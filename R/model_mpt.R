@@ -231,7 +231,7 @@ print.mpt_tree <- function(x, ...) {
 
   prior_info <- c(
     .mpt_named_list(standard_pars, latent_prior),
-    .mpt_named_list(raw_pars, latent_prior)
+    .mpt_stick_priors(simplex, links)
   )
 
   out <- structure(
@@ -292,6 +292,24 @@ print.mpt_tree <- function(x, ...) {
       main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(2)"
     )
   )
+}
+
+# under stick breaking, a symmetric Dirichlet(1) on a group of K is stick k ~
+# Beta(1, K - k), which logitbeta()/probitbeta() in mpt_functions.stan put on
+# the latent scale; the last stick is Beta(1, 1), which is the latent prior
+.mpt_stick_priors <- function(simplex, link) {
+  latent_prior <- .mpt_latent_prior(link)
+  priors <- lapply(simplex, function(grp) {
+    n_free <- length(grp) - 1L
+    stick_priors <- lapply(seq_len(n_free), function(k) {
+      if (k == n_free) {
+        return(latent_prior)
+      }
+      utils::modifyList(latent_prior, list(main = paste0(link, "beta(1, ", n_free + 1L - k, ")")))
+    })
+    setNames(stick_priors, paste0(grp[-length(grp)], "raw"))
+  })
+  do.call(c, unname(priors))
 }
 
 # the link of a latent probability parameter can be switched between logit
@@ -407,12 +425,21 @@ settable_link_functions.mpt <- function(model) {
 #'   "probit"`) takes that link's priors unless its default prior was
 #'   replaced. [default_prior()] lists the rows a given formula produces.
 #'
-#'   In a simplex group with intercept-only formulas, the default prior makes
-#'   each stick uniform on (0, 1) under both links. The prior means are therefore 0.50/0.25/0.25 for a
-#'   group of three and 0.50/0.25/0.125/0.125 for a group of four: the member
-#'   listed first always has prior mean 0.5, so the listing order matters. A
-#'   symmetric (uniform Dirichlet) prior would put 1/K on each of K members. A
-#'   predictor on member `p` acts on the logit (or probit) of `p`'s share of
+#'   The default prior of a simplex group of K members is the uniform
+#'   (symmetric Dirichlet(1)) distribution on the simplex: each member has
+#'   prior mean 1/K, whatever the listing order. Under stick breaking this is
+#'   a Beta(1, K - k) prior on stick k, which [default_prior()] shows as
+#'   `logitbeta(1, K - k)` (or `probitbeta(1, K - k)`) on the intercept of
+#'   the k-th `praw`; the last stick keeps `logistic(0, 1)` (or
+#'   `normal(0, 1)`), which is the same distribution. The result is exact
+#'   under both links, and under `0 + cond` it holds in every cell. Under
+#'   `1 + cond` it holds in the reference cell only, because the effects keep
+#'   their own prior. TreeBUGS instead puts a uniform prior on each branch
+#'   parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
+#'   for three members); for a group `gA`, `gB`, `gC`, `gD` that is
+#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"),
+#'   coef = "Intercept")`.
+#'   A predictor on member `p` acts on the logit (or probit) of `p`'s share of
 #'   the probability left over by the members listed before it. A predictor
 #'   on the first member therefore scales all later members by the same
 #'   factor, leaving their ratios unchanged. Read such effects on the probability scale with
@@ -817,6 +844,10 @@ print_model_details.mpt <- function(model, ...) {
       {collapse_comma(model$other_vars$simplex_raw[grp[-length(grp)]])} pass \\
       through {inv_link('x', model$other_vars$link)[[1]]}()"
     ), "\n")
+    cat(strrep(" ", 12), glue(
+      "default prior: symmetric Dirichlet(1), prior mean 1/{length(grp)} = \\
+      {round(1 / length(grp), 3)} for each member"
+    ), "\n", sep = "")
   }
   # the classical parameters-versus-categories bound, followed by the Jacobian
   # rank, which also catches redundant parameters when the count passes; each
@@ -1320,11 +1351,14 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
   model$parameters[sub_pars] <- NULL
   model$links[sub_pars] <- NULL
   model$default_priors[sub_pars] <- NULL
-  # back to the model's latent prior, which check_model.mpt() then matches to
-  # a switched link
+  # back to the prior from construction (a simplex stick's beta prior, else the
+  # latent prior, which check_model.mpt() then matches to a switched link)
   bypassed <- attr(model, "mpt_bypassed_links")
   model$links[names(bypassed)] <- bypassed
-  model$default_priors[names(bypassed)] <- list(.mpt_latent_prior(model$other_vars$link))
+  construction_priors <- .mpt_stick_priors(model$other_vars$simplex, model$other_vars$link)
+  model$default_priors[names(bypassed)] <- lapply(names(bypassed), function(par) {
+    construction_priors[[par]] %||% .mpt_latent_prior(model$other_vars$link)
+  })
   attr(model, "mpt_bypassed_links") <- NULL
   attr(model, "links_checked") <- model$links
   model
@@ -1825,7 +1859,16 @@ configure_model.mpt <- function(model, data, formula) {
   formula$family$cats <- model$resp_vars$resp_cats
   formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
 
-  nlist(formula, data)
+  # the stick priors of simplex groups need the beta densities on the latent
+  # scale; models without a group keep their Stan code
+  if (length(model$other_vars$simplex) == 0L) {
+    return(nlist(formula, data))
+  }
+  stanvars <- brms::stanvar(
+    scode = read_lines2(system.file("stan_chunks", "mpt_functions.stan", package = "bmm")),
+    block = "functions"
+  )
+  nlist(formula, data, stanvars)
 }
 
 ############################################################################# !
