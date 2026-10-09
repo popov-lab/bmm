@@ -653,4 +653,16 @@ test_that("validate_default_priors() warns only when a default prior is dropped"
     ),
     "Non-linear transformations"
   )
+
+  # m3's b is fixed by default and has no default prior to drop, so freeing it
+  # through a non-linear formula is as silent as freeing it through b ~ 1
+  m3_model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c("n_corr", "n_other", "n_npl"), version = "ss"
+  )
+  for (formula in list(bmf(c ~ 1, a ~ 1, b ~ 1), bmf(c ~ 1, a ~ 1, b ~ exp(lb), lb ~ 1))) {
+    expect_no_warning(
+      default_prior(formula, data = oberauer_lewandowsky_2019_e1, model = m3_model)
+    )
+  }
 })
