@@ -762,7 +762,13 @@ combine_prior <- function(prior1, prior2) {
   prior_types <- function(prior) {
     do.call(paste, as_prior_table(prior)[, c("class", "dpar", "nlpar", "coef", "group", "resp")])
   }
-  is_duplicate <- prior_types(prior1) %in% prior_types(prior2)
+  # brms stores the intercept of a non-linear parameter as the coefficient
+  # "Intercept" of class "b", so a prior on the whole nlpar (no coef) must
+  # replace that row too, or the more specific row wins in brms (#526)
+  as_nlpar_wide <- prior1
+  as_nlpar_wide$coef[nzchar(prior1$nlpar) & prior1$coef == "Intercept"] <- ""
+  is_duplicate <- prior_types(prior1) %in% prior_types(prior2) |
+    prior_types(as_nlpar_wide) %in% prior_types(prior2)
   prior <- prior1[!is_duplicate, ] + prior2
   row.names(prior) <- seq_len(nrow(prior))
   prior
