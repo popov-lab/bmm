@@ -237,10 +237,10 @@ or dots in non-linear parameter names.
 
 All latent parameters are non-linear parameters of the underlying brms
 model, and brms has no separate \code{Intercept} prior class for those: their
-intercept prior is stored as \verb{class = "b", coef = "Intercept"}. Overriding
-the default prior of an intercept therefore requires \code{coef = "Intercept"};
-a prior given as \verb{class = "b", nlpar = "D"} reaches the remaining
-coefficients only. Call \code{\link[=default_prior]{default_prior()}} to see which rows a given
+intercept prior is stored as \verb{class = "b", coef = "Intercept"}. A prior
+given as \verb{class = "b", nlpar = "D"} replaces the defaults of all
+coefficients of \code{D}, the intercept included; add \code{coef = "Intercept"} to
+set the intercept alone. Call \code{\link[=default_prior]{default_prior()}} to see which rows a given
 formula produces.
 }
 }
