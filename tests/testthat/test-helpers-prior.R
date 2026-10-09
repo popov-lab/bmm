@@ -95,6 +95,18 @@ test_that("a user prior on a non-linear parameter reaches its intercept (#526)",
   ))
 })
 
+test_that("a user prior on an mpt parameter reaches its intercept (#526)", {
+  skip_on_cran()
+  withr::local_seed(526)
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  user <- brms::set_prior("normal(0, 2)", class = "b", nlpar = "D")
+
+  code <- suppressMessages(stancode(bmf(D ~ 1, g ~ 1), mpt_2htm_data(), model, prior = user))
+  expect_match(code, "normal_lpdf(b_D | 0, 2)", fixed = TRUE)
+  expect_no_match(code, "logistic_lpdf(b_D[1] | 0, 1)", fixed = TRUE)
+  expect_match(code, "logistic_lpdf(b_g[1] | 0, 1)", fixed = TRUE)
+})
+
 test_that("validate_default_priors() accepts a formula without parameter formulas", {
   model <- list(default_priors = list())
   expect_equal(validate_default_priors(model, brms::bf(y ~ 1)), list())

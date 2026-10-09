@@ -330,10 +330,10 @@ settable_link_functions.mpt <- function(model) {
 #'
 #'   All latent parameters are non-linear parameters of the underlying brms
 #'   model, and brms has no separate `Intercept` prior class for those: their
-#'   intercept prior is stored as `class = "b", coef = "Intercept"`. Overriding
-#'   the default prior of an intercept therefore requires `coef = "Intercept"`;
-#'   a prior given as `class = "b", nlpar = "D"` reaches the remaining
-#'   coefficients only. Call [default_prior()] to see which rows a given
+#'   intercept prior is stored as `class = "b", coef = "Intercept"`. A prior
+#'   given as `class = "b", nlpar = "D"` replaces the defaults of all
+#'   coefficients of `D`, the intercept included; add `coef = "Intercept"` to
+#'   set the intercept alone. Call [default_prior()] to see which rows a given
 #'   formula produces.
 #'
 #' @return An object of class `bmmodel`
