@@ -37,8 +37,9 @@ test_that("mpt stores its derived state once", {
   expect_null(single$other_vars$indicators$possible)
   expect_equal(single$other_vars$simplex_raw, c(gA = "gAraw", gB = "gBraw"))
   expect_equal(single$links$gA, "identity")
-  expect_equal(single$default_priors$gAraw$main, "normal(0, 1)")
+  expect_equal(single$default_priors$gAraw$main, "probitbeta(1, 2)")
   expect_equal(single$default_priors$gAraw$effects, "normal(0, 1)")
+  expect_equal(single$default_priors$gBraw, .mpt_latent_prior("probit"))
 
   covariate_tree <- mpt_tree("main", list(
     correct = "Pb + (1 - Pb) * Pi * GcorrPi",
@@ -479,7 +480,8 @@ test_that("a stick-breaking component made linear again in a re-check gets back 
   checked <- suppressMessages(check_model(model, dat, bmf(gAraw ~ a + b * x, a ~ 1, b ~ 1)))
   rechecked <- check_model(checked, dat, bmf(gAraw ~ 1 + x))
   expect_equal(rechecked$links$gAraw, "identity")
-  expect_identical(rechecked$default_priors$gAraw, bmm:::.mpt_latent_prior("logit"))
+  expect_equal(rechecked$default_priors$gAraw$main, "logitbeta(1, 2)")
+  expect_equal(rechecked$default_priors$gAraw$effects, "logistic(0, 1)")
 })
 
 test_that("update() to a linear formula restores the link and prior of a non-linear parameter", {
@@ -545,6 +547,7 @@ test_that("printing an mpt model lists trees, restrictions and the identifiabili
   )
   expect_output(print(simplex), "2 free parameter\\(s\\), 2 degrees of freedom")
   expect_output(print(simplex), "'gAraw', 'gBraw' pass through inv_logit\\(\\)")
+  expect_output(print(simplex), "symmetric Dirichlet\\(1\\), prior mean 1/3 = 0.333")
   expect_match(
     parameter_info(simplex)$description[4],
     "transformed by the inverse logit into the stick proportion"
@@ -1357,7 +1360,8 @@ test_that("mpt compiles with a simplex group via stick-breaking", {
     c("dA", "dB", "gA", "gB", "gNew", "gAraw", "gBraw")
   )
   expect_equal(model$links$gA, "identity")
-  expect_equal(model$default_priors$gAraw$main, "logistic(0, 1)")
+  expect_equal(model$default_priors$gAraw$main, "logitbeta(1, 2)")
+  expect_equal(model$default_priors$gBraw$main, "logistic(0, 1)")
   expect_null(model$default_priors[["gA"]])
 
   dat <- expand.grid(
@@ -1403,6 +1407,31 @@ test_that("stick-breaking members form a simplex for any raw values", {
     unlist(mget(c("gA", "gB", "gC", "gD"), env), use.names = FALSE),
     c(s[1], (1 - s[1]) * s[2], (1 - s[1]) * (1 - s[2]) * s[3], prod(1 - s))
   )
+})
+
+test_that("the default simplex prior gives every member prior mean 1/K under both links", {
+  skip_on_cran()
+  withr::local_options("bmm.silent" = 2)
+  tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
+  dat <- data.frame(A = 4L, B = 3L, C = 3L)
+  inv_links <- list(logit = stats::plogis, probit = stats::pnorm)
+  for (link in names(inv_links)) {
+    fit <- bmm(
+      bmf(gA ~ 1, gB ~ 1), dat, mpt(tree, simplex = c("gA", "gB", "gC"), links = link),
+      sample_prior = "only", chains = 2, iter = 3000, warmup = 500, refresh = 0,
+      seed = 1, rename = FALSE
+    )
+    draws <- brms::as_draws_df(fit)
+    stick_a <- inv_links[[link]](draws[[grep("^b_gAraw", names(draws))]])
+    stick_b <- inv_links[[link]](draws[[grep("^b_gBraw", names(draws))]])
+    # the per-stick uniform prior this replaces gives 0.50/0.25/0.25; the
+    # Monte Carlo error of each mean is below 0.01 at these draws
+    expect_equal(
+      c(mean(stick_a), mean((1 - stick_a) * stick_b), mean((1 - stick_a) * (1 - stick_b))),
+      rep(1 / 3, 3),
+      tolerance = 0.03
+    )
+  }
 })
 
 test_that("predictors on the derived simplex parameter are rejected", {

@@ -123,12 +123,20 @@ Coefficients of the sub-parameters above get \code{normal(0, 0.5)}. A parameter
 switched to the other link after construction (\code{model$links$D <- "probit"}) takes that link's priors unless its default prior was
 replaced. \code{\link[=default_prior]{default_prior()}} lists the rows a given formula produces.
 
-In a simplex group with intercept-only formulas, the default prior makes
-each stick uniform on (0, 1) under both links. The prior means are therefore 0.50/0.25/0.25 for a
-group of three and 0.50/0.25/0.125/0.125 for a group of four: the member
-listed first always has prior mean 0.5, so the listing order matters. A
-symmetric (uniform Dirichlet) prior would put 1/K on each of K members. A
-predictor on member \code{p} acts on the logit (or probit) of \code{p}'s share of
+The default prior of a simplex group of K members is the uniform
+(symmetric Dirichlet(1)) distribution on the simplex: each member has
+prior mean 1/K, whatever the listing order. Under stick breaking this is
+a Beta(1, K - k) prior on stick k, which \code{\link[=default_prior]{default_prior()}} shows as
+\code{logitbeta(1, K - k)} (or \code{probitbeta(1, K - k)}) on the intercept of
+the k-th \code{praw}; the last stick keeps \code{logistic(0, 1)} (or
+\code{normal(0, 1)}), which is the same distribution. The result is exact
+under both links, and under \code{0 + cond} it holds in every cell. Under
+\code{1 + cond} it holds in the reference cell only, because the effects keep
+their own prior. TreeBUGS instead puts a uniform prior on each branch
+parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
+for three members); for a group \code{gA}, \code{gB}, \code{gC}, \code{gD} that is
+\code{prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"), coef = "Intercept")}.
+A predictor on member \code{p} acts on the logit (or probit) of \code{p}'s share of
 the probability left over by the members listed before it. A predictor
 on the first member therefore scales all later members by the same
 factor, leaving their ratios unchanged. Read such effects on the probability scale with
