@@ -1,3 +1,8 @@
+# bmm 1.5.0 (development)
+
+### New features
+* `native_parameters()` gained `population_summary`. With `"mean"` it returns the mean and SD of each parameter across participants, with `"median"` the median and quartiles, integrated over the group-level effects in every posterior draw. Use it to report group-level results on the native scale. `re_formula = NA` gives the median participant, and predicting for a new level gives one new participant, whose interval is not a credible interval for the population mean (#531).
+
 # bmm (development version)
 
 ### New models
