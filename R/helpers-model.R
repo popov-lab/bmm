@@ -435,7 +435,7 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
-  if (inherits(model, "m3")) {
+  if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
   if (inherits(model, "sdt_yn")) {
@@ -467,8 +467,32 @@ print.bmmodel <- function(x, ...) {
     )
     cat("Fixed:     ", fixed_str, "\n")
   }
-  cat("Use parameter_info() for more details.\n")
+  print_model_details(x)
+  cat("Use parameter_info() for parameter descriptions, links and fixed values.\n")
   invisible(x)
+}
+
+# print.bmmodel dispatches before any model-specific print method (classes
+# are ordered general to specific), so model-specific lines are added here
+
+#' Generic S3 method for model-specific lines in `print()` of a model
+#'
+#' Called by `print()` on a `bmmodel` after the lines all models share and
+#' before the closing pointer to [parameter_info()]. The default method prints
+#' nothing.
+#'
+#' @param model A `bmmodel` object
+#' @param ... Unused
+#'
+#' @return Called for its printed output; returns `NULL` invisibly
+#' @keywords internal developer
+print_model_details <- function(model, ...) {
+  UseMethod("print_model_details")
+}
+
+#' @export
+print_model_details.default <- function(model, ...) {
+  invisible(NULL)
 }
 
 
@@ -482,6 +506,7 @@ print.bmmodel <- function(x, ...) {
 model_groups <- c(
   "Visual working memory" = "Continuous reproduction",
   "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
+  "Categorical decision making, memory, and reasoning" = "Processing-tree models",
   "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
   "Recognition Memory" = "Detection, recognition and confidence judgments",
   "Decision Making / Response times" = "Choices and response times"
@@ -582,6 +607,10 @@ data_column_roles <- list(
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     set_size = "set size (a column, or one number)"
   ),
+  mpt = c(
+    trees = "number of responses in each response category, one column per category, named after the branches of the trees",
+    tree_id = "the tree each row belongs to (models with several trees)"
+  ),
   sdm = c(
     resp_error = "response error relative to the target, in radians"
   ),
@@ -681,8 +710,8 @@ model_overview <- function(group = NULL) {
 #'   meant for, one line per model with its constructor and full name. The
 #'   groups are: continuous reproduction; categorical recall and n-AFC
 #'   decisions; detection, recognition and confidence judgments; choices and
-#'   response times. Type `?modelname` (for example `?imm`) for the arguments
-#'   of a model.
+#'   response times; processing-tree models. Type `?modelname` (for example
+#'   `?imm`) for the arguments of a model.
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one

@@ -25,6 +25,7 @@ test_that("model_registry() lists every supported model once, grouped in lookup 
   expect_equal(registry$group[registry$model == "imm"], "Continuous reproduction")
   expect_equal(registry$group[registry$model == "sdt_yn"], "Detection, recognition and confidence judgments")
   expect_equal(registry$group[registry$model == "ddm"], "Choices and response times")
+  expect_equal(registry$group[registry$model == "mpt"], "Processing-tree models")
 })
 
 test_that("model_group() keeps an unknown domain as its own group", {
@@ -203,6 +204,9 @@ test_that("model_overview() has one row per version with its own columns and par
   m3_cs <- overview[grepl("m3.html), version `cs`", overview$Model, fixed = TRUE), ]
   expect_match(m3_cs$`Data columns`, "each of 5 categories", fixed = TRUE)
 
+  mpt_row <- overview[grepl("`mpt()`", overview$Model, fixed = TRUE), ]
+  expect_match(mpt_row$`Data columns`, "`trees`: number of responses in each response category", fixed = TRUE)
+
   mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
   expect_false(grepl("version", mixture2p$Model))
 
@@ -284,6 +288,47 @@ test_that("check_model() works with regular expressions", {
     attributes(check1) <- NULL
     attributes(check2) <- NULL
     expect_equal(check1, check2)
+  }
+})
+
+test_that("check_model() leaves an already checked model unchanged and silent", {
+  # update() checks the stored model again whenever the formula changes
+  m3_custom <- m3(
+    resp_cats = c("corr", "other", "dist", "npl"),
+    num_options = c("n_corr", "n_other", "n_dist", "n_npl"),
+    choice_rule = "simple"
+  )
+  m3_custom$links <- list(c = "log", a = "log", d = "log")
+  rt_data <- data.frame(rt = c(0.5, 0.7), response = c(1, 0))
+  cases <- list(
+    m3_custom = list(
+      model = m3_custom, data = oberauer_lewandowsky_2019_e1,
+      formula = bmf(
+        corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b,
+        c ~ 1, a ~ 1, d ~ 1
+      )
+    ),
+    sdm = list(model = sdm("dev_rad"), data = oberauer_lin_2017, formula = bmf(c ~ 1, kappa ~ 1)),
+    imm = list(
+      model = imm("dev_rad", "col_nt", "dist_nt", "set_size", regex = TRUE),
+      data = oberauer_lin_2017, formula = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
+    ),
+    ddm = list(model = ddm("rt", "response"), data = rt_data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
+    cswald = list(
+      model = cswald("rt", "response", version = "simple"), data = rt_data,
+      formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+    ),
+    sdt_rating = list(
+      model = sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus"),
+      data = data.frame(stimulus = 0:1, r1 = 1, r2 = 1, r3 = 1, r4 = 1),
+      formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+    )
+  )
+
+  for (case in cases) {
+    checked <- suppressWarnings(suppressMessages(check_model(case$model, case$data, case$formula)))
+    expect_silent(rechecked <- check_model(checked, case$data, case$formula))
+    expect_identical(rechecked, checked)
   }
 })
 
