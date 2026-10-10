@@ -253,8 +253,9 @@
 # a branch (or a covariate) that leaves (0, 1] near the edge of the parameter
 # space when the parameters enter the branch with one orientation; branches
 # that mix a parameter with its complement can leave (0, 1] at other vertices,
-# which are not evaluated. A simplex group sits at a corner (one member takes the rest of the
-# mass), so its members stay positive and sum to 1.
+# which .mpt_branch_vertices() supplies, in mpt() and in check_data(). A
+# simplex group sits at a corner (one member takes the rest of the mass), so
+# its members stay positive and sum to 1.
 .mpt_boundary_points <- function(symbols, simplex, eps = 0.001) {
   lapply(c(eps, 1 - eps), function(value) {
     vals <- setNames(rep(value, length(symbols)), symbols)
@@ -265,6 +266,132 @@
     }
     vals
   })
+}
+
+# The parameter values at which one branch is checked to stay in (0, 1], one
+# row per point and one column per parameter of the branch.
+# A branch that is multilinear in its parameters (each enters with degree <= 1,
+# also when it appears in several terms) takes its extremes over the parameter
+# box at the vertices, so the 2^k vertices of its k parameters make the range
+# check exact. A parameter of higher degree can peak between the vertices, as u
+# does in the pair-clustering term u * (1 - u), so it takes 0.5 as well; that
+# covers the common u * (1 - u) terms, other higher-degree terms are checked
+# approximately only. Degree is read from stats::D(): a parameter is of higher
+# degree when its derivative still contains it (or another member of its
+# simplex group). A derivative that D() cannot form counts as higher degree.
+# A simplex group is one dimension whose vertices put the mass on one member,
+# as the box vertices would not sum to 1; with a higher-degree term it also
+# takes the midpoints between members and the centroid.
+# A branch whose grid has more than max_points rows (k = 10 multilinear
+# parameters) falls back to the two corners and n_fallback further points.
+# Those come from a Weyl sequence (steps sqrt(prime)) instead of a random
+# number generator, so they are the same on every call and leave the global
+# random number state alone; the attribute "exact" says whether the grid is
+# complete.
+.mpt_branch_vertices <- function(branch, parameters, simplex, eps = 0.001,
+                                 max_points = 1024L, n_fallback = 64L) {
+  used <- intersect(all.vars(branch), parameters)
+  if (length(used) == 0L) {
+    return(structure(matrix(numeric(0), 1L, 0L), exact = TRUE))
+  }
+  groups <- Filter(function(grp) any(grp %in% used), simplex)
+  candidates <- c(
+    lapply(setdiff(used, unlist(groups)), function(par) {
+      values <- if (.mpt_higher_degree(branch, par)) c(eps, 0.5, 1 - eps) else c(eps, 1 - eps)
+      matrix(values, ncol = 1L, dimnames = list(NULL, par))
+    }),
+    lapply(groups, function(grp) {
+      members <- intersect(grp, used)
+      points <- .mpt_simplex_points(grp, eps, .mpt_higher_degree(branch, members))
+      unique(points[, members, drop = FALSE])
+    })
+  )
+
+  n_points <- prod(vapply(candidates, nrow, integer(1)))
+  if (n_points <= max_points) {
+    index <- expand.grid(lapply(candidates, function(points) seq_len(nrow(points))))
+    return(structure(
+      do.call(cbind, Map(function(points, i) points[i, , drop = FALSE], candidates, index)),
+      exact = TRUE
+    ))
+  }
+
+  unit <- outer(seq_len(n_fallback), sqrt(.mpt_first_primes(length(candidates)))) %% 1
+  sampled <- do.call(cbind, lapply(seq_along(candidates), function(dim) {
+    candidates[[dim]][1 + floor(nrow(candidates[[dim]]) * unit[, dim]), , drop = FALSE]
+  }))
+  corners <- do.call(rbind, .mpt_boundary_points(parameters, simplex, eps))
+  structure(
+    rbind(corners[, colnames(sampled), drop = FALSE], sampled),
+    exact = FALSE
+  )
+}
+
+# the first vertex at which `branch` is not a number or leaves (0, 1], with the
+# covariate values given as a named list of equal-length vectors (empty for a
+# branch without covariates); NULL when no vertex does. At the vertices a branch
+# may underflow to 0 or cancel to just below it, so only a value below
+# -tolerance counts.
+.mpt_first_range_violation <- function(branch, vertices, covariate_values = list(),
+                                       tolerance = 1e-6) {
+  n_rows <- if (length(covariate_values) > 0L) length(covariate_values[[1]]) else 1L
+  for (vertex in seq_len(nrow(vertices))) {
+    values <- setNames(vertices[vertex, ], colnames(vertices))
+    branch_value <- rep(
+      eval(branch, envir = c(as.list(values), covariate_values)),
+      length.out = n_rows
+    )
+    outside <- is.na(branch_value) | branch_value < -tolerance |
+      branch_value > 1 + tolerance
+    if (any(outside)) {
+      first <- which(outside)[1]
+      at <- if (ncol(vertices) > 0L) {
+        paste(colnames(vertices), "=", signif(values, 4), collapse = ", ")
+      }
+      return(list(row = first, value = branch_value[first], at = at))
+    }
+  }
+  NULL
+}
+
+.mpt_message_sampled <- function(labels) {
+  if (length(labels) > 0L) {
+    message2(
+      "The range check of the branches of {paste(labels, collapse = ', ')} \\
+      uses selected points of the parameter box only, not every vertex, because \\
+      they have too many vertices to evaluate. A covariate value or parameter \\
+      combination that takes one of them outside (0, 1] elsewhere is not detected."
+    )
+  }
+}
+
+.mpt_higher_degree <- function(branch, members) {
+  any(vapply(members, function(par) {
+    derivative <- try(stats::D(branch, par), silent = TRUE)
+    is_try_error(derivative) || any(members %in% all.vars(derivative))
+  }, logical(1)))
+}
+
+# one row per point, one column per member of the group; the vertices put eps
+# spread over all members but one, which takes the rest
+.mpt_simplex_points <- function(group, eps, with_interior = FALSE) {
+  n <- length(group)
+  points <- matrix(eps / n, n, n, dimnames = list(NULL, group))
+  diag(points) <- 1 - eps * (n - 1) / n
+  if (!with_interior) {
+    return(points)
+  }
+  pairs <- which(upper.tri(diag(n)), arr.ind = TRUE)
+  midpoints <- (points[pairs[, 1], , drop = FALSE] + points[pairs[, 2], , drop = FALSE]) / 2
+  rbind(points, midpoints, colMeans(points))
+}
+
+.mpt_first_primes <- function(n) {
+  candidates <- seq_len(20 * n + 20) + 1L
+  is_prime <- vapply(candidates, function(x) {
+    all(x %% seq_len(floor(sqrt(x)))[-1L] != 0L)
+  }, logical(1))
+  candidates[is_prime][seq_len(n)]
 }
 
 # Local identifiability: the rank of the Jacobian of all category probabilities
@@ -452,6 +579,46 @@
   member_jacobian %*% map
 }
 
+# the first branch that is not a number or leaves (0, 1] at a vertex of its own
+# parameter box, per tree (NA where none does); the attribute "sampled" names
+# the branches whose vertices were only sampled. The points of
+# .mpt_tree_branch_errors() visit two corners and five interior points, which
+# miss a branch that mixes a parameter with another one's complement
+# (2 * a * (1 - b) reaches 2 at a = 0.999, b = 0.001).
+.mpt_tree_vertex_errors <- function(trees, parameters, simplex, tolerance = 1e-6) {
+  results <- lapply(trees, function(tree) {
+    sampled <- character(0)
+    for (resp_cat in names(tree$branches)) {
+      branch <- tree$branches[[resp_cat]]
+      vertices <- .mpt_branch_vertices(branch, parameters, simplex)
+      if (!attr(vertices, "exact")) {
+        sampled <- c(sampled, glue("category '{resp_cat}' in tree '{tree$name}'"))
+      }
+      violation <- .mpt_first_range_violation(branch, vertices, tolerance = tolerance)
+      if (is.null(violation)) next
+      error <- if (is.na(violation$value)) {
+        glue(
+          "The branch probability of category '{resp_cat}' in tree \\
+          '{tree$name}' is not a number at the test values {violation$at}, so \\
+          the likelihood is undefined there. Please check the branch expressions."
+        )
+      } else {
+        glue(
+          "The branch probability of category '{resp_cat}' in tree \\
+          '{tree$name}' is {signif(violation$value, 6)} at the test values \\
+          {violation$at}, outside (0, 1]. Please check the branch expressions."
+        )
+      }
+      return(list(error = error, sampled = sampled))
+    }
+    list(error = NA_character_, sampled = sampled)
+  })
+  structure(
+    vapply(results, `[[`, character(1), "error"),
+    sampled = as.character(unlist(lapply(results, `[[`, "sampled")))
+  )
+}
+
 # the first undefined, branch-sum or branch-range violation per tree, NA where
 # every test point gives branches in (0, 1] that sum to 1. A branch that is not
 # a number (0 / 0) is NaN in Stan too. Branches can sum to 1 for every value and
@@ -463,7 +630,7 @@
 # may underflow to 0 or, written as 1 minus the others, cancel to just below it
 # (-8.5e-20 for seven stages), so only a branch below -tolerance counts there.
 # The corners catch a branch that leaves (0, 1] only near the edge of the
-# parameter space (1.2 * a - 0.2)
+# parameter space (1.2 * a - 0.2); .mpt_tree_vertex_errors() takes the rest
 .mpt_tree_branch_errors <- function(trees, parameters, simplex,
                                     tolerance = 1e-6) {
   interior <- .mpt_test_points(parameters, simplex)

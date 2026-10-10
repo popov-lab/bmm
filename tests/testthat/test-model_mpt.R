@@ -792,7 +792,7 @@ test_that("deep chains of identified parameters keep full rank", {
       paste(c(reach(i), paste0("a", i)), collapse = " * ")
     })
     branches[[k + 1]] <- paste(reach(k + 1), collapse = " * ")
-    mpt(mpt_tree("t", setNames(branches, paste0("c", seq_len(k + 1)))))
+    suppressMessages(mpt(mpt_tree("t", setNames(branches, paste0("c", seq_len(k + 1))))))
   }
   for (k in c(20, 30)) {
     printed <- mpt_printed(chain_model(k))
@@ -802,9 +802,9 @@ test_that("deep chains of identified parameters keep full rank", {
 
   # each p_i moves 1 - p1 * ... * p30 by 1e-10 only, yet it does move it
   path <- paste(paste0("p", 1:30), collapse = " * ")
-  product <- mpt(mpt_tree("t", list(
+  product <- suppressMessages(mpt(mpt_tree("t", list(
     x = glue("{path} * q"), y = glue("{path} * (1 - q)"), z = glue("1 - {path}")
-  )))
+  ))))
   printed <- mpt_printed(product)
   expect_match(printed, "Jacobian rank 2 of 31 at interior test values")
   expect_no_match(printed, "zero up to rounding")
@@ -1722,6 +1722,116 @@ test_that("the near-boundary points accept valid simplex trees with covariates",
   )
 })
 
+test_that("check_data refuses a branch that mixes a parameter with another's complement (#528)", {
+  mixed <- mpt(mpt_tree("t", list(
+    yes = "a * (1 - b) * G", no = "1 - a * (1 - b) * G"
+  )), covariates = "G")
+  formula <- bmf(a ~ 1, b ~ 1)
+  expect_silent(check_data(mixed, data.frame(G = 0.9, yes = 6, no = 4), formula))
+  expect_error(
+    check_data(mixed, data.frame(G = 1.04, yes = 6, no = 4), formula),
+    "category 'yes' in tree 't' is 1.03[0-9]* in row 1, outside \\(0, 1\\] at the test parameter values a = 0.999, b = 0.001"
+  )
+
+  product <- mpt(mpt_tree("t", list(
+    yes = "a * b * G", no = "1 - a * b * G"
+  )), covariates = "G")
+  expect_error(
+    check_data(product, data.frame(G = 1.04, yes = 6, no = 4), formula),
+    "category 'yes' in tree 't' is [0-9.]+ in row 1, outside \\(0, 1\\]"
+  )
+
+  # the row that leaves the range is the one reported, not the first row
+  expect_error(
+    check_data(mixed, data.frame(G = c(0.5, 0.7, 1.04), yes = 6, no = 4), formula),
+    "in row 3, outside"
+  )
+})
+
+test_that("check_data checks a parameter that enters a branch twice on a grid", {
+  # u * (1 - u) peaks at u = 0.5, between the vertices and away from the
+  # interior test points; G = 1.01 puts only |u - 0.5| < 0.05 above 1
+  pair <- function(...) mpt(mpt_tree("t", list(...)), covariates = "G")
+  model <- pair(yes = "4 * u * (1 - u) * G", no = "1 - 4 * u * (1 - u) * G")
+  formula <- bmf(u ~ 1)
+  expect_error(
+    check_data(model, data.frame(G = 1.1, yes = 6, no = 4), formula),
+    "category 'yes' in tree 't' is [0-9.]+ in row 1, outside \\(0, 1\\]"
+  )
+  expect_error(
+    check_data(model, data.frame(G = 1.01, yes = 6, no = 4), formula),
+    "category 'yes' in tree 't' is 1.01 in row 1, outside \\(0, 1\\] at the test parameter values u = 0.5"
+  )
+  expect_silent(check_data(model, data.frame(G = 0.9, yes = 6, no = 4), formula))
+})
+
+test_that("check_data accepts the design-fixed guessing tree of the article over its covariate range", {
+  model <- mpt(
+    mpt_tree("ss", list(
+      correct = "Pb + (1 - Pb) * Pi * GcorrPi + (1 - Pb) * (1 - Pi) * GcorrNoPi",
+      other = "(1 - Pb) * Pi * (1 - GcorrPi) +
+               (1 - Pb) * (1 - Pi) * (1 - GcorrNoPi) * GotherNoPi",
+      npl = "(1 - Pb) * (1 - Pi) * (1 - GcorrNoPi) * (1 - GotherNoPi)"
+    )),
+    covariates = c("GcorrPi", "GcorrNoPi", "GotherNoPi")
+  )
+  set_size <- c(2, 4, 6, 8)
+  dat <- data.frame(
+    GcorrPi = 1 / set_size, GcorrNoPi = 1 / (set_size + 2),
+    GotherNoPi = 0.5, correct = 10, other = 10, npl = 10
+  )
+  expect_silent(check_data(model, dat, bmf(Pb ~ 1, Pi ~ 1)))
+
+  dat$GcorrNoPi[3] <- 1.3
+  expect_error(
+    check_data(model, dat, bmf(Pb ~ 1, Pi ~ 1)),
+    "in row 3, outside \\(0, 1\\]"
+  )
+})
+
+test_that("check_data names a branch whose range is only checked approximately", {
+  parameters <- paste0("p", 1:11)
+  build <- function(n_parameters) {
+    product <- paste(parameters[seq_len(n_parameters)], collapse = " * ")
+    mpt(mpt_tree("t", list(
+      yes = glue("{product} * G"), no = glue("1 - {product} * G")
+    )), covariates = "G")
+  }
+  dat <- data.frame(G = 0.5, yes = 6, no = 4)
+  formula <- do.call(bmf, lapply(parameters, function(par) stats::as.formula(paste(par, "~ 1"))))
+
+  expect_silent(check_data(build(10), dat, formula))
+  # one message names every branch that was only sampled
+  msgs <- testthat::capture_messages(check_data(build(11), dat, formula))
+  expect_length(msgs, 1L)
+  expect_match(msgs, "category 'yes' in tree 't', category 'no' in tree 't'.*not every vertex")
+  # the fallback still runs the range check at the corners
+  expect_error(
+    suppressMessages(check_data(build(11), transform(dat, G = 1.5), formula)),
+    "outside \\(0, 1\\]"
+  )
+})
+
+test_that("check_data checks the vertices of a simplex group as one dimension", {
+  # yes reaches 1.04 * 0.999 * 0.9995 only with D small and gB big, a vertex
+  # that is neither all-small nor all-large
+  model <- mpt(
+    mpt_tree("t", list(
+      yes = "G * (1 - D) * gB",
+      mid = "0.5 * G * (1 - D) * gA",
+      no = "1 - G * (1 - D) * gB - 0.5 * G * (1 - D) * gA"
+    )),
+    covariates = "G", simplex = c("gA", "gB")
+  )
+  formula <- bmf(D ~ 1, gA ~ 1)
+  dat <- data.frame(G = 0.9, yes = 3, mid = 3, no = 4)
+  expect_silent(check_data(model, dat, formula))
+  expect_error(
+    check_data(model, transform(dat, G = 1.04), formula),
+    "category 'yes' in tree 't' is 1.03[0-9]* in row 1, outside \\(0, 1\\] at the test parameter values D = 0.001, gB = 0.9995"
+  )
+})
+
 test_that("an NA covariate in a tree that does not use it is an error, not a dropped row", {
   trees <- list(
     mpt_tree("withdist", list(
@@ -1850,6 +1960,44 @@ test_that("mpt() refuses a tree that leaves (0, 1] only at a boundary corner, wi
 
   # 0.001^200 underflows to exactly 0 at the corner D = 0.999
   expect_silent(mpt(mpt_tree("u", list(hit = "1 - (1 - D)^200", miss = "(1 - D)^200"))))
+})
+
+test_that("mpt() refuses a tree without covariates that leaves (0, 1] at a mixed vertex (#528)", {
+  mixed <- function(scale) {
+    mpt_tree("t", list(
+      yes = glue("{scale} * a * (1 - b)"), no = glue("1 - {scale} * a * (1 - b)")
+    ))
+  }
+  expect_silent(mpt(mixed(1)))
+  expect_error(
+    mpt(mixed(2)),
+    "category 'yes' in tree 't' is 1.99[0-9]* at the test values a = 0.999, b = 0.001, outside \\(0, 1\\]"
+  )
+  expect_error(mpt(mixed(1.04)), "category 'yes' in tree 't' is 1.03[0-9]* at the test values a = 0.999, b = 0.001")
+
+  # a parameter of degree 2 peaks between the vertices, away from the interior points
+  pair <- function(scale) {
+    mpt_tree("t", list(
+      yes = glue("{scale} * u * (1 - u)"), no = glue("1 - {scale} * u * (1 - u)")
+    ))
+  }
+  expect_silent(mpt(pair(4)))
+  expect_error(mpt(pair(4.04)), "category 'yes' in tree 't' is 1.01 at the test values u = 0.5")
+
+  # a tree that uses a covariate is decided by check_data(), not here
+  expect_silent(mpt(mixed("2 * G"), covariates = "G"))
+})
+
+test_that("mpt() names the branches of a tree without covariates whose vertices it only samples", {
+  parameters <- paste0("p", 1:11)
+  product <- paste(parameters, collapse = " * ")
+  tree <- mpt_tree("t", list(yes = product, no = glue("1 - {product}")))
+  msgs <- testthat::capture_messages(mpt(tree))
+  expect_length(msgs, 1L)
+  expect_match(msgs, "category 'yes' in tree 't', category 'no' in tree 't'.*not every vertex")
+
+  ten <- paste(parameters[1:10], collapse = " * ")
+  expect_silent(mpt(mpt_tree("t", list(yes = ten, no = glue("1 - {ten}")))))
 })
 
 test_that("a branch that cancels to just below 0 at a corner is accepted", {
