@@ -46,6 +46,7 @@ reference:
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "pp_check.bmmfit"
+    - "ppp"
     - "posterior_epred.bmmfit"
   - title: "Model evaluation & post-processing"
     desc: "ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for signal detection models"
