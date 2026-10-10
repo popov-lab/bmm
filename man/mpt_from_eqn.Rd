@@ -131,31 +131,22 @@ and tree: a column named by \code{tree_id} holding the bmm tree names, and
 one count column per shared response category, named by \code{bmm_name} in
 the renaming map (see \code{\link[=mpt]{mpt()}}). A category that is \code{impossible} in a
 tree gets 0 (or \code{NA}) in the rows of that tree. TreeBUGS data are wide:
-one row per participant, one column per category label of the EQN file,
-and no participant column, so add an \code{id} column first. The \code{category}
-rows of the renaming map hold every tree with its labels and bmm names,
-so the wide data can be reshaped by name: for each tree, start from a
-block of zeros over all shared categories and fill in the columns of
-that tree (see Examples). MPTinR data for an EQN model are unnamed, and
-their columns do not follow the file: the trees and, within each tree,
-the category labels are sorted (alphabetically, or numerically when they
-are numbers); \code{MPTinR::check.mpt("model.eqn")} returns the order in its
-elements \code{eqn.order.trees} and \code{eqn.order.categories}. (For MPTinR's own
-model format the columns follow the lines instead; see
-\code{\link[=mpt_from_string]{mpt_from_string()}}.) Name the columns by tree and label,
-\code{paste(tree, label, sep = ".")} with the bmm tree names, because trees
-may share labels, and select them with the same key (see Examples).
-
-If \code{categories} merged several labels of a tree onto one name, sum their
-columns in the wide data into the first label's column and drop the map
-rows of the other labels (\code{map[!duplicated(map[c("tree", "bmm_name")]), ]})
-before reshaping; otherwise the recipe fails with "duplicate subscripts".
+one row per participant, one column per category label of the EQN file.
+MPTinR data for an EQN model are unnamed, and their columns do not follow
+the file: the trees and, within each tree, the category labels are sorted
+(alphabetically, or numerically when all labels in the file are numbers);
+\code{MPTinR::check.mpt("model.eqn")} returns the order in its elements
+\code{eqn.order.trees} and \code{eqn.order.categories}. (For MPTinR's own model
+format the columns follow the lines instead; see \code{\link[=mpt_from_string]{mpt_from_string()}}.)
+\code{\link[=mpt_long_data]{mpt_long_data()}} reshapes both layouts with the renaming map, sums the
+labels that \code{categories} merged onto one response category, and gives 0 to
+the categories a tree cannot produce (see Examples).
 
 bmm cannot tell a reshape that swaps tree labels or category columns
-from a correct one: such data fit without an error. The row sums,
-\code{rowSums(long[cats])}, are the trials per row; they cannot show swapped
-columns, and they show swapped tree labels only when the trees differ
-in their number of trials. Comparing the response proportions per tree
+from a correct one: such data fit without an error. The row sums of the
+count columns are the trials per row; they cannot show swapped columns,
+and they show swapped tree labels only when the trees differ in their
+number of trials. Comparing the response proportions per tree
 with the design (old items must get more "yes" responses than new
 items) catches swapped tree labels and response columns swapped in
 every tree, but not always a column slipped or a map entry wrong in one
@@ -190,50 +181,29 @@ model <- mpt_from_eqn(
 attr(model, "mpt_renaming")
 
 # TreeBUGS data: one row per participant, columns named by the category
-# labels of the EQN file, no participant column. bmm needs one row per
-# participant and tree, columns named by bmm_name: reshape by name through
-# the map, starting each tree from zeros so that categories the tree
-# cannot produce get 0
+# labels of the EQN file, no participant column. mpt_long_data() reshapes
+# them to bmm's one row per participant and tree, through the map; the
+# categories a tree cannot produce get 0
 wide <- data.frame(
   hit = c(30, 25), miss = c(10, 15), fa = c(8, 12), cr = c(32, 28)
 )
-wide$id <- seq_len(nrow(wide))
-map <- attr(model, "mpt_renaming")
-map <- map[map$kind == "category", ]
-cats <- unique(map$bmm_name)
-long <- do.call(rbind, lapply(split(map, map$tree), function(tree_map) {
-  counts <- as.data.frame(matrix(0, nrow(wide), length(cats)))
-  names(counts) <- cats
-  counts[tree_map$bmm_name] <- wide[tree_map$file_name]
-  data.frame(id = wide$id, item_type = tree_map$tree[1], counts)
-}))
+long <- mpt_long_data(wide, model)
 long
 # the row sums are the trials per row (40 here). The proportions catch
 # swapped tree labels and swapped response columns (old items must get
 # more "yes" than new items), but not always a column slipped in one
 # tree: also compare one participant's long rows with the wide row
-rowSums(long[cats])
-tapply(long$yes / rowSums(long[cats]), long$item_type, mean)
+rowSums(long[c("yes", "no")])
+tapply(long$yes / rowSums(long[c("yes", "no")]), long$item_type, mean)
 long[long$id == 1, ]
 wide[1, ]
 bmm_data_check(bmf(Do ~ 1, g ~ 1), long, model)
 
 # MPTinR data for an EQN model are unnamed and sorted by tree, then by
 # label: MPTinR::check.mpt(eqn_file)$eqn.order.categories lists the
-# labels (here cr, fa for tree new, then hit, miss for tree old). Name the
-# columns by tree and label, so that a label used in several trees stays
-# apart, and select with the same key
+# labels (here cr, fa for tree new, then hit, miss for tree old)
 wide_mptinr <- rbind(c(32, 8, 30, 10), c(28, 12, 25, 15))
-colnames(wide_mptinr) <- c("new.cr", "new.fa", "old.hit", "old.miss")
-long2 <- do.call(rbind, lapply(split(map, map$tree), function(tree_map) {
-  counts <- as.data.frame(matrix(0, nrow(wide_mptinr), length(cats)))
-  names(counts) <- cats
-  key <- paste(tree_map$tree, tree_map$file_name, sep = ".")
-  counts[tree_map$bmm_name] <- wide_mptinr[, key]
-  data.frame(id = seq_len(nrow(wide_mptinr)), item_type = tree_map$tree[1],
-             counts)
-}))
-identical(long2, long)
+identical(mpt_long_data(wide_mptinr, model, columns = "mptinr"), long)
 }
 \seealso{
 \code{\link[=mpt_from_string]{mpt_from_string()}} for model text in MPTinR's own format;

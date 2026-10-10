@@ -101,9 +101,8 @@ this format are wide and positional: one row per participant (or one
 vector for aggregated counts) and one unnamed column per line of the
 model file, in file order, because each line is one response category.
 (For EQN files MPTinR sorts the columns instead; see \code{\link[=mpt_from_eqn]{mpt_from_eqn()}}.)
-Name the columns by tree and category first, then stack one block per
-tree (see Examples); when a tree lacks some categories, start each tree
-from zeros, as in the Examples of \code{\link[=mpt_from_eqn]{mpt_from_eqn()}}.
+Name the columns \verb{<tree>.<category>}; \code{\link[=mpt_long_data]{mpt_long_data()}} then stacks the
+trees and gives 0 to the categories a tree cannot produce (see Examples).
 
 \strong{Provenance.} The returned model carries an \code{mpt_source} attribute,
 \code{list(text = )}, with the model definition as one string.
@@ -170,15 +169,11 @@ model <- mpt_from_string(
 )
 
 # MPTinR data: one unnamed column per line of the model file, in file
-# order. Name the columns by tree and category, then stack one block per
-# tree to get bmm's one row per participant and tree.
+# order. Name the columns by tree and category, then let mpt_long_data()
+# stack the trees to get bmm's one row per participant and tree.
 wide <- rbind(c(30, 10, 8, 32), c(25, 15, 12, 28))
 colnames(wide) <- c("old.old", "old.new", "new.old", "new.new")
-long <- do.call(rbind, lapply(c("old", "new"), function(tree) {
-  counts <- wide[, paste(tree, c("old", "new"), sep = "."), drop = FALSE]
-  colnames(counts) <- c("old", "new")
-  data.frame(id = seq_len(nrow(wide)), item_type = tree, counts)
-}))
+long <- mpt_long_data(wide, model)
 long
 # the row sums are the trials per row (40 here), but they cannot show
 # swapped columns or tree labels: compare one participant with the wide

@@ -640,6 +640,7 @@ Importing the model structure is the easy part; what usually needs translating i
 |---|---|
 | model file (EQN, MPTinR text) | `mpt_from_eqn()`, `mpt_from_string()`, or `mpt_tree()` + `mpt()` |
 | wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation]) |
+| reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_long_data(wide, model)`, or `mpt_long_data(wide, model, columns = "mptinr")` |
 | `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR reads them from `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS' `FE` has no restriction counterpart: leave the random effect out of that parameter's formula |
 | `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model]) |
 | `fit.mpt()`, `betaMPT()`, `traitMPT()` | `bmm()` with the random-effect structure written in the formula (see below) |
@@ -654,17 +655,24 @@ Importing the model structure is the easy part; what usually needs translating i
 | `testHetChi()`, `testHetPerm()` | these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In `bmm`, compare models with and without person effects ([Model comparison]) |
 | `BayesFactorMPT()`, `BayesFactorSlope()` | `brms::bayes_factor()` on fits stored with `save_pars = save_pars(all = TRUE)` ([Model comparison]) |
 
-**The data change from wide to long.** A frame in the layout of `genTraitMPT()`'s `data`, one row per participant and one column per EQN category, becomes one row per participant and tree, with the counts under the shared response categories:
+**The data change from wide to long.** A frame in the layout of `genTraitMPT()`'s `data`, one row per participant and one column per EQN category, becomes one row per participant and tree, with the counts under the shared response categories. `mpt_long_data()` does the reshape for the imported model, matching the columns by the category labels of the EQN file; columns that are no counts, such as a between-participant factor, are carried to every row, and `id = ` names the participant column (without it, the rows are numbered):
 
 ```{r}
-wide <- data.frame(oldhit = c(40, 35), oldmiss = c(10, 15),
-                   newfa = c(8, 12), newcr = c(42, 38))
-ids <- seq_len(nrow(wide))
-rbind(
-  data.frame(id = ids, item_type = "old", old = wide$oldhit, new = wide$oldmiss),
-  data.frame(id = ids, item_type = "new", old = wide$newfa, new = wide$newcr)
-)
+wide <- data.frame(old_hit = c(40, 35), old_miss = c(10, 15),
+                   new_fa = c(8, 12), new_cr = c(42, 38))
+long <- mpt_long_data(wide, model_eqn)
+long
 ```
+
+MPTinR data for an EQN model are unnamed. Their columns are sorted by tree and then by category label, the order of `check.mpt()$eqn.order.categories`; `columns = "mptinr"` reads them in that order. The row sums are the trials per row, but they cannot show swapped columns, so compare one participant's long rows with the wide row and run `bmm_data_check()` before fitting (the identifiability warning it prints is the single-test 2HTM result discussed above):
+
+```{r}
+wide_mptinr <- unname(as.matrix(wide[c("new_cr", "new_fa", "old_hit", "old_miss")]))
+identical(mpt_long_data(wide_mptinr, model_eqn, columns = "mptinr"), long)
+bmm_data_check(bmf(Do ~ 1, Dn ~ 1, g ~ 1), long, model_eqn)
+```
+
+For a model from `mpt_from_string()` or `mpt()`, name the columns `<tree>.<category>` instead, e.g. `old.hit`.
 
 **The random-effect structure is written as a formula, not chosen from a menu.** The two families of hierarchical MPT models map onto the `|` and `||` operators, and the choice is per parameter:
 
