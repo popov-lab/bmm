@@ -64,8 +64,8 @@
   unique(unlist(lapply(tree$branches, all.vars)))
 }
 
-.mpt_tree_parameters <- function(trees) {
-  unique(unlist(lapply(trees, .mpt_expr_vars)))
+.mpt_tree_parameters <- function(trees, covariates = NULL) {
+  setdiff(unique(unlist(lapply(trees, .mpt_expr_vars))), covariates)
 }
 
 .mpt_substitute_symbols <- function(expr, values) {
@@ -193,7 +193,7 @@
       into 0, which has no log probability. To model a parameter at 0 or 1, \\
       remove it from the branch expressions (write the reduced tree) and \\
       declare the categories that no branch reaches with \\
-      mpt_tree(impossible = ), which this version does not provide yet."
+      mpt_tree(impossible = )."
     )
     return(value)
   }
@@ -248,6 +248,152 @@
   })
 }
 
+# all parameters near 0 and all near 1, for the range checks in mpt() and,
+# with the observed covariate values, in check_data(). These two corners catch
+# a branch (or a covariate) that leaves (0, 1] near the edge of the parameter
+# space when the parameters enter the branch with one orientation; branches
+# that mix a parameter with its complement can leave (0, 1] at other vertices,
+# which .mpt_branch_vertices() supplies, in mpt() and in check_data(). A
+# simplex group sits at a corner (one member takes the rest of the mass), so
+# its members stay positive and sum to 1.
+.mpt_boundary_points <- function(symbols, simplex, eps = 0.001) {
+  lapply(c(eps, 1 - eps), function(value) {
+    vals <- setNames(rep(value, length(symbols)), symbols)
+    for (grp in simplex) {
+      big <- if (value < 0.5) 1L else length(grp)
+      vals[grp] <- eps / length(grp)
+      vals[grp[big]] <- 1 - sum(vals[grp[-big]])
+    }
+    vals
+  })
+}
+
+# The parameter values at which one branch is checked to stay in (0, 1], one
+# row per point and one column per parameter of the branch.
+# A branch that is multilinear in its parameters (each enters with degree <= 1,
+# also when it appears in several terms) takes its extremes over the parameter
+# box at the vertices, so the 2^k vertices of its k parameters make the range
+# check exact. A parameter of higher degree can peak between the vertices, as u
+# does in the pair-clustering term u * (1 - u), so it takes 0.5 as well; that
+# covers the common u * (1 - u) terms, other higher-degree terms are checked
+# approximately only. Degree is read from stats::D(): a parameter is of higher
+# degree when its derivative still contains it (or another member of its
+# simplex group). A derivative that D() cannot form counts as higher degree.
+# A simplex group is one dimension whose vertices put the mass on one member,
+# as the box vertices would not sum to 1; with a higher-degree term it also
+# takes the midpoints between members and the centroid.
+# A branch whose grid has more than max_points rows (k = 10 multilinear
+# parameters) falls back to the two corners and n_fallback further points.
+# Those come from a Weyl sequence (steps sqrt(prime)) instead of a random
+# number generator, so they are the same on every call and leave the global
+# random number state alone; the attribute "exact" says whether the grid is
+# complete.
+.mpt_branch_vertices <- function(branch, parameters, simplex, eps = 0.001,
+                                 max_points = 1024L, n_fallback = 64L) {
+  used <- intersect(all.vars(branch), parameters)
+  if (length(used) == 0L) {
+    return(structure(matrix(numeric(0), 1L, 0L), exact = TRUE))
+  }
+  groups <- Filter(function(grp) any(grp %in% used), simplex)
+  candidates <- c(
+    lapply(setdiff(used, unlist(groups)), function(par) {
+      values <- if (.mpt_higher_degree(branch, par)) c(eps, 0.5, 1 - eps) else c(eps, 1 - eps)
+      matrix(values, ncol = 1L, dimnames = list(NULL, par))
+    }),
+    lapply(groups, function(grp) {
+      members <- intersect(grp, used)
+      points <- .mpt_simplex_points(grp, eps, .mpt_higher_degree(branch, members))
+      unique(points[, members, drop = FALSE])
+    })
+  )
+
+  n_points <- prod(vapply(candidates, nrow, integer(1)))
+  if (n_points <= max_points) {
+    index <- expand.grid(lapply(candidates, function(points) seq_len(nrow(points))))
+    return(structure(
+      do.call(cbind, Map(function(points, i) points[i, , drop = FALSE], candidates, index)),
+      exact = TRUE
+    ))
+  }
+
+  unit <- outer(seq_len(n_fallback), sqrt(.mpt_first_primes(length(candidates)))) %% 1
+  sampled <- do.call(cbind, lapply(seq_along(candidates), function(dim) {
+    candidates[[dim]][1 + floor(nrow(candidates[[dim]]) * unit[, dim]), , drop = FALSE]
+  }))
+  corners <- do.call(rbind, .mpt_boundary_points(parameters, simplex, eps))
+  structure(
+    rbind(corners[, colnames(sampled), drop = FALSE], sampled),
+    exact = FALSE
+  )
+}
+
+# the first vertex at which `branch` is not a number or leaves (0, 1], with the
+# covariate values given as a named list of equal-length vectors (empty for a
+# branch without covariates); NULL when no vertex does. At the vertices a branch
+# may underflow to 0 or cancel to just below it, so only a value below
+# -tolerance counts.
+.mpt_first_range_violation <- function(branch, vertices, covariate_values = list(),
+                                       tolerance = 1e-6) {
+  n_rows <- if (length(covariate_values) > 0L) length(covariate_values[[1]]) else 1L
+  for (vertex in seq_len(nrow(vertices))) {
+    values <- setNames(vertices[vertex, ], colnames(vertices))
+    branch_value <- rep(
+      eval(branch, envir = c(as.list(values), covariate_values)),
+      length.out = n_rows
+    )
+    outside <- is.na(branch_value) | branch_value < -tolerance |
+      branch_value > 1 + tolerance
+    if (any(outside)) {
+      first <- which(outside)[1]
+      at <- if (ncol(vertices) > 0L) {
+        paste(colnames(vertices), "=", signif(values, 4), collapse = ", ")
+      }
+      return(list(row = first, value = branch_value[first], at = at))
+    }
+  }
+  NULL
+}
+
+.mpt_message_sampled <- function(labels) {
+  if (length(labels) > 0L) {
+    message2(
+      "The range check of the branches of {paste(labels, collapse = ', ')} \\
+      uses selected points of the parameter box only, not every vertex, because \\
+      they have too many vertices to evaluate. A covariate value or parameter \\
+      combination that takes one of them outside (0, 1] elsewhere is not detected."
+    )
+  }
+}
+
+.mpt_higher_degree <- function(branch, members) {
+  any(vapply(members, function(par) {
+    derivative <- try(stats::D(branch, par), silent = TRUE)
+    is_try_error(derivative) || any(members %in% all.vars(derivative))
+  }, logical(1)))
+}
+
+# one row per point, one column per member of the group; the vertices put eps
+# spread over all members but one, which takes the rest
+.mpt_simplex_points <- function(group, eps, with_interior = FALSE) {
+  n <- length(group)
+  points <- matrix(eps / n, n, n, dimnames = list(NULL, group))
+  diag(points) <- 1 - eps * (n - 1) / n
+  if (!with_interior) {
+    return(points)
+  }
+  pairs <- which(upper.tri(diag(n)), arr.ind = TRUE)
+  midpoints <- (points[pairs[, 1], , drop = FALSE] + points[pairs[, 2], , drop = FALSE]) / 2
+  rbind(points, midpoints, colMeans(points))
+}
+
+.mpt_first_primes <- function(n) {
+  candidates <- seq_len(20 * n + 20) + 1L
+  is_prime <- vapply(candidates, function(x) {
+    all(x %% seq_len(floor(sqrt(x)))[-1L] != 0L)
+  }, logical(1))
+  candidates[is_prime][seq_len(n)]
+}
+
 # Local identifiability: the rank of the Jacobian of all category probabilities
 # (all trees stacked) with respect to the free parameters, at the interior test
 # points; fixed parameters enter at their values. The maximum rank over the
@@ -258,7 +404,14 @@
 # differentiates exactly, so a null direction has a singular value at rounding
 # level (about 1e-16 relative) instead of the 1e-13 to 1e-11 left by central
 # differences. A branch that D() cannot differentiate (a function outside its
-# table) makes the check unavailable, never a false result.
+# table) makes the check unavailable, never a false result. A test point where
+# a derivative is not finite (a cusp such as ((c - k)^2)^0.25 at c = k, here or
+# at one covariate setting) is left out, as a point on a singular set is
+# outvoted, so a deficit at the other points is still reported. Outvoting needs
+# a second point, so with fewer than two points left the check is unavailable;
+# a derivative that is not finite at a covariate value in the data for every
+# point mostly comes with branches that are undefined there, which check_data()
+# reports by row.
 # Columns are scaled to unit norm, so a parameter that moves the probabilities
 # little at a test point is not mistaken for a redundant one. A parameter that
 # cancels from every branch can leave a rounding residue instead of an exact
@@ -281,28 +434,47 @@
 # by member), not its members: the member columns are multiplied by the
 # derivative of the members with respect to the sticks, at test points that lie
 # on the simplex. A fixed stick keeps its column out of the free set.
+# Covariates identify parameters through rows with different covariate values,
+# so `settings` (one data frame of covariate values per tree) stacks one block
+# of rows per tree and setting; the degrees of freedom grow with the number of
+# blocks. The blocks enter `chunk_size` settings at a time through the R factor
+# of a QR decomposition, which leaves the rank, the zero columns and the null
+# space as they are for the full stack (the stick derivative is a
+# right-multiplication, so it applies to R as it would to the stack).
 .mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
-                               sticks = character(0), tolerance = 1e-8) {
-  # the counts are reported even when the rank cannot be computed
+                               sticks = character(0), settings = NULL,
+                               tolerance = 1e-8, chunk_size = 2000L) {
+  # the counts are reported even when the rank cannot be computed; df is that
+  # of one design cell, as print() states it
   counts <- list(
     n_free = length(free), free = free,
     df = sum(lengths(lapply(trees, `[[`, "branches")) - 1L)
   )
   if (length(free) == 0L) {
     return(c(counts, list(
-      rank = 0L, involved = character(0), absent = character(0)
+      rank = 0L, involved = character(0), absent = character(0), left_out = 0L
     )))
   }
-  branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
+  trees <- unname(trees)
   parameters <- c(setdiff(free, sticks), unlist(simplex), names(fixed))
-  derivs <- try(unlist(lapply(branches, function(branch) {
-    lapply(parameters, function(par) {
-      if (par %in% all.vars(branch)) stats::D(branch, par) else 0
-    })
-  }), recursive = FALSE), silent = TRUE)
+  derivs <- try(lapply(trees, function(tree) {
+    unlist(lapply(tree$branches, function(branch) {
+      lapply(parameters, function(par) {
+        if (par %in% all.vars(branch)) stats::D(branch, par) else 0
+      })
+    }), recursive = FALSE)
+  }), silent = TRUE)
   if (is_try_error(derivs)) {
-    return(c(counts, list(error = conditionMessage(attr(derivs, "condition")))))
+    return(c(counts, list(error = glue(
+      "stats::D() cannot differentiate the branch expressions \\
+      ({conditionMessage(attr(derivs, 'condition'))})"
+    ))))
   }
+  settings <- settings %||% lapply(trees, function(tree) data.frame(row.names = 1L))
+  # no rank exceeds the rows stacked over every setting
+  max_rank <- sum(
+    (lengths(lapply(trees, `[[`, "branches")) - 1L) * vapply(settings, nrow, integer(1))
+  )
   symbols <- .mpt_tree_parameters(trees)
   points <- .mpt_test_points(symbols, simplex)
   # one vector per symbol holding its value at every test point, so each
@@ -311,14 +483,48 @@
     vapply(points, `[[`, numeric(1), symbol)
   })
   vals[names(fixed)] <- fixed
-  values <- vapply(derivs, function(deriv) {
-    rep_len(eval(deriv, vals), length(points))
-  }, numeric(length(points)))
-  decompositions <- lapply(seq_along(points), function(point) {
-    jacobian <- matrix(
-      values[point, ], ncol = length(parameters), byrow = TRUE,
-      dimnames = list(NULL, parameters)
-    )
+  # per test point, the R factor of a QR decomposition of the rows stacked so
+  # far: R'R = J'J, so column norms and the singular values of the
+  # column-scaled matrix are those of the full stack, while memory stays bounded
+  # by one chunk of settings. tol = 0 turns off LINPACK's column pivoting, so
+  # the columns stay in parameter order
+  n_points <- length(points)
+  factors <- vector("list", n_points)
+  finite <- rep(TRUE, n_points)
+  for (tree in seq_along(trees)) {
+    n_rows <- nrow(settings[[tree]])
+    for (rows in split(seq_len(n_rows), ceiling(seq_len(n_rows) / chunk_size))) {
+      # each derivative evaluated once over the chunk's settings and every test
+      # point, the points varying fastest
+      row_vals <- lapply(vals, rep, times = length(rows))
+      row_vals[names(settings[[tree]])] <- lapply(
+        settings[[tree]], function(column) rep(column[rows], each = n_points)
+      )
+      block <- vapply(derivs[[tree]], function(deriv) {
+        rep_len(eval(deriv, row_vals), length(rows) * n_points)
+      }, numeric(length(rows) * n_points))
+      for (point in which(finite)) {
+        point_block <- block[seq(point, nrow(block), by = n_points), , drop = FALSE]
+        # qr() stops on a non-finite entry with a bare foreign-call error
+        if (!all(is.finite(point_block))) {
+          finite[point] <- FALSE
+          next
+        }
+        factors[[point]] <- qr.R(qr(rbind(factors[[point]], matrix(
+          t(point_block), ncol = length(parameters), byrow = TRUE
+        )), tol = 0))
+      }
+    }
+  }
+  if (sum(finite) < 2L) {
+    return(c(counts, list(error = glue(
+      "at {length(finite) - sum(finite)} of the {length(finite)} interior \\
+      test values some derivative of the branch expressions is not finite"
+    ))))
+  }
+  decompositions <- lapply(which(finite), function(point) {
+    jacobian <- factors[[point]]
+    colnames(jacobian) <- parameters
     for (grp in simplex) {
       jacobian <- cbind(
         jacobian[, setdiff(colnames(jacobian), grp), drop = FALSE],
@@ -338,7 +544,7 @@
       sweep(jacobian, 2, norms, "/"), nu = 0, nv = length(free)
     )
     decomposition$rank <- min(
-      sum(decomposition$d > tolerance * decomposition$d[1]), counts$df
+      sum(decomposition$d > tolerance * decomposition$d[1]), max_rank
     )
     decomposition$absent <- free[zero]
     decomposition
@@ -351,7 +557,8 @@
   c(counts, list(
     rank = best$rank,
     involved = free[rowSums(abs(null_space) > 1e-6) > 0],
-    absent = best$absent
+    absent = best$absent,
+    left_out = sum(!finite), n_points = n_points
   ))
 }
 
@@ -372,19 +579,79 @@
   member_jacobian %*% map
 }
 
-# the first branch-sum or branch-range violation per tree, NA where every test
-# point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
-# value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
-# log(p) of a non-positive number in Stan. All test points are interior, so an
-# exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0, or one that
-# underflows at a test value, e.g. (1 - D)^392 at D = 0.851; refusing the
-# latter too is accepted, as no realistic tree has such a power
+# the first branch that is not a number or leaves (0, 1] at a vertex of its own
+# parameter box, per tree (NA where none does); the attribute "sampled" names
+# the branches whose vertices were only sampled. The points of
+# .mpt_tree_branch_errors() visit two corners and five interior points, which
+# miss a branch that mixes a parameter with another one's complement
+# (2 * a * (1 - b) reaches 2 at a = 0.999, b = 0.001).
+.mpt_tree_vertex_errors <- function(trees, parameters, simplex, tolerance = 1e-6) {
+  results <- lapply(trees, function(tree) {
+    sampled <- character(0)
+    for (resp_cat in names(tree$branches)) {
+      branch <- tree$branches[[resp_cat]]
+      vertices <- .mpt_branch_vertices(branch, parameters, simplex)
+      if (!attr(vertices, "exact")) {
+        sampled <- c(sampled, glue("category '{resp_cat}' in tree '{tree$name}'"))
+      }
+      violation <- .mpt_first_range_violation(branch, vertices, tolerance = tolerance)
+      if (is.null(violation)) next
+      error <- if (is.na(violation$value)) {
+        glue(
+          "The branch probability of category '{resp_cat}' in tree \\
+          '{tree$name}' is not a number at the test values {violation$at}, so \\
+          the likelihood is undefined there. Please check the branch expressions."
+        )
+      } else {
+        glue(
+          "The branch probability of category '{resp_cat}' in tree \\
+          '{tree$name}' is {signif(violation$value, 6)} at the test values \\
+          {violation$at}, outside (0, 1]. Please check the branch expressions."
+        )
+      }
+      return(list(error = error, sampled = sampled))
+    }
+    list(error = NA_character_, sampled = sampled)
+  })
+  structure(
+    vapply(results, `[[`, character(1), "error"),
+    sampled = as.character(unlist(lapply(results, `[[`, "sampled")))
+  )
+}
+
+# the first undefined, branch-sum or branch-range violation per tree, NA where
+# every test point gives branches in (0, 1] that sum to 1. A branch that is not
+# a number (0 / 0) is NaN in Stan too. Branches can sum to 1 for every value and
+# still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is log(p) of
+# a non-positive number in Stan. At an interior point an exact 0 is a branch
+# that is 0 for every value, e.g. (1 - a) * 0, or one that underflows there,
+# e.g. (1 - D)^392 at D = 0.851; refusing the latter too is accepted, as no
+# realistic tree has such a power. At the two boundary corners a valid branch
+# may underflow to 0 or, written as 1 minus the others, cancel to just below it
+# (-8.5e-20 for seven stages), so only a branch below -tolerance counts there.
+# The corners catch a branch that leaves (0, 1] only near the edge of the
+# parameter space (1.2 * a - 0.2); .mpt_tree_vertex_errors() takes the rest
 .mpt_tree_branch_errors <- function(trees, parameters, simplex,
                                     tolerance = 1e-6) {
-  points <- .mpt_test_points(parameters, simplex)
+  interior <- .mpt_test_points(parameters, simplex)
+  points <- c(interior, .mpt_boundary_points(parameters, simplex))
   vapply(trees, function(tree) {
-    for (vals in points) {
+    for (point in seq_along(points)) {
+      vals <- points[[point]]
       probs <- .mpt_eval_branches(tree, as.list(vals))
+      at_values <- function(category) {
+        symbols <- all.vars(tree$branches[[category]])
+        paste(symbols, "=", signif(vals[symbols], 3), collapse = ", ")
+      }
+      undefined <- names(probs)[is.na(probs)][1]
+      if (!is.na(undefined)) {
+        return(glue(
+          "The branch probability of category '{undefined}' in tree \\
+          '{tree$name}' is not a number at the test values \\
+          {at_values(undefined)}, so the likelihood is undefined there. \\
+          Please check the branch expressions."
+        ))
+      }
       if (abs(sum(probs) - 1) > tolerance) {
         return(glue(
           "The branch probabilities of tree '{tree$name}' sum to \\
@@ -396,9 +663,9 @@
           three options) belong in the simplex argument."
         ))
       }
-      outside <- names(probs)[probs <= 0 | probs > 1 + tolerance][1]
+      too_low <- if (point <= length(interior)) probs <= 0 else probs < -tolerance
+      outside <- names(probs)[too_low | probs > 1 + tolerance][1]
       if (!is.na(outside)) {
-        symbols <- all.vars(tree$branches[[outside]])
         zero_hint <- if (probs[[outside]] == 0) {
           " A zero probability makes the likelihood undefined."
         } else {
@@ -407,8 +674,8 @@
         return(glue(
           "The branch probability of category '{outside}' in tree \\
           '{tree$name}' is {signif(probs[[outside]], 6)} at the test values \\
-          {paste(symbols, '=', signif(vals[symbols], 3), collapse = ', ')}, \\
-          outside (0, 1]. Please check the branch expressions.{zero_hint}"
+          {at_values(outside)}, outside (0, 1]. Please check the branch \\
+          expressions.{zero_hint}"
         ))
       }
     }

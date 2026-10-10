@@ -332,6 +332,12 @@ conditional_effects.bmmfit <- function(x,
     escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_distances)
     internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
   }
+  if (length(model$other_vars$indicators$possible) > 0) {
+    internal_patterns <- c(
+      internal_patterns,
+      paste0("^", unlist(model$other_vars$indicators$possible, use.names = FALSE), "$")
+    )
+  }
   
   effect_names <- names(ce_result)
   combined_pattern <- paste(internal_patterns, collapse = "|")

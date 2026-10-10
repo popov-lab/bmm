@@ -609,7 +609,8 @@ data_column_roles <- list(
   ),
   mpt = c(
     trees = "number of responses in each response category, one column per category, named after the branches of the trees",
-    tree_id = "the tree each row belongs to (models with several trees)"
+    tree_id = "the tree each row belongs to (models with several trees)",
+    covariates = "numeric columns used in branch expressions, e.g. design-fixed guessing rates (optional)"
   ),
   sdm = c(
     resp_error = "response error relative to the target, in radians"

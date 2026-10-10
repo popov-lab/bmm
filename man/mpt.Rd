@@ -7,6 +7,7 @@
 mpt(
   trees,
   tree_id = NULL,
+  covariates = NULL,
   simplex = NULL,
   restrictions = NULL,
   links = "logit",
@@ -15,12 +16,22 @@ mpt(
 }
 \arguments{
 \item{trees}{A single \code{mpt_tree} object or a list of \code{mpt_tree} objects.
-All trees must share the same set of response categories.}
+All trees must share the same set of response categories, counting those
+declared impossible.}
 
 \item{tree_id}{Character. Name of the data column whose values name the tree
 each observation belongs to; the values must match the tree names. Can be
 omitted for single-tree models. Effects of experimental conditions belong
 in the parameter formulas, not here — see Details.}
+
+\item{covariates}{Character vector. Names of data columns that appear in
+branch expressions but are not latent parameters, for example
+design-fixed guessing rates. Covariates pass into the model formulas
+unchanged and have no naming restrictions. \code{bmm()} stops when, with a
+row's covariate values, the branches of a tree do not sum to 1, leave
+(0, 1], are undefined on the rows of another tree, or when a covariate
+that a branch uses is missing. Every declared covariate needs a numeric
+column in the data, also one that no branch uses.}
 
 \item{simplex}{A character vector, or a list of character vectors, naming
 groups of parameters that are jointly constrained to sum to 1. Each group
@@ -85,8 +96,9 @@ variable is passed. The \code{tree_id} column names the tree of each row, and
 the counts of a row must come from trials of that tree.
 
 A separate tree is needed only when the \emph{branch expressions} differ — that
-is, when the trial determines which latent processes apply (old versus
-new probes, inclusion versus exclusion instructions).
+is, when the trial determines which latent processes apply or which
+response categories are reachable (old versus new probes, a response set
+with or without distractors, inclusion versus exclusion instructions).
 Experimental factors whose \emph{effect on the parameters} you want to estimate
 belong in the parameter formulas, exactly as in every other \code{bmm} model:
 \code{bmf(D ~ 0 + condition)}. The two roles are independent, and one data
@@ -142,24 +154,23 @@ group and their \code{praw} components cannot be fixed this way; fix parameters
 outside the group instead.
 
 Printing the model ends with an identifiability check for intercept-only
-formulas. It compares the number of free parameters with the degrees of
-freedom (response categories minus 1, summed over trees) and computes the
-rank of the Jacobian of the category probabilities with respect to the
-free parameters, from exact derivatives at five interior test values;
-parameters fixed in the formula enter at their values. A rank below the
-number of free parameters means that a combination of the named
-parameters is not identified by the branch expressions, even when the
-count passes. The check is local: it holds at the test values, not at the
-boundaries of the parameter space. If \code{\link[stats:D]{stats::D()}} cannot differentiate a
-branch expression, the rank is not computed and the count decides.
+formulas: the free parameters against the degrees of freedom (response
+categories minus 1, summed over trees), and the rank of the Jacobian of
+the category probabilities at five interior test values (and five test
+values of each covariate). A rank below the number of free parameters
+means that a combination of the named parameters is not identified by the
+branch expressions. A test value with a non-finite derivative is left
+out, and the printout says how many; if \code{\link[stats:D]{stats::D()}} cannot differentiate
+a branch expression, the rank is not computed and the count decides.
 
 \code{bmm()} warns when the rank is deficient and every formula is
 intercept-only. When a formula has a predictor or is non-linear, it only
 says that these may identify the parameters and that it did not check.
+
 Example: separate detection parameters \code{Do} and \code{Dn} in a single old/new
 test give three free parameters and rank 2 of 3, so one combination of
-\code{Do}, \code{Dn} and \code{g} cannot be estimated; a second condition that varies the
-response bias identifies them.
+\code{Do}, \code{Dn} and \code{g} cannot be estimated; a second condition that varies
+the response bias identifies them.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
@@ -180,7 +191,9 @@ corresponds to the latent-trait MPT model.
 For posterior predictive checks, \code{\link[brms:posterior_predict]{brms::posterior_predict()}} returns
 simulated counts (draws x rows x categories) and \code{\link[brms:posterior_epred]{brms::posterior_epred()}}
 the expected counts; the MPT article computes the T1 statistic and its
-posterior predictive p-value from them.
+posterior predictive p-value from them. With \code{newdata},
+\code{\link[brms:posterior_predict]{brms::posterior_predict()}} needs the columns \code{nTrials}, \verb{Idx_<tree>} and
+\verb{Poss_<category>} that \code{check_data()} builds; \code{fit$data} contains them.
 
 Order constraints between parameters (\code{Do > Dn}) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.
