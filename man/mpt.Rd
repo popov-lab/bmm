@@ -142,32 +142,24 @@ group and their \code{praw} components cannot be fixed this way; fix parameters
 outside the group instead.
 
 Printing the model ends with an identifiability check for intercept-only
-formulas. It first compares the number of free parameters with the
-degrees of freedom (response categories minus one, summed over trees).
-It then computes the rank of the Jacobian of all category probabilities
-with respect to the free parameters, from exact derivatives at five
-interior test values; parameters fixed in the formula enter at their
-values. A simplex group counts with one free parameter fewer than its
-members, and the printout names the group by its members. A rank below
-the number of free parameters means that some combination of the listed
-parameters cannot be estimated from the data,
-even when the count passes, and its posterior follows the prior; a
-parameter whose derivatives are zero up to rounding at the test values
-appears not to affect any category probability and is named separately.
-Fix parameters in the formula or equate them in the branch expressions
-until the rank is full. \code{bmm()} warns about a rank deficit unless a
-formula has a data predictor, or a non-linear formula defines or reads
-one of the parameters involved. A parameter that differs between
-conditions can identify the model across them, and the
-rank covers the parameters of the branch expressions only, so a
-non-linear formula that ties them together (\code{Dn ~ Do}) or builds one
-from sub-parameters is not analysed. In these cases \code{bmm()} only
-announces the deficit and says what was not checked, and \code{print()} of
-the checked model says the formula was not analysed. The
-check is local: it holds at the test values, not at the boundaries of
-the parameter space. A branch expression with a function that
-\code{\link[stats:D]{stats::D()}} cannot differentiate leaves the rank uncomputed, and the
-printout says so.
+formulas. It compares the number of free parameters with the degrees of
+freedom (response categories minus 1, summed over trees) and computes the
+rank of the Jacobian of the category probabilities with respect to the
+free parameters, from exact derivatives at five interior test values;
+parameters fixed in the formula enter at their values. A rank below the
+number of free parameters means that a combination of the named
+parameters is not identified by the branch expressions, even when the
+count passes. The check is local: it holds at the test values, not at the
+boundaries of the parameter space. If \code{\link[stats:D]{stats::D()}} cannot differentiate a
+branch expression, the rank is not computed and the count decides.
+
+\code{bmm()} warns when the rank is deficient and every formula is
+intercept-only. When a formula has a predictor or is non-linear, it only
+says that these may identify the parameters and that it did not check.
+Example: separate detection parameters \code{Do} and \code{Dn} in a single old/new
+test give three free parameters and rank 2 of 3, so one combination of
+\code{Do}, \code{Dn} and \code{g} cannot be estimated; a second condition that varies the
+response bias identifies them.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
