@@ -68,6 +68,156 @@
   unique(unlist(lapply(trees, .mpt_expr_vars)))
 }
 
+.mpt_substitute_symbols <- function(expr, values) {
+  .mpt_fold_numeric_division(do.call(substitute, list(expr, values)))
+}
+
+.mpt_apply_restrictions <- function(tree, restrictions) {
+  tree$branches[] <- lapply(tree$branches, .mpt_substitute_symbols, restrictions)
+  tree
+}
+
+# restrictions in the MPTinR/TreeBUGS string syntax ("Dn = Do", "g = 0.5",
+# "G1 = G2 = G3") or as a named list (list(Dn = "Do", g = 0.5)) become one
+# named list mapping each restricted parameter to a symbol or a number
+.mpt_parse_restrictions <- function(restrictions) {
+  if (length(restrictions) == 0L) {
+    return(list())
+  }
+  if (is.null(names(restrictions))) {
+    # MPTinR and TreeBUGS pass inline restrictions as an unnamed list of strings
+    if (is.list(restrictions) && all(vapply(restrictions, is.character, logical(1)))) {
+      restrictions <- unlist(restrictions)
+    }
+    stopif(
+      !is.character(restrictions),
+      "The restrictions argument must be a character vector such as \\
+      c('Dn = Do', 'g = 0.5') or a named list such as list(Dn = 'Do', g = 0.5)."
+    )
+    # readLines() returns blank and comment lines of a restriction file as is
+    restrictions <- restrictions[!grepl("^\\s*(#|$)", restrictions)]
+    return(Reduce(
+      c, lapply(restrictions, .mpt_parse_restriction_string), list()
+    ))
+  }
+  stopif(
+    any(!nzchar(names(restrictions))),
+    "Every element of a named restrictions list must be named after the \\
+    parameter it restricts."
+  )
+  values <- lapply(names(restrictions), function(par) {
+    value <- restrictions[[par]]
+    if (is.character(value)) {
+      parsed <- try(str2lang(value), silent = TRUE)
+      stopif(
+        is_try_error(parsed),
+        "Cannot parse the restriction '{par} = {value}'."
+      )
+      value <- parsed
+    }
+    .mpt_restriction_value(value, glue("{par} = {deparse1(value)}"))
+  })
+  setNames(values, names(restrictions))
+}
+
+.mpt_parse_restriction_string <- function(text) {
+  # a restriction has an `=`, so a line without one that names a file is a path
+  # (the extension is judged without a trailing comment)
+  stopif(
+    !grepl("=", text, fixed = TRUE) &&
+      (file.exists(text) ||
+        grepl(
+          "\\.(restr|txt)\\s*$", sub("#.*$", "", text), ignore.case = TRUE
+        )),
+    "A restriction must not be a file path. bmm does not read restriction \\
+    files; pass readLines({encodeString(text, quote = '\"')}) instead (blank \\
+    and comment lines are skipped)."
+  )
+  expr <- try(str2lang(text), silent = TRUE)
+  # R cannot parse a chain such as G1 < G2 < G3
+  if (is_try_error(expr) && grepl("[<>]", text)) {
+    .mpt_stop_order_constraint(text)
+  }
+  stopif(is_try_error(expr), "Cannot parse the restriction '{text}'.")
+  lhs <- character(0)
+  while (is.call(expr) && identical(expr[[1]], quote(`=`))) {
+    stopif(
+      !is.symbol(expr[[2]]),
+      "The left-hand side of the restriction '{text}' must be a parameter name."
+    )
+    lhs <- c(lhs, as.character(expr[[2]]))
+    expr <- expr[[3]]
+  }
+  if (is.call(expr) && as.character(expr[[1]]) %in% c("<", ">", "<=", ">=")) {
+    .mpt_stop_order_constraint(text)
+  }
+  stopif(
+    length(lhs) == 0L,
+    "Each restriction must have the form 'parameter = parameter' or \\
+    'parameter = constant', not '{text}'."
+  )
+  setNames(rep(list(.mpt_restriction_value(expr, text)), length(lhs)), lhs)
+}
+
+.mpt_stop_order_constraint <- function(text) {
+  stop2(
+    "Order constraints such as '{text}' are not supported by the \\
+    restrictions argument. Reparameterize the larger parameter instead, e.g. \\
+    Do ~ Dn + (1 - Dn) * inv_logit(phi) in the model formula; see the section \\
+    'Order constraints' of the MPT article."
+  )
+}
+
+# a right-hand side without symbols is a constant (1/4, 1 - 0.75); a single
+# symbol equates two parameters; anything else has no MPT interpretation
+.mpt_restriction_value <- function(expr, text) {
+  if (is.symbol(expr)) {
+    return(expr)
+  }
+  if (length(all.vars(expr)) == 0L) {
+    value <- try(eval(expr, envir = baseenv()), silent = TRUE)
+    stopif(
+      is_try_error(value) || !is.numeric(value) || length(value) != 1L ||
+        is.na(value),
+      "The restriction '{text}' does not evaluate to a single number."
+    )
+    stopif(
+      value < 0 || value > 1,
+      "The restriction '{text}' fixes a parameter to {value}. A constant must \\
+      lie strictly between 0 and 1."
+    )
+    stopif(
+      value == 0 || value == 1,
+      "The restriction '{text}' fixes a parameter to {value}. Constants must \\
+      be strictly between 0 and 1: a constant 0 or 1 can turn a branch \\
+      into 0, which has no log probability. To model a parameter at 0 or 1, \\
+      remove it from the branch expressions (write the reduced tree) and \\
+      declare the categories that no branch reaches with \\
+      mpt_tree(impossible = ), which this version does not provide yet."
+    )
+    return(value)
+  }
+  stop2(
+    "Restrictions can equate a parameter with another parameter or fix it to \\
+    a numeric constant. '{text}' does neither."
+  )
+}
+
+# chains such as A = B, B = C resolve to the final target; a cycle leaves a
+# parameter pointing at a restricted name, which mpt() reports
+.mpt_resolve_restrictions <- function(restrictions) {
+  for (i in seq_along(restrictions)) {
+    restrictions <- lapply(restrictions, function(value) {
+      if (is.symbol(value) && as.character(value) %in% names(restrictions)) {
+        restrictions[[as.character(value)]]
+      } else {
+        value
+      }
+    })
+  }
+  restrictions
+}
+
 .mpt_eval_branches <- function(tree, values) {
   vapply(tree$branches, function(branch) eval(branch, envir = values), numeric(1))
 }
@@ -80,8 +230,9 @@
 # The first four points are linear in the symbol index, so v_i + v_j equals
 # v_k + v_l at all four whenever i + j = k + l; the fifth raises the index to
 # the irrational power sqrt(2), which no such linear relation survives, so the
-# rank check cannot meet the same coincidence at every point
-.mpt_test_points <- function(symbols) {
+# rank check cannot meet the same coincidence at every point. The members of a
+# simplex group are rescaled to sum to 1.
+.mpt_test_points <- function(symbols, simplex) {
   index <- seq_along(symbols)
   lapply(1:5, function(point) {
     position <- if (point < 5) {
@@ -89,7 +240,11 @@
     } else {
       index^1.4142135624 * 0.6180339887
     }
-    setNames(0.05 + 0.9 * (position %% 1), symbols)
+    vals <- setNames(0.05 + 0.9 * (position %% 1), symbols)
+    for (grp in simplex) {
+      vals[grp] <- vals[grp] / sum(vals[grp])
+    }
+    vals
   })
 }
 
@@ -122,7 +277,12 @@
 # the null space take part in a non-identified combination; zero columns are
 # reported separately as parameters that appear not to affect any category
 # probability.
-.mpt_jacobian_rank <- function(trees, free, fixed = list(), tolerance = 1e-8) {
+# A simplex group is free through its stick-breaking components (`sticks`, named
+# by member), not its members: the member columns are multiplied by the
+# derivative of the members with respect to the sticks, at test points that lie
+# on the simplex. A fixed stick keeps its column out of the free set.
+.mpt_jacobian_rank <- function(trees, free, fixed = list(), simplex = list(),
+                               sticks = character(0), tolerance = 1e-8) {
   # the counts are reported even when the rank cannot be computed
   counts <- list(
     n_free = length(free), free = free,
@@ -134,7 +294,7 @@
     )))
   }
   branches <- unlist(lapply(unname(trees), `[[`, "branches"), use.names = FALSE)
-  parameters <- c(free, names(fixed))
+  parameters <- c(setdiff(free, sticks), unlist(simplex), names(fixed))
   derivs <- try(unlist(lapply(branches, function(branch) {
     lapply(parameters, function(par) {
       if (par %in% all.vars(branch)) stats::D(branch, par) else 0
@@ -144,7 +304,7 @@
     return(c(counts, list(error = conditionMessage(attr(derivs, "condition")))))
   }
   symbols <- .mpt_tree_parameters(trees)
-  points <- .mpt_test_points(symbols)
+  points <- .mpt_test_points(symbols, simplex)
   # one vector per symbol holding its value at every test point, so each
   # derivative is evaluated once for all points
   vals <- lapply(setNames(nm = symbols), function(symbol) {
@@ -155,11 +315,23 @@
     rep_len(eval(deriv, vals), length(points))
   }, numeric(length(points)))
   decompositions <- lapply(seq_along(points), function(point) {
-    jacobian <- matrix(values[point, ], ncol = length(parameters), byrow = TRUE)
+    jacobian <- matrix(
+      values[point, ], ncol = length(parameters), byrow = TRUE,
+      dimnames = list(NULL, parameters)
+    )
+    for (grp in simplex) {
+      jacobian <- cbind(
+        jacobian[, setdiff(colnames(jacobian), grp), drop = FALSE],
+        .mpt_stick_jacobian(
+          jacobian[, grp, drop = FALSE], points[[point]][grp],
+          sticks[grp[-length(grp)]]
+        )
+      )
+    }
     norms <- sqrt(colSums(jacobian^2))
-    zero <- norms[seq_along(free)] <= 1e-12 * max(norms)
-    jacobian <- jacobian[, seq_along(free), drop = FALSE]
-    norms <- norms[seq_along(free)]
+    zero <- norms[free] <= 1e-12 * max(norms)
+    jacobian <- jacobian[, free, drop = FALSE]
+    norms <- norms[free]
     jacobian[, zero] <- 0
     norms[zero] <- 1
     decomposition <- svd(
@@ -183,6 +355,23 @@
   ))
 }
 
+# chain rule through the stick-breaking map: member k is
+# s_k * prod_{j < k} (1 - s_j) and the last member takes the remainder, so
+# d member_k / d s_k is the remainder before k, and every later member falls in
+# proportion to its own value, d member_k / d s_m = -member_k / (1 - s_m)
+.mpt_stick_jacobian <- function(member_jacobian, members, sticks) {
+  n_sticks <- length(sticks)
+  remainder <- 1 - c(0, cumsum(members[seq_len(n_sticks)]))
+  stick_values <- members[seq_len(n_sticks)] / remainder[seq_len(n_sticks)]
+  map <- matrix(0, length(members), n_sticks, dimnames = list(NULL, sticks))
+  for (m in seq_len(n_sticks)) {
+    map[m, m] <- remainder[m]
+    later <- seq.int(m + 1L, length(members))
+    map[later, m] <- -members[later] / (1 - stick_values[m])
+  }
+  member_jacobian %*% map
+}
+
 # the first branch-sum or branch-range violation per tree, NA where every test
 # point gives branches in (0, 1] that sum to 1. Branches can sum to 1 for every
 # value and still leave (0, 1] (2 * a and 1 - 2 * a); a branch below or at 0 is
@@ -190,8 +379,9 @@
 # exact 0 is a branch that is 0 for every value, e.g. (1 - a) * 0, or one that
 # underflows at a test value, e.g. (1 - D)^392 at D = 0.851; refusing the
 # latter too is accepted, as no realistic tree has such a power
-.mpt_tree_branch_errors <- function(trees, parameters, tolerance = 1e-6) {
-  points <- .mpt_test_points(parameters)
+.mpt_tree_branch_errors <- function(trees, parameters, simplex,
+                                    tolerance = 1e-6) {
+  points <- .mpt_test_points(parameters, simplex)
   vapply(trees, function(tree) {
     for (vals in points) {
       probs <- .mpt_eval_branches(tree, as.list(vals))
@@ -199,9 +389,11 @@
         return(glue(
           "The branch probabilities of tree '{tree$name}' sum to \\
           {signif(sum(probs), 6)} instead of 1 when evaluated at numeric test \\
-          values. Please check the branch expressions. To equate parameters, \\
-          give them the same name in the branch expressions or tie them in the \\
-          formula (e.g. Dn ~ Do)."
+          values. Please check the branch expressions. To equate parameters or \\
+          fix one to a constant, use the restrictions argument (e.g. \\
+          restrictions = 'Dn = Do'), or tie them in the formula (e.g. Dn ~ Do). \\
+          Parameters that must sum to 1 across branches (e.g. guessing over \\
+          three options) belong in the simplex argument."
         ))
       }
       outside <- names(probs)[probs <= 0 | probs > 1 + tolerance][1]

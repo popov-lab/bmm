@@ -640,10 +640,12 @@ validate_default_priors <- function(model, formula) {
     !is.list(default_priors) || !all(sapply(default_priors, is.list)),
     "The default_priors should be a list of lists"
   )
-  dpars_predicted_by_nlpars <- names(which(vapply(formula$pforms, is_nl, logical(1))))
-  default_priors[dpars_predicted_by_nlpars] <- NULL
+  dropped <- intersect(
+    names(which(vapply(formula$pforms, is_nl, logical(1)))), names(default_priors)
+  )
+  default_priors[dropped] <- NULL
   warnif(
-    any(dpars_predicted_by_nlpars %in% names(model$parameter)),
+    length(dropped) > 0,
     "Non-linear transformations of model parameters detected in the formula.
     Consider specifying priors for better estimation; otherwise, flat priors will be used."
   )

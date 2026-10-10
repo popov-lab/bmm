@@ -4,7 +4,14 @@
 \alias{mpt}
 \title{Multinomial Processing Tree (MPT) models}
 \usage{
-mpt(trees, tree_id = NULL, links = "logit", ...)
+mpt(
+  trees,
+  tree_id = NULL,
+  simplex = NULL,
+  restrictions = NULL,
+  links = "logit",
+  ...
+)
 }
 \arguments{
 \item{trees}{A single \code{mpt_tree} object or a list of \code{mpt_tree} objects.
@@ -14,6 +21,31 @@ All trees must share the same set of response categories.}
 each observation belongs to; the values must match the tree names. Can be
 omitted for single-tree models. Effects of experimental conditions belong
 in the parameter formulas, not here — see Details.}
+
+\item{simplex}{A character vector, or a list of character vectors, naming
+groups of parameters that are jointly constrained to sum to 1. Each group
+is reparameterized via stick-breaking: the last parameter of each group
+is derived as 1 minus the sum of the other members, and each other member
+\code{p} gets an unconstrained component \code{praw} that predictor formulas for
+\code{p} are applied to. The listing order sets the default prior and the
+meaning of the coefficients; see Details.}
+
+\item{restrictions}{Parameter restrictions in the string syntax of MPTinR
+and TreeBUGS, e.g. \code{c("Dn = Do", "g = 0.5")}, or as a named list,
+\code{list(Dn = "Do", g = 0.5)}. A restriction either equates a parameter with
+another one (chains such as \code{"G1 = G2 = G3"} map all earlier names onto
+the last) or fixes it to a numeric constant (\code{"g = 0.5"}; \code{bmm} also
+reads fractions such as \code{"g = 1/4"}, which MPTinR rejects).
+Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
+and TreeBUGS, \code{list("Dn = Do", "g = 0.5")}, works as well. Restriction
+files are not read: in MPTinR and TreeBUGS a character vector names a
+restrictions file, in \code{bmm} it holds the restrictions. To use such a file,
+pass \code{readLines(path)}; blank lines and lines starting with \verb{#} are
+skipped, and a \verb{#} after a restriction starts a comment, as in MPTinR.
+Restrictions are substituted into the branch expressions before the
+parameters are identified, so a restricted parameter is not part of the
+model and cannot be a simplex member. Order constraints (\code{"Do > Dn"}) are
+not supported here; see Details.}
 
 \item{links}{Character. The link function for all latent probability
 parameters: \code{"logit"} (default) or \code{"probit"}.}
@@ -79,14 +111,35 @@ Coefficients of the sub-parameters above get \code{normal(0, 0.5)}. A parameter
 switched to the other link after construction (\code{model$links$D <- "probit"}) takes that link's priors unless its default prior was
 replaced. \code{\link[=default_prior]{default_prior()}} lists the rows a given formula produces.
 
-A parameter can be fixed to a probability at fit time, in the formula:
-\code{bmf(D ~ 1, g = 0.5)}. The parameter stays part of the model and can be
-freed again by giving it a formula. The value is mapped to the latent
-scale when the constant prior is built, so
+The default prior of a simplex group of K members is the uniform
+(symmetric Dirichlet(1)) distribution on the simplex: each member has
+prior mean 1/K, whatever the listing order. Under stick breaking this is
+a Beta(1, K - k) prior on stick k, which \code{\link[=default_prior]{default_prior()}} shows as
+\code{logitbeta(1, K - k)} (or \code{probitbeta(1, K - k)}) on the intercept of
+the k-th \code{praw}; the last stick keeps \code{logistic(0, 1)} (or
+\code{normal(0, 1)}), which is the same distribution. The result is exact
+under both links, and under \code{0 + cond} it holds in every cell. Under
+\code{1 + cond} it holds in the reference cell only, because the effects keep
+their own prior. TreeBUGS instead puts a uniform prior on each branch
+parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
+for three members); for a group \code{gA}, \code{gB}, \code{gC}, \code{gD} that is
+\code{prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"), coef = "Intercept")}.
+A predictor on member \code{p} acts on the logit (or probit) of \code{p}'s share of
+the probability left over by the members listed before it. A predictor
+on the first member therefore scales all later members by the same
+factor, leaving their ratios unchanged. Read such effects on the probability scale with
+\code{\link[=native_parameters]{native_parameters()}}.
+
+A parameter can also be fixed to a probability at fit time, in the
+formula: \code{bmf(D ~ 1, g = 0.5)}. Unlike a restriction, the parameter stays
+part of the model and can be freed again by giving it a formula. The
+value is mapped to the latent scale when the constant prior is built, so
 \code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a guessing rate of 0.5 under
 the logit link. For the same reason, \code{summary()} lists a fixed \code{g = 0.5}
 as \verb{g_Intercept 0.00} under "Constant Parameters"; \code{\link[=prior_info]{prior_info()}} and
-\code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5.
+\code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5. Members of a \code{simplex}
+group and their \code{praw} components cannot be fixed this way; fix parameters
+outside the group instead.
 
 Printing the model ends with an identifiability check for intercept-only
 formulas. It compares the number of free parameters with the degrees of
@@ -132,7 +185,7 @@ posterior predictive p-value from them.
 Order constraints between parameters (\code{Do > Dn}) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.
 \code{bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)}; the section
-"Ordered parameter constraints" of the MPT article walks through the
+"Order constraints" of the MPT article walks through the
 recipe.
 
 Parameter and response category names must start with a letter and may
