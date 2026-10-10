@@ -725,6 +725,9 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   branch_errors <- .mpt_tree_branch_errors(trees[!uses_covariates], parameters, simplex)
   branch_errors <- branch_errors[!is.na(branch_errors)]
   stopif(length(branch_errors) > 0, "{branch_errors[1]}")
+  vertex_errors <- .mpt_tree_vertex_errors(trees[!uses_covariates], parameters, simplex)
+  stopif(!all(is.na(vertex_errors)), "{vertex_errors[!is.na(vertex_errors)][1]}")
+  .mpt_message_sampled(attr(vertex_errors, "sampled"))
 
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
@@ -1361,10 +1364,9 @@ check_data.mpt <- function(model, data, formula) {
 # row with the observed values, at several parameter test points: a single
 # symmetric point (all 0.5) hides swapped complements. Trees without covariates
 # are left to mpt() and enter only through the NA check of the covariates. The
-# range is also checked with all parameters near 0 and near 1. Those two
-# corners catch a covariate that pushes a branch out of (0, 1] when the
-# parameters enter the branch with one orientation (all increasing or all
-# decreasing); a branch that mixes complements of parameters is not covered.
+# range is also checked with all parameters near 0 and near 1, and then for
+# each branch at the vertices of its own parameter box, which are exact for a
+# branch multilinear in its parameters (.mpt_check_branch_vertices()).
 # brms evaluates every tree's branches on every row, so the branches of such a
 # tree must also be finite on the rows of the other trees.
 # Covariates themselves are not range-checked: one may be a set size entering
@@ -1383,6 +1385,7 @@ check_data.mpt <- function(model, data, formula) {
   used_covariates <- intersect(
     covariates, unlist(lapply(model$other_vars$trees, .mpt_expr_vars))
   )
+  approximate <- character(0)
   for (tree in model$other_vars$trees) {
     rows <- if (is.null(idx_vars)) {
       seq_len(nrow(data))
@@ -1470,22 +1473,75 @@ check_data.mpt <- function(model, data, formula) {
       resp_cat <- names(which(lengths(out_of_range) > 0L))[1]
       if (!is.na(resp_cat)) {
         row <- out_of_range[[resp_cat]][1]
-        value <- signif(branches[[resp_cat]][row], 6)
-        zero_hint <- if (value == 0) {
-          " A branch that is exactly 0 belongs in mpt_tree(impossible = )."
-        } else {
-          ""
-        }
-        stop2(
-          "With the covariate values in the data, the branch probability of \\
-          category '{resp_cat}' in tree '{tree$name}' is {value} in row \\
-          {rows[row]}, outside (0, 1] at the test parameter values. Please \\
-          check {check_what}.{zero_hint}"
+        .mpt_stop_branch_range(
+          tree$name, resp_cat, branches[[resp_cat]][row], rows[row], check_what
         )
       }
     }
+    approximate <- c(approximate, .mpt_check_branch_vertices(
+      tree, data, rows, covariates, symbols, simplex, tolerance, check_what
+    ))
   }
+  .mpt_message_sampled(approximate)
   invisible(NULL)
+}
+
+# every branch of a covariate tree, at the vertices of its own parameter box:
+# the points above visit only two corners and five interior points, so a branch
+# that mixes a parameter with another one's complement (a * (1 - b) * G) can
+# leave (0, 1] at a vertex that none of them reaches. The vertices are exact for
+# branches multilinear in their parameters (see .mpt_branch_vertices()). The
+# rule at the corners applies: a branch may underflow to 0 there, so only a
+# value below -tolerance counts. The result names the branches whose vertices
+# were only sampled.
+.mpt_check_branch_vertices <- function(tree, data, rows, covariates, parameters,
+                                       simplex, tolerance, check_what) {
+  sampled <- character(0)
+  if (length(rows) == 0L) {
+    return(sampled)
+  }
+  for (resp_cat in names(tree$branches)) {
+    branch <- tree$branches[[resp_cat]]
+    vertices <- .mpt_branch_vertices(branch, parameters, simplex)
+    if (!attr(vertices, "exact")) {
+      sampled <- c(sampled, glue("category '{resp_cat}' in tree '{tree$name}'"))
+    }
+    # rows with the same covariate values give the same branch value
+    branch_covariates <- intersect(covariates, all.vars(branch))
+    distinct <- if (length(branch_covariates) == 0L) {
+      rows[1]
+    } else {
+      rows[!duplicated(data[rows, branch_covariates, drop = FALSE])]
+    }
+    covariate_values <- as.list(data[distinct, branch_covariates, drop = FALSE])
+    violation <- .mpt_first_range_violation(
+      branch, vertices, covariate_values, tolerance
+    )
+    if (!is.null(violation)) {
+      .mpt_stop_branch_range(
+        tree$name, resp_cat, violation$value, distinct[violation$row],
+        check_what, at = violation$at
+      )
+    }
+  }
+  sampled
+}
+
+.mpt_stop_branch_range <- function(tree_name, resp_cat, value, row, check_what,
+                                   at = NULL) {
+  value <- signif(value, 6)
+  zero_hint <- if (isTRUE(value == 0)) {
+    " A branch that is exactly 0 belongs in mpt_tree(impossible = )."
+  } else {
+    ""
+  }
+  at_values <- if (is.null(at)) "" else paste0(" ", at)
+  stop2(
+    "With the covariate values in the data, the branch probability of \\
+    category '{resp_cat}' in tree '{tree_name}' is {value} in row {row}, \\
+    outside (0, 1] at the test parameter values{at_values}. Please check \\
+    {check_what}.{zero_hint}"
+  )
 }
 
 ############################################################################# !
