@@ -316,3 +316,69 @@ test_that("constants that Stan would receive in scientific notation error", {
   ))
   expect_equal(deparse1(tree$branches$b), "(1 - p) * 0.001")
 })
+
+test_that(".mpt_branch_vertices visits the 2^k vertices of a multilinear branch", {
+  vertices <- bmm:::.mpt_branch_vertices(quote(a * (1 - b) * c * G), c("a", "b", "c"), list())
+  expect_true(attr(vertices, "exact"))
+  expect_equal(dim(vertices), c(8L, 3L))
+  expect_equal(colnames(vertices), c("a", "b", "c"))
+  expect_setequal(unique(as.vector(vertices)), c(0.001, 0.999))
+  expect_equal(nrow(unique(vertices)), 8L)
+
+  # a parameter in several terms is still of degree 1
+  twice <- bmm:::.mpt_branch_vertices(quote(a * (1 - b) + (1 - a) * b), c("a", "b"), list())
+  expect_equal(dim(twice), c(4L, 2L))
+
+  constant <- bmm:::.mpt_branch_vertices(quote(0.5 * G), c("a", "b"), list())
+  expect_equal(dim(constant), c(1L, 0L))
+})
+
+test_that(".mpt_branch_vertices adds 0.5 for a parameter of higher degree", {
+  vertices <- bmm:::.mpt_branch_vertices(quote(4 * u * (1 - u) * a), c("u", "a"), list())
+  expect_equal(sort(unique(vertices[, "u"])), c(0.001, 0.5, 0.999))
+  expect_equal(sort(unique(vertices[, "a"])), c(0.001, 0.999))
+  expect_equal(nrow(vertices), 6L)
+
+  # a derivative that stats::D() cannot form counts as higher degree
+  unknown <- bmm:::.mpt_branch_vertices(quote(besselJ(a, 1)), "a", list())
+  expect_equal(sort(unique(unknown[, "a"])), c(0.001, 0.5, 0.999))
+})
+
+test_that(".mpt_branch_vertices takes a simplex group as one dimension", {
+  group <- list(c("gA", "gB", "gC"))
+  vertices <- bmm:::.mpt_branch_vertices(quote(D * gA + (1 - D) * gB), c("D", "gA", "gB", "gC"), group)
+  expect_equal(colnames(vertices), c("D", "gA", "gB"))
+  # gC takes the mass in the third vertex, where gA and gB are both small
+  expect_equal(nrow(vertices), 2L * 3L)
+  expect_true(all(rowSums(vertices[, c("gA", "gB")]) < 1.0001))
+
+  all_members <- bmm:::.mpt_branch_vertices(quote(gA + 2 * gB + 3 * gC), c("gA", "gB", "gC"), group)
+  expect_equal(nrow(all_members), 3L)
+  expect_equal(unname(rowSums(all_members)), rep(1, 3))
+
+  # a product of members peaks inside the simplex
+  crossed <- bmm:::.mpt_branch_vertices(quote(gA * gB), c("gA", "gB", "gC"), group)
+  expect_equal(nrow(crossed), 3L + 3L + 1L)
+  expect_equal(unname(colMeans(crossed[7, , drop = FALSE])), rep(1 / 3, 2))
+})
+
+test_that(".mpt_branch_vertices falls back to a fixed sample above max_points", {
+  parameters <- paste0("p", 1:11)
+  branch <- str2lang(paste(parameters, collapse = " * "))
+  set.seed(1)
+  seed_before <- .Random.seed
+  vertices <- bmm:::.mpt_branch_vertices(branch, parameters, list())
+  expect_identical(.Random.seed, seed_before)
+
+  expect_false(attr(vertices, "exact"))
+  expect_equal(dim(vertices), c(2L + 64L, 11L))
+  expect_setequal(unique(as.vector(vertices)), c(0.001, 0.999))
+  expect_equal(unname(vertices[1:2, 1]), c(0.001, 0.999))
+  expect_identical(vertices, bmm:::.mpt_branch_vertices(branch, parameters, list()))
+  # the sample uses both ends of every parameter
+  expect_true(all(apply(vertices, 2, function(column) length(unique(column)) == 2L)))
+
+  ten <- bmm:::.mpt_branch_vertices(str2lang(paste(parameters[1:10], collapse = " * ")), parameters, list())
+  expect_true(attr(ten, "exact"))
+  expect_equal(nrow(ten), 1024L)
+})
