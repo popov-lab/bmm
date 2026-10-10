@@ -480,33 +480,33 @@ The posterior predictive distribution reproduces the response-category proportio
 pp_check(fit_ol, group = "cond")
 ```
 
-## Goodness of fit: the T1 statistic
+## Goodness of fit: T1 and T2
 
-The plot compares proportions by eye. A posterior predictive p-value (PPP) puts a number on it. @klauer2010 proposed the statistic $T_1$, which compares the observed mean frequency of each response category in each tree with the frequency the model expects:
+The plot compares proportions by eye. A posterior predictive p-value (PPP) puts a number on it. @klauer2010 proposed two statistics for hierarchical MPT models. $T_1$ compares the observed frequency of each response category in each cell of the design with the frequency the model expects:
 
 $$
-T_1 = \sum_{k} \frac{(n_k - \hat{n}_k)^2}{\hat{n}_k},
+T_1 = \sum_{c,k} \frac{(n_{ck} - \hat{n}_{ck})^2}{\hat{n}_{ck}},
 $$
 
-summed over all categories $k$ of all trees, where $n_k$ is the observed and $\hat{n}_k$ the expected frequency, averaged over participants. $T_1$ is computed once for the observed counts and once for counts simulated from the model, both against the expected counts of the same posterior draw. The PPP is the proportion of draws in which the simulated data deviate more than the observed data. `brms::posterior_predict()` returns the simulated counts and `brms::posterior_epred()` the expected counts, each as draws x rows x categories. Here a cell is one condition, which also fixes the tree; summing instead of averaging over participants scales both statistics alike and leaves the PPP unchanged:
+summed over all categories $k$ of all cells $c$, where $n_{ck}$ is the observed and $\hat{n}_{ck}$ the expected frequency. $T_2$ compares the covariances of the category frequencies across participants with the covariances the model expects, so it checks whether the model reproduces how participants differ, not only the average. Each statistic is computed once for the observed counts and once for counts simulated from the model, both against the expected counts of the same posterior draw. The PPP is the proportion of draws in which the simulated data deviate more than the observed data; a PPP near 0 flags misfit. `ppp()` computes both:
 
-```{r ppp-t1}
-obs <- fit_ol$data$Y
-yrep <- brms::posterior_predict(fit_ol)
-mu <- brms::posterior_epred(fit_ol)
-cell <- fit_ol$data$cond
-
-t1 <- function(o, e) sum((o - e)^2 / e)
-t1_draws <- t(vapply(seq_len(dim(mu)[1]), function(s) {
-  e <- rowsum(mu[s, , ], cell)
-  c(observed = t1(rowsum(obs, cell), e), replicated = t1(rowsum(yrep[s, , ], cell), e))
-}, numeric(2)))
-
-ppp_t1 <- mean(t1_draws[, "replicated"] > t1_draws[, "observed"])
-round(c(apply(t1_draws, 2, median), ppp = ppp_t1), 3)
+```{r ppp-ol}
+ppp_ol <- ppp(fit_ol)
+ppp_ol
 ```
 
-The PPP of `r round(ppp_t1, 2)` is computed from `r nrow(t1_draws)` draws. A PPP near 0 means that data simulated from the model rarely deviate as much as the observed data, which flags misfit; a value away from 0 means the model reproduces the mean category frequencies. $T_1$ checks means only. @klauer2010 adds $T_2$ for the covariances of the counts across participants.
+By default, a cell combines the tree column with the categorical predictors of the formula, here `tree` and `cond`, which gives the three conditions; the `by` argument changes this. The participants for $T_2$ come from the grouping variable of the random effects, `ID`. `ppp()` sums the counts of a cell over participants, where @klauer2010 and TreeBUGS average them; with the same number of participants in every cell, as here, both give the same PPP.
+
+The $T_1$ PPP of `r round(ppp_ol$ppp[1], 2)` shows that the model reproduces the category frequencies of each condition. The $T_2$ PPP of `r round(ppp_ol$ppp[2], 3)` is small: data simulated from the model rarely deviate from the expected covariances as much as the observed data do. The model keeps all person effects uncorrelated, so a participant with a high `Pi` in one condition is not expected to have a high `Pi` in the other conditions as well. Correlated person effects, `(0 + cond | ID)` or the `|p|` syntax described under [Migrating from MPTinR or TreeBUGS], are the first extension to try.
+
+With `level = "participant"`, `ppp()` computes $T_1$ and its PPP for each participant separately, as TreeBUGS does, to find the participants the model fits poorly:
+
+```{r ppp-ol-participant}
+ppp_ol_id <- ppp(fit_ol, level = "participant")
+head(ppp_ol_id)
+```
+
+The smallest of the `r nrow(ppp_ol_id)` participant PPPs is `r round(min(ppp_ol_id$ppp), 2)`.
 
 ## Model comparison
 
@@ -649,7 +649,7 @@ Importing the model structure is the easy part; what usually needs translating i
 | `getParam(fit, "mean")` | `native_parameters(fit, re_formula = NA, summary = TRUE)`: the probability of the median participant, as in TreeBUGS ([Population-level probabilities]) |
 | `probitInverse()` | `?native_parameters`, section "Group-level effects" |
 | `genTraitMPT()`, `genBetaMPT()` | `rmpt()` inside a small simulation function ([Data format and simulation]) |
-| `PPP()` | `pp_check()` for the plot; the code in [Goodness of fit: the T1 statistic] for the posterior predictive p-value |
+| `PPP()` | `ppp()`: $T_1$ and $T_2$ with their posterior predictive p-values, and with `level = "participant"` the $T_1$ of each participant ([Goodness of fit: T1 and T2]); `pp_check()` for the plot |
 | `WAIC()`, `select.mpt()` | `loo()`, `waic()` and `bayes_factor()` from **brms**; for aggregated counts see [Model comparison] before using any of them |
 | `testHetChi()`, `testHetPerm()` | these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In `bmm`, compare models with and without person effects ([Model comparison]) |
 | `BayesFactorMPT()`, `BayesFactorSlope()` | `brms::bayes_factor()` on fits stored with `save_pars = save_pars(all = TRUE)` ([Model comparison]) |
