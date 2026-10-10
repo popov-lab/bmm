@@ -457,53 +457,23 @@ settable_link_functions.mpt <- function(model) {
 #'   outside the group instead.
 #'
 #'   Printing the model ends with an identifiability check for intercept-only
-#'   formulas. It first compares the number of free parameters with the
-#'   degrees of freedom (response categories minus one, summed over trees).
-#'   It then computes the rank of the Jacobian of all category probabilities
-#'   with respect to the free parameters, from exact derivatives at five
-#'   interior test values; parameters fixed in the formula enter at their
-#'   values. A simplex group counts with one free parameter fewer than its
-#'   members, and the printout names the group by its members. Covariates
-#'   are never free parameters; because rows with different covariate values
-#'   can identify what one design cell cannot, the rank is taken over the rows
-#'   of every distinct covariate setting in the data in `bmm()`, and
-#'   over five test values of the covariates when printing. In `bmm()`, a
-#'   tree without rows in the data adds nothing to the rank. The two can
-#'   therefore disagree in either direction: `print()` can report full rank
-#'   for a design whose data leave a parameter open, and `bmm()` then reports
-#'   the deficit (a warning, or a message when a formula has predictors or
-#'   is non-linear); five test values of a covariate can leave open what more
-#'   distinct values in the data identify, and `bmm()` then stays silent. A
-#'   rank below the
-#'   number of free parameters means that some combination of the listed
-#'   parameters cannot be estimated from the data,
-#'   even when the count passes, and its posterior follows the prior; a
-#'   parameter whose derivatives are zero up to rounding at the test values
-#'   appears not to affect any category probability and is named separately.
-#'   Fix parameters in the formula or equate them in the branch expressions
-#'   until the rank is full. `bmm()` warns about a rank deficit unless a
-#'   formula uses a data column as a predictor, or a non-linear formula
-#'   defines or reads one of the parameters the deficit involves. A parameter
-#'   that differs between conditions can identify the model across them, and a
-#'   non-linear formula can tie the parameters of the deficit together, so
-#'   `bmm()` then only announces the deficit and says what was not checked; a
-#'   non-linear formula on a parameter outside the deficit keeps the warning.
-#'   The announcement says that the tree parameters are not identified within
-#'   one design cell when predictors make cells, and by the branch expressions
-#'   alone otherwise. It names the parameters involved when the rank uses the
-#'   data (covariate values or trees without rows), and otherwise refers to
-#'   `print()`. The rank covers the parameters of the branch expressions only:
-#'   a non-linear formula that ties them together (`Dn ~ Do`) or builds one
-#'   from sub-parameters is not analysed, and `print()` of the checked model
-#'   says the formula was not analysed. The check is local: it holds at the
-#'   test values, not at the boundaries of the parameter space. A test value
-#'   at which a derivative is not finite (in `bmm()`, also at a covariate
-#'   value in the data) is left out, and the rank text says how many were. A
-#'   branch expression with a function that [stats::D()] cannot differentiate,
-#'   or a derivative that is not finite at all but one of the test values,
-#'   leaves the rank uncomputed, and the printout says so; `bmm()` then
-#'   reports only the count, when the free parameters outnumber the degrees of
-#'   freedom.
+#'   formulas: the free parameters against the degrees of freedom (response
+#'   categories minus 1, summed over trees), and the rank of the Jacobian of
+#'   the category probabilities at five interior test values (and five test
+#'   values of each covariate). A rank below the number of free parameters
+#'   means that a combination of the named parameters is not identified by the
+#'   branch expressions. A test value with a non-finite derivative is left
+#'   out, and the printout says how many; if [stats::D()] cannot differentiate
+#'   a branch expression, the rank is not computed and the count decides.
+#'
+#'   `bmm()` warns when the rank is deficient and every formula is
+#'   intercept-only. When a formula has a predictor or is non-linear, it only
+#'   says that these may identify the parameters and that it did not check.
+#'
+#'   Example: separate detection parameters `Do` and `Dn` in a single old/new
+#'   test give three free parameters and rank 2 of 3, so one combination of
+#'   `Do`, `Dn` and `g` cannot be estimated; a second condition that varies
+#'   the response bias identifies them.
 #'
 #'   `summary()` reports intercepts and regression coefficients on the latent
 #'   (logit or probit) scale. [native_parameters()] returns the posterior
@@ -872,22 +842,10 @@ print_model_details.mpt <- function(model, ...) {
   }
   # set by check_model.mpt() for parameters with a non-linear formula
   tied <- names(attr(model, "mpt_bypassed_links"))
-  rank_text <- if (!is.null(identifiability$error)) {
-    glue("Jacobian rank not computed: {identifiability$error}.")
-  } else if (length(tied) > 0) {
-    .mpt_tied_rank_text(identifiability, tied)
-  } else if (identifiability$rank < identifiability$n_free) {
-    .mpt_rank_deficit_text(identifiability)
-  } else {
-    paste(c(
-      glue(
-        "Jacobian rank {identifiability$rank} of {identifiability$n_free} \\
-        {identifiability$where}: locally identified."
-      ),
-      .mpt_left_out_text(identifiability)
-    ), collapse = " ")
-  }
-  cat(strwrap(rank_text, indent = 2, exdent = 4), sep = "\n")
+  cat(
+    strwrap(.mpt_rank_text(identifiability, tied), indent = 2, exdent = 4),
+    sep = "\n"
+  )
   invisible(NULL)
 }
 
@@ -913,14 +871,14 @@ print_model_details.mpt <- function(model, ...) {
 # rank of the category probabilities in the free tree parameters; a parameter
 # fixed in the formula enters at its value. A simplex group is free through its
 # stick-breaking components, which users never write, so the text names the
-# group's members instead. Covariates are data, never free parameters
-.mpt_identifiability <- function(model, data = NULL) {
+# group's members instead. Covariates are data, never free parameters; the rank
+# is taken at five test values of each
+.mpt_identifiability <- function(model) {
   trees <- model$other_vars$trees
   simplex <- model$other_vars$simplex
   sticks <- model$other_vars$simplex_raw
-  parameters <- setdiff(
-    .mpt_tree_parameters(trees, model$other_vars$covariates), unlist(simplex)
-  )
+  covariates <- model$other_vars$covariates
+  parameters <- setdiff(.mpt_tree_parameters(trees, covariates), unlist(simplex))
   fixed <- model$fixed_parameters[
     intersect(names(model$fixed_parameters), parameters)
   ]
@@ -934,176 +892,85 @@ print_model_details.mpt <- function(model, ...) {
       "the simplex group {collapse_comma(grp)}"
     )
   }
-  settings <- .mpt_covariate_settings(model, data)
-  # a tree without rows has no setting; only data on it can inform what no
-  # tree with rows contains
-  unobserved <- if (settings$from_data) {
-    observed <- vapply(settings$values, nrow, integer(1)) > 0L
-    covariates <- model$other_vars$covariates
-    only_unobserved <- setdiff(
-      .mpt_tree_parameters(trees[!observed], covariates),
-      .mpt_tree_parameters(trees[observed], covariates)
-    )
-    # a simplex group is free through its sticks, which no tree contains
-    intersect(free, c(only_unobserved, unlist(lapply(simplex, function(grp) {
-      if (all(grp %in% only_unobserved)) sticks[grp[-length(grp)]]
-    }))))
+  settings <- NULL
+  where <- "at interior test values"
+  if (.mpt_uses_covariates(model)) {
+    test_values <- as.data.frame(do.call(rbind, .mpt_test_points(covariates, list())))
+    settings <- lapply(trees, function(tree) {
+      used <- intersect(covariates, .mpt_expr_vars(tree))
+      if (length(used) == 0L) data.frame(row.names = 1L) else test_values[used]
+    })
+    where <- "at interior test values and 5 test values of the covariates"
   }
   c(
-    .mpt_jacobian_rank(trees, free, fixed, simplex, sticks, settings$values),
-    list(
-      labels = labels, where = settings$where, from_data = settings$from_data,
-      unobserved = unobserved
-    )
+    .mpt_jacobian_rank(trees, free, fixed, simplex, sticks, settings),
+    list(labels = labels, where = where)
   )
 }
 
-# covariate values at which the rank is taken, one data frame per tree (a tree
-# without covariates has one empty setting): the distinct finite values in the
-# tree's rows of the data. A subset can only lower the rank, so none is dropped.
-# A tree without rows adds no rows, with or without covariates; without
-# covariates the data matter only through such a tree, and when every tree or
-# none has rows the rank is the model's. Five test values stand in when the
-# data cannot provide the covariates (print() has no data; a missing,
-# non-numeric or non-finite covariate is check_data()'s to report)
-.mpt_covariate_settings <- function(model, data) {
-  trees <- model$other_vars$trees
-  covariates <- model$other_vars$covariates
-  tree_id <- model$other_vars$tree_id
-  used <- lapply(trees, function(tree) intersect(covariates, .mpt_expr_vars(tree)))
-  empty <- data.frame(row.names = 1L)
-  # an absent or non-matching tree_id column leaves every tree without rows;
-  # check_data() names the problem
-  tree_rows <- if (is.data.frame(data)) {
-    lapply(names(trees), function(name) {
-      if (is.null(tree_id)) {
-        seq_len(nrow(data))
-      } else {
-        which(as.character(data[[tree_id]]) %in% name)
-      }
-    })
-  }
-  # one empty setting for a tree with rows, none for a tree without
-  one_setting <- function(rows) empty[seq_len(min(length(rows), 1L)), , drop = FALSE]
-  with_rows <- lengths(tree_rows) > 0L
-  in_data <- if (all(with_rows)) "in the data" else "in the trees with rows in the data"
-  if (length(unlist(used)) == 0L) {
-    if (all(with_rows) || !any(with_rows)) {
-      return(list(values = NULL, where = "at interior test values", from_data = FALSE))
-    }
-    return(list(
-      values = lapply(tree_rows, one_setting),
-      where = glue("at interior test values {in_data}"),
-      from_data = TRUE
-    ))
-  }
-  usable <- is.data.frame(data) && all(covariates %in% names(data)) &&
-    all(vapply(data[covariates], is.numeric, logical(1)))
-  if (usable) {
-    values <- lapply(seq_along(trees), function(tree) {
-      rows <- tree_rows[[tree]]
-      if (length(used[[tree]]) == 0L) {
-        return(one_setting(rows))
-      }
-      settings <- data[rows, used[[tree]], drop = FALSE]
-      settings <- unique(settings[rowSums(!is.finite(as.matrix(settings))) == 0L, ,
-        drop = FALSE])
-      # rows without one complete setting leave the data unusable for the rank
-      if (length(rows) > 0L && nrow(settings) == 0L) {
-        return(NULL)
-      }
-      settings
-    })
-    if (!any(vapply(values, is.null, logical(1))) &&
-          sum(vapply(values, nrow, integer(1))) > 0L) {
-      return(list(
-        values = values,
-        where = glue("at interior test values and the covariate values {in_data}"),
-        from_data = TRUE
-      ))
-    }
-  }
-  test_values <- as.data.frame(do.call(rbind, .mpt_test_points(covariates, list())))
-  list(
-    values = lapply(used, function(cov) {
-      if (length(cov) == 0L) empty else test_values[cov]
-    }),
-    where = "at interior test values and 5 test values of the covariates",
-    from_data = FALSE
+.mpt_rank_text <- function(identifiability, tied = NULL) {
+  rank_line <- glue(
+    "Jacobian rank {identifiability$rank} of {identifiability$n_free} \\
+    {identifiability$where}:"
   )
+  # the rank sees the tree parameters only, not what a non-linear formula ties
+  # together or builds from sub-parameters
+  not_analysed <- if (length(tied) > 0) {
+    glue("; non-linear formula(s) for {collapse_comma(tied)} not analysed")
+  } else {
+    ""
+  }
+  if (!is.null(identifiability$error)) {
+    glue("Jacobian rank not computed: {identifiability$error}.")
+  } else if (identifiability$rank < identifiability$n_free) {
+    paste(c(
+      glue(
+        "{rank_line} {.mpt_deficit_subject(identifiability)} not identified \\
+        by the branch expressions{not_analysed}."
+      ),
+      .mpt_left_out_text(identifiability)
+    ), collapse = " ")
+  } else {
+    paste(c(
+      glue("{rank_line} locally identified{not_analysed}."),
+      .mpt_left_out_text(identifiability)
+    ), collapse = " ")
+  }
 }
 
-.mpt_rank_deficit_text <- function(identifiability,
-                                   lead = "The model is not identified") {
-  free <- identifiability$free
-  labels <- identifiability$labels
-  absent <- identifiability$absent
-  unobserved <- identifiability$unobserved
-  entangled <- setdiff(identifiability$involved, absent)
-  n_combinations <- identifiability$n_free - identifiability$rank -
-    length(absent)
-  paste(c(
-    glue(
-      "{lead}: the Jacobian of the category probabilities has rank \\
-      {identifiability$rank} for {identifiability$n_free} free parameters \\
-      {identifiability$where}."
-    ),
-    if (n_combinations > 0 && length(entangled) > 0) {
-      glue(
-        "{n_combinations} combination(s) of \\
-        {.mpt_parameter_set(entangled, free, labels)} cannot be estimated \\
-        from the data."
-      )
-    },
-    # a parameter only in trees without rows has a zero derivative for that
-    # reason alone, which the next sentence gives
-    if (length(setdiff(absent, unobserved)) > 0) {
-      glue(
-        "The derivative with respect to \\
-        {.mpt_labels(setdiff(absent, unobserved), labels)} is zero up to \\
-        rounding {identifiability$where}, so these parameter(s) appear not to \\
-        affect any category probability there."
-      )
-    },
-    if (length(unobserved) > 0) {
-      glue(
-        "Only trees without rows in the data contain \\
-        {.mpt_labels(unobserved, labels)}, so no row's category probabilities \\
-        depend on {if (length(unique(labels[unobserved])) == 1L) 'it' else 'them'}."
-      )
-    },
-    .mpt_left_out_text(identifiability),
-    glue(
-      "Fix parameters in the formula (bmf(name = value)) or equate them in \\
-      the branch expressions."
-    )
-  ), collapse = " ")
+.mpt_deficit_pars <- function(identifiability) {
+  # without a rank, every free parameter is suspect
+  if (is.null(identifiability$error)) identifiability$involved else identifiability$free
 }
 
-# a non-linear formula can tie tree parameters together (Dn ~ Do) or build one
-# from sub-parameters; the rank of the tree parameters sees neither, so it
-# can neither confirm nor refute identification
-.mpt_tied_rank_text <- function(identifiability, tied) {
-  paste(c(
+.mpt_deficit_params <- function(identifiability) {
+  pars <- .mpt_deficit_pars(identifiability)
+  if (length(pars) == 1L) {
+    .mpt_labels(pars, identifiability$labels)
+  } else {
+    .mpt_parameter_set(pars, identifiability$free, identifiability$labels)
+  }
+}
+
+.mpt_deficit_subject <- function(identifiability) {
+  params <- .mpt_deficit_params(identifiability)
+  if (length(.mpt_deficit_pars(identifiability)) == 1L) {
+    glue("{params} is")
+  } else {
+    glue("the combination of {params} is")
+  }
+}
+
+.mpt_deficit_text <- function(identifiability) {
+  if (is.null(identifiability$error)) {
+    .mpt_rank_text(identifiability)
+  } else {
     glue(
-      "Jacobian rank {identifiability$rank} of {identifiability$n_free} in \\
-      the tree parameters {identifiability$where}."
-    ),
-    if (identifiability$rank < identifiability$n_free) {
-      glue(
-        "{identifiability$n_free - identifiability$rank} combination(s) of \\
-        {.mpt_parameter_set(
-          identifiability$involved, identifiability$free, identifiability$labels
-        )} \\
-        are not identified by the branch expressions alone."
-      )
-    },
-    .mpt_left_out_text(identifiability),
-    glue(
-      "The non-linear formula(s) for {collapse_comma(tied)} were not \\
-      analysed, so whether the model is identified is not checked."
+      "{identifiability$n_free} free parameters for {identifiability$df} \\
+      degrees of freedom (response categories minus 1, summed over trees); \\
+      {.mpt_rank_text(identifiability)}"
     )
-  ), collapse = " ")
+  }
 }
 
 # a list longer than half the free parameters reads better as its complement
@@ -1204,117 +1071,49 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
       )
     }
 
-    # population-level predictors can identify a parameter across design
-    # cells that a single cell leaves open, also when they sit on a parameter
-    # outside the deficit (h ~ cond identifies D and r in h * r + (1 - h) * D),
-    # and a non-linear formula can tie parameters together. Without
-    # predictors there is one cell, so a deficit whose parameters no
-    # non-linear formula defines or reads is certain and warned about;
-    # otherwise it is announced only
-    with_predictors <- .mpt_predictor_formulas(formula, names(model$parameters))
-    identifiability <- .mpt_identifiability(model, data)
-    reached <- c(
-      nl_pars,
-      intersect(rhs_vars(formula[is_nl(formula)]), names(model$parameters))
-    )
-    # a simplex group is free through its sticks, so reaching a member reaches them
-    for (grp in model$other_vars$simplex) {
-      if (any(grp %in% reached)) {
-        reached <- c(reached, unname(model$other_vars$simplex_raw[grp[-length(grp)]]))
-      }
-    }
-    # without a rank, the count bound is all there is; covariate values that
-    # differ between rows can add what one design cell lacks
-    count_only <- !is.null(identifiability$error)
-    # a non-linear formula speaks only to a deficit it reaches; without a rank
-    # there are no parameters to compare it against, so any formula counts
-    nl_reaches <- count_only ||
-      length(intersect(identifiability$involved, reached)) > 0
-    unchecked <- paste(c(
-      if (length(with_predictors) > 0) {
-        glue(
-          "the predictors on {collapse_comma(with_predictors)} identify \\
-          it across cells"
-        )
-      },
-      if (length(nl_pars) > 0 && nl_reaches) {
-        glue("the non-linear formula(s) for {collapse_comma(nl_pars)} identify it")
-      },
-      if (count_only && .mpt_uses_covariates(model)) {
-        "the covariate values in the data identify it"
-      }
-    ), collapse = " or ")
-    warn <- !nzchar(unchecked)
-    # a non-linear tie is not a design cell; predictors and covariate values are
-    lead <- if (length(with_predictors) > 0 || .mpt_uses_covariates(model)) {
-      "The tree parameters are not identified within one design cell"
+    # a deficit of the branch expressions alone is certain only when no
+    # predictor or non-linear formula can identify the parameters involved; the
+    # count bound stands in when the rank cannot be computed
+    identifiability <- .mpt_identifiability(model)
+    deficit <- if (is.null(identifiability$error)) {
+      identifiability$rank < identifiability$n_free
     } else {
-      "The tree parameters are not identified by the branch expressions alone"
+      identifiability$n_free > identifiability$df
     }
-    if (count_only && identifiability$n_free > identifiability$df) {
-      count_text <- glue(
-        "{identifiability$n_free} free parameters for \\
-        {identifiability$df} degrees of freedom (response categories minus 1, \\
-        summed over trees); the Jacobian rank was not computed: \\
-        {identifiability$error}."
+    if (deficit && .mpt_no_predictors(formula, names(model$parameters))) {
+      warning2(
+        "The model is not identified. {.mpt_deficit_text(identifiability)} \\
+        Along the non-identified direction(s), the posterior follows the prior."
       )
-      if (warn) {
-        warning2(
-          "The model is not identified: {count_text} Fix parameters in the \\
-          formula (bmf(name = value)) or equate them in the branch expressions."
-        )
-      } else {
-        message2(
-          "{lead}: {count_text} Whether {unchecked} is not checked."
-        )
-      }
-    } else if (!count_only && identifiability$rank < identifiability$n_free) {
-      if (warn) {
-        warning2(
-          "{.mpt_rank_deficit_text(identifiability)} Along the non-identified \\
-          direction(s), the posterior follows the prior."
-        )
-      } else if (identifiability$from_data) {
-        # print() has no data, so it cannot name the parameters that the
-        # covariate values in the data or a tree without rows leave open
-        message2(
-          "{.mpt_rank_deficit_text(
-            identifiability, lead
-          )} Whether {unchecked} is not checked."
-        )
-      } else {
-        message2(
-          "{lead} (Jacobian rank {identifiability$rank} for \\
-          {identifiability$n_free} free parameters; print(model) names the \\
-          parameters involved). Whether {unchecked} is not checked."
-        )
-      }
+    } else if (deficit) {
+      message2(
+        "The branch expressions alone do not identify \\
+        {.mpt_deficit_params(identifiability)}. Predictors or non-linear \\
+        formulas may identify them; this was not checked."
+      )
     }
   }
   NextMethod("check_model")
 }
 
-# formulas whose population-level terms use a data column; random-effect terms
-# carry a bar, and parameters inside a non-linear formula are not data. A
-# formula terms() cannot read counts as having predictors, which turns the
-# warning into the milder message rather than risking a false one
-.mpt_predictor_formulas <- function(formula, parameters) {
+# a population-level term uses a data column; random-effect terms carry a bar,
+# and parameters inside a non-linear formula are not data. A formula terms()
+# cannot read counts as having predictors, which gives the message rather than
+# a false warning
+.mpt_no_predictors <- function(formula, parameters) {
   formula <- formula[!is_constant(formula)]
-  has_predictors <- vapply(formula, function(par_formula) {
+  !any(is_nl(formula)) && !any(vapply(formula, function(par_formula) {
     formula_terms <- try(stats::terms(par_formula), silent = TRUE)
-    if (is_try_error(formula_terms)) {
-      return(TRUE)
-    }
-    labels <- attr(formula_terms, "term.labels")
-    length(setdiff(
+    is_try_error(formula_terms) || length(setdiff(
       unlist(lapply(
-        labels[!grepl("|", labels, fixed = TRUE)],
+        attr(formula_terms, "term.labels")[
+          !grepl("|", attr(formula_terms, "term.labels"), fixed = TRUE)
+        ],
         function(label) all.vars(str2lang(label))
       )),
       c(names(formula), parameters)
     )) > 0
-  }, logical(1))
-  names(formula)[has_predictors]
+  }, logical(1)))
 }
 
 # a parameter whose link was switched after construction gets the matched
