@@ -154,53 +154,23 @@ group and their \code{praw} components cannot be fixed this way; fix parameters
 outside the group instead.
 
 Printing the model ends with an identifiability check for intercept-only
-formulas. It first compares the number of free parameters with the
-degrees of freedom (response categories minus one, summed over trees).
-It then computes the rank of the Jacobian of all category probabilities
-with respect to the free parameters, from exact derivatives at five
-interior test values; parameters fixed in the formula enter at their
-values. A simplex group counts with one free parameter fewer than its
-members, and the printout names the group by its members. Covariates
-are never free parameters; because rows with different covariate values
-can identify what one design cell cannot, the rank is taken over the rows
-of every distinct covariate setting in the data in \code{bmm()}, and
-over five test values of the covariates when printing. In \code{bmm()}, a
-tree without rows in the data adds nothing to the rank. The two can
-therefore disagree in either direction: \code{print()} can report full rank
-for a design whose data leave a parameter open, and \code{bmm()} then reports
-the deficit (a warning, or a message when a formula has predictors or
-is non-linear); five test values of a covariate can leave open what more
-distinct values in the data identify, and \code{bmm()} then stays silent. A
-rank below the
-number of free parameters means that some combination of the listed
-parameters cannot be estimated from the data,
-even when the count passes, and its posterior follows the prior; a
-parameter whose derivatives are zero up to rounding at the test values
-appears not to affect any category probability and is named separately.
-Fix parameters in the formula or equate them in the branch expressions
-until the rank is full. \code{bmm()} warns about a rank deficit unless a
-formula uses a data column as a predictor, or a non-linear formula
-defines or reads one of the parameters the deficit involves. A parameter
-that differs between conditions can identify the model across them, and a
-non-linear formula can tie the parameters of the deficit together, so
-\code{bmm()} then only announces the deficit and says what was not checked; a
-non-linear formula on a parameter outside the deficit keeps the warning.
-The announcement says that the tree parameters are not identified within
-one design cell when predictors make cells, and by the branch expressions
-alone otherwise. It names the parameters involved when the rank uses the
-data (covariate values or trees without rows), and otherwise refers to
-\code{print()}. The rank covers the parameters of the branch expressions only:
-a non-linear formula that ties them together (\code{Dn ~ Do}) or builds one
-from sub-parameters is not analysed, and \code{print()} of the checked model
-says the formula was not analysed. The check is local: it holds at the
-test values, not at the boundaries of the parameter space. A test value
-at which a derivative is not finite (in \code{bmm()}, also at a covariate
-value in the data) is left out, and the rank text says how many were. A
-branch expression with a function that \code{\link[stats:D]{stats::D()}} cannot differentiate,
-or a derivative that is not finite at all but one of the test values,
-leaves the rank uncomputed, and the printout says so; \code{bmm()} then
-reports only the count, when the free parameters outnumber the degrees of
-freedom.
+formulas: the free parameters against the degrees of freedom (response
+categories minus 1, summed over trees), and the rank of the Jacobian of
+the category probabilities at five interior test values (and five test
+values of each covariate). A rank below the number of free parameters
+means that a combination of the named parameters is not identified by the
+branch expressions. A test value with a non-finite derivative is left
+out, and the printout says how many; if \code{\link[stats:D]{stats::D()}} cannot differentiate
+a branch expression, the rank is not computed and the count decides.
+
+\code{bmm()} warns when the rank is deficient and every formula is
+intercept-only. When a formula has a predictor or is non-linear, it only
+says that these may identify the parameters and that it did not check.
+
+Example: separate detection parameters \code{Do} and \code{Dn} in a single old/new
+test give three free parameters and rank 2 of 3, so one combination of
+\code{Do}, \code{Dn} and \code{g} cannot be estimated; a second condition that varies
+the response bias identifies them.
 
 \code{summary()} reports intercepts and regression coefficients on the latent
 (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
