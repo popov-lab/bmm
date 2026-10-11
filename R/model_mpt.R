@@ -354,9 +354,10 @@ settable_link_functions.mpt <- function(model) {
 #'   `1 + cond` it holds in the reference cell only, because the effects keep
 #'   their own prior. TreeBUGS instead puts a uniform prior on each branch
 #'   parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
-#'   for three members); for a group `gA`, `gB`, `gC`, `gD` that is
-#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"),
-#'   coef = "Intercept")`.
+#'   for three members). To get it for a group `gA`, `gB`, `gC`, `gD`, pass
+#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"))`,
+#'   with `"normal(0, 1)"` under the probit link; without `coef`, it covers
+#'   every cell of a `0 + cond` formula.
 #'   A predictor on member `p` acts on the logit (or probit) of `p`'s share of
 #'   the probability left over by the members listed before it. A predictor
 #'   on the first member therefore scales all later members by the same
