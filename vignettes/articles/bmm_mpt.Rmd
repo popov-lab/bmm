@@ -65,20 +65,30 @@ The article follows the order of a typical analysis: specifying the trees, prepa
 
 # Specifying an MPT model
 
-An MPT model is specified as a set of trees. Each tree is created with `mpt_tree()`: it has a name, and one branch-probability expression per response category:
+An MPT model is specified as a set of trees. Each tree is created with `mpt_tree()`: it has a name, and one branch-probability expression per response category, written as a formula `category ~ expression`:
 
 ```{r}
 library(bmm)
 
-tree_old <- mpt_tree("old", list(
+tree_old <- mpt_tree("old",
+  old ~ D + (1 - D) * g,
+  new ~ (1 - D) * (1 - g)
+)
+tree_new <- mpt_tree("new",
+  old ~ (1 - D) * g,
+  new ~ D + (1 - D) * (1 - g)
+)
+tree_old
+```
+
+The formulas are never evaluated; they only carry the expressions and the response category on the left-hand side. The expressions can equally be given as a named list of character strings, which is the form that `mpt_from_string()` and `mpt_from_eqn()` produce. The two spellings give identical trees:
+
+```{r}
+tree_old_strings <- mpt_tree("old", list(
   old = "D + (1 - D) * g",
   new = "(1 - D) * (1 - g)"
 ))
-tree_new <- mpt_tree("new", list(
-  old = "(1 - D) * g",
-  new = "D + (1 - D) * (1 - g)"
-))
-tree_old
+identical(tree_old, tree_old_strings)
 ```
 
 The trees are combined into a model object with `mpt()`. The `tree_id` argument names the data column whose values say which tree each observation belongs to; here `item_type`, holding `"old"` and `"new"`. Printing the model lists the trees and then checks identifiability in two ways: it compares the number of free parameters with the degrees of freedom the trees provide (response categories minus 1, summed over trees), the classical bound that MPTinR's `check.mpt()` reports, and it computes the rank of the Jacobian of the category probabilities at interior parameter values:

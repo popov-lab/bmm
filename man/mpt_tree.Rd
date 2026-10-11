@@ -4,23 +4,32 @@
 \alias{mpt_tree}
 \title{Create a tree for a Multinomial Processing Tree (MPT) model}
 \usage{
-mpt_tree(name, branches, impossible = NULL)
+mpt_tree(name, branches, ..., impossible = NULL)
 }
 \arguments{
 \item{name}{Character. Label for the tree. For models with multiple trees,
 the label identifies the tree in the data: the column named by the
 \code{tree_id} argument of \code{\link[=mpt]{mpt()}} holds one such label per observation.}
 
-\item{branches}{A named list of character strings. Each element gives the
-branch probability expression for one response category, and the element
-names are the response categories. The expressions can use latent
-parameters (e.g., \code{"D + (1 - D) * g"}), numeric constants, and declared
-covariates (see \code{\link[=mpt]{mpt()}}).}
+\item{branches}{Either a named list of character strings or the first of
+several formulas. Each list element (or formula) gives the branch
+probability expression for one response category; the element names (or
+the left-hand sides) are the response categories. The expressions can use
+latent parameters (e.g., \code{D + (1 - D) * g}), numeric constants, and
+declared covariates (see \code{\link[=mpt]{mpt()}}).}
+
+\item{...}{Further formulas of the form \code{category ~ expression}, one per
+response category, when \code{branches} is a formula. The two spellings are
+equivalent: \code{mpt_tree("old", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))} and `mpt_tree("old", old ~ D + (1 - D) * g, new ~ (1 - D) * (1
+\itemize{
+\item g))` give the same tree. A call uses one of the two, not a mix.
+}}
 
 \item{impossible}{Character vector. Response categories that cannot occur in
 this tree, for example distractor responses when no distractors were
 presented. Such categories get no branch expression, and the remaining
-branches must sum to 1 on their own.}
+branches must sum to 1 on their own. It follows \code{...}, so it has to be
+named.}
 }
 \value{
 An object of class \code{mpt_tree}
@@ -32,6 +41,11 @@ response category. Trees created with \code{mpt_tree()} are combined into a
 full model specification with \code{\link[=mpt]{mpt()}}.
 }
 \details{
+The formulas are never evaluated: the left-hand side must be a
+single response category name, the right-hand side is stored as written,
+and the formula environment is dropped. A one-sided formula, a left-hand
+side that is not a name, and a mix of formulas and strings are errors.
+
 Constant arithmetic such as \code{1/4} or \code{1/(2*2)} is folded into a
 decimal literal (\code{0.25}) when the tree is created. Stan compiles a bare
 integer fraction as integer division (\code{1/4 == 0}), which would silently
@@ -46,33 +60,37 @@ remaining branches to compensate.
 }
 \examples{
 tree_old <- mpt_tree(
+  "old",
+  old ~ D + (1 - D) * g,
+  new ~ (1 - D) * (1 - g)
+)
+tree_old
+
+# the same tree with the branches as a named list of strings
+tree_old_strings <- mpt_tree(
   name = "old",
   branches = list(
     old = "D + (1 - D) * g",
     new = "(1 - D) * (1 - g)"
   )
 )
-tree_old
+identical(tree_old, tree_old_strings)
 
 # a three-alternative recognition task in which lures are shown on some
 # trials only: `lure` responses cannot occur on the others
 tree_lures <- mpt_tree(
-  name = "lures",
-  branches = list(
-    target = "D * b + (1 - D) * (1/3)",
-    lure   = "D * (1 - b) + (1 - D) * (1/3)",
-    new    = "(1 - D) * (1/3)"
-  )
+  "lures",
+  target ~ D * b + (1 - D) * (1/3),
+  lure ~ D * (1 - b) + (1 - D) * (1/3),
+  new ~ (1 - D) * (1/3)
 )
 
 # the branches of the lure-free tree sum to 1 without the `lure` category;
 # no probability is reserved for it
 tree_nolures <- mpt_tree(
-  name = "nolures",
-  branches = list(
-    target = "D + (1 - D) * (1/2)",
-    new    = "(1 - D) * (1/2)"
-  ),
+  "nolures",
+  target ~ D + (1 - D) * (1/2),
+  new ~ (1 - D) * (1/2),
   impossible = "lure"
 )
 tree_nolures

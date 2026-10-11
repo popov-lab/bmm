@@ -13,17 +13,29 @@
 #' @param name Character. Label for the tree. For models with multiple trees,
 #'   the label identifies the tree in the data: the column named by the
 #'   `tree_id` argument of [mpt()] holds one such label per observation.
-#' @param branches A named list of character strings. Each element gives the
-#'   branch probability expression for one response category, and the element
-#'   names are the response categories. The expressions can use latent
-#'   parameters (e.g., `"D + (1 - D) * g"`), numeric constants, and declared
-#'   covariates (see [mpt()]).
+#' @param branches Either a named list of character strings or the first of
+#'   several formulas. Each list element (or formula) gives the branch
+#'   probability expression for one response category; the element names (or
+#'   the left-hand sides) are the response categories. The expressions can use
+#'   latent parameters (e.g., `D + (1 - D) * g`), numeric constants, and
+#'   declared covariates (see [mpt()]).
+#' @param ... Further formulas of the form `category ~ expression`, one per
+#'   response category, when `branches` is a formula. The two spellings are
+#'   equivalent: `mpt_tree("old", list(old = "D + (1 - D) * g", new = "(1 - D) *
+#'   (1 - g)"))` and `mpt_tree("old", old ~ D + (1 - D) * g, new ~ (1 - D) * (1
+#'   - g))` give the same tree. A call uses one of the two, not a mix.
 #' @param impossible Character vector. Response categories that cannot occur in
 #'   this tree, for example distractor responses when no distractors were
 #'   presented. Such categories get no branch expression, and the remaining
-#'   branches must sum to 1 on their own.
+#'   branches must sum to 1 on their own. It follows `...`, so it has to be
+#'   named.
 #'
-#' @details Constant arithmetic such as `1/4` or `1/(2*2)` is folded into a
+#' @details The formulas are never evaluated: the left-hand side must be a
+#'   single response category name, the right-hand side is stored as written,
+#'   and the formula environment is dropped. A one-sided formula, a left-hand
+#'   side that is not a name, and a mix of formulas and strings are errors.
+#'
+#'   Constant arithmetic such as `1/4` or `1/(2*2)` is folded into a
 #'   decimal literal (`0.25`) when the tree is created. Stan compiles a bare
 #'   integer fraction as integer division (`1/4 == 0`), which would silently
 #'   corrupt the likelihood.
@@ -41,33 +53,37 @@
 #'
 #' @examples
 #' tree_old <- mpt_tree(
+#'   "old",
+#'   old ~ D + (1 - D) * g,
+#'   new ~ (1 - D) * (1 - g)
+#' )
+#' tree_old
+#'
+#' # the same tree with the branches as a named list of strings
+#' tree_old_strings <- mpt_tree(
 #'   name = "old",
 #'   branches = list(
 #'     old = "D + (1 - D) * g",
 #'     new = "(1 - D) * (1 - g)"
 #'   )
 #' )
-#' tree_old
+#' identical(tree_old, tree_old_strings)
 #'
 #' # a three-alternative recognition task in which lures are shown on some
 #' # trials only: `lure` responses cannot occur on the others
 #' tree_lures <- mpt_tree(
-#'   name = "lures",
-#'   branches = list(
-#'     target = "D * b + (1 - D) * (1/3)",
-#'     lure   = "D * (1 - b) + (1 - D) * (1/3)",
-#'     new    = "(1 - D) * (1/3)"
-#'   )
+#'   "lures",
+#'   target ~ D * b + (1 - D) * (1/3),
+#'   lure ~ D * (1 - b) + (1 - D) * (1/3),
+#'   new ~ (1 - D) * (1/3)
 #' )
 #'
 #' # the branches of the lure-free tree sum to 1 without the `lure` category;
 #' # no probability is reserved for it
 #' tree_nolures <- mpt_tree(
-#'   name = "nolures",
-#'   branches = list(
-#'     target = "D + (1 - D) * (1/2)",
-#'     new    = "(1 - D) * (1/2)"
-#'   ),
+#'   "nolures",
+#'   target ~ D + (1 - D) * (1/2),
+#'   new ~ (1 - D) * (1/2),
 #'   impossible = "lure"
 #' )
 #' tree_nolures
@@ -77,16 +93,32 @@
 #' # e.g. bmf(D ~ 0 + cond)
 #' model <- mpt(list(tree_lures, tree_nolures), tree_id = "tree")
 #' @export
-mpt_tree <- function(name, branches, impossible = NULL) {
+mpt_tree <- function(name, branches, ..., impossible = NULL) {
   stop_missing_args()
   stopif(
     !is.character(name) || length(name) != 1L || !nzchar(name),
     "The tree name must be a single non-empty character string."
   )
+  extra <- list(...)
+  from_formulas <- inherits(branches, "formula")
+  stopif(
+    length(extra) > 0 && !from_formulas,
+    "Arguments after branches must be formulas, and then branches has to be a \\
+    formula too. Use either a named list of character strings or formulas, not \\
+    a mix. The impossible argument has to be named."
+  )
+  stopif(
+    is.list(branches) && any(vapply(branches, inherits, logical(1), "formula")),
+    "Pass the branch formulas as separate arguments, \\
+    mpt_tree(name, a ~ expr_a, b ~ expr_b), not as a list."
+  )
+  if (from_formulas) {
+    branches <- .mpt_formula_branches(c(list(branches), extra), name)
+  }
   stopif(
     !is.list(branches) || length(branches) == 0L,
     "The branches must be a named list with one branch probability expression \\
-    per response category."
+    per response category, or formulas of the form category ~ expression."
   )
   resp_cats <- names(branches)
   stopif(
@@ -116,16 +148,21 @@ mpt_tree <- function(name, branches, impossible = NULL) {
   )
   branches[] <- lapply(resp_cats, function(resp_cat) {
     expr <- branches[[resp_cat]]
-    stopif(
-      !is.character(expr) || length(expr) != 1L || !nzchar(expr),
-      "Branch probability expressions must be single character strings \\
-      (tree '{name}', category '{resp_cat}')."
-    )
-    parsed <- try(str2lang(expr), silent = TRUE)
-    stopif(
-      is_try_error(parsed),
-      "Cannot parse the branch expression '{expr}' in tree '{name}'."
-    )
+    if (from_formulas) {
+      parsed <- expr
+      expr <- deparse1(parsed)
+    } else {
+      stopif(
+        !is.character(expr) || length(expr) != 1L || !nzchar(expr),
+        "Branch probability expressions must be single character strings \\
+        (tree '{name}', category '{resp_cat}')."
+      )
+      parsed <- try(str2lang(expr), silent = TRUE)
+      stopif(
+        is_try_error(parsed),
+        "Cannot parse the branch expression '{expr}' in tree '{name}'."
+      )
+    }
     parsed <- .mpt_fold_numeric_division(parsed)
     scientific <- .mpt_scientific_constants(parsed)
     if (length(scientific) > 0) {
@@ -523,14 +560,14 @@ settable_link_functions.mpt <- function(model) {
 #' @examples
 #' \dontrun{
 #' # two-high-threshold (2HTM) model of recognition memory
-#' tree_old <- mpt_tree("old", list(
-#'   old = "D + (1 - D) * g",
-#'   new = "(1 - D) * (1 - g)"
-#' ))
-#' tree_new <- mpt_tree("new", list(
-#'   old = "(1 - D) * g",
-#'   new = "D + (1 - D) * (1 - g)"
-#' ))
+#' tree_old <- mpt_tree("old",
+#'   old ~ D + (1 - D) * g,
+#'   new ~ (1 - D) * (1 - g)
+#' )
+#' tree_new <- mpt_tree("new",
+#'   old ~ (1 - D) * g,
+#'   new ~ D + (1 - D) * (1 - g)
+#' )
 #'
 #' model <- mpt(
 #'   trees = list(tree_old, tree_new),
