@@ -386,7 +386,7 @@ settable_link_functions.mpt <- function(model) {
 #' @param tree_id Character. Name of the data column whose values name the tree
 #'   each observation belongs to; the values must match the tree names. Can be
 #'   omitted for single-tree models. Effects of experimental conditions belong
-#'   in the parameter formulas, not here — see Details.
+#'   in the parameter formulas, not here; see Details.
 #' @param covariates Character vector. Names of data columns that appear in
 #'   branch expressions but are not latent parameters, for example
 #'   design-fixed guessing rates. Covariates pass into the model formulas
@@ -414,12 +414,14 @@ settable_link_functions.mpt <- function(model) {
 #'   restrictions file, in `bmm` it holds the restrictions. To use such a file,
 #'   pass `readLines(path)`; blank lines and lines starting with `#` are
 #'   skipped, and a `#` after a restriction starts a comment, as in MPTinR.
-#'   Restrictions are substituted into the branch expressions before the
-#'   parameters are identified, so a restricted parameter is not part of the
-#'   model and cannot be a simplex member. Order constraints (`"Do > Dn"`) are
-#'   not supported here; see Details.
+#'   A restricted parameter is removed from the model; the Details say how
+#'   this differs from fixing a parameter in the formula. Order constraints
+#'   (`"Do > Dn"`) are not supported here; see Details.
 #' @param links Character. The link function for all latent probability
-#'   parameters: `"logit"` (default) or `"probit"`.
+#'   parameters: `"logit"` (default) or `"probit"`. The constructor takes one
+#'   link for the whole model; a single parameter is switched afterwards,
+#'   `model$links$D <- "probit"`, and takes that link's default priors (see
+#'   Details).
 #' @param ... used internally for testing, ignore it
 #'
 #' @details `r model_docs(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
@@ -432,7 +434,7 @@ settable_link_functions.mpt <- function(model) {
 #'   variable is passed. The `tree_id` column names the tree of each row, and
 #'   the counts of a row must come from trials of that tree.
 #'
-#'   A separate tree is needed only when the *branch expressions* differ — that
+#'   A separate tree is needed only when the *branch expressions* differ, that
 #'   is, when the trial determines which latent processes apply or which
 #'   response categories are reachable (old versus new probes, a response set
 #'   with or without distractors, inclusion versus exclusion instructions).
@@ -443,23 +445,36 @@ settable_link_functions.mpt <- function(model) {
 #'   well. When several levels of a factor share a branch structure, add a
 #'   column naming the tree and keep the factor for the formulas.
 #'
-#'   Parameters that receive a non-linear predictor formula (a formula whose
-#'   right-hand side references other formula parameters, e.g.
-#'   `D ~ Dmax * (1 - exp(-rate * ptime))`) are not transformed by the link
-#'   function: the user-supplied expression must keep the parameter within
-#'   (0, 1). Sub-parameters of such formulas (e.g., `Dmax` and `rate`) are
-#'   estimated on the identity scale with `normal(0, 1)` default priors. Their
-#'   random-effect SDs keep brms's default prior, `student_t(3, 0, 2.5)`,
-#'   because no single rate fits every scale such a formula can give them.
+#'   **Equating and fixing parameters.** Parameters are equated across trees
+#'   by giving them the same name. Beyond that, there are two mechanisms, and
+#'   they differ in when the constraint is decided. A *restriction*
+#'   (`restrictions = c("Dn = Do", "g = 0.5")`) is applied when the model is
+#'   built: it is substituted into the branch expressions before the
+#'   parameters are identified, so the restricted parameter is not part of
+#'   the model, gets no formula and no prior, cannot be a simplex member, and
+#'   is listed by `print(model)` under `Restrictions:` but not by
+#'   [parameter_info()]. A *constant in the formula* (`bmf(D ~ 1, g = 0.5)`)
+#'   is applied at fit time: the parameter stays part of the model, is listed
+#'   by `print()` under `Fixed:` and by [parameter_info()] with its value, and
+#'   is freed again by giving it a formula. The value is mapped to the latent
+#'   scale when the constant prior is built, so [default_prior()] shows
+#'   `constant(0)` for a guessing rate of 0.5 under the logit link, and
+#'   `summary()` lists it as `g_Intercept 0.00` under "Constant Parameters";
+#'   [prior_info()] and [parameter_info()] show the probability, 0.5. Members
+#'   of a `simplex` group and their `praw` components cannot be fixed this
+#'   way; fix parameters outside the group instead. As a rule of thumb, a
+#'   constant that defines the model goes into `restrictions`, a constant you
+#'   compare against a free version goes into the formula; the section
+#'   "Constraining parameters" of the MPT article walks through both.
 #'
-#'   Under the logit link, intercepts and regression coefficients get a
-#'   `logistic(0, 1)` prior and random-effect SDs get `exponential(1)`. Under
-#'   the probit link, intercepts and coefficients get `normal(0, 1)` and SDs
-#'   get `exponential(2)`. Group-level correlation matrices get `lkj(2)`.
-#'   Coefficients of the sub-parameters above get `normal(0, 0.5)`. A parameter
-#'   switched to the other link after construction (`model$links$D <-
-#'   "probit"`) takes that link's priors unless its default prior was
-#'   replaced. [default_prior()] lists the rows a given formula produces.
+#'   **Default priors.** Under the logit link, intercepts and regression
+#'   coefficients get a `logistic(0, 1)` prior and random-effect SDs get
+#'   `exponential(1)`. Under the probit link, intercepts and coefficients get
+#'   `normal(0, 1)` and SDs get `exponential(2)`. Group-level correlation
+#'   matrices get `lkj(2)`. A parameter switched to the other link after
+#'   construction (`model$links$D <- "probit"`) takes that link's priors
+#'   unless its default prior was replaced. [default_prior()] lists the rows
+#'   a given formula produces.
 #'
 #'   The default prior of a simplex group of K members is the uniform
 #'   (symmetric Dirichlet(1)) distribution on the simplex: each member has
@@ -481,26 +496,16 @@ settable_link_functions.mpt <- function(model) {
 #'   factor, leaving their ratios unchanged. Read such effects on the probability scale with
 #'   [native_parameters()].
 #'
-#'   A parameter can also be fixed to a probability at fit time, in the
-#'   formula: `bmf(D ~ 1, g = 0.5)`. Unlike a restriction, the parameter stays
-#'   part of the model and can be freed again by giving it a formula. The
-#'   value is mapped to the latent scale when the constant prior is built, so
-#'   [default_prior()] shows `constant(0)` for a guessing rate of 0.5 under
-#'   the logit link. For the same reason, `summary()` lists a fixed `g = 0.5`
-#'   as `g_Intercept 0.00` under "Constant Parameters"; [prior_info()] and
-#'   [parameter_info()] show the probability, 0.5. Members of a `simplex`
-#'   group and their `praw` components cannot be fixed this way; fix parameters
-#'   outside the group instead.
-#'
-#'   Printing the model ends with an identifiability check for intercept-only
-#'   formulas: the free parameters against the degrees of freedom (response
-#'   categories minus 1, summed over trees), and the rank of the Jacobian of
-#'   the category probabilities at five interior test values (and five test
-#'   values of each covariate). A rank below the number of free parameters
-#'   means that a combination of the named parameters is not identified by the
-#'   branch expressions. A test value with a non-finite derivative is left
-#'   out, and the printout says how many; if [stats::D()] cannot differentiate
-#'   a branch expression, the rank is not computed and the count decides.
+#'   **Identifiability.** Printing the model includes an identifiability
+#'   check for intercept-only formulas: the free parameters against the
+#'   degrees of freedom (response categories minus 1, summed over trees), and
+#'   the rank of the Jacobian of the category probabilities at five interior
+#'   test values (and five test values of each covariate). A rank below the
+#'   number of free parameters means that a combination of the named
+#'   parameters is not identified by the branch expressions. A test value
+#'   with a non-finite derivative is left out, and the printout says how
+#'   many; if [stats::D()] cannot differentiate a branch expression, the rank
+#'   is not computed and the count decides.
 #'
 #'   `bmm()` warns when the rank is deficient and every formula is
 #'   intercept-only. When a formula has a predictor or is non-linear, it only
@@ -511,10 +516,10 @@ settable_link_functions.mpt <- function(model) {
 #'   `Do`, `Dn` and `g` cannot be estimated; a second condition that varies
 #'   the response bias identifies them.
 #'
-#'   `summary()` reports intercepts and regression coefficients on the latent
-#'   (logit or probit) scale. [native_parameters()] returns the posterior
-#'   draws of every parameter on the probability scale for each observed
-#'   combination of the predictors, e.g.
+#'   **Reading the estimates.** `summary()` reports intercepts and regression
+#'   coefficients on the latent (logit or probit) scale. [native_parameters()]
+#'   returns the posterior draws of every parameter on the probability scale
+#'   for each observed combination of the predictors, e.g.
 #'   `native_parameters(fit, re_formula = NA, summary = TRUE)`; a difference
 #'   between conditions is the difference of these draws. With
 #'   `re_formula = NA` these are the probabilities of the median participant
@@ -534,15 +539,26 @@ settable_link_functions.mpt <- function(model) {
 #'   [brms::posterior_predict()] needs the columns `nTrials`, `Idx_<tree>` and
 #'   `Poss_<category>` that `check_data()` builds; `fit$data` contains them.
 #'
+#'   **Non-linear formulas.** Parameters that receive a non-linear predictor
+#'   formula (a formula whose right-hand side references other formula
+#'   parameters, e.g. `D ~ Dmax * (1 - exp(-rate * ptime))`) are not
+#'   transformed by the link function: the user-supplied expression must keep
+#'   the parameter within (0, 1). Sub-parameters of such formulas (e.g.,
+#'   `Dmax` and `rate`) are estimated on the identity scale with
+#'   `normal(0, 1)` default priors on their intercepts and `normal(0, 0.5)`
+#'   on their regression coefficients. Their random-effect SDs keep brms's
+#'   default prior, `student_t(3, 0, 2.5)`, because no single rate fits every
+#'   scale such a formula can give them.
+#'
 #'   Order constraints between parameters (`Do > Dn`) are expressed by
 #'   reparameterizing the larger parameter in the model formula, e.g.
 #'   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the section
 #'   "Order constraints" of the MPT article walks through the
 #'   recipe.
 #'
-#'   Parameter and response category names must start with a letter and may
-#'   contain only letters and digits, because brms does not allow underscores
-#'   or dots in non-linear parameter names.
+#'   **Names.** Parameter and response category names must start with a
+#'   letter and may contain only letters and digits, because brms does not
+#'   allow underscores or dots in non-linear parameter names.
 #'
 #'   All latent parameters are non-linear parameters of the underlying brms
 #'   model, and brms has no separate `Intercept` prior class for those: their

@@ -846,7 +846,11 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'   categories, giving the number of observed responses per category. If
 #'   `x` is a named vector, its names are matched to the response categories
 #'   and the vector is reordered accordingly; an unnamed vector is read in
-#'   the order of the branch names of the selected tree.
+#'   the order of the model's response categories,
+#'   `mpt_model$resp_vars$resp_cats`, which is the order of the first tree
+#'   given to [mpt()] ([mpt()] stores the branches of every tree in that
+#'   order, whatever order they were written in). `rmpt()` returns its
+#'   columns in the same order.
 #' @param n Integer. Number of observations to generate data for.
 #' @param size The total number of observations across all response categories.
 #' @param pars A named vector or list with the values of at least the latent
