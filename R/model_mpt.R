@@ -20,10 +20,9 @@
 #'   latent parameters (e.g., `D + (1 - D) * g`), numeric constants, and
 #'   declared covariates (see [mpt()]).
 #' @param ... Further formulas of the form `category ~ expression`, one per
-#'   response category, when `branches` is a formula. The two spellings are
-#'   equivalent: `mpt_tree("old", list(old = "D + (1 - D) * g", new = "(1 - D) *
-#'   (1 - g)"))` and `mpt_tree("old", old ~ D + (1 - D) * g, new ~ (1 - D) * (1
-#'   - g))` give the same tree. A call uses one of the two, not a mix.
+#'   response category, when `branches` is a formula. A call uses either
+#'   formulas or a named list of strings, not a mix; both spellings give the
+#'   same tree (see the examples).
 #' @param impossible Character vector. Response categories that cannot occur in
 #'   this tree, for example distractor responses when no distractors were
 #'   presented. Such categories get no branch expression, and the remaining
