@@ -1730,7 +1730,7 @@ test_that("check_data refuses a branch that mixes a parameter with another's com
   expect_silent(check_data(mixed, data.frame(G = 0.9, yes = 6, no = 4), formula))
   expect_error(
     check_data(mixed, data.frame(G = 1.04, yes = 6, no = 4), formula),
-    "category 'yes' in tree 't' is 1.03[0-9]* in row 1, outside \\(0, 1\\] at the test parameter values a = 0.999, b = 0.001"
+    "category 'yes' in tree 't' is 1.04 in row 1, outside \\(0, 1\\] at the test parameter values a = 1, b = 0"
   )
 
   product <- mpt(mpt_tree("t", list(
@@ -1745,6 +1745,22 @@ test_that("check_data refuses a branch that mixes a parameter with another's com
   expect_error(
     check_data(mixed, data.frame(G = c(0.5, 0.7, 1.04), yes = 6, no = 4), formula),
     "in row 3, outside"
+  )
+})
+
+test_that("the vertex check catches a branch that exceeds 1 by less than 0.1%", {
+  # a * (1 - b) * G peaks at G as a -> 1 and b -> 0; a grid at 0.001 and 0.999
+  # sees only 0.998 * G
+  mixed <- mpt(mpt_tree("t", list(
+    yes = "a * (1 - b) * G", no = "1 - a * (1 - b) * G"
+  )), covariates = "G")
+  expect_error(
+    check_data(mixed, data.frame(G = 1.0015, yes = 6, no = 4), bmf(a ~ 1, b ~ 1)),
+    "is 1.0015 in row 1, outside \\(0, 1\\] at the test parameter values a = 1, b = 0"
+  )
+  expect_error(
+    mpt(mpt_tree("t", list(yes = "1.0015 * a * (1 - b)", no = "1 - 1.0015 * a * (1 - b)"))),
+    "is 1.0015 at the test values a = 1, b = 0, outside \\(0, 1\\]"
   )
 })
 
@@ -1828,7 +1844,7 @@ test_that("check_data checks the vertices of a simplex group as one dimension", 
   expect_silent(check_data(model, dat, formula))
   expect_error(
     check_data(model, transform(dat, G = 1.04), formula),
-    "category 'yes' in tree 't' is 1.03[0-9]* in row 1, outside \\(0, 1\\] at the test parameter values D = 0.001, gB = 0.9995"
+    "category 'yes' in tree 't' is 1.04 in row 1, outside \\(0, 1\\] at the test parameter values D = 0, gB = 1"
   )
 })
 
@@ -1971,9 +1987,9 @@ test_that("mpt() refuses a tree without covariates that leaves (0, 1] at a mixed
   expect_silent(mpt(mixed(1)))
   expect_error(
     mpt(mixed(2)),
-    "category 'yes' in tree 't' is 1.99[0-9]* at the test values a = 0.999, b = 0.001, outside \\(0, 1\\]"
+    "category 'yes' in tree 't' is 2 at the test values a = 1, b = 0, outside \\(0, 1\\]"
   )
-  expect_error(mpt(mixed(1.04)), "category 'yes' in tree 't' is 1.03[0-9]* at the test values a = 0.999, b = 0.001")
+  expect_error(mpt(mixed(1.04)), "category 'yes' in tree 't' is 1.04 at the test values a = 1, b = 0")
 
   # a parameter of degree 2 peaks between the vertices, away from the interior points
   pair <- function(scale) {
