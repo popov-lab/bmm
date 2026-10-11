@@ -31,7 +31,12 @@ unchanged and have no naming restrictions. \code{bmm()} stops when, with a
 row's covariate values, the branches of a tree do not sum to 1, leave
 (0, 1], are undefined on the rows of another tree, or when a covariate
 that a branch uses is missing. Every declared covariate needs a numeric
-column in the data, also one that no branch uses.}
+column in the data, also one that no branch uses. The range is checked
+at the vertices of each branch's parameter box, which is exact when no
+term of the branch contains the same parameter twice
+(\code{a * (1 - b) * G + (1 - a) * c}). A parameter that does is also checked
+at 0.5, which is exact for a factor \code{u * (1 - u)} and approximate
+otherwise, e.g. for \code{u * (1 - u)^2}.}
 
 \item{simplex}{A character vector, or a list of character vectors, naming
 groups of parameters that are jointly constrained to sum to 1. Each group
