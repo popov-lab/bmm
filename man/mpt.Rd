@@ -134,8 +134,10 @@ under both links, and under \code{0 + cond} it holds in every cell. Under
 \code{1 + cond} it holds in the reference cell only, because the effects keep
 their own prior. TreeBUGS instead puts a uniform prior on each branch
 parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
-for three members); for a group \code{gA}, \code{gB}, \code{gC}, \code{gD} that is
-\code{prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"), coef = "Intercept")}.
+for three members). To get it for a group \code{gA}, \code{gB}, \code{gC}, \code{gD}, pass
+\code{prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"))},
+with \code{"normal(0, 1)"} under the probit link; without \code{coef}, it covers
+every cell of a \code{0 + cond} formula.
 A predictor on member \code{p} acts on the logit (or probit) of \code{p}'s share of
 the probability left over by the members listed before it. A predictor
 on the first member therefore scales all later members by the same
