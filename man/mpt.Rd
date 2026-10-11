@@ -95,7 +95,9 @@ column per response category. The count columns must be named exactly
 like the branch names given to \code{\link[=mpt_tree]{mpt_tree()}} (\code{old} and \code{new} in the
 example below); \code{bmm()} finds them by these names, so no response
 variable is passed. The \code{tree_id} column names the tree of each row, and
-the counts of a row must come from trials of that tree.
+the counts of a row must come from trials of that tree. Wide tables with
+one column per category of an EQN file, as MPTinR and TreeBUGS take them,
+are reshaped with \code{\link[=mpt_long_data]{mpt_long_data()}}.
 
 A separate tree is needed only when the \emph{branch expressions} differ, that
 is, when the trial determines which latent processes apply or which
@@ -196,8 +198,8 @@ corresponds to the latent-trait MPT model.
 
 For posterior predictive checks, \code{\link[brms:posterior_predict]{brms::posterior_predict()}} returns
 simulated counts (draws x rows x categories) and \code{\link[brms:posterior_epred]{brms::posterior_epred()}}
-the expected counts; the MPT article computes the T1 statistic and its
-posterior predictive p-value from them. With \code{newdata},
+the expected counts; \code{\link[=ppp]{ppp()}} computes the T1 and T2 statistics of Klauer
+(2010) and their posterior predictive p-values from them. With \code{newdata},
 \code{\link[brms:posterior_predict]{brms::posterior_predict()}} needs the columns \code{nTrials}, \verb{Idx_<tree>} and
 \verb{Poss_<category>} that \code{check_data()} builds; \code{fit$data} contains them.
 

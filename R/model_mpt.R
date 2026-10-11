@@ -432,7 +432,9 @@ settable_link_functions.mpt <- function(model) {
 #'   like the branch names given to [mpt_tree()] (`old` and `new` in the
 #'   example below); `bmm()` finds them by these names, so no response
 #'   variable is passed. The `tree_id` column names the tree of each row, and
-#'   the counts of a row must come from trials of that tree.
+#'   the counts of a row must come from trials of that tree. Wide tables with
+#'   one column per category of an EQN file, as MPTinR and TreeBUGS take them,
+#'   are reshaped with [mpt_long_data()].
 #'
 #'   A separate tree is needed only when the *branch expressions* differ, that
 #'   is, when the trial determines which latent processes apply or which
@@ -534,8 +536,8 @@ settable_link_functions.mpt <- function(model) {
 #'
 #'   For posterior predictive checks, [brms::posterior_predict()] returns
 #'   simulated counts (draws x rows x categories) and [brms::posterior_epred()]
-#'   the expected counts; the MPT article computes the T1 statistic and its
-#'   posterior predictive p-value from them. With `newdata`,
+#'   the expected counts; [ppp()] computes the T1 and T2 statistics of Klauer
+#'   (2010) and their posterior predictive p-values from them. With `newdata`,
 #'   [brms::posterior_predict()] needs the columns `nTrials`, `Idx_<tree>` and
 #'   `Poss_<category>` that `check_data()` builds; `fit$data` contains them.
 #'

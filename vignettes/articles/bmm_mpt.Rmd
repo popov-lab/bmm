@@ -651,7 +651,7 @@ Importing the model structure is the easy part; what usually needs translating i
 | model file (EQN, MPTinR text) | `mpt_from_eqn()`, `mpt_from_string()`, or `mpt_tree()` + `mpt()` |
 | wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation]) |
 | reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_long_data(wide, model)`, or `mpt_long_data(wide, model, columns = "mptinr")` |
-| `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR reads them from `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS' `FE` has no restriction counterpart: leave the random effect out of that parameter's formula |
+| `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS' `FE` has no restriction counterpart: leave the random effect out of that parameter's formula |
 | `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model]) |
 | `fit.mpt()`, `betaMPT()`, `traitMPT()` | `bmm()` with the random-effect structure written in the formula (see below) |
 | `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
