@@ -98,7 +98,9 @@ number of free parameters means that a combination of the named
 parameters is not identified by the branch expressions, even when the
 count passes. The check is local: it holds at the test values, not at the
 boundaries of the parameter space. If \code{\link[stats:D]{stats::D()}} cannot differentiate a
-branch expression, the rank is not computed and the count decides.
+branch expression, the rank is not computed and the count decides. The
+rank sees the tree parameters only: after a non-linear formula, the rank
+line names that formula's parameter as not analysed.
 
 \code{bmm()} warns when the rank is deficient and every formula is
 intercept-only. When a formula has a predictor or is non-linear, it only
