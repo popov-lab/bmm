@@ -183,6 +183,19 @@ test_that("ppp() asks for the participant column when it cannot find one", {
   expect_no_error(ppp(crossed, statistic = "T1"))
 })
 
+test_that("ppp() says where the participant column has to be", {
+  # brms keeps only formula variables, so a model without person effects has
+  # no participant column in its data
+  data <- data.frame(item_type = c("old", "old"))
+  observed <- matrix(c(4, 6, 6, 4), 2)
+  local_ppp_counts(observed, ppp_toy_draws(observed), ppp_toy_draws(observed), data)
+  no_re <- ppp_toy_fit(data)
+  expect_match(tryCatch(ppp(no_re), message = conditionMessage),
+               "contain only the variables of the formula")
+  expect_match(tryCatch(ppp(no_re, participant = "id"), error = conditionMessage),
+               "contain only the variables of the formula")
+})
+
 test_that("ppp() checks its arguments", {
   data <- data.frame(id = factor(1:2), item_type = "old")
   observed <- matrix(c(4, 6, 6, 4), 2)

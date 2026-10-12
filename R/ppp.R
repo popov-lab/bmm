@@ -82,7 +82,10 @@
 #'   data set; `"participant"` for one \eqn{T_1} and PPP per participant, as
 #'   TreeBUGS reports them, to find the participants the model fits poorly.
 #' @param participant Character. The column that identifies participants,
-#'   needed for \eqn{T_2} and for `level = "participant"`. `NULL` (default)
+#'   needed for \eqn{T_2} and for `level = "participant"`. It must be a
+#'   variable of the model formula, because the model data contain only
+#'   those; a model without random effects has one only if a predictor such
+#'   as `0 + id` names the participants. `NULL` (default)
 #'   uses the grouping variable of the random effects; when the model has more
 #'   than one (e.g. participants and items), name it here.
 #' @param ... Unused.
@@ -137,7 +140,8 @@ ppp.bmmfit <- function(fit, statistic = c("T1", "T2"), by = NULL, ndraws = NULL,
   stopif(!is.null(participant) &&
            (!is.character(participant) || length(participant) != 1L ||
               !participant %in% names(fit$data)),
-         "'participant' must name a column of the model data.")
+         "'participant' must name a column of the model data, which contain \\
+          only the variables of the formula.")
   stopif(!is.null(ndraws) &&
            (!is.numeric(ndraws) || length(ndraws) != 1L || ndraws < 1 ||
               ndraws > brms::ndraws(fit)),
@@ -159,10 +163,12 @@ ppp.bmmfit <- function(fit, statistic = c("T1", "T2"), by = NULL, ndraws = NULL,
     stopif(level == "participant" || statistic_given,
            "{requested} needs to know which rows belong to which participant, \\
             and the model has no random effects to tell. Name the column with \\
-            'participant'.")
+            'participant'; the model data contain only the variables of the \\
+            formula, so it must be one of them.")
     message2("The model has no random effects to identify participants, so \\
-              ppp() computes T1 only. Name the participant column with \\
-              'participant' to get T2.")
+              ppp() computes T1 only. T2 needs the participant column named \\
+              with 'participant', and the model data contain only the \\
+              variables of the formula.")
     statistic <- "T1"
   }
   person <- if (length(participant) == 1L) as.factor(counts$data[[participant]])
