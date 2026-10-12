@@ -103,6 +103,29 @@ test_that("mpt_tree validates formula input", {
   expect_error(mpt_tree("t", a ~ 1e-5 * D, b ~ 1 - D), "scientific notation")
 })
 
+test_that("mpt_tree gives the same tree for a formula as for the same string", {
+  expressions <- c(
+    "D", "-D", "-(1 - D)", "(D)", "((D))", "D^2", "D * 2^-1", "2 * (1 - D) * g",
+    "pnorm(-x) + exp(-(y + 1))", "`my par` * (1 - `my par`)", "`a.b` + 0.5",
+    "1/3 + D * (1/3)", "(1 - D) * (4/5)", "-1 + 2 * D", "D / (1 + D)"
+  )
+  for (expression in expressions) {
+    from_string <- mpt_tree("t", list(a = expression, b = "1"))
+    from_formula <- mpt_tree("t", as.formula(paste("a ~", expression)), b ~ 1)
+    expect_identical(from_formula, from_string, label = expression)
+  }
+})
+
+test_that("mpt_tree stores nothing from the environment of a formula", {
+  formula_with_large_environment <- function() {
+    large_object <- numeric(1e5)
+    a ~ D
+  }
+  tree <- mpt_tree("t", formula_with_large_environment(), b ~ 1 - D)
+  string_tree <- mpt_tree("t", list(a = "D", b = "1 - D"))
+  expect_identical(length(serialize(tree, NULL)), length(serialize(string_tree, NULL)))
+})
+
 test_that("mpt_tree does not let a partially matched name reorder or drop formulas", {
   expect_error(mpt_tree("t", a ~ D, b = b ~ 1 - D), "in full")
   expect_error(mpt_tree("t", a ~ D, foo = b ~ 1 - D), "in full")
