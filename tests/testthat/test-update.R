@@ -804,3 +804,108 @@ test_that("an updated fit carries nothing from the frame that called update()", 
   serialized_size <- function(n) length(serialize(update_beside(n), NULL))
   expect_equal(serialized_size(1e6), serialized_size(1))
 })
+
+# =============================================================================
+# UPDATING WITH THE STORED MODEL FRAME AS newdata (kfold(), reloo())
+# =============================================================================
+
+# models whose stored frame check_data() accepts as it is, so that update() has
+# nothing to route
+frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
+
+test_that("only a slice of a fit's model frame counts as stored data", {
+  skip_on_cran()
+  for (case_name in names(stored_frame_cases())) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stored_frame_fit(case)
+    model <- fit$bmm$model
+    slice <- fit$data[-1, , drop = FALSE]
+    expect_false(is_stored_frame(model, fit$data, case$data), label = case_name)
+    expect_equal(
+      is_stored_frame(model, fit$data, slice),
+      !case_name %in% frame_is_user_layout,
+      label = case_name
+    )
+    if (case_name %in% frame_is_user_layout) {
+      expect_no_error(suppressWarnings(check_data(model, slice, fit$bmm$user_formula)))
+    }
+  }
+})
+
+test_that("user data that hold a column of the stored layout stay user data", {
+  skip_on_cran()
+  for (case_name in c("m3", "sdt_rating", "sdt_ranking", "sdt_cdp")) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stored_frame_fit(case)
+    model <- fit$bmm$model
+    for (column in c("Y", "nTrials")) {
+      user_data <- case$data
+      user_data[[column]] <- 1
+      expect_false(is_stored_frame(model, fit$data, user_data), label = case_name)
+    }
+    # all of them, still with the response columns the stored frame has given up
+    user_data <- case$data
+    user_data[colnames(fit$data)] <- 1
+    expect_false(is_stored_frame(model, fit$data, user_data), label = case_name)
+  }
+})
+
+# a mock fit cannot be reused, so update() takes the recompile path, and brms
+# then reads the sampler settings of the fit it updates
+stub_stanfit <- function() {
+  methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+}
+
+quietly <- function(x) suppressWarnings(suppressMessages(x))
+
+stub_frame_fit <- function(case) {
+  quietly(bmm(case$formula, case$data, case$model,
+    backend = "mock", mock_fit = stub_stanfit(), rename = FALSE
+  ))
+}
+
+stub_update <- function(fit, ...) {
+  update(fit, ..., backend = "mock", mock_fit = stub_stanfit(), rename = FALSE, recompile = TRUE)
+}
+
+test_that("update() takes a slice of the model frame as newdata (kfold(), reloo())", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  for (case_name in c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
+                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm")) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stub_frame_fit(case)
+    rows <- seq_len(nrow(fit$data))[-1]
+    up <- quietly(stub_update(fit, newdata = fit$data[rows, , drop = FALSE]))
+    expect_true(is(up, "bmmfit"), label = case_name)
+    expect_equal(nrow(up$data), length(rows), label = case_name)
+    expect_equal(brms::standata(up)$N, length(rows), label = case_name)
+    expect_equal(attr(up$data, "data_name"), attr(fit$data, "data_name"), label = case_name)
+
+    # the whole frame is the same update as passing no newdata
+    expect_equal(
+      brms::standata(quietly(stub_update(fit, newdata = fit$data))),
+      brms::standata(quietly(stub_update(fit))),
+      label = case_name
+    )
+  }
+})
+
+test_that("update() still treats data with a column Y as the user's data", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  case <- stored_frame_cases()$sdt_rating
+  fit <- stub_frame_fit(case)
+  user_data <- case$data
+  user_data$Y <- 1
+  # only the user-data route warns that Y is reserved: the stored route strips
+  # the generated columns before check_data() sees them
+  expect_warning(suppressMessages(stub_update(fit, newdata = user_data)), "reserved")
+  expect_equal(
+    brms::standata(quietly(stub_update(fit, newdata = case$data))),
+    brms::standata(fit)
+  )
+})

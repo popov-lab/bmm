@@ -10,7 +10,7 @@ flag_contaminant_rts(
   contaminant_bound = c("min", "max"),
   init_contaminant = 0.05,
   max_contaminant = 0.5,
-  maxit = 100,
+  maxit = 500,
   tol = 1e-06
 )
 }
@@ -30,15 +30,19 @@ algorithm. Must be in (0, 1). Default 0.05.}
 \item{max_contaminant}{Numeric. Maximum allowed contaminant proportion. Values
 exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.}
 
-\item{maxit}{Integer. Maximum EM iterations. Default 100.}
+\item{maxit}{Integer. Maximum EM iterations. Default 500. A group whose EM
+reaches \code{maxit} without converging gets \code{NA} probabilities and a warning.}
 
 \item{tol}{Numeric. Convergence tolerance for log-likelihood. Default 1e-6.}
 }
 \value{
 Numeric vector of posterior contamination probabilities P(contaminant
-| RT), with a \code{"diagnostics"} attribute containing a one-row data.frame
-with columns: \code{mixture_params} (list), \code{contaminant_prop}, \code{converged},
-\code{iterations}, \code{loglik}, \code{n_trials}, \code{distribution}, \code{method}.
+| RT), \code{NA} for every trial of a group whose EM did not converge (a
+threshold such as \code{filter(contam_prob <= 0.5)} drops that whole group, so
+check for \code{NA} first), with a \code{"diagnostics"} attribute containing a
+one-row data.frame with columns: \code{mixture_params} (list),
+\code{contaminant_prop}, \code{converged}, \code{iterations}, \code{loglik}, \code{n_trials},
+\code{distribution}, \code{method}.
 }
 \description{
 Identifies contaminant RTs (fast guesses, attention lapses) at
