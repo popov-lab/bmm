@@ -112,6 +112,7 @@ test_that("rmixture2p() draws from dmixture2p() for every version", {
   compare(kappa = 6, p_mem = 0.7)
   compare(kappa = 6, p_mem = 0.7, tau = 1.5)
   compare(kappa = 6, K = 3, set_size = 5, version = "slot")
+  compare(kappa = 6, K = 7, set_size = 2, version = "slot")
   compare(kappa = 6, K = 7, set_size = 2, version = "slot_averaging")
   compare(kappa = 6, K = 7, set_size = 2, version = "slot_averaging", tau = 1)
 })
@@ -151,6 +152,32 @@ test_that("rmixture2p() is exact at high precision", {
       2e5, mu = 0.0087, kappa = 1e4, p_mem = 1, K = 4, set_size = 4, version = version
     )
     expect_lt(abs(sd(draws) - 0.01), 1e-4)
+  }
+})
+
+test_that("posterior_predict() samples the density log_lik() evaluates, for every version", {
+  withr::local_seed(398)
+  n <- 2e5
+  # K / set_size = 1.5: the slot version stores every item, slot averaging
+  # gives the reported item one or two slots
+  pars <- list(mu = 0, kappa = 6, thetat = 0.7, K = 3)
+  breaks <- seq(-pi, pi, length.out = 21)
+  for (tau in c(0, 1)) {
+    dpars <- lapply(c(pars, if (tau > 0) list(tau = tau)), function(x) matrix(x, n, 1))
+    prep <- structure(
+      list(dpars = dpars, data = list(Y = 0, vint1 = 2L), ndraws = n, family = list(vp_nodes = 41L)),
+      class = "brmsprep"
+    )
+    for (version in c("simple", "slot", "slot_averaging")) {
+      draws <- .mixture2p_posterior_predict(version)(1, prep)
+      observed <- as.numeric(table(cut(draws, breaks))) / n
+      expected <- vapply(seq_len(20), function(i) {
+        stats::integrate(function(x) {
+          dmixture2p(x, kappa = 6, p_mem = 0.7, K = 3, set_size = 2, tau = tau, version = version)
+        }, breaks[i], breaks[i + 1])$value
+      }, numeric(1))
+      expect_lt(max(abs(observed - expected)), 0.005)
+    }
   }
 })
 
