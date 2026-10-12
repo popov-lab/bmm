@@ -559,7 +559,7 @@ configure_model.lba_custom <- function(model, data, formula) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
   dist <- .lba_dist_from_family(prep$family$name)
-  n_draws <- length(ndt)
+  n_draws <- prep$ndraws
   drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
   n_cat <- race_counts(prep, i, n_cats)
 
