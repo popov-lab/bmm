@@ -230,14 +230,14 @@ formula produces.
 \examples{
 \dontrun{
 # two-high-threshold (2HTM) model of recognition memory
-tree_old <- mpt_tree("old", list(
-  old = "D + (1 - D) * g",
-  new = "(1 - D) * (1 - g)"
-))
-tree_new <- mpt_tree("new", list(
-  old = "(1 - D) * g",
-  new = "D + (1 - D) * (1 - g)"
-))
+tree_old <- mpt_tree("old",
+  old ~ D + (1 - D) * g,
+  new ~ (1 - D) * (1 - g)
+)
+tree_new <- mpt_tree("new",
+  old ~ (1 - D) * g,
+  new ~ D + (1 - D) * (1 - g)
+)
 
 model <- mpt(
   trees = list(tree_old, tree_new),

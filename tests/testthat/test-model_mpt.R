@@ -19,6 +19,142 @@ test_that("mpt_tree validates its inputs", {
   expect_error(mpt_tree("t", list(a = 0.5, b = "x")), "character strings")
 })
 
+test_that("mpt_tree takes formulas and strings interchangeably", {
+  mpt_formula_tree_pairs <- list(
+    twohtm_old = list(
+      formulas = mpt_tree("old",
+        old ~ D + (1 - D) * g,
+        new ~ (1 - D) * (1 - g)
+      ),
+      strings = mpt_tree("old", list(
+        old = "D + (1 - D) * g",
+        new = "(1 - D) * (1 - g)"
+      ))
+    ),
+    pcm = list(
+      formulas = mpt_tree("study",
+        C ~ cp + (1 - cp) * rp * rp,
+        E ~ 2 * (1 - cp) * rp * (1 - rp),
+        U ~ (1 - cp) * (1 - rp) * (1 - rp)
+      ),
+      strings = mpt_tree("study", list(
+        C = "cp + (1 - cp) * rp * rp",
+        E = "2 * (1 - cp) * rp * (1 - rp)",
+        U = "(1 - cp) * (1 - rp) * (1 - rp)"
+      ))
+    ),
+    source_monitoring = list(
+      formulas = mpt_tree("sourceA",
+        A ~ dA + (1 - dA) * gA,
+        B ~ (1 - dA) * gB,
+        New ~ (1 - dA) * gNew
+      ),
+      strings = mpt_tree("sourceA", list(
+        A = "dA + (1 - dA) * gA",
+        B = "(1 - dA) * gB",
+        New = "(1 - dA) * gNew"
+      ))
+    ),
+    folded_fractions = list(
+      formulas = mpt_tree("nodist",
+        corr ~ Pm * Pb + (1 - Pm) * (1/5),
+        npl ~ Pm * (1 - Pb) + (1 - Pm) * (4/5),
+        impossible = "dist"
+      ),
+      strings = mpt_tree("nodist", list(
+        corr = "Pm * Pb + (1 - Pm) * (1/5)",
+        npl = "Pm * (1 - Pb) + (1 - Pm) * (4/5)"
+      ), impossible = "dist")
+    )
+  )
+  for (pair in mpt_formula_tree_pairs) {
+    expect_identical(pair$formulas, pair$strings)
+  }
+  expect_equal(mpt_formula_tree_pairs$folded_fractions$formulas$branches$corr[[3]][[3]], 0.2)
+
+  formula_model <- mpt(
+    list(
+      mpt_tree("old", old ~ D + (1 - D) * g, new ~ (1 - D) * (1 - g)),
+      mpt_tree("new", old ~ (1 - D) * g, new ~ D + (1 - D) * (1 - g))
+    ),
+    tree_id = "item_type"
+  )
+  string_model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  expect_equal(formula_model, string_model, ignore_attr = "call")
+  dat <- mpt_2htm_data()
+  expect_identical(
+    stancode(bmf(D ~ 1, g ~ 1), data = dat, model = formula_model),
+    stancode(bmf(D ~ 1, g ~ 1), data = dat, model = string_model)
+  )
+})
+
+test_that("mpt_tree validates formula input", {
+  expect_error(mpt_tree("t", ~ D), "two-sided")
+  expect_error(mpt_tree("t", a ~ D, ~ 1 - D), "two-sided")
+  expect_error(mpt_tree("t", "a" ~ D, b ~ 1 - D), "single response category name")
+  expect_error(mpt_tree("t", a ~ D, c(a, b) ~ 1 - D), "single response category name")
+  expect_error(mpt_tree("t", a ~ D, a ~ 1 - D), "unique within a tree")
+  expect_error(mpt_tree("t", a ~ D, "1 - D"), "mix")
+  expect_error(mpt_tree("t", a ~ D, 0.5), "mix")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), c ~ 1), "not a mix")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), "a"), "impossible argument has to be named")
+  expect_error(mpt_tree("t", list(a ~ D, b ~ 1 - D)), "separate arguments")
+  expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, impossible = "a"), "both impossible")
+  expect_error(mpt_tree("t", a ~ 1e-5 * D, b ~ 1 - D), "scientific notation")
+})
+
+test_that("mpt_tree gives the same tree for a formula as for the same string", {
+  expressions <- c(
+    "D", "-D", "-(1 - D)", "(D)", "((D))", "D^2", "D * 2^-1", "2 * (1 - D) * g",
+    "pnorm(-x) + exp(-(y + 1))", "`my par` * (1 - `my par`)", "`a.b` + 0.5",
+    "1/3 + D * (1/3)", "(1 - D) * (4/5)", "-1 + 2 * D", "D / (1 + D)"
+  )
+  for (expression in expressions) {
+    from_string <- mpt_tree("t", list(a = expression, b = "1"))
+    from_formula <- mpt_tree("t", as.formula(paste("a ~", expression)), b ~ 1)
+    expect_identical(from_formula, from_string, label = expression)
+  }
+})
+
+test_that("mpt_tree stores nothing from the environment of a formula", {
+  formula_with_large_environment <- function() {
+    large_object <- numeric(1e5)
+    a ~ D
+  }
+  tree <- mpt_tree("t", formula_with_large_environment(), b ~ 1 - D)
+  string_tree <- mpt_tree("t", list(a = "D", b = "1 - D"))
+  expect_identical(length(serialize(tree, NULL)), length(serialize(string_tree, NULL)))
+})
+
+test_that("mpt_tree does not let a partially matched name reorder or drop formulas", {
+  expect_error(mpt_tree("t", a ~ D, b = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", a ~ D, foo = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", list(a = "D"), imp = "b"), "in full")
+  expect_identical(
+    mpt_tree("t", br = list(a = "D", b = "1 - D")),
+    mpt_tree("t", list(a = "D", b = "1 - D"))
+  )
+  expect_identical(
+    names(mpt_tree(name = "t", a ~ D, b ~ 1 - D)$branches),
+    c("a", "b")
+  )
+})
+
+test_that("mpt_tree rejects branch values that are not expressions", {
+  expect_error(mpt_tree("t", a ~ D, b ~ NULL), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, b ~ "1 - D"), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, eval(bquote(b ~ .(c(0.2, 0.3))))), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "NULL")), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "'1 - D'")), "must be an expression")
+  expect_s3_class(mpt_tree("t", a ~ 0.5, b ~ 0.5), "mpt_tree")
+})
+
+test_that("mpt_tree names a trailing comma instead of reporting a missing argument", {
+  expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, ), "trailing comma")
+  expect_error(mpt_tree("t", a ~ D, , b ~ 1 - D), "trailing comma")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), ), "trailing comma")
+})
+
 test_that("mpt stores its derived state once", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")

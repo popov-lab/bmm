@@ -972,7 +972,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
 .mpt_model_from_branches <- function(branches, impossible, ...) {
   trees <- Map(function(tree_name, tree_branches) {
-    mpt_tree(tree_name, tree_branches, impossible[[tree_name]])
+    mpt_tree(tree_name, tree_branches, impossible = impossible[[tree_name]])
   }, names(branches), branches)
   mpt(trees = trees, ...)
 }
