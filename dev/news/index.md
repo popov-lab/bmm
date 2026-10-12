@@ -324,6 +324,14 @@
   too. A prior with `coef = "Intercept"` still sets the intercept alone.
   Refit models that used such a prior
   ([\#526](https://github.com/popov-lab/bmm/issues/526)).
+- [`update()`](https://rdrr.io/r/stats/update.html) with a `formula.`
+  that adds predictors to a parameter fitted with an intercept only gave
+  the new coefficients a flat prior instead of the bmm default, in
+  models such as **mixture2p**, **mixture3p**, **imm** and **m3**. With
+  `0 + predictor`, the whole parameter was left without a prior. They
+  now get the priors
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) gives
+  them. Rerun such updates.
 - A saved fit, whether through `file =` in
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) or
   [`update()`](https://rdrr.io/r/stats/update.html) or with
