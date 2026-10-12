@@ -137,7 +137,8 @@
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
-    if (tau <= 0) {
+    // kappa = 0 has J = 0: the gamma on J is a point mass there, as in R
+    if (tau <= 0 || kappa <= 0) {
       return circmix_ld(cosd, logw, logw_guess, kappa);
     }
     real shape = circmix_J(kappa) / tau;

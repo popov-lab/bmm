@@ -543,7 +543,7 @@ circmix_stan_values <- function(data) {
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
       real out_het; vector[NTAU] out_vp; vector[2] out_slots;
-      vector[NTAU] out_sa; vector[NFAR] out_far; vector[NI0] out_logi0;
+      vector[NTAU] out_sa; vector[NFAR] out_far; vector[NI0] out_logi0; real out_vp0;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -563,6 +563,8 @@ circmix_stan_values <- function(data) {
                                               logk, dlogk, logJ_min, dlogJ);
       }
       out_slots = circmix_slots(K_slots, ss_slots);
+      out_vp0 = circmix_vp_ld(cosd, logw, logw_guess, 0, 0.5, nodes,
+                              logk, dlogk, logJ_min, dlogJ);
       for (i in 1:NFAR) {
         out_far[i] = circmix_vp_ld(cosd_far, logw_far, negative_infinity(), kappa_far,
                                    tau_far[i], nodes, logk, dlogk, logJ_min, dlogJ);
@@ -647,6 +649,12 @@ test_that("the Stan and R implementations of the shared core agree", {
     tolerance = 1e-12
   )
   expect_equal(stan("out_slots"), unname(unlist(.circmix_slots(3.5, 2))))
+  # J(0) = 0, so the gamma on J is a point mass at zero and memory is uniform
+  expect_equal(
+    stan("out_vp0"),
+    .circmix_vp_ld(matrix(cosd, nrow = 1), matrix(logw, nrow = 1), logw_guess, 0, 0.5),
+    tolerance = 1e-12
+  )
   expect_equal(
     stan("out_far"),
     vapply(tau_far, function(c_tau) {
