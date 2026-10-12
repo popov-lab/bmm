@@ -196,13 +196,18 @@ test_that("the set-size versions pass the set size as an integer covariate", {
   expect_match(code, "mixture2p_slot_lpdf(Y[n] | mu[n], kappa[n], K[n], vint1[n]", fixed = TRUE)
 })
 
-test_that("check_data() warns when the set size cannot identify the capacity", {
-  model <- mixture2p("dev_rad", set_size = "set_size", version = "slot")
+test_that("check_data() says what a single set size leaves of the capacity", {
+  # with one set size N, p_mem = min(1, K / N) still identifies K below N
+  # (on 375 trials at N = 6, log K contracted 95% from its prior); only the
+  # capacity rule itself, and K at or above N, are beyond the data
   constant_set_size <- subset(oberauer_lin_2017, set_size == 4)
-  expect_warning(
-    check_data(model, constant_set_size, bmf(kappa ~ 1, K ~ 1)),
-    "not identified by the data"
-  )
+  for (version in c("slot", "slot_averaging")) {
+    model <- mixture2p("dev_rad", set_size = "set_size", version = version)
+    expect_warning(
+      check_data(model, constant_set_size, bmf(kappa ~ 1, K ~ 1)),
+      "cannot test the capacity rule.*reflects only its prior where it reaches 4"
+    )
+  }
 })
 
 test_that("mu1 keeps working as a deprecated name for mu", {

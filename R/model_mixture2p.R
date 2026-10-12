@@ -120,7 +120,7 @@
         "- The response variable should be in radians and represent the \\
         angular error relative to the target", "\n",
         "- The 'slot' and 'slot_averaging' versions additionally require a \\
-        set_size variable, which has to vary for the capacity K to be identified"
+        set_size variable, which should vary for the capacity rule to be testable"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -148,8 +148,9 @@
 #'   in degrees to radian using the `deg2rad` function.
 #' @param set_size Name of the variable in the dataset containing the set size,
 #'   or a single number if the set size is constant. Required by the `"slot"`
-#'   and `"slot_averaging"` versions and ignored by `"simple"`. The capacity `K`
-#'   is only identified if the set size varies.
+#'   and `"slot_averaging"` versions and ignored by `"simple"`. With a single
+#'   set size the capacity rule cannot be tested: `K` is then estimated from the
+#'   responses at that set size, and only below it.
 #' @param version A character string specifying which version of the model to
 #'   use. Options are:
 #'   \itemize{
@@ -254,8 +255,10 @@ check_data.mixture2p <- function(model, data, formula) {
   ss <- check_var_set_size(model$other_vars$set_size, data)
   warnif(
     length(unique(ss$ss_numeric)) == 1,
-    "The set size does not vary, so the capacity K of the '{model$version}' \\
-    version is not identified by the data and will only reflect its prior."
+    "The set size does not vary, so the data cannot test the capacity rule of \\
+    the '{model$version}' version. K is estimated from the responses at set \\
+    size {ss$max_set_size}, and reflects only its prior where it reaches \\
+    {ss$max_set_size}."
   )
   data$ss_numeric <- ss$ss_numeric
   attr(data, "max_set_size") <- ss$max_set_size

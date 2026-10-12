@@ -22,8 +22,9 @@ in degrees to radian using the \code{deg2rad} function.}
 
 \item{set_size}{Name of the variable in the dataset containing the set size,
 or a single number if the set size is constant. Required by the \code{"slot"}
-and \code{"slot_averaging"} versions and ignored by \code{"simple"}. The capacity \code{K}
-is only identified if the set size varies.}
+and \code{"slot_averaging"} versions and ignored by \code{"simple"}. With a single
+set size the capacity rule cannot be tested: \code{K} is then estimated from the
+responses at that set size, and only below it.}
 
 \item{version}{A character string specifying which version of the model to
 use. Options are:
@@ -94,7 +95,7 @@ Two-parameter mixture model by Zhang and Luck (2008).
 }
 }
 \itemize{
-\item The 'slot' and 'slot_averaging' versions additionally require a         set_size variable, which has to vary for the capacity K to be identified
+\item The 'slot' and 'slot_averaging' versions additionally require a         set_size variable, which should vary for the capacity rule to be testable
 }
 \itemize{
 \item \strong{Parameters:}
