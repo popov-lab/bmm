@@ -3117,29 +3117,59 @@ rsdt_mafc <- function(n, n_trials, m, d,
   key <- as.character(n)
   cached <- .gh_cache[[key]]
   if (!is.null(cached)) return(cached)
-  i <- seq_len(n - 1L)
-  jacobi <- matrix(0, n, n)
-  jacobi[cbind(i, i + 1L)] <- sqrt(i)
-  jacobi[cbind(i + 1L, i)] <- sqrt(i)
-  e <- eigen(jacobi, symmetric = TRUE)
-  ord <- order(e$values)
-  out <- list(nodes = e$values[ord], weights = (e$vectors[1, ord])^2)
+  out <- .golub_welsch(sqrt(seq_len(n - 1L)), mass = 1)
   .gh_cache[[key]] <- out
   out
 }
 
-# How many nodes the ranking quadrature needs. The integrand gets harder in both
-# the set size (the CDF power concentrates the mass in a tail) and the SD ratio
-# (a wider signal distribution pushes it further out), and Gauss-Hermite
-# converges fast but NON-uniformly, so a single fixed count is either wasteful
-# or wrong. Counts were calibrated against adaptive quadrature over
-# d_a in [0.3, 3.5]: the equal-variance ladder holds max error below 1e-8, and
-# the free-sdratio ladder below 1e-6 across sdratio in [0.5, 2.0]. That interval
-# is chosen to match the default normal(0, 0.3) prior on log sdratio, 97.9% of
-# which falls inside it -- the wider normal(0, 0.5) this replaced left one prior
-# draw in six outside the range the quadrature was verified over. The free
-# ladder stays below 1e-6 through m = 9 (8.2e-7) and reaches 3.1e-6 at m = 10;
-# check_data warns above m = 8, which is conservative by one.
+# Gauss-Legendre rule on [-1, 1], the same way. Eigenvalues come out symmetric
+# only to rounding; they are symmetrized so that a node's mirror is exactly its
+# negative, which lets the ranking kernel read Phi(-x) off the mirrored node.
+.gl_cache <- new.env(parent = emptyenv())
+
+.gl_rule <- function(n) {
+  key <- as.character(n)
+  cached <- .gl_cache[[key]]
+  if (!is.null(cached)) return(cached)
+  i <- seq_len(n - 1L)
+  rule <- .golub_welsch(i / sqrt(4 * i^2 - 1), mass = 2)
+  out <- list(nodes = (rule$nodes - rev(rule$nodes)) / 2,
+              weights = (rule$weights + rev(rule$weights)) / 2)
+  .gl_cache[[key]] <- out
+  out
+}
+
+# nodes and weights of the Gauss rule whose symmetric Jacobi matrix has a zero
+# diagonal and the given off-diagonal; `mass` is the weight function's integral
+.golub_welsch <- function(offdiag, mass) {
+  n <- length(offdiag) + 1L
+  i <- seq_along(offdiag)
+  jacobi <- matrix(0, n, n)
+  jacobi[cbind(i, i + 1L)] <- offdiag
+  jacobi[cbind(i + 1L, i)] <- offdiag
+  e <- eigen(jacobi, symmetric = TRUE)
+  ord <- order(e$values)
+  list(nodes = e$values[ord], weights = mass * (e$vectors[1, ord])^2)
+}
+
+# Gaussian ranking integrates the lure terms Phi(x)^(m-r) Phi(-x)^(r-1) against
+# the target density, and which rule does that well depends on which of the two
+# is narrower. The lure terms change on a scale of one noise SD. For sdratio <=
+# 1 the target density is the narrower one, and Gauss-Hermite weighted by it
+# sees the lure terms as smooth (the .ranking_gh_n() ladders). For sdratio > 1
+# the lure terms are the narrower ones -- 1/sdratio in Hermite node units -- and
+# a fixed Hermite rule under-resolves them: the free ladder was off by 2e-4 at a
+# ratio of 3 and 3e-2 at 8. That branch therefore integrates on the noise axis
+# instead (.ranking_gl_rule()).
+#
+# How many Hermite nodes the sdratio <= 1 branch needs. The set size makes the
+# integrand harder (the CDF power concentrates the mass in a tail), and
+# Gauss-Hermite converges fast but NON-uniformly, so a single fixed count is
+# either wasteful or wrong. Measured against adaptive quadrature over d_a in
+# [-1, 4] and sdratio in [0.05, 1]: the equal-variance ladder, which Stan
+# compiles when sdratio is fixed, holds max error below 6e-9 through m = 20;
+# the free ladder, which R always uses and Stan compiles when sdratio is
+# estimated, below 6e-10.
 .ranking_gh_n <- function(max_m, free_sdratio) {
   if (free_sdratio) {
     counts <- c(32L, 48L, 64L, 80L, 96L, 128L)
@@ -3149,6 +3179,27 @@ rsdt_mafc <- function(n, n_trials, m, d,
     breaks <- c(2, 3, 4, 6, 8, 10, 12, 16)
   }
   counts[findInterval(max_m, breaks, left.open = TRUE) + 1L]
+}
+
+# The sdratio > 1 rule: Gauss-Legendre on x in [-half_width, half_width] of the
+# noise axis, with the target density evaluated at each node. Past the nodes the
+# lure terms are 1 for one rank and 0 for the others (rank 1 above, rank m
+# below), so the target mass out there is added in closed form; what that drops
+# is at most (m - 1) * Phi(-6) per rank, 6.9e-9 at m = 8. Measured against
+# adaptive quadrature over d_a in [-1, 4] and sdratio in (1, 8]: 48 nodes hold
+# max error below 2.4e-10 through m = 8 and 7e-7 at m = 16, and 64 nodes
+# 4.2e-9 through m = 20 (on a coarser grid); the two rules meet at sdratio = 1
+# within 1.5e-10. The weights
+# carry the half width and the normal density's 1 / sqrt(2 pi), and `cdf` holds
+# Phi at the nodes, so the kernel needs no Phi of a parameter inside the sum.
+.ranking_gl_rule <- function(max_m) {
+  half_width <- 6
+  gl <- .gl_rule(if (max_m <= 8) 48L else 64L)
+  nodes <- half_width * gl$nodes
+  list(nodes = nodes,
+       weights = half_width * gl$weights / sqrt(2 * pi),
+       cdf = stats::pnorm(nodes),
+       half_width = half_width)
 }
 
 # Rank probability P(target rank = rank_pos | set size m). Mirrors the Stan
@@ -3183,22 +3234,45 @@ rsdt_mafc <- function(n, n_trials, m, d,
     sigma <- rep_len(exp(sdratio), n)
     # `d` is d_a; the separation in noise-SD units is d * the RMS scale, so the
     # equal-variance case (sigma = 1) leaves eta untouched.
-    #
-    # Deliberately the free-sdratio ladder regardless of the sdratio values:
-    # this kernel serves log_lik/posterior_epred and the d*/r* functions, where
-    # accuracy matters and speed does not, and a count inferred from the values
-    # would make the result depend on how calls are batched (a vector holding
-    # one exact zero would quadrature differently from that element alone).
-    # configure_model() may compile Stan with the cheaper equal-variance ladder;
-    # both sit inside the calibrated tolerance, so the two agree to ~1e-9.
-    gh <- .gh_rule(.ranking_gh_n(m, free_sdratio = TRUE))
     delta <- rep_len(d, n) * .sdt_rms_scale(sigma)
-    eta <- outer(gh$nodes, sigma) + rep(delta, each = length(gh$nodes))
-    log_terms <- log(gh$weights) +
-      (m - rank_pos) * stats::pnorm(eta, log.p = TRUE) +
-      (rank_pos - 1) * stats::pnorm(eta, lower.tail = FALSE, log.p = TRUE)
-    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::colLogSumExps(log_terms))
+    narrow <- sigma <= 1
+    p <- numeric(n)
+    if (any(narrow)) {
+      p[narrow] <- .ranking_prob_gh(delta[narrow], sigma[narrow], rank_pos, m)
+    }
+    if (!all(narrow)) {
+      p[!narrow] <- .ranking_prob_gl(delta[!narrow], sigma[!narrow], rank_pos, m)
+    }
+    p
   }
+}
+
+# Deliberately the free-sdratio ladder regardless of the sdratio values: this
+# kernel serves log_lik/posterior_epred and the d*/r* functions, where accuracy
+# matters and speed does not, and a count inferred from the values would make
+# the result depend on how calls are batched (a vector holding one exact zero
+# would quadrature differently from that element alone). configure_model() may
+# compile Stan with the cheaper equal-variance ladder; both sit inside the
+# measured tolerance, so the two agree to ~1e-8.
+.ranking_prob_gh <- function(delta, sigma, rank_pos, m) {
+  gh <- .gh_rule(.ranking_gh_n(m, free_sdratio = TRUE))
+  eta <- outer(gh$nodes, sigma) + rep(delta, each = length(gh$nodes))
+  log_terms <- log(gh$weights) +
+    (m - rank_pos) * stats::pnorm(eta, log.p = TRUE) +
+    (rank_pos - 1) * stats::pnorm(eta, lower.tail = FALSE, log.p = TRUE)
+  exp(lchoose(m - 1, rank_pos - 1) + matrixStats::colLogSumExps(log_terms))
+}
+
+# The binomial coefficient is 1 for the two ranks that receive a tail, so the
+# tails can join the sum before it is scaled, as they do in Stan.
+.ranking_prob_gl <- function(delta, sigma, rank_pos, m) {
+  gl <- .ranking_gl_rule(m)
+  lure <- gl$cdf^(m - rank_pos) * rev(gl$cdf)^(rank_pos - 1)
+  z <- outer(gl$nodes, delta, "-") / rep(sigma, each = length(gl$nodes))
+  body <- colSums(gl$weights * lure * exp(-0.5 * z^2)) / sigma
+  tails <- (rank_pos == 1) * stats::pnorm((delta - gl$half_width) / sigma) +
+    (rank_pos == m) * stats::pnorm((-gl$half_width - delta) / sigma)
+  choose(m - 1, rank_pos - 1) * body + tails
 }
 
 # All rank probabilities (ranks 1..m), normalized. Returns a length-m vector
