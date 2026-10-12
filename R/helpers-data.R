@@ -368,8 +368,11 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   via mixture modeling, "robust" for non-parametric robust estimation using
 #'   median and IQR/MAD-based variance, or "simple" for standard moment
 #'   calculation. The "robust" method is faster and requires no distributional
-#'   assumptions, but note that the EZ equations were derived for mean and
-#'   variance, so using median may introduce some bias for skewed distributions.
+#'   assumptions, but its moments are not the mean and variance the EZ
+#'   equations were derived for. For right-skewed RTs the median lies below the
+#'   mean and (IQR/1.349)^2 below the variance, so the EZ estimates are offset
+#'   systematically, not just noisier: a larger drift rate and a smaller
+#'   boundary separation than the same data give with "mixture".
 #' @param robust_scale Character. Scale estimator for robust method. Either
 #'   "iqr" (default) for IQR-based variance estimation (variance = (IQR/1.349)^2)
 #'   or "mad" for MAD-based estimation (variance = MAD^2, where MAD is scaled
@@ -396,7 +399,10 @@ has_nonconsecutive_duplicates <- function(vec) {
 #' @param max_contaminant Numeric. Maximum allowed contaminant proportion
 #'   (0 < max <= 1). Estimates are clipped to this value to prevent inflated
 #'   contaminant proportions. Default is 0.5
-#' @param maxit Integer. Maximum number of EM iterations. Default is 100
+#' @param maxit Integer. Maximum number of EM iterations. Default is 500. The
+#'   EM converges slowly when the contaminant proportion is close to zero, and
+#'   a cell that reaches `maxit` without converging falls back to robust
+#'   moments with a warning.
 #' @param tol Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
 #' @param guess_rate Numeric. Accuracy expected of a contaminant response, used
 #'   to split the estimated contaminants of `version = "3par"` across the two
@@ -470,7 +476,7 @@ ezdm_summary_stats <- function(
     min_trials = 10,
     init_contaminant = 0.05,
     max_contaminant = 0.5,
-    maxit = 100,
+    maxit = 500,
     tol = 1e-6,
     guess_rate = 0.5) {
   stop_missing_args()
@@ -516,7 +522,7 @@ ezdm_summary_stats <- function(
         init_contaminant, max_contaminant, maxit, tol
       )
       if (!fit$converged || is.null(fit$params)) {
-        warning2("EM did not converge. Using robust moments.")
+        warning2("EM did not converge{.em_maxit_hint(fit, maxit)}. Using robust moments.")
         c(.robust_aggregation(rt_vec, scale_method = robust_scale),
           contaminant_prop = NA_real_)
       } else {
@@ -557,6 +563,16 @@ ezdm_summary_stats <- function(
       contaminant_prop_upper = moments_upper$contaminant_prop,
       contaminant_prop_lower = moments_lower$contaminant_prop
     )
+  }
+}
+
+# Raising maxit helps only when the EM ran out of iterations, not when it
+# stopped early on too few in-range RTs or a numerical failure
+.em_maxit_hint <- function(fit, maxit) {
+  if (fit$iterations >= maxit) {
+    glue(" within maxit = {maxit} iterations (increase `maxit`)")
+  } else {
+    ""
   }
 }
 
@@ -829,7 +845,8 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 #'   algorithm. Must be in (0, 1). Default 0.05.
 #' @param max_contaminant Numeric. Maximum allowed contaminant proportion. Values
 #'   exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.
-#' @param maxit Integer. Maximum EM iterations. Default 100.
+#' @param maxit Integer. Maximum EM iterations. Default 500. A group whose EM
+#'   reaches `maxit` without converging gets `NA` probabilities and a warning.
 #' @param tol Numeric. Convergence tolerance for log-likelihood. Default 1e-6.
 #'
 #' @details
@@ -854,9 +871,12 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 #' Access them with `attr(result, "diagnostics")`.
 #'
 #' @return Numeric vector of posterior contamination probabilities P(contaminant
-#'   | RT), with a `"diagnostics"` attribute containing a one-row data.frame
-#'   with columns: `mixture_params` (list), `contaminant_prop`, `converged`,
-#'   `iterations`, `loglik`, `n_trials`, `distribution`, `method`.
+#'   | RT), `NA` for every trial of a group whose EM did not converge (a
+#'   threshold such as `filter(contam_prob <= 0.5)` drops that whole group, so
+#'   check for `NA` first), with a `"diagnostics"` attribute containing a
+#'   one-row data.frame with columns: `mixture_params` (list),
+#'   `contaminant_prop`, `converged`, `iterations`, `loglik`, `n_trials`,
+#'   `distribution`, `method`.
 #'
 #' @seealso [ezdm_summary_stats()] for aggregated RT statistics with contamination
 #'   handling, [validate_fast_guesses()] for testing whether flagged contaminants
@@ -902,7 +922,7 @@ flag_contaminant_rts <- function(
     contaminant_bound = c("min", "max"),
     init_contaminant = 0.05,
     max_contaminant = 0.5,
-    maxit = 100,
+    maxit = 500,
     tol = 1e-6) {
   distribution <- match.arg(distribution)
   stopif(!is.numeric(rt), "Argument 'rt' must be a numeric vector")
@@ -923,7 +943,7 @@ flag_contaminant_rts <- function(
   )
 
   if (!fit$converged || is.null(fit$params)) {
-    warning2("EM did not converge. Returning NA.")
+    warning2("EM did not converge{.em_maxit_hint(fit, maxit)}. Returning NA.")
     contam_prob_clean <- rep(NA_real_, length(rt_clean))
   } else {
     par <- fit$params

@@ -20,7 +20,9 @@
 \item{formula.}{A \code{\link[=bmmformula]{bmmformula()}}. If missing, the original formula
 is used. Currently you have to specify a full \code{bmmformula}}
 
-\item{newdata}{An optional data frame containing the variables in the model}
+\item{newdata}{An optional data frame containing the variables in the model.
+Rows of \code{fit$data} are accepted as they are, which is how \code{\link[brms:kfold]{brms::kfold()}}
+and \code{\link[brms:reloo]{brms::reloo()}} pass them.}
 
 \item{recompile}{Logical, indicating whether the Stan model should be recompiled. If
 NULL (the default), update tries to figure out internally, if recompilation

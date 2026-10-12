@@ -70,7 +70,7 @@ Provide aggregated statistics for each subject and condition that model paramete
 \item \code{drift}: Drift rate = Average rate of evidence accumulation of the decision processes
 \item \code{bound}: Boundary separation = Distance between the decision boundaries that need to be reached
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
-\item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
+\item \code{zr}: Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, > 0.5 = biased towards the upper response).
 \item \code{s}: The diffusion constant, that is the standard deviation of the Gaussian noise during sampling
 }
 \item \strong{Fixed parameters:}
