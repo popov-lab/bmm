@@ -2,6 +2,15 @@ nt_model <- function(...) {
   mixture3p("dev_rad", nt_features = "col_nt", set_size = "set_size", regex = TRUE, ...)
 }
 
+test_that("mixture3p() and dmixture3p() default to 81 quadrature nodes", {
+  # 41 nodes put the reject threshold inside a real-data posterior: slot
+  # averaging + VP on three subjects of oberauer_lin_2017 diverged on 165 of
+  # 200 transitions at 41 nodes (#398)
+  expect_equal(nt_model(variable_precision = TRUE)$vp_nodes, 81L)
+  expect_equal(formals(mixture3p)$vp_nodes, 81L)
+  expect_equal(formals(dmixture3p)$vp_nodes, 81L)
+})
+
 test_that("mixture3p() exposes the parameters each version implies", {
   expect_equal(names(nt_model()$parameters), c("mu", "kappa", "thetat", "thetant"))
   expect_equal(

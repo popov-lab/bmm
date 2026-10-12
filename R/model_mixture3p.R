@@ -121,7 +121,7 @@
 
 .model_mixture3p <- function(resp_error = NULL, nt_features = NULL, set_size = NULL,
                              regex = FALSE, links = NULL, version = "simple",
-                             variable_precision = FALSE, vp_nodes = 41L,
+                             variable_precision = FALSE, vp_nodes = 81L,
                              call = NULL, ...) {
   spec <- .mixture3p_version_table[[version]]
   if (variable_precision) {
@@ -218,8 +218,8 @@ settable_links.mixture3p <- function(model) {
 #'   draws, `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance
 #'   grows with `j`.
 #' @param vp_nodes Number of quadrature nodes used when
-#'   `variable_precision = TRUE`; must be an odd number of at least 41. See
-#'   [mixture2p()].
+#'   `variable_precision = TRUE`; must be an odd number of at least 41, and
+#'   defaults to 81. See [mixture2p()] for the accuracy this gives.
 #' @param links A named list of link functions for the model parameters. The
 #'   links of `thetat` and `thetant` cannot be changed, because the softmax over
 #'   them is part of the likelihood.
@@ -277,7 +277,7 @@ settable_links.mixture3p <- function(model) {
 #' )
 mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
                       version = c("simple", "slot", "slot_averaging"),
-                      variable_precision = FALSE, vp_nodes = 41L, links = NULL,
+                      variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
   dots <- list(...)
