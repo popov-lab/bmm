@@ -127,10 +127,11 @@ three rules apply:
 2. **List it in NEWS.** Every deprecation and every removal gets a bullet under
    the heading `### Deprecated functions and arguments`.
 3. **Announce breaking changes.** A change is breaking when a script that ran
-   before now fails or has to be edited. Removing a deprecated form counts. We
-   announce it in a GitHub issue before the release that contains it, with the
-   old and the new code side by side (use the "Breaking change" issue
-   template).
+   before now fails, has to be edited, or gives different results for the same
+   data and model. Removing a deprecated form counts. A bug fix that corrects
+   results is not; it goes in NEWS under the bug fixes. We announce a breaking
+   change in a GitHub issue before the release that contains it, with the old
+   and the new code side by side (use the "Breaking change" issue template).
 
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data layout a
