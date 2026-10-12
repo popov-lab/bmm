@@ -154,6 +154,78 @@ test_that("the generated Stan likelihood equals the R reference", {
   }
 })
 
+lnr_custom3_stan_values <- function(grid, stan_code) {
+  code <- paste0(
+    "functions {\n", stan_code, "\n}\n",
+    "data {\n",
+    "  int N; vector[N] rt; matrix[N, 3] m; vector[N] s; vector[N] ndt;\n",
+    "  array[N] int resp; array[N, 3] int n;\n",
+    "}\n",
+    "generated quantities {\n",
+    "  vector[N] lp;\n",
+    "  for (i in 1:N) {\n",
+    "    lp[i] = lnr_custom_lpdf([rt[i]]' | [0]', [m[i, 1]]', [m[i, 2]]',\n",
+    "      [m[i, 3]]', [ndt[i]]', [s[i]]', {resp[i]}, {n[i, 1]}, {n[i, 2]},\n",
+    "      {n[i, 3]});\n",
+    "  }\n",
+    "}\n"
+  )
+  f <- file.path(tempdir(), "lnr_zero_counts.stan")
+  writeLines(code, f)
+  mod <- cmdstanr::cmdstan_model(f)
+  sdata <- list(
+    N = nrow(grid), rt = grid$rt, m = as.matrix(grid[, paste0("m", 1:3)]),
+    s = grid$s, ndt = grid$ndt, resp = as.integer(grid$response),
+    n = as.matrix(grid[, paste0("n", 1:3)])
+  )
+  draws <- mod$sample(sdata, fixed_param = TRUE, chains = 1, iter_warmup = 0,
+                      iter_sampling = 1, refresh = 0, sig_figs = 18,
+                      show_messages = FALSE)$draws(format = "df")
+  as.numeric(draws[1, paste0("lp[", seq_len(nrow(grid)), "]")])
+}
+
+test_that("the generated Stan likelihood handles categories with no accumulators", {
+  skip_unless_cmdstan()
+
+  # a category may have zero accumulators on a trial it does not win; it then
+  # contributes nothing, which is why the reference drops it outright instead
+  # of multiplying its survivor by zero
+  grid <- data.frame(
+    rt = c(0.7, 0.9, 1.2, 0.6, 1.1, 0.8, 1.4, 150.15),
+    ndt = 0.15,
+    s = c(0.6, 0.6, 0.4, 0.5, 0.8, 0.6, 0.3, 0.1),
+    m1 = c(-1.0, -0.8, -1.2, -0.9, -1.0, -1.1, -0.7, -3),
+    m2 = c(0.0, 0.1, -0.2, 0.2, 0.0, -0.1, 0.1, -3),
+    m3 = c(0.3, 0.4, 0.2, 0.5, 0.3, 0.2, 0.4, 5),
+    response = c(1L, 2L, 3L, 1L, 2L, 3L, 1L, 3L),
+    n1 = c(2L, 0L, 0L, 3L, 1L, 2L, 1L, 0L),
+    n2 = c(0L, 3L, 0L, 1L, 2L, 0L, 0L, 0L),
+    n3 = c(0L, 0L, 1L, 0L, 0L, 4L, 2L, 1L)
+  )
+  reference <- vapply(seq_len(nrow(grid)), function(i) {
+    t <- grid$rt[i] - grid$ndt[i]
+    m <- unlist(grid[i, paste0("m", 1:3)])
+    n <- unlist(grid[i, paste0("n", 1:3)])
+    reps <- n - (seq_along(n) == grid$response[i])
+    racing <- reps > 0
+    log(n[grid$response[i]]) +
+      stats::dlnorm(t, m[grid$response[i]], grid$s[i], log = TRUE) +
+      sum(reps[racing] * stats::plnorm(t, m[racing], grid$s[i],
+                                        lower.tail = FALSE, log.p = TRUE))
+  }, numeric(1))
+
+  # in the last trial the zero-count losers sit 80 sdlogs below the decision
+  # time, past where Stan's lognormal_lccdf returns -Inf; without the
+  # reps > 0 guard the trial would evaluate 0 * -Inf = NaN
+  expect_true(all(is.finite(reference)))
+
+  got <- suppressWarnings(lnr_custom3_stan_values(
+    grid, bmm:::.lnr_stan_code("lnr_custom", c("aa", "bb", "cc"))
+  ))
+  expect_true(all(is.finite(got)))
+  expect_equal(got, reference, tolerance = 1e-10)
+})
+
 test_that("log_lik for the simple version carries the category constant", {
   skip_on_cran()
   path <- test_path("assets", "bmmfit_lnr_ppcheck.rds")

@@ -29,8 +29,8 @@ alternatives), of the same length as \code{rt} (or \code{q}).}
 \item{s}{Numeric vector of sdlog parameters (one per accumulator, or a
 single value shared across all accumulators).}
 
-\item{ndt}{Non-decision time in seconds, a single value or one per response
-time.}
+\item{ndt}{Non-decision time in seconds. \code{dlnr()} and \code{plnr()} take a single
+value or one per response time; \code{rlnr()} and \code{qlnr()} take a single value.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 

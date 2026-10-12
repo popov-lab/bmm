@@ -154,3 +154,34 @@ test_that("plnr keeps the upper tail where the lower tail has rounded to one", {
     direct
   )
 })
+
+test_that("plnr(response = ) stays finite near the lower support edge", {
+  q <- c(0.2092, 0.2291)
+  expect_no_warning(
+    out <- plnr(q, 1, c(-1, 0, 0.4), 0.3, 0.2)
+  )
+  expect_false(anyNA(out))
+  expect_true(all(out >= 0 & out <= 1))
+  expect_true(all(diff(out) >= 0))
+})
+
+test_that("plnr accepts one ndt per response time without recycling warnings", {
+  m <- c(-1, 0)
+  expect_no_warning(
+    out <- plnr(c(1, 2), 1, m, 1, c(0.1, 0.2))
+  )
+  expect_equal(out, c(plnr(1, 1, m, 1, 0.1), plnr(2, 1, m, 1, 0.2)))
+})
+
+test_that("qlnr propagates NA and inverts the upper tail at tiny p", {
+  m <- c(-1, 0)
+  expect_equal(qlnr(c(0.5, NA), m, 1, 0.2)[2], NA_real_)
+  q <- qlnr(1e-18, m, 1, 0.2, lower.tail = FALSE)
+  expect_true(is.finite(q))
+  expect_equal(plnr(q, m = m, s = 1, ndt = 0.2, lower.tail = FALSE, log.p = TRUE),
+               log(1e-18), tolerance = 1e-6)
+})
+
+test_that("plnr(response = NA) fails like dlnr", {
+  expect_error(plnr(1, NA, c(-1, 0), 1, 0.2), "response must contain integers")
+})
