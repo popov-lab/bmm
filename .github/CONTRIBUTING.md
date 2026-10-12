@@ -143,8 +143,8 @@ If your PR deprecates something:
 - Warn with `warn_deprecated(what, with, since = "1.5.0")` where the old form
   is detected. `what` and `with` are the old and the new code as users would
   type it. The message is fixed: it names the release that deprecated the form,
-  the earliest release that may remove it (the next minor release, unless you
-  set `removed_in`) and the replacement. Use `details` only for something users
+  the earliest release that may remove it (the next minor release; set
+  `removed_in` only to name a later one) and the replacement. Use `details` only for something users
   would otherwise miss, such as a changed meaning.
 - Call `warn_deprecated()` once per user call. If one call can meet many old
   forms, such as prior rows, collect them first and pass them as vectors, so
