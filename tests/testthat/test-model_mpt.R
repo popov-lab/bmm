@@ -126,6 +126,12 @@ test_that("mpt_tree rejects branch values that are not expressions", {
   expect_s3_class(mpt_tree("t", a ~ 0.5, b ~ 0.5), "mpt_tree")
 })
 
+test_that("mpt_tree names a trailing comma instead of reporting a missing argument", {
+  expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, ), "trailing comma")
+  expect_error(mpt_tree("t", a ~ D, , b ~ 1 - D), "trailing comma")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), ), "trailing comma")
+})
+
 test_that("mpt stores its derived state once", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")

@@ -98,6 +98,11 @@ mpt_tree <- function(name, branches, ..., impossible = NULL) {
     !is.character(name) || length(name) != 1L || !nzchar(name),
     "The tree name must be a single non-empty character string."
   )
+  stopif(
+    any(!nzchar(as.character(as.list(substitute(list(...)))[-1]))),
+    "An argument of mpt_tree() is empty, probably from a trailing comma after \\
+    the last branch."
+  )
   extra <- list(...)
   # name, branches and impossible match partially, so b = b ~ y would take the
   # slot of branches and reorder the categories, and imp = binds to ...
