@@ -592,8 +592,9 @@ test_that("the Stan and R implementations of the shared core agree", {
   logw <- log(c(0.4, 0.2, 0.15))
   logw_guess <- log(0.25)
   kappa <- c(0.05, 0.5, 2, 10, 100, 1000, 6e4)
-  # Stan's binary search and R's floor() pick different cells at a node, and
-  # the last cell is the one an off-by-one in either would lose
+  # at a node Stan's binary search and R's floor() pick different cells, which
+  # must give the same value; only the point inside the last cell would see an
+  # off-by-one that loses that cell
   n_tab <- length(tab$logkappa)
   node <- function(i) exp(tab$logJ_min + (i - 1) * tab$dlogJ)
   Jtest <- c(

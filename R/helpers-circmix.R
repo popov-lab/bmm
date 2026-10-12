@@ -86,12 +86,12 @@
 })
 
 # Cubic Hermite interpolation of log kappa against log J, with the asymptotics
-# outside the tabulated range: below it, inverting J = kappa^2 / 2 - kappa^4 / 16
-# gives sqrt(2 J) (1 + J / 8), whose relative error is O(J^2), so the value
-# jumps by 1e-12 at the edge rather than by the 1.25e-6 of sqrt(2 J) alone;
-# above it, J -> kappa - 1/2. Max relative error 1.7e-11. Stan's
-# circmix_kappa() receives the same table as data, so the R and Stan inverses
-# cannot drift apart.
+# outside the tabulated range: below it, inverting
+# J = kappa^2 / 2 - kappa^4 / 16 gives sqrt(2 J) (1 + J / 8), whose relative
+# error is O(J^2), so the value jumps by about 2e-12 at the edge rather than by
+# the 1.25e-6 of sqrt(2 J) alone; above it, J -> kappa - 1/2. Max relative
+# error 1.7e-11. Stan's circmix_kappa() receives the same table as data, so the
+# R and Stan inverses cannot drift apart.
 .circmix_kappa <- function(J, tab = .circmix_kappa_table()) {
   n <- length(tab$logkappa)
   t <- log(J)
@@ -145,7 +145,8 @@
 # is integrated on its own grid (.circmix_vp_component()). A grid shared by the
 # components and centred on the gamma prior misses the integrand of a response
 # far from a component, which peaks many prior SDs below E[log J]; without a
-# guess weight to mask it, that underestimated the log density by up to nats.
+# guess weight to mask it, that underestimated the log density by up to 233
+# nats (kappa 500, shape 100, y = pi).
 # Below a shape of 60 / nodes the left tail of log J is too heavy for the grid:
 # with 81 nodes the log density holds to about 1e-5 from that threshold (0.74)
 # up, to 2e-6 from shape 1, and to 1e-9 from shape 10.
