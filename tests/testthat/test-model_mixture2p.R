@@ -141,6 +141,19 @@ test_that("dmixture2p() and rmixture2p() refuse what the model refuses", {
   expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
 })
 
+test_that("rmixture2p() is exact at high precision", {
+  # a sampler that bounds the density on a grid misses the peak between grid
+  # points: develop's rmixture3p() gave an SD of 0.01067 at this mu (#434)
+  # 1e-4 is about six Monte Carlo standard errors of the SD at 2e5 draws
+  withr::local_seed(434)
+  for (version in c("simple", "slot", "slot_averaging")) {
+    draws <- rmixture2p(
+      2e5, mu = 0.0087, kappa = 1e4, p_mem = 1, K = 4, set_size = 4, version = version
+    )
+    expect_lt(abs(sd(draws) - 0.01), 1e-4)
+  }
+})
+
 test_that("configure_model() builds a custom family without the mixture machinery", {
   code <- stancode(bmf(kappa ~ 1, thetat ~ 1), oberauer_lin_2017, mixture2p("dev_rad"))
   expect_match(code, "mixture2p_simple_lpdf")
