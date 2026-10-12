@@ -80,3 +80,9 @@ test_that("no deprecated form gives no warning, not an empty one", {
     warn_deprecated(character(0), character(0), since = "1.5.0", details = "g() also centres x.")
   )
 })
+
+test_that("the warning names no call, so users do not see an internal function", {
+  w <- tryCatch(warn_deprecated("f()", "g()", since = "1.5.0"), warning = identity)
+
+  expect_null(conditionCall(w))
+})
