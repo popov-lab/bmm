@@ -19,7 +19,8 @@ latent parameters (e.g., \code{D + (1 - D) * g}), numeric constants, and
 declared covariates (see \code{\link[=mpt]{mpt()}}).}
 
 \item{...}{Further formulas of the form \code{category ~ expression}, one per
-response category, when \code{branches} is a formula. A call uses either
+response category, when \code{branches} is a formula; they take no argument
+names. A call uses either
 formulas or a named list of strings, not a mix; both spellings give the
 same tree (see the examples).}
 
@@ -27,7 +28,7 @@ same tree (see the examples).}
 this tree, for example distractor responses when no distractors were
 presented. Such categories get no branch expression, and the remaining
 branches must sum to 1 on their own. It follows \code{...}, so it has to be
-named.}
+named in full.}
 }
 \value{
 An object of class \code{mpt_tree}
@@ -39,10 +40,11 @@ response category. Trees created with \code{mpt_tree()} are combined into a
 full model specification with \code{\link[=mpt]{mpt()}}.
 }
 \details{
-The formulas are never evaluated: the left-hand side must be a
-single response category name, the right-hand side is stored as written,
-and the formula environment is dropped. A one-sided formula, a left-hand
-side that is not a name, and a mix of formulas and strings are errors.
+Nothing in the formulas is evaluated: the left-hand side must be a
+single response category name, the right-hand side is kept as an
+expression (with constant arithmetic folded, see below), and the formula
+environment is dropped. A one-sided formula, a left-hand side that is not
+a name, and a mix of formulas and strings are errors.
 
 Constant arithmetic such as \code{1/4} or \code{1/(2*2)} is folded into a
 decimal literal (\code{0.25}) when the tree is created. Stan compiles a bare

@@ -81,7 +81,7 @@ tree_new <- mpt_tree("new",
 tree_old
 ```
 
-The formulas are never evaluated; they only carry the expressions and the response category on the left-hand side. The expressions can equally be given as a named list of character strings, which is the form that `mpt_from_string()` and `mpt_from_eqn()` produce. The two spellings give identical trees:
+The formulas only carry the expressions and the response category on the left-hand side; nothing in them is evaluated. The expressions can equally be given as a named list of character strings, which is the form that `mpt_from_string()` and `mpt_from_eqn()` produce. The two spellings give identical trees:
 
 ```{r}
 tree_old_strings <- mpt_tree("old", list(

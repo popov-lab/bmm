@@ -20,19 +20,21 @@
 #'   latent parameters (e.g., `D + (1 - D) * g`), numeric constants, and
 #'   declared covariates (see [mpt()]).
 #' @param ... Further formulas of the form `category ~ expression`, one per
-#'   response category, when `branches` is a formula. A call uses either
+#'   response category, when `branches` is a formula; they take no argument
+#'   names. A call uses either
 #'   formulas or a named list of strings, not a mix; both spellings give the
 #'   same tree (see the examples).
 #' @param impossible Character vector. Response categories that cannot occur in
 #'   this tree, for example distractor responses when no distractors were
 #'   presented. Such categories get no branch expression, and the remaining
 #'   branches must sum to 1 on their own. It follows `...`, so it has to be
-#'   named.
+#'   named in full.
 #'
-#' @details The formulas are never evaluated: the left-hand side must be a
-#'   single response category name, the right-hand side is stored as written,
-#'   and the formula environment is dropped. A one-sided formula, a left-hand
-#'   side that is not a name, and a mix of formulas and strings are errors.
+#' @details Nothing in the formulas is evaluated: the left-hand side must be a
+#'   single response category name, the right-hand side is kept as an
+#'   expression (with constant arithmetic folded, see below), and the formula
+#'   environment is dropped. A one-sided formula, a left-hand side that is not
+#'   a name, and a mix of formulas and strings are errors.
 #'
 #'   Constant arithmetic such as `1/4` or `1/(2*2)` is folded into a
 #'   decimal literal (`0.25`) when the tree is created. Stan compiles a bare
