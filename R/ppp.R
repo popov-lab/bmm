@@ -143,9 +143,9 @@ ppp.bmmfit <- function(fit, statistic = c("T1", "T2"), by = NULL, ndraws = NULL,
          "'participant' must name a column of the model data, which contain \\
           only the variables of the formula.")
   stopif(!is.null(ndraws) &&
-           (!is.numeric(ndraws) || length(ndraws) != 1L || ndraws < 1 ||
-              ndraws > brms::ndraws(fit)),
-         "'ndraws' must be a number between 1 and {brms::ndraws(fit)}.")
+           (!is.numeric(ndraws) || length(ndraws) != 1L || ndraws %% 1 != 0 ||
+              ndraws < 1 || ndraws > brms::ndraws(fit)),
+         "'ndraws' must be a whole number between 1 and {brms::ndraws(fit)}.")
 
   # one set of draws for posterior_predict() and posterior_epred(), so that
   # each replicated data set is compared with its own expectation

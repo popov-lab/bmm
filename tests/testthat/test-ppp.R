@@ -246,6 +246,13 @@ test_that("ppp() works on an m3 fit", {
   expect_equal(res$ndraws, c(20L, 20L))
 })
 
+test_that("ppp() takes ndraws as a whole number of draws", {
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  expect_error(ppp(fit, ndraws = 2.5), "'ndraws' must be a whole number")
+})
+
 test_that("ppp() does not flag a well-specified mpt model and flags a misspecified one", {
   skip_on_cran()
   skip_if_not_installed("cmdstanr")
