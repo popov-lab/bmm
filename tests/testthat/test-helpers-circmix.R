@@ -7,9 +7,11 @@ ld_mixture <- function(y, mu_nt = numeric(0), kappa = 5, w_mem = 1, w_guess = 0)
   .circmix_ld(cosd, logw, rep(log(w_guess), n), rep(kappa, n))
 }
 
+# the table is built for a relative error near 2e-11, so a looser bound would
+# miss a coarser table or a broken slope
 test_that(".circmix_kappa() inverts .circmix_J() over the tabulated range", {
   kappa <- exp(seq(log(0.02), log(4e4), length.out = 400))
-  expect_equal(.circmix_kappa(.circmix_J(kappa)), kappa, tolerance = 1e-9)
+  expect_lt(max(abs(.circmix_kappa(.circmix_J(kappa)) / kappa - 1)), 5e-11)
 })
 
 test_that(".circmix_kappa() uses the exact asymptotics outside the table", {
@@ -527,13 +529,14 @@ circmix_stan_values <- function(data) {
       int NKAP; vector[NKAP] kappa;
       int NJ; vector[NJ] Jtest;
       int NTAU; vector[NTAU] tau; real kappa_vp; int nodes;
+      int NI0; vector[NI0] kappa_i0;
       real K_slots; int ss_slots;
       vector[2] cosd_far; vector[2] logw_far; real kappa_far; int NFAR; vector[NFAR] tau_far;
     }
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
       real out_het; vector[NTAU] out_vp; vector[2] out_slots;
-      vector[NTAU] out_sa; vector[NFAR] out_far;
+      vector[NTAU] out_sa; vector[NFAR] out_far; vector[NI0] out_logi0;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -542,6 +545,9 @@ circmix_stan_values <- function(data) {
         out_kappa[i] = circmix_kappa(Jtest[i], logk, dlogk, logJ_min, dlogJ);
       }
       out_het = circmix_het_ld(cosd, logw, logw_guess, kappa_het);
+      for (i in 1:NI0) {
+        out_logi0[i] = log_modified_bessel_first_kind(0, kappa_i0[i]);
+      }
       for (i in 1:NTAU) {
         out_vp[i] = circmix_vp_ld(cosd, logw, logw_guess, kappa_vp, tau[i], nodes,
                                   logk, dlogk, logJ_min, dlogJ);
@@ -577,7 +583,17 @@ test_that("the Stan and R implementations of the shared core agree", {
   logw <- log(c(0.4, 0.2, 0.15))
   logw_guess <- log(0.25)
   kappa <- c(0.05, 0.5, 2, 10, 100, 1000, 6e4)
-  Jtest <- c(1e-7, 1e-3, 0.5, 9.486, 500, 5e4, 1e7)
+  # Stan's binary search and R's floor() pick different cells at a node, and
+  # the last cell is the one an off-by-one in either would lose
+  n_tab <- length(tab$logkappa)
+  node <- function(i) exp(tab$logJ_min + (i - 1) * tab$dlogJ)
+  Jtest <- c(
+    1e-7, 1e-3, 0.5, 9.486, 500, 5e4, 1e7,
+    node(c(2, 1000, n_tab - 1, n_tab)), sqrt(node(n_tab - 1) * node(n_tab))
+  )
+  # either side of the point where besselI() underflows and R switches to the
+  # asymptotic series; Stan's log_modified_bessel_first_kind() is independent
+  kappa_i0 <- c(1, 1e3, 9e4, 9.99e4, 1.0005e5, 1.001e5, 1e6)
   kappa_het <- c(3, 12, 40)
   tau <- c(0, 0.5, 2, .circmix_J(10) / 0.75)
   # far from both components and no guessing: each component's own window
@@ -591,6 +607,7 @@ test_that("the Stan and R implementations of the shared core agree", {
     NC = length(cosd), cosd = cosd, logw = logw, logw_guess = logw_guess,
     kappa_het = kappa_het, NKAP = length(kappa), kappa = kappa,
     NJ = length(Jtest), Jtest = Jtest, NTAU = length(tau), tau = tau,
+    NI0 = length(kappa_i0), kappa_i0 = kappa_i0,
     kappa_vp = 10, nodes = 81L, K_slots = 3.5, ss_slots = 2L,
     cosd_far = cosd_far, logw_far = logw_far, kappa_far = 200,
     NFAR = length(tau_far), tau_far = tau_far
@@ -600,7 +617,8 @@ test_that("the Stan and R implementations of the shared core agree", {
   as_rows <- function(x) matrix(x, nrow = n, ncol = length(x), byrow = TRUE)
 
   expect_equal(stan("out_J"), .circmix_J(kappa), tolerance = 1e-10)
-  expect_equal(stan("out_kappa"), .circmix_kappa(Jtest), tolerance = 1e-10)
+  expect_lt(max(abs(stan("out_kappa") / .circmix_kappa(Jtest) - 1)), 1e-13)
+  expect_lt(max(abs(stan("out_logi0") / .circmix_log_besselI0(kappa_i0) - 1)), 1e-14)
   expect_equal(
     stan("out_ld"),
     .circmix_ld(as_rows(cosd), as_rows(logw), rep(logw_guess, n), kappa),
