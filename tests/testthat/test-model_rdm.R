@@ -1536,3 +1536,18 @@ test_that("rdm refuses a category named after an identifier of its Stan code", {
     "Stan code uses"
   )
 })
+
+# the guard is only as complete as .rdm_stan_names, so the identifiers the
+# generated likelihood declares are listed here literally: a loop over the
+# vector itself would pass whatever it held
+test_that("rdm refuses every identifier of its Stan code as a category name", {
+  for (name in c("rt", "response", "t", "lp", "i")) {
+    f <- bmf(other ~ 1, gap ~ 1, ndt ~ 1)
+    f[[name]] <- stats::as.formula(paste(name, "~ 1"))
+    expect_error(
+      check_model(rdm(rt = "rt", response = "resp", version = "custom"), NULL, f),
+      "Stan code uses",
+      info = name
+    )
+  }
+})
