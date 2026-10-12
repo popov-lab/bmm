@@ -211,6 +211,29 @@ test_that("mpt_long_data sums the labels that categories merged", {
   expect_equal(mpt_long_data(wide, model)$no, c(10L, 32L))
 })
 
+test_that("mpt_long_data returns integer counts and keeps the types of carried columns", {
+  model <- eqn_2htm_model()
+  wide <- data.frame(
+    subject = factor(c("s1", "s2")), when = as.Date("2026-01-01") + 0:1,
+    flag = c(TRUE, NA), group = factor(c("a", "b"), levels = c("b", "a", "unused")),
+    wide_2htm()
+  )
+  long <- mpt_long_data(wide, model, id = "subject")
+  expect_type(long$yes, "integer")
+  expect_type(long$no, "integer")
+  expect_identical(long$subject, factor(c("s1", "s1", "s2", "s2")))
+  expect_identical(long$when, rep(wide$when, each = 2))
+  expect_identical(long$flag, c(TRUE, TRUE, NA, NA))
+  expect_identical(long$group, factor(c("a", "a", "b", "b"), levels = levels(wide$group)))
+})
+
+test_that("mpt_long_data takes the qualified name where a bare label also exists", {
+  model <- eqn_2htm_model()
+  wide <- cbind(wide_2htm(), old.hit = c(5, 6))
+  long <- mpt_long_data(wide, model)
+  expect_equal(long$yes[long$item_type == "old"], c(5L, 6L))
+})
+
 test_that("mpt_long_data without a tree_id column in a single-tree model", {
   model <- mpt(mpt_tree("t", list(a = "p", b = "1 - p")))
   long <- mpt_long_data(data.frame(t.a = c(3, 4), t.b = c(7, 6)), model)
