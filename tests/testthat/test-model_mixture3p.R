@@ -111,6 +111,41 @@ test_that("rmixture3p() is exact at high precision", {
   expect_lt(abs(sd(draws) - 0.01), 1e-4)
 })
 
+test_that("posterior_predict() samples the density log_lik() evaluates, for every version", {
+  withr::local_seed(398)
+  n <- 2e5
+  nt <- c(2, -1.5)
+  # K / set_size = 1.5: the slot version stores every item, slot averaging
+  # gives the reported item one or two slots
+  pars <- list(mu = 0, kappa = 6, thetat = 0.6, thetant = -0.4, K = 4.5, pnt = 0.3)
+  density <- function(x, version, tau) {
+    exp(switch(version,
+      simple = .dmixture3p_simple(x, 0, 6, 0.6, -0.4, 3, nt, tau, 41L),
+      slot = .dmixture3p_slot(x, 0, 6, 4.5, 0.3, 3, nt, tau, 41L),
+      slot_averaging = .dmixture3p_slot_averaging(x, 0, 6, 4.5, 0.3, 3, nt, tau, 41L)
+    ))
+  }
+  breaks <- seq(-pi, pi, length.out = 21)
+  for (tau in c(0, 1)) {
+    dpars <- lapply(c(pars, if (tau > 0) list(tau = tau)), function(x) matrix(x, n, 1))
+    prep <- structure(
+      list(
+        dpars = dpars, data = list(Y = 0, vint1 = 3L, vreal1 = nt[1], vreal2 = nt[2]),
+        ndraws = n, family = list(vp_nodes = 41L)
+      ),
+      class = "brmsprep"
+    )
+    for (version in c("simple", "slot", "slot_averaging")) {
+      draws <- .mixture3p_posterior_predict(version)(1, prep)
+      observed <- as.numeric(table(cut(draws, breaks))) / n
+      expected <- vapply(seq_len(20), function(i) {
+        stats::integrate(density, breaks[i], breaks[i + 1], version = version, tau = tau)$value
+      }, numeric(1))
+      expect_lt(max(abs(observed - expected)), 0.005)
+    }
+  }
+})
+
 test_that("the capacity versions separate storage from swapping", {
   x <- seq(-pi, pi, length.out = 30)
   nt <- c(2, -1.5, 1, 0.5, -2, 2.5, -0.7)
