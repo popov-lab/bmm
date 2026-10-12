@@ -48,7 +48,7 @@
 #'
 #' @return An object of class `mpt_tree`
 #'
-#' @keywords transform
+#' @keywords bmmodel
 #'
 #' @examples
 #' tree_old <- mpt_tree(
@@ -100,11 +100,14 @@ mpt_tree <- function(name, branches, ..., impossible = NULL) {
   )
   extra <- list(...)
   from_formulas <- inherits(branches, "formula")
+  mixed <- length(extra) > 0 &&
+    (!from_formulas || !all(vapply(extra, inherits, logical(1), "formula")))
   stopif(
-    length(extra) > 0 && !from_formulas,
-    "Arguments after branches must be formulas, and then branches has to be a \\
-    formula too. Use either a named list of character strings or formulas, not \\
-    a mix. The impossible argument has to be named."
+    mixed,
+    "Cannot mix formulas and other branch expressions in tree '{name}'. Write \\
+    every branch as a formula, category ~ expression, or pass a named list of \\
+    character strings. The impossible argument has to be named, \\
+    impossible = \"c\"."
   )
   stopif(
     is.list(branches) && any(vapply(branches, inherits, logical(1), "formula")),
@@ -202,6 +205,9 @@ print.mpt_tree <- function(x, ...) {
                        simplex = NULL, restrictions = NULL,
                        unrestricted_trees = NULL, links = "logit",
                        default_priors = NULL, call = NULL, ...) {
+  # a named list sets single parameters on top of the model-wide default link
+  parameter_links <- if (is.list(links)) links
+  links <- if (is.list(links)) "logit" else links
   trees <- .mpt_as_tree_list(trees)
   if (length(trees)) names(trees) <- vapply(trees, `[[`, character(1), "name")
   covariates <- covariates %||% character(0)
@@ -311,7 +317,8 @@ print.mpt_tree <- function(x, ...) {
     call = call
   )
   out$default_priors[names(default_priors)] <- default_priors
-  set_links(out, NULL)
+  out <- set_links(out, parameter_links)
+  .mpt_match_link_priors(out)
 }
 
 # matched priors: effects get the intercept's own prior, because a narrower
@@ -357,9 +364,21 @@ settable_links.mpt <- function(model) {
   names(defaults)[defaults != "identity"]
 }
 
+.mpt_link_functions <- c("logit", "probit")
+
 #' @exportS3Method
 settable_link_functions.mpt <- function(model) {
-  c("logit", "probit")
+  .mpt_link_functions
+}
+
+# the derived member of each simplex group and the stick-breaking components
+# get their formulas from check_formula.mpt(), so none is expected from the user
+#' @exportS3Method
+generated_parameters.mpt <- function(model) {
+  c(
+    vapply(model$other_vars$simplex, function(grp) grp[length(grp)], character(1)),
+    unname(model$other_vars$simplex_raw)
+  )
 }
 
 # user facing alias
@@ -417,10 +436,13 @@ settable_link_functions.mpt <- function(model) {
 #'   A restricted parameter is removed from the model; the Details say how
 #'   this differs from fixing a parameter in the formula. Order constraints
 #'   (`"Do > Dn"`) are not supported here; see Details.
-#' @param links Character. The link function for all latent probability
-#'   parameters: `"logit"` (default) or `"probit"`. The constructor takes one
-#'   link for the whole model; a single parameter is switched afterwards,
-#'   `model$links$D <- "probit"`, and takes that link's default priors (see
+#' @param links The link function of the latent probability parameters:
+#'   `"logit"` (default) or `"probit"`. A single string sets every parameter;
+#'   a named list, `links = list(D = "probit")`, sets the named parameters
+#'   and leaves the others at `"logit"`. Members of a `simplex` group and
+#'   their `praw` components take no link of their own. A parameter switched
+#'   to the other link, in the list or afterwards with
+#'   `model$links$D <- "probit"`, takes that link's default priors (see
 #'   Details).
 #' @param ... used internally for testing, ignore it
 #'
@@ -434,7 +456,7 @@ settable_link_functions.mpt <- function(model) {
 #'   variable is passed. The `tree_id` column names the tree of each row, and
 #'   the counts of a row must come from trials of that tree. Wide tables with
 #'   one column per category of an EQN file, as MPTinR and TreeBUGS take them,
-#'   are reshaped with [mpt_long_data()].
+#'   are reshaped with [mpt_data_reshape()].
 #'
 #'   A separate tree is needed only when the *branch expressions* differ, that
 #'   is, when the trial determines which latent processes apply or which
@@ -629,7 +651,23 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
                 restrictions = NULL, links = "logit", ...) {
   call <- match.call()
   stop_missing_args()
-  links <- match.arg(links, c("logit", "probit"))
+  # a named list is validated against the parameters once the model exists
+  stopif(
+    !is.list(links) && !is.character(links),
+    "The links argument must be a single link function for all latent \\
+    parameters, links = \"probit\", or a named list with one link per \\
+    parameter, links = list(D = \"probit\")."
+  )
+  stopif(
+    is.character(links) && length(links) != 1L,
+    "The links argument takes one link function for the whole model. Links \\
+    for single parameters go in a named list, links = list(D = \"probit\")."
+  )
+  stopif(
+    is.character(links) && !links %in% .mpt_link_functions,
+    "Unknown link function(s): {collapse_comma(links)}. mpt() takes \\
+    {collapse_comma(.mpt_link_functions)}"
+  )
   trees <- .mpt_as_tree_list(trees)
   covariates <- covariates %||% character(0)
   simplex <- .mpt_as_simplex_list(simplex)
@@ -863,13 +901,14 @@ print_model_details.mpt <- function(model, ...) {
       "\n"
     )
   }
-  # the links field lists the sticks as identity because their generated
-  # formulas apply the model link; the display says which one
+  # the links field lists the members and sticks as identity because their
+  # generated formulas apply the model link; the display says which one
   for (grp in model$other_vars$simplex) {
     cat(glue(
       "Simplex:    {collapse_comma(grp)} via stick-breaking; the components \\
       {collapse_comma(model$other_vars$simplex_raw[grp[-length(grp)]])} pass \\
-      through {inv_link('x', model$other_vars$link)[[1]]}()"
+      through {inv_link('x', model$other_vars$link)[[1]]}() in the generated \\
+      formulas (hence the identity links above)"
     ), "\n")
     cat(strrep(" ", 12), glue(
       "default prior: symmetric Dirichlet(1), prior mean 1/{length(grp)} = \\
@@ -1315,7 +1354,7 @@ check_data.mpt <- function(model, data, formula) {
     unused_trees <- setdiff(tree_names, unique(tree_values))
     warnif(
       length(unused_trees) > 0,
-      "The data contain no observations for tree(s): {collapse_comma(unused_trees)}"
+      "The data contain no rows for tree(s): {collapse_comma(unused_trees)}"
     )
     # brms needs the indicators as data columns, so they are handed on through
     # the data rather than through the attribute bridge
@@ -1404,7 +1443,7 @@ check_data.mpt <- function(model, data, formula) {
     stopif(
       length(observed) > 0,
       "The response category '{resp_cat}' is declared impossible for \\
-      {length(observed)} observation(s), but the data record responses in it \\
+      {length(observed)} row(s), but the data record responses in it \\
       (first: row {observed[1]}, count {data$Y[observed[1], resp_cat]}). \\
       Please check the impossible argument of mpt_tree() and the response counts."
     )

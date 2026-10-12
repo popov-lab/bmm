@@ -57,10 +57,13 @@ A restricted parameter is removed from the model; the Details say how
 this differs from fixing a parameter in the formula. Order constraints
 (\code{"Do > Dn"}) are not supported here; see Details.}
 
-\item{links}{Character. The link function for all latent probability
-parameters: \code{"logit"} (default) or \code{"probit"}. The constructor takes one
-link for the whole model; a single parameter is switched afterwards,
-\code{model$links$D <- "probit"}, and takes that link's default priors (see
+\item{links}{The link function of the latent probability parameters:
+\code{"logit"} (default) or \code{"probit"}. A single string sets every parameter;
+a named list, \code{links = list(D = "probit")}, sets the named parameters
+and leaves the others at \code{"logit"}. Members of a \code{simplex} group and
+their \code{praw} components take no link of their own. A parameter switched
+to the other link, in the list or afterwards with
+\code{model$links$D <- "probit"}, takes that link's default priors (see
 Details).}
 
 \item{...}{used internally for testing, ignore it}
@@ -97,7 +100,7 @@ example below); \code{bmm()} finds them by these names, so no response
 variable is passed. The \code{tree_id} column names the tree of each row, and
 the counts of a row must come from trials of that tree. Wide tables with
 one column per category of an EQN file, as MPTinR and TreeBUGS take them,
-are reshaped with \code{\link[=mpt_long_data]{mpt_long_data()}}.
+are reshaped with \code{\link[=mpt_data_reshape]{mpt_data_reshape()}}.
 
 A separate tree is needed only when the \emph{branch expressions} differ, that
 is, when the trial determines which latent processes apply or which
