@@ -1188,7 +1188,9 @@ log_diff_exp_floored <- function(a, b, floor = -Inf) {
 
 # log(Phi(hi) - Phi(lo)) for hi > lo, from whichever tail keeps both
 # probabilities away from 1: the lower tails left of zero, the upper tails right
-# of it. A straddling pair has both probabilities O(1) and is exact directly.
+# of it. A straddling pair is subtracted directly; the cancellation costs about
+# 1e-16 / width in relative terms (measured: 6.7e-7 at width 1e-10), as in the
+# two versions this replaced.
 # An empty interval is -Inf, and NA propagates
 log_Phi_diff <- function(lo, hi) {
   out <- rep(NA_real_, length(lo))
@@ -1210,6 +1212,11 @@ log_Phi_diff <- function(lo, hi) {
 # the named arguments recycled to the length of the longest, as a named list
 recycle_args <- function(...) {
   args <- list(...)
+  # rep_len() would silently turn a zero-length argument into NA
+  stopif(
+    any(lengths(args) == 0),
+    "recycle_args() received an empty argument: {collapse_comma(names(args)[lengths(args) == 0])}"
+  )
   lapply(args, rep_len, length.out = max(lengths(args)))
 }
 

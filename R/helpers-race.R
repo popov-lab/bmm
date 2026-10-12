@@ -169,7 +169,7 @@ race_code_simple_response <- function(model, data, prefix) {
   counts <- race_count_columns(prefix, 2)
   data[[race_cat_column(prefix)]] <- ifelse(data[, response_var] == 1L, 1L, 2L)
   data[[counts[1]]] <- 1L
-  data[[counts[2]]] <- n_alt - 1L
+  data[[counts[2]]] <- as.integer(n_alt) - 1L
   data
 }
 

@@ -116,7 +116,7 @@ test_that("every data argument of every model version has a column role", {
       stale <- setdiff(names(roles), names(args))
       expect(
         length(unlabeled) == 0,
-        glue::glue("{model} {version}: no entry in data_column_roles for {collapse_comma(unlabeled)}")
+        glue::glue("{model} {version}: no column role for {collapse_comma(unlabeled)}; add a model_column_roles.{model}() method in the model's file (see R/helpers-model.R)")
       )
       expect(
         length(stale) == 0,
