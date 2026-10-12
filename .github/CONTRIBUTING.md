@@ -169,7 +169,9 @@ If your PR deprecates something:
 
 When the window has passed, you may remove the old form. Remove its tests with
 it, list the removal under the same heading in the release that removes it, and
-announce it in an issue before that release (rule 3).
+announce it in an issue before that release (rule 3). Forms deprecated before
+1.5.0 may be removed in any later release once the removal is announced the
+same way.
 
 ## Review and merging
 
