@@ -55,6 +55,46 @@ test_that("combine_prior() handles empty priors", {
   expect_equal(nrow(combine_prior(prior, empty)), 1)
 })
 
+test_that("combine_prior() lets a prior on a whole nlpar replace its intercept prior", {
+  default <- brms::prior_("normal(2, 1)", class = "b", coef = "Intercept", nlpar = "kappa") +
+    brms::prior_("normal(0, 1)", class = "b", nlpar = "kappa") +
+    brms::prior_("logistic(0, 1)", class = "b", coef = "Intercept", nlpar = "thetat")
+  user <- brms::prior_("normal(0, 2)", class = "b", nlpar = "kappa")
+
+  out <- as.data.frame(combine_prior(default, user))
+  expect_equal(out$prior[out$nlpar == "kappa"], "normal(0, 2)")
+  expect_equal(out$prior[out$nlpar == "thetat"], "logistic(0, 1)")
+
+  # a user prior that names the intercept keeps it next to the nlpar-wide one
+  user_both <- user + brms::prior_("normal(5, 1)", class = "b", coef = "Intercept", nlpar = "kappa")
+  out <- as.data.frame(combine_prior(default, user_both))
+  expect_setequal(out$prior[out$nlpar == "kappa"], c("normal(0, 2)", "normal(5, 1)"))
+
+  # a dpar intercept is its own class, so a class "b" prior leaves it alone
+  dpar_default <- brms::prior_("normal(2, 1)", class = "Intercept", dpar = "kappa")
+  dpar_user <- brms::prior_("normal(0, 2)", class = "b", dpar = "kappa")
+  expect_equal(nrow(combine_prior(dpar_default, dpar_user)), 2)
+})
+
+test_that("a user prior on a non-linear parameter reaches its intercept (#526)", {
+  skip_on_cran()
+  dat <- data.frame(y = rmixture2p(n = 100), cond = rep(c("a", "b"), 50))
+  user <- brms::set_prior("normal(0, 2)", class = "b", nlpar = "kappa")
+
+  for (formula in list(bmf(kappa ~ 1, thetat ~ 1), bmf(kappa ~ 1 + cond, thetat ~ 1))) {
+    code <- suppressMessages(stancode(formula, dat, mixture2p(resp_error = "y"), prior = user))
+    # one prior for every coefficient of kappa, so brms vectorizes it
+    expect_match(code, "normal_lpdf(b_kappa | 0, 2)", fixed = TRUE)
+    expect_no_match(code, "normal_lpdf(b_kappa[1] | 2, 1)", fixed = TRUE)
+  }
+
+  expect_no_warning(suppressMessages(
+    bmm(bmf(kappa ~ 1 + cond, thetat ~ 1), dat, mixture2p(resp_error = "y"),
+      prior = user, backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  ))
+})
+
 test_that("validate_default_priors() accepts a formula without parameter formulas", {
   model <- list(default_priors = list())
   expect_equal(validate_default_priors(model, brms::bf(y ~ 1)), list())
