@@ -8,7 +8,10 @@
 #'
 #' @description Density, distribution function, quantile function, and random
 #'   generation for the Linear Ballistic Accumulator (LBA) model with multiple
-#'   drift rate distributions.
+#'   drift rate distributions. `dlba()` is the joint density of the response
+#'   time and the winning accumulator. `plba()` and `qlba()` describe the
+#'   distribution of the race's first finishing time, regardless of which
+#'   accumulator wins.
 #'
 #' @param rt Numeric vector of response times in seconds. Recycled with `gap`,
 #'   `sp` and `ndt` to a common length.
@@ -29,7 +32,8 @@
 #'   uniformly distributed on `[0, sp]`. Recycled with `rt`, `gap` and `ndt` to
 #'   a common length.
 #' @param ndt Numeric. Non-decision time in seconds (>= 0). Recycled with
-#'   `rt`, `gap` and `sp` to a common length.
+#'   `rt`, `gap` and `sp` to a common length. `qlba()` takes a single `ndt`,
+#'   because its root search needs one interval.
 #' @param s Numeric. Scale parameter (> 0, default = 1). Interpretation depends
 #'   on `distribution`: drift SD for `"normal"`, rate for `"gamma"`, scale for
 #'   `"frechet"`, sdlog for `"lognormal"`. Typically fixed to 1 for

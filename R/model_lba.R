@@ -3,7 +3,7 @@
 # gap/sp/ndt/s block lives in .lba_shared (identical across all distributions).
 .lba_dist_specs <- list(
   normal = list(
-    s_desc = "drift rate SD (fixed to 1 by default)",
+    s_desc = "drift rate SD (fixed to 1 by default, i.e. `s = 0` on the log scale)",
     drift = list(
       desc = "mean drift rate",
       link = "identity",
@@ -15,7 +15,7 @@
     )
   ),
   gamma = list(
-    s_desc = "rate parameter (fixed to 1 by default)",
+    s_desc = "rate parameter (fixed to 1 by default, i.e. `s = 0` on the log scale)",
     drift = list(
       desc = "drift rate (gamma shape)",
       link = "log",
@@ -27,7 +27,7 @@
     )
   ),
   frechet = list(
-    s_desc = "scale parameter (fixed to 1 by default)",
+    s_desc = "scale parameter (fixed to 1 by default, i.e. `s = 0` on the log scale)",
     drift = list(
       desc = "drift rate (Frechet shape)",
       link = "log",
@@ -39,7 +39,7 @@
     )
   ),
   lognormal = list(
-    s_desc = "sdlog parameter (fixed to 1 by default)",
+    s_desc = "sdlog parameter (fixed to 1 by default, i.e. `s = 0` on the log scale)",
     drift = list(
       desc = "drift rate (meanlog)",
       link = "identity",
@@ -184,7 +184,10 @@ settable_links.lba_custom <- function(model) {
 #'   to use. Options are:
 #'   \itemize{
 #'     \item `"simple"` (default): Two drift parameters, one for the correct
-#'       accumulator (response = 1) and one for all error accumulators. The
+#'       accumulator (response = 1) and one for all error accumulators. Every
+#'       one of the `n_choices - 1` error accumulators runs with the same
+#'       `drifte`, and which error was given is not used by the likelihood (only
+#'       correct vs. error). The
 #'       scale parameter `s` is shared and fixed to 1 by default (`s = 0` on
 #'       the log scale). This covers the common case where interest is in the
 #'       speed of correct vs. error processing.
@@ -231,9 +234,12 @@ settable_links.lba_custom <- function(model) {
 #'   scale for `gap`, `sp`, `ndt`): `exponential(1)` puts 36% of its mass
 #'   below 0.45, `exponential(2)` puts 29% below 0.17.
 #' @section Numerical notes: For `distribution = "gamma"`, the accumulator's
-#'   shape is `driftc`/`drifte` + 1, and `s * b / t` grows without bound as
+#'   shape is `driftc`/`drifte`, and the moment integral evaluates the gamma
+#'   CDF at shape `driftc`/`drifte` + 1; `s * b / t` grows without bound as
 #'   `ndt` approaches the fastest response time. Stan Math's gamma CDF has an
-#'   approximate shape partial above shape ~5 and an undefined one once the
+#'   approximate shape partial at every shape (errors above 1e-3 at a few
+#'   percent of ordinary response times for shapes below 6, worst for shapes
+#'   above 10 and in the far tails) and an undefined one once the
 #'   CDF saturates (stan-dev/math #3408), making the gamma drift the slowest
 #'   and least robust of the four distributions near the fastest response
 #'   times; the default gamma prior keeps shape away from this region.
@@ -252,12 +258,20 @@ settable_links.lba_custom <- function(model) {
 #'   category-level likelihood: for `version = "simple"`, an error trial with
 #'   `K` response categories contributes `log(K - 1)` more than a
 #'   per-response likelihood would, i.e. the likelihood of "some error"
-#'   rather than of the specific error observed.
+#'   rather than of the specific error observed. Because of that constant,
+#'   `loo()` values of a `"simple"` fit are not comparable with those of a
+#'   `"custom"` fit of the same data.
 #'
 #'   `posterior_epred()` returns the expected response time (`ndt` plus the
 #'   integral of the race survivor); it is deterministic, not
-#'   simulation-based.
+#'   simulation-based. The mean is infinite for a race in which only one
+#'   normal-drift accumulator runs (a custom version with a single category, or
+#'   an `accumulators` column that leaves one category on a trial) and for a
+#'   gamma drift whose shapes sum to at most 1; the integral is then truncated
+#'   at 1e7 s and the returned value is not meaningful (0.50 s and 1 359 s were
+#'   returned in such cases).
 #'
+#'   `pp_check(fit, resp_var = "rt")` checks the response times and
 #'   `pp_check(fit, resp_var = "response")` checks the response category
 #'   (1 = correct, 2 = error for `version = "simple"`; category order for
 #'   `version = "custom"`). `pp_check_vars(fit)` lists the available checks.

@@ -34,7 +34,10 @@ alternatives (K >= 2). Required for \code{version = "simple"}. Not used for
 to use. Options are:
 \itemize{
 \item \code{"simple"} (default): Two drift parameters, one for the correct
-accumulator (response = 1) and one for all error accumulators. The
+accumulator (response = 1) and one for all error accumulators. Every
+one of the \code{n_choices - 1} error accumulators runs with the same
+\code{drifte}, and which error was given is not used by the likelihood (only
+correct vs. error). The
 scale parameter \code{s} is shared and fixed to 1 by default (\code{s = 0} on
 the log scale). This covers the common case where interest is in the
 speed of correct vs. error processing.
@@ -103,7 +106,7 @@ Linear Ballistic Accumulator
 \item \code{gap}: threshold gap: the threshold is b = gap + sp
 \item \code{sp}: maximum starting point (uniform on 0 to sp)
 \item \code{ndt}: non-decision time
-\item \code{s}: drift rate SD (fixed to 1 by default)
+\item \code{s}: drift rate SD (fixed to 1 by default, i.e. \code{s = 0} on the log scale)
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -181,9 +184,12 @@ below 0.45, \code{exponential(2)} puts 29\% below 0.17.
 
 \section{Numerical notes}{
  For \code{distribution = "gamma"}, the accumulator's
-shape is \code{driftc}/\code{drifte} + 1, and \code{s * b / t} grows without bound as
+shape is \code{driftc}/\code{drifte}, and the moment integral evaluates the gamma
+CDF at shape \code{driftc}/\code{drifte} + 1; \code{s * b / t} grows without bound as
 \code{ndt} approaches the fastest response time. Stan Math's gamma CDF has an
-approximate shape partial above shape ~5 and an undefined one once the
+approximate shape partial at every shape (errors above 1e-3 at a few
+percent of ordinary response times for shapes below 6, worst for shapes
+above 10 and in the far tails) and an undefined one once the
 CDF saturates (stan-dev/math #3408), making the gamma drift the slowest
 and least robust of the four distributions near the fastest response
 times; the default gamma prior keeps shape away from this region.
@@ -208,12 +214,20 @@ with another parameter fixed in its place.
 category-level likelihood: for \code{version = "simple"}, an error trial with
 \code{K} response categories contributes \code{log(K - 1)} more than a
 per-response likelihood would, i.e. the likelihood of "some error"
-rather than of the specific error observed.
+rather than of the specific error observed. Because of that constant,
+\code{loo()} values of a \code{"simple"} fit are not comparable with those of a
+\code{"custom"} fit of the same data.
 
 \code{posterior_epred()} returns the expected response time (\code{ndt} plus the
 integral of the race survivor); it is deterministic, not
-simulation-based.
+simulation-based. The mean is infinite for a race in which only one
+normal-drift accumulator runs (a custom version with a single category, or
+an \code{accumulators} column that leaves one category on a trial) and for a
+gamma drift whose shapes sum to at most 1; the integral is then truncated
+at 1e7 s and the returned value is not meaningful (0.50 s and 1 359 s were
+returned in such cases).
 
+\code{pp_check(fit, resp_var = "rt")} checks the response times and
 \code{pp_check(fit, resp_var = "response")} checks the response category
 (1 = correct, 2 = error for \code{version = "simple"}; category order for
 \code{version = "custom"}). \code{pp_check_vars(fit)} lists the available checks.

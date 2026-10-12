@@ -73,15 +73,13 @@ starting point and the decision threshold. The total threshold is computed
 as \code{b = gap + sp}, ensuring \code{b > sp} structurally. Recycled with \code{rt},
 \code{sp} and \code{ndt} to a common length.}
 
-\item{sp}{Numeric. Maximum starting point (>= 0 here; strictly positive,
-\code{sp > 0}, in the \code{lba()} model). Starting evidence is uniformly
-distributed on \verb{[0, sp]}. These distribution functions additionally
-accept \code{sp = 0} as the no-starting-point-variability limit, which the
-fitted model does not. Recycled with \code{rt}, \code{gap} and \code{ndt} to a common
-length.}
+\item{sp}{Numeric. Maximum starting point (\code{sp > 0}). Starting evidence is
+uniformly distributed on \verb{[0, sp]}. Recycled with \code{rt}, \code{gap} and \code{ndt} to
+a common length.}
 
 \item{ndt}{Numeric. Non-decision time in seconds (>= 0). Recycled with
-\code{rt}, \code{gap} and \code{sp} to a common length.}
+\code{rt}, \code{gap} and \code{sp} to a common length. \code{qlba()} takes a single \code{ndt},
+because its root search needs one interval.}
 
 \item{s}{Numeric. Scale parameter (> 0, default = 1). Interpretation depends
 on \code{distribution}: drift SD for \code{"normal"}, rate for \code{"gamma"}, scale for
@@ -115,7 +113,10 @@ identifiability.}
 \description{
 Density, distribution function, quantile function, and random
 generation for the Linear Ballistic Accumulator (LBA) model with multiple
-drift rate distributions.
+drift rate distributions. \code{dlba()} is the joint density of the response
+time and the winning accumulator. \code{plba()} and \code{qlba()} describe the
+distribution of the race's first finishing time, regardless of which
+accumulator wins.
 }
 \examples{
 dat <- rlba(n = 1000, drift = c(3, 1.5), gap = 0.5, sp = 0.3, ndt = 0.3)
