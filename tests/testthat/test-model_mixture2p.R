@@ -116,6 +116,31 @@ test_that("rmixture2p() draws from dmixture2p() for every version", {
   compare(kappa = 6, K = 7, set_size = 2, version = "slot_averaging", tau = 1)
 })
 
+test_that("dmixture2p() and rmixture2p() refuse what the model refuses", {
+  # a set size of 0 used to give p_mem = 1 in the slot version and NA or
+  # uniform draws in slot averaging, without an error
+  for (version in c("slot", "slot_averaging")) {
+    for (set_size in c(0, -2, 2.5)) {
+      expect_error(
+        dmixture2p(0.1, K = 3, set_size = set_size, version = version),
+        "positive whole numbers"
+      )
+      expect_error(
+        rmixture2p(5, K = 3, set_size = set_size, version = version),
+        "positive whole numbers"
+      )
+    }
+  }
+  # the simple version ignores set_size, as the model does
+  expect_equal(
+    dmixture2p(0.1, kappa = 6, p_mem = 0.7, set_size = 0),
+    dmixture2p(0.1, kappa = 6, p_mem = 0.7)
+  )
+  # 21 nodes miss the log density by about 1e-2 at a gamma shape near 3
+  expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 21), "odd number of at least 41")
+  expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
+})
+
 test_that("configure_model() builds a custom family without the mixture machinery", {
   code <- stancode(bmf(kappa ~ 1, thetat ~ 1), oberauer_lin_2017, mixture2p("dev_rad"))
   expect_match(code, "mixture2p_simple_lpdf")
