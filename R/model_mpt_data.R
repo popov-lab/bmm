@@ -285,6 +285,15 @@ mpt_long_data <- function(wide, model, id = NULL,
                    paste0(' or ', layout$label[missing_cols]), ''), ')',
             collapse = ', ')}"
   )
+  # a bare label of one tree can equal the qualified name of a label of another
+  shared_cols <- unique(count_cols[duplicated(count_cols)])
+  stopif(
+    length(shared_cols) > 0,
+    "The wide column(s) {collapse_comma(shared_cols)} would be read as the \\
+    counts of more than one response category. Name the count columns of \\
+    these labels by tree and label, {collapse_comma(qualified[count_cols %in% \\
+    shared_cols])}."
+  )
   count_cols
 }
 

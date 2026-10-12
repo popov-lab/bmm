@@ -181,6 +181,21 @@ test_that("mpt_long_data reads a label shared by trees from the qualified name",
   )
 })
 
+test_that("mpt_long_data stops when one wide column would feed two categories", {
+  eqn_file <- withr::local_tempfile(fileext = ".eqn")
+  writeLines(c("4", "old hit p", "old miss 1-p", "new old.hit q", "new old.miss 1-q"), eqn_file)
+  model <- suppressMessages(mpt_from_eqn(
+    eqn_file,
+    categories = c(hit = "yes", miss = "no", old.hit = "yes", old.miss = "no"),
+    tree_id = "tree"
+  ))
+  # 'old.hit' is the label of tree new and the qualified name of hit in tree old
+  wide <- data.frame(hit = 1, miss = 2, old.hit = 30, old.miss = 40)
+  expect_error(mpt_long_data(wide, model), "more than one response category.*old.hit")
+  qualified <- data.frame(old.hit = 1, old.miss = 2, new.old.hit = 30, new.old.miss = 40)
+  expect_equal(mpt_long_data(qualified, model)$yes, c(1L, 30L))
+})
+
 test_that("mpt_long_data sums the labels that categories merged", {
   eqn_file <- withr::local_tempfile(fileext = ".eqn")
   writeLines(c(
