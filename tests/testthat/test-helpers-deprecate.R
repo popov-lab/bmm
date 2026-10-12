@@ -86,3 +86,21 @@ test_that("the warning names no call, so users do not see an internal function",
 
   expect_null(conditionCall(w))
 })
+
+test_that("a deprecation without replacement ends the message at the removal release", {
+  expect_identical(
+    collect_warnings(warn_deprecated("f()", NULL, since = "1.5.0"))$warnings,
+    "`f()` is deprecated since bmm 1.5.0 and will be removed in bmm 1.6.0 at the earliest."
+  )
+  expect_identical(
+    collect_warnings(
+      warn_deprecated(c("f()", "g()"), NULL, since = "1.5.0", details = "Nothing replaces them.")
+    )$warnings,
+    paste(
+      "`f()` is deprecated since bmm 1.5.0 and will be removed in bmm 1.6.0 at the earliest.",
+      "`g()` is deprecated since bmm 1.5.0 and will be removed in bmm 1.6.0 at the earliest.",
+      "Nothing replaces them.",
+      sep = "\n"
+    )
+  )
+})

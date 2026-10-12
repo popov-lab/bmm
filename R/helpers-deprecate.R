@@ -3,15 +3,17 @@
 # first and calls this once, also when it found none; the deprecation policy
 # in CONTRIBUTING.md ("Deprecating and removing features") gives the rules this
 # implements.
-# `what` and `with` are code, written as the user would type them.
+# `what` and `with` are code, written as the user would type them; `with` is
+# NULL when nothing replaces the old form.
 warn_deprecated <- function(what, with, since, removed_in = next_minor(since),
                             details = NULL) {
   if (length(what) == 0) {
     return(invisible())
   }
+  replacement <- if (length(with) == 0) "" else glue(" Use `{with}` instead.", .trim = FALSE)
   statements <- unique(glue(
     "`{what}` is deprecated since bmm {since} and will be removed in bmm ",
-    "{removed_in} at the earliest. Use `{with}` instead."
+    "{removed_in} at the earliest.{replacement}"
   ))
   msg <- paste(c(statements, details), collapse = "\n")
   warning2("{msg}")
