@@ -95,44 +95,54 @@ test_that(".circmix_vp_ld() is a normalised density at the shape threshold", {
   expect_equal(total$value, 1, tolerance = 1e-8)
 })
 
-test_that(".circmix_vp_ld() matches adaptive integration above the shape threshold", {
-  vp_reference <- function(y, kappa, tau, p_mem) {
-    shape <- .circmix_J(kappa) / tau
-    integrand <- function(t) {
-      J <- exp(t)
-      k <- .circmix_kappa(J)
-      density <- (p_mem * exp(k * cos(y) - .circmix_log_besselI0(k)) + (1 - p_mem)) / (2 * pi)
-      density * stats::dgamma(J, shape = shape, scale = tau) * J
-    }
-    centre <- digamma(shape) + log(tau)
-    width <- 30 * sqrt(trigamma(shape))
-    log(stats::integrate(integrand, centre - width, centre + width,
-      rel.tol = 1e-12, subdivisions = 8000L
-    )$value)
+# Integrates in log J from J = 1e-12 rather than from a gamma quantile: for a
+# response far from the target the integrand peaks far below the prior's bulk,
+# where a quantile bound cuts it off (and returns -Inf at large kappa).
+vp_reference <- function(y, kappa, tau, p_mem) {
+  shape <- .circmix_J(kappa) / tau
+  integrand <- function(t) {
+    J <- exp(t)
+    k <- .circmix_kappa(J)
+    density <- (p_mem * exp(k * cos(y) - .circmix_log_besselI0(k)) + (1 - p_mem)) / (2 * pi)
+    density * stats::dgamma(J, shape = shape, scale = tau) * J
   }
+  upper <- log(stats::qgamma(1e-20, shape, scale = tau, lower.tail = FALSE))
+  breaks <- seq(log(1e-12), upper, length.out = 300)
+  log(sum(vapply(seq_len(length(breaks) - 1), function(i) {
+    stats::integrate(integrand, breaks[i], breaks[i + 1],
+      rel.tol = 1e-12, abs.tol = 0, subdivisions = 2000L
+    )$value
+  }, numeric(1))))
+}
 
-  # 41 nodes hold the log density to 1e-4 from shape 2 up, but at the threshold
-  # itself the error is several 1e-4 (3.5e-4 at shape 1, worst case over y)
-  tolerances <- c(`4` = 1e-4, `2` = 1e-4, `1` = 1e-3)
-  for (shape in c(4, 2, 1)) {
-    tau <- .circmix_J(10) / shape
-    expect_equal(
-      .circmix_vp_ld(matrix(cos(0.3)), matrix(log(0.8)), log(0.2), 10, tau),
-      vp_reference(0.3, 10, tau, 0.8),
-      tolerance = tolerances[[as.character(shape)]]
+vp_errors <- function(y, kappa, shape, p_mem, ...) {
+  tau <- .circmix_J(kappa) / shape
+  n <- length(y)
+  .circmix_vp_ld(
+    matrix(cos(y)), matrix(log(p_mem), nrow = n), rep(log1p(-p_mem), n),
+    rep(kappa, n), rep(tau, n), ...
+  ) - vapply(y, vp_reference, numeric(1), kappa = kappa, tau = tau, p_mem = p_mem)
+}
+
+test_that(".circmix_vp_ld() matches adaptive integration from the shape threshold up", {
+  y <- c(0, 0.3, 1.5, pi)
+  tolerances <- c(`0.75` = 2e-5, `1` = 2e-6, `2` = 1e-7)
+  for (shape in c(0.75, 1, 2)) {
+    expect_lt(
+      max(abs(vp_errors(y, kappa = 10, shape = shape, p_mem = 0.8))),
+      tolerances[[as.character(shape)]]
     )
   }
 })
 
-test_that(".circmix_vp_ld() refuses shapes the node count cannot integrate", {
-  tau <- .circmix_J(10) / 0.5
-  expect_error(
-    .circmix_vp_ld(matrix(cos(0.3)), matrix(log(0.8)), log(0.2), 10, tau),
-    "gamma shape"
-  )
-  expect_silent(
-    .circmix_vp_ld(matrix(cos(0.3)), matrix(log(0.8)), log(0.2), 10, tau, nodes = 81L)
-  )
+test_that(".circmix_vp_ld() refuses shapes below 60 / nodes", {
+  at_shape <- function(shape, ...) {
+    .circmix_vp_ld(matrix(cos(0.3)), matrix(log(0.8)), log(0.2), 10, .circmix_J(10) / shape, ...)
+  }
+  expect_error(at_shape(0.7), "gamma shape")
+  expect_silent(at_shape(0.75))
+  expect_error(at_shape(0.36, nodes = 161L), "gamma shape")
+  expect_silent(at_shape(0.38, nodes = 161L))
 })
 
 test_that(".circmix_slots() gives a slot distribution that is continuous in K", {
@@ -152,7 +162,7 @@ slot_averaging_density <- function(y, K, set_size, kappa = 6, tau = 0) {
   n <- length(y)
   .circmix_slot_averaging_ld(
     matrix(cos(y)), matrix(0, nrow = n), rep(K, n), rep(set_size, n),
-    rep(kappa, n), rep(tau, n), 41L
+    rep(kappa, n), rep(tau, n), 81L
   )
 }
 
@@ -285,8 +295,8 @@ test_that(".circmix_prep_tau() is zero when the model has no tau parameter", {
 })
 
 test_that(".circmix_prep_nodes() falls back to the default node count", {
-  expect_equal(.circmix_prep_nodes(list(family = list())), 41L)
-  expect_equal(.circmix_prep_nodes(list(family = list(vp_nodes = 81L))), 81L)
+  expect_equal(.circmix_prep_nodes(list(family = list())), 81L)
+  expect_equal(.circmix_prep_nodes(list(family = list(vp_nodes = 41L))), 41L)
 })
 
 test_that(".circmix_check_variable_precision() rejects unusable node counts", {
@@ -384,7 +394,7 @@ test_that(".circmix_stan_wrapper() can pass the core a value its family omits", 
       "data real circmix_logJ_min, data real circmix_dlogJ\\) \\{"
     )
   )
-  expect_match(wrapper, "mixture2p_simple_core\\(y, mu, kappa, 0.0, thetat, 41")
+  expect_match(wrapper, "mixture2p_simple_core\\(y, mu, kappa, 0.0, thetat, 81")
 })
 
 test_that(".circmix_stan_wrapper() emits Stan that parses", {
@@ -477,7 +487,7 @@ test_that("the Stan and R implementations of the shared core agree", {
   kappa <- c(0.05, 0.5, 2, 10, 100, 1000, 6e4)
   Jtest <- c(1e-7, 1e-3, 0.5, 9.486, 500, 5e4, 1e7)
   kappa_het <- c(3, 12, 40)
-  tau <- c(0, 0.5, 2)
+  tau <- c(0, 0.5, 2, .circmix_J(10) / 0.75)
 
   stan <- circmix_stan_values(list(
     NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
@@ -485,7 +495,7 @@ test_that("the Stan and R implementations of the shared core agree", {
     NC = length(cosd), cosd = cosd, logw = logw, logw_guess = logw_guess,
     kappa_het = kappa_het, NKAP = length(kappa), kappa = kappa,
     NJ = length(Jtest), Jtest = Jtest, NTAU = length(tau), tau = tau,
-    kappa_vp = 10, nodes = 41L, K_slots = 3.5, ss_slots = 2L
+    kappa_vp = 10, nodes = 81L, K_slots = 3.5, ss_slots = 2L
   ))
 
   n <- length(kappa)
@@ -518,7 +528,7 @@ test_that("the Stan and R implementations of the shared core agree", {
     stan("out_sa"),
     vapply(tau, function(c_tau) {
       .circmix_slot_averaging_ld(
-        matrix(cosd, nrow = 1), matrix(logw, nrow = 1), 3.5, 2L, 10, c_tau, 41L
+        matrix(cosd, nrow = 1), matrix(logw, nrow = 1), 3.5, 2L, 10, c_tau, 81L
       )
     }, numeric(1)),
     tolerance = 1e-12

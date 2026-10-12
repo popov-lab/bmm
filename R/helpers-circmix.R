@@ -139,15 +139,17 @@
 # J ~ gamma(shape = J(kappa) / tau, scale = tau) on a composite Simpson grid in
 # log J. tau = 0 is the point mass at J(kappa), so rows with tau = 0 fall back
 # to the constant-precision density, which is why tau is the parameter
-# variable_precision frees. The nodes are centred on
-# E[log J] = digamma(shape) + log(tau) with half width
-# 8 sd(log J) = 8 sqrt(trigamma(shape)); the offsets are constants, so only the
-# centre and the width depend on parameters, and they do so smoothly. The
-# quadrature weights are renormalised to sum to one, which makes the result a
-# finite von Mises mixture and so a proper density. Unnormalised, their sum
-# differs from one by an amount that depends only on the shape and acts as a
-# log prior on tau.
-.circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 41L,
+# variable_precision frees. The nodes run from 12 to 6 sd(log J) =
+# sqrt(trigamma(shape)) around E[log J] = digamma(shape) + log(tau), wider below
+# because log J is left-skewed; the offsets are constants, so only the centre
+# and the width depend on parameters, and they do so smoothly. Below a shape of
+# 60 / nodes the left tail is too heavy for the grid: with 81 nodes the log
+# density holds to about 1e-5 from that threshold (0.74) up and to 2e-6 from
+# shape 1. The quadrature weights are renormalised to sum to one, which makes
+# the result a finite von Mises mixture and so a proper density. Unnormalised,
+# their sum differs from one by an amount that depends only on the shape and
+# acts as a log prior on tau.
+.circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
   shape <- .circmix_J(kappa) / tau
@@ -157,14 +159,14 @@
     return(out)
   }
   stopif(
-    any(shape[vp] < 40 / nodes),
-    "The variable-precision quadrature holds the log density to about 1e-5 \\
-    while the gamma shape J(kappa)/tau stays above {40 / nodes}, but the \\
-    smallest value here is {min(shape[vp])}. Raise vp_nodes."
+    any(shape[vp] < 60 / nodes),
+    "The variable-precision quadrature needs a gamma shape J(kappa)/tau of at \\
+    least 60 / vp_nodes = {60 / nodes}, but the smallest value here is \\
+    {min(shape[vp])}. Raise vp_nodes."
   )
 
   centre <- digamma(shape[vp]) + log(tau[vp])
-  offsets <- seq(-1, 1, length.out = nodes)
+  offsets <- seq(-12, 6, length.out = nodes) / 8
   simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
   t <- centre + outer(half_width[vp], offsets)
   J <- exp(t)
@@ -337,7 +339,7 @@
 # The node count travels on the family so that log_lik() uses the grid the Stan
 # likelihood was fitted with.
 .circmix_prep_nodes <- function(prep) {
-  prep$family$vp_nodes %||% 41L
+  prep$family$vp_nodes %||% 81L
 }
 
 # brms wants bounds on the natural scale of each distributional parameter, which
@@ -487,7 +489,7 @@
 # in inst/stan_chunks. core_dpars may hold literals, which is how a
 # constant-precision model passes 0 for the tau its family does not estimate.
 .circmix_stan_wrapper <- function(family, dpars, core_dpars = dpars, vint = NULL,
-                                  vreal = list(), nodes = 41L) {
+                                  vreal = list(), nodes = 81L) {
   vreal_names <- lapply(names(vreal), function(g) paste0(g, seq_len(vreal[[g]])))
   vreal_args <- unlist(vreal_names)
   args <- c(

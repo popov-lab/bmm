@@ -72,7 +72,7 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
-  // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau) on a Simpson grid in log J; tau = 0 is constant precision
+  // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau) on a Simpson grid in log J, -12 to +6 sd; tau = 0 is constant precision
   // the weights are renormalised to sum to one, so the result is a proper density (see .circmix_vp_ld())
   real circmix_vp_ld(vector cosd, vector logw, real logw_guess,
                      real kappa, real tau, int nodes,
@@ -82,23 +82,23 @@
       return circmix_ld(cosd, logw, logw_guess, kappa);
     }
     real shape = circmix_J(kappa) / tau;
-    if (shape < 40.0 / nodes) {
-      reject("bmm: the variable-precision quadrature holds the log density to ",
-             "about 1e-5 while the gamma shape J(kappa)/tau stays above ",
-             40.0 / nodes, ", but got ", shape,
+    if (shape < 60.0 / nodes) {
+      reject("bmm: the variable-precision quadrature needs a gamma shape ",
+             "J(kappa)/tau of at least 60 / vp_nodes = ", 60.0 / nodes,
+             ", but got ", shape,
              ". Raise vp_nodes, or use a more informative prior on tau.");
     }
     real half_width = 8 * sqrt(trigamma(shape));
     if (half_width < 1e-6) {
       return circmix_ld(cosd, logw, logw_guess, kappa);
     }
-    real step = 2 * half_width / (nodes - 1);
+    real step = 2.25 * half_width / (nodes - 1);
     real centre = digamma(shape) + log(tau);
     real rate = inv(tau);
     vector[nodes] lw;
     vector[nodes] lp;
     for (i in 1:nodes) {
-      real t = centre - half_width + (i - 1) * step;
+      real t = centre - 1.5 * half_width + (i - 1) * step;
       real J = exp(t);
       lw[i] = circmix_simpson_lw(i, nodes) + t + gamma_lpdf(J | shape, rate);
       lp[i] = lw[i] + circmix_ld(cosd, logw, logw_guess,
