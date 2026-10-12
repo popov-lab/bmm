@@ -19,9 +19,11 @@ automatically.}
 \item{links}{A named list of link functions for the model parameters.
 Available parameters depend on the version: "simple" has \code{drift}, \code{bound},
 \code{ndt}, and \code{s}; "crisk" additionally has \code{zr}. Default links are "log" for
-most parameters and "logit" for \code{zr}. For positive parameters, "softplus"
-is available as an alternative to "log" that grows linearly for large
-values and avoids the numerical blow-up of \code{exp()}. A name that is not a
+\code{bound}, \code{ndt} and \code{s}, and "logit" for \code{zr}. \code{drift} has a "log" link in
+"simple", where it is positive, and an "identity" link in "crisk", where
+it can be negative, as in \code{\link[=ddm]{ddm()}} and \code{\link[=ezdm]{ezdm()}}. For positive parameters,
+"softplus" is available as an alternative to "log" that grows linearly for
+large values and avoids the numerical blow-up of \code{exp()}. A name that is not a
 parameter of the model is an error, and a link that allows values the
 default link excludes (e.g. "identity" for a positive parameter) is a
 warning.}
@@ -41,7 +43,8 @@ by 2.
 types as arising from racing accumulators toward opposite boundaries.
 Better suited for tasks with substantial error rates. The \code{bound}
 parameter represents the total boundary separation, consistent with
-the diffusion model parameterization.
+the diffusion model parameterization. \code{zr} is fixed at 0 on its
+logit scale (an unbiased \code{zr = 0.5}) unless you give it a formula.
 }
 For more details, see Miller et al. (2018).}
 
@@ -75,7 +78,7 @@ Censored-Shifted Wald Model
 \item \strong{Parameters:}
 \itemize{
 \item \code{drift}: drift rate
-\item \code{bound}: boundary (distance from starting point to correct boundary)
+\item \code{bound}: boundary (distance from starting point to correct boundary, half the boundary separation \code{bound} of version "crisk", ddm() and ezdm())
 \item \code{ndt}: non-decision time
 \item \code{s}: diffusion constant
 }
