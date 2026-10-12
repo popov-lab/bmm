@@ -151,7 +151,70 @@ test_that("the swap parameter is flagged as prior-only at set size 1", {
       nt_model(),
       backend = "mock", mock_fit = 1, rename = FALSE
     ),
-    "set-size-1 level"
+    "do not determine 'b_thetant_set_size1' in the formula for 'thetant'"
+  )
+})
+
+test_that("the set-size-1 warning names exactly the coefficients no other trial informs", {
+  dat <- oberauer_lin_2017
+  dat$ss_numeric <- as.numeric(as.character(dat$set_size))
+  dat$ss_num <- dat$ss_numeric
+  dat$single <- factor(ifelse(dat$ss_numeric == 1, "single", "multi"))
+  named <- function(rhs, data = dat, version = "slot") {
+    par <- if (version == "simple") "thetant" else "pnt"
+    ff <- bmf(kappa ~ 1) + bmf(stats::as.formula(paste(par, rhs)))
+    msg <- NULL
+    withCallingHandlers(
+      .mixture3p_warn_set_size_one(nt_model(version = version), data, ff),
+      warning = function(w) {
+        msg <<- conditionMessage(w)
+        invokeRestart("muffleWarning")
+      }
+    )
+    if (is.null(msg)) {
+      return(character(0))
+    }
+    gsub("'", "", unlist(regmatches(msg, gregexpr("'(b|sd)_[^']+'", msg))))
+  }
+  levels_2_to_8 <- paste0("set_size", 2:8)
+
+  # every coefficient is informed by the trials with non-targets
+  expect_equal(named("~ 1"), character(0))
+  expect_equal(named("~ 1 + (1 | ID)"), character(0))
+  expect_equal(named("~ 0 + set_size", droplevels(dat[dat$ss_numeric > 1, ])), character(0))
+  # a numeric set size is a line, fixed by set sizes 2 to 8
+  expect_equal(named("~ 1 + ss_num"), character(0))
+  expect_equal(named("~ 0 + ss_num"), character(0))
+
+  expect_equal(named("~ 0 + set_size"), "b_pnt_set_size1")
+  expect_equal(named("~ 0 + set_size", version = "simple"), "b_thetant_set_size1")
+  # with set size 1 as the reference, every coefficient is a contrast with it
+  expect_equal(named("~ 1 + set_size"), paste0("b_pnt_", c("Intercept", levels_2_to_8)))
+  expect_equal(
+    named("~ set_size + (set_size | ID)"),
+    c(
+      paste0("b_pnt_", c("Intercept", levels_2_to_8)),
+      paste0("sd_ID__pnt_", c("Intercept", levels_2_to_8))
+    )
+  )
+  expect_equal(
+    named("~ 0 + set_size + (0 + set_size || ID)"),
+    c("b_pnt_set_size1", "sd_ID__pnt_set_size1")
+  )
+  # a predictor that only varies at set size 1 is just as uninformed
+  expect_equal(named("~ 0 + single"), "b_pnt_singlesingle")
+  # two set sizes, one of them 1: the line through them has one point left
+  expect_equal(
+    named("~ 1 + ss_num", droplevels(dat[dat$ss_numeric %in% c(1, 4), ])),
+    c("b_pnt_Intercept", "b_pnt_ss_num")
+  )
+  # a variable missing from the data is left to brms, which names it
+  expect_equal(named("~ 0 + typo"), character(0))
+  expect_error(
+    bmm(bmf(kappa ~ 1, K ~ 1, pnt ~ 0 + typo), oberauer_lin_2017, nt_model(version = "slot"),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "can neither be found in 'data'"
   )
 })
 
