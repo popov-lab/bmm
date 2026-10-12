@@ -114,6 +114,48 @@ To build the articles locally, download the fits first:
 gh release download article-fits --dir vignettes/articles/fits --skip-existing
 ```
 
+## Deprecating and removing features
+
+Users should know how long their scripts keep working. From bmm 1.5.0 on,
+three rules apply:
+
+1. **Deprecate before you remove.** A deprecated function or argument keeps
+   working, with a warning, for at least one minor release. Something
+   deprecated in 1.5.0 still works in every 1.5.x release and is removed in
+   1.6.0 at the earliest.
+2. **List it in NEWS.** Every deprecation and every removal gets a bullet under
+   the heading `### Deprecated functions and arguments`.
+3. **Announce breaking changes.** A change is breaking when a script that ran
+   before now fails or has to be edited. Removing a deprecated form counts. We
+   announce it in a GitHub issue before the release that contains it, with the
+   old and the new code side by side (use the "Breaking change" issue
+   template).
+
+The rules cover what users type or read: exported functions and their
+arguments, model parameter names, documented defaults, and the data layout a
+model expects. Internal functions are not covered.
+
+If your PR deprecates something:
+
+- Keep the old form working by passing it on to the new one, with the same
+  result.
+- Warn with `warn_deprecated(what, with, since = "1.5.0")` where the old form
+  is detected. `what` and `with` are the old and the new code as users would
+  type it. The message is fixed: it names the release that deprecated the form,
+  the earliest release that may remove it (the next minor release, unless you
+  set `removed_in`) and the replacement. Use `details` only for something users
+  would otherwise miss, such as a changed meaning.
+- Call `warn_deprecated()` once per user call. If one call can meet many old
+  forms, such as prior rows, collect them first and pass them as vectors, so
+  users get one warning and not one per row.
+- Add the NEWS bullet under `### Deprecated functions and arguments` in the
+  section of the release that deprecates the form. On a `dev-*` branch that is
+  the branch's own section ([ADR 0002](../.dev/decisions/0002-release-integration-branches.md)).
+- Test that the old form still works and warns.
+
+When the window has passed, remove the old form and list the removal under the
+same heading in the release that removes it.
+
 ## Review and merging
 
 How many reviews a PR needs depends on what it touches.
