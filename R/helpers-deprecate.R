@@ -1,10 +1,14 @@
 # One warning for everything a single user call deprecates. A caller that
 # translates many rows (priors, formula terms) collects the old and new forms
-# first and calls this once; the deprecation policy in CONTRIBUTING.md
-# ("Deprecating and removing features") gives the rules this implements.
+# first and calls this once, also when it found none; the deprecation policy
+# in CONTRIBUTING.md ("Deprecating and removing features") gives the rules this
+# implements.
 # `what` and `with` are code, written as the user would type them.
 warn_deprecated <- function(what, with, since, removed_in = next_minor(since),
                             details = NULL) {
+  if (length(what) == 0) {
+    return(invisible())
+  }
   statements <- unique(glue(
     "`{what}` is deprecated since bmm {since} and will be removed in bmm ",
     "{removed_in} at the earliest. Use `{with}` instead."

@@ -73,3 +73,10 @@ test_that("braces in the code are printed, not evaluated", {
     )
   )
 })
+
+test_that("no deprecated form gives no warning, not an empty one", {
+  expect_silent(warn_deprecated(character(0), character(0), since = "1.5.0"))
+  expect_silent(
+    warn_deprecated(character(0), character(0), since = "1.5.0", details = "g() also centres x.")
+  )
+})
