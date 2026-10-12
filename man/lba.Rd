@@ -183,13 +183,12 @@ below 0.45, \code{exponential(2)} puts 29\% below 0.17.
 }
 
 \section{Numerical notes}{
- For \code{distribution = "gamma"}, the accumulator's
-shape is \code{driftc}/\code{drifte}, and the moment integral evaluates the gamma
-CDF at shape \code{driftc}/\code{drifte} + 1; \code{s * b / t} grows without bound as
+ For \code{distribution = "gamma"}, the drift's shape
+is \code{driftc}/\code{drifte} (internally the likelihood evaluates the gamma CDF
+at shape \code{driftc}/\code{drifte} + 1), and \code{s * b / t} grows without bound as
 \code{ndt} approaches the fastest response time. Stan Math's gamma CDF has an
-approximate shape partial at every shape (errors above 1e-3 at a few
-percent of ordinary response times for shapes below 6, worst for shapes
-above 10 and in the far tails) and an undefined one once the
+approximate shape partial at every shape (worst above shape 10 and in
+the far tails) and an undefined one once the
 CDF saturates (stan-dev/math #3408), making the gamma drift the slowest
 and least robust of the four distributions near the fastest response
 times; the default gamma prior keeps shape away from this region.
@@ -224,8 +223,7 @@ simulation-based. The mean is infinite for a race in which only one
 normal-drift accumulator runs (a custom version with a single category, or
 an \code{accumulators} column that leaves one category on a trial) and for a
 gamma drift whose shapes sum to at most 1; the integral is then truncated
-at 1e7 s and the returned value is not meaningful (0.50 s and 1 359 s were
-returned in such cases).
+at 1e7 s and the returned value is not meaningful; treat it as missing.
 
 \code{pp_check(fit, resp_var = "rt")} checks the response times and
 \code{pp_check(fit, resp_var = "response")} checks the response category

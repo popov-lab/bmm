@@ -78,8 +78,8 @@ uniformly distributed on \verb{[0, sp]}. Recycled with \code{rt}, \code{gap} and
 a common length.}
 
 \item{ndt}{Numeric. Non-decision time in seconds (>= 0). Recycled with
-\code{rt}, \code{gap} and \code{sp} to a common length. \code{qlba()} takes a single \code{ndt},
-because its root search needs one interval.}
+\code{rt}, \code{gap} and \code{sp} to a common length. \code{qlba()} requires a single value
+for \code{ndt}, \code{gap}, \code{sp} and \code{s}.}
 
 \item{s}{Numeric. Scale parameter (> 0, default = 1). Interpretation depends
 on \code{distribution}: drift SD for \code{"normal"}, rate for \code{"gamma"}, scale for

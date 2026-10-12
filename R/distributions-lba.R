@@ -32,8 +32,8 @@
 #'   uniformly distributed on `[0, sp]`. Recycled with `rt`, `gap` and `ndt` to
 #'   a common length.
 #' @param ndt Numeric. Non-decision time in seconds (>= 0). Recycled with
-#'   `rt`, `gap` and `sp` to a common length. `qlba()` takes a single `ndt`,
-#'   because its root search needs one interval.
+#'   `rt`, `gap` and `sp` to a common length. `qlba()` requires a single value
+#'   for `ndt`, `gap`, `sp` and `s`.
 #' @param s Numeric. Scale parameter (> 0, default = 1). Interpretation depends
 #'   on `distribution`: drift SD for `"normal"`, rate for `"gamma"`, scale for
 #'   `"frechet"`, sdlog for `"lognormal"`. Typically fixed to 1 for
@@ -137,16 +137,19 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   vapply(p, function(pi) {
     # a Frechet p(ndt + 1e-6) is already above 0, so the root search would extend
     # into the flat region below ndt and stop anywhere in it
-    if (pi <= 0) return(ndt)
-    stats::uniroot(
-      function(q) {
-        plba(q, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s,
-             distribution = distribution) - pi
-      },
-      interval = c(ndt + 1e-6, ndt + 20),
-      extendInt = "upX",
-      tol = 1e-8
-    )$root
+    if (pi <= 0) {
+      ndt
+    } else {
+      stats::uniroot(
+        function(q) {
+          plba(q, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s,
+               distribution = distribution) - pi
+        },
+        interval = c(ndt + 1e-6, ndt + 20),
+        extendInt = "upX",
+        tol = 1e-8
+      )$root
+    }
   }, numeric(1))
 }
 
