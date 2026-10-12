@@ -168,6 +168,37 @@ test_that("update.bmmfit fixes parameters that the new formula sets to a constan
   expect_match(brms::stancode(up), "Intercept = 0.5;", fixed = TRUE)
 })
 
+test_that("a predictor added by update() gets the prior bmm() gives it", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  stub_fit <- function(formula, model) suppressWarnings(suppressMessages(
+    bmm(formula, dat, model, backend = "mock", mock_fit = stub, rename = FALSE)
+  ))
+  dat <- data.frame(y = rmixture2p(n = 60), cond = rep(c("a", "b"), 30))
+  cases <- list(
+    nlpar = list(model = mixture2p("y"), old = bmf(kappa ~ 1, thetat ~ 1),
+                 new = bmf(kappa ~ 1 + cond, thetat ~ 1)),
+    dpar = list(model = sdm("y"), old = bmf(c ~ 1, kappa ~ 1),
+                new = bmf(c ~ 1 + cond, kappa ~ 1))
+  )
+
+  for (case_name in names(cases)) {
+    case <- cases[[case_name]]
+    # the fit stores brms's flat default row for the class of the old formula's
+    # parameter; carried over as a user prior, it overrode bmm's prior on the slope
+    up <- suppressWarnings(suppressMessages(update(
+      stub_fit(case$old, case$model), formula. = case$new, newdata = dat,
+      backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE
+    )))
+    expect_equal(brms::stancode(up), brms::stancode(stub_fit(case$new, case$model)),
+                 label = case_name)
+  }
+})
+
 # read the emitted program rather than bmm's own stanvars, and assert on the
 # call: the sliced function is declared in the functions block either way
 sdm_likelihood_is_sliced <- function(fit) {
