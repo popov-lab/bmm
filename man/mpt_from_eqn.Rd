@@ -109,9 +109,11 @@ declare it with the \code{impossible} argument instead.
 parameter names, parameter and response category names are sanitized: a
 leading \verb{<tree>_} prefix is removed from category names that are not
 mapped with \code{categories}, and all remaining underscores and dots are
-stripped. Names that would clash after this are an error; names are
-case-sensitive, so \code{P_G1} and \code{P_g1} stay distinct (\code{PG1}, \code{Pg1}). Tree
-labels are kept, unless \code{tree_names} maps them. The formulas passed to
+stripped. Two labels of the file, or two different values within one
+tree, that become the same name are an error; mapped values that become
+the same name in different trees are that one shared category. Names
+are case-sensitive, so \code{P_G1} and \code{P_g1} stay distinct (\code{PG1}, \code{Pg1}).
+Tree labels are kept, unless \code{tree_names} maps them. The formulas passed to
 \code{\link[=bmm]{bmm()}} use the bmm names (\code{bmf(Do ~ 1)} for a file parameter \code{D_o};
 \code{bmf()} is short for \code{\link[=bmmformula]{bmmformula()}}); the \code{parameter} rows of the
 renaming map translate them, and \code{print(model)} lists them. Of the
@@ -138,7 +140,7 @@ the file: the trees and, within each tree, the category labels are sorted
 \code{MPTinR::check.mpt("model.eqn")} returns the order in its elements
 \code{eqn.order.trees} and \code{eqn.order.categories}. (For MPTinR's own model
 format the columns follow the lines instead; see \code{\link[=mpt_from_string]{mpt_from_string()}}.)
-\code{\link[=mpt_long_data]{mpt_long_data()}} reshapes both layouts with the renaming map, sums the
+\code{\link[=mpt_data_reshape]{mpt_data_reshape()}} reshapes both layouts with the renaming map, sums the
 labels that \code{categories} merged onto one response category, and gives 0 to
 the categories a tree cannot produce (see Examples).
 
@@ -181,13 +183,13 @@ model <- mpt_from_eqn(
 attr(model, "mpt_renaming")
 
 # TreeBUGS data: one row per participant, columns named by the category
-# labels of the EQN file, no participant column. mpt_long_data() reshapes
+# labels of the EQN file, no participant column. mpt_data_reshape() reshapes
 # them to bmm's one row per participant and tree, through the map; the
 # categories a tree cannot produce get 0
 wide <- data.frame(
   hit = c(30, 25), miss = c(10, 15), fa = c(8, 12), cr = c(32, 28)
 )
-long <- mpt_long_data(wide, model)
+long <- mpt_data_reshape(wide, model)
 long
 # the row sums are the trials per row (40 here). The proportions catch
 # swapped tree labels and swapped response columns (old items must get
@@ -203,11 +205,11 @@ bmm_data_check(bmf(Do ~ 1, g ~ 1), long, model)
 # label: MPTinR::check.mpt(eqn_file)$eqn.order.categories lists the
 # labels (here cr, fa for tree new, then hit, miss for tree old)
 wide_mptinr <- rbind(c(32, 8, 30, 10), c(28, 12, 25, 15))
-identical(mpt_long_data(wide_mptinr, model, columns = "mptinr"), long)
+identical(mpt_data_reshape(wide_mptinr, model, columns = "mptinr"), long)
 }
 \seealso{
 \code{\link[=mpt_from_string]{mpt_from_string()}} for model text in MPTinR's own format;
 \code{\link[=mpt]{mpt()}} and \code{\link[=mpt_tree]{mpt_tree()}} for building the trees in R, including the data
 layout \code{bmm()} expects.
 }
-\keyword{transform}
+\keyword{bmmodel}

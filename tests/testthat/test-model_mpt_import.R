@@ -35,6 +35,13 @@ test_that("mpt_from_string parses MPTinR-style model definitions", {
   )
 })
 
+test_that("the importers take restrictions right after the model source", {
+  expect_equal(names(formals(mpt_from_eqn))[1:2], c("file", "restrictions"))
+  expect_equal(names(formals(mpt_from_string))[1:2], c("text", "restrictions"))
+  # tree_names stays required behind the optional restrictions
+  expect_error(mpt_from_string("D # a\n1 - D # b"), "tree_names")
+})
+
 test_that("mpt_from_string says when it sums lines that share a category", {
   expect_message(
     mpt_from_string(
@@ -249,6 +256,46 @@ test_that("mpt_from_eqn errors when sanitizing merges categories across trees", 
       "B  y    1-g"
     )), tree_id = "t"),
     "duplicated names"
+  )
+})
+
+test_that("mapped values that sanitize alike across trees are one category", {
+  model <- suppressMessages(mpt_from_eqn(
+    write_eqn(eqn_2htm_lines),
+    categories = c(hit = "y_es", fa = "yes", miss = "no", cr = "no"),
+    tree_id = "item_type"
+  ))
+  expect_setequal(model$resp_vars$resp_cats, c("yes", "no"))
+  renaming <- attr(model, "mpt_renaming")
+  expect_equal(
+    renaming$bmm_name[renaming$file_name %in% c("hit", "fa")], c("yes", "yes")
+  )
+  expect_equal(
+    deparse1(model$other_vars$trees$old$branches$yes), "(Do) + ((1 - Do) * g)"
+  )
+
+  # a mapped value also meets the file label of another tree
+  with_label <- suppressMessages(mpt_from_eqn(
+    write_eqn(c("old hit D", "old no 1-D", "new yes 1-D", "new no D")),
+    categories = c(hit = "y_es"), tree_id = "item_type"
+  ))
+  expect_setequal(with_label$resp_vars$resp_cats, c("yes", "no"))
+})
+
+test_that("mapped values that sanitize alike within one tree are a clash", {
+  eqn_file <- write_eqn(c("t a D", "t b (1-D)*g", "t c (1-D)*(1-g)"))
+  clash <- tryCatch(
+    mpt_from_eqn(eqn_file, categories = c(a = "y_es", b = "yes", c = "no")),
+    error = conditionMessage
+  )
+  expect_match(clash, "produces duplicated names: 'a', 'b' become 'yes'")
+  expect_match(clash, "map them with the categories argument")
+  # written identically, the two values merge instead
+  expect_match(
+    paste(testthat::capture_messages(
+      mpt_from_eqn(eqn_file, categories = c(a = "yes", b = "yes", c = "no"))
+    ), collapse = ""),
+    "tree t: 'a', 'b' -> yes"
   )
 })
 
