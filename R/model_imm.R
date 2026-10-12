@@ -60,7 +60,7 @@
 
 .model_imm <- function(resp_error = NULL, nt_features = NULL, nt_distances = NULL,
                        set_size = NULL, regex = FALSE, version = "full", links = NULL,
-                       variable_precision = FALSE, vp_nodes = 41L,
+                       variable_precision = FALSE, vp_nodes = 81L,
                        call = NULL, ...) {
   spec <- .imm_version_spec(version)
   if (variable_precision) {
@@ -150,8 +150,8 @@
 #'   -- its bottleneck is the ratio of context to general activation -- so
 #'   variable precision is the only additional version offered here.
 #' @param vp_nodes Number of quadrature nodes used when
-#'   `variable_precision = TRUE`; must be an odd number of at least 41. See
-#'   [mixture2p()].
+#'   `variable_precision = TRUE`; must be an odd number of at least 41, default
+#'   81. See [mixture2p()] for the accuracy this buys and the shapes it refuses.
 #' @param links A named list of link functions for the model parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
@@ -222,7 +222,7 @@
 #' )
 #' @export
 imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
-                version = c("full", "bsc", "abc"), variable_precision = FALSE, vp_nodes = 41L,
+                version = c("full", "bsc", "abc"), variable_precision = FALSE, vp_nodes = 81L,
                 links = NULL, ...) {
   call <- match.call()
   version <- match.arg(version)

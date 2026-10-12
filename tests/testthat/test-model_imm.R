@@ -17,6 +17,14 @@ test_that("imm() exposes the parameters each version implies", {
   expect_error(imm_model(vp_nodes = 21), "at least 41")
 })
 
+test_that("imm() and dimm() default to 81 quadrature nodes", {
+  # the core refuses gamma shapes below 60 / vp_nodes, which at 41 nodes is 1.46
+  # and reaches into real-data posteriors of mixture2p and mixture3p (#398)
+  expect_equal(imm_model(variable_precision = TRUE)$vp_nodes, 81L)
+  expect_equal(formals(imm)$vp_nodes, 81L)
+  expect_equal(formals(dimm)$vp_nodes, 81L)
+})
+
 test_that("the background activation is a visible fixed parameter", {
   model <- imm_model()
   expect_equal(model$fixed_parameters, list(mu = 0, b = 0))

@@ -543,7 +543,7 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'
 dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                  c = 5, a = 2, b = 1, s = 2, kappa = 5, tau = 0,
-                 vp_nodes = 41L, log = FALSE) {
+                 vp_nodes = 81L, log = FALSE) {
   .check_imm_args(kappa, s, dist, tau, length(mu))
 
   n <- length(x)
