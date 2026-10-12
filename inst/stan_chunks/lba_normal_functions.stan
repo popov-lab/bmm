@@ -43,9 +43,9 @@ real lba_normal_log_M(real t, real v, real b, real A, real s) {
   }
 }
 
-// Single-accumulator log-PDF for LBA with normal drift
+// Single-accumulator log-PDF for LBA with normal drift; the truncation denominator via erfc for its exact gradient
 real lba_normal_single_lpdf(real t, real v, real b, real A, real s) {
-  return lba_normal_log_M(t, v, b, A, s) - log(A) - std_normal_lcdf(v / s |);
+  return lba_normal_log_M(t, v, b, A, s) - log(A) - lba_log_Phi_lower(v / s);
 }
 
 // Single-accumulator log-survival for LBA with normal drift, in probability space via exact-gradient Phi()
@@ -53,7 +53,7 @@ real lba_normal_single_lccdf(real t, real v, real b, real A, real s) {
   real z_lo = ((b - A) / t - v) / s;
   real z_hi = (b / t - v) / s;
   real delta = A / (t * s);
-  real log_denom = std_normal_lcdf(v / s |);
+  real log_denom = lba_log_Phi_lower(v / s);
   real num;
   if (delta < 1e-4) {
     // (1/delta) int Phi = Phi(z_m) - delta^2 / 24 z_m phi(z_m) + O(delta^4)
