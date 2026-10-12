@@ -251,15 +251,24 @@ test_that(".ppp_complement() adds the second category of a binomial count", {
   expect_equal(out[, , 2], matrix(c(7, 6, 13, 12), 2))
 })
 
-test_that("ppp() works on an m3 fit", {
+test_that("ppp() compares each replicated data set with the expectation of its own draw", {
   path <- test_path("assets/bmmfit_m3_ppcheck.rds")
   skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
   withr::local_seed(1)
-  res <- ppp(readRDS(path), ndraws = 20)
+  res <- ppp(fit, statistic = "T1", by = character(0), ndraws = 5)
   expect_s3_class(res, "bmm_ppp")
-  expect_equal(res$statistic, c("T1", "T2"))
-  expect_true(all(res$ppp >= 0 & res$ppp <= 1))
-  expect_equal(res$ndraws, c(20L, 20L))
+
+  # the same random numbers as ppp(): the draw ids first, then the simulation
+  withr::local_seed(1)
+  draw_ids <- sample.int(brms::ndraws(fit), 5)
+  yrep <- brms::posterior_predict(fit, draw_ids = draw_ids)
+  mu <- brms::posterior_epred(fit, draw_ids = draw_ids)
+  pooled <- function(x) apply(x, c(1L, 3L), sum)
+  x2 <- function(n) rowSums((n - pooled(mu))^2 / pooled(mu))
+  observed <- matrix(colSums(unclass(fit$data$Y)), 5, dim(mu)[3], byrow = TRUE)
+  expect_equal(unname(attr(res, "draws")$T1[, "observed"]), x2(observed))
+  expect_equal(unname(attr(res, "draws")$T1[, "replicated"]), x2(pooled(yrep)))
 })
 
 test_that("ppp() takes ndraws as a whole number of draws", {
