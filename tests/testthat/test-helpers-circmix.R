@@ -13,8 +13,19 @@ test_that(".circmix_kappa() inverts .circmix_J() over the tabulated range", {
 })
 
 test_that(".circmix_kappa() uses the exact asymptotics outside the table", {
-  expect_equal(.circmix_kappa(1e-9), sqrt(2e-9), tolerance = 1e-12)
+  # the neglected term is O(J^2), 3e-12 just below the table
+  J <- c(1e-12, 1e-9, 1e-7, 9.9e-6)
+  expect_lt(max(abs(.circmix_J(.circmix_kappa(J)) / J - 1)), 1e-11)
   expect_equal(.circmix_kappa(1e7), 1e7 + 0.5, tolerance = 1e-12)
+})
+
+test_that(".circmix_kappa() is continuous at the edges of the table", {
+  tab <- .circmix_kappa_table()
+  edges <- exp(tab$logJ_min + c(0, (length(tab$logkappa) - 1) * tab$dlogJ))
+  for (edge in edges) {
+    across <- .circmix_kappa(edge * c(1 - 1e-12, 1 + 1e-12))
+    expect_lt(abs(across[2] / across[1] - 1), 1e-10)
+  }
 })
 
 test_that(".circmix_J() reproduces the limits of kappa * I1/I0", {

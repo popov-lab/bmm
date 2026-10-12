@@ -85,9 +85,11 @@
   }
 })
 
-# Cubic Hermite interpolation of log kappa against log J, with the exact
-# asymptotics outside the tabulated range: J -> kappa^2 / 2 as kappa -> 0 and
-# J -> kappa - 1/2 as kappa -> infinity. Max relative error 1.7e-11. Stan's
+# Cubic Hermite interpolation of log kappa against log J, with the asymptotics
+# outside the tabulated range: below it, inverting J = kappa^2 / 2 - kappa^4 / 16
+# gives sqrt(2 J) (1 + J / 8), whose relative error is O(J^2), so the value
+# jumps by 1e-12 at the edge rather than by the 1.25e-6 of sqrt(2 J) alone;
+# above it, J -> kappa - 1/2. Max relative error 1.7e-11. Stan's
 # circmix_kappa() receives the same table as data, so the R and Stan inverses
 # cannot drift apart.
 .circmix_kappa <- function(J, tab = .circmix_kappa_table()) {
@@ -95,7 +97,7 @@
   t <- log(J)
   out <- J + 0.5
   low <- which(t <= tab$logJ_min)
-  out[low] <- sqrt(2 * J[low])
+  out[low] <- sqrt(2 * J[low]) * (1 + J[low] / 8)
   mid <- which(t > tab$logJ_min & t < tab$logJ_min + (n - 1) * tab$dlogJ)
   if (!length(mid)) {
     return(out)

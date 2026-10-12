@@ -30,7 +30,7 @@
     int n = num_elements(logk);
     real t = log(J);
     if (t <= logJ_min) {
-      return sqrt(2 * J);
+      return sqrt(2 * J) * (1 + J / 8);
     }
     if (t >= logJ_min + (n - 1) * dlogJ) {
       return J + 0.5;
