@@ -181,6 +181,21 @@ test_that("mpt_data_reshape reads a label shared by trees from the qualified nam
   )
 })
 
+test_that("mpt_data_reshape stops when one wide column would feed two categories", {
+  eqn_file <- withr::local_tempfile(fileext = ".eqn")
+  writeLines(c("4", "old hit p", "old miss 1-p", "new old.hit q", "new old.miss 1-q"), eqn_file)
+  model <- suppressMessages(mpt_from_eqn(
+    eqn_file,
+    categories = c(hit = "yes", miss = "no", old.hit = "yes", old.miss = "no"),
+    tree_id = "tree"
+  ))
+  # 'old.hit' is the label of tree new and the qualified name of hit in tree old
+  wide <- data.frame(hit = 1, miss = 2, old.hit = 30, old.miss = 40)
+  expect_error(mpt_data_reshape(wide, model), "more than one response category.*old.hit")
+  qualified <- data.frame(old.hit = 1, old.miss = 2, new.old.hit = 30, new.old.miss = 40)
+  expect_equal(mpt_data_reshape(qualified, model)$yes, c(1L, 30L))
+})
+
 test_that("mpt_data_reshape sums the labels that categories merged", {
   eqn_file <- withr::local_tempfile(fileext = ".eqn")
   writeLines(c(
@@ -194,6 +209,29 @@ test_that("mpt_data_reshape sums the labels that categories merged", {
   ))
   wide <- data.frame(hit = 30, miss = 4, miss2 = 6, fa = 8, cr = 32)
   expect_equal(mpt_data_reshape(wide, model)$no, c(10L, 32L))
+})
+
+test_that("mpt_data_reshape returns integer counts and keeps the types of carried columns", {
+  model <- eqn_2htm_model()
+  wide <- data.frame(
+    subject = factor(c("s1", "s2")), when = as.Date("2026-01-01") + 0:1,
+    flag = c(TRUE, NA), group = factor(c("a", "b"), levels = c("b", "a", "unused")),
+    wide_2htm()
+  )
+  long <- mpt_data_reshape(wide, model, id = "subject")
+  expect_type(long$yes, "integer")
+  expect_type(long$no, "integer")
+  expect_identical(long$subject, factor(c("s1", "s1", "s2", "s2")))
+  expect_identical(long$when, rep(wide$when, each = 2))
+  expect_identical(long$flag, c(TRUE, TRUE, NA, NA))
+  expect_identical(long$group, factor(c("a", "a", "b", "b"), levels = levels(wide$group)))
+})
+
+test_that("mpt_data_reshape takes the qualified name where a bare label also exists", {
+  model <- eqn_2htm_model()
+  wide <- cbind(wide_2htm(), old.hit = c(5, 6))
+  long <- mpt_data_reshape(wide, model)
+  expect_equal(long$yes[long$item_type == "old"], c(5L, 6L))
 })
 
 test_that("mpt_data_reshape without a tree_id column in a single-tree model", {
@@ -215,6 +253,18 @@ test_that("mpt_data_reshape reports unusable input", {
   expect_error(mpt_data_reshape(wide_2htm(), model, id = c("a", "b")), "id argument")
   repeated <- cbind(subject = c("s1", "s1"), wide_2htm())
   expect_error(mpt_data_reshape(repeated, model, id = "subject"), "repeated values")
+})
+
+test_that("mpt_data_reshape refuses duplicated column names", {
+  model <- eqn_2htm_model()
+  repeated <- cbind(wide_2htm(), hit = c(1, 1))
+  expect_error(mpt_data_reshape(repeated, model), "duplicated column names.*hit")
+  positional <- unname(as.matrix(wide_2htm()))
+  colnames(positional) <- c("a", "a", "b", "b")
+  expect_error(
+    mpt_data_reshape(positional, model, columns = "mptinr"),
+    "duplicated column names.*a.*b"
+  )
 })
 
 test_that("mpt_data_reshape names every missing count column", {

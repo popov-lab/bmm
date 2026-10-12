@@ -322,7 +322,7 @@ test_that(".mpt_branch_vertices visits the 2^k vertices of a multilinear branch"
   expect_true(attr(vertices, "exact"))
   expect_equal(dim(vertices), c(8L, 3L))
   expect_equal(colnames(vertices), c("a", "b", "c"))
-  expect_setequal(unique(as.vector(vertices)), c(0.001, 0.999))
+  expect_setequal(unique(as.vector(vertices)), c(1e-9, 1 - 1e-9))
   expect_equal(nrow(unique(vertices)), 8L)
 
   # a parameter in several terms is still of degree 1
@@ -335,13 +335,13 @@ test_that(".mpt_branch_vertices visits the 2^k vertices of a multilinear branch"
 
 test_that(".mpt_branch_vertices adds 0.5 for a parameter of higher degree", {
   vertices <- bmm:::.mpt_branch_vertices(quote(4 * u * (1 - u) * a), c("u", "a"), list())
-  expect_equal(sort(unique(vertices[, "u"])), c(0.001, 0.5, 0.999))
-  expect_equal(sort(unique(vertices[, "a"])), c(0.001, 0.999))
+  expect_equal(sort(unique(vertices[, "u"])), c(1e-9, 0.5, 1 - 1e-9))
+  expect_equal(sort(unique(vertices[, "a"])), c(1e-9, 1 - 1e-9))
   expect_equal(nrow(vertices), 6L)
 
   # a derivative that stats::D() cannot form counts as higher degree
   unknown <- bmm:::.mpt_branch_vertices(quote(besselJ(a, 1)), "a", list())
-  expect_equal(sort(unique(unknown[, "a"])), c(0.001, 0.5, 0.999))
+  expect_equal(sort(unique(unknown[, "a"])), c(1e-9, 0.5, 1 - 1e-9))
 })
 
 test_that(".mpt_branch_vertices takes a simplex group as one dimension", {
@@ -372,8 +372,8 @@ test_that(".mpt_branch_vertices falls back to a fixed sample above max_points", 
 
   expect_false(attr(vertices, "exact"))
   expect_equal(dim(vertices), c(2L + 64L, 11L))
-  expect_setequal(unique(as.vector(vertices)), c(0.001, 0.999))
-  expect_equal(unname(vertices[1:2, 1]), c(0.001, 0.999))
+  expect_setequal(unique(as.vector(vertices)), c(1e-9, 1 - 1e-9))
+  expect_equal(unname(vertices[1:2, 1]), c(1e-9, 1 - 1e-9))
   expect_identical(vertices, bmm:::.mpt_branch_vertices(branch, parameters, list()))
   # the sample uses both ends of every parameter
   expect_true(all(apply(vertices, 2, function(column) length(unique(column)) == 2L)))

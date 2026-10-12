@@ -20,19 +20,21 @@
 #'   latent parameters (e.g., `D + (1 - D) * g`), numeric constants, and
 #'   declared covariates (see [mpt()]).
 #' @param ... Further formulas of the form `category ~ expression`, one per
-#'   response category, when `branches` is a formula. A call uses either
+#'   response category, when `branches` is a formula; they take no argument
+#'   names. A call uses either
 #'   formulas or a named list of strings, not a mix; both spellings give the
 #'   same tree (see the examples).
 #' @param impossible Character vector. Response categories that cannot occur in
 #'   this tree, for example distractor responses when no distractors were
 #'   presented. Such categories get no branch expression, and the remaining
 #'   branches must sum to 1 on their own. It follows `...`, so it has to be
-#'   named.
+#'   named in full.
 #'
-#' @details The formulas are never evaluated: the left-hand side must be a
-#'   single response category name, the right-hand side is stored as written,
-#'   and the formula environment is dropped. A one-sided formula, a left-hand
-#'   side that is not a name, and a mix of formulas and strings are errors.
+#' @details Nothing in the formulas is evaluated: the left-hand side must be a
+#'   single response category name, the right-hand side is kept as an
+#'   expression (with constant arithmetic folded, see below), and the formula
+#'   environment is dropped. A one-sided formula, a left-hand side that is not
+#'   a name, and a mix of formulas and strings are errors.
 #'
 #'   Constant arithmetic such as `1/4` or `1/(2*2)` is folded into a
 #'   decimal literal (`0.25`) when the tree is created. Stan compiles a bare
@@ -98,7 +100,22 @@ mpt_tree <- function(name, branches, ..., impossible = NULL) {
     !is.character(name) || length(name) != 1L || !nzchar(name),
     "The tree name must be a single non-empty character string."
   )
+  stopif(
+    any(!nzchar(as.character(as.list(substitute(list(...)))[-1]))),
+    "An argument of mpt_tree() is empty, probably from a trailing comma after \\
+    the last branch."
+  )
   extra <- list(...)
+  # name, branches and impossible match partially, so b = b ~ y would take the
+  # slot of branches and reorder the categories, and imp = binds to ...
+  inexact_names <- setdiff(names(sys.call()), c("", "name", "branches", "impossible"))
+  stopif(
+    length(extra) > 0 && length(inexact_names) > 0,
+    "Write the arguments name, branches and impossible out in full when \\
+    several branches are given, and give the formulas after branches without \\
+    a name: the left-hand side of a formula is its response category. \\
+    Offending: {collapse_comma(inexact_names)}"
+  )
   from_formulas <- inherits(branches, "formula")
   mixed <- length(extra) > 0 &&
     (!from_formulas || !all(vapply(extra, inherits, logical(1), "formula")))
@@ -165,6 +182,11 @@ mpt_tree <- function(name, branches, ..., impossible = NULL) {
         "Cannot parse the branch expression '{expr}' in tree '{name}'."
       )
     }
+    stopif(
+      !is.language(parsed) && !(is.numeric(parsed) && length(parsed) == 1L),
+      "The branch of category '{resp_cat}' in tree '{name}' must be an \\
+      expression in parameters and numbers, such as D + (1 - D) * g, not {expr}."
+    )
     parsed <- .mpt_fold_numeric_division(parsed)
     scientific <- .mpt_scientific_constants(parsed)
     if (length(scientific) > 0) {
@@ -413,7 +435,12 @@ generated_parameters.mpt <- function(model) {
 #'   row's covariate values, the branches of a tree do not sum to 1, leave
 #'   (0, 1], are undefined on the rows of another tree, or when a covariate
 #'   that a branch uses is missing. Every declared covariate needs a numeric
-#'   column in the data, also one that no branch uses.
+#'   column in the data, also one that no branch uses. The range is checked
+#'   at the vertices of each branch's parameter box, which is exact when no
+#'   term of the branch contains the same parameter twice
+#'   (`a * (1 - b) * G + (1 - a) * c`). A parameter that does is also checked
+#'   at 0.5, which is exact for a factor `u * (1 - u)` and approximate
+#'   otherwise, e.g. for `u * (1 - u)^2`.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -511,25 +538,32 @@ generated_parameters.mpt <- function(model) {
 #'   `1 + cond` it holds in the reference cell only, because the effects keep
 #'   their own prior. TreeBUGS instead puts a uniform prior on each branch
 #'   parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
-#'   for three members); for a group `gA`, `gB`, `gC`, `gD` that is
-#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"),
-#'   coef = "Intercept")`.
+#'   for three members). To get it for a group `gA`, `gB`, `gC`, `gD`, pass
+#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"))`,
+#'   with `"normal(0, 1)"` under the probit link; without `coef`, it covers
+#'   every cell of a `0 + cond` formula.
 #'   A predictor on member `p` acts on the logit (or probit) of `p`'s share of
 #'   the probability left over by the members listed before it. A predictor
 #'   on the first member therefore scales all later members by the same
 #'   factor, leaving their ratios unchanged. Read such effects on the probability scale with
 #'   [native_parameters()].
 #'
-#'   **Identifiability.** Printing the model includes an identifiability
-#'   check for intercept-only formulas: the free parameters against the
-#'   degrees of freedom (response categories minus 1, summed over trees), and
-#'   the rank of the Jacobian of the category probabilities at five interior
-#'   test values (and five test values of each covariate). A rank below the
+#'   **Identifiability.** Printing the model ends with an identifiability
+#'   check for intercept-only formulas. It compares the number of free
+#'   parameters with the degrees of freedom (response categories minus 1,
+#'   summed over trees) and computes the rank of the Jacobian of the category
+#'   probabilities with respect to the free parameters, from exact derivatives
+#'   at five interior test values (and five test values of each covariate);
+#'   parameters fixed in the formula enter at their values. A rank below the
 #'   number of free parameters means that a combination of the named
-#'   parameters is not identified by the branch expressions. A test value
-#'   with a non-finite derivative is left out, and the printout says how
-#'   many; if [stats::D()] cannot differentiate a branch expression, the rank
-#'   is not computed and the count decides.
+#'   parameters is not identified by the branch expressions, even when the
+#'   count passes. The check is local: it holds at the test values, not at the
+#'   boundaries of the parameter space. A test value with a non-finite
+#'   derivative is left out, and the printout says how many; if [stats::D()]
+#'   cannot differentiate a branch expression, the rank is not computed and
+#'   the count decides. The rank sees the tree parameters only: after a
+#'   non-linear formula, the rank line names that formula's parameter as not
+#'   analysed.
 #'
 #'   `bmm()` warns when the rank is deficient and every formula is
 #'   intercept-only. When a formula has a predictor or is non-linear, it only

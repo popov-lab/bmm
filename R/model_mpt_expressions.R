@@ -312,13 +312,17 @@
 # A simplex group is one dimension whose vertices put the mass on one member,
 # as the box vertices would not sum to 1; with a higher-degree term it also
 # takes the midpoints between members and the centroid.
+# The vertices sit eps inside the box, where a branch such as a / (a + b) is
+# still defined; eps is far below the tolerance of the range check, so a branch
+# that passes them stays within the tolerance at the true vertices. At 0.001 a
+# multilinear branch could exceed 1 by 0.1% per parameter unnoticed.
 # A branch whose grid has more than max_points rows (k = 10 multilinear
 # parameters) falls back to the two corners and n_fallback further points.
 # Those come from a Weyl sequence (steps sqrt(prime)) instead of a random
 # number generator, so they are the same on every call and leave the global
 # random number state alone; the attribute "exact" says whether the grid is
 # complete.
-.mpt_branch_vertices <- function(branch, parameters, simplex, eps = 0.001,
+.mpt_branch_vertices <- function(branch, parameters, simplex, eps = 1e-9,
                                  max_points = 1024L, n_fallback = 64L) {
   used <- intersect(all.vars(branch), parameters)
   if (length(used) == 0L) {
@@ -376,7 +380,7 @@
     if (any(outside)) {
       first <- which(outside)[1]
       at <- if (ncol(vertices) > 0L) {
-        paste(colnames(vertices), "=", signif(values, 4), collapse = ", ")
+        paste(colnames(vertices), "=", round(values, 4), collapse = ", ")
       }
       return(list(row = first, value = branch_value[first], at = at))
     }
@@ -614,7 +618,7 @@
 # the branches whose vertices were only sampled. The points of
 # .mpt_tree_branch_errors() visit two corners and five interior points, which
 # miss a branch that mixes a parameter with another one's complement
-# (2 * a * (1 - b) reaches 2 at a = 0.999, b = 0.001).
+# (2 * a * (1 - b) reaches 2 as a -> 1 and b -> 0).
 .mpt_tree_vertex_errors <- function(trees, parameters, simplex, tolerance = 1e-6) {
   results <- lapply(trees, function(tree) {
     sampled <- character(0)

@@ -38,7 +38,10 @@ data set; \code{"participant"} for one \eqn{T_1} and PPP per participant, as
 TreeBUGS reports them, to find the participants the model fits poorly.}
 
 \item{participant}{Character. The column that identifies participants,
-needed for \eqn{T_2} and for \code{level = "participant"}. \code{NULL} (default)
+needed for \eqn{T_2} and for \code{level = "participant"}. It must be a
+variable of the model formula, because the model data contain only
+those; a model without random effects has one only if a predictor such
+as \code{0 + id} names the participants. \code{NULL} (default)
 uses the grouping variable of the random effects; when the model has more
 than one (e.g. participants and items), name it here.}
 }
@@ -54,8 +57,8 @@ the attribute \code{"draws"}.
 Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
 (2010) and their posterior predictive p-values (PPP) for models that fit
 aggregated response counts: \code{\link[=mpt]{mpt()}}, \code{\link[=m3]{m3()}}, \code{\link[=sdt_yn]{sdt_yn()}}, \code{\link[=sdt_rating]{sdt_rating()}},
-\code{\link[=sdt_mafc]{sdt_mafc()}}, \code{\link[=sdt_ranking]{sdt_ranking()}} and \code{\link[=sdt_cdp]{sdt_cdp()}}. These are the statistics that
-TreeBUGS' \code{PPP()} reports.
+\code{\link[=sdt_mafc]{sdt_mafc()}}, \code{\link[=sdt_ranking]{sdt_ranking()}} and \code{\link[=sdt_cdp]{sdt_cdp()}}. TreeBUGS' \code{PPP()} reports the
+same two statistics; Details says where their values differ.
 }
 \details{
 Both statistics are computed once per posterior draw, for the observed counts
@@ -73,8 +76,9 @@ and \eqn{T_1} is Pearson's \eqn{X^2} over all cells and response categories,
 where \eqn{n_{ck}} is the observed and \eqn{\hat{n}_{ck}} the expected count
 of category \eqn{k} in cell \eqn{c}. Klauer (2010, Eq. 17) and TreeBUGS
 average the counts over participants instead of summing them. With the same
-number of participants in every cell, the two give the same PPP; otherwise
-the mean gives the cells with fewer participants more weight.
+number \eqn{T} of participants in every cell, the two give the same PPP and
+\eqn{T_1} here is \eqn{T} times theirs; otherwise the mean gives the cells
+with fewer participants more weight.
 
 \strong{\eqn{T_2}: covariance structure.} For every participant, the counts are
 summed per cell, giving one vector per participant over all cells and
@@ -83,8 +87,15 @@ across participants with the covariance matrix \eqn{\sigma} the model
 expects (Klauer, 2010, Eq. 18):
 \deqn{T_2 = \sum_{i,j} \frac{(s_{ij} - \sigma_{ij})^2}{\sqrt{\sigma_{ii}\sigma_{jj}}}.}
 \eqn{\sigma} is the covariance of the expected counts across participants
-plus \eqn{(T - 1) / T} times the average multinomial covariance within a
-participant, where \eqn{T} is the number of participants. The sum runs over
+plus the average multinomial covariance within a participant, which is the
+expected value of \eqn{s} given the draw. Both covariances divide by
+\eqn{T - 1}, where \eqn{T} is the number of participants. Klauer (2010)
+multiplies the multinomial part by \eqn{(T - 1) / T}, the expected value
+for covariances that divide by \eqn{T}; that version of \eqn{T_2} is
+\eqn{(T - 1) / T} times this one and has the same PPP. TreeBUGS combines
+the factor with covariances that divide by \eqn{T - 1}, so its \eqn{\sigma}
+falls short of the expected \eqn{s} by \eqn{1 / T} of the multinomial part.
+The sum runs over
 the full matrix, so the covariances between trees or conditions, which
 carry the correlations between the person parameters, are part of the
 check. When participants differ in the cells they have, as in a
@@ -104,7 +115,9 @@ categories.
 \strong{Impossible categories.} Categories with an expected count of about 0 in
 every draw, such as the impossible categories of an \code{\link[=mpt]{mpt()}} or \code{\link[=m3]{m3()}} model
 or the ranks beyond the set size of an \code{\link[=sdt_ranking]{sdt_ranking()}} model, are left out
-of both statistics.
+of both statistics. A cell with a single possible category, such as an
+\code{\link[=m3]{m3()}} set size without other candidates, is left out of \eqn{T_2}: the
+number of trials fixes its count.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}

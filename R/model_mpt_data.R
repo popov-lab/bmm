@@ -150,6 +150,12 @@ mpt_data_reshape <- function(data, model, id = NULL,
     data."
   )
   data <- as.data.frame(data, stringsAsFactors = FALSE)
+  stopif(
+    anyDuplicated(names(data)) > 0,
+    "The wide data have duplicated column names: \\
+    {collapse_comma(unique(names(data)[duplicated(names(data))]))}. Each \\
+    column is read once, so a second column of the same name would be dropped."
+  )
   stopif(nrow(data) == 0, "The wide data contain no rows.")
   stopif(
     !is.null(id) && !id %in% names(data),
@@ -278,6 +284,15 @@ mpt_data_reshape <- function(data, model, id = NULL,
             ifelse(shared_label[missing_cols],
                    paste0(' or ', layout$label[missing_cols]), ''), ')',
             collapse = ', ')}"
+  )
+  # a bare label of one tree can equal the qualified name of a label of another
+  shared_cols <- unique(count_cols[duplicated(count_cols)])
+  stopif(
+    length(shared_cols) > 0,
+    "The wide column(s) {collapse_comma(shared_cols)} would be read as the \\
+    counts of more than one response category. Name the count columns of \\
+    these labels by tree and label, {collapse_comma(qualified[count_cols %in% \\
+    shared_cols])}."
   )
   count_cols
 }

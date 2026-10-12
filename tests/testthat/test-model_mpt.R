@@ -107,6 +107,58 @@ test_that("mpt_tree validates formula input", {
   expect_error(mpt_tree("t", a ~ 1e-5 * D, b ~ 1 - D), "scientific notation")
 })
 
+test_that("mpt_tree gives the same tree for a formula as for the same string", {
+  expressions <- c(
+    "D", "-D", "-(1 - D)", "(D)", "((D))", "D^2", "D * 2^-1", "2 * (1 - D) * g",
+    "pnorm(-x) + exp(-(y + 1))", "`my par` * (1 - `my par`)", "`a.b` + 0.5",
+    "1/3 + D * (1/3)", "(1 - D) * (4/5)", "-1 + 2 * D", "D / (1 + D)"
+  )
+  for (expression in expressions) {
+    from_string <- mpt_tree("t", list(a = expression, b = "1"))
+    from_formula <- mpt_tree("t", as.formula(paste("a ~", expression)), b ~ 1)
+    expect_identical(from_formula, from_string, label = expression)
+  }
+})
+
+test_that("mpt_tree stores nothing from the environment of a formula", {
+  formula_with_large_environment <- function() {
+    large_object <- numeric(1e5)
+    a ~ D
+  }
+  tree <- mpt_tree("t", formula_with_large_environment(), b ~ 1 - D)
+  string_tree <- mpt_tree("t", list(a = "D", b = "1 - D"))
+  expect_identical(length(serialize(tree, NULL)), length(serialize(string_tree, NULL)))
+})
+
+test_that("mpt_tree does not let a partially matched name reorder or drop formulas", {
+  expect_error(mpt_tree("t", a ~ D, b = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", a ~ D, foo = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", list(a = "D"), imp = "b"), "in full")
+  expect_identical(
+    mpt_tree("t", br = list(a = "D", b = "1 - D")),
+    mpt_tree("t", list(a = "D", b = "1 - D"))
+  )
+  expect_identical(
+    names(mpt_tree(name = "t", a ~ D, b ~ 1 - D)$branches),
+    c("a", "b")
+  )
+})
+
+test_that("mpt_tree rejects branch values that are not expressions", {
+  expect_error(mpt_tree("t", a ~ D, b ~ NULL), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, b ~ "1 - D"), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, eval(bquote(b ~ .(c(0.2, 0.3))))), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "NULL")), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "'1 - D'")), "must be an expression")
+  expect_s3_class(mpt_tree("t", a ~ 0.5, b ~ 0.5), "mpt_tree")
+})
+
+test_that("mpt_tree names a trailing comma instead of reporting a missing argument", {
+  expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, ), "trailing comma")
+  expect_error(mpt_tree("t", a ~ D, , b ~ 1 - D), "trailing comma")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), ), "trailing comma")
+})
+
 test_that("mpt stores its derived state once", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")
@@ -1952,7 +2004,7 @@ test_that("check_data refuses a branch that mixes a parameter with another's com
   expect_silent(check_data(mixed, data.frame(G = 0.9, yes = 6, no = 4), formula))
   expect_error(
     check_data(mixed, data.frame(G = 1.04, yes = 6, no = 4), formula),
-    "category 'yes' in tree 't' is 1.03[0-9]* in row 1, outside \\(0, 1\\] at the test parameter values a = 0.999, b = 0.001"
+    "category 'yes' in tree 't' is 1.04 in row 1, outside \\(0, 1\\] at the test parameter values a = 1, b = 0"
   )
 
   product <- mpt(mpt_tree("t", list(
@@ -1967,6 +2019,22 @@ test_that("check_data refuses a branch that mixes a parameter with another's com
   expect_error(
     check_data(mixed, data.frame(G = c(0.5, 0.7, 1.04), yes = 6, no = 4), formula),
     "in row 3, outside"
+  )
+})
+
+test_that("the vertex check catches a branch that exceeds 1 by less than 0.1%", {
+  # a * (1 - b) * G peaks at G as a -> 1 and b -> 0; a grid at 0.001 and 0.999
+  # sees only 0.998 * G
+  mixed <- mpt(mpt_tree("t", list(
+    yes = "a * (1 - b) * G", no = "1 - a * (1 - b) * G"
+  )), covariates = "G")
+  expect_error(
+    check_data(mixed, data.frame(G = 1.0015, yes = 6, no = 4), bmf(a ~ 1, b ~ 1)),
+    "is 1.0015 in row 1, outside \\(0, 1\\] at the test parameter values a = 1, b = 0"
+  )
+  expect_error(
+    mpt(mpt_tree("t", list(yes = "1.0015 * a * (1 - b)", no = "1 - 1.0015 * a * (1 - b)"))),
+    "is 1.0015 at the test values a = 1, b = 0, outside \\(0, 1\\]"
   )
 })
 
@@ -2050,7 +2118,7 @@ test_that("check_data checks the vertices of a simplex group as one dimension", 
   expect_silent(check_data(model, dat, formula))
   expect_error(
     check_data(model, transform(dat, G = 1.04), formula),
-    "category 'yes' in tree 't' is 1.03[0-9]* in row 1, outside \\(0, 1\\] at the test parameter values D = 0.001, gB = 0.9995"
+    "category 'yes' in tree 't' is 1.04 in row 1, outside \\(0, 1\\] at the test parameter values D = 0, gB = 1"
   )
 })
 
@@ -2193,9 +2261,9 @@ test_that("mpt() refuses a tree without covariates that leaves (0, 1] at a mixed
   expect_silent(mpt(mixed(1)))
   expect_error(
     mpt(mixed(2)),
-    "category 'yes' in tree 't' is 1.99[0-9]* at the test values a = 0.999, b = 0.001, outside \\(0, 1\\]"
+    "category 'yes' in tree 't' is 2 at the test values a = 1, b = 0, outside \\(0, 1\\]"
   )
-  expect_error(mpt(mixed(1.04)), "category 'yes' in tree 't' is 1.03[0-9]* at the test values a = 0.999, b = 0.001")
+  expect_error(mpt(mixed(1.04)), "category 'yes' in tree 't' is 1.04 at the test values a = 1, b = 0")
 
   # a parameter of degree 2 peaks between the vertices, away from the interior points
   pair <- function(scale) {

@@ -8,8 +8,8 @@
 #' Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
 #' (2010) and their posterior predictive p-values (PPP) for models that fit
 #' aggregated response counts: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
-#' [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()]. These are the statistics that
-#' TreeBUGS' `PPP()` reports.
+#' [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()]. TreeBUGS' `PPP()` reports the
+#' same two statistics; Details says where their values differ.
 #'
 #' @details
 #' Both statistics are computed once per posterior draw, for the observed counts
@@ -27,8 +27,9 @@
 #' where \eqn{n_{ck}} is the observed and \eqn{\hat{n}_{ck}} the expected count
 #' of category \eqn{k} in cell \eqn{c}. Klauer (2010, Eq. 17) and TreeBUGS
 #' average the counts over participants instead of summing them. With the same
-#' number of participants in every cell, the two give the same PPP; otherwise
-#' the mean gives the cells with fewer participants more weight.
+#' number \eqn{T} of participants in every cell, the two give the same PPP and
+#' \eqn{T_1} here is \eqn{T} times theirs; otherwise the mean gives the cells
+#' with fewer participants more weight.
 #'
 #' **\eqn{T_2}: covariance structure.** For every participant, the counts are
 #' summed per cell, giving one vector per participant over all cells and
@@ -37,8 +38,15 @@
 #' expects (Klauer, 2010, Eq. 18):
 #' \deqn{T_2 = \sum_{i,j} \frac{(s_{ij} - \sigma_{ij})^2}{\sqrt{\sigma_{ii}\sigma_{jj}}}.}
 #' \eqn{\sigma} is the covariance of the expected counts across participants
-#' plus \eqn{(T - 1) / T} times the average multinomial covariance within a
-#' participant, where \eqn{T} is the number of participants. The sum runs over
+#' plus the average multinomial covariance within a participant, which is the
+#' expected value of \eqn{s} given the draw. Both covariances divide by
+#' \eqn{T - 1}, where \eqn{T} is the number of participants. Klauer (2010)
+#' multiplies the multinomial part by \eqn{(T - 1) / T}, the expected value
+#' for covariances that divide by \eqn{T}; that version of \eqn{T_2} is
+#' \eqn{(T - 1) / T} times this one and has the same PPP. TreeBUGS combines
+#' the factor with covariances that divide by \eqn{T - 1}, so its \eqn{\sigma}
+#' falls short of the expected \eqn{s} by \eqn{1 / T} of the multinomial part.
+#' The sum runs over
 #' the full matrix, so the covariances between trees or conditions, which
 #' carry the correlations between the person parameters, are part of the
 #' check. When participants differ in the cells they have, as in a
@@ -58,7 +66,9 @@
 #' **Impossible categories.** Categories with an expected count of about 0 in
 #' every draw, such as the impossible categories of an [mpt()] or [m3()] model
 #' or the ranks beyond the set size of an [sdt_ranking()] model, are left out
-#' of both statistics.
+#' of both statistics. A cell with a single possible category, such as an
+#' [m3()] set size without other candidates, is left out of \eqn{T_2}: the
+#' number of trials fixes its count.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()].
 #' @param statistic Character. `"T1"`, `"T2"`, or both (the default). If the
@@ -73,7 +83,10 @@
 #'   data set; `"participant"` for one \eqn{T_1} and PPP per participant, as
 #'   TreeBUGS reports them, to find the participants the model fits poorly.
 #' @param participant Character. The column that identifies participants,
-#'   needed for \eqn{T_2} and for `level = "participant"`. `NULL` (default)
+#'   needed for \eqn{T_2} and for `level = "participant"`. It must be a
+#'   variable of the model formula, because the model data contain only
+#'   those; a model without random effects has one only if a predictor such
+#'   as `0 + id` names the participants. `NULL` (default)
 #'   uses the grouping variable of the random effects; when the model has more
 #'   than one (e.g. participants and items), name it here.
 #' @param ... Unused.
@@ -128,11 +141,12 @@ ppp.bmmfit <- function(fit, statistic = c("T1", "T2"), by = NULL, ndraws = NULL,
   stopif(!is.null(participant) &&
            (!is.character(participant) || length(participant) != 1L ||
               !participant %in% names(fit$data)),
-         "'participant' must name a column of the model data.")
+         "'participant' must name a column of the model data, which contain \\
+          only the variables of the formula.")
   stopif(!is.null(ndraws) &&
-           (!is.numeric(ndraws) || length(ndraws) != 1L || ndraws < 1 ||
-              ndraws > brms::ndraws(fit)),
-         "'ndraws' must be a number between 1 and {brms::ndraws(fit)}.")
+           (!is.numeric(ndraws) || length(ndraws) != 1L || ndraws %% 1 != 0 ||
+              ndraws < 1 || ndraws > brms::ndraws(fit)),
+         "'ndraws' must be a whole number between 1 and {brms::ndraws(fit)}.")
 
   # one set of draws for posterior_predict() and posterior_epred(), so that
   # each replicated data set is compared with its own expectation
@@ -150,10 +164,12 @@ ppp.bmmfit <- function(fit, statistic = c("T1", "T2"), by = NULL, ndraws = NULL,
     stopif(level == "participant" || statistic_given,
            "{requested} needs to know which rows belong to which participant, \\
             and the model has no random effects to tell. Name the column with \\
-            'participant'.")
+            'participant'; the model data contain only the variables of the \\
+            formula, so it must be one of them.")
     message2("The model has no random effects to identify participants, so \\
-              ppp() computes T1 only. Name the participant column with \\
-              'participant' to get T2.")
+              ppp() computes T1 only. T2 needs the participant column named \\
+              with 'participant', and the model data contain only the \\
+              variables of the formula.")
     statistic <- "T1"
   }
   person <- if (length(participant) == 1L) as.factor(counts$data[[participant]])
@@ -410,7 +426,10 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 .ppp_t2_pattern <- function(counts, rows, cell, person, possible) {
   n_people <- nlevels(person)
   cells <- sort(unique(cell))
-  columns <- which(possible[cells, , drop = FALSE], arr.ind = TRUE)
+  # the trials fix the count of a cell's only possible category, so its
+  # variance is 0 and would sit in the denominator of T2
+  possible <- possible[cells, , drop = FALSE]
+  columns <- which(possible & rowSums(possible) > 1L, arr.ind = TRUE)
   col_cell <- columns[, "row"]
   col_cat <- columns[, "col"]
   # every participant has every cell, so participant p's row sum for the j-th
@@ -443,7 +462,9 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
                        ncol = sum(in_cell)) * weight[row_col == j]
       within[in_cell, in_cell] <- within[in_cell, in_cell] - crossprod(scaled) / n_people
     }
-    sigma <- stats::cov(expected_wide) + (n_people - 1) / n_people * within
+    # the expected value of stats::cov() of the counts (divisor T - 1); the
+    # (T - 1) / T of Klauer (2010) belongs to the divisor T
+    sigma <- stats::cov(expected_wide) + within
     c(observed = t2(observed_cov, sigma),
       replicated = t2(stats::cov(wide(replicated[d, , ])), sigma))
   }, numeric(2)))

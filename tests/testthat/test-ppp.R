@@ -39,7 +39,9 @@ klauer_t2 <- function(observed, cells, n) {
     within[idx, idx] <- b
     offset <- offset + ncol(b)
   }
-  sigma <- stats::cov(do.call(cbind, cells)) + (n_people - 1) / n_people * within
+  # under cov()'s divisor T - 1 the expected sample covariance is
+  # cov(expected) + within; Klauer's factor (T - 1) / T goes with the divisor T
+  sigma <- stats::cov(do.call(cbind, cells)) + within
   sum((stats::cov(observed) - sigma)^2 / sqrt(outer(diag(sigma), diag(sigma))))
 }
 
@@ -90,6 +92,29 @@ test_that("ppp() computes T2 as in Klauer (2010), across cells", {
   expect_equal(unname(attr(res, "draws")$T2[, "replicated"]), klauer_t2(wide(replicated), cells, n))
 })
 
+test_that("T2 is 0 when the observed covariance is the one the model implies", {
+  # E[cov(counts)] by enumeration: 3 participants, 3 binomial trials each
+  n_trials <- 3
+  p <- c(0.2, 0.5, 0.7)
+  outcomes <- as.matrix(expand.grid(0:n_trials, 0:n_trials, 0:n_trials))
+  prob <- apply(outcomes, 1, function(k) prod(stats::dbinom(k, n_trials, p)))
+  expected_cov <- Reduce(`+`, lapply(seq_len(nrow(outcomes)), function(o) {
+    prob[o] * stats::cov(cbind(outcomes[o, ], n_trials - outcomes[o, ]))
+  }))
+  # observed counts whose sample covariance is exactly expected_cov, which has
+  # rank 1 because the two counts of a participant sum to n_trials
+  eig <- eigen(expected_cov, symmetric = TRUE)
+  centred <- outer(c(1, -1, 0), sqrt(eig$values[1]) * eig$vectors[, 1])
+  observed <- sweep(centred, 2, n_trials * c(0.5, 0.5), "+")
+  colnames(observed) <- c("old", "new")
+
+  data <- data.frame(id = factor(1:3), item_type = "old")
+  expected <- cbind(n_trials * p, n_trials * (1 - p))
+  local_ppp_counts(observed, ppp_toy_draws(expected), ppp_toy_draws(expected), data)
+  res <- ppp(ppp_toy_fit(data, bmf(D ~ 1 + (1 | id), g ~ 1)), statistic = "T2")
+  expect_equal(unname(attr(res, "draws")$T2[, "observed"]), 0)
+})
+
 test_that("ppp() leaves participants without a matching set of cells out of T2", {
   data <- data.frame(id = factor(c(1, 2, 3, 1, 2)), item_type = c(rep("old", 3), "new", "new"))
   observed <- matrix(c(7, 5, 9, 2, 4, 3, 5, 1, 8, 6), 5)
@@ -117,6 +142,38 @@ test_that("ppp() skips impossible categories without Inf or NaN", {
   expect_equal(unclass(ppp(fit))$observed, res$observed)
 })
 
+test_that("ppp() leaves out categories whose expected count is exactly 0", {
+  data <- data.frame(id = factor(1:3), item_type = "old")
+  observed <- cbind(a = c(4, 5, 6), b = c(6, 5, 4), c = 0)
+  expected <- cbind(c(5, 4, 6), c(5, 6, 4), 0)
+  replicated <- cbind(c(6, 3, 6), c(4, 7, 4), 0)
+  fit <- ppp_toy_fit(data, bmf(D ~ 1 + (1 | id), g ~ 1))
+  local_ppp_counts(observed, ppp_toy_draws(expected), ppp_toy_draws(replicated), data)
+  group <- attr(ppp(fit), "draws")
+  person <- attr(ppp(fit, level = "participant"), "draws")
+
+  local_ppp_counts(observed[, 1:2], ppp_toy_draws(expected[, 1:2]),
+                   ppp_toy_draws(replicated[, 1:2]), data)
+  expect_equal(group, attr(ppp(fit), "draws"))
+  expect_equal(person, attr(ppp(fit, level = "participant"), "draws"))
+})
+
+test_that("T2 leaves out a cell in which a single category is possible", {
+  # e.g. an m3 set size without "other" candidates: every response is correct
+  data <- data.frame(id = factor(rep(1:3, 2)), item_type = rep(c("old", "new"), each = 3))
+  observed <- cbind(old = c(10, 10, 10, 4, 6, 5), new = c(0, 0, 0, 6, 4, 5))
+  expected <- cbind(old = c(10, 10, 10, 5, 4, 6), new = c(1e-43, 1e-43, 1e-43, 5, 6, 4))
+  replicated <- cbind(old = c(10, 10, 10, 5, 3, 6), new = c(0, 0, 0, 5, 7, 4))
+  fit <- ppp_toy_fit(data, bmf(D ~ 1 + (1 | id), g ~ 1))
+  local_ppp_counts(observed, ppp_toy_draws(expected), ppp_toy_draws(replicated), data)
+  with_forced_cell <- attr(ppp(fit, statistic = "T2"), "draws")$T2
+
+  rows <- 4:6
+  local_ppp_counts(observed[rows, ], ppp_toy_draws(expected[rows, ]),
+                   ppp_toy_draws(replicated[rows, ]), data[rows, ])
+  expect_equal(with_forced_cell, attr(ppp(fit, statistic = "T2"), "draws")$T2)
+})
+
 test_that("ppp() refuses observed counts in an impossible category", {
   data <- data.frame(item_type = "old")
   observed <- cbind(a = 4, b = 5, c = 1)
@@ -140,6 +197,19 @@ test_that("ppp() asks for the participant column when it cannot find one", {
   crossed <- ppp_toy_fit(data, bmf(D ~ 1 + (1 | id) + (1 | item), g ~ 1))
   expect_error(ppp(crossed), "several grouping variables \\('id', 'item'\\)")
   expect_no_error(ppp(crossed, statistic = "T1"))
+})
+
+test_that("ppp() says where the participant column has to be", {
+  # brms keeps only formula variables, so a model without person effects has
+  # no participant column in its data
+  data <- data.frame(item_type = c("old", "old"))
+  observed <- matrix(c(4, 6, 6, 4), 2)
+  local_ppp_counts(observed, ppp_toy_draws(observed), ppp_toy_draws(observed), data)
+  no_re <- ppp_toy_fit(data)
+  expect_match(tryCatch(ppp(no_re), message = conditionMessage),
+               "contain only the variables of the formula")
+  expect_match(tryCatch(ppp(no_re, participant = "id"), error = conditionMessage),
+               "contain only the variables of the formula")
 })
 
 test_that("ppp() checks its arguments", {
@@ -181,15 +251,31 @@ test_that(".ppp_complement() adds the second category of a binomial count", {
   expect_equal(out[, , 2], matrix(c(7, 6, 13, 12), 2))
 })
 
-test_that("ppp() works on an m3 fit", {
+test_that("ppp() compares each replicated data set with the expectation of its own draw", {
   path <- test_path("assets/bmmfit_m3_ppcheck.rds")
   skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
   withr::local_seed(1)
-  res <- ppp(readRDS(path), ndraws = 20)
+  res <- ppp(fit, statistic = "T1", by = character(0), ndraws = 5)
   expect_s3_class(res, "bmm_ppp")
-  expect_equal(res$statistic, c("T1", "T2"))
-  expect_true(all(res$ppp >= 0 & res$ppp <= 1))
-  expect_equal(res$ndraws, c(20L, 20L))
+
+  # the same random numbers as ppp(): the draw ids first, then the simulation
+  withr::local_seed(1)
+  draw_ids <- sample.int(brms::ndraws(fit), 5)
+  yrep <- brms::posterior_predict(fit, draw_ids = draw_ids)
+  mu <- brms::posterior_epred(fit, draw_ids = draw_ids)
+  pooled <- function(x) apply(x, c(1L, 3L), sum)
+  x2 <- function(n) rowSums((n - pooled(mu))^2 / pooled(mu))
+  observed <- matrix(colSums(unclass(fit$data$Y)), 5, dim(mu)[3], byrow = TRUE)
+  expect_equal(unname(attr(res, "draws")$T1[, "observed"]), x2(observed))
+  expect_equal(unname(attr(res, "draws")$T1[, "replicated"]), x2(pooled(yrep)))
+})
+
+test_that("ppp() takes ndraws as a whole number of draws", {
+  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
+  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
+  fit <- readRDS(path)
+  expect_error(ppp(fit, ndraws = 2.5), "'ndraws' must be a whole number")
 })
 
 test_that("ppp() does not flag a well-specified mpt model and flags a misspecified one", {
