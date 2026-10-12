@@ -73,6 +73,7 @@
   }
 
   // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau) on a Simpson grid in log J; tau = 0 is constant precision
+  // the weights are renormalised to sum to one, so the result is a proper density (see .circmix_vp_ld())
   real circmix_vp_ld(vector cosd, vector logw, real logw_guess,
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
@@ -94,15 +95,16 @@
     real step = 2 * half_width / (nodes - 1);
     real centre = digamma(shape) + log(tau);
     real rate = inv(tau);
+    vector[nodes] lw;
     vector[nodes] lp;
     for (i in 1:nodes) {
       real t = centre - half_width + (i - 1) * step;
       real J = exp(t);
-      lp[i] = circmix_simpson_lw(i, nodes) + t + gamma_lpdf(J | shape, rate)
-              + circmix_ld(cosd, logw, logw_guess,
-                           circmix_kappa(J, logk, dlogk, logJ_min, dlogJ));
+      lw[i] = circmix_simpson_lw(i, nodes) + t + gamma_lpdf(J | shape, rate);
+      lp[i] = lw[i] + circmix_ld(cosd, logw, logw_guess,
+                                 circmix_kappa(J, logk, dlogk, logJ_min, dlogJ));
     }
-    return log_sum_exp(lp) + log(step / 3);
+    return log_sum_exp(lp) - log_sum_exp(lw);
   }
 
   // slot allocation of capacity K over set size ss: [floor(K / ss), probability of one more slot]

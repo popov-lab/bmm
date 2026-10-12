@@ -142,7 +142,11 @@
 # variable_precision frees. The nodes are centred on
 # E[log J] = digamma(shape) + log(tau) with half width
 # 8 sd(log J) = 8 sqrt(trigamma(shape)); the offsets are constants, so only the
-# centre and the width depend on parameters, and they do so smoothly.
+# centre and the width depend on parameters, and they do so smoothly. The
+# quadrature weights are renormalised to sum to one, which makes the result a
+# finite von Mises mixture and so a proper density. Unnormalised, their sum
+# differs from one by an amount that depends only on the shape and acts as a
+# log prior on tau.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 41L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
@@ -162,20 +166,18 @@
   centre <- digamma(shape[vp]) + log(tau[vp])
   offsets <- seq(-1, 1, length.out = nodes)
   simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
-  lp <- vapply(seq_len(nodes), function(i) {
-    t <- centre + half_width[vp] * offsets[i]
-    J <- exp(t)
-    simpson[i] + t +
-      stats::dgamma(J, shape = shape[vp], scale = tau[vp], log = TRUE) +
-      .circmix_ld(
-        cosd[vp, , drop = FALSE], logw[vp, , drop = FALSE], logw_guess[vp],
-        .circmix_kappa(J, tab)
-      )
+  t <- centre + outer(half_width[vp], offsets)
+  J <- exp(t)
+  lw <- t + stats::dgamma(J, shape = shape[vp], scale = tau[vp], log = TRUE) +
+    rep(simpson, each = length(vp))
+  ld <- vapply(seq_len(nodes), function(i) {
+    .circmix_ld(
+      cosd[vp, , drop = FALSE], logw[vp, , drop = FALSE], logw_guess[vp],
+      .circmix_kappa(J[, i], tab)
+    )
   }, numeric(length(vp)))
 
-  step <- 2 * half_width[vp] / (nodes - 1)
-  out[vp] <- matrixStats::rowLogSumExps(matrix(lp, nrow = length(vp))) +
-    log(step / 3)
+  out[vp] <- matrixStats::rowLogSumExps(lw + ld) - matrixStats::rowLogSumExps(lw)
   out
 }
 

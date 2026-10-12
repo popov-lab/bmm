@@ -76,6 +76,25 @@ test_that(".circmix_vp_ld() is a normalised density on the circle", {
   expect_equal(total$value, 1, tolerance = 1e-6)
 })
 
+# Near the threshold the Simpson weights alone sum to about exp(2.5e-4). That
+# offset is the same for every response, so it acts as a log prior on tau and
+# moved its maximum-likelihood estimate by 0.13 standard errors at N = 5000.
+test_that(".circmix_vp_ld() is a normalised density at the shape threshold", {
+  tau <- .circmix_J(10)
+  total <- stats::integrate(
+    function(y) {
+      n <- length(y)
+      exp(.circmix_vp_ld(
+        matrix(cos(y)), matrix(log(0.8), nrow = n), rep(log(0.2), n),
+        rep(10, n), rep(tau, n)
+      ))
+    },
+    -pi, pi,
+    rel.tol = 1e-10
+  )
+  expect_equal(total$value, 1, tolerance = 1e-8)
+})
+
 test_that(".circmix_vp_ld() matches adaptive integration above the shape threshold", {
   vp_reference <- function(y, kappa, tau, p_mem) {
     shape <- .circmix_J(kappa) / tau
@@ -92,12 +111,15 @@ test_that(".circmix_vp_ld() matches adaptive integration above the shape thresho
     )$value)
   }
 
+  # 41 nodes hold the log density to 1e-4 from shape 2 up, but at the threshold
+  # itself the error is several 1e-4 (3.5e-4 at shape 1, worst case over y)
+  tolerances <- c(`4` = 1e-4, `2` = 1e-4, `1` = 1e-3)
   for (shape in c(4, 2, 1)) {
     tau <- .circmix_J(10) / shape
     expect_equal(
       .circmix_vp_ld(matrix(cos(0.3)), matrix(log(0.8)), log(0.2), 10, tau),
       vp_reference(0.3, 10, tau, 0.8),
-      tolerance = 1e-4
+      tolerance = tolerances[[as.character(shape)]]
     )
   }
 })
