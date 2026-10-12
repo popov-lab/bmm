@@ -117,6 +117,15 @@ test_that("mpt_tree does not let a partially matched name reorder or drop formul
   )
 })
 
+test_that("mpt_tree rejects branch values that are not expressions", {
+  expect_error(mpt_tree("t", a ~ D, b ~ NULL), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, b ~ "1 - D"), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, eval(bquote(b ~ .(c(0.2, 0.3))))), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "NULL")), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "'1 - D'")), "must be an expression")
+  expect_s3_class(mpt_tree("t", a ~ 0.5, b ~ 0.5), "mpt_tree")
+})
+
 test_that("mpt stores its derived state once", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")

@@ -172,6 +172,11 @@ mpt_tree <- function(name, branches, ..., impossible = NULL) {
         "Cannot parse the branch expression '{expr}' in tree '{name}'."
       )
     }
+    stopif(
+      !is.language(parsed) && !(is.numeric(parsed) && length(parsed) == 1L),
+      "The branch of category '{resp_cat}' in tree '{name}' must be an \\
+      expression in parameters and numbers, such as D + (1 - D) * g, not {expr}."
+    )
     parsed <- .mpt_fold_numeric_division(parsed)
     scientific <- .mpt_scientific_constants(parsed)
     if (length(scientific) > 0) {
