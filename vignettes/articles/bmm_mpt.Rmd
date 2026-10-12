@@ -136,7 +136,7 @@ Two things to keep in mind when writing branch expressions:
 - Parameter and category names must consist of letters and digits only (no underscores or dots), because they become non-linear parameters in **brms**.
 - Numeric fractions such as `1/4` are converted to decimal literals (`0.25`) when the tree is created. In Stan, a bare integer fraction would be evaluated as integer division.
 
-The link function is chosen once per model. The default is the logit; `links = "probit"` selects the probit link that latent-trait MPT models traditionally use, and switches the default priors accordingly (see [Default priors]):
+The default link is the logit. `links = "probit"` selects the probit link that latent-trait MPT models traditionally use for every parameter, and switches the default priors accordingly (see [Default priors]); a named list, `links = list(D = "probit")`, switches single parameters and their priors:
 
 ```{r}
 model_2htm_probit <- mpt(
