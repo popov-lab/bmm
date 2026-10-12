@@ -156,7 +156,9 @@ settable_link_functions.rdm <- function(model) {
 #'
 #' The fixed-parameter values above are on the log link: `s = 0` is a
 #' diffusion constant of 1, and `sp = -100` is a starting-point range of
-#' essentially 0, i.e. no start-point variability.
+#' essentially 0, i.e. no start-point variability. `mu` is the location
+#' parameter brms attaches to every family; it is fixed to 0 and is not a
+#' parameter of the model.
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -240,10 +242,16 @@ settable_link_functions.rdm <- function(model) {
 #' The likelihood is invariant to scaling every drift rate, `gap`, `sp` and
 #' `s` by the same positive constant, so only their ratios are identified.
 #' `s` is fixed to 1 by default (`s = 0` on the log link) to pin that scale.
-#' Freeing `s` with an intercept estimates that scale ray rather than a new
-#' quantity, and `check_formula()` warns when a formula does so; write
-#' `s ~ 0 + condition` instead to estimate contrasts of `s` without freeing
-#' the scale.
+#' Freeing `s` estimates that scale ray rather than a new quantity, whether
+#' through an intercept (`s ~ 1`, `s ~ condition`) or through one coefficient
+#' per cell (`s ~ 0 + condition`: cell-means coding has no reference cell, so
+#' the common scale stays free), and `check_formula()` warns in both cases. To
+#' estimate the ratio of `s` between conditions, pin one cell with a constant
+#' prior, e.g. `s ~ 0 + condition` with
+#' `prior(constant(0), class = "b", coef = "conditionA", dpar = "s")`, or keep
+#' `s` fixed and put the condition on the drift rates. Group-level terms alone
+#' (`s ~ 0 + (1 | id)`) do not free the scale, because their hierarchical
+#' prior is centred on the fixed value.
 #' @note Both versions describe the same response type (a categorical winner in
 #'   a choice-RT race), so they live in one constructor rather than separate
 #'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
@@ -352,20 +360,25 @@ check_data.rdm_custom <- function(model, data, formula) {
 ############################################################################# !
 
 # Scaling drift, gap, sp and s by a common factor leaves the likelihood exactly
-# unchanged, so an intercept for s slides along that ray together with the
-# drifts and the thresholds and none of them is identified. Contrasts of s are
-# identified, because the reference cell pins the scale.
+# unchanged, so any population-level term for s, an intercept or one
+# coefficient per cell, slides along that ray together with the drifts and the
+# thresholds and none of them is identified (cell-means coding has no reference
+# cell to pin the scale). Group-level terms alone leave it pinned, because their
+# prior is centred on the fixed value.
 #' @export
 check_formula.rdm <- function(model, data, formula) {
   s_form <- formula[["s"]]
   warnif(
-    is_formula(s_form) && !is_constant(s_form) && has_intercept(s_form),
-    "The formula for 's' has an intercept, so 's' is estimated on the same \\
-    scale as the drift rates, 'gap' and 'sp': multiplying all of them by a \\
-    common factor leaves the likelihood unchanged, so only their ratios are \\
-    identified. Either fix 's' (the default, or to another value with \\
-    s = log(0.9) in bmf()) or suppress the intercept to estimate contrasts of \\
-    's' only, as in s ~ 0 + condition."
+    is_formula(s_form) && !is_constant(s_form) &&
+      (has_intercept(s_form) ||
+         length(.vars_outside_bars(s_form[[length(s_form)]])) > 0),
+    "The formula for 's' has population-level terms, so 's' is estimated on \\
+    the same scale as the drift rates, 'gap' and 'sp': multiplying all of them \\
+    by a common factor leaves the likelihood unchanged, so only their ratios \\
+    are identified. Either fix 's' (the default, or to another value with \\
+    s = log(0.9) in bmf()) or pin one cell with a constant prior to estimate \\
+    the ratio of 's' between conditions, e.g. s ~ 0 + condition with \\
+    prior(constant(0), class = 'b', coef = 'conditionA', dpar = 's')."
   )
   NextMethod("check_formula")
 }

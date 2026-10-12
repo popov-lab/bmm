@@ -145,7 +145,9 @@ Racing Diffusion Model
 
 The fixed-parameter values above are on the log link: \code{s = 0} is a
 diffusion constant of 1, and \code{sp = -100} is a starting-point range of
-essentially 0, i.e. no start-point variability.
+essentially 0, i.e. no start-point variability. \code{mu} is the location
+parameter brms attaches to every family; it is fixed to 0 and is not a
+parameter of the model.
 
 \subsection{Start-point variability (\code{sp})}{
 
@@ -205,10 +207,16 @@ the \strong{lba} model).
 The likelihood is invariant to scaling every drift rate, \code{gap}, \code{sp} and
 \code{s} by the same positive constant, so only their ratios are identified.
 \code{s} is fixed to 1 by default (\code{s = 0} on the log link) to pin that scale.
-Freeing \code{s} with an intercept estimates that scale ray rather than a new
-quantity, and \code{check_formula()} warns when a formula does so; write
-\code{s ~ 0 + condition} instead to estimate contrasts of \code{s} without freeing
-the scale.
+Freeing \code{s} estimates that scale ray rather than a new quantity, whether
+through an intercept (\code{s ~ 1}, \code{s ~ condition}) or through one coefficient
+per cell (\code{s ~ 0 + condition}: cell-means coding has no reference cell, so
+the common scale stays free), and \code{check_formula()} warns in both cases. To
+estimate the ratio of \code{s} between conditions, pin one cell with a constant
+prior, e.g. \code{s ~ 0 + condition} with
+\code{prior(constant(0), class = "b", coef = "conditionA", dpar = "s")}, or keep
+\code{s} fixed and put the condition on the drift rates. Group-level terms alone
+(\code{s ~ 0 + (1 | id)}) do not free the scale, because their hierarchical
+prior is centred on the fixed value.
 }
 
 \examples{
