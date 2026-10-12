@@ -235,3 +235,40 @@ test_that("Stan normal LBA lpdf matches an independent start-point quadrature", 
   expect_gt(nrow(d), 0)
   expect_lt(max(abs(d$stan_lpdf - quad)), 1e-6)
 })
+
+# cmdstan's own gradient diagnostic (cmdstanr's model methods cannot be used
+# once bmm's namespace is loaded): autodiff versus finite differences of the
+# drift partial at points where a Phi difference taken from std_normal_lcdf,
+# whose Stan gradient is a piecewise approximation, was off by 2.2 % and
+# 0.17 %. Negative-drift points are not checked here: the lpdf's denominator
+# std_normal_lcdf(v / s) carries the same approximate derivative (measured
+# -7e-6 at v / s = -2 and 1e-4 at v / s = -6.7), which this tolerance resolves.
+test_that("Stan normal LBA lpdf drift gradient matches finite differences", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+
+  sc_dir <- system.file("stan_chunks", package = "bmm")
+  rl <- function(f) paste(readLines(file.path(sc_dir, paste0(f, ".stan"))), collapse = "\n")
+  prog <- paste0(
+    "functions {\n", rl("lba_shared_functions"), "\n", rl("lba_normal_functions"), "\n}\n",
+    "data { real t; real b; real A; real s; }\n",
+    "parameters { real v; }\n",
+    "model { target += lba_normal_single_lpdf(t | v, b, A, s); }\n"
+  )
+  mod <- cmdstanr::cmdstan_model(
+    cmdstanr::write_stan_file(prog, dir = tempdir()),
+    compile = TRUE, quiet = TRUE
+  )
+
+  pts <- data.frame(t = c(4.6415888, 0.4641589), v = c(3, 8), b = 0.3, A = 0.25, s = c(1, 2.5))
+  for (i in seq_len(nrow(pts))) {
+    # error = 1 keeps cmdstan from aborting at its own 1e-6 threshold so the
+    # expectation below sees the numbers
+    invisible(utils::capture.output(diag <- mod$diagnose(
+      data = as.list(pts[i, c("t", "b", "A", "s")]),
+      init = list(list(v = pts$v[i])), error = 1
+    )))
+    g <- diag$gradients()
+    expect_lt(abs(g$error), 1e-4 * max(abs(g$finite_diff), 1e-3))
+  }
+})

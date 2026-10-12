@@ -10,12 +10,17 @@ real lba_log_floor() {
   return log(1e-300);
 }
 
-// log(Phi(hi) - Phi(lo)), hi > lo, via std_normal_lcdf(-z) in the right half, never lccdf
+// lower-tail log Phi with the exact gradient: erfc, not the approximate-derivative std_normal_lcdf
+// (erfc(26.5) ~ 1e-306: beyond z = -37 fall back to the lcdf's asymptotic branch)
+real lba_log_Phi_lower(real z) {
+  if (z > -37) return log(0.5 * erfc(-0.7071067811865476 * z));
+  return std_normal_lcdf(z |);
+}
+
+// log(Phi(hi) - Phi(lo)), hi > lo, from whichever tail keeps both probabilities away from 1
 real lba_log_Phi_diff(real lo, real hi) {
-  if (lo + hi >= 0) {
-    return log_diff_exp(std_normal_lcdf(-lo |), std_normal_lcdf(-hi |));
-  }
-  return log_diff_exp(std_normal_lcdf(hi |), std_normal_lcdf(lo |));
+  if (lo + hi >= 0) return log_diff_exp(lba_log_Phi_lower(-lo), lba_log_Phi_lower(-hi));
+  return log_diff_exp(lba_log_Phi_lower(hi), lba_log_Phi_lower(lo));
 }
 
 // log int phi(z) dz over a narrow interval: midpoint rule with its second-order term
