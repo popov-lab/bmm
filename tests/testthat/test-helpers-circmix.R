@@ -236,6 +236,38 @@ test_that(".circmix_slot_averaging_ld() sums the information of the slots an ite
   )
 })
 
+test_that("the slot-averaging gradient in K is finite at a whole K / set_size", {
+  skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required to compile the shared Stan functions"
+  )
+  tab <- .circmix_kappa_table()
+  code <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")),
+    "\n}\n",
+    "data { int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ; }
+    parameters { real<lower=0> K; }
+    model {
+      target += circmix_slot_averaging_ld([cos(0.3)]', [0.0]', K, 2, 6, 0.5, 81,
+                                          logk, dlogk, logJ_min, dlogJ);
+    }"
+  )
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+  utils::capture.output(diagnosis <- model$diagnose(
+    data = list(
+      NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+      logJ_min = tab$logJ_min, dlogJ = tab$dlogJ
+    ),
+    init = list(list(K = 4)),
+    error = 1e6
+  ))
+  # the density has a kink in K there, so a central finite difference straddles
+  # two slopes and only finiteness is asserted
+  expect_true(all(is.finite(diagnosis$gradients()$model)))
+})
+
 # Compares the sampler against the density it is meant to draw from. n is large
 # enough that a bin proportion has a standard error near 5e-4, so the tolerance
 # below is about ten standard errors and does not need a seed to be stable.

@@ -307,10 +307,18 @@
   no_guessing <- rep(-Inf, n)
   single_slot <- .circmix_J(kappa)
 
-  high <- log(allocation$extra) + .circmix_vp_ld(
-    cosd, logw, no_guessing,
-    .circmix_kappa((allocation$slots + 1) * single_slot), tau, nodes
-  )
+  # At a whole K / set_size the extra slot has weight zero. Skipping it rather
+  # than adding log(0) is what keeps Stan's gradient in K finite there.
+  high <- rep(-Inf, n)
+  partial <- which(allocation$extra > 0)
+  if (length(partial)) {
+    high[partial] <- log(allocation$extra[partial]) + .circmix_vp_ld(
+      cosd[partial, , drop = FALSE], logw[partial, , drop = FALSE],
+      no_guessing[partial],
+      .circmix_kappa((allocation$slots[partial] + 1) * single_slot[partial]),
+      tau[partial], nodes
+    )
+  }
 
   low <- log1p(-allocation$extra) - log(2 * pi)
   held <- which(allocation$slots >= 0.5)
