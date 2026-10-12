@@ -68,6 +68,12 @@ response and the RT.
 \code{drdm()} and \code{prdm()}, so trial-varying parameters can be passed as
 vectors. \code{rrdm()} and \code{qrdm()} take one value of each; \code{drift} is always
 one value per accumulator.
+
+\code{drdm()} is the joint density of the response time and the winning
+response. \code{prdm()} and \code{qrdm()} describe the response time irrespective
+of which accumulator wins: \code{prdm(q)} is P(RT <= q) summed over all
+responses, i.e. the CDF of the race's finishing time, and \code{qrdm()} is
+its quantile function.
 }
 \examples{
 dat <- rrdm(n = 1000, drift = c(3, 1.5), gap = 1, sp = 0, ndt = 0.2)

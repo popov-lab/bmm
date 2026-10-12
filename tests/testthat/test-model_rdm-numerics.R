@@ -1,7 +1,7 @@
 # =============================================================================
 # Numerics tests for the RDM start-point kernels (Stage 4 of #353): continuity
 # of .dwald_full()/.pwald_full() across the midpoint switch, and far-tail
-# finiteness of drdm()/prdm(). See R/distributions.R for the derivation.
+# finiteness of drdm()/prdm(). See R/distributions-rdm.R for the derivation.
 # =============================================================================
 
 # .dwald_full()/.pwald_full() fall back to the plain-Wald midpoint

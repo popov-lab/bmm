@@ -36,6 +36,12 @@
 #'   vectors. `rrdm()` and `qrdm()` take one value of each; `drift` is always
 #'   one value per accumulator.
 #'
+#'   `drdm()` is the joint density of the response time and the winning
+#'   response. `prdm()` and `qrdm()` describe the response time irrespective
+#'   of which accumulator wins: `prdm(q)` is P(RT <= q) summed over all
+#'   responses, i.e. the CDF of the race's finishing time, and `qrdm()` is
+#'   its quantile function.
+#'
 #' @return
 #'   - `drdm()` returns a numeric vector of (log-)densities.
 #'   - `rrdm()` returns a data.frame with columns `rt` and `response`.

@@ -1,4 +1,4 @@
-// Racing diffusion model (Tillman et al., 2020); R twins .dwald_full() / .pwald_full() in R/distributions.R
+// Racing diffusion model (Tillman et al., 2020); R twins .dwald_full() / .pwald_full() in R/distributions-rdm.R
 
 // log Phi(z) via erfc; upper tails as lcdf(-z), never the lccdf of z (-inf from z = 8.26 on Stan Math 5.3)
 real rdm_log_Phi(real z) {
