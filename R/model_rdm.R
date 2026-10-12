@@ -371,9 +371,15 @@ check_data.rdm_custom <- function(model, data, formula) {
   s_terms <- stats::terms(s_form)
   labels <- attr(s_terms, "term.labels")
   labels <- labels[!grepl("|", labels, fixed = TRUE)]
-  intercept <- attr(s_terms, "intercept") == 1
-  if (length(labels) == 0) return(intercept)
-  X <- stats::model.matrix(stats::reformulate(labels, intercept = intercept), data)
+  if (attr(s_terms, "intercept") == 1) return(TRUE)
+  if (length(labels) == 0) return(FALSE)
+  # a design only brms can build (mo(), s(), gp(), a single-level factor) is
+  # not rebuilt here; a population-level term then warns conservatively
+  X <- tryCatch(
+    stats::model.matrix(stats::reformulate(labels, intercept = FALSE), data),
+    error = function(e) NULL
+  )
+  if (is.null(X) || nrow(X) == 0) return(TRUE)
   qr(cbind(1, X))$rank == qr(X)$rank
 }
 

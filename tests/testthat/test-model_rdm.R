@@ -428,7 +428,8 @@ test_that("check_formula.rdm warns only where the design of s can absorb a commo
   model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = rep(c(0.5, 0.6), 5), response = rep(c(1, 2), 5),
                     cond = rep(c("a", "b"), 5), id = rep(1:2, each = 5),
-                    x = seq(-1, 1, length.out = 10))
+                    x = seq(-1, 1, length.out = 10),
+                    ord = factor(rep(1:5, 2), ordered = TRUE))
   warns <- function(f) {
     checked <- suppressMessages(check_model(model, data = dat, formula = f))
     suppressMessages(check_formula(checked, dat, f))
@@ -444,6 +445,12 @@ test_that("check_formula.rdm warns only where the design of s can absorb a commo
   )
   expect_warning(
     warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ (1 | id))),
+    "only their ratios are identified"
+  )
+  # a brms special term cannot be rebuilt with model.matrix(): no error, and
+  # the warning errs on the side of firing
+  expect_warning(
+    warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 0 + mo(ord))),
     "only their ratios are identified"
   )
   expect_no_warning(warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)))
