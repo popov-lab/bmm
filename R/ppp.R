@@ -37,8 +37,15 @@
 #' expects (Klauer, 2010, Eq. 18):
 #' \deqn{T_2 = \sum_{i,j} \frac{(s_{ij} - \sigma_{ij})^2}{\sqrt{\sigma_{ii}\sigma_{jj}}}.}
 #' \eqn{\sigma} is the covariance of the expected counts across participants
-#' plus \eqn{(T - 1) / T} times the average multinomial covariance within a
-#' participant, where \eqn{T} is the number of participants. The sum runs over
+#' plus the average multinomial covariance within a participant, which is the
+#' expected value of \eqn{s} given the draw. Both covariances divide by
+#' \eqn{T - 1}, where \eqn{T} is the number of participants. Klauer (2010)
+#' multiplies the multinomial part by \eqn{(T - 1) / T}, the expected value
+#' for covariances that divide by \eqn{T}; that version of \eqn{T_2} is
+#' \eqn{(T - 1) / T} times this one and has the same PPP. TreeBUGS combines
+#' the factor with covariances that divide by \eqn{T - 1}, so its \eqn{\sigma}
+#' falls short of the expected \eqn{s} by \eqn{1 / T} of the multinomial part.
+#' The sum runs over
 #' the full matrix, so the covariances between trees or conditions, which
 #' carry the correlations between the person parameters, are part of the
 #' check. When participants differ in the cells they have, as in a
@@ -443,7 +450,9 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
                        ncol = sum(in_cell)) * weight[row_col == j]
       within[in_cell, in_cell] <- within[in_cell, in_cell] - crossprod(scaled) / n_people
     }
-    sigma <- stats::cov(expected_wide) + (n_people - 1) / n_people * within
+    # the expected value of stats::cov() of the counts (divisor T - 1); the
+    # (T - 1) / T of Klauer (2010) belongs to the divisor T
+    sigma <- stats::cov(expected_wide) + within
     c(observed = t2(observed_cov, sigma),
       replicated = t2(stats::cov(wide(replicated[d, , ])), sigma))
   }, numeric(2)))

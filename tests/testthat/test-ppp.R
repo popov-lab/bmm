@@ -39,7 +39,9 @@ klauer_t2 <- function(observed, cells, n) {
     within[idx, idx] <- b
     offset <- offset + ncol(b)
   }
-  sigma <- stats::cov(do.call(cbind, cells)) + (n_people - 1) / n_people * within
+  # under cov()'s divisor T - 1 the expected sample covariance is
+  # cov(expected) + within; Klauer's factor (T - 1) / T goes with the divisor T
+  sigma <- stats::cov(do.call(cbind, cells)) + within
   sum((stats::cov(observed) - sigma)^2 / sqrt(outer(diag(sigma), diag(sigma))))
 }
 
@@ -88,6 +90,29 @@ test_that("ppp() computes T2 as in Klauer (2010), across cells", {
   n <- matrix(10, 3, 2)
   expect_equal(unname(attr(res, "draws")$T2[, "observed"]), klauer_t2(wide(observed), cells, n))
   expect_equal(unname(attr(res, "draws")$T2[, "replicated"]), klauer_t2(wide(replicated), cells, n))
+})
+
+test_that("T2 is 0 when the observed covariance is the one the model implies", {
+  # E[cov(counts)] by enumeration: 3 participants, 3 binomial trials each
+  n_trials <- 3
+  p <- c(0.2, 0.5, 0.7)
+  outcomes <- as.matrix(expand.grid(0:n_trials, 0:n_trials, 0:n_trials))
+  prob <- apply(outcomes, 1, function(k) prod(stats::dbinom(k, n_trials, p)))
+  expected_cov <- Reduce(`+`, lapply(seq_len(nrow(outcomes)), function(o) {
+    prob[o] * stats::cov(cbind(outcomes[o, ], n_trials - outcomes[o, ]))
+  }))
+  # observed counts whose sample covariance is exactly expected_cov, which has
+  # rank 1 because the two counts of a participant sum to n_trials
+  eig <- eigen(expected_cov, symmetric = TRUE)
+  centred <- outer(c(1, -1, 0), sqrt(eig$values[1]) * eig$vectors[, 1])
+  observed <- sweep(centred, 2, n_trials * c(0.5, 0.5), "+")
+  colnames(observed) <- c("old", "new")
+
+  data <- data.frame(id = factor(1:3), item_type = "old")
+  expected <- cbind(n_trials * p, n_trials * (1 - p))
+  local_ppp_counts(observed, ppp_toy_draws(expected), ppp_toy_draws(expected), data)
+  res <- ppp(ppp_toy_fit(data, bmf(D ~ 1 + (1 | id), g ~ 1)), statistic = "T2")
+  expect_equal(unname(attr(res, "draws")$T2[, "observed"]), 0)
 })
 
 test_that("ppp() leaves participants without a matching set of cells out of T2", {
