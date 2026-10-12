@@ -65,7 +65,9 @@
 #' **Impossible categories.** Categories with an expected count of about 0 in
 #' every draw, such as the impossible categories of an [mpt()] or [m3()] model
 #' or the ranks beyond the set size of an [sdt_ranking()] model, are left out
-#' of both statistics.
+#' of both statistics. A cell with a single possible category, such as an
+#' [m3()] set size without other candidates, is left out of \eqn{T_2}: the
+#' number of trials fixes its count.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()].
 #' @param statistic Character. `"T1"`, `"T2"`, or both (the default). If the
@@ -417,7 +419,10 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 .ppp_t2_pattern <- function(counts, rows, cell, person, possible) {
   n_people <- nlevels(person)
   cells <- sort(unique(cell))
-  columns <- which(possible[cells, , drop = FALSE], arr.ind = TRUE)
+  # the trials fix the count of a cell's only possible category, so its
+  # variance is 0 and would sit in the denominator of T2
+  possible <- possible[cells, , drop = FALSE]
+  columns <- which(possible & rowSums(possible) > 1L, arr.ind = TRUE)
   col_cell <- columns[, "row"]
   col_cat <- columns[, "col"]
   # every participant has every cell, so participant p's row sum for the j-th

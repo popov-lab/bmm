@@ -111,7 +111,9 @@ categories.
 \strong{Impossible categories.} Categories with an expected count of about 0 in
 every draw, such as the impossible categories of an \code{\link[=mpt]{mpt()}} or \code{\link[=m3]{m3()}} model
 or the ranks beyond the set size of an \code{\link[=sdt_ranking]{sdt_ranking()}} model, are left out
-of both statistics.
+of both statistics. A cell with a single possible category, such as an
+\code{\link[=m3]{m3()}} set size without other candidates, is left out of \eqn{T_2}: the
+number of trials fixes its count.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}

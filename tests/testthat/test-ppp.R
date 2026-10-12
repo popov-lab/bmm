@@ -142,6 +142,22 @@ test_that("ppp() skips impossible categories without Inf or NaN", {
   expect_equal(unclass(ppp(fit))$observed, res$observed)
 })
 
+test_that("T2 leaves out a cell in which a single category is possible", {
+  # e.g. an m3 set size without "other" candidates: every response is correct
+  data <- data.frame(id = factor(rep(1:3, 2)), item_type = rep(c("old", "new"), each = 3))
+  observed <- cbind(old = c(10, 10, 10, 4, 6, 5), new = c(0, 0, 0, 6, 4, 5))
+  expected <- cbind(old = c(10, 10, 10, 5, 4, 6), new = c(1e-43, 1e-43, 1e-43, 5, 6, 4))
+  replicated <- cbind(old = c(10, 10, 10, 5, 3, 6), new = c(0, 0, 0, 5, 7, 4))
+  fit <- ppp_toy_fit(data, bmf(D ~ 1 + (1 | id), g ~ 1))
+  local_ppp_counts(observed, ppp_toy_draws(expected), ppp_toy_draws(replicated), data)
+  with_forced_cell <- attr(ppp(fit, statistic = "T2"), "draws")$T2
+
+  rows <- 4:6
+  local_ppp_counts(observed[rows, ], ppp_toy_draws(expected[rows, ]),
+                   ppp_toy_draws(replicated[rows, ]), data[rows, ])
+  expect_equal(with_forced_cell, attr(ppp(fit, statistic = "T2"), "draws")$T2)
+})
+
 test_that("ppp() refuses observed counts in an impossible category", {
   data <- data.frame(item_type = "old")
   observed <- cbind(a = 4, b = 5, c = 1)
