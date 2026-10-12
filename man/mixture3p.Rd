@@ -56,7 +56,10 @@ the shared normalisation, so neither weight is separately interpretable.}
 
 \item{variable_precision}{Logical; if \code{TRUE}, the precision of memory varies
 from trial to trial (van den Berg et al., 2012). See \code{\link[=mixture2p]{mixture2p()}} for
-details of the parameterisation.}
+details of the parameterisation. Under \code{version = "slot_averaging"}, the
+precision of an item held in \code{j} slots is the sum of \code{j} independent slot
+draws, \code{gamma(shape = j * J(kappa) / tau, scale = tau)}, so its variance
+grows with \code{j}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
 \code{variable_precision = TRUE}; must be an odd number of at least 41. See

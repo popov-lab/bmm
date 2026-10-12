@@ -213,7 +213,10 @@ settable_links.mixture3p <- function(model) {
 #'   the shared normalisation, so neither weight is separately interpretable.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
 #'   from trial to trial (van den Berg et al., 2012). See [mixture2p()] for
-#'   details of the parameterisation.
+#'   details of the parameterisation. Under `version = "slot_averaging"`, the
+#'   precision of an item held in `j` slots is the sum of `j` independent slot
+#'   draws, `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance
+#'   grows with `j`.
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41. See
 #'   [mixture2p()].
