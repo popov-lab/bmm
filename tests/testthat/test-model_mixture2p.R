@@ -10,6 +10,15 @@ test_that("mixture2p() validates its arguments", {
   expect_error(mixture2p("y", vp_nodes = 42), "odd number of at least 41")
 })
 
+test_that("mixture2p() and dmixture2p() default to 81 quadrature nodes", {
+  # 41 nodes put the reject threshold inside a real-data posterior: slot
+  # averaging + VP on three subjects of zhang_luck_2008 diverged on 143 of 200
+  # transitions at 41 nodes and on none at 81 (#398)
+  expect_equal(mixture2p("y", variable_precision = TRUE)$vp_nodes, 81L)
+  expect_equal(formals(mixture2p)$vp_nodes, 81L)
+  expect_equal(formals(dmixture2p)$vp_nodes, 81L)
+})
+
 test_that("mixture2p() exposes the parameters each version implies", {
   expect_equal(names(mixture2p("y")$parameters), c("mu", "kappa", "thetat"))
   expect_equal(

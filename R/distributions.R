@@ -351,7 +351,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' lines(x, d, type = "l", col = "red")
 #'
 dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
-                       set_size = 1, version = "simple", vp_nodes = 41L,
+                       set_size = 1, version = "simple", vp_nodes = 81L,
                        log = FALSE) {
   version <- match.arg(version, names(.mixture2p_version_table))
   .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)

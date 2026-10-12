@@ -87,7 +87,7 @@
 
 .model_mixture2p <- function(resp_error = NULL, set_size = NULL, links = NULL,
                              version = "simple", variable_precision = FALSE,
-                             vp_nodes = 41L, call = NULL, ...) {
+                             vp_nodes = 81L, call = NULL, ...) {
   spec <- .mixture2p_version_table[[version]]
   if (variable_precision) {
     spec <- .circmix_add_variable_precision(spec)
@@ -184,11 +184,12 @@
 #'   the parameter that needs the most data, and is often only weakly identified
 #'   in small designs.
 #' @param vp_nodes Number of quadrature nodes used when
-#'   `variable_precision = TRUE`; must be an odd number of at least 41. The
-#'   default holds the log likelihood to about 1e-5 as long as the implied gamma
-#'   shape `J(kappa) / tau` stays above roughly 1. Below that the model rejects
-#'   rather than returning a biased likelihood, and asks for more nodes; 81
-#'   nodes reach a shape of about 0.5, and 161 about 0.25.
+#'   `variable_precision = TRUE`; must be an odd number of at least 41. With the
+#'   default of 81, the log likelihood holds to about 1e-5 as long as the
+#'   implied gamma shape `J(kappa) / tau` stays above `60 / vp_nodes` (0.74 at
+#'   the default), and to about 2e-6 above a shape of 1. Below that threshold
+#'   the model rejects rather than returning a biased likelihood, and asks for
+#'   more nodes; 121 nodes reach a shape of about 0.5, and 241 about 0.25.
 #' @param links A named list of link functions for the model parameters, e.g.
 #'   `list(kappa = "softplus")`. Defaults are `"log"` for `kappa`, `K` and
 #'   `tau`, and `"logit"` for `thetat`.
@@ -222,7 +223,7 @@
 #' @export
 mixture2p <- function(resp_error, set_size = NULL,
                       version = c("simple", "slot", "slot_averaging"),
-                      variable_precision = FALSE, vp_nodes = 41L, links = NULL,
+                      variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
   stop_missing_args()
