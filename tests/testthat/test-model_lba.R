@@ -870,6 +870,29 @@ test_that("the posterior_epred integral matches quadrature for every drift distr
   }
 })
 
+# a slow normal race (drift 0.5 each, gap 1) keeps so much mass beyond 10 s that
+# a fixed search range of c(1e-3, 10) would be off by about 2 %
+test_that("posterior_epred_lba_simple() reaches the tail of a slow race", {
+  prep <- structure(list(
+    ndraws = 1L, nobs = 1L,
+    dpars = list(driftc = matrix(0.5, 1, 1), drifte = matrix(0.5, 1, 1),
+                 gap = matrix(1, 1, 1), sp = matrix(0.1, 1, 1),
+                 ndt = matrix(0.2, 1, 1), s = matrix(1, 1, 1)),
+    data = list(Y = 1, vint1 = 1L, vint2 = 1L, vint3 = 1L),
+    family = list(dpars = c("mu", "driftc", "drifte", "gap", "sp", "ndt", "s"),
+                  name = "lba_normal_simple")
+  ), class = "brmsprep")
+  log_surv <- function(t) {
+    matrix(.lba_lsurv_single(t, 0.5, 1.1, 0.1, 1, "normal") +
+             .lba_lsurv_single(t, 0.5, 1.1, 0.1, 1, "normal"), nrow = 1)
+  }
+  reference <- 0.2 + stats::integrate(
+    function(u) exp(as.vector(log_surv(exp(u))) + u), log(1e-6), log(1e8),
+    rel.tol = 1e-10, abs.tol = 0, subdivisions = 5000L
+  )$value
+  expect_equal(posterior_epred_lba_simple(prep)[1, 1], reference, tolerance = 1e-4)
+})
+
 
 # -----------------------------------------------------------------------------
 # log_lik category-level convention (log(n[win]) for an error response)
@@ -1078,10 +1101,13 @@ test_that("initfun starts every LBA parameter inside its init range", {
 # a category becomes an argument of the generated likelihood, so one named after
 # a variable that likelihood declares would make stanc refuse the program
 test_that("lba refuses a category named after an identifier of its Stan code", {
-  expect_error(
-    check_model(lba(rt = "rt", response = "resp", version = "custom"), NULL, bmf(t ~ 1, other ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)),
-    "Stan code uses"
-  )
+  model <- lba(rt = "rt", response = "resp", version = "custom")
+  # spelled out here so that dropping a name from .lba_stan_names is caught
+  stan_names <- c("rt", "response", "t", "b", "A", "drift", "n", "win", "lp", "reps", "i", "j")
+  for (nm in stan_names) {
+    f <- bmf(stats::as.formula(paste(nm, "~ 1")), other ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+    expect_error(check_model(model, NULL, f), "Stan code uses", label = nm)
+  }
 })
 
 # a hand-built prep may store a fixed dpar as a single number (a real fit fixes
