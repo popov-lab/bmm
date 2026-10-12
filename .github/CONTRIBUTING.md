@@ -181,7 +181,7 @@ How many reviews a PR needs depends on what it touches.
 |---|---|---|
 | **Low-risk** | Typos, docs only, CI config, tests only, NEWS only | None. May merge on green CI by anyone with write access. |
 | **Standard** | Everything else, including bug fixes and new models | One approving review from someone other than the author. |
-| **Pipeline or exported API** | The shared pipeline files (`R/bmm.R`, `R/bmmformula.R`, `R/helpers-model.R`, `R/helpers-data.R`, `R/helpers-prior.R`, `R/helpers-postprocess.R`, `R/helpers-inits.R`, `R/update.R`), or the signature or return value of an exported function | Two approving reviews. |
+| **Pipeline or exported API** | The shared pipeline files (`R/bmm.R`, `R/bmmformula.R`, `R/helpers-model.R`, `R/helpers-data.R`, `R/helpers-prior.R`, `R/helpers-postprocess.R`, `R/helpers-inits.R`, `R/update.R`), the signature or return value of an exported function, or deprecating or removing an exported function or argument | Two approving reviews. |
 
 A **new model** is a standard PR with one addition: the reviewer works through
 the reviewer block in the PR template. They read the likelihood against the
