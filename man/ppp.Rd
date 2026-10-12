@@ -57,8 +57,8 @@ the attribute \code{"draws"}.
 Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
 (2010) and their posterior predictive p-values (PPP) for models that fit
 aggregated response counts: \code{\link[=mpt]{mpt()}}, \code{\link[=m3]{m3()}}, \code{\link[=sdt_yn]{sdt_yn()}}, \code{\link[=sdt_rating]{sdt_rating()}},
-\code{\link[=sdt_mafc]{sdt_mafc()}}, \code{\link[=sdt_ranking]{sdt_ranking()}} and \code{\link[=sdt_cdp]{sdt_cdp()}}. These are the statistics that
-TreeBUGS' \code{PPP()} reports.
+\code{\link[=sdt_mafc]{sdt_mafc()}}, \code{\link[=sdt_ranking]{sdt_ranking()}} and \code{\link[=sdt_cdp]{sdt_cdp()}}. TreeBUGS' \code{PPP()} reports the
+same two statistics; Details says where their values differ.
 }
 \details{
 Both statistics are computed once per posterior draw, for the observed counts
@@ -76,8 +76,9 @@ and \eqn{T_1} is Pearson's \eqn{X^2} over all cells and response categories,
 where \eqn{n_{ck}} is the observed and \eqn{\hat{n}_{ck}} the expected count
 of category \eqn{k} in cell \eqn{c}. Klauer (2010, Eq. 17) and TreeBUGS
 average the counts over participants instead of summing them. With the same
-number of participants in every cell, the two give the same PPP; otherwise
-the mean gives the cells with fewer participants more weight.
+number \eqn{T} of participants in every cell, the two give the same PPP and
+\eqn{T_1} here is \eqn{T} times theirs; otherwise the mean gives the cells
+with fewer participants more weight.
 
 \strong{\eqn{T_2}: covariance structure.} For every participant, the counts are
 summed per cell, giving one vector per participant over all cells and
