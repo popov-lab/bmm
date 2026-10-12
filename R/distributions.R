@@ -1212,12 +1212,10 @@ log_Phi_diff <- function(lo, hi) {
 # the named arguments recycled to the length of the longest, as a named list
 recycle_args <- function(...) {
   args <- list(...)
-  # rep_len() would silently turn a zero-length argument into NA
-  stopif(
-    any(lengths(args) == 0),
-    "recycle_args() received an empty argument: {collapse_comma(names(args)[lengths(args) == 0])}"
-  )
-  lapply(args, rep_len, length.out = max(lengths(args)))
+  # a zero-length argument makes the result zero-length, as in dnorm(1, numeric(0));
+  # rep_len() alone would turn it into NA
+  n <- if (any(lengths(args) == 0L)) 0L else max(lengths(args))
+  lapply(args, rep_len, length.out = n)
 }
 
 # count * log_prob, treating a zero count as contributing nothing even when the

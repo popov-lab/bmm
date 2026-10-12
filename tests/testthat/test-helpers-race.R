@@ -95,7 +95,7 @@ test_that("log_Phi_diff() is accurate in both tails and across zero", {
 
 test_that("recycle_args() recycles to the longest argument and keeps the names", {
   expect_equal(recycle_args(a = 1, b = 1:3), list(a = c(1, 1, 1), b = 1:3))
-  expect_error(recycle_args(a = 1, b = numeric(0)), "empty argument")
+  expect_equal(recycle_args(a = 1, b = numeric(0)), list(a = numeric(0), b = numeric(0)))
 })
 
 # =============================================================================

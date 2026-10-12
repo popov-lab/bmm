@@ -120,7 +120,7 @@ test_that("every data argument of every model version has a column role", {
       )
       expect(
         length(stale) == 0,
-        glue::glue("{model} {version}: data_column_roles names unknown arguments {collapse_comma(stale)}")
+        glue::glue("{model} {version}: column roles name arguments the constructor does not have: {collapse_comma(stale)}")
       )
     }
   }

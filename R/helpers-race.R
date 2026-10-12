@@ -394,9 +394,9 @@ race_expected_time <- function(log_surv, t_lo, t_hi, n_grid = 1024L) {
 # of t (the normal-drift LBA race decays like 1/t^2). A survivor that decays
 # more slowly than 1/t has no finite mean; t_max stops the search for it. A
 # draw whose survivor is not finite at a decade counts as not yet inside `tol`.
-# The `truncated` attribute tells the caller that t_hi is the cap, not a
-# converged bound, so a mean over this range is the mean of the race truncated
-# at t_max; a single normal-drift LBA accumulator, with no finite mean, is the
+# The `truncated` attribute tells the caller that the search stopped at the cap
+# rather than converging, so a mean over this range is the mean of the race
+# truncated at t_max; a single normal-drift LBA accumulator, with no finite mean, is the
 # case it exists for. A bracket that converges exactly at t_max is not truncated
 race_time_range <- function(log_surv, tol = 1e-12, t_max = 1e7) {
   in_tail <- function(t) isTRUE(all(exp(log_surv(t)) * t <= tol))
