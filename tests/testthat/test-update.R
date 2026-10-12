@@ -869,7 +869,7 @@ test_that("only a slice of a fit's model frame counts as stored data", {
 
 test_that("user data that hold a column of the stored layout stay user data", {
   skip_on_cran()
-  for (case_name in c("m3", "sdt_rating", "sdt_ranking", "sdt_cdp")) {
+  for (case_name in c("m3", "sdt_rating", "sdt_ranking", "sdt_cdp", "mpt")) {
     case <- stored_frame_cases()[[case_name]]
     fit <- stored_frame_fit(case)
     model <- fit$bmm$model
@@ -910,7 +910,8 @@ test_that("update() takes a slice of the model frame as newdata (kfold(), reloo(
   skip_on_cran()
   skip_if_not_installed("rstan")
   for (case_name in c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
-                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm")) {
+                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
+                      "mpt", "mpt_tree_predictor", "mpt_single_tree")) {
     case <- stored_frame_cases()[[case_name]]
     fit <- stub_frame_fit(case)
     rows <- seq_len(nrow(fit$data))[-1]
