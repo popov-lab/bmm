@@ -75,8 +75,9 @@ An object of class `bmmodel`
   - `ndt`: Non-decision time = Additional time required beyond the
     evidence accumulation process
 
-  - `zr`: Relative starting point = Starting point between the decision
-    thresholds relative to the upper bound.
+  - `zr`: Relative starting point = Starting point as a proportion of
+    the boundary separation, measured from the lower boundary (0.5 =
+    unbiased, \> 0.5 = biased towards the upper response).
 
 - **Fixed parameters:**
 
@@ -124,10 +125,20 @@ An object of class `bmmodel`
 
 ## Default behavior
 
-By default, `zr` is fixed at 0. If you want to estimate `zr`, add a
-formula for `zr` in your
+By default, `zr` is fixed at 0 on its logit link scale, that is at an
+unbiased starting point of `zr = 0.5`. If you want to estimate `zr`, add
+a formula for `zr` in your
 [`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
-call.
+call. Estimates of `zr` are on the logit scale too, so use
+[`plogis()`](https://rdrr.io/r/stats/Logistic.html) to read them as
+proportions.
+
+With accuracy-coded responses (1 = correct, 0 = error) the unbiased
+default is the usual assumption. With response-coded data (1 and 0 for
+the two response options, e.g. "word" and "nonword"), a bias towards one
+option moves the starting point; with `zr` fixed, that bias is absorbed
+by the other parameters instead. Estimate `zr` for response-coded data,
+e.g. `zr ~ 1`, and code `drift` so that its sign follows the stimulus.
 
 ## Examples
 

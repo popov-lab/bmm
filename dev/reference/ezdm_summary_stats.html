@@ -65,7 +65,7 @@ contaminant responses from true responses.</p>
 <span>  min_trials <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  init_contaminant <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  max_contaminant <span class="op">=</span> <span class="fl">0.5</span>,</span>
-<span>  maxit <span class="op">=</span> <span class="fl">100</span>,</span>
+<span>  maxit <span class="op">=</span> <span class="fl">500</span>,</span>
 <span>  tol <span class="op">=</span> <span class="fl">1e-06</span>,</span>
 <span>  guess_rate <span class="op">=</span> <span class="fl">0.5</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -102,8 +102,11 @@ component. One of "exgaussian" (default), "lognormal", or "invgaussian"</p></dd>
 via mixture modeling, "robust" for non-parametric robust estimation using
 median and IQR/MAD-based variance, or "simple" for standard moment
 calculation. The "robust" method is faster and requires no distributional
-assumptions, but note that the EZ equations were derived for mean and
-variance, so using median may introduce some bias for skewed distributions.</p></dd>
+assumptions, but its moments are not the mean and variance the EZ
+equations were derived for. For right-skewed RTs the median lies below the
+mean and (IQR/1.349)^2 below the variance, so the EZ estimates are offset
+systematically, not just noisier: a larger drift rate and a smaller
+boundary separation than the same data give with "mixture".</p></dd>
 
 
 <dt id="arg-robust-scale">robust_scale<a class="anchor" aria-label="anchor" href="#arg-robust-scale"></a></dt>
@@ -145,7 +148,10 @@ contaminant proportions. Default is 0.5</p></dd>
 
 
 <dt id="arg-maxit">maxit<a class="anchor" aria-label="anchor" href="#arg-maxit"></a></dt>
-<dd><p>Integer. Maximum number of EM iterations. Default is 100</p></dd>
+<dd><p>Integer. Maximum number of EM iterations. Default is 500. The
+EM converges slowly when the contaminant proportion is close to zero, and
+a cell that reaches <code>maxit</code> without converging falls back to robust
+moments with a warning.</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>

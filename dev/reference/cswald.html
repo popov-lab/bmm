@@ -72,9 +72,11 @@ automatically.</p></dd>
 <dd><p>A named list of link functions for the model parameters.
 Available parameters depend on the version: "simple" has <code>drift</code>, <code>bound</code>,
 <code>ndt</code>, and <code>s</code>; "crisk" additionally has <code>zr</code>. Default links are "log" for
-most parameters and "logit" for <code>zr</code>. For positive parameters, "softplus"
-is available as an alternative to "log" that grows linearly for large
-values and avoids the numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>. A name that is not a
+<code>bound</code>, <code>ndt</code> and <code>s</code>, and "logit" for <code>zr</code>. <code>drift</code> has a "log" link in
+"simple", where it is positive, and an "identity" link in "crisk", where
+it can be negative, as in <code><a href="ddm.html">ddm()</a></code> and <code><a href="ezdm.html">ezdm()</a></code>. For positive parameters,
+"softplus" is available as an alternative to "log" that grows linearly for
+large values and avoids the numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>. A name that is not a
 parameter of the model is an error, and a link that allows values the
 default link excludes (e.g. "identity" for a positive parameter) is a
 warning.</p></dd>
@@ -94,7 +96,8 @@ by 2.</p></li>
 types as arising from racing accumulators toward opposite boundaries.
 Better suited for tasks with substantial error rates. The <code>bound</code>
 parameter represents the total boundary separation, consistent with
-the diffusion model parameterization.</p></li>
+the diffusion model parameterization. <code>zr</code> is fixed at 0 on its
+logit scale (an unbiased <code>zr = 0.5</code>) unless you give it a formula.</p></li>
 </ul><p>For more details, see Miller et al. (2018).</p></dd>
 
 
@@ -119,7 +122,7 @@ the diffusion model parameterization.</p></li>
 </ul></li>
 </ul><ul><li><p>The response variable should be passed numerically: 0 = lower response, 1 = upper response</p></li>
 </ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>drift</code>: drift rate</p></li>
-<li><p><code>bound</code>: boundary (distance from starting point to correct boundary)</p></li>
+<li><p><code>bound</code>: boundary (distance from starting point to correct boundary, half the boundary separation <code>bound</code> of version "crisk", ddm() and ezdm())</p></li>
 <li><p><code>ndt</code>: non-decision time</p></li>
 <li><p><code>s</code>: diffusion constant</p></li>
 </ul></li>

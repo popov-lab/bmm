@@ -506,8 +506,11 @@ the Wiener process. See
 [`?ezdm_summary_stats`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
 for details.
 
-When the EM fails to converge, it usually means too few trials or bounds
-that do not fit the data well.
+When the EM fails to converge, it usually means too few trials, bounds
+that do not fit the data well, or a contaminant proportion close to
+zero, where the EM converges slowly. In the last case the warning says
+that the EM stopped at `maxit` (default 500), and a larger `maxit`
+usually lets it converge.
 [`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
 then returns `NA` for every trial of the group, and
 `attr(result, "diagnostics")$converged` is `FALSE`.

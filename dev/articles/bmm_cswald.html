@@ -272,6 +272,12 @@ standard diffusion model.</p>
 <p>The <code>cswald</code> model in <code>bmm</code> is related to but distinct from the full Wiener
 diffusion model available in <code><a href="https://paulbuerkner.com/brms/reference/brmsfamily.html" class="external-link">brms::wiener()</a></code>. Key differences:</p>
 <table class="table">
+<colgroup>
+<col width="16%">
+<col width="30%">
+<col width="28%">
+<col width="25%">
+</colgroup>
 <thead><tr class="header">
 <th>Feature</th>
 <th>cswald (simple)</th>
@@ -288,7 +294,7 @@ diffusion model available in <code><a href="https://paulbuerkner.com/brms/refere
 <tr class="even">
 <td>Starting point</td>
 <td>Fixed (unbiased)</td>
-<td>Estimated</td>
+<td>Fixed (unbiased) by default; estimated with a <code>zr</code> formula</td>
 <td>Estimated</td>
 </tr>
 <tr class="odd">

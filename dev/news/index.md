@@ -795,6 +795,7 @@
   for uncertainty on the scale you asked for. A new section covers
   models with a multinomial family
   ([\#512](https://github.com/popov-lab/bmm/issues/512)).
+
 - New online
   [article](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.html)
   on testing hypotheses and comparing models: testing effects on a
@@ -805,8 +806,40 @@
   cross-validation and Bayes factors
   ([\#308](https://github.com/popov-lab/bmm/issues/308)).
 
+- [`?ddm`](https://popov-lab.github.io/bmm/dev/reference/ddm.md),
+  [`?ezdm`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md) and
+  [`?cswald`](https://popov-lab.github.io/bmm/dev/reference/cswald.md)
+  now give the scale of `zr`:
+  [`ddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm.md) and
+  `cswald(version = "crisk")` fix it at 0 on its logit scale, an
+  unbiased 0.5, and
+  [`?ddm`](https://popov-lab.github.io/bmm/dev/reference/ddm.md)
+  explains why response-coded data need `zr` estimated.
+  [`?cswald`](https://popov-lab.github.io/bmm/dev/reference/cswald.md)
+  says that `drift` has a log link in `"simple"` and an identity link in
+  `"crisk"`, and that the `"simple"` `bound` is half the boundary
+  separation.
+  [`?ezdm_summary_stats`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+  says that `method = "robust"` gives larger drift and smaller boundary
+  estimates than `"mixture"`
+  ([\#540](https://github.com/popov-lab/bmm/issues/540)).
+
 #### Other changes
 
+- [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+  and
+  [`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
+  now run up to 500 EM iterations (`maxit`) instead of 100. Cells with
+  almost no contaminants can need more than 100; they fell back to
+  robust moments in
+  [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+  and to `NA` probabilities in
+  [`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md),
+  which a filter such as `contam_prob <= 0.5` drops entirely. Such cells
+  now get mixture-based values, so summary statistics and flags from
+  earlier runs can differ for them. The warning now says when the EM
+  stopped at `maxit`. Pass `maxit = 100` to reproduce earlier results
+  ([\#540](https://github.com/popov-lab/bmm/issues/540)).
 - [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
   (formerly
   [`supported_models()`](https://popov-lab.github.io/bmm/dev/reference/supported_models.md))

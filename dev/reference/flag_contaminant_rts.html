@@ -72,7 +72,7 @@ contamination probabilities, making it compatible with <code><a href="https://dp
 <span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"min"</span>, <span class="st">"max"</span><span class="op">)</span>,</span>
 <span>  init_contaminant <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  max_contaminant <span class="op">=</span> <span class="fl">0.5</span>,</span>
-<span>  maxit <span class="op">=</span> <span class="fl">100</span>,</span>
+<span>  maxit <span class="op">=</span> <span class="fl">500</span>,</span>
 <span>  tol <span class="op">=</span> <span class="fl">1e-06</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -107,7 +107,8 @@ exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.</p></
 
 
 <dt id="arg-maxit">maxit<a class="anchor" aria-label="anchor" href="#arg-maxit"></a></dt>
-<dd><p>Integer. Maximum EM iterations. Default 100.</p></dd>
+<dd><p>Integer. Maximum EM iterations. Default 500. A group whose EM
+reaches <code>maxit</code> without converging gets <code>NA</code> probabilities and a warning.</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
@@ -117,9 +118,12 @@ exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.</p></
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Numeric vector of posterior contamination probabilities P(contaminant
-| RT), with a <code>"diagnostics"</code> attribute containing a one-row data.frame
-with columns: <code>mixture_params</code> (list), <code>contaminant_prop</code>, <code>converged</code>,
-<code>iterations</code>, <code>loglik</code>, <code>n_trials</code>, <code>distribution</code>, <code>method</code>.</p>
+| RT), <code>NA</code> for every trial of a group whose EM did not converge (a
+threshold such as <code>filter(contam_prob &lt;= 0.5)</code> drops that whole group, so
+check for <code>NA</code> first), with a <code>"diagnostics"</code> attribute containing a
+one-row data.frame with columns: <code>mixture_params</code> (list),
+<code>contaminant_prop</code>, <code>converged</code>, <code>iterations</code>, <code>loglik</code>, <code>n_trials</code>,
+<code>distribution</code>, <code>method</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

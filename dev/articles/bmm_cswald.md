@@ -155,15 +155,15 @@ Wiener diffusion model available in
 [`brms::wiener()`](https://paulbuerkner.com/brms/reference/brmsfamily.html).
 Key differences:
 
-| Feature        | cswald (simple)  | cswald (crisk)    | brms::wiener      |
-|----------------|------------------|-------------------|-------------------|
-| Boundaries     | Single           | Both              | Both              |
-| Starting point | Fixed (unbiased) | Estimated         | Estimated         |
-| Bound param    | Half separation  | Full separation   | Full separation   |
-| Drift sign     | Positive only    | Positive/negative | Positive/negative |
-| Best for       | High accuracy    | Moderate accuracy | Any accuracy      |
-| Computation    | Fast             | Moderate          | Slower            |
-| Parameters     | 3-4              | 4-5               | 4-5               |
+| Feature | cswald (simple) | cswald (crisk) | brms::wiener |
+|----|----|----|----|
+| Boundaries | Single | Both | Both |
+| Starting point | Fixed (unbiased) | Fixed (unbiased) by default; estimated with a `zr` formula | Estimated |
+| Bound param | Half separation | Full separation | Full separation |
+| Drift sign | Positive only | Positive/negative | Positive/negative |
+| Best for | High accuracy | Moderate accuracy | Any accuracy |
+| Computation | Fast | Moderate | Slower |
+| Parameters | 3-4 | 4-5 | 4-5 |
 
 For tasks with low error rates, the `cswald` model provides equivalent
 inferences with faster computation. When comparing results across model

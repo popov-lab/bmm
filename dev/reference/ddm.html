@@ -95,7 +95,7 @@ is an error, and a link that allows values the default link excludes
 </ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>drift</code>: Drift rate = Average rate of evidence accumulation of the decision processes</p></li>
 <li><p><code>bound</code>: Boundary separation = Distance between the decision boundaries that need to be reached</p></li>
 <li><p><code>ndt</code>: Non-decision time = Additional time required beyond the evidence accumulation process</p></li>
-<li><p><code>zr</code>: Relative starting point = Starting point between the decision thresholds relative to the upper bound.</p></li>
+<li><p><code>zr</code>: Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, &gt; 0.5 = biased towards the upper response).</p></li>
 </ul></li>
 <li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>zr</code> = 0</p></li>
 <li><p><code>mu</code> = 0</p></li>
@@ -124,8 +124,16 @@ is an error, and a link that allows values the default link excludes
     <h2 id="default-behavior">Default behavior<a class="anchor" aria-label="anchor" href="#default-behavior"></a></h2>
 
 
-<p>By default, <code>zr</code> is fixed at 0. If you want to estimate <code>zr</code>, add a formula
-for <code>zr</code> in your <code><a href="bmmformula.html">bmf()</a></code> call.</p>
+<p>By default, <code>zr</code> is fixed at 0 on its logit link scale, that is at an
+unbiased starting point of <code>zr = 0.5</code>. If you want to estimate <code>zr</code>, add a
+formula for <code>zr</code> in your <code><a href="bmmformula.html">bmf()</a></code> call. Estimates of <code>zr</code> are on the logit
+scale too, so use <code><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis()</a></code> to read them as proportions.</p>
+<p>With accuracy-coded responses (1 = correct, 0 = error) the unbiased default
+is the usual assumption. With response-coded data (1 and 0 for the two
+response options, e.g. "word" and "nonword"), a bias towards one option
+moves the starting point; with <code>zr</code> fixed, that bias is absorbed by the
+other parameters instead. Estimate <code>zr</code> for response-coded data, e.g.
+<code>zr ~ 1</code>, and code <code>drift</code> so that its sign follows the stimulus.</p>
     </div>
 
     <div class="section level2">
