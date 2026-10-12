@@ -685,6 +685,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
                 restrictions = NULL, links = "logit", ...) {
   call <- match.call()
   stop_missing_args()
+  # NULL means the default, as in the other model constructors
+  links <- links %||% "logit"
   # a named list is validated against the parameters once the model exists
   stopif(
     !is.list(links) && !is.character(links),

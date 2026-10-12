@@ -400,6 +400,11 @@ test_that("the links argument of mpt() refuses what set_links() refuses", {
     "one link function for the whole model"
   )
   expect_error(mpt(trees, tree_id = "item_type", links = 1), "named list")
+  # NULL takes the default link, as in the other model constructors
+  expect_equal(
+    mpt(trees, tree_id = "item_type", links = NULL)$links,
+    list(D = "logit", g = "logit")
+  )
 
   # simplex members and their stick-breaking components carry identity links
   tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
