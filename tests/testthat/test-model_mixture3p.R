@@ -100,6 +100,17 @@ test_that("rmixture3p() draws from dmixture3p()", {
   compare(mu = c(0, 2, -1.5), kappa = 6, p_mem = 0.6, p_nt = 0.2, tau = 1.5)
 })
 
+test_that("rmixture3p() is exact at high precision", {
+  # the grid-based sampler this replaces bounded the density on a grid and
+  # missed the peak between grid points: an SD of 0.01067 at this mu (#434)
+  # 1e-4 is about six Monte Carlo standard errors of the SD at 2e5 draws
+  withr::local_seed(434)
+  draws <- rmixture3p(2e5, mu = 0.0087, kappa = 1e4, p_mem = 1, p_nt = 0)
+  expect_lt(abs(sd(draws) - 0.01), 1e-4)
+  draws <- rmixture3p(2e5, mu = c(0.0087, 2, -1.5), kappa = 1e4, p_mem = 1, p_nt = 0)
+  expect_lt(abs(sd(draws) - 0.01), 1e-4)
+})
+
 test_that("the capacity versions separate storage from swapping", {
   x <- seq(-pi, pi, length.out = 30)
   nt <- c(2, -1.5, 1, 0.5, -2, 2.5, -0.7)
