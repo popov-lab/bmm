@@ -50,7 +50,10 @@ Fougnie et al., 2012). This adds the parameter \code{tau}, and the likelihood
 integrates the Fisher information \code{J} of a memory representation over
 \code{gamma(mean = J(kappa), scale = tau)}. \code{kappa} keeps its meaning as the
 mean precision, so \code{tau -> 0} recovers the constant-precision model.
-The integral is evaluated by quadrature, which costs about ten times as
+Under \code{version = "slot_averaging"}, the precision of an item held in \code{j}
+slots is the sum of \code{j} independent slot draws,
+\code{gamma(shape = j * J(kappa) / tau, scale = tau)}, so its variance grows
+with \code{j}. The integral is evaluated by quadrature, which costs about ten times as
 much per gradient at the default \code{vp_nodes}; expect a larger factor in wall
 time, since the posterior geometry also needs more leapfrog steps. \code{tau} is
 the parameter that needs the most data, and is often only weakly identified

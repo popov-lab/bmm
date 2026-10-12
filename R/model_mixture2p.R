@@ -174,7 +174,10 @@
 #'   integrates the Fisher information `J` of a memory representation over
 #'   `gamma(mean = J(kappa), scale = tau)`. `kappa` keeps its meaning as the
 #'   mean precision, so `tau -> 0` recovers the constant-precision model.
-#'   The integral is evaluated by quadrature, which costs about ten times as
+#'   Under `version = "slot_averaging"`, the precision of an item held in `j`
+#'   slots is the sum of `j` independent slot draws,
+#'   `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance grows
+#'   with `j`. The integral is evaluated by quadrature, which costs about ten times as
 #'   much per gradient at the default `vp_nodes`; expect a larger factor in wall
 #'   time, since the posterior geometry also needs more leapfrog steps. `tau` is
 #'   the parameter that needs the most data, and is often only weakly identified
