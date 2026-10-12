@@ -356,8 +356,10 @@
     "The variable_precision argument must be either TRUE or FALSE."
   )
   stopif(
-    vp_nodes < 41 || vp_nodes %% 2 == 0,
-    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
+    !isTRUE(is.numeric(vp_nodes) && length(vp_nodes) == 1 &&
+      vp_nodes >= 41 && vp_nodes %% 2 == 1),
+    "vp_nodes must be a single, whole, odd number of at least 41, but is \\
+    {collapse_comma(vp_nodes)}."
   )
 }
 

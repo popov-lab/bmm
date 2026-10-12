@@ -271,7 +271,13 @@ test_that(".circmix_check_variable_precision() rejects unusable node counts", {
   expect_error(.circmix_check_variable_precision(NA, 41L), "TRUE or FALSE")
   expect_error(.circmix_check_variable_precision(FALSE, 21L), "at least 41")
   expect_error(.circmix_check_variable_precision(FALSE, 42L), "at least 41")
+  # the model stores as.integer(vp_nodes), so 42.5 would become an even 42
+  expect_error(.circmix_check_variable_precision(FALSE, 42.5), "at least 41")
+  expect_error(.circmix_check_variable_precision(FALSE, 41.5), "at least 41")
+  expect_error(.circmix_check_variable_precision(FALSE, NA), "at least 41")
+  expect_error(.circmix_check_variable_precision(FALSE, c(41, 43)), "at least 41")
   expect_silent(.circmix_check_variable_precision(TRUE, 81L))
+  expect_silent(.circmix_check_variable_precision(TRUE, 43))
 })
 
 test_that(".circmix_prep_nt() returns the covariates in numeric order", {
