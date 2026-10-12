@@ -421,10 +421,14 @@ test_that("check_model.rdm_custom errors on category names containing underscore
 # check_formula tests
 # -----------------------------------------------------------------------------
 
-test_that("check_formula.rdm warns only where s has population-level terms", {
+# the warning is about the population-level design of s being able to absorb a
+# common scale, so a factor without an intercept warns while a numeric
+# predictor without one does not
+test_that("check_formula.rdm warns only where the design of s can absorb a common scale", {
   model <- rdm(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(rt = rep(c(0.5, 0.6), 5), response = rep(c(1, 2), 5),
-                    cond = rep(c("a", "b"), 5), id = rep(1:2, each = 5))
+                    cond = rep(c("a", "b"), 5), id = rep(1:2, each = 5),
+                    x = seq(-1, 1, length.out = 10))
   warns <- function(f) {
     checked <- suppressMessages(check_model(model, data = dat, formula = f))
     suppressMessages(check_formula(checked, dat, f))
@@ -438,7 +442,14 @@ test_that("check_formula.rdm warns only where s has population-level terms", {
     warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 0 + cond)),
     "only their ratios are identified"
   )
+  expect_warning(
+    warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ (1 | id))),
+    "only their ratios are identified"
+  )
   expect_no_warning(warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1)))
+  expect_no_warning(
+    warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 0 + x))
+  )
   expect_no_warning(
     warns(bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1, s ~ 0 + (1 | id)))
   )

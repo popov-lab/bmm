@@ -210,13 +210,14 @@ The likelihood is invariant to scaling every drift rate, \code{gap}, \code{sp} a
 Freeing \code{s} estimates that scale ray rather than a new quantity, whether
 through an intercept (\code{s ~ 1}, \code{s ~ condition}) or through one coefficient
 per cell (\code{s ~ 0 + condition}: cell-means coding has no reference cell, so
-the common scale stays free), and \code{check_formula()} warns in both cases. To
-estimate the ratio of \code{s} between conditions, pin one cell with a constant
-prior, e.g. \code{s ~ 0 + condition} with
+the common scale stays free); \code{check_formula()} warns whenever the
+population-level terms of \code{s} can absorb such a common factor. To estimate
+the ratio of \code{s} between conditions, pin one cell with a constant prior,
+e.g. \code{s ~ 0 + condition} with
 \code{prior(constant(0), class = "b", coef = "conditionA", dpar = "s")}, or keep
-\code{s} fixed and put the condition on the drift rates. Group-level terms alone
-(\code{s ~ 0 + (1 | id)}) do not free the scale, because their hierarchical
-prior is centred on the fixed value.
+\code{s} fixed and put the condition on the drift rates. A numeric predictor
+without an intercept (\code{s ~ 0 + x}) pins \code{s = 1} at \code{x = 0} and is
+identified.
 }
 
 \examples{

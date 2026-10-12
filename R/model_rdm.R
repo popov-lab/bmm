@@ -245,13 +245,14 @@ settable_link_functions.rdm <- function(model) {
 #' Freeing `s` estimates that scale ray rather than a new quantity, whether
 #' through an intercept (`s ~ 1`, `s ~ condition`) or through one coefficient
 #' per cell (`s ~ 0 + condition`: cell-means coding has no reference cell, so
-#' the common scale stays free), and `check_formula()` warns in both cases. To
-#' estimate the ratio of `s` between conditions, pin one cell with a constant
-#' prior, e.g. `s ~ 0 + condition` with
+#' the common scale stays free); `check_formula()` warns whenever the
+#' population-level terms of `s` can absorb such a common factor. To estimate
+#' the ratio of `s` between conditions, pin one cell with a constant prior,
+#' e.g. `s ~ 0 + condition` with
 #' `prior(constant(0), class = "b", coef = "conditionA", dpar = "s")`, or keep
-#' `s` fixed and put the condition on the drift rates. Group-level terms alone
-#' (`s ~ 0 + (1 | id)`) do not free the scale, because their hierarchical
-#' prior is centred on the fixed value.
+#' `s` fixed and put the condition on the drift rates. A numeric predictor
+#' without an intercept (`s ~ 0 + x`) pins `s = 1` at `x = 0` and is
+#' identified.
 #' @note Both versions describe the same response type (a categorical winner in
 #'   a choice-RT race), so they live in one constructor rather than separate
 #'   model functions: `"simple"` is an accuracy-coded convenience layer (correct
@@ -360,24 +361,33 @@ check_data.rdm_custom <- function(model, data, formula) {
 ############################################################################# !
 
 # Scaling drift, gap, sp and s by a common factor leaves the likelihood exactly
-# unchanged, so any population-level term for s, an intercept or one
-# coefficient per cell, slides along that ray together with the drifts and the
-# thresholds and none of them is identified (cell-means coding has no reference
-# cell to pin the scale). Group-level terms alone leave it pinned, because their
-# prior is centred on the fixed value.
+# unchanged, so s slides along that ray together with the drifts and the
+# thresholds whenever its population-level design can represent a constant: an
+# intercept, or a factor in cell-means coding (no reference cell pins the
+# scale). A numeric predictor without an intercept pins s = 1 at zero, and
+# group-level terms alone are held near the fixed value by their prior, so
+# neither gets the warning.
+.rdm_s_scale_free <- function(s_form, data) {
+  s_terms <- stats::terms(s_form)
+  labels <- attr(s_terms, "term.labels")
+  labels <- labels[!grepl("|", labels, fixed = TRUE)]
+  intercept <- attr(s_terms, "intercept") == 1
+  if (length(labels) == 0) return(intercept)
+  X <- stats::model.matrix(stats::reformulate(labels, intercept = intercept), data)
+  qr(cbind(1, X))$rank == qr(X)$rank
+}
+
 #' @export
 check_formula.rdm <- function(model, data, formula) {
   s_form <- formula[["s"]]
   warnif(
-    is_formula(s_form) && !is_constant(s_form) &&
-      (has_intercept(s_form) ||
-         length(.vars_outside_bars(s_form[[length(s_form)]])) > 0),
-    "The formula for 's' has population-level terms, so 's' is estimated on \\
-    the same scale as the drift rates, 'gap' and 'sp': multiplying all of them \\
-    by a common factor leaves the likelihood unchanged, so only their ratios \\
-    are identified. Either fix 's' (the default, or to another value with \\
-    s = log(0.9) in bmf()) or pin one cell with a constant prior to estimate \\
-    the ratio of 's' between conditions, e.g. s ~ 0 + condition with \\
+    is_formula(s_form) && !is_constant(s_form) && .rdm_s_scale_free(s_form, data),
+    "The formula for 's' lets 's' take any common scale with the drift rates, \\
+    'gap' and 'sp': multiplying all of them by a common factor leaves the \\
+    likelihood unchanged, so only their ratios are identified. Either fix 's' \\
+    (the default, or to another value with s = log(0.9) in bmf()) or pin one \\
+    cell with a constant prior to estimate the ratio of 's' between \\
+    conditions, e.g. s ~ 0 + condition with \\
     prior(constant(0), class = 'b', coef = 'conditionA', dpar = 's')."
   )
   NextMethod("check_formula")
