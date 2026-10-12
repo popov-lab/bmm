@@ -1102,3 +1102,23 @@ test_that("posterior_predict_lba_simple() returns with a fixed s and frequent ne
   expect_true(all(rt > 0.2))
 })
 
+
+test_that("dlba() and plba() return 0 or NA at and below the non-decision time for every distribution", {
+  drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),
+                 lognormal = c(0.5, 0.3))
+  for (dist in names(drifts)) {
+    drift <- drifts[[dist]]
+    args <- list(drift = drift, gap = 0.5, sp = 0.3, ndt = 0.2, distribution = dist)
+    d <- do.call(dlba, c(list(c(0.1, 0.2, 0.3), 1L), args))
+    expect_equal(d[1:2], c(0, 0), label = dist)
+    expect_true(is.finite(d[3]) && d[3] > 0, label = dist)
+    d <- do.call(dlba, c(list(c(0.5, 0.5), c(1L, NA)), args))
+    expect_true(is.finite(d[1]) && is.na(d[2]), label = dist)
+    d <- do.call(dlba, c(list(c(NA, 0.5), 1L), args))
+    expect_true(is.na(d[1]) && is.finite(d[2]), label = dist)
+    p <- do.call(plba, c(list(c(0.1, 0.2, 0.3)), args))
+    expect_equal(p[1:2], c(0, 0), label = dist)
+    expect_true(p[3] > 0 && p[3] < 1, label = dist)
+    expect_equal(do.call(qlba, c(list(0), args)), 0.2 + 1e-6, tolerance = 1e-5, label = dist)
+  }
+})

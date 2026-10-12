@@ -108,8 +108,11 @@ plba <- function(q, drift, gap, sp, ndt, s = 1,
   t <- q - ndt
   b <- gap + sp
   A <- sp
+  # the gamma and Frechet kernels error on t <= 0; those probabilities are 0 below
+  t_kernel <- t
+  t_kernel[!is.na(t) & t <= 0] <- NA_real_
   log_surv <- Reduce(`+`, lapply(drift, function(v) {
-    .lba_lsurv_single(t, v, b, A, s, distribution)
+    .lba_lsurv_single(t_kernel, v, b, A, s, distribution)
   }))
   p_total <- -expm1(log_surv)
   p_total[!is.na(t) & t <= 0] <- 0
@@ -131,6 +134,9 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   if (!lower.tail) p <- 1 - p
 
   vapply(p, function(pi) {
+    # a Frechet p(ndt + 1e-6) is already above 0, so the root search would extend
+    # into the flat region below ndt and stop anywhere in it
+    if (pi <= 0) return(ndt)
     stats::uniroot(
       function(q) {
         plba(q, drift = drift, gap = gap, sp = sp, ndt = ndt, s = s,
@@ -150,11 +156,15 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   A <- rep_len(A, n)
   s <- rep_len(s, n)
   t <- rt - rep_len(ndt, n)
-  out <- .lba_lpdf_single(t, drift[response], b, A, s, distribution)
+  # the gamma and Frechet kernels error on t <= 0, so those times never reach them
+  masked <- (!is.na(t) & t <= 0) | is.na(response)
+  t_kernel <- t
+  t_kernel[masked] <- NA_real_
+  out <- .lba_lpdf_single(t_kernel, drift[response], b, A, s, distribution)
   out[is.na(response)] <- NA_real_
   for (j in seq_along(drift)) {
     i <- which(response != j)
-    out[i] <- out[i] + .lba_lsurv_single(t[i], drift[j], b[i], A[i], s[i], distribution)
+    out[i] <- out[i] + .lba_lsurv_single(t_kernel[i], drift[j], b[i], A[i], s[i], distribution)
   }
   out[!is.na(t) & t <= 0] <- -Inf
   if (log) out else exp(out)
