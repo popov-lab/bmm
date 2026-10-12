@@ -42,9 +42,10 @@ Your PR also needs:
 
 - **Tests** for new behaviour, in `tests/testthat/`. Test what your code does,
   not how R subsets a data frame.
-- **A NEWS bullet** under `# bmm (development version)` for anything users can
-  see. Keep it short: what changes for the user and what they should do. Do not
-  describe how the fix works.
+- **A NEWS bullet** for anything users can see, under the development heading of
+  the branch you target: `# bmm (development version)` on `develop`,
+  `# bmm 1.5.0 (development)` on `dev-1.5.0`. Keep it short: what changes for the
+  user and what they should do. Do not describe how the fix works.
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
   [developer notes](https://venpopov.com/bmm/dev/dev-notes/) and follow the
