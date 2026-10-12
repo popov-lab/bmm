@@ -135,7 +135,10 @@ three rules apply:
 
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data layout a
-model expects. Internal functions are not covered.
+model expects. Internal functions are not covered. Fits saved by an earlier
+release are covered: they keep working with `update()` and the extraction
+functions, through `restructure()` where they need converting, or the NEWS
+bullet says they must be refitted.
 
 If your PR deprecates something:
 
