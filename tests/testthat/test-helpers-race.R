@@ -49,11 +49,13 @@ test_that("race_time_range() brackets power-law tails for race_expected_time()",
   expect_true(all(exp(log_surv(range[2])) * range[2] <= 1e-12))
   expect_true(all(-expm1(log_surv(range[1])) <= 1e-12) || range[1] <= range[2] * 1e-12)
   expect_equal(race_expected_time(log_surv, range[1], range[2]), 1 / (k - 1), tolerance = 1e-6)
+  expect_false(attr(range, "truncated"))
 })
 
 test_that("race_time_range() stops at t_max for a survivor without a finite mean", {
   log_surv <- function(t) matrix(-log1p(t), nrow = 1)
   expect_equal(race_time_range(log_surv, t_max = 1e5)[2], 1e5)
+  expect_true(attr(race_time_range(log_surv, t_max = 1e5), "truncated"))
   nan_surv <- function(t) matrix(NaN, nrow = 1)
   expect_equal(race_time_range(nan_surv, t_max = 1e3)[2], 1e3)
 })
