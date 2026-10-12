@@ -140,6 +140,11 @@ release are covered: they keep working with `update()` and the extraction
 functions, through `restructure()` where they need converting, or the NEWS
 bullet says they must be refitted.
 
+A changed default has no old form to warn about. Announce it as a breaking
+change (rule 3) and say in NEWS how to get the old default back. For a changed
+data layout, accept both layouts for the window and give the old and the new
+column names as `what` and `with`.
+
 If your PR deprecates something:
 
 - Keep the old form working by passing it on to the new one. If the new form
