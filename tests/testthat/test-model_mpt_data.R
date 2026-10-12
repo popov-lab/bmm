@@ -217,6 +217,18 @@ test_that("mpt_long_data reports unusable input", {
   expect_error(mpt_long_data(repeated, model, id = "subject"), "repeated values")
 })
 
+test_that("mpt_long_data refuses duplicated column names", {
+  model <- eqn_2htm_model()
+  repeated <- cbind(wide_2htm(), hit = c(1, 1))
+  expect_error(mpt_long_data(repeated, model), "duplicated column names.*hit")
+  positional <- unname(as.matrix(wide_2htm()))
+  colnames(positional) <- c("a", "a", "b", "b")
+  expect_error(
+    mpt_long_data(positional, model, columns = "mptinr"),
+    "duplicated column names.*a.*b"
+  )
+})
+
 test_that("mpt_long_data names every missing count column", {
   model <- eqn_2htm_model()
   err <- expect_error(

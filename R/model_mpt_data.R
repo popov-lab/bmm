@@ -150,6 +150,12 @@ mpt_long_data <- function(wide, model, id = NULL,
     data."
   )
   wide <- as.data.frame(wide, stringsAsFactors = FALSE)
+  stopif(
+    anyDuplicated(names(wide)) > 0,
+    "The wide data have duplicated column names: \\
+    {collapse_comma(unique(names(wide)[duplicated(names(wide))]))}. Each \\
+    column is read once, so a second column of the same name would be dropped."
+  )
   stopif(nrow(wide) == 0, "The wide data contain no rows.")
   stopif(
     !is.null(id) && !id %in% names(wide),
