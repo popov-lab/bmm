@@ -150,7 +150,10 @@ If your PR deprecates something:
 - Deprecate in a minor release (1.5.0, 1.6.0), not in a patch release, so that
   users meet the warning before the release that may remove the form.
 - Keep the old form working by passing it on to the new one. If the new form
-  gives a different result, say so in `details`.
+  gives a different result, say so in `details`. Keep a deprecated function
+  exported and mark its help page as deprecated (title `Deprecated: use new()`,
+  `@keywords deprecated`). If a call gives both the old and the new argument,
+  stop and name both.
 - Warn with `warn_deprecated(what, with, since = "1.5.0")` where the old form
   is detected. `what` and `with` are the old and the new code as users would
   type it; pass `with = NULL` when nothing replaces the old form. The message
