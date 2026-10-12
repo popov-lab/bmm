@@ -76,34 +76,40 @@ test_that(".circmix_vp_ld() is a normalised density on the circle", {
   expect_equal(total$value, 1, tolerance = 1e-6)
 })
 
-# Near the threshold the Simpson weights alone sum to about exp(2.5e-4). That
-# offset is the same for every response, so it acts as a log prior on tau and
-# moved its maximum-likelihood estimate by 0.13 standard errors at N = 5000.
-test_that(".circmix_vp_ld() is a normalised density at the shape threshold", {
-  tau <- .circmix_J(10)
-  total <- stats::integrate(
-    function(y) {
-      n <- length(y)
-      exp(.circmix_vp_ld(
-        matrix(cos(y)), matrix(log(0.8), nrow = n), rep(log(0.2), n),
-        rep(10, n), rep(tau, n)
-      ))
-    },
-    -pi, pi,
-    rel.tol = 1e-10
-  )
-  expect_equal(total$value, 1, tolerance = 1e-8)
+# The grid follows each component's integrand rather than the prior, so the
+# density integrates to one only up to the quadrature error. The part of that
+# error that depends on the shape alone acts as a log prior on tau: an offset of
+# 2.5e-4 moved the maximum-likelihood estimate of log tau by 0.13 standard
+# errors at N = 5000.
+test_that(".circmix_vp_ld() is a normalised density from the shape threshold up", {
+  total <- function(shape) {
+    tau <- .circmix_J(10) / shape
+    stats::integrate(
+      function(y) {
+        n <- length(y)
+        exp(.circmix_vp_ld(
+          matrix(cos(y)), matrix(log(0.8), nrow = n), rep(log(0.2), n),
+          rep(10, n), rep(tau, n)
+        ))
+      },
+      -pi, pi,
+      rel.tol = 1e-12
+    )$value
+  }
+  expect_lt(abs(total(0.75) - 1), 1e-5)
+  expect_lt(abs(total(1) - 1), 1e-6)
 })
 
 # Integrates in log J from J = 1e-12 rather than from a gamma quantile: for a
 # response far from the target the integrand peaks far below the prior's bulk,
 # where a quantile bound cuts it off (and returns -Inf at large kappa).
-vp_reference <- function(y, kappa, tau, p_mem) {
+vp_reference <- function(y, kappa, tau, p_mem, mu = 0, w = 1) {
   shape <- .circmix_J(kappa) / tau
   integrand <- function(t) {
     J <- exp(t)
     k <- .circmix_kappa(J)
-    density <- (p_mem * exp(k * cos(y) - .circmix_log_besselI0(k)) + (1 - p_mem)) / (2 * pi)
+    memory <- Reduce(`+`, Map(function(m, wm) wm * exp(k * cos(y - m) - .circmix_log_besselI0(k)), mu, w))
+    density <- (p_mem * memory + (1 - p_mem)) / (2 * pi)
     density * stats::dgamma(J, shape = shape, scale = tau) * J
   }
   upper <- log(stats::qgamma(1e-20, shape, scale = tau, lower.tail = FALSE))
@@ -133,6 +139,32 @@ test_that(".circmix_vp_ld() matches adaptive integration from the shape threshol
       tolerances[[as.character(shape)]]
     )
   }
+})
+
+# Without a guess weight nothing masks the memory density of a response far
+# from the target, whose integrand peaks many prior SDs below E[log J]: the
+# capacity versions once an item holds a slot.
+test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
+  y <- c(0, 1, 2, pi)
+  expect_lt(max(abs(vp_errors(y, kappa = 200, shape = 10, p_mem = 1))), 1e-8)
+  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 100, p_mem = 1))), 1e-8)
+  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.75, p_mem = 1))), 2e-5)
+
+  # each component needs its own window when the components sit apart
+  tau <- .circmix_J(100) / 20
+  y <- c(0.3, 1.25, 2.4)
+  n <- length(y)
+  expect_lt(
+    max(abs(
+      .circmix_vp_ld(
+        cbind(cos(y), cos(y - 2.5)), matrix(log(c(0.7, 0.3)), n, 2, byrow = TRUE),
+        rep(-Inf, n), rep(100, n), rep(tau, n)
+      ) - vapply(y, vp_reference, numeric(1),
+        kappa = 100, tau = tau, p_mem = 1, mu = c(0, 2.5), w = c(0.7, 0.3)
+      )
+    )),
+    1e-8
+  )
 })
 
 test_that(".circmix_vp_ld() refuses shapes below 60 / nodes", {
@@ -174,6 +206,18 @@ test_that(".circmix_slot_averaging_ld() is a normalised density on the circle", 
     )
     expect_equal(total$value, 1, tolerance = 1e-6)
   }
+})
+
+test_that(".circmix_slot_averaging_ld() is accurate for far responses under variable precision", {
+  y <- c(1.5, 2, pi)
+  three_slots <- .circmix_kappa(3 * .circmix_J(20))
+  expect_lt(
+    max(abs(
+      slot_averaging_density(y, K = 3, set_size = 1, kappa = 20, tau = 2) -
+        vapply(y, vp_reference, numeric(1), kappa = three_slots, tau = 2, p_mem = 1)
+    )),
+    1e-8
+  )
 })
 
 test_that(".circmix_slot_averaging_ld() sums the information of the slots an item holds", {
@@ -441,11 +485,12 @@ circmix_stan_values <- function(data) {
       int NJ; vector[NJ] Jtest;
       int NTAU; vector[NTAU] tau; real kappa_vp; int nodes;
       real K_slots; int ss_slots;
+      vector[2] cosd_far; vector[2] logw_far; real kappa_far; int NFAR; vector[NFAR] tau_far;
     }
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
       real out_het; vector[NTAU] out_vp; vector[2] out_slots;
-      vector[NTAU] out_sa;
+      vector[NTAU] out_sa; vector[NFAR] out_far;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -462,6 +507,10 @@ circmix_stan_values <- function(data) {
                                               logk, dlogk, logJ_min, dlogJ);
       }
       out_slots = circmix_slots(K_slots, ss_slots);
+      for (i in 1:NFAR) {
+        out_far[i] = circmix_vp_ld(cosd_far, logw_far, negative_infinity(), kappa_far,
+                                   tau_far[i], nodes, logk, dlogk, logJ_min, dlogJ);
+      }
     }"
   )
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
@@ -488,6 +537,10 @@ test_that("the Stan and R implementations of the shared core agree", {
   Jtest <- c(1e-7, 1e-3, 0.5, 9.486, 500, 5e4, 1e7)
   kappa_het <- c(3, 12, 40)
   tau <- c(0, 0.5, 2, .circmix_J(10) / 0.75)
+  # far from both components and no guessing: each component's own window
+  cosd_far <- cos(2.9 - c(0, 1.2))
+  logw_far <- log(c(0.7, 0.3))
+  tau_far <- .circmix_J(200) / c(0.75, 10, 1000)
 
   stan <- circmix_stan_values(list(
     NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
@@ -495,7 +548,9 @@ test_that("the Stan and R implementations of the shared core agree", {
     NC = length(cosd), cosd = cosd, logw = logw, logw_guess = logw_guess,
     kappa_het = kappa_het, NKAP = length(kappa), kappa = kappa,
     NJ = length(Jtest), Jtest = Jtest, NTAU = length(tau), tau = tau,
-    kappa_vp = 10, nodes = 81L, K_slots = 3.5, ss_slots = 2L
+    kappa_vp = 10, nodes = 81L, K_slots = 3.5, ss_slots = 2L,
+    cosd_far = cosd_far, logw_far = logw_far, kappa_far = 200,
+    NFAR = length(tau_far), tau_far = tau_far
   ))
 
   n <- length(kappa)
@@ -524,6 +579,13 @@ test_that("the Stan and R implementations of the shared core agree", {
     tolerance = 1e-12
   )
   expect_equal(stan("out_slots"), unname(unlist(.circmix_slots(3.5, 2))))
+  expect_equal(
+    stan("out_far"),
+    vapply(tau_far, function(c_tau) {
+      .circmix_vp_ld(matrix(cosd_far, nrow = 1), matrix(logw_far, nrow = 1), -Inf, 200, c_tau)
+    }, numeric(1)),
+    tolerance = 1e-12
+  )
   expect_equal(
     stan("out_sa"),
     vapply(tau, function(c_tau) {

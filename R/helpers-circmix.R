@@ -136,19 +136,17 @@
 }
 
 # Marginalises the Fisher information of the memory components over
-# J ~ gamma(shape = J(kappa) / tau, scale = tau) on a composite Simpson grid in
-# log J. tau = 0 is the point mass at J(kappa), so rows with tau = 0 fall back
-# to the constant-precision density, which is why tau is the parameter
-# variable_precision frees. The nodes run from 12 to 6 sd(log J) =
-# sqrt(trigamma(shape)) around E[log J] = digamma(shape) + log(tau), wider below
-# because log J is left-skewed; the offsets are constants, so only the centre
-# and the width depend on parameters, and they do so smoothly. Below a shape of
-# 60 / nodes the left tail is too heavy for the grid: with 81 nodes the log
-# density holds to about 1e-5 from that threshold (0.74) up and to 2e-6 from
-# shape 1. The quadrature weights are renormalised to sum to one, which makes
-# the result a finite von Mises mixture and so a proper density. Unnormalised,
-# their sum differs from one by an amount that depends only on the shape and
-# acts as a log prior on tau.
+# J ~ gamma(shape = J(kappa) / tau, scale = tau). tau = 0 is the point mass at
+# J(kappa), so rows with tau = 0 fall back to the constant-precision density,
+# which is why tau is the parameter variable_precision frees. The density is
+# linear in the components, sum_k w_k I_k(y) + w_guess / (2 pi), and each I_k
+# is integrated on its own grid (.circmix_vp_component()). A grid shared by the
+# components and centred on the gamma prior misses the integrand of a response
+# far from a component, which peaks many prior SDs below E[log J]; without a
+# guess weight to mask it, that underestimated the log density by up to nats.
+# Below a shape of 60 / nodes the left tail of log J is too heavy for the grid:
+# with 81 nodes the log density holds to about 1e-5 from that threshold (0.74)
+# up, to 2e-6 from shape 1, and to 1e-9 from shape 10.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
@@ -165,22 +163,83 @@
     {min(shape[vp])}. Raise vp_nodes."
   )
 
-  centre <- digamma(shape[vp]) + log(tau[vp])
-  offsets <- seq(-12, 6, length.out = nodes) / 8
-  simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
-  t <- centre + outer(half_width[vp], offsets)
-  J <- exp(t)
-  lw <- t + stats::dgamma(J, shape = shape[vp], scale = tau[vp], log = TRUE) +
-    rep(simpson, each = length(vp))
-  ld <- vapply(seq_len(nodes), function(i) {
-    .circmix_ld(
-      cosd[vp, , drop = FALSE], logw[vp, , drop = FALSE], logw_guess[vp],
-      .circmix_kappa(J[, i], tab)
-    )
+  log_integral <- vapply(seq_len(ncol(cosd)), function(k) {
+    .circmix_vp_component(cosd[vp, k], shape[vp], tau[vp], nodes, tab)
   }, numeric(length(vp)))
-
-  out[vp] <- matrixStats::rowLogSumExps(lw + ld) - matrixStats::rowLogSumExps(lw)
+  memory <- matrixStats::rowLogSumExps(
+    logw[vp, , drop = FALSE] + matrix(log_integral, nrow = length(vp))
+  )
+  out[vp] <- matrixStats::rowLogSumExps(cbind(memory, logw_guess[vp] - log(2 * pi)))
   out
+}
+
+# log of the integral over J ~ gamma(shape, scale = tau) of one von Mises
+# component with cos(y - mu) = cos_d, on a composite Simpson grid in t = log J.
+# The grid is centred on the mode of the integrand, found by a fixed number of
+# damped Newton steps from the large-kappa mode (shape + 1/2) / (1/tau + 1 -
+# cos_d); a fixed count keeps the grid a smooth function of the parameters, and
+# four steps reach the mode to 1e-4 of the window scale from shape 0.5 to 1e6
+# and kappa 0.01 to 1e4 (the start alone is within 0.4 of it there, which the
+# window absorbs, so the steps guard parameters outside that range). The grid
+# spans -12 to +6 times the integrand's curvature scale, wider below because
+# log J is left-skewed, and never less than sd(log J) = sqrt(trigamma(shape)).
+# The weights are not renormalised: the grid follows the integrand, not the
+# prior, so their sum is not an approximation of the prior's mass.
+.circmix_vp_component <- function(cos_d, shape, tau, nodes, tab) {
+  t <- log((shape + 0.5) / (1 / tau + 1 - cos_d))
+  for (i in 1:4) {
+    slopes <- .circmix_vp_slopes(t, cos_d, shape, tau, tab)
+    step <- ifelse(slopes$d2 < 0, -slopes$d1 / slopes$d2, ifelse(slopes$d1 > 0, 1, -1))
+    t <- t + pmin(pmax(step, -1), 1)
+  }
+  d2 <- .circmix_vp_slopes(t, cos_d, shape, tau, tab)$d2
+  scale <- pmax(1 / sqrt(ifelse(d2 < 0, -d2, Inf)), sqrt(trigamma(shape)))
+
+  n <- length(t)
+  grid <- t + outer(scale, seq(-12, 6, length.out = nodes))
+  log_integrand <- matrix(.circmix_vp_log_integrand(
+    as.vector(grid), rep(cos_d, nodes), rep(shape, nodes), rep(tau, nodes), tab
+  ), nrow = n)
+  simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
+  matrixStats::rowLogSumExps(log_integrand + rep(simpson, each = n)) +
+    log(6 * scale / (nodes - 1))
+}
+
+.circmix_vp_log_integrand <- function(t, cos_d, shape, tau, tab) {
+  J <- exp(t)
+  kappa <- .circmix_kappa(J, tab)
+  t + stats::dgamma(J, shape = shape, scale = tau, log = TRUE) +
+    kappa * cos_d - .circmix_log_besselI0(kappa) - log(2 * pi)
+}
+
+# First and second derivatives of .circmix_vp_log_integrand() in t, from
+# d kappa / d log J = A / (1 - A^2) and dA / d kappa = 1 - A / kappa - A^2.
+.circmix_vp_slopes <- function(t, cos_d, shape, tau, tab) {
+  J <- exp(t)
+  a <- .circmix_A_terms(.circmix_kappa(J, tab))
+  one_minus_A2 <- a$one_minus * (1 + a$A)
+  dkappa <- a$A / one_minus_A2
+  list(
+    d1 = shape - J / tau + (cos_d - a$A) * dkappa,
+    d2 = -J / tau - a$slope * dkappa^2 +
+      (cos_d - a$A) * a$slope * (1 + a$A^2) * dkappa / one_minus_A2^2
+  )
+}
+
+# A, 1 - A and dA / d kappa. Above kappa = 1e3, where .circmix_A() switches to
+# its series, the last two come from that series too, because computing them
+# from A cancels.
+.circmix_A_terms <- function(kappa) {
+  A <- .circmix_A(kappa)
+  one_minus <- 1 - A
+  slope <- 1 - A / kappa - A^2
+  large <- which(kappa > 1e3)
+  if (length(large)) {
+    k <- kappa[large]
+    one_minus[large] <- 1 / (2 * k) + 1 / (8 * k^2) + 1 / (8 * k^3)
+    slope[large] <- 1 / (2 * k^2) + 1 / (4 * k^3) + 3 / (8 * k^4)
+  }
+  nlist(A, one_minus, slope)
 }
 
 # Draws from the mixture by picking a component and then sampling from it, which

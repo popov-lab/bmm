@@ -72,8 +72,67 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
-  // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau) on a Simpson grid in log J, -12 to +6 sd; tau = 0 is constant precision
-  // the weights are renormalised to sum to one, so the result is a proper density (see .circmix_vp_ld())
+  // first and second derivative in t = log J of the log integrand in circmix_vp_component(), as .circmix_vp_slopes()
+  vector circmix_vp_slopes(real t, real c, real shape, real tau,
+                           data vector logk, data vector dlogk,
+                           data real logJ_min, data real dlogJ) {
+    real J = exp(t);
+    real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
+    real A;
+    real one_minus_A;
+    real dA;
+    if (kappa > 1e3) {
+      one_minus_A = inv(2 * kappa) + inv(8 * square(kappa)) + inv(8 * kappa^3);
+      A = 1 - one_minus_A;
+      dA = inv(2 * square(kappa)) + inv(4 * kappa^3) + 3 * inv(8 * kappa^4);
+    } else {
+      A = exp(log_modified_bessel_first_kind(1, kappa)
+              - log_modified_bessel_first_kind(0, kappa));
+      one_minus_A = 1 - A;
+      dA = 1 - A / kappa - square(A);
+    }
+    real one_minus_A2 = one_minus_A * (1 + A);
+    real dkappa = A / one_minus_A2;
+    return [shape - J / tau + (c - A) * dkappa,
+            -J / tau - dA * square(dkappa)
+            + (c - A) * dA * (1 + square(A)) * dkappa / square(one_minus_A2)]';
+  }
+
+  // log integral over J ~ gamma(shape, scale = tau) of one von Mises with c = cos(y - mu); grid centred on the integrand's mode, see .circmix_vp_component()
+  real circmix_vp_component(real c, real shape, real tau, int nodes,
+                            data vector logk, data vector dlogk,
+                            data real logJ_min, data real dlogJ) {
+    real rate = inv(tau);
+    real t = log((shape + 0.5) / (rate + 1 - c));
+    for (i in 1:4) {
+      vector[2] d = circmix_vp_slopes(t, c, shape, tau, logk, dlogk, logJ_min, dlogJ);
+      real newton;
+      if (d[2] < 0) {
+        newton = -d[1] / d[2];
+      } else {
+        newton = d[1] > 0 ? 1 : -1;
+      }
+      t += fmin(fmax(newton, -1), 1);
+    }
+    real d2 = circmix_vp_slopes(t, c, shape, tau, logk, dlogk, logJ_min, dlogJ)[2];
+    real scale = sqrt(trigamma(shape));
+    if (d2 < 0) {
+      scale = fmax(scale, inv_sqrt(-d2));
+    }
+    real step = 18 * scale / (nodes - 1);
+    real lo = t - 12 * scale;
+    vector[nodes] lp;
+    for (i in 1:nodes) {
+      real ti = lo + (i - 1) * step;
+      real J = exp(ti);
+      real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
+      lp[i] = circmix_simpson_lw(i, nodes) + ti + gamma_lpdf(J | shape, rate)
+              + kappa * c - log_modified_bessel_first_kind(0, kappa);
+    }
+    return log_sum_exp(lp) + log(step / 3) - log(2 * pi());
+  }
+
+  // circmix_ld with J marginalised over gamma(J(kappa) / tau, scale = tau), one grid per component; tau = 0 is constant precision
   real circmix_vp_ld(vector cosd, vector logw, real logw_guess,
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
@@ -88,23 +147,18 @@
              ", but got ", shape,
              ". Raise vp_nodes, or use a more informative prior on tau.");
     }
-    real half_width = 8 * sqrt(trigamma(shape));
-    if (half_width < 1e-6) {
+    if (8 * sqrt(trigamma(shape)) < 1e-6) {
       return circmix_ld(cosd, logw, logw_guess, kappa);
     }
-    real step = 2.25 * half_width / (nodes - 1);
-    real centre = digamma(shape) + log(tau);
-    real rate = inv(tau);
-    vector[nodes] lw;
-    vector[nodes] lp;
-    for (i in 1:nodes) {
-      real t = centre - 1.5 * half_width + (i - 1) * step;
-      real J = exp(t);
-      lw[i] = circmix_simpson_lw(i, nodes) + t + gamma_lpdf(J | shape, rate);
-      lp[i] = lw[i] + circmix_ld(cosd, logw, logw_guess,
-                                 circmix_kappa(J, logk, dlogk, logJ_min, dlogJ));
+    int k = num_elements(cosd);
+    vector[k] lp = rep_vector(negative_infinity(), k);
+    for (j in 1:k) {
+      if (logw[j] > negative_infinity()) {
+        lp[j] = logw[j] + circmix_vp_component(cosd[j], shape, tau, nodes,
+                                               logk, dlogk, logJ_min, dlogJ);
+      }
     }
-    return log_sum_exp(lp) - log_sum_exp(lw);
+    return log_sum_exp(log_sum_exp(lp), logw_guess - log(2 * pi()));
   }
 
   // slot allocation of capacity K over set size ss: [floor(K / ss), probability of one more slot]
