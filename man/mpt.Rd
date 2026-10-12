@@ -161,14 +161,20 @@ group and their \code{praw} components cannot be fixed this way; fix parameters
 outside the group instead.
 
 Printing the model ends with an identifiability check for intercept-only
-formulas: the free parameters against the degrees of freedom (response
-categories minus 1, summed over trees), and the rank of the Jacobian of
-the category probabilities at five interior test values (and five test
-values of each covariate). A rank below the number of free parameters
-means that a combination of the named parameters is not identified by the
-branch expressions. A test value with a non-finite derivative is left
-out, and the printout says how many; if \code{\link[stats:D]{stats::D()}} cannot differentiate
-a branch expression, the rank is not computed and the count decides.
+formulas. It compares the number of free parameters with the degrees of
+freedom (response categories minus 1, summed over trees) and computes the
+rank of the Jacobian of the category probabilities with respect to the
+free parameters, from exact derivatives at five interior test values (and
+five test values of each covariate); parameters fixed in the formula enter
+at their values. A rank below the number of free parameters means that a
+combination of the named parameters is not identified by the branch
+expressions, even when the count passes. The check is local: it holds at
+the test values, not at the boundaries of the parameter space. A test
+value with a non-finite derivative is left out, and the printout says how
+many; if \code{\link[stats:D]{stats::D()}} cannot differentiate a branch expression, the rank
+is not computed and the count decides. The rank sees the tree parameters
+only: after a non-linear formula, the rank line names that formula's
+parameter as not analysed.
 
 \code{bmm()} warns when the rank is deficient and every formula is
 intercept-only. When a formula has a predictor or is non-linear, it only
