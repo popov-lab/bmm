@@ -304,6 +304,14 @@
 
 #### Bug fixes
 
+- A prior set on a whole non-linear parameter,
+  e.g. `set_prior("normal(0, 2)", class = "b", nlpar = "kappa")`, did
+  not reach its intercept in **mixture2p**, **mixture3p**, **imm** and
+  **m3**: the intercept kept the bmm default, and `brms` warned that
+  your prior would not be used. Your prior now applies to the intercept
+  too. A prior with `coef = "Intercept"` still sets the intercept alone.
+  Refit models that used such a prior
+  ([\#526](https://github.com/popov-lab/bmm/issues/526)).
 - A saved fit, whether through `file =` in
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) or
   [`update()`](https://rdrr.io/r/stats/update.html) or with
