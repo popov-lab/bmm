@@ -100,4 +100,4 @@ tree_nolures
 # e.g. bmf(D ~ 0 + cond)
 model <- mpt(list(tree_lures, tree_nolures), tree_id = "tree")
 }
-\keyword{transform}
+\keyword{bmmodel}

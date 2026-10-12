@@ -701,7 +701,9 @@
       outside <- names(probs)[too_low | probs > 1 + tolerance][1]
       if (!is.na(outside)) {
         zero_hint <- if (probs[[outside]] == 0) {
-          " A zero probability makes the likelihood undefined."
+          " A zero probability makes the likelihood undefined. Declare a \\
+          response category that a tree cannot produce with \\
+          mpt_tree(impossible = ) instead of giving it a zero branch."
         } else {
           ""
         }

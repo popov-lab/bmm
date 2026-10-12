@@ -241,10 +241,23 @@ bmf2bf.default <- function(model, formula) {
   NULL
 }
 
+# The parameters whose formulas a model's check_formula method generates, so
+# that no user formula is expected for them. Their placeholders are still added
+# below, because the generating method overwrites them by name.
+generated_parameters <- function(model) {
+  UseMethod("generated_parameters")
+}
+
+#' @exportS3Method
+generated_parameters.default <- function(model) {
+  character(0)
+}
+
 add_missing_parameters <- function(model, formula = bmmformula()) {
   formula_pars <- names(formula)
   model_pars <- names(model$parameters)
   fixed_pars <- names(model$fixed_parameters)
+  generated_pars <- generated_parameters(model)
 
   estimable_formula_pars <- setdiff(formula_pars, fixed_pars)
   missing_pars <- setdiff(model_pars, estimable_formula_pars)
@@ -253,7 +266,7 @@ add_missing_parameters <- function(model, formula = bmmformula()) {
     add <- stats::as.formula(paste(mpar, "~ 1"))
     if (mpar %in% fixed_pars) {
       attr(add, "constant") <- TRUE
-    } else {
+    } else if (!mpar %in% generated_pars) {
       message2("No formula for parameter {mpar} provided. Only a fixed intercept will be estimated.")
     }
     formula[mpar] <- add

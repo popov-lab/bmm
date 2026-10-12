@@ -8,6 +8,10 @@ test_that("an unrecognized link target is refused, not appended", {
        links = list(zzz = "log")),
     "Unrecognized link target"
   )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(zzz = "probit")),
+    "Unrecognized link target"
+  )
 })
 
 test_that("a link target one edit from a parameter is read as that parameter", {
@@ -23,6 +27,13 @@ test_that("a link target one edit from a parameter is read as that parameter", {
     "'bond' read as 'bound'"
   )
   expect_equal(model$links$bound, "softplus")
+
+  expect_warning(
+    model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(gg = "probit")),
+    "'gg' read as 'g'"
+  )
+  expect_equal(model$links$g, "probit")
+  expect_false("gg" %in% names(model$links))
 })
 
 test_that("a link target that abbreviates a parameter is read as that parameter", {
@@ -89,6 +100,25 @@ test_that("a link the model cannot honour is refused at the constructor", {
   expect_equal(
     settable_link_functions(m3_ss(NULL)),
     c("log", "softplus", "logit", "probit", "identity")
+  )
+
+  # mpt applies its links in the generated category formulas, so it honours
+  # the two latent scales it has default priors for, as a list or as a string
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "cauchit")),
+    "Unknown link function\\(s\\): 'cauchit'\\. mpt\\(\\) takes 'logit', 'probit'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = "cauchit"),
+    "Unknown link function\\(s\\): 'cauchit'\\. mpt\\(\\) takes 'logit', 'probit'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = c("logit", "probit")),
+    "one link function for the whole model"
+  )
+  expect_equal(
+    settable_link_functions(mpt(mpt_2htm_trees(), tree_id = "item_type")),
+    c("logit", "probit")
   )
 })
 
@@ -173,8 +203,20 @@ test_that("a link the model does not pass on to the fit is refused", {
               links = list(kappa = "softplus")),
     "cannot be changed in mixture3p\\(\\)"
   )
+  # a simplex member and its stick-breaking component take the link of the
+  # generated stick-breaking formulas, not one of their own
+  simplex_tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
+  expect_error(
+    mpt(simplex_tree, simplex = c("gA", "gB", "gC"), links = list(gA = "probit")),
+    "cannot be changed in mpt\\(\\)"
+  )
+  expect_error(
+    mpt(simplex_tree, simplex = c("gA", "gB", "gC"), links = list(gAraw = "probit")),
+    "cannot be changed in mpt\\(\\)"
+  )
   # naming the link the model already uses asks for no change
   expect_silent(sdm(resp_error = "y", links = list(kappa = "log")))
+  expect_silent(mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "logit")))
 })
 
 test_that("the links a model applies are exactly the settable ones", {

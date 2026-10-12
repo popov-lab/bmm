@@ -100,4 +100,4 @@ Batchelder, W. H., & Riefer, D. M. (1999). Theoretical and
 empirical review of multinomial process tree modeling. Psychonomic
 Bulletin & Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812
 }
-\keyword{transform}
+\keyword{bmmodel}

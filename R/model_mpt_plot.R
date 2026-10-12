@@ -69,7 +69,7 @@
 #'   empirical review of multinomial process tree modeling. Psychonomic
 #'   Bulletin & Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812
 #'
-#' @keywords transform
+#' @keywords bmmodel
 #'
 #' @examples
 #' tree_old <- mpt_tree("old", list(
