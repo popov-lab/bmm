@@ -304,6 +304,18 @@
 
 #### Bug fixes
 
+- [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html)
+  and
+  [`reloo()`](https://paulbuerkner.com/brms/reference/reloo.brmsfit.html)
+  now run on **m3**, **sdt_rating**, **sdt_ranking**, **sdt_cdp**,
+  **sdt_mafc** (with `m` a column), **mixture3p** and **imm** fits, and
+  so does `update(fit, newdata = fit$data[rows, ])`. They stopped before
+  the first refit with `Response columns ... missing in the data`,
+  `The response variable(s) ... missing in the data` or a complaint
+  about `set_size`, because
+  [`update()`](https://rdrr.io/r/stats/update.html) checked the fit’s
+  stored data as if you had passed them. No refit and no change to your
+  calls is needed.
 - A prior set on a whole non-linear parameter,
   e.g. `set_prior("normal(0, 2)", class = "b", nlpar = "kappa")`, did
   not reach its intercept in **mixture2p**, **mixture3p**, **imm** and

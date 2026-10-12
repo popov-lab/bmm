@@ -80,7 +80,9 @@ is used. Currently you have to specify a full <code>bmmformula</code></p></dd>
 
 
 <dt id="arg-newdata">newdata<a class="anchor" aria-label="anchor" href="#arg-newdata"></a></dt>
-<dd><p>An optional data frame containing the variables in the model</p></dd>
+<dd><p>An optional data frame containing the variables in the model.
+Rows of <code>fit$data</code> are accepted as they are, which is how <code><a href="https://mc-stan.org/loo/reference/kfold-generic.html" class="external-link">brms::kfold()</a></code>
+and <code><a href="https://paulbuerkner.com/brms/reference/reloo.brmsfit.html" class="external-link">brms::reloo()</a></code> pass them.</p></dd>
 
 
 <dt id="arg-recompile">recompile<a class="anchor" aria-label="anchor" href="#arg-recompile"></a></dt>

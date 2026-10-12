@@ -35,7 +35,12 @@ update(
 
 - newdata:
 
-  An optional data frame containing the variables in the model
+  An optional data frame containing the variables in the model. Rows of
+  `fit$data` are accepted as they are, which is how
+  [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html)
+  and
+  [`brms::reloo()`](https://paulbuerkner.com/brms/reference/reloo.brmsfit.html)
+  pass them.
 
 - recompile:
 
