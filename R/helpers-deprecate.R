@@ -15,7 +15,16 @@ warn_deprecated <- function(what, with, since, removed_in = next_minor(since),
     "`{what}` is deprecated since bmm {since} and will be removed in bmm ",
     "{removed_in} at the earliest.{replacement}"
   ))
+  max_listed <- 20L
+  not_listed <- length(statements) - max_listed
+  if (not_listed > 0) {
+    statements <- c(statements[seq_len(max_listed)], glue("Not listed: {not_listed} more."))
+  }
   msg <- paste(c(statements, details), collapse = "\n")
+
+  # R cuts a warning at 1000 characters by default, and `details` comes last
+  old_options <- options(warning.length = 8170L)
+  on.exit(options(old_options))
   warning2("{msg}")
 }
 

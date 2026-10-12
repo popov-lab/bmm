@@ -104,3 +104,37 @@ test_that("a deprecation without replacement ends the message at the removal rel
     )
   )
 })
+
+test_that("more than 20 forms list the first 20 and count the rest", {
+  what <- sprintf("f%d()", 1:25)
+  msg <- collect_warnings(warn_deprecated(what, "g()", since = "1.5.0", details = "See NEWS."))$warnings
+  lines <- strsplit(msg, "\n", fixed = TRUE)[[1]]
+
+  expect_length(lines, 22)
+  expect_match(lines[1], "^`f1\\(\\)` is deprecated", perl = TRUE)
+  expect_match(lines[20], "^`f20\\(\\)` is deprecated", perl = TRUE)
+  expect_identical(lines[21], "Not listed: 5 more.")
+  expect_identical(lines[22], "See NEWS.")
+})
+
+test_that("the warning is raised with R's longest warning length", {
+  withr::local_options(warning.length = 1000L)
+  length_when_raised <- NULL
+
+  withCallingHandlers(
+    warn_deprecated("f()", "g()", since = "1.5.0"),
+    warning = function(w) {
+      length_when_raised <<- getOption("warning.length")
+      invokeRestart("muffleWarning")
+    }
+  )
+
+  expect_identical(length_when_raised, 8170L)
+})
+
+test_that("the warning length option is the caller's again after the call", {
+  withr::local_options(warning.length = 1000L)
+  suppressWarnings(warn_deprecated("f()", "g()", since = "1.5.0"))
+
+  expect_identical(getOption("warning.length"), 1000L)
+})

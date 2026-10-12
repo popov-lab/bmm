@@ -149,7 +149,8 @@ If your PR deprecates something:
   something users would otherwise miss, such as a changed meaning.
 - Call `warn_deprecated()` once per user call. If one call can meet many old
   forms, such as prior rows, collect them first and pass them as vectors, so
-  users get one warning and not one per row.
+  users get one warning and not one per row. The message lists the first 20
+  forms and counts the rest.
 - Add the NEWS bullet under `### Deprecated functions and arguments` in the
   section of the release that deprecates the form. On a `dev-*` branch that is
   the branch's own section ([ADR 0002](../.dev/decisions/0002-release-integration-branches.md)).
