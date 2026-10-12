@@ -147,6 +147,8 @@ column names as `what` and `with`.
 
 If your PR deprecates something:
 
+- Deprecate in a minor release (1.5.0, 1.6.0), not in a patch release, so that
+  users meet the warning before the release that may remove the form.
 - Keep the old form working by passing it on to the new one. If the new form
   gives a different result, say so in `details`.
 - Warn with `warn_deprecated(what, with, since = "1.5.0")` where the old form
