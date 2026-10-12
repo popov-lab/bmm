@@ -407,6 +407,25 @@ test_that("the links argument of mpt() refuses what set_links() refuses", {
   )
 })
 
+test_that("mpt() refuses a link for a parameter the restrictions removed", {
+  trees <- list(
+    mpt_tree("old", list(old = "Do + (1 - Do) * g", new = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(old = "(1 - Dn) * g", new = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "Dn = Do", links = list(Dn = "probit")),
+    "'Dn' .*removed by the restrictions"
+  )
+  # 'g' is one edit from 'D', so the link matcher used to read it as D
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", restrictions = "g = 0.5",
+        links = list(g = "probit")),
+    "'g' .*removed by the restrictions"
+  )
+  model <- mpt(trees, tree_id = "item_type", restrictions = "Dn = Do", links = list(Do = "probit"))
+  expect_equal(model$links, list(Do = "probit", g = "logit"))
+})
+
 test_that("formulas for response categories are rejected", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()

@@ -706,6 +706,14 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   covariates <- covariates %||% character(0)
   simplex <- .mpt_as_simplex_list(simplex)
   restrictions <- .mpt_parse_restrictions(restrictions)
+  # the link matcher would repair a removed name to a parameter one edit away
+  restricted_links <- intersect(names(links), names(restrictions))
+  stopif(
+    length(restricted_links) > 0,
+    "The link target(s) {collapse_comma(restricted_links)} are removed by the \\
+    restrictions and take no link. Set the link of the parameter a \\
+    restriction equates them to instead."
+  )
 
   stopif(
     length(trees) == 0L || !all(vapply(trees, inherits, logical(1), "mpt_tree")),
