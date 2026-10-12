@@ -77,6 +77,15 @@ test_that("dmixture3p() is a normalised density", {
   expect_equal(varying$value, 1, tolerance = 1e-6)
 })
 
+test_that("dmixture3p() refuses node counts the model refuses", {
+  # 21 nodes miss the log density by about 1e-2 at a gamma shape near 3
+  expect_error(
+    dmixture3p(0.1, kappa = 4, tau = 1.5, vp_nodes = 21),
+    "odd number of at least 41"
+  )
+  expect_error(dmixture3p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
+})
+
 test_that("rmixture3p() draws from dmixture3p()", {
   compare <- function(n = 2e5, n_bins = 20, ...) {
     draws <- rmixture3p(n, ...)
