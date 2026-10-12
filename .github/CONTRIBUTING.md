@@ -154,8 +154,9 @@ If your PR deprecates something:
   the branch's own section ([ADR 0002](../.dev/decisions/0002-release-integration-branches.md)).
 - Test that the old form still works and warns.
 
-When the window has passed, remove the old form and list the removal under the
-same heading in the release that removes it.
+When the window has passed, you may remove the old form. Remove its tests with
+it, list the removal under the same heading in the release that removes it, and
+announce it in an issue before that release (rule 3).
 
 ## Review and merging
 
