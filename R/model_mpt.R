@@ -99,6 +99,16 @@ mpt_tree <- function(name, branches, ..., impossible = NULL) {
     "The tree name must be a single non-empty character string."
   )
   extra <- list(...)
+  # name, branches and impossible match partially, so b = b ~ y would take the
+  # slot of branches and reorder the categories, and imp = binds to ...
+  inexact_names <- setdiff(names(sys.call()), c("", "name", "branches", "impossible"))
+  stopif(
+    length(extra) > 0 && length(inexact_names) > 0,
+    "Write the arguments name, branches and impossible out in full when \\
+    several branches are given, and give the formulas after branches without \\
+    a name: the left-hand side of a formula is its response category. \\
+    Offending: {collapse_comma(inexact_names)}"
+  )
   from_formulas <- inherits(branches, "formula")
   stopif(
     length(extra) > 0 && !from_formulas,

@@ -103,6 +103,20 @@ test_that("mpt_tree validates formula input", {
   expect_error(mpt_tree("t", a ~ 1e-5 * D, b ~ 1 - D), "scientific notation")
 })
 
+test_that("mpt_tree does not let a partially matched name reorder or drop formulas", {
+  expect_error(mpt_tree("t", a ~ D, b = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", a ~ D, foo = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", list(a = "D"), imp = "b"), "in full")
+  expect_identical(
+    mpt_tree("t", br = list(a = "D", b = "1 - D")),
+    mpt_tree("t", list(a = "D", b = "1 - D"))
+  )
+  expect_identical(
+    names(mpt_tree(name = "t", a ~ D, b ~ 1 - D)$branches),
+    c("a", "b")
+  )
+})
+
 test_that("mpt stores its derived state once", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")
