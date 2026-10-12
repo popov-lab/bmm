@@ -265,6 +265,12 @@ test_that("mpt refuses a zero branch and points to impossible categories", {
     mpt(mpt_tree("a", list(y = "D", z = "0 * D", w = "1 - D"))),
     "is 0 at the test values.*mpt_tree\\(impossible = \\)"
   )
+  # the hint reads as one sentence, not with the source's line breaks
+  expect_error(
+    mpt(mpt_tree("a", list(y = "D", z = "0 * D", w = "1 - D"))),
+    "undefined. Declare a response category that a tree cannot produce with mpt_tree(impossible = ) instead",
+    fixed = TRUE
+  )
   zero_padded <- list(
     mpt_tree("a", list(x = "D", y = "1 - D", z = "0")),
     mpt_tree("b", list(x = "1 - 1", y = "g", z = "1 - g"))

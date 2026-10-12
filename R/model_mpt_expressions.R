@@ -700,10 +700,14 @@
       too_low <- if (point <= length(interior)) probs <= 0 else probs < -tolerance
       outside <- names(probs)[too_low | probs > 1 + tolerance][1]
       if (!is.na(outside)) {
+        # interpolated into the glue() below, which leaves the line
+        # continuations of an interpolated value in place
         zero_hint <- if (probs[[outside]] == 0) {
-          " A zero probability makes the likelihood undefined. Declare a \\
-          response category that a tree cannot produce with \\
-          mpt_tree(impossible = ) instead of giving it a zero branch."
+          paste(
+            " A zero probability makes the likelihood undefined. Declare a",
+            "response category that a tree cannot produce with",
+            "mpt_tree(impossible = ) instead of giving it a zero branch."
+          )
         } else {
           ""
         }
