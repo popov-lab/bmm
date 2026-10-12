@@ -1187,11 +1187,8 @@ test_that("flag_contaminant_rts() warns when upper bound < max RT", {
   rt <- c(0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0)
 
   expect_warning(
-    expect_warning(
-      flag_contaminant_rts(rt, contaminant_bound = c("min", 1.0)),
-      "Upper contaminant bound.*less than the maximum observed RT"
-    ),
-    "EM did not converge"
+    flag_contaminant_rts(rt, contaminant_bound = c("min", 1.0)),
+    "Upper contaminant bound.*less than the maximum observed RT"
   )
 })
 
@@ -1297,6 +1294,37 @@ test_that("flag_contaminant_rts() diagnostics report convergence correctly", {
     expect_true("loglik" %in% names(diag))
     expect_false(is.na(diag$loglik))
   }
+})
+
+# Without contaminants the EM approaches a contaminant proportion of zero
+# slowly; this sample needs about 250 iterations
+test_that("the EM converges by default where it needs more than 100 iterations", {
+  withr::local_seed(8)
+  rt <- 0.3 + rnorm(60, 0.15, 0.03) + rexp(60, 10)
+  response <- rep(c(1, 0), c(54, 6))
+
+  expect_warning(
+    capped <- ezdm_summary_stats(rt, response, maxit = 100),
+    "did not converge within maxit = 100 iterations"
+  )
+  expect_true(is.na(capped$contaminant_prop))
+  expect_warning(
+    flag_contaminant_rts(rt, maxit = 100),
+    "did not converge within maxit = 100 iterations"
+  )
+
+  stats <- expect_no_warning(ezdm_summary_stats(rt, response))
+  expect_false(is.na(stats$contaminant_prop))
+  probs <- expect_no_warning(flag_contaminant_rts(rt))
+  expect_false(anyNA(probs))
+  expect_gt(attr(probs, "diagnostics")$iterations, 100)
+})
+
+test_that("the EM warning suggests maxit only when the EM ran out of iterations", {
+  expect_warning(
+    flag_contaminant_rts(c(0.5, 0.6, 0.7)),
+    "EM did not converge\\. Returning NA\\."
+  )
 })
 
 test_that("flag_contaminant_rts() diagnostics track trial counts", {
