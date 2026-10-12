@@ -1091,3 +1091,54 @@ test_that("lnr refuses a category named after an identifier of its Stan code", {
     "Stan code uses"
   )
 })
+
+test_that("lnr refuses each identifier of the Stan program as a category, but not other names", {
+  refused <- c("rt", "response", "t", "m", "n", "win", "lp", "reps", "i", "j",
+               "start", "end", "seq", "ptarget", "nn")
+  for (nm in refused) {
+    expect_error(
+      check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL,
+                  bmf(stats::as.formula(paste(nm, "~ 1")), other ~ 1, ndt ~ 1)),
+      "Stan code uses",
+      info = nm
+    )
+  }
+  expect_no_error(
+    check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL,
+                bmf(alpha ~ 1, other ~ 1, ndt ~ 1))
+  )
+})
+
+test_that("log_lik_lnr_custom is finite and matches the reference with zero-count losers", {
+  set.seed(11)
+  nd <- 5L
+  no <- 6L
+  dp <- list(mu = 0, aa = rnorm(nd * no, -1, .3), bb = rnorm(nd * no, 0, .3),
+             cc = rnorm(nd * no, .2, .3), ndt = runif(nd * no, .1, .2),
+             s = runif(nd * no, .4, .9))
+  # trials 1-3: only the winner has a nonzero count; trials 4-6 are mixed
+  data <- list(Y = c(0.9, 1.2, 0.8, 1.5, 1.1, 0.7),
+               vint1 = c(1L, 2L, 3L, 1L, 2L, 3L),
+               vint2 = c(2L, 0L, 0L, 3L, 1L, 0L),
+               vint3 = c(0L, 3L, 0L, 0L, 2L, 1L),
+               vint4 = c(0L, 0L, 1L, 2L, 0L, 4L))
+  prep <- fake_prep(nd, no, dp, data)
+  prep$family <- list(dpars = names(dp), name = "lnr_custom")
+
+  ll <- vapply(seq_len(no), function(i) log_lik_lnr_custom(i, prep), numeric(nd))
+  expect_true(all(is.finite(ll)))
+
+  ref <- vapply(seq_len(no), function(i) vapply(seq_len(nd), function(d) {
+    idx <- (i - 1) * nd + d
+    m <- c(dp$aa[idx], dp$bb[idx], dp$cc[idx])
+    n <- c(data$vint2[i], data$vint3[i], data$vint4[i])
+    w <- data$vint1[i]
+    t <- data$Y[i] - dp$ndt[idx]
+    sd <- dp$s[idx]
+    losers <- setdiff(which(n > 0), w)
+    log(n[w]) + dlnorm(t, m[w], sd, log = TRUE) +
+      (n[w] - 1) * plnorm(t, m[w], sd, lower.tail = FALSE, log.p = TRUE) +
+      sum(n[losers] * plnorm(t, m[losers], sd, lower.tail = FALSE, log.p = TRUE))
+  }, numeric(1)), numeric(nd))
+  expect_equal(ll, ref, tolerance = 1e-12)
+})

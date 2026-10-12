@@ -20,8 +20,8 @@
 #' @param m Numeric vector of meanlog parameters (one per accumulator).
 #' @param s Numeric vector of sdlog parameters (one per accumulator, or a
 #'   single value shared across all accumulators).
-#' @param ndt Non-decision time in seconds, a single value or one per response
-#'   time.
+#' @param ndt Non-decision time in seconds. `dlnr()` and `plnr()` take a single
+#'   value or one per response time; `rlnr()` and `qlnr()` take a single value.
 #' @param n Number of samples to generate.
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #' @param q Numeric vector of quantiles (response times).
@@ -143,10 +143,12 @@ plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
       "response has {length(response)} entries but q has {length(q)}."
     )
     stopif(
-      any(response < 1) || any(response > K) || any(response != round(response)),
+      !is.numeric(response) || anyNA(response) ||
+        any(response < 1) || any(response > K) || any(response != round(response)),
       "response must contain integers in 1:{K}."
     )
-    log_p <- .plnr_defective(t, rep_len(response, length(t)), m, s, ndt)
+    log_p <- .plnr_defective(t, rep_len(response, length(t)), m, s,
+                             rep_len(ndt, length(t)))
     if (!lower.tail) log_p <- log1m_exp(log_p)
   }
 
@@ -164,10 +166,14 @@ plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
   vapply(seq_along(t), function(i) {
     if (is.na(t[i])) return(NA_real_)
     if (t[i] <= 0) return(-Inf)
+    upper <- min(log(t[i]), u_cap)
+    # below the lower bound the mass is under 1e-14, and integrate() over a
+    # reversed interval returns a negative value
+    if (upper <= u_lo) return(-Inf)
     log(stats::integrate(
-      function(u) .dlnr(exp(u) + ndt, response[i], m, s, ndt, log = FALSE) *
-        exp(u),
-      lower = u_lo, upper = min(log(t[i]), u_cap),
+      function(u) .dlnr(exp(u) + ndt[i], response[i], m, s, ndt[i],
+                        log = FALSE) * exp(u),
+      lower = u_lo, upper = upper,
       rel.tol = .Machine$double.eps^0.5
     )$value)
   }, numeric(1))
@@ -179,24 +185,27 @@ qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
   validate_lnr_parameters(s, ndt, length(m), 1L)
   K <- length(m)
   if (length(s) == 1) s <- rep(s, K)
-  if (log.p) p <- exp(p)
-  if (!lower.tail) p <- 1 - p
+  log_surv_target <- if (lower.tail) {
+    if (log.p) log1m_exp(p) else log1p(-p)
+  } else {
+    if (log.p) p else log(p)
+  }
 
-  vapply(p, function(pi) {
-    if (pi <= 0) return(ndt)
-    if (pi >= 1) return(Inf)
-    cdf_fn <- function(q) {
+  vapply(log_surv_target, function(target) {
+    if (is.na(target)) return(NA_real_)
+    if (target >= 0) return(ndt)
+    if (target == -Inf) return(Inf)
+    gap_fn <- function(q) {
       t <- q - ndt
-      if (t <= 0) return(-pi)
-      log_surv <- sum(stats::plnorm(t, meanlog = m, sdlog = s,
-                                     lower.tail = FALSE, log.p = TRUE))
-      (1 - exp(log_surv)) - pi
+      if (t <= 0) return(-target)
+      sum(stats::plnorm(t, meanlog = m, sdlog = s,
+                        lower.tail = FALSE, log.p = TRUE)) - target
     }
     upper <- ndt + stats::qlnorm(0.999, meanlog = max(m), sdlog = max(s))
-    while (cdf_fn(upper) < 0) {
+    while (gap_fn(upper) > 0) {
       upper <- ndt + 2 * (upper - ndt)
     }
-    stats::uniroot(cdf_fn, interval = c(ndt + 1e-10, upper),
+    stats::uniroot(gap_fn, interval = c(ndt + 1e-10, upper),
                    tol = 1e-8)$root
   }, numeric(1))
 }

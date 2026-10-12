@@ -73,10 +73,14 @@
 # categories cannot be named after
 .lnr_shared_pars <- c("ndt", "s")
 
-# the identifiers .lnr_stan_code() declares, which a category would shadow
-# (measured: each made a category and the program handed to stanc)
-.lnr_stan_names <- c("rt", "response", "t", "m", "n", "win", "lp", "reps", "i", "j")
-
+# the identifiers of the generated likelihood and of the program brms wraps
+# around it for the models this package builds, which a category would shadow.
+# Measured with stanc (rstan::stanc): each name, used as a category, makes the
+# program fail with "Identifier ... is already in use". Relied on: the
+# likelihood's own locals, and that threaded programs add `start`, `end`,
+# `seq` and `ptarget`, and the threaded random-effects loop adds `nn`.
+.lnr_stan_names <- c("rt", "response", "t", "m", "n", "win", "lp", "reps", "i", "j",
+                     "start", "end", "seq", "ptarget", "nn")
 
 .model_lnr <- function(
     rt = NULL,
@@ -152,9 +156,10 @@ settable_links.lnr <- function(model) {
 #'   specifying the number of racing accumulators per response category.
 #'   Can be a named integer vector of positive counts for constant numbers of
 #'   accumulators (e.g., `c(correct = 1, other = 3, npl = 5)`) or a named
-#'   character vector of column names whose values are positive integers for
-#'   trial-varying counts (e.g., `c(correct = "n_corr", other = "n_other",
-#'   npl = "n_npl")`). If omitted, defaults to 1 accumulator per category.
+#'   character vector of column names whose values are non-negative integers
+#'   for trial-varying counts (e.g., `c(correct = "n_corr", other = "n_other",
+#'   npl = "n_npl")`). A category needs at least one accumulator on every trial
+#'   it wins. If omitted, defaults to 1 accumulator per category.
 #' @param version A character string specifying which version of the LNR model
 #'   to use. Options are:
 #'   \itemize{
@@ -222,11 +227,11 @@ settable_links.lnr <- function(model) {
 #'   vs. error) over the general per-accumulator case handled by `"custom"`.
 #' @export
 #' @keywords bmmodel
-#' @seealso [dlnr()] and [rlnr()] for the density and random generation
-#'   functions.
+#' @seealso [dlnr()], [plnr()], [qlnr()] and [rlnr()] for the density,
+#'   distribution, quantile and random generation functions.
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
-#' dat <- rlnr(n = 500, m = c(-1, 0), s = c(1, 1), ndt = 0.2)
+#' dat <- rlnr(n = 500, m = c(-1, 0), s = c(0.5, 0.5), ndt = 0.2)
 #' model <- lnr(rt = "rt", response = "response", n_choices = 2)
 #' formula <- bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1)
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
@@ -235,10 +240,12 @@ settable_links.lnr <- function(model) {
 #' fit_fixed <- bmm(bmf(correct ~ 1, error ~ 1, ndt ~ 1, s = 0), dat, model,
 #'                  cores = 4, backend = "cmdstanr")
 #'
-#' # custom version with named categories
-#' model2 <- lnr(rt = "rt", response = "resp", version = "custom",
-#'               accumulators = c(correct = 1, similar = 3, other = 5))
-#' formula2 <- bmf(correct ~ 1, similar ~ 1, other ~ 1, ndt ~ 1)
+#' # custom version with named categories, one accumulator each
+#' dat2 <- rlnr(n = 500, m = c(-1, -0.5, 0), s = c(0.5, 0.5, 0.5), ndt = 0.2)
+#' dat2$resp <- c("correct", "similar", "other")[dat2$response]
+#' model2 <- lnr(rt = "rt", response = "resp", version = "custom")
+#' formula2 <- bmf(correct ~ 1, similar ~ 1, other ~ 1, ndt ~ 1, s ~ 1)
+#' fit2 <- bmm(formula2, dat2, model2, cores = 4, backend = "cmdstanr")
 lnr <- function(rt, response, n_choices = NULL,
                 version = c("simple", "custom"),
                 accumulators = NULL, links = NULL, ...) {
