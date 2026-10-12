@@ -1122,3 +1122,9 @@ test_that("dlba() and plba() return 0 or NA at and below the non-decision time f
     expect_equal(do.call(qlba, c(list(0), args)), 0.2 + 1e-6, tolerance = 1e-5, label = dist)
   }
 })
+
+test_that("the lba distribution functions refuse sp = 0", {
+  expect_error(dlba(0.5, 1, drift = c(3, 1), gap = 0.5, sp = 0, ndt = 0.2), "must be positive")
+  expect_error(rlba(5, drift = c(3, 1), gap = 0.5, sp = 0, ndt = 0.2), "must be positive")
+  expect_error(plba(0.5, drift = c(3, 1), gap = 0.5, sp = 0, ndt = 0.2), "must be positive")
+})

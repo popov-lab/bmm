@@ -25,12 +25,9 @@
 #'   starting point and the decision threshold. The total threshold is computed
 #'   as `b = gap + sp`, ensuring `b > sp` structurally. Recycled with `rt`,
 #'   `sp` and `ndt` to a common length.
-#' @param sp Numeric. Maximum starting point (>= 0 here; strictly positive,
-#'   `sp > 0`, in the `lba()` model). Starting evidence is uniformly
-#'   distributed on `[0, sp]`. These distribution functions additionally
-#'   accept `sp = 0` as the no-starting-point-variability limit, which the
-#'   fitted model does not. Recycled with `rt`, `gap` and `ndt` to a common
-#'   length.
+#' @param sp Numeric. Maximum starting point (`sp > 0`). Starting evidence is
+#'   uniformly distributed on `[0, sp]`. Recycled with `rt`, `gap` and `ndt` to
+#'   a common length.
 #' @param ndt Numeric. Non-decision time in seconds (>= 0). Recycled with
 #'   `rt`, `gap` and `sp` to a common length.
 #' @param s Numeric. Scale parameter (> 0, default = 1). Interpretation depends
@@ -557,7 +554,7 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 
 validate_lba_parameters <- function(drift, gap, sp, ndt, s, distribution) {
   stopif(any(gap <= 0), "gap (threshold gap) must be positive.")
-  stopif(any(sp < 0), "sp (maximum starting point) must be non-negative.")
+  stopif(any(sp <= 0), "sp (maximum starting point) must be positive.")
   stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
   stopif(any(s <= 0), "s (scale parameter) must be positive.")
   # the normal drift is a mean and the lognormal a meanlog, both unrestricted;
