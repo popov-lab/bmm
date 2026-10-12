@@ -358,7 +358,12 @@ settable_link_functions.mpt <- function(model) {
 #'   row's covariate values, the branches of a tree do not sum to 1, leave
 #'   (0, 1], are undefined on the rows of another tree, or when a covariate
 #'   that a branch uses is missing. Every declared covariate needs a numeric
-#'   column in the data, also one that no branch uses.
+#'   column in the data, also one that no branch uses. The range is checked
+#'   at the vertices of each branch's parameter box, which is exact when no
+#'   term of the branch contains the same parameter twice
+#'   (`a * (1 - b) * G + (1 - a) * c`). A parameter that does is also checked
+#'   at 0.5, which is exact for a factor `u * (1 - u)` and approximate
+#'   otherwise, e.g. for `u * (1 - u)^2`.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -436,9 +441,10 @@ settable_link_functions.mpt <- function(model) {
 #'   `1 + cond` it holds in the reference cell only, because the effects keep
 #'   their own prior. TreeBUGS instead puts a uniform prior on each branch
 #'   parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
-#'   for three members); for a group `gA`, `gB`, `gC`, `gD` that is
-#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"),
-#'   coef = "Intercept")`.
+#'   for three members). To get it for a group `gA`, `gB`, `gC`, `gD`, pass
+#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"))`,
+#'   with `"normal(0, 1)"` under the probit link; without `coef`, it covers
+#'   every cell of a `0 + cond` formula.
 #'   A predictor on member `p` acts on the logit (or probit) of `p`'s share of
 #'   the probability left over by the members listed before it. A predictor
 #'   on the first member therefore scales all later members by the same
@@ -457,14 +463,20 @@ settable_link_functions.mpt <- function(model) {
 #'   outside the group instead.
 #'
 #'   Printing the model ends with an identifiability check for intercept-only
-#'   formulas: the free parameters against the degrees of freedom (response
-#'   categories minus 1, summed over trees), and the rank of the Jacobian of
-#'   the category probabilities at five interior test values (and five test
-#'   values of each covariate). A rank below the number of free parameters
-#'   means that a combination of the named parameters is not identified by the
-#'   branch expressions. A test value with a non-finite derivative is left
-#'   out, and the printout says how many; if [stats::D()] cannot differentiate
-#'   a branch expression, the rank is not computed and the count decides.
+#'   formulas. It compares the number of free parameters with the degrees of
+#'   freedom (response categories minus 1, summed over trees) and computes the
+#'   rank of the Jacobian of the category probabilities with respect to the
+#'   free parameters, from exact derivatives at five interior test values (and
+#'   five test values of each covariate); parameters fixed in the formula enter
+#'   at their values. A rank below the number of free parameters means that a
+#'   combination of the named parameters is not identified by the branch
+#'   expressions, even when the count passes. The check is local: it holds at
+#'   the test values, not at the boundaries of the parameter space. A test
+#'   value with a non-finite derivative is left out, and the printout says how
+#'   many; if [stats::D()] cannot differentiate a branch expression, the rank
+#'   is not computed and the count decides. The rank sees the tree parameters
+#'   only: after a non-linear formula, the rank line names that formula's
+#'   parameter as not analysed.
 #'
 #'   `bmm()` warns when the rank is deficient and every formula is
 #'   intercept-only. When a formula has a predictor or is non-linear, it only
