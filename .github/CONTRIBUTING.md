@@ -138,8 +138,8 @@ model expects. Internal functions are not covered.
 
 If your PR deprecates something:
 
-- Keep the old form working by passing it on to the new one, with the same
-  result.
+- Keep the old form working by passing it on to the new one. If the new form
+  gives a different result, say so in `details`.
 - Warn with `warn_deprecated(what, with, since = "1.5.0")` where the old form
   is detected. `what` and `with` are the old and the new code as users would
   type it. The message is fixed: it names the release that deprecated the form,
