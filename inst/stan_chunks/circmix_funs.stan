@@ -178,23 +178,18 @@
     real extra = allocation[2];
     real J1 = circmix_J(kappa);
 
-    // skipped at a whole K / ss, where log(0) would make the gradient in K NaN
-    real lp_hi = negative_infinity();
+    real kappa_hi = circmix_kappa((slots + 1) * J1, logk, dlogk, logJ_min, dlogJ);
+    real ld_hi = circmix_vp_ld(cosd, logw, negative_infinity(), kappa_hi, tau,
+                               nodes, logk, dlogk, logJ_min, dlogJ);
+    real ld_lo = -log(2 * pi());
+    if (slots >= 0.5) {
+      real kappa_lo = circmix_kappa(slots * J1, logk, dlogk, logJ_min, dlogJ);
+      ld_lo = circmix_vp_ld(cosd, logw, negative_infinity(), kappa_lo, tau,
+                            nodes, logk, dlogk, logJ_min, dlogJ);
+    }
     if (extra > 0) {
-      real kappa_hi = circmix_kappa((slots + 1) * J1, logk, dlogk, logJ_min, dlogJ);
-      lp_hi = log(extra)
-              + circmix_vp_ld(cosd, logw, negative_infinity(), kappa_hi, tau,
-                              nodes, logk, dlogk, logJ_min, dlogJ);
+      return log_sum_exp(log1m(extra) + ld_lo, log(extra) + ld_hi);
     }
-
-    if (slots < 0.5) {
-      return log_sum_exp(log1m(extra) - log(2 * pi()), lp_hi);
-    }
-
-    real kappa_lo = circmix_kappa(slots * J1, logk, dlogk, logJ_min, dlogJ);
-    return log_sum_exp(
-      log1m(extra) + circmix_vp_ld(cosd, logw, negative_infinity(), kappa_lo,
-                                   tau, nodes, logk, dlogk, logJ_min, dlogJ),
-      lp_hi
-    );
+    // whole K / ss: the same value without log(0), whose NaN adjoint would poison K; the gradient is the right-hand slope
+    return ld_lo + extra * expm1(ld_hi - ld_lo);
   }

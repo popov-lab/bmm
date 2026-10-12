@@ -309,8 +309,10 @@
   no_guessing <- rep(-Inf, n)
   single_slot <- .circmix_J(kappa)
 
-  # At a whole K / set_size the extra slot has weight zero. Skipping it rather
-  # than adding log(0) is what keeps Stan's gradient in K finite there.
+  # At a whole K / set_size the extra slot has weight zero, so it is skipped.
+  # Stan cannot skip it: log(0) would give K a NaN gradient, and dropping the
+  # branch would give the wrong slope, so it returns the same value in a form
+  # whose gradient is the right-hand slope.
   high <- rep(-Inf, n)
   partial <- which(allocation$extra > 0)
   if (length(partial)) {

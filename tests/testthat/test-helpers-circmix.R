@@ -249,7 +249,7 @@ test_that(".circmix_slot_averaging_ld() sums the information of the slots an ite
   )
 })
 
-test_that("the slot-averaging gradient in K is finite at a whole K / set_size", {
+test_that("the slot-averaging gradient in K is the right-hand slope at a whole K / set_size", {
   skip_on_cran()
   skip_if_not(
     requireNamespace("cmdstanr", quietly = TRUE),
@@ -276,9 +276,16 @@ test_that("the slot-averaging gradient in K is finite at a whole K / set_size", 
     init = list(list(K = 4)),
     error = 1e6
   ))
-  # the density has a kink in K there, so a central finite difference straddles
-  # two slopes and only finiteness is asserted
-  expect_true(all(is.finite(diagnosis$gradients()$model)))
+  # the density has a kink in K there, so diagnose()'s central difference
+  # straddles two slopes; the gradient is held to the slope on the side the
+  # allocation belongs to (K = 4 is two slots each, the start of [4, 6)), taken
+  # from the R density and moved to the log K scale Stan samples on
+  ld <- function(K) {
+    .circmix_slot_averaging_ld(matrix(cos(0.3)), matrix(0), K, 2, 6, 0.5, 81L)
+  }
+  h <- 1e-7
+  right_slope <- (ld(4 + h) - ld(4)) / h
+  expect_equal(diagnosis$gradients()$model, 4 * right_slope + 1, tolerance = 1e-5)
 })
 
 # Compares the sampler against the density it is meant to draw from. n is large
