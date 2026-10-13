@@ -155,6 +155,16 @@ check_formula.bmmodel <- function(model, data, formula) {
   stopif(length(wpar), "Unrecognized model parameters: \\
          {collapse_comma(wpar)}. {model$name} has the parameters {valid_pars}")
 
+  for (alternatives in model$alternative_parameters) {
+    given <- intersect(alternatives, names(formula))
+    stopif(
+      length(given) > 1,
+      "The formula gives both {collapse_comma(given)}, which are alternative \\
+      parameterizations of the same quantity, so only one of them can be \\
+      estimated. Keep the one whose meaning your design holds constant."
+    )
+  }
+
   formula <- add_missing_parameters(model, formula)
   warn_predictor_parameter_clash(data, formula)
   NextMethod("check_formula")
@@ -255,7 +265,8 @@ generated_parameters.default <- function(model) {
 
 add_missing_parameters <- function(model, formula = bmmformula()) {
   formula_pars <- names(formula)
-  model_pars <- names(model$parameters)
+  model_pars <- setdiff(names(model$parameters),
+                        unused_alternative_parameters(model, formula))
   fixed_pars <- names(model$fixed_parameters)
   generated_pars <- generated_parameters(model)
 
@@ -275,6 +286,15 @@ add_missing_parameters <- function(model, formula = bmmformula()) {
   # Ensure formula list matches model parameters order
   all_pars <- unique(c(model_pars, formula_pars))
   formula[all_pars]
+}
+
+# Of a set of alternative parameters only the one the formula names takes
+# part, and the first stands in when the formula names none
+unused_alternative_parameters <- function(model, formula) {
+  unlist(lapply(model$alternative_parameters, function(alternatives) {
+    given <- intersect(alternatives, names(formula))
+    setdiff(alternatives, if (length(given)) given else alternatives[1])
+  }))
 }
 
 unrecognized_parameters <- function(model, formula) {

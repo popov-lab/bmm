@@ -71,7 +71,9 @@ print_model_header <- function(model, formula, data_name, nobs) {
   cat(style("purple1")("  Model: "))
   cat(summarise_model(model, newline = TRUE, wsp = 9), "\n")
   cat(style("purple1")("  Links: "))
-  cat(summarise_links(model$links), "\n")
+  links <- model$links
+  cat(summarise_links(links[setdiff(names(links),
+                                    unused_alternative_parameters(model, formula))]), "\n")
   cat(style("purple1")("Formula: "))
   cat(collapse_lines(summarise_formula(formula, model = model), wsp = 9), "\n")
   cat(style("purple1")("   Data:"), data_name, "(Number of observations:", paste0(nobs, ")\n"))

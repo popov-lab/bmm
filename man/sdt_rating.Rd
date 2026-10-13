@@ -65,7 +65,7 @@ the log M-ratio). All three use the same confidence-rating response
 interface. See Details.}
 
 \item{links}{A named list of link functions for the parameters, e.g.
-\code{links = list(d = "log")}. Only \code{d} and \code{criterion} can be set, to
+\code{links = list(d = "log")}. Only \code{d}, \code{criterion} and \code{bias} can be set, to
 \code{"identity"}, \code{"log"}, \code{"softplus"}, \code{"logit"} or \code{"probit"}. \code{sdratio}
 and the threshold parameters keep their identity links, because the model
 reads each of them through \code{exp()} and fixes \code{sdratio} at 0 for equal
@@ -106,7 +106,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \strong{Parameters:}
 \itemize{
 \item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
-\item \code{criterion}: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{criterion}: Decision criterion, measured from the mean of the noise distribution in noise-SD units: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{bias}: Alternative to criterion: the same middle threshold measured from the midpoint between the noise and signal means (0 = neutral, positive = conservative). Use one of the two
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 }
@@ -116,7 +117,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item d = identity; criterion = identity; spacing = identity; sdratio = identity
+\item d = identity; criterion = identity; bias = identity; spacing = identity; sdratio = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -127,6 +128,12 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \code{sd}: exponential(1)
 }
 \item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0.5, 1.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{bias}:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
@@ -195,7 +202,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \strong{Parameters:}
 \itemize{
 \item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
-\item \code{criterion}: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{criterion}: Decision criterion, measured from the mean of the noise distribution in noise-SD units: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{bias}: Alternative to criterion: the same middle threshold measured from the midpoint between the noise and signal means (0 = neutral, positive = conservative). Use one of the two
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 \item \code{Ro}: Recollection of old items: probability inv_logit(Ro) that an old item is recollected as old, loading the most-confident 'signal' category
@@ -209,7 +217,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item d = identity; criterion = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity
+\item d = identity; criterion = identity; bias = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -220,6 +228,12 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \code{sd}: exponential(1)
 }
 \item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0.5, 1.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{bias}:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
@@ -267,12 +281,15 @@ and anchors the ideal point (meta-d' = \code{d}, perfect metacognition) at
 \code{logmratio = 0}, which recovers \code{standard}. Type-1 and type-2 sensitivity
 share one scale (\eqn{d'}, or \eqn{d_a} when \code{sdratio} is estimated), so the
 M-ratio is unaffected by \code{sdratio}.
-The type-1 boundary is \code{criterion}, the middle threshold, so this version
-needs an even number of rating categories: with an odd number the middle
-category straddles the boundary (see "Where \code{criterion} sits").
-The type-1 criterion is held at the same location in the meta-d' space as
-in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
-2017, Appendix).
+The type-1 boundary is the middle threshold (\code{criterion} or \code{bias}), so this
+version needs an even number of rating categories: with an odd number the
+middle category straddles the boundary (see "Where \code{criterion} and \code{bias}
+sit").
+Every threshold keeps its distance from the midpoint between the means when
+\code{d} is replaced by meta-d', as the HMeta-d toolbox's model equations do
+(Fleming, 2017, Appendix). Whether the formula estimates \code{criterion} or
+\code{bias} changes how the type-1 boundary is parameterized, not this
+constraint.
 Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &
 Lau, 2014), so its estimates differ from bmm's when the criterion is far
 from the midpoint.
@@ -299,7 +316,8 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \strong{Parameters:}
 \itemize{
 \item \code{d}: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD
-\item \code{criterion}: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{criterion}: Decision criterion, measured from the mean of the noise distribution in noise-SD units: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number
+\item \code{bias}: Alternative to criterion: the same middle threshold measured from the midpoint between the noise and signal means (0 = neutral, positive = conservative). Use one of the two
 \item \code{spacing}: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)
 \item \code{sdratio}: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance
 \item \code{logmratio}: Log M-ratio, log(meta-d/d): metacognitive efficiency. 0 is ideal metacognition (meta-d = d), negative is inefficiency, positive is hyper-efficiency. meta-d is recovered as exp(logmratio) * d, on the same scale as d
@@ -310,7 +328,7 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item d = identity; criterion = identity; spacing = identity; sdratio = identity; logmratio = identity
+\item d = identity; criterion = identity; bias = identity; spacing = identity; sdratio = identity; logmratio = identity
 }
 \item \strong{Default priors:}
 \itemize{
@@ -321,6 +339,12 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \code{sd}: exponential(1)
 }
 \item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0.5, 1.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{bias}:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
@@ -364,7 +388,7 @@ conditions that differ in \code{sdratio}; see the sensitivity section of
 the caveat that under the Gumbel distributions \eqn{d_a} is not the
 AUC-equivalent index once \code{sdratio} is estimated.
 
-The \code{criterion} and the confidence thresholds are \strong{not} rescaled. They stay
+The criterion and the confidence thresholds are \strong{not} rescaled. They stay
 on the noise-standardized axis, so under unequal variance they and \code{d} are
 in different units.
 
@@ -373,16 +397,26 @@ describes the familiarity (type-1) distributions, and meta-d' is scaled the
 same way, which leaves the M-ratio invariant to \code{sdratio}.
 }
 
-\section{Where \code{criterion} sits}{
+\section{Where \code{criterion} and \code{bias} sit}{
 
-Every \code{threshold_type} places \code{criterion} the same way. With an even number
-of categories K it is the middle threshold, the boundary between the K/2
-"noise" categories and the K/2 "signal" categories. With an odd number there
-is no such boundary -- the middle category straddles it -- so \code{criterion} is
-the centre of that category, and the two thresholds around it sit half an
-interval below and above. A shift in \code{criterion} therefore moves the whole
-threshold set, and the threshold parameters (\code{spacing}, \code{delta}) describe
-its shape around that point.
+Every \code{threshold_type} places the criterion the same way. With an even
+number of categories K it is the middle threshold, the boundary between the
+K/2 "noise" categories and the K/2 "signal" categories. With an odd number
+there is no such boundary -- the middle category straddles it -- so the
+criterion is the centre of that category, and the two thresholds around it
+sit half an interval below and above. A shift in the criterion therefore
+moves the whole threshold set, and the threshold parameters (\code{spacing},
+\code{delta}) describe its shape around that point.
+
+As in \code{\link[=sdt_yn]{sdt_yn()}}, the formula estimates that point either as \code{criterion},
+measured from the mean of the noise distribution, or as \code{bias}, measured
+from the midpoint between the noise and signal means (\code{bias = criterion - d * sqrt((1 + exp(sdratio)^2) / 2) / 2}); a formula that names neither
+estimates \code{criterion ~ 1}. The two differ in what a linear formula holds
+constant when \code{d} or \code{sdratio} varies; the section "Choosing between
+\code{criterion} and \code{bias}" of \code{\link[=sdt_yn]{sdt_yn()}} says which to choose. Threshold locations reported by
+\code{\link[=sdt_thresholds]{sdt_thresholds()}} and \code{\link[=latent_sdt]{latent_sdt()}}, and the \code{thresholds} taken by
+\code{\link[=rsdt_rating]{rsdt_rating()}} and its siblings, are positions measured from the noise
+mean.
 }
 
 \section{Identifying \code{sdratio}}{
@@ -401,7 +435,7 @@ identification caveats on the \code{\link[=sdt_yn]{sdt_yn()}} page do not carry 
 # EV-SDT rating model
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
-                              d = 1.5, thresholds = c(-0.5, 0, 0.5)))
+                              d = 1.5, thresholds = c(0.25, 0.75, 1.25)))
 
 model <- sdt_rating(
   response = c("r1", "r2", "r3", "r4"),

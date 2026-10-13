@@ -1274,6 +1274,41 @@ test_that(".ce_own_effects follows the formulas of the parameters a non-linear f
   )
 })
 
+test_that("conditional_effects() leaves out the alternative parameter the formula does not use", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit_criterion <- suppressWarnings(mock_bmm(bmf(d ~ 1, criterion ~ 1), dat, model))
+  fit_bias <- suppressWarnings(mock_bmm(bmf(d ~ 1, bias ~ 1), dat, model))
+  visited <- character(0)
+  local_mocked_bindings(.ce_single_parameter = function(x, par, scale, ...) {
+    visited <<- c(visited, par)
+    list()
+  })
+  conditional_effects(fit_criterion)
+  expect_equal(visited, c("d", "criterion"))
+  visited <- character(0)
+  conditional_effects(fit_bias)
+  expect_equal(visited, c("d", "bias"))
+})
+
+test_that("conditional_effects(par =) names the formula's own parameterization when asked for the other (#543)", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit_criterion <- suppressWarnings(mock_bmm(bmf(d ~ 1, criterion ~ 1), dat, model))
+  fit_bias <- suppressWarnings(mock_bmm(bmf(d ~ 1, bias ~ 1), dat, model))
+  local_mocked_bindings(.brms_conditional_effects = function(x, ...) list())
+  expect_error(
+    conditional_effects(fit_criterion, par = "bias"),
+    "Parameter 'bias' is not estimated in this fit: its formula uses 'criterion'",
+    fixed = TRUE
+  )
+  expect_error(
+    conditional_effects(fit_bias, par = "criterion"),
+    "Parameter 'criterion' is not estimated in this fit: its formula uses 'bias'",
+    fixed = TRUE
+  )
+})
+
 # 72 rows: enough for brms to build smooth, gp and monotonic terms
 mock_rating_terms_fit <- function(formula) {
   withr::local_seed(512)
