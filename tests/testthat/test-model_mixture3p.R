@@ -322,3 +322,24 @@ test_that("the Stan and R likelihoods agree for every version", {
     tolerance = 1e-12
   )
 })
+
+test_that("the capacity versions warn when the set size does not vary", {
+  one_size <- droplevels(oberauer_lin_2017[oberauer_lin_2017$set_size == 4, ])
+  capacity_model <- function(version) {
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:3), set_size = "set_size", version = version)
+  }
+  for (version in c("slot", "slot_averaging")) {
+    expect_warning(
+      stancode(bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), one_size, capacity_model(version)),
+      "K is estimated from the responses at set size 4"
+    )
+  }
+  expect_no_warning(
+    stancode(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), one_size, capacity_model("simple"))
+  )
+  expect_no_warning(
+    stancode(bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), oberauer_lin_2017, mixture3p(
+      "dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size", version = "slot"
+    ))
+  )
+})

@@ -322,6 +322,24 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
 }
 
 ############################################################################# !
+# CHECK_DATA METHODS                                                     ####
+############################################################################# !
+
+# check_data.non_targets() runs first and adds ss_numeric. The wording is the
+# one check_data.mixture2p() uses for the same limit.
+#' @export
+check_data.mixture3p <- function(model, data, formula) {
+  set_sizes <- unique(data$ss_numeric)
+  warnif(
+    model$version != "simple" && length(set_sizes) == 1,
+    "The set size does not vary, so the data cannot test the capacity rule of \\
+    the '{model$version}' version. K is estimated from the responses at set \\
+    size {set_sizes}, and reflects only its prior where it reaches {set_sizes}."
+  )
+  NextMethod("check_data")
+}
+
+############################################################################# !
 # CHECK_FORMULA METHODS                                                  ####
 ############################################################################# !
 
