@@ -103,7 +103,7 @@ plot(ce_kappa)
 ce_kappa_log <- conditional_effects(fit, par = "kappa", scale = "sampling")
 plot(ce_kappa_log)
 
-# Get effects for thetat (memory probability)
+# Get effects for thetat (probability of a target response)
 ce_thetat <- conditional_effects(fit, par = "thetat")
 plot(ce_thetat)
 

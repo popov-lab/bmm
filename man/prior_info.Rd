@@ -59,12 +59,13 @@ bridge sampling are undefined when any parameter has an improper prior.
 
 Parameters that exist only because the family machinery requires them are
 omitted: a fixed parameter the model does not declare (the \code{mu} brms
-forces on the custom families of the response-time models, or the \code{mu2}
-and \code{kappa2} of a two-component \code{brms::mixture()} family), and the
-mixture-weight reference component \code{theta2}, which brms lists with a
-default prior although the sampler holds it at zero. Fixed parameters the
-model does declare are reported, since the user can estimate them: \code{mu}
-for \code{sdm()}, \code{mu1} for the circular mixture models, \code{zr} for \code{ddm()}.
+forces on the custom families of the response-time models, or, in fits
+saved before bmm 1.5.0, the \code{mu2} and \code{kappa2} of a two-component
+\code{brms::mixture()} family), and the mixture-weight reference component
+\code{theta2} of those fits, which brms lists with a default prior although the
+sampler holds it at zero. Fixed parameters the model does declare are
+reported, since the user can estimate them: \code{mu} for \code{sdm()} and the
+circular mixture models, \code{zr} for \code{ddm()}.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
