@@ -48,6 +48,7 @@ Suggests:
     ggplot2,
     ggthemes,
     knitr,
+    lavaan,
     loo (>= 2.10.0),
     mixtur,
     MPTinR,

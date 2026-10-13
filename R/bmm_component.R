@@ -132,15 +132,31 @@ bmm_component <- function(formula, model = NULL, family = NULL, data, prior = NU
   if (missing(e2)) {
     return(e1)
   }
-  new_mvbmmformula(c(component_list(e1), component_list(e2)))
+  latent <- c(latent_list(e1), latent_list(e2))
+  stopif(
+    length(latent) > 1,
+    "A multivariate bmm model can have only one latent structure created by \\
+    bmm_latent()."
+  )
+  new_mvbmmformula(c(component_list(e1), component_list(e2)), if (length(latent)) latent[[1]])
 }
 
 #' @rdname bmm_component
 #' @export
 "+.mvbmmformula" <- `+.bmm_component`
 
-new_mvbmmformula <- function(components) {
-  structure(components, class = "mvbmmformula")
+new_mvbmmformula <- function(components, latent = NULL) {
+  structure(components, class = "mvbmmformula", latent = latent)
+}
+
+latent_list <- function(x) {
+  if (is_bmm_latent(x)) {
+    return(list(x))
+  }
+  if (is_mvbmmformula(x) && !is.null(attr(x, "latent"))) {
+    return(list(attr(x, "latent")))
+  }
+  list()
 }
 
 is_mvbmmformula <- function(x) {
@@ -152,11 +168,14 @@ is_bmm_component <- function(x) {
 }
 
 component_list <- function(x) {
+  if (is_bmm_latent(x)) {
+    return(list())
+  }
   if (is_bmm_component(x)) {
     return(list(x))
   }
   if (is_mvbmmformula(x)) {
-    return(unclass(x))
+    return(c(unclass(x)))
   }
   stop2(
     "Objects of class '{class(x)[1]}' cannot be part of a multivariate bmm \\
@@ -182,6 +201,9 @@ print.mvbmmformula <- function(x, ...) {
     cat(style("green")(paste0("Component ", i, ":\n")))
     print(x[[i]])
     cat("\n")
+  }
+  if (!is.null(attr(x, "latent"))) {
+    print(attr(x, "latent"))
   }
   invisible(x)
 }

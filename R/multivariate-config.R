@@ -100,7 +100,13 @@ configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior
   )
   components <- lapply(spec, mv_configure_component, frame_args = frame_args)
   validate_component_resps(components)
-  check_shared_random_effects(spec)
+  latent <- attr(spec, "latent")
+  if (is.null(latent)) {
+    check_shared_random_effects(spec)
+  } else {
+    latent <- latent_structure(latent, components)
+    components <- rewrite_latent_terms(components, latent)
+  }
   warn_factor_level_mismatch(spec)
 
   formula <- Reduce(`+`, lapply(components, function(x) x$cfg$formula)) +
@@ -112,6 +118,10 @@ configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior
   data_names <- vapply(components, function(x) x$data_name %||% "data", character(1))
   attr(data, "data_name") <- paste(unique(data_names), collapse = " + ")
   stanvars <- merge_stanvars(lapply(components, function(x) x$cfg$stanvars))
+  if (!is.null(latent)) {
+    latent <- latent_locate_block(latent, formula, data)
+    stanvars <- merge_stanvars(list(stanvars, latent_stanvars(latent)))
+  }
   component_priors <- Reduce(
     combine_prior,
     lapply(components, function(x) x$prior),
@@ -131,7 +141,7 @@ configure_fit.mvbmmformula <- function(formula, data = NULL, model = NULL, prior
   })
   nlist(
     config_args, prior,
-    model = structure(components, class = "bmm_components"),
+    model = structure(components, class = "bmm_components", latent = latent),
     user_formula = spec
   )
 }
@@ -312,7 +322,10 @@ postprocess_brm.bmm_components <- function(model, fit, ...) {
   class(fit) <- c("mvbmmfit", "bmmfit", "brmsfit")
   fit <- add_bmm_fit_info(
     fit,
-    nlist(components = unclass(model), configure_opts = dots$configure_opts),
+    nlist(
+      components = c(unclass(model)), latent = attr(model, "latent"),
+      configure_opts = dots$configure_opts
+    ),
     dots$fit_args
   )
   reset_env(fit)
