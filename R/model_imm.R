@@ -106,6 +106,14 @@
   out
 }
 
+# b is fixed to 0 on its log link, the background of 1 that the other
+# activations are weighed against; on another link that fixed value would be
+# another background, so its link stays
+#' @exportS3Method
+settable_links.imm <- function(model) {
+  setdiff(names(model$links), "b")
+}
+
 # user facing alias
 
 #' @title `r .model_imm()$name`

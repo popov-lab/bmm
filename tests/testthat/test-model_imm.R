@@ -460,3 +460,15 @@ test_that("the generated likelihood passes each parameter to its place in the co
   }, numeric(1))
   expect_equal(as.numeric(fit$draws("out")), unname(r_side), tolerance = 1e-10)
 })
+
+test_that("the link of the fixed background activation cannot be changed", {
+  # b = 0 on the log link is the background of 1 the activations are weighed
+  # against; on another link the same fixed value is another model
+  expect_error(
+    imm_model(links = list(b = "identity")),
+    "The link of 'b' cannot be changed in imm"
+  )
+  expect_error(imm_model("abc", links = list(b = "softplus")), "cannot be changed")
+  expect_silent(imm_model(links = list(c = "softplus")))
+  expect_silent(imm_model(links = list(b = "log")))
+})
