@@ -118,6 +118,15 @@ test_that("rimm() draws from dimm()", {
   compare(mu = c(0, 2, -1.5), dist = c(0, 0.5, 2), c = 5, a = 2, b = 1, s = 2, kappa = 8, tau = 1)
 })
 
+test_that("rimm() keeps its spread at high precision", {
+  # a sampler on a grid of locations loses spread at large kappa (#434); b is
+  # tiny so that no draw is a guess
+  withr::local_seed(434)
+  draws <- rimm(1e5, mu = 0, dist = 0, c = 1, a = 1, b = 1e-12, s = 1, kappa = 1e4)
+  # 1 / sqrt(J(1e4)), the sd of a von Mises at this precision
+  expect_equal(sd(draws), 0.0100003, tolerance = 0.01)
+})
+
 test_that("configure_model() drops the set-size sentinel machinery", {
   code <- stancode(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1), oberauer_lin_2017, imm_model())
   expect_match(code, "imm_full_lpdf")
