@@ -116,7 +116,7 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   mixture-weight reference component `theta2`, which brms lists with a
 #'   default prior although the sampler holds it at zero. Fixed parameters the
 #'   model does declare are reported, since the user can estimate them: `mu`
-#'   for `sdm()`, `mu1` for the circular mixture models, `zr` for `ddm()`.
+#'   for `sdm()` and the circular mixture models, `zr` for `ddm()`.
 #' @return A `data.frame` of class `bmm_prior_info` with columns
 #'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
 #'   Subsetting the report with `[` returns a plain `data.frame`, as the
