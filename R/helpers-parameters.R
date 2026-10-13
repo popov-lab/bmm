@@ -194,6 +194,9 @@ parameter_info.bmmodel <- function(x, formula = NULL, ...) {
     ))
   }
 
+  if (!is.null(formula)) {
+    model$parameters[unused_alternative_parameters(model, formula)] <- NULL
+  }
   pars <- names(model$parameters)
   if (length(pars) == 0) {
     message2("This model has no parameters defined.")
@@ -541,7 +544,10 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   x <- restructure(x)
   scale <- match.arg(scale)
 
-  model_pars <- names(x$bmm$model$parameters)
+  model_pars <- setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  )
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
   pars <- pars %||% model_pars
   unknown <- pars[not_in(pars, model_pars)]
