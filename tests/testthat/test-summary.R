@@ -132,3 +132,15 @@ test_that("SDT summaries name d as d_a for a user-fixed non-zero sdratio too", {
                                               fixed), color = FALSE))
   expect_true(any(grepl("d is d_a", out)))
 })
+
+test_that("the Links line lists only the alternative parameter the formula uses", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1, bias ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "bias = identity", fixed = TRUE)
+  expect_no_match(links, "criterion", fixed = TRUE)
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "criterion = identity", fixed = TRUE)
+  expect_no_match(links, "bias", fixed = TRUE)
+})

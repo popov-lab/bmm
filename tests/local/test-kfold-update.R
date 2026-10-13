@@ -1,5 +1,4 @@
-# Needs sampling: run by hand with
-#   NOT_CRAN=true testthat::test_file("tests/internal/test-kfold-update.R")
+# Needs sampling: runs with the local tests (Rscript tests/local/run.R)
 # kfold() and reloo() refit with update(newdata = <slice of fit$data>)
 
 skip_if_not_installed("cmdstanr")
