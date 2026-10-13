@@ -41,8 +41,9 @@ between the distributions in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}
 
 \item{thresholds}{Numeric vector of length K-1 with the ordered decision
 thresholds, or an n-by-(K-1) matrix with one row per observation. The
-thresholds are on the noise-standardized axis and are not rescaled by
-\code{sdratio}.}
+thresholds are positions on the noise-standardized axis, measured from
+the mean of the noise distribution (the signal mean sits at
+\code{d * sqrt((1 + sdratio^2) / 2)}), and are not rescaled by \code{sdratio}.}
 
 \item{metad}{Numeric vector. Metacognitive sensitivity (type-2 sensitivity),
 on the same scale as \code{d} (\eqn{d'}, or \eqn{d_a} when \code{sdratio} is not
@@ -83,11 +84,11 @@ be even (an odd number of \code{thresholds}).
 \examples{
 # Density for a single observation (K=4) with imperfect metacognition
 dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
-           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
+           d = 1.5, thresholds = c(0.25, 0.75, 1.25), metad = 1.0)
 # Generate meta-d' rating data (K=4) for 10 subjects and both stimulus types
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, d = 1.5,
-                             thresholds = c(-0.5, 0, 0.5), metad = 1.0))
+                             thresholds = c(0.25, 0.75, 1.25), metad = 1.0))
 head(dat)
 }
 \references{

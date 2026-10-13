@@ -219,7 +219,8 @@ conditional_effects.bmmfit <- function(x,
 .ce_all_parameters <- function(x, scale, ...) {
   model <- x$bmm$model
   estimated_pars <- setdiff(names(model$parameters),
-                            names(model$fixed_parameters))
+                            c(names(model$fixed_parameters),
+                              unused_alternative_parameters(model, x$bmm$user_formula)))
   all_effects <- list()
   for (p in estimated_pars) {
     ce <- .ce_single_parameter(x, par = p, scale = scale, ...)
