@@ -374,3 +374,80 @@ test_that("the set-size-1 warning names exactly the coefficients no other trial 
     character(0)
   )
 })
+
+test_that("the generated likelihood passes each parameter to its place in the core", {
+  skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required to compile the imm likelihood"
+  )
+  # the cores are checked against R above; this checks the generated wrappers
+  # that brms calls, whose argument order is built from the version tables
+  cases <- list(
+    full = list(version = "full", formula = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)),
+    bsc = list(version = "bsc", formula = bmf(kappa ~ 1, c ~ 1, s ~ 1)),
+    abc = list(version = "abc", formula = bmf(kappa ~ 1, c ~ 1, a ~ 1)),
+    full_vp = list(version = "full", formula = bmf(kappa ~ 1, tau ~ 1, c ~ 1, a ~ 1, s ~ 1),
+      variable_precision = TRUE)
+  )
+  values <- c(
+    y = 0.7, mu = 0.1, kappa = 6, tau = 0.8, c = 3, a = 0.5, s = 1.5, b = 1.2,
+    ss = 5, setNames(c(2, -1.5, 1, -0.4, 2.8, 0.3, -2), paste0("nt", 1:7)),
+    setNames(c(0.3, 1.5, 2, 0.8, 2.5, 1.1, 0.6), paste0("dist", 1:7))
+  )
+  wrappers <- character(0)
+  calls <- character(0)
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    model <- check_model(
+      imm_model(case$version, variable_precision = isTRUE(case$variable_precision)),
+      oberauer_lin_2017, case$formula
+    )
+    data <- check_data(model, oberauer_lin_2017, case$formula)
+    family <- paste0("imm_", case$version)
+    code <- configure_model(model, data, case$formula)$stanvars[[paste0(family, "_lpdf")]]$scode
+    code <- gsub(paste0(family, "_lpdf"), paste0("w_", name, "_lpdf"), code, fixed = TRUE)
+    wrappers <- c(wrappers, code)
+    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1", strsplit(code, "\n")[[1]][1])
+    arg_names <- sub(".* ", "", strsplit(signature, ", ")[[1]])
+    arg_values <- ifelse(arg_names %in% names(values),
+      format(values[arg_names], digits = 17), arg_names
+    )
+    arg_values[arg_names == "ss"] <- as.character(as.integer(values[["ss"]]))
+    calls <- c(calls, glue::glue(
+      "out[{length(calls) + 1}] = w_{name}_lpdf({arg_values[1]} | ",
+      "{paste(arg_values[-1], collapse = ', ')});"
+    ))
+  }
+  program <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "imm_funs.stan", package = "bmm")), "\n",
+    paste(wrappers, collapse = "\n"), "}\n",
+    "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
+    " real circmix_logJ_min; real circmix_dlogJ; }\n",
+    "generated quantities { vector[", length(calls), "] out;\n",
+    paste(calls, collapse = "\n"), "\n}\n"
+  )
+  tab <- .circmix_kappa_table()
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = list(
+      NK = length(tab$logkappa), circmix_logk = tab$logkappa,
+      circmix_dlogk = tab$dlogkappa, circmix_logJ_min = tab$logJ_min,
+      circmix_dlogJ = tab$dlogJ
+    ),
+    fixed_param = TRUE, iter_sampling = 1, chains = 1, refresh = 0,
+    show_messages = FALSE, sig_figs = 18
+  )
+  r_side <- vapply(cases, function(case) {
+    v <- case$version
+    .dimm_version(values[["y"]], values[["mu"]], values[["kappa"]],
+      c = values[["c"]], a = if (v != "bsc") values[["a"]],
+      s = if (v != "abc") values[["s"]], b = values[["b"]], set_size = values[["ss"]],
+      nt = values[paste0("nt", 1:7)], dist = values[paste0("dist", 1:7)],
+      tau = if (isTRUE(case$variable_precision)) values[["tau"]] else 0,
+      nodes = 81L, version = v
+    )
+  }, numeric(1))
+  expect_equal(as.numeric(fit$draws("out")), unname(r_side), tolerance = 1e-10)
+})
