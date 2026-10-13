@@ -5,7 +5,9 @@
 #' @param object An object of class `bmmfit`
 #' @param formula. A [bmmformula()]. If missing, the original formula
 #'  is used. Currently you have to specify a full `bmmformula`
-#' @param newdata An optional data frame containing the variables in the model
+#' @param newdata An optional data frame containing the variables in the model.
+#'   Rows of `fit$data` are accepted as they are, which is how [brms::kfold()]
+#'   and [brms::reloo()] pass them.
 #' @param recompile Logical, indicating whether the Stan model should be recompiled. If
 #'   NULL (the default), update tries to figure out internally, if recompilation
 #'   is necessary. Setting it to FALSE will cause all Stan code changing
@@ -126,8 +128,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     logical(1)
   )]
 
-  if (is.null(newdata)) {
-    data <- check_stored_data(model, olddata, user_formula)
+  if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
+    data <- check_stored_data(model, newdata %||% olddata, user_formula)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
@@ -143,8 +145,11 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # freshly configured one -- the stale constant() of a freed or re-valued
   # parameter and the stale free prior of a newly fixed one alike. brms stores
   # the main dpar without a `dpar` label, so its rows are the ones carrying
-  # neither label
-  old_prior <- object$prior
+  # neither label. Rows brms filled in itself are left out, as
+  # brms::update.brmsfit() leaves them out: a flat default for the class of an
+  # intercept-only parameter would otherwise override bmm's prior on the
+  # predictors a new formula adds
+  old_prior <- object$prior[object$prior$source != "default", ]
   if (length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
@@ -243,6 +248,22 @@ check_stored_data <- function(model, data, formula) {
     data[[var]] <- NULL
   }
   data
+}
+
+# brms::kfold() and reloo() hand update() slices of the fit's own model frame,
+# not data in the layout bmm() was given. Data are such a slice when
+# revert_check_data() has something to change in the stored frame, they carry
+# every column of it (the generated ones included) and lack the ones it
+# restores. A user's own column Y is not enough: the other generated columns
+# are missing. A fit that revert_check_data() refuses to rebuild is updated
+# with the user's data (its error says so), so a refusal means no model frame
+is_stored_frame <- function(model, stored, data) {
+  reverted <- tryCatch(revert_check_data(model, stored), error = function(e) NULL)
+  if (is.null(reverted) || setequal(names(reverted), names(stored))) {
+    return(FALSE)
+  }
+  restored <- setdiff(names(reverted), names(stored))
+  all(names(stored) %in% names(data)) && !any(restored %in% names(data))
 }
 
 # Dispatch runs general to specific, so every method chains with NextMethod():
