@@ -88,9 +88,7 @@ test_that("the default sdratio prior brackets the group-level estimates", {
   # 1.26 signal over noise, and the broeder_schuetz_2009_e3 posterior gives
   # 1.46 [1.25, 1.71]. The prior has to reach past the widest ratio those
   # support and still keep its mass off ratios above 2, which recognition does
-  # not produce -- one-sided, "covers the empirical range" cannot fail. The
-  # upper bound matters twice for ranking: .ranking_gh_n() is calibrated over
-  # ratios in [0.5, 2.0].
+  # not produce -- one-sided, "covers the empirical range" cannot fail.
   models <- list(sdt_yn("n_old", "stimulus", "n_trials"),
                  sdt_ranking(paste0("rank", 1:4), m = 4, dist = "normal"))
   for (model in models) {
@@ -181,10 +179,11 @@ test_that("sdt_d computes correct values for normal distribution", {
   expect_equal(sdt_d(hr, far, dist = "normal"), 2, tolerance = 1e-10)
 })
 
-test_that("sdt_criterion computes correct values for normal distribution", {
+test_that("sdt_criterion and sdt_bias compute correct values for normal distribution", {
   hr <- pnorm(1)
   far <- pnorm(-1)
-  expect_equal(sdt_criterion(hr, far, dist = "normal"), 0, tolerance = 1e-10)
+  expect_equal(sdt_criterion(hr, far, dist = "normal"), 1, tolerance = 1e-10)
+  expect_equal(sdt_bias(hr, far, dist = "normal"), 0, tolerance = 1e-10)
 })
 
 test_that("sdt_d validates input", {
@@ -288,20 +287,20 @@ test_that("a format without a stimulus other-var skips the confound check", {
 test_that(".sdt_eta is vectorized over all arguments", {
   eta <- bmm:::.sdt_eta(1.5, 0.2, c(0, 1))
   expect_length(eta, 2)
-  expect_equal(eta[1], -1.5/2 - 0.2)
-  expect_equal(eta[2], 1.5/2 - 0.2)
+  expect_equal(eta[1], -0.2)
+  expect_equal(eta[2], 1.5 - 0.2)
 
   eta <- bmm:::.sdt_eta(c(1.0, 2.0), 0.2, c(0, 1))
   expect_length(eta, 2)
-  expect_equal(eta[1], -1.0/2 - 0.2)
-  expect_equal(eta[2], 2.0/2 - 0.2)
+  expect_equal(eta[1], -0.2)
+  expect_equal(eta[2], 2.0 - 0.2)
 
   # `d` is d_a, so the separation in noise units is d * sqrt((1 + r^2) / 2)
   s <- sqrt((1 + c(1.0, 1.3)^2) / 2)
   eta <- bmm:::.sdt_eta(1.5, 0.2, c(0, 1), sdratio = c(1.0, 1.3))
   expect_length(eta, 2)
-  expect_equal(eta[1], -1.5 * s[1] / 2 - 0.2)
-  expect_equal(eta[2], (1.5 * s[2] / 2 - 0.2) / 1.3)
+  expect_equal(eta[1], -0.2)
+  expect_equal(eta[2], (1.5 * s[2] - 0.2) / 1.3)
 })
 
 test_that(".sdt_eta divides only the signal trials by sdratio", {

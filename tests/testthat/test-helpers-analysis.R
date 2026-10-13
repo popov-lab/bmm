@@ -856,11 +856,12 @@ test_that("latent_sdt() binary returns noise/signal densities + criterion line",
   expect_equal(nrow(lat), 2L * 200L)
   expect_true(all(lat$density >= 0))
 
-  # densities are the standard normal at -d/2 (noise) and +d/2 (signal, SD 1)
+  # densities are the standard normal at 0 (noise) and d (signal, SD 1): the
+  # axis the criterion is measured on
   noise  <- lat[lat$distribution == "noise", ]
   signal <- lat[lat$distribution == "signal", ]
-  expect_equal(noise$density,  dnorm(noise$x, -dp / 2), tolerance = 1e-10)
-  expect_equal(signal$density, dnorm(signal$x, dp / 2), tolerance = 1e-10)
+  expect_equal(noise$density,  dnorm(noise$x, 0), tolerance = 1e-10)
+  expect_equal(signal$density, dnorm(signal$x, dp), tolerance = 1e-10)
 
   ln <- attr(lat, "lines")
   expect_equal(nrow(ln), 1L)
@@ -872,7 +873,8 @@ test_that("latent_sdt() binary returns noise/signal densities + criterion line",
   area <- sum(diff(noise$x[keep]) *
               (utils::head(noise$density[keep], -1L) +
                utils::tail(noise$density[keep], -1L)) / 2)
-  expect_equal(area, pnorm(-dp / 2 - ln$position), tolerance = 0.02)
+  # integrated from the first grid point past the line, so compare from there
+  expect_equal(area, pnorm(-min(noise$x[keep])), tolerance = 0.001)
 })
 
 test_that("latent_sdt() rating returns ordered threshold lines per condition", {
@@ -948,13 +950,12 @@ test_that("latent_sdt() UV widens the signal distribution by exp(sdratio)", {
   lat    <- latent_sdt(fit, n_grid = 200L)
   signal <- lat[lat$distribution == "signal", ]
   noise  <- lat[lat$distribution == "noise", ]
-  # d is d_a, so the densities sit at +/- sep/2 with sep the separation in
-  # noise-SD units -- not at +/- d/2, which would understate it whenever
-  # sdratio > 0.
+  # d is d_a, so the signal density sits at sep, the separation in noise-SD
+  # units -- not at d, which would understate it whenever sdratio > 0.
   sep <- 1.2 * sqrt((1 + exp(sdr)^2) / 2)
-  expect_equal(signal$density, dnorm(signal$x, sep / 2, exp(sdr)),
+  expect_equal(signal$density, dnorm(signal$x, sep, exp(sdr)),
                tolerance = 1e-10)
-  expect_equal(noise$density, dnorm(noise$x, -sep / 2, 1), tolerance = 1e-10)
+  expect_equal(noise$density, dnorm(noise$x, 0, 1), tolerance = 1e-10)
 })
 
 test_that("latent_sdt() density separation is d_a in RMS-SD units", {
@@ -1391,4 +1392,51 @@ test_that("a column subset that lost its attributes prints as a data frame", {
                      capture.output(print.data.frame(sub)),
                      info = class(obj)[1])
   }
+})
+
+test_that("a bias fit and its criterion twin give the same ROC points and lines", {
+  # criterion = bias + sep / 2 describes the same observer, so every derived
+  # quantity must agree once the bias is moved onto the noise-mean axis
+  bias <- c(-0.8, -0.3, 0, 0.3, 0.8)
+  sep <- 1.2 * sqrt((1 + 1.3^2) / 2)
+  mock <- function(anchor_par, values) {
+    draws <- list(d = 1.2, sdratio = log(1.3))
+    draws[[anchor_par]] <- values
+    mock_linpred_factory(draws)
+  }
+  run <- function(anchor_par, values) {
+    fit <- fake_binary_fit(uv = TRUE, multi = TRUE, anchor = anchor_par)
+    local_mocked_bindings(
+      posterior_linpred = mock(anchor_par, values),
+      ranef = function(...) list(id = array(0, dim = c(1, 1, 1))),
+      variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+      .package = "brms"
+    )
+    list(points = attr(roc_sdt(fit), "points"),
+         lines = attr(latent_sdt(fit, n_grid = 50L), "lines"))
+  }
+  from_bias <- run("bias", bias)
+  from_crit <- run("criterion", bias + sep / 2)
+  expect_equal(nrow(from_bias$points), 5L)
+  expect_equal(from_bias$points, from_crit$points, tolerance = 1e-12)
+  expect_equal(from_bias$lines$position, bias + sep / 2, tolerance = 1e-12)
+  expect_equal(from_bias$lines, from_crit$lines, tolerance = 1e-12)
+})
+
+test_that("sdt_thresholds() puts a bias fit's thresholds on the noise-mean axis", {
+  run <- function(anchor_par, value) {
+    fit <- fake_rating_fit(uv = TRUE, anchor = anchor_par)
+    draws <- list(d = 1.2, spacing = log(0.4), sdratio = 0.3)
+    draws[[anchor_par]] <- value
+    local_mocked_bindings(
+      posterior_linpred = mock_linpred_factory(draws),
+      variables = function(...) c("b_d_Intercept", "bsp_sdratio"),
+      .package = "brms"
+    )
+    attr(sdt_thresholds(fit), "summary")
+  }
+  sep <- 1.2 * sqrt((1 + exp(0.3)^2) / 2)
+  from_bias <- run("bias", -0.1)
+  expect_equal(from_bias, run("criterion", -0.1 + sep / 2), tolerance = 1e-12)
+  expect_equal(from_bias$position[3], -0.1 + sep / 2, tolerance = 1e-12)
 })

@@ -226,21 +226,28 @@
       "distributions in units of their root-mean-square SD"
     ),
     criterion = paste0(
-      "Response bias, on the noise-standardized axis: the middle threshold ",
-      "(the old/new boundary) for an even number of categories, the centre ",
-      "of the middle category for an odd number"
+      "Decision criterion, measured from the mean of the noise distribution in ",
+      "noise-SD units: the middle threshold (the old/new boundary) for an even ",
+      "number of categories, the centre of the middle category for an odd number"
+    ),
+    bias = paste0(
+      "Alternative to criterion: the same middle threshold measured from the ",
+      "midpoint between the noise and signal means (0 = neutral, positive = ",
+      "conservative). Use one of the two"
     )
   )
   # sd rates as in sdt_yn, so the same subjects shrink the same way whichever
   # SDT model they are fitted with: rate 1 for the sensitivity d, whose
   # between-subject SD is ~0.6 on broeder_schuetz_2009_e3 and 0.30 on
-  # meyer_grant_jakob_2025, and rate 2 for criterion (~0.15 there) and for the
-  # log-scale sdratio.
+  # meyer_grant_jakob_2025, and rate 2 for bias (~0.15 there) and for the
+  # log-scale sdratio; criterion carries half of d's spread on top of bias's
+  # and takes rate 1, as in sdt_yn, whose comment gives the measurement.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-    criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
+    criterion = list(main = "normal(0.5, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+    bias = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
   )
-  param_links <- list(d = "identity", criterion = "identity")
+  param_links <- list(d = "identity", criterion = "identity", bias = "identity")
 
   threshold_parts <- .sdt_threshold_parameter_parts(n_ratings, threshold_type)
   parameters <- c(parameters, threshold_parts$parameters)
@@ -263,7 +270,8 @@
   # underflows to log_diff_exp(-Inf, -Inf) = NaN, so every chain rejects its
   # initial value.
   init_ranges <- list(
-    d = c(0.5, 1.5), criterion = c(-0.5, 0.5), sdratio = c(-0.3, 0.3)
+    d = c(0.5, 1.5), criterion = c(0, 1), bias = c(-0.5, 0.5),
+    sdratio = c(-0.3, 0.3)
   )
   for (p in names(threshold_parts$parameters)) {
     init_ranges[[p]] <- if (p == "spacing") c(-0.7, -0.2) else c(-0.5, 0.2)
@@ -297,6 +305,7 @@
       parameters = parameters,
       links = param_links,
       fixed_parameters = fixed_parameters,
+      alternative_parameters = list(c("criterion", "bias")),
       default_priors = default_priors,
       init_ranges = init_ranges
     ),
@@ -309,11 +318,11 @@
 # `sdratio` is fixed at 0 and read as a log SD ratio (the Stan code takes its
 # exp()), and every threshold parameter is read the same way, so neither
 # survives a change of link: it would rescale the fixed value and stack a
-# second transformation on the exp(). `d` and `criterion` fix nothing, so
-# their links stay settable, as in sdt_yn.
+# second transformation on the exp(). `d`, `criterion` and `bias` fix nothing,
+# so their links stay settable, as in sdt_yn.
 #' @exportS3Method
 settable_links.sdt_rating <- function(model) {
-  c("d", "criterion")
+  c("d", "criterion", "bias")
 }
 
 # the links are applied by substituting the inverse link into the multinomial
@@ -371,12 +380,15 @@ settable_link_functions.sdt_rating <- function(model) {
 #' `logmratio = 0`, which recovers `standard`. Type-1 and type-2 sensitivity
 #' share one scale (\eqn{d'}, or \eqn{d_a} when `sdratio` is estimated), so the
 #' M-ratio is unaffected by `sdratio`.
-#' The type-1 boundary is `criterion`, the middle threshold, so this version
-#' needs an even number of rating categories: with an odd number the middle
-#' category straddles the boundary (see "Where `criterion` sits").
-#' The type-1 criterion is held at the same location in the meta-d' space as
-#' in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
-#' 2017, Appendix).
+#' The type-1 boundary is the middle threshold (`criterion` or `bias`), so this
+#' version needs an even number of rating categories: with an odd number the
+#' middle category straddles the boundary (see "Where `criterion` and `bias`
+#' sit").
+#' Every threshold keeps its distance from the midpoint between the means when
+#' `d` is replaced by meta-d', as the HMeta-d toolbox's model equations do
+#' (Fleming, 2017, Appendix). Whether the formula estimates `criterion` or
+#' `bias` changes how the type-1 boundary is parameterized, not this
+#' constraint.
 #' Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &
 #' Lau, 2014), so its estimates differ from bmm's when the criterion is far
 #' from the midpoint.
@@ -398,7 +410,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #' the caveat that under the Gumbel distributions \eqn{d_a} is not the
 #' AUC-equivalent index once `sdratio` is estimated.
 #'
-#' The `criterion` and the confidence thresholds are **not** rescaled. They stay
+#' The criterion and the confidence thresholds are **not** rescaled. They stay
 #' on the noise-standardized axis, so under unequal variance they and `d` are
 #' in different units.
 #'
@@ -406,15 +418,26 @@ settable_link_functions.sdt_rating <- function(model) {
 #' describes the familiarity (type-1) distributions, and meta-d' is scaled the
 #' same way, which leaves the M-ratio invariant to `sdratio`.
 #'
-#' @section Where `criterion` sits:
-#' Every `threshold_type` places `criterion` the same way. With an even number
-#' of categories K it is the middle threshold, the boundary between the K/2
-#' "noise" categories and the K/2 "signal" categories. With an odd number there
-#' is no such boundary -- the middle category straddles it -- so `criterion` is
-#' the centre of that category, and the two thresholds around it sit half an
-#' interval below and above. A shift in `criterion` therefore moves the whole
-#' threshold set, and the threshold parameters (`spacing`, `delta`) describe
-#' its shape around that point.
+#' @section Where `criterion` and `bias` sit:
+#' Every `threshold_type` places the criterion the same way. With an even
+#' number of categories K it is the middle threshold, the boundary between the
+#' K/2 "noise" categories and the K/2 "signal" categories. With an odd number
+#' there is no such boundary -- the middle category straddles it -- so the
+#' criterion is the centre of that category, and the two thresholds around it
+#' sit half an interval below and above. A shift in the criterion therefore
+#' moves the whole threshold set, and the threshold parameters (`spacing`,
+#' `delta`) describe its shape around that point.
+#'
+#' As in [sdt_yn()], the formula estimates that point either as `criterion`,
+#' measured from the mean of the noise distribution, or as `bias`, measured
+#' from the midpoint between the noise and signal means (`bias = criterion -
+#' d * sqrt((1 + exp(sdratio)^2) / 2) / 2`); a formula that names neither
+#' estimates `criterion ~ 1`. The two differ in what a linear formula holds
+#' constant when `d` or `sdratio` varies; the section "Choosing between
+#' `criterion` and `bias`" of [sdt_yn()] says which to choose. Threshold locations reported by
+#' [sdt_thresholds()] and [latent_sdt()], and the `thresholds` taken by
+#' [rsdt_rating()] and its siblings, are positions measured from the noise
+#' mean.
 #'
 #' @section Identifying `sdratio`:
 #' Unlike [sdt_yn()], a rating design identifies `sdratio` from a single
@@ -468,7 +491,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #'   the log M-ratio). All three use the same confidence-rating response
 #'   interface. See Details.
 #' @param links A named list of link functions for the parameters, e.g.
-#'   `links = list(d = "log")`. Only `d` and `criterion` can be set, to
+#'   `links = list(d = "log")`. Only `d`, `criterion` and `bias` can be set, to
 #'   `"identity"`, `"log"`, `"softplus"`, `"logit"` or `"probit"`. `sdratio`
 #'   and the threshold parameters keep their identity links, because the model
 #'   reads each of them through `exp()` and fixes `sdratio` at 0 for equal
@@ -516,7 +539,7 @@ settable_link_functions.sdt_rating <- function(model) {
 #' # EV-SDT rating model
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
-#'                               d = 1.5, thresholds = c(-0.5, 0, 0.5)))
+#'                               d = 1.5, thresholds = c(0.25, 0.75, 1.25)))
 #'
 #' model <- sdt_rating(
 #'   response = c("r1", "r2", "r3", "r4"),
@@ -637,18 +660,20 @@ check_data.sdt_rating <- function(model, data, formula) {
   .sdt_rating_variants[[model$version]] %||% .sdt_rating_variants$standard
 }
 
-# cat, K, dist, and threshold type travel as integer literals so the same
-# non-linear call resolves against both the generated Stan function and the R
-# companion. spacing is the parameter when present, otherwise the literal 0
-# (threshold types without spacing ignore it).
-.sdt_rating_logmu_args <- function(model) {
+# cat, K, dist, threshold type and anchor travel as integer literals so the
+# same non-linear call resolves against both the generated Stan function and
+# the R companion. spacing is the parameter when present, otherwise the literal
+# 0 (threshold types without spacing ignore it). `anchor` is the parameter the
+# formula estimates for the middle threshold, `criterion` (1) or `bias` (2).
+.sdt_rating_logmu_args <- function(model, anchor) {
   has_spacing <- "spacing" %in% names(model$parameters)
   # d and criterion reach the kernel on the natural scale, so a non-identity
   # link is inverted here, as apply_links() does for m3
   c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
     match(model$other_vars$threshold_type, .sdt_threshold_types),
+    match(anchor, c("criterion", "bias")),
     deparse(inv_link("d", model$links$d)),
-    deparse(inv_link("criterion", model$links$criterion)),
+    deparse(inv_link(anchor, model$links[[anchor]])),
     if (has_spacing) "spacing" else "0", "sdratio",
     .sdt_rating_variant(model)$extra_params,
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
@@ -663,7 +688,7 @@ check_data.sdt_rating <- function(model, data, formula) {
   extra <- variant$extra_params
 
   signature <- paste(
-    c("int cat", "int K", "int dist_type", "int thresh_type",
+    c("int cat", "int K", "int dist_type", "int thresh_type", "int anchor",
       "real d", "real criterion", "real spacing", "real sdratio",
       if (length(extra)) paste("real", extra),
       "real stimulus", if (nd) paste("real", delta_names)),
@@ -680,7 +705,9 @@ check_data.sdt_rating <- function(model, data, formula) {
   paste0(
     "real ", variant$logmu_fun, "(", signature, ") {\n",
     delta_decl,
-    "  vector[K - 1] thr = sdt_make_thresholds_rating(criterion, spacing, deltas, K, thresh_type);\n",
+    "  // a bias is measured from the midpoint, the thresholds from the noise mean\n",
+    "  real crit = anchor == 2 ? criterion + d * sdt_rms_scale(exp(sdratio)) / 2.0 : criterion;\n",
+    "  vector[K - 1] thr = sdt_make_thresholds_rating(crit, spacing, deltas, K, thresh_type);\n",
     "  return ", variant$logmu_cat_call, ";\n",
     "}\n"
   )
@@ -699,7 +726,8 @@ check_data.sdt_rating <- function(model, data, formula) {
 bmf2bf.sdt_rating <- function(model, formula) {
   resp_cats <- model$resp_vars$response
   fun <- .sdt_rating_variant(model)$logmu_fun
-  args <- paste(.sdt_rating_logmu_args(model), collapse = ", ")
+  args <- paste(.sdt_rating_logmu_args(model, .sdt_anchor_parameter(formula)),
+                collapse = ", ")
 
   bform <- brms::bf(
     glue("Y | trials(nTrials) ~ {fun}(1, {args})"),
@@ -753,6 +781,9 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @param K Integer number of rating categories.
 #' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).
 #' @param thresh Integer threshold-parameterization id.
+#' @param anchor Integer: 1 when `criterion` is measured from the noise mean, 2
+#'   when it is the `bias` parameter, measured from the midpoint between the
+#'   means.
 #' @param d,criterion,spacing,sdratio Model parameters (draws-by-observation
 #'   matrices supplied by brms). `d` is d', or d_a when sdratio is not 0;
 #'   `spacing` is `0` for threshold types without it.
@@ -766,7 +797,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @return `log(p_cat)`, matching the shape of `d`.
 #' @keywords internal
 #' @export
-sdt_rating_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
+sdt_rating_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing,
                              sdratio, stimulus, ...) {
   dist_name <- .sdt_dist_names[dist]
   thresh_name <- .sdt_threshold_types[thresh]
@@ -782,6 +813,7 @@ sdt_rating_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
     do.call(cbind, lapply(list(...), function(x) rep_len(as.vector(x), n)))
   }
 
+  if (anchor == 2L) criterion <- .sdt_bias_to_criterion(criterion, d, exp(sdratio))
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
   out <- rbind(.sdt_category_log_probs(rbind(thr), d, exp(sdratio),
                                        stimulus, dist_name))[, cat]
@@ -793,7 +825,7 @@ sdt_rating_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
 
 #' @rdname sdt_rating_logmu
 #' @export
-sdt_dpsdt_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
+sdt_dpsdt_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing,
                             sdratio, Ro, Rn, stimulus, ...) {
   dist_name <- .sdt_dist_names[dist]
   thresh_name <- .sdt_threshold_types[thresh]
@@ -811,6 +843,7 @@ sdt_dpsdt_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
     do.call(cbind, lapply(list(...), function(x) rep_len(as.vector(x), n)))
   }
 
+  if (anchor == 2L) criterion <- .sdt_bias_to_criterion(criterion, d, exp(sdratio))
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
   out <- rbind(.sdt_dpsdt_category_log_probs(rbind(thr), d, exp(sdratio),
                                              stimulus, dist_name, Ro, Rn))[, cat]
@@ -822,7 +855,7 @@ sdt_dpsdt_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
 
 #' @rdname sdt_rating_logmu
 #' @export
-sdt_metad_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
+sdt_metad_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing,
                             sdratio, logmratio, stimulus, ...) {
   dist_name <- .sdt_dist_names[dist]
   thresh_name <- .sdt_threshold_types[thresh]
@@ -840,6 +873,7 @@ sdt_metad_logmu <- function(cat, K, dist, thresh, d, criterion, spacing,
     do.call(cbind, lapply(list(...), function(x) rep_len(as.vector(x), n)))
   }
 
+  if (anchor == 2L) criterion <- .sdt_bias_to_criterion(criterion, d, exp(sdratio))
   thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
   out <- rbind(.sdt_metad_category_log_probs(rbind(thr), d, exp(sdratio),
                                              stimulus, dist_name, metad))[, cat]

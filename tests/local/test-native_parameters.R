@@ -1,6 +1,6 @@
 # Model-fitting integration tests for native_parameters().
 # These fit real models and are too slow for tests/testthat. Run manually with:
-#   devtools::load_all(); testthat::test_file("tests/internal/test-native_parameters.R")
+#   devtools::load_all(); testthat::test_file("tests/local/test-native_parameters.R")
 
 library(bmm)
 library(testthat)
