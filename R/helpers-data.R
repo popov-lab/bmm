@@ -56,8 +56,12 @@ built_data_columns.default <- function(model) {
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")
   data_name <- attr(data, "data_name") %||% substitute_name(data, envir = eval(parent.frame()))
+  # plyr registers as.data.frame.function, so with its namespace loaded (a
+  # pp_check() loads it through bayesplot) a function coerces to a function
+  # instead of failing; only a data frame counts as coerced
   data <- try(as.data.frame(data), silent = TRUE)
-  stopif(is_try_error(data), "Argument 'data' must be coercible to a data.frame.")
+  stopif(is_try_error(data) || !is.data.frame(data),
+         "Argument 'data' must be coercible to a data.frame.")
   stopif(!isTRUE(nrow(data) > 0L), "Argument 'data' does not contain observations.")
 
   attr(data, "data_name") <- data_name
