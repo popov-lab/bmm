@@ -310,20 +310,26 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @param kappa Vector of precision values. With `tau > 0` this is the mean
 #'   precision rather than the precision itself.
 #' @param p_mem Vector of probabilities for memory recall. Used by the
-#'   `"simple"` version; the other versions derive it from `K` and `set_size`.
+#'   `"simple"` version; the other versions derive it from `K` and `set_size`,
+#'   and warn if `p_mem` is given.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision.
 #' @param K Vector of memory capacities. Used by the `"slot"` and
-#'   `"slot_averaging"` versions and ignored by `"simple"`.
-#' @param set_size Vector of set sizes. Used by the `"slot"` and
-#'   `"slot_averaging"` versions and ignored by `"simple"`.
+#'   `"slot_averaging"` versions; `"simple"` ignores it and warns if it is
+#'   given.
+#' @param set_size Vector of set sizes. Required by the `"slot"` and
+#'   `"slot_averaging"` versions, which stop without it; `"simple"` ignores it
+#'   and warns if it is given.
 #' @param version A character string selecting the storage model: `"simple"`,
 #'   `"slot"` or `"slot_averaging"`. See [mixture2p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
 #'   odd number of at least 41. See [mixture2p()].
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the fifth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
@@ -351,10 +357,18 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' lines(x, d, type = "l", col = "red")
 #'
 dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
-                       set_size = 1, version = "simple", vp_nodes = 41L,
+                       set_size = NULL, version = "simple", vp_nodes = 41L,
                        log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dmixture2p", "x, mu, kappa, p_mem", tau)
+    log <- tau
+    tau <- 0
+  }
   version <- match.arg(version, names(.mixture2p_version_table))
   .check_mixture2p_args(kappa, p_mem, tau, K, version)
+  .check_mixture2p_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
 
   density <- switch(version,
     simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
@@ -378,6 +392,33 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
     return(invisible())
   }
   stopif(isTRUE(any(K <= 0)), "K must be positive.")
+}
+
+# set_size has no default: at a set size of 1 every capacity version remembers
+# everything, whatever K is, so a forgotten set size would go unnoticed
+.check_mixture2p_version_args <- function(version, set_size, supplied) {
+  needs_set_size <- .mixture2p_version_table[[version]]$needs_set_size
+  stopif(
+    needs_set_size && is.null(set_size),
+    "The '{version}' version of mixture2p predicts the probability of a memory \\
+    response from the set size, so the set_size argument is required."
+  )
+  unused <- if (needs_set_size) "p_mem" else c("K", "set_size")
+  ignored <- intersect(unused, names(supplied)[supplied])
+  warnif(
+    length(ignored) > 0,
+    "The '{version}' version of mixture2p ignores {collapse_comma(ignored)}."
+  )
+}
+
+# 1.4 took log where tau now is, so a logical there is a 1.4 call; the form
+# stays readable until 1.6.0
+.warn_positional_log <- function(fun, before, log) {
+  warning2(
+    "`{fun}({before}, {log})` is deprecated since bmm 1.5.0 and will be \\
+    removed in bmm 1.6.0 at the earliest. Use `{fun}({before}, log = {log})` \\
+    instead. That position now holds `tau`, so pass `log` by name."
+  )
 }
 
 .dmixture2p_simple <- function(x, mu, kappa, p_mem, tau, nodes) {
@@ -445,9 +486,12 @@ qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
 #' @rdname mixture2p_dist
 #' @export
 rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
-                       set_size = 1, version = "simple") {
+                       set_size = NULL, version = "simple") {
   version <- match.arg(version, names(.mixture2p_version_table))
   .check_mixture2p_args(kappa, p_mem, tau, K, version)
+  .check_mixture2p_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
 
   recycle <- function(x) rep_len(x, n)
   switch(version,
@@ -489,7 +533,10 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   precision. See [mixture3p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
 #'   odd number of at least 41. See [mixture2p()].
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the sixth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
@@ -515,6 +562,11 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'
 dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
                        tau = 0, vp_nodes = 41L, log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dmixture3p", "x, mu, kappa, p_mem, p_nt", tau)
+    log <- tau
+    tau <- 0
+  }
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
 
   set_size <- length(mu)
@@ -708,7 +760,10 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   precision. See [imm()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
 #'   odd number of at least 41. See [mixture2p()].
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the ninth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
@@ -741,6 +796,11 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                  c = 5, a = 2, b = 1, s = 2, kappa = 5, tau = 0,
                  vp_nodes = 41L, log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dimm", "x, mu, dist, c, a, b, s, kappa", tau)
+    log <- tau
+    tau <- 0
+  }
   .check_imm_args(kappa, s, dist, tau, length(mu))
 
   n <- length(x)

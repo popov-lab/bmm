@@ -81,7 +81,10 @@ precision. See \code{\link[=imm]{imm()}}.}
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
 odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
 
-\item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
+\item{log}{Logical; if \code{TRUE}, values are returned on the log scale. Pass
+it by name: in bmm 1.4 it was the ninth argument, which is now \code{tau}.
+Until bmm 1.6.0 a logical value in that position is still read as \code{log},
+with a warning.}
 
 \item{q}{Vector of quantiles}
 
