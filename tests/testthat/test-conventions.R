@@ -23,7 +23,12 @@ pattern_counts <- function(pattern) {
 expect_pattern_counts <- function(pattern, expected, rule) {
   counts <- pattern_counts(pattern)
   present <- intersect(names(expected), names(counts))
-  expect_identical(counts[present], expected[present], info = rule)
+  # waldo reports a mismatch by position, so name the files in the message
+  changed <- present[counts[present] != expected[present]]
+  expect_identical(counts[present], expected[present], info = paste0(
+    rule, "; found vs registered: ",
+    paste0(changed, " ", counts[changed], " vs ", expected[changed], collapse = ", ")
+  ))
   others <- counts[setdiff(names(counts), names(expected))]
   expect_identical(names(others)[others > 0], character(0), info = rule)
 }
@@ -49,7 +54,8 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
       "test-model_rdm.R" = 1L,
       "test-model_sdt_cdp.R" = 3L,
       "test-model_sdt_ranking.R" = 1L,
-      "test-model_sdt_rating.R" = 1L,
+      "test-model_sdt_rating.R" = 2L,
+      "test-model_sdt_yn.R" = 1L,
       "test-sdt-rating-versions.R" = 1L
     ),
     rule = "R1: cmdstan_model() sites per file"
@@ -97,7 +103,8 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
       "test-model_rdm.R" = 1L,
       "test-model_sdt_cdp.R" = 1L,
       "test-model_sdt_ranking.R" = 1L,
-      "test-model_sdt_rating.R" = 1L,
+      "test-model_sdt_rating.R" = 2L,
+      "test-model_sdt_yn.R" = 1L,
       "test-sdt-rating-versions.R" = 1L
     ),
     rule = "R1: $sample() per file"
