@@ -29,6 +29,15 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # Four testthat workers (Config/testthat/parallel in DESCRIPTION). R CMD
+      # check runs the tests with --vanilla, so the Ncpus option that setup-r
+      # writes to the Rprofile does not reach them and this variable does.
+      TESTTHAT_CPUS: 4
+      # The Stan compile tests (parity and gradient checks, the bmm_setup()
+      # smoke test) run on Ubuntu for every event and on all three OS for
+      # pushes. The Windows and macOS pull-request jobs get no CmdStan and
+      # set this to false, so those tests skip there (ADR 0004).
+      BMM_TEST_STAN: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +86,7 @@ jobs:
       # Cache the built CmdStan so it is only compiled when a new version is
       # released (the cache key includes the latest release version)
       - name: Get latest CmdStan release
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         id: cmdstan-version
         shell: bash
         run: |
@@ -100,6 +110,7 @@ jobs:
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
       - name: Locate CmdStan install path
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         id: cmdstan-path
         run: |
           cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
@@ -107,6 +118,7 @@ jobs:
         shell: Rscript {0}
 
       - name: Cache CmdStan
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         id: cmdstan-cache
         uses: actions/cache@v4
         with:
@@ -114,11 +126,12 @@ jobs:
           key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
 
       - name: Set up CmdStan toolchain
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         run: cmdstanr::check_cmdstan_toolchain(fix = TRUE)
         shell: Rscript {0}
 
       - name: Build CmdStan
-        if: steps.cmdstan-cache.outputs.cache-hit != 'true'
+        if: ${{ (startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push') && steps.cmdstan-cache.outputs.cache-hit != 'true' }}
         run: |
           cmdstanr::install_cmdstan(
             cores = parallel::detectCores(),
@@ -126,9 +139,10 @@ jobs:
           )
         shell: Rscript {0}
 
-      # The check takes 7-12 minutes; a hung runner otherwise holds the job,
-      # and the concurrency group's next run, for GitHub's 6-hour default.
-      # The limit sits on this step so a cold CmdStan build cannot trip it.
+      # Before the test tiers (ADR 0004) the check took 14-28 minutes, Windows
+      # slowest; a hung runner otherwise holds the job, and the concurrency
+      # group's next run, for GitHub's 6-hour default. The limit sits on this
+      # step so a cold CmdStan build cannot trip it.
       - uses: r-lib/actions/check-r-package@v2
         timeout-minutes: 30
         with:
