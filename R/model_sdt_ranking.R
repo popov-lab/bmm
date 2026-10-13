@@ -368,8 +368,9 @@ configure_model.sdt_ranking <- function(model, data, formula) {
 
 
 # Substitute the quadrature tokens in sdt_ranking_funs.stan with the rules that
-# .ranking_gh_n() and .ranking_gl_rule() select, so the compiled Stan code and
-# .ranking_prob_r() use the same nodes. 17 significant digits round-trips a
+# .ranking_gh_n() and .ranking_gl_rule() select for the data's largest set size;
+# .ranking_prob_r() selects per row, so rows with a smaller set size can use a
+# different rule (they agree to ~1e-8). 17 significant digits round-trips a
 # double exactly.
 .ranking_fill_quadrature <- function(scode, max_m, free_sdratio) {
   gh <- .gh_rule(.ranking_gh_n(max_m, free_sdratio))

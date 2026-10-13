@@ -3185,11 +3185,14 @@ rsdt_mafc <- function(n, n_trials, m, d,
 # noise axis, with the target density evaluated at each node. Past the nodes the
 # lure terms are 1 for one rank and 0 for the others (rank 1 above, rank m
 # below), so the target mass out there is added in closed form; what that drops
-# is at most (m - 1) * Phi(-6) per rank, 6.9e-9 at m = 8. Measured against
-# adaptive quadrature over d_a in [-1, 4] and sdratio in (1, 8]: 48 nodes hold
-# max error below 2.4e-10 through m = 8 and 7e-7 at m = 16, and 64 nodes
-# 4.2e-9 through m = 20 (on a coarser grid); the two rules meet at sdratio = 1
-# within 1.5e-10. The weights
+# is at most (m - 1) * Phi(-6) per rank, 6.9e-9 at m = 8. That bound is
+# absolute: for rank 2 (and m - 1) the integrand peaks near d / 2 just above
+# sdratio = 1, so the dropped part is a growing share of a small probability;
+# log p is off by 1e-6 at |d| = 5.5, 6e-6 at |d| = 6 and 0.06 at |d| = 10, and
+# steps by as much at sdratio = 1. Measured against adaptive quadrature over
+# d_a in [-1, 4] and sdratio in (1, 8]: 48 nodes hold max error below 2.4e-10
+# through m = 8 and 7e-7 at m = 16, and 64 nodes 4.2e-9 through m = 20 (on a
+# coarser grid); the two rules meet at sdratio = 1 within 1.5e-10. The weights
 # carry the half width and the normal density's 1 / sqrt(2 pi), and `cdf` holds
 # Phi at the nodes, so the kernel needs no Phi of a parameter inside the sum.
 .ranking_gl_rule <- function(max_m) {

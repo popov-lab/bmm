@@ -280,13 +280,15 @@ ranking_ref_prob <- function(k, m, d, sigma) {
   exp(lchoose(m - 1, k - 1) + peak$objective + log(left$value + right$value))
 }
 
-test_that("Gaussian rank probabilities are accurate over sdratio 0.2-8, d -1-4, m 2-8", {
+test_that("Gaussian rank probabilities are accurate over sdratio 0.2-8, d -1-4, m 2-20", {
   # corners and centre of the range the quadrature promises 1e-6 over; it
-  # measured 2.4e-10 on a 29400-cell grid, so 1e-8 leaves room without hiding a
-  # regression to the old Hermite-only rule (2e-4 at sdratio 3)
+  # measured 2.4e-10 through m = 8 and 4.3e-9 at m = 20, so 1e-8 leaves room
+  # without hiding a regression to the old Hermite-only rule (2e-4 at sdratio 3).
+  # Both rules are weakest next to sdratio = 1, so m = 20 is checked there too.
   cells <- rbind(
-    expand.grid(sigma = c(0.2, 8), d = c(-1, 4), m = c(2L, 8L)),
-    data.frame(sigma = c(0.999, 1.26, 1.001), d = 1.5, m = 5L)
+    expand.grid(sigma = c(0.2, 8), d = c(-1, 4), m = c(2L, 8L, 20L)),
+    data.frame(sigma = c(0.999, 1.26, 1.001), d = 1.5, m = 5L),
+    data.frame(sigma = c(1, 1.001), d = 0, m = 20L)
   )
   for (i in seq_len(nrow(cells))) {
     sigma <- cells$sigma[i]
