@@ -943,6 +943,7 @@ test_that("stick-breaking members form a simplex for any raw values", {
 
 test_that("the default simplex prior gives every member prior mean 1/K under both links", {
   skip_on_cran()
+  skip_unless_stan_tests()
   withr::local_options("bmm.silent" = 2)
   tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
   dat <- data.frame(A = 4L, B = 3L, C = 3L)
@@ -1187,7 +1188,7 @@ test_that("bmm_data_check() reads the correlation ID that ?mpt recommends as a l
 
 test_that("conditional_effects() shows simplex members on the probability scale", {
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
+  skip_unless_stan_tests()
 
   trees <- list(
     mpt_tree("x", list(A = "D + (1 - D) * a", B = "(1 - D) * b", C = "(1 - D) * c")),

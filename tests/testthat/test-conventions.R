@@ -76,7 +76,7 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
     c(
       "test-bmm_setup.R" = 18L,
       "test-conditional_effects.R" = 2L,
-      "test-model_mpt.R" = 1L,
+      "test-model_mpt.R" = 2L,
       "test-model_rdm.R" = 4L,
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
