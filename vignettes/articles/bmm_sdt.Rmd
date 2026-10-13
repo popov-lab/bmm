@@ -502,9 +502,11 @@ whether the implied decision process is plausible for the task at hand.
 
 In a binary old/new recognition task each cell of the design contributes a count
 of "old" responses out of a number of trials, separately for old (`signal`) and
-new (`noise`) items. The latent decision variable places "old" responses above a
-criterion; sensitivity `d` is the distance between the signal and noise
-distributions and `criterion` is the location of the boundary.
+new (`noise`) items. The observer responds "old" when the evidence exceeds a
+decision boundary. Sensitivity `d` is the distance between the signal and noise
+means in units of the root-mean-square of their SDs ($d_a$ above, $d'$ under
+equal variance), and `criterion` is the position of the boundary measured from
+the noise mean in noise-SD units, the $k$ of the equations above.
 
 ## A single condition: equal-variance SDT
 
@@ -534,10 +536,12 @@ summary(fit_ev)
 ```
 
 The population estimates recover the simulated `d = 1.5` and
-`criterion = 0.95`, which is a bias of $0.95 - 1.5/2 = 0.2$ toward "new".
+`criterion = 0.95`. Measured from the midpoint between the two means instead,
+the same boundary lies at $0.95 - 1.5/2 = 0.2$, a slight bias toward "new"; this
+is the `bias` parameter introduced below.
 
 By default `sdratio` is fixed to 0, i.e. the signal and noise distributions have
-equal variance (`exp(0) = 1`) — it appears in the model's parameter list but got
+equal variance (`exp(0) = 1`). It appears in the model's parameter list but got
 no formula, so it stays at its fixed default (step 3 of the workflow recipe).
 With a single (hit, false-alarm) pair per subject the signal/noise variance
 ratio is not identified, so leaving it fixed is the right default here, and `d`
@@ -545,18 +549,24 @@ in this fit is $d'$ in the textbook sense.
 
 ## One set of lures: `criterion` or `bias`
 
-A formula names either `criterion`, measured from the noise mean, or `bias`,
-measured from the midpoint between the means; one that names neither estimates
-`criterion ~ 1`. The two differ in what a linear formula holds constant when
-`d` changes, and that matters in a classic recognition design: weak and strong
-targets tested against one shared set of lures, under one criterion. The lures
-have no strength, and their false-alarm rate depends on the criterion alone,
-$\text{FA} = 1 - \Phi(k)$.
+A formula places the boundary with `criterion`, measured from the noise mean,
+or with `bias`, measured from the midpoint between the means. Under equal
+variance $\text{bias} = \text{criterion} - d/2$, the textbook $c$ (`?sdt_yn`
+gives the general form). Naming neither estimates `criterion ~ 1`; naming both
+is an error.
 
-We simulate such a design with a strength effect of 0.8 on `d`. `strong` is 1
-for strong targets and 0 for weak targets and lures; the lure rows could carry
-any value, because their likelihood does not involve `d`. The same data are
-fitted once with a constant `criterion` and once with a constant `bias`.
+`criterion ~ 1` keeps the boundary at one distance from the noise mean in every
+row. `bias ~ 1` keeps it at one distance from the midpoint, so the boundary
+moves up by half of every change in `d`. This matters in the classic
+recognition design: weak and strong targets are tested against one shared set
+of lures, with one boundary for all test items. The lures' false-alarm rate,
+$1 - \Phi(\text{criterion})$, depends on that boundary alone.
+
+We simulate this design with a constant `criterion` of 0.7 and a strength
+effect of 0.8 on `d`. `strong` is 1 for strong targets and 0 for weak targets
+and lures. The `criterion` fit ignores the lures' value of `strong`, because
+their likelihood does not involve `d`; the `bias` fit places their boundary at
+$\text{bias} + d/2$, here the weak targets' boundary.
 
 ```{r}
 set.seed(543)
@@ -587,8 +597,8 @@ fit_str_bias <- bmm(
   silent = 2,
   file = "fits/bmmfit_sdt_yn_strength_bias_vignette"
 )
-rbind(criterion = brms::fixef(fit_str)["d_strong", ],
-      bias      = brms::fixef(fit_str_bias)["d_strong", ])
+rbind("fit with criterion ~ 1" = brms::fixef(fit_str)["d_strong", ],
+      "fit with bias ~ 1"      = brms::fixef(fit_str_bias)["d_strong", ])
 ```
 
 ```{r strength-effects, include = FALSE}
@@ -597,17 +607,26 @@ eff_bias <- brms::fixef(fit_str_bias)["d_strong", "Estimate"]
 ```
 
 With `criterion ~ 1` the strength effect is `r round(eff_crit, 2)`, close to the
-simulated 0.8. With `bias ~ 1` it is `r round(eff_bias, 2)`. Holding the bias
-constant moves the boundary up by half of every change in the separation, so to
-raise the strong targets' hit rate by what an effect of 0.8 does at a fixed
-criterion, the model needs an effect on `d` about twice as large. Both models
-have three parameters for the three rates, so they fit the counts equally well:
-model comparison cannot flag the wrong choice, and the formula has to state what
-the design holds constant. Use `bias` when the observer's position relative to
-both distributions is what stays fixed, or what you want to compare, for
-example the bias of groups that differ in sensitivity. `sdt_criterion()` and
-`sdt_bias()` compute both quantities from a single pair of hit and false-alarm
-rates.
+simulated 0.8. With `bias ~ 1` it is `r round(eff_bias, 2)`,
+`r round(eff_bias / eff_crit, 2)` times as large. The strong targets' hit rate
+depends on $d - \text{criterion}$. At a fixed criterion, an effect $\Delta$ on
+`d` raises this distance by $\Delta$. At a fixed bias,
+$d - \text{criterion} = d/2 - \text{bias}$ rises by only $\Delta/2$, so the
+`bias` fit needs $2 \times 0.8 = 1.6$. Both fits have three parameters (`d`
+intercept, strength effect, and `criterion` or `bias`) for three rates (lures,
+weak, strong) and describe the counts equally well. In the likelihood the factor
+is exactly 2; the estimates depart from it only through priors and Monte Carlo
+error. Model comparison therefore cannot detect the wrong choice, and the
+formula has to state what the design holds constant:
+
+- Lures shared by conditions that differ in `d`: `criterion`.
+- Separate lures per condition, with condition-wise terms for both parameters
+  (`d ~ 0 + cond`, `criterion ~ 0 + cond`): either. The likelihood is the same;
+  the coefficients differ by $d/2$ and get different default priors.
+- Comparing bias between groups or conditions that differ in `d`: `bias`.
+
+`sdt_criterion()` and `sdt_bias()` compute both quantities from one hit rate
+and one false-alarm rate, for checking a fit against the raw rates.
 
 ## Multiple criteria: identifying the unequal-variance ratio
 
