@@ -2378,11 +2378,12 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 # Shared by density, random generation, and log_lik across versions
 # `d` is the balanced sensitivity index d_a; the separation between the
 # distributions in noise units is d * .sdt_rms_scale(sdratio), which is d itself
-# for EV-SDT (sdratio = 1). The criterion is NOT rescaled: it stays on the
-# noise-standardized axis, so eta is unchanged for any equal-variance fit.
-# All arguments are vectorized (recycled to common length)
+# for EV-SDT (sdratio = 1). The evidence axis has its origin at the noise mean
+# and noise-SD units, so the noise distribution sits at 0, the signal
+# distribution at the separation, and `criterion` is measured from the noise
+# mean. All arguments are vectorized (recycled to common length)
 .sdt_eta <- function(d, criterion, stimulus, sdratio = 1) {
-  shift <- d * .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
+  shift <- d * .sdt_rms_scale(sdratio) * stimulus
   # sdratio^(stimulus == 1) scales the signal by sdratio and the noise by 1,
   # broadcasting whether stimulus is a per-observation vector (likelihood) or a
   # scalar with sdratio a vector of draws (ROC points) -- unlike ifelse(), whose
@@ -2390,6 +2391,26 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
   # and silently applies sdratio[1] to every draw rather than shortening eta.
   scale <- sdratio^(stimulus == 1)
   (shift - criterion) / scale
+}
+
+
+# `bias` is the criterion measured from the midpoint between the two means
+# instead of from the noise mean, so the two differ by half the separation.
+.sdt_bias_to_criterion <- function(bias, d, sdratio = 1) {
+  bias + d * .sdt_rms_scale(sdratio) / 2
+}
+
+.sdt_criterion_to_bias <- function(criterion, d, sdratio = 1) {
+  criterion - d * .sdt_rms_scale(sdratio) / 2
+}
+
+# the d/r functions take the criterion in either parameterization, as the model
+# formula does, and work with the noise-anchored one
+.sdt_resolve_criterion <- function(criterion, bias, d, sdratio) {
+  stopif(is.null(criterion) == is.null(bias),
+         "Give exactly one of 'criterion' (measured from the noise mean) or \\
+         'bias' (measured from the midpoint between the noise and signal means)")
+  criterion %||% .sdt_bias_to_criterion(bias, d, sdratio)
 }
 
 
@@ -2405,9 +2426,9 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 
 #' @title Utility functions for Signal Detection Theory
 #'
-#' @description Compute sensitivity and criterion from hit and false alarm
-#'   rates for different SDT distribution families. A single (hit, false alarm)
-#'   pair cannot identify the signal-to-noise SD ratio, so both quantities are
+#' @description Compute sensitivity, criterion and bias from hit and false
+#'   alarm rates for different SDT distribution families. A single (hit, false
+#'   alarm) pair cannot identify the signal-to-noise SD ratio, so all three are
 #'   the equal-variance values; see [sdt_yn()] for the unequal-variance
 #'   model.
 #'
@@ -2426,10 +2447,10 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 #'     \item "logistic": \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 #'   }
 #'
-#' @seealso [sdt_yn()], whose `d` and `criterion` parameters these two functions
-#'   compute in closed form from observed rates: `sdt_d()` returns the same
-#'   quantity as the `d` parameter and `sdt_criterion()` the same quantity as
-#'   `criterion`, on the same axis, whenever `sdratio` is at its default.
+#' @seealso [sdt_yn()], whose `d`, `criterion` and `bias` parameters these
+#'   functions compute in closed form from observed rates: `sdt_d()`,
+#'   `sdt_criterion()` and `sdt_bias()` return the same quantities as the
+#'   parameters of the same name whenever `sdratio` is at its default.
 #'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
@@ -2466,11 +2487,11 @@ sdt_d <- function(hit_rate, fa_rate,
 
 
 #' @rdname SDTdist
-#' @return `sdt_criterion` returns the criterion (response bias) on the
-#'   centred, noise-standardized evidence axis used by [sdt_yn()], where the
-#'   noise and signal distributions sit at -d'/2 and +d'/2:
-#'   \eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For `dist = "normal"` this reduces to
-#'   the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}{-(Phi^-1(H) + Phi^-1(FA)) / 2}.
+#' @return `sdt_criterion` returns the location of the decision criterion
+#'   measured from the mean of the noise distribution, in noise-SD units, as
+#'   the `criterion` parameter of [sdt_yn()] is: \eqn{Q(1 - FA)}. It depends on
+#'   the false-alarm rate alone. For `dist = "normal"` this is
+#'   \eqn{-\Phi^{-1}(FA)}{-Phi^-1(FA)}.
 #' @export
 #' @examples
 #' # Compute criterion from hit and false alarm rates
@@ -2478,6 +2499,26 @@ sdt_d <- function(hit_rate, fa_rate,
 sdt_criterion <- function(hit_rate, fa_rate,
                           dist = c("normal", "gumbel_min", "gumbel_max",
                                    "logistic")) {
+  dist <- match.arg(dist)
+  .validate_sdt_rates(hit_rate, fa_rate)
+  .sdt_dists[[dist]]$qf(1 - fa_rate)
+}
+
+
+#' @rdname SDTdist
+#' @return `sdt_bias` returns the criterion measured from the midpoint between
+#'   the noise and signal means instead, as the `bias` parameter of [sdt_yn()]
+#'   is: \eqn{(Q(1 - FA) + Q(1 - H)) / 2}, which is `sdt_criterion() - sdt_d()
+#'   / 2`. For `dist = "normal"` this is the familiar
+#'   \eqn{c = -(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}{c = -(Phi^-1(H) + Phi^-1(FA)) / 2}.
+#'   Positive values are a conservative bias, toward "new"/"noise" responses.
+#' @export
+#' @examples
+#' # Compute the bias relative to the midpoint
+#' sdt_bias(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+sdt_bias <- function(hit_rate, fa_rate,
+                     dist = c("normal", "gumbel_min", "gumbel_max",
+                              "logistic")) {
   dist <- match.arg(dist)
   .validate_sdt_rates(hit_rate, fa_rate)
   qf <- .sdt_dists[[dist]]$qf
@@ -2504,8 +2545,13 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #'   the balanced index \eqn{d_a}, the separation between the two distributions
 #'   divided by the root-mean-square of their SDs (see [sdt_yn()]). The
 #'   separation in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
-#' @param criterion Numeric. Response bias (decision boundary location), on the
-#'   noise-standardized axis, i.e. in units of the noise distribution's SD.
+#' @param criterion Numeric. Location of the decision criterion, measured from
+#'   the mean of the noise distribution in units of its SD. Give either
+#'   `criterion` or `bias`, not both.
+#' @param bias Numeric. Location of the decision criterion measured from the
+#'   midpoint between the noise and signal means instead, in noise-SD units:
+#'   `criterion - d * sqrt((1 + sdratio^2) / 2) / 2`. 0 is the neutral point,
+#'   positive values a bias toward "new"/"noise".
 #' @param sdratio Numeric. Ratio of signal to noise standard deviations
 #'   (default 1, i.e., equal variance). Must be positive, and is on the
 #'   **natural** scale — see the section below before reusing a fitted value.
@@ -2536,19 +2582,23 @@ sdt_criterion <- function(hit_rate, fa_rate,
 #' @examples
 #' # Density of yes/no SDT data
 #' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-#'         d = 1.5, criterion = 0.2)
+#'         d = 1.5, criterion = 0.9)
+#'
+#' # The same observer, with the criterion given relative to the midpoint
+#' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
+#'         d = 1.5, bias = 0.15)
 #'
 #' # Vectorized over observations
 #' dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-#'         stimulus = c(0, 1), d = 1.5, criterion = 0.2,
+#'         stimulus = c(0, 1), d = 1.5, criterion = 0.9,
 #'         log = TRUE)
 #'
 #' # Unequal variance from a fitted model: sdt_yn() reports sdratio on its log
 #' # link, so exponentiate before passing it here
 #' dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-#'         d = 1.5, criterion = 0.2, sdratio = exp(0.375))
-dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
-                    sdratio = 1,
+#'         d = 1.5, criterion = 0.9, sdratio = exp(0.375))
+dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
+                    bias = NULL, sdratio = 1,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                     log = FALSE) {
   dist <- match.arg(dist)
@@ -2565,6 +2615,7 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)
 
   eta <- .sdt_eta(d, criterion, stimulus, sdratio)
   # assembled on the log scale to match sdt_yn_lpmf: the probability scale
@@ -2584,10 +2635,10 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion,
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-#'                      d = 1.5, criterion = 0.2)
+#'                      d = 1.5, criterion = 0.9)
 #' head(dat)
-rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
-                    sdratio = 1,
+rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
+                    bias = NULL, sdratio = 1,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic")) {
   dist <- match.arg(dist)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
@@ -2598,6 +2649,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)
 
   eta <- .sdt_eta(d, criterion, stimulus, sdratio)
   stats::rbinom(n, n_trials, exp(.sdt_log_p_old(eta, dist)))
@@ -2829,7 +2881,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion,
 #' # Density for a single observation (K=4) with recollection of old items;
 #' # Rn defaults to 0 (no recall-to-reject), the one-sided model
 #' dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3)
+#'            d = 1.5, thresholds = c(0.25, 0.75, 1.25), Ro = 0.3)
 dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
@@ -2873,7 +2925,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
 #' # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
 #' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 #' dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,
-#'                              thresholds = c(-0.5, 0, 0.5),
+#'                              thresholds = c(0.25, 0.75, 1.25),
 #'                              Ro = 0.3, Rn = 0.1))
 #' head(dat)
 rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
@@ -2940,7 +2992,7 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
 #' @examples
 #' # Density for a single observation (K=4) with imperfect metacognition
 #' dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
-#'            d = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
+#'            d = 1.5, thresholds = c(0.25, 0.75, 1.25), metad = 1.0)
 dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
                        sdratio = 1,
                        dist = c("normal", "gumbel_min", "gumbel_max",
@@ -2984,7 +3036,7 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
 #' # Generate meta-d' rating data (K=4) for 10 subjects and both stimulus types
 #' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 #' dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, d = 1.5,
-#'                              thresholds = c(-0.5, 0, 0.5), metad = 1.0))
+#'                              thresholds = c(0.25, 0.75, 1.25), metad = 1.0))
 #' head(dat)
 rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
                        sdratio = 1,
@@ -3341,7 +3393,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # Category log-probabilities from thresholds: the noise cdf differenced into K
 # interval masses. `d` is d_a, so the separation in noise units is
 # d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled, they stay on the
-# noise-standardized axis. sdratio is the signal/noise SD ratio on the natural
+# noise-standardized axis, measured from the noise mean. sdratio is the signal/noise SD ratio on the natural
 # scale, and the unequal-variance scaling of signal trials lives here alone (the
 # Stan counterpart is sdt_rating_logmu_cat). Vectorized over observations:
 # thresholds may be an n-by-(K-1) matrix (or a vector, recycled across rows)
@@ -3360,7 +3412,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
   stimulus <- rep_len(stimulus, n)
   sdratio <- rep_len(sdratio, n)
 
-  shift <- rep_len(d, n) * .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
+  shift <- rep_len(d, n) * .sdt_rms_scale(sdratio) * stimulus
   scale <- ifelse(stimulus == 1, sdratio, 1)
   eta <- (thr - shift) / scale
   lower <- cbind(-Inf, eta)
@@ -3421,8 +3473,11 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # ("old" side), taken in log space as in sdt_metad_logmu_cat(). Both d and metad
 # are d_a indices converted by the same root-mean-square factor, which leaves
 # the M-ratio metad/d unchanged and keeps the metad = d reduction to standard
-# rating SDT exact under unequal variance. Vectorized like
-# .sdt_category_log_probs().
+# rating SDT exact under unequal variance. What the two spaces share is each
+# threshold's distance from the midpoint between the means, so the thresholds,
+# given from the noise mean of the type-1 space, move by half the difference
+# between the two separations on the way into the meta-d' space. Vectorized
+# like .sdt_category_log_probs().
 .sdt_metad_category_log_probs <- function(thresholds, d, sdratio, stimulus,
                                           dist, metad) {
   thr <- rbind(thresholds)
@@ -3436,17 +3491,20 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
   sdratio <- rep_len(sdratio, n)
   metad <- rep_len(metad, n)
 
-  half_rms <- .sdt_rms_scale(sdratio) / 2 * (2 * stimulus - 1)
+  sep_d <- rep_len(d, n) * .sdt_rms_scale(sdratio)
+  sep_metad <- metad * .sdt_rms_scale(sdratio)
+  thr_metad <- thr - (sep_d - sep_metad) / 2
   scale <- ifelse(stimulus == 1, sdratio, 1)
-  eta_d <- (thr[, mid] - rep_len(d, n) * half_rms) / scale
-  eta_metad <- (thr[, mid] - metad * half_rms) / scale
+  eta_d <- (thr[, mid] - sep_d * stimulus) / scale
+  eta_metad <- (thr_metad[, mid] - sep_metad * stimulus) / scale
   log_norm <- cbind(
     matrix(.sdt_log_cdf(eta_d, dist) - .sdt_log_cdf(eta_metad, dist), n, mid),
     matrix(.sdt_log_ccdf(eta_d, dist) - .sdt_log_ccdf(eta_metad, dist), n,
            K - mid)
   )
 
-  out <- rbind(.sdt_category_log_probs(thr, metad, sdratio, stimulus, dist)) +
+  out <- rbind(.sdt_category_log_probs(thr_metad, metad, sdratio, stimulus,
+                                       dist)) +
     log_norm
   if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
 }
@@ -3599,8 +3657,9 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 #'   between the distributions in noise units is `d * sqrt((1 + sdratio^2) / 2)`.
 #' @param thresholds Numeric vector of length K-1 with the ordered decision
 #'   thresholds, or an n-by-(K-1) matrix with one row per observation. The
-#'   thresholds are on the noise-standardized axis and are not rescaled by
-#'   `sdratio`.
+#'   thresholds are positions on the noise-standardized axis, measured from
+#'   the mean of the noise distribution (the signal mean sits at
+#'   `d * sqrt((1 + sdratio^2) / 2)`), and are not rescaled by `sdratio`.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
 #'   (default 1, i.e., equal variance). Must be positive. Note that this is the
 #'   natural scale: the `sdratio` parameter of [sdt_rating()] is sampled on the
@@ -3631,7 +3690,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 #' @examples
 #' # Density for a single observation (K=4)
 #' dsdt_rating(counts = c(5, 15, 25, 55), stimulus = 1,
-#'             d = 1.5, thresholds = c(-0.5, 0.0, 0.5))
+#'             d = 1.5, thresholds = c(0.25, 0.75, 1.25))
 dsdt_rating <- function(counts, stimulus, d, thresholds,
                         sdratio = 1,
                         dist = c("normal", "gumbel_min", "gumbel_max",
@@ -3671,7 +3730,7 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
 #' # Generate rating data (K=4) for 10 subjects and both stimulus types
 #' dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 #' dat <- cbind(dat, rsdt_rating(nrow(dat), 100, dat$stimulus,
-#'                               d = 1.5, thresholds = c(-0.5, 0, 0.5)))
+#'                               d = 1.5, thresholds = c(0.25, 0.75, 1.25)))
 #' head(dat)
 rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
                         sdratio = 1,

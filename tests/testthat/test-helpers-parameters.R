@@ -884,3 +884,26 @@ test_that("native_parameters marginalises over new grouping levels when asked", 
   )
   expect_true(all(is.finite(out$value)))
 })
+
+test_that("native_parameters and parameter_info skip the unused alternative parameter", {
+  withr::local_options(bmm.silent = 2)
+  dat <- data.frame(n_old = c(10, 40, 12, 38), stimulus = c(0, 1, 0, 1),
+                    n_trials = 50, id = c(1, 1, 2, 2))
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  for (anchor in c("criterion", "bias")) {
+    formula <- bmf(d ~ 1)
+    formula[[anchor]] <- stats::as.formula(paste(anchor, "~ 1"))
+    fit <- suppressWarnings(suppressMessages(bmm(
+      formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE
+    )))
+    # a mock fit has no draws, so the call fails later; only the declared-but-
+    # not-fitted error for the other alternative matters
+    err <- tryCatch(native_parameters(fit, summary = TRUE), error = conditionMessage)
+    expect_false(grepl("declared by the model", err), label = anchor)
+    other <- setdiff(c("criterion", "bias"), anchor)
+    expect_false(other %in% parameter_info(fit)$parameter, label = anchor)
+    expect_true(anchor %in% parameter_info(fit)$parameter, label = anchor)
+  }
+  # without a formula the model lists both, as its help page does
+  expect_true(all(c("criterion", "bias") %in% parameter_info(model)$parameter))
+})
