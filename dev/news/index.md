@@ -311,6 +311,11 @@
 
 #### Bug fixes
 
+- [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) says
+  that a function passed as `data` is not coercible to a data frame also
+  while the plyr namespace is loaded (a
+  [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+  loads it); it used to say the data has no observations.
 - [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html)
   and
   [`reloo()`](https://paulbuerkner.com/brms/reference/reloo.brmsfit.html)
