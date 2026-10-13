@@ -5,7 +5,7 @@ nt_model <- function(...) {
 test_that("mixture3p() exposes the parameters each version implies", {
   expect_equal(names(nt_model()$parameters), c("mu", "kappa", "thetat", "thetant"))
   expect_equal(
-    names(nt_model(version = "slot")$parameters), c("mu", "kappa", "K", "pnt")
+    names(nt_model(version = "slot")$parameters), c("mu", "kappa", "K", "ptarget")
   )
   expect_equal(
     names(nt_model(variable_precision = TRUE)$parameters),
@@ -95,17 +95,36 @@ test_that("the capacity versions separate storage from swapping", {
   x <- seq(-pi, pi, length.out = 30)
   nt <- c(2, -1.5, 1, 0.5, -2, 2.5, -0.7)
   # below capacity nothing is guessed, so the density is the target and the
-  # non-targets only, in the proportions pnt implies
+  # non-targets only, in the proportions ptarget implies
   expect_equal(
-    .dmixture3p_slot(x, 0, 6, K = 6, p_nt = 0.25, set_size = 3, nt = nt, tau = 0, nodes = 41L),
-    .dmixture3p_slot(x, 0, 6, K = 99, p_nt = 0.25, set_size = 3, nt = nt, tau = 0, nodes = 41L),
+    .dmixture3p_slot(x, 0, 6, K = 6, p_target = 0.75, set_size = 3, nt = nt, tau = 0, nodes = 41L),
+    .dmixture3p_slot(x, 0, 6, K = 99, p_target = 0.75, set_size = 3, nt = nt, tau = 0, nodes = 41L),
     tolerance = 1e-12
   )
-  # with pnt = 0 and full capacity it collapses to a plain von Mises
+  # with ptarget = 1 and full capacity it collapses to a plain von Mises
   expect_equal(
-    .dmixture3p_slot(x, 0, 6, K = 6, p_nt = 0, set_size = 3, nt = nt, tau = 0, nodes = 41L),
+    .dmixture3p_slot(x, 0, 6, K = 6, p_target = 1, set_size = 3, nt = nt, tau = 0, nodes = 41L),
     brms::dvon_mises(x, mu = 0, kappa = 6, log = TRUE),
     tolerance = 1e-12
+  )
+})
+
+test_that("ptarget is the probability that a remembered response reports the target", {
+  x <- seq(-pi, pi, length.out = 30)
+  nt <- c(2, -1.5)
+  vm <- function(mu) brms::dvon_mises(x, mu = mu, kappa = 6)
+  # K far above the set size: every response comes from memory, the target
+  # with 0.75 and each of the two non-targets with half of the remaining 0.25
+  expected <- log(0.75 * vm(0) + 0.125 * vm(2) + 0.125 * vm(-1.5))
+  expect_equal(
+    .dmixture3p_slot(x, 0, 6, K = 99, p_target = 0.75, set_size = 3, nt = nt, tau = 0, nodes = 41L),
+    expected,
+    tolerance = 1e-12
+  )
+  expect_equal(
+    .dmixture3p_slot_averaging(x, 0, 6, K = 3, p_target = 0.75, set_size = 3, nt = nt, tau = 0, nodes = 41L),
+    expected,
+    tolerance = 1e-8
   )
 })
 
@@ -114,9 +133,9 @@ test_that("a set size of one leaves no room for a swap", {
   nt <- c(2, -1.5)
   # whatever the swap parameter says, a single item cannot be confused with
   # another, so the density matches the two-parameter model
-  for (p_nt in c(0, 0.3, 0.9)) {
+  for (p_target in c(1, 0.7, 0.1)) {
     expect_equal(
-      .dmixture3p_slot(x, 0, 6, K = 0.5, p_nt = p_nt, set_size = 1, nt = nt, tau = 0, nodes = 41L),
+      .dmixture3p_slot(x, 0, 6, K = 0.5, p_target = p_target, set_size = 1, nt = nt, tau = 0, nodes = 41L),
       dmixture2p(x, mu = 0, kappa = 6, p_mem = 0.5, log = TRUE),
       tolerance = 1e-12
     )
@@ -168,7 +187,7 @@ test_that("every version runs through the bmm() pipeline", {
     backend = "mock", mock_fit = 1, rename = FALSE
   ))
   expect_silent(bmm(
-    bmf(kappa ~ 1, K ~ 1, pnt ~ 1), dat, nt_model(version = "slot_averaging"),
+    bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), dat, nt_model(version = "slot_averaging"),
     backend = "mock", mock_fit = 1, rename = FALSE
   ))
 })
@@ -177,8 +196,8 @@ test_that("every version's family refuses the expected response by name", {
   dat <- oberauer_lin_2017
   formulas <- list(
     simple = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1),
-    slot = bmf(kappa ~ 1, K ~ 1, pnt ~ 1),
-    slot_averaging = bmf(kappa ~ 1, K ~ 1, pnt ~ 1)
+    slot = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1),
+    slot_averaging = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1)
   )
   for (version in names(formulas)) {
     fit <- bmm(formulas[[version]], dat, nt_model(version = version),
@@ -235,7 +254,7 @@ test_that("the Stan and R likelihoods agree for every version", {
     "data {
       int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
       int N; int NT; vector[N] y; vector[N] kappa; vector[N] tau;
-      vector[N] thetat; vector[N] thetant; vector[N] K; vector[N] pnt;
+      vector[N] thetat; vector[N] thetant; vector[N] K; vector[N] ptarget;
       array[N] int ss; matrix[N, NT] nt;
     }
     generated quantities {
@@ -245,10 +264,10 @@ test_that("the Stan and R likelihoods agree for every version", {
                           thetat[i], thetant[i], ss[i], to_vector(nt[i]), 41,
                           logk, dlogk, logJ_min, dlogJ);
         out_slot[i] = mixture3p_slot_core(y[i], 0.0, kappa[i], tau[i], K[i],
-                        pnt[i], ss[i], to_vector(nt[i]), 41, logk, dlogk,
+                        ptarget[i], ss[i], to_vector(nt[i]), 41, logk, dlogk,
                         logJ_min, dlogJ);
         out_sa[i] = mixture3p_slot_averaging_core(y[i], 0.0, kappa[i], tau[i],
-                      K[i], pnt[i], ss[i], to_vector(nt[i]), 41, logk, dlogk,
+                      K[i], ptarget[i], ss[i], to_vector(nt[i]), 41, logk, dlogk,
                       logJ_min, dlogJ);
       }
     }"
@@ -260,7 +279,7 @@ test_that("the Stan and R likelihoods agree for every version", {
   thetat <- c(-1, 0, 0.8, 1.5, 2, 0.3)
   thetant <- c(-2, -1, -0.5, 0, 0.5, -1.5)
   K <- c(1.2, 2.5, 3, 3.5, 6, 8)
-  pnt <- c(0.05, 0.15, 0.25, 0.4, 0.1, 0.5)
+  ptarget <- c(0.95, 0.85, 0.75, 0.6, 0.9, 0.5)
   ss <- c(1L, 2L, 3L, 4L, 6L, 8L)
   nt <- matrix(seq(-3, 3, length.out = 6 * 7), nrow = 6)
 
@@ -270,7 +289,7 @@ test_that("the Stan and R likelihoods agree for every version", {
       NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
       logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, N = length(y), NT = ncol(nt),
       y = y, kappa = kappa, tau = tau, thetat = thetat, thetant = thetant,
-      K = K, pnt = pnt, ss = ss, nt = nt
+      K = K, ptarget = ptarget, ss = ss, nt = nt
     ),
     fixed_param = TRUE, iter_sampling = 1, chains = 1, refresh = 0,
     show_messages = FALSE, sig_figs = 18
@@ -290,14 +309,14 @@ test_that("the Stan and R likelihoods agree for every version", {
   expect_equal(
     stan("out_slot"),
     vapply(seq_along(y), function(i) {
-      .dmixture3p_slot(y[i], 0, kappa[i], K[i], pnt[i], ss[i], nt[i, ], tau[i], 41L)
+      .dmixture3p_slot(y[i], 0, kappa[i], K[i], ptarget[i], ss[i], nt[i, ], tau[i], 41L)
     }, numeric(1)),
     tolerance = 1e-12
   )
   expect_equal(
     stan("out_sa"),
     vapply(seq_along(y), function(i) {
-      .dmixture3p_slot_averaging(y[i], 0, kappa[i], K[i], pnt[i], ss[i],
+      .dmixture3p_slot_averaging(y[i], 0, kappa[i], K[i], ptarget[i], ss[i],
         nt[i, ], tau[i], 41L)
     }, numeric(1)),
     tolerance = 1e-12

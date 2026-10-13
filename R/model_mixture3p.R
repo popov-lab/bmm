@@ -31,12 +31,12 @@
   mu = .mixture3p_location_prior,
   kappa = .mixture3p_kappa_prior,
   K = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
-  pnt = list(main = "logistic(-1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+  ptarget = list(main = "logistic(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
 )
 
 # central 50% of the main default prior on the native scale
 .mixture3p_capacity_inits <- list(
-  mu = c(-0.65, 0.65), kappa = c(3.8, 15), K = c(1.9, 3.8), pnt = c(0.11, 0.52)
+  mu = c(-0.65, 0.65), kappa = c(3.8, 15), K = c(1.9, 3.8), ptarget = c(0.48, 0.89)
 )
 
 .mixture3p_version_table <- list(
@@ -74,8 +74,8 @@
     )
   ),
   slot = list(
-    weight_parameters = c("K", "pnt"),
-    swap_parameter = "pnt",
+    weight_parameters = c("K", "ptarget"),
+    swap_parameter = "ptarget",
     parameters = list(
       mu = .mixture3p_location,
       kappa = "Concentration of the von Mises distribution of memory responses",
@@ -84,18 +84,18 @@
         either held at full precision or not held at all, so the probability \\
         that a response comes from memory is min(1, K / set_size)."
       ),
-      pnt = glue(
-        "Probability that a response reports a non-target rather than the \\
-        target, given that it comes from memory."
+      ptarget = glue(
+        "Probability that a response reports the target rather than a \\
+        non-target, given that it comes from memory."
       )
     ),
-    links = list(mu = "tan_half", kappa = "log", K = "log", pnt = "logit"),
+    links = list(mu = "tan_half", kappa = "log", K = "log", ptarget = "logit"),
     priors = .mixture3p_capacity_priors,
     init_ranges = .mixture3p_capacity_inits
   ),
   slot_averaging = list(
-    weight_parameters = c("K", "pnt"),
-    swap_parameter = "pnt",
+    weight_parameters = c("K", "ptarget"),
+    swap_parameter = "ptarget",
     parameters = list(
       mu = .mixture3p_location,
       kappa = glue(
@@ -108,12 +108,12 @@
         the array. An item receives floor(K / set_size) or one more slot, and \\
         an item that receives none is guessed."
       ),
-      pnt = glue(
-        "Probability that a response reports a non-target rather than the \\
-        target, given that it comes from memory."
+      ptarget = glue(
+        "Probability that a response reports the target rather than a \\
+        non-target, given that it comes from memory."
       )
     ),
-    links = list(mu = "tan_half", kappa = "log", K = "log", pnt = "logit"),
+    links = list(mu = "tan_half", kappa = "log", K = "log", ptarget = "logit"),
     priors = .mixture3p_capacity_priors,
     init_ranges = .mixture3p_capacity_inits
   )
@@ -203,13 +203,13 @@ settable_links.mixture3p <- function(model) {
 #'       with guessing as the reference.
 #'     \item `"slot"`: the probability that a response comes from memory follows
 #'       the fixed-resolution slot model of Zhang and Luck (2008),
-#'       `min(1, K / set_size)`, and `pnt` is the probability that a remembered
-#'       response reports a non-target.
+#'       `min(1, K / set_size)`, and `ptarget` is the probability that a
+#'       remembered response reports the target rather than a non-target.
 #'     \item `"slot_averaging"`: as `"slot"`, but `K` slots are distributed over
 #'       the items and precision grows with the number of slots an item holds.
 #'   }
 #'   Storage and swapping are separate in the capacity versions: the capacity
-#'   rule says how often a response comes from memory and `pnt` says which
+#'   rule says how often a response comes from memory and `ptarget` says which
 #'   stored item is reported. In `"simple"` the two are jointly constrained by
 #'   the shared normalisation, so neither weight is separately interpretable.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
@@ -411,7 +411,7 @@ log_lik_mixture3p_slot <- function(i, prep) {
     mu = brms::get_dpar(prep, "mu", i = i),
     kappa = brms::get_dpar(prep, "kappa", i = i),
     K = brms::get_dpar(prep, "K", i = i),
-    p_nt = brms::get_dpar(prep, "pnt", i = i),
+    p_target = brms::get_dpar(prep, "ptarget", i = i),
     set_size = prep$data$vint1[i], nt = .circmix_prep_nt(prep, i),
     tau = .circmix_prep_tau(prep, i), nodes = .circmix_prep_nodes(prep)
   )
@@ -423,7 +423,7 @@ log_lik_mixture3p_slot_averaging <- function(i, prep) {
     mu = brms::get_dpar(prep, "mu", i = i),
     kappa = brms::get_dpar(prep, "kappa", i = i),
     K = brms::get_dpar(prep, "K", i = i),
-    p_nt = brms::get_dpar(prep, "pnt", i = i),
+    p_target = brms::get_dpar(prep, "ptarget", i = i),
     set_size = prep$data$vint1[i], nt = .circmix_prep_nt(prep, i),
     tau = .circmix_prep_tau(prep, i), nodes = .circmix_prep_nodes(prep)
   )
@@ -445,7 +445,7 @@ posterior_predict_mixture3p_slot <- function(i, prep, ...) {
   set_size <- prep$data$vint1[i]
   weights <- .mixture3p_nested_weights(
     pmin(1, brms::get_dpar(prep, "K", i = i) / set_size),
-    brms::get_dpar(prep, "pnt", i = i), set_size
+    brms::get_dpar(prep, "ptarget", i = i), set_size
   )
   .rmixture3p(
     brms::get_dpar(prep, "mu", i = i), .circmix_prep_nt(prep, i), set_size,
@@ -459,7 +459,7 @@ posterior_predict_mixture3p_slot_averaging <- function(i, prep, ...) {
     nt = .circmix_prep_nt(prep, i), set_size = prep$data$vint1[i],
     kappa = brms::get_dpar(prep, "kappa", i = i),
     K = brms::get_dpar(prep, "K", i = i),
-    p_nt = brms::get_dpar(prep, "pnt", i = i),
+    p_target = brms::get_dpar(prep, "ptarget", i = i),
     tau = .circmix_prep_tau(prep, i)
   )
 }

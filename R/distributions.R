@@ -616,24 +616,24 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   list(logw = logw - total, logw_guess = -total)
 }
 
-# which stored item is reported: the target with 1 - p_nt and each non-target
-# with an equal share of p_nt; at set size 1 there is nothing to swap to
-.mixture3p_swap_weights <- function(p_nt, set_size) {
-  n <- length(p_nt)
+# which stored item is reported: the target with p_target and each non-target
+# with an equal share of 1 - p_target; at set size 1 there is nothing to swap to
+.mixture3p_swap_weights <- function(p_target, set_size) {
+  n <- length(p_target)
   if (set_size == 1) {
     return(matrix(0, nrow = n))
   }
   cbind(
-    log1p(-p_nt),
-    matrix(log(p_nt) - log(set_size - 1), nrow = n, ncol = set_size - 1)
+    log(p_target),
+    matrix(log1p(-p_target) - log(set_size - 1), nrow = n, ncol = set_size - 1)
   )
 }
 
 # the capacity versions separate storage from swapping: p_mem says how often a
-# response comes from memory and p_nt which stored item is reported
-.mixture3p_nested_weights <- function(p_mem, p_nt, set_size) {
+# response comes from memory and p_target how often that memory is the target
+.mixture3p_nested_weights <- function(p_mem, p_target, set_size) {
   list(
-    logw = log(p_mem) + .mixture3p_swap_weights(p_nt, set_size),
+    logw = log(p_mem) + .mixture3p_swap_weights(p_target, set_size),
     logw_guess = log1p(-p_mem)
   )
 }
@@ -654,12 +654,12 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
-.dmixture3p_slot <- function(x, mu, kappa, K, p_nt, set_size, nt, tau, nodes) {
+.dmixture3p_slot <- function(x, mu, kappa, K, p_target, set_size, nt, tau, nodes) {
   args <- .circmix_recycle(
-    x = x, mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau
+    x = x, mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau
   )
   weights <- .mixture3p_nested_weights(
-    pmin(1, args$K / set_size), args$p_nt, set_size
+    pmin(1, args$K / set_size), args$p_target, set_size
   )
   .circmix_vp_ld(
     .circmix_cos(args$x, args$mu, nt, set_size),
@@ -669,13 +669,13 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 
 # Which item is reported and how many slots it holds are independent, so the
 # swap weights serve both slot counts and only the concentration differs.
-.dmixture3p_slot_averaging <- function(x, mu, kappa, K, p_nt, set_size, nt, tau, nodes) {
+.dmixture3p_slot_averaging <- function(x, mu, kappa, K, p_target, set_size, nt, tau, nodes) {
   args <- .circmix_recycle(
-    x = x, mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau
+    x = x, mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau
   )
   .circmix_slot_averaging_ld(
     .circmix_cos(args$x, args$mu, nt, set_size),
-    .mixture3p_swap_weights(args$p_nt, set_size),
+    .mixture3p_swap_weights(args$p_target, set_size),
     args$K, set_size, args$kappa, args$tau, nodes
   )
 }
@@ -698,11 +698,11 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
-.rmixture3p_slot_averaging <- function(mu, nt, set_size, kappa, K, p_nt, tau) {
-  args <- .circmix_recycle(mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau)
+.rmixture3p_slot_averaging <- function(mu, nt, set_size, kappa, K, p_target, tau) {
+  args <- .circmix_recycle(mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau)
   .rcircmix_slot_averaging(
     .mixture3p_locations(args$mu, nt, set_size),
-    .mixture3p_swap_weights(args$p_nt, set_size),
+    .mixture3p_swap_weights(args$p_target, set_size),
     args$K, set_size, args$kappa, args$tau
   )
 }

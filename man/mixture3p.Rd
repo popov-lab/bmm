@@ -44,13 +44,13 @@ guessing are normalised across the components a trial actually has,
 with guessing as the reference.
 \item \code{"slot"}: the probability that a response comes from memory follows
 the fixed-resolution slot model of Zhang and Luck (2008),
-\code{min(1, K / set_size)}, and \code{pnt} is the probability that a remembered
-response reports a non-target.
+\code{min(1, K / set_size)}, and \code{ptarget} is the probability that a
+remembered response reports the target rather than a non-target.
 \item \code{"slot_averaging"}: as \code{"slot"}, but \code{K} slots are distributed over
 the items and precision grows with the number of slots an item holds.
 }
 Storage and swapping are separate in the capacity versions: the capacity
-rule says how often a response comes from memory and \code{pnt} says which
+rule says how often a response comes from memory and \code{ptarget} says which
 stored item is reported. In \code{"simple"} the two are jointly constrained by
 the shared normalisation, so neither weight is separately interpretable.}
 

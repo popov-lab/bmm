@@ -442,12 +442,14 @@ test_that("every model ships an sd default on the link scale of each parameter",
   for (par in c("kappa", "thetat", "thetant")) expect_equal(sd_default(pr, par), "exponential(1)")
   for (version in c("slot", "slot_averaging")) {
     pr <- default_prior(
-      bmf(kappa ~ 1 + (1 | ID), K ~ 1 + session + (1 | ID), pnt ~ 1 + session + (1 | ID)), data,
+      bmf(kappa ~ 1 + (1 | ID), K ~ 1 + session + (1 | ID), ptarget ~ 1 + session + (1 | ID)), data,
       mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size", version = version)
     )
     expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "K", ]$prior, "normal(0, 0.3)")
-    expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "pnt", ]$prior, "normal(0, 0.5)")
-    for (par in c("kappa", "pnt")) expect_equal(sd_default(pr, par), "exponential(1)")
+    expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "ptarget", ]$prior, "normal(0, 0.5)")
+    # ptarget = 1 - the previous pnt, so its intercept prior is the mirror image
+    expect_equal(pr[pr$class == "Intercept" & pr$dpar == "ptarget", ]$prior, "logistic(1, 1)")
+    for (par in c("kappa", "ptarget")) expect_equal(sd_default(pr, par), "exponential(1)")
     expect_equal(sd_default(pr, "K"), "exponential(2)")
   }
   pr <- default_prior(

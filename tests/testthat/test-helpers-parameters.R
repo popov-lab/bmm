@@ -209,7 +209,7 @@ test_that(".is_softmax_param returns FALSE for the capacity-limited versions", {
   for (version in c("slot", "slot_averaging")) {
     model <- .model_mixture3p(version = version)
     expect_false(.is_softmax_param("K", model))
-    expect_false(.is_softmax_param("pnt", model))
+    expect_false(.is_softmax_param("ptarget", model))
   }
 })
 
