@@ -85,7 +85,8 @@
       reject("bmm: the variable-precision quadrature holds the log density to ",
              "about 1e-5 while the gamma shape J(kappa)/tau stays above ",
              40.0 / nodes, ", but got ", shape,
-             ". Raise vp_nodes, or use a more informative prior on tau.");
+             ". Raise vp_nodes above ", 40.0 / shape,
+             ", or use a more informative prior on tau.");
     }
     real half_width = 8 * sqrt(trigamma(shape));
     if (half_width < 1e-6) {

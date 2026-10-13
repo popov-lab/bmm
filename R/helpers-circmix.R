@@ -155,8 +155,9 @@
   stopif(
     any(shape[vp] < 40 / nodes),
     "The variable-precision quadrature holds the log density to about 1e-5 \\
-    while the gamma shape J(kappa)/tau stays above {40 / nodes}, but the \\
-    smallest value here is {min(shape[vp])}. Raise vp_nodes."
+    while the gamma shape J(kappa)/tau stays above {signif(40 / nodes, 3)}, \\
+    but the smallest value here is {signif(min(shape[vp]), 3)}. Raise vp_nodes \\
+    to at least {2 * ceiling((40 / min(shape[vp]) - 1) / 2) + 1}."
   )
 
   centre <- digamma(shape[vp]) + log(tau[vp])

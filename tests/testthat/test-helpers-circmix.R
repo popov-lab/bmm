@@ -510,3 +510,14 @@ test_that("variable precision says what kappa means, in every model and version"
   }
   expect_no_match(mixture2p("y")$parameters$kappa, "variable precision")
 })
+
+test_that("the variable-precision quadrature names the node count it needs", {
+  # J(1) / 20 = 0.0223, and 1793 is the smallest odd count with 40 / nodes below it
+  expect_error(
+    dmixture2p(0.3, kappa = 1, tau = 20),
+    "smallest value here is 0.0223. Raise vp_nodes to at least 1793",
+    fixed = TRUE
+  )
+  expect_no_error(dmixture2p(0.3, kappa = 1, tau = 20, vp_nodes = 1793))
+  expect_error(dmixture2p(0.3, kappa = 1, tau = 20, vp_nodes = 1791), "at least 1793")
+})
