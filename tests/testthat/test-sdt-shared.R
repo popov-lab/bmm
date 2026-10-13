@@ -88,9 +88,7 @@ test_that("the default sdratio prior brackets the group-level estimates", {
   # 1.26 signal over noise, and the broeder_schuetz_2009_e3 posterior gives
   # 1.46 [1.25, 1.71]. The prior has to reach past the widest ratio those
   # support and still keep its mass off ratios above 2, which recognition does
-  # not produce -- one-sided, "covers the empirical range" cannot fail. The
-  # upper bound matters twice for ranking: .ranking_gh_n() is calibrated over
-  # ratios in [0.5, 2.0].
+  # not produce -- one-sided, "covers the empirical range" cannot fail.
   models <- list(sdt_yn("n_old", "stimulus", "n_trials"),
                  sdt_ranking(paste0("rank", 1:4), m = 4, dist = "normal"))
   for (model in models) {
