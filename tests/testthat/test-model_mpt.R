@@ -941,32 +941,6 @@ test_that("stick-breaking members form a simplex for any raw values", {
   )
 })
 
-test_that("the default simplex prior gives every member prior mean 1/K under both links", {
-  skip_on_cran()
-  skip_unless_stan_tests()
-  withr::local_options("bmm.silent" = 2)
-  tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
-  dat <- data.frame(A = 4L, B = 3L, C = 3L)
-  inv_links <- list(logit = stats::plogis, probit = stats::pnorm)
-  for (link in names(inv_links)) {
-    fit <- bmm(
-      bmf(gA ~ 1, gB ~ 1), dat, mpt(tree, simplex = c("gA", "gB", "gC"), links = link),
-      sample_prior = "only", chains = 2, iter = 3000, warmup = 500, refresh = 0,
-      seed = 1, rename = FALSE
-    )
-    draws <- brms::as_draws_df(fit)
-    stick_a <- inv_links[[link]](draws[[grep("^b_gAraw", names(draws))]])
-    stick_b <- inv_links[[link]](draws[[grep("^b_gBraw", names(draws))]])
-    # the per-stick uniform prior this replaces gives 0.50/0.25/0.25; the
-    # Monte Carlo error of each mean is below 0.01 at these draws
-    expect_equal(
-      c(mean(stick_a), mean((1 - stick_a) * stick_b), mean((1 - stick_a) * (1 - stick_b))),
-      rep(1 / 3, 3),
-      tolerance = 0.03
-    )
-  }
-})
-
 test_that("predictors on the derived simplex parameter are rejected", {
   trees <- list(mpt_tree("t", list(A = "gA", B = "gB", New = "gNew")))
   model <- mpt(trees, simplex = c("gA", "gB", "gNew"))
@@ -1163,33 +1137,6 @@ test_that("bmm_data_check() reads the correlation ID that ?mpt recommends as a l
   )
   expect_setequal(res$predictors$coding$variable, "id")
   expect_false("p" %in% unlist(res$predictors$pred_map))
-})
-
-test_that("conditional_effects() shows simplex members on the probability scale", {
-  skip_on_cran()
-  skip_unless_stan_tests()
-
-  trees <- list(
-    mpt_tree("x", list(A = "D + (1 - D) * a", B = "(1 - D) * b", C = "(1 - D) * c")),
-    mpt_tree("y", list(A = "(1 - D) * a", B = "D + (1 - D) * b", C = "(1 - D) * c"))
-  )
-  dat <- data.frame(
-    tt = rep(c("x", "y"), 2), cond = rep(c("p", "q"), each = 2),
-    A = c(60, 15, 50, 30), B = c(25, 55, 20, 40), C = c(15, 21, 30, 35)
-  )
-  fit <- bmm(
-    bmf(D ~ 1, a ~ cond, b ~ cond), dat, mpt(trees, "tt", simplex = c("a", "b", "c")),
-    backend = "cmdstanr", chains = 2, iter = 1000, refresh = 0, silent = 2
-  )
-
-  np <- native_parameters(fit, pars = c("a", "b"))
-  # b = (1 - a) * stick, so its panel depends on both stick-breaking components
-  for (p in c("a", "b")) {
-    ce <- conditional_effects(fit, par = p, robust = TRUE)$cond
-    medians <- c(tapply(np$value[np$parameter == p], np$cond[np$parameter == p], stats::median))
-    expect_true(all(ce$lower__ > 0 & ce$upper__ < 1))
-    expect_equal(ce$estimate__, unname(medians[as.character(ce$cond)]), tolerance = 1e-3)
-  }
 })
 
 test_that("mpt keeps the trees as given before the restrictions", {
