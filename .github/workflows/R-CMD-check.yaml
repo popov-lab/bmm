@@ -126,11 +126,12 @@ jobs:
           )
         shell: Rscript {0}
 
-      # The check takes 7-12 minutes; a hung runner otherwise holds the job,
-      # and the concurrency group's next run, for GitHub's 6-hour default.
+      # The check takes up to ~30 minutes on Windows (tests alone took 26 in
+      # October 2026); a hung runner otherwise holds the job, and the
+      # concurrency group's next run, for GitHub's 6-hour default.
       # The limit sits on this step so a cold CmdStan build cannot trip it.
       - uses: r-lib/actions/check-r-package@v2
-        timeout-minutes: 30
+        timeout-minutes: 60
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'
           args: 'c("--no-manual", "--as-cran", "--ignore-vignettes")'
