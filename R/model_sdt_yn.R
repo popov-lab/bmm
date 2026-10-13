@@ -10,7 +10,15 @@
       "d_a sensitivity (= d' when sdratio is fixed): the distance between ",
       "the signal and noise distributions in units of their root-mean-square SD"
     ),
-    criterion = "Response bias: location of decision boundary",
+    criterion = paste0(
+      "Decision criterion, measured from the mean of the noise distribution in ",
+      "noise-SD units; the false-alarm rate depends on it alone"
+    ),
+    bias = paste0(
+      "Alternative to criterion: the decision criterion measured from the ",
+      "midpoint between the noise and signal means (0 = neutral, positive = ",
+      "conservative). Use one of the two"
+    ),
     sdratio = paste0(
       "SD ratio signal/noise, log link (0 = equal SDs): summary() prints the ",
       "log of this ratio, not the ratio itself, so exp() a posterior value ",
@@ -28,9 +36,15 @@
   # intercept shared across five conditions -- a single condition alone gives
   # 0.24, above rate 4's median (0.17) -- so criterion takes rate 2. sdratio's
   # 0.2 clears that same median on its own, so it takes rate 2 too.
+  # bias is the midpoint-relative criterion those fits estimated. criterion
+  # adds half the separation, so it inherits half of d's spread: closed-form
+  # per-subject values on the same data spread 0.42 against bias's 0.17, which
+  # puts criterion at rate 1. Its intercept centres on 0.5, the unbiased
+  # observer at d's prior mean of 1; condition means there run 0.28 to 1.47.
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-    criterion = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
+    criterion = list(main = "normal(0.5, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+    bias = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
     # sdratio is on the log scale, so normal(0, 0.3) puts 95% of the prior on
     # ratios in [0.56, 1.80] and next to nothing above 2, which recognition
     # does not produce. Both group-level estimates in hand sit inside that:
@@ -65,15 +79,17 @@
       version = "NA",
       requirements = requirements,
       parameters = parameters,
-      links = list(d = "identity", criterion = "identity",
+      links = list(d = "identity", criterion = "identity", bias = "identity",
                    sdratio = "log"),
       # on the link scale, so exp(0) = 1 = equal variance
       fixed_parameters = list(sdratio = 0),
+      alternative_parameters = list(c("criterion", "bias")),
       default_priors = default_priors,
       # on the natural scale; create_initfun() applies the forward link
       init_ranges = list(
         d         = c(0.5, 1.5),
-        criterion = c(-0.5, 0.5),
+        criterion = c(0, 1),
+        bias      = c(-0.5, 0.5),
         sdratio   = c(0.75, 1.35)
       )
     ),
@@ -92,19 +108,22 @@
 # which samples to completion and is wrong; and inverse into an infinite
 # ratio, which makes eta NaN (Inf/Inf) rather than Inf -- worse than the other
 # two failure modes, because a NaN poisons the adjoint of every shared
-# parameter instead of just killing one row's likelihood. `d` and `criterion`
-# fix nothing, so their links stay settable.
+# parameter instead of just killing one row's likelihood. `d`, `criterion` and
+# `bias` fix nothing, so their links stay settable.
 #' @exportS3Method
 settable_links.sdt_yn <- function(model) {
-  c("d", "criterion")
+  c("d", "criterion", "bias")
 }
 
 
 #' @title Yes/No Signal Detection Theory Model
 #' @name sdt_yn
 #' @description Estimates sensitivity (`d`, which is \eqn{d'} under equal
-#'   variance and \eqn{d_a} once `sdratio` is estimated) and response bias
-#'   (`criterion`) from yes/no detection or old/new recognition counts.
+#'   variance and \eqn{d_a} once `sdratio` is estimated) and the decision
+#'   criterion from yes/no detection or old/new recognition counts. The
+#'   criterion is estimated either as `criterion`, measured from the mean of the
+#'   noise distribution, or as `bias`, measured from the midpoint between the
+#'   noise and signal means; the formula names the one to estimate.
 #' @details `r model_docs(.model_sdt_yn())`
 #' @param response The name of the variable in the dataset containing the
 #'   count of "old"/"signal" responses for each cell.
@@ -132,8 +151,8 @@ settable_links.sdt_yn <- function(model) {
 #'       \eqn{1 / (1 + \exp(-x))}{1 / (1 + exp(-x))}
 #'   }
 #' @param links A named list of link functions for the parameters, one entry
-#'   per parameter you want to change, e.g. `links = list(d = "log")`. Only `d`
-#'   and `criterion` can be set. `sdratio` keeps its log link, because the
+#'   per parameter you want to change, e.g. `links = list(d = "log")`. Only `d`,
+#'   `criterion` and `bias` can be set. `sdratio` keeps its log link, because the
 #'   model's default of an equal-variance SD ratio is stored as the 0 that the
 #'   log link maps to 1; read on any other link that same 0 is a different
 #'   ratio, and on an identity link it is a ratio of zero that makes the signal
@@ -170,11 +189,10 @@ settable_links.sdt_yn <- function(model) {
 #' you compare, the two indices differ by one common factor and give the same
 #' contrasts up to scale.
 #'
-#' **Units of the other parameters.** `criterion` is *not* rescaled. It is the
-#' location of the decision boundary relative to the midpoint between the two
-#' distributions, in noise-SD units, so under unequal variance `d` (in
-#' root-mean-square SD units) and `criterion` (in noise-SD units) are on
-#' different scales, and a ratio such as `criterion / d` mixes them.
+#' **Units of the other parameters.** `criterion` and `bias` are *not*
+#' rescaled: both are in noise-SD units, so under unequal variance `d` (in
+#' root-mean-square SD units) and the criterion are on different scales, and a
+#' ratio such as `bias / d` mixes them.
 #'
 #' **Extreme-value distributions.** For `dist = "normal"`, \eqn{d_a} is also the
 #' AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}{d_a = sqrt(2) * Phi^-1(AUC)}, so it
@@ -189,30 +207,108 @@ settable_links.sdt_yn <- function(model) {
 #' used as a predictor will collide with this parameter; `bmm()` warns when that
 #' happens.
 #'
+#' @section Choosing between `criterion` and `bias`:
+#' Both parameters place the same decision boundary on the noise-standardized
+#' evidence axis, and they differ only in the point they measure it from:
+#' \itemize{
+#'   \item `criterion` is the distance from the mean of the noise distribution.
+#'     The false-alarm rate depends on it alone: \eqn{FA = 1 - F(criterion)}.
+#'   \item `bias` is the distance from the midpoint between the noise and signal
+#'     means: 0 is the neutral point, positive values a conservative bias toward
+#'     "new"/"noise". Under equal variance it is the index usually written
+#'     \eqn{c}.
+#' }
+#' They are related by \eqn{bias = criterion - \delta / 2}{bias = criterion -
+#' delta / 2}, where \eqn{\delta = d \sqrt{(1 + r^2)/2}}{delta = d * sqrt((1 +
+#' r^2) / 2)} is the separation in noise-SD units. Write one of them in the
+#' formula; a formula that names neither estimates `criterion ~ 1`, and one
+#' that names both is refused. [sdt_criterion()] and [sdt_bias()] compute the
+#' two from a single hit and false-alarm rate.
+#'
+#' **The choice matters whenever `d` or `sdratio` differs between rows that
+#' share a criterion term**, because a linear formula holds constant the
+#' parameter you write. `criterion ~ 1` with `d ~ 1 + strength` says the
+#' observer keeps one boundary while targets get stronger; `bias ~ 1` with the
+#' same `d` formula says the boundary moves up by half of every change in
+#' separation. When the criterion and `d` share condition-wise (factor)
+#' predictors and `sdratio` does not vary within those cells, or share
+#' predictors while `d` keeps its identity link and `sdratio` is the same in
+#' every row, the two give the same likelihood and their coefficients differ
+#' by \eqn{\delta / 2}.
+#' Otherwise they are different models. Even with the same likelihood, the
+#' posteriors differ through the default priors: `criterion` takes
+#' `normal(0.5, 1.5)` for its intercept, or for each cell under
+#' `~ 0 + condition`, and `exponential(1)` for its random-effect SDs, while
+#' `bias` takes `normal(0, 1.5)` and `exponential(2)`.
+#'
+#' Use `criterion` when the lures, and the observer's boundary, do not depend
+#' on the manipulation of `d`: the classic recognition design in which weak and
+#' strong targets are tested against one shared set of lures under the same
+#' criteria. Its lure rows have no strength level, and with `criterion` they
+#' need none, because the false-alarm rate does not involve `d`. Use `bias`
+#' when you want to hold, or compare, the observer's position relative to the
+#' two distributions, e.g. a bias contrast between groups that differ in
+#' sensitivity.
+#'
+#' `bias` is measured from the midpoint, which is the point where the two
+#' densities are equal -- the optimal boundary for equal base rates and
+#' payoffs -- only for the symmetric distributions (`"normal"`, `"logistic"`)
+#' under equal variance. Under unequal variance, or for the Gumbel
+#' distributions, `bias = 0` is the midpoint, not the optimum.
+#'
 #' @section Identifying `sdratio`:
-#' `sdratio` needs a design that supplies more than one operating point. A single
-#' (hit, false-alarm) pair is two numbers for three unknowns, so when every
-#' parameter is intercept-only with no random effects, `sdratio ~ 1` returns its
-#' prior and `d` is pulled along the resulting ridge: sampling converges, `Rhat`
-#' is fine, and the profile likelihood over `sdratio` is flat to 1e-12. `bmm()`
-#' warns for that one design, which is the only shape that provably cannot work.
+#' `sdratio` needs a design that supplies more than one operating point, and
+#' whether it gets one depends on which criterion parameter the formula holds
+#' constant.
 #'
-#' Any linear predictor that moves the operating point along the ROC supplies
-#' what is missing, and it need not sit on `criterion`: a sensitivity
-#' manipulation (`d ~ 0 + condition`, a study-time or strength manipulation with
-#' bias held constant) identifies `sdratio` just as a criterion manipulation
-#' does, and so does between-subject variation entering through a random effect
-#' such as `criterion ~ 1 + (1 | id)` — though, like any predictor, only in
-#' proportion to how far it actually moves the operating point: a random
-#' effect with little between-subject spread carries little information and
-#' will not trigger the warning above, because that warning counts formula
-#' terms, not how much they move the design.
+#' **With `criterion`**, the boundary must move among rows that share the
+#' same `d`: give `criterion` a predictor that shifts it while `d` stays put,
+#' such as a base-rate, payoff, or confidence manipulation (`d ~ 1`,
+#' `criterion ~ 0 + condition`; see [broeder_schuetz_2009_e3]). A criterion
+#' that is the same in every row is fixed by the false-alarm rate, and each
+#' hit rate then fixes only \eqn{(\delta - criterion) / r}{(delta -
+#' criterion) / r}, so `sdratio` trades against `d`. A change in `sdratio` is
+#' matched by shifting the separation of every cell by one common amount and
+#' rescaling it by one common factor, and whenever the formula for `d` can
+#' make that change, `sdratio` returns its prior. A factor can, under the
+#' identity and the log link alike (`d ~ 0 + condition` or `d ~ 1 +
+#' condition`), because it gives every cell a value of its own. An intercept
+#' with a numeric predictor can under the identity link (`d ~ 1 + strength`),
+#' because the intercept shifts and the slope rescales. `sdratio` is
+#' identified only when the formula constrains `d` across cells beyond that.
+#' A numeric predictor without an intercept (`d ~ 0 + strength`) holds `d`
+#' proportional to `strength`. It identifies `sdratio` when `strength` takes
+#' at least two nonzero values and the criterion lies clearly away from the
+#' noise mean (for `"normal"`, a false-alarm rate clearly away from .5); at a
+#' criterion of 0 it does not. The estimate then rests on the assumption that
+#' `d` is zero where `strength` is zero, not on a second operating point in
+#' the data. A numeric predictor under a log link on `d` barely identifies
+#' `sdratio`, and in practice `sdratio` returns its prior. `bmm()` warns for
+#' every criterion that is the same in every row, so it also warns for
+#' `d ~ 0 + strength`. Giving `d` and `criterion` the same condition-wise
+#' predictors (`d ~ 0 + condition`, `criterion ~ 0 + condition`) fails too,
+#' because each condition then has two rates for two parameters of its own,
+#' and no warning catches it. A random effect such as
+#' `criterion ~ 1 + (1 | id)` moves the boundary between subjects and does not
+#' trigger the warning, but it informs `sdratio`
+#' only weakly, through the assumption that the subject effects on `d` and on
+#' the criterion are independent.
 #'
-#' A criterion manipulation is still the cleanest design, because it traces the
-#' ROC at fixed sensitivity: give `criterion` a predictor that shifts the
-#' decision boundary — a base-rate, payoff, or confidence manipulation — as in
-#' `criterion ~ 0 + condition`; see [broeder_schuetz_2009_e3]. Leaving `sdratio`
-#' at its default is always identified.
+#' **With `bias`**, any predictor that moves the operating point supplies what
+#' is missing, including a sensitivity manipulation such as `d ~ 0 + condition`
+#' with `bias ~ 1`: holding the bias constant moves the criterion with the
+#' separation, and that movement traces the ROC. The identification then rests
+#' on that assumption about the observer. The design in which every parameter
+#' is intercept-only with no random effects cannot work: a single (hit,
+#' false-alarm) pair is two numbers for three unknowns, and `bmm()` warns for
+#' it. Neither can `bias` and `d` with the same condition-wise predictors, for
+#' the reason given above, and that design raises no warning.
+#'
+#' Sampling converges and `Rhat` is fine in every unidentified case, so the
+#' warnings are the only signal. They count formula terms, not how far the
+#' terms move the operating point, so a predictor with a small effect carries
+#' little information without a warning. Leaving `sdratio` at its default is
+#' always identified.
 #'
 #' @section Reading `sdratio` and carrying it to [dsdt_yn()]/[rsdt_yn()]:
 #' As in every `bmm` model, the parameters the model *estimates* are on their
@@ -230,8 +326,8 @@ settable_links.sdt_yn <- function(model) {
 #' Passing `0.22` straight to `rsdt_yn()` instead asks for a signal
 #' distribution 4.5 times *narrower* than the noise — a legal value that
 #' raises no error, and the one mistake worth checking for in a posterior
-#' predictive check written by hand. `d` and `criterion` have identity links,
-#' so they carry across unchanged.
+#' predictive check written by hand. `d`, `criterion` and `bias` have identity
+#' links, so they carry across unchanged.
 #'
 #' The **zROC slope** reported in the recognition-memory literature is the
 #' reciprocal of that ratio, `1 / exp(sdratio)`, so a `sdratio` posterior mean
@@ -249,7 +345,9 @@ settable_links.sdt_yn <- function(model) {
 #' @section Terms used on this page:
 #' \itemize{
 #'   \item **noise-standardized axis** — latent evidence expressed in units of
-#'     the noise distribution's SD. `criterion` always lives on this axis.
+#'     the noise distribution's SD, with its origin at the noise mean.
+#'     `criterion` is a position on this axis; `bias` is a distance on it,
+#'     measured from the midpoint between the means.
 #'   \item \eqn{\delta} (**separation**) — the distance between the signal and
 #'     noise means, on that axis.
 #'   \item \eqn{d_N} — the classical \eqn{d'}: \eqn{\delta} itself, i.e. the
@@ -269,9 +367,9 @@ settable_links.sdt_yn <- function(model) {
 #'     the standard deviations of the parameter's random effects.
 #' }
 #'
-#' @seealso [sdt_d()] and [sdt_criterion()] compute the `d` and `criterion` of
-#'   this model in closed form from a single pair of observed hit and false-alarm
-#'   rates, without fitting: use them for a quick check of a fitted value, and
+#' @seealso [sdt_d()], [sdt_criterion()] and [sdt_bias()] compute the `d`,
+#'   `criterion` and `bias` of this model in closed form from a single pair of
+#'   observed hit and false-alarm rates, without fitting: use them for a quick check of a fitted value, and
 #'   this model when you need a hierarchical or condition-wise estimate, or
 #'   unequal variance.
 #'
@@ -301,7 +399,7 @@ settable_links.sdt_yn <- function(model) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat$n_trials <- 100L
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-#'                      d = 1.5, criterion = 0.2)
+#'                      d = 1.5, criterion = 0.9)
 #'
 #' model <- sdt_yn(
 #'   response = "n_old",
@@ -337,11 +435,39 @@ settable_links.sdt_yn <- function(model) {
 #'   backend = "cmdstanr"
 #' )
 #'
+#' # The same observer, with the boundary measured from the midpoint
+#' fit_bias <- bmm(
+#'   formula = bmf(d ~ 1 + (1 | id), bias ~ 1 + (1 | id)),
+#'   data = dat,
+#'   model = model,
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
+#' # Weak and strong targets against one shared set of lures, one criterion per
+#' # subject: `strong` is 1 for strong targets and 0 for weak targets and lures
+#' # (the lure rows' value does not matter, their false-alarm rate depends on
+#' # the criterion alone)
+#' lure_dat <- expand.grid(id = 1:20, cell = c("lure", "weak", "strong"))
+#' lure_dat$stimulus <- as.integer(lure_dat$cell != "lure")
+#' lure_dat$strong <- as.integer(lure_dat$cell == "strong")
+#' lure_dat$n_trials <- 100L
+#' lure_dat$n_old <- rsdt_yn(nrow(lure_dat), lure_dat$n_trials,
+#'                           lure_dat$stimulus, d = 1 + 0.8 * lure_dat$strong,
+#'                           criterion = 0.7)
+#' fit_strength <- bmm(
+#'   formula = bmf(d ~ 1 + strong + (1 | id), criterion ~ 1 + (1 | id)),
+#'   data = lure_dat,
+#'   model = model,
+#'   cores = 4,
+#'   backend = "cmdstanr"
+#' )
+#'
 #' # Simulating from a fitted unequal-variance model: the model reports
 #' # sdratio on its log link, rsdt_yn() takes the ratio itself.
 #' sdratio_posterior <- 0.375
 #' rsdt_yn(2, 100L, c(0L, 1L),
-#'         d = 1.3, criterion = 0.1, sdratio = exp(sdratio_posterior))
+#'         d = 1.3, criterion = 0.75, sdratio = exp(sdratio_posterior))
 #' }
 sdt_yn <- function(response, stimulus, n_trials,
                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
@@ -369,11 +495,39 @@ sdt_yn <- function(response, stimulus, n_trials,
 check_formula.sdt_yn <- function(model, data, formula) {
   # rhs_vars() reports random-effect grouping variables and the `Intercept`
   # pseudo-predictor, so `1 + (1 | id)` and `0 + Intercept` are both visible
-  flat_design <- all(vapply(formula, function(x) {
-    all(rhs_vars(x) %in% "Intercept")
-  }, logical(1)))
+  is_flat <- function(x) all(rhs_vars(x) %in% "Intercept")
+  free_sdratio <- !is_constant(formula)[["sdratio"]]
+  # Measured from the noise mean, a criterion that is the same in every row is
+  # fixed by the false-alarm rate, and each hit rate then fixes only
+  # (d * s - criterion) / sdratio: a change in sdratio is matched by shifting
+  # every cell's separation by one amount, proportional to the criterion, and
+  # rescaling it by one factor. A factor on d absorbs that under any link, an
+  # intercept plus a numeric slope under the identity link, and under the log
+  # link a numeric slope leaves only a trace. Only a numeric slope without an
+  # intercept rules out the shift, and only while the criterion is away from
+  # 0. Terms do not reveal that, so the warning errs on the side of firing.
+  # A bias held constant moves the criterion with d and sdratio instead, which
+  # is why only the all-flat design is caught there.
+  if (.sdt_anchor_parameter(formula) == "criterion") {
+    warnif(
+      free_sdratio && (is.null(formula$criterion) || is_flat(formula$criterion)),
+      "'sdratio' is estimated, but 'criterion' is the same in every row (no \\
+      predictor, no random effect). Measured from the noise mean, such a \\
+      criterion is fixed by the false-alarm rate, so every hit rate can be \\
+      matched by trading 'sdratio' against 'd'. This leaves 'sdratio' at its \\
+      prior, while sampling converges and Rhat stays fine, unless the formula \\
+      for 'd' rules out shifting every cell's separation by one common amount \\
+      and rescaling it by one common factor (e.g. a numeric predictor without \\
+      an intercept and an identity link, with the criterion away from the \\
+      noise mean). Give \\
+      'criterion' a predictor that moves it (a base-rate, payoff, or \\
+      confidence manipulation), or leave 'sdratio' at its default. See the \\
+      'Identifying sdratio' section of ?sdt_yn"
+    )
+    return(NextMethod("check_formula"))
+  }
   warnif(
-    flat_design && !is_constant(formula)[["sdratio"]],
+    all(vapply(formula, is_flat, logical(1))) && free_sdratio,
     "'sdratio' is estimated, but every parameter formula is intercept-only with \\
     no random effects. Such a design has two sufficient statistics (one hit \\
     rate, one false-alarm rate) for three parameters, so 'sdratio' will return \\
@@ -430,12 +584,15 @@ bmf2bf.sdt_yn <- function(model, formula) {
 
 #' @export
 configure_model.sdt_yn <- function(model, data, formula) {
+  anchor <- .sdt_anchor_parameter(formula)
   formula <- bmf2bf(model, formula)
 
+  # the dpar names must match the parameter the formula estimates, so each
+  # parameterization is its own family; the Stan functions share one kernel
   formula$family <- brms::custom_family(
-    "sdt_yn",
-    dpars = c("mu", "d", "criterion", "sdratio"),
-    links = c("identity", model$links$d, model$links$criterion,
+    if (anchor == "bias") "sdt_yn_bias" else "sdt_yn",
+    dpars = c("mu", "d", anchor, "sdratio"),
+    links = c("identity", model$links$d, model$links[[anchor]],
               model$links$sdratio),
     type = "int",
     loop = TRUE,
@@ -463,8 +620,8 @@ configure_model.sdt_yn <- function(model, data, formula) {
 
 log_lik_sdt_yn <- function(i, prep) {
   d <- brms::get_dpar(prep, "d", i = i)
-  criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- brms::get_dpar(prep, "sdratio", i = i)
+  criterion <- .sdt_criterion_dpar(prep, d, sdratio, i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
   dsdt_yn(prep$data$Y[i], prep$data$trials[i], prep$data$vint1[i],
@@ -473,8 +630,8 @@ log_lik_sdt_yn <- function(i, prep) {
 
 posterior_predict_sdt_yn <- function(i, prep, ...) {
   d <- brms::get_dpar(prep, "d", i = i)
-  criterion <- brms::get_dpar(prep, "criterion", i = i)
   sdratio <- brms::get_dpar(prep, "sdratio", i = i)
+  criterion <- .sdt_criterion_dpar(prep, d, sdratio, i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
   rsdt_yn(length(d), prep$data$trials[i], prep$data$vint1[i],
@@ -484,6 +641,7 @@ posterior_predict_sdt_yn <- function(i, prep, ...) {
 posterior_epred_sdt_yn <- function(prep) {
   stimulus <- .epred_data(prep$data$vint1, prep)
   dist <- .sdt_dist_names[prep$data$vint2[1]]
+  criterion <- .sdt_criterion_dpar(prep, prep$dpars$d, prep$dpars$sdratio)
   p_old <- with(prep$dpars, exp(.sdt_log_p_old(.sdt_eta(d, criterion, stimulus, sdratio), dist)))
   .epred_matrix(.epred_data(prep$data$trials, prep) * p_old, prep)
 }

@@ -124,11 +124,12 @@ test_that("metad equal to d reduces to the standard category probs", {
 
 test_that("metad holds each side of the criterion to the type-1 rate", {
   # the old/new boundary is criterion itself (threshold K/2), whatever the
-  # threshold type, so the "new" side carries F((criterion - shift) / scale)
+  # threshold type, so the "new" side carries F((criterion - shift) / scale),
+  # with the signal mean at the separation and the noise mean at 0
   sr <- 1.3
   d <- 1.5
   crit <- 0.4
-  shift <- d * bmm:::.sdt_rms_scale(sr) / 2
+  shift <- d * bmm:::.sdt_rms_scale(sr)
   for (tt in c("parsimonious", "log_distance", "softmax")) {
     thr <- bmm:::.sdt_make_thresholds(crit, 6L, tt, spacing = 0.2,
                                       deltas = if (tt == "softmax") c(0.3, -0.2, 0.1)
@@ -137,7 +138,32 @@ test_that("metad holds each side of the criterion to the type-1 rate", {
     pn <- bmm:::.sdt_metad_category_probs(thr, d, sr, 0L, "normal", 0.7)
     expect_equal(sum(ps[1:3]), pnorm((crit - shift) / sr), tolerance = 1e-12,
                  info = tt)
-    expect_equal(sum(pn[1:3]), pnorm(crit + shift), tolerance = 1e-12, info = tt)
+    expect_equal(sum(pn[1:3]), pnorm(crit), tolerance = 1e-12, info = tt)
+  }
+})
+
+test_that("metad holds the thresholds' distance from the midpoint fixed", {
+  # The meta-d' constraint is that the thresholds keep their distance from the
+  # midpoint between the means when d is replaced by meta-d'. Written here in
+  # that midpoint frame, independently of the kernels' noise-mean frame.
+  sr <- 1.3
+  d <- 1.5
+  metad <- 0.7
+  t_mid <- c(-0.5, 0.15, 0.6)
+  sep_d <- d * sqrt((1 + sr^2) / 2)
+  sep_m <- metad * sqrt((1 + sr^2) / 2)
+  for (stim in 0:1) {
+    sigma <- sr^stim
+    mu_d <- sep_d * (stim - 0.5)
+    mu_m <- sep_m * (stim - 0.5)
+    p_meta <- diff(c(0, pnorm((t_mid - mu_m) / sigma), 1))
+    new_d <- pnorm((t_mid[2] - mu_d) / sigma)
+    new_m <- pnorm((t_mid[2] - mu_m) / sigma)
+    hand <- p_meta * c(rep(new_d / new_m, 2), rep((1 - new_d) / (1 - new_m), 2))
+
+    got <- bmm:::.sdt_metad_category_probs(t_mid + sep_d / 2, d, sr, stim,
+                                           "normal", metad)
+    expect_equal(got, hand, tolerance = 1e-12, info = stim)
   }
 })
 
@@ -185,7 +211,7 @@ test_that("dpsdt category probs match an independent hand computation (K=4)", {
   thr <- c(-0.6, 0.1, 0.7)
   d <- 1.5
   Ro <- 0.35
-  base_s <- diff(c(0, pnorm(thr - d / 2), 1))            # signal, sr = 1
+  base_s <- diff(c(0, pnorm(thr - d), 1))                # signal, sr = 1
   hand_s <- (1 - Ro) * base_s
   hand_s[4] <- hand_s[4] + Ro
   got_s <- bmm:::.sdt_dpsdt_category_probs(thr, d, 1, 1L, "normal",
@@ -327,7 +353,7 @@ test_that("the generated Stan wrapper carries the version-specific call", {
 })
 
 test_that("metad R companion with logmratio = 0 reduces to the standard model", {
-  args <- list(K = 6L, dist = 1L, thresh = 1L, d = matrix(1.4),
+  args <- list(K = 6L, dist = 1L, thresh = 1L, anchor = 1L, d = matrix(1.4),
                criterion = matrix(0), spacing = matrix(0.3),
                sdratio = matrix(0), stimulus = matrix(1))
   for (k in 1:6) {
