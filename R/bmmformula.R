@@ -217,6 +217,10 @@ check_formula.default <- function(model, data, formula) {
 
 #' @export
 check_formula.non_targets <- function(model, data, formula) {
+  # imm no longer pins its set-size-1 levels and warns instead (check_formula.imm)
+  if (inherits(model, "imm")) {
+    return(NextMethod("check_formula"))
+  }
   set_size_var <- model$other_vars$set_size
   pred_list <- rhs_vars(formula, collapse = FALSE)
   has_set_size <- vapply(pred_list, function(x) set_size_var %in% x, logical(1))

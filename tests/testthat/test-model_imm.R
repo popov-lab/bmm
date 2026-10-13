@@ -177,24 +177,6 @@ test_that("each imm family refuses the expected response under its own name", {
   }
 })
 
-test_that("a set-size-1 factor level pins the parameters that trial cannot inform", {
-  formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size, s ~ 0 + set_size)
-  pr <- default_prior(formula, oberauer_lin_2017, imm_model())
-  pinned <- pr[pr$class == "b" & pr$coef == "set_size1", ]
-  expect_setequal(pinned$dpar, c("a", "s"))
-  expect_true(all(pinned$prior == "constant(0)"))
-
-  pr <- default_prior(bmf(kappa ~ 1, c ~ 1, s ~ 0 + set_size), oberauer_lin_2017,
-    imm_model("bsc"))
-  expect_equal(pr[pr$coef == "set_size1", ]$dpar, "s")
-
-  # a numeric set size has no set-size-1 level to pin
-  dat <- oberauer_lin_2017
-  dat$set_size <- as.numeric(as.character(dat$set_size))
-  pr <- default_prior(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 0 + set_size), dat, imm_model())
-  expect_false(any(grepl("constant(0)", pr$prior[pr$class == "b"], fixed = TRUE)))
-})
-
 test_that("check_data() still validates the non-target distances", {
   dat <- oberauer_lin_2017
   dat$dist_nt1 <- -1
@@ -279,4 +261,116 @@ test_that("the Stan and R likelihoods agree for every version", {
   expect_equal(stan("out_full"), r_side("full"), tolerance = 1e-12)
   expect_equal(stan("out_bsc"), r_side("bsc"), tolerance = 1e-12)
   expect_equal(stan("out_abc"), r_side("abc"), tolerance = 1e-12)
+})
+
+# names of the coefficients the set-size-1 warnings name, from the warnings
+# check_formula() gives for the formula
+set_size_one_names <- function(formula, data = oberauer_lin_2017, version = "full") {
+  model <- check_model(imm_model(version), data, formula)
+  data <- check_data(model, data, formula)
+  messages <- character(0)
+  withCallingHandlers(
+    check_formula(model, data, formula),
+    warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  messages <- grep("set size of 1", messages, value = TRUE)
+  as.character(sort(unlist(regmatches(messages, gregexpr("(b|sd)_[A-Za-z0-9_.]+(?=')", messages, perl = TRUE)))))
+}
+
+test_that("set size 1 leaves a and s to their priors instead of pinning them", {
+  formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID),
+    s ~ 0 + set_size + (0 + set_size | ID))
+  pr <- suppressWarnings(default_prior(formula, oberauer_lin_2017, imm_model()))
+  expect_false(any(grepl("constant", pr$prior[pr$dpar %in% c("a", "s")], fixed = TRUE)))
+  expect_equal(unique(pr$prior[pr$class == "sd" & pr$dpar %in% c("a", "s") & pr$group == ""]),
+    "exponential(1)")
+})
+
+test_that("an intercept next to set_size is accepted, with the set-size-1 warning", {
+  expect_warning(
+    bmm(bmf(kappa ~ 1 + set_size, c ~ 1, a ~ 1 + set_size, s ~ 1 + set_size),
+      oberauer_lin_2017, imm_model(),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "set size of 1"
+  )
+})
+
+test_that("the set-size-1 warning names exactly the coefficients no other trial informs", {
+  set_sizes <- paste0("set_size", 2:8)
+  # s is absent at set size 1
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)), character(0))
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 0 + set_size)),
+    "b_s_set_size1")
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1 + set_size)),
+    sort(c("b_s_Intercept", paste0("b_s_", set_sizes))))
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1,
+      s ~ 0 + set_size + (0 + set_size | ID))),
+    c("b_s_set_size1", "sd_ID__s_set_size1")
+  )
+  # a enters set size 1 through c + a, so c from the other trials fixes it
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size, s ~ 1)),
+    character(0))
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1 + set_size, s ~ 1)),
+    character(0))
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID), s ~ 1)),
+    character(0)
+  )
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 1, s ~ 1)),
+    character(0))
+  # with c free per set size too, set size 1 fixes only their sum
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size, s ~ 1)),
+    c("b_a_set_size1", "b_c_set_size1")
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 1 + set_size, s ~ 1)),
+    sort(c("b_a_Intercept", paste0("b_a_", set_sizes), "b_c_set_size1"))
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size,
+      a ~ 0 + set_size + (0 + set_size | ID), s ~ 1)),
+    c("b_a_set_size1", "b_c_set_size1")
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size + (0 + set_size | ID),
+      a ~ 0 + set_size + (0 + set_size | ID), s ~ 1)),
+    c("b_a_set_size1", "b_c_set_size1", "sd_ID__a_set_size1", "sd_ID__c_set_size1")
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size),
+      version = "abc"),
+    c("b_a_set_size1", "b_c_set_size1")
+  )
+  # bsc has no a, and c alone is the target's activation at set size 1
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, s ~ 0 + set_size),
+      version = "bsc"),
+    "b_s_set_size1"
+  )
+  # a numeric set size draws its line through the set sizes above 1
+  numeric_ss <- oberauer_lin_2017
+  numeric_ss$set_size <- as.numeric(as.character(numeric_ss$set_size))
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 1 + set_size, a ~ 1 + set_size,
+      s ~ 1 + set_size), numeric_ss),
+    character(0)
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size,
+      s ~ 0 + set_size), numeric_ss),
+    character(0)
+  )
+  # without set size 1 nothing is left to the prior
+  no_single <- oberauer_lin_2017[oberauer_lin_2017$set_size != 1, ]
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size,
+      s ~ 0 + set_size), no_single),
+    character(0)
+  )
 })

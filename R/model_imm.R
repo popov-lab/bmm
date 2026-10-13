@@ -285,6 +285,141 @@ check_data.imm_full <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# CHECK_FORMULA METHODS                                                  ####
+############################################################################# !
+
+#' @export
+check_formula.imm <- function(model, data, formula) {
+  .imm_warn_set_size_one(model, data, formula)
+  NextMethod("check_formula")
+}
+
+# A trial with one item has no non-target, so s is absent from its likelihood
+# and a enters only through the target's activation c + a. The previous mixture
+# implementation hid this by pinning the set-size-1 levels of a and s to a
+# constant, which it had to do anyway to switch off the sentinel weight.
+.imm_warn_set_size_one <- function(model, data, formula) {
+  if (!isTRUE(any(data[["ss_numeric"]] == 1))) {
+    return(invisible())
+  }
+  pars <- names(model$parameters)
+  if ("s" %in% pars) {
+    coefs <- .set_size_one_undetermined("s", formula, data)
+    warnif(
+      length(coefs) > 0,
+      "Trials with a set size of 1 have no non-target, so they say nothing about \\
+      's'. The other trials do not determine {collapse_comma(coefs)} in the \\
+      formula for 's', so the posteriors of these coefficients depend on \\
+      their priors. Give set size 1 a level of its own in a factor, and read that \\
+      level's coefficient as prior-only."
+    )
+  }
+  if ("a" %in% pars) {
+    coefs <- .set_size_one_undetermined(c("a", "c"), formula, data, summed = TRUE)
+    warnif(
+      length(coefs) > 0,
+      "Trials with a set size of 1 have no non-target, so they inform 'a' and \\
+      'c' only through their sum. The other trials do not determine \\
+      {collapse_comma(coefs)} in the formulas for 'a' and 'c', so the posteriors \\
+      of these coefficients depend on their priors. Give set size 1 a level of \\
+      its own in a factor, and read only the sum of 'c' and 'a' at that level as \\
+      informed by the data."
+    )
+  }
+}
+
+# The coefficients of the formulas for `pars` that the trials with more than one
+# item leave undetermined, named as in the fit's draws. The trials with one item
+# inform nothing about `pars` or, with `summed = TRUE`, only the sum of their
+# effects. Group-level terms are judged by their columns pooled over groups,
+# which is what their sd is estimated from, one grouping factor at a time.
+.set_size_one_undetermined <- function(pars, formula, data, summed = FALSE) {
+  forms <- lapply(pars, function(par) formula[[par]])
+  if (any(vapply(forms, function(f) !is.null(f) && is_nl(f), logical(1)))) {
+    return(character(0))
+  }
+  estimated <- vapply(forms, function(f) !is.null(f) && !is_constant(f), logical(1))
+  pars <- pars[estimated]
+  forms <- forms[estimated]
+  # a variable missing from the data is left to brms, which names it
+  vars <- unique(unlist(lapply(forms, function(f) all.vars(f[[3]]))))
+  if (!length(pars) || !all(vars %in% names(data))) {
+    return(character(0))
+  }
+  data <- data[stats::complete.cases(data[vars]), ]
+  informed <- data[["ss_numeric"]] > 1
+  bterms <- lapply(forms, function(f) brms::brmsterms(brms::bf(f))$dpars$mu)
+
+  fixed <- lapply(bterms, function(bt) {
+    get_model_matrix(bt$fe, data) %||% matrix(0, nrow(data), 0)
+  })
+  out <- .lost_coefficients(fixed, informed, summed, glue("b_{pars}_"))
+
+  re <- lapply(bterms, function(bt) if (is.data.frame(bt$re)) bt$re)
+  for (group in unique(unlist(lapply(re, function(r) r$group)))) {
+    pooled <- lapply(re, function(r) {
+      terms <- which(r$group == group)
+      if (!length(terms)) {
+        return(matrix(0, nrow(data), 0))
+      }
+      do.call(cbind, lapply(terms, function(i) get_model_matrix(r$form[[i]], data)))
+    })
+    out <- c(out, .lost_coefficients(pooled, informed, summed, glue("sd_{group}__{pars}_")))
+  }
+  as.character(out)
+}
+
+# Columns of the design matrices in `blocks`, one per parameter, involved in a
+# direction that the informed rows (plus, when summed, the uninformed rows as
+# one row across all blocks) leave free but every row informing every block
+# separately would fix
+.lost_coefficients <- function(blocks, informed, summed, prefixes) {
+  blocks <- lapply(blocks, function(X) {
+    norms <- sqrt(colSums(X^2))
+    sweep(X, 2, ifelse(norms > 0, norms, 1), "/")
+  })
+  widths <- vapply(blocks, ncol, integer(1))
+  if (!sum(widths)) {
+    return(character(0))
+  }
+  full <- .block_diagonal(blocks)
+  available <- rbind(
+    .block_diagonal(lapply(blocks, function(X) X[informed, , drop = FALSE])),
+    if (summed) do.call(cbind, lapply(blocks, function(X) X[!informed, , drop = FALSE]))
+  )
+  free <- .null_space(full)
+  free_in_available <- .null_space(available)
+  lost <- free_in_available - free %*% crossprod(free, free_in_available)
+  names <- unlist(lapply(seq_along(blocks), function(i) {
+    if (widths[i]) paste0(prefixes[i], colnames(blocks[[i]]))
+  }))
+  names[rowSums(abs(lost)) > 1e-8]
+}
+
+.block_diagonal <- function(blocks) {
+  widths <- vapply(blocks, ncol, integer(1))
+  heights <- vapply(blocks, nrow, integer(1))
+  out <- matrix(0, sum(heights), sum(widths))
+  rows <- cumsum(c(0, heights))
+  columns <- cumsum(c(0, widths))
+  for (i in seq_along(blocks)) {
+    if (widths[i] && heights[i]) {
+      out[rows[i] + seq_len(heights[i]), columns[i] + seq_len(widths[i])] <- blocks[[i]]
+    }
+  }
+  out
+}
+
+.null_space <- function(M) {
+  if (!nrow(M)) {
+    return(diag(ncol(M)))
+  }
+  s <- svd(M, nu = 0, nv = ncol(M))
+  d <- c(s$d, rep(0, ncol(M) - length(s$d)))
+  s$v[, d <= 1e-8 * max(d), drop = FALSE]
+}
+
+############################################################################# !
 # CONFIGURE_MODEL METHODS                                                ####
 ############################################################################# !
 # Each model should have a corresponding configure_model.* function. See
@@ -326,28 +461,6 @@ configure_model.imm <- function(model, data, formula) {
       vint = "ss", vreal = groups
     )
   )
-}
-
-############################################################################# !
-# CONFIGURE_PRIOR METHODS                                                ####
-############################################################################# !
-
-# A set-size-1 trial has no non-target, so s is absent from its likelihood and
-# a enters only through its sum with c. With set size as a factor, those levels
-# are pinned to a constant, as they were before imm moved to a custom family
-#' @export
-configure_prior.imm <- function(model, data, formula, user_prior, ...) {
-  set_size_var <- model$other_vars$set_size
-  if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
-    return(NULL)
-  }
-  pars <- intersect(c("a", "s"), names(model$parameters))
-  prior <- brms::empty_prior() +
-    constrain_set_size1_fixef(formula, pars, set_size_var, "constant(0)") +
-    constrain_set_size1_ranef(formula, pars, set_size_var, "constant(1e-8)")
-  prior$dpar <- prior$nlpar
-  prior$nlpar <- rep("", nrow(prior))
-  prior
 }
 
 ############################################################################# !
