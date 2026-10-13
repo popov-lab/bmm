@@ -335,7 +335,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @keywords distribution
 #'
 #' @references Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
-#'   representations in visual working memory. Nature, 453.
+#'   representations in visual working memory. Nature, 453(7192), 233-235.
 #'
 #'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 #'   Variability in encoding precision accounts for visual short-term memory
@@ -545,7 +545,11 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'
 #' @references Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
 #'   precision of visual working memory is set by allocation of a shared
-#'   resource. Journal of Vision, 9(10), 7.
+#'   resource. Journal of Vision, 9(10), Article 7.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
 #'   `pmixture3p` gives the cumulative distribution function of the
@@ -775,6 +779,10 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @references Oberauer, K., Stoneking, C., Wabersich, D., & Lin, H.-Y. (2017).
 #'   Hierarchical Bayesian measurement models for continuous reproduction of
 #'   visual features from working memory. Journal of Vision, 17(5), 11.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dimm` gives the density of the interference measurement model,
 #'   `pimm` gives the cumulative distribution function of the interference

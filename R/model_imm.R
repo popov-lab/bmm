@@ -163,6 +163,15 @@
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
+#' @references Oberauer, K., & Lin, H.-Y. (2017). An interference model of
+#'   visual working memory. Psychological Review, 124(1), 21-59.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
+#'
+#'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
+#'   in visual working memory. Nature, 453(7192), 233-235.
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # load data
 #' data <- oberauer_lin_2017

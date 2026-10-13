@@ -127,5 +127,9 @@ lines(x, d, type = "l", col = "red")
 Oberauer, K., Stoneking, C., Wabersich, D., & Lin, H.-Y. (2017).
 Hierarchical Bayesian measurement models for continuous reproduction of
 visual features from working memory. Journal of Vision, 17(5), 11.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
 }
 \keyword{distribution}

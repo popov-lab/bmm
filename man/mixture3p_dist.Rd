@@ -84,6 +84,10 @@ lines(x, d, type = "l", col = "red")
 \references{
 Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
 precision of visual working memory is set by allocation of a shared
-resource. Journal of Vision, 9(10), 7.
+resource. Journal of Vision, 9(10), Article 7.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
 }
 \keyword{distribution}

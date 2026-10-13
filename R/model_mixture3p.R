@@ -244,10 +244,14 @@ settable_links.mixture3p <- function(model) {
 #' @keywords bmmodel
 #' @references Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
 #'   precision of visual working memory is set by allocation of a shared
-#'   resource. Journal of Vision, 9(10), 1-11.
+#'   resource. Journal of Vision, 9(10), Article 7.
 #'
 #'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
 #'   in visual working memory. Nature, 453(7192), 233-235.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #' @export
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # generate artificial data from the Bays et al (2009) 3-parameter mixture model

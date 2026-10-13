@@ -103,7 +103,7 @@ lines(x, d, type = "l", col = "red")
 }
 \references{
 Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
-representations in visual working memory. Nature, 453.
+representations in visual working memory. Nature, 453(7192), 233-235.
 
 van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 Variability in encoding precision accounts for visual short-term memory

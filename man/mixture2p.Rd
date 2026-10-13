@@ -286,5 +286,8 @@ representations in visual working memory. Nature, 453(7192), 233-235.
 van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 Variability in encoding precision accounts for visual short-term memory
 limitations. PNAS, 109(22), 8780-8785.
+
+Fougnie, D., Suchow, J. W., & Alvarez, G. A. (2012). Variability in the
+quality of visual working memory. Nature Communications, 3(1), 1229.
 }
 \keyword{bmmodel}
