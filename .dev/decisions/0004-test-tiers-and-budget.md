@@ -22,7 +22,8 @@ unless stated:
   42fb3e92, which sets no start order, and in 126 to 129 s (three runs) on
   this record's pull request, which adds `Config/testthat/start-first` to
   start the long files first. No run had a failure.
-- Twenty-one tests need CmdStan on every run: eighteen tests at the
+- Twenty-one tests need CmdStan on every run (#545 added two more on
+  2026-10-13): eighteen tests at the
   fourteen `cmdstanr::cmdstan_model()` sites (R-against-Stan parity and
   gradient checks), two `bmm_setup()` tests (one of them the smoke test),
   and one sampled fit with its refit in `test-update.R`. They skip on CRAN
@@ -70,24 +71,28 @@ which the push-time run keeps. The gate is opt-out so a local
 A time budget is enforced by the `tests-source` job
 (`.github/scripts/test-budget.R`): the job fails when the suite, a file or a
 test exceeds its cap. The caps are 1.5 times the maxima of the first
-measured run on the runner (the first CI run of this record's pull request,
-2026-10-13), rounded:
+four-worker run on the runner (this record's pull request with develop at
+dfde3d25 merged, 2026-10-13), rounded:
 
 | Applies to | Measured maximum | Cap |
 | --- | --- | --- |
-| a test | 23.4 s | 35 s |
-| a file | 221 s (`test-update.R`) | 330 s |
-| the suite | not measured | 600 s, provisional |
+| a test | 44.1 s | 66 s |
+| a file | 450 s (`test-update.R`) | 680 s |
+| the suite | 532 s | 800 s |
 
 Two known offenders in `test-update.R` carry their own cap until the #422
 consolidation removes them: "update() takes a slice of the model frame as
-newdata (kfold(), reloo())" (44.1 s, cap 66 s) and "only a slice of a fit's
-model frame counts as stored data" (28.5 s, cap 43 s). The measured run had
-one worker: `r-lib/actions/setup-r` sets `options(Ncpus = 1)` by default,
-and testthat reads `Ncpus` before `TESTTHAT_CPUS`. Its wall time (978 s)
-therefore cannot set a four-worker cap, so the suite cap stays at a
-provisional 600 s until the first four-worker run; the script now clears
-`Ncpus`. Every later change is recorded here.
+newdata (kfold(), reloo())" (87.6 s, cap 131 s) and "only a slice of a fit's
+model frame counts as stored data" (55.5 s, cap 83 s).
+
+History. The pull request's first CI run had one worker:
+`r-lib/actions/setup-r` sets `options(Ncpus = 1)` by default, and testthat
+reads `Ncpus` before `TESTTHAT_CPUS`; the script now clears `Ncpus`. Caps
+taken from that run (35 s per test, 330 s per file, 600 s for the suite)
+were breached by the first four-worker run: four workers on the 4-vCPU
+runner cut the wall time from 978 s to 532 s but doubled each file's and
+test's own time (the test times summed to 971 s on one worker and 2,032 s
+on four). Every later change is recorded here.
 
 The check step's `timeout-minutes` stays at 30 until the first push run on
 develop is measured. Push runs compile Stan on Windows; on the develop run

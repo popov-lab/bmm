@@ -5,18 +5,18 @@
 # slowest tests in the job summary, and exits with status 1 when a test fails
 # or a cap is breached.
 #
-# The file and test caps, and the allowlist caps below, are 1.5x the maxima of
-# the first measured run on the runner (ADR 0004), rounded: the slowest file
-# took 221 s, the slowest test outside the allowlist 23 s, the two allowlisted
-# tests 44 s and 28.5 s. That run had one worker, so its wall time cannot set
-# the four-worker suite cap, which stays provisional until a four-worker run.
-# Every later change goes through the ADR. Seconds throughout.
-caps <- list(suite = 600, file = 330, test = 35)
+# The caps are 1.5x the maxima of the first four-worker run on the runner
+# (ADR 0004), rounded: suite 532 s, slowest file 450 s, slowest test outside
+# the allowlist 44 s, the two allowlisted tests 88 s and 56 s. Four workers on
+# the 4-vCPU runner double each test's time against one worker, so caps from
+# a one-worker run do not carry over. Every later change goes through the ADR.
+# Seconds throughout.
+caps <- list(suite = 800, file = 680, test = 66)
 
 # known offenders with their own caps, emptied by the #422 consolidation
 allowed <- c(
-  "test-update.R | update() takes a slice of the model frame as newdata (kfold(), reloo())" = 66,
-  "test-update.R | only a slice of a fit's model frame counts as stored data" = 43
+  "test-update.R | update() takes a slice of the model frame as newdata (kfold(), reloo())" = 131,
+  "test-update.R | only a slice of a fit's model frame counts as stored data" = 83
 )
 
 Sys.setenv(NOT_CRAN = "true")
@@ -69,6 +69,20 @@ breaches <- c(breaches, sprintf("%s | %s takes %.1f s, cap %g s", timings$file[s
 
 cat(sprintf("\nSuite wall time %.0f s; %d tests, %d failed, %d errors, %d skipped\n",
             wall, nrow(timings), sum(timings$failed), sum(timings$error), sum(timings$skipped)))
+# the list reporter keeps the messages out of the log, so print them here
+bad <- which(timings$failed > 0 | timings$error)
+if (length(bad)) {
+  messages <- vapply(results[bad], function(test) {
+    hits <- Filter(function(x) inherits(x, c("expectation_failure", "expectation_error")),
+                   test$results)
+    paste(vapply(hits, conditionMessage, character(1)), collapse = "\n")
+  }, character(1))
+  cat("\nFailing tests:\n",
+      paste0("- ", timings$file[bad], " | ",
+             ifelse(is.na(timings$test[bad]), "(code outside test_that())", timings$test[bad]),
+             "\n", messages, collapse = "\n\n"),
+      "\n", sep = "")
+}
 cat("\nSlowest tests:\n")
 print(slowest, row.names = FALSE)
 if (length(breaches)) {
