@@ -68,19 +68,16 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
   # "a real smoke test compiles and samples"), which skip without CmdStan. The
   # sampling fits in test-conditional_effects.R, test-model_sdt_ranking.R,
   # test-model_sdt_rating.R and test-update.R move to tests/local in #422.
-  # test-ppp.R (#489) and test-model_rdm.R (#502) are registered ahead; a
-  # present file must match, so each MPT level registers the fits it adds to
-  # test-model_mpt.R.
+  # test-model_rdm.R (#502) is registered ahead. The MPT stack (#484-#489)
+  # registers nothing: its sampling fits live in tests/local.
   expect_pattern_counts(
     "backend\\s*=\\s*[\"']cmdstanr[\"']",
     c(
       "test-bmm_setup.R" = 18L,
       "test-conditional_effects.R" = 2L,
-      "test-model_mpt.R" = 2L,
       "test-model_rdm.R" = 4L,
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
-      "test-ppp.R" = 3L,
       "test-update.R" = 3L
     ),
     rule = "R1: backend = \"cmdstanr\" (any spacing or quotes) per file"
