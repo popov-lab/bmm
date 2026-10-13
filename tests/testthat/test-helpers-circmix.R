@@ -408,6 +408,26 @@ test_that(".circmix_check_variable_precision() rejects unusable node counts", {
   expect_silent(.circmix_check_variable_precision(TRUE, 43))
 })
 
+test_that("a diverging VP fit piled against the shape bound is told to raise vp_nodes", {
+  storm <- c(rep(0.75, 50), rep(0.9, 50))
+  expect_warning(
+    .circmix_warn_vp_bound(storm, divergent = 153, nodes = 81L),
+    "153 transitions.*50% of the posterior draws.*0\\.741.*vp_nodes = 121.*0\\.496"
+  )
+  expect_warning(
+    .circmix_warn_vp_bound(storm, divergent = 3, nodes = 41L),
+    "vp_nodes = 61"
+  )
+})
+
+test_that("the shape-bound warning stays silent without divergences or without a pile at the bound", {
+  expect_no_warning(.circmix_warn_vp_bound(rep(0.75, 100), divergent = 0, nodes = 81L))
+  # the 121-node refit of the diverging fit: 4 divergences, 1% of draws near 0.496
+  expect_no_warning(
+    .circmix_warn_vp_bound(c(0.52, 0.53, rep(0.78, 198)), divergent = 4, nodes = 121L)
+  )
+})
+
 test_that(".circmix_prep_nt() returns the covariates in numeric order", {
   prep <- list(data = list(
     Y = 1:3, vreal10 = c(10, 0, 0), vreal2 = c(2, 0, 0), vreal1 = c(1, 0, 0)

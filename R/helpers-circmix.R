@@ -439,6 +439,55 @@
   )
 }
 
+# A posterior that the shape bound 60 / vp_nodes cuts off does not reach the
+# reject message: the sampler only diverges at the bound. In a diverging
+# mixture3p slot-averaging fit at 81 nodes, 34-50% of the draws sat within 10% of
+# it; refitted at 121 nodes, at most 1% sat near the new bound. Draws stopped at
+# the bound do not show how far below it the posterior reaches, so the node count
+# suggested moves the bound to two thirds of its value instead of to the lowest
+# draw.
+#' @export
+postprocess_brm.circular <- function(model, fit, ...) {
+  fit <- NextMethod("postprocess_brm")
+  if (isTRUE(model$variable_precision) && has_draws(fit) &&
+    identical(fit$algorithm, "sampling")) {
+    .circmix_warn_vp_bound(
+      .circmix_vp_shape_min(fit),
+      divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
+      nodes = model$vp_nodes
+    )
+  }
+  fit
+}
+
+.circmix_warn_vp_bound <- function(shape_min, divergent, nodes) {
+  near <- mean(shape_min < 1.1 * 60 / nodes)
+  suggested <- 2 * ceiling(0.75 * (nodes - 1)) + 1
+  warnif(
+    divergent > 0 && near >= 0.05,
+    "{divergent} transitions after warmup were divergent, and in {round(100 * near)}% \\
+    of the posterior draws the gamma shape J(kappa)/tau lies within 10% of the \\
+    smallest value the variable-precision quadrature accepts, 60 / vp_nodes = \\
+    {signif(60 / nodes, 3)}. That bound may cut off part of the posterior. Refit \\
+    with vp_nodes = {suggested}, which lowers it to {signif(60 / suggested, 3)} \\
+    and takes about 1.5 times as long."
+  )
+}
+
+# The smallest J(kappa)/tau over the observations, per draw. kappa and tau can
+# vary with predictors, so they are read per observation, in blocks that keep the
+# draws x observations matrices small.
+.circmix_vp_shape_min <- function(fit) {
+  prep <- brms::prepare_predictions(fit)
+  out <- rep(Inf, prep$ndraws)
+  for (idx in split(seq_len(prep$nobs), ceiling(seq_len(prep$nobs) / 1000))) {
+    shape <- .circmix_J(brms::get_dpar(prep, "kappa", i = idx)) /
+      brms::get_dpar(prep, "tau", i = idx)
+    out <- pmin(out, matrixStats::rowMins(matrix(shape, nrow = prep$ndraws)))
+  }
+  out
+}
+
 # The non-target locations reach the likelihood as vreal1..vrealK, padded to
 # max_set_size - 1; the likelihood reads only as many as the trial's set size.
 .circmix_prep_nt <- function(prep, i) {
