@@ -9,8 +9,11 @@ on:
 name: R-CMD-check
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  # a newer push to a pull request supersedes its run; a push to a target
+  # branch (a merge) gets a group of its own commit, so it is never cancelled
+  # or dropped from the queue by the next merge
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   R-CMD-check:
@@ -33,10 +36,11 @@ jobs:
       # check runs the tests with --vanilla, so the Ncpus option that setup-r
       # writes to the Rprofile does not reach them and this variable does.
       TESTTHAT_CPUS: 4
-      # The Stan compile tests (parity and gradient checks, the bmm_setup()
-      # smoke test) run on Ubuntu for every event and on all three OS for
-      # pushes. The Windows and macOS pull-request jobs get no CmdStan and
-      # set this to false, so those tests skip there (ADR 0004).
+      # The Stan compile tests (parity and gradient checks, the two
+      # bmm_setup() tests that need CmdStan) run on Ubuntu for every event
+      # and on all three OS for pushes. The Windows and macOS pull-request
+      # jobs get no CmdStan and set this to false, so those tests skip there
+      # (ADR 0004).
       BMM_TEST_STAN: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
 
     steps:
@@ -140,9 +144,11 @@ jobs:
         shell: Rscript {0}
 
       # Before the test tiers (ADR 0004) the check took 14-28 minutes, Windows
-      # slowest; a hung runner otherwise holds the job, and the concurrency
-      # group's next run, for GitHub's 6-hour default. The limit sits on this
-      # step so a cold CmdStan build cannot trip it.
+      # slowest. Without a limit a hung runner holds the job for GitHub's
+      # 6-hour default; on a pull request only until the next push cancels
+      # it, on a push to a target branch for the full six hours. The limit
+      # sits on this step so a cold CmdStan build cannot trip it, and it
+      # stays at 30 until a push run has been measured.
       - uses: r-lib/actions/check-r-package@v2
         timeout-minutes: 30
         with:

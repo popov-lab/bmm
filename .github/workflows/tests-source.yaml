@@ -13,8 +13,11 @@ on:
 name: tests-source
 
 concurrency:
-  group: tests-source-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-source-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  # a newer push to a pull request supersedes its run; a push to a target
+  # branch (a merge) gets a group of its own commit, so it is never cancelled
+  # or dropped from the queue by the next merge
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests-source:
