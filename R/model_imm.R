@@ -288,29 +288,6 @@ check_data.imm_full <- function(model, data, formula) {
 }
 
 ############################################################################# !
-# CHECK_FORMULA METHODS                                                  ####
-############################################################################# !
-
-# configure_prior.imm() pins the set_size1 coefficient, which exists only
-# without an intercept; with one, brms rejects the pin as matching no parameter
-#' @export
-check_formula.imm <- function(model, data, formula) {
-  set_size_var <- model$other_vars$set_size
-  pred_list <- rhs_vars(formula, collapse = FALSE)
-  has_set_size <- vapply(pred_list, function(x) set_size_var %in% x, logical(1))
-  ss_forms <- formula[has_set_size]
-  intercepts <- vapply(ss_forms, has_intercept, logical(1))
-  stopif(
-    any(intercepts),
-    "The formula for parameter(s) {names(ss_forms)[intercepts]} contains \\
-    an intercept and also uses set_size as a predictor. This model requires \\
-    that the intercept is supressed when set_size is used as predictor. \\
-    Try using 0 + {set_size_var} instead."
-  )
-  NextMethod("check_formula")
-}
-
-############################################################################# !
 # CONFIGURE_MODEL METHODS                                                ####
 ############################################################################# !
 # Each model should have a corresponding configure_model.* function. See
@@ -352,28 +329,6 @@ configure_model.imm <- function(model, data, formula) {
       vint = "ss", vreal = groups
     )
   )
-}
-
-############################################################################# !
-# CONFIGURE_PRIOR METHODS                                                ####
-############################################################################# !
-
-# A set-size-1 trial has no non-target, so s is absent from its likelihood and
-# a enters only through its sum with c. With set size as a factor, those levels
-# are pinned to a constant, as they were before imm moved to a custom family
-#' @export
-configure_prior.imm <- function(model, data, formula, user_prior, ...) {
-  set_size_var <- model$other_vars$set_size
-  if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
-    return(NULL)
-  }
-  pars <- intersect(c("a", "s"), names(model$parameters))
-  prior <- brms::empty_prior() +
-    constrain_set_size1_fixef(formula, pars, set_size_var, "constant(0)") +
-    constrain_set_size1_ranef(formula, pars, set_size_var, "constant(1e-8)")
-  prior$dpar <- prior$nlpar
-  prior$nlpar <- rep("", nrow(prior))
-  prior
 }
 
 ############################################################################# !

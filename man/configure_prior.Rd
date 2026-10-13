@@ -31,25 +31,17 @@ object. The function will also recognize if the user has specified that some
 parameters should be fixed to a constant and put the appropriate constant
 priors. Any additional priors that a developer wants to specify, which are
 not based on information in the model object, can be defined in the
-configure_prior.* method for the model. See configure_prior.imm_full for an
-example.
+configure_prior.* method for the model. No model in bmm needs one at
+present; the example shows the form such a method takes.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
-configure_prior.imm <- function(model, data, formula, user_prior, ...) {
-  # a set-size-1 trial has no non-target, so the set-size-1 levels of a and s
-  # are pinned to a constant when set size is a factor
-  set_size_var <- model$other_vars$set_size
-  if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
+configure_prior.mymodel <- function(model, data, formula, user_prior, ...) {
+  # a prior that depends on the data, which the model object cannot declare
+  if (!"condition" \%in\% names(data)) {
     return(NULL)
   }
-  pars <- intersect(c("a", "s"), names(model$parameters))
-  prior <- brms::empty_prior() +
-    constrain_set_size1_fixef(formula, pars, set_size_var, "constant(0)") +
-    constrain_set_size1_ranef(formula, pars, set_size_var, "constant(1e-8)")
-  prior$dpar <- prior$nlpar
-  prior$nlpar <- rep("", nrow(prior))
-  prior
+  brms::prior_("normal(0, 0.5)", class = "b", dpar = "kappa")
 }
 \dontshow{\}) # examplesIf}
 }

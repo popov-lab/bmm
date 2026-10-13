@@ -579,17 +579,6 @@ test_that("a freed mu gets regularizing main, effects and sd priors on the tan_h
   expect_equal(pr[pr$class == "sd" & pr$coef == "" & pr$group == "" & pr$dpar == "" & pr$nlpar == "", ]$prior, "exponential(4)")
 })
 
-test_that("the set-size-1 sd constraint survives next to the blanket sd prior", {
-  data <- oberauer_lin_2017
-  model <- imm("dev_rad", nt_features = paste0("col_nt", 1:7), nt_distances = paste0("dist_nt", 1:7), set_size = "set_size")
-  formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID), s ~ 0 + set_size + (0 + set_size | ID))
-  pr <- default_prior(formula, data, model)
-  constraint <- pr[pr$class == "sd" & pr$coef == "set_size1", ]
-  expect_setequal(constraint$dpar, c("a", "s"))
-  expect_true(all(constraint$prior == "constant(1e-8)"))
-  for (par in c("a", "s")) expect_equal(sd_default(pr, par), "exponential(1)")
-})
-
 test_that("mock fits carry class-level b and sd priors for every formula shape and contrast coding", {
   withr::local_options(bmm.sort_data = FALSE)
   expect_defaults_applied <- function(fit, pars, re_pars) {

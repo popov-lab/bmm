@@ -162,6 +162,17 @@ test_that("imm cites van den Berg et al. only with variable precision", {
   expect_identical(vp[2], model_citation(mixture2p("y", variable_precision = TRUE))[2])
 })
 
+test_that("an intercept next to set_size reaches imm without a set-size-1 pin", {
+  # set size 1 is left to the priors; check_formula.imm() says which coefficients
+  fit <- suppressWarnings(
+    bmm(bmf(kappa ~ 1 + set_size, c ~ 1, a ~ 1 + set_size, s ~ 0 + set_size),
+      oberauer_lin_2017, imm_model(),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  )
+  expect_false(any(grepl("constant", fit$prior$prior[fit$prior$dpar %in% c("a", "s")])))
+})
+
 test_that("each imm family refuses the expected response under its own name", {
   formulas <- list(
     full = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1),
@@ -179,35 +190,6 @@ test_that("each imm family refuses the expected response under its own name", {
     )
     expect_error(family$posterior_epred(NULL), "not defined for the imm model")
   }
-})
-
-test_that("a set-size-1 factor level pins the parameters that trial cannot inform", {
-  formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size, s ~ 0 + set_size)
-  pr <- default_prior(formula, oberauer_lin_2017, imm_model())
-  pinned <- pr[pr$class == "b" & pr$coef == "set_size1", ]
-  expect_setequal(pinned$dpar, c("a", "s"))
-  expect_true(all(pinned$prior == "constant(0)"))
-
-  pr <- default_prior(bmf(kappa ~ 1, c ~ 1, s ~ 0 + set_size), oberauer_lin_2017,
-    imm_model("bsc"))
-  expect_equal(pr[pr$coef == "set_size1", ]$dpar, "s")
-
-  # a numeric set size has no set-size-1 level to pin
-  dat <- oberauer_lin_2017
-  dat$set_size <- as.numeric(as.character(dat$set_size))
-  pr <- default_prior(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 0 + set_size), dat, imm_model())
-  expect_false(any(grepl("constant(0)", pr$prior[pr$class == "b"], fixed = TRUE)))
-})
-
-test_that("an intercept is still refused when set_size predicts an imm parameter", {
-  # the set-size-1 pin above needs a set_size1 coefficient to exist
-  expect_error(
-    bmm(bmf(kappa ~ 1, c ~ 1, a ~ 1 + set_size, s ~ 0 + set_size),
-      oberauer_lin_2017, imm_model(),
-      backend = "mock", mock_fit = 1, rename = FALSE
-    ),
-    "contains \\s*an intercept"
-  )
 })
 
 test_that("check_data() still validates the non-target distances", {
