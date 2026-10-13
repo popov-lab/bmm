@@ -150,10 +150,12 @@
 #'  `full`, `bsc`, or `abc`. The default is `full`.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
 #'   from trial to trial (van den Berg et al., 2012). This adds the parameter
-#'   `tau`; see [mixture2p()] for the parameterisation. The capacity models of
-#'   Zhang and Luck (2008) do not apply to the IMM, which has no discrete slots
-#'   -- its bottleneck is the ratio of context to general activation -- so
-#'   variable precision is the only additional version offered here.
+#'   `tau`, and `kappa` then describes the average trial: it is the
+#'   concentration whose Fisher information `J(kappa)` is the mean of `J`; see
+#'   [mixture2p()] for the parameterisation. The capacity models of Zhang and
+#'   Luck (2008) do not apply to the IMM, which has no discrete slots -- its
+#'   bottleneck is the ratio of context to general activation -- so variable
+#'   precision is the only extension offered here.
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41. See
 #'   [mixture2p()].

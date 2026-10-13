@@ -71,7 +71,9 @@ rimm(
 
 \item{s}{Vector of generalization gradients}
 
-\item{kappa}{Vector of precision values}
+\item{kappa}{Vector of precision values. With \code{tau > 0} this is the
+concentration of the average trial, whose Fisher information \code{J(kappa)} is
+the mean of \code{J}.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from

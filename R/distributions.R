@@ -307,8 +307,9 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
-#' @param kappa Vector of precision values. With `tau > 0` this is the mean
-#'   precision rather than the precision itself.
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
 #' @param p_mem Vector of probabilities for memory recall. Used by the
 #'   `"simple"` version; the other versions derive it from `K` and `set_size`,
 #'   and warn if `p_mem` is given.
@@ -524,7 +525,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param mu Vector of locations. First value represents the location of the
 #'   target item and any additional values indicate the location of non-target
 #'   items.
-#' @param kappa Vector of precision values
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
 #' @param p_mem Vector of probabilities for memory recall
 #' @param p_nt Vector of probabilities for swap errors
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
@@ -749,7 +752,9 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
 #' @param dist Vector of distances of the item locations to the cued location
-#' @param kappa Vector of precision values
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
 #' @param c Vector of strengths for cue-dependent activation
 #' @param a Vector of strengths for cue-independent activation
 #' @param s Vector of generalization gradients

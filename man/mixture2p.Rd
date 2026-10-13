@@ -48,8 +48,9 @@ Fisher information.
 from trial to trial rather than being constant (van den Berg et al., 2012;
 Fougnie et al., 2012). This adds the parameter \code{tau}, and the likelihood
 integrates the Fisher information \code{J} of a memory representation over
-\code{gamma(mean = J(kappa), scale = tau)}. \code{kappa} keeps its meaning as the
-mean precision, so \code{tau -> 0} recovers the constant-precision model.
+\code{gamma(mean = J(kappa), scale = tau)}. \code{kappa} then describes the average
+trial: it is the concentration whose Fisher information \code{J(kappa)} is the
+mean of \code{J}, and \code{tau -> 0} recovers the constant-precision model.
 The integral is evaluated by quadrature, which costs about ten times as
 much per gradient at the default \code{vp_nodes}; expect a larger factor in wall
 time, since the posterior geometry also needs more leapfrog steps. \code{tau} is
@@ -219,7 +220,7 @@ becomes the precision of the average trial. Shown for \code{"simple"}:
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses. With variable precision, kappa describes the average trial: it is the concentration whose Fisher information J(kappa) is the mean of J across trials.
 \item \code{tau}: Scale of the trial-to-trial variability in memory precision. The Fisher information J of a memory representation is drawn from gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision and larger values spread precision more widely across trials.
 \item \code{thetat}: Mixture weight for target responses, i.e. the probability that a response comes from memory rather than from guessing.
 }

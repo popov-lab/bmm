@@ -57,8 +57,10 @@ stored item is reported. In \code{"simple"} the two are jointly constrained by
 the shared normalisation, so neither weight is separately interpretable.}
 
 \item{variable_precision}{Logical; if \code{TRUE}, the precision of memory varies
-from trial to trial (van den Berg et al., 2012). See \code{\link[=mixture2p]{mixture2p()}} for
-details of the parameterisation.}
+from trial to trial (van den Berg et al., 2012). This adds the parameter
+\code{tau}, and \code{kappa} then describes the average trial: it is the
+concentration whose Fisher information \code{J(kappa)} is the mean of \code{J}. See
+\code{\link[=mixture2p]{mixture2p()}} for details of the parameterisation.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
 \code{variable_precision = TRUE}; must be an odd number of at least 41. See
@@ -243,7 +245,7 @@ becomes the precision of the average trial. Shown for \code{"simple"}:
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses. With variable precision, kappa describes the average trial: it is the concentration whose Fisher information J(kappa) is the mean of J across trials.
 \item \code{tau}: Scale of the trial-to-trial variability in memory precision. The Fisher information J of a memory representation is drawn from gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision and larger values spread precision more widely across trials.
 \item \code{thetat}: Mixture weight for target responses. The weights of the target, the non-targets and guessing are normalised across the components present on a trial, with guessing as the reference, so thetat maps to the probability of a target response only jointly with thetant.
 \item \code{thetant}: Mixture weight for non-target responses

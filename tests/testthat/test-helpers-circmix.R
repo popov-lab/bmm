@@ -496,3 +496,17 @@ test_that("the Stan and R implementations of the shared core agree", {
     tolerance = 1e-12
   )
 })
+
+test_that("variable precision says what kappa means, in every model and version", {
+  models <- list(
+    mixture2p("y", variable_precision = TRUE),
+    mixture2p("y", set_size = "ss", version = "slot_averaging", variable_precision = TRUE),
+    mixture3p("y", "nt", "ss", version = "slot", variable_precision = TRUE),
+    imm("y", "nt", "d", "ss", variable_precision = TRUE)
+  )
+  for (model in models) {
+    expect_match(model$parameters$kappa, "Fisher information J(kappa) is the mean of J", fixed = TRUE)
+    expect_no_match(model$parameters$kappa, "..", fixed = TRUE)
+  }
+  expect_no_match(mixture2p("y")$parameters$kappa, "variable precision")
+})

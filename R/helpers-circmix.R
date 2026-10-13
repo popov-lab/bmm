@@ -301,6 +301,14 @@
     gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision \\
     and larger values spread precision more widely across trials."
   )), after = after_kappa)
+  spec$parameters$kappa <- paste(
+    sub("\\.?$", ".", spec$parameters$kappa),
+    glue(
+      "With variable precision, kappa describes the average trial: it is the \\
+      concentration whose Fisher information J(kappa) is the mean of J across \\
+      trials."
+    )
+  )
   spec$links <- append(spec$links, list(tau = "log"),
     after = which(names(spec$links) == "kappa")
   )

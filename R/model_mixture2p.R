@@ -177,8 +177,9 @@
 #'   from trial to trial rather than being constant (van den Berg et al., 2012;
 #'   Fougnie et al., 2012). This adds the parameter `tau`, and the likelihood
 #'   integrates the Fisher information `J` of a memory representation over
-#'   `gamma(mean = J(kappa), scale = tau)`. `kappa` keeps its meaning as the
-#'   mean precision, so `tau -> 0` recovers the constant-precision model.
+#'   `gamma(mean = J(kappa), scale = tau)`. `kappa` then describes the average
+#'   trial: it is the concentration whose Fisher information `J(kappa)` is the
+#'   mean of `J`, and `tau -> 0` recovers the constant-precision model.
 #'   The integral is evaluated by quadrature, which costs about ten times as
 #'   much per gradient at the default `vp_nodes`; expect a larger factor in wall
 #'   time, since the posterior geometry also needs more leapfrog steps. `tau` is

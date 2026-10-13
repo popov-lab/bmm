@@ -56,10 +56,12 @@ columns in the dataset.}
 
 \item{variable_precision}{Logical; if \code{TRUE}, the precision of memory varies
 from trial to trial (van den Berg et al., 2012). This adds the parameter
-\code{tau}; see \code{\link[=mixture2p]{mixture2p()}} for the parameterisation. The capacity models of
-Zhang and Luck (2008) do not apply to the IMM, which has no discrete slots
--- its bottleneck is the ratio of context to general activation -- so
-variable precision is the only additional version offered here.}
+\code{tau}, and \code{kappa} then describes the average trial: it is the
+concentration whose Fisher information \code{J(kappa)} is the mean of \code{J}; see
+\code{\link[=mixture2p]{mixture2p()}} for the parameterisation. The capacity models of Zhang and
+Luck (2008) do not apply to the IMM, which has no discrete slots -- its
+bottleneck is the ratio of context to general activation -- so variable
+precision is the only extension offered here.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
 \code{variable_precision = TRUE}; must be an odd number of at least 41. See

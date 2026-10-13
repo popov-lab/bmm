@@ -229,8 +229,10 @@ settable_links.mixture3p <- function(model) {
 #'   stored item is reported. In `"simple"` the two are jointly constrained by
 #'   the shared normalisation, so neither weight is separately interpretable.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
-#'   from trial to trial (van den Berg et al., 2012). See [mixture2p()] for
-#'   details of the parameterisation.
+#'   from trial to trial (van den Berg et al., 2012). This adds the parameter
+#'   `tau`, and `kappa` then describes the average trial: it is the
+#'   concentration whose Fisher information `J(kappa)` is the mean of `J`. See
+#'   [mixture2p()] for details of the parameterisation.
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41. See
 #'   [mixture2p()].

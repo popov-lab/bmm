@@ -41,8 +41,9 @@ rmixture2p(
 
 \item{mu}{Vector of locations}
 
-\item{kappa}{Vector of precision values. With \code{tau > 0} this is the mean
-precision rather than the precision itself.}
+\item{kappa}{Vector of precision values. With \code{tau > 0} this is the
+concentration of the average trial, whose Fisher information \code{J(kappa)} is
+the mean of \code{J}.}
 
 \item{p_mem}{Vector of probabilities for memory recall. Used by the
 \code{"simple"} version; the other versions derive it from \code{K} and \code{set_size},

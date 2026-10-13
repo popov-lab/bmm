@@ -32,7 +32,9 @@ rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
 target item and any additional values indicate the location of non-target
 items.}
 
-\item{kappa}{Vector of precision values}
+\item{kappa}{Vector of precision values. With \code{tau > 0} this is the
+concentration of the average trial, whose Fisher information \code{J(kappa)} is
+the mean of \code{J}.}
 
 \item{p_mem}{Vector of probabilities for memory recall}
 
