@@ -28,8 +28,11 @@ Files:
     lies inside `[lower, upper]`.
   - `SW()`: short for `suppressWarnings()`.
   - `SM()`: short for `suppressMessages()`.
+- `helper-mpt.R`: sources `tests/testthat/helper-mpt.R`, so the MPT fits use
+  the same tree and data builders as the unit tests.
 - `test-*.R`: the tests, among them `test-kfold-update.R` (refits through
-  `update()` on a slice of the fit's data, grouped `kfold()`). Keep each fit
+  `update()` on a slice of the fit's data, grouped `kfold()`) and
+  `test-mpt-fits.R` (`mpt()` fits read through `conditional_effects()`). Keep each fit
   short (one or two chains, a few hundred iterations) and assert with
   `expect_range()` or a tolerance, never with exact equality to a stored fit.
 - `make-fixtures.R`: regenerates four fixtures in `tests/testthat/assets/`:
