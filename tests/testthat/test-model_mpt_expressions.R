@@ -365,7 +365,7 @@ test_that(".mpt_branch_vertices takes a simplex group as one dimension", {
 test_that(".mpt_branch_vertices falls back to a fixed sample above max_points", {
   parameters <- paste0("p", 1:11)
   branch <- str2lang(paste(parameters, collapse = " * "))
-  set.seed(1)
+  withr::local_seed(1)
   seed_before <- .Random.seed
   vertices <- bmm:::.mpt_branch_vertices(branch, parameters, list())
   expect_identical(.Random.seed, seed_before)
