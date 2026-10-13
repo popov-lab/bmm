@@ -13,9 +13,10 @@
   s = "Spatial similarity gradient",
   b = glue(
     "Background activation, the reference against which the activations of \\
-    the target and the non-targets are weighed. Fixed internally to 1; \\
-    freeing it leaves the remaining activations unidentified, since only \\
-    their ratio to the background enters the likelihood."
+    the target and the non-targets are weighed. Fixed internally to 0 on its \\
+    log scale, i.e. to an activation of 1; freeing it leaves the remaining \\
+    activations unidentified, since only their ratio to the background enters \\
+    the likelihood."
   )
 )
 

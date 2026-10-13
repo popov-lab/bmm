@@ -103,7 +103,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
-\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -169,7 +169,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{kappa}: Concentration of the von Mises distribution of memory responses
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
-\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -229,7 +229,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{kappa}: Concentration of the von Mises distribution of memory responses
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
-\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
