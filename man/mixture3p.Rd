@@ -30,7 +30,9 @@ dataset.}
 
 \item{set_size}{Name of the column containing the set size variable (if
 set_size varies) or a numeric value for the set_size, if the set_size is
-fixed.}
+fixed. In the \code{"slot"} and \code{"slot_averaging"} versions a single set size
+cannot test the capacity rule: \code{K} is then estimated from the responses at
+that set size, and only below it.}
 
 \item{regex}{Logical. If TRUE, the \code{nt_features} argument is interpreted as
 a regular expression to match the non-target feature columns in the dataset.}
@@ -82,16 +84,17 @@ Three-parameter mixture model by Bays et al (2009).
 \item \strong{Citation:}
 \itemize{
 \item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7
+\item Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in visual working memory. Nature, 453(7192), 233-235. https://doi.org/10.1038/nature06860
+\item van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012). Variability in encoding precision accounts for visual short-term memory limitations. Proceedings of the National Academy of Sciences, 109(22), 8780-8785. https://doi.org/10.1073/pnas.1117465109
 }
-\item \strong{Version:} simple
 \item \strong{Requirements:}
 \itemize{
-\item The response vairable should be in radians and represent the angular error relative to the target
-}
-}
-\itemize{
+\item The response variable should be in radians and represent the angular error relative to the target
 \item The non-target features should be in radians and be centered relative to the target
+\item In the 'slot' and 'slot_averaging' versions, the set size should vary for the capacity rule to be testable
 }
+}
+\subsection{Version: \code{simple}}{
 \itemize{
 \item \strong{Parameters:}
 \itemize{
@@ -133,6 +136,154 @@ Three-parameter mixture model by Bays et al (2009).
 \item \code{main}: logistic(0, 1)
 \item \code{effects}: normal(0, 2.5)
 \item \code{sd}: exponential(1)
+}
+}
+}
+}
+
+\subsection{Version: \code{slot}}{
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{K}: Capacity: the number of items that can be held in memory. An item is either held at full precision or not held at all, so the probability that a response comes from memory is min(1, K / set_size).
+\item \code{ptarget}: Probability that a response reports the target rather than a non-target, given that it comes from memory.
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{mu} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; K = log; ptarget = logit
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
+}
+\item \code{K}:
+\itemize{
+\item \code{main}: normal(1, 0.5)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+\item \code{ptarget}:
+\itemize{
+\item \code{main}: logistic(1, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+}
+}
+}
+
+\subsection{Version: \code{slot_averaging}}{
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution for an item held in a single slot. An item holding several slots is more precise, because averaging independent samples adds their Fisher information.
+\item \code{K}: Capacity: the number of memory slots distributed over the items in the array. An item receives floor(K / set_size) or one more slot, and an item that receives none is guessed.
+\item \code{ptarget}: Probability that a response reports the target rather than a non-target, given that it comes from memory.
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{mu} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; K = log; ptarget = logit
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
+}
+\item \code{K}:
+\itemize{
+\item \code{main}: normal(1, 0.5)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+\item \code{ptarget}:
+\itemize{
+\item \code{main}: logistic(1, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+}
+}
+}
+
+\subsection{Variable precision}{
+
+With \code{variable_precision = TRUE} every version gains \code{tau}, and \code{kappa}
+becomes the precision of the average trial. Shown for \code{"simple"}:
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{tau}: Scale of the trial-to-trial variability in memory precision. The Fisher information J of a memory representation is drawn from gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision and larger values spread precision more widely across trials.
+\item \code{thetat}: Mixture weight for target responses. The weights of the target, the non-targets and guessing are normalised across the components present on a trial, with guessing as the reference, so thetat maps to the probability of a target response only jointly with thetant.
+\item \code{thetant}: Mixture weight for non-target responses
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; tau = log; thetat = softmax; thetant = softmax
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
+}
+\item \code{thetat}:
+\itemize{
+\item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 2.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{thetant}:
+\itemize{
+\item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 2.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{tau}:
+\itemize{
+\item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
+}
 }
 }
 }

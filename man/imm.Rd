@@ -91,13 +91,9 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Requirements:}
 \itemize{
-\item The response vairable should be in radians and represent the angular error relative to the target
-}
-}
-\itemize{
+\item The response variable should be in radians and represent the angular error relative to the target
 \item The non-target features should be in radians and be centered relative to the target
 }
-\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
@@ -162,13 +158,9 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Requirements:}
 \itemize{
-\item The response vairable should be in radians and represent the angular error relative to the target
-}
-}
-\itemize{
+\item The response variable should be in radians and represent the angular error relative to the target
 \item The non-target features should be in radians and be centered relative to the target
 }
-\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
@@ -226,13 +218,9 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Requirements:}
 \itemize{
-\item The response vairable should be in radians and represent the angular error relative to the target
-}
-}
-\itemize{
+\item The response variable should be in radians and represent the angular error relative to the target
 \item The non-target features should be in radians and be centered relative to the target
 }
-\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.

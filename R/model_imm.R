@@ -83,11 +83,13 @@
         if (variable_precision) .circmix_vp_citation
       ),
       version = version,
-      requirements = glue(
-        "- The response vairable should be in radians and \\
-          represent the angular error relative to the target
-          - The non-target features should be in radians and be \\
-          centered relative to the target"
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the requirements in one list
+      requirements = paste0(
+        "- The response variable should be in radians and represent the ",
+        "angular error relative to the target\n",
+        "  - The non-target features should be in radians and be centered ",
+        "relative to the target"
       ),
       parameters = spec$parameters,
       links = spec$links,

@@ -109,11 +109,13 @@
         if (variable_precision) .circmix_vp_citation
       ),
       version = version,
-      requirements = glue(
-        "- The response variable should be in radians and represent the \\
-        angular error relative to the target", "\n",
-        "- The 'slot' and 'slot_averaging' versions additionally require a \\
-        set_size variable, which has to vary for the capacity K to be identified"
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the second requirement in the same list
+      requirements = paste0(
+        "- The response variable should be in radians and represent the ",
+        "angular error relative to the target\n",
+        "  - The 'slot' and 'slot_averaging' versions additionally require a ",
+        "set_size variable, which should vary for the capacity rule to be testable"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -134,7 +136,17 @@
 # user facing alias
 
 #' @title `r .model_mixture2p()$name`
-#' @details `r model_docs(.model_mixture2p())`
+#' @details `r model_docs(.model_mixture2p(variable_precision = TRUE), components = c('domain', 'task', 'name', 'citation', 'requirements'))`
+#' #### Version: `simple`
+#' `r model_docs(.model_mixture2p(version = "simple"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot`
+#' `r model_docs(.model_mixture2p(version = "slot"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot_averaging`
+#' `r model_docs(.model_mixture2p(version = "slot_averaging"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Variable precision
+#' With `variable_precision = TRUE` every version gains `tau`, and `kappa`
+#' becomes the precision of the average trial. Shown for `"simple"`:
+#' `r model_docs(.model_mixture2p(variable_precision = TRUE), components = c('parameters', 'links', 'prior'))`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error

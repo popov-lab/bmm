@@ -141,11 +141,15 @@
         if (variable_precision) .circmix_vp_citation
       ),
       version = version,
-      requirements = glue(
-        "- The response vairable should be in radians and \\
-        represent the angular error relative to the target
-        - The non-target features should be in radians and be \\
-        centered relative to the target"
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the requirements in one list
+      requirements = paste0(
+        "- The response variable should be in radians and represent the ",
+        "angular error relative to the target\n",
+        "  - The non-target features should be in radians and be centered ",
+        "relative to the target\n",
+        "  - In the 'slot' and 'slot_averaging' versions, the set size should ",
+        "vary for the capacity rule to be testable"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -179,7 +183,17 @@ settable_links.mixture3p <- function(model) {
 
 # user facing alias
 #' @title `r .model_mixture3p()$name`
-#' @details `r model_docs(.model_mixture3p())`
+#' @details `r model_docs(.model_mixture3p(version = "slot", variable_precision = TRUE), components = c('domain', 'task', 'name', 'citation', 'requirements'))`
+#' #### Version: `simple`
+#' `r model_docs(.model_mixture3p(version = "simple"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot`
+#' `r model_docs(.model_mixture3p(version = "slot"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot_averaging`
+#' `r model_docs(.model_mixture3p(version = "slot_averaging"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Variable precision
+#' With `variable_precision = TRUE` every version gains `tau`, and `kappa`
+#' becomes the precision of the average trial. Shown for `"simple"`:
+#' `r model_docs(.model_mixture3p(variable_precision = TRUE), components = c('parameters', 'links', 'prior'))`
 #' @param resp_error The name of the variable in the dataset containing
 #'   the response error. The response error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -191,7 +205,9 @@ settable_links.mixture3p <- function(model) {
 #'   dataset.
 #' @param set_size Name of the column containing the set size variable (if
 #'   set_size varies) or a numeric value for the set_size, if the set_size is
-#'   fixed.
+#'   fixed. In the `"slot"` and `"slot_averaging"` versions a single set size
+#'   cannot test the capacity rule: `K` is then estimated from the responses at
+#'   that set size, and only below it.
 #' @param regex Logical. If TRUE, the `nt_features` argument is interpreted as
 #'  a regular expression to match the non-target feature columns in the dataset.
 #' @param version A character string specifying which version of the model to
