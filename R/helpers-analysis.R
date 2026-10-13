@@ -154,9 +154,10 @@
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -565,6 +566,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     cond_row <- if (curve_has_cols) curve_cond[c_i, , drop = FALSE]
     # Anchor the criterion grid to the mean separation so FA is ~evenly spaced;
     # the noise scale is 1, so FA = 1 - cdf(sep/2 + criterion) inverts to this.
+    # c_grid is measured from the midpoint, internal to the sweep: only the
+    # (FA, Hit) pairs are returned, never a criterion position.
     c_grid  <- -mean(dp) / 2 + qf(1 - fa_grid)
     # P("old") is the survival function of the evidence distribution, matching
     # the likelihood; cdf(eta) would trace the mirror ROC for the asymmetric
@@ -644,7 +647,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # threshold operating points with a credible band (`points`, labelled t1..tK-1).
 # The smooth curve uses the rating model's own probability map -- FA = 1 - cdf(t
 # + sep/2), Hit = 1 - cdf((t - sep/2) / sdratio), where sep is the separation in
-# noise-SD units -- the continuous envelope of the discrete points, so the
+# noise-SD units and t is measured from the midpoint (internal to the sweep,
+# never returned) -- the continuous envelope of the discrete points, so the
 # thresholds fall on it for every distribution (the binary curve's criterion
 # sign convention would mismatch for the asymmetric Gumbel distributions).
 .roc_sdt_rating <- function(fit, model, conditions, n_points,
@@ -705,6 +709,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       .draw = rep(seq_len(n_draws), each = K1 + 2L)
     )
 
+    # Midpoint frame, internal to the sweep; only (FA, Hit) pairs leave it.
     t_grid  <- qf(1 - fa_grid) - mean(sep_vec) / 2
     fa_mat  <- 1 - cdf(outer(sep_vec / 2, t_grid, "+"))
     hit_mat <- 1 - cdf(sweep(outer(-sep_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
@@ -795,9 +800,10 @@ print.bmm_sdt_roc <- function(x, ...) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -975,9 +981,10 @@ roc_observed <- function(fit, conditions = NULL) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -1425,9 +1432,10 @@ print.bmm_sdt_mratio <- function(x, ...) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -1499,12 +1507,14 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
 
 # Area under the swept model curve, the map of .roc_sdt_rating()'s `summary`.
-# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. Against
-# integrate(), the error is at most 5e-4 when every draw has the same sep: the
-# grid starts at FA = 0.001, and the straight first segment from (0, 0) loses
-# up to 0.001 / 2 once Hit is near 1 there (sep >= 4). On real rating fits it
-# was at most 1.1e-4. The grid is placed by mean(sep), so a wide sep spread
-# across draws costs more (3e-2 for gumbel_min with sep from 0.2 to 8).
+# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. t_grid is
+# measured from the midpoint, internal to the sweep: only (FA, Hit) leave it.
+# Against integrate(), the error is at most 5e-4 when every draw has the same
+# sep: the grid starts at FA = 0.001, and the straight first segment from
+# (0, 0) loses up to 0.001 / 2 once Hit is near 1 there (sep >= 4). On real
+# rating fits it was at most 1.1e-4. The grid is placed by mean(sep), so a wide
+# sep spread across draws costs more (3e-2 for gumbel_min with sep from 0.2 to
+# 8).
 # Dual-process recollection lifts the curve as in .roc_sdt_rating(): its ends
 # move to (0, Ro) and (1 - Rn, 1), and the last column closes it at (1, 1).
 .sdt_auc_swept <- function(sep, sdratio, dist, ro = 0, rn = 0,
@@ -1665,9 +1675,10 @@ print.bmm_sdt_auc <- function(x, ...) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
