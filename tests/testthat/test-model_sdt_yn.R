@@ -177,6 +177,20 @@ test_that("a free sdratio with a constant criterion warns whatever d does", {
   }
 })
 
+test_that("a constant criterion warns even when d's form identifies sdratio", {
+  # d ~ 0 + xnum holds d proportional to xnum, so with the criterion away from
+  # 0 (false-alarm rate .2) the cells cannot absorb the common shift a change
+  # in sdratio needs, and a profile likelihood over sdratio is sharp. The
+  # warning counts terms and cannot tell this from d ~ 1 + xnum, which is
+  # unidentified, so it fires on purpose
+  dat <- data.frame(n_old = c(10, 20, 10, 30, 10, 40), stimulus = rep(0:1, 3),
+                    n_trials = rep(50, 6), xnum = rep(c(1, 2, 3), each = 2))
+  expect_warning(
+    sdt_yn_warns(bmf(d ~ 0 + xnum, criterion ~ 1, sdratio ~ 1), dat),
+    "'criterion' is the same in every row"
+  )
+})
+
 test_that("the sdratio warning sees through the 0 + Intercept spelling", {
   # rhs_vars(d ~ 0 + Intercept) is "Intercept", so a naive length() == 0 test
   # would miss the same unidentified design

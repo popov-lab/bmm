@@ -230,8 +230,16 @@ settable_links.sdt_yn <- function(model) {
 #' parameter you write. `criterion ~ 1` with `d ~ 1 + strength` says the
 #' observer keeps one boundary while targets get stronger; `bias ~ 1` with the
 #' same `d` formula says the boundary moves up by half of every change in
-#' separation. When the criterion and `d` have the same predictors, the two
-#' give the same fit and their coefficients differ by \eqn{\delta / 2}.
+#' separation. When the criterion and `d` share condition-wise (factor)
+#' predictors and `sdratio` does not vary within those cells, or share
+#' predictors while `d` keeps its identity link and `sdratio` is the same in
+#' every row, the two give the same likelihood and their coefficients differ
+#' by \eqn{\delta / 2}.
+#' Otherwise they are different models. Even with the same likelihood, the
+#' posteriors differ through the default priors: `criterion` takes
+#' `normal(0.5, 1.5)` for its intercept, or for each cell under
+#' `~ 0 + condition`, and `exponential(1)` for its random-effect SDs, while
+#' `bias` takes `normal(0, 1.5)` and `exponential(2)`.
 #'
 #' Use `criterion` when the lures, and the observer's boundary, do not depend
 #' on the manipulation of `d`: the classic recognition design in which weak and
@@ -257,17 +265,32 @@ settable_links.sdt_yn <- function(model) {
 #' same `d`: give `criterion` a predictor that shifts it while `d` stays put,
 #' such as a base-rate, payoff, or confidence manipulation (`d ~ 1`,
 #' `criterion ~ 0 + condition`; see [broeder_schuetz_2009_e3]). A criterion
-#' that is the same in every row is informed by the false-alarm rate alone,
-#' and each hit rate then fixes only \eqn{(\delta - criterion) / r}{(delta -
-#' criterion) / r}, so `sdratio` trades against `d` and returns its prior.
-#' This holds whenever `d` keeps its identity link and its formula can shift
-#' every row by the same amount, which any formula with an intercept, or with
-#' a full set of condition levels, can. `bmm()` warns for that design. Giving
-#' `d` and `criterion` the same condition-wise predictors (`d ~ 0 +
-#' condition`, `criterion ~ 0 + condition`) fails too, because each condition
-#' then has two rates for two parameters of its own, and no warning catches
-#' it. A random effect such as `criterion ~ 1 + (1 | id)` moves the boundary
-#' between subjects and does not trigger the warning, but it informs `sdratio`
+#' that is the same in every row is fixed by the false-alarm rate, and each
+#' hit rate then fixes only \eqn{(\delta - criterion) / r}{(delta -
+#' criterion) / r}, so `sdratio` trades against `d`. A change in `sdratio` is
+#' matched by shifting the separation of every cell by one common amount and
+#' rescaling it by one common factor, and whenever the formula for `d` can
+#' make that change, `sdratio` returns its prior. A factor can, under the
+#' identity and the log link alike (`d ~ 0 + condition` or `d ~ 1 +
+#' condition`), because it gives every cell a value of its own. An intercept
+#' with a numeric predictor can under the identity link (`d ~ 1 + strength`),
+#' because the intercept shifts and the slope rescales. `sdratio` is
+#' identified only when the formula constrains `d` across cells beyond that.
+#' A numeric predictor without an intercept (`d ~ 0 + strength`) holds `d`
+#' proportional to `strength`. It identifies `sdratio` when `strength` takes
+#' at least two nonzero values and the criterion lies clearly away from the
+#' noise mean (for `"normal"`, a false-alarm rate clearly away from .5); at a
+#' criterion of 0 it does not. The estimate then rests on the assumption that
+#' `d` is zero where `strength` is zero, not on a second operating point in
+#' the data. A numeric predictor under a log link on `d` barely identifies
+#' `sdratio`, and in practice `sdratio` returns its prior. `bmm()` warns for
+#' every criterion that is the same in every row, so it also warns for
+#' `d ~ 0 + strength`. Giving `d` and `criterion` the same condition-wise
+#' predictors (`d ~ 0 + condition`, `criterion ~ 0 + condition`) fails too,
+#' because each condition then has two rates for two parameters of its own,
+#' and no warning catches it. A random effect such as
+#' `criterion ~ 1 + (1 | id)` moves the boundary between subjects and does not
+#' trigger the warning, but it informs `sdratio`
 #' only weakly, through the assumption that the subject effects on `d` and on
 #' the criterion are independent.
 #'
@@ -475,20 +498,28 @@ check_formula.sdt_yn <- function(model, data, formula) {
   is_flat <- function(x) all(rhs_vars(x) %in% "Intercept")
   free_sdratio <- !is_constant(formula)[["sdratio"]]
   # Measured from the noise mean, a criterion that is the same in every row is
-  # read off the false-alarm rate alone, and each hit rate then fixes only
-  # (d * s - criterion) / sdratio: d's constant absorbs any change in sdratio
-  # as long as d has an identity link and a formula that can shift every row
-  # alike (an intercept or a full set of levels), so the warning errs on the
-  # side of firing. A bias held constant moves the criterion with d and
-  # sdratio instead, which is why only the all-flat design is caught there.
+  # fixed by the false-alarm rate, and each hit rate then fixes only
+  # (d * s - criterion) / sdratio: a change in sdratio is matched by shifting
+  # every cell's separation by one amount, proportional to the criterion, and
+  # rescaling it by one factor. A factor on d absorbs that under any link, an
+  # intercept plus a numeric slope under the identity link, and under the log
+  # link a numeric slope leaves only a trace. Only a numeric slope without an
+  # intercept rules out the shift, and only while the criterion is away from
+  # 0. Terms do not reveal that, so the warning errs on the side of firing.
+  # A bias held constant moves the criterion with d and sdratio instead, which
+  # is why only the all-flat design is caught there.
   if (.sdt_anchor_parameter(formula) == "criterion") {
     warnif(
       free_sdratio && (is.null(formula$criterion) || is_flat(formula$criterion)),
       "'sdratio' is estimated, but 'criterion' is the same in every row (no \\
       predictor, no random effect). Measured from the noise mean, such a \\
-      criterion is informed by the false-alarm rate alone, and every hit rate \\
-      can then be matched by trading 'sdratio' against 'd', so 'sdratio' \\
-      returns its prior while sampling converges and Rhat stays fine. Give \\
+      criterion is fixed by the false-alarm rate, so every hit rate can be \\
+      matched by trading 'sdratio' against 'd'. This leaves 'sdratio' at its \\
+      prior, while sampling converges and Rhat stays fine, unless the formula \\
+      for 'd' rules out shifting every cell's separation by one common amount \\
+      and rescaling it by one common factor (e.g. a numeric predictor without \\
+      an intercept and an identity link, with the criterion away from the \\
+      noise mean). Give \\
       'criterion' a predictor that moves it (a base-rate, payoff, or \\
       confidence manipulation), or leave 'sdratio' at its default. See the \\
       'Identifying sdratio' section of ?sdt_yn"

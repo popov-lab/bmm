@@ -200,8 +200,16 @@ share a criterion term}, because a linear formula holds constant the
 parameter you write. \code{criterion ~ 1} with \code{d ~ 1 + strength} says the
 observer keeps one boundary while targets get stronger; \code{bias ~ 1} with the
 same \code{d} formula says the boundary moves up by half of every change in
-separation. When the criterion and \code{d} have the same predictors, the two
-give the same fit and their coefficients differ by \eqn{\delta / 2}.
+separation. When the criterion and \code{d} share condition-wise (factor)
+predictors and \code{sdratio} does not vary within those cells, or share
+predictors while \code{d} keeps its identity link and \code{sdratio} is the same in
+every row, the two give the same likelihood and their coefficients differ
+by \eqn{\delta / 2}.
+Otherwise they are different models. Even with the same likelihood, the
+posteriors differ through the default priors: \code{criterion} takes
+\code{normal(0.5, 1.5)} for its intercept, or for each cell under
+\code{~ 0 + condition}, and \code{exponential(1)} for its random-effect SDs, while
+\code{bias} takes \code{normal(0, 1.5)} and \code{exponential(2)}.
 
 Use \code{criterion} when the lures, and the observer's boundary, do not depend
 on the manipulation of \code{d}: the classic recognition design in which weak and
@@ -229,16 +237,31 @@ constant.
 same \code{d}: give \code{criterion} a predictor that shifts it while \code{d} stays put,
 such as a base-rate, payoff, or confidence manipulation (\code{d ~ 1},
 \code{criterion ~ 0 + condition}; see \link{broeder_schuetz_2009_e3}). A criterion
-that is the same in every row is informed by the false-alarm rate alone,
-and each hit rate then fixes only \eqn{(\delta - criterion) / r}{(delta -
-criterion) / r}, so \code{sdratio} trades against \code{d} and returns its prior.
-This holds whenever \code{d} keeps its identity link and its formula can shift
-every row by the same amount, which any formula with an intercept, or with
-a full set of condition levels, can. \code{bmm()} warns for that design. Giving
-\code{d} and \code{criterion} the same condition-wise predictors (\code{d ~ 0 + condition}, \code{criterion ~ 0 + condition}) fails too, because each condition
-then has two rates for two parameters of its own, and no warning catches
-it. A random effect such as \code{criterion ~ 1 + (1 | id)} moves the boundary
-between subjects and does not trigger the warning, but it informs \code{sdratio}
+that is the same in every row is fixed by the false-alarm rate, and each
+hit rate then fixes only \eqn{(\delta - criterion) / r}{(delta -
+criterion) / r}, so \code{sdratio} trades against \code{d}. A change in \code{sdratio} is
+matched by shifting the separation of every cell by one common amount and
+rescaling it by one common factor, and whenever the formula for \code{d} can
+make that change, \code{sdratio} returns its prior. A factor can, under the
+identity and the log link alike (\code{d ~ 0 + condition} or \code{d ~ 1 + condition}), because it gives every cell a value of its own. An intercept
+with a numeric predictor can under the identity link (\code{d ~ 1 + strength}),
+because the intercept shifts and the slope rescales. \code{sdratio} is
+identified only when the formula constrains \code{d} across cells beyond that.
+A numeric predictor without an intercept (\code{d ~ 0 + strength}) holds \code{d}
+proportional to \code{strength}. It identifies \code{sdratio} when \code{strength} takes
+at least two nonzero values and the criterion lies clearly away from the
+noise mean (for \code{"normal"}, a false-alarm rate clearly away from .5); at a
+criterion of 0 it does not. The estimate then rests on the assumption that
+\code{d} is zero where \code{strength} is zero, not on a second operating point in
+the data. A numeric predictor under a log link on \code{d} barely identifies
+\code{sdratio}, and in practice \code{sdratio} returns its prior. \code{bmm()} warns for
+every criterion that is the same in every row, so it also warns for
+\code{d ~ 0 + strength}. Giving \code{d} and \code{criterion} the same condition-wise
+predictors (\code{d ~ 0 + condition}, \code{criterion ~ 0 + condition}) fails too,
+because each condition then has two rates for two parameters of its own,
+and no warning catches it. A random effect such as
+\code{criterion ~ 1 + (1 | id)} moves the boundary between subjects and does not
+trigger the warning, but it informs \code{sdratio}
 only weakly, through the assumption that the subject effects on \code{d} and on
 the criterion are independent.
 
