@@ -17,6 +17,7 @@ sdt_rating_logmu(
   K,
   dist,
   thresh,
+  anchor,
   d,
   criterion,
   spacing,
@@ -30,6 +31,7 @@ sdt_dpsdt_logmu(
   K,
   dist,
   thresh,
+  anchor,
   d,
   criterion,
   spacing,
@@ -45,6 +47,7 @@ sdt_metad_logmu(
   K,
   dist,
   thresh,
+  anchor,
   d,
   criterion,
   spacing,
@@ -72,6 +75,11 @@ sdt_metad_logmu(
 - thresh:
 
   Integer threshold-parameterization id.
+
+- anchor:
+
+  Integer: 1 when `criterion` is measured from the noise mean, 2 when it
+  is the `bias` parameter, measured from the midpoint between the means.
 
 - d, criterion, spacing, sdratio:
 

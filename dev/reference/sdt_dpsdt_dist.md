@@ -61,7 +61,9 @@ rsdt_dpsdt(
 
   Numeric vector of length K-1 with the ordered decision thresholds, or
   an n-by-(K-1) matrix with one row per observation. The thresholds are
-  on the noise-standardized axis and are not rescaled by `sdratio`.
+  positions on the noise-standardized axis, measured from the mean of
+  the noise distribution (the signal mean sits at
+  `d * sqrt((1 + sdratio^2) / 2)`), and are not rescaled by `sdratio`.
 
 - Ro:
 
@@ -125,12 +127,12 @@ processes. *Psychological Review*, *131*(2), 321–348.
 # Density for a single observation (K=4) with recollection of old items;
 # Rn defaults to 0 (no recall-to-reject), the one-sided model
 dsdt_dpsdt(counts = c(2, 8, 20, 70), stimulus = 1,
-           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), Ro = 0.3)
+           d = 1.5, thresholds = c(0.25, 0.75, 1.25), Ro = 0.3)
 #> [1] 3.023007e-05
 # Generate DPSDT rating data (K=4) for 10 subjects and both stimulus types
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_dpsdt(nrow(dat), 100, dat$stimulus, d = 1.5,
-                             thresholds = c(-0.5, 0, 0.5),
+                             thresholds = c(0.25, 0.75, 1.25),
                              Ro = 0.3, Rn = 0.1))
 head(dat)
 #>   id stimulus r1 r2 r3 r4

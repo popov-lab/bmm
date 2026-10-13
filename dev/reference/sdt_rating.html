@@ -120,7 +120,7 @@ interface. See Details.</p></dd>
 
 <dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
 <dd><p>A named list of link functions for the parameters, e.g.
-<code>links = list(d = "log")</code>. Only <code>d</code> and <code>criterion</code> can be set, to
+<code>links = list(d = "log")</code>. Only <code>d</code>, <code>criterion</code> and <code>bias</code> can be set, to
 <code>"identity"</code>, <code>"log"</code>, <code>"softplus"</code>, <code>"logit"</code> or <code>"probit"</code>. <code>sdratio</code>
 and the threshold parameters keep their identity links, because the model
 reads each of them through <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> and fixes <code>sdratio</code> at 0 for equal
@@ -154,19 +154,24 @@ selected with <code>version</code>:</p><div class="section">
 <li><p>Stimulus type (stimulus): 0 = noise, 1 = signal
 Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'</p></li>
 </ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>d</code>: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD</p></li>
-<li><p><code>criterion</code>: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>bias</code>: Alternative to criterion: the same middle threshold measured from the midpoint between the noise and signal means (0 = neutral, positive = conservative). Use one of the two</p></li>
 <li><p><code>spacing</code>: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)</p></li>
 <li><p><code>sdratio</code>: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance</p></li>
 </ul></li>
 <li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>sdratio</code> = 0</p></li>
 </ul></li>
-<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; spacing = identity; sdratio = identity</p></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; bias = identity; spacing = identity; sdratio = identity</p></li>
 </ul></li>
 <li><p><strong>Default priors:</strong></p><ul><li><p><code>d</code>:</p><ul><li><p><code>main</code>: normal(1, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 0.5)</p></li>
 <li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
-<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
+<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0.5, 1.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+<li><p><code>bias</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
 <li><p><code>effects</code>: normal(0, 0.5)</p></li>
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
@@ -219,7 +224,8 @@ parameter fixed off, not the interval.</p><ul><li><p><strong>Domain:</strong> Pe
 <li><p>Stimulus type (stimulus): 0 = noise, 1 = signal
 Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'</p></li>
 </ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>d</code>: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD</p></li>
-<li><p><code>criterion</code>: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>bias</code>: Alternative to criterion: the same middle threshold measured from the midpoint between the noise and signal means (0 = neutral, positive = conservative). Use one of the two</p></li>
 <li><p><code>spacing</code>: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)</p></li>
 <li><p><code>sdratio</code>: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance</p></li>
 <li><p><code>Ro</code>: Recollection of old items: probability inv_logit(Ro) that an old item is recollected as old, loading the most-confident 'signal' category</p></li>
@@ -229,13 +235,17 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'<
 <li><p><code>Ro</code> = -100</p></li>
 <li><p><code>Rn</code> = -100</p></li>
 </ul></li>
-<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity</p></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; bias = identity; spacing = identity; sdratio = identity; Ro = identity; Rn = identity</p></li>
 </ul></li>
 <li><p><strong>Default priors:</strong></p><ul><li><p><code>d</code>:</p><ul><li><p><code>main</code>: normal(1, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 0.5)</p></li>
 <li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
-<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
+<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0.5, 1.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+<li><p><code>bias</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
 <li><p><code>effects</code>: normal(0, 0.5)</p></li>
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
@@ -274,12 +284,15 @@ and anchors the ideal point (meta-d' = <code>d</code>, perfect metacognition) at
 <code>logmratio = 0</code>, which recovers <code>standard</code>. Type-1 and type-2 sensitivity
 share one scale (\(d'\), or \(d_a\) when <code>sdratio</code> is estimated), so the
 M-ratio is unaffected by <code>sdratio</code>.
-The type-1 boundary is <code>criterion</code>, the middle threshold, so this version
-needs an even number of rating categories: with an odd number the middle
-category straddles the boundary (see "Where <code>criterion</code> sits").
-The type-1 criterion is held at the same location in the meta-d' space as
-in the type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
-2017, Appendix).
+The type-1 boundary is the middle threshold (<code>criterion</code> or <code>bias</code>), so this
+version needs an even number of rating categories: with an odd number the
+middle category straddles the boundary (see "Where <code>criterion</code> and <code>bias</code>
+sit").
+Every threshold keeps its distance from the midpoint between the means when
+<code>d</code> is replaced by meta-d', as the HMeta-d toolbox's model equations do
+(Fleming, 2017, Appendix). Whether the formula estimates <code>criterion</code> or
+<code>bias</code> changes how the type-1 boundary is parameterized, not this
+constraint.
 Maximum-likelihood meta-d' instead constrains meta-c' = c' (Maniscalco &amp;
 Lau, 2014), so its estimates differ from bmm's when the criterion is far
 from the midpoint.
@@ -295,20 +308,25 @@ Extract the M-ratio posterior with <code><a href="mratio.html">mratio()</a></cod
 <li><p>Stimulus type (stimulus): 0 = noise, 1 = signal
 Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'</p></li>
 </ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>d</code>: Sensitivity: d' under equal variance (the default). When sdratio is estimated, d is d_a, the distance between the signal and noise distributions in units of their root-mean-square SD</p></li>
-<li><p><code>criterion</code>: Response bias, on the noise-standardized axis: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units: the middle threshold (the old/new boundary) for an even number of categories, the centre of the middle category for an odd number</p></li>
+<li><p><code>bias</code>: Alternative to criterion: the same middle threshold measured from the midpoint between the noise and signal means (0 = neutral, positive = conservative). Use one of the two</p></li>
 <li><p><code>spacing</code>: Threshold spacing: controls distance between adjacent thresholds (exp(spacing) ensures positive spacing)</p></li>
 <li><p><code>sdratio</code>: Log SD ratio: the log of the signal-to-noise standard deviation ratio, so exp(sdratio) is the ratio itself and 0 means equal variance</p></li>
 <li><p><code>logmratio</code>: Log M-ratio, log(meta-d/d): metacognitive efficiency. 0 is ideal metacognition (meta-d = d), negative is inefficiency, positive is hyper-efficiency. meta-d is recovered as exp(logmratio) * d, on the same scale as d</p></li>
 </ul></li>
 <li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>sdratio</code> = 0</p></li>
 </ul></li>
-<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; spacing = identity; sdratio = identity; logmratio = identity</p></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity; criterion = identity; bias = identity; spacing = identity; sdratio = identity; logmratio = identity</p></li>
 </ul></li>
 <li><p><strong>Default priors:</strong></p><ul><li><p><code>d</code>:</p><ul><li><p><code>main</code>: normal(1, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 0.5)</p></li>
 <li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
-<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
+<li><p><code>criterion</code>:</p><ul><li><p><code>main</code>: normal(0.5, 1.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+<li><p><code>bias</code>:</p><ul><li><p><code>main</code>: normal(0, 1.5)</p></li>
 <li><p><code>effects</code>: normal(0, 0.5)</p></li>
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
@@ -344,7 +362,7 @@ conditions that differ in <code>sdratio</code>; see the sensitivity section of
 <code><a href="sdt_yn.html">sdt_yn()</a></code> for the reasoning, for how far the two indices lie apart, and for
 the caveat that under the Gumbel distributions \(d_a\) is not the
 AUC-equivalent index once <code>sdratio</code> is estimated.</p>
-<p>The <code>criterion</code> and the confidence thresholds are <strong>not</strong> rescaled. They stay
+<p>The criterion and the confidence thresholds are <strong>not</strong> rescaled. They stay
 on the noise-standardized axis, so under unequal variance they and <code>d</code> are
 in different units.</p>
 <p>The <code>dpsdt</code> and <code>metad</code> versions inherit the same convention: <code>d</code> there
@@ -352,17 +370,26 @@ describes the familiarity (type-1) distributions, and meta-d' is scaled the
 same way, which leaves the M-ratio invariant to <code>sdratio</code>.</p>
     </div>
     <div class="section level2">
-    <h2 id="where-criterion-sits">Where <code>criterion</code> sits<a class="anchor" aria-label="anchor" href="#where-criterion-sits"></a></h2>
+    <h2 id="where-criterion-and-bias-sit">Where <code>criterion</code> and <code>bias</code> sit<a class="anchor" aria-label="anchor" href="#where-criterion-and-bias-sit"></a></h2>
 
 
-<p>Every <code>threshold_type</code> places <code>criterion</code> the same way. With an even number
-of categories K it is the middle threshold, the boundary between the K/2
-"noise" categories and the K/2 "signal" categories. With an odd number there
-is no such boundary – the middle category straddles it – so <code>criterion</code> is
-the centre of that category, and the two thresholds around it sit half an
-interval below and above. A shift in <code>criterion</code> therefore moves the whole
-threshold set, and the threshold parameters (<code>spacing</code>, <code>delta</code>) describe
-its shape around that point.</p>
+<p>Every <code>threshold_type</code> places the criterion the same way. With an even
+number of categories K it is the middle threshold, the boundary between the
+K/2 "noise" categories and the K/2 "signal" categories. With an odd number
+there is no such boundary – the middle category straddles it – so the
+criterion is the centre of that category, and the two thresholds around it
+sit half an interval below and above. A shift in the criterion therefore
+moves the whole threshold set, and the threshold parameters (<code>spacing</code>,
+<code>delta</code>) describe its shape around that point.</p>
+<p>As in <code><a href="sdt_yn.html">sdt_yn()</a></code>, the formula estimates that point either as <code>criterion</code>,
+measured from the mean of the noise distribution, or as <code>bias</code>, measured
+from the midpoint between the noise and signal means (<code>bias = criterion - d * sqrt((1 + exp(sdratio)^2) / 2) / 2</code>); a formula that names neither
+estimates <code>criterion ~ 1</code>. The two differ in what a linear formula holds
+constant when <code>d</code> or <code>sdratio</code> varies; the section "Choosing between
+<code>criterion</code> and <code>bias</code>" of <code><a href="sdt_yn.html">sdt_yn()</a></code> says which to choose. Threshold locations reported by
+<code><a href="sdt_thresholds.html">sdt_thresholds()</a></code> and <code><a href="latent_sdt.html">latent_sdt()</a></code>, and the <code>thresholds</code> taken by
+<code><a href="sdt_rating_dist.html">rsdt_rating()</a></code> and its siblings, are positions measured from the noise
+mean.</p>
     </div>
     <div class="section level2">
     <h2 id="identifying-sdratio">Identifying <code>sdratio</code><a class="anchor" aria-label="anchor" href="#identifying-sdratio"></a></h2>
@@ -411,7 +438,7 @@ ordinal response. <em>PsyArXiv</em>. <a href="https://doi.org/10.31234/osf.io/e7
 <span class="r-in"><span><span class="co"># EV-SDT rating model</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span>, stimulus <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0L</span>, <span class="fl">1L</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="sdt_rating_dist.html">rsdt_rating</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span>, <span class="fl">200</span>, <span class="va">dat</span><span class="op">$</span><span class="va">stimulus</span>,</span></span>
-<span class="r-in"><span>                              d <span class="op">=</span> <span class="fl">1.5</span>, thresholds <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0</span>, <span class="fl">0.5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                              d <span class="op">=</span> <span class="fl">1.5</span>, thresholds <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.25</span>, <span class="fl">0.75</span>, <span class="fl">1.25</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">sdt_rating</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  response <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"r1"</span>, <span class="st">"r2"</span>, <span class="st">"r3"</span>, <span class="st">"r4"</span><span class="op">)</span>,</span></span>

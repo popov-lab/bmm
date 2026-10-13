@@ -59,7 +59,9 @@ rsdt_metad(
 
   Numeric vector of length K-1 with the ordered decision thresholds, or
   an n-by-(K-1) matrix with one row per observation. The thresholds are
-  on the noise-standardized axis and are not rescaled by `sdratio`.
+  positions on the noise-standardized axis, measured from the mean of
+  the noise distribution (the signal mean sits at
+  `d * sqrt((1 + sdratio^2) / 2)`), and are not rescaled by `sdratio`.
 
 - metad:
 
@@ -112,12 +114,12 @@ for estimating metacognitive sensitivity from confidence ratings.
 ``` r
 # Density for a single observation (K=4) with imperfect metacognition
 dsdt_metad(counts = c(5, 15, 25, 55), stimulus = 1,
-           d = 1.5, thresholds = c(-0.5, 0.0, 0.5), metad = 1.0)
+           d = 1.5, thresholds = c(0.25, 0.75, 1.25), metad = 1.0)
 #> [1] 6.662953e-05
 # Generate meta-d' rating data (K=4) for 10 subjects and both stimulus types
 dat <- expand.grid(id = 1:10, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, d = 1.5,
-                             thresholds = c(-0.5, 0, 0.5), metad = 1.0))
+                             thresholds = c(0.25, 0.75, 1.25), metad = 1.0))
 head(dat)
 #>   id stimulus r1 r2 r3 r4
 #> 1  1        0 57 23 13  7

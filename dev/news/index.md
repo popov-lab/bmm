@@ -6,13 +6,19 @@
 
 - Add **Yes/No Signal Detection Theory** (`sdt_yn`) for detection and
   old/new recognition tasks with aggregated response counts. It
-  estimates sensitivity (`d`) and response bias (`criterion`), and
-  optionally the unequal-variance ratio (`sdratio`). Also adds
+  estimates sensitivity (`d`), the decision criterion and optionally the
+  unequal-variance ratio (`sdratio`). The criterion is estimated as
+  `criterion`, measured from the noise mean, or as `bias`, measured from
+  the midpoint between the means: write the one your design holds
+  constant, e.g. `criterion` for weak and strong targets tested against
+  shared lures ([\#543](https://github.com/popov-lab/bmm/issues/543)).
+  Also adds
   [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md),
   [`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md),
-  [`sdt_d()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+  [`sdt_d()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md),
+  [`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
   and
-  [`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md).
+  [`sdt_bias()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md).
   See
   [`?sdt_yn`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   for the parameters, links, default priors and the designs that
@@ -51,10 +57,11 @@
 - Add **Confidence Rating Signal Detection Theory** (`sdt_rating`) for
   old/new recognition and detection tasks with ordered confidence
   ratings, aggregated to counts per rating category. It estimates
-  sensitivity (`d`), response bias (`criterion`) and the confidence
-  thresholds, and optionally the unequal-variance ratio (`sdratio`);
-  `threshold_type` chooses how the thresholds are parameterized. Also
-  adds
+  sensitivity (`d`), the criterion (as `criterion` or `bias`, as in
+  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md))
+  and the confidence thresholds, and optionally the unequal-variance
+  ratio (`sdratio`); `threshold_type` chooses how the thresholds are
+  parameterized. Also adds
   [`dsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md)
   and
   [`rsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md).

@@ -309,9 +309,9 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <code><a href="../reference/sdt_cdp.html">sdt_cdp()</a></code>.</p>
 <table class="table">
 <colgroup>
-<col width="16%">
-<col width="40%">
-<col width="42%">
+<col width="15%">
+<col width="36%">
+<col width="48%">
 </colgroup>
 <thead><tr class="header">
 <th align="left">Model</th>
@@ -350,7 +350,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <code>response</code>: number of responses in each rating category, one column per category, ordered from ‘definitely noise’ to ‘definitely signal’<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old</td>
 <td align="left">
-<code>d</code>: Sensitivity<br><code>criterion</code>: Response bias, on the noise-standardized axis<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>
+<code>d</code>: Sensitivity<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units<br><code>bias</code>: Alternative to criterion<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>
 </td>
 </tr>
 <tr class="odd">
@@ -359,7 +359,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <code>response</code>: number of responses in each rating category, one column per category, ordered from ‘definitely noise’ to ‘definitely signal’<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old</td>
 <td align="left">
-<code>d</code>: Sensitivity<br><code>criterion</code>: Response bias, on the noise-standardized axis<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>, <code>Ro</code>, <code>Rn</code>
+<code>d</code>: Sensitivity<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units<br><code>bias</code>: Alternative to criterion<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>, <code>Ro</code>, <code>Rn</code>
 </td>
 </tr>
 <tr class="even">
@@ -368,7 +368,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <code>response</code>: number of responses in each rating category, one column per category, ordered from ‘definitely noise’ to ‘definitely signal’<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old</td>
 <td align="left">
-<code>d</code>: Sensitivity<br><code>criterion</code>: Response bias, on the noise-standardized axis<br><code>spacing</code>: Threshold spacing<br><code>logmratio</code>: Log M-ratio, log(meta-d/d)<br>Fixed by default: <code>sdratio</code>
+<code>d</code>: Sensitivity<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units<br><code>bias</code>: Alternative to criterion<br><code>spacing</code>: Threshold spacing<br><code>logmratio</code>: Log M-ratio, log(meta-d/d)<br>Fixed by default: <code>sdratio</code>
 </td>
 </tr>
 <tr class="odd">
@@ -377,7 +377,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <code>response</code>: number of ‘old’/‘signal’ responses<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old<br><code>n_trials</code>: number of trials</td>
 <td align="left">
-<code>d</code>: d_a sensitivity (= d’ when sdratio is fixed)<br><code>criterion</code>: Response bias<br>Fixed by default: <code>sdratio</code>
+<code>d</code>: d_a sensitivity (= d’ when sdratio is fixed)<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units; the false-alarm rate depends on it alone<br><code>bias</code>: Alternative to criterion<br>Fixed by default: <code>sdratio</code>
 </td>
 </tr>
 </tbody>
@@ -577,8 +577,9 @@ the column named in <code>response</code> then holds <code>0</code> or <code>1</
 <code>n_trials</code> holds <code>1</code> on every row, and <code>stimulus</code> codes the item of that
 trial as before. We leave <code>dist</code> at its default, <code>"normal"</code>.</p>
 <p>The model has two parameters. <code>d</code> is the sensitivity: the distance between
-the evidence distributions of old and new items. <code>criterion</code> is the response
-bias: the point on the evidence axis above which participants say “old”. A
+the evidence distributions of old and new items. <code>criterion</code> is the decision
+criterion: the point on the evidence axis, measured from the mean of the new
+items, above which participants say “old”. A
 third parameter, <code>sdratio</code>, allows the two distributions to differ in spread,
 and stays fixed to equal variances unless you add a formula for it.</p>
 </div>
@@ -623,7 +624,7 @@ the first 1000 of each as warmup, which gives 4000 posterior draws:</p>
 <span>  model <span class="op">=</span> <span class="va">model</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_sdt_yn_getting_started"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_sdt_yn_getting_started"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3" number="4.5">
@@ -648,17 +649,17 @@ convergence diagnostics you know from <code>brms</code>:</p>
 <span style="color: #00BB00;">Multilevel Hyperparameters:
 </span>~id (Number of levels: 40) 
                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-sd(d_Intercept)             0.60      0.08     0.46     0.78 1.01      670     1560
-sd(criterion_Intercept)     0.15      0.02     0.11     0.21 1.00     1402     2270
+sd(d_Intercept)             0.55      0.07     0.42     0.70 1.00     1379     2323
+sd(criterion_Intercept)     0.35      0.05     0.27     0.46 1.00     1415     2309
 
 <span style="color: #00BB00;">Regression Coefficients:
 </span>                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-d_Intercept                1.53      0.10     1.34     1.73 1.01      463      986
-criterion_conditionbr1     0.68      0.05     0.60     0.77 1.00     1531     2569
-criterion_conditionbr2     0.43      0.04     0.35     0.51 1.00     1280     1931
-criterion_conditionbr3     0.09      0.04     0.02     0.17 1.00     1194     2099
-criterion_conditionbr4    -0.23      0.04    -0.31    -0.15 1.00     1185     2058
-criterion_conditionbr5    -0.37      0.04    -0.45    -0.29 1.00     1356     2171
+d_Intercept                1.53      0.09     1.36     1.72 1.00     1059     1746
+criterion_conditionbr1     1.44      0.07     1.31     1.57 1.00     1124     1880
+criterion_conditionbr2     1.19      0.06     1.07     1.31 1.00     1087     1804
+criterion_conditionbr3     0.85      0.06     0.73     0.98 1.00     1095     1664
+criterion_conditionbr4     0.53      0.07     0.40     0.66 1.00     1222     1907
+criterion_conditionbr5     0.39      0.07     0.25     0.52 1.00     1314     2224
 
 <span style="color: #00BB00;">Constant Parameters:
 </span>                      Value

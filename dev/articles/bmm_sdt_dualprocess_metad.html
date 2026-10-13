@@ -256,7 +256,7 @@ both recollection terms:</p>
 <span>  thin <span class="op">=</span> <span class="fl">6</span>,</span>
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  silent <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_sdt_dpsdt_vignette"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_sdt_dpsdt_vignette"</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_dp</span><span class="op">)</span></span></code></pre></div>
 <pre class="fansi fansi-output"><code><span><span class="co">#&gt;   Model: sdt_rating(response = paste0("r", 1:6),</span></span>
@@ -269,26 +269,26 @@ both recollection terms:</p>
 <span><span class="co">#&gt;          sdratio = 0</span></span>
 <span><span class="co">#&gt;          Ro ~ 1</span></span>
 <span><span class="co">#&gt;          Rn ~ 1 </span></span>
-<span><span class="co">#&gt;    Data: (Number of observations: 194)</span></span>
+<span><span class="co">#&gt;    Data: rating_data (Number of observations: 194)</span></span>
 <span><span class="co">#&gt;   Draws: 4 chains, each with iter = 7000; warmup = 1000; thin = 6;</span></span>
 <span><span class="co">#&gt;          total post-warmup draws = 4000</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Multilevel Hyperparameters:</span></span>
 <span><span class="co">#&gt; ~id (Number of levels: 97) </span></span>
 <span><span class="co">#&gt;                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span></span>
-<span><span class="co">#&gt; sd(d_Intercept)             0.49      0.04     0.42     0.58 1.00     2631</span></span>
-<span><span class="co">#&gt; sd(criterion_Intercept)     0.45      0.03     0.39     0.52 1.00     2060</span></span>
+<span><span class="co">#&gt; sd(d_Intercept)             0.49      0.04     0.42     0.57 1.00     3678</span></span>
+<span><span class="co">#&gt; sd(criterion_Intercept)     0.48      0.04     0.41     0.55 1.00     3483</span></span>
 <span><span class="co">#&gt;                         Tail_ESS</span></span>
-<span><span class="co">#&gt; sd(d_Intercept)             3234</span></span>
-<span><span class="co">#&gt; sd(criterion_Intercept)     2873</span></span>
+<span><span class="co">#&gt; sd(d_Intercept)             3850</span></span>
+<span><span class="co">#&gt; sd(criterion_Intercept)     3579</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; d_Intercept             0.68      0.05     0.57     0.78 1.01     1197     2156</span></span>
-<span><span class="co">#&gt; criterion_Intercept     0.31      0.05     0.22     0.40 1.00      665      966</span></span>
-<span><span class="co">#&gt; spacing_Intercept      -0.26      0.01    -0.27    -0.25 1.00     3814     3892</span></span>
-<span><span class="co">#&gt; Ro_Intercept           -1.00      0.02    -1.05    -0.96 1.00     3983     3817</span></span>
-<span><span class="co">#&gt; Rn_Intercept           -6.43      0.37    -7.21    -5.75 1.00     3685     3723</span></span>
+<span><span class="co">#&gt; d_Intercept             0.67      0.05     0.58     0.78 1.00     2770     3604</span></span>
+<span><span class="co">#&gt; criterion_Intercept     0.65      0.05     0.56     0.74 1.00     1856     2826</span></span>
+<span><span class="co">#&gt; spacing_Intercept      -0.26      0.01    -0.27    -0.24 1.00     3468     3246</span></span>
+<span><span class="co">#&gt; Ro_Intercept           -1.00      0.02    -1.05    -0.96 1.00     3693     3974</span></span>
+<span><span class="co">#&gt; Rn_Intercept           -6.43      0.38    -7.23    -5.74 1.00     3895     4017</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Constant Parameters:</span></span>
 <span><span class="co">#&gt;                       Value</span></span>
@@ -304,9 +304,9 @@ them to probabilities and prints them alongside the familiarity distributions:</
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">latent_dp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/latent_sdt.html">latent_sdt</a></span><span class="op">(</span><span class="va">fit_dp</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">latent_dp</span>, <span class="st">"extra"</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    parameter        mean        lower       upper</span></span>
-<span><span class="co">#&gt; Ro        Ro 0.268355813 0.2590777931 0.277253483</span></span>
-<span><span class="co">#&gt; Rn        Rn 0.001713203 0.0007397265 0.003185263</span></span></code></pre></div>
+<span><span class="co">#&gt;    parameter       mean        lower       upper</span></span>
+<span><span class="co">#&gt; Ro        Ro 0.26886510 0.2599197734 0.277609508</span></span>
+<span><span class="co">#&gt; Rn        Rn 0.00172835 0.0007269151 0.003208967</span></span></code></pre></div>
 <p>Recollection of old items (<code>Ro</code>) is credibly positive — it contributes to
 high-confidence “old” responses over and above familiarity, the dual-process
 signature. Recall-to-reject (<code>Rn</code>), by contrast, is estimated at essentially
@@ -355,7 +355,7 @@ that <code>d</code> is the familiarity <span class="math inline">\(d'\)</span> i
 <span>  thin <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  silent <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_sdt_dp_uv_vignette"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_sdt_dp_uv_vignette"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>On probability axes both ROCs bend through the operating points. The
 <strong>z-transformed</strong> ROC (<code>scale = "z"</code>) is the diagnostic that separates them: the
@@ -471,7 +471,7 @@ metacognitive efficiency. Only the <code>version</code> changes:</p>
 <span>  thin <span class="op">=</span> <span class="fl">6</span>,</span>
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  silent <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_sdt_metad_pratte_vignette"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_sdt_metad_pratte_vignette"</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_md</span><span class="op">)</span></span></code></pre></div>
 <pre class="fansi fansi-output"><code><span><span class="co">#&gt;   Model: sdt_rating(response = paste0("r", 1:6),</span></span>
@@ -483,27 +483,27 @@ metacognitive efficiency. Only the <code>version</code> changes:</p>
 <span><span class="co">#&gt;          spacing ~ 1</span></span>
 <span><span class="co">#&gt;          sdratio = 0</span></span>
 <span><span class="co">#&gt;          logmratio ~ 1 + (1 | id) </span></span>
-<span><span class="co">#&gt;    Data: (Number of observations: 194)</span></span>
+<span><span class="co">#&gt;    Data: rating_data (Number of observations: 194)</span></span>
 <span><span class="co">#&gt;   Draws: 4 chains, each with iter = 7000; warmup = 1000; thin = 6;</span></span>
 <span><span class="co">#&gt;          total post-warmup draws = 4000</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Multilevel Hyperparameters:</span></span>
 <span><span class="co">#&gt; ~id (Number of levels: 97) </span></span>
 <span><span class="co">#&gt;                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS</span></span>
-<span><span class="co">#&gt; sd(d_Intercept)             0.41      0.03     0.35     0.48 1.00     2998</span></span>
-<span><span class="co">#&gt; sd(criterion_Intercept)     0.27      0.02     0.23     0.31 1.00     1819</span></span>
-<span><span class="co">#&gt; sd(logmratio_Intercept)     0.64      0.06     0.53     0.77 1.00     2581</span></span>
+<span><span class="co">#&gt; sd(d_Intercept)             0.40      0.03     0.34     0.46 1.00     3768</span></span>
+<span><span class="co">#&gt; sd(criterion_Intercept)     0.36      0.03     0.31     0.42 1.00     3866</span></span>
+<span><span class="co">#&gt; sd(logmratio_Intercept)     0.64      0.06     0.53     0.78 1.00     3833</span></span>
 <span><span class="co">#&gt;                         Tail_ESS</span></span>
-<span><span class="co">#&gt; sd(d_Intercept)             3280</span></span>
-<span><span class="co">#&gt; sd(criterion_Intercept)     3081</span></span>
-<span><span class="co">#&gt; sd(logmratio_Intercept)     3468</span></span>
+<span><span class="co">#&gt; sd(d_Intercept)             3896</span></span>
+<span><span class="co">#&gt; sd(criterion_Intercept)     3690</span></span>
+<span><span class="co">#&gt; sd(logmratio_Intercept)     4039</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Regression Coefficients:</span></span>
 <span><span class="co">#&gt;                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
-<span><span class="co">#&gt; d_Intercept             1.10      0.04     1.02     1.19 1.00     2011     2635</span></span>
-<span><span class="co">#&gt; criterion_Intercept     0.02      0.03    -0.03     0.07 1.00     1184     1934</span></span>
-<span><span class="co">#&gt; spacing_Intercept      -0.44      0.00    -0.45    -0.43 1.00     3965     3667</span></span>
-<span><span class="co">#&gt; logmratio_Intercept    -0.20      0.07    -0.34    -0.06 1.00     2229     3139</span></span>
+<span><span class="co">#&gt; d_Intercept             1.10      0.04     1.02     1.19 1.00     3654     3892</span></span>
+<span><span class="co">#&gt; criterion_Intercept     0.57      0.04     0.50     0.64 1.00     3014     3556</span></span>
+<span><span class="co">#&gt; spacing_Intercept      -0.44      0.00    -0.45    -0.43 1.00     3941     3836</span></span>
+<span><span class="co">#&gt; logmratio_Intercept    -0.20      0.07    -0.35    -0.06 1.00     3540     4008</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Constant Parameters:</span></span>
 <span><span class="co">#&gt;                       Value</span></span>
@@ -521,8 +521,8 @@ full per-draw posteriors kept in the <code>draws</code> attribute for plotting o
 <span><span class="co">#&gt; Metacognitive efficiency (meta-d' SDT)</span></span>
 <span><span class="co">#&gt; posterior mean/median with 95% CrI [lower, upper]</span></span>
 <span><span class="co">#&gt;  parameter  mean median lower upper</span></span>
-<span><span class="co">#&gt;     mratio 0.821  0.820 0.709 0.942</span></span>
-<span><span class="co">#&gt;      metad 0.906  0.904 0.773 1.053</span></span></code></pre></div>
+<span><span class="co">#&gt;     mratio 0.819  0.818 0.705 0.939</span></span>
+<span><span class="co">#&gt;      metad 0.904  0.902 0.767 1.050</span></span></code></pre></div>
 <p>The population M-ratio sits a little below 1, the typical finding for recognition
 memory: confidence tracks accuracy well but not perfectly, carrying slightly less
 information than the old/new decision itself. The <code>(1 | id)</code> term on <code>logmratio</code>
@@ -597,8 +597,10 @@ directly.</p>
 </h4>
 <p>Meta-d′ models must fix the type-2 confidence scale relative to the type-1
 criterion. <code>bmm</code> uses the <strong>absolute</strong> convention — the confidence criteria are
-anchored at the same boundary as the old/new decision (meta-<span class="math inline">\(c = c\)</span>), as in the
-HMeta-d toolbox <span class="citation">(Fleming 2017)</span>. The maximum-likelihood estimator instead
+anchored at the same boundary as the old/new decision (meta-<span class="math inline">\(c = c\)</span>, with <span class="math inline">\(c\)</span>
+measured from the midpoint between the means), as in the HMeta-d toolbox
+<span class="citation">(Fleming 2017)</span>. This holds whether the formula estimates the type-1 boundary
+as <code>criterion</code> or as <code>bias</code>. The maximum-likelihood estimator instead
 uses a <strong>relative</strong> convention that scales the anchor with metacognitive
 efficiency (meta-<span class="math inline">\(c' = c'\)</span>, i.e. meta-<span class="math inline">\(c = M \cdot c\)</span>) <span class="citation">(Maniscalco and Lau 2014)</span>;
 <span class="citation">Fleming (2017)</span> states that relative constraint for the maximum-likelihood

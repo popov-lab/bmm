@@ -140,10 +140,13 @@ remains comparable across conditions whose \\s\\ differs (Simpson and
 Fitter 1973; Macmillan and Creelman 2005). The Binary SDT section below
 shows how far the indices lie apart on real data.
 
-bmm places the two distributions symmetrically, at \\-\delta/2\\ and
-\\+\delta/2\\, and its `criterion` parameter is the boundary measured
-from their midpoint, \\k - \delta/2\\ in the notation above. The
-criterion is in noise-SD units whether or not \\s\\ is estimated.
+bmm’s `criterion` parameter is this \\k\\: the boundary measured from
+the noise mean, in noise-SD units whether or not \\s\\ is estimated. A
+model can estimate the same boundary as `bias` instead, measured from
+the midpoint between the two means, \\k - \delta/2\\, the index usually
+written \\c\\. The two describe the same observer; which one belongs in
+a formula depends on what the design holds constant, as the section on
+shared lures below shows.
 
 ![Latent evidence model. Noise and signal distributions overlap;
 responses above the criterion are labelled as signal. The shaded right
@@ -367,7 +370,7 @@ fit_normal <- bmm(
   model   = sdt_yn(response = "n_old", stimulus = "stimulus",
                    n_trials = "n_trials", dist = "normal"),
   backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
-  file = "assets/bmmfit_sdt_noise_normal_vignette"
+  file = "fits/bmmfit_sdt_noise_normal_vignette"
 )
 
 fit_gumbel <- bmm(
@@ -376,7 +379,7 @@ fit_gumbel <- bmm(
   model   = sdt_yn(response = "n_old", stimulus = "stimulus",
                    n_trials = "n_trials", dist = "gumbel_min"),
   backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
-  file = "assets/bmmfit_sdt_noise_gumbel_vignette"
+  file = "fits/bmmfit_sdt_noise_gumbel_vignette"
 )
 ```
 
@@ -422,11 +425,11 @@ sensitivity is recovered either way); the distribution shows up in the
 ``` r
 
 attr(auc_sdt(fit_normal), "summary")
-#>   AUC_mean AUC_lower AUC_upper
-#> 1 0.860819 0.8288508 0.8894475
+#>    AUC_mean AUC_lower AUC_upper
+#> 1 0.8592887 0.8294334 0.8869094
 attr(auc_sdt(fit_gumbel), "summary")
-#>   AUC_mean AUC_lower AUC_upper
-#> 1  0.85062  0.822559 0.8754817
+#>    AUC_mean AUC_lower AUC_upper
+#> 1 0.8525084 0.8262501   0.87705
 ```
 
 ### 3.6 Choosing a noise distribution in practice
@@ -460,10 +463,12 @@ task at hand.
 
 In a binary old/new recognition task each cell of the design contributes
 a count of “old” responses out of a number of trials, separately for old
-(`signal`) and new (`noise`) items. The latent decision variable places
-“old” responses above a criterion; sensitivity `d` is the distance
-between the signal and noise distributions and `criterion` is the
-location of the boundary.
+(`signal`) and new (`noise`) items. The observer responds “old” when the
+evidence exceeds a decision boundary. Sensitivity `d` is the distance
+between the signal and noise means in units of the root-mean-square of
+their SDs (\\d_a\\ above, \\d'\\ under equal variance), and `criterion`
+is the position of the boundary measured from the noise mean in noise-SD
+units, the \\k\\ of the equations above.
 
 ### 4.1 A single condition: equal-variance SDT
 
@@ -477,7 +482,7 @@ set.seed(123)
 dat <- expand.grid(id = 1:30, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-                     d = 1.5, criterion = 0.2)
+                     d = 1.5, criterion = 0.95)
 
 model <- sdt_yn(response = "n_old", stimulus = "stimulus",
                 n_trials = "n_trials")
@@ -490,7 +495,7 @@ fit_ev <- bmm(
   cores = 4,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_yn_ev_vignette"
+  file = "fits/bmmfit_sdt_yn_ev_vignette"
 )
 summary(fit_ev)
 ```
@@ -510,16 +515,16 @@ summary(fit_ev)
 #> Multilevel Hyperparameters:
 #> ~id (Number of levels: 30) 
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sd(d_Intercept)             0.05      0.04     0.00     0.14 1.01     1747
-#> sd(criterion_Intercept)     0.04      0.03     0.00     0.10 1.00     1144
+#> sd(d_Intercept)             0.04      0.03     0.00     0.10 1.00     1812
+#> sd(criterion_Intercept)     0.04      0.03     0.00     0.10 1.01     1077
 #>                         Tail_ESS
-#> sd(d_Intercept)             1504
-#> sd(criterion_Intercept)     1555
+#> sd(d_Intercept)             1802
+#> sd(criterion_Intercept)     1198
 #> 
 #> Regression Coefficients:
 #>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> d_Intercept             1.49      0.04     1.41     1.56 1.00     5525     2447
-#> criterion_Intercept     0.17      0.02     0.13     0.21 1.00     3918     2902
+#> d_Intercept             1.49      0.04     1.41     1.56 1.00     3199     2790
+#> criterion_Intercept     0.91      0.03     0.86     0.97 1.00     2824     2717
 #> 
 #> Constant Parameters:
 #>                       Value
@@ -531,17 +536,109 @@ summary(fit_ev)
 ```
 
 The population estimates recover the simulated `d = 1.5` and
-`criterion = 0.2`.
+`criterion = 0.95`. Measured from the midpoint between the two means
+instead, the same boundary lies at \\0.95 - 1.5/2 = 0.2\\, a slight bias
+toward “new”; this is the `bias` parameter introduced below.
 
 By default `sdratio` is fixed to 0, i.e. the signal and noise
-distributions have equal variance (`exp(0) = 1`) — it appears in the
+distributions have equal variance (`exp(0) = 1`). It appears in the
 model’s parameter list but got no formula, so it stays at its fixed
 default (step 3 of the workflow recipe). With a single (hit,
 false-alarm) pair per subject the signal/noise variance ratio is not
 identified, so leaving it fixed is the right default here, and `d` in
 this fit is \\d'\\ in the textbook sense.
 
-### 4.2 Multiple criteria: identifying the unequal-variance ratio
+### 4.2 One set of lures: `criterion` or `bias`
+
+A formula places the boundary with `criterion`, measured from the noise
+mean, or with `bias`, measured from the midpoint between the means.
+Under equal variance \\\text{bias} = \text{criterion} - d/2\\, the
+textbook \\c\\
+([`?sdt_yn`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+gives the general form). Naming neither estimates `criterion ~ 1`;
+naming both is an error.
+
+`criterion ~ 1` keeps the boundary at one distance from the noise mean
+in every row. `bias ~ 1` keeps it at one distance from the midpoint, so
+the boundary moves up by half of every change in `d`. This matters in
+the classic recognition design: weak and strong targets are tested
+against one shared set of lures, with one boundary for all test items.
+The lures’ false-alarm rate, \\1 - \Phi(\text{criterion})\\, depends on
+that boundary alone.
+
+We simulate this design with a constant `criterion` of 0.7 and a
+strength effect of 0.8 on `d`. `strong` is 1 for strong targets and 0
+for weak targets and lures. The `criterion` fit ignores the lures’ value
+of `strong`, because their likelihood does not involve `d`; the `bias`
+fit places their boundary at \\\text{bias} + d/2\\, here the weak
+targets’ boundary.
+
+``` r
+
+set.seed(543)
+dat_str <- expand.grid(id = 1:30, cell = c("lure", "weak", "strong"))
+dat_str$stimulus <- as.integer(dat_str$cell != "lure")
+dat_str$strong <- as.integer(dat_str$cell == "strong")
+dat_str$n_trials <- 100L
+dat_str$n_old <- rsdt_yn(nrow(dat_str), dat_str$n_trials, dat_str$stimulus,
+                         d = 1 + 0.8 * dat_str$strong, criterion = 0.7)
+
+fit_str <- bmm(
+  formula = bmf(d ~ 1 + strong, criterion ~ 1),
+  data = dat_str,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "fits/bmmfit_sdt_yn_strength_vignette"
+)
+fit_str_bias <- bmm(
+  formula = bmf(d ~ 1 + strong, bias ~ 1),
+  data = dat_str,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "fits/bmmfit_sdt_yn_strength_bias_vignette"
+)
+rbind("fit with criterion ~ 1" = brms::fixef(fit_str)["d_strong", ],
+      "fit with bias ~ 1"      = brms::fixef(fit_str_bias)["d_strong", ])
+#>                         Estimate  Est.Error      Q2.5     Q97.5
+#> fit with criterion ~ 1 0.7707447 0.03619196 0.7000913 0.8400134
+#> fit with bias ~ 1      1.5159800 0.07107452 1.3782988 1.6563053
+```
+
+With `criterion ~ 1` the strength effect is 0.77, close to the simulated
+0.8. With `bias ~ 1` it is 1.52, 1.97 times as large. The strong
+targets’ hit rate depends on \\d - \text{criterion}\\. At a fixed
+criterion, an effect \\\Delta\\ on `d` raises this distance by
+\\\Delta\\. At a fixed bias, \\d - \text{criterion} = d/2 -
+\text{bias}\\ rises by only \\\Delta/2\\, so the `bias` fit needs \\2
+\times 0.8 = 1.6\\. Both fits have three parameters (`d` intercept,
+strength effect, and `criterion` or `bias`) for three rates (lures,
+weak, strong) and describe the counts equally well. In the likelihood
+the factor is exactly 2; the estimates depart from it only through
+priors and Monte Carlo error. Model comparison therefore cannot detect
+the wrong choice, and the formula has to state what the design holds
+constant:
+
+- Lures shared by conditions that differ in `d`: `criterion`.
+- Separate lures per condition, with condition-wise terms for both
+  parameters (`d ~ 0 + cond`, `criterion ~ 0 + cond`): either. The
+  likelihood is the same; the coefficients differ by \\d/2\\ and get
+  different default priors.
+- Comparing bias between groups or conditions that differ in `d`:
+  `bias`.
+
+[`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+and
+[`sdt_bias()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+compute both quantities from one hit rate and one false-alarm rate, for
+checking a fit against the raw rates.
+
+### 4.3 Multiple criteria: identifying the unequal-variance ratio
 
 When the criterion is shifted across conditions — for example by a
 base-rate or payoff manipulation — while sensitivity is held constant,
@@ -573,7 +670,7 @@ fit_uv <- bmm(
   thin = 3,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_yn_uv_vignette"
+  file = "fits/bmmfit_sdt_yn_uv_vignette"
 )
 summary(fit_uv)
 ```
@@ -593,29 +690,29 @@ summary(fit_uv)
 #> Multilevel Hyperparameters:
 #> ~id (Number of levels: 40) 
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sd(d_Intercept)             0.58      0.08     0.45     0.75 1.00     1980
-#> sd(criterion_Intercept)     0.17      0.03     0.12     0.23 1.00     3059
+#> sd(d_Intercept)             0.52      0.07     0.40     0.68 1.00     2698
+#> sd(criterion_Intercept)     0.37      0.05     0.28     0.48 1.00     3059
 #>                         Tail_ESS
-#> sd(d_Intercept)             3048
-#> sd(criterion_Intercept)     3701
+#> sd(d_Intercept)             3482
+#> sd(criterion_Intercept)     3451
 #> 
 #> Regression Coefficients:
 #>                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> d_Intercept                1.49      0.10     1.29     1.68 1.00     1307
-#> sdratio_Intercept          0.36      0.08     0.21     0.51 1.00     2494
-#> criterion_conditionbr1     0.58      0.06     0.46     0.69 1.00     2675
-#> criterion_conditionbr2     0.33      0.06     0.22     0.44 1.00     2506
-#> criterion_conditionbr3    -0.06      0.06    -0.19     0.05 1.00     2464
-#> criterion_conditionbr4    -0.45      0.07    -0.59    -0.32 1.00     2455
-#> criterion_conditionbr5    -0.67      0.09    -0.85    -0.50 1.00     2590
+#> d_Intercept                1.47      0.09     1.29     1.64 1.00     2544
+#> sdratio_Intercept          0.46      0.09     0.29     0.64 1.00     3749
+#> criterion_conditionbr1     1.49      0.07     1.36     1.63 1.00     2266
+#> criterion_conditionbr2     1.25      0.07     1.11     1.38 1.00     2317
+#> criterion_conditionbr3     0.84      0.07     0.71     0.98 1.00     2168
+#> criterion_conditionbr4     0.44      0.07     0.30     0.59 1.00     2327
+#> criterion_conditionbr5     0.20      0.09     0.04     0.37 1.00     2607
 #>                        Tail_ESS
-#> d_Intercept                2298
-#> sdratio_Intercept          3466
-#> criterion_conditionbr1     3240
-#> criterion_conditionbr2     3389
-#> criterion_conditionbr3     3143
-#> criterion_conditionbr4     3204
-#> criterion_conditionbr5     3595
+#> d_Intercept                3066
+#> sdratio_Intercept          3648
+#> criterion_conditionbr1     3335
+#> criterion_conditionbr2     3059
+#> criterion_conditionbr3     3004
+#> criterion_conditionbr4     2884
+#> criterion_conditionbr5     3308
 #> 
 #> Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units), not the noise-standardized d'.
 #>       sdt_sensitivity() converts it to d' (noise SD) and d_S (signal SD).
@@ -634,13 +731,23 @@ for the SD ratio on the natural scale:
 
 exp(brms::fixef(fit_uv)["sdratio_Intercept", c("Estimate", "Q2.5", "Q97.5")])
 #> Estimate     Q2.5    Q97.5 
-#> 1.432103 1.231625 1.667237
+#> 1.579851 1.336469 1.889383
 ```
 
 A value above 1 means the signal distribution is wider than the noise
 distribution, the classic recognition-memory pattern.
 
-#### 4.2.1 Which sensitivity index?
+Here the base-rate manipulation moves `criterion`, and that is what
+identifies `sdratio`. A strength manipulation with a constant
+`criterion`, as in the shared-lure design above, would not: the
+false-alarm rate then informs the criterion alone, and every hit rate
+can be matched by trading `sdratio` against `d`.
+[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
+for that design; the section “Identifying `sdratio`” of
+[`?sdt_yn`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+covers the cases in between.
+
+#### 4.3.1 Which sensitivity index?
 
 Once `sdratio` is free, “the” distance between the two distributions
 depends on which standard deviation you measure it in, and `d` is no
@@ -660,21 +767,21 @@ sens
 #> SDT sensitivity (sdt_yn, dist = normal)
 #>   da = RMS-SD units (estimated) | dn = noise-SD units (d') | ds = signal-SD units
 #>  measure mean lower upper condition
-#>       da 1.49  1.29  1.68       br1
-#>       da 1.49  1.29  1.68       br2
-#>       da 1.49  1.29  1.68       br3
-#>       da 1.49  1.29  1.68       br4
-#>       da 1.49  1.29  1.68       br5
-#>       dn 1.84  1.56  2.14       br1
-#>       dn 1.84  1.56  2.14       br2
-#>       dn 1.84  1.56  2.14       br3
-#>       dn 1.84  1.56  2.14       br4
-#>       dn 1.84  1.56  2.14       br5
-#>       ds 1.28  1.10  1.46       br1
-#>       ds 1.28  1.10  1.46       br2
-#>       ds 1.28  1.10  1.46       br3
-#>       ds 1.28  1.10  1.46       br4
-#>       ds 1.28  1.10  1.46       br5
+#>       da 1.47  1.29  1.64       br1
+#>       da 1.47  1.29  1.64       br2
+#>       da 1.47  1.29  1.64       br3
+#>       da 1.47  1.29  1.64       br4
+#>       da 1.47  1.29  1.64       br5
+#>       dn 1.95  1.66  2.27       br1
+#>       dn 1.95  1.66  2.27       br2
+#>       dn 1.95  1.66  2.27       br3
+#>       dn 1.95  1.66  2.27       br4
+#>       dn 1.95  1.66  2.27       br5
+#>       ds 1.23  1.06  1.40       br1
+#>       ds 1.23  1.06  1.40       br2
+#>       ds 1.23  1.06  1.40       br3
+#>       ds 1.23  1.06  1.40       br4
+#>       ds 1.23  1.06  1.40       br5
 ```
 
 **For readers who know \\d'\\.** The classical index and bmm’s `d`
@@ -690,7 +797,7 @@ with the SD ratio:
 |           1.50 |          1.27 |
 |           2.00 |          1.58 |
 
-For the base-rate data the posterior mean of \\d_N\\ is 24% larger than
+For the base-rate data the posterior mean of \\d_N\\ is 33% larger than
 the posterior mean of `d`. A \\d'\\ published for similar data under
 unequal variance should therefore be compared with the `dn` row above,
 not with `d`.
@@ -707,17 +814,17 @@ same contrasts up to scale. Report \\d_N\\ or \\d_S\\ when you need to
 line up with a literature that uses them, but prefer \\d_a\\ for
 contrasts.
 
-Two further points apply to unequal-variance fits. First, `criterion` is
-not converted: it stays in noise-SD units whichever sensitivity index
-you report, so a ratio such as `criterion / d` mixes two scales. Second,
-for `dist = "normal"` the index \\d_a\\ is also the AUC-equivalent
-index, \\d_a = \sqrt{2}\\\Phi^{-1}(\mathrm{AUC})\\. Under the Gumbel
-distributions that identity only holds with equal variance, so compare
-unequal-variance Gumbel fits with
+Two further points apply to unequal-variance fits. First, `criterion`
+and `bias` are not converted: they stay in noise-SD units whichever
+sensitivity index you report, so a ratio such as `bias / d` mixes two
+scales. Second, for `dist = "normal"` the index \\d_a\\ is also the
+AUC-equivalent index, \\d_a = \sqrt{2}\\\Phi^{-1}(\mathrm{AUC})\\. Under
+the Gumbel distributions that identity only holds with equal variance,
+so compare unequal-variance Gumbel fits with
 [`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
 rather than on `d`.
 
-### 4.3 ROC and AUC
+### 4.4 ROC and AUC
 
 [`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
 returns the model-implied ROC from the posterior. For a binary fit it
@@ -739,7 +846,7 @@ obs <- roc_observed(fit_uv)
 plot(roc, observed = obs)
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-8-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-9-1.jpeg)
 
 The smooth ribbon is the posterior ROC, the filled points with
 crosshairs are the model-implied operating points per base-rate
@@ -762,16 +869,16 @@ auc <- auc_sdt(fit_uv)
 plot(auc)
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-9-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-10-1.jpeg)
 
 ``` r
 
 attr(auc, "summary")
 #>    AUC_mean AUC_lower AUC_upper
-#> 1 0.8522991 0.8194102 0.8817438
+#> 1 0.8494397 0.8193612 0.8770114
 ```
 
-### 4.4 Quantile-transformed ROC and latent distributions
+### 4.5 Quantile-transformed ROC and latent distributions
 
 Passing `scale = "quantile"` to the ROC
 [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method reads
@@ -796,10 +903,10 @@ and are dropped.)
 plot(roc, observed = obs, scale = "quantile")
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-10-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-11-1.jpeg)
 
-For the base-rate data the fitted slope is 0.70 (95% CrI \[0.60,
-0.81\]). The equal-variance `gumbel_min` fit from the noise-distribution
+For the base-rate data the fitted slope is 0.64 (95% CrI \[0.53,
+0.75\]). The equal-variance `gumbel_min` fit from the noise-distribution
 section implied a slope of 0.59 through the same operating points,
 without an `sdratio` parameter.
 
@@ -821,9 +928,9 @@ condition).
 plot(latent_sdt(fit_uv))
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-11-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-12-1.jpeg)
 
-### 4.5 Posterior predictive checks
+### 4.6 Posterior predictive checks
 
 [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
 uses a custom binomial family, so
@@ -841,7 +948,7 @@ directly:
 pp_check(fit_uv, type = "ecdf_overlay", group = "stimulus", ndraws = 100)
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-12-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-13-1.jpeg)
 
 ## 5 Rating SDT
 
@@ -893,7 +1000,7 @@ fit_rating <- bmm(
   iter = 7000,
   warmup = 1000,
   thin = 6,
-  file = "assets/bmmfit_sdt_rating_vignette"
+  file = "fits/bmmfit_sdt_rating_vignette"
 )
 summary(fit_rating)
 ```
@@ -906,25 +1013,25 @@ summary(fit_rating)
 #>          criterion ~ 1 + (1 | id)
 #>          spacing ~ 1
 #>          sdratio ~ 1 
-#>    Data: (Number of observations: 194)
+#>    Data: rating_data (Number of observations: 194)
 #>   Draws: 4 chains, each with iter = 7000; warmup = 1000; thin = 6;
 #>          total post-warmup draws = 4000
 #> 
 #> Multilevel Hyperparameters:
 #> ~id (Number of levels: 97) 
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sd(d_Intercept)             0.53      0.04     0.46     0.62 1.00     2716
-#> sd(criterion_Intercept)     0.33      0.03     0.28     0.38 1.00     2881
+#> sd(d_Intercept)             0.53      0.04     0.45     0.61 1.00     2611
+#> sd(criterion_Intercept)     0.47      0.03     0.41     0.55 1.00     2617
 #>                         Tail_ESS
-#> sd(d_Intercept)             3372
-#> sd(criterion_Intercept)     3186
+#> sd(d_Intercept)             2870
+#> sd(criterion_Intercept)     3386
 #> 
 #> Regression Coefficients:
 #>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> d_Intercept             1.10      0.06     0.99     1.21 1.00     1725     2774
-#> criterion_Intercept    -0.03      0.03    -0.09     0.04 1.00     1522     2282
-#> spacing_Intercept      -0.26      0.01    -0.27    -0.25 1.00     4134     3955
-#> sdratio_Intercept       0.35      0.01     0.33     0.37 1.00     4133     3778
+#> d_Intercept             1.10      0.05     0.99     1.20 1.00     1781     2899
+#> criterion_Intercept     0.65      0.05     0.55     0.74 1.01     1232     2371
+#> spacing_Intercept      -0.26      0.01    -0.27    -0.25 1.00     3896     3851
+#> sdratio_Intercept       0.35      0.01     0.33     0.37 1.00     3950     3764
 #> 
 #> Note: sdratio is not fixed at 0, so d is d_a (root-mean-square SD units), not the noise-standardized d'.
 #>       sdt_sensitivity() converts it to d' (noise SD) and d_S (signal SD).
@@ -986,14 +1093,14 @@ roc <- roc_sdt(fit_rating)
 plot(roc, observed = roc_observed(fit_rating))
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-14-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-15-1.jpeg)
 
 ``` r
 
 
 attr(auc_sdt(fit_rating), "summary")
 #>    AUC_mean AUC_lower AUC_upper
-#> 1 0.7809546 0.7579513 0.8030136
+#> 1 0.7807858 0.7584945 0.8024159
 ```
 
 ### 5.3 Posterior predictive checks
@@ -1011,7 +1118,7 @@ rating distributions should be checked separately, so
 pp_check(fit_rating, ndraws = 100)
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-15-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-16-1.jpeg)
 
 Pass `group = NA` to pool both stimulus types into a single profile, or
 `group = "<predictor>"` to facet by another design variable.
@@ -1056,13 +1163,13 @@ fit_rating_lr <- bmm(
   thin = 3,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_rating_logratio_vignette"
+  file = "fits/bmmfit_sdt_rating_logratio_vignette"
 )
 
 pp_check(fit_rating_lr, ndraws = 100)
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-16-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-17-1.jpeg)
 
 The interior categories are now captured: the flexible thresholds absorb
 the systematic deviation that the parsimonious model could not. The
@@ -1101,12 +1208,12 @@ can be reported directly, whatever the `threshold_type`.
 ``` r
 
 attr(sdt_thresholds(fit_rating_lr), "summary")
-#>   marker   position       lower      upper
-#> 1     t1 -1.3041170 -1.37289582 -1.2385101
-#> 2     t2 -0.4071132 -0.47385795 -0.3430747
-#> 3     t3  0.0981242  0.03145709  0.1634927
-#> 4     t4  0.5160744  0.44915164  0.5801853
-#> 5     t5  1.1056789  1.03838991  1.1714890
+#>   marker   position      lower      upper
+#> 1     t1 -0.6661859 -0.7630365 -0.5663209
+#> 2     t2  0.2308720  0.1360814  0.3279148
+#> 3     t3  0.7363087  0.6415069  0.8339158
+#> 4     t4  1.1548702  1.0579011  1.2530744
+#> 5     t5  1.7453748  1.6474459  1.8443663
 ```
 
 [`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
@@ -1121,7 +1228,7 @@ model could not) is directly visible:
 plot(latent_sdt(fit_rating_lr))
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-18-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-19-1.jpeg)
 
 ## 6 m-AFC SDT
 
@@ -1221,7 +1328,7 @@ effective competitor the target must beat — which shifts rightward as
 plot(latent_sdt(fit_mafc, show_competitors = TRUE))
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-20-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-21-1.jpeg)
 
 Each subject contributes one correct-response count, so a bar per count
 value is sparse and noisy; an overlaid empirical CDF of the
@@ -1233,7 +1340,7 @@ spread of accuracy across subjects:
 pp_check(fit_mafc, type = "ecdf_overlay", ndraws = 100)
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-21-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-22-1.jpeg)
 
 ## 7 Ranking SDT
 
@@ -1329,7 +1436,7 @@ set-size column so each panel has a homogeneous denominator:
 pp_check(fit_rank, group = "set_size", ndraws = 100)
 ```
 
-![](bmm_sdt_files/figure-html/unnamed-chunk-23-1.jpeg)
+![](bmm_sdt_files/figure-html/unnamed-chunk-24-1.jpeg)
 
 ## 8 Post-processing reference
 

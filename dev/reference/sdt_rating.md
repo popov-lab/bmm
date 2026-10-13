@@ -86,8 +86,8 @@ sdt_rating(
 - links:
 
   A named list of link functions for the parameters, e.g.
-  `links = list(d = "log")`. Only `d` and `criterion` can be set, to
-  `"identity"`, `"log"`, `"softplus"`, `"logit"` or `"probit"`.
+  `links = list(d = "log")`. Only `d`, `criterion` and `bias` can be
+  set, to `"identity"`, `"log"`, `"softplus"`, `"logit"` or `"probit"`.
   `sdratio` and the threshold parameters keep their identity links,
   because the model reads each of them through
   [`exp()`](https://rdrr.io/r/base/Log.html) and fixes `sdratio` at 0
@@ -142,9 +142,14 @@ with `version`:
     sdratio is estimated, d is d_a, the distance between the signal and
     noise distributions in units of their root-mean-square SD
 
-  - `criterion`: Response bias, on the noise-standardized axis: the
-    middle threshold (the old/new boundary) for an even number of
-    categories, the centre of the middle category for an odd number
+  - `criterion`: Decision criterion, measured from the mean of the noise
+    distribution in noise-SD units: the middle threshold (the old/new
+    boundary) for an even number of categories, the centre of the middle
+    category for an odd number
+
+  - `bias`: Alternative to criterion: the same middle threshold measured
+    from the midpoint between the noise and signal means (0 = neutral,
+    positive = conservative). Use one of the two
 
   - `spacing`: Threshold spacing: controls distance between adjacent
     thresholds (exp(spacing) ensures positive spacing)
@@ -159,8 +164,8 @@ with `version`:
 
 - **Default parameter links:**
 
-  - d = identity; criterion = identity; spacing = identity; sdratio =
-    identity
+  - d = identity; criterion = identity; bias = identity; spacing =
+    identity; sdratio = identity
 
 - **Default priors:**
 
@@ -173,6 +178,14 @@ with `version`:
     - `sd`: exponential(1)
 
   - `criterion`:
+
+    - `main`: normal(0.5, 1.5)
+
+    - `effects`: normal(0, 0.5)
+
+    - `sd`: exponential(1)
+
+  - `bias`:
 
     - `main`: normal(0, 1.5)
 
@@ -262,9 +275,14 @@ parameter fixed off, not the interval.
     sdratio is estimated, d is d_a, the distance between the signal and
     noise distributions in units of their root-mean-square SD
 
-  - `criterion`: Response bias, on the noise-standardized axis: the
-    middle threshold (the old/new boundary) for an even number of
-    categories, the centre of the middle category for an odd number
+  - `criterion`: Decision criterion, measured from the mean of the noise
+    distribution in noise-SD units: the middle threshold (the old/new
+    boundary) for an even number of categories, the centre of the middle
+    category for an odd number
+
+  - `bias`: Alternative to criterion: the same middle threshold measured
+    from the midpoint between the noise and signal means (0 = neutral,
+    positive = conservative). Use one of the two
 
   - `spacing`: Threshold spacing: controls distance between adjacent
     thresholds (exp(spacing) ensures positive spacing)
@@ -291,8 +309,8 @@ parameter fixed off, not the interval.
 
 - **Default parameter links:**
 
-  - d = identity; criterion = identity; spacing = identity; sdratio =
-    identity; Ro = identity; Rn = identity
+  - d = identity; criterion = identity; bias = identity; spacing =
+    identity; sdratio = identity; Ro = identity; Rn = identity
 
 - **Default priors:**
 
@@ -305,6 +323,14 @@ parameter fixed off, not the interval.
     - `sd`: exponential(1)
 
   - `criterion`:
+
+    - `main`: normal(0.5, 1.5)
+
+    - `effects`: normal(0, 0.5)
+
+    - `sd`: exponential(1)
+
+  - `bias`:
 
     - `main`: normal(0, 1.5)
 
@@ -358,14 +384,17 @@ toward `d`, and anchors the ideal point (meta-d' = `d`, perfect
 metacognition) at `logmratio = 0`, which recovers `standard`. Type-1 and
 type-2 sensitivity share one scale (\\d'\\, or \\d_a\\ when `sdratio` is
 estimated), so the M-ratio is unaffected by `sdratio`. The type-1
-boundary is `criterion`, the middle threshold, so this version needs an
-even number of rating categories: with an odd number the middle category
-straddles the boundary (see "Where `criterion` sits"). The type-1
-criterion is held at the same location in the meta-d' space as in the
-type-1 model, as the HMeta-d toolbox's model equations do (Fleming,
-2017, Appendix). Maximum-likelihood meta-d' instead constrains meta-c' =
-c' (Maniscalco & Lau, 2014), so its estimates differ from bmm's when the
-criterion is far from the midpoint. Extract the M-ratio posterior with
+boundary is the middle threshold (`criterion` or `bias`), so this
+version needs an even number of rating categories: with an odd number
+the middle category straddles the boundary (see "Where `criterion` and
+`bias` sit"). Every threshold keeps its distance from the midpoint
+between the means when `d` is replaced by meta-d', as the HMeta-d
+toolbox's model equations do (Fleming, 2017, Appendix). Whether the
+formula estimates `criterion` or `bias` changes how the type-1 boundary
+is parameterized, not this constraint. Maximum-likelihood meta-d'
+instead constrains meta-c' = c' (Maniscalco & Lau, 2014), so its
+estimates differ from bmm's when the criterion is far from the midpoint.
+Extract the M-ratio posterior with
 [`mratio()`](https://popov-lab.github.io/bmm/dev/reference/mratio.md).
 
 - **Domain:** Perception & Recognition Memory
@@ -402,9 +431,14 @@ criterion is far from the midpoint. Extract the M-ratio posterior with
     sdratio is estimated, d is d_a, the distance between the signal and
     noise distributions in units of their root-mean-square SD
 
-  - `criterion`: Response bias, on the noise-standardized axis: the
-    middle threshold (the old/new boundary) for an even number of
-    categories, the centre of the middle category for an odd number
+  - `criterion`: Decision criterion, measured from the mean of the noise
+    distribution in noise-SD units: the middle threshold (the old/new
+    boundary) for an even number of categories, the centre of the middle
+    category for an odd number
+
+  - `bias`: Alternative to criterion: the same middle threshold measured
+    from the midpoint between the noise and signal means (0 = neutral,
+    positive = conservative). Use one of the two
 
   - `spacing`: Threshold spacing: controls distance between adjacent
     thresholds (exp(spacing) ensures positive spacing)
@@ -424,8 +458,8 @@ criterion is far from the midpoint. Extract the M-ratio posterior with
 
 - **Default parameter links:**
 
-  - d = identity; criterion = identity; spacing = identity; sdratio =
-    identity; logmratio = identity
+  - d = identity; criterion = identity; bias = identity; spacing =
+    identity; sdratio = identity; logmratio = identity
 
 - **Default priors:**
 
@@ -438,6 +472,14 @@ criterion is far from the midpoint. Extract the M-ratio posterior with
     - `sd`: exponential(1)
 
   - `criterion`:
+
+    - `main`: normal(0.5, 1.5)
+
+    - `effects`: normal(0, 0.5)
+
+    - `sd`: exponential(1)
+
+  - `bias`:
 
     - `main`: normal(0, 1.5)
 
@@ -488,7 +530,7 @@ for the reasoning, for how far the two indices lie apart, and for the
 caveat that under the Gumbel distributions \\d_a\\ is not the
 AUC-equivalent index once `sdratio` is estimated.
 
-The `criterion` and the confidence thresholds are **not** rescaled. They
+The criterion and the confidence thresholds are **not** rescaled. They
 stay on the noise-standardized axis, so under unequal variance they and
 `d` are in different units.
 
@@ -496,16 +538,34 @@ The `dpsdt` and `metad` versions inherit the same convention: `d` there
 describes the familiarity (type-1) distributions, and meta-d' is scaled
 the same way, which leaves the M-ratio invariant to `sdratio`.
 
-## Where `criterion` sits
+## Where `criterion` and `bias` sit
 
-Every `threshold_type` places `criterion` the same way. With an even
+Every `threshold_type` places the criterion the same way. With an even
 number of categories K it is the middle threshold, the boundary between
 the K/2 "noise" categories and the K/2 "signal" categories. With an odd
 number there is no such boundary – the middle category straddles it – so
-`criterion` is the centre of that category, and the two thresholds
-around it sit half an interval below and above. A shift in `criterion`
+the criterion is the centre of that category, and the two thresholds
+around it sit half an interval below and above. A shift in the criterion
 therefore moves the whole threshold set, and the threshold parameters
 (`spacing`, `delta`) describe its shape around that point.
+
+As in
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
+the formula estimates that point either as `criterion`, measured from
+the mean of the noise distribution, or as `bias`, measured from the
+midpoint between the noise and signal means
+(`bias = criterion - d * sqrt((1 + exp(sdratio)^2) / 2) / 2`); a formula
+that names neither estimates `criterion ~ 1`. The two differ in what a
+linear formula holds constant when `d` or `sdratio` varies; the section
+"Choosing between `criterion` and `bias`" of
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+says which to choose. Threshold locations reported by
+[`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
+and
+[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md),
+and the `thresholds` taken by
+[`rsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md)
+and its siblings, are positions measured from the noise mean.
 
 ## Identifying `sdratio`
 
@@ -566,7 +626,7 @@ if (FALSE) { # \dontrun{
 # EV-SDT rating model
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus,
-                              d = 1.5, thresholds = c(-0.5, 0, 0.5)))
+                              d = 1.5, thresholds = c(0.25, 0.75, 1.25)))
 
 model <- sdt_rating(
   response = c("r1", "r2", "r3", "r4"),

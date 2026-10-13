@@ -1,8 +1,8 @@
 # Utility functions for Signal Detection Theory
 
-Compute sensitivity and criterion from hit and false alarm rates for
-different SDT distribution families. A single (hit, false alarm) pair
-cannot identify the signal-to-noise SD ratio, so both quantities are the
+Compute sensitivity, criterion and bias from hit and false alarm rates
+for different SDT distribution families. A single (hit, false alarm)
+pair cannot identify the signal-to-noise SD ratio, so all three are the
 equal-variance values; see
 [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
 for the unequal-variance model.
@@ -17,6 +17,12 @@ sdt_d(
 )
 
 sdt_criterion(
+  hit_rate,
+  fa_rate,
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
+)
+
+sdt_bias(
   hit_rate,
   fa_rate,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
@@ -61,12 +67,20 @@ this matches the `d` parameter of
 [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
 whenever `sdratio` is at its default.
 
-`sdt_criterion` returns the criterion (response bias) on the centred,
-noise-standardized evidence axis used by
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
-where the noise and signal distributions sit at -d'/2 and +d'/2:
-\\(Q(1 - FA) + Q(1 - H)) / 2\\. For `dist = "normal"` this reduces to
-the familiar \\-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2\\.
+`sdt_criterion` returns the location of the decision criterion measured
+from the mean of the noise distribution, in noise-SD units, as the
+`criterion` parameter of
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+is: \\Q(1 - FA)\\. It depends on the false-alarm rate alone. For
+`dist = "normal"` this is \\-\Phi^{-1}(FA)\\.
+
+`sdt_bias` returns the criterion measured from the midpoint between the
+noise and signal means instead, as the `bias` parameter of
+[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+is: \\(Q(1 - FA) + Q(1 - H)) / 2\\, which is
+`sdt_criterion() - sdt_d() / 2`. For `dist = "normal"` this is the
+familiar \\c = -(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2\\. Positive values
+are a conservative bias, toward "new"/"noise" responses.
 
 ## References
 
@@ -76,10 +90,10 @@ psychophysics*. Wiley.
 ## See also
 
 [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
-whose `d` and `criterion` parameters these two functions compute in
-closed form from observed rates: `sdt_d()` returns the same quantity as
-the `d` parameter and `sdt_criterion()` the same quantity as
-`criterion`, on the same axis, whenever `sdratio` is at its default.
+whose `d`, `criterion` and `bias` parameters these functions compute in
+closed form from observed rates: `sdt_d()`, `sdt_criterion()` and
+`sdt_bias()` return the same quantities as the parameters of the same
+name whenever `sdratio` is at its default.
 
 ## Examples
 
@@ -93,5 +107,8 @@ sdt_d(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
 #> [1] 1.572534
 # Compute criterion from hit and false alarm rates
 sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+#> [1] 0.8416212
+# Compute the bias relative to the midpoint
+sdt_bias(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 #> [1] 0
 ```

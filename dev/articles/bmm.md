@@ -249,10 +249,10 @@ item of that trial as before. We leave `dist` at its default,
 
 The model has two parameters. `d` is the sensitivity: the distance
 between the evidence distributions of old and new items. `criterion` is
-the response bias: the point on the evidence axis above which
-participants say “old”. A third parameter, `sdratio`, allows the two
-distributions to differ in spread, and stays fixed to equal variances
-unless you add a formula for it.
+the decision criterion: the point on the evidence axis, measured from
+the mean of the new items, above which participants say “old”. A third
+parameter, `sdratio`, allows the two distributions to differ in spread,
+and stays fixed to equal variances unless you add a formula for it.
 
 ### 4.3 The formula
 
@@ -305,7 +305,7 @@ fit <- bmm(
   model = model,
   cores = 4,
   backend = "cmdstanr",
-  file = "assets/bmmfit_sdt_yn_getting_started"
+  file = "fits/bmmfit_sdt_yn_getting_started"
 )
 ```
 
@@ -334,17 +334,17 @@ Formula: d ~ 1 + (1 | id)
 Multilevel Hyperparameters:
 ~id (Number of levels: 40) 
                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-sd(d_Intercept)             0.60      0.08     0.46     0.78 1.01      670     1560
-sd(criterion_Intercept)     0.15      0.02     0.11     0.21 1.00     1402     2270
+sd(d_Intercept)             0.55      0.07     0.42     0.70 1.00     1379     2323
+sd(criterion_Intercept)     0.35      0.05     0.27     0.46 1.00     1415     2309
 
 Regression Coefficients:
                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-d_Intercept                1.53      0.10     1.34     1.73 1.01      463      986
-criterion_conditionbr1     0.68      0.05     0.60     0.77 1.00     1531     2569
-criterion_conditionbr2     0.43      0.04     0.35     0.51 1.00     1280     1931
-criterion_conditionbr3     0.09      0.04     0.02     0.17 1.00     1194     2099
-criterion_conditionbr4    -0.23      0.04    -0.31    -0.15 1.00     1185     2058
-criterion_conditionbr5    -0.37      0.04    -0.45    -0.29 1.00     1356     2171
+d_Intercept                1.53      0.09     1.36     1.72 1.00     1059     1746
+criterion_conditionbr1     1.44      0.07     1.31     1.57 1.00     1124     1880
+criterion_conditionbr2     1.19      0.06     1.07     1.31 1.00     1087     1804
+criterion_conditionbr3     0.85      0.06     0.73     0.98 1.00     1095     1664
+criterion_conditionbr4     0.53      0.07     0.40     0.66 1.00     1222     1907
+criterion_conditionbr5     0.39      0.07     0.25     0.52 1.00     1314     2224
 
 Constant Parameters:
                       Value

@@ -91,9 +91,10 @@ if (FALSE) { # \dontrun{
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
                    condition = c("liberal", "neutral", "strict"))
 dat$n_trials <- 100L
+# simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-                     criterion = criteria[as.character(dat$condition)],
+                     bias = criteria[as.character(dat$condition)],
                      sdratio = 1.3)
 
 fit <- bmm(

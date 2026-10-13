@@ -176,6 +176,7 @@ Functions for special distributions
 
 - [`sdt_d()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
   [`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+  [`sdt_bias()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
   : Utility functions for Signal Detection Theory
 
 - [`dcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)

@@ -169,7 +169,7 @@ fit_dp <- bmm(
   thin = 6,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_dpsdt_vignette"
+  file = "fits/bmmfit_sdt_dpsdt_vignette"
 )
 summary(fit_dp)
 ```
@@ -185,26 +185,26 @@ summary(fit_dp)
 #>          sdratio = 0
 #>          Ro ~ 1
 #>          Rn ~ 1 
-#>    Data: (Number of observations: 194)
+#>    Data: rating_data (Number of observations: 194)
 #>   Draws: 4 chains, each with iter = 7000; warmup = 1000; thin = 6;
 #>          total post-warmup draws = 4000
 #> 
 #> Multilevel Hyperparameters:
 #> ~id (Number of levels: 97) 
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sd(d_Intercept)             0.49      0.04     0.42     0.58 1.00     2631
-#> sd(criterion_Intercept)     0.45      0.03     0.39     0.52 1.00     2060
+#> sd(d_Intercept)             0.49      0.04     0.42     0.57 1.00     3678
+#> sd(criterion_Intercept)     0.48      0.04     0.41     0.55 1.00     3483
 #>                         Tail_ESS
-#> sd(d_Intercept)             3234
-#> sd(criterion_Intercept)     2873
+#> sd(d_Intercept)             3850
+#> sd(criterion_Intercept)     3579
 #> 
 #> Regression Coefficients:
 #>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> d_Intercept             0.68      0.05     0.57     0.78 1.01     1197     2156
-#> criterion_Intercept     0.31      0.05     0.22     0.40 1.00      665      966
-#> spacing_Intercept      -0.26      0.01    -0.27    -0.25 1.00     3814     3892
-#> Ro_Intercept           -1.00      0.02    -1.05    -0.96 1.00     3983     3817
-#> Rn_Intercept           -6.43      0.37    -7.21    -5.75 1.00     3685     3723
+#> d_Intercept             0.67      0.05     0.58     0.78 1.00     2770     3604
+#> criterion_Intercept     0.65      0.05     0.56     0.74 1.00     1856     2826
+#> spacing_Intercept      -0.26      0.01    -0.27    -0.24 1.00     3468     3246
+#> Ro_Intercept           -1.00      0.02    -1.05    -0.96 1.00     3693     3974
+#> Rn_Intercept           -6.43      0.38    -7.23    -5.74 1.00     3895     4017
 #> 
 #> Constant Parameters:
 #>                       Value
@@ -226,9 +226,9 @@ distributions:
 
 latent_dp <- latent_sdt(fit_dp)
 attr(latent_dp, "extra")
-#>    parameter        mean        lower       upper
-#> Ro        Ro 0.268355813 0.2590777931 0.277253483
-#> Rn        Rn 0.001713203 0.0007397265 0.003185263
+#>    parameter       mean        lower       upper
+#> Ro        Ro 0.26886510 0.2599197734 0.277609508
+#> Rn        Rn 0.00172835 0.0007269151 0.003208967
 ```
 
 Recollection of old items (`Ro`) is credibly positive — it contributes
@@ -282,7 +282,7 @@ fit_uv <- bmm(
   thin = 3,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_dp_uv_vignette"
+  file = "fits/bmmfit_sdt_dp_uv_vignette"
 )
 ```
 
@@ -432,7 +432,7 @@ fit_md <- bmm(
   thin = 6,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_metad_pratte_vignette"
+  file = "fits/bmmfit_sdt_metad_pratte_vignette"
 )
 summary(fit_md)
 ```
@@ -447,27 +447,27 @@ summary(fit_md)
 #>          spacing ~ 1
 #>          sdratio = 0
 #>          logmratio ~ 1 + (1 | id) 
-#>    Data: (Number of observations: 194)
+#>    Data: rating_data (Number of observations: 194)
 #>   Draws: 4 chains, each with iter = 7000; warmup = 1000; thin = 6;
 #>          total post-warmup draws = 4000
 #> 
 #> Multilevel Hyperparameters:
 #> ~id (Number of levels: 97) 
 #>                         Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
-#> sd(d_Intercept)             0.41      0.03     0.35     0.48 1.00     2998
-#> sd(criterion_Intercept)     0.27      0.02     0.23     0.31 1.00     1819
-#> sd(logmratio_Intercept)     0.64      0.06     0.53     0.77 1.00     2581
+#> sd(d_Intercept)             0.40      0.03     0.34     0.46 1.00     3768
+#> sd(criterion_Intercept)     0.36      0.03     0.31     0.42 1.00     3866
+#> sd(logmratio_Intercept)     0.64      0.06     0.53     0.78 1.00     3833
 #>                         Tail_ESS
-#> sd(d_Intercept)             3280
-#> sd(criterion_Intercept)     3081
-#> sd(logmratio_Intercept)     3468
+#> sd(d_Intercept)             3896
+#> sd(criterion_Intercept)     3690
+#> sd(logmratio_Intercept)     4039
 #> 
 #> Regression Coefficients:
 #>                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-#> d_Intercept             1.10      0.04     1.02     1.19 1.00     2011     2635
-#> criterion_Intercept     0.02      0.03    -0.03     0.07 1.00     1184     1934
-#> spacing_Intercept      -0.44      0.00    -0.45    -0.43 1.00     3965     3667
-#> logmratio_Intercept    -0.20      0.07    -0.34    -0.06 1.00     2229     3139
+#> d_Intercept             1.10      0.04     1.02     1.19 1.00     3654     3892
+#> criterion_Intercept     0.57      0.04     0.50     0.64 1.00     3014     3556
+#> spacing_Intercept      -0.44      0.00    -0.45    -0.43 1.00     3941     3836
+#> logmratio_Intercept    -0.20      0.07    -0.35    -0.06 1.00     3540     4008
 #> 
 #> Constant Parameters:
 #>                       Value
@@ -491,8 +491,8 @@ mratio(fit_md)
 #> Metacognitive efficiency (meta-d' SDT)
 #> posterior mean/median with 95% CrI [lower, upper]
 #>  parameter  mean median lower upper
-#>     mratio 0.821  0.820 0.709 0.942
-#>      metad 0.906  0.904 0.773 1.053
+#>     mratio 0.819  0.818 0.705 0.939
+#>      metad 0.904  0.902 0.767 1.050
 ```
 
 The population M-ratio sits a little below 1, the typical finding for
@@ -585,9 +585,11 @@ inspected directly.
 Meta-d′ models must fix the type-2 confidence scale relative to the
 type-1 criterion. `bmm` uses the **absolute** convention — the
 confidence criteria are anchored at the same boundary as the old/new
-decision (meta-\\c = c\\), as in the HMeta-d toolbox (Fleming 2017). The
-maximum-likelihood estimator instead uses a **relative** convention that
-scales the anchor with metacognitive efficiency (meta-\\c' = c'\\,
+decision (meta-\\c = c\\, with \\c\\ measured from the midpoint between
+the means), as in the HMeta-d toolbox (Fleming 2017). This holds whether
+the formula estimates the type-1 boundary as `criterion` or as `bias`.
+The maximum-likelihood estimator instead uses a **relative** convention
+that scales the anchor with metacognitive efficiency (meta-\\c' = c'\\,
 i.e. meta-\\c = M \cdot c\\) (Maniscalco and Lau 2014); Fleming (2017)
 states that relative constraint for the maximum-likelihood estimator and
 writes the hierarchical model’s type-2 probabilities with the type-1

@@ -98,8 +98,9 @@ between the distributions in noise units is <code>d * sqrt((1 + sdratio^2) / 2)<
 <dt id="arg-thresholds">thresholds<a class="anchor" aria-label="anchor" href="#arg-thresholds"></a></dt>
 <dd><p>Numeric vector of length K-1 with the ordered decision
 thresholds, or an n-by-(K-1) matrix with one row per observation. The
-thresholds are on the noise-standardized axis and are not rescaled by
-<code>sdratio</code>.</p></dd>
+thresholds are positions on the noise-standardized axis, measured from
+the mean of the noise distribution (the signal mean sits at
+<code>d * sqrt((1 + sdratio^2) / 2)</code>), and are not rescaled by <code>sdratio</code>.</p></dd>
 
 
 <dt id="arg-sdratio">sdratio<a class="anchor" aria-label="anchor" href="#arg-sdratio"></a></dt>
@@ -148,12 +149,12 @@ Parsimonious estimation of signal detection models from confidence ratings.
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Density for a single observation (K=4)</span></span></span>
 <span class="r-in"><span><span class="fu">dsdt_rating</span><span class="op">(</span>counts <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">25</span>, <span class="fl">55</span><span class="op">)</span>, stimulus <span class="op">=</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>            d <span class="op">=</span> <span class="fl">1.5</span>, thresholds <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.0</span>, <span class="fl">0.5</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>            d <span class="op">=</span> <span class="fl">1.5</span>, thresholds <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.25</span>, <span class="fl">0.75</span>, <span class="fl">1.25</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 4.384333e-05</span>
 <span class="r-in"><span><span class="co"># Generate rating data (K=4) for 10 subjects and both stimulus types</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span>, stimulus <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0L</span>, <span class="fl">1L</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu">rsdt_rating</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span>, <span class="fl">100</span>, <span class="va">dat</span><span class="op">$</span><span class="va">stimulus</span>,</span></span>
-<span class="r-in"><span>                              d <span class="op">=</span> <span class="fl">1.5</span>, thresholds <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0</span>, <span class="fl">0.5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                              d <span class="op">=</span> <span class="fl">1.5</span>, thresholds <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.25</span>, <span class="fl">0.75</span>, <span class="fl">1.25</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id stimulus r1 r2 r3 r4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1        0 56 24 10 10</span>

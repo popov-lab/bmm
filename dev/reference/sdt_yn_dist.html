@@ -59,7 +59,8 @@ out of a fixed number of trials (a binomial likelihood).</p>
 <span>  <span class="va">n_trials</span>,</span>
 <span>  <span class="va">stimulus</span>,</span>
 <span>  <span class="va">d</span>,</span>
-<span>  <span class="va">criterion</span>,</span>
+<span>  criterion <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  bias <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  sdratio <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  dist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"normal"</span>, <span class="st">"gumbel_min"</span>, <span class="st">"gumbel_max"</span>, <span class="st">"logistic"</span><span class="op">)</span>,</span>
 <span>  log <span class="op">=</span> <span class="cn">FALSE</span></span>
@@ -70,7 +71,8 @@ out of a fixed number of trials (a binomial likelihood).</p>
 <span>  <span class="va">n_trials</span>,</span>
 <span>  <span class="va">stimulus</span>,</span>
 <span>  <span class="va">d</span>,</span>
-<span>  <span class="va">criterion</span>,</span>
+<span>  criterion <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  bias <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  sdratio <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  dist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"normal"</span>, <span class="st">"gumbel_min"</span>, <span class="st">"gumbel_max"</span>, <span class="st">"logistic"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -100,8 +102,16 @@ separation in noise units is <code>d * sqrt((1 + sdratio^2) / 2)</code>.</p></dd
 
 
 <dt id="arg-criterion">criterion<a class="anchor" aria-label="anchor" href="#arg-criterion"></a></dt>
-<dd><p>Numeric. Response bias (decision boundary location), on the
-noise-standardized axis, i.e. in units of the noise distribution's SD.</p></dd>
+<dd><p>Numeric. Location of the decision criterion, measured from
+the mean of the noise distribution in units of its SD. Give either
+<code>criterion</code> or <code>bias</code>, not both.</p></dd>
+
+
+<dt id="arg-bias">bias<a class="anchor" aria-label="anchor" href="#arg-bias"></a></dt>
+<dd><p>Numeric. Location of the decision criterion measured from the
+midpoint between the noise and signal means instead, in noise-SD units:
+<code>criterion - d * sqrt((1 + sdratio^2) / 2) / 2</code>. 0 is the neutral point,
+positive values a bias toward "new"/"noise".</p></dd>
 
 
 <dt id="arg-sdratio">sdratio<a class="anchor" aria-label="anchor" href="#arg-sdratio"></a></dt>
@@ -158,33 +168,38 @@ psychophysics</em>. Wiley.</p>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Density of yes/no SDT data</span></span></span>
 <span class="r-in"><span><span class="fu">dsdt_yn</span><span class="op">(</span>n_old <span class="op">=</span> <span class="fl">80</span>, n_trials <span class="op">=</span> <span class="fl">100</span>, stimulus <span class="op">=</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>        d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.01136708</span>
+<span class="r-in"><span>        d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.02264629</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The same observer, with the criterion given relative to the midpoint</span></span></span>
+<span class="r-in"><span><span class="fu">dsdt_yn</span><span class="op">(</span>n_old <span class="op">=</span> <span class="fl">80</span>, n_trials <span class="op">=</span> <span class="fl">100</span>, stimulus <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>        d <span class="op">=</span> <span class="fl">1.5</span>, bias <span class="op">=</span> <span class="fl">0.15</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.02264629</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Vectorized over observations</span></span></span>
 <span class="r-in"><span><span class="fu">dsdt_yn</span><span class="op">(</span>n_old <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">80</span><span class="op">)</span>, n_trials <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">100</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>        stimulus <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.2</span>,</span></span>
+<span class="r-in"><span>        stimulus <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.9</span>,</span></span>
 <span class="r-in"><span>        log <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -7.463009 -4.477034</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -6.371711 -3.787759</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Unequal variance from a fitted model: sdt_yn() reports sdratio on its log</span></span></span>
 <span class="r-in"><span><span class="co"># link, so exponentiate before passing it here</span></span></span>
 <span class="r-in"><span><span class="fu">dsdt_yn</span><span class="op">(</span>n_old <span class="op">=</span> <span class="fl">80</span>, n_trials <span class="op">=</span> <span class="fl">100</span>, stimulus <span class="op">=</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>        d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.2</span>, sdratio <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">0.375</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.005538898</span>
+<span class="r-in"><span>        d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.9</span>, sdratio <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">0.375</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.04679876</span>
 <span class="r-in"><span><span class="co"># Generate yes/no SDT data for a design</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span>, stimulus <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0L</span>, <span class="fl">1L</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">n_trials</span> <span class="op">&lt;-</span> <span class="fl">100L</span></span></span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">n_old</span> <span class="op">&lt;-</span> <span class="fu">rsdt_yn</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span>, <span class="va">dat</span><span class="op">$</span><span class="va">n_trials</span>, <span class="va">dat</span><span class="op">$</span><span class="va">stimulus</span>,</span></span>
-<span class="r-in"><span>                     d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                     d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id stimulus n_trials n_old</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1        0      100    14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2        0      100    13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3        0      100    26</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4        0      100    16</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5        0      100    13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6        0      100    13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1        0      100    15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2        0      100    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3        0      100    27</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4        0      100    18</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5        0      100    15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6        0      100    14</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

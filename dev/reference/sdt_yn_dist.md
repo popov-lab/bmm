@@ -12,7 +12,8 @@ dsdt_yn(
   n_trials,
   stimulus,
   d,
-  criterion,
+  criterion = NULL,
+  bias = NULL,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
@@ -23,7 +24,8 @@ rsdt_yn(
   n_trials,
   stimulus,
   d,
-  criterion,
+  criterion = NULL,
+  bias = NULL,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
@@ -53,8 +55,16 @@ rsdt_yn(
 
 - criterion:
 
-  Numeric. Response bias (decision boundary location), on the
-  noise-standardized axis, i.e. in units of the noise distribution's SD.
+  Numeric. Location of the decision criterion, measured from the mean of
+  the noise distribution in units of its SD. Give either `criterion` or
+  `bias`, not both.
+
+- bias:
+
+  Numeric. Location of the decision criterion measured from the midpoint
+  between the noise and signal means instead, in noise-SD units:
+  `criterion - d * sqrt((1 + sdratio^2) / 2) / 2`. 0 is the neutral
+  point, positive values a bias toward "new"/"noise".
 
 - sdratio:
 
@@ -115,31 +125,36 @@ psychophysics*. Wiley.
 ``` r
 # Density of yes/no SDT data
 dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-        d = 1.5, criterion = 0.2)
-#> [1] 0.01136708
+        d = 1.5, criterion = 0.9)
+#> [1] 0.02264629
+
+# The same observer, with the criterion given relative to the midpoint
+dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
+        d = 1.5, bias = 0.15)
+#> [1] 0.02264629
 
 # Vectorized over observations
 dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-        stimulus = c(0, 1), d = 1.5, criterion = 0.2,
+        stimulus = c(0, 1), d = 1.5, criterion = 0.9,
         log = TRUE)
-#> [1] -7.463009 -4.477034
+#> [1] -6.371711 -3.787759
 
 # Unequal variance from a fitted model: sdt_yn() reports sdratio on its log
 # link, so exponentiate before passing it here
 dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-        d = 1.5, criterion = 0.2, sdratio = exp(0.375))
-#> [1] 0.005538898
+        d = 1.5, criterion = 0.9, sdratio = exp(0.375))
+#> [1] 0.04679876
 # Generate yes/no SDT data for a design
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-                     d = 1.5, criterion = 0.2)
+                     d = 1.5, criterion = 0.9)
 head(dat)
 #>   id stimulus n_trials n_old
-#> 1  1        0      100    14
-#> 2  2        0      100    13
-#> 3  3        0      100    26
-#> 4  4        0      100    16
-#> 5  5        0      100    13
-#> 6  6        0      100    13
+#> 1  1        0      100    15
+#> 2  2        0      100    14
+#> 3  3        0      100    27
+#> 4  4        0      100    18
+#> 5  5        0      100    15
+#> 6  6        0      100    14
 ```

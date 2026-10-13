@@ -97,16 +97,17 @@ carries `probs`, `model_class`, `dist`, `is_rating` and `conditions`
 ## Details
 
 Densities are evaluated at the posterior-mean parameters of each
-condition, on the centred evidence axis the model uses internally: noise
-at `-sep/2` with unit SD and signal at `+sep/2` with SD `exp(sdratio)`,
+condition, on the evidence axis the model's `criterion` is measured on:
+noise at 0 with unit SD and signal at `sep` with SD `exp(sdratio)`,
 where `sep = d * sqrt((1 + exp(sdratio)^2) / 2)` is the separation in
-noise-SD units. `d` is \\d_a\\, measured in root-mean-square SD units,
-so `sep` equals `d` whenever `sdratio` is fixed at 0. The decision
-boundaries additionally carry a posterior credible band on their
-location. The area beyond a boundary equals the corresponding
-hit/false-alarm rate for every noise distribution: the likelihood
-evaluates the survivor function of the evidence distribution at the
-boundary, which is exactly that area.
+noise-SD units. A fit that estimated `bias` has its boundaries drawn on
+the same axis, at `bias + sep / 2`. `d` is \\d_a\\, measured in
+root-mean-square SD units, so `sep` equals `d` whenever `sdratio` is
+fixed at 0. The decision boundaries additionally carry a posterior
+credible band on their location. The area beyond a boundary equals the
+corresponding hit/false-alarm rate for every noise distribution: the
+likelihood evaluates the survivor function of the evidence distribution
+at the boundary, which is exactly that area.
 
 Available for all four SDT models.
 [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
@@ -144,9 +145,10 @@ if (FALSE) { # \dontrun{
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
                    condition = c("liberal", "neutral", "strict"))
 dat$n_trials <- 100L
+# simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-                     criterion = criteria[as.character(dat$condition)],
+                     bias = criteria[as.character(dat$condition)],
                      sdratio = 1.3)
 
 fit <- bmm(
