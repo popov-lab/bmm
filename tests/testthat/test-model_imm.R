@@ -472,3 +472,33 @@ test_that("the link of the fixed background activation cannot be changed", {
   expect_silent(imm_model(links = list(c = "softplus")))
   expect_silent(imm_model(links = list(b = "log")))
 })
+
+test_that("the set-size-1 warnings of s and of a with c share one wording", {
+  formula <- bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size, s ~ 0 + set_size)
+  model <- check_model(imm_model(), oberauer_lin_2017, formula)
+  data <- check_data(model, oberauer_lin_2017, formula)
+  messages <- character(0)
+  withCallingHandlers(
+    check_formula(model, data, formula),
+    warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_equal(sort(gsub("\\s+", " ", messages)), c(
+    paste(
+      "Trials with a set size of 1 have no non-target, so they inform 'a' and 'c'",
+      "only through their sum. The other trials do not determine 'b_a_set_size1',",
+      "'b_c_set_size1' in the formulas for 'a' and 'c', so the posteriors of these",
+      "coefficients depend on their priors. Give set size 1 a level of its own in a",
+      "factor, so that only the set-size-1 coefficients depend on their priors."
+    ),
+    paste(
+      "Trials with a set size of 1 have no non-target, so they say nothing about 's'.",
+      "The other trials do not determine 'b_s_set_size1' in the formula for 's', so",
+      "the posteriors of these coefficients depend on their priors. Give set size 1 a",
+      "level of its own in a factor, so that only the set-size-1 coefficients depend",
+      "on their priors."
+    )
+  ))
+})

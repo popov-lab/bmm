@@ -312,28 +312,32 @@ check_formula.imm <- function(model, data, formula) {
   }
   pars <- names(model$parameters)
   if ("s" %in% pars) {
-    coefs <- .set_size_one_undetermined("s", formula, data)
-    warnif(
-      length(coefs) > 0,
-      "Trials with a set size of 1 have no non-target, so they say nothing about \\
-      's'. The other trials do not determine {collapse_comma(coefs)} in the \\
-      formula for 's', so the posteriors of these coefficients depend on \\
-      their priors. Give set size 1 a level of its own in a factor, and read that \\
-      level's coefficient as prior-only."
+    .warn_set_size_one(
+      .set_size_one_undetermined("s", formula, data), "s",
+      reason = "say nothing about 's'"
     )
   }
   if ("a" %in% pars) {
-    coefs <- .set_size_one_undetermined(c("a", "c"), formula, data, summed = TRUE)
-    warnif(
-      length(coefs) > 0,
-      "Trials with a set size of 1 have no non-target, so they inform 'a' and \\
-      'c' only through their sum. The other trials do not determine \\
-      {collapse_comma(coefs)} in the formulas for 'a' and 'c', so the posteriors \\
-      of these coefficients depend on their priors. Give set size 1 a level of \\
-      its own in a factor, and read only the sum of 'c' and 'a' at that level as \\
-      informed by the data."
+    .warn_set_size_one(
+      .set_size_one_undetermined(c("a", "c"), formula, data, summed = TRUE), c("a", "c"),
+      reason = "inform 'a' and 'c' only through their sum"
     )
   }
+}
+
+# One wording for every model whose set-size-1 trials leave coefficients to
+# their priors; only the reason the trials give differs between parameters
+.warn_set_size_one <- function(coefs, pars, reason) {
+  formulas <- if (length(pars) > 1) "formulas" else "formula"
+  pars <- paste0("'", pars, "'", collapse = " and ")
+  warnif(
+    length(coefs) > 0,
+    "Trials with a set size of 1 have no non-target, so they {reason}. The \\
+    other trials do not determine {collapse_comma(coefs)} in the {formulas} for \\
+    {pars}, so the posteriors of these coefficients depend on their priors. Give \\
+    set size 1 a level of its own in a factor, so that only the set-size-1 \\
+    coefficients depend on their priors."
+  )
 }
 
 # The coefficients of the formulas for `pars` that the trials with more than one
