@@ -1146,7 +1146,7 @@ test_that("factor tree identifier columns are matched to tree names", {
 
 test_that("conditional_effects() shows mpt parameters on the native scale", {
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
+  skip_unless_stan_tests()
 
   # unequal trials per row, with a mean that is not an integer
   dat <- data.frame(
