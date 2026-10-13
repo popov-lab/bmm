@@ -194,6 +194,9 @@ parameter_info.bmmodel <- function(x, formula = NULL, ...) {
     ))
   }
 
+  if (!is.null(formula)) {
+    model$parameters[unused_alternative_parameters(model, formula)] <- NULL
+  }
   pars <- names(model$parameters)
   if (length(pars) == 0) {
     message2("This model has no parameters defined.")
@@ -325,8 +328,20 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' @noRd
 .get_parameter_info <- function(bmmfit, par) {
   model <- bmmfit$bmm$model
-  model_pars <- names(model$parameters)
+  unused <- unused_alternative_parameters(model, bmmfit$bmm$user_formula)
+  model_pars <- setdiff(names(model$parameters), unused)
   bterms <- brms::brmsterms(bmmfit$formula)
+
+  if (par %in% unused) {
+    used <- setdiff(
+      unlist(Filter(function(a) par %in% a, model$alternative_parameters)),
+      unused
+    )
+    stop2(
+      "Parameter '{par}' is not estimated in this fit: its formula uses ",
+      "{collapse_comma(used)}, the alternative parameterization."
+    )
+  }
 
   if (!par %in% model_pars) {
     stop2(
@@ -541,7 +556,10 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   x <- restructure(x)
   scale <- match.arg(scale)
 
-  model_pars <- names(x$bmm$model$parameters)
+  model_pars <- setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  )
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
   pars <- pars %||% model_pars
   unknown <- pars[not_in(pars, model_pars)]

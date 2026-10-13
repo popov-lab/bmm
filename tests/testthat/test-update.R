@@ -840,6 +840,33 @@ test_that("an updated fit carries nothing from the frame that called update()", 
   expect_equal(serialized_size(1e6), serialized_size(1))
 })
 
+test_that("update() switches an SDT fit between criterion and bias", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- data.frame(n_old = c(10, 40, 12, 38), stimulus = c(0, 1, 0, 1),
+                    n_trials = 50)
+  fit <- suppressMessages(bmm(bmf(d ~ 1, criterion ~ 1), dat,
+                              sdt_yn("n_old", "stimulus", "n_trials"),
+                              backend = "mock", mock_fit = stub, rename = FALSE))
+  switched <- suppressMessages(update(
+    fit, formula. = bmf(d ~ 1, bias ~ 1), backend = "mock", mock_fit = stub,
+    rename = FALSE, recompile = TRUE
+  ))
+  expect_equal(switched$family$name, "sdt_yn_bias")
+  expect_true("bias" %in% switched$prior$dpar)
+  expect_false("criterion" %in% switched$prior$dpar)
+
+  back <- suppressMessages(update(
+    switched, formula. = bmf(d ~ 1, criterion ~ 1), backend = "mock",
+    mock_fit = stub, rename = FALSE, recompile = TRUE
+  ))
+  expect_equal(back$family$name, "sdt_yn")
+  expect_false("bias" %in% back$prior$dpar)
+})
+
 # =============================================================================
 # UPDATING WITH THE STORED MODEL FRAME AS newdata (kfold(), reloo())
 # =============================================================================
