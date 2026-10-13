@@ -45,9 +45,10 @@ rmixture2p(
 concentration of the average trial, whose Fisher information \code{J(kappa)} is
 the mean of \code{J}.}
 
-\item{p_mem}{Vector of probabilities for memory recall. Used by the
-\code{"simple"} version; the other versions derive it from \code{K} and \code{set_size},
-and warn if \code{p_mem} is given.}
+\item{p_mem}{Vector of probabilities for memory recall, i.e. \code{thetat} of
+\code{\link[=mixture2p]{mixture2p()}} on its native scale. Used by the \code{"simple"} version; the
+other versions derive it from \code{K} and \code{set_size}, and warn if \code{p_mem} is
+given.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
@@ -66,7 +67,9 @@ and warns if it is given.}
 \code{"slot"} or \code{"slot_averaging"}. See \code{\link[=mixture2p]{mixture2p()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
-odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
+function needs no nodes: it draws \code{J} from its gamma distribution and then
+the response, which is exact.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale. Pass
 it by name: in bmm 1.4 it was the fifth argument, which is now \code{tau}.

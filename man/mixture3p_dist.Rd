@@ -36,9 +36,17 @@ items.}
 concentration of the average trial, whose Fisher information \code{J(kappa)} is
 the mean of \code{J}.}
 
-\item{p_mem}{Vector of probabilities for memory recall}
+\item{p_mem}{Vector of probabilities of a target response. For a
+\code{\link[=mixture3p]{mixture3p()}} fit these are \code{thetat} on its native scale (version
+\code{"simple"}, see \code{\link[=native_parameters]{native_parameters()}}) or \code{min(1, K / set_size) * ptarget}
+(versions \code{"slot"} and \code{"slot_averaging"}).}
 
-\item{p_nt}{Vector of probabilities for swap errors}
+\item{p_nt}{Vector of probabilities of a non-target response, summed over
+the non-targets, which share it equally. For a \code{\link[=mixture3p]{mixture3p()}} fit these are
+\code{thetant} on its native scale (version \code{"simple"}) or
+\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions). Unlike
+\code{ptarget}, \code{p_mem} and \code{p_nt} are not conditional on a response from
+memory.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
@@ -46,7 +54,9 @@ Fisher information \code{J} of a memory representation is drawn from
 precision. See \code{\link[=mixture3p]{mixture3p()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
-odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
+function needs no nodes: it draws \code{J} from its gamma distribution and then
+the response, which is exact.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale. Pass
 it by name: in bmm 1.4 it was the sixth argument, which is now \code{tau}.
@@ -62,15 +72,15 @@ with a warning.}
 \value{
 \code{dmixture3p} gives the density of the three-parameter mixture model,
 \code{pmixture3p} gives the cumulative distribution function of the
-two-parameter mixture model, \code{qmixture3p} gives the quantile function of
-the two-parameter mixture model, and \code{rmixture3p} gives the random
-generation function for the two-parameter mixture model.
+three-parameter mixture model, \code{qmixture3p} gives the quantile function of
+the three-parameter mixture model, and \code{rmixture3p} gives the random
+generation function for the three-parameter mixture model.
 }
 \description{
 Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of \code{mu}, precision of
-memory representations \code{kappa}, probability of recalling items from memory
-\code{p_mem}, and probability of recalling non-targets \code{p_nt}.
+memory representations \code{kappa}, probability of a target response \code{p_mem},
+and probability of a non-target response \code{p_nt}.
 }
 \examples{
 # generate random samples from the mixture3p model and overlay the density

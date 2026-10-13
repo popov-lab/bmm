@@ -310,9 +310,10 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`.
-#' @param p_mem Vector of probabilities for memory recall. Used by the
-#'   `"simple"` version; the other versions derive it from `K` and `set_size`,
-#'   and warn if `p_mem` is given.
+#' @param p_mem Vector of probabilities for memory recall, i.e. `thetat` of
+#'   [mixture2p()] on its native scale. Used by the `"simple"` version; the
+#'   other versions derive it from `K` and `set_size`, and warn if `p_mem` is
+#'   given.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
@@ -326,7 +327,9 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @param version A character string selecting the storage model: `"simple"`,
 #'   `"slot"` or `"slot_averaging"`. See [mixture2p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
-#'   odd number of at least 41. See [mixture2p()].
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
 #' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
 #'   it by name: in bmm 1.4 it was the fifth argument, which is now `tau`.
 #'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
@@ -513,8 +516,8 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'
 #' @description Density, distribution, and random generation functions for the
 #'   three-parameter mixture model with the location of `mu`, precision of
-#'   memory representations `kappa`, probability of recalling items from memory
-#'   `p_mem`, and probability of recalling non-targets `p_nt`.
+#'   memory representations `kappa`, probability of a target response `p_mem`,
+#'   and probability of a non-target response `p_nt`.
 #'
 #' @name mixture3p_dist
 #'
@@ -528,14 +531,24 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`.
-#' @param p_mem Vector of probabilities for memory recall
-#' @param p_nt Vector of probabilities for swap errors
+#' @param p_mem Vector of probabilities of a target response. For a
+#'   [mixture3p()] fit these are `thetat` on its native scale (version
+#'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
+#'   (versions `"slot"` and `"slot_averaging"`).
+#' @param p_nt Vector of probabilities of a non-target response, summed over
+#'   the non-targets, which share it equally. For a [mixture3p()] fit these are
+#'   `thetant` on its native scale (version `"simple"`) or
+#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions). Unlike
+#'   `ptarget`, `p_mem` and `p_nt` are not conditional on a response from
+#'   memory.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision. See [mixture3p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
-#'   odd number of at least 41. See [mixture2p()].
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
 #' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
 #'   it by name: in bmm 1.4 it was the sixth argument, which is now `tau`.
 #'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
@@ -553,9 +566,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
 #'   `pmixture3p` gives the cumulative distribution function of the
-#'   two-parameter mixture model, `qmixture3p` gives the quantile function of
-#'   the two-parameter mixture model, and `rmixture3p` gives the random
-#'   generation function for the two-parameter mixture model.
+#'   three-parameter mixture model, `qmixture3p` gives the quantile function of
+#'   the three-parameter mixture model, and `rmixture3p` gives the random
+#'   generation function for the three-parameter mixture model.
 #'
 #' @export
 #'
@@ -768,7 +781,9 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision. See [imm()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
-#'   odd number of at least 41. See [mixture2p()].
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
 #' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
 #'   it by name: in bmm 1.4 it was the ninth argument, which is now `tau`.
 #'   Until bmm 1.6.0 a logical value in that position is still read as `log`,

@@ -81,7 +81,9 @@ Fisher information \code{J} of a memory representation is drawn from
 precision. See \code{\link[=imm]{imm()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
-odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
+function needs no nodes: it draws \code{J} from its gamma distribution and then
+the response, which is exact.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale. Pass
 it by name: in bmm 1.4 it was the ninth argument, which is now \code{tau}.

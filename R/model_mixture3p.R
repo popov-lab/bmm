@@ -52,7 +52,10 @@
         on a trial, with guessing as the reference, so thetat maps to the \\
         probability of a target response only jointly with thetant."
       ),
-      thetant = "Mixture weight for non-target responses"
+      thetant = glue(
+        "Mixture weight for non-target responses, summed over the non-targets, \\
+        which share it equally. Like thetat, it is weighed against guessing."
+      )
     ),
     links = list(
       mu = "tan_half", kappa = "log", thetat = "softmax", thetant = "softmax"
@@ -226,8 +229,10 @@ settable_links.mixture3p <- function(model) {
 #'   }
 #'   Storage and swapping are separate in the capacity versions: the capacity
 #'   rule says how often a response comes from memory and `ptarget` says which
-#'   stored item is reported. In `"simple"` the two are jointly constrained by
-#'   the shared normalisation, so neither weight is separately interpretable.
+#'   stored item is reported. In `"simple"` both weights are log odds against
+#'   guessing, `thetat` for the target and `thetant` for all non-targets
+#'   together, so neither is a probability on its own; [native_parameters()]
+#'   returns the probabilities.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
 #'   from trial to trial (van den Berg et al., 2012). This adds the parameter
 #'   `tau`, and `kappa` then describes the average trial: it is the
