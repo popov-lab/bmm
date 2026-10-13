@@ -280,7 +280,7 @@ test_that("ppp() takes ndraws as a whole number of draws", {
 
 test_that("ppp() does not flag a well-specified mpt model and flags a misspecified one", {
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
+  skip_unless_stan_tests()
   withr::local_seed(2)
   withr::local_options("bmm.silent" = 2)
   n_id <- 15
@@ -311,7 +311,7 @@ test_that("ppp() does not flag a well-specified mpt model and flags a misspecifi
 
 test_that("ppp() handles the impossible categories of a fitted mpt model", {
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
+  skip_unless_stan_tests()
   withr::local_seed(3)
   withr::local_options("bmm.silent" = 2)
   dat <- mpt_impossible_data()
