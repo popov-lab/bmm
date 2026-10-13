@@ -76,23 +76,23 @@ Unlike the densities of the circular models in this package (\code{dsdm()},
 \code{dmpt()} returns the log density by default, matching \code{\link[=dm3]{dm3()}}.
 }
 \examples{
-tree_old <- mpt_tree("old", list(
+tree_target <- mpt_tree("target", list(
   old = "D + (1 - D) * g",
   new = "(1 - D) * (1 - g)"
 ))
-tree_new <- mpt_tree("new", list(
+tree_lure <- mpt_tree("lure", list(
   old = "(1 - D) * g",
   new = "D + (1 - D) * (1 - g)"
 ))
-model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
+model <- mpt(list(tree_target, tree_lure), tree_id = "item_type")
 
 dmpt(
   x = c(35, 15), pars = c(D = 0.7, g = 0.5),
-  mpt_model = model, tree = "old"
+  mpt_model = model, tree = "target"
 )
 rmpt(
   n = 10, size = 50, pars = c(D = 0.7, g = 0.5),
-  mpt_model = model, tree = "new"
+  mpt_model = model, tree = "lure"
 )
 }
 \references{

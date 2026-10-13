@@ -9,7 +9,10 @@ mpt_tree(name, branches, ..., impossible = NULL)
 \arguments{
 \item{name}{Character. Label for the tree. For models with multiple trees,
 the label identifies the tree in the data: the column named by the
-\code{tree_id} argument of \code{\link[=mpt]{mpt()}} holds one such label per observation.}
+\code{tree_id} argument of \code{\link[=mpt]{mpt()}} holds one such label per observation. A
+tree stands for one kind of trial, such as targets or lures in a
+recognition test, not for a response; the responses are the branch
+names.}
 
 \item{branches}{Either a named list of character strings or the first of
 several formulas. Each list element (or formula) gives the branch
@@ -59,22 +62,24 @@ rather than a literal zero; no probability has to be taken away from the
 remaining branches to compensate.
 }
 \examples{
-tree_old <- mpt_tree(
-  "old",
+# the target tree of the two-high-threshold model: targets (studied items)
+# end in the responses "old" and "new"
+tree_target <- mpt_tree(
+  "target",
   old ~ D + (1 - D) * g,
   new ~ (1 - D) * (1 - g)
 )
-tree_old
+tree_target
 
 # the same tree with the branches as a named list of strings
-tree_old_strings <- mpt_tree(
-  name = "old",
+tree_target_strings <- mpt_tree(
+  name = "target",
   branches = list(
     old = "D + (1 - D) * g",
     new = "(1 - D) * (1 - g)"
   )
 )
-identical(tree_old, tree_old_strings)
+identical(tree_target, tree_target_strings)
 
 # a three-alternative recognition task in which lures are shown on some
 # trials only: `lure` responses cannot occur on the others

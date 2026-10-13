@@ -123,7 +123,7 @@ D + (1 - D) * (1 - g)  # new
 "
 model <- mpt_from_string(
   model_2htm,
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type"
 )
 model
@@ -131,7 +131,7 @@ model
 # fix the guessing rate as in MPTinR / TreeBUGS
 mpt_from_string(
   model_2htm,
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type",
   restrictions = "g = 0.5"
 )
@@ -168,7 +168,7 @@ writeLines(c("# fix the guessing rate", "g = 0.5"), restr_file)
 restr <- trimws(sub("#.*", "", readLines(restr_file)))
 model <- mpt_from_string(
   readLines(model_file),
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type",
   restrictions = restr[nzchar(restr)]
 )
@@ -177,7 +177,7 @@ model <- mpt_from_string(
 # order. Name the columns by tree and category, then let mpt_data_reshape()
 # stack the trees to get bmm's one row per participant and tree.
 wide <- rbind(c(30, 10, 8, 32), c(25, 15, 12, 28))
-colnames(wide) <- c("old.old", "old.new", "new.old", "new.new")
+colnames(wide) <- c("target.old", "target.new", "lure.old", "lure.new")
 long <- mpt_data_reshape(wide, model)
 long
 # the row sums are the trials per row (40 here), but they cannot show

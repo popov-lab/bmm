@@ -59,7 +59,7 @@ categories. When the trees do not share their categories and
 categories each tree lacks.}
 
 \item{tree_names}{A named character vector mapping tree labels of the EQN
-file onto tree names in bmm, e.g. \code{c("1" = "old", "2" = "new")}. bmm tree
+file onto tree names in bmm, e.g. \code{c("1" = "target", "2" = "lure")}. bmm tree
 names must start with a letter and contain only letters, digits, or
 underscores, so files with numeric tree labels need this mapping. Labels
 not listed keep their name.}
@@ -149,8 +149,8 @@ from a correct one: such data fit without an error. The row sums of the
 count columns are the trials per row; they cannot show swapped columns,
 and they show swapped tree labels only when the trees differ in their
 number of trials. Comparing the response proportions per tree
-with the design (old items must get more "yes" responses than new
-items) catches swapped tree labels and response columns swapped in
+with the design (targets must get more "yes" responses than lures)
+catches swapped tree labels and response columns swapped in
 every tree, but not always a column slipped or a map entry wrong in one
 tree, nor a swap between two trees of the same kind; so also compare
 one participant's long rows with the wide row. \code{\link[=bmm_data_check]{bmm_data_check()}} runs
@@ -166,12 +166,12 @@ it was built from.
 eqn_file <- tempfile(fileext = ".eqn")
 writeLines(c(
   "6",
-  "old  hit   D_o",
-  "old  hit   (1-D_o)*g",
-  "old  miss  (1-D_o)*(1-g)",
-  "new  fa    (1-D_n)*g",
-  "new  cr    D_n",
-  "new  cr    (1-D_n)*(1-g)"
+  "target  hit   D_o",
+  "target  hit   (1-D_o)*g",
+  "target  miss  (1-D_o)*(1-g)",
+  "lure    fa    (1-D_n)*g",
+  "lure    cr    D_n",
+  "lure    cr    (1-D_n)*(1-g)"
 ), eqn_file)
 # restrictions use the file's names; the formulas use the bmm names
 model <- mpt_from_eqn(
@@ -192,8 +192,8 @@ wide <- data.frame(
 long <- mpt_data_reshape(wide, model)
 long
 # the row sums are the trials per row (40 here). The proportions catch
-# swapped tree labels and swapped response columns (old items must get
-# more "yes" than new items), but not always a column slipped in one
+# swapped tree labels and swapped response columns (targets must get
+# more "yes" than lures), but not always a column slipped in one
 # tree: also compare one participant's long rows with the wide row
 rowSums(long[c("yes", "no")])
 tapply(long$yes / rowSums(long[c("yes", "no")]), long$item_type, mean)

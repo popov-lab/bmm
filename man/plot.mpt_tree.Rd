@@ -77,16 +77,16 @@ labels near the root can be clipped earlier, when the leaf labels leave
 little room.
 }
 \examples{
-tree_old <- mpt_tree("old", list(
+tree_target <- mpt_tree("target", list(
   old = "D + (1 - D) * g",
   new = "(1 - D) * (1 - g)"
 ))
-plot(tree_old)
+plot(tree_target)
 
 model <- mpt(
   list(
-    tree_old,
-    mpt_tree("new", list(
+    tree_target,
+    mpt_tree("lure", list(
       old = "(1 - D) * g",
       new = "D + (1 - D) * (1 - g)"
     ))

@@ -79,8 +79,9 @@ An object of class \code{bmmodel}
 \description{
 Multinomial Processing Tree (MPT) models measure the probabilities of
 discrete latent cognitive states from categorical responses. A model is
-specified as a set of trees (one per distinct branch structure) created
-with \code{\link[=mpt_tree]{mpt_tree()}}. Branch expressions that terminate in the same response
+specified as a set of trees created with \code{\link[=mpt_tree]{mpt_tree()}}, one per distinct
+branch structure, such as one tree for targets and one for lures in a
+recognition test. Branch expressions that terminate in the same response
 category are summed within each tree, and parameters shared across trees
 are equated by giving them the same name. All latent probability
 parameters are estimated on an unconstrained latent scale (logit or
@@ -109,7 +110,7 @@ are reshaped with \code{\link[=mpt_data_reshape]{mpt_data_reshape()}}.
 
 A separate tree is needed only when the \emph{branch expressions} differ, that
 is, when the trial determines which latent processes apply or which
-response categories are reachable (old versus new probes, a response set
+response categories are reachable (targets versus lures, a response set
 with or without distractors, inclusion versus exclusion instructions).
 Experimental factors whose \emph{effect on the parameters} you want to estimate
 belong in the parameter formulas, exactly as in every other \code{bmm} model:
@@ -252,17 +253,19 @@ formula produces.
 \examples{
 \dontrun{
 # two-high-threshold (2HTM) model of recognition memory
-tree_old <- mpt_tree("old",
+# one tree per probe type: targets (studied items) and lures (new items),
+# each ending in the responses "old" and "new"
+tree_target <- mpt_tree("target",
   old ~ D + (1 - D) * g,
   new ~ (1 - D) * (1 - g)
 )
-tree_new <- mpt_tree("new",
+tree_lure <- mpt_tree("lure",
   old ~ (1 - D) * g,
   new ~ D + (1 - D) * (1 - g)
 )
 
 model <- mpt(
-  trees = list(tree_old, tree_new),
+  trees = list(tree_target, tree_lure),
   tree_id = "item_type"
 )
 
@@ -270,7 +273,7 @@ model <- mpt(
 # one row per participant x tree; count columns named after the branches
 data <- data.frame(
   id = rep(1:20, each = 2),
-  item_type = rep(c("old", "new"), 20)
+  item_type = rep(c("target", "lure"), 20)
 )
 counts <- t(sapply(data$item_type, function(cond) {
   rmpt(

@@ -13,7 +13,7 @@
 #'   [mpt_from_string()]. For a model from [mpt_from_eqn()] the `mpt_renaming`
 #'   attribute maps the labels of the EQN file onto the response categories
 #'   of the model. For any other model, the columns of `data` are named
-#'   `<tree>.<category>`, e.g. `old.hit`, with the tree names and response
+#'   `<tree>.<category>`, e.g. `target.old`, with the tree names and response
 #'   categories of the model.
 #' @param id Character. The name of the participant column in `data`, or
 #'   `NULL` (the default) to number the rows of `data`, as `id = seq_len(nrow(data))`
@@ -26,7 +26,7 @@
 #'   **Named columns (`columns = "names"`).** For a model from
 #'   [mpt_from_eqn()], a column is matched to a category by the EQN label
 #'   (`hit`), or, when trees share labels, by the tree name and label
-#'   (`old.hit`, with the bmm name of the tree); the qualified name wins
+#'   (`target.hit`, with the bmm name of the tree); the qualified name wins
 #'   where both exist. A label used in several trees must be qualified.
 #'   Labels that the `categories` argument of [mpt_from_eqn()] merged onto one
 #'   response category are summed. All columns of `data` that are neither
@@ -82,12 +82,12 @@
 #' eqn_file <- tempfile(fileext = ".eqn")
 #' writeLines(c(
 #'   "6",
-#'   "old  hit   D_o",
-#'   "old  hit   (1-D_o)*g",
-#'   "old  miss  (1-D_o)*(1-g)",
-#'   "new  fa    (1-D_n)*g",
-#'   "new  cr    D_n",
-#'   "new  cr    (1-D_n)*(1-g)"
+#'   "target  hit   D_o",
+#'   "target  hit   (1-D_o)*g",
+#'   "target  miss  (1-D_o)*(1-g)",
+#'   "lure    fa    (1-D_n)*g",
+#'   "lure    cr    D_n",
+#'   "lure    cr    (1-D_n)*(1-g)"
 #' ), eqn_file)
 #' model <- mpt_from_eqn(
 #'   eqn_file,
@@ -108,7 +108,7 @@
 #' bmm_data_check(bmf(Do ~ 1, g ~ 1), long, model)
 #'
 #' # MPTinR data: unnamed columns, sorted by tree, then by label (cr, fa for
-#' # tree new, then hit, miss for tree old)
+#' # tree lure, then hit, miss for tree target)
 #' wide_mptinr <- rbind(c(32, 8, 30, 10), c(28, 12, 25, 15))
 #' identical(
 #'   mpt_data_reshape(wide_mptinr, model, columns = "mptinr"),

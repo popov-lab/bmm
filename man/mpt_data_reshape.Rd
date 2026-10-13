@@ -15,7 +15,7 @@ all other columns except \code{id} are carried to the long data.}
 \code{\link[=mpt_from_string]{mpt_from_string()}}. For a model from \code{\link[=mpt_from_eqn]{mpt_from_eqn()}} the \code{mpt_renaming}
 attribute maps the labels of the EQN file onto the response categories
 of the model. For any other model, the columns of \code{data} are named
-\verb{<tree>.<category>}, e.g. \code{old.hit}, with the tree names and response
+\verb{<tree>.<category>}, e.g. \code{target.old}, with the tree names and response
 categories of the model.}
 
 \item{id}{Character. The name of the participant column in \code{data}, or
@@ -44,7 +44,7 @@ layout into the second for a given model.
 \strong{Named columns (\code{columns = "names"}).} For a model from
 \code{\link[=mpt_from_eqn]{mpt_from_eqn()}}, a column is matched to a category by the EQN label
 (\code{hit}), or, when trees share labels, by the tree name and label
-(\code{old.hit}, with the bmm name of the tree); the qualified name wins
+(\code{target.hit}, with the bmm name of the tree); the qualified name wins
 where both exist. A label used in several trees must be qualified.
 Labels that the \code{categories} argument of \code{\link[=mpt_from_eqn]{mpt_from_eqn()}} merged onto one
 response category are summed. All columns of \code{data} that are neither
@@ -88,12 +88,12 @@ of \code{\link[=mpt_from_eqn]{mpt_from_eqn()}}).
 eqn_file <- tempfile(fileext = ".eqn")
 writeLines(c(
   "6",
-  "old  hit   D_o",
-  "old  hit   (1-D_o)*g",
-  "old  miss  (1-D_o)*(1-g)",
-  "new  fa    (1-D_n)*g",
-  "new  cr    D_n",
-  "new  cr    (1-D_n)*(1-g)"
+  "target  hit   D_o",
+  "target  hit   (1-D_o)*g",
+  "target  miss  (1-D_o)*(1-g)",
+  "lure    fa    (1-D_n)*g",
+  "lure    cr    D_n",
+  "lure    cr    (1-D_n)*(1-g)"
 ), eqn_file)
 model <- mpt_from_eqn(
   eqn_file,
@@ -114,7 +114,7 @@ long
 bmm_data_check(bmf(Do ~ 1, g ~ 1), long, model)
 
 # MPTinR data: unnamed columns, sorted by tree, then by label (cr, fa for
-# tree new, then hit, miss for tree old)
+# tree lure, then hit, miss for tree target)
 wide_mptinr <- rbind(c(32, 8, 30, 10), c(28, 12, 25, 15))
 identical(
   mpt_data_reshape(wide_mptinr, model, columns = "mptinr"),

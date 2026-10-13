@@ -12,7 +12,10 @@
 #'
 #' @param name Character. Label for the tree. For models with multiple trees,
 #'   the label identifies the tree in the data: the column named by the
-#'   `tree_id` argument of [mpt()] holds one such label per observation.
+#'   `tree_id` argument of [mpt()] holds one such label per observation. A
+#'   tree stands for one kind of trial, such as targets or lures in a
+#'   recognition test, not for a response; the responses are the branch
+#'   names.
 #' @param branches Either a named list of character strings or the first of
 #'   several formulas. Each list element (or formula) gives the branch
 #'   probability expression for one response category; the element names (or
@@ -53,22 +56,24 @@
 #' @keywords bmmodel
 #'
 #' @examples
-#' tree_old <- mpt_tree(
-#'   "old",
+#' # the target tree of the two-high-threshold model: targets (studied items)
+#' # end in the responses "old" and "new"
+#' tree_target <- mpt_tree(
+#'   "target",
 #'   old ~ D + (1 - D) * g,
 #'   new ~ (1 - D) * (1 - g)
 #' )
-#' tree_old
+#' tree_target
 #'
 #' # the same tree with the branches as a named list of strings
-#' tree_old_strings <- mpt_tree(
-#'   name = "old",
+#' tree_target_strings <- mpt_tree(
+#'   name = "target",
 #'   branches = list(
 #'     old = "D + (1 - D) * g",
 #'     new = "(1 - D) * (1 - g)"
 #'   )
 #' )
-#' identical(tree_old, tree_old_strings)
+#' identical(tree_target, tree_target_strings)
 #'
 #' # a three-alternative recognition task in which lures are shown on some
 #' # trials only: `lure` responses cannot occur on the others
@@ -413,8 +418,9 @@ generated_parameters.mpt <- function(model) {
 #' @description
 #' Multinomial Processing Tree (MPT) models measure the probabilities of
 #' discrete latent cognitive states from categorical responses. A model is
-#' specified as a set of trees (one per distinct branch structure) created
-#' with [mpt_tree()]. Branch expressions that terminate in the same response
+#' specified as a set of trees created with [mpt_tree()], one per distinct
+#' branch structure, such as one tree for targets and one for lures in a
+#' recognition test. Branch expressions that terminate in the same response
 #' category are summed within each tree, and parameters shared across trees
 #' are equated by giving them the same name. All latent probability
 #' parameters are estimated on an unconstrained latent scale (logit or
@@ -487,7 +493,7 @@ generated_parameters.mpt <- function(model) {
 #'
 #'   A separate tree is needed only when the *branch expressions* differ, that
 #'   is, when the trial determines which latent processes apply or which
-#'   response categories are reachable (old versus new probes, a response set
+#'   response categories are reachable (targets versus lures, a response set
 #'   with or without distractors, inclusion versus exclusion instructions).
 #'   Experimental factors whose *effect on the parameters* you want to estimate
 #'   belong in the parameter formulas, exactly as in every other `bmm` model:
@@ -633,17 +639,19 @@ generated_parameters.mpt <- function(model) {
 #' @examples
 #' \dontrun{
 #' # two-high-threshold (2HTM) model of recognition memory
-#' tree_old <- mpt_tree("old",
+#' # one tree per probe type: targets (studied items) and lures (new items),
+#' # each ending in the responses "old" and "new"
+#' tree_target <- mpt_tree("target",
 #'   old ~ D + (1 - D) * g,
 #'   new ~ (1 - D) * (1 - g)
 #' )
-#' tree_new <- mpt_tree("new",
+#' tree_lure <- mpt_tree("lure",
 #'   old ~ (1 - D) * g,
 #'   new ~ D + (1 - D) * (1 - g)
 #' )
 #'
 #' model <- mpt(
-#'   trees = list(tree_old, tree_new),
+#'   trees = list(tree_target, tree_lure),
 #'   tree_id = "item_type"
 #' )
 #'
@@ -651,7 +659,7 @@ generated_parameters.mpt <- function(model) {
 #' # one row per participant x tree; count columns named after the branches
 #' data <- data.frame(
 #'   id = rep(1:20, each = 2),
-#'   item_type = rep(c("old", "new"), 20)
+#'   item_type = rep(c("target", "lure"), 20)
 #' )
 #' counts <- t(sapply(data$item_type, function(cond) {
 #'   rmpt(

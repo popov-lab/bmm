@@ -122,12 +122,12 @@ number of trials fixes its count.
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 trees <- list(
-  mpt_tree("old", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
-  mpt_tree("new", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))
+  mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
+  mpt_tree("lure", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))
 )
-dat <- expand.grid(id = factor(1:20), item_type = c("old", "new"),
+dat <- expand.grid(id = factor(1:20), item_type = c("target", "lure"),
                    stringsAsFactors = FALSE)
-dat$old <- rbinom(nrow(dat), 50, ifelse(dat$item_type == "old", 0.8, 0.2))
+dat$old <- rbinom(nrow(dat), 50, ifelse(dat$item_type == "target", 0.8, 0.2))
 dat$new <- 50 - dat$old
 
 fit <- bmm(
