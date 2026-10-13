@@ -252,11 +252,13 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 
 # Classify the formula predictors of a binary fit into criterion "operating
-# points" (predict the criterion only) and "curves" (predict d/sdratio).
+# points" (predict the criterion or bias only) and "curves" (predict
+# d/sdratio).
 .sdt_criterion_point_dims <- function(fit) {
   preds <- .sdt_stripped_preds(fit)
+  anchor <- .sdt_anchor_parameter(fit$bmm$user_formula)
   curve_vars <- union(preds[["d"]], preds[["sdratio"]]) %||% character(0)
-  list(points = setdiff(preds[["criterion"]] %||% character(0), curve_vars),
+  list(points = setdiff(preds[[anchor]] %||% character(0), curve_vars),
        curves = curve_vars)
 }
 
@@ -396,9 +398,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # conditions overriding the first data row so every formula variable is
 # present. The parameters are nlpars for the multinomial models (rating,
 # ranking) and dpars for the custom-family models (binary, mafc); which applies
-# is derived from the model class so callers never need to know. d and
-# criterion reach the kernels through the model's inverse link, so they get it
-# here too; sdratio and the threshold parameters stay on the log scale that
+# is derived from the model class so callers never need to know. d,
+# criterion and bias reach the kernels through the model's inverse link, so
+# they get it here too; sdratio and the threshold parameters stay on the log scale that
 # the SDT helpers exponentiate themselves.
 .sdt_par_draws <- function(fit, param, conditions, ...) {
   newdata <- fit$data[rep(1L, max(1L, nrow(conditions))), , drop = FALSE]
@@ -415,8 +417,21 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     brms::posterior_linpred(fit, dpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   }
-  if (!param %in% c("d", "criterion")) return(linpred)
+  if (!param %in% c("d", "criterion", "bias")) return(linpred)
   link_transform(linpred, model$links[[param]], inverse = TRUE)
+}
+
+
+# Posterior draws of the criterion measured from the noise mean, whichever of
+# `criterion` and `bias` the fit estimated: a bias sits half the separation
+# closer to the signal mean.
+.sdt_criterion_draws <- function(fit, conditions, ...) {
+  if (.sdt_anchor_parameter(fit$bmm$user_formula) == "criterion") {
+    return(.sdt_par_draws(fit, "criterion", conditions, ...))
+  }
+  has_sdratio <- .sdt_has_estimated_sdratio(fit$bmm$model, fit)
+  geom <- .sdt_latent_geometry(fit, conditions, has_sdratio, ...)
+  .sdt_par_draws(fit, "bias", conditions, ...) + geom$sep / 2
 }
 
 
@@ -437,7 +452,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 
 # The K-1 rating thresholds are not posterior parameters: they are rebuilt per
-# draw from the criterion plus the parameterization parameters (spacing and/or
+# draw from the criterion (measured from the noise mean) plus the parameterization parameters (spacing and/or
 # delta*), whose mapping to ordered thresholds differs by threshold_type.
 # Keeping that reconstruction here lets roc_sdt(), latent_sdt(), and
 # sdt_thresholds() share it. .sdt_make_thresholds is vectorized over draws, so
@@ -445,7 +460,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 .sdt_rating_thresholds <- function(fit, model, conditions, ...) {
   n_ratings      <- model$other_vars$n_ratings
   threshold_type <- model$other_vars$threshold_type
-  crit    <- .sdt_par_draws(fit, "criterion", conditions, ...)
+  crit    <- .sdt_criterion_draws(fit, conditions, ...)
   spacing <- if ("spacing" %in% names(model$parameters)) {
     .sdt_par_draws(fit, "spacing", conditions, ...)
   }
@@ -587,7 +602,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   n_pt <- max(1L, nrow(point_cond))
 
   geom     <- .sdt_latent_geometry(fit, point_cond, has_sdratio, ...)
-  crit_mat <- .sdt_par_draws(fit, "criterion", point_cond, ...)
+  crit_mat <- .sdt_criterion_draws(fit, point_cond, ...)
 
   rows <- vector("list", n_pt)
   for (c_i in seq_len(n_pt)) {
@@ -892,10 +907,11 @@ roc_observed <- function(fit, conditions = NULL) {
 #' the sensitivity and cut by one or more decision boundaries.
 #'
 #' Densities are evaluated at the posterior-mean parameters of each condition,
-#' on the centred evidence axis the model uses internally: noise at `-sep/2`
-#' with unit SD and signal at `+sep/2` with SD `exp(sdratio)`, where
+#' on the evidence axis the model's `criterion` is measured on: noise at 0 with
+#' unit SD and signal at `sep` with SD `exp(sdratio)`, where
 #' `sep = d * sqrt((1 + exp(sdratio)^2) / 2)` is the separation in noise-SD
-#' units. `d` is \eqn{d_a}, measured in root-mean-square SD units, so `sep`
+#' units. A fit that estimated `bias` has its boundaries drawn on the same
+#' axis, at `bias + sep / 2`. `d` is \eqn{d_a}, measured in root-mean-square SD units, so `sep`
 #' equals `d` whenever `sdratio` is fixed at 0. The decision
 #' boundaries additionally carry a posterior credible band on their location.
 #' The area beyond a boundary equals the corresponding hit/false-alarm rate for
@@ -992,7 +1008,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   pdf           <- .sdt_dists[[dist]]$pdf
   cdf           <- .sdt_dists[[dist]]$cdf
   is_rating     <- inherits(model, "sdt_rating")
-  # criterion exists only for the models with an explicit response boundary
+  # a criterion exists only for the models with an explicit response boundary
   # (binary, rating)
   has_criterion <- "criterion" %in% names(model$parameters)
   has_sdratio   <- .sdt_has_estimated_sdratio(model, fit)
@@ -1006,14 +1022,13 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   n_panel    <- max(1L, nrow(panel_cond))
 
   # The densities live on the noise-standardized axis, so the signal mean is
-  # half the separation (geom$sep), not half of d_a. The two coincide under
-  # equal variance.
+  # the separation (geom$sep), not d_a. The two coincide under equal variance.
   geom <- .sdt_latent_geometry(fit, panel_cond, has_sdratio, ...)
 
   # Boundary positions are evaluated over the density x boundary combinations so
   # that each density panel can carry all its criteria/thresholds.
   if (has_criterion) {
-    crit_line <- .sdt_par_draws(fit, "criterion", line_cond, ...)
+    crit_line <- .sdt_criterion_draws(fit, line_cond, ...)
     thr_list  <- if (is_rating) {
       .sdt_rating_thresholds(fit, model, line_cond, ...)
     }
@@ -1065,11 +1080,11 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
 
     positions <- if (!is.null(lines)) lines$position else numeric(0)
     pad <- 4 * max(1, s)
-    x   <- seq(min(-dp / 2, positions) - pad, max(dp / 2, positions) + pad,
+    x   <- seq(min(0, positions) - pad, max(dp, positions) + pad,
                length.out = n_grid)
     dens <- data.frame(
       x            = rep(x, 2L),
-      density      = c(pdf(x + dp / 2), pdf((x - dp / 2) / s) / s),
+      density      = c(pdf(x), pdf((x - dp) / s) / s),
       distribution = rep(c("noise", "signal"), each = n_grid)
     )
 
@@ -1082,7 +1097,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
       do.call(rbind, lapply(ms, function(mv) {
         data.frame(
           x        = x,
-          density  = (mv - 1) * cdf(x + dp / 2)^(mv - 2) * pdf(x + dp / 2),
+          density  = (mv - 1) * cdf(x)^(mv - 2) * pdf(x),
           set_size = factor(mv, levels = set_sizes)
         )
       }))
@@ -1195,7 +1210,7 @@ print.bmm_sdt_latent <- function(x, ...) {
 #' \dontrun{
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus, d = 1.5,
-#'                               thresholds = c(-0.5, 0, 0.5), sdratio = 1.3))
+#'                               thresholds = c(0.25, 0.75, 1.25), sdratio = 1.3))
 #'
 #' fit <- bmm(
 #'   formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),

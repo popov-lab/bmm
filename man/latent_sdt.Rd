@@ -73,10 +73,11 @@ the sensitivity and cut by one or more decision boundaries.
 }
 \details{
 Densities are evaluated at the posterior-mean parameters of each condition,
-on the centred evidence axis the model uses internally: noise at \code{-sep/2}
-with unit SD and signal at \code{+sep/2} with SD \code{exp(sdratio)}, where
+on the evidence axis the model's \code{criterion} is measured on: noise at 0 with
+unit SD and signal at \code{sep} with SD \code{exp(sdratio)}, where
 \code{sep = d * sqrt((1 + exp(sdratio)^2) / 2)} is the separation in noise-SD
-units. \code{d} is \eqn{d_a}, measured in root-mean-square SD units, so \code{sep}
+units. A fit that estimated \code{bias} has its boundaries drawn on the same
+axis, at \code{bias + sep / 2}. \code{d} is \eqn{d_a}, measured in root-mean-square SD units, so \code{sep}
 equals \code{d} whenever \code{sdratio} is fixed at 0. The decision
 boundaries additionally carry a posterior credible band on their location.
 The area beyond a boundary equals the corresponding hit/false-alarm rate for
