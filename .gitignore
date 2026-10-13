@@ -23,6 +23,7 @@ inst/doc
 
 # Local / private directories
 .claude/
+LOCAL-AGENTS.md
 # the scratch folder at the root only; tests/local is tracked (ADR 0004)
 /local/
 bmm-dev
