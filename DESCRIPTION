@@ -57,7 +57,7 @@ Suggests:
     roxygen2,
     rstan,
     stringr,
-    testthat (>= 3.0.0),
+    testthat (>= 3.3.2),
     tidybayes,
     tidyr,
     usethis,

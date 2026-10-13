@@ -32,15 +32,20 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
   # each site compiles on every run and opens with skip_unless_stan_tests()
   # once #422 inserts the gate; until then CmdStan's absence on the Windows
   # and macOS pull-request jobs is the gate. A new site is a new entry here
-  # and the gate in the test. test-helpers-circmix.R (#434) and
-  # test-model_rdm.R (#502) are registered ahead.
+  # and the gate in the test. test-helpers-circmix.R and
+  # test-model_mixture2p.R (#434, counts at the tip of the stack) and
+  # test-model_rdm.R (#502) are registered ahead; the circmix sites in
+  # test-model_imm.R and test-model_mixture3p.R cannot be: those files exist
+  # here with none and a present file must match its count, so the circmix
+  # merge registers them.
   expect_pattern_counts(
     "cmdstan_model\\(",
     c(
-      "test-helpers-circmix.R" = 3L,
+      "test-helpers-circmix.R" = 2L,
       "test-model_cswald.R" = 3L,
       "test-model_ezdm.R" = 3L,
       "test-model_m3.R" = 2L,
+      "test-model_mixture2p.R" = 1L,
       "test-model_rdm.R" = 1L,
       "test-model_sdt_cdp.R" = 3L,
       "test-model_sdt_ranking.R" = 1L,
@@ -60,7 +65,7 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
   # test-model_mpt.R, test-ppp.R (#484-#489) and test-model_rdm.R (#502) are
   # registered ahead.
   expect_pattern_counts(
-    "backend = \"cmdstanr\"",
+    "backend\\s*=\\s*[\"']cmdstanr[\"']",
     c(
       "test-bmm_setup.R" = 18L,
       "test-conditional_effects.R" = 2L,
@@ -71,7 +76,31 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
       "test-ppp.R" = 3L,
       "test-update.R" = 3L
     ),
-    rule = "R1: backend = \"cmdstanr\" per file"
+    rule = "R1: backend = \"cmdstanr\" (any spacing or quotes) per file"
+  )
+})
+
+test_that("compiled Stan programs are sampled only at the registered sites (R1)", {
+  # a compiled model can sample without bmm() and its backend argument, so
+  # $sample() is counted on its own. test-helpers-circmix.R and
+  # test-model_mixture2p.R (#434) and test-model_rdm.R (#502) are registered
+  # ahead; the circmix merge registers its sites in test-model_imm.R and
+  # test-model_mixture3p.R, as for the compile sites.
+  expect_pattern_counts(
+    "\\$sample\\(",
+    c(
+      "test-helpers-circmix.R" = 1L,
+      "test-model_cswald.R" = 3L,
+      "test-model_ezdm.R" = 1L,
+      "test-model_m3.R" = 1L,
+      "test-model_mixture2p.R" = 1L,
+      "test-model_rdm.R" = 1L,
+      "test-model_sdt_cdp.R" = 1L,
+      "test-model_sdt_ranking.R" = 1L,
+      "test-model_sdt_rating.R" = 1L,
+      "test-sdt-rating-versions.R" = 1L
+    ),
+    rule = "R1: $sample() per file"
   )
 })
 
