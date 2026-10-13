@@ -237,6 +237,37 @@ test_that(".get_parameter_info returns correct info for SDM params", {
   expect_false(info_kappa$softmax)
 })
 
+test_that(".get_parameter_info treats the alternative the formula leaves out as not in the fit (#543)", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit_criterion <- suppressWarnings(bmm(
+    bmf(d ~ 1, criterion ~ 1), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  fit_bias <- suppressWarnings(bmm(
+    bmf(d ~ 1, bias ~ 1), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+
+  expect_equal(.get_parameter_info(fit_criterion, "criterion")$model_name, "criterion")
+  expect_equal(.get_parameter_info(fit_bias, "bias")$model_name, "bias")
+  expect_error(
+    .get_parameter_info(fit_criterion, "bias"),
+    "Parameter 'bias' is not estimated in this fit: its formula uses 'criterion'",
+    fixed = TRUE
+  )
+  expect_error(
+    .get_parameter_info(fit_bias, "criterion"),
+    "Parameter 'criterion' is not estimated in this fit: its formula uses 'bias'",
+    fixed = TRUE
+  )
+  expect_error(
+    .get_parameter_info(fit_criterion, "nonsense"),
+    "Available parameters: d, criterion, sdratio",
+    fixed = TRUE
+  )
+})
+
 # ===========================================================================
 # native_parameters() and native_transform()
 # Tier 1: Unit tests (always run, no fitted model)

@@ -328,8 +328,20 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' @noRd
 .get_parameter_info <- function(bmmfit, par) {
   model <- bmmfit$bmm$model
-  model_pars <- names(model$parameters)
+  unused <- unused_alternative_parameters(model, bmmfit$bmm$user_formula)
+  model_pars <- setdiff(names(model$parameters), unused)
   bterms <- brms::brmsterms(bmmfit$formula)
+
+  if (par %in% unused) {
+    used <- setdiff(
+      unlist(Filter(function(a) par %in% a, model$alternative_parameters)),
+      unused
+    )
+    stop2(
+      "Parameter '{par}' is not estimated in this fit: its formula uses ",
+      "{collapse_comma(used)}, the alternative parameterization."
+    )
+  }
 
   if (!par %in% model_pars) {
     stop2(
