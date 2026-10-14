@@ -324,17 +324,20 @@ test_that("Monte Carlo over new levels agrees with the closed form on a fit", {
   grid_vars <- .np_grid_vars(fit, names(fit$bmm$model$parameters), NA)
   newdata <- .np_newdata(fit, grid_vars, NULL)
   draw_ids <- 1:20
+  # the cost is brms sampling each new level, so n sets the test's time; at
+  # 2000 the 5-SE bound still rejects the median (z ~ 15) or a 20% sd error
+  n <- 2000
   links <- list(a = "log", b = "identity", c = "log", d = "log")
   withr::local_seed(531)
   mc <- .np_population_mc(
     fit, c("b", "a", "c", "d"), "a", newdata, grid_vars, NULL, draw_ids,
-    "mean", native = TRUE, links = links, ndraws_population = 20000, dots = list()
+    "mean", native = TRUE, links = links, ndraws_population = n, dots = list()
   )
   prep <- .np_re_design(fit, newdata, NULL, 1)
   latent <- .np_latent_sd(fit, prep, "a", draw_ids)
   eta <- .np_linpred(fit, "a", "a", newdata, NA, draw_ids, list())$a
   exact <- .np_population_moments(eta, latent$sd, "log")
-  se <- exact$sd / sqrt(20000)
+  se <- exact$sd / sqrt(n)
   expect_lt(max(abs(mc$a$mean - exact$mean) / se), 5)
 })
 
