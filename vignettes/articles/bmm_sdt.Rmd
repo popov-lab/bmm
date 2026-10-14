@@ -169,10 +169,12 @@ remains comparable across conditions whose $s$ differs
 [@Simpson_Fitter_1973; @Macmillan_Creelman_2005]. The Binary SDT section below
 shows how far the indices lie apart on real data.
 
-bmm places the two distributions symmetrically, at $-\delta/2$ and $+\delta/2$,
-and its `criterion` parameter is the boundary measured from their midpoint,
-$k - \delta/2$ in the notation above. The criterion is in noise-SD units whether
-or not $s$ is estimated.
+bmm's `criterion` parameter is this $k$: the boundary measured from the noise
+mean, in noise-SD units whether or not $s$ is estimated. A model can estimate
+the same boundary as `bias` instead, measured from the midpoint between the two
+means, $k - \delta/2$, the index usually written $c$. The two describe the same
+observer; which one belongs in a formula depends on what the design holds
+constant, as the section on shared lures below shows.
 
 ```{r sdt-distributions, echo = FALSE, fig.cap = "Latent evidence model. Noise and signal distributions overlap; responses above the criterion are labelled as signal. The shaded right tails are the false-alarm rate (noise) and the hit rate (signal); their separation is the sensitivity d-prime."}
 crit <- 0.75
@@ -433,7 +435,7 @@ fit_normal <- bmm(
   model   = sdt_yn(response = "n_old", stimulus = "stimulus",
                    n_trials = "n_trials", dist = "normal"),
   backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
-  file = "assets/bmmfit_sdt_noise_normal_vignette"
+  file = "fits/bmmfit_sdt_noise_normal_vignette"
 )
 
 fit_gumbel <- bmm(
@@ -442,7 +444,7 @@ fit_gumbel <- bmm(
   model   = sdt_yn(response = "n_old", stimulus = "stimulus",
                    n_trials = "n_trials", dist = "gumbel_min"),
   backend = "cmdstanr", cores = 4, refresh = 0, silent = 2,
-  file = "assets/bmmfit_sdt_noise_gumbel_vignette"
+  file = "fits/bmmfit_sdt_noise_gumbel_vignette"
 )
 ```
 
@@ -500,9 +502,11 @@ whether the implied decision process is plausible for the task at hand.
 
 In a binary old/new recognition task each cell of the design contributes a count
 of "old" responses out of a number of trials, separately for old (`signal`) and
-new (`noise`) items. The latent decision variable places "old" responses above a
-criterion; sensitivity `d` is the distance between the signal and noise
-distributions and `criterion` is the location of the boundary.
+new (`noise`) items. The observer responds "old" when the evidence exceeds a
+decision boundary. Sensitivity `d` is the distance between the signal and noise
+means in units of the root-mean-square of their SDs ($d_a$ above, $d'$ under
+equal variance), and `criterion` is the position of the boundary measured from
+the noise mean in noise-SD units, the $k$ of the equations above.
 
 ## A single condition: equal-variance SDT
 
@@ -513,7 +517,7 @@ set.seed(123)
 dat <- expand.grid(id = 1:30, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-                     d = 1.5, criterion = 0.2)
+                     d = 1.5, criterion = 0.95)
 
 model <- sdt_yn(response = "n_old", stimulus = "stimulus",
                 n_trials = "n_trials")
@@ -526,20 +530,103 @@ fit_ev <- bmm(
   cores = 4,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_yn_ev_vignette"
+  file = "fits/bmmfit_sdt_yn_ev_vignette"
 )
 summary(fit_ev)
 ```
 
 The population estimates recover the simulated `d = 1.5` and
-`criterion = 0.2`.
+`criterion = 0.95`. Measured from the midpoint between the two means instead,
+the same boundary lies at $0.95 - 1.5/2 = 0.2$, a slight bias toward "new"; this
+is the `bias` parameter introduced below.
 
 By default `sdratio` is fixed to 0, i.e. the signal and noise distributions have
-equal variance (`exp(0) = 1`) — it appears in the model's parameter list but got
+equal variance (`exp(0) = 1`). It appears in the model's parameter list but got
 no formula, so it stays at its fixed default (step 3 of the workflow recipe).
 With a single (hit, false-alarm) pair per subject the signal/noise variance
 ratio is not identified, so leaving it fixed is the right default here, and `d`
 in this fit is $d'$ in the textbook sense.
+
+## One set of lures: `criterion` or `bias`
+
+A formula places the boundary with `criterion`, measured from the noise mean,
+or with `bias`, measured from the midpoint between the means. Under equal
+variance $\text{bias} = \text{criterion} - d/2$, the textbook $c$ (`?sdt_yn`
+gives the general form). Naming neither estimates `criterion ~ 1`; naming both
+is an error.
+
+`criterion ~ 1` keeps the boundary at one distance from the noise mean in every
+row. `bias ~ 1` keeps it at one distance from the midpoint, so the boundary
+moves up by half of every change in `d`. This matters in the classic
+recognition design: weak and strong targets are tested against one shared set
+of lures, with one boundary for all test items. The lures' false-alarm rate,
+$1 - \Phi(\text{criterion})$, depends on that boundary alone.
+
+We simulate this design with a constant `criterion` of 0.7 and a strength
+effect of 0.8 on `d`. `strong` is 1 for strong targets and 0 for weak targets
+and lures. The `criterion` fit ignores the lures' value of `strong`, because
+their likelihood does not involve `d`; the `bias` fit places their boundary at
+$\text{bias} + d/2$, here the weak targets' boundary.
+
+```{r}
+set.seed(543)
+dat_str <- expand.grid(id = 1:30, cell = c("lure", "weak", "strong"))
+dat_str$stimulus <- as.integer(dat_str$cell != "lure")
+dat_str$strong <- as.integer(dat_str$cell == "strong")
+dat_str$n_trials <- 100L
+dat_str$n_old <- rsdt_yn(nrow(dat_str), dat_str$n_trials, dat_str$stimulus,
+                         d = 1 + 0.8 * dat_str$strong, criterion = 0.7)
+
+fit_str <- bmm(
+  formula = bmf(d ~ 1 + strong, criterion ~ 1),
+  data = dat_str,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "fits/bmmfit_sdt_yn_strength_vignette"
+)
+fit_str_bias <- bmm(
+  formula = bmf(d ~ 1 + strong, bias ~ 1),
+  data = dat_str,
+  model = model,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  silent = 2,
+  file = "fits/bmmfit_sdt_yn_strength_bias_vignette"
+)
+rbind("fit with criterion ~ 1" = brms::fixef(fit_str)["d_strong", ],
+      "fit with bias ~ 1"      = brms::fixef(fit_str_bias)["d_strong", ])
+```
+
+```{r strength-effects, include = FALSE}
+eff_crit <- brms::fixef(fit_str)["d_strong", "Estimate"]
+eff_bias <- brms::fixef(fit_str_bias)["d_strong", "Estimate"]
+```
+
+With `criterion ~ 1` the strength effect is `r round(eff_crit, 2)`, close to the
+simulated 0.8. With `bias ~ 1` it is `r round(eff_bias, 2)`,
+`r round(eff_bias / eff_crit, 2)` times as large. The strong targets' hit rate
+depends on $d - \text{criterion}$. At a fixed criterion, an effect $\Delta$ on
+`d` raises this distance by $\Delta$. At a fixed bias,
+$d - \text{criterion} = d/2 - \text{bias}$ rises by only $\Delta/2$, so the
+`bias` fit needs $2 \times 0.8 = 1.6$. Both fits have three parameters (`d`
+intercept, strength effect, and `criterion` or `bias`) for three rates (lures,
+weak, strong) and describe the counts equally well. In the likelihood the factor
+is exactly 2; the estimates depart from it only through priors and Monte Carlo
+error. Model comparison therefore cannot detect the wrong choice, and the
+formula has to state what the design holds constant:
+
+- Lures shared by conditions that differ in `d`: `criterion`.
+- Separate lures per condition, with condition-wise terms for both parameters
+  (`d ~ 0 + cond`, `criterion ~ 0 + cond`): either. The likelihood is the same;
+  the coefficients differ by $d/2$ and get different default priors.
+- Comparing bias between groups or conditions that differ in `d`: `bias`.
+
+`sdt_criterion()` and `sdt_bias()` compute both quantities from one hit rate
+and one false-alarm rate, for checking a fit against the raw rates.
 
 ## Multiple criteria: identifying the unequal-variance ratio
 
@@ -571,7 +658,7 @@ fit_uv <- bmm(
   thin = 3,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_yn_uv_vignette"
+  file = "fits/bmmfit_sdt_yn_uv_vignette"
 )
 summary(fit_uv)
 ```
@@ -587,6 +674,13 @@ exp(brms::fixef(fit_uv)["sdratio_Intercept", c("Estimate", "Q2.5", "Q97.5")])
 
 A value above 1 means the signal distribution is wider than the noise
 distribution, the classic recognition-memory pattern.
+
+Here the base-rate manipulation moves `criterion`, and that is what identifies
+`sdratio`. A strength manipulation with a constant `criterion`, as in the
+shared-lure design above, would not: the false-alarm rate then informs the
+criterion alone, and every hit rate can be matched by trading `sdratio` against
+`d`. `bmm()` warns for that design; the section "Identifying `sdratio`" of
+`?sdt_yn` covers the cases in between.
 
 ### Which sensitivity index?
 
@@ -639,9 +733,9 @@ you compare, as in this fit, the three indices differ by one common factor and
 give the same contrasts up to scale. Report $d_N$ or $d_S$ when you need to line
 up with a literature that uses them, but prefer $d_a$ for contrasts.
 
-Two further points apply to unequal-variance fits. First, `criterion` is not
-converted: it stays in noise-SD units whichever sensitivity index you report,
-so a ratio such as `criterion / d` mixes two scales. Second, for
+Two further points apply to unequal-variance fits. First, `criterion` and
+`bias` are not converted: they stay in noise-SD units whichever sensitivity
+index you report, so a ratio such as `bias / d` mixes two scales. Second, for
 `dist = "normal"` the index $d_a$ is also the AUC-equivalent index,
 $d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})$. Under the Gumbel distributions that
 identity only holds with equal variance, so compare unequal-variance Gumbel fits
@@ -787,7 +881,7 @@ fit_rating <- bmm(
   iter = 7000,
   warmup = 1000,
   thin = 6,
-  file = "assets/bmmfit_sdt_rating_vignette"
+  file = "fits/bmmfit_sdt_rating_vignette"
 )
 summary(fit_rating)
 ```
@@ -899,7 +993,7 @@ fit_rating_lr <- bmm(
   thin = 3,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_rating_logratio_vignette"
+  file = "fits/bmmfit_sdt_rating_logratio_vignette"
 )
 
 pp_check(fit_rating_lr, ndraws = 100)

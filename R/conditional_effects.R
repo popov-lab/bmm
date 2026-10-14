@@ -219,7 +219,8 @@ conditional_effects.bmmfit <- function(x,
 .ce_all_parameters <- function(x, scale, ...) {
   model <- x$bmm$model
   estimated_pars <- setdiff(names(model$parameters),
-                            names(model$fixed_parameters))
+                            c(names(model$fixed_parameters),
+                              unused_alternative_parameters(model, x$bmm$user_formula)))
   all_effects <- list()
   for (p in estimated_pars) {
     ce <- .ce_single_parameter(x, par = p, scale = scale, ...)
@@ -331,6 +332,12 @@ conditional_effects.bmmfit <- function(x,
     nt_distances <- model$other_vars$nt_distances
     escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_distances)
     internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
+  }
+  if (length(model$other_vars$indicators$possible) > 0) {
+    internal_patterns <- c(
+      internal_patterns,
+      paste0("^", unlist(model$other_vars$indicators$possible, use.names = FALSE), "$")
+    )
   }
   
   effect_names <- names(ce_result)

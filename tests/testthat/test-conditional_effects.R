@@ -509,6 +509,53 @@ test_that(".filter_internal_effects keeps all user vars", {
   expect_named(result, c("set_size", "condition"))
 })
 
+test_that(".filter_internal_effects removes the Poss_ columns an MPT fit generates", {
+  fit <- bmm(
+    bmf(Pm ~ 1, Pb ~ 1),
+    mpt_impossible_data(),
+    mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  ce <- mock_ce(
+    cond = mock_ce_df(1:3, 0:2, 2:4),
+    Poss_dist = mock_ce_df(1:3, 0:2, 2:4),
+    `cond:Poss_dist` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+
+  expect_named(.filter_internal_effects(ce, fit), "cond")
+})
+
+test_that(".filter_internal_effects keeps a user column named Poss_*", {
+  mock_bmmfit <- list(
+    bmm = list(
+      model = structure(
+        list(other_vars = list()),
+        class = c("sdm", "bmmodel")
+      )
+    )
+  )
+  mpt_fit <- bmm(
+    bmf(Pm ~ 1, Pb ~ 1),
+    mpt_impossible_data(),
+    mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  ce <- mock_ce(
+    set_size = mock_ce_df(1:3, 0:2, 2:4),
+    Poss_load = mock_ce_df(1:3, 0:2, 2:4),
+    `Poss_load:set_size` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+
+  expect_named(
+    .filter_internal_effects(ce, mock_bmmfit),
+    c("set_size", "Poss_load", "Poss_load:set_size")
+  )
+  expect_named(
+    .filter_internal_effects(ce, mpt_fit),
+    c("set_size", "Poss_load", "Poss_load:set_size")
+  )
+})
+
 
 # ===========================================================================
 # Tier 1: Unit tests — conditional_effects() on multinomial families
@@ -1224,6 +1271,41 @@ test_that(".ce_own_effects follows the formulas of the parameters a non-linear f
   expect_setequal(
     own(bmf(d ~ exp(nlc) * x * cond, nlc ~ 1 + cond2, criterion ~ 1, spacing ~ 1)),
     c("cond", "cond:x", "cond2", "x")
+  )
+})
+
+test_that("conditional_effects() leaves out the alternative parameter the formula does not use", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit_criterion <- suppressWarnings(mock_bmm(bmf(d ~ 1, criterion ~ 1), dat, model))
+  fit_bias <- suppressWarnings(mock_bmm(bmf(d ~ 1, bias ~ 1), dat, model))
+  visited <- character(0)
+  local_mocked_bindings(.ce_single_parameter = function(x, par, scale, ...) {
+    visited <<- c(visited, par)
+    list()
+  })
+  conditional_effects(fit_criterion)
+  expect_equal(visited, c("d", "criterion"))
+  visited <- character(0)
+  conditional_effects(fit_bias)
+  expect_equal(visited, c("d", "bias"))
+})
+
+test_that("conditional_effects(par =) names the formula's own parameterization when asked for the other (#543)", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit_criterion <- suppressWarnings(mock_bmm(bmf(d ~ 1, criterion ~ 1), dat, model))
+  fit_bias <- suppressWarnings(mock_bmm(bmf(d ~ 1, bias ~ 1), dat, model))
+  local_mocked_bindings(.brms_conditional_effects = function(x, ...) list())
+  expect_error(
+    conditional_effects(fit_criterion, par = "bias"),
+    "Parameter 'bias' is not estimated in this fit: its formula uses 'criterion'",
+    fixed = TRUE
+  )
+  expect_error(
+    conditional_effects(fit_bias, par = "criterion"),
+    "Parameter 'criterion' is not estimated in this fit: its formula uses 'bias'",
+    fixed = TRUE
   )
 })
 
