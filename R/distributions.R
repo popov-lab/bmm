@@ -4439,3 +4439,66 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   }
   counts
 }
+
+#' @title Distribution functions for the target confusability competition model
+#'
+#' @description Probability mass and random generation for the response error
+#'   under [tcc()]: each of `n_options` options produces a Gaussian
+#'   memory-match signal with mean `d * f(x)` and unit variance, and the
+#'   response is the option with the strongest signal.
+#'
+#' @name tcc_dist
+#'
+#' @param x Vector of response errors in radians; each is binned to the
+#'   nearest option, as [tcc()] does with `units = "radians"`.
+#' @param n Number of observations to generate.
+#' @param d Memory strength, the mean signal of the target (recycled).
+#' @param similarity Similarity of an option to the target at each distance
+#'   0, 1, ..., `n_options / 2` options, starting with 1 (see [tcc()]).
+#' @param n_options Number of response options, an even number.
+#' @param log Logical; if `TRUE`, the log probability is returned.
+#'
+#' @return `dtcc()` returns the probability of the option each `x` falls on (a
+#'   probability mass, not a density: divide by `2 * pi / n_options` for the
+#'   density in radians). `rtcc()` returns response errors in radians at the
+#'   option centres, in (-pi, pi].
+#'
+#' @references `r .model_tcc()$citation`
+#'
+#' @keywords distribution
+#'
+#' @examples
+#' f <- exp(-(0:180) / 20)
+#' f <- (f - min(f)) / (1 - min(f))
+#' x <- 2 * pi * (-179:180) / 360
+#' plot(x, dtcc(x, d = 2, similarity = f), type = "h")
+#' hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
+#' @export
+dtcc <- function(x, d, similarity, n_options = 360, log = FALSE) {
+  .tcc_check_similarity(similarity, n_options)
+  dist <- abs(.tcc_bin(x, n_options, "radians")) + 1
+  n <- max(length(x), length(d))
+  dist <- rep_len(dist, n)
+  d <- rep_len(d, n)
+  out <- rep(NA_real_, n)
+  for (value in unique(d[!is.na(d)])) {
+    rows <- which(d == value)
+    out[rows] <- .tcc_logp(value, similarity)[dist[rows]]
+  }
+  if (log) out else exp(out)
+}
+
+#' @rdname tcc_dist
+#' @export
+rtcc <- function(n, d, similarity, n_options = 360) {
+  .tcc_check_similarity(similarity, n_options)
+  d <- rep_len(d, n)
+  offsets <- seq(-n_options / 2 + 1, n_options / 2)
+  out <- numeric(n)
+  for (value in unique(d)) {
+    rows <- which(d == value)
+    prob <- exp(.tcc_logp(value, similarity))[abs(offsets) + 1]
+    out[rows] <- sample(offsets, length(rows), replace = TRUE, prob = prob)
+  }
+  2 * pi * out / n_options
+}
