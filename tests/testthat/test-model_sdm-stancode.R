@@ -1,5 +1,5 @@
 simulate_sdm_smoke_data <- function() {
-  set.seed(123)
+  withr::local_seed(123)
   condition <- factor(rep(paste0("condition", 1:2), each = 50))
   data.frame(
     y = rsdm(100),
@@ -106,7 +106,7 @@ test_that("SDM accepts numeric threads shorthand", {
 })
 
 test_that("SDM run metadata aligns with brms after NA rows are dropped", {
-  set.seed(1)
+  withr::local_seed(1)
   dat <- data.frame(
     y = rsdm(20),
     condition = factor(rep(c("a", "b"), each = 10))
@@ -191,7 +191,7 @@ test_that("SDM Stan code validates run metadata in transformed data", {
 })
 
 test_that("update() refreshes SDM run metadata for new data", {
-  set.seed(42)
+  withr::local_seed(42)
   dat20 <- data.frame(y = rsdm(20))
   dat40 <- data.frame(y = rsdm(40))
 

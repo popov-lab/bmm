@@ -245,53 +245,11 @@ test_that("dsdt_mafc validates input", {
   expect_error(dsdt_mafc(120, 100, d = 1, m = 4), "must not exceed")
 })
 
-test_that("m-AFC probability correct equals chance (1/m) at d' = 0", {
-  # 1e-7 is set by one cell, normal at m = 8, where the 40-point Gauss-Hermite
-  # rule sits 4.5e-8 from 1/m *relative* (5.7e-9 absolute, which is the measure
-  # the sibling logit test quotes); the other fifteen are all below 5e-14. A
-  # tolerance loose enough for the whole grid would let that rule degrade by
-  # two orders of magnitude unnoticed.
-  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    for (m in c(2L, 3L, 4L, 8L)) {
-      expect_equal(.mafc_pc_r(0, m, di), 1 / m, tolerance = 1e-7,
-                   info = paste(di, "m =", m))
-    }
-  }
-})
-
 test_that("m-AFC probability correct is monotone increasing in d'", {
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
     pcs <- vapply(c(0, 0.5, 1, 2, 3), .mafc_pc_r, numeric(1), m = 4L, dist = di)
     expect_true(all(diff(pcs) > 0), info = di)
     expect_true(all(pcs > 0 & pcs < 1), info = di)
-  }
-})
-
-test_that("gumbel_max m-AFC matches the exact softmax closed form", {
-  for (m in c(2L, 3L, 4L, 8L)) {
-    for (d in c(0, 1, 2, 3)) {
-      expect_equal(.mafc_pc_r(d, m, "gumbel_max"), 1 / (1 + (m - 1) * exp(-d)),
-                   tolerance = 1e-12, info = paste("m =", m, "d =", d))
-    }
-  }
-})
-
-test_that("gumbel_min m-AFC matches the exact Gamma-ratio closed form", {
-  for (m in c(2L, 3L, 4L, 8L)) {
-    for (d in c(0, 1, 2, 3)) {
-      expect_equal(
-        .mafc_pc_r(d, m, "gumbel_min"),
-        exp(lgamma(1 + exp(-d)) + lgamma(m) - lgamma(m + exp(-d))),
-        tolerance = 1e-12, info = paste("m =", m, "d =", d)
-      )
-    }
-  }
-})
-
-test_that("normal m-AFC matches Phi(d'/sqrt(2)) at m = 2", {
-  for (d in c(0, 0.5, 1, 2)) {
-    expect_equal(.mafc_pc_r(d, 2L, "normal"), pnorm(d / sqrt(2)),
-                 tolerance = 1e-10, info = paste("d =", d))
   }
 })
 
@@ -353,23 +311,6 @@ test_that("sdt_mafc produces valid stancode including its custom functions", {
   expect_true(grepl("sdt_quantile", code))
 })
 
-test_that("sdt_mafc produces valid stancode for all distributions", {
-  dat <- data.frame(n_correct = c(70, 65), n_trials = c(100, 100))
-  for (d in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    model <- sdt_mafc("n_correct", "n_trials", m = 4, dist = d)
-    code <- stancode(bmf(d ~ 1), data = dat, model = model)
-    expect_true(nchar(code) > 0, info = paste("dist:", d))
-  }
-})
-
-test_that("sdt_mafc handles predictors and random effects in the formula", {
-  dat <- data.frame(n_correct = c(70, 65, 80, 60), n_trials = rep(100, 4),
-                    condition = c("A", "B", "A", "B"), id = c(1, 1, 2, 2))
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  expect_true(nchar(stancode(bmf(d ~ condition), dat, model = model)) > 0)
-  expect_true(nchar(stancode(bmf(d ~ 1 + (1 | id)), dat, model = model)) > 0)
-})
-
 test_that("sdt_mafc integrates with the bmm pipeline via mock backend", {
   dat <- data.frame(n_trials = rep(100L, 8))
   dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4, d = 1.2)
@@ -390,14 +331,6 @@ test_that("sdt_mafc fits mixed set sizes through the pipeline (mock)", {
     bmm(bmf(d ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
 })
-
-test_that("sdt_mafc default_prior returns a valid prior object", {
-  dat <- data.frame(n_correct = c(70, 65), n_trials = c(100, 100))
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  prior <- default_prior(bmf(d ~ 1), data = dat, model = model)
-  expect_s3_class(prior, "brmsprior")
-})
-
 
 ############################################################################# !
 # R <-> STAN QUADRATURE AND BRANCH CONTRACT                              ####

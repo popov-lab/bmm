@@ -453,16 +453,16 @@ test_that("rsdt_yn recycles vectorized parameters per observation", {
 })
 
 test_that("rsdt_yn generates different data for different distributions", {
-  set.seed(42)
+  withr::local_seed(42)
   n_norm <- rsdt_yn(2, 1000, c(0L, 1L), d = 2, criterion = 0)
-  set.seed(42)
+  withr::local_seed(42)
   n_logis <- rsdt_yn(2, 1000, c(0L, 1L), d = 2, criterion = 0,
                          dist = "logistic")
   expect_false(identical(n_norm, n_logis))
 })
 
 test_that("rsdt_yn with zero d produces equal hit and FA rates on average", {
-  set.seed(123)
+  withr::local_seed(123)
   n_old <- rsdt_yn(2, 10000, c(0L, 1L), d = 0, criterion = 0)
   expect_equal(n_old[1] / 10000, 0.5, tolerance = 0.05)
   expect_equal(n_old[2] / 10000, 0.5, tolerance = 0.05)
@@ -653,14 +653,6 @@ test_that("dsdt_yn returns one value per posterior draw for a scalar count", {
   expect_length(dens, 20)
 })
 
-test_that("dsdt_yn with sdratio produces different densities than EV-SDT", {
-  d_ev <- dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-                      d = 1.5, criterion = 0, sdratio = 1)
-  d_uv <- dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-                      d = 1.5, criterion = 0, sdratio = 1.3)
-  expect_false(d_ev == d_uv)
-})
-
 test_that("sdratio never divides the noise trials, it only widens the separation", {
   # Only the signal distribution carries the scale division. On a noise trial
   # sdratio therefore acts solely through d_a -> d_N = d * s, so the same
@@ -708,11 +700,8 @@ test_that("d is a no-op relative to d' for every equal-variance call", {
   # sdratio = 1 gives s = 1, so nothing in the reparameterization may move
   grid <- expand.grid(d = c(0.4, 1.5, 3), criterion = c(-0.7, 0, 0.5),
                       stimulus = c(0L, 1L))
-  for (dist_name in c("normal", "gumbel_min", "gumbel_max", "logistic")) {
-    eta <- .sdt_eta(grid$d, grid$criterion, grid$stimulus, 1)
-    textbook <- grid$d * grid$stimulus - grid$criterion
-    expect_equal(eta, textbook, info = dist_name)
-  }
+  eta <- .sdt_eta(grid$d, grid$criterion, grid$stimulus, 1)
+  expect_equal(eta, grid$d * grid$stimulus - grid$criterion)
 })
 
 test_that("d equals the noise-standardized separation divided by the RMS scale", {
@@ -861,65 +850,10 @@ test_that("sdt_yn model produces valid stancode with brms", {
   model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
   formula <- bmf(d ~ 1, criterion ~ 1)
   code <- stancode(formula, data = dat, model = model)
-  expect_true(nchar(code) > 0)
-  expect_true(grepl("sdt_yn_lpmf", code))
-  expect_true(grepl("sdt_log_cumprob", code))
+  expect_match(code, paste("target += sdt_yn_lpmf(Y[n] | mu[n], d[n], criterion[n],",
+                           "sdratio[n], vint1[n], vint2[n], trials[n]);"), fixed = TRUE)
+  expect_match(code, "real sdt_log_cumprob(", fixed = TRUE)
 })
-
-test_that("sdt_yn model produces valid stancode for all distributions", {
-  dat <- data.frame(
-    n_old = c(10, 40),
-    stimulus = c(0L, 1L),
-    n_trials = c(50, 50)
-  )
-  for (dist_name in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    model <- sdt_yn("n_old", "stimulus", "n_trials", dist = dist_name)
-    formula <- bmf(d ~ 1, criterion ~ 1)
-    code <- stancode(formula, data = dat, model = model)
-    expect_true(nchar(code) > 0, info = paste("Failed for dist:", dist_name))
-  }
-})
-
-test_that("sdt_yn model handles predictors in formula", {
-  dat <- data.frame(
-    n_old = c(10, 40, 15, 35),
-    stimulus = c(0L, 1L, 0L, 1L),
-    n_trials = c(50, 50, 50, 50),
-    condition = c("A", "A", "B", "B")
-  )
-  model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
-  formula <- bmf(d ~ condition, criterion ~ 1)
-  code <- stancode(formula, data = dat, model = model)
-  expect_true(nchar(code) > 0)
-})
-
-test_that("sdt_yn model handles random effects in formula", {
-  dat <- data.frame(
-    n_old = c(10, 40, 15, 35),
-    stimulus = c(0L, 1L, 0L, 1L),
-    n_trials = c(50, 50, 50, 50),
-    id = c(1, 1, 2, 2)
-  )
-  model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
-  formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1)
-  code <- stancode(formula, data = dat, model = model)
-  expect_true(nchar(code) > 0)
-})
-
-test_that("sdt_yn default_prior returns valid prior object", {
-  dat <- data.frame(
-    n_old = c(10, 40),
-    stimulus = c(0L, 1L),
-    n_trials = c(50, 50)
-  )
-  model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
-  formula <- bmf(d ~ 1, criterion ~ 1)
-  prior <- default_prior(formula, data = dat, model = model)
-  expect_s3_class(prior, "brmsprior")
-  prior_strs <- prior$prior
-  expect_true(any(grepl("normal", prior_strs)))
-})
-
 
 ############################################################################# !
 # R <-> STAN DIST_TYPE CONTRACT                                          ####

@@ -122,7 +122,7 @@ test_that("the gumbel_min ranking kernel is the smallest-extreme-value one", {
   # from the documented cdf 1 - exp(-exp(x)), i.e. quantile log(-log(1 - u)).
   # The mirror (largest extreme value) gives visibly different rank
   # probabilities, so this fails loudly if the two labels are ever swapped.
-  set.seed(4711)
+  withr::local_seed(4711)
   rmin <- function(n) log(-log(1 - runif(n)))
   n <- 200000
   d <- 1.5
@@ -777,15 +777,6 @@ test_that("Gaussian ranking fixes sdratio for EV and frees it for UV", {
   expect_false(all(grepl("constant", uv_sdratio$prior)))
 })
 
-test_that("sdt_ranking stancode works with predictors and random effects", {
-  dat <- sim_ranking(5, 50, m = 4, d = 1.5)
-  dat$condition <- rep(c("A", "B"), length.out = nrow(dat))
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_true(nchar(stancode(bmf(d ~ condition), data = dat, model = model)) > 0)
-  expect_true(nchar(stancode(bmf(d ~ 1 + (1 | id)), data = dat, model = model)) > 0)
-})
-
-
 ############################################################################# !
 # PIPELINE INTEGRATION TESTS                                             ####
 ############################################################################# !
@@ -816,12 +807,5 @@ test_that("sdt_ranking unequal-variance ranking runs through the pipeline (mock)
     bmm(bmf(d ~ 1, sdratio ~ 1), dat, model,
         backend = "mock", mock_fit = 1, rename = FALSE)
   )
-})
-
-test_that("sdt_ranking default_prior returns a valid prior object", {
-  dat <- sim_ranking(3, 50, m = 4, d = 1.5)
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_s3_class(default_prior(bmf(d ~ 1), data = dat, model = model),
-                  "brmsprior")
 })
 

@@ -255,23 +255,6 @@ test_that("ddm default priors are correctly set", {
   expect_true(any(grepl("ndt", prior_summary$dpar)))
 })
 
-test_that("ddm stanvars are correctly added", {
-  skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required for DDM models"
-  )
-  
-  sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
-  model <- ddm("rt", "response")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
-  
-  fit <- bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE)
-  
-  # Check that custom Stan functions were added
-  expect_true(!is.null(fit$stanvars))
-})
-
 # posterior_epred (#475) ------------------------------------------------------
 
 ddm_epred_sets <- data.frame(

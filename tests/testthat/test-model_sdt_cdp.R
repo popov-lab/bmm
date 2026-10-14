@@ -284,7 +284,7 @@ test_that("sdt_cdp_logmu matches .sdt_cdp_category_probs and preserves shape", {
 test_that("sdt_cdp_logmu vectorized path matches per-element evaluation", {
   nd <- 6
   nobs <- 4
-  set.seed(11)
+  withr::local_seed(11)
   mk <- function(center, spread) matrix(rnorm(nd * nobs, center, spread), nd, nobs)
   a <- list(dfam = mk(0.8, 0.2), drec = mk(1.0, 0.2),
             criterion = mk(0.1, 0.1), spacing = mk(-0.3, 0.1),

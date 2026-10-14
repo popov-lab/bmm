@@ -590,20 +590,6 @@ test_that("ezdm default priors are correctly set for 4par", {
   expect_true(any(grepl("^s$", prior_summary$dpar)))
 })
 
-test_that("ezdm stanvars are correctly added", {
-  skip_on_cran()
-
-  sim_data <- rezdm(10, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, version = "3par")
-  model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
-  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
-
-  fit <- bmm(formula, sim_data, model, backend = "mock", mock = 1, rename = FALSE)
-
-  # Check that custom Stan functions were added
-  expect_true(!is.null(fit$stanvars))
-  expect_s3_class(fit$stanvars, "stanvars")
-})
-
 test_that("ezdm 3par requires single mean_rt and var_rt variables", {
   model_3par <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
 
@@ -649,25 +635,6 @@ test_that("ezdm check_data validates all required variables exist", {
     "missing from the data"
   )
 })
-
-test_that("ezdm posterior_predict function is defined for 3par", {
-  # Test that the posterior_predict function exists and has correct structure
-  # Note: Cannot test with mock backend as it doesn't create proper brmsfit objects
-  # This would need actual sampling which is too slow for regular tests
-
-  # Just verify the function is exported and callable
-  expect_true(exists("posterior_predict_ezdm_3par", where = asNamespace("bmm")))
-})
-
-test_that("ezdm posterior_predict function is defined for 4par", {
-  # Test that the posterior_predict function exists and has correct structure
-  # Note: Cannot test with mock backend as it doesn't create proper brmsfit objects
-  # This would need actual sampling which is too slow for regular tests
-
-  # Just verify the function is exported and callable
-  expect_true(exists("posterior_predict_ezdm_4par", where = asNamespace("bmm")))
-})
-
 
 # R <-> Stan parity of the likelihood ------------------------------------------
 

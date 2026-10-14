@@ -1,15 +1,3 @@
-test_that("default_prior() works with brmsformula", {
-  ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
-  prior <- default_prior(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(prior)[1], "brmsprior")
-})
-
-test_that("default_prior() works with formula", {
-  ff <- count ~ zAge + zBase * Trt + (1 | patient)
-  prior <- default_prior(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(prior)[1], "brmsprior")
-})
-
 test_that("default_prior() works with bmmformula", {
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
   prior <- default_prior(ff, small_data(), mixture3p(

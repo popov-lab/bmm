@@ -36,6 +36,50 @@ test_that("every dist argument offers exactly the registry's distributions", {
   }
 })
 
+test_that("the noise distribution reaches Stan as the id the Stan switch reads", {
+  # sdt_dist_funs.stan dispatches on 1 normal, 2 gumbel_min, 3 gumbel_max,
+  # 4 logistic; the code is the same for every distribution, so the id in the
+  # data is the only thing that selects it
+  ids <- c(normal = 1L, gumbel_min = 2L, gumbel_max = 3L, logistic = 4L)
+  yn_data <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  mafc_data <- data.frame(n_correct = c(70, 65), n_trials = 100)
+  for (dist in names(ids)) {
+    yn <- standata(bmf(d ~ 1, criterion ~ 1), yn_data,
+                   sdt_yn("n_old", "stimulus", "n_trials", dist = dist))
+    mafc <- standata(bmf(d ~ 1), mafc_data,
+                     sdt_mafc("n_correct", "n_trials", m = 4, dist = dist))
+    expect_equal(as.vector(yn$vint2), rep(ids[[dist]], 2), label = paste("sdt_yn", dist))
+    expect_equal(as.vector(mafc$vint2), rep(ids[[dist]], 2), label = paste("sdt_mafc", dist))
+  }
+})
+
+test_that("a predictor and a random effect on d reach every SDT model's program", {
+  cells <- data.frame(id = rep(1:2, each = 2), stimulus = c(0L, 1L, 0L, 1L),
+                      condition = c("A", "A", "B", "B"))
+  cases <- list(
+    sdt_yn = list(sdt_yn("n_old", "stimulus", "n_trials"),
+                  cbind(cells, n_old = c(10, 40, 15, 35), n_trials = 50), bmf(criterion ~ 1)),
+    sdt_mafc = list(sdt_mafc("n_correct", "n_trials", m = 4),
+                    cbind(cells, n_correct = c(70, 65, 80, 60), n_trials = 100), NULL),
+    sdt_ranking = list(sdt_ranking(paste0("rank", 1:4), m = 4),
+                       cbind(cells, rank1 = 20L, rank2 = 15L, rank3 = 10L, rank4 = 5L), NULL),
+    sdt_rating = list(sdt_rating(paste0("r", 1:4), "stimulus"),
+                      cbind(cells, r1 = 20L, r2 = 15L, r3 = 10L, r4 = 5L),
+                      bmf(criterion ~ 1, spacing ~ 1))
+  )
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    formula <- bmf(d ~ condition + (1 | id))
+    if (!is.null(case[[3]])) formula <- formula + case[[3]]
+    code <- stancode(formula, data = case[[2]], model = case[[1]])
+    # Kc_d and Xc_d where d is a dpar with a centred design, K_d and X_d where
+    # it is an nlpar
+    for (term in c("vector\\[Kc?_d\\] b_d;", "Xc?_d \\* b_d", "r_1_d_1\\[J_1\\[n\\]\\] \\* Z_1_d_1\\[n\\]")) {
+      expect_match(code, term, label = paste(name, term))
+    }
+  }
+})
+
 test_that("a two-category rating reduces to the binary likelihood", {
   # both models must implement the same decision rule -- evidence above the
   # criterion is an "old" response -- which for the asymmetric extreme-value

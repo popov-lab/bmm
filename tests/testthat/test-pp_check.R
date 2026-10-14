@@ -206,10 +206,10 @@ test_that("pp_check(resp_var = 'signed_rt') signs RTs by the response", {
 
 test_that("pp_check(negative_rt = TRUE) redirects to the signed_rt check", {
   fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
-  set.seed(99)
+  withr::local_seed(99)
   expect_message(p1 <- pp_check(fit, negative_rt = TRUE, ndraws = 5),
                  "signed_rt")
-  set.seed(99)
+  withr::local_seed(99)
   p2 <- pp_check(fit, resp_var = "signed_rt", ndraws = 5)
   expect_equal(p1$data, p2$data)
 })

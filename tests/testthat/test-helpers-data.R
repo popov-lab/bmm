@@ -60,31 +60,31 @@ test_that("check_var_set_size accepts valid input", {
   expect_silent(check_var_set_size("y", dat))
   expect_equal(names(check_var_set_size("y", dat)), c("max_set_size", "ss_numeric"))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 3)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Factor with numeric levels is valid
   dat <- data.frame(y = factor(rep(c(1, 2, 3), each = 3)))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 3)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Character vector representing numbers is valid
   dat <- data.frame(y = rep(c("1", "2", "3"), each = 3))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 3)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Numeric vector with NA values is valid (assuming NA is treated correctly)
   dat <- data.frame(y = rep(c(1, 5, NA), each = 3))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 5)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Factor with NA and numeric levels is valid
   dat <- data.frame(y = factor(rep(c(1, 5, NA), each = 3)))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 5)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 })
 
 test_that("check_var_set_size rejects invalid input", {
@@ -228,18 +228,6 @@ test_that("rad2deg returns the correct values for 0, pi/2, 2*pi", {
   expect_equal(wrap(rad2deg(x), radians = F), rad2deg(wrap(x)))
 })
 
-test_that("standata() works with brmsformula", {
-  ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
-  sd <- standata(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "standata")
-})
-
-test_that("standata() works with formula", {
-  ff <- count ~ zAge + zBase * Trt + (1 | patient)
-  sd <- standata(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "standata")
-})
-
 test_that("standata() works with bmf", {
   ff <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
   dat <- small_data()
@@ -356,7 +344,7 @@ test_that("is_data_ordered works when there are non-linear predictors", {
 ############################################################################# !
 
 test_that("ezdm_summary_stats() returns 1-row data.frame for 3par version", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -373,7 +361,7 @@ test_that("ezdm_summary_stats() returns 1-row data.frame for 3par version", {
 })
 
 test_that("ezdm_summary_stats() returns 1-row data.frame for 4par version", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(200, shape = 5, rate = 10) + 0.3
   response <- rbinom(200, 1, 0.7)
 
@@ -451,7 +439,7 @@ test_that("ezdm_summary_stats() errors for non-positive RT values", {
 })
 
 test_that("ezdm_summary_stats() handles too few trials", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(5, shape = 5, rate = 10) + 0.3
   response <- rbinom(5, 1, 0.8)
 
@@ -463,7 +451,7 @@ test_that("ezdm_summary_stats() handles too few trials", {
 })
 
 test_that("ezdm_summary_stats() simple method matches mean() and var()", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -476,7 +464,7 @@ test_that("ezdm_summary_stats() simple method matches mean() and var()", {
 })
 
 test_that("ezdm_summary_stats() robust method uses median and IQR/MAD", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -512,7 +500,7 @@ test_that("ezdm_summary_stats() robust method is resistant to outliers", {
 })
 
 test_that("ezdm_summary_stats() mixture method works with different distributions", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(200, shape = 5, rate = 10) + 0.3
   response <- rbinom(200, 1, 0.8)
 
@@ -528,7 +516,7 @@ test_that("ezdm_summary_stats() mixture method works with different distribution
 })
 
 test_that("ezdm_summary_stats() 4par handles all correct or all errors", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
 
   result <- ezdm_summary_stats(rt, rep(1, 100),
@@ -579,7 +567,7 @@ test_that("ezdm_summary_stats() validates contaminant_bound", {
 })
 
 test_that("ezdm_summary_stats() accepts 'min' and 'max' for contaminant_bound", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -689,7 +677,7 @@ test_that("ezdm_summary_stats() max_contaminant works with 4par version", {
 })
 
 test_that("ezdm_summary_stats() handles character responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2))
 
@@ -700,7 +688,7 @@ test_that("ezdm_summary_stats() handles character responses", {
 })
 
 test_that("ezdm_summary_stats() handles factor responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- factor(sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2)))
 
@@ -709,7 +697,7 @@ test_that("ezdm_summary_stats() handles factor responses", {
 })
 
 test_that("ezdm_summary_stats() handles correct/error and logical responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
 
   response_ce <- sample(c("correct", "error"), 100, replace = TRUE, prob = c(0.8, 0.2))
@@ -722,7 +710,7 @@ test_that("ezdm_summary_stats() handles correct/error and logical responses", {
 })
 
 test_that("ezdm_summary_stats() handles case-insensitive responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- sample(c("UPPER", "Lower", "UpPeR", "LOWER"), 100, replace = TRUE)
 
@@ -741,7 +729,7 @@ test_that("ezdm_summary_stats() errors on unrecognized response values", {
 })
 
 test_that("ezdm_summary_stats() 4par version works with character responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(200, shape = 5, rate = 10) + 0.3
   response <- sample(c("upper", "lower"), 200, replace = TRUE, prob = c(0.7, 0.3))
 
@@ -756,7 +744,7 @@ test_that("ezdm_summary_stats() 4par version works with character responses", {
 })
 
 test_that("ezdm_summary_stats() handles NAs in rt", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- c(rgamma(90, shape = 5, rate = 10) + 0.3, rep(NA, 10))
   response <- rbinom(100, 1, 0.8)
 
@@ -768,7 +756,7 @@ test_that("ezdm_summary_stats() handles NAs in rt", {
 
 test_that("ezdm_summary_stats() works with dplyr::reframe()", {
   skip_if_not_installed("dplyr")
-  set.seed(123)
+  withr::local_seed(123)
   test_data <- data.frame(
     subject = rep(1:3, each = 50),
     rt = rgamma(150, shape = 5, rate = 10) + 0.3,
@@ -1040,7 +1028,7 @@ test_that("adjust_ezdm_accuracy() signals its deprecation", {
 })
 
 test_that("adjust_ezdm_accuracy() returns 1-row data.frame", {
-  set.seed(42)
+  withr::local_seed(42)
   result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, 0.1))
 
   expect_s3_class(result, "data.frame")
@@ -1049,7 +1037,7 @@ test_that("adjust_ezdm_accuracy() returns 1-row data.frame", {
 })
 
 test_that("adjust_ezdm_accuracy() returns integer values", {
-  set.seed(42)
+  withr::local_seed(42)
   result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, 0.1))
 
   expect_type(result$n_upper_adj, "integer")

@@ -110,35 +110,12 @@ test_that("skip_on_ci() is not used as a tier gate (R2)", {
 })
 
 test_that("stancode() tests assert content, not that the code is non-empty (R7)", {
-  # the 18 nchar() checks become content checks in #422
-  expect_pattern_counts(
-    "expect_true\\(nchar\\(",
-    c(
-      "test-model_sdt_mafc.R" = 3L,
-      "test-model_sdt_ranking.R" = 2L,
-      "test-model_sdt_rating.R" = 9L,
-      "test-model_sdt_yn.R" = 4L
-    ),
-    rule = "R7: expect_true(nchar(code) > 0) per file"
-  )
+  expect_pattern_counts("expect_true\\(nchar\\(", integer(),
+                        rule = "R7: expect_true(nchar(code) > 0) per file")
 })
 
 test_that("tests seed through withr::local_seed(), not set.seed() (R8)", {
-  # the 34 calls are replaced in #422
-  expect_pattern_counts(
-    "^\\s*set\\.seed\\(",
-    c(
-      "test-distributions.R" = 4L,
-      "test-helpers-data.R" = 17L,
-      "test-helpers-parameters.R" = 3L,
-      "test-model_sdm-stancode.R" = 3L,
-      "test-model_sdt_cdp.R" = 1L,
-      "test-model_sdt_ranking.R" = 1L,
-      "test-model_sdt_yn.R" = 3L,
-      "test-pp_check.R" = 2L
-    ),
-    rule = "R8: set.seed() per file"
-  )
+  expect_pattern_counts("^\\s*set\\.seed\\(", integer(), rule = "R8: set.seed() per file")
 })
 
 test_that("fixtures are small, short, and regenerable (R5)", {

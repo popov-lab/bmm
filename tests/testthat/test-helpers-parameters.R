@@ -286,7 +286,7 @@ load_np_m3_fit <- function() {
 # ===========================================================================
 
 test_that(".np_softmax matches softmax() with an implicit zero reference", {
-  set.seed(20)
+  withr::local_seed(20)
   mats <- list(a = matrix(rnorm(12), 4), b = matrix(rnorm(12), 4))
   out <- .np_softmax(mats)
 
@@ -329,7 +329,7 @@ test_that(".np_softmax preserves names and dimensions", {
 
 test_that("native_transform applies the elementwise inverse link of each parameter", {
   model <- .model_sdm()
-  set.seed(21)
+  withr::local_seed(21)
   linpred <- list(
     mu = matrix(rnorm(6), 3),
     c = matrix(rnorm(6), 3),
@@ -353,7 +353,7 @@ test_that("native_transform treats a parameter without a declared link as identi
 
 test_that("native_transform softmaxes mixture3p weights without a model specific method", {
   model <- .model_mixture3p()
-  set.seed(22)
+  withr::local_seed(22)
   linpred <- list(
     kappa = matrix(rnorm(4), 2),
     thetat = matrix(rnorm(4), 2),

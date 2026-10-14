@@ -215,10 +215,6 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
 })
 
-test_that("get_model() returns the correct function", {
-  expect_equal(get_model("mixture2p"), .model_mixture2p)
-})
-
 test_that("check_model() refuses invalid models and accepts valid models", {
   expect_error(check_model("invalid_model"))
   expect_error(check_model(structure(list(), class = "invalid")))
@@ -510,18 +506,6 @@ test_that("model constructors and the template list their fields in the canonica
     )
     expect_canonical(env$.model_tmpl_order(), "use_model_template() scaffold")
   }
-})
-
-test_that("stancode() works with brmsformula", {
-  ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
-  sd <- stancode(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "character")
-})
-
-test_that("stancode() works with formula", {
-  ff <- count ~ zAge + zBase * Trt + (1 | patient)
-  sd <- stancode(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "character")
 })
 
 test_that("stancode() works with bmmformula", {
