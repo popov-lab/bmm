@@ -472,3 +472,43 @@ test_that("pp_check_vars() lists the same checks for a 4par fit with indicators"
   )
   expect_identical(vars$default, c(TRUE, FALSE, FALSE, FALSE, FALSE))
 })
+
+
+# Generated Poss_<category> columns are hidden by name, user columns with the same prefix are not
+
+mock_poss_fit <- function(user_column = NULL) {
+  dat <- mpt_impossible_data()
+  if (!is.null(user_column)) {
+    dat[[user_column]] <- rep(c("a", "b"), length.out = nrow(dat))
+  }
+  rhs <- if (is.null(user_column)) "1" else paste("0 +", user_column)
+  bmm(
+    bmf(as.formula(paste("Pm ~", rhs)), Pb ~ 1),
+    dat,
+    mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+}
+
+mock_sdm_poss_fit <- function() {
+  dat <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:4, c("ID", "set_size", "dev_rad")]
+  dat$set_size <- as.numeric(as.character(dat$set_size))
+  dat$Poss_load <- factor(ifelse(dat$set_size > 4, "high", "low"))
+  suppressMessages(bmm(
+    bmf(kappa ~ 0 + Poss_load, c ~ 1),
+    dat,
+    sdm(resp_error = "dev_rad"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+}
+
+test_that(".resolve_pp_conditions() hides the Poss_ columns an MPT fit generates", {
+  fit <- mock_poss_fit()
+  expect_true("Poss_dist" %in% names(fit$data))
+  expect_false("Poss_dist" %in% .resolve_pp_conditions(fit))
+})
+
+test_that(".resolve_pp_conditions() keeps a user column named Poss_*", {
+  expect_true("Poss_block" %in% .resolve_pp_conditions(mock_poss_fit("Poss_block")))
+  expect_true("Poss_load" %in% .resolve_pp_conditions(mock_sdm_poss_fit()))
+})

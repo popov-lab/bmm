@@ -509,6 +509,53 @@ test_that(".filter_internal_effects keeps all user vars", {
   expect_named(result, c("set_size", "condition"))
 })
 
+test_that(".filter_internal_effects removes the Poss_ columns an MPT fit generates", {
+  fit <- bmm(
+    bmf(Pm ~ 1, Pb ~ 1),
+    mpt_impossible_data(),
+    mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  ce <- mock_ce(
+    cond = mock_ce_df(1:3, 0:2, 2:4),
+    Poss_dist = mock_ce_df(1:3, 0:2, 2:4),
+    `cond:Poss_dist` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+
+  expect_named(.filter_internal_effects(ce, fit), "cond")
+})
+
+test_that(".filter_internal_effects keeps a user column named Poss_*", {
+  mock_bmmfit <- list(
+    bmm = list(
+      model = structure(
+        list(other_vars = list()),
+        class = c("sdm", "bmmodel")
+      )
+    )
+  )
+  mpt_fit <- bmm(
+    bmf(Pm ~ 1, Pb ~ 1),
+    mpt_impossible_data(),
+    mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+  ce <- mock_ce(
+    set_size = mock_ce_df(1:3, 0:2, 2:4),
+    Poss_load = mock_ce_df(1:3, 0:2, 2:4),
+    `Poss_load:set_size` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+
+  expect_named(
+    .filter_internal_effects(ce, mock_bmmfit),
+    c("set_size", "Poss_load", "Poss_load:set_size")
+  )
+  expect_named(
+    .filter_internal_effects(ce, mpt_fit),
+    c("set_size", "Poss_load", "Poss_load:set_size")
+  )
+})
+
 
 # ===========================================================================
 # Tier 1: Unit tests — conditional_effects() on multinomial families
