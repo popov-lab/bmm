@@ -21,7 +21,8 @@ the order of the branch names of the selected tree.}
 parameters appearing in the branch expressions of the selected tree, on
 the probability scale and strictly between 0 and 1, as for fixed
 parameters in \code{\link[=bmm]{bmm()}}. Values for parameters the tree does not use are
-ignored, so one vector can serve every tree of the model.}
+ignored, so one vector can serve every tree of the model. Parameters of a
+simplex group must sum to 1.}
 
 \item{mpt_model}{A \code{bmmodel} object created with \code{\link[=mpt]{mpt()}} specifying the
 model that densities or random samples should be generated for.}
