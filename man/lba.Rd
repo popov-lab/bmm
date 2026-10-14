@@ -9,7 +9,7 @@ lba(
   response,
   n_choices = NULL,
   version = c("simple", "custom"),
-  distribution = c("normal", "gamma", "frechet", "lognormal"),
+  distribution = "normal",
   accumulators = NULL,
   links = NULL,
   ...
@@ -48,20 +48,9 @@ Supports per-category \code{accumulators}.
 }}
 
 \item{distribution}{A character string specifying the trial-to-trial drift
-rate distribution. All distributions use \code{driftc}/\code{drifte} as drift
-parameters (for the simple version), but their interpretation and link
-function differ:
-\itemize{
-\item \code{"normal"} (default): Drift rates drawn from a normal distribution.
-\code{driftc}/\code{drifte} = mean drift rate (identity link), \code{s} = SD (fixed=1).
-\item \code{"gamma"}: Drift rates drawn from a gamma distribution.
-\code{driftc}/\code{drifte} = shape parameter (log link), \code{s} = rate (fixed=1).
-\item \code{"frechet"}: Drift rates drawn from a Frechet distribution.
-\code{driftc}/\code{drifte} = shape parameter (log link), \code{s} = scale (fixed=1).
-\item \code{"lognormal"}: Drift rates drawn from a lognormal distribution.
-\code{driftc}/\code{drifte} = meanlog parameter, which may take any real value
-(identity link), \code{s} = sdlog (fixed=1).
-}}
+rate distribution. Currently \code{"normal"}: drift rates drawn from a normal
+distribution truncated at zero, with \code{driftc}/\code{drifte} the mean drift rate
+(identity link) and \code{s} its SD (fixed to 1).}
 
 \item{accumulators}{For \code{version = "custom"} only. A named vector
 specifying the number of racing accumulators per response category.
@@ -171,8 +160,7 @@ on the log scale (median 0.22 s), the same as \code{ddm()}'s. An earlier
 \code{ndt} down and drift rates/thresholds up on a 400-trial recovery.
 
 Random-effects SDs get \code{exponential(1)} for the identity-linked normal
-mean drift and \code{exponential(2)} for the log-linked shape drifts (gamma,
-Frechet), the lognormal meanlog, and for \code{gap}, \code{sp}, \code{ndt} and \code{s},
+mean drift and \code{exponential(2)} for \code{gap}, \code{sp}, \code{ndt} and \code{s},
 following the package-wide rule of rate 1 for identity-linked drift
 parameters and rate 2 for log-linked, boundary, non-decision-time and
 start-point parameters. These rates are anchored on the hierarchical
@@ -180,23 +168,6 @@ simulation design used for the LBA recovery (between-subject SDs
 0.30-0.60 for \code{driftc}, 0.20-0.50 for \code{drifte}, and 0.10-0.25 on the log
 scale for \code{gap}, \code{sp}, \code{ndt}): \code{exponential(1)} puts 36\% of its mass
 below 0.45, \code{exponential(2)} puts 29\% below 0.17.
-}
-
-\section{Numerical notes}{
- For \code{distribution = "gamma"}, the drift's shape
-is \code{driftc}/\code{drifte} (internally the likelihood evaluates the gamma CDF
-at shape \code{driftc}/\code{drifte} + 1), and \code{s * b / t} grows without bound as
-\code{ndt} approaches the fastest response time. Stan Math's gamma CDF has an
-approximate shape partial at every shape (worst above shape 10 and in
-the far tails) and an undefined one once the
-CDF saturates (stan-dev/math #3408), making the gamma drift the slowest
-and least robust of the four distributions near the fastest response
-times; the default gamma prior keeps shape away from this region.
-
-For \code{distribution = "frechet"}, the accumulator's moment integral has no
-closed form and is evaluated by a 16-point Gauss-Legendre rule, accurate
-to 1e-6 nats for \code{sp / gap <= 6}, 6e-5 nats at 10, and 8.7e-3 nats at 40;
-the default priors put \code{sp / gap} near 0.6.
 }
 
 \section{Identifiability of \code{s}}{
@@ -221,9 +192,9 @@ rather than of the specific error observed. Because of that constant,
 integral of the race survivor); it is deterministic, not
 simulation-based. The mean is infinite for a race in which only one
 normal-drift accumulator runs (a custom version with a single category, or
-an \code{accumulators} column that leaves one category on a trial) and for a
-gamma drift whose shapes sum to at most 1; the integral is then truncated
-at 1e7 s and the returned value is not meaningful; treat it as missing.
+an \code{accumulators} column that leaves one category on a trial); the
+integral is then truncated at 1e7 s and the returned value is not
+meaningful; treat it as missing.
 
 \code{pp_check(fit, resp_var = "rt")} checks the response times and
 \code{pp_check(fit, resp_var = "response")} checks the response category

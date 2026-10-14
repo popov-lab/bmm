@@ -1,4 +1,4 @@
-# Per-distribution spec: everything that differs between the four drift-rate
+# Per-distribution spec: everything that differs between the drift-rate
 # distributions. `drift` describes the driftc/drifte accumulator parameters; the
 # gap/sp/ndt/s block lives in .lba_shared (identical across all distributions).
 .lba_dist_specs <- list(
@@ -12,42 +12,6 @@
         drifte = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
       ),
       inits = list(driftc = c(2, 4), drifte = c(0.5, 2))
-    )
-  ),
-  gamma = list(
-    s_desc = "rate parameter (fixed to 1 by default, i.e. `s = 0` on the log scale)",
-    drift = list(
-      desc = "drift rate (gamma shape)",
-      link = "log",
-      priors = list(
-        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
-        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
-      ),
-      inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
-    )
-  ),
-  frechet = list(
-    s_desc = "scale parameter (fixed to 1 by default, i.e. `s = 0` on the log scale)",
-    drift = list(
-      desc = "drift rate (Frechet shape)",
-      link = "log",
-      priors = list(
-        driftc = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
-        drifte = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
-      ),
-      inits = list(driftc = c(1.5, 3), drifte = c(0.8, 2))
-    )
-  ),
-  lognormal = list(
-    s_desc = "sdlog parameter (fixed to 1 by default, i.e. `s = 0` on the log scale)",
-    drift = list(
-      desc = "drift rate (meanlog)",
-      link = "identity",
-      priors = list(
-        driftc = list(main = "normal(0.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
-        drifte = list(main = "normal(0, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
-      ),
-      inits = list(driftc = c(0.2, 0.8), drifte = c(-0.3, 0.3))
     )
   )
 )
@@ -197,20 +161,9 @@ settable_links.lba_custom <- function(model) {
 #'       Supports per-category `accumulators`.
 #'   }
 #' @param distribution A character string specifying the trial-to-trial drift
-#'   rate distribution. All distributions use `driftc`/`drifte` as drift
-#'   parameters (for the simple version), but their interpretation and link
-#'   function differ:
-#'   \itemize{
-#'     \item `"normal"` (default): Drift rates drawn from a normal distribution.
-#'       `driftc`/`drifte` = mean drift rate (identity link), `s` = SD (fixed=1).
-#'     \item `"gamma"`: Drift rates drawn from a gamma distribution.
-#'       `driftc`/`drifte` = shape parameter (log link), `s` = rate (fixed=1).
-#'     \item `"frechet"`: Drift rates drawn from a Frechet distribution.
-#'       `driftc`/`drifte` = shape parameter (log link), `s` = scale (fixed=1).
-#'     \item `"lognormal"`: Drift rates drawn from a lognormal distribution.
-#'       `driftc`/`drifte` = meanlog parameter, which may take any real value
-#'       (identity link), `s` = sdlog (fixed=1).
-#'   }
+#'   rate distribution. Currently `"normal"`: drift rates drawn from a normal
+#'   distribution truncated at zero, with `driftc`/`drifte` the mean drift rate
+#'   (identity link) and `s` its SD (fixed to 1).
 #' @param accumulators For `version = "custom"` only. A named vector
 #'   specifying the number of racing accumulators per response category.
 #'   Can be a named integer vector for constant counts or a named character
@@ -224,8 +177,7 @@ settable_links.lba_custom <- function(model) {
 #'   `ndt` down and drift rates/thresholds up on a 400-trial recovery.
 #'
 #'   Random-effects SDs get `exponential(1)` for the identity-linked normal
-#'   mean drift and `exponential(2)` for the log-linked shape drifts (gamma,
-#'   Frechet), the lognormal meanlog, and for `gap`, `sp`, `ndt` and `s`,
+#'   mean drift and `exponential(2)` for `gap`, `sp`, `ndt` and `s`,
 #'   following the package-wide rule of rate 1 for identity-linked drift
 #'   parameters and rate 2 for log-linked, boundary, non-decision-time and
 #'   start-point parameters. These rates are anchored on the hierarchical
@@ -233,20 +185,6 @@ settable_links.lba_custom <- function(model) {
 #'   0.30-0.60 for `driftc`, 0.20-0.50 for `drifte`, and 0.10-0.25 on the log
 #'   scale for `gap`, `sp`, `ndt`): `exponential(1)` puts 36% of its mass
 #'   below 0.45, `exponential(2)` puts 29% below 0.17.
-#' @section Numerical notes: For `distribution = "gamma"`, the drift's shape
-#'   is `driftc`/`drifte` (internally the likelihood evaluates the gamma CDF
-#'   at shape `driftc`/`drifte` + 1), and `s * b / t` grows without bound as
-#'   `ndt` approaches the fastest response time. Stan Math's gamma CDF has an
-#'   approximate shape partial at every shape (worst above shape 10 and in
-#'   the far tails) and an undefined one once the
-#'   CDF saturates (stan-dev/math #3408), making the gamma drift the slowest
-#'   and least robust of the four distributions near the fastest response
-#'   times; the default gamma prior keeps shape away from this region.
-#'
-#'   For `distribution = "frechet"`, the accumulator's moment integral has no
-#'   closed form and is evaluated by a 16-point Gauss-Legendre rule, accurate
-#'   to 1e-6 nats for `sp / gap <= 6`, 6e-5 nats at 10, and 8.7e-3 nats at 40;
-#'   the default priors put `sp / gap` near 0.6.
 #' @section Identifiability of `s`: The evidence scale of the LBA is
 #'   arbitrary: multiplying every drift rate, `gap`, `sp` and `s` by the same
 #'   constant leaves the likelihood unchanged. `s` is therefore fixed to 1 by
@@ -265,9 +203,9 @@ settable_links.lba_custom <- function(model) {
 #'   integral of the race survivor); it is deterministic, not
 #'   simulation-based. The mean is infinite for a race in which only one
 #'   normal-drift accumulator runs (a custom version with a single category, or
-#'   an `accumulators` column that leaves one category on a trial) and for a
-#'   gamma drift whose shapes sum to at most 1; the integral is then truncated
-#'   at 1e7 s and the returned value is not meaningful; treat it as missing.
+#'   an `accumulators` column that leaves one category on a trial); the
+#'   integral is then truncated at 1e7 s and the returned value is not
+#'   meaningful; treat it as missing.
 #'
 #'   `pp_check(fit, resp_var = "rt")` checks the response times and
 #'   `pp_check(fit, resp_var = "response")` checks the response category
@@ -290,7 +228,7 @@ settable_links.lba_custom <- function(model) {
 #' fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 lba <- function(rt, response, n_choices = NULL,
                 version = c("simple", "custom"),
-                distribution = c("normal", "gamma", "frechet", "lognormal"),
+                distribution = "normal",
                 accumulators = NULL, links = NULL, ...) {
   call <- match.call()
   dots <- list(...)

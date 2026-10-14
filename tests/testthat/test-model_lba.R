@@ -28,16 +28,6 @@ test_that("lba simple version has correct parameters", {
   expect_equal(model$other_vars$n_choices, 4L)
 })
 
-test_that("lba gamma distribution uses consistent drift parameter names", {
-  model <- lba(rt = "rt", response = "response", n_choices = 2,
-               distribution = "gamma")
-
-  expect_true(all(c("driftc", "drifte", "gap", "sp", "ndt", "s") %in%
-                    names(model$parameters)))
-  expect_equal(model$other_vars$distribution, "gamma")
-  expect_equal(model$links$driftc, "log")
-})
-
 test_that("lba has correct link functions for gap and sp", {
   model <- lba(rt = "rt", response = "response", n_choices = 2)
   expect_equal(model$links$gap, "log")
@@ -279,36 +269,6 @@ test_that("Stan code for normal LBA contains expected elements", {
   expect_false(grepl("Phi_approx", code))
 })
 
-test_that("Stan code for gamma LBA contains expected elements", {
-  code <- bmm:::.lba_stan_code("lba_gamma_simple", c("driftc", "drifte"), "gamma")
-  dat <- rlba(10, drift = c(2, 3), gap = 0.5, sp = 0.5, ndt = 0.2,
-              distribution = "gamma")
-  config <- configure_model(
-    lba(rt = "rt", response = "response", n_choices = 2,
-        distribution = "gamma"),
-    dat,
-    bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
-  )
-  expect_true(grepl("lba_gamma_single_lpdf", code))
-  expect_true(grepl("gamma_lcdf", code))
-  expect_false(config$formula$family$loop)
-})
-
-test_that("Stan code for lognormal LBA contains expected elements", {
-  code <- bmm:::.lba_stan_code("lba_lognormal_simple", c("driftc", "drifte"), "lognormal")
-  expect_true(grepl("lba_lognormal_single_lpdf", code))
-  expect_true(grepl("std_normal_lcdf", code))
-  expect_true(grepl("log_diff_exp", code))
-  expect_false(grepl("Phi_approx", code))
-})
-
-test_that("Stan code for frechet LBA contains expected elements", {
-  code <- bmm:::.lba_stan_code("lba_frechet_simple", c("driftc", "drifte"), "frechet")
-  expect_true(grepl("lba_frechet_single_lpdf", code))
-  expect_true(grepl("array\\[16\\] real nodes", code))
-  expect_true(grepl("log_sum_exp", code))
-})
-
 test_that("LBA generated Stan code uses vectorized custom likelihoods", {
   # unseeded, one draw in fifty (P = 0.82^20) has no error response and the custom
   # version then warns that 'wrong' is not in the data
@@ -441,39 +401,6 @@ test_that("lba normal simple version runs with mock backend (4-choice)", {
   )
 })
 
-test_that("lba gamma simple version runs with mock backend", {
-  dat <- rlba(n = 100, drift = c(2, 3), gap = 0.5, sp = 0.5, ndt = 0.2,
-              distribution = "gamma")
-  model <- lba(rt = "rt", response = "response", n_choices = 2,
-               distribution = "gamma")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
-  )
-})
-
-test_that("lba lognormal simple version runs with mock backend", {
-  dat <- rlba(n = 100, drift = c(0.5, 0.3), gap = 0.5, sp = 0.5, ndt = 0.2,
-              distribution = "lognormal")
-  model <- lba(rt = "rt", response = "response", n_choices = 2,
-               distribution = "lognormal")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
-  )
-})
-
-test_that("lba frechet simple version runs with mock backend", {
-  dat <- rlba(n = 100, drift = c(2, 3), gap = 0.5, sp = 0.5, ndt = 0.2,
-              distribution = "frechet")
-  model <- lba(rt = "rt", response = "response", n_choices = 2,
-               distribution = "frechet")
-  formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
-  expect_silent(
-    bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
-  )
-})
-
 test_that("lba custom version runs with mock backend", {
   dat <- rlba(n = 100, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   dat$response <- ifelse(dat$response == 1, "correct", "wrong")
@@ -535,8 +462,7 @@ lba_fake_prep <- function(distribution, driftc, drifte, sp, rt = 0.6,
 }
 
 test_that("log_lik evaluates all draws of an observation in one call", {
-  drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),
-                 lognormal = c(0.5, 0.3))
+  drifts <- list(normal = c(3, 1.5))
   sp <- c(1e-12, 0.3, 0.5)
   for (dist in names(drifts)) {
     d <- drifts[[dist]]
@@ -600,36 +526,6 @@ test_that("dlba matches rtdists for normal distribution", {
   expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
 })
 
-test_that("dlba matches rtdists for gamma distribution", {
-  skip_if_not_installed("rtdists")
-  withr::local_seed(42)
-  ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
-                       shape_v = c(2, 3), rate_v = c(1, 1),
-                       distribution = "gamma")
-  bmm_d <- dlba(ref$rt, ref$response, drift = c(2, 3),
-                gap = 0.5, sp = 0.5, ndt = 0.3, s = 1,
-                distribution = "gamma")
-  rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
-                         shape_v = c(2, 3), rate_v = c(1, 1),
-                         distribution = "gamma", silent = TRUE)
-  expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
-})
-
-test_that("dlba matches rtdists for lognormal distribution", {
-  skip_if_not_installed("rtdists")
-  withr::local_seed(42)
-  ref <- rtdists::rLBA(5, A = 0.5, b = 1, t0 = 0.3,
-                       meanlog_v = c(0.5, 0.3), sdlog_v = c(1, 1),
-                       distribution = "lnorm")
-  bmm_d <- dlba(ref$rt, ref$response, drift = c(0.5, 0.3),
-                gap = 0.5, sp = 0.5, ndt = 0.3, s = 1,
-                distribution = "lognormal")
-  rtd_d <- rtdists::dLBA(ref$rt, ref$response, A = 0.5, b = 1, t0 = 0.3,
-                         meanlog_v = c(0.5, 0.3), sdlog_v = c(1, 1),
-                         distribution = "lnorm", silent = TRUE)
-  expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
-})
-
 test_that("validate_lba_parameters catches invalid inputs", {
   expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = -1, sp = 0.3,
                     ndt = 0.2))
@@ -650,11 +546,7 @@ test_that("dlba integrates to 1 over rt and responses for every distribution", {
   gap <- 0.5; sp <- 0.3; ndt <- 0.2
   cases <- list(
     list(distribution = "normal", drift = c(3, 1.5)),
-    list(distribution = "normal", drift = c(-0.5, 2)),
-    list(distribution = "gamma", drift = c(2, 3)),
-    list(distribution = "lognormal", drift = c(0.5, 0.3)),
-    list(distribution = "lognormal", drift = c(-0.5, 0.3)),
-    list(distribution = "frechet", drift = c(2, 3))
+    list(distribution = "normal", drift = c(-0.5, 2))
   )
   for (case in cases) {
     K <- length(case$drift)
@@ -757,48 +649,6 @@ test_that("pp_simulate() draws rt and response jointly for the custom version", 
 # posterior_epred (#475 contract: the mean of what posterior_predict simulates)
 # -----------------------------------------------------------------------------
 
-# the lognormal and gamma races have a finite RT variance, so a Monte-Carlo
-# mean settles; the K = 2 normal race does not (see .lba_posterior_epred())
-test_that("posterior_epred_lba_simple() is the mean RT posterior_predict_lba_simple() simulates", {
-  withr::local_seed(475)
-  n_draws <- 40000
-  cases <- list(
-    list(dist = "lognormal", driftc = 0.8, drifte = 0.2),
-    list(dist = "gamma", driftc = 6, drifte = 4)
-  )
-  for (case in cases) {
-    one <- lba_fake_prep(case$dist, case$driftc, case$drifte, sp = 0.4)
-    many <- lba_fake_prep(case$dist, case$driftc, case$drifte, sp = rep(0.4, n_draws))
-    epred <- posterior_epred_lba_simple(one)[1, 1]
-    mc <- mean(posterior_predict_lba_simple(1, many))
-    expect_lt(abs(mc / epred - 1), 0.01, label = case$dist)
-  }
-})
-
-test_that("posterior_epred_lba_custom() is the mean RT of its race", {
-  withr::local_seed(476)
-  n_draws <- 40000
-  prep <- function(n) {
-    structure(
-      list(
-        ndraws = n, nobs = 1L,
-        dpars = list(
-          a = matrix(0.8, n, 1), b = matrix(0.3, n, 1),
-          gap = matrix(0.5, n, 1), sp = matrix(0.4, n, 1),
-          ndt = matrix(0.2, n, 1), s = matrix(1, n, 1)
-        ),
-        data = list(Y = 0.7, vint1 = 1L, vint2 = 1L, vint3 = 2L),
-        family = list(name = "lba_lognormal_custom",
-                      dpars = c("mu", "a", "b", "gap", "sp", "ndt", "s"))
-      ),
-      class = "brmsprep"
-    )
-  }
-  epred <- posterior_epred_lba_custom(prep(1))[1, 1]
-  mc <- mean(posterior_predict_lba_custom(1, prep(n_draws)))
-  expect_lt(abs(mc / epred - 1), 0.01)
-})
-
 test_that("posterior_epred_lba_simple() returns one column per observation", {
   ndraws <- 3
   nobs <- 2
@@ -855,8 +705,7 @@ test_that("both lba versions store their posterior_epred in the family", {
 # the normal race decays like 1/t^2, so its mean rests on a long tail that the
 # searched range has to reach
 test_that("the posterior_epred integral matches quadrature for every drift distribution", {
-  drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),
-                 lognormal = c(0.5, 0.3))
+  drifts <- list(normal = c(3, 1.5))
   for (dist in names(drifts)) {
     drift <- drifts[[dist]]
     log_surv <- function(t) {
@@ -996,19 +845,6 @@ test_that("dlba recycles a per-trial gap vector like two separate scalar calls",
   expect_equal(combined, separate)
 })
 
-test_that("dlba accepts an unrestricted lognormal meanlog and rejects a non-positive gamma shape", {
-  expect_gt(
-    dlba(0.5, 1, drift = c(-0.5, 0.3), gap = 0.5, sp = 0.5, ndt = 0.2,
-         distribution = "lognormal"),
-    0
-  )
-  expect_error(
-    dlba(0.5, 1, drift = c(-1, 2), gap = 0.5, sp = 0.5, ndt = 0.2,
-         distribution = "gamma"),
-    "positive"
-  )
-})
-
 # =============================================================================
 # DEFAULT PRIORS, LINKS AND INITIAL VALUES
 # =============================================================================
@@ -1021,12 +857,6 @@ test_that("lba ships an sd default on the link scale of each parameter", {
   pr <- default_prior(lba_formula, lba_data, lba("rt", "response", n_choices = 2))
   for (par in c("driftc", "drifte")) expect_equal(sd_default(pr, par), "exponential(1)")
   for (par in c("gap", "sp", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
-  for (dist in c("gamma", "frechet", "lognormal")) {
-    pr <- default_prior(lba_formula, lba_data, lba("rt", "response", n_choices = 2, distribution = dist))
-    for (par in c("driftc", "drifte", "gap", "sp", "ndt")) {
-      expect_equal(sd_default(pr, par), "exponential(2)", label = paste(dist, par))
-    }
-  }
   lba_data$response <- ifelse(lba_data$response == 1, "hit", "miss")
   pr <- default_prior(
     bmf(hit ~ 1 + (1 | id), miss ~ 1 + (1 | id), gap ~ 1, sp ~ 1, ndt ~ 1), lba_data,
@@ -1072,8 +902,7 @@ test_that("initfun starts every LBA parameter inside its init range", {
                   info = paste(model$other_vars$distribution, model$version, par))
     }
   }
-  drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),
-                 lognormal = c(0.5, 0.3))
+  drifts <- list(normal = c(3, 1.5))
 
   for (dist in names(drifts)) {
     dat <- rlba(n = 120, drift = drifts[[dist]], gap = 0.5, sp = 0.5, ndt = 0.2,
@@ -1151,8 +980,7 @@ test_that("posterior_predict_lba_simple() keeps one start-point draw per posteri
 
 
 test_that("dlba() and plba() return 0 or NA at and below the non-decision time for every distribution", {
-  drifts <- list(normal = c(3, 1.5), gamma = c(2, 3), frechet = c(2, 3),
-                 lognormal = c(0.5, 0.3))
+  drifts <- list(normal = c(3, 1.5))
   for (dist in names(drifts)) {
     drift <- drifts[[dist]]
     args <- list(drift = drift, gap = 0.5, sp = 0.3, ndt = 0.2, distribution = dist)
