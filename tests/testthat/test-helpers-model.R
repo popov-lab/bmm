@@ -46,7 +46,7 @@ test_that("format_model_list() appends unknown groups after the known ones and s
   expect_true("- foo(): Foo model" %in% txt)
   md <- format_model_list(registry, "md", headers = FALSE)
   expect_false(any(grepl("^\\*\\*", md)))
-  expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://popov-lab.github.io/bmm/reference/imm.html\\)", md)))
+  expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://venpopov.com/bmm/reference/imm.html\\)", md)))
 })
 
 test_that("bmm_models() prints every model exactly once, without arguments", {

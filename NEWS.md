@@ -97,7 +97,7 @@
 
 ### Documentation
 * `?conditional_effects.bmmfit` now says that `se__` is the spread of the draws on the scale `brms` or bmm summarises them on, so with a link other than identity it can sit on a different scale than `estimate__`. Use `lower__` and `upper__` for uncertainty on the scale you asked for. A new section covers models with a multinomial family (#512).
-* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_hypothesis_testing.html) on testing hypotheses and comparing models: testing effects on a parameter with `hypothesis()`, comparing a model with and without a predictor, and comparing different models fitted to the same data, with leave-one-out cross-validation and Bayes factors (#308).
+* New online [article](https://venpopov.com/bmm/dev/articles/bmm_hypothesis_testing.html) on testing hypotheses and comparing models: testing effects on a parameter with `hypothesis()`, comparing a model with and without a predictor, and comparing different models fitted to the same data, with leave-one-out cross-validation and Bayes factors (#308).
 
 * `?ddm`, `?ezdm` and `?cswald` now give the scale of `zr`: `ddm()` and `cswald(version = "crisk")` fix it at 0 on its logit scale, an unbiased 0.5, and `?ddm` explains why response-coded data need `zr` estimated. `?cswald` says that `drift` has a log link in `"simple"` and an identity link in `"crisk"`, and that the `"simple"` `bound` is half the boundary separation. `?ezdm_summary_stats` says that `method = "robust"` gives larger drift and smaller boundary estimates than `"mixture"` (#540).
 
@@ -105,9 +105,8 @@
 * `ezdm_summary_stats()` and `flag_contaminant_rts()` now run up to 500 EM iterations (`maxit`) instead of 100. Cells with almost no contaminants can need more than 100; they fell back to robust moments in `ezdm_summary_stats()` and to `NA` probabilities in `flag_contaminant_rts()`, which a filter such as `contam_prob <= 0.5` drops entirely. Such cells now get mixture-based values, so summary statistics and flags from earlier runs can differ for them. The warning now says when the EM stopped at `maxit`. Pass `maxit = 100` to reproduce earlier results (#540).
 * `bmm_models()` (formerly `supported_models()`) now lists the models under four task groups (continuous reproduction; categorical recall and n-AFC decisions; detection, recognition and confidence judgments; choices and response times), one line per model with its constructor and full name. The argument lists are gone from the printout; `?modelname` has them (#440).
 * The home page of the website and the README now start from your task and list the models for each one, with links to the matching articles. The lists are generated from the package, so they stay current as models are added (#440).
-* New [Get started](https://popov-lab.github.io/bmm/articles/bmm.html) page on the website: install and check your machine with `bmm_setup()`, find the model for your task, including a table of the signal detection models by response format and noise distribution, and fit a first model to `broeder_schuetz_2009_e3` step by step (#440).
+* New [Get started](https://venpopov.com/bmm/articles/bmm.html) page on the website: install and check your machine with `bmm_setup()`, find the model for your task, including a table of the signal detection models by response format and noise distribution, and fit a first model to `broeder_schuetz_2009_e3` step by step (#440).
 * The model lists on the Get started page are now tables with one row per model version: the data columns each version needs, by argument, and the parameters it estimates (#467).
-* bmm's own links now point at popov-lab.github.io/bmm instead of venpopov.com/bmm, which currently redirects to the new address. Update bookmarks when convenient (#433).
 * For developers: the model file written by `use_model_template()` now follows the package's current conventions. `document()` runs on it without warnings, the new model passes the website reference check, its default priors include `sd`, and with `custom_family = TRUE` `posterior_epred()` works once the generated stubs are filled in. The file header lists the registries and test fixtures a new model must also update (#490).
 * The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
 
@@ -170,10 +169,10 @@
 * New function **create_initfun()** creates initialization functions for models that benefit from or require initial values for MCMC sampling (#285).
 
 ### Documentation
-* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_ddm.html) to accompany the **ddm** model
-* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_ezdm.html) to accompany the **ezdm** model
-* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_cswald.html) to accompany the **cswald** model
-* New online [article](https://popov-lab.github.io/bmm/dev/articles/bmm_rt_contamination.html) on pre-processing and contamination detection for reaction time data
+* New online [article](https://venpopov.com/bmm/dev/articles/bmm_ddm.html) to accompany the **ddm** model
+* New online [article](https://venpopov.com/bmm/dev/articles/bmm_ezdm.html) to accompany the **ezdm** model
+* New online [article](https://venpopov.com/bmm/dev/articles/bmm_cswald.html) to accompany the **cswald** model
+* New online [article](https://venpopov.com/bmm/dev/articles/bmm_rt_contamination.html) on pre-processing and contamination detection for reaction time data
 
 ### Other changes
 * Improved **rm3()** random generation function for the M3 model (#279).
@@ -183,7 +182,7 @@
 # bmm 1.2.0
 
 ### New models
-* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
+* Add the Memory Measurement Model (Oberauer & Lewandowsky, 2019) and its generalization as the Multinomial Measurement Model for categorical decision tasks as new model class **m3** with three versions: simple span (**ss**), complex span (**cs**), and **custom**. For details, see the [article](https://venpopov.com/bmm/articles/bmm_m3.html) on the `bmm` website (#237). Thanks to @GidonFrischkorn and @chenyu-psy
 
 ### New features
 * Updates to the `bmf2bf` S3 methods for more flexible translation of `bmmformulas` into `brmsformulas` (#227).
@@ -198,8 +197,8 @@
 * Improve error messages when attempting to construct bmmformulas without a left-hand-side variable
 
 ### Documentation
-* Add documentation to the [continuous reproduction task](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
-* New online [article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) to accompany the m3 model
+* Add documentation to the [continuous reproduction task](https://venpopov.com/bmm/articles/bmm_vwm_crt.html) article for pre-processing half-circular stimulus spaces when using `bmmodels` of the `circular` model class (#229, #233).
+* New online [article](https://venpopov.com/bmm/articles/bmm_m3.html) to accompany the m3 model
 
 ### Other changes
 * vectorize `k2sd()` function for improved performance
@@ -241,7 +240,7 @@ First version of the package on published on CRAN!
 * various updates to the documentation and data sets
 
 ### Documentation
-* two new online articles that [introduce the **bmmformula** syntax](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
+* two new online articles that [introduce the **bmmformula** syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.html) and explain [how to extract information from **bmmodels**](https://venpopov.com/bmm/articles/bmm_extract_info.html) such as the generated Stan code and Stan data for each model
 
 ### Bug fixes
 * fix a bug preventing the **sort_data** check from being executed (#72)
@@ -327,9 +326,9 @@ to zero for scaling and as of now cannot be predicted by independent variables b
 
 ### Documentation
 
-* Website for the development version of the package is now available at https://popov-lab.github.io/bmm/dev/ (#18)
-* Add articles for each model to the website at https://popov-lab.github.io/bmm/dev/articles/
-* Add a detailed developer's guide to the website at https://popov-lab.github.io/bmm/dev/dev-notes (#21)
+* Website for the development version of the package is now available at https://venpopov.com/bmm/dev/ (#18)
+* Add articles for each model to the website at https://venpopov.com/bmm/dev/articles/
+* Add a detailed developer's guide to the website at https://venpopov.com/bmm/dev/dev-notes (#21)
 * Improve README with more detailed information about the package's goals and its models (#21)
 
 ### Other changes

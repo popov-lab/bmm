@@ -16,7 +16,7 @@ n_suggests <- length(strsplit(desc[["Suggests"]], ",")[[1]])
 # bmm <img src="man/figures/logo.png" align="right" height="139" alt="bmm logo" />
 
 <!-- badges: start -->
-[![Documentation](https://img.shields.io/badge/documentation-bmm-blue.svg)](https://popov-lab.github.io/bmm/)
+[![Documentation](https://img.shields.io/badge/documentation-bmm-blue.svg)](https://venpopov.com/bmm/)
 [![CRAN status](https://www.r-pkg.org/badges/version/bmm)](https://CRAN.R-project.org/package=bmm)
 [![bmm status badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-universe.dev/bmm)
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
@@ -36,8 +36,8 @@ parameters that describe the cognitive processes behind the data, such as
 memory precision, the rate of guessing, or the sensitivity in a recognition
 task, in the same formula interface you already use for regression.
 
-The [documentation website](https://popov-lab.github.io/bmm/) has a
-[Get started](https://popov-lab.github.io/bmm/articles/bmm.html) page and
+The [documentation website](https://venpopov.com/bmm/) has a
+[Get started](https://venpopov.com/bmm/articles/bmm.html) page and
 one article per model family. This page gives you the short version.
 
 ## Which model for your task
@@ -48,7 +48,7 @@ the version this page was built from.
 
 **Continuous reproduction.** Participants reproduce a color, an orientation
 or another continuous feature, and the response error is the dependent
-variable. See the [continuous reproduction article](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html).
+variable. See the [continuous reproduction article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html).
 
 ```{r, results = "asis", echo = FALSE}
 bmm::print_pretty_models_md(group = "Continuous reproduction")
@@ -58,7 +58,7 @@ bmm::print_pretty_models_md(group = "Continuous reproduction")
 from a set of categories (n-alternative forced choice), for example the
 correct item, an item from another position, or an item that was not
 studied. See the
-[M3 article](https://popov-lab.github.io/bmm/articles/bmm_m3.html).
+[M3 article](https://venpopov.com/bmm/articles/bmm_m3.html).
 
 ```{r, results = "asis", echo = FALSE}
 bmm::print_pretty_models_md(group = "Categorical recall and n-AFC decisions")
@@ -69,12 +69,12 @@ whether a signal was present or an item was studied, rate their confidence,
 give Remember/Know judgments, pick the target among several alternatives, or
 rank the alternatives. One signal detection model per response format, each
 fit to response counts per participant and condition. See the
-[signal detection article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html)
+[signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
 and, for the dual-process and meta-d′ versions of `sdt_rating()` and the
 Remember/Know model `sdt_cdp()`, the
-[dual-process and meta-d′ article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html).
+[dual-process and meta-d′ article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html).
 The
-[Get started](https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
+[Get started](https://venpopov.com/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
 page has a table of the response formats and the noise distributions each
 model offers.
 
@@ -85,10 +85,10 @@ bmm::print_pretty_models_md(group = "Detection, recognition and confidence judgm
 **Choices and response times.** Participants choose between two options and
 the response time is recorded, either on every trial or as means and
 variances per condition. See the
-[DDM](https://popov-lab.github.io/bmm/articles/bmm_ddm.html),
-[censored shifted Wald](https://popov-lab.github.io/bmm/articles/bmm_cswald.html),
-[EZ-diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html) and
-[response time contamination](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html)
+[DDM](https://venpopov.com/bmm/articles/bmm_ddm.html),
+[censored shifted Wald](https://venpopov.com/bmm/articles/bmm_cswald.html),
+[EZ-diffusion](https://venpopov.com/bmm/articles/bmm_ezdm.html) and
+[response time contamination](https://venpopov.com/bmm/articles/bmm_rt_contamination.html)
 articles.
 
 ```{r, results = "asis", echo = FALSE}
@@ -100,7 +100,7 @@ you describe the discrete processes that lead to each response as a
 multinomial processing tree: the two-high-threshold model of recognition,
 the pair-clustering model of free recall, or a tree of your own. The model is
 fit to response counts per participant and condition. See the
-[MPT article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html).
+[MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html).
 
 ```{r, results = "asis", echo = FALSE}
 bmm::print_pretty_models_md(group = "Processing-tree models")
@@ -217,24 +217,24 @@ summary(fit)
 
 The fit is a `brms` fit with extras, so `summary()`, posterior predictive
 checks with `pp_check()` and the rest of the `brms` toolbox work as usual.
-The [Get started](https://popov-lab.github.io/bmm/articles/bmm.html) page
+The [Get started](https://venpopov.com/bmm/articles/bmm.html) page
 walks through this example line by line, including how to read the
 summary.
 
 ## Learn more
 
-- [Articles](https://popov-lab.github.io/bmm/articles/index.html): one per
+- [Articles](https://venpopov.com/bmm/articles/index.html): one per
   model family, plus the
-  [bmmformula syntax](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
+  [bmmformula syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.html)
   and how to
-  [extract priors, Stan code and Stan data](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
+  [extract priors, Stan code and Stan data](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   from a model.
-- [Function reference](https://popov-lab.github.io/bmm/reference/index.html)
-- [Changelog](https://popov-lab.github.io/bmm/news/index.html)
+- [Function reference](https://venpopov.com/bmm/reference/index.html)
+- [Changelog](https://venpopov.com/bmm/news/index.html)
 - Something missing or broken? Open an
   [issue](https://github.com/popov-lab/bmm/issues). For a new model, describe
   it, point to the literature, and link code that already implements it if
   there is any.
 - Want to add a model yourself? Start with the
-  [Developer Notes](https://popov-lab.github.io/bmm/dev-notes/index.html) and
+  [Developer Notes](https://venpopov.com/bmm/dev-notes/index.html) and
   the [Contributor Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md).
