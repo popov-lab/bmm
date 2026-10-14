@@ -160,6 +160,27 @@
   [`?mpt_tree`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- New functions
+  [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+  and
+  [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+  build an
+  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) model
+  from MPTinR-style model text (a string or
+  [`readLines()`](https://rdrr.io/r/base/readLines.html) output) or from
+  an EQN file. Both take `impossible` for response categories a tree
+  cannot produce.
+  [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+  renames names
+  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) cannot
+  use, such as `D_o`, reports the renaming, takes restrictions in the
+  file’s names, and maps numeric tree labels through `tree_names`.
+  MPTinR and TreeBUGS skip the first line of an EQN file; bmm reads it
+  unless it is the equation count, so delete a title line or start it
+  with `#`. See
+  [`?mpt_from_eqn`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+  ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 
