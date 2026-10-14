@@ -726,9 +726,8 @@ ezdm_parity_drift <- c(
 )
 
 test_that("ezdm_3par_lpdf in Stan matches dezdm() in R", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   grid <- expand.grid(
     drift = ezdm_parity_drift, bound = c(0.4, 1.5, 3), s = c(1, 1.4),
@@ -761,9 +760,8 @@ test_that("ezdm_3par_lpdf in Stan matches dezdm() in R", {
 })
 
 test_that("ezdm_4par_lpdf in Stan matches dezdm() in R", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   grid <- expand.grid(
     drift = ezdm_parity_drift, bound = c(0.4, 1.5, 3),
@@ -878,9 +876,13 @@ test_that("ezdm_4par_lpdf never reads the summaries of an unused boundary", {
   for (k in seq_along(placeholders)[-1]) {
     expect_identical(r_count_gated[, k], r_count_gated[, 1])
   }
+})
 
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+test_that("the Stan ezdm_4par_lpdf never reads the summaries of an unused boundary", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  placeholders <- c(-1, 0, 0.3, 1e300)
+  grids <- lapply(placeholders, ezdm_unused_grid)
 
   stacked <- do.call(rbind, grids)
   stan_lpdf <- matrix(
@@ -910,8 +912,7 @@ test_that("ezdm_4par_lpdf never reads the summaries of an unused boundary", {
 # boundary is absorbed at the upper one, checked against rtdists::ddiffusion()
 # integrated over time. |drift * bound| <= 3 keeps this direct form accurate
 # far below the tolerance.
-test_that("an ezdm 4par cell without a used boundary is a Wiener binomial", {
-  skip_on_cran()
+ezdm_binomial_grid <- function() {
   grid <- expand.grid(
     drift = c(-2, -0.9, -0.3, 0.3, 0.9, 2), bound = c(0.5, 1.5),
     zr = c(0.2, 0.5, 0.8), s = c(1, 1.3), n_upper = c(3L, 12L, 27L)
@@ -921,20 +922,27 @@ test_that("an ezdm 4par cell without a used boundary is a Wiener binomial", {
   start <- grid$zr * grid$bound
   p_upper <- (1 - exp(-2 * grid$drift * start / grid$s^2)) /
     (1 - exp(-2 * grid$drift * grid$bound / grid$s^2))
-  reference <- stats::dbinom(grid$n_upper, grid$n_trials, p_upper, log = TRUE)
+  grid$reference <- stats::dbinom(grid$n_upper, grid$n_trials, p_upper, log = TRUE)
+  grid
+}
 
+test_that("an ezdm 4par cell without a used boundary is a Wiener binomial", {
+  grid <- ezdm_binomial_grid()
   grid[c("mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower")] <- NA_real_
-  expect_lt(max(abs(dezdm_4par_grid(grid) / reference - 1)), 1e-9)
+  expect_lt(max(abs(dezdm_4par_grid(grid) / grid$reference - 1)), 1e-9)
+})
 
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+test_that("the Stan ezdm 4par cell without a used boundary is a Wiener binomial", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  grid <- ezdm_binomial_grid()
   grid[c("mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower")] <- -1
   grid$rt_upper <- 0L
   grid$rt_lower <- 0L
   stan_lpdf <- ezdm_stan_lpdf("4par", c(
     list(N = nrow(grid)), as.list(grid[ezdm_stan_columns_4par])
   ))
-  expect_lt(max(abs(stan_lpdf / reference - 1)), 1e-9)
+  expect_lt(max(abs(stan_lpdf / grid$reference - 1)), 1e-9)
 })
 
 # The placeholder is -1 so that a summary read by mistake cannot pass
@@ -942,7 +950,6 @@ test_that("an ezdm 4par cell without a used boundary is a Wiener binomial", {
 # quantities and writes NaN for every value of that iteration, so each
 # boundary gets a run of its own, and no such row may join a batched run.
 test_that("a placeholder read as data gives no finite ezdm 4par density", {
-  skip_on_cran()
   moments <- .ezdm_moments_4par(1, 1.5, 0.5, 1)
   mean_rt <- 0.25 + c(moments$mdt_upper, moments$mdt_lower)
   var_rt <- c(moments$vrt_upper, moments$vrt_lower)
@@ -952,9 +959,14 @@ test_that("a placeholder read as data gives no finite ezdm 4par density", {
   }
   expect_identical(lpdf(c(-1, mean_rt[2]), c(-1, var_rt[2])), -Inf)
   expect_identical(lpdf(c(mean_rt[1], -1), c(var_rt[1], -1)), -Inf)
+})
 
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+test_that("a placeholder read as data gives no finite Stan ezdm 4par density", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  moments <- .ezdm_moments_4par(1, 1.5, 0.5, 1)
+  mean_rt <- 0.25 + c(moments$mdt_upper, moments$mdt_lower)
+  var_rt <- c(moments$vrt_upper, moments$vrt_lower)
   for (boundary in c("upper", "lower")) {
     data <- list(
       N = 2L, drift = c(1, 1), bound = c(1.5, 1.5), ndt = c(0.25, 0.25),
@@ -971,37 +983,43 @@ test_that("a placeholder read as data gives no finite ezdm 4par density", {
   }
 })
 
-test_that("ezdm Stan code calls the model lpdf and parses", {
-  skip_on_cran()
+ezdm_stancode_both <- function() {
   data <- data.frame(
     mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.03), n_upper = c(60L, 40L),
     n_trials = c(100L, 100L), mean_rt_upper = c(0.5, 0.55),
     mean_rt_lower = c(0.6, 0.58), var_rt_upper = c(0.02, 0.03),
     var_rt_lower = c(0.03, 0.04)
   )
-
-  code3 <- stancode(
-    bmf(drift ~ 1, bound ~ 1, ndt ~ 1), data = data,
-    model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
-  )
-  expect_match(code3, "real ezdm_3par_lpdf(", fixed = TRUE)
-  expect_match(code3, "real ezdm_symmetric_lpdf(", fixed = TRUE)
-  expect_match(code3, "ezdm_3par_lpdf(Y[n] |", fixed = TRUE)
-
-  code4 <- stancode(
-    bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1), data = data,
-    model = ezdm(
-      c("mean_rt_upper", "mean_rt_lower"), c("var_rt_upper", "var_rt_lower"),
-      "n_upper", "n_trials",
-      version = "4par"
+  list(
+    "3par" = stancode(
+      bmf(drift ~ 1, bound ~ 1, ndt ~ 1), data = data,
+      model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
+    ),
+    "4par" = stancode(
+      bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1), data = data,
+      model = ezdm(
+        c("mean_rt_upper", "mean_rt_lower"), c("var_rt_upper", "var_rt_lower"),
+        "n_upper", "n_trials",
+        version = "4par"
+      )
     )
   )
-  expect_match(code4, "real ezdm_4par_lpdf(", fixed = TRUE)
-  expect_match(code4, "real ezdm_boundary_lpdf(", fixed = TRUE)
+}
 
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
-  for (code in list(code3, code4)) {
+test_that("ezdm Stan code calls the model lpdf", {
+  skip_on_cran()
+  code <- ezdm_stancode_both()
+  expect_match(code[["3par"]], "real ezdm_3par_lpdf(", fixed = TRUE)
+  expect_match(code[["3par"]], "real ezdm_symmetric_lpdf(", fixed = TRUE)
+  expect_match(code[["3par"]], "ezdm_3par_lpdf(Y[n] |", fixed = TRUE)
+  expect_match(code[["4par"]], "real ezdm_4par_lpdf(", fixed = TRUE)
+  expect_match(code[["4par"]], "real ezdm_boundary_lpdf(", fixed = TRUE)
+})
+
+test_that("ezdm Stan code parses", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  for (code in ezdm_stancode_both()) {
     model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
     expect_true(model$check_syntax(quiet = TRUE))
   }
@@ -1024,9 +1042,8 @@ test_that("ezdm_4par_lpdf has the right gradient at and around zero drift", {
   # Returning the limit of pC at drift = 0 as a constant gave the right value
   # and a zero gradient, which only autodiff can see. CmdStan's standalone
   # log_prob method is used because expose_functions() returns no gradients.
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   program <- paste0(
     "functions {\n", .ezdm_stan_functions("4par"), "\n}\n",

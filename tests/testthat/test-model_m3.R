@@ -707,9 +707,8 @@ test_that("m3_gauss_logp keeps the draws-by-observation shape and gives absent c
 })
 
 test_that("the Stan Gaussian-rule wrapper matches its R companion", {
+  skip_unless_stan_tests()
   skip_on_cran() # compiles and runs a Stan program
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "gaussian", version = "ss")
   grid <- expand.grid(k = 1:3, A1 = c(-2, 0.5, 4, 40), A2 = c(0, 1.5), n2 = c(1e-4, 1, 8), n3 = c(1, 30))
@@ -740,9 +739,8 @@ test_that("the Stan Gaussian-rule wrapper matches its R companion", {
 # gradient is non-finite (log(0) times Phi's zero derivative); the fallback's derivative is approximate
 # (5e-4 off the finite difference at this point), hence error = 1e-2
 test_that("the Stan Gaussian-rule kernel has finite gradients where one category trails by 50", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "gaussian", version = "ss")
   program <- paste0(

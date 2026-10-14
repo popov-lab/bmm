@@ -34,10 +34,9 @@ expect_pattern_counts <- function(pattern, expected, rule) {
 }
 
 test_that("Stan programs are compiled only at the registered sites (R1)", {
-  # each site compiles on every run and opens with skip_unless_stan_tests()
-  # once #422 inserts the gate; until then CmdStan's absence on the Windows
-  # and macOS pull-request jobs is the gate. A new site is a new entry here
-  # and the gate in the test. test-helpers-circmix.R and
+  # each test that reaches a site, directly or through a builder function,
+  # opens with skip_unless_stan_tests(). A new site is a new entry here and
+  # the gate in the test. test-helpers-circmix.R and
   # test-model_mixture2p.R (#434, counts at the tip of the stack) and
   # test-model_rdm.R (#502) are registered ahead; the circmix sites in
   # test-model_imm.R and test-model_mixture3p.R cannot be: those files exist

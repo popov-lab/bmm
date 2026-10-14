@@ -402,9 +402,8 @@ versions_stan_logmu <- function(grid, deltas) {
 }
 
 test_that("the Stan dpsdt and metad kernels match their R counterparts in both tails", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   grid <- expand.grid(cat = 1:6, criterion = c(-12, -0.5, 0.3, 12),
                       sdratio = c(-0.6, 0, 0.9), stimulus = c(0, 1),

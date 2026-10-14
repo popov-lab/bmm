@@ -544,12 +544,8 @@ cswald_parity_data <- function(n = 200) {
 }
 
 test_that("the vectorized cswald likelihood matches the scalar and R versions", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   # seeded so a failure reproduces. Under this seed the log-space fallback,
   # with both clamp conditions firing, takes 23 survivor terms for simple and 7
@@ -642,12 +638,8 @@ test_that("the R cswald likelihood is 0 or -Inf where rt <= ndt, not NaN (#453)"
 })
 
 test_that("the cswald survivor keeps a finite gradient where Phi() nears underflow", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   file <- file.path(tempdir(), "bmm_cswald_surv_grad.stan")
@@ -679,12 +671,8 @@ test_that("the cswald survivor keeps a finite gradient where Phi() nears underfl
 })
 
 test_that("swald_log_Phi keeps a finite gradient on its own where Phi() nears underflow", {
+  skip_unless_stan_tests()
   skip_on_cran() # compiles a Stan program
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   file <- file.path(tempdir(), "bmm_cswald_log_phi_grad.stan")

@@ -732,9 +732,8 @@ cdp_kernel_stan <- function(cells) {
 }
 
 test_that("the Stan cdp kernel matches the R kernel in both tails", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   cells <- cdp_kernel_grid()
   stan <- cdp_kernel_stan(cells)
@@ -756,9 +755,8 @@ test_that("the Stan cdp likelihood has a finite gradient with an unbounded top b
   # the parity test compares values only; an infinite bin bound that reaches
   # Phi() as a function of the parameters gives a NaN gradient (zero density
   # times an infinite adjoint) while every value stays right
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   program <- paste0(
     "functions {\n",
@@ -907,9 +905,8 @@ test_that("the Stan cdp gradient is right where a threshold meets the strength m
   # rcrit == kcrit on lures makes all three Guess breakpoints coincide. The
   # values were always right there; the gradients were not (0 for the first,
   # -3.65 against a finite difference of -1.51 for the second)
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   program <- paste0(
     "functions {\n",

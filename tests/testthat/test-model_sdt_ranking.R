@@ -454,9 +454,8 @@ ranking_stan_logmu <- function(grid, max_m) {
 }
 
 test_that("the Stan ranking kernels match their R counterparts", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   max_m <- 5L
   cells <- expand.grid(m = 2:max_m, d = c(-10, -3, 0, 1.3, 4, 10, 30),

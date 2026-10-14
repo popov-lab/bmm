@@ -682,9 +682,8 @@ rating_stan_logmu <- function(grid, deltas, K) {
 }
 
 test_that("the Stan rating kernel matches its R counterpart in both tails", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   # criterion = 12 puts every threshold far into the upper tail, where the log
   # cdf of both bounds of an interval rounds to 0; -12 does the same below.
@@ -840,9 +839,8 @@ test_that("sdt_rating log_distance fits with finite likelihood at K=6 (real fit)
 })
 
 test_that("the generated Stan logmu function reads either anchor as its R companion does", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   model <- sdt_rating(paste0("r", 1:4), "stimulus")
   sc <- system.file("stan_chunks", package = "bmm")

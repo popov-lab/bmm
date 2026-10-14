@@ -439,9 +439,8 @@ test_that("probe_smoke_test() restores PKG_CPPFLAGS, PKG_LIBS and USE_CXX17 a us
 })
 
 test_that("a real machine check without a smoke test finds no failure", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   report <- bmm_setup(smoke_test = FALSE, backend = "cmdstanr")
   expect_false(
@@ -451,9 +450,8 @@ test_that("a real machine check without a smoke test finds no failure", {
 })
 
 test_that("a real smoke test compiles and samples", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
   expect_equal(

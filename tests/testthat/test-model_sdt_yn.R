@@ -999,9 +999,8 @@ test_that("an sdt_yn fit stores posterior_epred_sdt_yn() in its family", {
 })
 
 test_that("both Stan yes/no likelihoods match dsdt_yn", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   sc <- system.file("stan_chunks", package = "bmm")
   program <- paste0(
