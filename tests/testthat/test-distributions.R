@@ -1004,7 +1004,7 @@ test_that("dcswald with sndt handles draws-vector parameters mixing 0 and 0.2", 
 })
 
 test_that("rcswald with sndt generates valid output", {
-  set.seed(123)
+  withr::local_seed(123)
   dat0 <- rcswald(5000, drift = 2, bound = 1.5, ndt = 0.3)
   dat1 <- rcswald(5000, drift = 2, bound = 1.5, ndt = 0.3, sndt = 0.3)
   expect_true(all(dat1$rt > 0.3))
