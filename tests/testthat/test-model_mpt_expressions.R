@@ -1,0 +1,384 @@
+test_that("mpt_tree folds integer fractions into decimal literals", {
+  tree <- mpt_tree("t", list(
+    a = "p + (1 - p) * (1/4)",
+    b = "(1 - p) * (3/4)"
+  ))
+  expect_equal(deparse1(tree$branches$a), "p + (1 - p) * 0.25")
+  expect_equal(deparse1(tree$branches$b), "(1 - p) * 0.75")
+})
+
+test_that("mpt_tree folds compound integer constants into decimal literals", {
+  tree <- mpt_tree("t", list(
+    a = "p + (1 - p) * (1/(2*2))",
+    b = "(1 - p) * (-1/4)",
+    c = "p * (1/2^2)"
+  ))
+  expect_equal(deparse1(tree$branches$a), "p + (1 - p) * 0.25")
+  expect_equal(deparse1(tree$branches$b), "(1 - p) * -0.25")
+  expect_equal(deparse1(tree$branches$c), "p * 0.25")
+  dat <- data.frame(a = c(30L, 28L), b = c(0L, 2L))
+  code <- stancode(
+    bmf(p ~ 1), data = dat,
+    model = mpt(mpt_tree("t", list(a = "p + (1 - p) * (1/(2*2))", b = "(1 - p) * (1 - 1/(2*2))")))
+  )
+  expect_match(code, "* 0.25", fixed = TRUE)
+  expect_false(grepl("1 / (2 * 2)", code, fixed = TRUE))
+})
+
+test_that("mpt_tree says why a constant is refused and which rewrite works", {
+  expect_error(
+    mpt_tree("t", list(a = "0.00010 + 0.9999 * p", b = "0.9999 * (1 - p)")),
+    "'0.00010' \\(1e-04\\) in tree 't' in scientific notation.*\\(1 \\+ 9999 \\* p\\) / 10000"
+  )
+  # a folded constant has no written form, so brms's form is not repeated
+  expect_error(
+    mpt_tree("t", list(a = "1/10000 + 0.9999 * p", b = "0.9999 * (1 - p)")),
+    "constant\\(s\\) '1e-04' in tree 't' in scientific notation, which"
+  )
+  # a large constant gets a rewrite for large numbers
+  for (large in c("100000", "1e5")) {
+    expect_error(
+      mpt_tree("t", list(a = glue("p / {large}"), b = glue("1 - p / {large}"))),
+      glue(
+        "'{large}' \\(1e\\+05\\) in tree 't'.*write p / 100000 as p / 1000 / \\
+        100, or provide the value as a data column declared in the covariates \\
+        argument\\.$"
+      )
+    )
+  }
+  expect_no_error(mpt_tree("t", list(a = "p / 1000 / 100", b = "1 - p / 1000 / 100")))
+  rescaled <- mpt(mpt_tree("t", list(
+    a = "(1 + 9999 * p) / 10000", b = "9999 * (1 - p) / 10000"
+  )))
+  code <- stancode(
+    bmf(p ~ 1), data = data.frame(a = c(30L, 28L), b = c(0L, 2L)), model = rescaled
+  )
+  expect_match(code, "(1 + 9999 * inv_logit(nlp_p[n])) / 10000", fixed = TRUE)
+  expect_no_match(code, "e - 0")
+})
+
+test_that("mpt_tree stores branch expressions as parsed calls", {
+  tree <- mpt_tree("t", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
+  expect_identical(tree$branches$a, quote(D + (1 - D) * g))
+  expect_equal(.mpt_expr_vars(tree), c("D", "g"))
+  expect_equal(
+    .mpt_eval_branches(tree, list(D = 0.7, g = 0.5)),
+    c(a = 0.85, b = 0.15)
+  )
+})
+
+test_that("restrictions parse from MPTinR strings and named lists alike", {
+  from_strings <- .mpt_parse_restrictions(c("Dn = Do", "g = 1/4", "G1 = G2 = G3"))
+  expect_equal(
+    from_strings,
+    list(Dn = quote(Do), g = 0.25, G1 = quote(G3), G2 = quote(G3))
+  )
+  expect_equal(
+    .mpt_parse_restrictions(list(Dn = "Do", g = 0.25)),
+    list(Dn = quote(Do), g = 0.25)
+  )
+  expect_equal(.mpt_parse_restrictions(c(g = 1 / 4)), list(g = 0.25))
+  expect_equal(.mpt_parse_restrictions(from_strings), from_strings)
+  expect_equal(.mpt_parse_restrictions(NULL), list())
+
+  expect_error(.mpt_parse_restrictions("Do < Dn"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("Do >= Dn"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("Do = Dn * 2"), "does neither")
+  expect_error(.mpt_parse_restrictions("Do"), "form")
+  expect_error(.mpt_parse_restrictions("Do = "), "parse")
+  expect_error(.mpt_parse_restrictions(list("Do")), "the form")
+})
+
+test_that("an unnamed list of restrictions parses like the character vector", {
+  expect_equal(
+    .mpt_parse_restrictions(list("Dn = Do", "g = 0.5")),
+    .mpt_parse_restrictions(c("Dn = Do", "g = 0.5"))
+  )
+  expect_equal(
+    .mpt_parse_restrictions(list("Dn = Do", "g = 0.5")),
+    list(Dn = quote(Do), g = 0.5)
+  )
+})
+
+test_that("restriction constants must be strictly between 0 and 1", {
+  expect_error(.mpt_parse_restrictions("g = 1.5"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions("g = -0.2"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions("g = 0"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions("g = 0"), "mpt_tree(impossible = )", fixed = TRUE)
+  expect_error(.mpt_parse_restrictions("g = 1"), "strictly between 0 and 1")
+  expect_error(.mpt_parse_restrictions(list(g = 1)), "strictly between")
+  expect_equal(.mpt_parse_restrictions("g = 0.5"), list(g = 0.5))
+  expect_equal(.mpt_parse_restrictions("g = 1/4"), list(g = 0.25))
+})
+
+test_that("the message for a constant 0 or 1 holds for every model", {
+  for (r in c("D = 0", "D = 1")) {
+    msg <- tryCatch(.mpt_parse_restrictions(r), error = conditionMessage)
+    expect_match(msg, "reduced tree")
+    expect_no_match(msg, "turns a branch into the constant 0")
+  }
+})
+
+test_that("an out-of-range constant is not explained with 0/1 branches", {
+  for (r in c("g = 1.5", "g = -0.2")) {
+    msg <- tryCatch(.mpt_parse_restrictions(r), error = conditionMessage)
+    expect_match(msg, "strictly between 0 and 1")
+    expect_no_match(msg, "branch")
+  }
+})
+
+test_that("a restrictions file path gets a pointer to readLines()", {
+  path <- withr::local_tempfile(fileext = ".restr", lines = "Dn = Do")
+  expect_error(.mpt_parse_restrictions(path), "does not read restriction")
+  expect_error(.mpt_parse_restrictions("models/2htm.restr"), "readLines")
+  expect_error(.mpt_parse_restrictions("models/2htm.txt"), "readLines")
+  expect_error(.mpt_parse_restrictions(list("models/2htm.restr")), "readLines")
+  expect_equal(.mpt_parse_restrictions("Dn = Do"), list(Dn = quote(Do)))
+})
+
+test_that("an existing file without a known extension is recognised", {
+  path <- withr::local_tempfile(lines = "Dn = Do")
+  expect_error(.mpt_parse_restrictions(path), "does not read restriction")
+})
+
+test_that("the path hint quotes the path as valid R and names it once", {
+  msg <- tryCatch(
+    .mpt_parse_restrictions("C:\\models\\2htm.restr"),
+    error = conditionMessage
+  )
+  expect_match(msg, 'readLines("C:\\\\models\\\\2htm.restr")', fixed = TRUE)
+  expect_equal(lengths(regmatches(msg, gregexpr("2htm.restr", msg, fixed = TRUE))), 1L)
+})
+
+test_that("restrictions with a file name in a comment or an existing file are valid", {
+  expect_equal(.mpt_parse_restrictions("g = 0.5 # half.txt"), list(g = 0.5))
+  expect_equal(
+    .mpt_parse_restrictions("Dn = Do # from broeder.2htm.restr"),
+    list(Dn = quote(Do))
+  )
+  expect_equal(
+    .mpt_parse_restrictions("Dn = Do # see notes.TXT "),
+    list(Dn = quote(Do))
+  )
+  withr::with_dir(withr::local_tempdir(), {
+    file.create("g = 0.5")
+    expect_equal(.mpt_parse_restrictions("g = 0.5"), list(g = 0.5))
+  })
+  expect_error(
+    .mpt_parse_restrictions("D1 < D2 # notes.txt"), "Order constraints"
+  )
+})
+
+test_that("blank and comment lines of readLines() are skipped", {
+  path <- withr::local_tempfile(
+    lines = c("# 2HTM", "Dn = Do # equal detection", "", "  ", "g = 0.5", "  # end")
+  )
+  expect_equal(
+    .mpt_parse_restrictions(readLines(path)),
+    list(Dn = quote(Do), g = 0.5)
+  )
+  expect_equal(.mpt_parse_restrictions(c("", "# only a comment")), list())
+})
+
+test_that("chained order constraints get the order-constraint message", {
+  expect_error(.mpt_parse_restrictions("G1 < G2 < G3"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("G1 > G2 > G3"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("D1 <= D2 <= D3"), "Order constraints")
+  expect_error(.mpt_parse_restrictions("D1 < D2 < D3"), "'D1 < D2 < D3'")
+  expect_error(.mpt_parse_restrictions("Do = "), "Cannot parse")
+})
+
+test_that("restriction chains resolve to their final target", {
+  resolved <- .mpt_resolve_restrictions(list(A = quote(B), B = quote(C), g = 0.5))
+  expect_equal(resolved, list(A = quote(C), B = quote(C), g = 0.5))
+})
+
+test_that("mpt errors when branch probabilities do not sum to 1", {
+  bad_tree <- mpt_tree("t", list(a = "D * g", b = "(1 - D) * g"))
+  expect_error(mpt(bad_tree), "sum to")
+  expect_error(mpt(bad_tree), "or tie them in the formula \\(e.g. Dn ~ Do\\)")
+  expect_error(mpt(bad_tree), "use the restrictions argument")
+
+  good_tree <- mpt_tree("u", list(a = "D + (1 - D) * g", b = "(1 - D) * (1 - g)"))
+  branch_errors <- .mpt_tree_branch_errors(
+    list(t = bad_tree, u = good_tree), c("D", "g"), list()
+  )
+  # the branches reduce to g, so the first test point reports g's value there
+  expect_match(
+    branch_errors[["t"]],
+    glue("sum to {signif(.mpt_test_points(c('D', 'g'), list())[[1]][['g']], 6)} instead of 1")
+  )
+  expect_true(is.na(branch_errors[["u"]]))
+})
+
+test_that("mpt errors when a branch probability leaves (0, 1]", {
+  # the branches sum to 1 for every value of a
+  doubled <- mpt_tree("t", list(yes = "2 * a", no = "1 - 2 * a"))
+  expect_error(
+    mpt(doubled),
+    "category 'yes' in tree 't' is 1\\.7.* at the test values a = 0\\.85.*, outside \\(0, 1\\]"
+  )
+  zero <- mpt_tree("z", list(yes = "a", no = "(1 - a) * 0", maybe = "1 - a"))
+  expect_error(
+    mpt(zero),
+    "category 'no' in tree 'z' is 0 .*outside \\(0, 1\\].*makes the likelihood undefined"
+  )
+  expect_no_error(mpt(mpt_tree("t", list(yes = "a", no = "1 - a"))))
+})
+
+test_that("test points give every symbol its own interior value at every point", {
+  for (n in c(2, 4, 5, 8, 12, 30)) {
+    symbols <- paste0("p", seq_len(n))
+    points <- .mpt_test_points(symbols, list())
+    expect_length(points, 5)
+    for (vals in points) {
+      expect_named(vals, symbols)
+      expect_true(all(vals > 0 & vals < 1))
+      expect_equal(anyDuplicated(round(vals, 6)), 0L)
+    }
+    expect_equal(anyDuplicated(round(unlist(lapply(points, `[[`, 1)), 6)), 0L)
+  }
+
+  points <- .mpt_test_points(c("a", "b", "c", "d"), list(c("a", "b", "c")))
+  for (vals in points) {
+    expect_equal(sum(vals[c("a", "b", "c")]), 1)
+  }
+})
+
+test_that("the stick-breaking Jacobian matches central differences of the map", {
+  sticks_to_members <- function(sticks) cumprod(c(1, 1 - sticks)) * c(sticks, 1)
+  for (sticks in list(0.3, c(0.3, 0.6), c(0.3, 0.6, 0.2), c(0.7, 0.2, 0.5, 0.4))) {
+    members <- sticks_to_members(sticks)
+    numeric_map <- vapply(seq_along(sticks), function(m) {
+      step <- replace(numeric(length(sticks)), m, 1e-6)
+      (sticks_to_members(sticks + step) - sticks_to_members(sticks - step)) / 2e-6
+    }, numeric(length(members)))
+    names <- paste0("s", seq_along(sticks))
+    exact <- .mpt_stick_jacobian(diag(length(members)), members, names)
+    expect_equal(
+      unname(exact), matrix(numeric_map, nrow = length(members)), tolerance = 1e-8
+    )
+    expect_equal(colnames(exact), names)
+  }
+})
+
+test_that("no sum of two test values equals another such sum at every point", {
+  # a linear sequence in the symbol index gives v_i + v_j == v_k + v_l at
+  # every point whenever i + j == k + l, which the rank check would read as a
+  # property of the model
+  n <- 12
+  values <- do.call(rbind, .mpt_test_points(paste0("p", seq_len(n)), list()))
+  pairs <- t(utils::combn(n, 2))
+  sums <- apply(pairs, 1, function(pair) values[, pair[1]] + values[, pair[2]])
+  coincide <- outer(seq_len(nrow(pairs)), seq_len(nrow(pairs)), Vectorize(
+    function(a, b) a < b && all(abs(sums[, a] - sums[, b]) < 1e-9)
+  ))
+  expect_false(any(coincide))
+})
+
+test_that("a typo between parameters four places apart in the symbol order is caught", {
+  # a short cycle of test values would give the first and the fifth parameter
+  # the same value at every point, so (1 - A) * (1 - A) would pass for
+  # (1 - A) * (1 - F)
+  branches <- list(
+    r1 = "A * B", r2 = "A * (1 - B) * C", r3 = "A * (1 - B) * (1 - C) * E",
+    r4 = "A * (1 - B) * (1 - C) * (1 - E)", r5 = "(1 - A) * F"
+  )
+  good <- mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - F)"))
+  typo <- mpt_tree("main", c(branches, r6 = "(1 - A) * (1 - A)"))
+  expect_no_error(mpt(good))
+  expect_error(mpt(typo), "sum to")
+})
+
+test_that("a tree that sums to 1 at only one test point is still caught", {
+  at_first <- sprintf("%.8f", .mpt_test_points("D", list())[[1]][["D"]])
+  tree <- mpt_tree("t", list(a = "D", b = glue("1 - D + (D - {at_first})")))
+  expect_true(abs(
+    sum(.mpt_eval_branches(tree, as.list(.mpt_test_points("D", list())[[1]]))) - 1
+  ) < 1e-6)
+  expect_error(mpt(tree), "sum to")
+})
+
+test_that("constants that Stan would receive in scientific notation error", {
+  # brms deparses formula constants into the Stan code and spaces out
+  # operators, so 6.7e-05 would become the subtraction '6.7e - 05'
+  expect_error(
+    mpt_tree("t", list(
+      a = "p + (1 - p) * (1 - 0.001/15.001)",
+      b = "(1 - p) * (0.001/15.001)"
+    )),
+    "scientific"
+  )
+  # constants that deparse in fixed notation are fine
+  tree <- mpt_tree("t", list(
+    a = "p + (1 - p) * (1 - 0.001)",
+    b = "(1 - p) * 0.001"
+  ))
+  expect_equal(deparse1(tree$branches$b), "(1 - p) * 0.001")
+})
+
+test_that(".mpt_branch_vertices visits the 2^k vertices of a multilinear branch", {
+  vertices <- bmm:::.mpt_branch_vertices(quote(a * (1 - b) * c * G), c("a", "b", "c"), list())
+  expect_true(attr(vertices, "exact"))
+  expect_equal(dim(vertices), c(8L, 3L))
+  expect_equal(colnames(vertices), c("a", "b", "c"))
+  expect_setequal(unique(as.vector(vertices)), c(1e-9, 1 - 1e-9))
+  expect_equal(nrow(unique(vertices)), 8L)
+
+  # a parameter in several terms is still of degree 1
+  twice <- bmm:::.mpt_branch_vertices(quote(a * (1 - b) + (1 - a) * b), c("a", "b"), list())
+  expect_equal(dim(twice), c(4L, 2L))
+
+  constant <- bmm:::.mpt_branch_vertices(quote(0.5 * G), c("a", "b"), list())
+  expect_equal(dim(constant), c(1L, 0L))
+})
+
+test_that(".mpt_branch_vertices adds 0.5 for a parameter of higher degree", {
+  vertices <- bmm:::.mpt_branch_vertices(quote(4 * u * (1 - u) * a), c("u", "a"), list())
+  expect_equal(sort(unique(vertices[, "u"])), c(1e-9, 0.5, 1 - 1e-9))
+  expect_equal(sort(unique(vertices[, "a"])), c(1e-9, 1 - 1e-9))
+  expect_equal(nrow(vertices), 6L)
+
+  # a derivative that stats::D() cannot form counts as higher degree
+  unknown <- bmm:::.mpt_branch_vertices(quote(besselJ(a, 1)), "a", list())
+  expect_equal(sort(unique(unknown[, "a"])), c(1e-9, 0.5, 1 - 1e-9))
+})
+
+test_that(".mpt_branch_vertices takes a simplex group as one dimension", {
+  group <- list(c("gA", "gB", "gC"))
+  vertices <- bmm:::.mpt_branch_vertices(quote(D * gA + (1 - D) * gB), c("D", "gA", "gB", "gC"), group)
+  expect_equal(colnames(vertices), c("D", "gA", "gB"))
+  # gC takes the mass in the third vertex, where gA and gB are both small
+  expect_equal(nrow(vertices), 2L * 3L)
+  expect_true(all(rowSums(vertices[, c("gA", "gB")]) < 1.0001))
+
+  all_members <- bmm:::.mpt_branch_vertices(quote(gA + 2 * gB + 3 * gC), c("gA", "gB", "gC"), group)
+  expect_equal(nrow(all_members), 3L)
+  expect_equal(unname(rowSums(all_members)), rep(1, 3))
+
+  # a product of members peaks inside the simplex
+  crossed <- bmm:::.mpt_branch_vertices(quote(gA * gB), c("gA", "gB", "gC"), group)
+  expect_equal(nrow(crossed), 3L + 3L + 1L)
+  expect_equal(unname(colMeans(crossed[7, , drop = FALSE])), rep(1 / 3, 2))
+})
+
+test_that(".mpt_branch_vertices falls back to a fixed sample above max_points", {
+  parameters <- paste0("p", 1:11)
+  branch <- str2lang(paste(parameters, collapse = " * "))
+  withr::local_seed(1)
+  seed_before <- .Random.seed
+  vertices <- bmm:::.mpt_branch_vertices(branch, parameters, list())
+  expect_identical(.Random.seed, seed_before)
+
+  expect_false(attr(vertices, "exact"))
+  expect_equal(dim(vertices), c(2L + 64L, 11L))
+  expect_setequal(unique(as.vector(vertices)), c(1e-9, 1 - 1e-9))
+  expect_equal(unname(vertices[1:2, 1]), c(1e-9, 1 - 1e-9))
+  expect_identical(vertices, bmm:::.mpt_branch_vertices(branch, parameters, list()))
+  # the sample uses both ends of every parameter
+  expect_true(all(apply(vertices, 2, function(column) length(unique(column)) == 2L)))
+
+  ten <- bmm:::.mpt_branch_vertices(str2lang(paste(parameters[1:10], collapse = " * ")), parameters, list())
+  expect_true(attr(ten, "exact"))
+  expect_equal(nrow(ten), 1024L)
+})

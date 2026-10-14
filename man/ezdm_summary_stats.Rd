@@ -15,7 +15,7 @@ ezdm_summary_stats(
   min_trials = 10,
   init_contaminant = 0.05,
   max_contaminant = 0.5,
-  maxit = 100,
+  maxit = 500,
   tol = 1e-06,
   guess_rate = 0.5
 )
@@ -41,8 +41,11 @@ component. One of "exgaussian" (default), "lognormal", or "invgaussian"}
 via mixture modeling, "robust" for non-parametric robust estimation using
 median and IQR/MAD-based variance, or "simple" for standard moment
 calculation. The "robust" method is faster and requires no distributional
-assumptions, but note that the EZ equations were derived for mean and
-variance, so using median may introduce some bias for skewed distributions.}
+assumptions, but its moments are not the mean and variance the EZ
+equations were derived for. For right-skewed RTs the median lies below the
+mean and (IQR/1.349)^2 below the variance, so the EZ estimates are offset
+systematically, not just noisier: a larger drift rate and a smaller
+boundary separation than the same data give with "mixture".}
 
 \item{robust_scale}{Character. Scale estimator for robust method. Either
 "iqr" (default) for IQR-based variance estimation (variance = (IQR/1.349)^2)
@@ -75,7 +78,10 @@ algorithm. Default is 0.05}
 (0 < max <= 1). Estimates are clipped to this value to prevent inflated
 contaminant proportions. Default is 0.5}
 
-\item{maxit}{Integer. Maximum number of EM iterations. Default is 100}
+\item{maxit}{Integer. Maximum number of EM iterations. Default is 500. The
+EM converges slowly when the contaminant proportion is close to zero, and
+a cell that reaches \code{maxit} without converging falls back to robust
+moments with a warning.}
 
 \item{tol}{Numeric. Convergence tolerance for EM algorithm. Default is 1e-6}
 

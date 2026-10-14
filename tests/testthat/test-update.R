@@ -168,6 +168,37 @@ test_that("update.bmmfit fixes parameters that the new formula sets to a constan
   expect_match(brms::stancode(up), "Intercept = 0.5;", fixed = TRUE)
 })
 
+test_that("a predictor added by update() gets the prior bmm() gives it", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  stub_fit <- function(formula, model) suppressWarnings(suppressMessages(
+    bmm(formula, dat, model, backend = "mock", mock_fit = stub, rename = FALSE)
+  ))
+  dat <- data.frame(y = rmixture2p(n = 60), cond = rep(c("a", "b"), 30))
+  cases <- list(
+    nlpar = list(model = mixture2p("y"), old = bmf(kappa ~ 1, thetat ~ 1),
+                 new = bmf(kappa ~ 1 + cond, thetat ~ 1)),
+    dpar = list(model = sdm("y"), old = bmf(c ~ 1, kappa ~ 1),
+                new = bmf(c ~ 1 + cond, kappa ~ 1))
+  )
+
+  for (case_name in names(cases)) {
+    case <- cases[[case_name]]
+    # the fit stores brms's flat default row for the class of the old formula's
+    # parameter; carried over as a user prior, it overrode bmm's prior on the slope
+    up <- suppressWarnings(suppressMessages(update(
+      stub_fit(case$old, case$model), formula. = case$new, newdata = dat,
+      backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE
+    )))
+    expect_equal(brms::stancode(up), brms::stancode(stub_fit(case$new, case$model)),
+                 label = case_name)
+  }
+})
+
 # read the emitted program rather than bmm's own stanvars, and assert on the
 # call: the sliced function is declared in the functions block either way
 sdm_likelihood_is_sliced <- function(fit) {
@@ -398,6 +429,11 @@ stored_frame_cases <- function() {
     c ~ 1, a ~ 1, d ~ 1
   )
   m3_links <- list(c = "log", a = "log", d = "log")
+  mpt_data <- data.frame(
+    id = factor(rep(1:5, 2)), item_type = factor(rep(c("old", "new"), each = 5)),
+    old = c(40:44, 8:12)
+  )
+  mpt_data$new <- 50L - mpt_data$old
   mafc_data <- data.frame(
     n_correct = c(80, 55, 78, 60, 85, 52, 81, 58), n_trials = 100,
     n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
@@ -551,6 +587,45 @@ stored_frame_cases <- function() {
       model = sdt_rating(paste0("r", 1:4), "stimulus", version = "metad"),
       formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1 + (1 | id)),
       data = rating_data[setdiff(names(rating_data), "r5")]
+    ),
+    # brms drops the tree column unless a formula names it, so it is rebuilt
+    mpt = list(
+      model = mpt(mpt_2htm_trees(), tree_id = "item_type"),
+      formula = bmf(D ~ 1 + (1 | id), g ~ 1),
+      data = mpt_data
+    ),
+    mpt_tree_predictor = list(
+      model = mpt(mpt_2htm_trees(), tree_id = "item_type"),
+      formula = bmf(D ~ 1 + item_type, g ~ 1),
+      data = mpt_data
+    ),
+    mpt_single_tree = list(
+      model = mpt(mpt_tree("study", list(
+        C = "cp + (1 - cp) * rp * rp",
+        E = "2 * (1 - cp) * rp * (1 - rp)",
+        U = "(1 - cp) * (1 - rp) * (1 - rp)"
+      ))),
+      formula = bmf(cp ~ 1 + (1 | id), rp ~ 1),
+      data = data.frame(id = factor(1:6), C = 30:35, E = 20L, U = 10L)
+    ),
+    mpt_impossible = list(
+      model = mpt(mpt_impossible_trees(), tree_id = "tree"),
+      formula = bmf(Pm ~ 1 + (1 | id), Pb ~ 1),
+      data = mpt_impossible_data()
+    ),
+    mpt_covariates = list(
+      model = mpt(
+        mpt_tree("main", list(
+          correct = "D + (1 - D) * Gcorr",
+          incorrect = "(1 - D) * (1 - Gcorr)"
+        )),
+        covariates = "Gcorr"
+      ),
+      formula = bmf(D ~ 1 + (1 | id)),
+      data = data.frame(
+        id = factor(1:10), Gcorr = rep(c(0.25, 0.5), 5),
+        correct = 21:30, incorrect = 19:10
+      )
     )
   )
 }
@@ -630,6 +705,16 @@ test_that("a set_size rebuilt for check_data() stays out of the model frame", {
       check_stored_data(case$model, fit$data, fit$bmm$user_formula)
     ))
   }
+})
+
+test_that("an mpt tree column rebuilt for check_data() stays out of the model frame", {
+  skip_on_cran()
+  case <- stored_frame_cases()$mpt
+  fit <- stored_frame_fit(case)
+  expect_false("item_type" %in% colnames(fit$data))
+  expect_false("item_type" %in% colnames(
+    check_stored_data(case$model, fit$data, fit$bmm$user_formula)
+  ))
 })
 
 test_that("an m column rebuilt for check_data() stays out of the model frame", {
@@ -765,4 +850,158 @@ test_that("data without the largest set size still fail the nt_features check", 
   msg <- "'nt_features' should equal max\\(set_size\\)-1"
   expect_error(bmm(case$formula, short_data, case$model, backend = "mock", mock_fit = 1), msg)
   expect_error(update_mock(fit, newdata = short_data), msg)
+})
+
+test_that("an updated fit carries nothing from the frame that called update()", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- data.frame(y = rsdm(60, kappa = 5))
+  fit <- suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"),
+                              backend = "mock", mock_fit = stub, rename = FALSE))
+  # on a recompile, the only route the mock backend runs, brms stores the init
+  # function update() builds in the fit, which saveRDS() would then write with
+  # the caller's frame
+  update_beside <- function(n) {
+    ballast <- runif(n)
+    suppressMessages(update(fit, backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE))
+  }
+  # each fit is sized on its own, so that the other one's ballast is not counted
+  serialized_size <- function(n) length(serialize(update_beside(n), NULL))
+  expect_equal(serialized_size(1e6), serialized_size(1))
+})
+
+test_that("update() switches an SDT fit between criterion and bias", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- data.frame(n_old = c(10, 40, 12, 38), stimulus = c(0, 1, 0, 1),
+                    n_trials = 50)
+  fit <- suppressMessages(bmm(bmf(d ~ 1, criterion ~ 1), dat,
+                              sdt_yn("n_old", "stimulus", "n_trials"),
+                              backend = "mock", mock_fit = stub, rename = FALSE))
+  switched <- suppressMessages(update(
+    fit, formula. = bmf(d ~ 1, bias ~ 1), backend = "mock", mock_fit = stub,
+    rename = FALSE, recompile = TRUE
+  ))
+  expect_equal(switched$family$name, "sdt_yn_bias")
+  expect_true("bias" %in% switched$prior$dpar)
+  expect_false("criterion" %in% switched$prior$dpar)
+
+  back <- suppressMessages(update(
+    switched, formula. = bmf(d ~ 1, criterion ~ 1), backend = "mock",
+    mock_fit = stub, rename = FALSE, recompile = TRUE
+  ))
+  expect_equal(back$family$name, "sdt_yn")
+  expect_false("bias" %in% back$prior$dpar)
+})
+
+# =============================================================================
+# UPDATING WITH THE STORED MODEL FRAME AS newdata (kfold(), reloo())
+# =============================================================================
+
+# models whose stored frame check_data() accepts as it is, so that update() has
+# nothing to route
+frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
+
+test_that("only a slice of a fit's model frame counts as stored data", {
+  skip_on_cran()
+  for (case_name in names(stored_frame_cases())) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stored_frame_fit(case)
+    model <- fit$bmm$model
+    slice <- fit$data[-1, , drop = FALSE]
+    expect_false(is_stored_frame(model, fit$data, case$data), label = case_name)
+    expect_equal(
+      is_stored_frame(model, fit$data, slice),
+      !case_name %in% frame_is_user_layout,
+      label = case_name
+    )
+    if (case_name %in% frame_is_user_layout) {
+      expect_no_error(suppressWarnings(check_data(model, slice, fit$bmm$user_formula)))
+    }
+  }
+})
+
+test_that("user data that hold a column of the stored layout stay user data", {
+  skip_on_cran()
+  for (case_name in c("m3", "sdt_rating", "sdt_ranking", "sdt_cdp", "mpt")) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stored_frame_fit(case)
+    model <- fit$bmm$model
+    for (column in c("Y", "nTrials")) {
+      user_data <- case$data
+      user_data[[column]] <- 1
+      expect_false(is_stored_frame(model, fit$data, user_data), label = case_name)
+    }
+    # all of them, still with the response columns the stored frame has given up
+    user_data <- case$data
+    user_data[colnames(fit$data)] <- 1
+    expect_false(is_stored_frame(model, fit$data, user_data), label = case_name)
+  }
+})
+
+# a mock fit cannot be reused, so update() takes the recompile path, and brms
+# then reads the sampler settings of the fit it updates
+stub_stanfit <- function() {
+  methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+}
+
+quietly <- function(x) suppressWarnings(suppressMessages(x))
+
+stub_frame_fit <- function(case) {
+  quietly(bmm(case$formula, case$data, case$model,
+    backend = "mock", mock_fit = stub_stanfit(), rename = FALSE
+  ))
+}
+
+stub_update <- function(fit, ...) {
+  update(fit, ..., backend = "mock", mock_fit = stub_stanfit(), rename = FALSE, recompile = TRUE)
+}
+
+test_that("update() takes a slice of the model frame as newdata (kfold(), reloo())", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  for (case_name in c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
+                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
+                      "mpt", "mpt_tree_predictor", "mpt_single_tree")) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stub_frame_fit(case)
+    rows <- seq_len(nrow(fit$data))[-1]
+    up <- quietly(stub_update(fit, newdata = fit$data[rows, , drop = FALSE]))
+    expect_true(is(up, "bmmfit"), label = case_name)
+    expect_equal(nrow(up$data), length(rows), label = case_name)
+    expect_equal(brms::standata(up)$N, length(rows), label = case_name)
+    expect_equal(attr(up$data, "data_name"), attr(fit$data, "data_name"), label = case_name)
+
+    # the whole frame is the same update as passing no newdata
+    expect_equal(
+      brms::standata(quietly(stub_update(fit, newdata = fit$data))),
+      brms::standata(quietly(stub_update(fit))),
+      label = case_name
+    )
+  }
+})
+
+test_that("update() still treats data with a column Y as the user's data", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  case <- stored_frame_cases()$sdt_rating
+  fit <- stub_frame_fit(case)
+  user_data <- case$data
+  user_data$Y <- 1
+  # only the user-data route warns that Y is reserved: the stored route strips
+  # the generated columns before check_data() sees them
+  expect_warning(suppressMessages(stub_update(fit, newdata = user_data)), "reserved")
+  expect_equal(
+    brms::standata(quietly(stub_update(fit, newdata = case$data))),
+    brms::standata(fit)
+  )
 })

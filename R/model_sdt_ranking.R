@@ -33,10 +33,12 @@
       "Log SD ratio: log ratio of signal to noise standard deviations ",
       "(exp(sdratio) is the ratio, 0 = equal variance)"
     )
-    # Identical to sdt_yn's, whose comment gives the empirical grounds. For
-    # ranking the prior also has to stay inside the ratios [0.5, 2.0] that the
-    # Gauss-Hermite ladder is calibrated over (see .ranking_gh_n): normal(0, 0.3)
-    # puts 97.9% of its mass there.
+    # Identical to sdt_yn's, whose comment gives the empirical grounds: it
+    # reaches past the widest group-level ratio on record (1.71) and keeps its
+    # mass off ratios above 2, which recognition does not produce. The
+    # quadrature no longer bounds it; it holds 1e-6 over ratios in [0.2, 8]
+    # (see .ranking_gh_n and .ranking_gl_rule), 5.4 prior SDs below 0 and 6.9
+    # above.
     default_priors$sdratio <- list(
       main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"
     )
@@ -116,7 +118,9 @@ settable_link_functions.sdt_ranking <- function(model) {
 #'
 #' Models the rank ordering of `m` items by perceived strength. Only `d`
 #' is estimated (no criterion). Supports `dist = "gumbel_min"` (closed-form via
-#' lgamma ratios) and `dist = "normal"` (Gauss-Hermite quadrature).
+#' lgamma ratios) and `dist = "normal"` (numerical quadrature, accurate to
+#' 1e-6 in each rank probability for SD ratios from 0.2 to 8, `d` from -1 to 4
+#' and set sizes up to 20).
 #'
 #' The model uses the native brms multinomial family: each rank position is a
 #' multinomial category whose logit is set to `log p(rank)`, so `softmax`
@@ -278,11 +282,11 @@ check_data.sdt_ranking <- function(model, data, formula) {
 
   free_sdratio <- "sdratio" %in% names(model$parameters) &&
     !"sdratio" %in% names(model$fixed_parameters)
-  warnif(free_sdratio && max(max_rank, na.rm = TRUE) > 8,
-         "Estimating `sdratio` with set sizes above 8 pushes the Gaussian \\
-         quadrature past the node count bmm calibrates for (128), so the rank \\
-         probabilities may carry errors above 1e-6. Consider fixing `sdratio`, \\
-         or `dist = \"gumbel_min\"`, which is closed form")
+  warnif(free_sdratio && max(max_rank, na.rm = TRUE) > 20,
+         "Estimating `sdratio` with set sizes above 20 goes past the range bmm \\
+         has verified its Gaussian quadrature over, so the rank probabilities \\
+         may carry errors above 1e-6. Consider fixing `sdratio`, or \\
+         `dist = \"gumbel_min\"`, which is closed form")
   warnif(free_sdratio && max(max_rank, na.rm = TRUE) < 3,
          "`sdratio` cannot be identified from two-item rankings: the model \\
          reduces to 2AFC, where the rank probabilities depend only on `d`. \\
@@ -363,15 +367,29 @@ configure_model.sdt_ranking <- function(model, data, formula) {
 }
 
 
-# Substitute the quadrature tokens in sdt_ranking_funs.stan with the rule that
-# .ranking_gh_n() selects, so the compiled Stan code and .ranking_prob_r() use
-# the same nodes. 17 significant digits round-trips a double exactly.
+# Substitute the quadrature tokens in sdt_ranking_funs.stan with the rules that
+# .ranking_gh_n() and .ranking_gl_rule() select for the data's largest set size;
+# .ranking_prob_r() selects per row, so rows with a smaller set size can use a
+# different rule (they agree to ~1e-8). 17 significant digits round-trips a
+# double exactly.
 .ranking_fill_quadrature <- function(scode, max_m, free_sdratio) {
   gh <- .gh_rule(.ranking_gh_n(max_m, free_sdratio))
+  gl <- .ranking_gl_rule(max_m)
   brace <- function(x) paste0("({", paste(sprintf("%.17g", x), collapse = ", "), "})")
-  scode <- gsub("{{N_GH}}", length(gh$nodes), scode, fixed = TRUE)
-  scode <- gsub("({{GH_NODES}})", brace(gh$nodes), scode, fixed = TRUE)
-  gsub("({{GH_WEIGHTS}})", brace(gh$weights), scode, fixed = TRUE)
+  tokens <- list(
+    "{{N_GH}}" = length(gh$nodes),
+    "({{GH_NODES}})" = brace(gh$nodes),
+    "({{GH_WEIGHTS}})" = brace(gh$weights),
+    "{{N_GL}}" = length(gl$nodes),
+    "{{GL_HALF_WIDTH}}" = sprintf("%.17g", gl$half_width),
+    "({{GL_NODES}})" = brace(gl$nodes),
+    "({{GL_WEIGHTS}})" = brace(gl$weights),
+    "({{GL_CDF}})" = brace(gl$cdf)
+  )
+  for (token in names(tokens)) {
+    scode <- gsub(token, tokens[[token]], scode, fixed = TRUE)
+  }
+  scode
 }
 
 

@@ -82,7 +82,7 @@ In this case, $b$ is the baseline activation or background noise, that can be un
 
 ## Choice Rules in the `m3`
 
-The activation for each category is then translated into probabilities of recalling one item or response from each category with a normalization function as a choice rule. In `bmm` we have implemented two choice rules, that are different implementations of Luce's choice axiom:
+The activation for each category is then translated into probabilities of recalling one item or response from each category with a normalization function as a choice rule. In `bmm` we have implemented three choice rules. The first two are different implementations of Luce's choice axiom:
 
 1.  Simple normalization (`"simple"`)
 
@@ -106,7 +106,17 @@ $$
 
 This choice rule can be interpreted as an n-alternative SDT model over the different response candidates with a Gumbel (or double-exponential) noise distribution.
 
-The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined `ss` and `cs` versions are calibrated so that both rules imply a comparable, broad range of average performance. For the `softmax` rule the priors for general (`a`) and context (`c`) activation share the same mean, so the implied prior on their difference is centered at zero. This makes `softmax` the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The `simple` rule normalizes the raw activations, so context activation has to exceed general activation (`c > a`) for the model to predict accurate recall; its default priors therefore encode `c > a` and are not suited for directly comparing `c` and `a`. If your research question concerns the contrast between activation sources, use the `softmax` choice rule (or supply your own symmetric priors).
+3.  Gaussian (`"gaussian"`)
+
+The `gaussian` choice rule is the same n-alternative SDT model with normally distributed noise: every candidate receives its category's activation plus independent standard normal noise, and the candidate with the largest value is recalled. The probability of choosing category $i$ is
+
+$$
+p_i = n_i \int \phi(z) \, \Phi(z)^{n_i - 1} \prod_{j \neq i} \Phi(z + A_i - A_j)^{n_j} \, dz
+$$
+
+where $\phi$ and $\Phi$ are the standard normal density and distribution function. There is no closed form for this integral, so `bmm` approximates it numerically, and fits take much longer than with `softmax`. The softmax rule is the only rule for which the noise model and Luce's choice axiom coincide [@Yellott_1977], so the two rules are genuinely different models, not two parameterizations of one.
+
+The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined `ss` and `cs` versions are calibrated so that both rules imply a comparable, broad range of average performance. For the `softmax` rule the priors for general (`a`) and context (`c`) activation share the same mean, so the implied prior on their difference is centered at zero. This makes `softmax` the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The `simple` rule normalizes the raw activations, so context activation has to exceed general activation (`c > a`) for the model to predict accurate recall; its default priors therefore encode `c > a` and are not suited for directly comparing `c` and `a`. If your research question concerns the contrast between activation sources, use the `softmax` choice rule (or supply your own symmetric priors). The `gaussian` rule also has equal default prior means for `a` and `c`, but its activations are on a smaller scale than under `softmax`, and not by one constant factor: general activation shrinks more than context activation. Comparisons of `c` against `a`, and effects of conditions that change the number of candidates (for example set size), can therefore differ between `softmax` and `gaussian`. If such a contrast is your question, it is worth checking whether it holds under both rules.
 
 Finally, the model then links the response frequencies $Y$ for each response category to the probabilities $p$ using a multinomial distribution with the total number of trials:
 
@@ -154,7 +164,7 @@ For the `version = "custom"` of the `m3` you have to provide the activation func
 
 ## Parameter Scaling the `m3`
 
-Generally, one of the `m3` parameters has to be fixed to set the scaling of the model. In `bmm` the default is to fix the background noise parameter `b`. Thus the values of the other parameters should be interpreted relative to the background noise. The value `b` will be fixed to depends on the choice rule you choose for fitting the model. For the `simple` choice rule, `b` will be fixed to `0.1`, for the `softmax` choice rule, `b` will be fixed to `0`.
+Generally, one of the `m3` parameters has to be fixed to set the scaling of the model. In `bmm` the default is to fix the background noise parameter `b`. Thus the values of the other parameters should be interpreted relative to the background noise. The value `b` will be fixed to depends on the choice rule you choose for fitting the model. For the `simple` choice rule, `b` will be fixed to `0.1`, for the `softmax` and `gaussian` choice rules, `b` will be fixed to `0`.
 
 We chose two fix the background noise `b` for scaling for two reasons:
 

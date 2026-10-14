@@ -67,6 +67,17 @@ test_that("print.bmmsummary handles a single regression coefficient row (#369)",
   expect_true(any(grepl("kappa_Intercept", out)))
 })
 
+test_that("print.bmmsummary lists only constants when no shown coefficient is estimated", {
+  model <- sdm(resp_error = "y")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  fixed <- make_fixed(c("c_Intercept", "kappa_Intercept"))
+  fixed$Rhat <- NA
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+  expect_false(any(grepl("Regression Coefficients", out)))
+  expect_true(any(grepl("Constant Parameters", out)))
+  expect_true(any(grepl("kappa_Intercept", out)))
+})
+
 test_that(".summary_fixed_rows keeps a single fixed-effect row", {
   # gumbel-min sdt_ranking has one population coefficient (d_Intercept) but
   # two printed parameters (d, sdratio); the old sapply+apply errored here.
@@ -120,4 +131,16 @@ test_that("SDT summaries name d as d_a for a user-fixed non-zero sdratio too", {
   out <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1, sdratio = 0.3),
                                               fixed), color = FALSE))
   expect_true(any(grepl("d is d_a", out)))
+})
+
+test_that("the Links line lists only the alternative parameter the formula uses", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1, bias ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "bias = identity", fixed = TRUE)
+  expect_no_match(links, "criterion", fixed = TRUE)
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "criterion = identity", fixed = TRUE)
+  expect_no_match(links, "bias", fixed = TRUE)
 })

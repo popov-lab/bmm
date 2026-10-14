@@ -213,10 +213,26 @@ responses are the topic of the
 knitr::kable(bmm:::model_overview(group = "Choices and response times"))
 ```
 
+## Processing-tree models
+
+Participants give categorical responses, and you describe the discrete
+processes that lead to each response as a multinomial processing tree, for
+example the two-high-threshold model of recognition or the pair-clustering
+model of free recall. You write each tree's branch probabilities as
+expressions, and `mpt()` fits them to response counts. The
+[MPT article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html) covers
+specifying trees, importing model files from MPTinR and TreeBUGS, and
+constraining parameters.
+
+```{r, echo = FALSE}
+knitr::kable(bmm:::model_overview(group = "Processing-tree models"))
+```
+
 ```{r other-groups, results = "asis", echo = FALSE}
 known <- c(
   "Continuous reproduction", "Categorical recall and n-AFC decisions",
-  "Detection, recognition and confidence judgments", "Choices and response times"
+  "Detection, recognition and confidence judgments", "Choices and response times",
+  "Processing-tree models"
 )
 registry <- bmm:::model_registry()
 other <- setdiff(unique(registry$group), known)
@@ -280,8 +296,9 @@ the column named in `response` then holds `0` or `1`, the column named in
 trial as before. We leave `dist` at its default, `"normal"`.
 
 The model has two parameters. `d` is the sensitivity: the distance between
-the evidence distributions of old and new items. `criterion` is the response
-bias: the point on the evidence axis above which participants say "old". A
+the evidence distributions of old and new items. `criterion` is the decision
+criterion: the point on the evidence axis, measured from the mean of the new
+items, above which participants say "old". A
 third parameter, `sdratio`, allows the two distributions to differ in spread,
 and stays fixed to equal variances unless you add a formula for it.
 
@@ -326,7 +343,7 @@ fit <- bmm(
   model = model,
   cores = 4,
   backend = "cmdstanr",
-  file = "assets/bmmfit_sdt_yn_getting_started"
+  file = "fits/bmmfit_sdt_yn_getting_started"
 )
 ```
 

@@ -11,7 +11,8 @@ dsdt_yn(
   n_trials,
   stimulus,
   d,
-  criterion,
+  criterion = NULL,
+  bias = NULL,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   log = FALSE
@@ -22,7 +23,8 @@ rsdt_yn(
   n_trials,
   stimulus,
   d,
-  criterion,
+  criterion = NULL,
+  bias = NULL,
   sdratio = 1,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
 )
@@ -39,8 +41,14 @@ the balanced index \eqn{d_a}, the separation between the two distributions
 divided by the root-mean-square of their SDs (see \code{\link[=sdt_yn]{sdt_yn()}}). The
 separation in noise units is \code{d * sqrt((1 + sdratio^2) / 2)}.}
 
-\item{criterion}{Numeric. Response bias (decision boundary location), on the
-noise-standardized axis, i.e. in units of the noise distribution's SD.}
+\item{criterion}{Numeric. Location of the decision criterion, measured from
+the mean of the noise distribution in units of its SD. Give either
+\code{criterion} or \code{bias}, not both.}
+
+\item{bias}{Numeric. Location of the decision criterion measured from the
+midpoint between the noise and signal means instead, in noise-SD units:
+\code{criterion - d * sqrt((1 + sdratio^2) / 2) / 2}. 0 is the neutral point,
+positive values a bias toward "new"/"noise".}
 
 \item{sdratio}{Numeric. Ratio of signal to noise standard deviations
 (default 1, i.e., equal variance). Must be positive, and is on the
@@ -86,22 +94,26 @@ value and raises no error, so exponentiate first.
 \examples{
 # Density of yes/no SDT data
 dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-        d = 1.5, criterion = 0.2)
+        d = 1.5, criterion = 0.9)
+
+# The same observer, with the criterion given relative to the midpoint
+dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
+        d = 1.5, bias = 0.15)
 
 # Vectorized over observations
 dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-        stimulus = c(0, 1), d = 1.5, criterion = 0.2,
+        stimulus = c(0, 1), d = 1.5, criterion = 0.9,
         log = TRUE)
 
 # Unequal variance from a fitted model: sdt_yn() reports sdratio on its log
 # link, so exponentiate before passing it here
 dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-        d = 1.5, criterion = 0.2, sdratio = exp(0.375))
+        d = 1.5, criterion = 0.9, sdratio = exp(0.375))
 # Generate yes/no SDT data for a design
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-                     d = 1.5, criterion = 0.2)
+                     d = 1.5, criterion = 0.9)
 head(dat)
 }
 \references{

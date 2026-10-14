@@ -47,7 +47,7 @@ sits" in \code{\link[=sdt_rating]{sdt_rating()}}.
 \dontrun{
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus, d = 1.5,
-                              thresholds = c(-0.5, 0, 0.5), sdratio = 1.3))
+                              thresholds = c(0.25, 0.75, 1.25), sdratio = 1.3))
 
 fit <- bmm(
   formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
