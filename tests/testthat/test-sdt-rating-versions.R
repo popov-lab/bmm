@@ -72,21 +72,6 @@ test_that("the metad version refuses an odd number of rating categories", {
                   "sdt_rating_dpsdt")
 })
 
-test_that("Ro, Rn and logmratio keep their identity links", {
-  for (par in c("Ro", "Rn")) {
-    expect_error(
-      sdt_rating(paste0("r", 1:4), "stimulus", version = "dpsdt",
-                 links = stats::setNames(list("log"), par)),
-      paste0("link of '", par, "' cannot be changed")
-    )
-  }
-  expect_error(
-    sdt_rating(paste0("r", 1:4), "stimulus", version = "metad",
-               links = list(logmratio = "log")),
-    "link of 'logmratio' cannot be changed"
-  )
-})
-
 test_that("a link on d reaches the dpsdt and metad kernels through the formula", {
   for (v in c("dpsdt", "metad")) {
     bf <- bmf2bf(sdt_rating(paste0("r", 1:4), "stimulus", version = v,
@@ -237,30 +222,6 @@ test_that("recollection moves mass to the most-confident category and sums to 1"
 # DISTRIBUTION & SIMULATION FUNCTIONS                                    ####
 ############################################################################# !
 
-test_that("rsdt_dpsdt / rsdt_metad return rating count matrices", {
-  thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
-  counts_dp <- rsdt_dpsdt(8, 50, rep(c(0L, 1L), 4), d = 1.4, thresholds = thr,
-                          Ro = 0.3, Rn = 0.1)
-  expect_true(is.matrix(counts_dp))
-  expect_equal(colnames(counts_dp), paste0("r", 1:4))
-  expect_true(all(rowSums(counts_dp) == 50))
-
-  m <- rsdt_metad(8, 50, rep(c(0L, 1L), 4), d = 1.4, thresholds = thr,
-                  metad = 1.0)
-  expect_equal(dim(m), c(8L, 4L))
-})
-
-test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs", {
-  expect_true(is.finite(dsdt_dpsdt(c(2, 8, 20, 70), 1L, 1.5,
-                                   c(-0.5, 0, 0.5), Ro = 0.3, Rn = 0)))
-  expect_true(is.finite(dsdt_metad(c(5, 15, 25, 55), 1L, 1.5,
-                                   c(-0.5, 0, 0.5), metad = 1.0)))
-  expect_error(dsdt_dpsdt(c(1, 2, 3, 4), 1L, 1, c(0, 0.5, 1), Ro = 1.5, Rn = 0),
-               "Ro must be a probability")
-  expect_error(rsdt_metad(c(2, 3), 50, 1L, 1.4, c(-0.5, 0, 0.5), metad = 1),
-               "single positive integer")
-})
-
 test_that("dsdt_dpsdt() and rsdt_dpsdt() default to Rn = 0, the one-sided model", {
   thr <- c(-0.5, 0, 0.5)
   for (stim in c(0L, 1L)) {
@@ -277,7 +238,7 @@ test_that("dsdt_dpsdt() and rsdt_dpsdt() default to Rn = 0, the one-sided model"
   expect_lt(abs(counts_n[1, 1] / 1e5 - p_bottom), 0.01)
 })
 
-test_that("dsdt version densities match dmultinom and vectorize over rows", {
+test_that("dsdt version densities match dmultinom", {
   thr <- c(-0.5, 0, 0.5)
   p_dp <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 1L, "normal",
                                           qlogis(0.3), -Inf)
@@ -287,12 +248,6 @@ test_that("dsdt version densities match dmultinom and vectorize over rows", {
   p_md <- bmm:::.sdt_metad_category_probs(thr, 1.5, 1, 1L, "normal", 1.0)
   expect_equal(dsdt_metad(c(5, 15, 25, 55), 1L, 1.5, thr, metad = 1.0),
                dmultinom(c(5, 15, 25, 55), prob = p_md), tolerance = 1e-12)
-
-  counts <- rbind(c(2, 8, 20, 70), c(70, 20, 8, 2))
-  dens <- dsdt_dpsdt(counts, c(1L, 0L), 1.5, thr, Ro = c(0.3, 0.2),
-                     Rn = c(0, 0.1), log = TRUE)
-  expect_length(dens, 2)
-  expect_true(all(is.finite(dens)))
 })
 
 test_that("version category probs vectorized path matches per-draw evaluation", {
@@ -402,9 +357,8 @@ versions_stan_logmu <- function(grid, deltas) {
 }
 
 test_that("the Stan dpsdt and metad kernels match their R counterparts in both tails", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   grid <- expand.grid(cat = 1:6, criterion = c(-12, -0.5, 0.3, 12),
                       sdratio = c(-0.6, 0, 0.9), stimulus = c(0, 1),

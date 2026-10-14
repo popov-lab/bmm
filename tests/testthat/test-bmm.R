@@ -120,7 +120,7 @@ test_that("Available models produce expected errors", {
 
 test_that("bmm() starts the step-size search at the package default unless the user sets it", {
   withr::local_options(bmm.step_size = 0.02)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   formula <- bmf(c ~ 1 + (1 | ID), kappa ~ 1 + (1 | ID))
   mock <- function(...) {
     bmm(formula, dat, sdm("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE, ...)
@@ -140,7 +140,7 @@ test_that("bmm() starts the step-size search at the package default unless the u
 })
 
 test_that("bmm() builds the default prior and the inits from the data2 brm() gets", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   ids <- levels(factor(dat$ID))
   A <- diag(length(ids))
   dimnames(A) <- list(ids, ids)

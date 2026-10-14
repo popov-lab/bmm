@@ -34,3 +34,7 @@ bmm-dev
 
 # per-test timings written by .github/scripts/test-budget.R
 test-timings.csv
+
+# what testthat 3.3 writes for each failing test
+/tests/testthat/_problems/
+/tests/testthat/testthat-problems.rds

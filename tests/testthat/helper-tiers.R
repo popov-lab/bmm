@@ -1,7 +1,6 @@
 # Tier gates (ADR 0004). A new test that compiles a Stan program (a parity or
 # gradient check, the bmm_setup() smoke test) opens with
-# skip_unless_stan_tests(); #422 adds it to the existing ones, which until then
-# skip where CmdStan is not installed. The Windows and macOS pull-request jobs
+# skip_unless_stan_tests(). The Windows and macOS pull-request jobs
 # set BMM_TEST_STAN=false and ship no CmdStan; the Ubuntu jobs and every push
 # run them. A new test that needs a stored fit loads it through
 # load_fixture_fit(); one that needs only the assets folder opens with
