@@ -1478,6 +1478,139 @@ test_that("dezdm 3par handles varying n_trials correctly", {
   expect_true(all(is.finite(ll_vec)))
 })
 
+test_that("dmpt matches hand-computed multinomial densities", {
+  tree_old <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  tree_new <- mpt_tree("new", list(
+    old = "(1 - D) * g",
+    new = "D + (1 - D) * (1 - g)"
+  ))
+  model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
+
+  d_old <- dmpt(
+    x = c(35, 15), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "old"
+  )
+  expect_equal(d_old, dbinom(35, 50, 0.7 + 0.3 * 0.5, log = TRUE))
+
+  d_new <- dmpt(
+    x = c(10, 40), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "new", log = FALSE
+  )
+  expect_equal(d_new, dbinom(10, 50, 0.3 * 0.5))
+})
+
+test_that("rmpt generates counts with category names and unpacks", {
+  tree <- mpt_tree("study", list(
+    C = "cp + (1 - cp) * rp * rp",
+    E = "2 * (1 - cp) * rp * (1 - rp)",
+    U = "(1 - cp) * (1 - rp) * (1 - rp)"
+  ))
+  model <- mpt(tree)
+  draws <- rmpt(n = 7, size = 40, pars = c(cp = 0.6, rp = 0.75), mpt_model = model)
+  expect_equal(dim(draws), c(7, 3))
+  expect_equal(colnames(draws), c("C", "E", "U"))
+  expect_true(all(rowSums(draws) == 40))
+
+  unpacked <- rmpt(
+    n = 1, size = 40, pars = c(cp = 0.6, rp = 0.75),
+    mpt_model = model, unpack = TRUE
+  )
+  expect_named(unpacked, c("C", "E", "U"))
+  expect_equal(sum(unpacked), 40)
+})
+
+test_that("the categorical densities default to the log scale", {
+  model <- mpt(mpt_tree("t", list(a = "D", b = "1 - D")))
+  expect_equal(
+    dmpt(c(3, 7), pars = c(D = 0.4), mpt_model = model),
+    dmpt(c(3, 7), pars = c(D = 0.4), mpt_model = model, log = TRUE)
+  )
+  m3_model <- m3(
+    resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5),
+    choice_rule = "simple", version = "ss"
+  )
+  expect_equal(
+    dm3(c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = m3_model),
+    dm3(c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = m3_model, log = TRUE)
+  )
+})
+
+test_that("dmpt validates its inputs", {
+  tree_old <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  tree_new <- mpt_tree("new", list(
+    old = "(1 - D) * g",
+    new = "D + (1 - D) * (1 - g)"
+  ))
+  model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
+
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7), mpt_model = model, tree = "old"),
+    "Required"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model),
+    "multiple trees"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model, tree = "foo"),
+    "Unknown tree"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 1.7, g = 0.5), mpt_model = model, tree = "old"),
+    "between 0 and 1"
+  )
+  # bmm() refuses 0 and 1 as fixed values, so the distribution functions do too
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 1, g = 0), mpt_model = model, tree = "old"),
+    "strictly between 0 and 1. Provided: D = 1, g = 0"
+  )
+  expect_error(
+    rmpt(1, size = 10, pars = c(D = 0.5, g = 1), mpt_model = model, tree = "new"),
+    "strictly between 0 and 1. Provided: g = 1"
+  )
+  expect_error(
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = m3(
+      resp_cats = c("a", "b"), num_options = c(1, 1)
+    )),
+    "created with mpt"
+  )
+})
+
+test_that("dmpt matches named counts to the categories", {
+  tree_old <- mpt_tree("old", list(
+    old = "D + (1 - D) * g",
+    new = "(1 - D) * (1 - g)"
+  ))
+  tree_new <- mpt_tree("new", list(
+    old = "(1 - D) * g",
+    new = "D + (1 - D) * (1 - g)"
+  ))
+  model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
+
+  d_positional <- dmpt(
+    x = c(35, 15), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "old"
+  )
+  d_named <- dmpt(
+    x = c(new = 15, old = 35), pars = c(D = 0.7, g = 0.5),
+    mpt_model = model, tree = "old"
+  )
+  expect_equal(d_named, d_positional)
+
+  expect_error(
+    dmpt(
+      x = c(wrong = 15, name = 35), pars = c(D = 0.7, g = 0.5),
+      mpt_model = model, tree = "old"
+    ),
+    "categories"
+  )
+})
 
 # Tests for the ezdm decision-time cumulants (issue #407) ----------------------
 
@@ -1802,4 +1935,29 @@ test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.
 
   # pC rounds to 1 here and qlogis() of it is Inf
   expect_equal(.ezdm_logit_pc(0.45, bound - 0.45, 30), 2 * 30 * 0.45)
+})
+
+test_that("dmpt and rmpt ignore parameters the selected tree does not use", {
+  model <- mpt(list(
+    mpt_tree("a", list(x = "Do + (1 - Do) * g", y = "(1 - Do) * (1 - g)")),
+    mpt_tree("b", list(x = "(1 - Dn) * g", y = "Dn + (1 - Dn) * (1 - g)"))
+  ), tree_id = "t")
+  all_pars <- c(Do = 0.6, Dn = 0.4, g = 0.3)
+
+  expect_equal(
+    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "a"),
+    dbinom(7, 10, 0.72, log = TRUE)
+  )
+  expect_equal(
+    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "b"),
+    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "b")
+  )
+  draws <- rmpt(5, size = 20, pars = all_pars, mpt_model = model, tree = "b")
+  expect_equal(dim(draws), c(5, 2))
+  expect_true(all(rowSums(draws) == 20))
+
+  expect_error(
+    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "a"),
+    "Missing: 'Do'"
+  )
 })

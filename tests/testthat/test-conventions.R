@@ -68,18 +68,16 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
   # "a real smoke test compiles and samples"), which skip without CmdStan. The
   # sampling fits in test-conditional_effects.R, test-model_sdt_ranking.R,
   # test-model_sdt_rating.R and test-update.R move to tests/local in #422.
-  # test-model_mpt.R, test-ppp.R (#484-#489) and test-model_rdm.R (#502) are
-  # registered ahead.
+  # test-model_rdm.R (#502) is registered ahead. The MPT stack (#484-#489)
+  # registers nothing: its sampling fits live in tests/local.
   expect_pattern_counts(
     "backend\\s*=\\s*[\"']cmdstanr[\"']",
     c(
       "test-bmm_setup.R" = 18L,
       "test-conditional_effects.R" = 2L,
-      "test-model_mpt.R" = 2L,
       "test-model_rdm.R" = 4L,
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
-      "test-ppp.R" = 3L,
       "test-update.R" = 3L
     ),
     rule = "R1: backend = \"cmdstanr\" (any spacing or quotes) per file"
@@ -140,15 +138,13 @@ test_that("stancode() tests assert content, not that the code is non-empty (R7)"
 })
 
 test_that("tests seed through withr::local_seed(), not set.seed() (R8)", {
-  # the 34 calls are replaced in #422; test-model_mpt_expressions.R
-  # (#484-#489) is registered ahead
+  # the 34 calls are replaced in #422
   expect_pattern_counts(
     "^\\s*set\\.seed\\(",
     c(
       "test-distributions.R" = 4L,
       "test-helpers-data.R" = 17L,
       "test-helpers-parameters.R" = 3L,
-      "test-model_mpt_expressions.R" = 1L,
       "test-model_sdm-stancode.R" = 3L,
       "test-model_sdt_cdp.R" = 1L,
       "test-model_sdt_ranking.R" = 1L,
