@@ -14,6 +14,10 @@
 #'
 #' @param text Character. The model definition, either as a single string or
 #'   as a vector of lines (e.g., from [readLines()]).
+#' @param restrictions Parameter restrictions as in [mpt()], written with the
+#'   parameter names of the model text, e.g. `"g = 0.5"` or `list(g = 0.5)`.
+#'   They mirror the `restrictions` argument of MPTinR and TreeBUGS.
+#'   Restriction files are not read: pass their lines (see Examples).
 #' @param tree_names Character vector with one name per tree block. The names
 #'   are matched to the blocks by position: the first name goes to the first
 #'   block, and so on. bmm cannot check this order, so names given in a
@@ -36,8 +40,8 @@
 #'   each observation belongs to (see [mpt()]). Add this column to the data
 #'   yourself: for each row it holds the name, as given in `tree_names`, of
 #'   the tree the counts come from.
-#' @param covariates,simplex,restrictions,links passed to [mpt()].
-#'   `print(model)` lists the symbols that became parameters.
+#' @param covariates,simplex,links passed to [mpt()]. `print(model)` lists
+#'   the symbols that became parameters.
 #' @param impossible A named list with the response categories that cannot
 #'   occur in a tree, one element per such tree:
 #'   `list(<tree> = c("<category>", ...))` (see the `impossible` argument of
@@ -77,9 +81,8 @@
 #'   vector for aggregated counts) and one unnamed column per line of the
 #'   model file, in file order, because each line is one response category.
 #'   (For EQN files MPTinR sorts the columns instead; see [mpt_from_eqn()].)
-#'   Name the columns by tree and category first, then stack one block per
-#'   tree (see Examples); when a tree lacks some categories, start each tree
-#'   from zeros, as in the Examples of [mpt_from_eqn()].
+#'   Name the columns `<tree>.<category>`; [mpt_data_reshape()] then stacks the
+#'   trees and gives 0 to the categories a tree cannot produce (see Examples).
 #'
 #'   **Provenance.** The returned model carries an `mpt_source` attribute,
 #'   `list(text = )`, with the model definition as one string.
@@ -91,7 +94,7 @@
 #'   [mpt()] and [mpt_tree()] for building the trees in R, including the data
 #'   layout `bmm()` expects.
 #'
-#' @keywords transform
+#' @keywords bmmodel
 #'
 #' @examples
 #' model_2htm <- "
@@ -104,7 +107,7 @@
 #' "
 #' model <- mpt_from_string(
 #'   model_2htm,
-#'   tree_names = c("old", "new"),
+#'   tree_names = c("target", "lure"),
 #'   tree_id = "item_type"
 #' )
 #' model
@@ -112,7 +115,7 @@
 #' # fix the guessing rate as in MPTinR / TreeBUGS
 #' mpt_from_string(
 #'   model_2htm,
-#'   tree_names = c("old", "new"),
+#'   tree_names = c("target", "lure"),
 #'   tree_id = "item_type",
 #'   restrictions = "g = 0.5"
 #' )
@@ -149,21 +152,17 @@
 #' restr <- trimws(sub("#.*", "", readLines(restr_file)))
 #' model <- mpt_from_string(
 #'   readLines(model_file),
-#'   tree_names = c("old", "new"),
+#'   tree_names = c("target", "lure"),
 #'   tree_id = "item_type",
 #'   restrictions = restr[nzchar(restr)]
 #' )
 #'
 #' # MPTinR data: one unnamed column per line of the model file, in file
-#' # order. Name the columns by tree and category, then stack one block per
-#' # tree to get bmm's one row per participant and tree.
+#' # order. Name the columns by tree and category, then let mpt_data_reshape()
+#' # stack the trees to get bmm's one row per participant and tree.
 #' wide <- rbind(c(30, 10, 8, 32), c(25, 15, 12, 28))
-#' colnames(wide) <- c("old.old", "old.new", "new.old", "new.new")
-#' long <- do.call(rbind, lapply(c("old", "new"), function(tree) {
-#'   counts <- wide[, paste(tree, c("old", "new"), sep = "."), drop = FALSE]
-#'   colnames(counts) <- c("old", "new")
-#'   data.frame(id = seq_len(nrow(wide)), item_type = tree, counts)
-#' }))
+#' colnames(wide) <- c("target.old", "target.new", "lure.old", "lure.new")
+#' long <- mpt_data_reshape(wide, model)
 #' long
 #' # the row sums are the trials per row (40 here), but they cannot show
 #' # swapped columns or tree labels: compare one participant with the wide
@@ -174,9 +173,9 @@
 #' wide[1, ]
 #' bmm_data_check(bmf(D ~ 1), long, model)
 #' @export
-mpt_from_string <- function(text, tree_names, categories = NULL,
-                            tree_id = NULL, covariates = NULL,
-                            simplex = NULL, restrictions = NULL,
+mpt_from_string <- function(text, restrictions = NULL, tree_names,
+                            categories = NULL, tree_id = NULL,
+                            covariates = NULL, simplex = NULL,
                             links = "logit", impossible = NULL) {
   stop_missing_args()
   # a vector of lines keeps its "" elements, which separate the trees
@@ -376,7 +375,7 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #'   `impossible` does not cover the difference, the error names the
 #'   categories each tree lacks.
 #' @param tree_names A named character vector mapping tree labels of the EQN
-#'   file onto tree names in bmm, e.g. `c("1" = "old", "2" = "new")`. bmm tree
+#'   file onto tree names in bmm, e.g. `c("1" = "target", "2" = "lure")`. bmm tree
 #'   names must start with a letter and contain only letters, digits, or
 #'   underscores, so files with numeric tree labels need this mapping. Labels
 #'   not listed keep their name.
@@ -412,9 +411,11 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #'   parameter names, parameter and response category names are sanitized: a
 #'   leading `<tree>_` prefix is removed from category names that are not
 #'   mapped with `categories`, and all remaining underscores and dots are
-#'   stripped. Names that would clash after this are an error; names are
-#'   case-sensitive, so `P_G1` and `P_g1` stay distinct (`PG1`, `Pg1`). Tree
-#'   labels are kept, unless `tree_names` maps them. The formulas passed to
+#'   stripped. Two labels of the file, or two different values within one
+#'   tree, that become the same name are an error; mapped values that become
+#'   the same name in different trees are that one shared category. Names
+#'   are case-sensitive, so `P_G1` and `P_g1` stay distinct (`PG1`, `Pg1`).
+#'   Tree labels are kept, unless `tree_names` maps them. The formulas passed to
 #'   [bmm()] use the bmm names (`bmf(Do ~ 1)` for a file parameter `D_o`;
 #'   `bmf()` is short for [bmmformula()]); the `parameter` rows of the
 #'   renaming map translate them, and `print(model)` lists them. Of the
@@ -434,33 +435,24 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #'   one count column per shared response category, named by `bmm_name` in
 #'   the renaming map (see [mpt()]). A category that is `impossible` in a
 #'   tree gets 0 (or `NA`) in the rows of that tree. TreeBUGS data are wide:
-#'   one row per participant, one column per category label of the EQN file,
-#'   and no participant column, so add an `id` column first. The `category`
-#'   rows of the renaming map hold every tree with its labels and bmm names,
-#'   so the wide data can be reshaped by name: for each tree, start from a
-#'   block of zeros over all shared categories and fill in the columns of
-#'   that tree (see Examples). MPTinR data for an EQN model are unnamed, and
-#'   their columns do not follow the file: the trees and, within each tree,
-#'   the category labels are sorted (alphabetically, or numerically when they
-#'   are numbers); `MPTinR::check.mpt("model.eqn")` returns the order in its
-#'   elements `eqn.order.trees` and `eqn.order.categories`. (For MPTinR's own
-#'   model format the columns follow the lines instead; see
-#'   [mpt_from_string()].) Name the columns by tree and label,
-#'   `paste(tree, label, sep = ".")` with the bmm tree names, because trees
-#'   may share labels, and select them with the same key (see Examples).
-#'
-#'   If `categories` merged several labels of a tree onto one name, sum their
-#'   columns in the wide data into the first label's column and drop the map
-#'   rows of the other labels (`map[!duplicated(map[c("tree", "bmm_name")]), ]`)
-#'   before reshaping; otherwise the recipe fails with "duplicate subscripts".
+#'   one row per participant, one column per category label of the EQN file.
+#'   MPTinR data for an EQN model are unnamed, and their columns do not follow
+#'   the file: the trees and, within each tree, the category labels are sorted
+#'   (alphabetically, or numerically when all labels in the file are numbers);
+#'   `MPTinR::check.mpt("model.eqn")` returns the order in its elements
+#'   `eqn.order.trees` and `eqn.order.categories`. (For MPTinR's own model
+#'   format the columns follow the lines instead; see [mpt_from_string()].)
+#'   [mpt_data_reshape()] reshapes both layouts with the renaming map, sums the
+#'   labels that `categories` merged onto one response category, and gives 0 to
+#'   the categories a tree cannot produce (see Examples).
 #'
 #'   bmm cannot tell a reshape that swaps tree labels or category columns
-#'   from a correct one: such data fit without an error. The row sums,
-#'   `rowSums(long[cats])`, are the trials per row; they cannot show swapped
-#'   columns, and they show swapped tree labels only when the trees differ
-#'   in their number of trials. Comparing the response proportions per tree
-#'   with the design (old items must get more "yes" responses than new
-#'   items) catches swapped tree labels and response columns swapped in
+#'   from a correct one: such data fit without an error. The row sums of the
+#'   count columns are the trials per row; they cannot show swapped columns,
+#'   and they show swapped tree labels only when the trees differ in their
+#'   number of trials. Comparing the response proportions per tree
+#'   with the design (targets must get more "yes" responses than lures)
+#'   catches swapped tree labels and response columns swapped in
 #'   every tree, but not always a column slipped or a map entry wrong in one
 #'   tree, nor a swap between two trees of the same kind; so also compare
 #'   one participant's long rows with the wide row. [bmm_data_check()] runs
@@ -479,18 +471,18 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #'   [mpt()] and [mpt_tree()] for building the trees in R, including the data
 #'   layout `bmm()` expects.
 #'
-#' @keywords transform
+#' @keywords bmmodel
 #'
 #' @examples
 #' eqn_file <- tempfile(fileext = ".eqn")
 #' writeLines(c(
 #'   "6",
-#'   "old  hit   D_o",
-#'   "old  hit   (1-D_o)*g",
-#'   "old  miss  (1-D_o)*(1-g)",
-#'   "new  fa    (1-D_n)*g",
-#'   "new  cr    D_n",
-#'   "new  cr    (1-D_n)*(1-g)"
+#'   "target  hit   D_o",
+#'   "target  hit   (1-D_o)*g",
+#'   "target  miss  (1-D_o)*(1-g)",
+#'   "lure    fa    (1-D_n)*g",
+#'   "lure    cr    D_n",
+#'   "lure    cr    (1-D_n)*(1-g)"
 #' ), eqn_file)
 #' # restrictions use the file's names; the formulas use the bmm names
 #' model <- mpt_from_eqn(
@@ -502,50 +494,29 @@ mpt_from_string <- function(text, tree_names, categories = NULL,
 #' attr(model, "mpt_renaming")
 #'
 #' # TreeBUGS data: one row per participant, columns named by the category
-#' # labels of the EQN file, no participant column. bmm needs one row per
-#' # participant and tree, columns named by bmm_name: reshape by name through
-#' # the map, starting each tree from zeros so that categories the tree
-#' # cannot produce get 0
+#' # labels of the EQN file, no participant column. mpt_data_reshape() reshapes
+#' # them to bmm's one row per participant and tree, through the map; the
+#' # categories a tree cannot produce get 0
 #' wide <- data.frame(
 #'   hit = c(30, 25), miss = c(10, 15), fa = c(8, 12), cr = c(32, 28)
 #' )
-#' wide$id <- seq_len(nrow(wide))
-#' map <- attr(model, "mpt_renaming")
-#' map <- map[map$kind == "category", ]
-#' cats <- unique(map$bmm_name)
-#' long <- do.call(rbind, lapply(split(map, map$tree), function(tree_map) {
-#'   counts <- as.data.frame(matrix(0, nrow(wide), length(cats)))
-#'   names(counts) <- cats
-#'   counts[tree_map$bmm_name] <- wide[tree_map$file_name]
-#'   data.frame(id = wide$id, item_type = tree_map$tree[1], counts)
-#' }))
+#' long <- mpt_data_reshape(wide, model)
 #' long
 #' # the row sums are the trials per row (40 here). The proportions catch
-#' # swapped tree labels and swapped response columns (old items must get
-#' # more "yes" than new items), but not always a column slipped in one
+#' # swapped tree labels and swapped response columns (targets must get
+#' # more "yes" than lures), but not always a column slipped in one
 #' # tree: also compare one participant's long rows with the wide row
-#' rowSums(long[cats])
-#' tapply(long$yes / rowSums(long[cats]), long$item_type, mean)
+#' rowSums(long[c("yes", "no")])
+#' tapply(long$yes / rowSums(long[c("yes", "no")]), long$item_type, mean)
 #' long[long$id == 1, ]
 #' wide[1, ]
 #' bmm_data_check(bmf(Do ~ 1, g ~ 1), long, model)
 #'
 #' # MPTinR data for an EQN model are unnamed and sorted by tree, then by
 #' # label: MPTinR::check.mpt(eqn_file)$eqn.order.categories lists the
-#' # labels (here cr, fa for tree new, then hit, miss for tree old). Name the
-#' # columns by tree and label, so that a label used in several trees stays
-#' # apart, and select with the same key
+#' # labels (here cr, fa for tree new, then hit, miss for tree old)
 #' wide_mptinr <- rbind(c(32, 8, 30, 10), c(28, 12, 25, 15))
-#' colnames(wide_mptinr) <- c("new.cr", "new.fa", "old.hit", "old.miss")
-#' long2 <- do.call(rbind, lapply(split(map, map$tree), function(tree_map) {
-#'   counts <- as.data.frame(matrix(0, nrow(wide_mptinr), length(cats)))
-#'   names(counts) <- cats
-#'   key <- paste(tree_map$tree, tree_map$file_name, sep = ".")
-#'   counts[tree_map$bmm_name] <- wide_mptinr[, key]
-#'   data.frame(id = seq_len(nrow(wide_mptinr)), item_type = tree_map$tree[1],
-#'              counts)
-#' }))
-#' identical(long2, long)
+#' identical(mpt_data_reshape(wide_mptinr, model, columns = "mptinr"), long)
 #' @export
 mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
                          tree_id = NULL, covariates = NULL, simplex = NULL,
@@ -843,10 +814,23 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
     removed. Rename them in the EQN file or map them with the categories \\
     argument."
   )
-  cat_renaming <- .mpt_sanitized_names(unique(category_clean))
+  # a mapped value is the user's choice of a shared name, so two of them that
+  # sanitize alike in different trees are one category; two file labels that
+  # do so are a clash in any tree, as are two different values in one tree
+  labels <- unique(data.frame(
+    tree = eqn$tree, original = eqn$category, clean = category_clean,
+    mapped = user_mapped, bmm = gsub("[._]", "", category_clean)
+  ))
+  in_tree <- unique(labels[c("tree", "clean", "bmm")])
+  file_labels <- unique(labels[!labels$mapped, c("clean", "bmm")])
+  clashing <- unique(c(
+    in_tree$clean[.mpt_repeated(in_tree[c("tree", "bmm")])],
+    file_labels$clean[.mpt_repeated(file_labels["bmm"])]
+  ))
   # the message names the labels as the EQN file writes them, before the
   # prefix strip
-  names(cat_renaming) <- eqn$category[match(names(cat_renaming), category_clean)]
+  cat_renaming <- .mpt_sanitized_names(clashing)
+  names(cat_renaming) <- labels$original[match(clashing, labels$clean)]
   .mpt_check_sanitized_names(cat_renaming, for_categories = TRUE)
   eqn$bmm_category <- gsub("[._]", "", category_clean)
   eqn$prefix <- ifelse(has_tree_prefix, paste0(eqn$tree, "_"), "")
@@ -972,7 +956,7 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
 .mpt_model_from_branches <- function(branches, impossible, ...) {
   trees <- Map(function(tree_name, tree_branches) {
-    mpt_tree(tree_name, tree_branches, impossible[[tree_name]])
+    mpt_tree(tree_name, tree_branches, impossible = impossible[[tree_name]])
   }, names(branches), branches)
   mpt(trees = trees, ...)
 }
@@ -1009,8 +993,11 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
 
 # the rows whose bmm category is shared by another row of the same tree
 .mpt_merged_rows <- function(rows) {
-  merge_key <- rows[c("tree", "bmm_category")]
-  rows[duplicated(merge_key) | duplicated(merge_key, fromLast = TRUE), ]
+  rows[.mpt_repeated(rows[c("tree", "bmm_category")]), ]
+}
+
+.mpt_repeated <- function(key) {
+  duplicated(key) | duplicated(key, fromLast = TRUE)
 }
 
 .mpt_format_merges <- function(merged) {

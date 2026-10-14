@@ -19,6 +19,146 @@ test_that("mpt_tree validates its inputs", {
   expect_error(mpt_tree("t", list(a = 0.5, b = "x")), "character strings")
 })
 
+test_that("mpt_tree takes formulas and strings interchangeably", {
+  mpt_formula_tree_pairs <- list(
+    twohtm_old = list(
+      formulas = mpt_tree("old",
+        old ~ D + (1 - D) * g,
+        new ~ (1 - D) * (1 - g)
+      ),
+      strings = mpt_tree("old", list(
+        old = "D + (1 - D) * g",
+        new = "(1 - D) * (1 - g)"
+      ))
+    ),
+    pcm = list(
+      formulas = mpt_tree("study",
+        C ~ cp + (1 - cp) * rp * rp,
+        E ~ 2 * (1 - cp) * rp * (1 - rp),
+        U ~ (1 - cp) * (1 - rp) * (1 - rp)
+      ),
+      strings = mpt_tree("study", list(
+        C = "cp + (1 - cp) * rp * rp",
+        E = "2 * (1 - cp) * rp * (1 - rp)",
+        U = "(1 - cp) * (1 - rp) * (1 - rp)"
+      ))
+    ),
+    source_monitoring = list(
+      formulas = mpt_tree("sourceA",
+        A ~ dA + (1 - dA) * gA,
+        B ~ (1 - dA) * gB,
+        New ~ (1 - dA) * gNew
+      ),
+      strings = mpt_tree("sourceA", list(
+        A = "dA + (1 - dA) * gA",
+        B = "(1 - dA) * gB",
+        New = "(1 - dA) * gNew"
+      ))
+    ),
+    folded_fractions = list(
+      formulas = mpt_tree("nodist",
+        corr ~ Pm * Pb + (1 - Pm) * (1/5),
+        npl ~ Pm * (1 - Pb) + (1 - Pm) * (4/5),
+        impossible = "dist"
+      ),
+      strings = mpt_tree("nodist", list(
+        corr = "Pm * Pb + (1 - Pm) * (1/5)",
+        npl = "Pm * (1 - Pb) + (1 - Pm) * (4/5)"
+      ), impossible = "dist")
+    )
+  )
+  for (pair in mpt_formula_tree_pairs) {
+    expect_identical(pair$formulas, pair$strings)
+  }
+  expect_equal(mpt_formula_tree_pairs$folded_fractions$formulas$branches$corr[[3]][[3]], 0.2)
+
+  formula_model <- mpt(
+    list(
+      mpt_tree("old", old ~ D + (1 - D) * g, new ~ (1 - D) * (1 - g)),
+      mpt_tree("new", old ~ (1 - D) * g, new ~ D + (1 - D) * (1 - g))
+    ),
+    tree_id = "item_type"
+  )
+  string_model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  expect_equal(formula_model, string_model, ignore_attr = "call")
+  dat <- mpt_2htm_data()
+  expect_identical(
+    stancode(bmf(D ~ 1, g ~ 1), data = dat, model = formula_model),
+    stancode(bmf(D ~ 1, g ~ 1), data = dat, model = string_model)
+  )
+})
+
+test_that("mpt_tree validates formula input", {
+  expect_error(mpt_tree("t", ~ D), "two-sided")
+  expect_error(mpt_tree("t", a ~ D, ~ 1 - D), "two-sided")
+  expect_error(mpt_tree("t", "a" ~ D, b ~ 1 - D), "single response category name")
+  expect_error(mpt_tree("t", a ~ D, c(a, b) ~ 1 - D), "single response category name")
+  expect_error(mpt_tree("t", a ~ D, a ~ 1 - D), "unique within a tree")
+  expect_error(mpt_tree("t", a ~ D, "1 - D"), "mix")
+  expect_error(mpt_tree("t", a ~ D, 0.5), "mix")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), c ~ 1), "Cannot mix")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), "a"), "impossible argument has to be named")
+  expect_error(
+    mpt_tree("t", a ~ D, b ~ 1 - D, "c"),
+    "Cannot mix formulas.*impossible argument has to be named, impossible = \"c\""
+  )
+  expect_error(mpt_tree("t", list(a ~ D, b ~ 1 - D)), "separate arguments")
+  expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, impossible = "a"), "both impossible")
+  expect_error(mpt_tree("t", a ~ 1e-5 * D, b ~ 1 - D), "scientific notation")
+})
+
+test_that("mpt_tree gives the same tree for a formula as for the same string", {
+  expressions <- c(
+    "D", "-D", "-(1 - D)", "(D)", "((D))", "D^2", "D * 2^-1", "2 * (1 - D) * g",
+    "pnorm(-x) + exp(-(y + 1))", "`my par` * (1 - `my par`)", "`a.b` + 0.5",
+    "1/3 + D * (1/3)", "(1 - D) * (4/5)", "-1 + 2 * D", "D / (1 + D)"
+  )
+  for (expression in expressions) {
+    from_string <- mpt_tree("t", list(a = expression, b = "1"))
+    from_formula <- mpt_tree("t", as.formula(paste("a ~", expression)), b ~ 1)
+    expect_identical(from_formula, from_string, label = expression)
+  }
+})
+
+test_that("mpt_tree stores nothing from the environment of a formula", {
+  formula_with_large_environment <- function() {
+    large_object <- numeric(1e5)
+    a ~ D
+  }
+  tree <- mpt_tree("t", formula_with_large_environment(), b ~ 1 - D)
+  string_tree <- mpt_tree("t", list(a = "D", b = "1 - D"))
+  expect_identical(length(serialize(tree, NULL)), length(serialize(string_tree, NULL)))
+})
+
+test_that("mpt_tree does not let a partially matched name reorder or drop formulas", {
+  expect_error(mpt_tree("t", a ~ D, b = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", a ~ D, foo = b ~ 1 - D), "in full")
+  expect_error(mpt_tree("t", list(a = "D"), imp = "b"), "in full")
+  expect_identical(
+    mpt_tree("t", br = list(a = "D", b = "1 - D")),
+    mpt_tree("t", list(a = "D", b = "1 - D"))
+  )
+  expect_identical(
+    names(mpt_tree(name = "t", a ~ D, b ~ 1 - D)$branches),
+    c("a", "b")
+  )
+})
+
+test_that("mpt_tree rejects branch values that are not expressions", {
+  expect_error(mpt_tree("t", a ~ D, b ~ NULL), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, b ~ "1 - D"), "must be an expression")
+  expect_error(mpt_tree("t", a ~ D, eval(bquote(b ~ .(c(0.2, 0.3))))), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "NULL")), "must be an expression")
+  expect_error(mpt_tree("t", list(a = "D", b = "'1 - D'")), "must be an expression")
+  expect_s3_class(mpt_tree("t", a ~ 0.5, b ~ 0.5), "mpt_tree")
+})
+
+test_that("mpt_tree names a trailing comma instead of reporting a missing argument", {
+  expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, ), "trailing comma")
+  expect_error(mpt_tree("t", a ~ D, , b ~ 1 - D), "trailing comma")
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), ), "trailing comma")
+})
+
 test_that("mpt stores its derived state once", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   expect_equal(model$other_vars$link, "logit")
@@ -121,6 +261,16 @@ test_that("mpt errors on inconsistent trees and a missing tree_id", {
 })
 
 test_that("mpt refuses a zero branch and points to impossible categories", {
+  expect_error(
+    mpt(mpt_tree("a", list(y = "D", z = "0 * D", w = "1 - D"))),
+    "is 0 at the test values.*mpt_tree\\(impossible = \\)"
+  )
+  # the hint reads as one sentence, not with the source's line breaks
+  expect_error(
+    mpt(mpt_tree("a", list(y = "D", z = "0 * D", w = "1 - D"))),
+    "undefined. Declare a response category that a tree cannot produce with mpt_tree(impossible = ) instead",
+    fixed = TRUE
+  )
   zero_padded <- list(
     mpt_tree("a", list(x = "D", y = "1 - D", z = "0")),
     mpt_tree("b", list(x = "1 - 1", y = "g", z = "1 - g"))
@@ -205,6 +355,86 @@ test_that("check_formula uses Phi for the probit link", {
   old_rhs <- paste(deparse(formula_checked$old[[3]]), collapse = " ")
   expect_true(grepl("Phi(D)", old_rhs, fixed = TRUE))
   expect_false(grepl("pnorm", old_rhs, fixed = TRUE))
+})
+
+test_that("links = list() sets one parameter's link and matched prior at construction", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "probit"))
+  expect_equal(model$links, list(D = "probit", g = "logit"))
+  expect_equal(model$default_priors$D, bmm:::.mpt_latent_prior("probit"))
+  expect_equal(model$default_priors$g, bmm:::.mpt_latent_prior("logit"))
+  expect_output(print(model), "Links:\\s+D = probit; g = logit")
+
+  pr <- suppressMessages(default_prior(bmf(D ~ 1, g ~ 1), mpt_2htm_data(), model))
+  intercepts <- pr$class == "b" & pr$coef == "Intercept"
+  expect_equal(pr$prior[intercepts & pr$nlpar == "D"], "normal(0, 1)")
+  expect_equal(pr$prior[intercepts & pr$nlpar == "g"], "logistic(0, 1)")
+
+  # the single string remains the shorthand for every latent parameter
+  all_probit <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = "probit")
+  expect_equal(all_probit$links, list(D = "probit", g = "probit"))
+  expect_equal(all_probit$default_priors$g, bmm:::.mpt_latent_prior("probit"))
+  expect_equal(all_probit$other_vars$link, "probit")
+})
+
+test_that("the links argument of mpt() refuses what set_links() refuses", {
+  trees <- mpt_2htm_trees()
+  expect_warning(
+    model <- mpt(trees, tree_id = "item_type", links = list(gg = "probit")),
+    "'gg' read as 'g'"
+  )
+  expect_equal(model$links$g, "probit")
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = list(zzz = "probit")),
+    "Unrecognized link target\\(s\\): 'zzz'"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = list(D = "cauchit")),
+    "Unknown link function\\(s\\): 'cauchit'\\. mpt\\(\\) takes 'logit', 'probit'"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = "cauchit"),
+    "Unknown link function\\(s\\): 'cauchit'\\. mpt\\(\\) takes 'logit', 'probit'"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = c("logit", "probit")),
+    "one link function for the whole model"
+  )
+  expect_error(mpt(trees, tree_id = "item_type", links = 1), "named list")
+  # NULL takes the default link, as in the other model constructors
+  expect_equal(
+    mpt(trees, tree_id = "item_type", links = NULL)$links,
+    list(D = "logit", g = "logit")
+  )
+
+  # simplex members and their stick-breaking components carry identity links
+  tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
+  expect_error(
+    mpt(tree, simplex = c("gA", "gB", "gC"), links = list(gA = "probit")),
+    "The link of 'gA' cannot be changed in mpt\\(\\)"
+  )
+  expect_error(
+    mpt(tree, simplex = c("gA", "gB", "gC"), links = list(gAraw = "probit")),
+    "The link of 'gAraw' cannot be changed in mpt\\(\\)"
+  )
+})
+
+test_that("mpt() refuses a link for a parameter the restrictions removed", {
+  trees <- list(
+    mpt_tree("old", list(old = "Do + (1 - Do) * g", new = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(old = "(1 - Dn) * g", new = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", restrictions = "Dn = Do", links = list(Dn = "probit")),
+    "'Dn' .*removed by the restrictions"
+  )
+  # 'g' is one edit from 'D', so the link matcher used to read it as D
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", restrictions = "g = 0.5",
+        links = list(g = "probit")),
+    "'g' .*removed by the restrictions"
+  )
+  model <- mpt(trees, tree_id = "item_type", restrictions = "Dn = Do", links = list(Do = "probit"))
+  expect_equal(model$links, list(Do = "probit", g = "logit"))
 })
 
 test_that("formulas for response categories are rejected", {
@@ -546,7 +776,10 @@ test_that("printing an mpt model lists trees, restrictions and the identifiabili
     simplex = c("gA", "gB", "gC")
   )
   expect_output(print(simplex), "2 free parameter\\(s\\), 2 degrees of freedom")
-  expect_output(print(simplex), "'gAraw', 'gBraw' pass through inv_logit\\(\\)")
+  expect_output(
+    print(simplex),
+    "pass through inv_logit\\(\\) in the generated formulas \\(hence the identity links above\\)"
+  )
   expect_output(print(simplex), "symmetric Dirichlet\\(1\\), prior mean 1/3 = 0.333")
   expect_match(
     parameter_info(simplex)$description[4],
@@ -1245,6 +1478,37 @@ test_that("stick-breaking members form a simplex for any raw values", {
   )
 })
 
+test_that("generated simplex formulas are neither announced as missing nor listed in the summary", {
+  tree <- mpt_tree("t", list(A = "gA", B = "gB", New = "gNew"))
+  model <- mpt(tree, simplex = c("gA", "gB", "gNew"))
+  dat <- data.frame(A = 10L, B = 10L, New = 10L)
+  expect_no_message(
+    fit <- bmm(
+      bmf(gA ~ 1, gB ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    message = "No formula"
+  )
+  expect_equal(summarise_formula(fit$bmm$user_formula, fit$bmm$model), c("gA ~ 1", "gB ~ 1"))
+  # the header block print(summary(fit)) uses; a mock fit has no draws to summarise
+  withr::local_options(bmm.color_summary = FALSE)
+  expect_output(
+    bmm:::print_model_header(fit$bmm$model, fit$bmm$user_formula, "dat", 1L),
+    "Formula: gA ~ 1\\s+gB ~ 1\\s+Data:"
+  )
+
+  # a parameter the user leaves out of a plain model is still announced, and
+  # the summary still lists the constants the user fixed
+  plain <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  expect_message(
+    bmm(bmf(D ~ 1), mpt_2htm_data(), plain, backend = "mock", mock_fit = 1, rename = FALSE),
+    "No formula for parameter g"
+  )
+  fixed <- suppressMessages(bmm(
+    bmf(D ~ 1, g = 0.5), mpt_2htm_data(), plain, backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_equal(summarise_formula(fixed$bmm$user_formula, fixed$bmm$model), c("D ~ 1", "g = 0.5"))
+})
+
 test_that("predictors on the derived simplex parameter are rejected", {
   trees <- list(mpt_tree("t", list(A = "gA", B = "gB", New = "gNew")))
   model <- mpt(trees, simplex = c("gA", "gB", "gNew"))
@@ -1505,7 +1769,16 @@ test_that("check_data builds possibility indicators for impossible categories", 
   dat_observed$dist[dat_observed$cond == "same"][1] <- 3L
   expect_error(
     check_data(model, dat_observed, bmf(Pm ~ 1, Pb ~ 1)),
-    "declared impossible for 1 observation"
+    "declared impossible for 1 row\\(s\\)"
+  )
+})
+
+test_that("check_data warns about a tree without rows in units of rows", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  dat <- mpt_2htm_data()
+  expect_warning(
+    check_data(model, dat[dat$item_type == "old", ], bmf(D ~ 1, g ~ 1)),
+    "no rows for tree\\(s\\): 'new'"
   )
 })
 

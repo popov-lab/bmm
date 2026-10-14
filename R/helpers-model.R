@@ -486,6 +486,7 @@ print.bmmodel <- function(x, ...) {
 #'
 #' @return Called for its printed output; returns `NULL` invisibly
 #' @keywords internal developer
+#' @export
 print_model_details <- function(model, ...) {
   UseMethod("print_model_details")
 }

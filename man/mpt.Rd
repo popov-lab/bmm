@@ -22,7 +22,7 @@ declared impossible.}
 \item{tree_id}{Character. Name of the data column whose values name the tree
 each observation belongs to; the values must match the tree names. Can be
 omitted for single-tree models. Effects of experimental conditions belong
-in the parameter formulas, not here — see Details.}
+in the parameter formulas, not here; see Details.}
 
 \item{covariates}{Character vector. Names of data columns that appear in
 branch expressions but are not latent parameters, for example
@@ -58,13 +58,18 @@ files are not read: in MPTinR and TreeBUGS a character vector names a
 restrictions file, in \code{bmm} it holds the restrictions. To use such a file,
 pass \code{readLines(path)}; blank lines and lines starting with \verb{#} are
 skipped, and a \verb{#} after a restriction starts a comment, as in MPTinR.
-Restrictions are substituted into the branch expressions before the
-parameters are identified, so a restricted parameter is not part of the
-model and cannot be a simplex member. Order constraints (\code{"Do > Dn"}) are
-not supported here; see Details.}
+A restricted parameter is removed from the model; the Details say how
+this differs from fixing a parameter in the formula. Order constraints
+(\code{"Do > Dn"}) are not supported here; see Details.}
 
-\item{links}{Character. The link function for all latent probability
-parameters: \code{"logit"} (default) or \code{"probit"}.}
+\item{links}{The link function of the latent probability parameters:
+\code{"logit"} (default) or \code{"probit"}. A single string sets every parameter;
+a named list, \code{links = list(D = "probit")}, sets the named parameters
+and leaves the others at \code{"logit"}. Members of a \code{simplex} group and
+their \code{praw} components take no link of their own. A parameter switched
+to the other link, in the list or afterwards with
+\code{model$links$D <- "probit"}, takes that link's default priors (see
+Details).}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -74,8 +79,9 @@ An object of class \code{bmmodel}
 \description{
 Multinomial Processing Tree (MPT) models measure the probabilities of
 discrete latent cognitive states from categorical responses. A model is
-specified as a set of trees (one per distinct branch structure) created
-with \code{\link[=mpt_tree]{mpt_tree()}}. Branch expressions that terminate in the same response
+specified as a set of trees created with \code{\link[=mpt_tree]{mpt_tree()}}, one per distinct
+branch structure, such as one tree for targets and one for lures in a
+recognition test. Branch expressions that terminate in the same response
 category are summed within each tree, and parameters shared across trees
 are equated by giving them the same name. All latent probability
 parameters are estimated on an unconstrained latent scale (logit or
@@ -98,11 +104,13 @@ column per response category. The count columns must be named exactly
 like the branch names given to \code{\link[=mpt_tree]{mpt_tree()}} (\code{old} and \code{new} in the
 example below); \code{bmm()} finds them by these names, so no response
 variable is passed. The \code{tree_id} column names the tree of each row, and
-the counts of a row must come from trials of that tree.
+the counts of a row must come from trials of that tree. Wide tables with
+one column per category of an EQN file, as MPTinR and TreeBUGS take them,
+are reshaped with \code{\link[=mpt_data_reshape]{mpt_data_reshape()}}.
 
-A separate tree is needed only when the \emph{branch expressions} differ — that
+A separate tree is needed only when the \emph{branch expressions} differ, that
 is, when the trial determines which latent processes apply or which
-response categories are reachable (old versus new probes, a response set
+response categories are reachable (targets versus lures, a response set
 with or without distractors, inclusion versus exclusion instructions).
 Experimental factors whose \emph{effect on the parameters} you want to estimate
 belong in the parameter formulas, exactly as in every other \code{bmm} model:
@@ -111,22 +119,36 @@ column can serve both when a factor happens to change the structure as
 well. When several levels of a factor share a branch structure, add a
 column naming the tree and keep the factor for the formulas.
 
-Parameters that receive a non-linear predictor formula (a formula whose
-right-hand side references other formula parameters, e.g.
-\code{D ~ Dmax * (1 - exp(-rate * ptime))}) are not transformed by the link
-function: the user-supplied expression must keep the parameter within
-(0, 1). Sub-parameters of such formulas (e.g., \code{Dmax} and \code{rate}) are
-estimated on the identity scale with \code{normal(0, 1)} default priors. Their
-random-effect SDs keep brms's default prior, \code{student_t(3, 0, 2.5)},
-because no single rate fits every scale such a formula can give them.
+\strong{Equating and fixing parameters.} Parameters are equated across trees
+by giving them the same name. Beyond that, there are two mechanisms, and
+they differ in when the constraint is decided. A \emph{restriction}
+(\code{restrictions = c("Dn = Do", "g = 0.5")}) is applied when the model is
+built: it is substituted into the branch expressions before the
+parameters are identified, so the restricted parameter is not part of
+the model, gets no formula and no prior, cannot be a simplex member, and
+is listed by \code{print(model)} under \verb{Restrictions:} but not by
+\code{\link[=parameter_info]{parameter_info()}}. A \emph{constant in the formula} (\code{bmf(D ~ 1, g = 0.5)})
+is applied at fit time: the parameter stays part of the model, is listed
+by \code{print()} under \verb{Fixed:} and by \code{\link[=parameter_info]{parameter_info()}} with its value, and
+is freed again by giving it a formula. The value is mapped to the latent
+scale when the constant prior is built, so \code{\link[=default_prior]{default_prior()}} shows
+\code{constant(0)} for a guessing rate of 0.5 under the logit link, and
+\code{summary()} lists it as \verb{g_Intercept 0.00} under "Constant Parameters";
+\code{\link[=prior_info]{prior_info()}} and \code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5. Members
+of a \code{simplex} group and their \code{praw} components cannot be fixed this
+way; fix parameters outside the group instead. As a rule of thumb, a
+constant that defines the model goes into \code{restrictions}, a constant you
+compare against a free version goes into the formula; the section
+"Constraining parameters" of the MPT article walks through both.
 
-Under the logit link, intercepts and regression coefficients get a
-\code{logistic(0, 1)} prior and random-effect SDs get \code{exponential(1)}. Under
-the probit link, intercepts and coefficients get \code{normal(0, 1)} and SDs
-get \code{exponential(2)}. Group-level correlation matrices get \code{lkj(2)}.
-Coefficients of the sub-parameters above get \code{normal(0, 0.5)}. A parameter
-switched to the other link after construction (\code{model$links$D <- "probit"}) takes that link's priors unless its default prior was
-replaced. \code{\link[=default_prior]{default_prior()}} lists the rows a given formula produces.
+\strong{Default priors.} Under the logit link, intercepts and regression
+coefficients get a \code{logistic(0, 1)} prior and random-effect SDs get
+\code{exponential(1)}. Under the probit link, intercepts and coefficients get
+\code{normal(0, 1)} and SDs get \code{exponential(2)}. Group-level correlation
+matrices get \code{lkj(2)}. A parameter switched to the other link after
+construction (\code{model$links$D <- "probit"}) takes that link's priors
+unless its default prior was replaced. \code{\link[=default_prior]{default_prior()}} lists the rows
+a given formula produces.
 
 The default prior of a simplex group of K members is the uniform
 (symmetric Dirichlet(1)) distribution on the simplex: each member has
@@ -149,32 +171,22 @@ on the first member therefore scales all later members by the same
 factor, leaving their ratios unchanged. Read such effects on the probability scale with
 \code{\link[=native_parameters]{native_parameters()}}.
 
-A parameter can also be fixed to a probability at fit time, in the
-formula: \code{bmf(D ~ 1, g = 0.5)}. Unlike a restriction, the parameter stays
-part of the model and can be freed again by giving it a formula. The
-value is mapped to the latent scale when the constant prior is built, so
-\code{\link[=default_prior]{default_prior()}} shows \code{constant(0)} for a guessing rate of 0.5 under
-the logit link. For the same reason, \code{summary()} lists a fixed \code{g = 0.5}
-as \verb{g_Intercept 0.00} under "Constant Parameters"; \code{\link[=prior_info]{prior_info()}} and
-\code{\link[=parameter_info]{parameter_info()}} show the probability, 0.5. Members of a \code{simplex}
-group and their \code{praw} components cannot be fixed this way; fix parameters
-outside the group instead.
-
-Printing the model ends with an identifiability check for intercept-only
-formulas. It compares the number of free parameters with the degrees of
-freedom (response categories minus 1, summed over trees) and computes the
-rank of the Jacobian of the category probabilities with respect to the
-free parameters, from exact derivatives at five interior test values (and
-five test values of each covariate); parameters fixed in the formula enter
-at their values. A rank below the number of free parameters means that a
-combination of the named parameters is not identified by the branch
-expressions, even when the count passes. The check is local: it holds at
-the test values, not at the boundaries of the parameter space. A test
-value with a non-finite derivative is left out, and the printout says how
-many; if \code{\link[stats:D]{stats::D()}} cannot differentiate a branch expression, the rank
-is not computed and the count decides. The rank sees the tree parameters
-only: after a non-linear formula, the rank line names that formula's
-parameter as not analysed.
+\strong{Identifiability.} Printing the model ends with an identifiability
+check for intercept-only formulas. It compares the number of free
+parameters with the degrees of freedom (response categories minus 1,
+summed over trees) and computes the rank of the Jacobian of the category
+probabilities with respect to the free parameters, from exact derivatives
+at five interior test values (and five test values of each covariate);
+parameters fixed in the formula enter at their values. A rank below the
+number of free parameters means that a combination of the named
+parameters is not identified by the branch expressions, even when the
+count passes. The check is local: it holds at the test values, not at the
+boundaries of the parameter space. A test value with a non-finite
+derivative is left out, and the printout says how many; if \code{\link[stats:D]{stats::D()}}
+cannot differentiate a branch expression, the rank is not computed and
+the count decides. The rank sees the tree parameters only: after a
+non-linear formula, the rank line names that formula's parameter as not
+analysed.
 
 \code{bmm()} warns when the rank is deficient and every formula is
 intercept-only. When a formula has a predictor or is non-linear, it only
@@ -185,10 +197,10 @@ test give three free parameters and rank 2 of 3, so one combination of
 \code{Do}, \code{Dn} and \code{g} cannot be estimated; a second condition that varies
 the response bias identifies them.
 
-\code{summary()} reports intercepts and regression coefficients on the latent
-(logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}} returns the posterior
-draws of every parameter on the probability scale for each observed
-combination of the predictors, e.g.
+\strong{Reading the estimates.} \code{summary()} reports intercepts and regression
+coefficients on the latent (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}}
+returns the posterior draws of every parameter on the probability scale
+for each observed combination of the predictors, e.g.
 \code{native_parameters(fit, re_formula = NA, summary = TRUE)}; a difference
 between conditions is the difference of these draws. With
 \code{re_formula = NA} these are the probabilities of the median participant
@@ -203,10 +215,21 @@ corresponds to the latent-trait MPT model.
 
 For posterior predictive checks, \code{\link[brms:posterior_predict]{brms::posterior_predict()}} returns
 simulated counts (draws x rows x categories) and \code{\link[brms:posterior_epred]{brms::posterior_epred()}}
-the expected counts; the MPT article computes the T1 statistic and its
-posterior predictive p-value from them. With \code{newdata},
+the expected counts; \code{\link[=ppp]{ppp()}} computes the T1 and T2 statistics of Klauer
+(2010) and their posterior predictive p-values from them. With \code{newdata},
 \code{\link[brms:posterior_predict]{brms::posterior_predict()}} needs the columns \code{nTrials}, \verb{Idx_<tree>} and
 \verb{Poss_<category>} that \code{check_data()} builds; \code{fit$data} contains them.
+
+\strong{Non-linear formulas.} Parameters that receive a non-linear predictor
+formula (a formula whose right-hand side references other formula
+parameters, e.g. \code{D ~ Dmax * (1 - exp(-rate * ptime))}) are not
+transformed by the link function: the user-supplied expression must keep
+the parameter within (0, 1). Sub-parameters of such formulas (e.g.,
+\code{Dmax} and \code{rate}) are estimated on the identity scale with
+\code{normal(0, 1)} default priors on their intercepts and \code{normal(0, 0.5)}
+on their regression coefficients. Their random-effect SDs keep brms's
+default prior, \code{student_t(3, 0, 2.5)}, because no single rate fits every
+scale such a formula can give them.
 
 Order constraints between parameters (\code{Do > Dn}) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.
@@ -214,9 +237,9 @@ reparameterizing the larger parameter in the model formula, e.g.
 "Order constraints" of the MPT article walks through the
 recipe.
 
-Parameter and response category names must start with a letter and may
-contain only letters and digits, because brms does not allow underscores
-or dots in non-linear parameter names.
+\strong{Names.} Parameter and response category names must start with a
+letter and may contain only letters and digits, because brms does not
+allow underscores or dots in non-linear parameter names.
 
 All latent parameters are non-linear parameters of the underlying brms
 model, and brms has no separate \code{Intercept} prior class for those: their
@@ -230,17 +253,19 @@ formula produces.
 \examples{
 \dontrun{
 # two-high-threshold (2HTM) model of recognition memory
-tree_old <- mpt_tree("old", list(
-  old = "D + (1 - D) * g",
-  new = "(1 - D) * (1 - g)"
-))
-tree_new <- mpt_tree("new", list(
-  old = "(1 - D) * g",
-  new = "D + (1 - D) * (1 - g)"
-))
+# one tree per probe type: targets (studied items) and lures (new items),
+# each ending in the responses "old" and "new"
+tree_target <- mpt_tree("target",
+  old ~ D + (1 - D) * g,
+  new ~ (1 - D) * (1 - g)
+)
+tree_lure <- mpt_tree("lure",
+  old ~ (1 - D) * g,
+  new ~ D + (1 - D) * (1 - g)
+)
 
 model <- mpt(
-  trees = list(tree_old, tree_new),
+  trees = list(tree_target, tree_lure),
   tree_id = "item_type"
 )
 
@@ -248,7 +273,7 @@ model <- mpt(
 # one row per participant x tree; count columns named after the branches
 data <- data.frame(
   id = rep(1:20, each = 2),
-  item_type = rep(c("old", "new"), 20)
+  item_type = rep(c("target", "lure"), 20)
 )
 counts <- t(sapply(data$item_type, function(cond) {
   rmpt(

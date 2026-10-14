@@ -177,13 +177,16 @@ summarise_links <- function(links) {
 }
 
 # the formula as text, one element per parameter; with a model, also the
-# parameters the user left out and the constants the model fixes them to
+# parameters the user left out and the constants the model fixes them to, but
+# not the formulas the model generates for parameters the user never wrote
 summarise_formula <- function(formula, model = NULL) {
   if (!is.null(model)) {
+    generated <- setdiff(generated_parameters(model), names(formula))
     formula <- suppressMessages(add_missing_parameters(model, formula))
     fixpars <- model$fixed_parameters
     fixpars <- fixpars[names(fixpars) %in% names(model$parameters)]
     formula[names(fixpars)] <- fixpars
+    formula <- formula[setdiff(names(formula), generated)]
   }
   formula_lines(formula)
 }

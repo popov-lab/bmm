@@ -6,12 +6,12 @@
 \usage{
 mpt_from_string(
   text,
+  restrictions = NULL,
   tree_names,
   categories = NULL,
   tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
-  restrictions = NULL,
   links = "logit",
   impossible = NULL
 )
@@ -19,6 +19,11 @@ mpt_from_string(
 \arguments{
 \item{text}{Character. The model definition, either as a single string or
 as a vector of lines (e.g., from \code{\link[=readLines]{readLines()}}).}
+
+\item{restrictions}{Parameter restrictions as in \code{\link[=mpt]{mpt()}}, written with the
+parameter names of the model text, e.g. \code{"g = 0.5"} or \code{list(g = 0.5)}.
+They mirror the \code{restrictions} argument of MPTinR and TreeBUGS.
+Restriction files are not read: pass their lines (see Examples).}
 
 \item{tree_names}{Character vector with one name per tree block. The names
 are matched to the blocks by position: the first name goes to the first
@@ -45,8 +50,8 @@ each observation belongs to (see \code{\link[=mpt]{mpt()}}). Add this column to 
 yourself: for each row it holds the name, as given in \code{tree_names}, of
 the tree the counts come from.}
 
-\item{covariates, simplex, restrictions, links}{passed to \code{\link[=mpt]{mpt()}}.
-\code{print(model)} lists the symbols that became parameters.}
+\item{covariates, simplex, links}{passed to \code{\link[=mpt]{mpt()}}. \code{print(model)} lists
+the symbols that became parameters.}
 
 \item{impossible}{A named list with the response categories that cannot
 occur in a tree, one element per such tree:
@@ -101,9 +106,8 @@ this format are wide and positional: one row per participant (or one
 vector for aggregated counts) and one unnamed column per line of the
 model file, in file order, because each line is one response category.
 (For EQN files MPTinR sorts the columns instead; see \code{\link[=mpt_from_eqn]{mpt_from_eqn()}}.)
-Name the columns by tree and category first, then stack one block per
-tree (see Examples); when a tree lacks some categories, start each tree
-from zeros, as in the Examples of \code{\link[=mpt_from_eqn]{mpt_from_eqn()}}.
+Name the columns \verb{<tree>.<category>}; \code{\link[=mpt_data_reshape]{mpt_data_reshape()}} then stacks the
+trees and gives 0 to the categories a tree cannot produce (see Examples).
 
 \strong{Provenance.} The returned model carries an \code{mpt_source} attribute,
 \code{list(text = )}, with the model definition as one string.
@@ -119,7 +123,7 @@ D + (1 - D) * (1 - g)  # new
 "
 model <- mpt_from_string(
   model_2htm,
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type"
 )
 model
@@ -127,7 +131,7 @@ model
 # fix the guessing rate as in MPTinR / TreeBUGS
 mpt_from_string(
   model_2htm,
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type",
   restrictions = "g = 0.5"
 )
@@ -164,21 +168,17 @@ writeLines(c("# fix the guessing rate", "g = 0.5"), restr_file)
 restr <- trimws(sub("#.*", "", readLines(restr_file)))
 model <- mpt_from_string(
   readLines(model_file),
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type",
   restrictions = restr[nzchar(restr)]
 )
 
 # MPTinR data: one unnamed column per line of the model file, in file
-# order. Name the columns by tree and category, then stack one block per
-# tree to get bmm's one row per participant and tree.
+# order. Name the columns by tree and category, then let mpt_data_reshape()
+# stack the trees to get bmm's one row per participant and tree.
 wide <- rbind(c(30, 10, 8, 32), c(25, 15, 12, 28))
-colnames(wide) <- c("old.old", "old.new", "new.old", "new.new")
-long <- do.call(rbind, lapply(c("old", "new"), function(tree) {
-  counts <- wide[, paste(tree, c("old", "new"), sep = "."), drop = FALSE]
-  colnames(counts) <- c("old", "new")
-  data.frame(id = seq_len(nrow(wide)), item_type = tree, counts)
-}))
+colnames(wide) <- c("target.old", "target.new", "lure.old", "lure.new")
+long <- mpt_data_reshape(wide, model)
 long
 # the row sums are the trials per row (40 here), but they cannot show
 # swapped columns or tree labels: compare one participant with the wide
@@ -194,4 +194,4 @@ bmm_data_check(bmf(D ~ 1), long, model)
 \code{\link[=mpt]{mpt()}} and \code{\link[=mpt_tree]{mpt_tree()}} for building the trees in R, including the data
 layout \code{bmm()} expects.
 }
-\keyword{transform}
+\keyword{bmmodel}

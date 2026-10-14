@@ -22,6 +22,36 @@
   unlist(lapply(as.list(expr)[-1], .mpt_scientific_constants)) %||% numeric(0)
 }
 
+# mpt_tree() formulas, category ~ expression, become the same named list of
+# language objects that the string form produces; the right-hand sides are
+# never evaluated and the formula environments are dropped
+.mpt_formula_branches <- function(formulas, tree_name) {
+  is_formula <- vapply(formulas, inherits, logical(1), "formula")
+  stopif(
+    !all(is_formula),
+    "Cannot mix formulas and other branch expressions in tree '{tree_name}'. \\
+    Write every branch as a formula, category ~ expression, or pass a named \\
+    list of character strings."
+  )
+  one_sided <- lengths(formulas) != 3L
+  stopif(
+    any(one_sided),
+    "Branch formulas must be two-sided, category ~ expression (tree \\
+    '{tree_name}'). One-sided: {collapse_comma(vapply(formulas[one_sided], deparse1, ''))}"
+  )
+  lhs_is_symbol <- vapply(formulas, function(f) is.symbol(f[[2]]), logical(1))
+  stopif(
+    !all(lhs_is_symbol),
+    "The left-hand side of a branch formula must be a single response category \\
+    name (tree '{tree_name}'). Offending: \\
+    {collapse_comma(vapply(formulas[!lhs_is_symbol], deparse1, ''))}"
+  )
+  setNames(
+    lapply(formulas, function(f) f[[3]]),
+    vapply(formulas, function(f) as.character(f[[2]]), character(1))
+  )
+}
+
 # the constants as the user wrote them in the branch string, each followed by
 # the form brms writes when the two differ; a value folded from constant
 # arithmetic (1/10000) has no written form and is shown as brms writes it
@@ -670,8 +700,14 @@
       too_low <- if (point <= length(interior)) probs <= 0 else probs < -tolerance
       outside <- names(probs)[too_low | probs > 1 + tolerance][1]
       if (!is.na(outside)) {
+        # interpolated into the glue() below, which leaves the line
+        # continuations of an interpolated value in place
         zero_hint <- if (probs[[outside]] == 0) {
-          " A zero probability makes the likelihood undefined."
+          paste(
+            " A zero probability makes the likelihood undefined. Declare a",
+            "response category that a tree cannot produce with",
+            "mpt_tree(impossible = ) instead of giving it a zero branch."
+          )
         } else {
           ""
         }

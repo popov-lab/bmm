@@ -213,10 +213,26 @@ responses are the topic of the
 knitr::kable(bmm:::model_overview(group = "Choices and response times"))
 ```
 
+## Processing-tree models
+
+Participants give categorical responses, and you describe the discrete
+processes that lead to each response as a multinomial processing tree, for
+example the two-high-threshold model of recognition or the pair-clustering
+model of free recall. You write each tree's branch probabilities as
+expressions, and `mpt()` fits them to response counts. The
+[MPT article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html) covers
+specifying trees, importing model files from MPTinR and TreeBUGS, and
+constraining parameters.
+
+```{r, echo = FALSE}
+knitr::kable(bmm:::model_overview(group = "Processing-tree models"))
+```
+
 ```{r other-groups, results = "asis", echo = FALSE}
 known <- c(
   "Continuous reproduction", "Categorical recall and n-AFC decisions",
-  "Detection, recognition and confidence judgments", "Choices and response times"
+  "Detection, recognition and confidence judgments", "Choices and response times",
+  "Processing-tree models"
 )
 registry <- bmm:::model_registry()
 other <- setdiff(unique(registry$group), known)

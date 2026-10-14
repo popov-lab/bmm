@@ -31,9 +31,11 @@ Files:
 - `helper-mpt.R`: sources `tests/testthat/helper-mpt.R`, so the MPT fits use
   the same tree and data builders as the unit tests.
 - `test-*.R`: the tests, among them `test-kfold-update.R` (refits through
-  `update()` on a slice of the fit's data, grouped `kfold()`) and
+  `update()` on a slice of the fit's data, grouped `kfold()`),
   `test-mpt-fits.R` (`mpt()` fits read through `conditional_effects()`, and
-  the prior-only fit behind the default simplex prior). Keep each fit
+  the prior-only fit behind the default simplex prior) and
+  `test-ppp-fits.R` (`ppp()` on well-specified, misspecified and
+  impossible-category `mpt()` fits). Keep each fit
   short (one or two chains, a few hundred iterations) and assert with
   `expect_range()` or a tolerance, never with exact equality to a stored fit.
 - `make-fixtures.R`: regenerates four fixtures in `tests/testthat/assets/`:
