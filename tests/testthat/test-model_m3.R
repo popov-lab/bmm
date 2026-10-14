@@ -254,6 +254,30 @@ test_that("m3 custom accepts softplus links and generates default priors", {
   }
 })
 
+test_that("m3 custom derives each parameter's default prior from its link and choice rule", {
+  formula <- bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1)
+  cases <- list(
+    list(rule = "simple", link = "identity", main = "normal(10, 4)"),
+    list(rule = "simple", link = "logit", main = "logistic(0, 1)"),
+    list(rule = "gaussian", link = "identity", main = "normal(2, 1)"),
+    list(rule = "softmax", link = "identity", main = "normal(3, 1)")
+  )
+  for (case in cases) {
+    model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 2, 5),
+                choice_rule = case$rule, version = "custom",
+                links = list(c = case$link, a = case$link))
+    priors <- suppressMessages(
+      check_model(model, oberauer_lewandowsky_2019_e1, formula)$default_priors
+    )
+    label <- paste(case$rule, case$link)
+    for (par in c("c", "a")) {
+      expect_equal(priors[[par]],
+                   list(main = case$main, effects = "normal(0, 0.5)", sd = "exponential(1)"),
+                   label = label)
+    }
+  }
+})
+
 test_that("m3 works with num_options as a numeric vector", {
   formula <- bmf(
     c ~ 1 + (1 | ID),

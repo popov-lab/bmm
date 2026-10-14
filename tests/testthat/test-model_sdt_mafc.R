@@ -453,3 +453,15 @@ test_that("an sdt_mafc fit stores posterior_epred_sdt_mafc() in its family", {
              backend = "mock", mock_fit = 1, rename = FALSE)
   expect_identical(fit$formula$family$posterior_epred, posterior_epred_sdt_mafc)
 })
+
+test_that("log_lik() of an sdt_mafc fit reads each observation's counts, m and distribution", {
+  # two draws of d for two observations; the second observation has its own
+  # number of alternatives and the gumbel_max distribution (id 3)
+  prep <- epred_prep(list(d = matrix(c(0.8, 1.1, 1.6, 2.2), 2, 2)),
+                     list(Y = c(30L, 55L), trials = c(40L, 60L), vint1 = c(2L, 4L),
+                          vint2 = c(1L, 3L)))
+  expect_equal(log_lik_sdt_mafc(1, prep),
+               dsdt_mafc(30, 40, 2, c(0.8, 1.1), dist = "normal", log = TRUE))
+  expect_equal(log_lik_sdt_mafc(2, prep),
+               dsdt_mafc(55, 60, 4, c(1.6, 2.2), dist = "gumbel_max", log = TRUE))
+})

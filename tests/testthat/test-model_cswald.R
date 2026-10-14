@@ -783,3 +783,16 @@ test_that("log_lik() of a cswald fit is the density of each observation under ea
     expect_equal(log_lik_cswald_crisk(i, prep), density(zr = dpars$zr[, i], version = "crisk"))
   }
 })
+
+test_that("cswald check_data refuses RTs and responses it cannot read", {
+  model <- cswald("rt", "response")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  expect_error(
+    check_data(model, data.frame(rt = c("0.5", "0.6"), response = c(1, 0)), formula),
+    "The RT variable 'rt' needs to be of type double or integer"
+  )
+  expect_error(
+    check_data(model, data.frame(rt = c(0.5, 0.6), response = as.complex(c(1, 0))), formula),
+    "is of type 'complex'"
+  )
+})
