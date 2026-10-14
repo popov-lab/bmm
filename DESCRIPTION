@@ -29,6 +29,7 @@ Imports:
     crayon,
     fs,
     glue,
+    graphics,
     matrixStats,
     methods,
     mvtnorm,
@@ -57,7 +58,7 @@ Suggests:
     roxygen2,
     rstan,
     stringr,
-    testthat (>= 3.0.0),
+    testthat (>= 3.3.2),
     tidybayes,
     tidyr,
     usethis,
@@ -66,6 +67,8 @@ Suggests:
     yaml
 Additional_repositories: https://stan-dev.r-universe.dev
 Config/testthat/edition: 3
+Config/testthat/parallel: true
+Config/testthat/start-first: conditional_effects, update, model_sdt_rating, model_sdt_cdp, default-priors, model_m3, model_cswald, helpers-init, model_ezdm, pp_check
 Config/Needs/website: rmarkdown
 Encoding: UTF-8
 LazyData: true

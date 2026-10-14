@@ -1,0 +1,121 @@
+# Runs the test suite from the source tree on Ubuntu and enforces the time
+# budget of ADR 0004. R CMD check tests the built tarball, which has no
+# tests/testthat/assets (build-ignored), so the fixture-based tests only run
+# here; the Stan compile tests run here as well. The job fails on a failing
+# test or on a breached cap (.github/scripts/test-budget.R), uploads the
+# per-test timings, and lists the slowest tests in the job summary.
+on:
+  push:
+    branches: [master, develop, 'dev-*']
+  pull_request:
+    branches: [master, develop, 'dev-*']
+
+name: tests-source
+
+concurrency:
+  group: tests-source-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  # a newer push to a pull request supersedes its run; a push to a target
+  # branch (a merge) gets a group of its own commit, so it is never cancelled
+  # or dropped from the queue by the next merge
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  tests-source:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: true
+      BMM_TEST_STAN: true
+      TESTTHAT_CPUS: 4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: NA
+          extra-packages: |
+            devtools
+            withr
+            dplyr
+            knitr
+            posterior
+            here
+            testthat
+            stan-dev/cmdstanr
+            tidybayes
+            ggplot2
+            mixtur
+            ggthemes
+            cowplot
+            stringr
+            waldo
+            fansi
+            yaml
+            roxygen2
+            emmeans
+
+      - name: Get latest CmdStan release
+        id: cmdstan-version
+        shell: bash
+        run: |
+          set +e
+          response=$(curl -sSL --fail \
+            --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 2 \
+            -H "Authorization: Bearer ${GITHUB_PAT}" \
+            https://api.github.com/repos/stan-dev/cmdstan/releases/latest)
+          curl_status=$?
+          set -e
+          if [ $curl_status -ne 0 ]; then
+            echo "Failed to reach the GitHub API (curl exit ${curl_status})" >&2
+            exit 1
+          fi
+          tag=$(echo "$response" | jq -r '.tag_name // empty')
+          if [ -z "$tag" ]; then
+            echo "Failed to determine the latest CmdStan release" >&2
+            exit 1
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Locate CmdStan install path
+        id: cmdstan-path
+        run: |
+          cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+        shell: Rscript {0}
+
+      - name: Cache CmdStan
+        id: cmdstan-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.cmdstan-path.outputs.path }}
+          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
+
+      - name: Set up CmdStan toolchain
+        run: cmdstanr::check_cmdstan_toolchain(fix = TRUE)
+        shell: Rscript {0}
+
+      - name: Build CmdStan
+        if: steps.cmdstan-cache.outputs.cache-hit != 'true'
+        run: |
+          cmdstanr::install_cmdstan(
+            cores = parallel::detectCores(),
+            version = "${{ steps.cmdstan-version.outputs.version }}"
+          )
+        shell: Rscript {0}
+
+      - name: Run the suite under the time budget
+        timeout-minutes: 30
+        run: Rscript .github/scripts/test-budget.R
+
+      - name: Upload per-test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timings
+          path: test-timings.csv

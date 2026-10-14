@@ -33,7 +33,7 @@
       drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
       bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
       ndt = "Non-decision time = Additional time required beyond the evidence accumulation process",
-      zr = "Relative starting point = Starting point between the decision thresholds relative to the upper bound.",
+      zr = "Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, > 0.5 = biased towards the upper response).",
       s = "The diffusion constant, that is the standard deviation of the Gaussian noise during sampling"
     ),
     links = list(
