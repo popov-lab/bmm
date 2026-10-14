@@ -1,15 +1,18 @@
 # Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 #
-# Measures test coverage with covr from the source tree and uploads it to
-# Codecov. It runs the unit, mock-pipeline and fixture tiers of ADR 0004 with
+# Measures test coverage with covr and reports the line coverage in the job
+# summary. It runs the unit, mock-pipeline and fixture tiers of ADR 0004 with
 # four workers; the Stan compile tier is off (BMM_TEST_STAN=false, no CmdStan
 # installed). On develop 1917e81f that tier reached 16 R lines no other test
 # reaches, all real-machine probes in R/bmm_setup.R (95.65 % with it, 95.52 %
 # without, R/brms-misc.R excluded), so the reported number is slightly lower
-# than a run with CmdStan would give, never higher. The upload needs the
-# CODECOV_TOKEN secret; without it a pull request still gets the coverage in
-# the log, and a push fails the upload step.
+# than a run with CmdStan would give, never higher.
+#
+# The README badge needs no third-party service and no secret: on a push to
+# develop the badge job force-pushes coverage.json, in the endpoint format of
+# shields.io, as the only commit of the `badges` branch, and the badge reads it
+# from raw.githubusercontent.com. Only that job can write to the repository.
 on:
   push:
     branches: [master, develop, 'dev-*']
@@ -47,7 +50,6 @@ jobs:
           dependencies: NA
           extra-packages: |
             any::covr
-            any::xml2
             bookdown
             stan-dev/cmdstanr
             cowplot
@@ -86,19 +88,23 @@ jobs:
             install_path = file.path(normalizePath(Sys.getenv("RUNNER_TEMP"), winslash = "/"), "package")
           )
           print(cov)
-          covr::to_cobertura(cov)
+          pct <- covr::percent_coverage(cov)
+          color <- if (pct >= 90) "brightgreen" else if (pct >= 80) "green" else
+            if (pct >= 70) "yellowgreen" else if (pct >= 60) "yellow" else "red"
+          writeLines(sprintf(
+            '{"schemaVersion": 1, "label": "coverage", "message": "%.1f%%", "color": "%s"}',
+            pct, color
+          ), "coverage.json")
+          cat(sprintf("Line coverage: %.2f %% (R/brms-misc.R excluded, Stan compile tier off)\n", pct),
+              file = Sys.getenv("GITHUB_STEP_SUMMARY"), append = TRUE)
         shell: Rscript {0}
 
-      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+      - name: Keep the badge for the badge job
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: actions/upload-artifact@v4
         with:
-          # fail on an upload error, except on a pull request without a token;
-          # the action reads only 'true', so the token test must give a boolean
-          # (r-lib's example passes the token itself, which reads as false)
-          fail_ci_if_error: ${{ github.event_name != 'pull_request' || secrets.CODECOV_TOKEN != '' }}
-          files: ./cobertura.xml
-          plugins: noop
-          disable_search: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+          name: coverage-badge
+          path: coverage.json
 
       - name: Show testthat output
         if: always()
@@ -113,3 +119,34 @@ jobs:
         with:
           name: coverage-test-failures
           path: ${{ runner.temp }}/package
+
+  badge:
+    needs: test-coverage
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # one badge push at a time; a queued newer push replaces an older one
+    concurrency:
+      group: coverage-badge
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-badge
+
+      # the branch holds one commit, replaced on every push, so it never grows
+      - name: Publish the badge to the badges branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q -b badges site
+          cp coverage.json site/
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage.json
+          git commit -q -m "Coverage of ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+        shell: bash
