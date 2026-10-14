@@ -403,120 +403,18 @@ sd_default <- function(pr, par) {
 }
 
 test_that("every model ships an sd default on the link scale of each parameter", {
-  data <- oberauer_lin_2017
-
-  pr <- default_prior(
-    bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID), thetant ~ 1 + (1 | ID)), data,
-    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
-  )
-  for (par in c("kappa", "thetat", "thetant")) expect_equal(sd_default(pr, par), "exponential(1)")
-
-  pr <- default_prior(
-    bmf(kappa ~ 1 + (1 | ID), a ~ 1 + (1 | ID), c ~ 1 + (1 | ID), s ~ 1 + (1 | ID)), data,
-    imm("dev_rad", nt_features = paste0("col_nt", 1:7), nt_distances = paste0("dist_nt", 1:7), set_size = "set_size")
-  )
-  for (par in c("kappa", "a", "c", "s")) expect_equal(sd_default(pr, par), "exponential(1)")
-
-  pr <- default_prior(bmf(kappa ~ 1 + (1 | ID), c ~ 1 + (1 | ID)), data, sdm("dev_rad"))
-  for (par in c("kappa", "c")) expect_equal(sd_default(pr, par), "exponential(1)")
-
-  m3_formula <- bmf(c ~ 1 + (1 | ID), a ~ 1 + (1 | ID))
-  for (rule in c("simple", "softmax")) {
-    model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"),
-      choice_rule = rule, version = "ss")
-    pr <- default_prior(m3_formula, oberauer_lewandowsky_2019_e1, model)
-    for (par in c("c", "a")) expect_equal(sd_default(pr, par), "exponential(1)")
-  }
-
-  # the custom version derives its defaults from the link of each parameter
+  # the rates are one per parameter meaning: 1 for the parameters that carry
+  # the between-subject spread, 2 for the scale-like ones (see each provider)
   withr::local_options(bmm.silent = 2)
-  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"),
-    choice_rule = "softmax", version = "custom", links = list(c = "log", a = "logit"))
-  pr <- suppressWarnings(default_prior(bmf(
-    c ~ 1 + (1 | ID), a ~ 1 + (1 | ID),
-    corr ~ b + a + c, other ~ b + a, npl ~ b
-  ), oberauer_lewandowsky_2019_e1, model))
-  for (par in c("c", "a")) expect_equal(sd_default(pr, par), "exponential(1)")
-
-  rt_data <- data.frame(rt = rep(c(0.6, 0.8, 1.1, 0.7), 5), response = rep(c(1, 0), 10), id = factor(rep(1:5, each = 4)))
-  rt_formula <- bmf(drift ~ 1 + (1 | id), bound ~ 1 + (1 | id), ndt ~ 1 + (1 | id))
-  pr <- default_prior(rt_formula, rt_data, ddm("rt", "response"))
-  expect_equal(sd_default(pr, "drift"), "exponential(1)")
-  for (par in c("bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
-
-  # the toy data has a 50% error rate, which cswald "simple" warns about
-  pr <- suppressWarnings(default_prior(rt_formula, rt_data, cswald("rt", "response", version = "simple")))
-  for (par in c("drift", "bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
-  pr <- default_prior(rt_formula + bmf(zr ~ 1 + (1 | id)), rt_data, cswald("rt", "response", version = "crisk"))
-  expect_equal(sd_default(pr, "drift"), "exponential(1)")
-  for (par in c("bound", "ndt", "zr")) expect_equal(sd_default(pr, par), "exponential(2)")
-
-  ez_data <- data.frame(
-    mean_rt = rep(c(0.5, 0.6), 10), var_rt = rep(c(0.02, 0.03), 10),
-    n_upper = rep(c(60, 70), 10), n_trials = 100, id = factor(rep(1:10, each = 2))
-  )
-  pr <- default_prior(rt_formula, ez_data, ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"))
-  expect_equal(sd_default(pr, "drift"), "exponential(1)")
-  for (par in c("bound", "ndt")) expect_equal(sd_default(pr, par), "exponential(2)")
-
-  pr <- default_prior(
-    bmf(d ~ 1 + (1 | id), criterion ~ 0 + condition + (1 | id), sdratio ~ 1 + (1 | id)),
-    broeder_schuetz_2009_e3,
-    sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
-  )
-  # criterion carries half of d's between-subject spread, so it joins d at rate 1
-  for (par in c("d", "criterion")) expect_equal(sd_default(pr, par), "exponential(1)")
-  expect_equal(sd_default(pr, "sdratio"), "exponential(2)")
-  pr <- default_prior(
-    bmf(d ~ 1 + (1 | id), bias ~ 0 + condition + (1 | id)),
-    broeder_schuetz_2009_e3,
-    sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
-  )
-  expect_equal(sd_default(pr, "bias"), "exponential(2)")
-
-  mafc_data <- data.frame(
-    n_correct = rep(c(30, 24), 10), n_trials = 40, id = factor(rep(1:10, each = 2))
-  )
-  pr <- default_prior(
-    bmf(d ~ 1 + (1 | id)), mafc_data,
-    sdt_mafc(response = "n_correct", n_trials = "n_trials", m = 4)
-  )
-  expect_equal(sd_default(pr, "d"), "exponential(1)")
-
-  pr <- default_prior(
-    bmf(d ~ 1 + (1 | id), sdratio ~ 1 + (1 | id)), meyer_grant_jakob_2025,
-    sdt_ranking(response = paste0("rank", 1:5), m = "set_size", dist = "normal")
-  )
-  expect_equal(sd_default(pr, "d"), "exponential(1)")
-  expect_equal(sd_default(pr, "sdratio"), "exponential(2)")
-
-  rating_data <- data.frame(
-    r1 = 5, r2 = 8, r3 = 12, r4 = 15, stimulus = rep(0:1, 10),
-    id = factor(rep(1:10, each = 2))
-  )
-  rating_formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
-                        spacing ~ 1 + (1 | id), sdratio ~ 1 + (1 | id))
-  pr <- default_prior(rating_formula, rating_data,
-                      sdt_rating(response = paste0("r", 1:4), stimulus = "stimulus"))
-  for (par in c("d", "criterion")) expect_equal(sd_default(pr, par), "exponential(1)")
-  for (par in c("spacing", "sdratio")) {
-    expect_equal(sd_default(pr, par), "exponential(2)")
-  }
-
-  cdp_cols <- c(paste0("new", 1:3), paste0("know", 4:6), paste0("remember", 4:6))
-  cdp_data <- cbind(
-    data.frame(stimulus = rep(0:1, 10), id = factor(rep(1:10, each = 2))),
-    stats::setNames(as.data.frame(matrix(10L, 20, length(cdp_cols))), cdp_cols)
-  )
-  cdp_formula <- bmf(
-    dfam ~ 1 + (1 | id), drec ~ 1 + (1 | id), criterion ~ 1 + (1 | id),
-    spacing ~ 1 + (1 | id), rcrit ~ 1 + (1 | id), sigmar ~ 1 + (1 | id)
-  )
-  pr <- default_prior(cdp_formula, cdp_data,
-                      sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3))
-  for (par in c("dfam", "drec")) expect_equal(sd_default(pr, par), "exponential(1)")
-  for (par in c("criterion", "spacing", "rcrit", "sigmar")) {
-    expect_equal(sd_default(pr, par), "exponential(2)")
+  for (name in names(cases <- model_test_cases("sd_default"))) {
+    case <- cases[[name]]
+    # the toy RT data have a 50% error rate, which cswald "simple" warns about
+    pr <- suppressWarnings(default_prior(case$formula, case$data, case$model))
+    rows <- sd_rows(pr)
+    expect_setequal(c(rows$nlpar, rows$dpar)[c(rows$nlpar, rows$dpar) != ""], names(case$sd))
+    for (par in names(case$sd)) {
+      expect_equal(sd_default(pr, par), case$sd[[par]], label = paste(name, par))
+    }
   }
 })
 

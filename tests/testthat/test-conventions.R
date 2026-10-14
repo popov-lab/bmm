@@ -166,3 +166,21 @@ test_that("fixtures are small, short, and regenerable (R5)", {
       "mock_bmmfit_mixture2p.rds")
   )
 })
+
+test_that("every model has a model-case provider with the cases every model needs (R4)", {
+  # a provider is model_cases_<model>() in helper-model-<model>.R; the shared
+  # tests read its cases through model_test_cases() (helper-model-cases.R)
+  providers <- sub("^model_cases_", "", ls(environment(model_test_cases), pattern = "^model_cases_"))
+  expect_identical(setdiff(model_names(), providers), character(0), info = paste(
+    "R4: add tests/testthat/helper-model-<model>.R defining model_cases_<model>()"
+  ))
+  for (kind in c("stored_frame", "sd_default", "init", "links")) {
+    covered <- unlist(lapply(model_test_cases(kind), function(case) {
+      intersect(class(case$model), model_names())
+    }))
+    # a model whose check_data() consumes or creates columns also needs a
+    # revert_check_data() method for its stored-frame case to pass
+    expect_identical(setdiff(model_names(), covered), character(0),
+                     info = paste0("R4: no '", kind, "' case for these models"))
+  }
+})

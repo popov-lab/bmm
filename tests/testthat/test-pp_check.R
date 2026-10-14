@@ -452,11 +452,19 @@ test_that("pp_check() still checks a 4par fit saved without RT indicators", {
   expect_s3_class(pp_check(fit, newdata = fit$data, ndraws = 5), "ggplot")
 })
 
-# only the ezdm 4par default leaves brms; the other models with declared
-# observables must still plot exactly what brms plots
-test_that("pp_check() without resp_var still delegates to brms for the other RT models", {
+test_that("pp_check() without arguments plots the stored fit of every model", {
+  for (name in vapply(model_test_cases("fixture"), `[[`, character(1), "file")) {
+    fit <- load_ppcheck_fit(name)
+    expect_s3_class(suppressMessages(pp_check(fit, ndraws = 5)), "ggplot")
+  }
+})
+
+# the ezdm 4par default leaves brms, and brms has no pp_check() for the m3
+# family; every other model with a stored fit must plot exactly what brms plots
+test_that("pp_check() without resp_var delegates to brms for every other model", {
   brms_method <- getS3method("pp_check", "brmsfit", envir = asNamespace("brms"))
-  for (name in c("bmmfit_ezdm3_ppcheck.rds", "bmmfit_ddm_ppcheck.rds")) {
+  files <- vapply(model_test_cases("fixture"), `[[`, character(1), "file")
+  for (name in setdiff(files, c("bmmfit_ezdm4_ppcheck.rds", "bmmfit_m3_ppcheck.rds"))) {
     fit <- load_ppcheck_fit(name)
     withr::with_seed(1, mine <- pp_check(fit, ndraws = 5))
     withr::with_seed(1, theirs <- brms_method(fit, type = "dens_overlay", ndraws = 5))

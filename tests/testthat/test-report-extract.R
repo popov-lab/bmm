@@ -1,6 +1,7 @@
+# the stored fit of every model that registers one (helper-model-<model>.R)
 fixture_fits <- function() {
-  paths <- list.files(test_path("assets"), pattern = "^bmmfit_.*\\.rds$", full.names = TRUE)
-  stats::setNames(lapply(paths, readRDS), basename(paths))
+  files <- vapply(model_test_cases("fixture"), `[[`, character(1), "file")
+  stats::setNames(lapply(files, load_fixture_fit), files)
 }
 
 all_model_versions <- function() {
@@ -152,7 +153,6 @@ test_that("summarise_formula() returns one line per parameter, constants include
 test_that("print(summary()) shows the formula text summarise_formula() returns", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   for (name in names(fits)) {
     fit <- fits[[name]]
     printed <- trimws(capture.output(print(suppressWarnings(summary(fit)), color = FALSE)), "right")
@@ -170,7 +170,6 @@ nuts_count <- function(fit, par, at_least = 1) {
 test_that("fit_settings() reads the sampler settings and versions stored on the fit", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   for (name in names(fits)) {
     fit <- fits[[name]]
     settings <- fit_settings(fit)
@@ -273,7 +272,6 @@ test_that("fit_settings() works on mock fits, with NA where the fit has no draws
 test_that("convergence_summary() equals R-hat and ESS computed per variable from the draws", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   for (name in names(fits)) {
     fit <- fits[[name]]
     # tiny fixture fits: posterior warns that it caps the ESS estimates
@@ -311,7 +309,6 @@ test_that("convergence_summary() leaves out the draws from the prior", {
 test_that("convergence_summary() marks the parameters that summary() shows", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   withr::local_options(list(warn = -1))
   for (name in names(fits)) {
     fit <- fits[[name]]

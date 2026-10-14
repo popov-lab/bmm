@@ -143,17 +143,15 @@ test_that("check_var_set_size rejects invalid input", {
 })
 
 test_that("check_data() returns a data.frame()", {
-  # sdt_rating needs one response column per rating category, so
-  # it cannot be exercised with the shared single `response` column used here; it
-  # is covered with proper count data in test-model_sdt_rating.R.
-  models <- setdiff(model_names(), "sdt_rating")
+  # a model whose response the shared columns below cannot express (the
+  # multi-column SDT responses) registers its own case in its provider
+  models <- model_names()
   mls <- lapply(models, get_model)
   # test data includes variables for all model types:
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
   # - stimulus (0/1) for sdt_yn (response counts come from `response`)
-  # - rank1, rank2 for sdt_ranking (wide rank-frequency count columns)
   # Use 50 rows to avoid small sample size warnings from cswald
   test_data <- data.frame(
     y = rep(1, 50), x = rep(1, 50), z = rep(2, 50), w = rep(1, 50),
@@ -163,11 +161,16 @@ test_that("check_data() returns a data.frame()", {
     mean_rt_upper = rep(0.45, 50), mean_rt_lower = rep(0.55, 50),
     var_rt_upper = rep(0.018, 50), var_rt_lower = rep(0.025, 50),
     rt = rep(0.6, 50), response = rep(1, 50),
-    stimulus = rep(c(0L, 1L), 25), rank1 = rep(30L, 50), rank2 = rep(20L, 50),
-    new1 = rep(30L, 50), know2 = rep(10L, 50), know3 = rep(5L, 50),
-    remember2 = rep(10L, 50), remember3 = rep(5L, 50)
+    stimulus = rep(c(0L, 1L), 25)
   )
-  for (ml in mls) {
+  registered <- model_test_cases("check_data")
+  for (m in seq_along(models)) {
+    case <- registered[[models[m]]]
+    if (!is.null(case)) {
+      expect_s3_class(check_data(case$model, case$data, bmf(kappa ~ 1)), "data.frame")
+      next
+    }
+    ml <- mls[[m]]
     model <- ml(
       resp_error = "y", nt_features = "x", set_size = 2,
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
@@ -176,17 +179,6 @@ test_that("check_data() returns a data.frame()", {
       stimulus = "stimulus", m = 2,
       trees = mpt_tree("t", list(w = "p", l = "1 - p"))
     )
-    # sdt_ranking takes a wide multi-column response, unlike the single
-    # `response` column shared by the other count models.
-    if (inherits(model, "sdt_ranking")) {
-      model <- ml(response = c("rank1", "rank2"), m = 2)
-    }
-    # sdt_cdp derives its count columns (new1/know2/remember2/...) from the
-    # declared scale size instead of a response argument; 1 + 1 is the scale
-    # the exported constructor refuses (nothing identifies the spacing)
-    if (inherits(model, "sdt_cdp")) {
-      model <- ml(response = "", stimulus = "stimulus", n_new = 1, n_old = 2)
-    }
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),
       "data.frame"
