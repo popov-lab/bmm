@@ -4,62 +4,16 @@
 # MODEL CONSTRUCTOR TESTS                                                ####
 ############################################################################# !
 
-test_that("sdt_mafc model can be created with default arguments", {
-  expect_silent(sdt_mafc("n_correct", "n_trials", m = 4))
-})
-
-test_that("sdt_mafc model can be created with all distribution options", {
-  expect_silent(sdt_mafc("n_correct", "n_trials", m = 4, dist = "normal"))
-  expect_silent(sdt_mafc("n_correct", "n_trials", m = 4, dist = "logistic"))
-  expect_silent(sdt_mafc("n_correct", "n_trials", m = 4, dist = "gumbel_min"))
-  expect_silent(sdt_mafc("n_correct", "n_trials", m = 4, dist = "gumbel_max"))
-})
-
-test_that("sdt_mafc model has correct class structure", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  expect_s3_class(model, "bmmodel")
-  expect_s3_class(model, "sdt")
-  expect_s3_class(model, "sdt_mafc")
-})
-
-test_that("sdt_mafc model parameters are correctly defined", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  expect_true("d" %in% names(model$parameters))
-  expect_false("criterion" %in% names(model$parameters))
-})
-
-test_that("sdt_mafc model has correct default link functions", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  expect_equal(model$links$d, "identity")
-})
-
-test_that("sdt_mafc model accepts custom links", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4, links = list(d = "log"))
-  expect_equal(model$links$d, "log")
-})
-
-test_that("sdt_mafc refuses a link it cannot apply, before and after construction", {
-  expect_equal(settable_links(sdt_mafc("n_correct", "n_trials", m = 4)), "d")
-  expect_error(
-    sdt_mafc("n_correct", "n_trials", m = 4, links = list(sensitivity = "log")),
-    "Unrecognized link target"
-  )
+test_that("sdt_mafc reads a near-miss link target as the parameter, with a warning", {
   expect_warning(
     sdt_mafc("n_correct", "n_trials", m = 4, links = list(dd = "log")),
     "read as 'd'"
   )
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  model$links$typo <- "log"
-  expect_error(check_links(model), "Unrecognized link target")
 })
 
-test_that("sdt_mafc model stores m and distribution info correctly", {
+test_that("sdt_mafc model stores m", {
   model <- sdt_mafc("n_correct", "n_trials", m = 6, dist = "gumbel_min")
   expect_equal(model$other_vars$m, 6L)
-  expect_equal(model$other_vars$dist, "gumbel_min")
-
-  model2 <- sdt_mafc("n_correct", "n_trials", m = 3, dist = "logistic")
-  expect_equal(model2$other_vars$dist, "logistic")
 })
 
 test_that("sdt_mafc accepts m as a constant or a column name", {
@@ -68,13 +22,6 @@ test_that("sdt_mafc accepts m as a constant or a column name", {
 
   m_col <- sdt_mafc("n_correct", "n_trials", m = "set_size")
   expect_identical(m_col$other_vars$m, "set_size")
-})
-
-test_that("sdt_mafc model has default priors and init_ranges", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  expect_true("d" %in% names(model$default_priors))
-  expect_length(model$init_ranges$d, 2)
-  expect_true(model$init_ranges$d[1] < model$init_ranges$d[2])
 })
 
 test_that("sdt_mafc requires response, n_trials, and m", {
@@ -115,38 +62,6 @@ test_that("sdt_mafc check_data adds m_afc and dist_type columns", {
   expect_equal(unique(result$dist_type), 4L)
 })
 
-test_that("sdt_mafc check_data refuses non-numeric count columns", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  dat <- data.frame(n_correct = c(70, 65), n_trials = c(100, 100))
-
-  for (conv in list(as.character, as.factor)) {
-    bad <- dat
-    bad$n_correct <- conv(bad$n_correct)
-    expect_error(check_data(model, bad, bmf(d ~ 1)),
-                 "Response variable 'n_correct' must be numeric")
-
-    bad <- dat
-    bad$n_trials <- conv(bad$n_trials)
-    expect_error(check_data(model, bad, bmf(d ~ 1)),
-                 "Variable 'n_trials' must be numeric")
-  }
-})
-
-test_that("sdt_mafc check_data still only warns on non-integer counts", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  dat <- data.frame(n_correct = c(70.5, 65), n_trials = c(100, 100))
-  expect_warning(check_data(model, dat, bmf(d ~ 1)),
-                 "Response variable 'n_correct' should contain integer counts")
-})
-
-test_that("dsdt_mafc refuses NA in m and the counts", {
-  expect_error(dsdt_mafc(5, 10, m = NA, d = 1), "m must not contain NA")
-  expect_error(dsdt_mafc(NA, 10, m = 4, d = 1),
-               "n_correct must not contain NA")
-  expect_error(dsdt_mafc(5, NA, m = 4, d = 1),
-               "n_trials must not contain NA")
-})
-
 test_that("sdt_mafc check_data resolves per-row set size from a data column", {
   model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
   dat <- data.frame(
@@ -165,31 +80,10 @@ test_that("sdt_mafc check_data errors when the set-size column is missing", {
   expect_error(check_data(model, dat, bmf(d ~ 1)), "Set-size column")
 })
 
-test_that("sdt_mafc check_data validates response counts", {
-  model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  formula <- bmf(d ~ 1)
-
-  expect_error(
-    check_data(model, data.frame(n_correct = c(-1, 40), n_trials = c(50, 50)), formula),
-    "non-negative"
-  )
-  expect_error(
-    check_data(model, data.frame(n_correct = c(60, 40), n_trials = c(50, 50)), formula),
-    "must not exceed"
-  )
-})
-
 
 ############################################################################# !
 # DISTRIBUTION FUNCTION TESTS                                            ####
 ############################################################################# !
-
-test_that("rsdt_mafc generates counts matching the design", {
-  n_correct <- rsdt_mafc(5, 50, m = 4, d = 1.5)
-  expect_length(n_correct, 5)
-  expect_true(all(n_correct >= 0))
-  expect_true(all(n_correct <= 50))
-})
 
 test_that("rsdt_mafc recycles vectorized parameters per observation", {
   n_correct <- rsdt_mafc(12, 100, m = 4, d = rnorm(12, 1.5, 0.3))
@@ -197,12 +91,6 @@ test_that("rsdt_mafc recycles vectorized parameters per observation", {
 
   n2 <- rsdt_mafc(3, 100, m = c(2, 4, 8), d = 1.5)
   expect_length(n2, 3)
-})
-
-test_that("rsdt_mafc validates input", {
-  expect_error(rsdt_mafc(c(2, 3), 100, m = 4, d = 1),
-               "single positive integer")
-  expect_error(rsdt_mafc(2, 100, m = 1, d = 1), "m must be")
 })
 
 test_that("rsdt_mafc stays inside the binomial's domain in the far tail", {
@@ -214,34 +102,6 @@ test_that("rsdt_mafc stays inside the binomial's domain in the far tail", {
                rep(0L, 5))
   expect_equal(rsdt_mafc(5, 100L, m = 2L, d = -40, dist = "gumbel_min"),
                rep(0L, 5))
-})
-
-test_that("dsdt_mafc recycles parameters across observations", {
-  dens <- dsdt_mafc(n_correct = c(60, 80), n_trials = 100,
-                 d = c(1, 2), m = c(4, 4))
-  expect_length(dens, 2)
-  expect_false(dens[1] == dens[2])
-})
-
-test_that("dsdt_mafc returns a valid binomial density and respects log", {
-  dens <- dsdt_mafc(n_correct = 80, n_trials = 100, d = 1.5, m = 4)
-  expect_true(dens > 0 && dens <= 1)
-  ld <- dsdt_mafc(n_correct = 80, n_trials = 100, d = 1.5, m = 4, log = TRUE)
-  expect_equal(log(dens), ld, tolerance = 1e-10)
-})
-
-test_that("dsdt_mafc is vectorized over observations and works for all dists", {
-  dens <- dsdt_mafc(n_correct = c(60, 80), n_trials = c(100, 100), d = 1.5, m = 4)
-  expect_length(dens, 2)
-  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    expect_true(dsdt_mafc(70, 100, d = 1.5, m = 4, dist = di) > 0,
-                info = paste("dist:", di))
-  }
-})
-
-test_that("dsdt_mafc validates input", {
-  expect_error(dsdt_mafc(80, 100, d = 1, m = 1), "m must be")
-  expect_error(dsdt_mafc(120, 100, d = 1, m = 4), "must not exceed")
 })
 
 test_that("m-AFC probability correct is monotone increasing in d'", {

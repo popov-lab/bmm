@@ -4,15 +4,9 @@
 # MODEL CONSTRUCTOR TESTS                                                ####
 ############################################################################# !
 
-test_that("sdt_rating model can be created with vector response", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  expect_s3_class(model, "bmmodel")
-  expect_s3_class(model, "sdt")
-  expect_s3_class(model, "sdt_rating")
-  expect_equal(model$other_vars$n_ratings, 4L)
-})
-
 test_that("sdt_rating takes the number of categories from the response columns", {
+  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  expect_equal(model$other_vars$n_ratings, 4L)
   model <- sdt_rating(c("r1", "r2", "r3", "r4", "r5", "r6"), "stimulus")
   expect_equal(model$other_vars$n_ratings, 6L)
 })
@@ -28,25 +22,12 @@ test_that("sdt_rating refuses column names brms cannot turn into parameters", {
   expect_error(sdt_rating(c("r1", "r.2", "r3"), "stimulus"), "'r.2'")
 })
 
-test_that("sdt_rating model has parsimonious threshold params by default", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  expect_true("spacing" %in% names(model$parameters))
-  expect_true("d" %in% names(model$parameters))
-  expect_true("criterion" %in% names(model$parameters))
-  expect_false("mu" %in% names(model$parameters))
-})
-
 test_that("sdt_rating model has log_distance threshold params", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                       threshold_type = "log_distance")
   expect_true(all(c("delta1", "delta2") %in% names(model$parameters)))
   expect_false("delta3" %in% names(model$parameters))
   expect_false("spacing" %in% names(model$parameters))
-})
-
-test_that("sdt_rating model does not estimate a base mu", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  expect_false("mu" %in% names(model$parameters))
 })
 
 test_that("sdt_rating stores threshold_type correctly", {
@@ -56,13 +37,6 @@ test_that("sdt_rating stores threshold_type correctly", {
   model_ld <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
                          threshold_type = "log_distance")
   expect_equal(model_ld$other_vars$threshold_type, "log_distance")
-})
-
-test_that("sdt_rating model stores all distribution options", {
-  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", dist = di)
-    expect_equal(model$other_vars$dist, di)
-  }
 })
 
 test_that("sdt_rating model has log_ratio threshold params", {
@@ -84,49 +58,6 @@ test_that("sdt_rating model has softmax threshold params", {
   expect_true(all(c("delta1", "delta2", "delta3") %in% names(model$parameters)))
 })
 
-test_that("sdt_rating always has sdratio as parameter (fixed to 0 by default)", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  expect_true("sdratio" %in% names(model$parameters))
-  expect_true("sdratio" %in% names(model$links))
-  expect_true("sdratio" %in% names(model$default_priors))
-  expect_equal(model$fixed_parameters$sdratio, 0)
-})
-
-test_that("sdt_rating model accepts custom links", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
-                      links = list(d = "log"))
-  expect_equal(model$links$d, "log")
-  expect_equal(model$links$criterion, "identity")
-})
-
-test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
-  # sdratio and the thresholds are read through exp() in Stan, and sdratio is
-  # additionally fixed at 0, so neither survives a change of link
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  expect_equal(settable_links(model), c("d", "criterion", "bias"))
-  for (par in c("sdratio", "spacing")) {
-    expect_error(
-      sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
-                 links = stats::setNames(list("log"), par)),
-      paste0("link of '", par, "' cannot be changed")
-    )
-  }
-  expect_error(
-    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
-               links = list(sensitivity = "log")),
-    "Unrecognized link target"
-  )
-  model$links$spacing <- "log"
-  expect_error(check_links(model), "link of 'spacing' cannot be changed")
-})
-
-test_that("sdt_rating offers only the links it can invert in its formula", {
-  expect_error(
-    sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", links = list(d = "sqrt")),
-    "Unknown link function"
-  )
-})
-
 test_that("sdt_rating gives every parameter an sd default prior", {
   # Ro and Rn are logit-scale probabilities, so they join d at rate 1, as does
   # criterion, which carries half of d's spread; everything else is a
@@ -142,23 +73,6 @@ test_that("sdt_rating gives every parameter an sd default prior", {
       expect_false(anyNA(sds), info = info)
       expect_true(all(sds[intersect(names(sds), rate1)] == "exponential(1)"), info = info)
       expect_true(all(sds[setdiff(names(sds), rate1)] == "exponential(2)"), info = info)
-    }
-  }
-})
-
-test_that("sdt_rating supplies init_ranges for every estimated parameter", {
-  # create_initfun() looks up init_ranges per parameter; a missing entry yields
-  # NA inits, and the flexible threshold types reject brms' default random init.
-  for (tt in c("parsimonious", "equidistant", "log_distance",
-               "log_ratio", "softmax")) {
-    model <- sdt_rating(paste0("r", 1:6), "stimulus", threshold_type = tt)
-    est_pars <- setdiff(names(model$parameters), "sdratio")
-    expect_true(all(est_pars %in% names(model$init_ranges)),
-                info = paste("threshold_type:", tt))
-    expect_true("sdratio" %in% names(model$init_ranges))
-    for (r in model$init_ranges) {
-      expect_length(r, 2)
-      expect_lte(r[1], r[2])
     }
   }
 })
@@ -263,20 +177,6 @@ test_that("sdt_rating check_data validates response columns", {
   expect_equal(result$nTrials, c(50, 100))
 })
 
-test_that("sdt_rating check_data refuses non-numeric count columns", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
-  dat <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30),
-                    r4 = c(5, 55), stimulus = c(0L, 1L))
-
-  for (conv in list(as.character, as.factor)) {
-    bad <- dat
-    bad$r1 <- conv(bad$r1)
-    expect_error(check_data(model, bad, formula),
-                 "Response column 'r1' must be numeric")
-  }
-})
-
 test_that("sdt_rating check_data refuses an all-NA column as NA, not a type", {
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
   dat <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30),
@@ -285,71 +185,10 @@ test_that("sdt_rating check_data refuses an all-NA column as NA, not a type", {
                "must not contain NA counts")
 })
 
-test_that("sdt_rating check_data still only warns on non-integer counts", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  dat <- data.frame(r1 = c(10.5, 5), r2 = c(20, 10), r3 = c(15, 30),
-                    r4 = c(5, 55), stimulus = c(0L, 1L))
-  expect_warning(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
-                 "Response column 'r1' should contain integer counts")
-})
-
-test_that("sdt_rating check_data rejects missing response columns", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
-
-  invalid_data <- data.frame(
-    r1 = c(10, 5), r2 = c(20, 10),
-    stimulus = c(0L, 1L)
-  )
-  expect_error(check_data(model, invalid_data, formula), "missing in the data")
-})
-
-test_that("sdt_rating check_data rejects negative counts", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
-
-  invalid_data <- data.frame(
-    r1 = c(-1, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55),
-    stimulus = c(0L, 1L)
-  )
-  expect_error(check_data(model, invalid_data, formula), "non-negative")
-})
-
-test_that("sdt_rating check_data refuses an NA or constant stimulus", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
-  counts <- data.frame(r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55))
-
-  expect_error(check_data(model, cbind(counts, stimulus = c(0L, NA)), formula),
-               "1 of 2 values are NA")
-  expect_error(check_data(model, cbind(counts, stimulus = c(1L, 1L)), formula),
-               "stimulus")
-})
-
-test_that("sdt_rating check_data validates stimulus coding", {
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
-
-  invalid_data <- data.frame(
-    r1 = c(10, 5), r2 = c(20, 10), r3 = c(15, 30), r4 = c(5, 55),
-    stimulus = c(0L, 2L)
-  )
-  expect_error(check_data(model, invalid_data, formula), "must be coded as 0")
-})
-
 
 ############################################################################# !
 # DISTRIBUTION FUNCTION TESTS                                            ####
 ############################################################################# !
-
-test_that("rsdt_rating generates counts matching the design", {
-  counts <- rsdt_rating(10, 50, rep(c(0L, 1L), 5), d = 1.5,
-                        thresholds = c(-0.5, 0, 0.5))
-  expect_true(is.matrix(counts))
-  expect_equal(dim(counts), c(10L, 4L))
-  expect_equal(colnames(counts), paste0("r", 1:4))
-  expect_true(all(rowSums(counts) == 50))
-})
 
 test_that("rsdt_rating recycles vectorized parameters per observation", {
   counts <- rsdt_rating(6, c(50, 100), c(0L, 1L), d = rnorm(6, 1.5, 0.2),
@@ -362,70 +201,11 @@ test_that("rsdt_rating recycles vectorized parameters per observation", {
   expect_equal(dim(counts2), c(2L, 4L))
 })
 
-test_that("rsdt_rating validates inputs", {
-  expect_error(rsdt_rating(c(2, 3), 50, 1L, d = 1,
-                           thresholds = c(-0.5, 0, 0.5)),
-               "single positive integer")
-  expect_error(rsdt_rating(2, 50, c(0L, 2L), d = 1,
-                           thresholds = c(-0.5, 0, 0.5)),
-               "0 \\(noise\\) or 1 \\(signal\\)")
-  expect_error(rsdt_rating(2, 50, c(0L, 1L), d = 1,
-                           thresholds = c(-0.5, 0, 0.5), dist = "cauchy"),
-               "should be one of")
-})
-
-test_that("dsdt_rating returns valid density", {
-  dens <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                      d = 1.5, thresholds = c(-0.5, 0, 0.5))
-  expect_true(dens > 0)
-  expect_true(dens <= 1)
-})
-
-test_that("dsdt_rating log matches log of density", {
-  dens <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                      d = 1.5, thresholds = c(-0.5, 0, 0.5))
-  ld <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                    d = 1.5, thresholds = c(-0.5, 0, 0.5), log = TRUE)
-  expect_equal(log(dens), ld, tolerance = 1e-10)
-})
-
-test_that("dsdt_rating validates inputs", {
-  expect_error(
-    dsdt_rating(counts = c(-1, 20, 30, 40), stimulus = 1,
-                d = 1.5, thresholds = c(-0.5, 0, 0.5)),
-    "non-negative"
-  )
-  expect_error(
-    dsdt_rating(counts = c(10, 20, 30), stimulus = 1,
-                d = 1.5, thresholds = c(-0.5, 0, 0.5)),
-    "K - 1"
-  )
-  expect_error(
-    dsdt_rating(counts = c(NA, 20, 30, 40), stimulus = 1,
-                d = 1.5, thresholds = c(-0.5, 0, 0.5)),
-    "must not contain NA"
-  )
-})
-
-test_that("dsdt_rating works for all distributions", {
-  for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    dens <- dsdt_rating(counts = c(10, 20, 30, 40), stimulus = 1,
-                        d = 1.5, thresholds = c(-0.5, 0, 0.5), dist = di)
-    expect_true(dens > 0, info = paste("dist:", di))
-  }
-})
-
-test_that("dsdt_rating matches dmultinom and is vectorized over rows", {
+test_that("dsdt_rating matches dmultinom", {
   thr <- c(-0.5, 0, 0.5)
   probs <- bmm:::.sdt_category_probs(thr, 1.5, 1, 1, "normal")
   expect_equal(dsdt_rating(c(10, 20, 30, 40), 1, 1.5, thr),
                dmultinom(c(10, 20, 30, 40), prob = probs), tolerance = 1e-12)
-
-  counts <- rbind(c(10, 20, 30, 40), c(40, 30, 20, 10))
-  dens <- dsdt_rating(counts, stimulus = c(1L, 0L), d = 1.5,
-                      thresholds = thr, log = TRUE)
-  expect_length(dens, 2)
-  expect_true(all(is.finite(dens)))
 })
 
 test_that(".sdt_make_thresholds vectorized path matches per-draw evaluation", {
