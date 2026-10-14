@@ -50,6 +50,20 @@ test_that("mpt stores its derived state once", {
   expect_equal(with_covariate$other_vars$covariates, "GcorrPi")
 })
 
+test_that("importers record their own call", {
+  model <- mpt_from_string(
+    "D + (1 - D) * g # old\n(1 - D) * (1 - g) # new", tree_names = "old"
+  )
+  expect_equal(deparse(attr(model, "call")[[1]]), "mpt_from_string")
+  expect_output(print(model), "mpt_from_string")
+
+  eqn_file <- tempfile(fileext = ".eqn")
+  writeLines(c("t  a  g", "t  b  1 - g"), eqn_file)
+  from_eqn <- mpt_from_eqn(eqn_file)
+  expect_equal(deparse(attr(from_eqn, "call")[[1]]), "mpt_from_eqn")
+  expect_output(print(from_eqn), "mpt_from_eqn")
+})
+
 test_that("an empty formula fits every parameter with an intercept", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   fit <- suppressMessages(bmm(
@@ -941,6 +955,23 @@ test_that("the rank check stacks rows over covariate values and never frees a co
     no = "1 - x * (a * b * c * q + c * b * a * (1 - q))"
   )), covariates = "x")
   expect_match(mpt_printed(residue), "Jacobian rank 1 of 4 .*the combination of all free parameters is not identified")
+})
+
+test_that("the rank check counts only the categories a tree can produce", {
+  model <- mpt(list(
+    mpt_tree("lure", list(
+      target = "D + (1 - D) * g",
+      lure = "(1 - D) * (1 - g) * l",
+      other = "(1 - D) * (1 - g) * (1 - l)"
+    )),
+    mpt_tree("new", list(
+      target = "(1 - D) * g",
+      other = "D + (1 - D) * (1 - g)"
+    ), impossible = "lure")
+  ), tree_id = "tree")
+  printed <- mpt_printed(model)
+  expect_match(printed, "3 free parameter\\(s\\), 3 degrees of freedom")
+  expect_match(printed, "Jacobian rank 3 of 3 at interior test values")
 })
 
 test_that("five test values of the covariates separate the Bernstein coefficients", {
