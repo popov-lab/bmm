@@ -270,7 +270,7 @@ test_that(".get_parameter_info treats the alternative the formula leaves out as 
 # native_parameters() and native_transform()
 # Tier 1: Unit tests (always run, no fitted model)
 # Tier 2: Fixture-based integration tests (skip on CRAN)
-# Model-fitting tests live in tests/internal/test-native_parameters.R
+# Model-fitting tests live in tests/local/test-native_parameters.R
 # ===========================================================================
 
 load_np_sdm_fit <- function() {

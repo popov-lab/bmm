@@ -168,3 +168,59 @@ if (make("mock_bmmfit_m3.rds")) {
     "mock_bmmfit_m3.rds", seed = NA
   )
 }
+
+# A fit saved by bmm 0.2.1 (February 2024), for restructure() of old fits.
+# It is cut from a reference fit that lived in tests/internal until #422,
+# read from the git history so that this block still runs after their
+# deletion: one chain of 200 draws, without the compiled model and the
+# sampler instance. Its custom family's environment held the whole frame of
+# the 0.2.1 fitting call; restructure() reads only the model and the
+# formula from it, so only those stay, with the formulas detached from the
+# frames they were written in
+if (make("bmmfit_legacy_sdm_v0.2.1.rds")) {
+  source_commit <- "6870f5d69ba94430192e6947cda6fb1b5d0fd744"
+  source_path <- "tests/internal/ref_fits/20240215_v0.2.1_sdmSimple_seed-365_d406b23125.rds"
+  blob <- tempfile(fileext = ".rds")
+  stopifnot(system2("git", c("show", paste0(source_commit, ":", source_path)), stdout = blob) == 0)
+  legacy <- readRDS(blob)
+
+  sim <- legacy$fit@sim
+  keep <- seq_len(200)
+  # rstan 2.21 stores a chain as a data frame whose attributes carry the
+  # sampler parameters; subsetting the rows drops them, so they are put back
+  chain <- sim$samples[[1]]
+  extra <- attributes(chain)[setdiff(names(attributes(chain)), c("names", "row.names", "class"))]
+  extra$sampler_params <- lapply(extra$sampler_params, `[`, keep)
+  cut <- chain[keep, , drop = FALSE]
+  attributes(cut)[names(extra)] <- extra
+  sim$samples <- list(cut)
+  sim$chains <- 1L
+  sim$n_save <- length(keep)
+  sim$warmup2 <- 0L
+  sim$iter <- sim$warmup + length(keep)
+  sim$permutation <- list(keep)
+  legacy$fit@sim <- sim
+  legacy$fit@stan_args <- legacy$fit@stan_args[1]
+  legacy$fit@inits <- legacy$fit@inits[1]
+  legacy$fit@stanmodel <- methods::new("stanmodel")
+  legacy$fit@.MISC <- new.env()
+
+  detach_formulas <- function(x) {
+    rapply(x, function(f) {
+      environment(f) <- globalenv()
+      f
+    }, classes = "formula", how = "replace")
+  }
+  old_env <- legacy$family$env
+  env <- new.env(parent = globalenv())
+  env$model <- old_env$model
+  env$formula <- detach_formulas(unclass(old_env$formula))
+  class(env$formula) <- class(old_env$formula)
+  env$formula$family$env <- env
+  legacy$family$env <- env
+  legacy$formula <- detach_formulas(unclass(legacy$formula))
+  class(legacy$formula) <- class(old_env$formula)
+  legacy$formula$family$env <- env
+  attr(attr(legacy$data, "terms"), ".Environment") <- globalenv()
+  save_fixture(legacy, "bmmfit_legacy_sdm_v0.2.1.rds", seed = 365)
+}

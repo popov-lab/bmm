@@ -241,4 +241,10 @@ last.
   about data size keeps the full set. As measured before, this barely
   changes the suite's time (four-worker wall time 129 s before, 134 s
   after, within run-to-run noise).
+- 2026-10-14, #422. A ninth fixture, `bmmfit_legacy_sdm_v0.2.1.rds`
+  (139 KB, one chain, 200 draws), is a fit saved by bmm 0.2.1, cut by
+  `make-fixtures.R` from the reference fit in `tests/internal` as it is at
+  commit 6870f5d6, so it can be rebuilt after that folder is deleted. It
+  replaces the always-skipped `restructure()` test that read
+  `tests/internal` directly.
 
