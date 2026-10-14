@@ -13,7 +13,7 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-14/25-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-15/25-orange?style=flat)](#)
 <!-- badges: end -->
 
 *Bayesian Measurement Models for behavioral research in R*
@@ -102,6 +102,17 @@ articles.
   Diffusion Decision Model
 - [`ezdm()`](https://popov-lab.github.io/bmm/reference/ezdm.html):
   EZ-Diffusion Model
+
+**Processing-tree models.** Participants give categorical responses, and
+you describe the discrete processes that lead to each response as a
+multinomial processing tree: the two-high-threshold model of
+recognition, the pair-clustering model of free recall, or a tree of your
+own. The model is fit to response counts per participant and condition.
+See the [MPT
+article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html).
+
+- [`mpt()`](https://popov-lab.github.io/bmm/reference/mpt.html):
+  Multinomial Processing Tree (MPT) models
 
 <img src="man/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%" />
 

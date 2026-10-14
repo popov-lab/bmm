@@ -28,3 +28,4 @@ record, and the old one is marked superseded with a link to the new one.
 | [0001](0001-release-scope-1.4-to-1.6.md) | Release scope for 1.4.0, 1.5.0 and 1.6.0 | accepted 2026-10-04 |
 | [0002](0002-release-integration-branches.md) | Integration branches for the next two releases | accepted 2026-10-04 |
 | [0003](0003-model-fit-files.md) | Large model-fit files: keep the history, stop the growth | accepted 2026-10-04 |
+| [0004](0004-test-tiers-and-budget.md) | Test tiers, a time budget, and rules for the test suite | accepted 2026-10-13 |
