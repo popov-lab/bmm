@@ -274,6 +274,21 @@ test_that("sdt_rating_logmu is vectorized and preserves the draw shape", {
   expect_equal(as.vector(out), ref, tolerance = 1e-12)
 })
 
+test_that("sdt_rating_logmu passes each draw's deltas to the delta threshold builders", {
+  # log_distance is threshold builder 3; the deltas differ by draw, so a
+  # delta read from the wrong element moves a threshold
+  d <- c(1, 1.5, 0.5)
+  delta1 <- c(-0.2, 0.1, 0.3)
+  delta2 <- c(0.4, -0.1, 0)
+  out <- sdt_rating_logmu(3L, 4L, 1L, 3L, 1L, d, criterion = 0.1, spacing = 0,
+                          sdratio = 0, stimulus = 1, delta1, delta2)
+  ref <- vapply(seq_along(d), function(j) {
+    thr <- bmm:::.sdt_make_thresholds(0.1, 4L, "log_distance", deltas = c(delta1[j], delta2[j]))
+    log(bmm:::.sdt_category_probs(thr, d[j], 1, 1, "normal")[3])
+  }, numeric(1))
+  expect_equal(out, ref, tolerance = 1e-12)
+})
+
 test_that("log_ratio requires at least 4 rating categories", {
   expect_error(sdt_rating(c("r1", "r2", "r3"), "stimulus",
                           threshold_type = "log_ratio"),
