@@ -372,7 +372,14 @@ m3_fixture <- function() {
 # each chosen so that the stored model frame is the hard case, such as an m3
 # category with zero options in some rows, or a non-target model whose formula
 # leaves brms no reason to keep the set_size column
-stored_frame_cases <- function() model_test_cases("stored_frame")
+# built once per file: every provider builds all its cases on each call
+stored_frame_cases <- local({
+  cases <- NULL
+  function() {
+    if (is.null(cases)) cases <<- model_test_cases("stored_frame")
+    cases
+  }
+})
 
 test_that("update.bmmfit needs no newdata for a model that packs its response", {
   skip_on_cran()
@@ -689,22 +696,40 @@ stub_update <- function(fit, ...) {
   update(fit, ..., backend = "mock", mock_fit = stub_stanfit(), rename = FALSE, recompile = TRUE)
 }
 
+slice_cases <- c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
+                 "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
+                 "mpt", "mpt_tree_predictor", "mpt_single_tree")
+
+# one stub fit per case, shared by the two tests below
+stub_frame_fits <- local({
+  fits <- list()
+  function(case_name) {
+    if (is.null(fits[[case_name]])) {
+      fits[[case_name]] <<- stub_frame_fit(stored_frame_cases()[[case_name]])
+    }
+    fits[[case_name]]
+  }
+})
+
 test_that("update() takes a slice of the model frame as newdata (kfold(), reloo())", {
   skip_on_cran()
   skip_if_not_installed("rstan")
-  for (case_name in c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
-                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
-                      "mpt", "mpt_tree_predictor", "mpt_single_tree")) {
-    case <- stored_frame_cases()[[case_name]]
-    fit <- stub_frame_fit(case)
+  for (case_name in slice_cases) {
+    fit <- stub_frame_fits(case_name)
     rows <- seq_len(nrow(fit$data))[-1]
     up <- quietly(stub_update(fit, newdata = fit$data[rows, , drop = FALSE]))
     expect_true(is(up, "bmmfit"), label = case_name)
     expect_equal(nrow(up$data), length(rows), label = case_name)
     expect_equal(brms::standata(up)$N, length(rows), label = case_name)
     expect_equal(attr(up$data, "data_name"), attr(fit$data, "data_name"), label = case_name)
+  }
+})
 
-    # the whole frame is the same update as passing no newdata
+test_that("update() with the whole model frame as newdata is update() without newdata", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  for (case_name in slice_cases) {
+    fit <- stub_frame_fits(case_name)
     expect_equal(
       brms::standata(quietly(stub_update(fit, newdata = fit$data))),
       brms::standata(quietly(stub_update(fit))),
