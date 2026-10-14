@@ -49,6 +49,7 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
       "test-helpers-circmix.R" = 2L,
       "test-model_cswald.R" = 3L,
       "test-model_ezdm.R" = 3L,
+      "test-model_lba-stan.R" = 2L,
       "test-model_m3.R" = 2L,
       "test-model_mixture2p.R" = 1L,
       "test-model_rdm.R" = 1L,
@@ -75,6 +76,7 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
     c(
       "test-bmm_setup.R" = 18L,
       "test-conditional_effects.R" = 2L,
+      "test-model_lba.R" = 6L,
       "test-model_rdm.R" = 4L,
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
@@ -96,6 +98,7 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
       "test-helpers-circmix.R" = 1L,
       "test-model_cswald.R" = 3L,
       "test-model_ezdm.R" = 1L,
+      "test-model_lba-stan.R" = 1L,
       "test-model_m3.R" = 1L,
       "test-model_mixture2p.R" = 1L,
       "test-model_rdm.R" = 1L,
