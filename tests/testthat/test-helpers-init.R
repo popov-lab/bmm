@@ -865,14 +865,16 @@ test_that("every init has the shape its Stan declaration asks for", {
   ), dat)
 })
 
-test_that("every model's init function gives each Stan parameter its declared shape", {
-  withr::local_options(bmm.silent = 2)
-  for (name in names(cases <- model_test_cases("init"))) {
-    case <- cases[[name]]
+# one test per case: each builds the Stan code and data, and together they
+# would take most of the per-test time budget
+for (name in names(model_test_cases("init"))) {
+  test_that(paste0("the init function of ", name, " gives each Stan parameter its declared shape"), {
+    withr::local_options(bmm.silent = 2)
+    case <- model_test_cases("init")[[name]]
     # the toy RT data have a 50% error rate, which cswald "simple" warns about
     suppressWarnings(expect_stan_shapes(case$model, case$formula, case$data))
-  }
-})
+  })
+}
 
 test_that("mo() and s() terms get a complete init list", {
   # their parameters are sized by an element of a data array, which the parser

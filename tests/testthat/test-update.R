@@ -638,9 +638,9 @@ test_that("update() switches an SDT fit between criterion and bias", {
 # nothing to route
 frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
 
-test_that("only a slice of a fit's model frame counts as stored data", {
-  skip_on_cran()
-  for (case_name in names(stored_frame_cases())) {
+for (case_name in names(stored_frame_cases())) {
+  test_that(paste0("only a slice of a fit's model frame counts as stored data (", case_name, ")"), {
+    skip_on_cran()
     case <- stored_frame_cases()[[case_name]]
     fit <- stored_frame_fit(case)
     model <- fit$bmm$model
@@ -654,8 +654,8 @@ test_that("only a slice of a fit's model frame counts as stored data", {
     if (case_name %in% frame_is_user_layout) {
       expect_no_error(suppressWarnings(check_data(model, slice, fit$bmm$user_formula)))
     }
-  }
-})
+  })
+}
 
 test_that("user data that hold a column of the stored layout stay user data", {
   skip_on_cran()
@@ -711,10 +711,10 @@ stub_frame_fits <- local({
   }
 })
 
-test_that("update() takes a slice of the model frame as newdata (kfold(), reloo())", {
-  skip_on_cran()
-  skip_if_not_installed("rstan")
-  for (case_name in slice_cases) {
+for (case_name in slice_cases) {
+  test_that(paste0("update() takes a slice of the model frame as newdata (kfold(), reloo()) (", case_name, ")"), {
+    skip_on_cran()
+    skip_if_not_installed("rstan")
     fit <- stub_frame_fits(case_name)
     rows <- seq_len(nrow(fit$data))[-1]
     up <- quietly(stub_update(fit, newdata = fit$data[rows, , drop = FALSE]))
@@ -722,21 +722,21 @@ test_that("update() takes a slice of the model frame as newdata (kfold(), reloo(
     expect_equal(nrow(up$data), length(rows), label = case_name)
     expect_equal(brms::standata(up)$N, length(rows), label = case_name)
     expect_equal(attr(up$data, "data_name"), attr(fit$data, "data_name"), label = case_name)
-  }
-})
+  })
+}
 
-test_that("update() with the whole model frame as newdata is update() without newdata", {
-  skip_on_cran()
-  skip_if_not_installed("rstan")
-  for (case_name in slice_cases) {
+for (case_name in slice_cases) {
+  test_that(paste0("update() with the whole model frame as newdata is update() without newdata (", case_name, ")"), {
+    skip_on_cran()
+    skip_if_not_installed("rstan")
     fit <- stub_frame_fits(case_name)
     expect_equal(
       brms::standata(quietly(stub_update(fit, newdata = fit$data))),
       brms::standata(quietly(stub_update(fit))),
       label = case_name
     )
-  }
-})
+  })
+}
 
 test_that("update() still treats data with a column Y as the user's data", {
   skip_on_cran()

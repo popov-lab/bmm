@@ -254,7 +254,10 @@ last.
   builds its stored-frame cases once instead of once per iteration. On one
   local worker the longest test in the file went from 17.6 s to 11.3 s;
   the runner-to-local ratio of the old run (about 5) puts it near 57 s,
-  under the 66 s cap but not far. The caps themselves are unchanged: they
+  under the 66 s cap but not far, so the three loops in `test-update.R` and
+  the registry loop over init functions became one test per case (the
+  longest test in either file is now 6.0 s on four local workers). The caps
+  themselves are unchanged: they
   are lowered from a measured `tests-source` run of this branch (1.5 times
   its maxima), not from a local run.
 - 2026-10-14, #422 and #123. The reference summaries exist:
