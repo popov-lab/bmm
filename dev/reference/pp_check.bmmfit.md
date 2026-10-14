@@ -64,7 +64,11 @@ pp_check(
   [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
   model shows the rank positions as the categories of the proportion
   profile; for mixed set sizes, pass the set-size column as `group` so
-  each facet has a homogeneous denominator. The custom-family models
+  each facet has a homogeneous denominator. For
+  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) fits,
+  the `tree_id` column can be named even if no parameter formula uses
+  it, giving one facet per tree; the default pools the trees. The
+  custom-family models
   [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   and
   [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)

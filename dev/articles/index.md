@@ -33,6 +33,8 @@ n-AFC, etc)
 
 - [The Multinomial / Memory Measurement Model
   (M3)](https://popov-lab.github.io/bmm/dev/articles/bmm_m3.md):
+- [Multinomial Processing Tree (MPT)
+  models](https://popov-lab.github.io/bmm/dev/articles/bmm_mpt.md):
 
 ### Signal detection & recognition
 

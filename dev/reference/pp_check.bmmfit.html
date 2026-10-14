@@ -105,7 +105,9 @@ signal and noise rating distributions are checked separately; pass
 <code>group = NA</code> to pool them into a single profile. The <code><a href="sdt_ranking.html">sdt_ranking()</a></code> model
 shows the rank positions as the categories of the proportion profile; for
 mixed set sizes, pass the set-size column as <code>group</code> so each facet has a
-homogeneous denominator. The custom-family
+homogeneous denominator. For <code><a href="mpt.html">mpt()</a></code> fits, the <code>tree_id</code> column can be
+named even if no parameter formula uses it, giving one facet per tree;
+the default pools the trees. The custom-family
 models <code><a href="sdt_yn.html">sdt_yn()</a></code> and <code><a href="sdt_mafc.html">sdt_mafc()</a></code> delegate to <code><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">brms::pp_check()</a></code>; for
 their aggregated counts an overlaid empirical CDF (<code>type = "ecdf_overlay"</code>,
 adding <code>group = "stimulus"</code> for <code><a href="sdt_yn.html">sdt_yn()</a></code>) is usually clearer than the

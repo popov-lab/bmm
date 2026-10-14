@@ -57,7 +57,7 @@ full model specification with <code><a href="mpt.html">mpt()</a></code>.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mpt_tree</span><span class="op">(</span><span class="va">name</span>, <span class="va">branches</span>, impossible <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mpt_tree</span><span class="op">(</span><span class="va">name</span>, <span class="va">branches</span>, <span class="va">...</span>, impossible <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -67,22 +67,35 @@ full model specification with <code><a href="mpt.html">mpt()</a></code>.</p>
 <dl><dt id="arg-name">name<a class="anchor" aria-label="anchor" href="#arg-name"></a></dt>
 <dd><p>Character. Label for the tree. For models with multiple trees,
 the label identifies the tree in the data: the column named by the
-<code>tree_id</code> argument of <code><a href="mpt.html">mpt()</a></code> holds one such label per observation.</p></dd>
+<code>tree_id</code> argument of <code><a href="mpt.html">mpt()</a></code> holds one such label per observation. A
+tree stands for one kind of trial, such as targets or lures in a
+recognition test, not for a response; the responses are the branch
+names.</p></dd>
 
 
 <dt id="arg-branches">branches<a class="anchor" aria-label="anchor" href="#arg-branches"></a></dt>
-<dd><p>A named list of character strings. Each element gives the
-branch probability expression for one response category, and the element
-names are the response categories. The expressions can use latent
-parameters (e.g., <code>"D + (1 - D) * g"</code>), numeric constants, and declared
-covariates (see <code><a href="mpt.html">mpt()</a></code>).</p></dd>
+<dd><p>Either a named list of character strings or the first of
+several formulas. Each list element (or formula) gives the branch
+probability expression for one response category; the element names (or
+the left-hand sides) are the response categories. The expressions can use
+latent parameters (e.g., <code>D + (1 - D) * g</code>), numeric constants, and
+declared covariates (see <code><a href="mpt.html">mpt()</a></code>).</p></dd>
+
+
+<dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
+<dd><p>Further formulas of the form <code>category ~ expression</code>, one per
+response category, when <code>branches</code> is a formula; they take no argument
+names. A call uses either
+formulas or a named list of strings, not a mix; both spellings give the
+same tree (see the examples).</p></dd>
 
 
 <dt id="arg-impossible">impossible<a class="anchor" aria-label="anchor" href="#arg-impossible"></a></dt>
 <dd><p>Character vector. Response categories that cannot occur in
 this tree, for example distractor responses when no distractors were
 presented. Such categories get no branch expression, and the remaining
-branches must sum to 1 on their own.</p></dd>
+branches must sum to 1 on their own. It follows <code>...</code>, so it has to be
+named in full.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -91,7 +104,12 @@ branches must sum to 1 on their own.</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Constant arithmetic such as <code>1/4</code> or <code>1/(2*2)</code> is folded into a
+    <p>Nothing in the formulas is evaluated: the left-hand side must be a
+single response category name, the right-hand side is kept as an
+expression (with constant arithmetic folded, see below), and the formula
+environment is dropped. A one-sided formula, a left-hand side that is not
+a name, and a mix of formulas and strings are errors.</p>
+<p>Constant arithmetic such as <code>1/4</code> or <code>1/(2*2)</code> is folded into a
 decimal literal (<code>0.25</code>) when the tree is created. Stan compiles a bare
 integer fraction as integer division (<code>1/4 == 0</code>), which would silently
 corrupt the likelihood.</p>
@@ -105,37 +123,44 @@ remaining branches to compensate.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">tree_old</span> <span class="op">&lt;-</span> <span class="fu">mpt_tree</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  name <span class="op">=</span> <span class="st">"old"</span>,</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># the target tree of the two-high-threshold model: targets (studied items)</span></span></span>
+<span class="r-in"><span><span class="co"># end in the responses "old" and "new"</span></span></span>
+<span class="r-in"><span><span class="va">tree_target</span> <span class="op">&lt;-</span> <span class="fu">mpt_tree</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="st">"target"</span>,</span></span>
+<span class="r-in"><span>  <span class="va">old</span> <span class="op">~</span> <span class="va">D</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">D</span><span class="op">)</span> <span class="op">*</span> <span class="va">g</span>,</span></span>
+<span class="r-in"><span>  <span class="va">new</span> <span class="op">~</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">D</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">g</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">tree_target</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'target':</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = D + (1 - D) * g</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * (1 - g)</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># the same tree with the branches as a named list of strings</span></span></span>
+<span class="r-in"><span><span class="va">tree_target_strings</span> <span class="op">&lt;-</span> <span class="fu">mpt_tree</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  name <span class="op">=</span> <span class="st">"target"</span>,</span></span>
 <span class="r-in"><span>  branches <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    old <span class="op">=</span> <span class="st">"D + (1 - D) * g"</span>,</span></span>
 <span class="r-in"><span>    new <span class="op">=</span> <span class="st">"(1 - D) * (1 - g)"</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">tree_old</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'old':</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = D + (1 - D) * g</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * (1 - g)</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">tree_target</span>, <span class="va">tree_target_strings</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># a three-alternative recognition task in which lures are shown on some</span></span></span>
 <span class="r-in"><span><span class="co"># trials only: `lure` responses cannot occur on the others</span></span></span>
 <span class="r-in"><span><span class="va">tree_lures</span> <span class="op">&lt;-</span> <span class="fu">mpt_tree</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  name <span class="op">=</span> <span class="st">"lures"</span>,</span></span>
-<span class="r-in"><span>  branches <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>    target <span class="op">=</span> <span class="st">"D * b + (1 - D) * (1/3)"</span>,</span></span>
-<span class="r-in"><span>    lure   <span class="op">=</span> <span class="st">"D * (1 - b) + (1 - D) * (1/3)"</span>,</span></span>
-<span class="r-in"><span>    new    <span class="op">=</span> <span class="st">"(1 - D) * (1/3)"</span></span></span>
-<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="st">"lures"</span>,</span></span>
+<span class="r-in"><span>  <span class="va">target</span> <span class="op">~</span> <span class="va">D</span> <span class="op">*</span> <span class="va">b</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">D</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">lure</span> <span class="op">~</span> <span class="va">D</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">b</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">D</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">new</span> <span class="op">~</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">D</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># the branches of the lure-free tree sum to 1 without the `lure` category;</span></span></span>
 <span class="r-in"><span><span class="co"># no probability is reserved for it</span></span></span>
 <span class="r-in"><span><span class="va">tree_nolures</span> <span class="op">&lt;-</span> <span class="fu">mpt_tree</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  name <span class="op">=</span> <span class="st">"nolures"</span>,</span></span>
-<span class="r-in"><span>  branches <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>    target <span class="op">=</span> <span class="st">"D + (1 - D) * (1/2)"</span>,</span></span>
-<span class="r-in"><span>    new    <span class="op">=</span> <span class="st">"(1 - D) * (1/2)"</span></span></span>
-<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="st">"nolures"</span>,</span></span>
+<span class="r-in"><span>  <span class="va">target</span> <span class="op">~</span> <span class="va">D</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">D</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span><span class="op">/</span><span class="fl">2</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">new</span> <span class="op">~</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">D</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span><span class="op">/</span><span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  impossible <span class="op">=</span> <span class="st">"lure"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">tree_nolures</span></span></span>

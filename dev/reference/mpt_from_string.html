@@ -68,12 +68,12 @@ terminate in the same response category are summed.</p>
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mpt_from_string</span><span class="op">(</span></span>
 <span>  <span class="va">text</span>,</span>
+<span>  restrictions <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">tree_names</span>,</span>
 <span>  categories <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  tree_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  covariates <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  simplex <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  restrictions <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  links <span class="op">=</span> <span class="st">"logit"</span>,</span>
 <span>  impossible <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -86,6 +86,13 @@ terminate in the same response category are summed.</p>
 <dl><dt id="arg-text">text<a class="anchor" aria-label="anchor" href="#arg-text"></a></dt>
 <dd><p>Character. The model definition, either as a single string or
 as a vector of lines (e.g., from <code><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines()</a></code>).</p></dd>
+
+
+<dt id="arg-restrictions">restrictions<a class="anchor" aria-label="anchor" href="#arg-restrictions"></a></dt>
+<dd><p>Parameter restrictions as in <code><a href="mpt.html">mpt()</a></code>, written with the
+parameter names of the model text, e.g. <code>"g = 0.5"</code> or <code>list(g = 0.5)</code>.
+They mirror the <code>restrictions</code> argument of MPTinR and TreeBUGS.
+Restriction files are not read: pass their lines (see Examples).</p></dd>
 
 
 <dt id="arg-tree-names">tree_names<a class="anchor" aria-label="anchor" href="#arg-tree-names"></a></dt>
@@ -119,9 +126,9 @@ yourself: for each row it holds the name, as given in <code>tree_names</code>, o
 the tree the counts come from.</p></dd>
 
 
-<dt id="arg-covariates-simplex-restrictions-links">covariates, simplex, restrictions, links<a class="anchor" aria-label="anchor" href="#arg-covariates-simplex-restrictions-links"></a></dt>
-<dd><p>passed to <code><a href="mpt.html">mpt()</a></code>.
-<code>print(model)</code> lists the symbols that became parameters.</p></dd>
+<dt id="arg-covariates-simplex-links">covariates, simplex, links<a class="anchor" aria-label="anchor" href="#arg-covariates-simplex-links"></a></dt>
+<dd><p>passed to <code><a href="mpt.html">mpt()</a></code>. <code>print(model)</code> lists
+the symbols that became parameters.</p></dd>
 
 
 <dt id="arg-impossible">impossible<a class="anchor" aria-label="anchor" href="#arg-impossible"></a></dt>
@@ -169,9 +176,8 @@ this format are wide and positional: one row per participant (or one
 vector for aggregated counts) and one unnamed column per line of the
 model file, in file order, because each line is one response category.
 (For EQN files MPTinR sorts the columns instead; see <code><a href="mpt_from_eqn.html">mpt_from_eqn()</a></code>.)
-Name the columns by tree and category first, then stack one block per
-tree (see Examples); when a tree lacks some categories, start each tree
-from zeros, as in the Examples of <code><a href="mpt_from_eqn.html">mpt_from_eqn()</a></code>.</p>
+Name the columns <code>&lt;tree&gt;.&lt;category&gt;</code>; <code><a href="mpt_data_reshape.html">mpt_data_reshape()</a></code> then stacks the
+trees and gives 0 to the categories a tree cannot produce (see Examples).</p>
 <p><strong>Provenance.</strong> The returned model carries an <code>mpt_source</code> attribute,
 <code>list(text = )</code>, with the model definition as one string.</p>
     </div>
@@ -194,18 +200,18 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-in"><span><span class="st">"</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">mpt_from_string</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">model_2htm</span>,</span></span>
-<span class="r-in"><span>  tree_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  tree_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"target"</span>, <span class="st">"lure"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  tree_id <span class="op">=</span> <span class="st">"item_type"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">model</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #FF875F;">mpt_from_string</span>(text = model_2htm,                 tree_names = c("old", "new"),                 tree_id = "item_type") </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #FF875F;">mpt_from_string</span>(text = model_2htm,                 tree_names = c("target", "lure"),                 tree_id = "item_type") </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Response:   resp_cats = old, new (counts per response category) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Parameters: D, g </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Links:      D = logit; g = logit </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'old':</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'target':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = D + (1 - D) * g</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * (1 - g)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'new':</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'lure':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = (1 - D) * g</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = D + (1 - D) * (1 - g)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Identifiability (intercept-only formulas): 2 free parameter(s), 2 degrees of freedom (response categories minus 1, summed over trees) </span>
@@ -215,18 +221,18 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-in"><span><span class="co"># fix the guessing rate as in MPTinR / TreeBUGS</span></span></span>
 <span class="r-in"><span><span class="fu">mpt_from_string</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">model_2htm</span>,</span></span>
-<span class="r-in"><span>  tree_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  tree_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"target"</span>, <span class="st">"lure"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  tree_id <span class="op">=</span> <span class="st">"item_type"</span>,</span></span>
 <span class="r-in"><span>  restrictions <span class="op">=</span> <span class="st">"g = 0.5"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #FF875F;">mpt_from_string</span>(text = model_2htm,                 tree_names = c("old", "new"),                 tree_id = "item_type",                 restrictions = "g = 0.5") </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #FF875F;">mpt_from_string</span>(text = model_2htm,                 restrictions = "g = 0.5",                 tree_names = c("target", "lure"),                 tree_id = "item_type") </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Response:   resp_cats = old, new (counts per response category) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Parameters: D </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Links:      D = logit </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'old':</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'target':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = D + (1 - D) * 0.5</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * 0.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'new':</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'lure':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = (1 - D) * 0.5</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = D + (1 - D) * 0.5</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Restrictions: g = 0.5 </span>
@@ -287,27 +293,23 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-in"><span><span class="va">restr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">sub</a></span><span class="op">(</span><span class="st">"#.*"</span>, <span class="st">""</span>, <span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">restr_file</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">mpt_from_string</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">model_file</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  tree_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  tree_names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"target"</span>, <span class="st">"lure"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  tree_id <span class="op">=</span> <span class="st">"item_type"</span>,</span></span>
 <span class="r-in"><span>  restrictions <span class="op">=</span> <span class="va">restr</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nzchar</a></span><span class="op">(</span><span class="va">restr</span><span class="op">)</span><span class="op">]</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># MPTinR data: one unnamed column per line of the model file, in file</span></span></span>
-<span class="r-in"><span><span class="co"># order. Name the columns by tree and category, then stack one block per</span></span></span>
-<span class="r-in"><span><span class="co"># tree to get bmm's one row per participant and tree.</span></span></span>
+<span class="r-in"><span><span class="co"># order. Name the columns by tree and category, then let mpt_data_reshape()</span></span></span>
+<span class="r-in"><span><span class="co"># stack the trees to get bmm's one row per participant and tree.</span></span></span>
 <span class="r-in"><span><span class="va">wide</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">10</span>, <span class="fl">8</span>, <span class="fl">32</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">25</span>, <span class="fl">15</span>, <span class="fl">12</span>, <span class="fl">28</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">wide</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"old.old"</span>, <span class="st">"old.new"</span>, <span class="st">"new.old"</span>, <span class="st">"new.new"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">tree</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">counts</span> <span class="op">&lt;-</span> <span class="va">wide</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">tree</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"."</span><span class="op">)</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">counts</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">wide</span><span class="op">)</span><span class="op">)</span>, item_type <span class="op">=</span> <span class="va">tree</span>, <span class="va">counts</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">wide</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"target.old"</span>, <span class="st">"target.new"</span>, <span class="st">"lure.old"</span>, <span class="st">"lure.new"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">long</span> <span class="op">&lt;-</span> <span class="fu"><a href="mpt_data_reshape.html">mpt_data_reshape</a></span><span class="op">(</span><span class="va">wide</span>, <span class="va">model</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">long</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id item_type old new</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1       old  30  10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2       old  25  15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1       new   8  32</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  2       new  12  28</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1    target  30  10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1      lure   8  32</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2    target  25  15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  2      lure  12  28</span>
 <span class="r-in"><span><span class="co"># the row sums are the trials per row (40 here), but they cannot show</span></span></span>
 <span class="r-in"><span><span class="co"># swapped columns or tree labels: compare one participant with the wide</span></span></span>
 <span class="r-in"><span><span class="co"># row, then run the data checks (bmm_data_check() prints</span></span></span>
@@ -316,14 +318,14 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 40 40 40 40</span>
 <span class="r-in"><span><span class="va">long</span><span class="op">[</span><span class="va">long</span><span class="op">$</span><span class="va">id</span> <span class="op">==</span> <span class="fl">1</span>, <span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id item_type old new</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1       old  30  10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1       new   8  32</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1    target  30  10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1      lure   8  32</span>
 <span class="r-in"><span><span class="va">wide</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> old.old old.new new.old new.new </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      30      10       8      32 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> target.old target.new   lure.old   lure.new </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         30         10          8         32 </span>
 <span class="r-in"><span><span class="fu"><a href="bmm_data_check.html">bmm_data_check</a></span><span class="op">(</span><span class="fu"><a href="bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">D</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>, <span class="va">long</span>, <span class="va">model</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pre-fit data check</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #AF5FFF;">Model:</span> <span style="color: #FF875F;">mpt_from_string</span>(text = readLines(model_file), tree_names = c("old", "new"), tree_id = "item_type", restrictions = restr[nzchar(restr)]) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #AF5FFF;">Model:</span> <span style="color: #FF875F;">mpt_from_string</span>(text = readLines(model_file), restrictions = restr[nzchar(restr)], tree_names = c("target", "lure"), tree_id = "item_type") </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #AF5FFF;">Data: </span> 4 observations ('long') </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">Response variables:</span></span>

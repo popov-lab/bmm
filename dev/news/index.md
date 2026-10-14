@@ -108,55 +108,50 @@
   [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   reports. Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
-- Add **Multinomial Processing Tree models** (`mpt`) for tasks with
-  categorical responses that come from discrete processing states, such
-  as the two-high-threshold model of recognition. You write each tree’s
-  branch probabilities with
+- Add **Multinomial Processing Tree models** (`mpt`) for categorical
+  responses from discrete processing states, such as the
+  two-high-threshold model of recognition. Write each tree’s branches
+  with
   [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md),
-  give a parameter the same name in every tree that shares it, and fit
-  the model to response counts; `tree_id` names the data column that
-  says which tree a row belongs to. Parameters take a logit or probit
-  link and can be fixed in the formula (`bmf(g = 0.5)`) or given
-  non-linear formulas. Also adds
+  as formulas or as a named list of strings, name a shared parameter
+  alike in every tree, and fit the model to response counts, one row per
+  participant and tree, with `tree_id` naming each row’s tree. `links`
+  sets a logit or probit link for all or single parameters; parameters
+  can be fixed in the formula (`bmf(g = 0.5)`) or given non-linear
+  formulas. Also adds
   [`dmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
   and
   [`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md).
   See [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
-- [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) gains
-  `restrictions`, which equates parameters or fixes them to constants in
-  the syntax of MPTinR and TreeBUGS (`c("Dn = Do", "g = 0.5")`), and
-  `simplex`, which declares groups of parameters that sum to 1, such as
-  guessing rates across response options. Blank and `#` comment lines in
-  the restrictions are skipped, so
-  [`readLines()`](https://rdrr.io/r/base/readLines.html) of an MPTinR
-  restrictions file of equalities and constants works. Printing a model
-  lists its restrictions and simplex groups. See
-  [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
+- [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) takes
+  `restrictions` that equate parameters or fix them to constants, in
+  MPTinR and TreeBUGS syntax (`c("Dn = Do", "g = 0.5")`, or
+  [`readLines()`](https://rdrr.io/r/base/readLines.html) of such a
+  restrictions file), and `simplex` for parameters that sum to 1, such
+  as guessing rates. A simplex group’s default uniform prior gives each
+  of K members prior mean 1/K whatever their order;
+  [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) shows
+  how to get the per-branch uniform priors of TreeBUGS, which give the
+  first member prior mean 0.5. Printing the model lists the
+  restrictions, the simplex groups with their prior and an
+  identifiability check
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
-- By default, a `simplex` group gets a uniform prior over all ways of
-  splitting the probability among its members, so each of K members has
-  prior mean 1/K whatever the order they are listed in. Printing the
-  model states this prior.
-  [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) shows
-  how to get the per-branch uniform priors of TreeBUGS instead, under
-  which the first-listed member has prior mean 0.5
-  ([\#255](https://github.com/popov-lab/bmm/issues/255)).
-- [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) gains
-  `covariates`, for data columns used in branch expressions, such as
-  guessing rates fixed by the design;
+- Branch expressions can use data columns declared in `covariates`, for
+  probabilities the design fixes, such as guessing rates that depend on
+  the number of response options;
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) stops
-  when the branches of a row do not sum to 1 with that row’s values.
+  when a row’s values make the branches of a tree not sum to 1. Response
+  categories a tree cannot produce, such as distractor responses on
+  trials without distractors, are declared with `impossible` in
   [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
-  gains `impossible`, for response categories a tree cannot produce,
-  such as distractor responses on trials without distractors.
+  and in the importers.
   [`dmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
   and
   [`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
   take covariate values too. See
-  [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) and
   [`?mpt_tree`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
@@ -168,26 +163,47 @@
   [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) model
   from MPTinR-style model text (a string or
   [`readLines()`](https://rdrr.io/r/base/readLines.html) output) or from
-  an EQN file. Both take `impossible` for response categories a tree
-  cannot produce.
+  an EQN file (multiTree, MPTinR, TreeBUGS); both take `restrictions` as
+  their second argument.
   [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
-  renames names
+  renames and reports names
   [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) cannot
-  use, such as `D_o`, reports the renaming, takes restrictions in the
-  file’s names, and maps numeric tree labels through `tree_names`.
-  MPTinR and TreeBUGS skip the first line of an EQN file; bmm reads it
-  unless it is the equation count, so delete a title line or start it
-  with `#`. See
+  use, such as `D_o`; it takes restrictions in the file’s names, maps
+  per-tree category labels onto shared categories with `categories`, and
+  numeric tree labels with `tree_names`. Unlike MPTinR and TreeBUGS, bmm
+  reads an EQN file’s first line unless it is the equation count, so
+  start a title line with `#` or delete it. See
   [`?mpt_from_eqn`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- New function
+  [`mpt_data_reshape()`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md)
+  reshapes the wide frequency tables of MPTinR and TreeBUGS, one row per
+  participant and one column per category, into the
+  one-row-per-participant-and-tree layout
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
+  expects, with 0 for the categories a tree cannot produce. Columns that
+  are no counts, such as a group factor, are carried to every row;
+  `columns = "mptinr"` reads the unnamed, sorted columns of MPTinR data.
+  See
+  [`?mpt_data_reshape`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md).
+  Thanks to [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 - [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
   processing-tree diagram of an
   [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md),
   or of every tree of an
   [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) model,
-  from the branch expressions. See
+  from the branch expressions, and marks restricted parameters on their
+  edges. See
   [`?plot.mpt_tree`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- New article *Multinomial Processing Tree (MPT) models* walks through
+  specifying, fitting and interpreting
+  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
+  models, constraining parameters, design-fixed covariates, a fit to
+  real data, non-linear parameters, importing model files and migrating
+  from MPTinR or TreeBUGS
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
@@ -204,6 +220,17 @@
 
 #### New features
 
+- New function
+  [`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md)
+  computes the goodness-of-fit statistics T1 (category frequencies) and
+  T2 (their covariances across participants) of Klauer (2010) with their
+  posterior predictive p-values, the checks TreeBUGS’ `PPP()` reports,
+  for [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md),
+  [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) and the
+  SDT count models. `level = "participant"` gives one T1 per
+  participant. See
+  [`?ppp`](https://popov-lab.github.io/bmm/dev/reference/ppp.md)
+  ([\#497](https://github.com/popov-lab/bmm/issues/497)).
 - [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) accepts
   `choice_rule = "gaussian"`, a Thurstonian rule: every candidate gets
   independent normal noise and the strongest one is chosen (`"softmax"`

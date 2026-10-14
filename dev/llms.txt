@@ -90,6 +90,17 @@ articles.
 - [`ezdm()`](https://popov-lab.github.io/bmm/reference/ezdm.html):
   EZ-Diffusion Model
 
+**Processing-tree models.** Participants give categorical responses, and
+you describe the discrete processes that lead to each response as a
+multinomial processing tree: the two-high-threshold model of
+recognition, the pair-clustering model of free recall, or a tree of your
+own. The model is fit to response counts per participant and condition.
+See the [MPT
+article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html).
+
+- [`mpt()`](https://popov-lab.github.io/bmm/reference/mpt.html):
+  Multinomial Processing Tree (MPT) models
+
 ![The tasks bmm covers and the models for
 each](reference/figures/README-task-map.png)
 
@@ -267,6 +278,9 @@ Main functions for model fitting
 - [`pp_check(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   : Posterior predictive check for bmmfit objects
 
+- [`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md) :
+  Posterior predictive p-values for count models
+
 - [`posterior_epred(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/posterior_epred.bmmfit.md)
   [`fitted(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/posterior_epred.bmmfit.md)
   : Expected response of a fitted bmm model
@@ -363,6 +377,15 @@ Functions for specifying which model to fit
   : Three-parameter mixture model by Bays et al (2009).
 - [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) :
   Multinomial Processing Tree (MPT) models
+- [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+  : Create an MPT model from an EQN model file
+- [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+  : Create an MPT model from an MPTinR-style model string
+- [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
+  : Create a tree for a Multinomial Processing Tree (MPT) model
+- [`plot(`*`<mpt_tree>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  [`plot(`*`<mpt>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  : Plot the structure of MPT trees
 - [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   : Signal Discrimination Model (SDM) by Oberauer (2023)
@@ -507,18 +530,11 @@ Utility functions for transforming data and parameters
   Transform kappa of the von Mises distribution to the circular standard
   deviation
 
-- [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
-  : Create an MPT model from an EQN model file
+- [`mpt_data_reshape()`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md)
+  :
 
-- [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
-  : Create an MPT model from an MPTinR-style model string
-
-- [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
-  : Create a tree for a Multinomial Processing Tree (MPT) model
-
-- [`plot(`*`<mpt_tree>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
-  [`plot(`*`<mpt>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
-  : Plot the structure of MPT trees
+  Reshape wide MPT frequency tables to the long format of
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
 
 - [`restructure(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/restructure.bmmfit.md)
   :
@@ -651,6 +667,8 @@ n-AFC, etc)
 
 - [The Multinomial / Memory Measurement Model
   (M3)](https://popov-lab.github.io/bmm/dev/articles/bmm_m3.md):
+- [Multinomial Processing Tree (MPT)
+  models](https://popov-lab.github.io/bmm/dev/articles/bmm_mpt.md):
 
 ### Signal detection & recognition
 

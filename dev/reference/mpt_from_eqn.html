@@ -138,7 +138,7 @@ categories each tree lacks.</p></dd>
 
 <dt id="arg-tree-names">tree_names<a class="anchor" aria-label="anchor" href="#arg-tree-names"></a></dt>
 <dd><p>A named character vector mapping tree labels of the EQN
-file onto tree names in bmm, e.g. <code>c("1" = "old", "2" = "new")</code>. bmm tree
+file onto tree names in bmm, e.g. <code>c("1" = "target", "2" = "lure")</code>. bmm tree
 names must start with a letter and contain only letters, digits, or
 underscores, so files with numeric tree labels need this mapping. Labels
 not listed keep their name.</p></dd>
@@ -180,9 +180,11 @@ declare it with the <code>impossible</code> argument instead.</p>
 parameter names, parameter and response category names are sanitized: a
 leading <code>&lt;tree&gt;_</code> prefix is removed from category names that are not
 mapped with <code>categories</code>, and all remaining underscores and dots are
-stripped. Names that would clash after this are an error; names are
-case-sensitive, so <code>P_G1</code> and <code>P_g1</code> stay distinct (<code>PG1</code>, <code>Pg1</code>). Tree
-labels are kept, unless <code>tree_names</code> maps them. The formulas passed to
+stripped. Two labels of the file, or two different values within one
+tree, that become the same name are an error; mapped values that become
+the same name in different trees are that one shared category. Names
+are case-sensitive, so <code>P_G1</code> and <code>P_g1</code> stay distinct (<code>PG1</code>, <code>Pg1</code>).
+Tree labels are kept, unless <code>tree_names</code> maps them. The formulas passed to
 <code><a href="bmm.html">bmm()</a></code> use the bmm names (<code>bmf(Do ~ 1)</code> for a file parameter <code>D_o</code>;
 <code><a href="bmmformula.html">bmf()</a></code> is short for <code><a href="bmmformula.html">bmmformula()</a></code>); the <code>parameter</code> rows of the
 renaming map translate them, and <code>print(model)</code> lists them. Of the
@@ -200,31 +202,23 @@ and tree: a column named by <code>tree_id</code> holding the bmm tree names, and
 one count column per shared response category, named by <code>bmm_name</code> in
 the renaming map (see <code><a href="mpt.html">mpt()</a></code>). A category that is <code>impossible</code> in a
 tree gets 0 (or <code>NA</code>) in the rows of that tree. TreeBUGS data are wide:
-one row per participant, one column per category label of the EQN file,
-and no participant column, so add an <code>id</code> column first. The <code>category</code>
-rows of the renaming map hold every tree with its labels and bmm names,
-so the wide data can be reshaped by name: for each tree, start from a
-block of zeros over all shared categories and fill in the columns of
-that tree (see Examples). MPTinR data for an EQN model are unnamed, and
-their columns do not follow the file: the trees and, within each tree,
-the category labels are sorted (alphabetically, or numerically when they
-are numbers); <code>MPTinR::check.mpt("model.eqn")</code> returns the order in its
-elements <code>eqn.order.trees</code> and <code>eqn.order.categories</code>. (For MPTinR's own
-model format the columns follow the lines instead; see
-<code><a href="mpt_from_string.html">mpt_from_string()</a></code>.) Name the columns by tree and label,
-<code>paste(tree, label, sep = ".")</code> with the bmm tree names, because trees
-may share labels, and select them with the same key (see Examples).</p>
-<p>If <code>categories</code> merged several labels of a tree onto one name, sum their
-columns in the wide data into the first label's column and drop the map
-rows of the other labels (<code>map[!duplicated(map[c("tree", "bmm_name")]), ]</code>)
-before reshaping; otherwise the recipe fails with "duplicate subscripts".</p>
+one row per participant, one column per category label of the EQN file.
+MPTinR data for an EQN model are unnamed, and their columns do not follow
+the file: the trees and, within each tree, the category labels are sorted
+(alphabetically, or numerically when all labels in the file are numbers);
+<code>MPTinR::check.mpt("model.eqn")</code> returns the order in its elements
+<code>eqn.order.trees</code> and <code>eqn.order.categories</code>. (For MPTinR's own model
+format the columns follow the lines instead; see <code><a href="mpt_from_string.html">mpt_from_string()</a></code>.)
+<code><a href="mpt_data_reshape.html">mpt_data_reshape()</a></code> reshapes both layouts with the renaming map, sums the
+labels that <code>categories</code> merged onto one response category, and gives 0 to
+the categories a tree cannot produce (see Examples).</p>
 <p>bmm cannot tell a reshape that swaps tree labels or category columns
-from a correct one: such data fit without an error. The row sums,
-<code>rowSums(long[cats])</code>, are the trials per row; they cannot show swapped
-columns, and they show swapped tree labels only when the trees differ
-in their number of trials. Comparing the response proportions per tree
-with the design (old items must get more "yes" responses than new
-items) catches swapped tree labels and response columns swapped in
+from a correct one: such data fit without an error. The row sums of the
+count columns are the trials per row; they cannot show swapped columns,
+and they show swapped tree labels only when the trees differ in their
+number of trials. Comparing the response proportions per tree
+with the design (targets must get more "yes" responses than lures)
+catches swapped tree labels and response columns swapped in
 every tree, but not always a column slipped or a map entry wrong in one
 tree, nor a swap between two trees of the same kind; so also compare
 one participant's long rows with the wide row. <code><a href="bmm_data_check.html">bmm_data_check()</a></code> runs
@@ -247,12 +241,12 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">eqn_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".eqn"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="st">"6"</span>,</span></span>
-<span class="r-in"><span>  <span class="st">"old  hit   D_o"</span>,</span></span>
-<span class="r-in"><span>  <span class="st">"old  hit   (1-D_o)*g"</span>,</span></span>
-<span class="r-in"><span>  <span class="st">"old  miss  (1-D_o)*(1-g)"</span>,</span></span>
-<span class="r-in"><span>  <span class="st">"new  fa    (1-D_n)*g"</span>,</span></span>
-<span class="r-in"><span>  <span class="st">"new  cr    D_n"</span>,</span></span>
-<span class="r-in"><span>  <span class="st">"new  cr    (1-D_n)*(1-g)"</span></span></span>
+<span class="r-in"><span>  <span class="st">"target  hit   D_o"</span>,</span></span>
+<span class="r-in"><span>  <span class="st">"target  hit   (1-D_o)*g"</span>,</span></span>
+<span class="r-in"><span>  <span class="st">"target  miss  (1-D_o)*(1-g)"</span>,</span></span>
+<span class="r-in"><span>  <span class="st">"lure    fa    (1-D_n)*g"</span>,</span></span>
+<span class="r-in"><span>  <span class="st">"lure    cr    D_n"</span>,</span></span>
+<span class="r-in"><span>  <span class="st">"lure    cr    (1-D_n)*(1-g)"</span></span></span>
 <span class="r-in"><span><span class="op">)</span>, <span class="va">eqn_file</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="co"># restrictions use the file's names; the formulas use the bmm names</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu">mpt_from_eqn</span><span class="op">(</span></span></span>
@@ -264,61 +258,50 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Names that differ from the EQN file (stored in attr(model, 'mpt_renaming')):</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   parameter  D_o -&gt; Do</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   parameter  D_n -&gt; Dn</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   categories in tree old: hit -&gt; yes, miss -&gt; no</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   categories in tree new: fa -&gt; yes, cr -&gt; no</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   categories in tree target: hit -&gt; yes, miss -&gt; no</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   categories in tree lure: fa -&gt; yes, cr -&gt; no</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">model</span>, <span class="st">"mpt_renaming"</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        kind tree file_name bmm_name renamed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 parameter &lt;NA&gt;       D_o       Do    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 parameter &lt;NA&gt;         g        g   FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 parameter &lt;NA&gt;       D_n       Dn    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      tree &lt;NA&gt;       old      old   FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5      tree &lt;NA&gt;       new      new   FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  category  old       hit      yes    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  category  old      miss       no    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  category  new        fa      yes    TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  category  new        cr       no    TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        kind   tree file_name bmm_name renamed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 parameter   &lt;NA&gt;       D_o       Do    TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 parameter   &lt;NA&gt;         g        g   FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 parameter   &lt;NA&gt;       D_n       Dn    TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      tree   &lt;NA&gt;    target   target   FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      tree   &lt;NA&gt;      lure     lure   FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  category target       hit      yes    TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  category target      miss       no    TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  category   lure        fa      yes    TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  category   lure        cr       no    TRUE</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># TreeBUGS data: one row per participant, columns named by the category</span></span></span>
-<span class="r-in"><span><span class="co"># labels of the EQN file, no participant column. bmm needs one row per</span></span></span>
-<span class="r-in"><span><span class="co"># participant and tree, columns named by bmm_name: reshape by name through</span></span></span>
-<span class="r-in"><span><span class="co"># the map, starting each tree from zeros so that categories the tree</span></span></span>
-<span class="r-in"><span><span class="co"># cannot produce get 0</span></span></span>
+<span class="r-in"><span><span class="co"># labels of the EQN file, no participant column. mpt_data_reshape() reshapes</span></span></span>
+<span class="r-in"><span><span class="co"># them to bmm's one row per participant and tree, through the map; the</span></span></span>
+<span class="r-in"><span><span class="co"># categories a tree cannot produce get 0</span></span></span>
 <span class="r-in"><span><span class="va">wide</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  hit <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">25</span><span class="op">)</span>, miss <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">15</span><span class="op">)</span>, fa <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">8</span>, <span class="fl">12</span><span class="op">)</span>, cr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">32</span>, <span class="fl">28</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">wide</span><span class="op">$</span><span class="va">id</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">wide</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">map</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">model</span>, <span class="st">"mpt_renaming"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">map</span> <span class="op">&lt;-</span> <span class="va">map</span><span class="op">[</span><span class="va">map</span><span class="op">$</span><span class="va">kind</span> <span class="op">==</span> <span class="st">"category"</span>, <span class="op">]</span></span></span>
-<span class="r-in"><span><span class="va">cats</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">map</span><span class="op">$</span><span class="va">bmm_name</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/split.html" class="external-link">split</a></span><span class="op">(</span><span class="va">map</span>, <span class="va">map</span><span class="op">$</span><span class="va">tree</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">tree_map</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">counts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">wide</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">cats</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">counts</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">cats</span></span></span>
-<span class="r-in"><span>  <span class="va">counts</span><span class="op">[</span><span class="va">tree_map</span><span class="op">$</span><span class="va">bmm_name</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">wide</span><span class="op">[</span><span class="va">tree_map</span><span class="op">$</span><span class="va">file_name</span><span class="op">]</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="va">wide</span><span class="op">$</span><span class="va">id</span>, item_type <span class="op">=</span> <span class="va">tree_map</span><span class="op">$</span><span class="va">tree</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>, <span class="va">counts</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">long</span> <span class="op">&lt;-</span> <span class="fu"><a href="mpt_data_reshape.html">mpt_data_reshape</a></span><span class="op">(</span><span class="va">wide</span>, <span class="va">model</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">long</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       id item_type yes no</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> new.1  1       new   8 32</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> new.2  2       new  12 28</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> old.1  1       old  30 10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> old.2  2       old  25 15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   id item_type yes no</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1    target  30 10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1      lure   8 32</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2    target  25 15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  2      lure  12 28</span>
 <span class="r-in"><span><span class="co"># the row sums are the trials per row (40 here). The proportions catch</span></span></span>
-<span class="r-in"><span><span class="co"># swapped tree labels and swapped response columns (old items must get</span></span></span>
-<span class="r-in"><span><span class="co"># more "yes" than new items), but not always a column slipped in one</span></span></span>
+<span class="r-in"><span><span class="co"># swapped tree labels and swapped response columns (targets must get</span></span></span>
+<span class="r-in"><span><span class="co"># more "yes" than lures), but not always a column slipped in one</span></span></span>
 <span class="r-in"><span><span class="co"># tree: also compare one participant's long rows with the wide row</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">long</span><span class="op">[</span><span class="va">cats</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> new.1 new.2 old.1 old.2 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    40    40    40    40 </span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">long</span><span class="op">$</span><span class="va">yes</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">long</span><span class="op">[</span><span class="va">cats</span><span class="op">]</span><span class="op">)</span>, <span class="va">long</span><span class="op">$</span><span class="va">item_type</span>, <span class="va">mean</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    new    old </span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">long</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"yes"</span>, <span class="st">"no"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 40 40 40 40</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">long</span><span class="op">$</span><span class="va">yes</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">long</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"yes"</span>, <span class="st">"no"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>, <span class="va">long</span><span class="op">$</span><span class="va">item_type</span>, <span class="va">mean</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lure target </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0.2500 0.6875 </span>
 <span class="r-in"><span><span class="va">long</span><span class="op">[</span><span class="va">long</span><span class="op">$</span><span class="va">id</span> <span class="op">==</span> <span class="fl">1</span>, <span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       id item_type yes no</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> new.1  1       new   8 32</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> old.1  1       old  30 10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   id item_type yes no</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1    target  30 10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1      lure   8 32</span>
 <span class="r-in"><span><span class="va">wide</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   hit miss fa cr id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  30   10  8 32  1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   hit miss fa cr</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  30   10  8 32</span>
 <span class="r-in"><span><span class="fu"><a href="bmm_data_check.html">bmm_data_check</a></span><span class="op">(</span><span class="fu"><a href="bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">Do</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">g</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>, <span class="va">long</span>, <span class="va">model</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pre-fit data check</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #AF5FFF;">Model:</span> <span style="color: #FF875F;">mpt_from_eqn</span>(file = eqn_file, restrictions = "D_n = D_o", categories = c(hit = "yes", fa = "yes", miss = "no", cr = "no"), tree_id = "item_type") </span>
@@ -336,20 +319,9 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># MPTinR data for an EQN model are unnamed and sorted by tree, then by</span></span></span>
 <span class="r-in"><span><span class="co"># label: MPTinR::check.mpt(eqn_file)$eqn.order.categories lists the</span></span></span>
-<span class="r-in"><span><span class="co"># labels (here cr, fa for tree new, then hit, miss for tree old). Name the</span></span></span>
-<span class="r-in"><span><span class="co"># columns by tree and label, so that a label used in several trees stays</span></span></span>
-<span class="r-in"><span><span class="co"># apart, and select with the same key</span></span></span>
+<span class="r-in"><span><span class="co"># labels (here cr, fa for tree new, then hit, miss for tree old)</span></span></span>
 <span class="r-in"><span><span class="va">wide_mptinr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">32</span>, <span class="fl">8</span>, <span class="fl">30</span>, <span class="fl">10</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">28</span>, <span class="fl">12</span>, <span class="fl">25</span>, <span class="fl">15</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">wide_mptinr</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"new.cr"</span>, <span class="st">"new.fa"</span>, <span class="st">"old.hit"</span>, <span class="st">"old.miss"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">long2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/split.html" class="external-link">split</a></span><span class="op">(</span><span class="va">map</span>, <span class="va">map</span><span class="op">$</span><span class="va">tree</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">tree_map</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="va">counts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">wide_mptinr</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">cats</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">counts</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">cats</span></span></span>
-<span class="r-in"><span>  <span class="va">key</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">tree_map</span><span class="op">$</span><span class="va">tree</span>, <span class="va">tree_map</span><span class="op">$</span><span class="va">file_name</span>, sep <span class="op">=</span> <span class="st">"."</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="va">counts</span><span class="op">[</span><span class="va">tree_map</span><span class="op">$</span><span class="va">bmm_name</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">wide_mptinr</span><span class="op">[</span>, <span class="va">key</span><span class="op">]</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">wide_mptinr</span><span class="op">)</span><span class="op">)</span>, item_type <span class="op">=</span> <span class="va">tree_map</span><span class="op">$</span><span class="va">tree</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>,</span></span>
-<span class="r-in"><span>             <span class="va">counts</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">long2</span>, <span class="va">long</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="mpt_data_reshape.html">mpt_data_reshape</a></span><span class="op">(</span><span class="va">wide_mptinr</span>, <span class="va">model</span>, columns <span class="op">=</span> <span class="st">"mptinr"</span><span class="op">)</span>, <span class="va">long</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] TRUE</span>
 </code></pre></div>
     </div>

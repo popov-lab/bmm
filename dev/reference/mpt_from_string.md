@@ -15,12 +15,12 @@ that terminate in the same response category are summed.
 ``` r
 mpt_from_string(
   text,
+  restrictions = NULL,
   tree_names,
   categories = NULL,
   tree_id = NULL,
   covariates = NULL,
   simplex = NULL,
-  restrictions = NULL,
   links = "logit",
   impossible = NULL
 )
@@ -33,6 +33,15 @@ mpt_from_string(
   Character. The model definition, either as a single string or as a
   vector of lines (e.g., from
   [`readLines()`](https://rdrr.io/r/base/readLines.html)).
+
+- restrictions:
+
+  Parameter restrictions as in
+  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md),
+  written with the parameter names of the model text, e.g. `"g = 0.5"`
+  or `list(g = 0.5)`. They mirror the `restrictions` argument of MPTinR
+  and TreeBUGS. Restriction files are not read: pass their lines (see
+  Examples).
 
 - tree_names:
 
@@ -66,7 +75,7 @@ mpt_from_string(
   this column to the data yourself: for each row it holds the name, as
   given in `tree_names`, of the tree the counts come from.
 
-- covariates, simplex, restrictions, links:
+- covariates, simplex, links:
 
   passed to
   [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md).
@@ -132,10 +141,10 @@ unnamed column per line of the model file, in file order, because each
 line is one response category. (For EQN files MPTinR sorts the columns
 instead; see
 [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md).)
-Name the columns by tree and category first, then stack one block per
-tree (see Examples); when a tree lacks some categories, start each tree
-from zeros, as in the Examples of
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md).
+Name the columns `<tree>.<category>`;
+[`mpt_data_reshape()`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md)
+then stacks the trees and gives 0 to the categories a tree cannot
+produce (see Examples).
 
 **Provenance.** The returned model carries an `mpt_source` attribute,
 `list(text = )`, with the model definition as one string.
@@ -162,18 +171,18 @@ D + (1 - D) * (1 - g)  # new
 "
 model <- mpt_from_string(
   model_2htm,
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type"
 )
 model
-#> mpt_from_string(text = model_2htm,                 tree_names = c("old", "new"),                 tree_id = "item_type") 
+#> mpt_from_string(text = model_2htm,                 tree_names = c("target", "lure"),                 tree_id = "item_type") 
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: D, g 
 #> Links:      D = logit; g = logit 
-#> MPT tree 'old':
+#> MPT tree 'target':
 #>   P(old) = D + (1 - D) * g
 #>   P(new) = (1 - D) * (1 - g)
-#> MPT tree 'new':
+#> MPT tree 'lure':
 #>   P(old) = (1 - D) * g
 #>   P(new) = D + (1 - D) * (1 - g)
 #> Identifiability (intercept-only formulas): 2 free parameter(s), 2 degrees of freedom (response categories minus 1, summed over trees) 
@@ -183,18 +192,18 @@ model
 # fix the guessing rate as in MPTinR / TreeBUGS
 mpt_from_string(
   model_2htm,
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type",
   restrictions = "g = 0.5"
 )
-#> mpt_from_string(text = model_2htm,                 tree_names = c("old", "new"),                 tree_id = "item_type",                 restrictions = "g = 0.5") 
+#> mpt_from_string(text = model_2htm,                 restrictions = "g = 0.5",                 tree_names = c("target", "lure"),                 tree_id = "item_type") 
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: D 
 #> Links:      D = logit 
-#> MPT tree 'old':
+#> MPT tree 'target':
 #>   P(old) = D + (1 - D) * 0.5
 #>   P(new) = (1 - D) * 0.5
-#> MPT tree 'new':
+#> MPT tree 'lure':
 #>   P(old) = (1 - D) * 0.5
 #>   P(new) = D + (1 - D) * 0.5
 #> Restrictions: g = 0.5 
@@ -255,27 +264,23 @@ writeLines(c("# fix the guessing rate", "g = 0.5"), restr_file)
 restr <- trimws(sub("#.*", "", readLines(restr_file)))
 model <- mpt_from_string(
   readLines(model_file),
-  tree_names = c("old", "new"),
+  tree_names = c("target", "lure"),
   tree_id = "item_type",
   restrictions = restr[nzchar(restr)]
 )
 
 # MPTinR data: one unnamed column per line of the model file, in file
-# order. Name the columns by tree and category, then stack one block per
-# tree to get bmm's one row per participant and tree.
+# order. Name the columns by tree and category, then let mpt_data_reshape()
+# stack the trees to get bmm's one row per participant and tree.
 wide <- rbind(c(30, 10, 8, 32), c(25, 15, 12, 28))
-colnames(wide) <- c("old.old", "old.new", "new.old", "new.new")
-long <- do.call(rbind, lapply(c("old", "new"), function(tree) {
-  counts <- wide[, paste(tree, c("old", "new"), sep = "."), drop = FALSE]
-  colnames(counts) <- c("old", "new")
-  data.frame(id = seq_len(nrow(wide)), item_type = tree, counts)
-}))
+colnames(wide) <- c("target.old", "target.new", "lure.old", "lure.new")
+long <- mpt_data_reshape(wide, model)
 long
 #>   id item_type old new
-#> 1  1       old  30  10
-#> 2  2       old  25  15
-#> 3  1       new   8  32
-#> 4  2       new  12  28
+#> 1  1    target  30  10
+#> 2  1      lure   8  32
+#> 3  2    target  25  15
+#> 4  2      lure  12  28
 # the row sums are the trials per row (40 here), but they cannot show
 # swapped columns or tree labels: compare one participant with the wide
 # row, then run the data checks (bmm_data_check() prints
@@ -284,14 +289,14 @@ rowSums(long[c("old", "new")])
 #> [1] 40 40 40 40
 long[long$id == 1, ]
 #>   id item_type old new
-#> 1  1       old  30  10
-#> 3  1       new   8  32
+#> 1  1    target  30  10
+#> 2  1      lure   8  32
 wide[1, ]
-#> old.old old.new new.old new.new 
-#>      30      10       8      32 
+#> target.old target.new   lure.old   lure.new 
+#>         30         10          8         32 
 bmm_data_check(bmf(D ~ 1), long, model)
 #> Pre-fit data check
-#> Model: mpt_from_string(text = readLines(model_file), tree_names = c("old", "new"), tree_id = "item_type", restrictions = restr[nzchar(restr)]) 
+#> Model: mpt_from_string(text = readLines(model_file), restrictions = restr[nzchar(restr)], tree_names = c("target", "lure"), tree_id = "item_type") 
 #> Data:  4 observations ('long') 
 #> 
 #> Response variables:

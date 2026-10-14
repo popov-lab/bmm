@@ -50,6 +50,9 @@ Main functions for model fitting
 - [`pp_check(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
   : Posterior predictive check for bmmfit objects
 
+- [`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md) :
+  Posterior predictive p-values for count models
+
 - [`posterior_epred(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/posterior_epred.bmmfit.md)
   [`fitted(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/posterior_epred.bmmfit.md)
   : Expected response of a fitted bmm model
@@ -146,6 +149,15 @@ Functions for specifying which model to fit
   : Three-parameter mixture model by Bays et al (2009).
 - [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) :
   Multinomial Processing Tree (MPT) models
+- [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+  : Create an MPT model from an EQN model file
+- [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+  : Create an MPT model from an MPTinR-style model string
+- [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
+  : Create a tree for a Multinomial Processing Tree (MPT) model
+- [`plot(`*`<mpt_tree>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  [`plot(`*`<mpt>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  : Plot the structure of MPT trees
 - [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   : Signal Discrimination Model (SDM) by Oberauer (2023)
@@ -290,18 +302,11 @@ Utility functions for transforming data and parameters
   Transform kappa of the von Mises distribution to the circular standard
   deviation
 
-- [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
-  : Create an MPT model from an EQN model file
+- [`mpt_data_reshape()`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md)
+  :
 
-- [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
-  : Create an MPT model from an MPTinR-style model string
-
-- [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
-  : Create a tree for a Multinomial Processing Tree (MPT) model
-
-- [`plot(`*`<mpt_tree>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
-  [`plot(`*`<mpt>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
-  : Plot the structure of MPT trees
+  Reshape wide MPT frequency tables to the long format of
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
 
 - [`restructure(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/restructure.bmmfit.md)
   :

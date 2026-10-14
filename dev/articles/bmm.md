@@ -179,9 +179,18 @@ article](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html).
 
 [TABLE]
 
-### 3.5 Other models
+### 3.5 Processing-tree models
 
-These models were added after this page was written:
+Participants give categorical responses, and you describe the discrete
+processes that lead to each response as a multinomial processing tree,
+for example the two-high-threshold model of recognition or the
+pair-clustering model of free recall. You write each tree’s branch
+probabilities as expressions, and
+[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) fits
+them to response counts. The [MPT
+article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html) covers
+specifying trees, importing model files from MPTinR and TreeBUGS, and
+constraining parameters.
 
 [TABLE]
 
