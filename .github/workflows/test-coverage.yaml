@@ -1,5 +1,15 @@
 # Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
+#
+# Measures test coverage with covr from the source tree and uploads it to
+# Codecov. It runs the unit, mock-pipeline and fixture tiers of ADR 0004 with
+# four workers; the Stan compile tier is off (BMM_TEST_STAN=false, no CmdStan
+# installed). On develop 1917e81f that tier reached 16 R lines no other test
+# reaches, all real-machine probes in R/bmm_setup.R (95.65 % with it, 95.52 %
+# without, R/brms-misc.R excluded), so the reported number is slightly lower
+# than a run with CmdStan would give, never higher. The upload needs the
+# CODECOV_TOKEN secret; without it a pull request still gets the coverage in
+# the log, and a push fails the upload step.
 on:
   push:
     branches: [master, develop, 'dev-*']
@@ -8,11 +18,20 @@ on:
 
 name: test-coverage
 
+permissions: read-all
+
+concurrency:
+  group: test-coverage-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test-coverage:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: true
+      BMM_TEST_STAN: false
+      TESTTHAT_CPUS: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -21,25 +40,69 @@ jobs:
         with:
           use-public-rspm: true
 
+      # cmdstanr is not on CRAN, so the Suggests are listed by hand, as in
+      # R-CMD-check; cmdstanr comes without CmdStan
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::covr
-          needs: coverage
+          dependencies: NA
+          extra-packages: |
+            any::covr
+            any::xml2
+            bookdown
+            stan-dev/cmdstanr
+            cowplot
+            dplyr
+            emmeans
+            fansi
+            ggplot2
+            ggthemes
+            knitr
+            loo
+            mixtur
+            MPTinR
+            pkgbuild
+            remotes
+            rmarkdown
+            roxygen2
+            rstan
+            stringr
+            testthat
+            tidybayes
+            tidyr
+            usethis
+            vctrs
+            waldo
+            yaml
+            withr
+            posterior
+            here
 
       - name: Test coverage
         run: |
-          covr::codecov(
+          cov <- covr::package_coverage(
             quiet = FALSE,
             clean = FALSE,
+            line_exclusions = list("R/brms-misc.R"),
             install_path = file.path(normalizePath(Sys.getenv("RUNNER_TEMP"), winslash = "/"), "package")
           )
+          print(cov)
+          covr::to_cobertura(cov)
         shell: Rscript {0}
+
+      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        with:
+          # fail on an upload error, except on a pull request without a token
+          fail_ci_if_error: ${{ github.event_name != 'pull_request' || secrets.CODECOV_TOKEN }}
+          files: ./cobertura.xml
+          plugins: noop
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Show testthat output
         if: always()
         run: |
           ## --------------------------------------------------------------------
-          find ${{ runner.temp }}/package -name 'testthat.Rout*' -exec cat '{}' \; || true
+          find '${{ runner.temp }}/package' -name 'testthat.Rout*' -exec cat '{}' \; || true
         shell: bash
 
       - name: Upload test results
