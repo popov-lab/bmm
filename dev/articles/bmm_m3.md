@@ -113,6 +113,21 @@ This choice rule can be interpreted as an n-alternative SDT model over
 the different response candidates with a Gumbel (or double-exponential)
 noise distribution.
 
+This interpretation is a helpful intuition, but it is not an empirical
+commitment the data could confirm. Choice probabilities alone do not
+identify the latent noise distribution that generates them: the same
+softmax probabilities arise from latent-strength models in which the
+noise is correlated across response options (Kilani 2025), and with four
+or more response categories infinitely many latent representations are
+consistent with any given set of choice probabilities (Falmagne 1978;
+Kilani and Colonius 2026). The `m3` parameters are therefore best
+interpreted as activation scale values, identified by the choice
+probabilities under the assumed choice rule, rather than as means of a
+specific noise distribution. Comparing the choice rules by model fit
+remains meaningful, because they imply different choice probabilities.
+What categorical response data cannot decide is the distributional story
+behind whichever rule fits better.
+
 3.  Gaussian (`"gaussian"`)
 
 The `gaussian` choice rule is the same n-alternative SDT model with
@@ -778,6 +793,19 @@ ggplot(data = pp_m3,
 ![](bmm_m3_files/figure-html/model_fit_custom-1.jpeg)
 
 ## References
+
+Falmagne, Jean-Claude. 1978. “A Representation Theorem for Finite Random
+Scale Systems.” *Journal of Mathematical Psychology* 18 (1): 52–72.
+<https://doi.org/10.1016/0022-2496(78)90048-2>.
+
+Kilani, Karim. 2025. “A Class of Random Utility Models Yielding the
+Exploded Logit.” *Journal of Mathematical Psychology* 124: 102900.
+<https://doi.org/10.1016/j.jmp.2025.102900>.
+
+Kilani, Karim, and Hans Colonius. 2026. “Representing Choice
+Probabilities by Ranking Probabilities via Entropy Maximization.”
+*Journal of Mathematical Psychology* 128: 102970.
+<https://doi.org/10.1016/j.jmp.2026.102970>.
 
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. “Simple Measurement
 Models for Complex Working-Memory Tasks.” *Psychological Review* 126

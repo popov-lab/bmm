@@ -137,6 +137,7 @@ p_i = \frac{n_i \cdot A_i}{\sum^n_{j = 1} n_j \cdot A_j}
 p_i = \frac{n_i \cdot e^{A_i}}{\sum^n_{j = 1} n_j \cdot e^{A_j}}
 \]</span></p>
 <p>This choice rule can be interpreted as an n-alternative SDT model over the different response candidates with a Gumbel (or double-exponential) noise distribution.</p>
+<p>This interpretation is a helpful intuition, but it is not an empirical commitment the data could confirm. Choice probabilities alone do not identify the latent noise distribution that generates them: the same softmax probabilities arise from latent-strength models in which the noise is correlated across response options <span class="citation">(Kilani 2025)</span>, and with four or more response categories infinitely many latent representations are consistent with any given set of choice probabilities <span class="citation">(Falmagne 1978; Kilani and Colonius 2026)</span>. The <code>m3</code> parameters are therefore best interpreted as activation scale values, identified by the choice probabilities under the assumed choice rule, rather than as means of a specific noise distribution. Comparing the choice rules by model fit remains meaningful, because they imply different choice probabilities. What categorical response data cannot decide is the distributional story behind whichever rule fits better.</p>
 <ol start="3" style="list-style-type: decimal">
 <li>Gaussian (<code>"gaussian"</code>)</li>
 </ol>
@@ -585,6 +586,15 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
 <div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-Falmagne_1978" class="csl-entry">
+Falmagne, Jean-Claude. 1978. <span>“A Representation Theorem for Finite Random Scale Systems.”</span> <em>Journal of Mathematical Psychology</em> 18 (1): 52–72. <a href="https://doi.org/10.1016/0022-2496(78)90048-2" class="external-link">https://doi.org/10.1016/0022-2496(78)90048-2</a>.
+</div>
+<div id="ref-Kilani_2025" class="csl-entry">
+Kilani, Karim. 2025. <span>“A Class of Random Utility Models Yielding the Exploded Logit.”</span> <em>Journal of Mathematical Psychology</em> 124: 102900. <a href="https://doi.org/10.1016/j.jmp.2025.102900" class="external-link">https://doi.org/10.1016/j.jmp.2025.102900</a>.
+</div>
+<div id="ref-Kilani_Colonius_2026" class="csl-entry">
+Kilani, Karim, and Hans Colonius. 2026. <span>“Representing Choice Probabilities by Ranking Probabilities via Entropy Maximization.”</span> <em>Journal of Mathematical Psychology</em> 128: 102970. <a href="https://doi.org/10.1016/j.jmp.2026.102970" class="external-link">https://doi.org/10.1016/j.jmp.2026.102970</a>.
+</div>
 <div id="ref-oberauerSimpleMeasurementModels2019" class="csl-entry">
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Models for Complex Working-Memory Tasks.”</span> <em>Psychological Review</em> 126 (6): 880–932. <a href="https://doi.org/10.1037/rev0000159" class="external-link">https://doi.org/10.1037/rev0000159</a>.
 </div>
