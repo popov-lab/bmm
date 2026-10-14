@@ -30,11 +30,20 @@ Files:
   - `SM()`: short for `suppressMessages()`.
 - `helper-mpt.R`: sources `tests/testthat/helper-mpt.R`, so the MPT fits use
   the same tree and data builders as the unit tests.
+- `helper-reference-fits.R`: `reference_cases()`, one small case per model in
+  `model_names()` (model, formula, data, seed; every formula gives a parameter
+  a two-level predictor), and `reference_fit(name)`, which fits a case (two
+  chains, 500 warmup and 500 sampling iterations) once per R session, so the
+  test files share the fits.
 - `test-*.R`: the tests, among them `test-kfold-update.R` (refits through
   `update()` on a slice of the fit's data, grouped `kfold()`),
   `test-update-fits.R` (`brms::combine_models()` on a fit and its refit),
   `test-conditional_effects-fits.R` (`conditional_effects()` on `sdt_rating()`
-  and `m3()` fits), `test-sdt-fits.R` (`sdt_ranking()` recovery,
+  and `m3()` fits), `test-conditional_effects-models.R` (`conditional_effects()`
+  and its plots for every parameter with a predictor in each model's reference
+  case, on both scales, with native estimates inside the range of the
+  parameter's link), `test-references.R` (each reference case refit and
+  compared with `references.rds`), `test-sdt-fits.R` (`sdt_ranking()` recovery,
   `sdt_rating()` `posterior_predict()` and a `log_distance` fit at six
   categories),
   `test-mpt-fits.R` (`mpt()` fits read through `conditional_effects()`, and
@@ -50,10 +59,16 @@ Files:
   carries its seed and the bmm and brms versions in `attr(fit, "fixture")`.
   A new fixture needs its own block in this script, saved with
   `save_fixture()`, and a `fixture` case in its model's provider.
-- `conditional_effects_comprehensive.R`: an older script kept for reference.
-  It fits eight of the 13 models (no SDT model) and prints
-  `conditional_effects()` output. It is out of date (its `ezdm()` call uses
-  arguments `ezdm()` no longer has), and `run.R` does not run it.
+- `references.rds` and `make-references.R`: the reference summaries of ADR
+  0004 (issue #123), a few KB: per model, the posterior mean and SD of every
+  fixed effect of its reference case, with the bmm, brms and CmdStan versions
+  and the date in the attributes of each model's entry. `test-references.R`
+  passes when a refit's estimate lies within 0.5 reference SDs of the
+  reference mean and its SD within 0.7 to 1.4 times the reference SD. After an
+  intended change to a model's likelihood, priors or case, regenerate that
+  model's entry (`Rscript tests/local/make-references.R sdm`) or all of them
+  (`Rscript tests/local/make-references.R`); a new model needs a case in
+  `helper-reference-fits.R` and an entry.
 
 A test that only compiles a Stan program (parity or gradient checks) belongs in
 `tests/testthat` behind `skip_unless_stan_tests()`, registered under rule R1

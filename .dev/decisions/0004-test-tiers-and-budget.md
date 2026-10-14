@@ -257,4 +257,13 @@ last.
   under the 66 s cap but not far. The caps themselves are unchanged: they
   are lowered from a measured `tests-source` run of this branch (1.5 times
   its maxima), not from a local run.
+- 2026-10-14, #422 and #123. The reference summaries exist:
+  `tests/local/make-references.R` fits one case per model
+  (`tests/local/helper-reference-fits.R`) and writes the fixed effects'
+  posterior mean and SD to `tests/local/references.rds` (1.7 KB);
+  `tests/local/test-references.R` refits and checks each estimate within
+  0.5 reference SDs and each SD within 0.7 to 1.4 times the reference
+  (refits with three other seeds moved estimates by at most 0.16 SDs).
+  `tests/local/conditional_effects_comprehensive.R` became
+  `tests/local/test-conditional_effects-models.R`, on the same fits.
 
