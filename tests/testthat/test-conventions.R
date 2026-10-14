@@ -145,26 +145,21 @@ test_that("fixtures are small, short, and regenerable (R5)", {
   skip_unless_fixtures()
   fixtures <- list.files(test_path("assets"), pattern = "\\.rds$")
   size_kb <- vapply(fixtures, function(f) file.size(test_path("assets", f)) / 1024, numeric(1))
-  # the draws stored in the file: brms::ndraws() on the m3 fixture reports 80
-  # while its arrays hold 4,000, and the arrays are what the file carries
+  # the draws stored in the file: the arrays are what the file carries, and
+  # brms::ndraws() reads n_save, which a trimmed fit can leave wrong
   draws <- vapply(fixtures, function(f) {
     fit <- readRDS(test_path("assets", f))
     tryCatch(brms::ndraws(brms::as_draws_array(fit)), error = function(e) NA_real_)
   }, numeric(1))
-  # bmmfit_example1.rds (1.2 MB) and bmmfit_m3_ppcheck.rds (4,000 draws) are
-  # regenerated in #422; the mock fits carry no draws
-  expect_identical(names(size_kb)[size_kb > 300], "bmmfit_example1.rds")
-  expect_identical(names(draws)[!is.na(draws) & draws > 200], "bmmfit_m3_ppcheck.rds")
+  # the mock fits carry no draws
+  expect_identical(names(size_kb)[size_kb > 300], character(0))
+  expect_identical(names(draws)[!is.na(draws) & draws > 200], character(0))
   generator <- test_path("..", "local", "make-fixtures.R")
   skip_if_not(file.exists(generator), "fixture generator not in the built package")
   generated <- vapply(fixtures, function(f) {
     any(grepl(f, readLines(generator, warn = FALSE), fixed = TRUE))
   }, logical(1))
-  expect_identical(
-    sort(names(generated)[!generated], method = "radix"),
-    c("bmmfit_example1.rds", "bmmfit_m3_ppcheck.rds", "mock_bmmfit_m3.rds",
-      "mock_bmmfit_mixture2p.rds")
-  )
+  expect_identical(names(generated)[!generated], character(0))
 })
 
 test_that("every model has a model-case provider with the cases every model needs (R4)", {

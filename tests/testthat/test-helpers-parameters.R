@@ -222,9 +222,7 @@ test_that(".is_softmax_param follows a links override rather than the class", {
 
 test_that(".get_parameter_info returns correct info for SDM params", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
 
   info_c <- .get_parameter_info(fit, "c")
   expect_equal(info_c$type, "dpar")
@@ -276,15 +274,11 @@ test_that(".get_parameter_info treats the alternative the formula leaves out as 
 # ===========================================================================
 
 load_np_sdm_fit <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_example1.rds")
 }
 
 load_np_m3_fit <- function() {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "m3 fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_m3_ppcheck.rds")
 }
 
 # ===========================================================================
@@ -857,7 +851,8 @@ test_that("native_parameters handles multinomial models with matrix columns", {
   out <- native_parameters(fit, draw_ids = 1:10)
 
   expect_named(out, c(".chain", ".iteration", ".draw", "cond", "ID", "parameter", "value"))
-  expect_equal(nrow(out), 10 * 120 * 4)
+  # 10 draws of 30 observations (10 participants x 3 conditions) x 4 categories
+  expect_equal(nrow(out), 10 * 30 * 4)
   expect_false(any(c("Y", "nTrials", "Idx_corr", "n_corr") %in% names(out)))
 })
 

@@ -1136,9 +1136,7 @@ test_that("the Stan series literals are the coefficients of log(sinh x / x)", {
 
 test_that("log_lik() of an ezdm 4par fit never reads a placeholder", {
   skip_on_cran()
-  path <- test_path("assets", "bmmfit_ezdm4_ppcheck.rds")
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  old <- readRDS(path)
+  old <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")
   # a placeholder that is read gives -Inf for -1 and 0 alike, so a plausible
   # RT is needed for the comparison across placeholders to see a read
   placeholders <- c(-1, 0, 0.3, 1e300)

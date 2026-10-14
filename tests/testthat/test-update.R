@@ -2,9 +2,7 @@ save_pars <- brms::save_pars
 
 test_that("update.bmmfit works", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit1 <- restructure(readRDS(path))
+  fit1 <- restructure(load_fixture_fit("bmmfit_example1.rds"))
   data <- fit1$data
 
   # formula is replaced
@@ -46,9 +44,7 @@ test_that("update.bmmfit works", {
 })
 
 sdm_fixture <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  restructure(readRDS(path))
+  restructure(load_fixture_fit("bmmfit_example1.rds"))
 }
 
 update_mock <- function(object, ...) {
@@ -290,7 +286,8 @@ test_that("update() applies the package step-size default to a fit that had none
   skip_on_cran()
   withr::local_options(bmm.step_size = 0.02)
   fit1 <- sdm_fixture()
-  expect_null(fit1$stan_args$control)
+  # as a fit from before the package had a step-size default
+  fit1$stan_args$control <- NULL
 
   up <- update_mock(fit1)
   expect_equal(up$stan_args$control, list(step_size = 0.02))
@@ -367,9 +364,7 @@ test_that("update() of a fit with a stored control keeps it next to the step siz
 # =============================================================================
 
 m3_fixture <- function() {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  restructure(readRDS(path))
+  restructure(load_fixture_fit("bmmfit_m3_ppcheck.rds"))
 }
 
 # the stored-frame cases come from the model-case providers

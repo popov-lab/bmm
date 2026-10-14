@@ -18,7 +18,9 @@ test_that("restructure works", {
 
 test_that("restructure() adds posterior_epred to a custom family saved without it", {
   fit <- load_fixture_fit("bmmfit_example1.rds")
-  expect_null(fit$formula$family$posterior_epred)
+  # as a fit saved before the family carried it
+  fit$formula$family$posterior_epred <- NULL
+  fit$family$posterior_epred <- NULL
   fit <- restructure(fit)
   expect_identical(fit$formula$family$posterior_epred, posterior_epred_sdm_simple)
   expect_identical(fit$family$posterior_epred, posterior_epred_sdm_simple)

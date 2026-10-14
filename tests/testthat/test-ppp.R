@@ -252,9 +252,7 @@ test_that(".ppp_complement() adds the second category of a binomial count", {
 })
 
 test_that("ppp() compares each replicated data set with the expectation of its own draw", {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
   withr::local_seed(1)
   res <- ppp(fit, statistic = "T1", by = character(0), ndraws = 5)
   expect_s3_class(res, "bmm_ppp")
@@ -272,8 +270,6 @@ test_that("ppp() compares each replicated data set with the expectation of its o
 })
 
 test_that("ppp() takes ndraws as a whole number of draws", {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
   expect_error(ppp(fit, ndraws = 2.5), "'ndraws' must be a whole number")
 })

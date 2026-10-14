@@ -43,12 +43,13 @@ Files:
   impossible-category `mpt()` fits). Keep each fit
   short (one or two chains, a few hundred iterations) and assert with
   `expect_range()` or a tolerance, never with exact equality to a stored fit.
-- `make-fixtures.R`: regenerates four fixtures in `tests/testthat/assets/`:
-  `bmmfit_ddm_ppcheck.rds`, `bmmfit_cswald_ppcheck.rds`,
-  `bmmfit_ezdm3_ppcheck.rds` and `bmmfit_ezdm4_ppcheck.rds` (one chain, at
-  most 300 KB and 200 draws each). Run it by hand when one of them no longer
-  loads. A new fixture needs its own block in this script: fit the model and
-  save it with `save_fixture()`, defined at the top of the script.
+- `make-fixtures.R`: regenerates every fixture in `tests/testthat/assets/`
+  (one chain, at most 300 KB and 200 draws each, ADR 0004 R5), all of them or
+  the ones named on the command line
+  (`Rscript tests/local/make-fixtures.R bmmfit_m3_ppcheck.rds`). Each fixture
+  carries its seed and the bmm and brms versions in `attr(fit, "fixture")`.
+  A new fixture needs its own block in this script, saved with
+  `save_fixture()`, and a `fixture` case in its model's provider.
 - `conditional_effects_comprehensive.R`: an older script kept for reference.
   It fits eight of the 13 models (no SDT model) and prints
   `conditional_effects()` output. It is out of date (its `ezdm()` call uses

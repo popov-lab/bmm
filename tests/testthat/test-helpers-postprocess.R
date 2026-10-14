@@ -63,7 +63,7 @@ test_that("posterior_epred() refuses a circular model with newdata passed by pos
 
 test_that("circular models saved under their pre-1.0.1 class refuse as well", {
   fit <- load_fixture_fit("bmmfit_example1.rds")
-  expect_true(inherits(fit$bmm$model, "vwm"))
+  class(fit$bmm$model) <- c("bmmodel", "vwm", "sdm", "sdm_simple")
   expect_false(expected_response_defined(fit$bmm$model))
 })
 

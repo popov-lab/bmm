@@ -342,34 +342,27 @@ test_that("prior_info() validates its input", {
 
 test_that("prior_info() rejects fits without prior information", {
   skip_on_cran()
-  path <- test_path("assets/mock_bmmfit_mixture2p.rds")
-  skip_if_not(file.exists(path), "Mock fixture not available (excluded by .Rbuildignore)")
-  expect_error(prior_info(readRDS(path)), "no prior information")
+  expect_error(prior_info(load_fixture_fit("mock_bmmfit_mixture2p.rds")), "no prior information")
 })
 
 test_that("prior_info() handles models whose data pipeline transforms the response (m3)", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
 
   out <- prior_info(fit)
   expect_s3_class(out, "bmm_prior_info")
   # a & c: effects + intercept; d: intercept; b: fixed constant; sd: a, c, d
   expect_equal(nrow(out), 9)
   expect_setequal(out$parameter, c("a", "b", "c", "d"))
-  expect_equal(sum(out$source == "bmm default"), 6)
-  expect_equal(sum(out$source == "brms default"), 3)
-  expect_true(all(out$class[out$source == "brms default"] == "sd"))
+  expect_equal(sum(out$source == "bmm default"), 9)
+  expect_equal(sum(out$class == "sd"), 3)
   expect_equal(out$prior[out$parameter == "b"], "constant(0.1)")
   expect_false(any(out$source == "flat"))
 })
 
 test_that("prior_info() classifies the fixture fit correctly", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
 
   expect_error(prior_info(fit, format = "foo"), "'arg'")
   expect_silent(out <- prior_info(fit))
@@ -397,9 +390,7 @@ test_that("constant_native_value() translates constants to the native scale", {
 
 test_that("printed reports annotate constants with their native-scale value", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  out <- prior_info(readRDS(path))
+  out <- prior_info(load_fixture_fit("bmmfit_example1.rds"))
 
   # sampling-scale footnote is always present when links are non-identity
   expect_true(any(grepl("sampling scale", capture.output(print(out)), fixed = TRUE)))
@@ -416,9 +407,7 @@ test_that("printed reports annotate constants with their native-scale value", {
 
 test_that("prior_info() omits a fixed mu that is not a model parameter", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
 
   expect_true("mu" %in% prior_info(fit)$parameter)
 
@@ -586,9 +575,7 @@ test_that("prior_info() re-checks a fit whose largest set size has no response (
 
 test_that("subsetting a report returns a plain data.frame that still prints", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  out <- prior_info(readRDS(path))
+  out <- prior_info(load_fixture_fit("bmmfit_example1.rds"))
 
   sub <- out[, c("parameter", "prior", "source")]
   expect_s3_class(sub, "data.frame")
@@ -603,9 +590,7 @@ test_that("subsetting a report returns a plain data.frame that still prints", {
 
 test_that("prior_info() detects user-modified priors without refitting", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
 
   kappa_row <- fit$prior$dpar == "kappa" & fit$prior$class == "Intercept"
   fit$prior$prior[kappa_row] <- "normal(0, 1)"
@@ -616,9 +601,7 @@ test_that("prior_info() detects user-modified priors without refitting", {
 
 test_that("print.bmm_prior_info() renders table and text formats", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
 
   out <- prior_info(fit)
   printed <- capture.output(print(out))

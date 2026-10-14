@@ -6,15 +6,11 @@
 # Tests on real fits live in tests/local/test-conditional_effects-fits.R.
 
 load_sdm_fit <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_example1.rds")
 }
 
 load_m3_fit <- function() {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "m3 fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_m3_ppcheck.rds")
 }
 
 mock_bmm <- function(formula, data, model) {

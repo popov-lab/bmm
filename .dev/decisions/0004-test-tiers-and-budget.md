@@ -225,3 +225,13 @@ last.
   keep its rdm/lba/lnr cases in their providers. `test-pp_observables.R`
   reads every model from the registry, so the branch's hand list goes.
   `test-helpers-data.R` keeps the branch's `check_data` override loop.
+- 2026-10-14, #422. R5: `tests/local/make-fixtures.R` now generates all
+  eight fixtures and records the seed and versions in `attr(fit,
+  "fixture")`. `bmmfit_m3_ppcheck.rds` was regenerated with 200 draws on
+  ten participants (209 KB, was 4,000 draws), `bmmfit_example1.rds` as an
+  rstan fit without its compiled model (169 KB, was 1.2 MB), and the two
+  mock fixtures from mock fits. Every test loads a fixture through
+  `load_fixture_fit()`; the R5 allowlists in `test-conventions.R` are
+  empty. Tests that relied on `bmmfit_example1.rds` being a 2024 fit now
+  set the old property they handle (no step-size control, the pre-1.0.1
+  class, no `posterior_epred` in the family, an older citation).

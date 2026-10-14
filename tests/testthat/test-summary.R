@@ -1,8 +1,6 @@
 test_that("summary has reasonable outputs", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   summary1 <- suppressWarnings(summary(fit))
   expect_true(is.data.frame(summary1$fixed))
   expect_equal(

@@ -1,7 +1,5 @@
 test_that("sdm posterior_predict draws each prediction from its own posterior draw", {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   withr::local_seed(445)
   yrep <- brms::posterior_predict(fit)
   c_draws <- brms::posterior_linpred(fit, dpar = "c", transform = TRUE)
