@@ -124,6 +124,26 @@
   See [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) gains
+  `restrictions`, which equates parameters or fixes them to constants in
+  the syntax of MPTinR and TreeBUGS (`c("Dn = Do", "g = 0.5")`), and
+  `simplex`, which declares groups of parameters that sum to 1, such as
+  guessing rates across response options. Blank and `#` comment lines in
+  the restrictions are skipped, so
+  [`readLines()`](https://rdrr.io/r/base/readLines.html) of an MPTinR
+  restrictions file of equalities and constants works. Printing a model
+  lists its restrictions and simplex groups. See
+  [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
+  ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- By default, a `simplex` group gets a uniform prior over all ways of
+  splitting the probability among its members, so each of K members has
+  prior mean 1/K whatever the order they are listed in. Printing the
+  model states this prior.
+  [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) shows
+  how to get the per-branch uniform priors of TreeBUGS instead, under
+  which the first-listed member has prior mean 0.5
+  ([\#255](https://github.com/popov-lab/bmm/issues/255)).
 
 #### New datasets
 
@@ -428,6 +448,13 @@
   also listed the variables of a nested grouping as effects.
   [`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
   reported the ID `p` as a missing data column. All three work now.
+- [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) and
+  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  no longer warn that flat priors will be used when a parameter that has
+  no bmm default prior gets a non-linear formula. The warning now
+  appears only when a formula replaces a default prior. The parameters
+  inside such a formula still get flat priors unless you set them: in
+  **m3** with `version = "ss"`, `b ~ exp(nlb)` leaves `nlb` flat.
 - [`posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
   failed with `object 'posterior_epred_ddm' not found` (or the name of
   another model) on **ddm**, **cswald**, **ezdm**, **sdt_yn**,

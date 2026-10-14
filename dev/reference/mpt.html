@@ -72,7 +72,14 @@ latent scale.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mpt</span><span class="op">(</span><span class="va">trees</span>, tree_id <span class="op">=</span> <span class="cn">NULL</span>, links <span class="op">=</span> <span class="st">"logit"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mpt</span><span class="op">(</span></span>
+<span>  <span class="va">trees</span>,</span>
+<span>  tree_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  simplex <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  restrictions <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  links <span class="op">=</span> <span class="st">"logit"</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -89,6 +96,35 @@ All trees must share the same set of response categories.</p></dd>
 each observation belongs to; the values must match the tree names. Can be
 omitted for single-tree models. Effects of experimental conditions belong
 in the parameter formulas, not here — see Details.</p></dd>
+
+
+<dt id="arg-simplex">simplex<a class="anchor" aria-label="anchor" href="#arg-simplex"></a></dt>
+<dd><p>A character vector, or a list of character vectors, naming
+groups of parameters that are jointly constrained to sum to 1. Each group
+is reparameterized via stick-breaking: the last parameter of each group
+is derived as 1 minus the sum of the other members, and each other member
+<code>p</code> gets an unconstrained component <code>praw</code> that predictor formulas for
+<code>p</code> are applied to. The listing order sets the default prior and the
+meaning of the coefficients; see Details.</p></dd>
+
+
+<dt id="arg-restrictions">restrictions<a class="anchor" aria-label="anchor" href="#arg-restrictions"></a></dt>
+<dd><p>Parameter restrictions in the string syntax of MPTinR
+and TreeBUGS, e.g. <code>c("Dn = Do", "g = 0.5")</code>, or as a named list,
+<code>list(Dn = "Do", g = 0.5)</code>. A restriction either equates a parameter with
+another one (chains such as <code>"G1 = G2 = G3"</code> map all earlier names onto
+the last) or fixes it to a numeric constant (<code>"g = 0.5"</code>; <code>bmm</code> also
+reads fractions such as <code>"g = 1/4"</code>, which MPTinR rejects).
+Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
+and TreeBUGS, <code>list("Dn = Do", "g = 0.5")</code>, works as well. Restriction
+files are not read: in MPTinR and TreeBUGS a character vector names a
+restrictions file, in <code>bmm</code> it holds the restrictions. To use such a file,
+pass <code>readLines(path)</code>; blank lines and lines starting with <code>#</code> are
+skipped, and a <code>#</code> after a restriction starts a comment, as in MPTinR.
+Restrictions are substituted into the branch expressions before the
+parameters are identified, so a restricted parameter is not part of the
+model and cannot be a simplex member. Order constraints (<code>"Do &gt; Dn"</code>) are
+not supported here; see Details.</p></dd>
 
 
 <dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
@@ -142,14 +178,36 @@ get <code>exponential(2)</code>. Group-level correlation matrices get <code>lkj(
 Coefficients of the sub-parameters above get <code>normal(0, 0.5)</code>. A parameter
 switched to the other link after construction (<code>model$links$D &lt;- "probit"</code>) takes that link's priors unless its default prior was
 replaced. <code><a href="default_prior.bmmformula.html">default_prior()</a></code> lists the rows a given formula produces.</p>
-<p>A parameter can be fixed to a probability at fit time, in the formula:
-<code>bmf(D ~ 1, g = 0.5)</code>. The parameter stays part of the model and can be
-freed again by giving it a formula. The value is mapped to the latent
-scale when the constant prior is built, so
+<p>The default prior of a simplex group of K members is the uniform
+(symmetric Dirichlet(1)) distribution on the simplex: each member has
+prior mean 1/K, whatever the listing order. Under stick breaking this is
+a Beta(1, K - k) prior on stick k, which <code><a href="default_prior.bmmformula.html">default_prior()</a></code> shows as
+<code>logitbeta(1, K - k)</code> (or <code>probitbeta(1, K - k)</code>) on the intercept of
+the k-th <code>praw</code>; the last stick keeps <code>logistic(0, 1)</code> (or
+<code>normal(0, 1)</code>), which is the same distribution. The result is exact
+under both links, and under <code>0 + cond</code> it holds in every cell. Under
+<code>1 + cond</code> it holds in the reference cell only, because the effects keep
+their own prior. TreeBUGS instead puts a uniform prior on each branch
+parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
+for three members). To get it for a group <code>gA</code>, <code>gB</code>, <code>gC</code>, <code>gD</code>, pass
+<code>prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"))</code>,
+with <code>"normal(0, 1)"</code> under the probit link; without <code>coef</code>, it covers
+every cell of a <code>0 + cond</code> formula.
+A predictor on member <code>p</code> acts on the logit (or probit) of <code>p</code>'s share of
+the probability left over by the members listed before it. A predictor
+on the first member therefore scales all later members by the same
+factor, leaving their ratios unchanged. Read such effects on the probability scale with
+<code><a href="native_parameters.html">native_parameters()</a></code>.</p>
+<p>A parameter can also be fixed to a probability at fit time, in the
+formula: <code>bmf(D ~ 1, g = 0.5)</code>. Unlike a restriction, the parameter stays
+part of the model and can be freed again by giving it a formula. The
+value is mapped to the latent scale when the constant prior is built, so
 <code><a href="default_prior.bmmformula.html">default_prior()</a></code> shows <code>constant(0)</code> for a guessing rate of 0.5 under
 the logit link. For the same reason, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> lists a fixed <code>g = 0.5</code>
 as <code>g_Intercept 0.00</code> under "Constant Parameters"; <code><a href="prior_info.html">prior_info()</a></code> and
-<code><a href="parameter_info.html">parameter_info()</a></code> show the probability, 0.5.</p>
+<code><a href="parameter_info.html">parameter_info()</a></code> show the probability, 0.5. Members of a <code>simplex</code>
+group and their <code>praw</code> components cannot be fixed this way; fix parameters
+outside the group instead.</p>
 <p>Printing the model ends with an identifiability check for intercept-only
 formulas. It compares the number of free parameters with the degrees of
 freedom (response categories minus 1, summed over trees) and computes the
@@ -191,7 +249,7 @@ posterior predictive p-value from them.</p>
 <p>Order constraints between parameters (<code>Do &gt; Dn</code>) are expressed by
 reparameterizing the larger parameter in the model formula, e.g.
 <code>bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)</code>; the section
-"Ordered parameter constraints" of the MPT article walks through the
+"Order constraints" of the MPT article walks through the
 recipe.</p>
 <p>Parameter and response category names must start with a letter and may
 contain only letters and digits, because brms does not allow underscores

@@ -16,7 +16,14 @@ apply on that latent scale.
 ## Usage
 
 ``` r
-mpt(trees, tree_id = NULL, links = "logit", ...)
+mpt(
+  trees,
+  tree_id = NULL,
+  simplex = NULL,
+  restrictions = NULL,
+  links = "logit",
+  ...
+)
 ```
 
 ## Arguments
@@ -32,6 +39,35 @@ mpt(trees, tree_id = NULL, links = "logit", ...)
   observation belongs to; the values must match the tree names. Can be
   omitted for single-tree models. Effects of experimental conditions
   belong in the parameter formulas, not here — see Details.
+
+- simplex:
+
+  A character vector, or a list of character vectors, naming groups of
+  parameters that are jointly constrained to sum to 1. Each group is
+  reparameterized via stick-breaking: the last parameter of each group
+  is derived as 1 minus the sum of the other members, and each other
+  member `p` gets an unconstrained component `praw` that predictor
+  formulas for `p` are applied to. The listing order sets the default
+  prior and the meaning of the coefficients; see Details.
+
+- restrictions:
+
+  Parameter restrictions in the string syntax of MPTinR and TreeBUGS,
+  e.g. `c("Dn = Do", "g = 0.5")`, or as a named list,
+  `list(Dn = "Do", g = 0.5)`. A restriction either equates a parameter
+  with another one (chains such as `"G1 = G2 = G3"` map all earlier
+  names onto the last) or fixes it to a numeric constant (`"g = 0.5"`;
+  `bmm` also reads fractions such as `"g = 1/4"`, which MPTinR rejects).
+  Constants must lie strictly between 0 and 1. The unnamed list of
+  MPTinR and TreeBUGS, `list("Dn = Do", "g = 0.5")`, works as well.
+  Restriction files are not read: in MPTinR and TreeBUGS a character
+  vector names a restrictions file, in `bmm` it holds the restrictions.
+  To use such a file, pass `readLines(path)`; blank lines and lines
+  starting with `#` are skipped, and a `#` after a restriction starts a
+  comment, as in MPTinR. Restrictions are substituted into the branch
+  expressions before the parameters are identified, so a restricted
+  parameter is not part of the model and cannot be a simplex member.
+  Order constraints (`"Do > Dn"`) are not supported here; see Details.
 
 - links:
 
@@ -104,10 +140,34 @@ An object of class `bmmodel`
   [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
   lists the rows a given formula produces.
 
-  A parameter can be fixed to a probability at fit time, in the formula:
-  `bmf(D ~ 1, g = 0.5)`. The parameter stays part of the model and can
-  be freed again by giving it a formula. The value is mapped to the
-  latent scale when the constant prior is built, so
+  The default prior of a simplex group of K members is the uniform
+  (symmetric Dirichlet(1)) distribution on the simplex: each member has
+  prior mean 1/K, whatever the listing order. Under stick breaking this
+  is a Beta(1, K - k) prior on stick k, which
+  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  shows as `logitbeta(1, K - k)` (or `probitbeta(1, K - k)`) on the
+  intercept of the k-th `praw`; the last stick keeps `logistic(0, 1)`
+  (or `normal(0, 1)`), which is the same distribution. The result is
+  exact under both links, and under `0 + cond` it holds in every cell.
+  Under `1 + cond` it holds in the reference cell only, because the
+  effects keep their own prior. TreeBUGS instead puts a uniform prior on
+  each branch parameter, under which the first member has prior mean 0.5
+  (0.50/0.25/0.25 for three members). To get it for a group `gA`, `gB`,
+  `gC`, `gD`, pass
+  `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"))`,
+  with `"normal(0, 1)"` under the probit link; without `coef`, it covers
+  every cell of a `0 + cond` formula. A predictor on member `p` acts on
+  the logit (or probit) of `p`'s share of the probability left over by
+  the members listed before it. A predictor on the first member
+  therefore scales all later members by the same factor, leaving their
+  ratios unchanged. Read such effects on the probability scale with
+  [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md).
+
+  A parameter can also be fixed to a probability at fit time, in the
+  formula: `bmf(D ~ 1, g = 0.5)`. Unlike a restriction, the parameter
+  stays part of the model and can be freed again by giving it a formula.
+  The value is mapped to the latent scale when the constant prior is
+  built, so
   [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
   shows `constant(0)` for a guessing rate of 0.5 under the logit link.
   For the same reason,
@@ -116,7 +176,9 @@ An object of class `bmmodel`
   [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
   and
   [`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md)
-  show the probability, 0.5.
+  show the probability, 0.5. Members of a `simplex` group and their
+  `praw` components cannot be fixed this way; fix parameters outside the
+  group instead.
 
   Printing the model ends with an identifiability check for
   intercept-only formulas. It compares the number of free parameters
@@ -172,8 +234,8 @@ An object of class `bmmodel`
   Order constraints between parameters (`Do > Dn`) are expressed by
   reparameterizing the larger parameter in the model formula, e.g.
   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the
-  section "Ordered parameter constraints" of the MPT article walks
-  through the recipe.
+  section "Order constraints" of the MPT article walks through the
+  recipe.
 
   Parameter and response category names must start with a letter and may
   contain only letters and digits, because brms does not allow

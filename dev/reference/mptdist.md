@@ -31,7 +31,8 @@ rmpt(n, size, pars, mpt_model, tree = NULL, unpack = FALSE, ...)
   parameters in
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
   Values for parameters the tree does not use are ignored, so one vector
-  can serve every tree of the model.
+  can serve every tree of the model. Parameters of a simplex group must
+  sum to 1.
 
 - mpt_model:
 
