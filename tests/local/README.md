@@ -32,6 +32,11 @@ Files:
   the same tree and data builders as the unit tests.
 - `test-*.R`: the tests, among them `test-kfold-update.R` (refits through
   `update()` on a slice of the fit's data, grouped `kfold()`),
+  `test-update-fits.R` (`brms::combine_models()` on a fit and its refit),
+  `test-conditional_effects-fits.R` (`conditional_effects()` on `sdt_rating()`
+  and `m3()` fits), `test-sdt-fits.R` (`sdt_ranking()` recovery,
+  `sdt_rating()` `posterior_predict()` and a `log_distance` fit at six
+  categories),
   `test-mpt-fits.R` (`mpt()` fits read through `conditional_effects()`, and
   the prior-only fit behind the default simplex prior) and
   `test-ppp-fits.R` (`ppp()` on well-specified, misspecified and

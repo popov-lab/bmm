@@ -797,47 +797,6 @@ test_that("sdt_rating log_distance integrates with the bmm pipeline via mock bac
   )
 })
 
-test_that("sdt_rating posterior_predict draws joint multinomial counts (real fit)", {
-  skip_on_cran()
-  skip_on_ci()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
-
-  dat <- sim_rating(6, 120, d = 1.4, criterion = 0, n_ratings = 4,
-                    spacing = 0.5)
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  fit <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat, model,
-             backend = "cmdstanr", chains = 1, iter = 300, warmup = 150,
-             refresh = 0, silent = 2)
-
-  pp <- brms::posterior_predict(fit)
-  expect_length(dim(pp), 3)
-  row_sums <- apply(pp, c(1, 2), sum)
-  expect_true(all(row_sums == 120))
-})
-
-test_that("sdt_rating log_distance fits with finite likelihood at K=6 (real fit)", {
-  # Regression: at K=6 the log_distance threshold builder has mid=3, so its
-  # lower thresholds were filled by a descending Stan for-loop. Stan for-loops
-  # only count up, so the loop was skipped and thresholds[1:2] stayed NaN,
-  # failing every chain. Earlier tests only used K=4 (mid=2), where the loop ran.
-  skip_on_cran()
-  skip_on_ci()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
-
-  dat <- sim_rating(6, 150, d = 1.4, criterion = 0, n_ratings = 6,
-                    deltas = c(-0.4, -0.4, -0.4, -0.4),
-                    threshold_type = "log_distance")
-  model <- sdt_rating(paste0("r", 1:6), "stimulus", threshold_type = "log_distance")
-  fit <- bmm(bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1,
-                 delta3 ~ 1, delta4 ~ 1),
-             dat, model, backend = "cmdstanr", chains = 1, iter = 300, warmup = 150,
-             refresh = 0, silent = 2)
-
-  expect_true(all(is.finite(brms::log_lik(fit))))
-})
-
 test_that("the generated Stan logmu function reads either anchor as its R companion does", {
   skip_unless_stan_tests()
   skip_on_cran()

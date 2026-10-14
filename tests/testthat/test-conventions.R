@@ -19,8 +19,9 @@ pattern_counts <- function(pattern) {
 
 # `expected` names every file allowed a non-zero count: a present file must
 # match its count, a file that is not merged yet is ignored, every other file
-# must have none
+# must have none; integer() means no file may have one
 expect_pattern_counts <- function(pattern, expected, rule) {
+  if (!length(expected)) expected <- stats::setNames(integer(), character())
   counts <- pattern_counts(pattern)
   present <- intersect(names(expected), names(counts))
   # waldo reports a mismatch by position, so name the files in the message
@@ -64,20 +65,16 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
 test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
   # test-bmm_setup.R passes the backend to a mocked bmm_setup() in all but two
   # tests ("a real machine check without a smoke test finds no failure" and
-  # "a real smoke test compiles and samples"), which skip without CmdStan. The
-  # sampling fits in test-conditional_effects.R, test-model_sdt_ranking.R,
-  # test-model_sdt_rating.R and test-update.R move to tests/local in #422.
-  # test-model_rdm.R (#502) is registered ahead. The MPT stack (#484-#489)
-  # registers nothing: its sampling fits live in tests/local.
+  # "a real smoke test compiles and samples"), which open with
+  # skip_unless_stan_tests(); test-update.R passes it to carried_control(),
+  # which fits nothing. Nothing else samples here: fits live in tests/local.
+  # test-model_rdm.R (#502) is registered ahead.
   expect_pattern_counts(
     "backend\\s*=\\s*[\"']cmdstanr[\"']",
     c(
       "test-bmm_setup.R" = 18L,
-      "test-conditional_effects.R" = 2L,
       "test-model_rdm.R" = 4L,
-      "test-model_sdt_ranking.R" = 1L,
-      "test-model_sdt_rating.R" = 2L,
-      "test-update.R" = 3L
+      "test-update.R" = 2L
     ),
     rule = "R1: backend = \"cmdstanr\" (any spacing or quotes) per file"
   )
@@ -109,17 +106,7 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
 })
 
 test_that("skip_on_ci() is not used as a tier gate (R2)", {
-  # the five sampling tests it hides today move to tests/local in #422;
-  # after that the expected set is empty
-  expect_pattern_counts(
-    "skip_on_ci\\(\\)",
-    c(
-      "test-conditional_effects.R" = 2L,
-      "test-model_sdt_ranking.R" = 1L,
-      "test-model_sdt_rating.R" = 2L
-    ),
-    rule = "R2: skip_on_ci() per file"
-  )
+  expect_pattern_counts("skip_on_ci\\(\\)", integer(), rule = "R2: skip_on_ci() per file")
 })
 
 test_that("stancode() tests assert content, not that the code is non-empty (R7)", {

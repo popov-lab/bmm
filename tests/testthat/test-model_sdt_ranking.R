@@ -825,22 +825,3 @@ test_that("sdt_ranking default_prior returns a valid prior object", {
                   "brmsprior")
 })
 
-test_that("sdt_ranking recovers d' and returns a multinomial count array", {
-  skip_on_cran()
-  skip_on_ci()
-  skip_if_not_installed("cmdstanr")
-
-  dat <- sim_ranking(10, 200, m = 4, d = 1.4)
-  model <- sdt_ranking(ranks4, m = 4)
-  fit <- bmm(bmf(d ~ 1 + (1 | id)), dat, model, backend = "cmdstanr",
-             chains = 2, iter = 600, warmup = 300, init = 0.5,
-             refresh = 0, silent = 2)
-
-  est <- brms::fixef(fit)["d_Intercept", "Estimate"]
-  expect_equal(est, 1.4, tolerance = 0.3)
-
-  pp <- brms::posterior_predict(fit, ndraws = 25)
-  expect_length(dim(pp), 3)
-  expect_equal(dim(pp)[3], 4L)
-  expect_false(any(is.nan(pp)))
-})
