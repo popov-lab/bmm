@@ -34,11 +34,21 @@
     return 0.5 * [-t + 2 * t2 - t3, 2 - 5 * t2 + 3 * t3, t + 4 * t2 - 3 * t3, t3 - t2]';
   }
 
-  // sum over rows i:j of the four table entries at each row's distance; data only, so no autodiff
+  // sum over rows i:j of the four table entries at each row's distance; data only, so no autodiff,
+  // and scalars, because a vector slice per row cost 2.5 ms per gradient at 15,200 rows
   vector tcc_row_sums(data array[] int y, data matrix tab, int first, int i, int j) {
-    vector[4] s = rep_vector(0, 4);
-    for (n in i:j) s += tab[first:(first + 3), abs(y[n]) + 1];
-    return s;
+    real s1 = 0;
+    real s2 = 0;
+    real s3 = 0;
+    real s4 = 0;
+    for (n in i:j) {
+      int col = abs(y[n]) + 1;
+      s1 += tab[first, col];
+      s2 += tab[first + 1, col];
+      s3 += tab[first + 2, col];
+      s4 += tab[first + 3, col];
+    }
+    return [s1, s2, s3, s4]';
   }
 
   // y: signed option offsets; runs of equal d share one interpolation (a run of length 1 is one trial)
