@@ -901,7 +901,9 @@ test_that("update() switches an SDT fit between criterion and bias", {
 
 # models whose stored frame check_data() accepts as it is, so that update() has
 # nothing to route
-frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
+frame_is_user_layout <- c(
+  "cswald", "ddm", "ezcdm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm"
+)
 
 test_that("only a slice of a fit's model frame counts as stored data", {
   skip_on_cran()
