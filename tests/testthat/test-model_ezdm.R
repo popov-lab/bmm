@@ -1234,3 +1234,18 @@ test_that("posterior_epred() works on ezdm fits saved without the function", {
     expect_true(all(is.finite(epred)))
   }
 })
+
+test_that("log_lik() of an ezdm 3par fit is the density of each cell's summaries under each draw", {
+  dpars <- list(
+    drift = matrix(c(1.5, 2, 0.5, 1), 2, 2), bound = matrix(c(1, 1.2, 0.9, 1.1), 2, 2),
+    ndt = matrix(c(0.2, 0.25, 0.22, 0.18), 2, 2), s = matrix(c(1, 1.1, 0.9, 1), 2, 2)
+  )
+  data <- list(Y = c(0.6, 0.8), vreal1 = c(0.02, 0.05), vint1 = c(70L, 40L), trials = c(100L, 80L))
+  prep <- epred_prep(dpars, data)
+  for (i in 1:2) {
+    expect_equal(log_lik_ezdm_3par(i, prep),
+                 dezdm(data$Y[i], data$vreal1[i], data$vint1[i], data$trials[i],
+                       dpars$drift[, i], dpars$bound[, i], dpars$ndt[, i], s = dpars$s[, i],
+                       version = "3par", log = TRUE))
+  }
+})

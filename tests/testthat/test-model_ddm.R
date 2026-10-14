@@ -256,3 +256,17 @@ test_that("posterior_epred() works on a ddm fit saved without the function", {
   expect_equal(dim(epred), c(20L, nrow(fit$data)))
   expect_true(all(is.finite(epred)))
 })
+
+test_that("log_lik() of a ddm fit is the density of each observation under each draw", {
+  # two draws (rows) of two observations (columns), every value different
+  dpars <- list(
+    drift = matrix(c(1.5, 2, -0.5, 1), 2, 2), bound = matrix(c(1, 1.2, 0.9, 1.1), 2, 2),
+    ndt = matrix(c(0.2, 0.25, 0.22, 0.18), 2, 2), zr = matrix(c(0.4, 0.6, 0.5, 0.55), 2, 2)
+  )
+  prep <- epred_prep(dpars, list(Y = c(0.6, 0.9), dec = c(1, 0)))
+  for (i in 1:2) {
+    expect_equal(log_lik_ddm(i, prep),
+                 dddm(prep$data$Y[i], prep$data$dec[i], dpars$drift[, i], dpars$bound[, i],
+                      dpars$ndt[, i], zr = dpars$zr[, i], log = TRUE))
+  }
+})
