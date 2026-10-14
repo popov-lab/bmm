@@ -933,3 +933,25 @@ test_that("native_parameters and parameter_info skip the unused alternative para
   # without a formula the model lists both, as its help page does
   expect_true(all(c("criterion", "bias") %in% parameter_info(model)$parameter))
 })
+
+test_that("print() of parameter_info() names the model and shortens long descriptions", {
+  info <- parameter_info(sdm("y"))
+  out <- capture.output(printed <- print(info, max_desc_width = 20))
+  expect_identical(printed, info)
+  expect_match(out[1], "Model:.*Signal Discrimination Model")
+  rows <- out[grep("^ (mu|c|kappa) ", out)]
+  expect_length(rows, 3)
+  # 17 characters of the description and an ellipsis, at most 20 in all
+  expect_match(rows[1], "Location paramete... ", fixed = TRUE)
+  # fixed as yes/no, and a parameter without a fixed value shows --
+  expect_match(rows[1], "\\byes\\s+0\\b")
+  expect_match(rows[2], "\\bno\\s+--")
+})
+
+test_that("print() of parameter_info() of a custom m3 model says how to find its parameters", {
+  model <- m3(resp_cats = c("a", "b"), num_options = c(1, 4), version = "custom")
+  out <- capture.output(print(parameter_info(model)))
+  expect_match(out[length(out)], "Pass a formula to discover additional parameters", fixed = TRUE)
+  out <- capture.output(print(parameter_info(model, formula = bmf(a ~ b + c, b ~ b))))
+  expect_false(any(grepl("Pass a formula", out, fixed = TRUE)))
+})

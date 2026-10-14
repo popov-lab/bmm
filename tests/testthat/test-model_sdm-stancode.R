@@ -215,3 +215,10 @@ test_that("update() refreshes SDM run metadata for new data", {
   expect_equal(sum(fit2$stanvars$sdm_run_count$sdata), 40L)
   expect_equal(fit2$stanvars$G_sdm_runs$sdata, 1L)
 })
+
+test_that("the deprecated sdmSimple() warns and builds the model sdm() builds", {
+  expect_warning(old <- sdmSimple("dev_rad"), "`sdmSimple()` is deprecated", fixed = TRUE)
+  current <- sdm("dev_rad")
+  expect_identical(class(old), class(current))
+  expect_identical(old$resp_vars, current$resp_vars)
+})

@@ -1326,3 +1326,61 @@ test_that("flag_contaminant_rts() handles small inputs gracefully", {
   expect_type(result, "double")
   expect_equal(length(result), 3)
 })
+
+# validate_fast_guesses(): three flagged trials below 0.5 s, two of them upper
+# responses, update a Beta(1, 1) prior to Beta(3, 2); its density at 0.5 is
+# 0.5^2 * 0.5 / B(3, 2) = 1.5, the Bayes factor for guessing
+fast_guess_data <- function() {
+  list(rt = c(0.1, 0.2, 0.3, 0.9, 1.0), flag = c(TRUE, TRUE, TRUE, TRUE, FALSE),
+       response = c(1, 0, 1, 1, 0))
+}
+
+test_that("validate_fast_guesses() tests the flagged fast trials against guessing", {
+  d <- fast_guess_data()
+  out <- validate_fast_guesses(d$flag, d$rt, d$response, threshold_type = "absolute",
+                               rt_threshold = 0.5)
+  expect_equal(out$n_tested, 3)
+  expect_equal(out$prop_upper, 2 / 3)
+  expect_equal(c(out$posterior_alpha, out$posterior_beta), c(3, 2))
+  expect_equal(out$bf_01, 1.5)
+  expect_equal(out$bf_evidence, "anecdotal_for_guessing")
+  expect_equal(out$mean_rt_tested, 0.2)
+  # the highest-density interval: 95% of the mass, equal density at both ends
+  expect_equal(pbeta(out$hdi_upper, 3, 2) - pbeta(out$hdi_lower, 3, 2), 0.95, tolerance = 1e-6)
+  expect_equal(dbeta(out$hdi_lower, 3, 2), dbeta(out$hdi_upper, 3, 2), tolerance = 0.01)
+  expect_lt(out$hdi_upper - out$hdi_lower, qbeta(0.975, 3, 2) - qbeta(0.025, 3, 2))
+  expect_true(out$guess_in_hdi)
+})
+
+test_that("validate_fast_guesses() reads a quantile threshold from the RTs", {
+  d <- fast_guess_data()
+  out <- validate_fast_guesses(d$flag, d$rt, d$response, rt_threshold = 0.5)
+  expect_equal(out$rt_threshold, 0.3)
+  expect_equal(out$n_tested, 2)
+  expect_equal(out$threshold_type, "quantile")
+})
+
+test_that("validate_fast_guesses() falls back to the equal-tailed interval for a U-shaped posterior", {
+  d <- fast_guess_data()
+  out <- validate_fast_guesses(rep(FALSE, 5), d$rt, d$response, threshold_type = "absolute",
+                               rt_threshold = 0.5, prior_alpha = 0.5, prior_beta = 0.5)
+  expect_equal(out$n_tested, 0)
+  expect_equal(c(out$hdi_lower, out$hdi_upper), qbeta(c(0.025, 0.975), 0.5, 0.5))
+})
+
+test_that("validate_fast_guesses() names the evidence on Jeffreys' scale", {
+  expect_identical(
+    vapply(c(20, 5, 2, 0.5, 0.2, 0.05), .categorize_bf, character(1)),
+    c("strong_for_guessing", "moderate_for_guessing", "anecdotal_for_guessing",
+      "anecdotal_against_guessing", "moderate_against_guessing", "strong_against_guessing")
+  )
+})
+
+test_that("validate_fast_guesses() refuses priors, guess probabilities and thresholds out of range", {
+  d <- fast_guess_data()
+  call <- function(...) validate_fast_guesses(d$flag, d$rt, d$response, ...)
+  expect_error(call(prior_alpha = 0), "Beta prior parameters must be positive")
+  expect_error(call(guess_prob = 1), "guess_prob must be between 0 and 1")
+  expect_error(call(rt_threshold = 1.5), "must be a quantile between 0 and 1")
+  expect_error(call(threshold_type = "absolute", rt_threshold = 0), "must be positive")
+})
