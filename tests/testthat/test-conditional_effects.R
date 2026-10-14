@@ -1654,6 +1654,16 @@ test_that("mixture3p softmax route asks brms for the grid of the parameter it re
   }
 })
 
+# conditional_effects() re-classes the route's result only when an effect
+# survives .filter_internal_effects(), so the route keeps its own class
+test_that("mixture3p softmax route returns a brms_conditional_effects object (#512)", {
+  stub_category_route(stub_grid("set_size", n = 2))
+  expect_s3_class(
+    .compute_softmax_ce_inner(mock_mixture3p_fit(), "thetat"),
+    "brms_conditional_effects"
+  )
+})
+
 test_that("mixture3p softmax route leaves transform and method to the grid call (#512)", {
   draws <- matrix(0, 3, 2)
   res <- softmax_ce("thetat", draws, draws, transform = NULL, method = "posterior_predict")

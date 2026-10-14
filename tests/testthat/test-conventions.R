@@ -3,7 +3,8 @@
 # pattern the rules forbid or gate cannot creep in unnoticed: the failure
 # names the file and the rule. Files that open pull requests add are
 # registered ahead with the counts on their branch and are ignored while
-# absent. The #422 consolidation lowers the ratchets to zero.
+# absent. Since #422 the R2, R7 and R8 counts are zero everywhere; R1 lists
+# the gated compile sites.
 
 suite_files <- function() {
   setdiff(list.files(test_path("."), pattern = "^test-.*\\.R$"), "test-conventions.R")

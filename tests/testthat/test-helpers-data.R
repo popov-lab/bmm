@@ -1350,6 +1350,12 @@ test_that("validate_fast_guesses() tests the flagged fast trials against guessin
   expect_equal(dbeta(out$hdi_lower, 3, 2), dbeta(out$hdi_upper, 3, 2), tolerance = 0.01)
   expect_lt(out$hdi_upper - out$hdi_lower, qbeta(0.975, 3, 2) - qbeta(0.025, 3, 2))
   expect_true(out$guess_in_hdi)
+
+  # an unequal prior, so that each prior parameter has to reach its own side
+  out <- validate_fast_guesses(d$flag, d$rt, d$response, threshold_type = "absolute",
+                               rt_threshold = 0.5, prior_alpha = 2, prior_beta = 1)
+  expect_equal(c(out$posterior_alpha, out$posterior_beta), c(4, 2))
+  expect_equal(out$bf_01, 1.25)
 })
 
 test_that("validate_fast_guesses() reads a quantile threshold from the RTs", {
