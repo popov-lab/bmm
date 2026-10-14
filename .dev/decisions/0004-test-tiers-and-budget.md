@@ -235,3 +235,10 @@ last.
   empty. Tests that relied on `bmmfit_example1.rds` being a 2024 fit now
   set the old property they handle (no step-size control, the pre-1.0.1
   class, no `posterior_epred` in the family, an older citation).
+- 2026-10-14, #422. R3: the 101 uses of the full `oberauer_lin_2017`
+  (15,200 rows) in mock fits and pipeline calls read `small_data()` (two
+  participants, all eight set sizes; `helper-model-data.R`). The one test
+  about data size keeps the full set. As measured before, this barely
+  changes the suite's time (four-worker wall time 129 s before, 134 s
+  after, within run-to-run noise).
+

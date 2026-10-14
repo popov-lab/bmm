@@ -12,7 +12,7 @@ test_that("default_prior() works with formula", {
 
 test_that("default_prior() works with bmmformula", {
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
-  prior <- default_prior(ff, oberauer_lin_2017, mixture3p(
+  prior <- default_prior(ff, small_data(), mixture3p(
     resp_error = "dev_rad",
     nt_features = "col_nt",
     set_size = "set_size",
@@ -139,7 +139,7 @@ test_that("bmm() honours bmm.default_priors = FALSE and prior_info() flags the r
   skip_on_cran()
   withr::local_options(bmm.default_priors = FALSE)
   fit <- bmm(
-    bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm(resp_error = "dev_rad"),
+    bmf(c ~ 1, kappa ~ 1), small_data(), sdm(resp_error = "dev_rad"),
     backend = "mock", mock = 1, rename = FALSE
   )
 
@@ -192,7 +192,7 @@ test_that("no check for sort_data with default_priors function", {
   withr::local_options("bmm.sort_data" = "check")
   res <- capture_messages(default_prior(
     bmf(kappa ~ set_size, c ~ set_size),
-    oberauer_lin_2017,
+    small_data(),
     sdm("dev_rad")
   ))
   expect_false(any(grepl("sort", res)))
@@ -436,7 +436,7 @@ test_that("drop_technical_parameters() keeps declared parameters and drops famil
 test_that("prior_info() omits the technical parameters of mixture families", {
   skip_on_cran()
   fit <- bmm(
-    bmf(kappa ~ 1, thetat ~ 1), oberauer_lin_2017, mixture2p(resp_error = "dev_rad"),
+    bmf(kappa ~ 1, thetat ~ 1), small_data(), mixture2p(resp_error = "dev_rad"),
     backend = "mock", mock = 1, rename = FALSE
   )
 
@@ -473,7 +473,7 @@ test_that("prior_info() omits the forced mu of a response-time custom family", {
 test_that("prior_info() collapses group-level effects into a single sd row", {
   skip_on_cran()
   fit <- bmm(
-    bmf(c ~ 1 + (1 | ID), kappa ~ 1), oberauer_lin_2017, sdm(resp_error = "dev_rad"),
+    bmf(c ~ 1 + (1 | ID), kappa ~ 1), small_data(), sdm(resp_error = "dev_rad"),
     backend = "mock", mock = 1, rename = FALSE
   )
 
@@ -521,7 +521,7 @@ test_that("as_prior_table() maps every correlation class brms stores internally"
 
 test_that("prior_info() attributes the correlation prior to bmm", {
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
-  fit <- bmm(formula, oberauer_lin_2017, mixture2p("dev_rad"),
+  fit <- bmm(formula, small_data(), mixture2p("dev_rad"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
   cor_row <- prior_info(fit)[prior_info(fit)$class == "cor", ]
@@ -529,7 +529,7 @@ test_that("prior_info() attributes the correlation prior to bmm", {
   expect_equal(cor_row$prior, "lkj(2)")
   expect_equal(cor_row$source, "bmm default")
 
-  fit <- bmm(formula, oberauer_lin_2017, mixture2p("dev_rad"),
+  fit <- bmm(formula, small_data(), mixture2p("dev_rad"),
     prior = brms::prior_("lkj(4)", class = "cor"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
@@ -539,7 +539,7 @@ test_that("prior_info() attributes the correlation prior to bmm", {
 })
 
 test_that("prior_info() reconstructs the defaults of a fit that needs data2", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   ids <- levels(factor(dat$ID))
   A <- diag(length(ids))
   dimnames(A) <- list(ids, ids)
@@ -631,7 +631,7 @@ test_that("validate_default_priors() warns only when a default prior is dropped"
   expect_warning(
     default_prior(
       object = bmmformula(c ~ exp(nlc), nlc ~ 1),
-      data = oberauer_lin_2017,
+      data = small_data(),
       model = sdm(resp_error = "dev_rad")
     ),
     "Non-linear transformations"

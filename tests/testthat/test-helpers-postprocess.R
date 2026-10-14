@@ -34,7 +34,7 @@ test_that("posterior_epred() refuses the circular mixture models by name", {
                "The expected response is not defined for the mixture2p model")
 
   skip_on_cran()
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   fit <- bmm(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), dat,
              mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
              backend = "mock", mock = 1, rename = FALSE)

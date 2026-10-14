@@ -29,11 +29,11 @@ mock_rating_fit <- function(formula = bmf(d ~ 1 + x, criterion ~ 1, spacing ~ 1)
 }
 
 mock_sdm_fit <- function() {
-  mock_bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm(resp_error = "dev_rad"))
+  mock_bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm(resp_error = "dev_rad"))
 }
 
 mock_mixture3p_fit <- function() {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$id <- factor(dat$ID)
   mock_bmm(
     bmf(kappa ~ 1, thetat ~ 0 + set_size + (1 | id), thetant ~ 1), dat,

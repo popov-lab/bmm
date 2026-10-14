@@ -561,7 +561,7 @@ test_that(".np_grid_vars keeps a grouping variable that is also a predictor", {
 test_that(".np_grid_vars spans only data columns for a non-linear formula", {
   withr::local_options(bmm.silent = 2)
   fit <- suppressWarnings(bmm(
-    bmf(c ~ exp(nlc), nlc ~ 1 + set_size, kappa ~ 1), oberauer_lin_2017,
+    bmf(c ~ exp(nlc), nlc ~ 1 + set_size, kappa ~ 1), small_data(),
     sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
   ))
   pars <- names(fit$bmm$model$parameters)
@@ -574,7 +574,7 @@ test_that(".np_grid_vars spans only data columns for a non-linear formula", {
 test_that(".np_grid_vars honours the re_formula regimes on a mock fit", {
   withr::local_options(bmm.silent = 2)
   fit <- suppressWarnings(bmm(
-    bmf(c ~ 1 + set_size + (1 | ID), kappa ~ 1 + (1 | ID)), oberauer_lin_2017,
+    bmf(c ~ 1 + set_size + (1 | ID), kappa ~ 1 + (1 | ID)), small_data(),
     sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
   ))
   pars <- names(fit$bmm$model$parameters)
@@ -597,7 +597,7 @@ test_that(".np_grid_vars follows sub-parameters to their grouping variables", {
 test_that(".np_grid_vars treats a correlation ID as a label, not a grid variable", {
   withr::local_options(bmm.silent = 2)
   fit <- suppressWarnings(bmm(
-    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), oberauer_lin_2017,
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), small_data(),
     sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
   ))
   pars <- names(fit$bmm$model$parameters)
@@ -609,7 +609,7 @@ test_that(".np_grid_vars treats a correlation ID as a label, not a grid variable
 test_that("native_parameters builds its grid for a formula with a correlation ID", {
   withr::local_options(bmm.silent = 2)
   fit <- suppressWarnings(bmm(
-    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), oberauer_lin_2017,
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), small_data(),
     sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
   ))
   # a mock fit has no draws, so the call fails later; only the grid error matters

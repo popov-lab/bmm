@@ -1,5 +1,5 @@
 test_that("default priors are set correctly with fixed effects only", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
 
   # Intercept only
@@ -60,7 +60,7 @@ test_that("default priors are set correctly with fixed effects only", {
 
 
 test_that("default priors are set correctly with random effects", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
 
   # Intercept only
@@ -129,7 +129,7 @@ test_that("default priors are set correctly with random effects", {
 
 
 test_that("mixture3p mixing weights get an effects prior on the softmax scale", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
 
   # set_size as predictor requires a suppressed intercept in this model
@@ -150,7 +150,7 @@ test_that("mixture3p mixing weights get an effects prior on the softmax scale", 
 
 
 test_that("default priors are set correctly with fixed effects only and sdm model", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- sdm("dev_rad")
 
   # Intercept only
@@ -215,7 +215,7 @@ test_that("default priors work when there are no fixed parameters", {
     kappa ~ 1
   )
 
-  pr <- default_prior(formula, oberauer_lin_2017, sdm("dev_rad"))
+  pr <- default_prior(formula, small_data(), sdm("dev_rad"))
   expect_s3_class(pr, "brmsprior")
 })
 
@@ -224,7 +224,7 @@ sd_rows <- function(pr) {
 }
 
 test_that("an sd default becomes one blanket prior per parameter with random effects", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
   model$default_priors$kappa$sd <- "exponential(1)"
   model$default_priors$thetat$sd <- "exponential(2)"
@@ -254,7 +254,7 @@ test_that("an sd default becomes one blanket prior per parameter with random eff
 })
 
 test_that("no sd prior is emitted for a parameter without random effects", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
   model$default_priors$kappa$sd <- "exponential(1)"
 
@@ -269,7 +269,7 @@ test_that("no sd prior is emitted for a parameter without random effects", {
 })
 
 test_that("sd defaults are set for distributional parameters", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- sdm("dev_rad")
   model$default_priors$c$sd <- "exponential(3)"
   model$default_priors$kappa$sd <- NULL
@@ -282,7 +282,7 @@ test_that("sd defaults are set for distributional parameters", {
 })
 
 test_that("user sd priors take precedence over the sd default", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
   model$default_priors$kappa$sd <- "exponential(1)"
   formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1)
@@ -310,7 +310,7 @@ test_that("bmm.default_priors = FALSE also disables the sd defaults", {
   model <- mixture2p("dev_rad")
   model$default_priors$kappa$sd <- "exponential(1)"
 
-  pr <- default_prior(bmf(kappa ~ 1 + (1 | ID), thetat ~ 1), oberauer_lin_2017, model)
+  pr <- default_prior(bmf(kappa ~ 1 + (1 | ID), thetat ~ 1), small_data(), model)
   expect_false("exponential(1)" %in% pr$prior)
 })
 
@@ -319,7 +319,7 @@ cor_default <- function(pr) {
 }
 
 test_that("correlated random effects get an lkj(2) default on their correlations", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
 
   pr <- default_prior(bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1), data, model)
@@ -334,7 +334,7 @@ test_that("correlated random effects get an lkj(2) default on their correlations
 })
 
 test_that("no cor prior is emitted for a model without a correlation matrix", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
   no_cor <- list(
     intercept_only = bmf(kappa ~ 1 + (1 | ID), thetat ~ 1),
@@ -354,7 +354,7 @@ test_that("no cor prior is emitted for a model without a correlation matrix", {
 })
 
 test_that("the lkj default reaches the Stan code and yields to a user prior", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
 
@@ -371,7 +371,7 @@ test_that("the lkj default reaches the Stan code and yields to a user prior", {
 })
 
 test_that("a fit's stored correlation prior replaces the cor default on a refit", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
   fit <- bmm(formula, data, model,
@@ -392,7 +392,7 @@ test_that("a fit's stored correlation prior replaces the cor default on a refit"
 test_that("bmm.default_priors = FALSE also disables the cor default", {
   withr::local_options(bmm.default_priors = FALSE)
   pr <- default_prior(
-    bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1), oberauer_lin_2017, mixture2p("dev_rad")
+    bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1), small_data(), mixture2p("dev_rad")
   )
   expect_equal(cor_default(pr), "lkj(1)")
 })
@@ -419,7 +419,7 @@ test_that("every model ships an sd default on the link scale of each parameter",
 })
 
 test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the tan_half scale", {
-  data <- oberauer_lin_2017
+  data <- small_data()
 
   pr <- default_prior(bmf(mu ~ 1 + set_size + (1 | ID), c ~ 1, kappa ~ 1), data, sdm("dev_rad"))
   expect_equal(pr[pr$class == "Intercept" & pr$dpar == "", ]$prior, "normal(0, 0.5)")
@@ -433,7 +433,7 @@ test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the
 })
 
 test_that("the set-size-1 sd constraint survives next to the blanket sd prior", {
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
   formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size + (0 + set_size | ID))
 
@@ -469,7 +469,7 @@ test_that("mock fits carry class-level b and sd priors for every formula shape a
     expect_true(all(grepl("^exponential", sd_rows$prior)))
   }
 
-  data <- oberauer_lin_2017
+  data <- small_data()
   model <- mixture2p("dev_rad")
   formulas <- list(
     bmf(kappa ~ set_size + (1 | ID), thetat ~ session + (1 | ID)),
@@ -501,7 +501,7 @@ test_that("default priors work when there are non-linear transformations of defa
   expect_warning(
     dp <- default_prior(
       object = bmmformula(c ~ exp(nlc), nlc ~ 1),
-      data = oberauer_lin_2017,
+      data = small_data(),
       model = sdm(resp_error = "dev_rad")
     ),
     "Non-linear transformations"

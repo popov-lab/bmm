@@ -232,7 +232,7 @@ test_that("a refused model builds the same fit whatever its links say", {
   # the refusal is only correct while configure_model() ignores model$links, so
   # that is measured rather than restated: the family carries the links of a
   # custom or mixture family, the parameter formulas carry imm's log scale
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   fingerprint <- function(model, formula) {
     bf <- configure_model(model, check_data(model, dat, formula), formula)$formula
     list(

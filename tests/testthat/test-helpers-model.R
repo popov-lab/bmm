@@ -233,7 +233,7 @@ test_that("check_model() refuses invalid models and accepts valid models", {
 })
 
 test_that("check_model() works with regular expressions", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   models1 <- list(
     mixture3p("dev_rad",
       nt_features = paste0("col_nt", 1:7),
@@ -309,10 +309,10 @@ test_that("check_model() leaves an already checked model unchanged and silent", 
         c ~ 1, a ~ 1, d ~ 1
       )
     ),
-    sdm = list(model = sdm("dev_rad"), data = oberauer_lin_2017, formula = bmf(c ~ 1, kappa ~ 1)),
+    sdm = list(model = sdm("dev_rad"), data = small_data(), formula = bmf(c ~ 1, kappa ~ 1)),
     imm = list(
       model = imm("dev_rad", "col_nt", "dist_nt", "set_size", regex = TRUE),
-      data = oberauer_lin_2017, formula = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
+      data = small_data(), formula = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
     ),
     ddm = list(model = ddm("rt", "response"), data = rt_data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
     cswald = list(
@@ -527,7 +527,7 @@ test_that("stancode() works with formula", {
 test_that("stancode() works with bmmformula", {
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
   model <- mixture3p("dev_rad", "col_nt", set_size = "set_size", regex = TRUE)
-  sc <- stancode(ff, oberauer_lin_2017, model = model)
+  sc <- stancode(ff, small_data(), model = model)
   expect_equal(class(sc)[1], "character")
 })
 
@@ -535,7 +535,7 @@ test_that("no check for with stancode function", {
   withr::local_options("bmm.sort_data" = "check")
   expect_no_message(stancode(
     bmf(kappa ~ set_size, c ~ set_size),
-    oberauer_lin_2017,
+    small_data(),
     sdm("dev_rad")
   ))
 })

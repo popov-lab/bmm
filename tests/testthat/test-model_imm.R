@@ -1,4 +1,4 @@
-dat <- oberauer_lin_2017
+dat <- small_data()
 
 test_that("imm works when set_size is not predicted and there is set_size 1", {
   skip_on_cran()
