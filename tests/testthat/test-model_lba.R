@@ -310,6 +310,9 @@ test_that("Stan code for frechet LBA contains expected elements", {
 })
 
 test_that("LBA generated Stan code uses vectorized custom likelihoods", {
+  # unseeded, one draw in fifty (P = 0.82^20) has no error response and the custom
+  # version then warns that 'wrong' is not in the data
+  withr::local_seed(1)
   dat <- rlba(n = 20, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
   simple_model <- lba(rt = "rt", response = "response", n_choices = 2)
   simple_formula <- bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
