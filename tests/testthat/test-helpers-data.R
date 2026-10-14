@@ -1384,3 +1384,13 @@ test_that("validate_fast_guesses() refuses priors, guess probabilities and thres
   expect_error(call(rt_threshold = 1.5), "must be a quantile between 0 and 1")
   expect_error(call(threshold_type = "absolute", rt_threshold = 0), "must be positive")
 })
+
+test_that("calc_error_relative_to_nontargets() gives one row per non-target with the wrapped error", {
+  data <- data.frame(id = 1:2, y = c(0.5, -3), nt1 = c(0.2, 3), nt2 = c(-0.4, 0))
+  out <- calc_error_relative_to_nontargets(data, "y", c("nt1", "nt2"))
+  expect_equal(nrow(out), 4)
+  expect_false(any(c("nt1", "nt2") %in% names(out)))
+  expect_equal(out$id, c(1, 2, 1, 2))
+  # -3 - 3 = -6 lies outside [-pi, pi] and wraps to -6 + 2 * pi
+  expect_equal(out$y_nt, c(0.3, -6 + 2 * pi, 0.9, -3))
+})
