@@ -247,4 +247,14 @@ last.
   commit 6870f5d6, so it can be rebuilt after that folder is deleted. It
   replaces the always-skipped `restructure()` test that read
   `tests/internal` directly.
+- 2026-10-14, #422. R6: the budget allowlist is empty. The two
+  `test-update.R` tests it held were at 87.6 s and 55.5 s on the runner;
+  the first is now two tests (a slice of the model frame as newdata; the
+  whole frame equals no newdata) sharing one stub fit per case, and the file
+  builds its stored-frame cases once instead of once per iteration. On one
+  local worker the longest test in the file went from 17.6 s to 11.3 s;
+  the runner-to-local ratio of the old run (about 5) puts it near 57 s,
+  under the 66 s cap but not far. The caps themselves are unchanged: they
+  are lowered from a measured `tests-source` run of this branch (1.5 times
+  its maxima), not from a local run.
 
