@@ -181,6 +181,15 @@
   [`?mpt_from_eqn`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
   ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
+  processing-tree diagram of an
+  [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md),
+  or of every tree of an
+  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) model,
+  from the branch expressions. See
+  [`?plot.mpt_tree`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 

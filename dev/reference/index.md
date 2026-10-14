@@ -299,6 +299,10 @@ Utility functions for transforming data and parameters
 - [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
   : Create a tree for a Multinomial Processing Tree (MPT) model
 
+- [`plot(`*`<mpt_tree>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  [`plot(`*`<mpt>`*`)`](https://popov-lab.github.io/bmm/dev/reference/plot.mpt_tree.md)
+  : Plot the structure of MPT trees
+
 - [`restructure(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/restructure.bmmfit.md)
   :
 
