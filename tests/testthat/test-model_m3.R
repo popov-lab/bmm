@@ -266,9 +266,11 @@ test_that("m3 custom derives each parameter's default prior from its link and ch
     model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 2, 5),
                 choice_rule = case$rule, version = "custom",
                 links = list(c = case$link, a = case$link))
-    priors <- suppressMessages(
-      check_model(model, oberauer_lewandowsky_2019_e1, formula)$default_priors
+    expect_warning(
+      checked <- suppressMessages(check_model(model, oberauer_lewandowsky_2019_e1, formula)),
+      "Default priors for each parameter will be specified internally"
     )
+    priors <- checked$default_priors
     label <- paste(case$rule, case$link)
     for (par in c("c", "a")) {
       expect_equal(priors[[par]],
