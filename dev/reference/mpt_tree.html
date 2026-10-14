@@ -57,7 +57,7 @@ full model specification with <code><a href="mpt.html">mpt()</a></code>.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mpt_tree</span><span class="op">(</span><span class="va">name</span>, <span class="va">branches</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mpt_tree</span><span class="op">(</span><span class="va">name</span>, <span class="va">branches</span>, impossible <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -74,7 +74,15 @@ the label identifies the tree in the data: the column named by the
 <dd><p>A named list of character strings. Each element gives the
 branch probability expression for one response category, and the element
 names are the response categories. The expressions can use latent
-parameters (e.g., <code>"D + (1 - D) * g"</code>) and numeric constants.</p></dd>
+parameters (e.g., <code>"D + (1 - D) * g"</code>), numeric constants, and declared
+covariates (see <code><a href="mpt.html">mpt()</a></code>).</p></dd>
+
+
+<dt id="arg-impossible">impossible<a class="anchor" aria-label="anchor" href="#arg-impossible"></a></dt>
+<dd><p>Character vector. Response categories that cannot occur in
+this tree, for example distractor responses when no distractors were
+presented. Such categories get no branch expression, and the remaining
+branches must sum to 1 on their own.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -87,6 +95,12 @@ parameters (e.g., <code>"D + (1 - D) * g"</code>) and numeric constants.</p></dd
 decimal literal (<code>0.25</code>) when the tree is created. Stan compiles a bare
 integer fraction as integer division (<code>1/4 == 0</code>), which would silently
 corrupt the likelihood.</p>
+<p>Categories listed in <code>impossible</code> keep their column in the data and their
+place in the response matrix, but their probability is set to zero for the
+observations belonging to this tree. Because the model is estimated on the
+log scale, "zero" is implemented as a large negative linear predictor
+rather than a literal zero; no probability has to be taken away from the
+remaining branches to compensate.</p>
     </div>
 
     <div class="section level2">
@@ -102,6 +116,38 @@ corrupt the likelihood.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'old':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = D + (1 - D) * g</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * (1 - g)</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># a three-alternative recognition task in which lures are shown on some</span></span></span>
+<span class="r-in"><span><span class="co"># trials only: `lure` responses cannot occur on the others</span></span></span>
+<span class="r-in"><span><span class="va">tree_lures</span> <span class="op">&lt;-</span> <span class="fu">mpt_tree</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  name <span class="op">=</span> <span class="st">"lures"</span>,</span></span>
+<span class="r-in"><span>  branches <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    target <span class="op">=</span> <span class="st">"D * b + (1 - D) * (1/3)"</span>,</span></span>
+<span class="r-in"><span>    lure   <span class="op">=</span> <span class="st">"D * (1 - b) + (1 - D) * (1/3)"</span>,</span></span>
+<span class="r-in"><span>    new    <span class="op">=</span> <span class="st">"(1 - D) * (1/3)"</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># the branches of the lure-free tree sum to 1 without the `lure` category;</span></span></span>
+<span class="r-in"><span><span class="co"># no probability is reserved for it</span></span></span>
+<span class="r-in"><span><span class="va">tree_nolures</span> <span class="op">&lt;-</span> <span class="fu">mpt_tree</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  name <span class="op">=</span> <span class="st">"nolures"</span>,</span></span>
+<span class="r-in"><span>  branches <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    target <span class="op">=</span> <span class="st">"D + (1 - D) * (1/2)"</span>,</span></span>
+<span class="r-in"><span>    new    <span class="op">=</span> <span class="st">"(1 - D) * (1/2)"</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  impossible <span class="op">=</span> <span class="st">"lure"</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">tree_nolures</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'nolures':</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   P(target) = D + (1 - D) * 0.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * 0.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   P(lure) = 0 (structurally impossible)</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># a `tree` column in the data holds "lures" or "nolures" per observation;</span></span></span>
+<span class="r-in"><span><span class="co"># effects of experimental conditions go in the parameter formulas instead,</span></span></span>
+<span class="r-in"><span><span class="co"># e.g. bmf(D ~ 0 + cond)</span></span></span>
+<span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="mpt.html">mpt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">tree_lures</span>, <span class="va">tree_nolures</span><span class="op">)</span>, tree_id <span class="op">=</span> <span class="st">"tree"</span><span class="op">)</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

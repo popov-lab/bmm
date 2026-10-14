@@ -54,9 +54,18 @@ functions are currently not vectorized.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dmpt</span><span class="op">(</span><span class="va">x</span>, <span class="va">pars</span>, <span class="va">mpt_model</span>, tree <span class="op">=</span> <span class="cn">NULL</span>, log <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dmpt</span><span class="op">(</span><span class="va">x</span>, <span class="va">pars</span>, <span class="va">mpt_model</span>, tree <span class="op">=</span> <span class="cn">NULL</span>, log <span class="op">=</span> <span class="cn">TRUE</span>, covariates <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">rmpt</span><span class="op">(</span><span class="va">n</span>, <span class="va">size</span>, <span class="va">pars</span>, <span class="va">mpt_model</span>, tree <span class="op">=</span> <span class="cn">NULL</span>, unpack <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">rmpt</span><span class="op">(</span></span>
+<span>  <span class="va">n</span>,</span>
+<span>  <span class="va">size</span>,</span>
+<span>  <span class="va">pars</span>,</span>
+<span>  <span class="va">mpt_model</span>,</span>
+<span>  tree <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  unpack <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  covariates <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -95,9 +104,15 @@ to compute probabilities for. Can be omitted for single-tree models.</p></dd>
 scale.</p></dd>
 
 
+<dt id="arg-covariates">covariates<a class="anchor" aria-label="anchor" href="#arg-covariates"></a></dt>
+<dd><p>A named vector or list with the values of all covariates
+declared in the model that appear in the branch expressions of the
+selected tree.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>can be used to pass additional values used in the branch
-expressions.</p></dd>
+expressions, as an alternative to the <code>covariates</code> argument.</p></dd>
 
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>

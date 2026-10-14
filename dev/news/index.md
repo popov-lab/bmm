@@ -144,6 +144,22 @@
   how to get the per-branch uniform priors of TreeBUGS instead, under
   which the first-listed member has prior mean 0.5
   ([\#255](https://github.com/popov-lab/bmm/issues/255)).
+- [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) gains
+  `covariates`, for data columns used in branch expressions, such as
+  guessing rates fixed by the design;
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) stops
+  when the branches of a row do not sum to 1 with that row’s values.
+  [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
+  gains `impossible`, for response categories a tree cannot produce,
+  such as distractor responses on trials without distractors.
+  [`dmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
+  and
+  [`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
+  take covariate values too. See
+  [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) and
+  [`?mpt_tree`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
+  ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 

@@ -8,9 +8,18 @@ note that these functions are currently not vectorized.
 ## Usage
 
 ``` r
-dmpt(x, pars, mpt_model, tree = NULL, log = TRUE, ...)
+dmpt(x, pars, mpt_model, tree = NULL, log = TRUE, covariates = NULL, ...)
 
-rmpt(n, size, pars, mpt_model, tree = NULL, unpack = FALSE, ...)
+rmpt(
+  n,
+  size,
+  pars,
+  mpt_model,
+  tree = NULL,
+  unpack = FALSE,
+  covariates = NULL,
+  ...
+)
 ```
 
 ## Arguments
@@ -50,9 +59,15 @@ rmpt(n, size, pars, mpt_model, tree = NULL, unpack = FALSE, ...)
 
   Logical; if `TRUE` (default), densities are returned on the log scale.
 
+- covariates:
+
+  A named vector or list with the values of all covariates declared in
+  the model that appear in the branch expressions of the selected tree.
+
 - ...:
 
-  can be used to pass additional values used in the branch expressions.
+  can be used to pass additional values used in the branch expressions,
+  as an alternative to the `covariates` argument.
 
 - n:
 

@@ -19,6 +19,7 @@ apply on that latent scale.
 mpt(
   trees,
   tree_id = NULL,
+  covariates = NULL,
   simplex = NULL,
   restrictions = NULL,
   links = "logit",
@@ -31,7 +32,8 @@ mpt(
 - trees:
 
   A single `mpt_tree` object or a list of `mpt_tree` objects. All trees
-  must share the same set of response categories.
+  must share the same set of response categories, counting those
+  declared impossible.
 
 - tree_id:
 
@@ -39,6 +41,23 @@ mpt(
   observation belongs to; the values must match the tree names. Can be
   omitted for single-tree models. Effects of experimental conditions
   belong in the parameter formulas, not here — see Details.
+
+- covariates:
+
+  Character vector. Names of data columns that appear in branch
+  expressions but are not latent parameters, for example design-fixed
+  guessing rates. Covariates pass into the model formulas unchanged and
+  have no naming restrictions.
+  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) stops
+  when, with a row's covariate values, the branches of a tree do not sum
+  to 1, leave (0, 1\], are undefined on the rows of another tree, or
+  when a covariate that a branch uses is missing. Every declared
+  covariate needs a numeric column in the data, also one that no branch
+  uses. The range is checked at the vertices of each branch's parameter
+  box, which is exact when no term of the branch contains the same
+  parameter twice (`a * (1 - b) * G + (1 - a) * c`). A parameter that
+  does is also checked at 0.5, which is exact for a factor `u * (1 - u)`
+  and approximate otherwise, e.g. for `u * (1 - u)^2`.
 
 - simplex:
 
@@ -109,15 +128,16 @@ An object of class `bmmodel`
   from trials of that tree.
 
   A separate tree is needed only when the *branch expressions* differ —
-  that is, when the trial determines which latent processes apply (old
-  versus new probes, inclusion versus exclusion instructions).
-  Experimental factors whose *effect on the parameters* you want to
-  estimate belong in the parameter formulas, exactly as in every other
-  `bmm` model: `bmf(D ~ 0 + condition)`. The two roles are independent,
-  and one data column can serve both when a factor happens to change the
-  structure as well. When several levels of a factor share a branch
-  structure, add a column naming the tree and keep the factor for the
-  formulas.
+  that is, when the trial determines which latent processes apply or
+  which response categories are reachable (old versus new probes, a
+  response set with or without distractors, inclusion versus exclusion
+  instructions). Experimental factors whose *effect on the parameters*
+  you want to estimate belong in the parameter formulas, exactly as in
+  every other `bmm` model: `bmf(D ~ 0 + condition)`. The two roles are
+  independent, and one data column can serve both when a factor happens
+  to change the structure as well. When several levels of a factor share
+  a branch structure, add a column naming the tree and keep the factor
+  for the formulas.
 
   Parameters that receive a non-linear predictor formula (a formula
   whose right-hand side references other formula parameters, e.g.
@@ -185,13 +205,14 @@ An object of class `bmmodel`
   with the degrees of freedom (response categories minus 1, summed over
   trees) and computes the rank of the Jacobian of the category
   probabilities with respect to the free parameters, from exact
-  derivatives at five interior test values; parameters fixed in the
-  formula enter at their values. A rank below the number of free
-  parameters means that a combination of the named parameters is not
-  identified by the branch expressions, even when the count passes. The
-  check is local: it holds at the test values, not at the boundaries of
-  the parameter space. If
-  [`stats::D()`](https://rdrr.io/r/stats/deriv.html) cannot
+  derivatives at five interior test values (and five test values of each
+  covariate); parameters fixed in the formula enter at their values. A
+  rank below the number of free parameters means that a combination of
+  the named parameters is not identified by the branch expressions, even
+  when the count passes. The check is local: it holds at the test
+  values, not at the boundaries of the parameter space. A test value
+  with a non-finite derivative is left out, and the printout says how
+  many; if [`stats::D()`](https://rdrr.io/r/stats/deriv.html) cannot
   differentiate a branch expression, the rank is not computed and the
   count decides. The rank sees the tree parameters only: after a
   non-linear formula, the rank line names that formula's parameter as
@@ -200,11 +221,12 @@ An object of class `bmmodel`
   [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
   when the rank is deficient and every formula is intercept-only. When a
   formula has a predictor or is non-linear, it only says that these may
-  identify the parameters and that it did not check. Example: separate
-  detection parameters `Do` and `Dn` in a single old/new test give three
-  free parameters and rank 2 of 3, so one combination of `Do`, `Dn` and
-  `g` cannot be estimated; a second condition that varies the response
-  bias identifies them.
+  identify the parameters and that it did not check.
+
+  Example: separate detection parameters `Do` and `Dn` in a single
+  old/new test give three free parameters and rank 2 of 3, so one
+  combination of `Do`, `Dn` and `g` cannot be estimated; a second
+  condition that varies the response bias identifies them.
 
   [`summary()`](https://rdrr.io/r/base/summary.html) reports intercepts
   and regression coefficients on the latent (logit or probit) scale.
@@ -229,7 +251,11 @@ An object of class `bmmodel`
   returns simulated counts (draws x rows x categories) and
   [`brms::posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
   the expected counts; the MPT article computes the T1 statistic and its
-  posterior predictive p-value from them.
+  posterior predictive p-value from them. With `newdata`,
+  [`brms::posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  needs the columns `nTrials`, `Idx_<tree>` and `Poss_<category>` that
+  [`check_data()`](https://popov-lab.github.io/bmm/dev/reference/check_data.md)
+  builds; `fit$data` contains them.
 
   Order constraints between parameters (`Do > Dn`) are expressed by
   reparameterizing the larger parameter in the model formula, e.g.
