@@ -57,7 +57,9 @@
 #'   `group = NA` to pool them into a single profile. The [sdt_ranking()] model
 #'   shows the rank positions as the categories of the proportion profile; for
 #'   mixed set sizes, pass the set-size column as `group` so each facet has a
-#'   homogeneous denominator. The custom-family
+#'   homogeneous denominator. For [mpt()] fits, the `tree_id` column can be
+#'   named even if no parameter formula uses it, giving one facet per tree;
+#'   the default pools the trees. The custom-family
 #'   models [sdt_yn()] and [sdt_mafc()] delegate to [brms::pp_check()]; for
 #'   their aggregated counts an overlaid empirical CDF (`type = "ecdf_overlay"`,
 #'   adding `group = "stimulus"` for [sdt_yn()]) is usually clearer than the
@@ -144,6 +146,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   if (identical(family(object)$family, "multinomial")) {
     group <- .pp_check_resolve_group(object, group)
     object <- .pp_check_restore_set_size(object, group)
+    object <- .pp_check_restore_tree(object, group)
     return(.pp_check_multinomial(object, type = type, ndraws = ndraws %||% 100L,
                                  group = group, ...))
   }
@@ -199,6 +202,22 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
     return(object)
   }
   object$data[[m]] <- object$data$max_rank
+  object
+}
+
+
+# brms keeps the tree column of an mpt fit only when a formula names it;
+# otherwise the one-hot tree indicators are the record of each row's tree
+.pp_check_restore_tree <- function(object, group) {
+  model <- object$bmm$model
+  indicators <- model$other_vars$indicators$tree
+  tree_id <- model$other_vars$tree_id
+  if (!inherits(model, "mpt") || is.null(indicators) ||
+      !identical(group, tree_id) || tree_id %in% names(object$data)) {
+    return(object)
+  }
+  tree <- max.col(as.matrix(object$data[indicators]), ties.method = "first")
+  object$data[[tree_id]] <- factor(names(indicators)[tree], levels = names(indicators))
   object
 }
 
@@ -400,7 +419,10 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   is_matrix <- vapply(pred_cols, function(col) is.matrix(data[[col]]), logical(1))
   pred_cols <- pred_cols[!is_matrix]
 
-  pred_cols <- pred_cols[!grepl("^(Idx_|n_)", pred_cols)]
+  pred_cols <- pred_cols[
+    !grepl("^(Idx_|n_)", pred_cols) &
+      !pred_cols %in% unlist(model$other_vars$indicators$possible, use.names = FALSE)
+  ]
 
   pred_cols
 }

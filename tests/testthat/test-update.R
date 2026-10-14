@@ -429,6 +429,11 @@ stored_frame_cases <- function() {
     c ~ 1, a ~ 1, d ~ 1
   )
   m3_links <- list(c = "log", a = "log", d = "log")
+  mpt_data <- data.frame(
+    id = factor(rep(1:5, 2)), item_type = factor(rep(c("old", "new"), each = 5)),
+    old = c(40:44, 8:12)
+  )
+  mpt_data$new <- 50L - mpt_data$old
   mafc_data <- data.frame(
     n_correct = c(80, 55, 78, 60, 85, 52, 81, 58), n_trials = 100,
     n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
@@ -568,6 +573,45 @@ stored_frame_cases <- function() {
       model = sdt_rating(paste0("r", 1:4), "stimulus", version = "metad"),
       formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1 + (1 | id)),
       data = rating_data[setdiff(names(rating_data), "r5")]
+    ),
+    # brms drops the tree column unless a formula names it, so it is rebuilt
+    mpt = list(
+      model = mpt(mpt_2htm_trees(), tree_id = "item_type"),
+      formula = bmf(D ~ 1 + (1 | id), g ~ 1),
+      data = mpt_data
+    ),
+    mpt_tree_predictor = list(
+      model = mpt(mpt_2htm_trees(), tree_id = "item_type"),
+      formula = bmf(D ~ 1 + item_type, g ~ 1),
+      data = mpt_data
+    ),
+    mpt_single_tree = list(
+      model = mpt(mpt_tree("study", list(
+        C = "cp + (1 - cp) * rp * rp",
+        E = "2 * (1 - cp) * rp * (1 - rp)",
+        U = "(1 - cp) * (1 - rp) * (1 - rp)"
+      ))),
+      formula = bmf(cp ~ 1 + (1 | id), rp ~ 1),
+      data = data.frame(id = factor(1:6), C = 30:35, E = 20L, U = 10L)
+    ),
+    mpt_impossible = list(
+      model = mpt(mpt_impossible_trees(), tree_id = "tree"),
+      formula = bmf(Pm ~ 1 + (1 | id), Pb ~ 1),
+      data = mpt_impossible_data()
+    ),
+    mpt_covariates = list(
+      model = mpt(
+        mpt_tree("main", list(
+          correct = "D + (1 - D) * Gcorr",
+          incorrect = "(1 - D) * (1 - Gcorr)"
+        )),
+        covariates = "Gcorr"
+      ),
+      formula = bmf(D ~ 1 + (1 | id)),
+      data = data.frame(
+        id = factor(1:10), Gcorr = rep(c(0.25, 0.5), 5),
+        correct = 21:30, incorrect = 19:10
+      )
     )
   )
 }
@@ -647,6 +691,16 @@ test_that("a set_size rebuilt for check_data() stays out of the model frame", {
       check_stored_data(case$model, fit$data, fit$bmm$user_formula)
     ))
   }
+})
+
+test_that("an mpt tree column rebuilt for check_data() stays out of the model frame", {
+  skip_on_cran()
+  case <- stored_frame_cases()$mpt
+  fit <- stored_frame_fit(case)
+  expect_false("item_type" %in% colnames(fit$data))
+  expect_false("item_type" %in% colnames(
+    check_stored_data(case$model, fit$data, fit$bmm$user_formula)
+  ))
 })
 
 test_that("an m column rebuilt for check_data() stays out of the model frame", {
@@ -805,6 +859,33 @@ test_that("an updated fit carries nothing from the frame that called update()", 
   expect_equal(serialized_size(1e6), serialized_size(1))
 })
 
+test_that("update() switches an SDT fit between criterion and bias", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- data.frame(n_old = c(10, 40, 12, 38), stimulus = c(0, 1, 0, 1),
+                    n_trials = 50)
+  fit <- suppressMessages(bmm(bmf(d ~ 1, criterion ~ 1), dat,
+                              sdt_yn("n_old", "stimulus", "n_trials"),
+                              backend = "mock", mock_fit = stub, rename = FALSE))
+  switched <- suppressMessages(update(
+    fit, formula. = bmf(d ~ 1, bias ~ 1), backend = "mock", mock_fit = stub,
+    rename = FALSE, recompile = TRUE
+  ))
+  expect_equal(switched$family$name, "sdt_yn_bias")
+  expect_true("bias" %in% switched$prior$dpar)
+  expect_false("criterion" %in% switched$prior$dpar)
+
+  back <- suppressMessages(update(
+    switched, formula. = bmf(d ~ 1, criterion ~ 1), backend = "mock",
+    mock_fit = stub, rename = FALSE, recompile = TRUE
+  ))
+  expect_equal(back$family$name, "sdt_yn")
+  expect_false("bias" %in% back$prior$dpar)
+})
+
 # =============================================================================
 # UPDATING WITH THE STORED MODEL FRAME AS newdata (kfold(), reloo())
 # =============================================================================
@@ -834,7 +915,7 @@ test_that("only a slice of a fit's model frame counts as stored data", {
 
 test_that("user data that hold a column of the stored layout stay user data", {
   skip_on_cran()
-  for (case_name in c("m3", "sdt_rating", "sdt_ranking", "sdt_cdp")) {
+  for (case_name in c("m3", "sdt_rating", "sdt_ranking", "sdt_cdp", "mpt")) {
     case <- stored_frame_cases()[[case_name]]
     fit <- stored_frame_fit(case)
     model <- fit$bmm$model
@@ -875,7 +956,8 @@ test_that("update() takes a slice of the model frame as newdata (kfold(), reloo(
   skip_on_cran()
   skip_if_not_installed("rstan")
   for (case_name in c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
-                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm")) {
+                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
+                      "mpt", "mpt_tree_predictor", "mpt_single_tree")) {
     case <- stored_frame_cases()[[case_name]]
     fit <- stub_frame_fit(case)
     rows <- seq_len(nrow(fit$data))[-1]
