@@ -1,15 +1,17 @@
 // log-PDF of the censored shifted Wald model
-real cswald_lpdf(real rt, real mu, real drift, real bound, real ndt, real s, int response) {
+real cswald_lpdf(real rt, real mu, real drift, real bound, real ndt, real s,
+                 real sndt, int response) {
   if (response == 1) {
-    return swald_lpdf(rt | drift, bound, ndt, s);
+    return swald_sndt_lpdf(rt | drift, bound, ndt, sndt, s);
   } else {
-    return swald_lccdf(rt | drift, bound, ndt, s);
+    return swald_sndt_lccdf(rt | drift, bound, ndt, sndt, s);
   }
 }
 
 // vectorized overload for the loop = FALSE family: density for responses, survivor for censored trials
+// sndt is unused: configure_model() selects this overload only while sndt is fixed at 0
 real cswald_lpdf(vector rt, vector mu, vector drift, vector bound,
-                 vector ndt, vector s, array[] int dec) {
+                 vector ndt, vector s, vector sndt, array[] int dec) {
   int N = rows(rt);
   array[N] int idx1;
   array[N] int idx0;
