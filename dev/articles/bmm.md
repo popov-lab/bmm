@@ -179,6 +179,12 @@ article](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html).
 
 [TABLE]
 
+### 3.5 Other models
+
+These models were added after this page was written:
+
+[TABLE]
+
 You can list the models in R at any time with
 [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
 and `?modelname` (for example

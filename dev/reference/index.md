@@ -144,6 +144,8 @@ Functions for specifying which model to fit
   : Two-parameter mixture model by Zhang and Luck (2008).
 - [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
   : Three-parameter mixture model by Bays et al (2009).
+- [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) :
+  Multinomial Processing Tree (MPT) models
 - [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
   : Signal Discrimination Model (SDM) by Oberauer (2023)
@@ -215,6 +217,10 @@ Functions for special distributions
   : Distribution functions for the three-parameter mixture model
   (mixture3p)
 
+- [`dmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
+  [`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md) :
+  Distribution functions for Multinomial Processing Tree (MPT) models
+
 - [`rejection_sampling()`](https://popov-lab.github.io/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
 
@@ -283,6 +289,9 @@ Utility functions for transforming data and parameters
 - [`k2sd()`](https://popov-lab.github.io/bmm/dev/reference/k2sd.md) :
   Transform kappa of the von Mises distribution to the circular standard
   deviation
+
+- [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
+  : Create a tree for a Multinomial Processing Tree (MPT) model
 
 - [`restructure(`*`<bmmfit>`*`)`](https://popov-lab.github.io/bmm/dev/reference/restructure.bmmfit.md)
   :
@@ -365,6 +374,12 @@ Functions to assist in developing new models
   [`pp_simulate()`](https://popov-lab.github.io/bmm/dev/reference/pp_observables.md)
   : Declare the observables of a bmm model for posterior predictive
   checks
+
+- [`print_model_details()`](https://popov-lab.github.io/bmm/dev/reference/print_model_details.md)
+  :
+
+  Generic S3 method for model-specific lines in
+  [`print()`](https://rdrr.io/r/base/print.html) of a model
 
 - [`revert_postprocess_brm()`](https://popov-lab.github.io/bmm/dev/reference/revert_postprocess_brm.md)
   : Generic S3 method for reverting any postprocessing of the fitted brm

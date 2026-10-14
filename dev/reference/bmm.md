@@ -178,6 +178,10 @@ Categorical recall and n-AFC decisions
 
 - m3(): The Multinomial / Memory Measurement Model
 
+Processing-tree models
+
+- mpt(): Multinomial Processing Tree (MPT) models
+
 Detection, recognition and confidence judgments
 
 - sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)

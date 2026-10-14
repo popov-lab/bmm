@@ -512,6 +512,31 @@ responses are the topic of the
 </tr>
 </tbody>
 </table>
+</div>
+<div class="section level3" number="3.5">
+<h3 id="other-models">
+<span class="header-section-number">3.5</span> Other models<a class="anchor" aria-label="anchor" href="#other-models"></a>
+</h3>
+<p>These models were added after this page was written:</p>
+<table class="table">
+<colgroup>
+<col width="18%">
+<col width="66%">
+<col width="15%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Model</th>
+<th align="left">Data columns</th>
+<th align="left">Key parameters</th>
+</tr></thead>
+<tbody><tr class="odd">
+<td align="left">
+<a href="https://popov-lab.github.io/bmm/reference/mpt.html"><code>mpt()</code></a><br>Multinomial Processing Tree (MPT) models</td>
+<td align="left">
+<code>trees</code>: number of responses in each response category, one column per category, named after the branches of the trees<br><code>tree_id</code>: the tree each row belongs to (models with several trees)</td>
+<td align="left">None by default: your formula defines them</td>
+</tr></tbody>
+</table>
 <p>You can list the models in R at any time with <code><a href="../reference/bmm_models.html">bmm_models()</a></code>, and
 <code>?modelname</code> (for example <code><a href="../reference/sdt_yn.html">?sdt_yn</a></code>) documents the data a model expects, its
 parameters and its default priors, that is, what the model assumes about each

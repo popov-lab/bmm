@@ -1,10 +1,11 @@
 # emmeans support for bmmfit objects
 
-These S3 methods allow `emmeans::emmeans()` to work seamlessly with
-bmmfit objects by automatically resolving whether a parameter is a
-distributional (`dpar`) or non-linear (`nlpar`) parameter in brms. Users
-can always use `dpar = "parameter_name"` regardless of internal
-classification.
+These S3 methods allow
+[`emmeans::emmeans()`](https://rvlenth.github.io/emmeans/reference/emmeans.html)
+to work seamlessly with bmmfit objects by automatically resolving
+whether a parameter is a distributional (`dpar`) or non-linear (`nlpar`)
+parameter in brms. Users can always use `dpar = "parameter_name"`
+regardless of internal classification.
 
 ## Usage
 
@@ -44,8 +45,11 @@ emm_basis(object, trms, xlev, grid, ..., dpar = NULL, nlpar = NULL)
 
 ## Value
 
-See `emmeans::recover_data()` and `emmeans::emm_basis()` for return
-values.
+See
+[`emmeans::recover_data()`](https://rvlenth.github.io/emmeans/reference/extending-emmeans.html)
+and
+[`emmeans::emm_basis()`](https://rvlenth.github.io/emmeans/reference/extending-emmeans.html)
+for return values.
 
 ## Details
 
@@ -64,7 +68,7 @@ re-route it to `nlpar`.
 
 ## See also
 
-`emmeans::emmeans()`
+[`emmeans::emmeans()`](https://rvlenth.github.io/emmeans/reference/emmeans.html)
 
 ## Examples
 

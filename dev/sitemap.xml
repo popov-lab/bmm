@@ -79,6 +79,9 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/mixture3p.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/mixture3p_dist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/model_citation.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/mpt.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/mpt_tree.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/mptdist.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/mratio.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/native_parameters.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/native_transform.html</loc></url>
@@ -94,6 +97,7 @@
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/pp_observables.html</loc></url>
+<url><loc>https://popov-lab.github.io/bmm/dev/reference/print_model_details.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/print_pretty_models_md.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/prior_info.html</loc></url>
 <url><loc>https://popov-lab.github.io/bmm/dev/reference/rejection_sampling.html</loc></url>

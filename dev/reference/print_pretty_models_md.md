@@ -40,6 +40,10 @@ print_pretty_models_md()
 #> 
 #> - [`m3()`](https://popov-lab.github.io/bmm/reference/m3.html): The Multinomial / Memory Measurement Model
 #> 
+#> **Processing-tree models**
+#> 
+#> - [`mpt()`](https://popov-lab.github.io/bmm/reference/mpt.html): Multinomial Processing Tree (MPT) models
+#> 
 #> **Detection, recognition and confidence judgments**
 #> 
 #> - [`sdt_cdp()`](https://popov-lab.github.io/bmm/reference/sdt_cdp.html): Continuous Dual-Process Signal Detection Theory (CDP)

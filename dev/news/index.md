@@ -108,6 +108,22 @@
   [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
   reports. Thanks to
   [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+- Add **Multinomial Processing Tree models** (`mpt`) for tasks with
+  categorical responses that come from discrete processing states, such
+  as the two-high-threshold model of recognition. You write each tree’s
+  branch probabilities with
+  [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md),
+  give a parameter the same name in every tree that shares it, and fit
+  the model to response counts; `tree_id` names the data column that
+  says which tree a row belongs to. Parameters take a logit or probit
+  link and can be fixed in the formula (`bmf(g = 0.5)`) or given
+  non-linear formulas. Also adds
+  [`dmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
+  and
+  [`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md).
+  See [`?mpt`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
+  ([\#255](https://github.com/popov-lab/bmm/issues/255)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
 
 #### New datasets
 

@@ -67,6 +67,6 @@ samples <- rejection_sampling(
   mu = mu, kappa = 10
 )
 tapply(samples, mu, mean)
-#>             0             2 
-#> -0.0009627108  1.9951207670 
+#>           0           2 
+#> 0.003265293 2.006425116 
 ```
