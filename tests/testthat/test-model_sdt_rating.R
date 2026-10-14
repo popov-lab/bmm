@@ -103,7 +103,7 @@ test_that("sdt_rating refuses a link on sdratio or a threshold parameter", {
   # sdratio and the thresholds are read through exp() in Stan, and sdratio is
   # additionally fixed at 0, so neither survives a change of link
   model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
-  expect_equal(settable_links(model), c("d", "criterion"))
+  expect_equal(settable_links(model), c("d", "criterion", "bias"))
   for (par in c("sdratio", "spacing")) {
     expect_error(
       sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus",
@@ -128,9 +128,10 @@ test_that("sdt_rating offers only the links it can invert in its formula", {
 })
 
 test_that("sdt_rating gives every parameter an sd default prior", {
-  # Ro and Rn are logit-scale probabilities, so they join d at rate 1;
-  # everything else is a log-scale quantity and takes rate 2
-  rate1 <- c("d", "Ro", "Rn")
+  # Ro and Rn are logit-scale probabilities, so they join d at rate 1, as does
+  # criterion, which carries half of d's spread; everything else is a
+  # log-scale quantity or the midpoint-relative bias and takes rate 2
+  rate1 <- c("d", "criterion", "Ro", "Rn")
   for (v in names(bmm:::.sdt_rating_variants)) {
     for (tt in c("parsimonious", "log_distance", "softmax")) {
       model <- sdt_rating(paste0("r", 1:6), "stimulus",
@@ -482,9 +483,30 @@ test_that(".sdt_category_probs vectorized path matches per-row evaluation", {
   expect_equal(probs, ref, tolerance = 1e-12)
 })
 
+test_that("a bias is the criterion moved by half the separation", {
+  # anchor 2 reads the middle threshold from the midpoint between the means,
+  # anchor 1 from the noise mean; on the same thresholds both give one model
+  d <- matrix(c(1, 1.5, 0.5, 2), nrow = 2)
+  sdratio <- 0.3
+  bias <- -0.2
+  criterion <- bias + d * sqrt((1 + exp(sdratio)^2) / 2) / 2
+  for (fun in list(sdt_rating_logmu, sdt_dpsdt_logmu, sdt_metad_logmu)) {
+    extra <- intersect(names(formals(fun)), c("Ro", "Rn", "logmratio"))
+    extra <- stats::setNames(rep(list(0.4), length(extra)), extra)
+    for (k in 1:4) {
+      args <- c(list(cat = k, K = 4L, dist = 1L, thresh = 1L, d = d,
+                     spacing = 0.3, sdratio = sdratio, stimulus = c(0, 1)),
+                extra)
+      from_bias <- do.call(fun, c(args, list(anchor = 2L, criterion = bias)))
+      from_crit <- do.call(fun, c(args, list(anchor = 1L, criterion = criterion)))
+      expect_equal(from_bias, from_crit, tolerance = 1e-12)
+    }
+  }
+})
+
 test_that("sdt_rating_logmu is vectorized and preserves the draw shape", {
   d <- matrix(c(1, 1.5, 0.5, 2), nrow = 2)
-  out <- sdt_rating_logmu(2L, 4L, 1L, 1L, d, criterion = 0.1,
+  out <- sdt_rating_logmu(2L, 4L, 1L, 1L, 1L, d, criterion = 0.1,
                           spacing = 0.3, sdratio = 0.2, stimulus = c(0, 1))
   expect_equal(dim(out), dim(d))
 
@@ -815,4 +837,48 @@ test_that("sdt_rating log_distance fits with finite likelihood at K=6 (real fit)
              refresh = 0, silent = 2)
 
   expect_true(all(is.finite(brms::log_lik(fit))))
+})
+
+test_that("the generated Stan logmu function reads either anchor as its R companion does", {
+  skip_on_cran()
+  skip_if_not_installed("cmdstanr")
+  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
+
+  model <- sdt_rating(paste0("r", 1:4), "stimulus")
+  sc <- system.file("stan_chunks", package = "bmm")
+  program <- paste0(
+    "functions {\n", read_lines2(file.path(sc, "sdt_dist_funs.stan")), "\n",
+    read_lines2(file.path(sc, "sdt_rating_funs.stan")), "\n",
+    bmm:::.sdt_rating_logmu_stan(model), "\n}\n",
+    "data {\n  int N; array[N] int cat; array[N] int anchor; array[N] int dist;\n",
+    "  vector[N] d; vector[N] crit; vector[N] sdratio; vector[N] stimulus;\n}\n",
+    "generated quantities {\n  vector[N] lp;\n  for (i in 1:N) {\n",
+    "    lp[i] = sdt_rating_logmu(cat[i], 4, dist[i], 1, anchor[i], d[i], crit[i],\n",
+    "      -0.4, sdratio[i], stimulus[i]);\n",
+    "  }\n}\n"
+  )
+  grid <- expand.grid(cat = 1:4, anchor = 1:2, dist = seq_along(bmm:::.sdt_dists),
+                      d = c(0.4, 2), crit = c(-0.5, 0.8), sdratio = c(-0.4, 0, 0.5),
+                      stimulus = c(0, 1))
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = c(list(N = nrow(grid)), as.list(grid)), fixed_param = TRUE,
+    chains = 1, iter_sampling = 1, iter_warmup = 0, refresh = 0,
+    show_messages = FALSE, sig_figs = 17
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#",
+                         check.names = FALSE)
+  r <- vapply(seq_len(nrow(grid)), function(i) with(grid[i, ], sdt_rating_logmu(
+    cat, 4L, dist, 1L, anchor, d, crit, -0.4, sdratio, stimulus)), numeric(1))
+  expect_equal(as.numeric(csv[1, paste0("lp.", seq_len(nrow(grid)))]), r,
+               tolerance = 1e-10)
+})
+
+test_that("a rating formula with bias passes anchor 2 and the bias parameter", {
+  model <- sdt_rating(paste0("r", 1:4), "stimulus")
+  bf_bias <- bmm:::bmf2bf(model, bmf(d ~ 1, bias ~ 1, spacing ~ 1))
+  expect_match(deparse1(bf_bias$formula), "sdt_rating_logmu(1, 4, 1, 1, 2, d, bias,",
+               fixed = TRUE)
+  bf_crit <- bmm:::bmf2bf(model, bmf(d ~ 1, criterion ~ 1, spacing ~ 1))
+  expect_match(deparse1(bf_crit$formula), "sdt_rating_logmu(1, 4, 1, 1, 1, d, criterion,",
+               fixed = TRUE)
 })

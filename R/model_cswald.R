@@ -6,7 +6,7 @@
   simple = list(
     parameters = list(
       drift = "drift rate",
-      bound = "boundary (distance from starting point to correct boundary)",
+      bound = "boundary (distance from starting point to correct boundary, half the boundary separation `bound` of version \"crisk\", ddm() and ezdm())",
       ndt = "non-decision time (minimum non-decision time when sndt > 0)",
       s = "diffusion constant",
       sndt = "range of the uniform trial-to-trial variability in the non-decision time"
@@ -45,7 +45,7 @@
       drift = "drift rate",
       bound = "boundary separation (total distance between boundaries)",
       ndt = "non-decision time (minimum non-decision time when sndt > 0)",
-      zr = "relative starting point",
+      zr = "relative starting point (proportion of the boundary separation, measured from the lower boundary; 0.5 = unbiased)",
       s = "diffusion constant",
       sndt = "range of the uniform trial-to-trial variability in the non-decision time"
     ),
@@ -138,9 +138,12 @@
 #' @param links A named list of link functions for the model parameters.
 #'   Available parameters depend on the version: "simple" has `drift`, `bound`,
 #'   `ndt`, `s`, and `sndt`; "crisk" additionally has `zr`. Default links are
-#'   "log" for most parameters and "logit" for `zr`. For positive parameters, "softplus"
-#'   is available as an alternative to "log" that grows linearly for large
-#'   values and avoids the numerical blow-up of `exp()`. A name that is not a
+#'   "log" for `bound`, `ndt`, `s` and `sndt`, and "logit" for `zr`. `drift`
+#'   has a "log" link in "simple", where it is positive, and an "identity" link
+#'   in "crisk", where it can be negative, as in [ddm()] and [ezdm()]. For
+#'   positive parameters, "softplus" is available as an alternative to "log"
+#'   that grows linearly for large values and avoids the numerical blow-up of
+#'   `exp()`. A name that is not a
 #'   parameter of the model is an error, and a link that allows values the
 #'   default link excludes (e.g. "identity" for a positive parameter) is a
 #'   warning.
@@ -159,7 +162,8 @@
 #'       types as arising from racing accumulators toward opposite boundaries.
 #'       Better suited for tasks with substantial error rates. The `bound`
 #'       parameter represents the total boundary separation, consistent with
-#'       the diffusion model parameterization.
+#'       the diffusion model parameterization. `zr` is fixed at 0 on its
+#'       logit scale (an unbiased `zr = 0.5`) unless you give it a formula.
 #'   }
 #'   For more details, see Miller et al. (2018).
 #' @param ... Additional arguments passed internally (for testing purposes).

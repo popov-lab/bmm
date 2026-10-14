@@ -42,9 +42,10 @@ Your PR also needs:
 
 - **Tests** for new behaviour, in `tests/testthat/`. Test what your code does,
   not how R subsets a data frame.
-- **A NEWS bullet** under `# bmm (development version)` for anything users can
-  see. Keep it short: what changes for the user and what they should do. Do not
-  describe how the fix works.
+- **A NEWS bullet** for anything users can see, under the development heading of
+  the branch you target: `# bmm (development version)` on `develop`,
+  `# bmm 1.5.0 (development)` on `dev-1.5.0`. Keep it short: what changes for the
+  user and what they should do. Do not describe how the fix works.
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
   [developer notes](https://venpopov.com/bmm/dev/dev-notes/) and follow the
@@ -63,6 +64,118 @@ of a parameter recovery for the new model:
 
 Attach the script as a gist or in a collapsed block in the PR.
 
+### Model fits for the website articles
+
+The articles load cached fits through `bmm(..., file = )`. Do not commit new
+or refitted fits. The `file-size` check fails a PR when any of its commits adds
+a file larger than 1 MiB, or a new version of one, even if a later commit
+removes the file again, because a merge commit keeps every commit of the PR in
+the history. A squash merge would not, but the check cannot know which one will
+be used ([ADR 0003](../.dev/decisions/0003-model-fit-files.md)). A file whose
+content is already in the history of `develop` or of the PR's base does not
+count, wherever it sits. A changed version of a tracked large file counts as
+new. If the check names a commit of yours, rewrite the branch without that
+file, for example with an interactive rebase.
+
+- Load a fit with `bmm(..., file = "fits/<name>")` or
+  `readRDS(file = "fits/<name>.rds")`, with the path written as a string
+  literal. The folder `vignettes/articles/fits/` is gitignored. Fits that are
+  already tracked in `assets/` stay there until their article is refitted.
+  Release fits work only for articles directly in `vignettes/articles/`. The
+  build downloads them to `vignettes/articles/fits/`, and an article in a
+  subfolder looks for `fits/` next to itself.
+- Say in the PR where we can get the fit. A maintainer uploads it to the
+  `article-fits` release, and the website build downloads it from there.
+- The website build checks every relative `file = "..."` that an evaluated R
+  chunk passes as a string literal to `bmm()`, `brm()`, `readRDS()` or
+  `read_rds()`. A `fits/<name>` file must be in the release. Any other file,
+  such as `assets/<name>`, must be tracked. Both must be readable. The build
+  stops, naming the article and the file, when one is not.
+- A string that names a `fits/` path and is not such a literal fails the
+  build, because the check cannot read it. This includes
+  `readRDS("fits/<name>")` without `file =`, a path built with `paste0()` or
+  `file.path()`, and inline code. Paths passed to a writer, such as
+  `saveRDS()`, `write.csv()`, `ggsave()` or `png()`, are ignored. A path that
+  reaches a reader only through a variable or a computed value is not seen
+  unless the string itself names `fits/`. Sourced code and child documents
+  are not checked.
+- Articles that pkgdown does not build (names starting with `_`,
+  `vignettes/tutorials/`) are not checked.
+- Chunks are found as knitr finds them. A chunk opens at any line like
+  `` ```{r} ``, also inside a longer fenced block that only shows it, because
+  knitr runs it there. `#| ` options count only at the top of the chunk.
+- Upload the fit before the PR is merged into a branch that builds the site.
+- Give a refitted fit a new file name instead of replacing the old asset. The
+  website builds from `develop` and reads whatever the release holds at that
+  moment.
+
+To build the articles locally, download the fits first:
+
+```sh
+gh release download article-fits --dir vignettes/articles/fits --skip-existing
+```
+
+## Deprecating and removing features
+
+Users should know how long their scripts keep working. From bmm 1.5.0 on,
+three rules apply:
+
+1. **Deprecate before you remove.** A deprecated function or argument keeps
+   working, with a warning, for at least one minor release. Something
+   deprecated in 1.5.0 still works in every 1.5.x release and is removed in
+   1.6.0 at the earliest.
+2. **List it in NEWS.** Every deprecation and every removal gets a bullet under
+   the heading `### Deprecated functions and arguments`.
+3. **Announce breaking changes.** A change is breaking when a script that ran
+   before now fails, has to be edited, or gives different results for the same
+   data and model. Removing a deprecated form counts. A bug fix that corrects
+   results is not; it goes in NEWS under the bug fixes. We announce a breaking
+   change in a GitHub issue before the release that contains it, with the old
+   and the new code side by side (use the "Breaking change" issue template).
+
+The rules cover what users type or read: exported functions and their
+arguments, model parameter names, documented defaults, and the data layout a
+model expects. Internal functions are not covered. Fits saved by an earlier
+release are covered: they keep working with `update()` and the extraction
+functions, through `restructure()` where they need converting, or the NEWS
+bullet says they must be refitted.
+
+A changed default has no old form to warn about. Announce it as a breaking
+change (rule 3) and say in NEWS how to get the old default back. For a changed
+data layout, accept both layouts for the window and give the old and the new
+column names as `what` and `with`.
+
+If your PR deprecates something:
+
+- Deprecate in a minor release (1.5.0, 1.6.0), not in a patch release, so that
+  users meet the warning before the release that may remove the form.
+- Keep the old form working by passing it on to the new one. If the new form
+  gives a different result, say so in `details`. Keep a deprecated function
+  exported and mark its help page as deprecated (title `Deprecated: use new()`,
+  `@keywords deprecated`). If a call gives both the old and the new argument,
+  stop and name both.
+- Warn with `warn_deprecated(what, with, since = "1.5.0")` where the old form
+  is detected. `what` and `with` are the old and the new code as users would
+  type it; pass `with = NULL` when nothing replaces the old form. The message
+  is fixed: it names the release that deprecated the form, the earliest release
+  that may remove it (the next minor release; set `removed_in` only to name a
+  later one) and the replacement, if there is one. Use `details` only for
+  something users would otherwise miss, such as a changed meaning.
+- Call `warn_deprecated()` once per user call. If one call can meet many old
+  forms, such as prior rows, collect them first and pass them as vectors, so
+  users get one warning and not one per row. The message lists the first 20
+  forms and counts the rest.
+- Add the NEWS bullet under `### Deprecated functions and arguments` in the
+  section of the release that deprecates the form. On a `dev-*` branch that is
+  the branch's own section ([ADR 0002](../.dev/decisions/0002-release-integration-branches.md)).
+- Test that the old form still works and warns.
+
+When the window has passed, you may remove the old form. Remove its tests with
+it, list the removal under the same heading in the release that removes it, and
+announce it in an issue before that release (rule 3). Forms deprecated before
+1.5.0 may be removed in any later release once the removal is announced the
+same way.
+
 ## Review and merging
 
 How many reviews a PR needs depends on what it touches.
@@ -71,7 +184,7 @@ How many reviews a PR needs depends on what it touches.
 |---|---|---|
 | **Low-risk** | Typos, docs only, CI config, tests only, NEWS only | None. May merge on green CI by anyone with write access. |
 | **Standard** | Everything else, including bug fixes and new models | One approving review from someone other than the author. |
-| **Pipeline or exported API** | The shared pipeline files (`R/bmm.R`, `R/bmmformula.R`, `R/helpers-model.R`, `R/helpers-data.R`, `R/helpers-prior.R`, `R/helpers-postprocess.R`, `R/helpers-inits.R`, `R/update.R`), or the signature or return value of an exported function | Two approving reviews. |
+| **Pipeline or exported API** | The shared pipeline files (`R/bmm.R`, `R/bmmformula.R`, `R/helpers-model.R`, `R/helpers-data.R`, `R/helpers-prior.R`, `R/helpers-postprocess.R`, `R/helpers-inits.R`, `R/update.R`), the signature or return value of an exported function, or deprecating or removing an exported function or argument | Two approving reviews. |
 
 A **new model** is a standard PR with one addition: the reviewer works through
 the reviewer block in the PR template. They read the likelihood against the
