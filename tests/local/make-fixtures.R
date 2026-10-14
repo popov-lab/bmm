@@ -1,6 +1,6 @@
 # Generates the small fitted-model fixtures used by tests/testthat/test-pp_check.R
 # for the multi-observable pp_check() tests (#401). Run from the repo root:
-#   Rscript tests/internal/generate_ppcheck_fixtures.R
+#   Rscript tests/local/make-fixtures.R
 # Fixtures are git-tracked in tests/testthat/assets/ but excluded from the
 # built package via .Rbuildignore; tests skip when they are absent.
 

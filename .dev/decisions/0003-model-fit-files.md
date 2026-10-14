@@ -32,4 +32,7 @@ Every open pull request and every existing clone would have to be rebuilt.
   tracked `.rds` files would add another copy of each to the history.
 - The same applies to the articles for MPT, TCC, the multivariate models and
   the racing models.
-- Open: the size limit. Proposed: 1 MiB per added or changed file.
+- The size limit is 1 MiB per added file or new version of a file, in any
+  commit of the pull request. The `file-size` workflow enforces it and is a
+  required check on `develop` and the `dev-*` branches (#517). The fits live
+  in the `article-fits` release.

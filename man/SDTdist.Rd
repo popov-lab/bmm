@@ -4,6 +4,7 @@
 \alias{SDTdist}
 \alias{sdt_d}
 \alias{sdt_criterion}
+\alias{sdt_bias}
 \title{Utility functions for Signal Detection Theory}
 \usage{
 sdt_d(
@@ -13,6 +14,12 @@ sdt_d(
 )
 
 sdt_criterion(
+  hit_rate,
+  fa_rate,
+  dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
+)
+
+sdt_bias(
   hit_rate,
   fa_rate,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic")
@@ -44,16 +51,22 @@ decision rule "respond old when the evidence exceeds the criterion":
 equal variance, this matches the \code{d} parameter of \code{\link[=sdt_yn]{sdt_yn()}} whenever
 \code{sdratio} is at its default.
 
-\code{sdt_criterion} returns the criterion (response bias) on the
-centred, noise-standardized evidence axis used by \code{\link[=sdt_yn]{sdt_yn()}}, where the
-noise and signal distributions sit at -d'/2 and +d'/2:
-\eqn{(Q(1 - FA) + Q(1 - H)) / 2}. For \code{dist = "normal"} this reduces to
-the familiar \eqn{-(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}{-(Phi^-1(H) + Phi^-1(FA)) / 2}.
+\code{sdt_criterion} returns the location of the decision criterion
+measured from the mean of the noise distribution, in noise-SD units, as
+the \code{criterion} parameter of \code{\link[=sdt_yn]{sdt_yn()}} is: \eqn{Q(1 - FA)}. It depends on
+the false-alarm rate alone. For \code{dist = "normal"} this is
+\eqn{-\Phi^{-1}(FA)}{-Phi^-1(FA)}.
+
+\code{sdt_bias} returns the criterion measured from the midpoint between
+the noise and signal means instead, as the \code{bias} parameter of \code{\link[=sdt_yn]{sdt_yn()}}
+is: \eqn{(Q(1 - FA) + Q(1 - H)) / 2}, which is \code{sdt_criterion() - sdt_d() / 2}. For \code{dist = "normal"} this is the familiar
+\eqn{c = -(\Phi^{-1}(H) + \Phi^{-1}(FA)) / 2}{c = -(Phi^-1(H) + Phi^-1(FA)) / 2}.
+Positive values are a conservative bias, toward "new"/"noise" responses.
 }
 \description{
-Compute sensitivity and criterion from hit and false alarm
-rates for different SDT distribution families. A single (hit, false alarm)
-pair cannot identify the signal-to-noise SD ratio, so both quantities are
+Compute sensitivity, criterion and bias from hit and false
+alarm rates for different SDT distribution families. A single (hit, false
+alarm) pair cannot identify the signal-to-noise SD ratio, so all three are
 the equal-variance values; see \code{\link[=sdt_yn]{sdt_yn()}} for the unequal-variance
 model.
 }
@@ -65,15 +78,17 @@ sdt_d(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 sdt_d(hit_rate = 0.75, fa_rate = 0.25, dist = "gumbel_min")
 # Compute criterion from hit and false alarm rates
 sdt_criterion(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
+# Compute the bias relative to the midpoint
+sdt_bias(hit_rate = 0.8, fa_rate = 0.2, dist = "normal")
 }
 \references{
 Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and
 psychophysics}. Wiley.
 }
 \seealso{
-\code{\link[=sdt_yn]{sdt_yn()}}, whose \code{d} and \code{criterion} parameters these two functions
-compute in closed form from observed rates: \code{sdt_d()} returns the same
-quantity as the \code{d} parameter and \code{sdt_criterion()} the same quantity as
-\code{criterion}, on the same axis, whenever \code{sdratio} is at its default.
+\code{\link[=sdt_yn]{sdt_yn()}}, whose \code{d}, \code{criterion} and \code{bias} parameters these
+functions compute in closed form from observed rates: \code{sdt_d()},
+\code{sdt_criterion()} and \code{sdt_bias()} return the same quantities as the
+parameters of the same name whenever \code{sdratio} is at its default.
 }
 \keyword{distribution}

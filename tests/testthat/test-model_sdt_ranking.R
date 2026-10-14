@@ -210,23 +210,29 @@ test_that("ranking d is d_a: equal variance is a no-op", {
 })
 
 test_that("ranking d is d_a: unequal variance uses the RMS-scaled separation", {
-  # the same model written with the separation in noise-SD units
+  # the same model written with the separation in noise-SD units, on the rule
+  # each branch uses: the free Hermite ladder over the target for a ratio below
+  # 1, 48 Legendre nodes on the noise interval [-6, 6] for a ratio above it
   m <- 4L
   for (sdr in c(-0.25, 0.35)) {
     r <- exp(sdr)
-    s <- sqrt((1 + r^2) / 2)
-    # a non-zero sdratio selects the free-sdratio node ladder
-    gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, TRUE))
-    nodes <- gh$nodes
-    w <- gh$weights
+    delta <- 1.4 * sqrt((1 + r^2) / 2)
     ref <- vapply(seq_len(m), function(k) {
-      eta <- 1.4 * s + r * nodes
-      exp(lchoose(m - 1, k - 1) + matrixStats::logSumExp(
-        log(w) + (m - k) * pnorm(eta, log.p = TRUE) +
-          (k - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)))
+      if (r < 1) {
+        gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, TRUE))
+        eta <- delta + r * gh$nodes
+        return(choose(m - 1, k - 1) *
+                 sum(gh$weights * pnorm(eta)^(m - k) * pnorm(-eta)^(k - 1)))
+      }
+      x <- 6 * bmm:::.gl_rule(48L)$nodes
+      w <- 6 * bmm:::.gl_rule(48L)$weights
+      choose(m - 1, k - 1) *
+        sum(w * dnorm(x, delta, r) * pnorm(x)^(m - k) * pnorm(-x)^(k - 1)) +
+        (k == 1) * pnorm(6, delta, r, lower.tail = FALSE) +
+        (k == m) * pnorm(-6, delta, r)
     }, numeric(1))
     expect_equal(bmm:::.ranking_all_probs_r(1.4, m, "normal", sdr),
-                 ref / sum(ref), info = paste("sdratio =", sdr))
+                 ref / sum(ref), tolerance = 1e-12, info = paste("sdratio =", sdr))
   }
 })
 
@@ -252,52 +258,81 @@ test_that("the quadrature ladder grows with set size and with a free sdratio", {
   }
 })
 
-test_that("the free-sdratio ladder is accurate where the fixed one is not", {
-  # The reference shares nothing with Gauss-Hermite: adaptive quadrature in a
-  # peak-shifted log space, integrated on each side of the peak.
-  log_integrand <- function(x, k, m, d, sigma) {
+# The reference shares nothing with either quadrature rule: adaptive quadrature
+# in a peak-shifted log space over the target's standard normal deviate,
+# integrated on each side of the peak.
+ranking_ref_prob <- function(k, m, d, sigma) {
+  f <- function(x) {
     eta <- d * sqrt((1 + sigma^2) / 2) + sigma * x
     dnorm(x, log = TRUE) + (m - k) * pnorm(eta, log.p = TRUE) +
       (k - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
   }
-  ref_logp <- function(k, m, d, sigma) {
-    f <- function(x) log_integrand(x, k, m, d, sigma)
-    peak <- optimize(f, c(-200, 200), maximum = TRUE, tol = 1e-10)
-    x0 <- peak$maximum
-    f0 <- peak$objective
-    g <- function(x) {
-      v <- exp(f(x) - f0)
-      v[!is.finite(v)] <- 0
-      v
-    }
-    left <- integrate(g, -Inf, x0, rel.tol = 1e-12, abs.tol = 0,
-                      subdivisions = 2000L)
-    right <- integrate(g, x0, Inf, rel.tol = 1e-12, abs.tol = 0,
-                       subdivisions = 2000L)
-    lchoose(m - 1, k - 1) + f0 + log(left$value + right$value)
+  peak <- optimize(f, c(-200, 200), maximum = TRUE, tol = 1e-10)
+  g <- function(x) {
+    v <- exp(f(x) - peak$objective)
+    v[!is.finite(v)] <- 0
+    v
   }
-  # R only evaluates the free ladder, so the fixed one is rebuilt here to show
-  # that the node count, not the kernel, is what makes the free one accurate
-  fixed_ladder_prob <- function(d, rank_pos, m, sigma) {
-    gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, FALSE))
-    eta <- gh$nodes * sigma + d * bmm:::.sdt_rms_scale(sigma)
-    log_terms <- log(gh$weights) +
-      (m - rank_pos) * pnorm(eta, log.p = TRUE) +
-      (rank_pos - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
-    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::logSumExp(log_terms))
-  }
+  left <- integrate(g, -Inf, peak$maximum, rel.tol = 1e-12, abs.tol = 0,
+                    subdivisions = 2000L)
+  right <- integrate(g, peak$maximum, Inf, rel.tol = 1e-12, abs.tol = 0,
+                     subdivisions = 2000L)
+  exp(lchoose(m - 1, k - 1) + peak$objective + log(left$value + right$value))
+}
 
-  d <- 1.4
-  sigma <- 2
-  for (m in c(4L, 8L)) {
+test_that("Gaussian rank probabilities are accurate over sdratio 0.2-8, d -1-4, m 2-20", {
+  # corners and centre of the range the quadrature promises 1e-6 over; it
+  # measured 2.4e-10 through m = 8 and 4.3e-9 at m = 20, so 1e-8 leaves room
+  # without hiding a regression to the old Hermite-only rule (2e-4 at sdratio 3).
+  # Both rules are weakest next to sdratio = 1, so m = 20 is checked there too.
+  cells <- rbind(
+    expand.grid(sigma = c(0.2, 8), d = c(-1, 4), m = c(2L, 8L, 20L)),
+    data.frame(sigma = c(0.999, 1.26, 1.001), d = 1.5, m = 5L),
+    data.frame(sigma = c(1, 1.001), d = 0, m = 20L)
+  )
+  for (i in seq_len(nrow(cells))) {
+    sigma <- cells$sigma[i]
+    d <- cells$d[i]
+    m <- cells$m[i]
     for (k in seq_len(m)) {
-      ref <- exp(ref_logp(k, m, d, sigma))
-      info <- paste("m =", m, "k =", k)
-      p_free <- bmm:::.ranking_prob_r(d, k, m, "normal", log(sigma))
-      expect_lt(abs(p_free - ref), 1e-6, label = info)
-      p_fixed <- fixed_ladder_prob(d, k, m, sigma)
-      expect_false(abs(p_fixed - ref) < 1e-6, info = info)
+      expect_lt(abs(bmm:::.ranking_prob_r(d, k, m, "normal", log(sigma)) -
+                      ranking_ref_prob(k, m, d, sigma)), 1e-8,
+                label = paste0("sigma = ", sigma, ", d = ", d, ", m = ", m, ", k = ", k))
     }
+  }
+})
+
+test_that("a Hermite rule over the target under-resolves sdratio above 1", {
+  # why ratios above 1 integrate on the noise axis: the lure terms change on a
+  # scale of 1/sigma in Hermite node units, and even the 128-node free ladder
+  # misses them at sigma = 3
+  gh <- bmm:::.gh_rule(128L)
+  d <- 1.4
+  sigma <- 3
+  m <- 8L
+  hermite_err <- kernel_err <- numeric(m)
+  for (k in seq_len(m)) {
+    eta <- d * sqrt((1 + sigma^2) / 2) + sigma * gh$nodes
+    hermite <- choose(m - 1, k - 1) *
+      sum(gh$weights * pnorm(eta)^(m - k) * pnorm(-eta)^(k - 1))
+    ref <- ranking_ref_prob(k, m, d, sigma)
+    hermite_err[k] <- abs(hermite - ref)
+    kernel_err[k] <- abs(bmm:::.ranking_prob_r(d, k, m, "normal", log(sigma)) - ref)
+  }
+  expect_gt(max(hermite_err), 1e-5)
+  expect_lt(max(kernel_err), 1e-8)
+})
+
+test_that("the generated Gauss-Legendre rule is symmetric and integrates polynomials exactly", {
+  # the kernel reads Phi(-x) off the mirrored node, so the mirror must be exact
+  for (n in c(48L, 64L)) {
+    gl <- bmm:::.gl_rule(n)
+    expect_identical(gl$nodes, -rev(gl$nodes))
+    expect_identical(gl$weights, rev(gl$weights))
+    expect_equal(sum(gl$weights), 2)
+    expect_equal(sum(gl$weights * gl$nodes^2), 2 / 3)
+    expect_equal(sum(gl$weights * gl$nodes^10), 2 / 11)
+    expect_equal(sum(gl$weights * gl$nodes^60), 2 / 61)
   }
 })
 
@@ -317,15 +352,29 @@ test_that("the generated Gauss-Hermite rule integrates the normal exactly", {
 test_that("configure_model substitutes every quadrature token", {
   sc <- system.file("stan_chunks", package = "bmm")
   tpl <- read_lines2(file.path(sc, "sdt_ranking_funs.stan"))
+  n_entries <- function(code, name) {
+    vec <- sub(paste0(".*", name, " = to_vector\\(\\{([^}]*)\\}\\).*"), "\\1",
+               gsub("\n", " ", code))
+    length(strsplit(vec, ",")[[1]])
+  }
   for (free in c(FALSE, TRUE)) {
     code <- bmm:::.ranking_fill_quadrature(tpl, max_m = 4, free_sdratio = free)
     expect_false(grepl("{{", code, fixed = TRUE), info = paste("free =", free))
     n <- bmm:::.ranking_gh_n(4, free)
     expect_match(code, paste0("int N_GH = ", n, ";"), fixed = TRUE)
-    # the emitted vectors must hold exactly N_GH entries
-    nodes <- sub(".*gh_nodes = to_vector\\(\\{([^}]*)\\}\\).*", "\\1",
-                 gsub("\n", " ", code))
-    expect_length(strsplit(nodes, ",")[[1]], n)
+    # the emitted vectors must hold exactly as many entries as declared
+    expect_equal(n_entries(code, "gh_nodes"), n)
+    expect_equal(n_entries(code, "gh_weights"), n)
+  }
+  # the Legendre rule has 48 nodes through m = 8 and 64 above, on [-6, 6]
+  for (max_m in c(8, 9)) {
+    code <- bmm:::.ranking_fill_quadrature(tpl, max_m = max_m, free_sdratio = TRUE)
+    n <- if (max_m == 8) 48 else 64
+    expect_match(code, paste0("int N_GL = ", n, ";"), fixed = TRUE)
+    expect_match(code, "real half_width = 6;", fixed = TRUE)
+    for (vec in c("gl_nodes", "gl_weights", "gl_cdf")) {
+      expect_equal(n_entries(code, vec), n, info = paste(vec, "max_m =", max_m))
+    }
   }
 })
 
@@ -411,7 +460,7 @@ test_that("the Stan ranking kernels match their R counterparts", {
 
   max_m <- 5L
   cells <- expand.grid(m = 2:max_m, d = c(-10, -3, 0, 1.3, 4, 10, 30),
-                       sdratio = log(c(0.5, 1, 1.8)), dist = 1:2)
+                       sdratio = log(c(0.3, 0.5, 1, 1.8, 3, 6)), dist = 1:2)
   # d = 10 already sits past a tenth of the default prior under a log link;
   # beyond it the Gaussian branch's probability-space sum underflows. The
   # Gumbel branch keeps the lgamma form in Stan, exact to 1e-10 from d = -10
@@ -422,8 +471,11 @@ test_that("the Stan ranking kernels match their R counterparts", {
   grid$sdratio[grid$dist == 2] <- 0
 
   # the Gaussian reference is the textbook log-space integrand on the nodes
-  # Stan was given, so what remains is the kernel, not the quadrature rule
+  # Stan was given, so what remains is the kernel, not the quadrature rule:
+  # Hermite nodes over the target for a ratio up to 1, and above it 48
+  # Legendre nodes on the noise interval [-6, 6] plus the target's mass beyond
   gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(max_m, TRUE))
+  gl <- bmm:::.gl_rule(48L)
   r_logmu <- vapply(seq_len(nrow(grid)), function(i) {
     g <- grid[i, ]
     if (g$cat > g$m) return(-100)
@@ -431,10 +483,26 @@ test_that("the Stan ranking kernels match their R counterparts", {
       return(log(bmm:::.ranking_prob_r(g$d, g$cat, g$m, "gumbel_min")))
     }
     r <- exp(g$sdratio)
-    eta <- g$d * sqrt((1 + r^2) / 2) + r * gh$nodes
-    lchoose(g$m - 1, g$cat - 1) + matrixStats::logSumExp(
-      log(gh$weights) + (g$m - g$cat) * pnorm(eta, log.p = TRUE) +
-        (g$cat - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE))
+    delta <- g$d * sqrt((1 + r^2) / 2)
+    if (r <= 1) {
+      eta <- delta + r * gh$nodes
+      return(lchoose(g$m - 1, g$cat - 1) + matrixStats::logSumExp(
+        log(gh$weights) + (g$m - g$cat) * pnorm(eta, log.p = TRUE) +
+          (g$cat - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)))
+    }
+    x <- 6 * gl$nodes
+    body <- lchoose(g$m - 1, g$cat - 1) + matrixStats::logSumExp(
+      log(6 * gl$weights) + dnorm(x, delta, r, log = TRUE) +
+        (g$m - g$cat) * pnorm(x, log.p = TRUE) +
+        (g$cat - 1) * pnorm(x, lower.tail = FALSE, log.p = TRUE))
+    tail <- if (g$cat == 1) {
+      pnorm(6, delta, r, lower.tail = FALSE, log.p = TRUE)
+    } else if (g$cat == g$m) {
+      pnorm(-6, delta, r, log.p = TRUE)
+    } else {
+      -Inf
+    }
+    matrixStats::logSumExp(c(body, tail))
   }, numeric(1))
 
   stan_logmu <- ranking_stan_logmu(
@@ -444,6 +512,15 @@ test_that("the Stan ranking kernels match their R counterparts", {
   )
   expect_true(all(is.finite(stan_logmu)))
   expect_lt(max(abs(stan_logmu - r_logmu)), 1e-10)
+
+  # and the R companion that log_lik and posterior_epred use reads the same
+  # nodes; it normalizes the m probabilities, which moves each log p by the
+  # quadrature's departure from summing to 1 (below 2e-9)
+  companion <- vapply(seq_len(nrow(grid)), function(i) {
+    g <- grid[i, ]
+    sdt_ranking_logmu(g$cat, g$m, matrix(g$d), g$sdratio, g$dist)
+  }, numeric(1))
+  expect_lt(max(abs(stan_logmu - companion)), 1e-8)
 })
 
 test_that("sdt_ranking_logmu preserves the draws-by-observation shape", {
@@ -600,6 +677,23 @@ test_that("check_data errors when set size exceeds the number of rank columns", 
                     rank1 = 10, rank2 = 10, rank3 = 10, rank4 = 10)
   expect_error(check_data(model, dat, bmf(d ~ 1)),
                "number of rank columns")
+})
+
+test_that("check_data warns about a free sdratio only above set size 20", {
+  # the Gaussian quadrature is verified to 1e-6 through m = 20
+  formula <- bmf(d ~ 1, sdratio ~ 1)
+  for (m in c(20L, 21L)) {
+    ranks <- paste0("rank", seq_len(m))
+    model <- bmm:::update_model_fixed_parameters(
+      sdt_ranking(ranks, m = m, dist = "normal"), formula
+    )
+    dat <- as.data.frame(rsdt_ranking(2, 100, m = m, d = 1.5, dist = "normal"))
+    if (m == 20L) {
+      expect_no_warning(check_data(model, dat, formula))
+    } else {
+      expect_warning(check_data(model, dat, formula), "set sizes above 20")
+    }
+  }
 })
 
 test_that("NA rank counts beyond a row's set size are structural zeros", {
