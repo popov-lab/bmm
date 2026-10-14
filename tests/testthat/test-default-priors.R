@@ -455,8 +455,15 @@ test_that("every model ships an sd default on the link scale of each parameter",
     broeder_schuetz_2009_e3,
     sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
   )
-  expect_equal(sd_default(pr, "d"), "exponential(1)")
-  for (par in c("criterion", "sdratio")) expect_equal(sd_default(pr, par), "exponential(2)")
+  # criterion carries half of d's between-subject spread, so it joins d at rate 1
+  for (par in c("d", "criterion")) expect_equal(sd_default(pr, par), "exponential(1)")
+  expect_equal(sd_default(pr, "sdratio"), "exponential(2)")
+  pr <- default_prior(
+    bmf(d ~ 1 + (1 | id), bias ~ 0 + condition + (1 | id)),
+    broeder_schuetz_2009_e3,
+    sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
+  )
+  expect_equal(sd_default(pr, "bias"), "exponential(2)")
 
   mafc_data <- data.frame(
     n_correct = rep(c(30, 24), 10), n_trials = 40, id = factor(rep(1:10, each = 2))
@@ -482,8 +489,8 @@ test_that("every model ships an sd default on the link scale of each parameter",
                         spacing ~ 1 + (1 | id), sdratio ~ 1 + (1 | id))
   pr <- default_prior(rating_formula, rating_data,
                       sdt_rating(response = paste0("r", 1:4), stimulus = "stimulus"))
-  expect_equal(sd_default(pr, "d"), "exponential(1)")
-  for (par in c("criterion", "spacing", "sdratio")) {
+  for (par in c("d", "criterion")) expect_equal(sd_default(pr, par), "exponential(1)")
+  for (par in c("spacing", "sdratio")) {
     expect_equal(sd_default(pr, par), "exponential(2)")
   }
 

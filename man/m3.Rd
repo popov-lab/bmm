@@ -25,14 +25,29 @@ named after the response categories, e.g. \code{c(corr = 1, other = 4)}, are mat
 the categories by name. Numbers without names, or with other names, are taken in
 the order of \code{resp_cats}, and other names become the names of the columns
 bmm adds to the data. Column names given category names, e.g.
-\code{c(other = "n_other", corr = "n_corr")}, are matched by name as well, in any order.}
+\code{c(other = "n_other", corr = "n_corr")}, are matched by name as well, in any order.
+Custom activation formulas can use numbers by these column names; numbers
+without names or named after the categories are called \verb{n_opt_<category>}.}
 
-\item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax"
-or "simple". The "softmax" option implements the softmax normalization of activation into
+\item{choice_rule}{The choice rule that should be used for the M3. The options are "softmax",
+"simple", or "gaussian". The "softmax" option implements the softmax normalization of activation into
 probabilities for choosing the different response categories. The "simple" option implements
 a simple normalization of the absolute activations over the sum of all activations. For details
 on the differences of these choice rules please see the appendix of Oberauer & Lewandowsky (2019)
-"Simple measurement models for complex working memory tasks" published in Psychological Review.}
+"Simple measurement models for complex working memory tasks" published in Psychological Review.
+The "gaussian" option adds independent standard normal noise to the activation of every
+candidate and chooses the candidate with the largest value (a Thurstonian rule: the choice is the
+maximum of noisy activations); "softmax" is the same with Gumbel noise. Activations under
+"gaussian" are on a smaller scale, and the difference is not one constant factor: \code{a} shrinks
+more than \code{c}, so a comparison of \code{c} with \code{a}, and effects of conditions that change the
+number of candidates (such as set size), can differ between the two rules. Sampling under
+"gaussian" costs about 40 times as much per iteration as under "softmax", because each
+probability is a 40-node numerical integral: a 40-subject, three-condition model with random
+intercepts took 15 seconds under "softmax" and about 4 minutes under "gaussian" end to end
+(4 chains, 1000 + 1000 iterations, Stan compilation included), 2.5 minutes with
+\code{threads = threading(2)}. In versions \code{ss} and \code{cs}, \code{c} and \code{a} have \code{normal(3, 1)} main priors
+under "softmax" and \code{normal(2, 1)} under "gaussian"; under "simple" \code{c} has \code{normal(3, 1)} and
+\code{a} has \code{normal(0, 1)}, on the log scale.}
 
 \item{version}{Character. The version of the M3 model to use. Can be one of
 \code{ss}, \code{cs}, or \code{custom}. The default is \code{custom}.}
@@ -171,6 +186,17 @@ decision task.
 }
 \item \strong{Default priors:}
 }
+}
+
+\subsection{Missing values and reserved names}{
+
+A missing response count (\code{NA}) is counted as 0. If the category has options in that
+row, \code{bmm()} warns and says how many counts were replaced; if it has none (\code{num_options}
+is 0 in that row), the 0 is true and there is no warning, as for \code{dist} in
+\link{oberauer_lewandowsky_2019_e1}. A missing value in a column named in \code{num_options} is
+an error: enter 0 where there were no options. Data columns named \code{Y}, \code{nTrials} or
+\verb{Idx_<category>} are refused because \code{bmm()} creates columns with these names; response
+categories may be called \code{Y} or \code{nTrials}.
 }
 }
 \examples{

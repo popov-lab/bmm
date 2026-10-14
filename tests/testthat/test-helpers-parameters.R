@@ -237,6 +237,37 @@ test_that(".get_parameter_info returns correct info for SDM params", {
   expect_false(info_kappa$softmax)
 })
 
+test_that(".get_parameter_info treats the alternative the formula leaves out as not in the fit (#543)", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit_criterion <- suppressWarnings(bmm(
+    bmf(d ~ 1, criterion ~ 1), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  fit_bias <- suppressWarnings(bmm(
+    bmf(d ~ 1, bias ~ 1), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+
+  expect_equal(.get_parameter_info(fit_criterion, "criterion")$model_name, "criterion")
+  expect_equal(.get_parameter_info(fit_bias, "bias")$model_name, "bias")
+  expect_error(
+    .get_parameter_info(fit_criterion, "bias"),
+    "Parameter 'bias' is not estimated in this fit: its formula uses 'criterion'",
+    fixed = TRUE
+  )
+  expect_error(
+    .get_parameter_info(fit_bias, "criterion"),
+    "Parameter 'criterion' is not estimated in this fit: its formula uses 'bias'",
+    fixed = TRUE
+  )
+  expect_error(
+    .get_parameter_info(fit_criterion, "nonsense"),
+    "Available parameters: d, criterion, sdratio",
+    fixed = TRUE
+  )
+})
+
 # ===========================================================================
 # native_parameters() and native_transform()
 # Tier 1: Unit tests (always run, no fitted model)
@@ -533,6 +564,65 @@ test_that(".np_grid_vars keeps a grouping variable that is also a predictor", {
   expect_setequal(.np_grid_vars(fit, "c", NA), "ID")
 })
 
+test_that(".np_grid_vars spans only data columns for a non-linear formula", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ exp(nlc), nlc ~ 1 + set_size, kappa ~ 1), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+  expect_setequal(.np_grid_vars(fit, pars, NULL), "set_size")
+  # the sub-parameter's own predictors reach the grid through c's formula
+  expect_setequal(.np_grid_vars(fit, "c", NULL), "set_size")
+  expect_length(.np_grid_vars(fit, "kappa", NULL), 0)
+})
+
+test_that(".np_grid_vars honours the re_formula regimes on a mock fit", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 | ID), kappa ~ 1 + (1 | ID)), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+
+  expect_setequal(.np_grid_vars(fit, pars, NULL), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, NA), "set_size")
+  expect_setequal(.np_grid_vars(fit, pars, ~ (1 | ID)), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, ~ (1 | other)), "set_size")
+  expect_equal(.np_grid_vars(fit, "kappa", NA), character(0))
+})
+
+test_that(".np_grid_vars follows sub-parameters to their grouping variables", {
+  fit <- load_np_m3_fit()
+  fit$bmm$user_formula$c <- stats::as.formula(c ~ exp(logc) * cond)
+  fit$bmm$user_formula$logc <- stats::as.formula(logc ~ 1 + (1 | ID))
+  expect_setequal(.np_grid_vars(fit, "c", NULL), c("cond", "ID"))
+  expect_setequal(.np_grid_vars(fit, "c", NA), "cond")
+})
+
+test_that(".np_grid_vars treats a correlation ID as a label, not a grid variable", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+  expect_setequal(.np_grid_vars(fit, pars, NULL), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, NA), "set_size")
+  expect_s3_class(.np_newdata(fit, .np_grid_vars(fit, pars, NULL), NULL), "data.frame")
+})
+
+test_that("native_parameters builds its grid for a formula with a correlation ID", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), oberauer_lin_2017,
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  # a mock fit has no draws, so the call fails later; only the grid error matters
+  err <- tryCatch(native_parameters(fit, summary = TRUE), error = conditionMessage)
+  expect_false(is.character(err) && grepl("not columns of the model data", err))
+})
+
 test_that(".np_newdata returns the unique observed cells in a stable order", {
   fit <- load_np_sdm_fit()
   grid <- .np_newdata(fit, "set_size", NULL)
@@ -824,4 +914,27 @@ test_that("native_parameters marginalises over new grouping levels when asked", 
     allow_new_levels = TRUE, sample_new_levels = "gaussian"
   )
   expect_true(all(is.finite(out$value)))
+})
+
+test_that("native_parameters and parameter_info skip the unused alternative parameter", {
+  withr::local_options(bmm.silent = 2)
+  dat <- data.frame(n_old = c(10, 40, 12, 38), stimulus = c(0, 1, 0, 1),
+                    n_trials = 50, id = c(1, 1, 2, 2))
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  for (anchor in c("criterion", "bias")) {
+    formula <- bmf(d ~ 1)
+    formula[[anchor]] <- stats::as.formula(paste(anchor, "~ 1"))
+    fit <- suppressWarnings(suppressMessages(bmm(
+      formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE
+    )))
+    # a mock fit has no draws, so the call fails later; only the declared-but-
+    # not-fitted error for the other alternative matters
+    err <- tryCatch(native_parameters(fit, summary = TRUE), error = conditionMessage)
+    expect_false(grepl("declared by the model", err), label = anchor)
+    other <- setdiff(c("criterion", "bias"), anchor)
+    expect_false(other %in% parameter_info(fit)$parameter, label = anchor)
+    expect_true(anchor %in% parameter_info(fit)$parameter, label = anchor)
+  }
+  # without a formula the model lists both, as its help page does
+  expect_true(all(c("criterion", "bias") %in% parameter_info(model)$parameter))
 })

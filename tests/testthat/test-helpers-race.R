@@ -49,11 +49,13 @@ test_that("race_time_range() brackets power-law tails for race_expected_time()",
   expect_true(all(exp(log_surv(range[2])) * range[2] <= 1e-12))
   expect_true(all(-expm1(log_surv(range[1])) <= 1e-12) || range[1] <= range[2] * 1e-12)
   expect_equal(race_expected_time(log_surv, range[1], range[2]), 1 / (k - 1), tolerance = 1e-6)
+  expect_false(attr(range, "truncated"))
 })
 
 test_that("race_time_range() stops at t_max for a survivor without a finite mean", {
   log_surv <- function(t) matrix(-log1p(t), nrow = 1)
   expect_equal(race_time_range(log_surv, t_max = 1e5)[2], 1e5)
+  expect_true(attr(race_time_range(log_surv, t_max = 1e5), "truncated"))
   nan_surv <- function(t) matrix(NaN, nrow = 1)
   expect_equal(race_time_range(nan_surv, t_max = 1e3)[2], 1e3)
 })
@@ -93,6 +95,7 @@ test_that("log_Phi_diff() is accurate in both tails and across zero", {
 
 test_that("recycle_args() recycles to the longest argument and keeps the names", {
   expect_equal(recycle_args(a = 1, b = 1:3), list(a = c(1, 1, 1), b = 1:3))
+  expect_equal(recycle_args(a = 1, b = numeric(0)), list(a = numeric(0), b = numeric(0)))
 })
 
 # =============================================================================
@@ -107,6 +110,8 @@ test_that("race_category_names() returns the categories and refuses unusable nam
   expect_error(race_category_names(bmf(Intercept ~ 1), shared), "reserved internal")
   expect_error(race_category_names(bmf(data ~ 1), shared), "Stan reserved")
   expect_error(race_category_names(bmf(Y ~ 1), shared), "Stan reserved")
+  expect_error(race_category_names(bmf(start ~ 1, end ~ 1), shared), "Stan reserved")
+  expect_error(race_category_names(bmf(seq ~ 1, other ~ 1), shared), "Stan reserved")
   # Stan is case-sensitive, so only the exact keyword is refused
   expect_equal(race_category_names(bmf(Data ~ 1), shared), "Data")
   expect_error(race_category_names(bmf(t ~ 1), shared, stan_names = c("t", "lp")), "Stan code uses")
@@ -139,6 +144,8 @@ test_that("race_code_simple_response() codes correct against any error", {
                "non-numeric label")
   expect_error(race_code_simple_response(model, transform(dat, resp = 5), "racestub"),
                "integers in 1:4")
+  coded_dbl <- race_code_simple_response(race_stub(n_choices = 4), dat, "racestub")
+  expect_type(coded_dbl$.racestub_n2, "integer")
 })
 
 test_that("race_code_custom_response() codes the categories and their accumulators", {

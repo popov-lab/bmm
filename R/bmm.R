@@ -154,26 +154,9 @@ bmm <- function(formula, data, model,
   opts <- configure_options(configure_opts)
   dots$parallel <- NULL
 
-  # check model, formula and data, and transform data if necessary
-  user_formula <- formula
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
+  cfg <- configure_fit(formula, data, model, prior, frame_args = brms_frame_args(dots))
 
-  # generate the model specification to pass to brms later
-  config_args <- configure_model(model, data, formula)
-
-  # configure the default prior and combine with user-specified prior
-  frame_args <- brms_frame_args(dots)
-  prior <- brms::do_call(configure_prior, c(list(model, data, config_args$formula, prior), frame_args))
-
-  # configure initial values; the prior decides which parameters exist
-  config_args$init <- brms::do_call(
-    create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
-  )
-
-  # estimate the model
-  fit_args <- combine_args(nlist(config_args, opts, dots, prior))
+  fit_args <- combine_args(nlist(config_args = cfg$config_args, opts, dots, prior = cfg$prior))
   fit_args$control <- configure_control(
     fit_args$control,
     opts$backend %||% getOption("brms.backend", "rstan"),
@@ -197,11 +180,10 @@ bmm <- function(formula, data, model,
     error = add_setup_hint
   )
 
-  # model post-processing
   fit <- postprocess_brm(
-    model, fit,
+    cfg$model, fit,
     fit_args = fit_args,
-    user_formula = user_formula,
+    user_formula = cfg$user_formula,
     configure_opts = configure_opts
   )
 

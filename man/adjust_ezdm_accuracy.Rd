@@ -7,12 +7,14 @@
 adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop, guess_rate = 0.5)
 }
 \arguments{
-\item{n_upper}{Numeric. Count of upper boundary (correct) responses.}
+\item{n_upper}{Numeric. Count of upper boundary (correct) responses, a
+single value.}
 
-\item{n_trials}{Numeric. Total number of trials.}
+\item{n_trials}{Numeric. Total number of trials, a single value.}
 
 \item{contaminant_prop}{Numeric. Estimated proportion of contaminant trials
-(e.g., from the \code{contaminant_prop} column of \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}}).}
+(e.g., from the \code{contaminant_prop} column of \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}}), a
+single value.}
 
 \item{guess_rate}{Numeric. Assumed accuracy rate for contaminant trials
 (random guessing). Default is 0.5 (appropriate for 2AFC tasks).}
@@ -34,6 +36,10 @@ are assumed to produce correct responses at a fixed guess rate (e.g., 0.5
 for 2AFC tasks).
 }
 \details{
+The function adjusts one cell at a time. Vectors of length greater
+than one are an error; to correct several cells, use
+\code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}} on each group.
+
 Uses binomial sampling to estimate the number of contaminant trials
 and contaminant correct responses, then subtracts these from the raw
 counts. Because of the stochastic sampling, results will vary across

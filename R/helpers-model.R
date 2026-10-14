@@ -442,7 +442,7 @@ response_annotations.default <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
-  if (inherits(model, "m3")) {
+  if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
   if (inherits(model, "sdt_yn")) {
@@ -474,8 +474,33 @@ print.bmmodel <- function(x, ...) {
     )
     cat("Fixed:     ", fixed_str, "\n")
   }
-  cat("Use parameter_info() for more details.\n")
+  print_model_details(x)
+  cat("Use parameter_info() for parameter descriptions, links and fixed values.\n")
   invisible(x)
+}
+
+# print.bmmodel dispatches before any model-specific print method (classes
+# are ordered general to specific), so model-specific lines are added here
+
+#' Generic S3 method for model-specific lines in `print()` of a model
+#'
+#' Called by `print()` on a `bmmodel` after the lines all models share and
+#' before the closing pointer to [parameter_info()]. The default method prints
+#' nothing.
+#'
+#' @param model A `bmmodel` object
+#' @param ... Unused
+#'
+#' @return Called for its printed output; returns `NULL` invisibly
+#' @keywords internal developer
+#' @export
+print_model_details <- function(model, ...) {
+  UseMethod("print_model_details")
+}
+
+#' @export
+print_model_details.default <- function(model, ...) {
+  invisible(NULL)
 }
 
 
@@ -489,6 +514,7 @@ print.bmmodel <- function(x, ...) {
 model_groups <- c(
   "Visual working memory" = "Continuous reproduction",
   "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
+  "Categorical decision making, memory, and reasoning" = "Processing-tree models",
   "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
   "Recognition Memory" = "Detection, recognition and confidence judgments",
   "Decision Making / Response times" = "Choices and response times"
@@ -589,6 +615,11 @@ data_column_roles <- list(
     resp_error = "response error relative to the target, in radians",
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     set_size = "set size (a column, or one number)"
+  ),
+  mpt = c(
+    trees = "number of responses in each response category, one column per category, named after the branches of the trees",
+    tree_id = "the tree each row belongs to (models with several trees)",
+    covariates = "numeric columns used in branch expressions, e.g. design-fixed guessing rates (optional)"
   ),
   sdm = c(
     resp_error = "response error relative to the target, in radians"
@@ -708,8 +739,8 @@ model_overview <- function(group = NULL) {
 #'   meant for, one line per model with its constructor and full name. The
 #'   groups are: continuous reproduction; categorical recall and n-AFC
 #'   decisions; detection, recognition and confidence judgments; choices and
-#'   response times. Type `?modelname` (for example `?imm`) for the arguments
-#'   of a model.
+#'   response times; processing-tree models. Type `?modelname` (for example
+#'   `?imm`) for the arguments of a model.
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
@@ -1424,27 +1455,71 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
+  add_bmm_version_to_stancode(call_brms_extractor(
+    brms::stancode,
+    configure_fit(object, data, model, prior, until = "prior", frame_args = brms_frame_args(dots)),
+    dots
+  ))
+}
 
-  # check model, formula and data, and transform data if necessary
-  formula <- object
+# Everything brm() needs to fit a specification: the checked model, the brms
+# formula with its stanvars, the prior, and the initial values, plus the model
+# and user formula that postprocess_brm() stores in the fit. Shared by bmm()
+# and the stancode/standata/default_prior extractors. `until` says how far to
+# go, because each step costs a brms frame build: "init" for bmm(), "prior"
+# for stancode() and default_prior(), "model" for standata(), whose Stan data
+# depends on neither. `frame_args` are the brm() arguments besides the formula
+# and data that shape the model frame (see brms_frame_args())
+configure_fit <- function(formula, data = NULL, model = NULL, prior = NULL, until = "init",
+                          frame_args = list()) {
+  UseMethod("configure_fit")
+}
+
+#' @export
+configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior = NULL,
+                                     until = "init", frame_args = list()) {
+  user_formula <- formula
+  # the user's expression for the data lives in the caller of the generic
+  # (bmm() or an extractor). It is set before check_data(), whose methods print
+  # it (order_data_query()), and again after, because some methods rebuild the
+  # data frame without it
+  data_name <- substitute_name(data, envir = parent.frame())
+  if (!missing(data) && !is.null(data) && (is.list(data) || is.atomic(data))) {
+    attr(data, "data_name") <- data_name
+  }
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
+  attr(data, "data_name") <- data_name
   formula <- check_formula(model, data, formula)
-
-  # generate the model specification to pass to brms later
   config_args <- configure_model(model, data, formula)
-
-  # configure the default prior and combine with user-specified prior
+  if (until == "model") {
+    return(nlist(config_args, model, user_formula))
+  }
   prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, prior), brms_frame_args(dots))
+    configure_prior, c(list(model, data, config_args$formula, prior), frame_args)
   )
+  # the prior decides which parameters exist, so the inits are built from it
+  if (until == "init") {
+    config_args$init <- brms::do_call(
+      create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
+    )
+  }
+  nlist(config_args, prior, model, user_formula)
+}
 
-  # extract stan code
-  fit_args <- combine_args(nlist(config_args, dots, prior))
-  fit_args$object <- fit_args$formula
-  fit_args$formula <- NULL
-  code <- brms::do_call(brms::stancode, fit_args)
-  add_bmm_version_to_stancode(code)
+#' @export
+configure_fit.default <- function(formula, data = NULL, model = NULL, ...) {
+  model <- check_model(model, data, formula)
+  data <- check_data(model, data, formula)
+  check_formula(model, data, formula)
+}
+
+# The brms extractors take the formula as `object`
+call_brms_extractor <- function(fun, cfg, dots) {
+  args <- combine_args(nlist(config_args = cfg$config_args, dots, prior = cfg$prior))
+  args$object <- args$formula
+  args$formula <- NULL
+  brms::do_call(fun, args)
 }
 
 add_bmm_version_to_stancode <- function(stancode) {

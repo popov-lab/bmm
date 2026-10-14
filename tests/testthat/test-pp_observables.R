@@ -83,7 +83,7 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  # one closure per check of every model: fewer means two keys collided
+  # one closure per check of every model: fewer means a spec repeats a check name
   n_checks <- sum(vapply(registered_models, function(model) {
     length(pp_observables(model)$checks)
   }, integer(1)))

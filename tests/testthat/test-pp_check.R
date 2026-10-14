@@ -466,3 +466,106 @@ test_that("pp_check_vars() lists the same checks for a 4par fit with indicators"
   )
   expect_identical(vars$default, c(TRUE, FALSE, FALSE, FALSE, FALSE))
 })
+
+
+# Generated Poss_<category> columns are hidden by name, user columns with the same prefix are not
+
+mock_poss_fit <- function(user_column = NULL) {
+  dat <- mpt_impossible_data()
+  if (!is.null(user_column)) {
+    dat[[user_column]] <- rep(c("a", "b"), length.out = nrow(dat))
+  }
+  rhs <- if (is.null(user_column)) "1" else paste("0 +", user_column)
+  bmm(
+    bmf(as.formula(paste("Pm ~", rhs)), Pb ~ 1),
+    dat,
+    mpt(mpt_impossible_trees(), tree_id = "tree"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )
+}
+
+mock_sdm_poss_fit <- function() {
+  dat <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:4, c("ID", "set_size", "dev_rad")]
+  dat$set_size <- as.numeric(as.character(dat$set_size))
+  dat$Poss_load <- factor(ifelse(dat$set_size > 4, "high", "low"))
+  suppressMessages(bmm(
+    bmf(kappa ~ 0 + Poss_load, c ~ 1),
+    dat,
+    sdm(resp_error = "dev_rad"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+}
+
+test_that(".resolve_pp_conditions() hides the Poss_ columns an MPT fit generates", {
+  fit <- mock_poss_fit()
+  expect_true("Poss_dist" %in% names(fit$data))
+  expect_false("Poss_dist" %in% .resolve_pp_conditions(fit))
+})
+
+test_that(".resolve_pp_conditions() keeps a user column named Poss_*", {
+  expect_true("Poss_block" %in% .resolve_pp_conditions(mock_poss_fit("Poss_block")))
+  expect_true("Poss_load" %in% .resolve_pp_conditions(mock_sdm_poss_fit()))
+})
+
+
+# The tree column of an mpt fit is a valid group even when no formula uses it
+
+# no parameter formula names item_type, so brms keeps only the Idx_ columns
+mock_2htm_fit <- function() {
+  suppressMessages(bmm(
+    bmf(D ~ 1, g ~ 1), mpt_2htm_data(),
+    mpt(mpt_2htm_trees(), tree_id = "item_type"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+}
+
+# a mock fit has no draws; the check only needs replicates of the right shape
+local_mock_posterior_predict <- function(env = parent.frame()) {
+  local_mocked_bindings(
+    posterior_predict = function(object, ndraws = 100L, ...) {
+      n_obs <- nrow(object$data)
+      cats <- colnames(object$data$Y)
+      array(stats::rbinom(ndraws * n_obs * length(cats), 50L, 0.5),
+            c(ndraws, n_obs, length(cats)), dimnames = list(NULL, NULL, cats))
+    },
+    .package = "brms", .env = env
+  )
+}
+
+test_that(".pp_check_restore_tree() rebuilds the tree column from the Idx_ columns", {
+  fit <- mock_2htm_fit()
+  expect_false("item_type" %in% names(fit$data))
+  restored <- .pp_check_restore_tree(fit, "item_type")
+  expect_identical(levels(restored$data$item_type), c("old", "new"))
+  expect_identical(restored$data$item_type == "old", restored$data$Idx_old == 1)
+  expect_identical(.pp_check_restore_tree(fit, "id"), fit)
+})
+
+test_that("pp_check() facets an mpt fit by its tree column", {
+  fit <- mock_2htm_fit()
+  local_mock_posterior_predict()
+  expect_no_warning(p <- pp_check(fit, group = "item_type", ndraws = 5))
+  expect_s3_class(p$facet, "FacetWrap")
+  expect_setequal(as.character(p$data$item_type), c("old", "new"))
+  expect_equal(nrow(p$data), 4L)
+  old_tree <- fit$data$Idx_old == 1
+  expect_equal(
+    p$data$proportion[p$data$item_type == "old" & p$data$category == "old"],
+    sum(fit$data$Y[old_tree, "old"]) / sum(fit$data$nTrials[old_tree])
+  )
+})
+
+test_that("pp_check() pools the trees of an mpt fit by default", {
+  fit <- mock_2htm_fit()
+  local_mock_posterior_predict()
+  p <- pp_check(fit, ndraws = 5)
+  expect_s3_class(p$facet, "FacetNull")
+  expect_equal(nrow(p$data), 2L)
+})
+
+test_that("pp_check() still warns for a column that is neither predictor nor tree", {
+  fit <- mock_2htm_fit()
+  local_mock_posterior_predict()
+  expect_warning(p <- pp_check(fit, group = "id", ndraws = 5), "not a predictor")
+  expect_s3_class(p$facet, "FacetNull")
+})

@@ -140,6 +140,50 @@ test_that("bmm_data_check flags formula predictors missing from the data", {
   expect_true(any(grepl("neither columns", finding_messages(res))))
 })
 
+test_that("bmm_data_check does not read a correlation ID as a data column", {
+  dat <- data.frame(
+    y = runif(40, -3, 3),
+    cond = rep(c("a", "b"), each = 20),
+    id = rep(1:4, each = 10)
+  )
+  model <- mixture2p(resp_error = "y")
+
+  res <- bmm_data_check(bmf(kappa ~ cond + (1 |p| id), thetat ~ 1 + (1 |p| id)), dat, model)
+  expect_false(any(grepl("neither columns", finding_messages(res))))
+  expect_setequal(res$predictors$coding$variable, c("cond", "id"))
+  expect_false("p" %in% unlist(res$predictors$pred_map))
+
+  # a correlation ID named like a column is a label, not a predictor
+  res_label <- bmm_data_check(
+    bmf(kappa ~ 1 + (1 |cond| id), thetat ~ 1 + (1 |cond| id)), dat, model
+  )
+  expect_setequal(res_label$predictors$coding$variable, "id")
+  expect_equal(res_label$cells$cell_vars, character(0))
+
+  # the same name used as a predictor stays one
+  res_both <- bmm_data_check(bmf(kappa ~ cond + (1 |cond| id), thetat ~ 1), dat, model)
+  expect_setequal(res_both$predictors$coding$variable, c("cond", "id"))
+})
+
+test_that("re_group_vars keeps every column a grouping term names", {
+  f <- bmf(kappa ~ 1 + (1 |p| gr(id, by = grp)), thetat ~ 1 + (1 | mm(g1, g2)))
+  expect_setequal(re_group_vars(f), c("id", "grp", "g1", "g2"))
+})
+
+test_that("bmm_data_check does not flag the columns m3 adds to the data (#495)", {
+  res <- bmm_data_check(
+    bmf(
+      corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1,
+      dist ~ b + n_opt_dist + nTrials + Idx_dist
+    ),
+    oberauer_lewandowsky_2019_e1,
+    m3(c("corr", "other", "dist", "npl"), c(1, 4, 5, 5), links = list(c = "log", a = "log"))
+  )
+  expect_null(res$pipeline$error)
+  expect_length(res$predictors$unknown_vars, 0)
+  expect_false(any(grepl("neither columns", finding_messages(res))))
+})
+
 test_that("data_check_findings returns an empty list for models without methods", {
   expect_identical(
     data_check_findings(
@@ -164,6 +208,16 @@ test_that("bmm_data_check skips the min_trials note for aggregate-data models", 
   expect_null(res$pipeline$error)
   expect_false(any(grepl("fewer than", finding_messages(res))))
   expect_equal(min(res$cells$counts$n), 3)
+})
+
+test_that("bmm_data_check does not count mpt rows as trials", {
+  res <- bmm_data_check(
+    bmf(D ~ 0 + item_type, g ~ 1),
+    mpt_2htm_data(n_id = 4),
+    mpt(mpt_2htm_trees(), tree_id = "item_type")
+  )
+  expect_null(res$pipeline$error)
+  expect_false(any(grepl("fewer than", finding_messages(res))))
 })
 
 test_that("bmm_data_check needs nothing beyond check_data and check_formula", {

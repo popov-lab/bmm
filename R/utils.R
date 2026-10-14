@@ -869,10 +869,12 @@ check_rds_file <- function(file) {
 
 # Identifiers a model cannot use for a parameter of a generated Stan program.
 # The list was measured, not copied: each candidate was made a response
-# category of an lnr_custom model and the generated program handed to stanc
-# 2.40 with the guard switched off. Stan's keywords are there, and so are the
-# three names the surrounding code declares -- brms calls the response Y and
-# writes a `lprior` accumulator, and bmm's per-row likelihood declares N.
+# category of an lnr_custom model and the generated program handed to
+# rstan::stanc() (stanc 2.32.2, no threading) with the guard switched off; the
+# threading names were found with stanc 2.40 on a threaded program. Stan's
+# keywords are there, and so are the three names the surrounding code
+# declares -- brms calls the response Y and writes a `lprior` accumulator, and
+# bmm's per-row likelihood declares N.
 # Several C++ keywords that Stan documents as reserved (class, new, template,
 # ...) are accepted by stanc and are deliberately absent. Stan is
 # case-sensitive, so the comparison against this list has to be too. The
@@ -887,7 +889,10 @@ check_rds_file <- function(file) {
   "reject", "repeat", "return", "row_vector", "simplex", "static", "struct",
   "target", "then", "transformed", "true", "tuple", "typedef", "unit_vector",
   "until", "upper", "vector", "void", "while",
-  "N", "Y", "lprior"
+  "N", "Y", "lprior",
+  # brms declares these only under threading: the index sequence and the slice
+  # bounds of partial_log_lik
+  "seq", "start", "end"
 )
 
 # like unlist, but keeps the final outcome a list of all
