@@ -144,7 +144,7 @@ Test tiers (ADR 0004, the architecture decision record `.dev/decisions/0004-test
 - Stan compile tests (R-against-Stan parity and gradient checks, the two `bmm_setup()` tests that need CmdStan) run on Ubuntu for PRs and on all three OS for pushes. Each opens with `skip_unless_stan_tests()` (`tests/testthat/helper-tiers.R`; `BMM_TEST_STAN=false` skips them locally) and is registered under R1.
 - A fixture test loads its fit through `load_fixture_fit()` (`helper-epred.R`), which skips when the file is absent. A test that needs the assets folder without loading a fit opens with `skip_unless_fixtures()` (`helper-tiers.R`).
 - `tests/local/` - tests that sample with a real backend; build-ignored, run by hand (`Rscript tests/local/run.R`) and by the weekly `local-tests` workflow. See `tests/local/README.md`.
-- `tests/internal/` - reference fits from 2024, pending replacement by reference summaries (ADR 0004)
+- `tests/internal/` - reference fits from 2024; nothing in `tests/testthat` reads them since #422, the reference summaries in `tests/local/references.rds` replace them, and the folder's deletion awaits the maintainer (ADR 0004)
 - `bmm-dev/feature_tests/` - exploratory/development scripts (synced via SWITCHdrive, not tracked by git)
 - `local/` - machine-specific scratch scripts (not tracked by git)
 
@@ -205,7 +205,7 @@ inst/stan_chunks/    # Stan code snippets for models
 data/                # Package datasets (.rda files)
 tests/testthat/      # Unit, mock-pipeline, fixture and Stan compile tests (test-*.R pattern)
 tests/local/         # Sampling tests, run by hand and weekly (build-ignored)
-tests/internal/      # Reference fits from 2024, pending replacement (ADR 0004)
+tests/internal/      # Reference fits from 2024, to be deleted (ADR 0004)
 vignettes/articles/  # Long-form tutorials (Rmd)
 man/                 # AUTO-GENERATED - do not edit
 docs/                # AUTO-GENERATED pkgdown site - do not edit

@@ -224,6 +224,8 @@ last.
   `model_test_cases("stored_frame")`: drop the branch's hand-typed list and
   keep its rdm/lba/lnr cases in their providers. `test-pp_observables.R`
   reads every model from the registry, so the branch's hand list goes.
+  `test-pp_check.R` conflicts on one blank line where both sides removed
+  `load_ppcheck_fit()`; take either side.
   `test-helpers-data.R` keeps the branch's `check_data` override loop.
 - 2026-10-14, #422. R5: `tests/local/make-fixtures.R` now generates all
   eight fixtures and records the seed and versions in `attr(fit,

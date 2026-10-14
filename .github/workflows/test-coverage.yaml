@@ -91,8 +91,10 @@ jobs:
 
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
         with:
-          # fail on an upload error, except on a pull request without a token
-          fail_ci_if_error: ${{ github.event_name != 'pull_request' || secrets.CODECOV_TOKEN }}
+          # fail on an upload error, except on a pull request without a token;
+          # the action reads only 'true', so the token test must give a boolean
+          # (r-lib's example passes the token itself, which reads as false)
+          fail_ci_if_error: ${{ github.event_name != 'pull_request' || secrets.CODECOV_TOKEN != '' }}
           files: ./cobertura.xml
           plugins: noop
           disable_search: true
