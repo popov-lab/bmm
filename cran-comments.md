@@ -1,6 +1,7 @@
 ## Resubmission
 
-The first submission of 1.4.0 (2026-10-15) was returned by the incoming pretest with a NOTE on
+This is 1.4.0 resubmitted as 1.4.1, with the version increased as the CRAN policy prefers. The
+submission of 1.4.0 (2026-10-15) was returned by the incoming pretest with a NOTE on
 r-devel-windows-x86_64: overall check time 16 min, of which the tests took 12 min (Debian: OK,
 tests 302 s). The tests that run every model through the full pipeline now skip on CRAN and run on
 the package's continuous integration instead. The tests CRAN runs take a fifth of the time they did
