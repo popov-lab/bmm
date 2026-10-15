@@ -94,7 +94,7 @@ An object of class `bmmodel`
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # generate artificial data
 dat <- data.frame(y = rmixture2p(n = 2000))
 

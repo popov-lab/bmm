@@ -143,7 +143,7 @@ e.g. `zr ~ 1`, and code `drift` so that its sign follows the stimulus.
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # Simulate data for one subject using rddm
 set.seed(123)
 n_trials <- 500

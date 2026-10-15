@@ -93,7 +93,7 @@ For more information and examples, see
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # generate artificial data from the Signal Discrimination Model
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))

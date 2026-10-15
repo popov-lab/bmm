@@ -83,7 +83,7 @@ usually rewriting the numbers (issue, page numbers) manually fixes it
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 library(usethis)
 
 

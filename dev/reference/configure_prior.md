@@ -47,7 +47,7 @@ A `brmsprior` object containing the default priors for the model
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
   # if there is set_size 1 in the data, set constant prior over thetant for set_size1
   prior <- brms::empty_prior()

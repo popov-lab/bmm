@@ -320,7 +320,7 @@ and is not included in the model formula. The parameter is:
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # load data
 data <- oberauer_lin_2017
 

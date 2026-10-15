@@ -167,7 +167,7 @@ for the graphical check.
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 trees <- list(
   mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
   mpt_tree("lure", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))

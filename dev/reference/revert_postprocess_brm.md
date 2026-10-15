@@ -40,7 +40,7 @@ An object of class brmsfit, with any necessary postprocessing applied
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 fit <- readRDS("my_saved_fit.rds")
 postprocessed_fit <- prostprocess_brm(fit)
 reverted_fit <- revert_postprocess_brm(postprocessed_fit)

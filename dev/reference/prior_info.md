@@ -84,7 +84,7 @@ circular mixture models, `zr` for
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 fit <- bmm(
   bmf(c ~ 0 + set_size, kappa ~ 1),
   data = oberauer_lin_2017,

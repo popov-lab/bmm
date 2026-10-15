@@ -36,7 +36,7 @@ returned.
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 fit <- bmm(
   formula = bmmformula(c ~ 1, kappa ~ 1),
   data = data.frame(y = rsdm(1000)),
