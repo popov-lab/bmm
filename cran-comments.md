@@ -15,19 +15,20 @@ pkgbuild, roxygen2, rstan and vctrs.
 
   Comment: cmdstanr is an optional dependency not required for the package's main functionality.
 
-TO BE FILLED IN: confirm the counts and the note above against the final checks.
-
 ## Test environments
 
-* local macOS (arm64), R x.y.z: `R CMD check --as-cran` with `_R_CHECK_CRAN_INCOMING_=true`, and a
-  second run with `_R_CHECK_DEPENDS_ONLY_=true` (Suggests unavailable): TO BE FILLED IN
-* GitHub Actions (macOS, Windows, Ubuntu; R release): TO BE FILLED IN
-* win-builder, R-devel: TO BE FILLED IN
-* win-builder, R-release: TO BE FILLED IN
+* local macOS (arm64), R 4.6.1: `R CMD check --as-cran` with `_R_CHECK_CRAN_INCOMING_=true`, and a
+  second run with `_R_CHECK_DEPENDS_ONLY_=true` (Suggests unavailable): same result, 0 errors,
+  0 warnings, 1 note
+* GitHub Actions (macOS, Windows, Ubuntu; R release): passing on the release commit
+* win-builder, R-devel (2026-10-14 r90673, x86_64-w64-mingw32, cmdstanr not installed): 0 errors,
+  0 warnings, 1 note (the same note)
+* win-builder, R-release (R 4.6.1, x86_64-w64-mingw32, cmdstanr not installed): 0 errors,
+  0 warnings, 1 note (the same note)
 * R-hub could not be used: its dependency resolver does not honour `Additional_repositories`, so the
   optional dependency cmdstanr blocks the build before the check starts
 
 ## Reverse dependencies
 
-One reverse dependency on CRAN, rtprep, which suggests bmm. R CMD check of rtprep with this version:
-TO BE FILLED IN.
+One reverse dependency on CRAN, rtprep, which suggests bmm. R CMD check of rtprep 0.1.0 with this
+version: Status OK.
