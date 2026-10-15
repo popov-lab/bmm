@@ -19,7 +19,9 @@ registered_models <- list(
   cswald(rt = "rt", response = "resp", version = "crisk"),
   ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
   ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
-       n_trials = "nt", version = "4par")
+       n_trials = "nt", version = "4par"),
+  tcc("err", similarity = exp(-(0:180) / 20)),
+  tcc("err", similarity = exp(-(0:90) / 10), n_options = 180, units = "bins")
 )
 
 test_that("declared observables name real standata slots", {
@@ -85,7 +87,7 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  expect_length(actual, 17L)
+  expect_length(actual, 21L)
   expect_equal(actual, expected)
 })
 

@@ -35,9 +35,9 @@
       ),
       links = list(d = "identity"),
       fixed_parameters = list(),
-      # provisional (#566): d of the uncorrelated model runs from about 0.6 to 2
-      # over set sizes 1-8 in oberauer_lin_2017, and the authors tabulate d' up
-      # to 4.5 for their correlated model, which they scale by ~0.65
+      # provisional (#566): d of the uncorrelated model runs from 0.6 to 2.0
+      # over set sizes 1-8 in oberauer_lin_2017; the authors' correlated d'
+      # (tabulated up to 4.5) is 1.60 times the uncorrelated d (median, S3 parity)
       default_priors = list(
         d = list(main = "normal(2, 1.5)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
@@ -56,16 +56,82 @@
 #'   signal with unit variance and mean `d * f(x)`, where `f(x)` is the
 #'   psychophysical similarity of an option `x` options away from the target,
 #'   and the response is the option with the strongest signal. This is the
-#'   uncorrelated-noise model of Schurgin et al. (2020); their reported d' comes
-#'   from a correlated-noise version and is about 0.65 times this `d`.
+#'   uncorrelated-noise model of Schurgin et al. (2020). The d' they report
+#'   comes from a correlated-noise version and is larger: across the
+#'   subjects and set sizes of their Figure 3 data, the median ratio of their
+#'   d' to this `d` was 1.60.
 #' @details `r model_docs(.model_tcc())`
+#'
+#' ## Similarity
+#'
+#'   `similarity` holds the psychophysical similarity of an option to the
+#'   target as a function of their distance on the wheel, one value per
+#'   distance in option steps, in the order 0, 1, ..., `n_options / 2`: the
+#'   first value belongs to the target itself and must be 1, the last to the
+#'   option opposite the target. The model assumes the similarity depends only
+#'   on the distance, the same for every target and on both sides of it. The
+#'   values are fixed, not estimated; Schurgin et al. (2020) measured them in
+#'   a separate perceptual matching task. With 360 options in 1-degree steps,
+#'   `similarity[k + 1]` is the similarity at `k` degrees.
+#'
+#' ## Response
+#'
+#'   With `units = "radians"`, `resp_error` is the response minus the target
+#'   in radians, as for [sdm()] and [mixture2p()], and each value is assigned to
+#'   the nearest of the `n_options` options (+-pi fall into the same option).
+#'   With `units = "bins"`, it is the chosen option's offset from the target in
+#'   option steps. The model treats the response as a choice among
+#'   `n_options` discrete options, so `n_options` should be the number of
+#'   options the participant could choose from.
+#'
+#' ## Grid limit on d
 #'
 #'   The likelihood reads the response probabilities from a table on a grid
 #'   of `d` values from -2 to `d_max` in steps of 0.02, built once per chain
 #'   by quadrature and interpolated with a cubic spline (error below 1e-6 in
 #'   log probability). Beyond either end of the grid the table is extended
-#'   linearly, which keeps the sampler moving during warmup but is not the
-#'   model: raise `d_max` if the posterior of `d` reaches it.
+#'   linearly. This keeps the sampler moving during warmup but is not the
+#'   model: past `d_max` the log-likelihood becomes a straight line in `d`, so
+#'   a posterior that reaches the end of the grid can run far beyond it, with
+#'   estimates that mean nothing. If any posterior draw of `d` exceeds `d_max`
+#'   (check `max(brms::posterior_linpred(fit, dpar = "d"))`), refit with a
+#'   larger `d_max`; each extra unit adds 50 table rows, which costs build time
+#'   and memory but nothing per gradient. A large `d` is weakly identified
+#'   when the similarity is broad, because the probability of reporting the
+#'   target then grows slowly with `d`.
+#'
+#' ## Posterior predictive checks
+#'
+#'   `pp_check(fit)` compares observed and predicted offsets in option steps.
+#'   `pp_check(fit, resp_var = "error")` shows the same on the scale of
+#'   `resp_error`, which for radians is the view [sdm()] and [mixture2p()] fits
+#'   give; add `type = "bars_binned"` and name a condition column in `group`
+#'   for histograms per condition. `resp_var = "abs_error"` shows the distance from the target,
+#'   the quantity the likelihood depends on. See [pp_check.bmmfit()].
+#'
+#' ## Comparing with continuous models
+#'
+#'   The log-likelihood of `tcc()` is a log probability mass over options,
+#'   whereas [sdm()] and [mixture2p()] return a log density in radians. The two
+#'   differ by the log of the option width, `log(2 * pi / n_options)` per
+#'   observation, so summed over `N` observations by `N * log(2 * pi /
+#'   n_options)`; for 360 options, `log(2 * pi / 360)` is -4.048. Before
+#'   comparing LOO estimates, convert the TCC log-likelihood into a density:
+#'
+#'   ```
+#'   ll <- brms::log_lik(fit_tcc) + log(n_options / (2 * pi))
+#'   loo_tcc <- loo::loo(ll, r_eff = loo::relative_eff(exp(ll), chain_id =
+#'     rep(seq_len(brms::nchains(fit_tcc)), each = brms::ndraws(fit_tcc) /
+#'     brms::nchains(fit_tcc))))
+#'   loo::loo_compare(loo_tcc, brms::loo(fit_sdm))
+#'   ```
+#'
+#'   `loo_compare()` warns that the models do not share the same y variable,
+#'   because `tcc()` stores the binned response; the warning is expected here.
+#'   The comparison is fair only if the responses were themselves recorded on
+#'   `n_options` discrete options, as on a 360-degree colour wheel.
+#'
+#' ## Speed
 #'
 #'   The fit is fastest when rows that share a value of `d` are adjacent, so
 #'   bmm offers to sort the data by the predictors of `d`, as for [sdm()].
@@ -170,6 +236,9 @@ configure_model.tcc <- function(model, data, formula) {
     links = c("identity", model$links$d),
     type = "int",
     loop = FALSE,
+    log_lik = log_lik_tcc,
+    posterior_predict = posterior_predict_tcc,
+    posterior_epred = posterior_epred_tcc,
     vars = c("tcc_tab", "tcc_grid_lo", "tcc_grid_step")
   )
   stanvars <- .tcc_stanvars(model, model$other_vars$table)
@@ -229,25 +298,130 @@ configure_model.tcc <- function(model, data, formula) {
 # from the target. With z_i = x - d f_i,
 #   P(r) = int phi(z_r) prod_{i != r} Phi(z_i) dx = int phi(z_r) / Phi(z_r) G(x) dx,
 # where G = prod_i Phi(z_i) is shared by all options, and log G is a sum over
-# distances weighted by the number of options at each (1, 2, ..., 2, 1). The
-# largest mean m = max(d f) kills every integrand below m - 8 through its own
-# Phi factor, and phi(z_r) kills it above d f_r + 8 <= m + 8, so the window
-# [m - 8, m + 8] holds all the mass whatever the sign and size of d.
+# distances weighted by the number of options at each (1, 2, ..., 2, 1).
+# phi(z_r) kills every integrand above d f_r + 8 <= m + 8, with m = max(d f).
+# Below, the Phi factor of the largest mean kills it from about m - 8, except
+# for an option far from the target under a sharp similarity: its integrand
+# peaks halfway between its own mean and m, so the window reaches down to
+# (min(d f) + m) / 2 - 6 as well (1.5e-4 off in log P at d = 12 with a 1-degree
+# Laplace similarity before, 1e-13 after; TCC 2-D table spike, 2026-10).
 # tcc_logp_by_distance() in tcc_funs.stan is the Stan twin
 .tcc_logp <- function(d, similarity) {
   n_dist <- length(similarity)
   mult <- c(1, rep(2, n_dist - 2), 1)
   means <- d * similarity
+  top <- max(means)
+  half <- (top + 8 - min(top - 8, (min(means) + top) / 2 - 6)) / 2
   rule <- .gl_rule(.tcc_gl_nodes)
-  z <- outer(max(means) + 8 * rule$nodes, means, "-")
+  z <- outer(top + 8 - half + half * rule$nodes, means, "-")
   lphi <- stats::pnorm(z, log.p = TRUE)
-  terms <- log(8 * rule$weights) + drop(lphi %*% mult) + stats::dnorm(z, log = TRUE) - lphi
+  terms <- log(half * rule$weights) + drop(lphi %*% mult) + stats::dnorm(z, log = TRUE) - lphi
   matrixStats::colLogSumExps(terms)
 }
 
 .tcc_table <- function(similarity, grid) {
   d_values <- grid$lo + (seq_len(grid$rows) - 2) * grid$step
   t(vapply(d_values, .tcc_logp, numeric(length(similarity)), similarity = similarity))
+}
+
+############################################################################# !
+# LOG_LIK, POSTERIOR_PREDICT AND PP_CHECK                                ####
+############################################################################# !
+
+# brms calls these once per observation, so the table that a fit built in
+# transformed data is rebuilt in R (about 1 s) once and kept for the next call
+.tcc_cache <- new.env(parent = emptyenv())
+
+# The table the fit read, from the standata in the prep: passed from R, or
+# rebuilt from the similarity and grid the fit built it from
+.tcc_prep_table <- function(prep) {
+  data <- prep$data
+  grid <- list(lo = data$tcc_grid_lo, step = data$tcc_grid_step, rows = data$tcc_grid_rows)
+  if (!is.null(data$tcc_tab)) {
+    return(c(grid, list(tab = data$tcc_tab)))
+  }
+  key <- rlang::hash(list(as.numeric(data$tcc_similarity), grid))
+  if (!identical(.tcc_cache$key, key)) {
+    .tcc_cache$tab <- .tcc_table(as.numeric(data$tcc_similarity), grid)
+    .tcc_cache$key <- key
+  }
+  c(grid, list(tab = .tcc_cache$tab))
+}
+
+# Catmull-Rom rows and weights at each d, as tcc_first_row() and
+# tcc_row_weights() compute them in Stan, linear beyond the grid
+.tcc_weights <- function(d, table) {
+  u <- (d - table$lo) / table$step + 2
+  first <- pmin(pmax(floor(u) - 1, 1), nrow(table$tab) - 3)
+  t <- u - first - 1
+  w <- 0.5 * cbind(-t + 2 * t^2 - t^3, 2 - 5 * t^2 + 3 * t^3, t + 4 * t^2 - 3 * t^3, t^3 - t^2)
+  below <- t < 0
+  above <- t > 1
+  w[below, ] <- cbind(-0.5 * t, 1, 0.5 * t, 0)[below, ]
+  w[above, ] <- cbind(0, -0.5 * (t - 1), 1, 0.5 * (t - 1))[above, ]
+  nlist(first, w)
+}
+
+# log P of distance index `col` (1 = the target) at each d, the R twin of tcc_lpmf()
+.tcc_interp <- function(d, col, table) {
+  at <- .tcc_weights(d, table)
+  col <- rep_len(col, length(d))
+  Reduce(`+`, lapply(1:4, function(k) at$w[, k] * table$tab[cbind(at$first + k - 1, col)]))
+}
+
+# signed option offsets drawn at each d from the interpolated table, by
+# inverse CDF over all options at once, in chunks to bound the memory
+.tcc_rbins <- function(d, table, n_options, chunk = 5000) {
+  offsets <- seq(-n_options / 2 + 1, n_options / 2)
+  cols <- abs(offsets) + 1
+  out <- integer(length(d))
+  for (start in seq(1, length(d), by = chunk)) {
+    idx <- start:min(length(d), start + chunk - 1)
+    at <- .tcc_weights(d[idx], table)
+    logp <- Reduce(`+`, lapply(1:4, function(k) at$w[, k] * table$tab[at$first + k - 1, , drop = FALSE]))
+    cum <- matrixStats::rowCumsums(exp(logp[, cols, drop = FALSE]))
+    u <- stats::runif(length(idx)) * cum[, n_options]
+    out[idx] <- as.integer(offsets[rowSums(cum < u) + 1])
+  }
+  out
+}
+
+log_lik_tcc <- function(i, prep) {
+  d <- brms::get_dpar(prep, "d", i = i)
+  .tcc_interp(d, abs(prep$data$Y[i]) + 1, .tcc_prep_table(prep))
+}
+
+posterior_predict_tcc <- function(i, prep, ...) {
+  table <- .tcc_prep_table(prep)
+  .tcc_rbins(brms::get_dpar(prep, "d", i = i), table, 2 * (ncol(table$tab) - 1))
+}
+
+posterior_epred_tcc <- posterior_epred_undefined("tcc")
+
+# pp_check(fit) without resp_var plots the signed offsets in options (the brms
+# response); "error" shows them on the user's scale, which for radians is the
+# view pp_check() gives for sdm() and mixture2p()
+#' @export
+pp_observables.tcc <- function(model) {
+  radians <- model$other_vars$units == "radians"
+  scale <- if (radians) 2 * pi / model$other_vars$n_options else 1
+  unit <- if (radians) "radians" else "options"
+  list(
+    observed = c(error = "Y"),
+    checks = list(
+      error = .pp_observable(function(x) x$error * scale,
+                             label = glue("Response error ({unit})")),
+      abs_error = .pp_observable(function(x) abs(x$error * scale),
+                                 label = glue("Absolute response error ({unit})"),
+                                 type = "bars_binned")
+    )
+  )
+}
+
+#' @export
+pp_simulate.tcc <- function(model, prep) {
+  bins <- .tcc_rbins(.pp_dpar_vector(prep, "d"), .tcc_prep_table(prep), model$other_vars$n_options)
+  list(error = matrix(bins, nrow = prep$ndraws))
 }
 
 ############################################################################# !

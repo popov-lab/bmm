@@ -3,8 +3,11 @@
     int D = rows(similarity);
     vector[D] mult = append_row(append_row(1, rep_vector(2, D - 2)), 1);
     vector[D] means = d * similarity;
-    vector[rows(gl_nodes)] x = max(means) + 8 * gl_nodes;
-    vector[rows(gl_nodes)] logw = gl_logw + log(8) - 0.5 * log(2 * pi());
+    real top = max(means);
+    // see .tcc_logp(): a far option under a sharp similarity peaks halfway to the largest mean
+    real half = (top + 8 - fmin(top - 8, 0.5 * (min(means) + top) - 6)) / 2;
+    vector[rows(gl_nodes)] x = top + 8 - half + half * gl_nodes;
+    vector[rows(gl_nodes)] logw = gl_logw + log(half) - 0.5 * log(2 * pi());
     vector[D] out = rep_vector(negative_infinity(), D);
     for (q in 1:rows(gl_nodes)) {
       vector[D] z = x[q] - means;

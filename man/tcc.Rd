@@ -43,8 +43,10 @@ every option on the response wheel produces a Gaussian memory-match
 signal with unit variance and mean \code{d * f(x)}, where \code{f(x)} is the
 psychophysical similarity of an option \code{x} options away from the target,
 and the response is the option with the strongest signal. This is the
-uncorrelated-noise model of Schurgin et al. (2020); their reported d' comes
-from a correlated-noise version and is about 0.65 times this \code{d}.
+uncorrelated-noise model of Schurgin et al. (2020). The d' they report
+comes from a correlated-noise version and is larger: across the
+subjects and set sizes of their Figure 3 data, the median ratio of their
+d' to this \code{d} was 1.60.
 }
 \details{
 \itemize{
@@ -82,13 +84,80 @@ from a correlated-noise version and is about 0.65 times this \code{d}.
 \item \code{sd}: exponential(1)
 }
 }
+}
+\subsection{Similarity}{
+
+\code{similarity} holds the psychophysical similarity of an option to the
+target as a function of their distance on the wheel, one value per
+distance in option steps, in the order 0, 1, ..., \code{n_options / 2}: the
+first value belongs to the target itself and must be 1, the last to the
+option opposite the target. The model assumes the similarity depends only
+on the distance, the same for every target and on both sides of it. The
+values are fixed, not estimated; Schurgin et al. (2020) measured them in
+a separate perceptual matching task. With 360 options in 1-degree steps,
+\code{similarity[k + 1]} is the similarity at \code{k} degrees.
+}
+
+\subsection{Response}{
+
+With \code{units = "radians"}, \code{resp_error} is the response minus the target
+in radians, as for \code{\link[=sdm]{sdm()}} and \code{\link[=mixture2p]{mixture2p()}}, and each value is assigned to
+the nearest of the \code{n_options} options (+-pi fall into the same option).
+With \code{units = "bins"}, it is the chosen option's offset from the target in
+option steps. The model treats the response as a choice among
+\code{n_options} discrete options, so \code{n_options} should be the number of
+options the participant could choose from.
+}
+
+\subsection{Grid limit on d}{
 
 The likelihood reads the response probabilities from a table on a grid
 of \code{d} values from -2 to \code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
 log probability). Beyond either end of the grid the table is extended
-linearly, which keeps the sampler moving during warmup but is not the
-model: raise \code{d_max} if the posterior of \code{d} reaches it.
+linearly. This keeps the sampler moving during warmup but is not the
+model: past \code{d_max} the log-likelihood becomes a straight line in \code{d}, so
+a posterior that reaches the end of the grid can run far beyond it, with
+estimates that mean nothing. If any posterior draw of \code{d} exceeds \code{d_max}
+(check \code{max(brms::posterior_linpred(fit, dpar = "d"))}), refit with a
+larger \code{d_max}; each extra unit adds 50 table rows, which costs build time
+and memory but nothing per gradient. A large \code{d} is weakly identified
+when the similarity is broad, because the probability of reporting the
+target then grows slowly with \code{d}.
+}
+
+\subsection{Posterior predictive checks}{
+
+\code{pp_check(fit)} compares observed and predicted offsets in option steps.
+\code{pp_check(fit, resp_var = "error")} shows the same on the scale of
+\code{resp_error}, which for radians is the view \code{\link[=sdm]{sdm()}} and \code{\link[=mixture2p]{mixture2p()}} fits
+give; add \code{type = "bars_binned"} and name a condition column in \code{group}
+for histograms per condition. \code{resp_var = "abs_error"} shows the distance from the target,
+the quantity the likelihood depends on. See \code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}}.
+}
+
+\subsection{Comparing with continuous models}{
+
+The log-likelihood of \code{tcc()} is a log probability mass over options,
+whereas \code{\link[=sdm]{sdm()}} and \code{\link[=mixture2p]{mixture2p()}} return a log density in radians. The two
+differ by the log of the option width, \code{log(2 * pi / n_options)} per
+observation, so summed over \code{N} observations by \code{N * log(2 * pi / n_options)}; for 360 options, \code{log(2 * pi / 360)} is -4.048. Before
+comparing LOO estimates, convert the TCC log-likelihood into a density:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{ll <- brms::log_lik(fit_tcc) + log(n_options / (2 * pi))
+loo_tcc <- loo::loo(ll, r_eff = loo::relative_eff(exp(ll), chain_id =
+  rep(seq_len(brms::nchains(fit_tcc)), each = brms::ndraws(fit_tcc) /
+  brms::nchains(fit_tcc))))
+loo::loo_compare(loo_tcc, brms::loo(fit_sdm))
+}\if{html}{\out{</div>}}
+
+\code{loo_compare()} warns that the models do not share the same y variable,
+because \code{tcc()} stores the binned response; the warning is expected here.
+The comparison is fair only if the responses were themselves recorded on
+\code{n_options} discrete options, as on a 360-degree colour wheel.
+}
+
+\subsection{Speed}{
 
 The fit is fastest when rows that share a value of \code{d} are adjacent, so
 bmm offers to sort the data by the predictors of \code{d}, as for \code{\link[=sdm]{sdm()}}.

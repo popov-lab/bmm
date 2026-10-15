@@ -1,5 +1,8 @@
 # bmm 1.5.0 (development)
 
+### New models
+* Add the **Target Confusability Competition model** (`tcc`) for continuous reproduction (Schurgin, Wixted & Brady, 2020). It estimates memory strength `d` from response errors in radians or option steps, given the similarity of each option to the target as a vector by distance. Also adds `dtcc()` and `rtcc()`. Its log-likelihood is a probability over options: `?tcc` shows how to compare it with `sdm()` or `mixture2p()` by LOO, and what to do when `d` reaches the grid limit `d_max` (#566). Thanks to @GidonFrischkorn
+
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
 

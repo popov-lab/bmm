@@ -110,14 +110,20 @@ test_that("dtcc() matches adaptive quadrature where the error peaks", {
     expand.grid(n = 360, d = c(-1.5, 0, 0.37, 11.97, 12), k = c(0, 1, 179, 180)),
     expand.grid(n = 180, d = c(0.37, 12), k = c(0, 1, 89, 90))
   )
+  cells$sharp <- FALSE
+  # a far option under a 1-degree similarity peaks halfway between its own
+  # mean and the target's, below the window's former lower end
+  cells <- rbind(cells, data.frame(n = 360, d = 12, k = c(0, 1, 5, 90, 180), sharp = TRUE))
   for (i in seq_len(nrow(cells))) {
     cl <- cells[i, ]
     f <- tcc_test_similarity(cl$n)
+    if (cl$sharp) f <- exp(-(0:180)) - exp(-180)
     x <- 2 * pi * cl$k / cl$n
     # absolute: testthat's tolerance is relative, and log P reaches -100 here
     error <- dtcc(x, d = cl$d, similarity = f, n_options = cl$n, log = TRUE) -
       ref_tcc_logp(cl$d, cl$k, f)
-    expect_lt(abs(error), 1e-7, label = paste("n =", cl$n, "d =", cl$d, "k =", cl$k))
+    expect_lt(abs(error), 1e-7,
+              label = paste("n =", cl$n, "d =", cl$d, "k =", cl$k, "sharp =", cl$sharp))
   }
 })
 
@@ -194,6 +200,92 @@ test_that("threading passes the table to the sliced likelihood as data", {
                fixed = TRUE)
 })
 
+############################################################################# !
+# LOG_LIK, POSTERIOR_PREDICT AND PP_CHECK                                ####
+############################################################################# !
+
+# the two response conventions the stored-frame cases of test-update.R cover:
+# radians on 360 options with the table built in Stan, whole option steps on
+# 180 options with the table passed from R
+tcc_postprocess_cases <- function() {
+  bins_model <- tcc("err", similarity = tcc_test_similarity(180), n_options = 180,
+                    units = "bins", d_max = 6)
+  bins_model$other_vars$table <- "r"
+  list(
+    radians = list(model = tcc_test_model(d_max = 6), n = 360),
+    bins = list(model = bins_model, n = 180,
+                data = data.frame(err = c(0, 3, -7, 90, 181, 12), cond = rep(c("a", "b"), 3)))
+  )
+}
+
+tcc_case_prep <- function(case, d) {
+  dat <- case$data %||% data.frame(err = c(0, 0.1, -0.2, 1, 3, -2), cond = rep(c("a", "b"), 3))
+  fit <- suppressMessages(bmm(bmf(d ~ 1), dat, case$model, backend = "mock", mock_fit = 1,
+                              rename = FALSE))
+  sdata <- brms::standata(fit)
+  epred_prep(list(d = matrix(d, length(d), sdata$N)), sdata)
+}
+
+test_that("log_lik_tcc() reads the table the fit used, for either response convention", {
+  d <- c(-1.234, 0.011, 2.345, 5.987)
+  for (case in tcc_postprocess_cases()) {
+    prep <- tcc_case_prep(case, d)
+    f <- tcc_test_similarity(case$n)
+    for (i in seq_len(prep$nobs)) {
+      exact <- dtcc(2 * pi * prep$data$Y[i] / case$n, d, f, n_options = case$n, log = TRUE)
+      expect_lt(max(abs(log_lik_tcc(i, prep) - exact)), 1e-6)
+    }
+  }
+})
+
+test_that("posterior_predict_tcc() draws signed offsets from the model's pmf", {
+  withr::local_seed(567)
+  n <- 20000
+  for (case in tcc_postprocess_cases()) {
+    half <- case$n / 2
+    sims <- posterior_predict_tcc(1, tcc_case_prep(case, rep(1.6, n)))
+    expect_true(all(sims > -half & sims <= half & sims == round(sims)))
+    p_dist <- dtcc(2 * pi * (0:half) / case$n, 1.6, tcc_test_similarity(case$n),
+                   n_options = case$n) * c(1, rep(2, half - 1), 1)
+    breaks <- c(-1, 0, 1, 2, 5, 10, 20, half / 2, half)
+    expected <- tapply(p_dist, cut(0:half, breaks), sum)
+    observed <- table(cut(abs(sims), breaks))
+    expect_gt(stats::chisq.test(observed, p = expected / sum(expected))$p.value, 0.001)
+    off_axis <- sims[sims != 0 & sims != half]
+    expect_equal(mean(off_axis > 0), 0.5, tolerance = 0.05)
+  }
+})
+
+test_that("pp_simulate.tcc() draws each observation from its own d", {
+  withr::local_seed(568)
+  case <- tcc_postprocess_cases()$radians
+  prep <- tcc_case_prep(case, rep(0, 40))
+  prep$dpars$d[, 1:3] <- 8
+  prep$dpars$d[, 4:6] <- -1.5
+  sims <- pp_simulate(case$model, prep)$error
+  expect_identical(dim(sims), c(40L, 6L))
+  expect_lt(max(colMeans(abs(sims[, 1:3]))), 3)
+  expect_gt(min(colMeans(abs(sims[, 4:6]))), 60)
+})
+
+test_that("the pp_check views put the response error on the user's scale", {
+  offsets <- c(0, 45, -90, 180)
+  checks <- pp_observables(tcc_test_model())$checks
+  expect_equal(checks$error$compute(list(error = offsets)), c(0, pi / 4, -pi / 2, pi))
+  expect_equal(checks$abs_error$compute(list(error = offsets)), c(0, pi / 4, pi / 2, pi))
+  expect_match(checks$error$label, "radians")
+  checks <- pp_observables(tcc_postprocess_cases()$bins$model)$checks
+  expect_equal(checks$error$compute(list(error = offsets)), offsets)
+  expect_match(checks$abs_error$label, "options")
+})
+
+test_that("a tcc fit stores its post-processing functions and has no expected response", {
+  family <- tcc_mock_fit()$formula$family
+  expect_identical(family$log_lik, log_lik_tcc)
+  expect_identical(family$posterior_predict, posterior_predict_tcc)
+  expect_error(family$posterior_epred(NULL), "not defined for the tcc model")
+})
+
 # the kernels run in a fixed_param program over the stanvars bmm generates, as
 # the other parity tests do (expose_functions() fails inside the suite)
 tcc_stan_lp <- function(model, rows) {
@@ -227,8 +319,11 @@ tcc_stan_lp <- function(model, rows) {
     show_messages = FALSE, sig_figs = 17
   )
   csv <- utils::read.csv(fit$output_files()[1], comment.char = "#", check.names = FALSE)
+  # log_lik_tcc() on the same rows, the R twin of the Stan lookup
+  prep <- epred_prep(list(d = matrix(rows$d, 1)), c(sdata, list(Y = rows$y)))
   list(table_diff = csv$table_diff, lp_runs = csv$lp_runs, lp_runs_r = csv$lp_runs_r,
-       lp = as.numeric(csv[1, paste0("lp.", seq_len(nrow(rows)))]))
+       lp = as.numeric(csv[1, paste0("lp.", seq_len(nrow(rows)))]),
+       log_lik = vapply(seq_len(nrow(rows)), log_lik_tcc, numeric(1), prep = prep))
 }
 
 test_that("the Stan likelihood matches dtcc() on and off the d grid, from either table", {
@@ -246,6 +341,7 @@ test_that("the Stan likelihood matches dtcc() on and off the d grid, from either
   expect_equal(out$lp_runs, out$lp_runs_r, tolerance = 1e-10)
   expect_equal(out$lp_runs, sum(out$lp), tolerance = 1e-10)
   expect_lt(max(abs(out$lp - dtcc(2 * pi * rows$y / 360, rows$d, f, log = TRUE))), 1e-6)
+  expect_lt(max(abs(out$log_lik - out$lp)), 1e-9)
 })
 
 test_that("beyond the d grid the Stan likelihood extends the table linearly", {
@@ -261,4 +357,5 @@ test_that("beyond the d grid the Stan likelihood extends the table linearly", {
     val(at) + (d - at) * (val(at + h) - val(at - h)) / (2 * h)
   }
   expect_lt(max(abs(out$lp - c(edge(-2, -3), edge(6, 7.5)))), 1e-9)
+  expect_lt(max(abs(out$log_lik - out$lp)), 1e-9)
 })
