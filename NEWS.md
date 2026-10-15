@@ -1,4 +1,4 @@
-# bmm (development version)
+# bmm 1.4.0
 
 ### New models
 * Add **Yes/No Signal Detection Theory** (`sdt_yn`) for detection and old/new recognition tasks with aggregated response counts. It estimates sensitivity (`d`), the decision criterion and optionally the unequal-variance ratio (`sdratio`). The criterion is estimated as `criterion`, measured from the noise mean, or as `bias`, measured from the midpoint between the means: write the one your design holds constant, e.g. `criterion` for weak and strong targets tested against shared lures (#543). Also adds `dsdt_yn()`, `rsdt_yn()`, `sdt_d()`, `sdt_criterion()` and `sdt_bias()`. See `?sdt_yn` for the parameters, links, default priors and the designs that identify `sdratio`. Thanks to @GidonFrischkorn
