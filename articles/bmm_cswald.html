@@ -26,7 +26,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,6 +35,7 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -61,7 +62,7 @@
                         <h4 data-toc-skip class="author">Ven Popov</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/vignettes/articles/bmm_cswald.Rmd" class="external-link"><code>vignettes/articles/bmm_cswald.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/vignettes/articles/bmm_cswald.Rmd" class="external-link"><code>vignettes/articles/bmm_cswald.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_cswald.Rmd</code></div>
     </div>
 
@@ -270,6 +271,12 @@ standard diffusion model.</p>
 <p>The <code>cswald</code> model in <code>bmm</code> is related to but distinct from the full Wiener
 diffusion model available in <code><a href="https://paulbuerkner.com/brms/reference/brmsfamily.html" class="external-link">brms::wiener()</a></code>. Key differences:</p>
 <table class="table">
+<colgroup>
+<col width="16%">
+<col width="30%">
+<col width="28%">
+<col width="25%">
+</colgroup>
 <thead><tr class="header">
 <th>Feature</th>
 <th>cswald (simple)</th>
@@ -286,7 +293,7 @@ diffusion model available in <code><a href="https://paulbuerkner.com/brms/refere
 <tr class="even">
 <td>Starting point</td>
 <td>Fixed (unbiased)</td>
-<td>Estimated</td>
+<td>Fixed (unbiased) by default; estimated with a <code>zr</code> formula</td>
 <td>Estimated</td>
 </tr>
 <tr class="odd">
@@ -694,9 +701,12 @@ so we need to exponentiate to get values on the original scale:</p>
 <h3 id="model-diagnostics">
 <span class="header-section-number">4.8</span> Model Diagnostics<a class="anchor" aria-label="anchor" href="#model-diagnostics"></a>
 </h3>
-<p>Check posterior predictive distributions:</p>
+<p>Check posterior predictive distributions. By default <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> shows the
+response time distribution; <code>resp_var = "response"</code> checks the response
+proportions and <code>resp_var = "signed_rt"</code> both jointly (see
+<code>pp_check_vars(fit)</code> for all options):</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/bayesplot/reference/pp_check.html" class="external-link">pp_check</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"dens_overlay"</span>, ndraws <span class="op">=</span> <span class="fl">10</span><span class="op">)</span> <span class="op">+</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"dens_overlay"</span>, ndraws <span class="op">=</span> <span class="fl">10</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Posterior Predictive Check"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_cswald_files/figure-html/unnamed-chunk-11-1.jpeg" alt="" width="800"></p>
 </div>

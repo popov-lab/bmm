@@ -22,10 +22,14 @@ ddm(rt, response, links = NULL, ...)
 
 - links:
 
-  A list of links for the parameters. For positive parameters (e.g.
+  A named list of links for the parameters, e.g.
+  `links = list(bound = "softplus")`. For positive parameters (e.g.
   `bound`, `ndt`), "softplus" is available as an alternative to the
   default "log" link that grows linearly for large values and avoids the
-  numerical blow-up of [`exp()`](https://rdrr.io/r/base/Log.html).
+  numerical blow-up of [`exp()`](https://rdrr.io/r/base/Log.html). A
+  name that is not a parameter of the model is an error, and a link that
+  allows values the default link excludes (e.g. "identity" for a
+  positive parameter) is a warning.
 
 - ...:
 
@@ -46,7 +50,7 @@ An object of class `bmmodel`
 - **Citation:**
 
   - Ratcliff, R. (1978). A theory of memory retrieval. Psychological
-    Review, 85(2), 59-108. https://doi.org/10/fjwm2f;
+    Review, 85(2), 59-108. https://doi.org/10.1037/0033-295X.85.2.59
 
 - **Requirements:**
 
@@ -71,8 +75,9 @@ An object of class `bmmodel`
   - `ndt`: Non-decision time = Additional time required beyond the
     evidence accumulation process
 
-  - `zr`: Relative starting point = Starting point between the decision
-    thresholds relative to the upper bound.
+  - `zr`: Relative starting point = Starting point as a proportion of
+    the boundary separation, measured from the lower boundary (0.5 =
+    unbiased, \> 0.5 = biased towards the upper response).
 
 - **Fixed parameters:**
 
@@ -92,11 +97,15 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.5)
 
+    - `sd`: exponential(1)
+
   - `bound`:
 
     - `main`: normal(0,0.5)
 
     - `effects`: normal(0,0.5)
+
+    - `sd`: exponential(2)
 
   - `ndt`:
 
@@ -104,22 +113,37 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.3)
 
+    - `sd`: exponential(2)
+
   - `zr`:
 
     - `main`: normal(0,0.5)
 
     - `effects`: normal(0,0.3)
 
+    - `sd`: exponential(2)
+
 ## Default behavior
 
-By default, `zr` is fixed at 0. If you want to estimate `zr`, add a
-formula for `zr` in your
+By default, `zr` is fixed at 0 on its logit link scale, that is at an
+unbiased starting point of `zr = 0.5`. If you want to estimate `zr`, add
+a formula for `zr` in your
 [`bmf()`](https://venpopov.com/bmm/reference/bmmformula.md) call.
+Estimates of `zr` are on the logit scale too, so use
+[`plogis()`](https://rdrr.io/r/stats/Logistic.html) to read them as
+proportions.
+
+With accuracy-coded responses (1 = correct, 0 = error) the unbiased
+default is the usual assumption. With response-coded data (1 and 0 for
+the two response options, e.g. "word" and "nonword"), a bias towards one
+option moves the starting point; with `zr` fixed, that bias is absorbed
+by the other parameters instead. Estimate `zr` for response-coded data,
+e.g. `zr ~ 1`, and code `drift` so that its sign follows the stimulus.
 
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # Simulate data for one subject using rddm
 set.seed(123)
 n_trials <- 500

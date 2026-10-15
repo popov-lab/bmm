@@ -25,7 +25,7 @@ dplyr::group_by() workflows."><meta property="og:image" content="https://venpopo
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,7 +33,8 @@ dplyr::group_by() workflows."><meta property="og:image" content="https://venpopo
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -49,7 +50,7 @@ dplyr::group_by() workflows."><meta property="og:image" content="https://venpopo
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Flag contaminant reaction times using mixture modeling</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
       <div class="d-none name"><code>flag_contaminant_rts.Rd</code></div>
     </div>
 
@@ -71,7 +72,7 @@ contamination probabilities, making it compatible with <code><a href="https://dp
 <span>  contaminant_bound <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"min"</span>, <span class="st">"max"</span><span class="op">)</span>,</span>
 <span>  init_contaminant <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  max_contaminant <span class="op">=</span> <span class="fl">0.5</span>,</span>
-<span>  maxit <span class="op">=</span> <span class="fl">100</span>,</span>
+<span>  maxit <span class="op">=</span> <span class="fl">500</span>,</span>
 <span>  tol <span class="op">=</span> <span class="fl">1e-06</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -106,7 +107,8 @@ exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.</p></
 
 
 <dt id="arg-maxit">maxit<a class="anchor" aria-label="anchor" href="#arg-maxit"></a></dt>
-<dd><p>Integer. Maximum EM iterations. Default 100.</p></dd>
+<dd><p>Integer. Maximum EM iterations. Default 500. A group whose EM
+reaches <code>maxit</code> without converging gets <code>NA</code> probabilities and a warning.</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
@@ -116,9 +118,12 @@ exceeding this are clipped with a warning. Must be in (0, 1]. Default 0.5.</p></
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Numeric vector of posterior contamination probabilities P(contaminant
-| RT), with a <code>"diagnostics"</code> attribute containing a one-row data.frame
-with columns: <code>mixture_params</code> (list), <code>contaminant_prop</code>, <code>converged</code>,
-<code>iterations</code>, <code>loglik</code>, <code>n_trials</code>, <code>distribution</code>, <code>method</code>.</p>
+| RT), <code>NA</code> for every trial of a group whose EM did not converge (a
+threshold such as <code>filter(contam_prob &lt;= 0.5)</code> drops that whole group, so
+check for <code>NA</code> first), with a <code>"diagnostics"</code> attribute containing a
+one-row data.frame with columns: <code>mixture_params</code> (list),
+<code>contaminant_prop</code>, <code>converged</code>, <code>iterations</code>, <code>loglik</code>, <code>n_trials</code>,
+<code>distribution</code>, <code>method</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

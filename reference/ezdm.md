@@ -5,7 +5,15 @@ EZ-Diffusion Model
 ## Usage
 
 ``` r
-ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
+ezdm(
+  mean_rt,
+  var_rt,
+  n_upper,
+  n_trials,
+  links = NULL,
+  version = c("3par", "4par"),
+  ...
+)
 ```
 
 ## Arguments
@@ -33,10 +41,14 @@ ezdm(mean_rt, var_rt, n_upper, n_trials, links = NULL, version = "3par", ...)
 
 - links:
 
-  A list of links for the parameters. For positive parameters (e.g.
+  A named list of links for the parameters, e.g.
+  `links = list(bound = "softplus")`. For positive parameters (e.g.
   `bound`, `ndt`), "softplus" is available as an alternative to the
   default "log" link that grows linearly for large values and avoids the
-  numerical blow-up of [`exp()`](https://rdrr.io/r/base/Log.html).
+  numerical blow-up of [`exp()`](https://rdrr.io/r/base/Log.html). A
+  name that is not a parameter of the model is an error, and a link that
+  allows values the default link excludes (e.g. "identity" for a
+  positive parameter) is a warning.
 
 - version:
 
@@ -66,16 +78,12 @@ An object of class `bmmodel`
   - Wagenmakers, E.-J., Van Der Maas, H. L. J., & Grasman, R. P. P. P.
     (2007). An EZ-diffusion model for response time and accuracy.
     Psychonomic Bulletin & Review, 14(1), 3-22.
-    https://doi.org/10/fk447c
+    https://doi.org/10.3758/BF03194023
 
-&nbsp;
-
-- Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian
-  hierarchical drift diffusion model for response time and accuracy.
-  Psychonomic Bulletin & Review.
-  https://doi.org/10.3758/s13423-025-02729-y
-
-&nbsp;
+  - Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ
+    Bayesian hierarchical drift diffusion model for response time and
+    accuracy. Psychonomic Bulletin & Review, 32(6), 3067-3087.
+    https://doi.org/10.3758/s13423-025-02729-y
 
 - **Version:** 4par
 
@@ -108,8 +116,9 @@ An object of class `bmmodel`
   - `ndt`: Non-decision time = Additional time required beyond the
     evidence accumulation process
 
-  - `zr`: Relative starting point = Starting point between the decision
-    thresholds relative to the upper bound.
+  - `zr`: Relative starting point = Starting point as a proportion of
+    the boundary separation, measured from the lower boundary (0.5 =
+    unbiased, \> 0.5 = biased towards the upper response).
 
   - `s`: The diffusion constant, that is the standard deviation of the
     Gaussian noise during sampling
@@ -132,11 +141,15 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.5)
 
+    - `sd`: exponential(1)
+
   - `bound`:
 
     - `main`: normal(0,0.5)
 
     - `effects`: normal(0,0.5)
+
+    - `sd`: exponential(2)
 
   - `ndt`:
 
@@ -144,17 +157,44 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.3)
 
+    - `sd`: exponential(2)
+
   - `zr`:
 
     - `main`: normal(0,0.5)
 
     - `effects`: normal(0,0.3)
 
+    - `sd`: exponential(2)
+
   - `s`:
 
     - `main`: normal(0,1)
 
     - `effects`: normal(0,0.3)
+
+    - `sd`: exponential(2)
+
+  In version "4par", a boundary reached fewer than twice, or without RT
+  summaries (`NA`), enters the model through the response counts only.
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) adds two columns
+  to the data, `rt_used_upper` and `rt_used_lower`, which it sets to 0
+  for such a boundary and to 1 otherwise, and replaces the summaries of
+  such a boundary with a placeholder the likelihood never reads. A 0
+  already in these columns is kept, so that
+  [`update()`](https://rdrr.io/r/stats/update.html) does not read the
+  placeholders in `fit$data` as data.
+
+  `newdata` passed to `log_lik()`,
+  [`predict()`](https://rdrr.io/r/stats/predict.html) or
+  `posterior_predict()` needs these columns too. Rows of `fit$data` have
+  them. For raw data, set both to 1: a boundary reached fewer than twice
+  or with `NA` summaries is then still left out of the likelihood. brms
+  functions that compare the response with predictions,
+  `predictive_error()` and `residuals(method = "posterior_predict")`,
+  read the placeholders as data in cells whose `rt_used_upper` is 0, so
+  leave those cells out first, for example with
+  `newdata = subset(fit$data, rt_used_upper == 1)`.
 
 ## Examples
 
@@ -208,7 +248,10 @@ fit <- bmm(
 summary(fit)
 
 # Extract population-level effects
-# True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
-exp(brms::fixef(fit))
+# True values: drift = 2, bound = 1.5, ndt = 0.3
+# drift has an identity link; bound and ndt have log links
+fixed_effects <- brms::fixef(fit)
+fixed_effects["drift_Intercept", "Estimate"]
+exp(fixed_effects[c("bound_Intercept", "ndt_Intercept"), "Estimate"])
 } # }
 ```

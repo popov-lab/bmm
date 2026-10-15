@@ -17,7 +17,7 @@ Please use imm(version = 'full'), imm(version = 'bsc'), or imm(version = 'abc') 
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -25,7 +25,8 @@ Please use imm(version = 'full'), imm(version = 'bsc'), or imm(version = 'abc') 
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -41,7 +42,7 @@ Please use imm(version = 'full'), imm(version = 'bsc'), or imm(version = 'abc') 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Interference measurement model by Oberauer and Lin (2017).</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/model_imm.R" class="external-link"><code>R/model_imm.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/model_imm.R" class="external-link"><code>R/model_imm.R</code></a></small>
       <div class="d-none name"><code>imm.Rd</code></div>
     </div>
 
@@ -59,7 +60,7 @@ Please use <code>imm(version = 'full')</code>, <code>imm(version = 'bsc')</code>
 <span>  <span class="va">nt_distances</span>,</span>
 <span>  <span class="va">set_size</span>,</span>
 <span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  version <span class="op">=</span> <span class="st">"full"</span>,</span>
+<span>  version <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"full"</span>, <span class="st">"bsc"</span>, <span class="st">"abc"</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -127,7 +128,7 @@ columns in the dataset.</p></dd>
 <ul><li><p><strong>Domain:</strong> Visual working memory</p></li>
 <li><p><strong>Task:</strong> Continuous reproduction</p></li>
 <li><p><strong>Name:</strong> Interference measurement model by Oberauer and Lin (2017).</p></li>
-<li><p><strong>Citation:</strong></p><ul><li><p>Oberauer, K., &amp; Lin, H.Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59</p></li>
+<li><p><strong>Citation:</strong></p><ul><li><p>Oberauer, K., &amp; Lin, H.-Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59. https://doi.org/10.1037/rev0000044</p></li>
 </ul></li>
 </ul><div class="section">
 <h3 id="version-full">Version: <code>full</code><a class="anchor" aria-label="anchor" href="#version-full"></a></h3>
@@ -147,19 +148,25 @@ columns in the dataset.</p></dd>
 </ul></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>mu1 = tan_half; kappa = log; a = log; c = log; s = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: student_t(1, 0, 1)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.25)</p></li>
+<li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
 <li><p><code>kappa</code>:</p><ul><li><p><code>main</code>: normal(2, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>a</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>s</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
@@ -181,16 +188,21 @@ columns in the dataset.</p></dd>
 </ul></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>mu1 = tan_half; kappa = log; c = log; s = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: student_t(1, 0, 1)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.25)</p></li>
+<li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
 <li><p><code>kappa</code>:</p><ul><li><p><code>main</code>: normal(2, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>s</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
@@ -212,16 +224,21 @@ columns in the dataset.</p></dd>
 </ul></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>mu1 = tan_half; kappa = log; a = log; c = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: student_t(1, 0, 1)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.25)</p></li>
+<li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
 <li><p><code>kappa</code>:</p><ul><li><p><code>main</code>: normal(2, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>a</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul><p>Additionally, all imm models have an internal parameter that is fixed to 0 to
@@ -233,7 +250,7 @@ included in the model formula. The parameter is:</p><ul><li><p>b = "Background a
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># isTRUE(Sys.getenv("BMM_EXAMPLES"))</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># identical(Sys.getenv("BMM_EXAMPLES"), "true")</span></span></span>
 <span class="r-in"><span><span class="co"># load data</span></span></span>
 <span class="r-in"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">oberauer_lin_2017</span></span></span>
 <span class="r-in"><span></span></span>

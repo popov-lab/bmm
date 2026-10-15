@@ -13,6 +13,24 @@ if no user-specified priors were passed to the
 The default priors in `bmm` tend to be more informative than the default
 priors in `brms`, as we use domain knowledge to specify the priors.
 
+Each model parameter carries three default priors, listed in the
+documentation of the model: `main` for the intercept (or for all levels
+of a factor when the intercept is suppressed), `effects` for the
+remaining regression coefficients, and `sd` for the standard deviations
+of its random effects. The `sd` prior is applied as a blanket prior to
+every random-effects standard deviation of that parameter (all grouping
+factors, intercepts and slopes alike) and replaces the
+`student_t(3, 0, 2.5)` default of `brms`. To override it, address the
+parameter with `dpar` or `nlpar` in
+[`brms::set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html),
+e.g. `set_prior("exponential(2)", class = "sd", nlpar = "kappa")`.
+
+Correlations among random effects belong to a grouping factor rather
+than to one parameter, so they get a single default for the whole model:
+`lkj(2)` instead of the `lkj(1)` of `brms`, set whenever the model
+estimates a correlation matrix. To override it, use e.g.
+`set_prior("lkj(1)", class = "cor")`.
+
 ## Usage
 
 ``` r
@@ -39,8 +57,10 @@ default_prior(object, data, model, formula = object, ...)
   [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.md)
   function. Every model function has a number of required arguments
   which need to be specified within the function call. Call
-  [`supported_models()`](https://venpopov.com/bmm/reference/supported_models.md)
-  to see the list of supported models and their required arguments
+  [`bmm_models()`](https://venpopov.com/bmm/reference/bmm_models.md) to
+  see the list of supported models, and `?modelname` (for example
+  [`?imm`](https://venpopov.com/bmm/reference/imm.md)) for their
+  required arguments.
 
 - formula:
 
@@ -61,7 +81,7 @@ which priors can be specified.
 
 ## See also
 
-[`supported_models()`](https://venpopov.com/bmm/reference/supported_models.md),
+[`bmm_models()`](https://venpopov.com/bmm/reference/bmm_models.md),
 [`brms::default_prior()`](https://paulbuerkner.com/brms/reference/default_prior.html)
 
 ## Examples

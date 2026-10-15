@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,7 +21,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -37,7 +38,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>EZ-Diffusion Model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/model_ezdm.R" class="external-link"><code>R/model_ezdm.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/model_ezdm.R" class="external-link"><code>R/model_ezdm.R</code></a></small>
       <div class="d-none name"><code>ezdm.Rd</code></div>
     </div>
 
@@ -47,7 +48,15 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ezdm</span><span class="op">(</span><span class="va">mean_rt</span>, <span class="va">var_rt</span>, <span class="va">n_upper</span>, <span class="va">n_trials</span>, links <span class="op">=</span> <span class="cn">NULL</span>, version <span class="op">=</span> <span class="st">"3par"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ezdm</span><span class="op">(</span></span>
+<span>  <span class="va">mean_rt</span>,</span>
+<span>  <span class="va">var_rt</span>,</span>
+<span>  <span class="va">n_upper</span>,</span>
+<span>  <span class="va">n_trials</span>,</span>
+<span>  links <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  version <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"3par"</span>, <span class="st">"4par"</span><span class="op">)</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -71,10 +80,13 @@
 
 
 <dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
-<dd><p>A list of links for the parameters. For positive parameters
+<dd><p>A named list of links for the parameters, e.g.
+<code>links = list(bound = "softplus")</code>. For positive parameters
 (e.g. <code>bound</code>, <code>ndt</code>), "softplus" is available as an alternative to the
 default "log" link that grows linearly for large values and avoids the
-numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>.</p></dd>
+numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>. A name that is not a parameter of the model
+is an error, and a link that allows values the default link excludes
+(e.g. "identity" for a positive parameter) is a warning.</p></dd>
 
 
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
@@ -97,10 +109,10 @@ four parameter version (version = "4par"), that allows to freely estimate the st
 <ul><li><p><strong>Domain:</strong> Decision Making / Response times</p></li>
 <li><p><strong>Task:</strong> Choice Reaction Time tasks</p></li>
 <li><p><strong>Name:</strong> EZ-Diffusion Model</p></li>
-<li><p><strong>Citation:</strong></p><ul><li><p>Wagenmakers, E.-J., Van Der Maas, H. L. J., &amp; Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin &amp; Review, 14(1), 3-22. https://doi.org/10/fk447c</p></li>
+<li><p><strong>Citation:</strong></p><ul><li><p>Wagenmakers, E.-J., Van Der Maas, H. L. J., &amp; Grasman, R. P. P. P. (2007). An EZ-diffusion model for response time and accuracy. Psychonomic Bulletin &amp; Review, 14(1), 3-22. https://doi.org/10.3758/BF03194023</p></li>
+<li><p>Chávez De la Peña, A. F., &amp; Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin &amp; Review, 32(6), 3067-3087. https://doi.org/10.3758/s13423-025-02729-y</p></li>
 </ul></li>
-</ul><ul><li><p>Chávez De la Peña, A. F., &amp; Vandekerckhove, J. (2025). An EZ Bayesian hierarchical drift diffusion model for response time and accuracy. Psychonomic Bulletin &amp; Review. https://doi.org/10.3758/s13423-025-02729-y</p></li>
-</ul><ul><li><p><strong>Version:</strong> 4par</p></li>
+<li><p><strong>Version:</strong> 4par</p></li>
 <li><p><strong>Requirements:</strong></p>
 <p>Provide aggregated statistics for each subject and condition that model parameters should vary over:</p></li>
 </ul><ul><li><p>Mean reaction times (mean_rt) in seconds</p></li>
@@ -110,7 +122,7 @@ four parameter version (version = "4par"), that allows to freely estimate the st
 </ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>drift</code>: Drift rate = Average rate of evidence accumulation of the decision processes</p></li>
 <li><p><code>bound</code>: Boundary separation = Distance between the decision boundaries that need to be reached</p></li>
 <li><p><code>ndt</code>: Non-decision time = Additional time required beyond the evidence accumulation process</p></li>
-<li><p><code>zr</code>: Relative starting point = Starting point between the decision thresholds relative to the upper bound.</p></li>
+<li><p><code>zr</code>: Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, &gt; 0.5 = biased towards the upper response).</p></li>
 <li><p><code>s</code>: The diffusion constant, that is the standard deviation of the Gaussian noise during sampling</p></li>
 </ul></li>
 <li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>s</code> = 0</p></li>
@@ -120,20 +132,40 @@ four parameter version (version = "4par"), that allows to freely estimate the st
 </ul></li>
 <li><p><strong>Default priors:</strong></p><ul><li><p><code>drift</code>:</p><ul><li><p><code>main</code>: cauchy(0,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>bound</code>:</p><ul><li><p><code>main</code>: normal(0,0.5)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 <li><p><code>ndt</code>:</p><ul><li><p><code>main</code>: normal(-1.5,0.5)</p></li>
 <li><p><code>effects</code>: normal(0,0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 <li><p><code>zr</code>:</p><ul><li><p><code>main</code>: normal(0,0.5)</p></li>
 <li><p><code>effects</code>: normal(0,0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 <li><p><code>s</code>:</p><ul><li><p><code>main</code>: normal(0,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
-</ul></li>
+</ul><p>In version "4par", a boundary reached fewer than twice, or without RT
+summaries (<code>NA</code>), enters the model through the response counts only.
+<code><a href="bmm.html">bmm()</a></code> adds two columns to the data, <code>rt_used_upper</code> and
+<code>rt_used_lower</code>, which it sets to 0 for such a boundary and to 1
+otherwise, and replaces the summaries of such a boundary with a
+placeholder the likelihood never reads. A 0 already in these columns is
+kept, so that <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> does not read the placeholders in <code>fit$data</code> as
+data.</p>
+<p><code>newdata</code> passed to <code>log_lik()</code>, <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> or <code>posterior_predict()</code>
+needs these columns too. Rows of <code>fit$data</code> have them. For raw data, set
+both to 1: a boundary reached fewer than twice or with <code>NA</code> summaries is
+then still left out of the likelihood. brms functions that compare the
+response with predictions, <code>predictive_error()</code> and
+<code>residuals(method = "posterior_predict")</code>, read the placeholders as data
+in cells whose <code>rt_used_upper</code> is 0, so leave those cells out first, for
+example with <code>newdata = subset(fit$data, rt_used_upper == 1)</code>.</p></li>
 </ul></div>
 
     <div class="section level2">
@@ -187,8 +219,11 @@ four parameter version (version = "4par"), that allows to freely estimate the st
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract population-level effects</span></span></span>
-<span class="r-in"><span><span class="co"># True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># True values: drift = 2, bound = 1.5, ndt = 0.3</span></span></span>
+<span class="r-in"><span><span class="co"># drift has an identity link; bound and ndt have log links</span></span></span>
+<span class="r-in"><span><span class="va">fixed_effects</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">fixed_effects</span><span class="op">[</span><span class="st">"drift_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixed_effects</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bound_Intercept"</span>, <span class="st">"ndt_Intercept"</span><span class="op">)</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

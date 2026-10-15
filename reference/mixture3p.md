@@ -56,7 +56,7 @@ An object of class `bmmodel`
 
   - Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision
     of visual working memory is set by allocation of a shared resource.
-    Journal of Vision, 9(10), 1-11
+    Journal of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7
 
 - **Requirements:**
 
@@ -97,7 +97,11 @@ An object of class `bmmodel`
 
   - `mu1`:
 
-    - `main`: student_t(1, 0, 1)
+    - `main`: normal(0, 0.5)
+
+    - `effects`: normal(0, 0.25)
+
+    - `sd`: exponential(4)
 
   - `kappa`:
 
@@ -105,18 +109,28 @@ An object of class `bmmodel`
 
     - `effects`: normal(0, 1)
 
+    - `sd`: exponential(1)
+
   - `thetat`:
 
     - `main`: logistic(0, 1)
+
+    - `effects`: normal(0, 2.5)
+
+    - `sd`: exponential(1)
 
   - `thetant`:
 
     - `main`: logistic(0, 1)
 
+    - `effects`: normal(0, 2.5)
+
+    - `sd`: exponential(1)
+
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # generate artificial data from the Bays et al (2009) 3-parameter mixture model
 dat <- data.frame(
   y = rmixture3p(n = 2000, mu = c(0, 1, -1.5, 2)),

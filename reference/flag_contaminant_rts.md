@@ -21,7 +21,7 @@ flag_contaminant_rts(
   contaminant_bound = c("min", "max"),
   init_contaminant = 0.05,
   max_contaminant = 0.5,
-  maxit = 100,
+  maxit = 500,
   tol = 1e-06
 )
 ```
@@ -55,7 +55,8 @@ flag_contaminant_rts(
 
 - maxit:
 
-  Integer. Maximum EM iterations. Default 100.
+  Integer. Maximum EM iterations. Default 500. A group whose EM reaches
+  `maxit` without converging gets `NA` probabilities and a warning.
 
 - tol:
 
@@ -64,9 +65,12 @@ flag_contaminant_rts(
 ## Value
 
 Numeric vector of posterior contamination probabilities P(contaminant \|
-RT), with a `"diagnostics"` attribute containing a one-row data.frame
-with columns: `mixture_params` (list), `contaminant_prop`, `converged`,
-`iterations`, `loglik`, `n_trials`, `distribution`, `method`.
+RT), `NA` for every trial of a group whose EM did not converge (a
+threshold such as `filter(contam_prob <= 0.5)` drops that whole group,
+so check for `NA` first), with a `"diagnostics"` attribute containing a
+one-row data.frame with columns: `mixture_params` (list),
+`contaminant_prop`, `converged`, `iterations`, `loglik`, `n_trials`,
+`distribution`, `method`.
 
 ## Details
 

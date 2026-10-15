@@ -71,7 +71,7 @@ A bare bones configure_model.\* method should look like this:
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 configure_model.mixture3p <- function(model, data, formula) {
   # retrieve arguments from the data check
   max_set_size <- attr(data, "max_set_size")

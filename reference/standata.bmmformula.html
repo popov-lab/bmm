@@ -17,7 +17,7 @@ brms"><meta property="og:image" content="https://venpopov.com/bmm/logo.png"></he
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -25,7 +25,8 @@ brms"><meta property="og:image" content="https://venpopov.com/bmm/logo.png"></he
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -41,7 +42,7 @@ brms"><meta property="og:image" content="https://venpopov.com/bmm/logo.png"></he
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Stan data for <code>bmm</code> models</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
       <div class="d-none name"><code>standata.bmmformula.Rd</code></div>
     </div>
 
@@ -75,8 +76,8 @@ passed to the <code>bmmodel</code> object for required argurments.</p></dd>
 <dd><p>A description of the model to be fitted. This is a call to a
 <code>bmmodel</code> such as <code><a href="mixture3p.html">mixture3p()</a></code> function. Every model function has a
 number of required arguments which need to be specified within the function
-call. Call <code><a href="supported_models.html">supported_models()</a></code> to see the list of supported models and
-their required arguments</p></dd>
+call. Call <code><a href="bmm_models.html">bmm_models()</a></code> to see the list of supported models, and
+<code>?modelname</code> (for example <code><a href="imm.html">?imm</a></code>) for their required arguments.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -91,7 +92,7 @@ model with Stan.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="supported_models.html">supported_models()</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/standata.html" class="external-link">brms::standata()</a></code></p></div>
+    <div class="dont-index"><p><code><a href="bmm_models.html">bmm_models()</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/standata.html" class="external-link">brms::standata()</a></code></p></div>
     </div>
 
     <div class="section level2">

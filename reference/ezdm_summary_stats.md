@@ -18,8 +18,9 @@ ezdm_summary_stats(
   min_trials = 10,
   init_contaminant = 0.05,
   max_contaminant = 0.5,
-  maxit = 100,
-  tol = 1e-06
+  maxit = 500,
+  tol = 1e-06,
+  guess_rate = 0.5
 )
 ```
 
@@ -56,9 +57,12 @@ ezdm_summary_stats(
   mixture modeling, "robust" for non-parametric robust estimation using
   median and IQR/MAD-based variance, or "simple" for standard moment
   calculation. The "robust" method is faster and requires no
-  distributional assumptions, but note that the EZ equations were
-  derived for mean and variance, so using median may introduce some bias
-  for skewed distributions.
+  distributional assumptions, but its moments are not the mean and
+  variance the EZ equations were derived for. For right-skewed RTs the
+  median lies below the mean and (IQR/1.349)^2 below the variance, so
+  the EZ estimates are offset systematically, not just noisier: a larger
+  drift rate and a smaller boundary separation than the same data give
+  with "mixture".
 
 - robust_scale:
 
@@ -85,8 +89,14 @@ ezdm_summary_stats(
 
 - min_trials:
 
-  Integer. Minimum number of trials required for fitting. Returns NA if
-  fewer trials are available. Default is 10
+  Integer. Minimum number of trials required for the RT summaries, which
+  are NA with fewer. Compared against the total number of trials for
+  `version = "3par"` and against each boundary's own count for
+  `version = "4par"`, so the two versions can disagree about whether the
+  same cell is corrected. For `version = "4par"`,
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) still fits a cell
+  whose summaries at one or both boundaries are NA, through its response
+  counts. Default is 10
 
 - init_contaminant:
 
@@ -101,11 +111,23 @@ ezdm_summary_stats(
 
 - maxit:
 
-  Integer. Maximum number of EM iterations. Default is 100
+  Integer. Maximum number of EM iterations. Default is 500. The EM
+  converges slowly when the contaminant proportion is close to zero, and
+  a cell that reaches `maxit` without converging falls back to robust
+  moments with a warning.
 
 - tol:
 
   Numeric. Convergence tolerance for EM algorithm. Default is 1e-6
+
+- guess_rate:
+
+  Numeric. Accuracy expected of a contaminant response, used to split
+  the estimated contaminants of `version = "3par"` across the two
+  boundaries. Default is 0.5, appropriate for a two-choice task; use
+  0.25 for a 4AFC task, or 0 if contaminants are never correct. Ignored
+  for `version = "4par"`, which estimates contamination separately per
+  boundary and needs no such assumption.
 
 ## Value
 
@@ -114,6 +136,12 @@ A 1-row `data.frame`. For version = "3par": `mean_rt`, `var_rt`,
 `mean_rt_upper`, `mean_rt_lower`, `var_rt_upper`, `var_rt_lower`,
 `n_upper`, `n_trials`, `contaminant_prop_upper`,
 `contaminant_prop_lower`.
+
+`n_upper` and `n_trials` count the responses the reported moments rest
+on. Whenever a contaminant proportion was estimated, the expected number
+of contaminants is removed from both counts and the result is rounded;
+with `method = "simple"`, `method = "robust"`, or an EM that did not
+converge, they are the raw counts.
 
 ## Details
 
@@ -124,19 +152,23 @@ mixture model with two components: a uniform distribution for
 contaminants and a parametric RT distribution for true responses. Robust
 moments are then extracted from the fitted parametric component.
 
+The returned counts describe the same responses as the returned moments.
+For `version = "3par"` the estimated contaminants are shared between the
+boundaries at `guess_rate`; a cell whose observed accuracy lies outside
+`[guess_rate * p, 1 - p * (1 - guess_rate)]` for an estimated proportion
+`p` cannot have arisen that way, so the contaminants are removed
+proportionally from both boundaries instead, leaving the observed
+accuracy unchanged apart from rounding, and a warning is issued. For
+`version = "4par"` each boundary is corrected by its own estimate.
+
 This function is designed to work with
 [`dplyr::group_by()`](https://dplyr.tidyverse.org/reference/group_by.html)
 and
 [`dplyr::reframe()`](https://dplyr.tidyverse.org/reference/reframe.html)
-for grouped operations. Use
-[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/reference/adjust_ezdm_accuracy.md)
-as a separate step if you need to adjust accuracy counts for
-contamination.
+for grouped operations.
 
 ## See also
 
-[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/reference/adjust_ezdm_accuracy.md)
-for adjusting accuracy counts,
 [`flag_contaminant_rts()`](https://venpopov.com/bmm/reference/flag_contaminant_rts.md)
 for trial-level contamination probabilities,
 [`ezdm()`](https://venpopov.com/bmm/reference/ezdm.md) for fitting the

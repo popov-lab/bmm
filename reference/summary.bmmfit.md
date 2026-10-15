@@ -72,7 +72,7 @@ options(bmm.color_summary = FALSE) or bmm_options(color_summary = FALSE)
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))
 

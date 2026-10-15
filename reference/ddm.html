@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,7 +21,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -37,7 +38,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Diffusion Decision Model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/model_ddm.R" class="external-link"><code>R/model_ddm.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/model_ddm.R" class="external-link"><code>R/model_ddm.R</code></a></small>
       <div class="d-none name"><code>ddm.Rd</code></div>
     </div>
 
@@ -63,10 +64,13 @@
 
 
 <dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
-<dd><p>A list of links for the parameters. For positive parameters
+<dd><p>A named list of links for the parameters, e.g.
+<code>links = list(bound = "softplus")</code>. For positive parameters
 (e.g. <code>bound</code>, <code>ndt</code>), "softplus" is available as an alternative to the
 default "log" link that grows linearly for large values and avoids the
-numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>.</p></dd>
+numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>. A name that is not a parameter of the model
+is an error, and a link that allows values the default link excludes
+(e.g. "identity" for a positive parameter) is a warning.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -83,7 +87,7 @@ numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="exte
 <ul><li><p><strong>Domain:</strong> Decision Making / Response times</p></li>
 <li><p><strong>Task:</strong> Two-Alternative Force Choice RT</p></li>
 <li><p><strong>Name:</strong> Diffusion Decision Model</p></li>
-<li><p><strong>Citation:</strong></p><ul><li><p>Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f;</p></li>
+<li><p><strong>Citation:</strong></p><ul><li><p>Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10.1037/0033-295X.85.2.59</p></li>
 </ul></li>
 <li><p><strong>Requirements:</strong></p><ul><li><p>The response time should be in seconds and represent the time between onset of the target stimulus until the response execution</p></li>
 </ul></li>
@@ -91,7 +95,7 @@ numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="exte
 </ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>drift</code>: Drift rate = Average rate of evidence accumulation of the decision processes</p></li>
 <li><p><code>bound</code>: Boundary separation = Distance between the decision boundaries that need to be reached</p></li>
 <li><p><code>ndt</code>: Non-decision time = Additional time required beyond the evidence accumulation process</p></li>
-<li><p><code>zr</code>: Relative starting point = Starting point between the decision thresholds relative to the upper bound.</p></li>
+<li><p><code>zr</code>: Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, &gt; 0.5 = biased towards the upper response).</p></li>
 </ul></li>
 <li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>zr</code> = 0</p></li>
 <li><p><code>mu</code> = 0</p></li>
@@ -100,15 +104,19 @@ numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="exte
 </ul></li>
 <li><p><strong>Default priors:</strong></p><ul><li><p><code>drift</code>:</p><ul><li><p><code>main</code>: cauchy(0,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>bound</code>:</p><ul><li><p><code>main</code>: normal(0,0.5)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 <li><p><code>ndt</code>:</p><ul><li><p><code>main</code>: normal(-1.5,0.5)</p></li>
 <li><p><code>effects</code>: normal(0,0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 <li><p><code>zr</code>:</p><ul><li><p><code>main</code>: normal(0,0.5)</p></li>
 <li><p><code>effects</code>: normal(0,0.3)</p></li>
+<li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
@@ -116,13 +124,21 @@ numerical blow-up of <code><a href="https://rdrr.io/r/base/Log.html" class="exte
     <h2 id="default-behavior">Default behavior<a class="anchor" aria-label="anchor" href="#default-behavior"></a></h2>
 
 
-<p>By default, <code>zr</code> is fixed at 0. If you want to estimate <code>zr</code>, add a formula
-for <code>zr</code> in your <code><a href="bmmformula.html">bmf()</a></code> call.</p>
+<p>By default, <code>zr</code> is fixed at 0 on its logit link scale, that is at an
+unbiased starting point of <code>zr = 0.5</code>. If you want to estimate <code>zr</code>, add a
+formula for <code>zr</code> in your <code><a href="bmmformula.html">bmf()</a></code> call. Estimates of <code>zr</code> are on the logit
+scale too, so use <code><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis()</a></code> to read them as proportions.</p>
+<p>With accuracy-coded responses (1 = correct, 0 = error) the unbiased default
+is the usual assumption. With response-coded data (1 and 0 for the two
+response options, e.g. "word" and "nonword"), a bias towards one option
+moves the starting point; with <code>zr</code> fixed, that bias is absorbed by the
+other parameters instead. Estimate <code>zr</code> for response-coded data, e.g.
+<code>zr ~ 1</code>, and code <code>drift</code> so that its sign follows the stimulus.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># isTRUE(Sys.getenv("BMM_EXAMPLES"))</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># identical(Sys.getenv("BMM_EXAMPLES"), "true")</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate data for one subject using rddm</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">n_trials</span> <span class="op">&lt;-</span> <span class="fl">500</span></span></span>

@@ -12,6 +12,7 @@ bmm_options(
   silent,
   color_summary,
   file_refit,
+  step_size,
   reset_options = FALSE
 )
 ```
@@ -53,8 +54,29 @@ bmm_options(
 
 - file_refit:
 
-  logical. If TRUE, bmm() will refit the model even if the file argument
-  is specified. **Default: FALSE**
+  logical or character. Controls when
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) re-uses a fit
+  saved via its `file` argument. `TRUE` or "always" always refits,
+  `FALSE` or "never" always re-uses the saved fit, and "on_change"
+  re-uses it only while the Stan code and data are unchanged. See
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) for details.
+  **Default: FALSE**
+
+- step_size:
+
+  numeric or `FALSE`. The step size at which
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) and
+  [`update()`](https://rdrr.io/r/stats/update.html) start Stan's
+  step-size search, passed as `control = list(step_size = )` (`stepsize`
+  for the rstan backend). Stan's own starting value of 1 is far above
+  the step sizes the hierarchical models in bmm adapt to, and the
+  oversized trial steps of the search print `lkj_corr_cholesky_lpdf` and
+  `von_mises_lpdf` exceptions at the start of warmup. The adapted step
+  size and the posterior do not depend on the starting value. `FALSE`
+  leaves the starting step size to Stan; a `step_size` (or `stepsize`)
+  in the `control` list of
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) always wins.
+  **Default: 0.01**
 
 - reset_options:
 
@@ -92,6 +114,7 @@ bmm_options()
 #>   default_priors = TRUE
 #>   silent = 1
 #>   file_refit = FALSE
+#>   step_size = 0.01
 #>   color_summary = TRUE
 #> For more information on these options or how to change them, see help(bmm_options).
 
@@ -103,6 +126,7 @@ bmm_options(sort_data = TRUE, parallel = TRUE)
 #>   default_priors = TRUE
 #>   silent = 1
 #>   file_refit = FALSE
+#>   step_size = 0.01
 #>   color_summary = TRUE
 #> For more information on these options or how to change them, see help(bmm_options).
 
@@ -114,6 +138,7 @@ bmm_options(reset_options = TRUE)
 #>   default_priors = TRUE
 #>   silent = 1
 #>   file_refit = FALSE
+#>   step_size = 0.01
 #>   color_summary = TRUE
 #> For more information on these options or how to change them, see help(bmm_options).
 
@@ -126,6 +151,7 @@ bmm_options()
 #>   default_priors = TRUE
 #>   silent = 1
 #>   file_refit = FALSE
+#>   step_size = 0.01
 #>   color_summary = TRUE
 #> For more information on these options or how to change them, see help(bmm_options).
 
@@ -137,6 +163,7 @@ bmm_options(reset_options = TRUE)
 #>   default_priors = TRUE
 #>   silent = 1
 #>   file_refit = FALSE
+#>   step_size = 0.01
 #>   color_summary = TRUE
 #> For more information on these options or how to change them, see help(bmm_options).
 
@@ -149,6 +176,7 @@ old_op <- bmm_options(sort_data = TRUE, parallel = TRUE)
 #>   default_priors = TRUE
 #>   silent = 1
 #>   file_refit = FALSE
+#>   step_size = 0.01
 #>   color_summary = TRUE
 #> For more information on these options or how to change them, see help(bmm_options).
 on.exit(bmm_options(old_op))
@@ -161,6 +189,7 @@ bmm_options(reset_options = TRUE)
 #>   default_priors = TRUE
 #>   silent = 1
 #>   file_refit = FALSE
+#>   step_size = 0.01
 #>   color_summary = TRUE
 #> For more information on these options or how to change them, see help(bmm_options).
 ```

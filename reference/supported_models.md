@@ -1,6 +1,13 @@
-# Measurement models available in `bmm`
+# Deprecated: use `bmm_models()`
 
-Measurement models available in `bmm`
+`supported_models()` is deprecated as of bmm 1.4.0 and will be removed
+in bmm 1.6.0. It shares its name with `insight::supported_models()`,
+which the **parameters** package re-exports, so whichever package is
+attached last decides what `supported_models()` returns. Replace both
+`supported_models()` and `supported_models(print_call = FALSE)` with
+[`bmm_models()`](https://venpopov.com/bmm/reference/bmm_models.md); wrap
+it in [`as.character()`](https://rdrr.io/r/base/character.html) if you
+need a plain character vector.
 
 ## Usage
 
@@ -12,29 +19,16 @@ supported_models(print_call = TRUE)
 
 - print_call:
 
-  Logical; If TRUE (default), the function will print information about
-  how each model function should be called and its required arguments.
-  If FALSE, the function will return a character vector with the names
-  of the available models
+  Logical. If `TRUE` (default), returns the output of
+  [`bmm_models()`](https://venpopov.com/bmm/reference/bmm_models.md),
+  which prints the models grouped by task. If `FALSE`, returns the model
+  names as a plain character vector.
 
 ## Value
 
-A character vector of measurement models available in `bmm`
-
-## Examples
-
-``` r
-supported_models()
-#> The following models are supported:
-#> 
-#> -  cswald(rt, response, links, version) 
-#> -  ddm(rt, response, links) 
-#> -  ezdm(mean_rt, var_rt, n_upper, n_trials, links, version) 
-#> -  imm(resp_error, nt_features, nt_distances, set_size, regex, version) 
-#> -  m3(resp_cats, num_options, choice_rule, version) 
-#> -  mixture2p(resp_error) 
-#> -  mixture3p(resp_error, nt_features, set_size, regex) 
-#> -  sdm(resp_error, version) 
-#> 
-#> Type  ?modelname  to get information about a specific model, e.g.  ?imm 
-```
+The output of
+[`bmm_models()`](https://venpopov.com/bmm/reference/bmm_models.md), or
+the model names as a plain character vector if `print_call = FALSE`.
+Before bmm 1.4.0 the default returned the printed list as one string;
+use `capture.output(print(bmm_models()))` for the printed list as text,
+one line per element.

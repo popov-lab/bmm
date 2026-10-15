@@ -9,7 +9,15 @@ before and after the update.
 
 ``` r
 # S3 method for class 'bmmfit'
-update(object, formula., newdata = NULL, recompile = NULL, ...)
+update(
+  object,
+  formula.,
+  newdata = NULL,
+  recompile = NULL,
+  file = NULL,
+  file_compress = TRUE,
+  ...
+)
 ```
 
 ## Arguments
@@ -26,7 +34,12 @@ update(object, formula., newdata = NULL, recompile = NULL, ...)
 
 - newdata:
 
-  An optional data frame containing the variables in the model
+  An optional data frame containing the variables in the model. Rows of
+  `fit$data` are accepted as they are, which is how
+  [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html)
+  and
+  [`brms::reloo()`](https://paulbuerkner.com/brms/reference/reloo.brmsfit.html)
+  pass them.
 
 - recompile:
 
@@ -35,6 +48,22 @@ update(object, formula., newdata = NULL, recompile = NULL, ...)
   recompilation is necessary. Setting it to FALSE will cause all Stan
   code changing arguments to be ignored.
 
+- file:
+
+  Either `NULL` or a character string. If a string, the updated model is
+  saved via [saveRDS](https://rdrr.io/r/base/readRDS.html) in a file
+  named after the string, as in
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md).
+  [`update()`](https://rdrr.io/r/stats/update.html) never writes to the
+  file the original fit was read from: pass `file` explicitly to save
+  the updated fit.
+
+- file_compress:
+
+  Logical or a character string, specifying one of the compression
+  algorithms supported by [saveRDS](https://rdrr.io/r/base/readRDS.html)
+  when saving the updated model object.
+
 - ...:
 
   Further arguments passed to
@@ -42,7 +71,12 @@ update(object, formula., newdata = NULL, recompile = NULL, ...)
 
 ## Value
 
-An updated `bmmfit` object refit to the new data and/or formula
+An updated `bmmfit` object refit to the new data and/or formula. If
+`file` is given, it names the newly written file. If not, the `file`
+field is carried over from the original fit, so the updated object still
+points at the file it came from – but that file is *not* rewritten: it
+still holds the fit as it was before this update. Pass `file` to save
+the updated fit.
 
 ## Details
 
@@ -58,7 +92,7 @@ For more information and examples, see
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # generate artificial data from the Signal Discrimination Model
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))

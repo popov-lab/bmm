@@ -15,7 +15,7 @@ backend interface to Stan."><meta property="og:image" content="https://venpopov.
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -23,7 +23,8 @@ backend interface to Stan."><meta property="og:image" content="https://venpopov.
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -39,7 +40,7 @@ backend interface to Stan."><meta property="og:image" content="https://venpopov.
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Fit Bayesian Measurement Models</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/bmm.R" class="external-link"><code>R/bmm.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/bmm.R" class="external-link"><code>R/bmm.R</code></a></small>
       <div class="d-none name"><code>bmm.Rd</code></div>
     </div>
 
@@ -95,8 +96,8 @@ passed to the <code>bmmodel</code> object for required argurments.</p></dd>
 <dd><p>A description of the model to be fitted. This is a call to a
 <code>bmmodel</code> such as <code><a href="mixture3p.html">mixture3p()</a></code> function. Every model function has a
 number of required arguments which need to be specified within the function
-call. Call <code><a href="supported_models.html">supported_models()</a></code> to see the list of supported models and
-their required arguments</p></dd>
+call. Call <code><a href="bmm_models.html">bmm_models()</a></code> to see the list of supported models, and
+<code>?modelname</code> (for example <code><a href="imm.html">?imm</a></code>) for their required arguments.</p></dd>
 
 
 <dt id="arg-prior">prior<a class="anchor" aria-label="anchor" href="#arg-prior"></a></dt>
@@ -149,16 +150,36 @@ the fitted model object.</p></dd>
 
 
 <dt id="arg-file-refit">file_refit<a class="anchor" aria-label="anchor" href="#arg-file-refit"></a></dt>
-<dd><p>Logical or character string. Modifies when the fit stored via the <code>file</code> argument is
-re-used. Can be set globally for the current R session via the
-<code>"bmm.file_refit"</code> option (see <a href="https://rdrr.io/r/base/options.html" class="external-link">options</a>). If <code>TRUE</code> or "always", the
-model is fitted again. If <code>FALSE</code> or "never" (the default), the model saved under the name specified in <code>file</code>
-will be re-used. Note that unlike in <code>brms</code>, there is no "on_change" option</p></dd>
+<dd><p>Logical or character string. Modifies when the fit stored
+via the <code>file</code> argument is re-used. Can be set globally for the current R
+session via the <code>"bmm.file_refit"</code> option (see <a href="https://rdrr.io/r/base/options.html" class="external-link">options</a>). If <code>TRUE</code> or
+"always", the model is fitted again. If <code>FALSE</code> or "never" (the default),
+the model saved under the name specified in <code>file</code> will be re-used. If
+"on_change", the saved model is re-used only if the Stan code, the Stan
+data, the factor levels of the model variables and the algorithm are
+unchanged; otherwise the model is fitted again. Because that comparison
+needs the Stan code and data of the current call, "on_change" runs the
+full bmm configuration pipeline, <a href="standata.bmmformula.html">standata()</a> and
+<a href="stancode.bmmformula.html">stancode()</a> even when the cached fit is returned:
+about 0.4 s rather than 0.02 s for an <strong>sdm</strong> model of <code>oberauer_lin_2017</code>,
+much cheaper than compiling and sampling, but not free. Only the four
+things listed above are compared, so sampler settings do <strong>not</strong> force a
+refit – in particular <code>control = list(adapt_delta = )</code>, <code>iter</code>, <code>warmup</code>,
+<code>chains</code>, <code>seed</code>, <code>init</code> and <code>save_pars</code>. Raising <code>adapt_delta</code> after
+divergent transitions, or rerunning with <code>save_pars(all = TRUE)</code> for
+<code>loo()</code>, therefore returns the cached fit unchanged; delete the file or
+pass <code>file_refit = "always"</code> for those. Because the row order of the data
+reaches the Stan data, <code>"on_change"</code> is most predictable with
+<code>sort_data</code> fixed to <code>TRUE</code> or <code>FALSE</code> (globally via
+<code>options(bmm.sort_data = )</code>): under the default <code>"check"</code>, answering the
+interactive prompt differently than last time forces a refit.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Further arguments passed to <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code> or Stan. See the
-description of <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code> for more details</p></dd>
+description of <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code> for more details. Unless <code>control</code> names a
+<code>step_size</code> (<code>stepsize</code> for the rstan backend), bmm adds the starting step
+size set in <code><a href="bmm_options.html">bmm_options()</a></code> to it; the other entries of <code>control</code> are kept.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -169,14 +190,21 @@ with many other useful information about the model. Use methods(class =
     </div>
     <div class="section level2">
     <h2 id="supported-models">Supported Models<a class="anchor" aria-label="anchor" href="#supported-models"></a></h2>
-    <p>The following models are supported:</p><ul><li><p>cswald(rt, response, links, version)</p></li>
-<li><p>ddm(rt, response, links)</p></li>
-<li><p>ezdm(mean_rt, var_rt, n_upper, n_trials, links, version)</p></li>
-<li><p>imm(resp_error, nt_features, nt_distances, set_size, regex, version)</p></li>
-<li><p>m3(resp_cats, num_options, choice_rule, version)</p></li>
-<li><p>mixture2p(resp_error)</p></li>
-<li><p>mixture3p(resp_error, nt_features, set_size, regex)</p></li>
-<li><p>sdm(resp_error, version)</p></li>
+    <p>The following models are supported:</p>
+<p>Continuous reproduction</p><ul><li><p>imm(): Interference measurement model by Oberauer and Lin (2017)</p></li>
+<li><p>mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)</p></li>
+<li><p>mixture3p(): Three-parameter mixture model by Bays et al (2009)</p></li>
+<li><p>sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)</p></li>
+</ul><p>Categorical recall and n-AFC decisions</p><ul><li><p>m3(): The Multinomial / Memory Measurement Model</p></li>
+</ul><p>Processing-tree models</p><ul><li><p>mpt(): Multinomial Processing Tree (MPT) models</p></li>
+</ul><p>Detection, recognition and confidence judgments</p><ul><li><p>sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)</p></li>
+<li><p>sdt_mafc(): Signal Detection Theory (m-AFC)</p></li>
+<li><p>sdt_ranking(): Signal Detection Theory (Ranking)</p></li>
+<li><p>sdt_rating(): Signal Detection Theory (Confidence Rating)</p></li>
+<li><p>sdt_yn(): Signal Detection Theory (Yes/No)</p></li>
+</ul><p>Choices and response times</p><ul><li><p>cswald(): Censored-Shifted Wald Model</p></li>
+<li><p>ddm(): Diffusion Decision Model</p></li>
+<li><p>ezdm(): EZ-Diffusion Model</p></li>
 </ul><p>Type  ?modelname  to get information about a specific model, e.g.  ?imm</p>
     </div>
     <div class="section level2">
@@ -186,7 +214,8 @@ it differs from the syntax for <strong>brmsformula</strong></p>
     </div>
     <div class="section level2">
     <h2 id="default-priors-stan-code-and-stan-data">Default priors, Stan code and Stan data<a class="anchor" aria-label="anchor" href="#default-priors-stan-code-and-stan-data"></a></h2>
-    <p>For more information about the default priors in <strong>bmm</strong> and about who to extract the Stan code and data generated by bmm and #'   brms, see <a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">the online article</a>.</p>
+    <p>For more information about the default priors in <strong>bmm</strong> and about who to extract the Stan code and data generated by bmm and
+brms, see <a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">the online article</a>.</p>
     </div>
     <div class="section level2">
     <h2 id="miscellaneous">Miscellaneous<a class="anchor" aria-label="anchor" href="#miscellaneous"></a></h2>
@@ -202,12 +231,12 @@ https://doi.org/10.31234/osf.io/umt57</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="supported_models.html">supported_models()</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code>, <a href="default_prior.bmmformula.html">default_prior()</a>, <code><a href="bmmformula.html">bmmformula()</a></code>, <a href="stancode.bmmformula.html">stancode()</a>, <a href="standata.bmmformula.html">standata()</a></p></div>
+    <div class="dont-index"><p><code><a href="bmm_models.html">bmm_models()</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brms::brm()</a></code>, <a href="default_prior.bmmformula.html">default_prior()</a>, <code><a href="bmmformula.html">bmmformula()</a></code>, <a href="stancode.bmmformula.html">stancode()</a>, <a href="standata.bmmformula.html">standata()</a></p></div>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># isTRUE(Sys.getenv("BMM_EXAMPLES"))</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># identical(Sys.getenv("BMM_EXAMPLES"), "true")</span></span></span>
 <span class="r-in"><span><span class="co"># generate artificial data from the Signal Discrimination Model</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="SDMdist.html">rsdm</a></span><span class="op">(</span><span class="fl">2000</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>

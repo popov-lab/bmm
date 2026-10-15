@@ -4,10 +4,14 @@
 
 Guides to using various features of the **bmm** package
 
+- [From brms to
+  bmm](https://venpopov.com/bmm/articles/bmm_brms_to_bmm.md):
 - [Introduction to the bmmformula
   syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.md):
 - [Extracting default priors, the generated Stan code and Stan
   data](https://venpopov.com/bmm/articles/bmm_extract_info.md):
+- [Testing hypotheses and comparing
+  models](https://venpopov.com/bmm/articles/bmm_hypothesis_testing.md):
 
 ### Continuous reproduction tasks
 
@@ -29,6 +33,17 @@ n-AFC, etc)
 
 - [The Multinomial / Memory Measurement Model
   (M3)](https://venpopov.com/bmm/articles/bmm_m3.md):
+- [Multinomial Processing Tree (MPT)
+  models](https://venpopov.com/bmm/articles/bmm_mpt.md):
+
+### Signal detection & recognition
+
+Fitting signal detection models and analysing ROC/AUC
+
+- [Signal Detection Theory
+  models](https://venpopov.com/bmm/articles/bmm_sdt.md):
+- [Dual-process and meta-d′ signal detection
+  models](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.md):
 
 ### Evidence accumulation models
 

@@ -3,17 +3,23 @@ pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   articles/bmm_bmmformula: bmm_bmmformula.html
+  articles/bmm_brms_to_bmm: bmm_brms_to_bmm.html
   articles/bmm_cswald: bmm_cswald.html
   articles/bmm_ddm: bmm_ddm.html
   articles/bmm_extract_info: bmm_extract_info.html
   articles/bmm_ezdm: bmm_ezdm.html
+  articles/bmm_hypothesis_testing: bmm_hypothesis_testing.html
   articles/bmm_imm: bmm_imm.html
   articles/bmm_m3: bmm_m3.html
   articles/bmm_mixture_models: bmm_mixture_models.html
+  articles/bmm_mpt: bmm_mpt.html
   articles/bmm_rt_contamination: bmm_rt_contamination.html
   articles/bmm_sdm_simple: bmm_sdm_simple.html
+  articles/bmm_sdt_dualprocess_metad: bmm_sdt_dualprocess_metad.html
+  articles/bmm_sdt: bmm_sdt.html
   articles/bmm_vwm_crt: bmm_vwm_crt.html
-last_built: 2026-09-16T12:25Z
+  articles/bmm: bmm.html
+last_built: 2026-10-15T11:08Z
 urls:
   reference: https://venpopov.com/bmm/reference
   article: https://venpopov.com/bmm/articles

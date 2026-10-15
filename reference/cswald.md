@@ -28,10 +28,17 @@ cswald(rt, response, links = NULL, version = c("simple", "crisk"), ...)
   A named list of link functions for the model parameters. Available
   parameters depend on the version: "simple" has `drift`, `bound`,
   `ndt`, and `s`; "crisk" additionally has `zr`. Default links are "log"
-  for most parameters and "logit" for `zr`. For positive parameters,
-  "softplus" is available as an alternative to "log" that grows linearly
-  for large values and avoids the numerical blow-up of
-  [`exp()`](https://rdrr.io/r/base/Log.html).
+  for `bound`, `ndt` and `s`, and "logit" for `zr`. `drift` has a "log"
+  link in "simple", where it is positive, and an "identity" link in
+  "crisk", where it can be negative, as in
+  [`ddm()`](https://venpopov.com/bmm/reference/ddm.md) and
+  [`ezdm()`](https://venpopov.com/bmm/reference/ezdm.md). For positive
+  parameters, "softplus" is available as an alternative to "log" that
+  grows linearly for large values and avoids the numerical blow-up of
+  [`exp()`](https://rdrr.io/r/base/Log.html). A name that is not a
+  parameter of the model is an error, and a link that allows values the
+  default link excludes (e.g. "identity" for a positive parameter) is a
+  warning.
 
 - version:
 
@@ -51,9 +58,11 @@ cswald(rt, response, links = NULL, version = c("simple", "crisk"), ...)
     types as arising from racing accumulators toward opposite
     boundaries. Better suited for tasks with substantial error rates.
     The `bound` parameter represents the total boundary separation,
-    consistent with the diffusion model parameterization.
+    consistent with the diffusion model parameterization. `zr` is fixed
+    at 0 on its logit scale (an unbiased `zr = 0.5`) unless you give it
+    a formula.
 
-  For more details, see Miller et al. (2017).
+  For more details, see Miller et al. (2018).
 
 - ...:
 
@@ -74,8 +83,8 @@ An object of class `bmmodel`
 - **Citation:**
 
   - Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S.
-    (2017). On the Relation Between the (Censored) Shifted Wald and the
-    Wiener Distribution as Measurement Models for Choice Response Times.
+    (2018). On the relation between the (censored) shifted Wald and the
+    Wiener distribution as measurement models for choice response times.
     Applied Psychological Measurement, 42(2), 116-135.
     https://doi.org/10.1177/0146621617710465
 
@@ -96,7 +105,9 @@ An object of class `bmmodel`
 
   - `drift`: drift rate
 
-  - `bound`: boundary (distance from starting point to correct boundary)
+  - `bound`: boundary (distance from starting point to correct boundary,
+    half the boundary separation `bound` of version "crisk", ddm() and
+    ezdm())
 
   - `ndt`: non-decision time
 
@@ -120,11 +131,15 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.3)
 
+    - `sd`: exponential(2)
+
   - `bound`:
 
     - `main`: normal(0,0.3)
 
     - `effects`: normal(0,0.3)
+
+    - `sd`: exponential(2)
 
   - `ndt`:
 
@@ -132,11 +147,15 @@ An object of class `bmmodel`
 
     - `effects`: normal(0,0.3)
 
+    - `sd`: exponential(2)
+
   - `s`:
 
     - `main`: normal(0,0.3)
 
     - `effects`: normal(0,0.2)
+
+    - `sd`: exponential(2)
 
 ## See also
 
@@ -147,7 +166,7 @@ density and random generation functions.
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # generate simulated data from the diffusion model
 dat <- rcswald(n = 500, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5, s = 1)
 

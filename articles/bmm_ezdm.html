@@ -26,7 +26,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,6 +35,7 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -61,7 +62,7 @@
                         <h4 data-toc-skip class="author">Ven Popov</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/vignettes/articles/bmm_ezdm.Rmd" class="external-link"><code>vignettes/articles/bmm_ezdm.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/vignettes/articles/bmm_ezdm.Rmd" class="external-link"><code>vignettes/articles/bmm_ezdm.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_ezdm.Rmd</code></div>
     </div>
 
@@ -153,6 +154,52 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <li>Compare conditions using Bayesian hypothesis testing</li>
 <li>Leverage the full power of the <code>brms</code> modeling framework</li>
 </ul>
+</div>
+<div class="section level3" number="1.5">
+<h3 id="the-sampling-distribution-of-the-summary-statistics">
+<span class="header-section-number">1.5</span> The sampling distribution of the summary statistics<a class="anchor" aria-label="anchor" href="#the-sampling-distribution-of-the-summary-statistics"></a>
+</h3>
+<p>Because the summary statistics <em>are</em> the data, the likelihood is a statement
+about how they vary from one sample of trials to the next. The number of
+upper-boundary responses is binomial. The mean and the variance of the response
+times are the sample mean and sample variance of <span class="math inline">\(n\)</span> decision times, and their
+joint sampling distribution is what the model needs.</p>
+<p>It is tempting to treat them the way one would for normally distributed data:
+<span class="math inline">\(\overline{\mathrm{RT}}\)</span> normal around the predicted mean with variance
+<span class="math inline">\(\mathrm{VRT}/n\)</span>, <span class="math inline">\(s^2\)</span> scaled chi-square, and the two independent. All three
+parts of that hold only if the response times themselves are normal, and
+diffusion decision times are conspicuously right-skewed. With a symmetric
+starting point their kurtosis is 8.8 at zero drift and falls towards 3 as drift
+grows. This inflates the sampling variance of <span class="math inline">\(s^2\)</span> by a factor of about 3.8
+with 100 trials per cell and 3.5 to 3.6 with 10 (less at accuracies above .95; with an
+asymmetric starting point it is more at the boundary nearer the starting point,
+up to 5.7 for a relative starting point between .3 and .7, and less at the
+other), and the skew makes the mean and the variance correlate at about 0.7. A likelihood that ignores both treats each cell as more
+informative than it is, and the resulting posteriors are too narrow — the
+credible intervals are not wrong about where the parameter is, but about how
+sure one should be.</p>
+<p><code>bmm</code> therefore matches the first four cumulants of the first-passage time
+distribution. Writing <span class="math inline">\(\kappa_3\)</span> and <span class="math inline">\(\kappa_4\)</span> for its third and fourth
+cumulants and
+<span class="math inline">\(W = \kappa_4 / n + 2\,\mathrm{VRT}^2 / (n - 1)\)</span> for the exact variance of a
+sample variance, the observed variance follows
+<span class="math inline">\(\mathrm{Gamma}(\mathrm{VRT}^2 / W,\ \mathrm{VRT} / W)\)</span> and the observed mean is
+normal <em>conditional on it</em>, centred at
+<span class="math inline">\(\mathrm{ndt} + \mathrm{MDT} + (\kappa_3 / n)\,W^{-1}(s^2 - \mathrm{VRT})\)</span>. Both
+reduce to the familiar normal and chi-square terms when <span class="math inline">\(\kappa_3\)</span> and
+<span class="math inline">\(\kappa_4\)</span> vanish, so nothing is lost when the decision times happen to be
+symmetric.</p>
+<p>One consequence is worth keeping in mind when designing a study: with a
+symmetric starting point the decision time does not depend on which boundary was
+reached, so all <span class="math inline">\(n\)</span> trials in a cell inform one set of moments. With a free
+starting point they do differ, which is why the 4-parameter version needs the
+summaries split by boundary — and why a boundary reached fewer than twice in a
+cell has no variance to contribute. Such a cell still contributes through the
+response counts, and so does a cell whose summaries at one boundary are
+missing, as <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> returns them for a boundary reached fewer
+than <code>min_trials</code> times. <code><a href="../reference/bmm.html">bmm()</a></code> keeps these cells and warns how many there
+are. Dropping them instead would remove exactly the cells with the most
+extreme accuracy, and with them information about drift and starting point.</p>
 </div>
 </div>
 <div class="section level2" number="2">
@@ -262,7 +309,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 </tr>
 </tbody>
 </table>
-<p>For the <strong>3-parameter version</strong>, <code>mean_rt</code> and <code>var_rt</code> should be computed from all correct responses pooled together.</p>
+<p>For the <strong>3-parameter version</strong>, <code>mean_rt</code> and <code>var_rt</code> are computed from all responses in a cell, correct and error pooled together, and <code>n_trials</code> counts all of them. The original EZ equations above use the RTs of correct responses only. Pooling is valid here because the starting point is symmetric: the decision time then has the same distribution at both boundaries, so every trial informs the same mean and variance. The accuracy enters the likelihood through <code>n_upper</code>. <code><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats()</a></code> pools the RTs for you.</p>
 <p>For the <strong>4-parameter version</strong>, you need separate statistics for upper and lower boundary responses:
 - <code>mean_rt_upper</code>, <code>var_rt_upper</code> for upper boundary (correct) responses
 - <code>mean_rt_lower</code>, <code>var_rt_lower</code> for lower boundary (error) responses</p>
@@ -388,29 +435,26 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <p>The mixture method identifies contaminants and provides more accurate moment estimates.</p>
 </div>
 <div class="section level3" number="4.2">
-<h3 id="accuracy-adjustment">
-<span class="header-section-number">4.2</span> Accuracy Adjustment<a class="anchor" aria-label="anchor" href="#accuracy-adjustment"></a>
+<h3 id="accuracy-and-trial-counts">
+<span class="header-section-number">4.2</span> Accuracy and Trial Counts<a class="anchor" aria-label="anchor" href="#accuracy-and-trial-counts"></a>
 </h3>
-<p>When using the mixture method, the <code><a href="../reference/adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code> function can adjust accuracy counts by removing estimated contaminants. This assumes contaminants are random guesses (50% accuracy by default) and is applied as a separate step after computing summary statistics:</p>
+<p>The mixture method also corrects <code>n_upper</code> and <code>n_trials</code>, so that the counts describe the responses the moments were computed from. The <code>simple</code> and <code>robust</code> methods estimate no contaminant proportion and return the raw counts:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">summary_no_adjust</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
+<code class="sourceCode R"><span><span class="va">summary_raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
+<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"simple"</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">summary_adjust</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ezdm_summary_stats.html">ezdm_summary_stats</a></span><span class="op">(</span></span>
-<span>  <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">rt</span>, <span class="va">trials_contaminated</span><span class="op">$</span><span class="va">correct</span>, version <span class="op">=</span> <span class="st">"3par"</span></span>
-<span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="fu"><a href="../reference/adjust_ezdm_accuracy.html">adjust_ezdm_accuracy</a></span><span class="op">(</span><span class="va">n_upper</span>, <span class="va">n_trials</span>, <span class="va">contaminant_prop</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Unadjusted accuracy:"</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">summary_no_adjust</span><span class="op">$</span><span class="va">n_upper</span> <span class="op">/</span> <span class="va">summary_no_adjust</span><span class="op">$</span><span class="va">n_trials</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Unadjusted accuracy: 0.93</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Adjusted accuracy:"</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">summary_adjust</span><span class="op">$</span><span class="va">n_upper_adj</span> <span class="op">/</span> <span class="va">summary_adjust</span><span class="op">$</span><span class="va">n_trials_adj</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Adjusted accuracy: 0.948</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Raw counts:"</span>, <span class="va">summary_raw</span><span class="op">$</span><span class="va">n_upper</span>, <span class="st">"of"</span>, <span class="va">summary_raw</span><span class="op">$</span><span class="va">n_trials</span>,</span>
+<span>    <span class="st">"- accuracy"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">summary_raw</span><span class="op">$</span><span class="va">n_upper</span> <span class="op">/</span> <span class="va">summary_raw</span><span class="op">$</span><span class="va">n_trials</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Raw counts: 186 of 200 - accuracy 0.93</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Contaminant-free:"</span>, <span class="va">summary_mixture</span><span class="op">$</span><span class="va">n_upper</span>, <span class="st">"of"</span>, <span class="va">summary_mixture</span><span class="op">$</span><span class="va">n_trials</span>,</span>
+<span>    <span class="st">"- accuracy"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">summary_mixture</span><span class="op">$</span><span class="va">n_upper</span> <span class="op">/</span> <span class="va">summary_mixture</span><span class="op">$</span><span class="va">n_trials</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Contaminant-free: 182 of 193 - accuracy 0.943</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"True accuracy (no contaminants):"</span>,</span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">trials_clean</span><span class="op">$</span><span class="va">response</span> <span class="op">==</span> <span class="st">"upper"</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; True accuracy (no contaminants): 0.945</span></span></code></pre></div>
+<p>Splitting the estimated contaminants between the two boundaries needs an assumption about how accurate a contaminant response is. The <code>guess_rate</code> argument carries it and defaults to 0.5, the chance level of a two-choice task. The 4-parameter version estimates contamination per boundary and ignores it.</p>
 </div>
 <div class="section level3" number="4.3">
 <h3 id="working-with-the-4-parameter-version">
@@ -440,9 +484,9 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span></span>
 <span><span class="va">summary_4par</span></span>
 <span><span class="co">#&gt;    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials</span></span>
-<span><span class="co">#&gt; mu     0.3952879            NA   0.01637452           NA     195      200</span></span>
+<span><span class="co">#&gt; mu     0.3950143            NA   0.01629836           NA     193      198</span></span>
 <span><span class="co">#&gt;    contaminant_prop_upper contaminant_prop_lower</span></span>
-<span><span class="co">#&gt; mu             0.01116972                     NA</span></span></code></pre></div>
+<span><span class="co">#&gt; mu             0.01143807                     NA</span></span></code></pre></div>
 <p>Notice the output now includes:
 - <code>mean_rt_upper</code>, <code>var_rt_upper</code>: Statistics for upper boundary responses
 - <code>mean_rt_lower</code>, <code>var_rt_lower</code>: Statistics for lower boundary responses</p>
@@ -548,12 +592,12 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim_data</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     mean_rt     var_rt n_upper n_trials subject condition</span></span>
-<span><span class="co">#&gt; 1 0.5821563 0.03227199      99      100       1      easy</span></span>
-<span><span class="co">#&gt; 2 0.7580137 0.09254939      95      100       1      hard</span></span>
-<span><span class="co">#&gt; 3 0.5170452 0.01770436     100      100       2      easy</span></span>
-<span><span class="co">#&gt; 4 0.7777224 0.16780351      85      100       2      hard</span></span>
-<span><span class="co">#&gt; 5 0.4981635 0.02285722      97      100       3      easy</span></span>
-<span><span class="co">#&gt; 6 0.6836707 0.06894347      93      100       3      hard</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 0.5849755 0.02704076      96      100       1      easy</span></span>
+<span><span class="co">#&gt; 2 0.7349579 0.05481245      89      100       1      hard</span></span>
+<span><span class="co">#&gt; 3 0.5064378 0.01015706     100      100       2      easy</span></span>
+<span><span class="co">#&gt; 4 0.6327151 0.07406956      91      100       2      hard</span></span>
+<span><span class="co">#&gt; 5 0.5354869 0.01897598      98      100       3      easy</span></span>
+<span><span class="co">#&gt; 6 0.6624182 0.07254991      85      100       3      hard</span></span></code></pre></div>
 </div>
 <div class="section level3" number="5.2">
 <h3 id="specifying-the-formula">
@@ -609,7 +653,7 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
               n_upper = "n_upper",
               n_trials = "n_trials",
               version = "3par") 
-<span style="color: #AF5FFF;">  Links: </span>drift = log; bound = log; ndt = log; s = log 
+<span style="color: #AF5FFF;">  Links: </span>drift = identity; bound = log; ndt = log; s = log 
 <span style="color: #AF5FFF;">Formula: </span>drift ~ 0 + condition
          bound ~ 1
          ndt ~ 1
@@ -620,10 +664,10 @@ T_{er} = MRT - \frac{a}{2v} \cdot \frac{1 - e^{-\frac{va}{s^2}}}{1 + e^{-\frac{v
 
 <span style="color: #00BB00;">Regression Coefficients:
 </span>                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-bound_Intercept         0.43      0.01     0.41     0.45 1.00     1028     1329
-ndt_Intercept          -1.26      0.02    -1.30    -1.23 1.00     1487     1256
-drift_conditioneasy     1.12      0.01     1.09     1.14 1.00     1455     1466
-drift_conditionhard     0.38      0.02     0.34     0.43 1.00     1145     1217
+bound_Intercept         0.43      0.01     0.41     0.46 1.00     1231     1134
+ndt_Intercept          -1.29      0.02    -1.33    -1.25 1.00     1230     1195
+drift_conditioneasy     2.74      0.06     2.63     2.85 1.00     1358     1196
+drift_conditionhard     1.37      0.04     1.29     1.44 1.00     1424     1365
 
 <span style="color: #00BB00;">Constant Parameters:
 </span>                Value
@@ -633,26 +677,26 @@ Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
 and Tail_ESS are effective sample size measures, and Rhat is the potential
 scale reduction factor on split chains (at convergence, Rhat = 1).
 </code></pre>
-<p>To provide stable sampling all parameters use log link functions, so we need to exponentiate to get estimates on the natural scale:</p>
+<p>The drift rate has an identity link, so its estimates are already on the natural scale. Boundary separation and non-decision time have log links, so we exponentiate them:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Extract fixed effects</span></span>
 <span><span class="va">fixef_est</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Transform to natural scale</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (easy):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditioneasy"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Drift rate (easy): 3.060362</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (hard):"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditionhard"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Drift rate (hard): 1.467012</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (easy):"</span>, <span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditioneasy"</span>, <span class="st">"Estimate"</span><span class="op">]</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Drift rate (easy): 2.735912</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Drift rate (hard):"</span>, <span class="va">fixef_est</span><span class="op">[</span><span class="st">"drift_conditionhard"</span>, <span class="st">"Estimate"</span><span class="op">]</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Drift rate (hard): 1.36663</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Boundary:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"bound_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Boundary: 1.534783</span></span>
+<span><span class="co">#&gt; Boundary: 1.543554</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Non-decision time:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fixef_est</span><span class="op">[</span><span class="st">"ndt_Intercept"</span>, <span class="st">"Estimate"</span><span class="op">]</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Non-decision time: 0.2827719</span></span></code></pre></div>
-<p>As you can see, these match the generating values well:</p>
+<span><span class="co">#&gt; Non-decision time: 0.2750842</span></span></code></pre></div>
+<p>The generating values were:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">true_params</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   condition drift bound ndt</span></span>
 <span><span class="co">#&gt; 1      easy   3.0   1.5 0.3</span></span>
 <span><span class="co">#&gt; 2      hard   1.5   1.5 0.3</span></span></code></pre></div>
+<p>The boundary (1.54) and the non-decision time (0.275) are close to the generating values of 1.5 and 0.3. The drift rates (2.74 and 1.37) sit below the generating values of 3.0 and 1.5, and the generating values lie outside their 95% credible intervals in the summary above. The data were simulated with subject-level variation in all three parameters, which this model leaves out.</p>
 </div>
 <div class="section level3" number="5.6">
 <h3 id="visualizing-posterior-distributions">
@@ -667,7 +711,7 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span><span class="co"># Extract posterior draws</span></span>
 <span><span class="va">draws</span> <span class="op">&lt;-</span> <span class="fu">tidybayes</span><span class="fu">::</span><span class="fu"><a href="https://mjskay.github.io/tidybayes/reference/tidy_draws.html" class="external-link">tidy_draws</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/starts_with.html" class="external-link">starts_with</a></span><span class="op">(</span><span class="st">"b_"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/across.html" class="external-link">across</a></span><span class="op">(</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/everything.html" class="external-link">everything</a></span><span class="op">(</span><span class="op">)</span>, <span class="va">exp</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/across.html" class="external-link">across</a></span><span class="op">(</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">any_of</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"b_bound_Intercept"</span>, <span class="st">"b_ndt_Intercept"</span><span class="op">)</span><span class="op">)</span>, <span class="va">exp</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Rename for plotting</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">draws</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"b_"</span>, <span class="st">""</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">draws</span><span class="op">)</span><span class="op">)</span></span>
@@ -695,16 +739,33 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 </div>
 </div>
 <div class="section level2" number="6">
+<h2 id="posterior-predictive-checks">
+<span class="header-section-number">6</span> Posterior predictive checks<a class="anchor" aria-label="anchor" href="#posterior-predictive-checks"></a>
+</h2>
+<p>The EZ-diffusion likelihood constrains three statistics per cell — the mean RT, the RT variance, and the number of upper-boundary (correct) responses — but by default <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> only shows the mean RT. The <code>resp_var</code> argument selects the other observables of the likelihood; <code><a href="../reference/pp_check_vars.html">pp_check_vars()</a></code> lists the available checks:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check_vars.html">pp_check_vars</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   resp_var                         label default_type          slot default</span></span>
+<span><span class="co">#&gt; 1  mean_rt            Mean response time dens_overlay             Y    TRUE</span></span>
+<span><span class="co">#&gt; 2   var_rt        Response time variance dens_overlay        vreal1   FALSE</span></span>
+<span><span class="co">#&gt; 3  mean_pc Proportion of upper responses  bars_binned vint1, trials   FALSE</span></span></code></pre></div>
+<p>The <code>mean_pc</code> check is the proportion of correct responses (<code>n_upper / n_trials</code>), which stays comparable across cells even when the number of trials differs. With <code>resp_var = "all"</code> all checks are drawn from one shared joint simulation. Each panel compares how a statistic is distributed across all cells: the RT panels overlay the density of the observed statistic (dark line) on the densities of the simulated datasets, and the accuracy panel is a histogram of the observed proportions (bars) with the predicted number of cells per bin (points with 90% intervals):</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit</span>, resp_var <span class="op">=</span> <span class="st">"all"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></code></pre></div>
+<p><img src="bmm_ezdm_files/figure-html/unnamed-chunk-12-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
+<p>The observed mean RTs are spread more evenly than the simulated ones, which cluster around one value per condition. The data were simulated with subject-level variation in all three parameters, which this model omits; the model with <a href="#adding-random-effects">random effects</a> below includes it. To compare each cell with its own predictive interval instead, select a single check with <code>type = "intervals"</code>, e.g. <code>pp_check(fit, resp_var = "mean_rt", type = "intervals")</code>.</p>
+</div>
+<div class="section level2" number="7">
 <h2 id="comparing-conditions">
-<span class="header-section-number">6</span> Comparing conditions<a class="anchor" aria-label="anchor" href="#comparing-conditions"></a>
+<span class="header-section-number">7</span> Comparing conditions<a class="anchor" aria-label="anchor" href="#comparing-conditions"></a>
 </h2>
 <p>As <code>bmm</code> feeds seamlessly into <code>brms</code>, we can use Bayesian hypothesis testing via Savage-Dickey density ratios to compare drift rates between conditions:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Test if drift rate is higher in easy vs hard condition</span></span>
-<span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"exp(drift_conditioneasy) &gt; exp(drift_conditionhard)"</span><span class="op">)</span></span>
+<span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit</span>, <span class="st">"drift_conditioneasy &gt; drift_conditionhard"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
 <span><span class="co">#&gt;                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio</span></span>
-<span><span class="co">#&gt; 1 (exp(drift_condit... &gt; 0     1.59      0.04     1.52     1.66        Inf</span></span>
+<span><span class="co">#&gt; 1 (drift_conditione... &gt; 0     1.37      0.06     1.27     1.47        Inf</span></span>
 <span><span class="co">#&gt;   Post.Prob Star</span></span>
 <span><span class="co">#&gt; 1         1    *</span></span>
 <span><span class="co">#&gt; ---</span></span>
@@ -713,12 +774,12 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <span><span class="co">#&gt; for two-sided hypotheses, the value tested against lies outside the 95%-CI.</span></span>
 <span><span class="co">#&gt; Posterior probabilities of point hypotheses assume equal prior probabilities.</span></span></code></pre></div>
 </div>
-<div class="section level2" number="7">
+<div class="section level2" number="8">
 <h2 id="adding-random-effects">
-<span class="header-section-number">7</span> Adding random effects<a class="anchor" aria-label="anchor" href="#adding-random-effects"></a>
+<span class="header-section-number">8</span> Adding random effects<a class="anchor" aria-label="anchor" href="#adding-random-effects"></a>
 </h2>
 <p>For hierarchical models with random effects across subjects:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Formula with random effects</span></span>
 <span><span class="va">model_formula_re</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>  <span class="va">drift</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span> <span class="op">+</span> <span class="op">(</span><span class="fl">0</span> <span class="op">+</span> <span class="va">condition</span> <span class="op">|</span> <span class="va">subject</span><span class="op">)</span>,</span>

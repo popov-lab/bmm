@@ -36,7 +36,8 @@ An object of class `bmmodel`
 - **Citation:**
 
   - Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
-    representations in visual working memory. Nature, 453(7192), 233-235
+    representations in visual working memory. Nature, 453(7192),
+    233-235. https://doi.org/10.1038/nature06860
 
 - **Requirements:**
 
@@ -68,7 +69,11 @@ An object of class `bmmodel`
 
   - `mu1`:
 
-    - `main`: student_t(1, 0, 1)
+    - `main`: normal(0, 0.5)
+
+    - `effects`: normal(0, 0.25)
+
+    - `sd`: exponential(4)
 
   - `kappa`:
 
@@ -76,14 +81,20 @@ An object of class `bmmodel`
 
     - `effects`: normal(0, 1)
 
+    - `sd`: exponential(1)
+
   - `thetat`:
 
     - `main`: logistic(0, 1)
 
+    - `effects`: normal(0, 2.5)
+
+    - `sd`: exponential(1)
+
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # generate artificial data
 dat <- data.frame(y = rmixture2p(n = 2000))
 

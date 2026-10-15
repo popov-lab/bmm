@@ -26,13 +26,19 @@ devtools::test()          # Run all tests
 testthat::test_file()     # Run single test file
 ```
 
-**ALWAYS** use `devtools::load_all()` instead of
-[`library(bmm)`](https://github.com/popov-lab/bmm) during development.
+**ALWAYS** use
+[`devtools::load_all()`](https://devtools.r-lib.org/reference/load_all.html)
+instead of [`library(bmm)`](https://github.com/popov-lab/bmm) during
+development.
 
 ### Package Requirements
 
 - Must pass R CMD CHECK for CRAN (enforced by CI on every commit/PR)
-- CI runs on push/PR to `master` and `develop` branches
+- CI runs on every push and PR to `master`, `develop` and `dev-*`: R CMD
+  check on three OS, and on Ubuntu `tests-source` (the suite from the
+  source tree, with the time budget) and `test-coverage` (covr). On PRs,
+  `file-size` also fails when any commit in the PR adds a file over 1
+  MB, even if a later commit removes it.
 - All code changes require corresponding tests in `tests/testthat/`
 - Documentation generated from roxygen comments (never edit `man/` or
   `docs/` directly)
@@ -182,11 +188,85 @@ into brms-generated models via stanvars for custom families.
 **Always add/update tests** for code changes - even if not explicitly
 requested.
 
-Test organization: - `tests/testthat/` - automated unit tests (run by
-CI) - `tests/internal/` - long-running manual tests -
-`bmm-dev/feature_tests/` - exploratory/development scripts (synced via
-SWITCHdrive, not tracked by git) - `local/` - machine-specific scratch
-scripts (not tracked by git)
+Test tiers (ADR 0004, the architecture decision record
+`.dev/decisions/0004-test-tiers-and-budget.md`): - `tests/testthat/` -
+unit tests, mock-backend pipeline tests, fixture tests and Stan compile
+tests. R CMD check runs them on every PR and push with four parallel
+workers (`Config/testthat/parallel` in DESCRIPTION). It tests the built
+package, which lacks the fixtures: `tests/testthat/assets/` is
+build-ignored (listed in `.Rbuildignore`, so not in the built package),
+and the fixture tests skip there. The `tests-source` workflow runs the
+suite from the source tree on Ubuntu, fixtures included, and enforces
+the time budget. - Tests run on parallel workers (four on CI) in no
+fixed order. A test must not depend on another file having run, or on
+global state another test leaves behind (options, loaded packages,
+seeds). - Stan compile tests (R-against-Stan parity and gradient checks,
+the two [`bmm_setup()`](https://venpopov.com/bmm/reference/bmm_setup.md)
+tests that need CmdStan) run on Ubuntu for PRs and on all three OS for
+pushes. Each opens with `skip_unless_stan_tests()`
+(`tests/testthat/helper-tiers.R`; `BMM_TEST_STAN=false` skips them
+locally) and is registered under R1. - A fixture test loads its fit
+through `load_fixture_fit()` (`helper-epred.R`), which skips when the
+file is absent. A test that needs the assets folder without loading a
+fit opens with `skip_unless_fixtures()` (`helper-tiers.R`). -
+`tests/local/` - tests that sample with a real backend; build-ignored,
+run by hand (`Rscript tests/local/run.R`) and by the weekly
+`local-tests` workflow. See `tests/local/README.md`. -
+`tests/internal/` - reference fits from 2024; nothing in
+`tests/testthat` reads them since \#422, the reference summaries in
+`tests/local/references.rds` replace them, and the folder’s deletion
+awaits the maintainer (ADR 0004) - `bmm-dev/feature_tests/` -
+exploratory/development scripts (synced via SWITCHdrive, not tracked by
+git) - `local/` - machine-specific scratch scripts (not tracked by git)
+
+Rules, with the ADR’s rule ids. `tests/testthat/test-conventions.R`
+checks R1, R2, R4, R7, R8 and part of R5 (size, draws, listed in
+`make-fixtures.R`) and runs with the rest of the suite; a violation
+fails with the file name and the rule. The `tests-source` budget job
+checks R6, and R3 only indirectly. R9 and the rest of R5 are checked in
+review. - R1: No sampling in `tests/testthat/`. `cmdstan_model()`,
+`$sample()` and `backend = "cmdstanr"` appear only at registered sites:
+files whose count of each pattern is written as a literal in
+`test-conventions.R`. A new site opens with `skip_unless_stan_tests()`
+and updates that count in the same PR. A model’s parity test lives in
+its `test-model_<name>.R` (R7). - R2: The tier gates are
+`skip_unless_stan_tests()` and `skip_unless_fixtures()`;
+`skip_on_cran()` is the CRAN gate. `skip_on_ci()` is not a gate. - R3: A
+mock fit (`backend = "mock", mock_fit = 1`) uses at most two
+participants or 200 rows unless the test is about data size. - R4:
+Cross-model behaviours (default priors, inits, stored frame and
+[`update()`](https://rdrr.io/r/stats/update.html),
+[`pp_check()`](https://venpopov.com/bmm/reference/pp_check.bmmfit.md),
+[`pp_observables()`](https://venpopov.com/bmm/reference/pp_observables.md),
+[`conditional_effects()`](https://venpopov.com/bmm/reference/conditional_effects.bmmfit.md),
+report extraction, links) loop over the model-cases registry, never over
+a hand-typed list of models: `model_test_cases(kind)` in
+`helper-model-cases.R` reads one provider per model,
+`model_cases_<name>()` in `helper-model-<name>.R`. Every provider has a
+`stored_frame`, `sd_default`, `init` and `links` case (checked);
+`check_data`, `observables` and `fixture` cases where they apply. The
+header of `helper-model-cases.R` lists what each kind holds. - R5: A
+fixture has one chain, at most 300 KB and 200 draws, and is generated by
+`tests/local/make-fixtures.R` (seed and versions stored in the object).
+A new test loads it through `load_fixture_fit()`. - R6: The budget job
+fails when a test takes over 66 s, a file over 680 s, or the suite over
+800 s, all measured on the 4-vCPU Ubuntu runner with four workers; no
+test has a cap of its own. A new test that takes more than a few seconds
+says in a comment why it needs the time. Run
+`devtools::test(reporter = "slow")` before opening a PR. - R7: A
+`test-model_<name>.R` file tests that model’s contract only: constructor
+validation,
+[`check_data()`](https://venpopov.com/bmm/reference/check_data.md),
+[`configure_model()`](https://venpopov.com/bmm/reference/configure_model.md),
+[`stancode()`](https://venpopov.com/bmm/reference/stancode.bmmformula.md)
+content (never `nchar(code) > 0`), its d/r functions, Stan parity. - R8:
+A test file seeds through
+[`withr::local_seed()`](https://withr.r-lib.org/reference/with_seed.html),
+never [`set.seed()`](https://rdrr.io/r/base/Random.html); a script such
+as `tests/local/make-fixtures.R` may. - R9: A new model adds
+`test-model_<name>.R`, a `helper-model-<name>.R` provider (R4), a
+fixture only when post-processing needs one (then also a `fixture` case
+and a block in `make-fixtures.R`), and stays inside the budget (R6).
 
 Test patterns from codebase:
 
@@ -239,8 +319,9 @@ bmf(kappa ~ set_size, c ~ 1, a = 0.5)  # 'a' fixed to 0.5
 
     inst/stan_chunks/    # Stan code snippets for models
     data/                # Package datasets (.rda files)
-    tests/testthat/      # Unit tests (test-*.R pattern)
-    tests/internal/      # Manual long-running tests
+    tests/testthat/      # Unit, mock-pipeline, fixture and Stan compile tests (test-*.R pattern)
+    tests/local/         # Sampling tests, run by hand and weekly (build-ignored)
+    tests/internal/      # Reference fits from 2024, to be deleted (ADR 0004)
     vignettes/articles/  # Long-form tutorials (Rmd)
     man/                 # AUTO-GENERATED - do not edit
     docs/                # AUTO-GENERATED pkgdown site - do not edit
@@ -267,8 +348,11 @@ developer maintains their own copy.
 5.  **devtools::load_all()** - never use
     [`library(bmm)`](https://github.com/popov-lab/bmm) during
     development
-6.  **Git branching** - feature branches → PR to `develop` (never commit
-    directly to `develop` or `master`)
+6.  **Git branching** - feature branches → PR to `develop`, or to the
+    release’s `dev-*` integration branch for features planned for a
+    later release (see
+    `.dev/decisions/0002-release-integration-branches.md`); never commit
+    directly to `develop`, `dev-*` or `master`
 7.  **Local `.gitignore` changes** - to ignore files locally without
     touching the tracked `.gitignore`, add patterns to
     `.git/info/exclude` instead (see

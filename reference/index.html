@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,7 +21,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -58,7 +59,7 @@
 
         <dt>
 
-          <code><a href="supported_models.html">supported_models()</a></code>
+          <code><a href="bmm_models.html">bmm_models()</a></code>
 
         </dt>
         <dd>Measurement models available in <code>bmm</code></dd>
@@ -69,6 +70,13 @@
 
         </dt>
         <dd>View or change global bmm options</dd>
+
+        <dt>
+
+          <code><a href="bmm_setup.html">bmm_setup()</a></code>
+
+        </dt>
+        <dd>Check whether this machine can fit bmm models</dd>
       </dl></div><div class="section level2">
       <h2 id="fitting-models">Fitting models<a class="anchor" aria-label="anchor" href="#fitting-models"></a></h2>
 
@@ -127,6 +135,99 @@
 
         </dt>
         <dd>Posterior predictive check for bmmfit objects</dd>
+
+        <dt>
+
+          <code><a href="ppp.html">ppp()</a></code>
+
+        </dt>
+        <dd>Posterior predictive p-values for count models</dd>
+
+        <dt>
+
+          <code><a href="posterior_epred.bmmfit.html">posterior_epred(<i>&lt;bmmfit&gt;</i>)</a></code> <code><a href="posterior_epred.bmmfit.html">fitted(<i>&lt;bmmfit&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Expected response of a fitted bmm model</dd>
+      </dl></div><div class="section level2">
+      <h2 id="model-evaluation-post-processing">Model evaluation &amp; post-processing<a class="anchor" aria-label="anchor" href="#model-evaluation-post-processing"></a></h2>
+
+      <div class="section-desc"><p>ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for signal detection models</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="roc_sdt.html">roc_sdt()</a></code>
+
+        </dt>
+        <dd>Model-implied ROC curve from a fitted SDT model</dd>
+
+        <dt>
+
+          <code><a href="roc_observed.html">roc_observed()</a></code>
+
+        </dt>
+        <dd>Observed ROC points from a fitted SDT model</dd>
+
+        <dt>
+
+          <code><a href="auc_sdt.html">auc_sdt()</a></code>
+
+        </dt>
+        <dd>Area under the ROC curve from a fitted SDT model</dd>
+
+        <dt>
+
+          <code><a href="latent_sdt.html">latent_sdt()</a></code>
+
+        </dt>
+        <dd>Model-implied latent decision-variable distributions</dd>
+
+        <dt>
+
+          <code><a href="sdt_thresholds.html">sdt_thresholds()</a></code>
+
+        </dt>
+        <dd>Latent decision thresholds from a fitted rating SDT model</dd>
+
+        <dt>
+
+          <code><a href="mratio.html">mratio()</a></code>
+
+        </dt>
+        <dd>Metacognitive efficiency (M-ratio) from a fitted meta-d' SDT model</dd>
+
+        <dt>
+
+          <code><a href="sdt_sensitivity.html">sdt_sensitivity()</a></code>
+
+        </dt>
+        <dd>Sensitivity on the noise, signal, or root-mean-square scale</dd>
+
+        <dt>
+
+          <code><a href="plot.bmm_sdt_roc.html">plot(<i>&lt;bmm_sdt_roc&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot a model-implied SDT ROC curve</dd>
+
+        <dt>
+
+          <code><a href="plot.bmm_sdt_auc.html">plot(<i>&lt;bmm_sdt_auc&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot the posterior AUC distribution from a fitted SDT model</dd>
+
+        <dt>
+
+          <code><a href="plot.bmm_sdt_latent.html">plot(<i>&lt;bmm_sdt_latent&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot the latent decision-variable distributions of an SDT model</dd>
       </dl></div><div class="section level2">
       <h2 id="extract-model-information">Extract model information<a class="anchor" aria-label="anchor" href="#extract-model-information"></a></h2>
 
@@ -138,6 +239,13 @@
 
 
       <dl><dt>
+
+          <code><a href="bmm_data_check.html">bmm_data_check()</a></code>
+
+        </dt>
+        <dd>Human-readable pre-fit data report for bmm models</dd>
+
+        <dt>
 
           <code><a href="default_prior.bmmformula.html">default_prior(<i>&lt;bmmformula&gt;</i>)</a></code>
 
@@ -167,6 +275,41 @@
 
         <dt>
 
+          <code><a href="model_citation.html">model_citation()</a></code>
+
+        </dt>
+        <dd>References for a measurement model</dd>
+
+        <dt>
+
+          <code><a href="native_parameters.html">native_parameters()</a></code>
+
+        </dt>
+        <dd>Posterior draws of model parameters on the native scale</dd>
+
+        <dt>
+
+          <code><a href="parameter_info.html">parameter_info()</a></code>
+
+        </dt>
+        <dd>Get parameter information for a bmm model</dd>
+
+        <dt>
+
+          <code><a href="pp_check_vars.html">pp_check_vars()</a></code>
+
+        </dt>
+        <dd>List the posterior predictive checks available for a model fit</dd>
+
+        <dt>
+
+          <code><a href="prior_info.html">prior_info()</a></code>
+
+        </dt>
+        <dd>Priors of a fitted bmm model and where they came from</dd>
+
+        <dt>
+
           <code><a href="stancode.bmmformula.html">stancode(<i>&lt;bmmformula&gt;</i>)</a></code>
 
         </dt>
@@ -178,13 +321,6 @@
 
         </dt>
         <dd>Stan data for <code>bmm</code> models</dd>
-
-        <dt>
-
-          <code><a href="parameters.html">parameters()</a></code>
-
-        </dt>
-        <dd>Get parameter information for a bmm model</dd>
       </dl></div><div class="section level2">
       <h2 id="specifying-models">Specifying models<a class="anchor" aria-label="anchor" href="#specifying-models"></a></h2>
 
@@ -246,10 +382,80 @@
 
         <dt>
 
+          <code><a href="mpt.html">mpt()</a></code>
+
+        </dt>
+        <dd>Multinomial Processing Tree (MPT) models</dd>
+
+        <dt>
+
+          <code><a href="mpt_from_eqn.html">mpt_from_eqn()</a></code>
+
+        </dt>
+        <dd>Create an MPT model from an EQN model file</dd>
+
+        <dt>
+
+          <code><a href="mpt_from_string.html">mpt_from_string()</a></code>
+
+        </dt>
+        <dd>Create an MPT model from an MPTinR-style model string</dd>
+
+        <dt>
+
+          <code><a href="mpt_tree.html">mpt_tree()</a></code>
+
+        </dt>
+        <dd>Create a tree for a Multinomial Processing Tree (MPT) model</dd>
+
+        <dt>
+
+          <code><a href="plot.mpt_tree.html">plot(<i>&lt;mpt_tree&gt;</i>)</a></code> <code><a href="plot.mpt_tree.html">plot(<i>&lt;mpt&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot the structure of MPT trees</dd>
+
+        <dt>
+
           <code><a href="sdm.html">sdm()</a></code> <code><a href="sdm.html">sdmSimple()</a></code>
 
         </dt>
         <dd>Signal Discrimination Model (SDM) by Oberauer (2023)</dd>
+
+        <dt>
+
+          <code><a href="sdt_cdp.html">sdt_cdp()</a></code>
+
+        </dt>
+        <dd>Continuous Dual-Process Signal Detection Theory Model</dd>
+
+        <dt>
+
+          <code><a href="sdt_mafc.html">sdt_mafc()</a></code>
+
+        </dt>
+        <dd>m-Alternative Forced Choice Signal Detection Theory Model</dd>
+
+        <dt>
+
+          <code><a href="sdt_ranking.html">sdt_ranking()</a></code>
+
+        </dt>
+        <dd>Ranking Signal Detection Theory Model</dd>
+
+        <dt>
+
+          <code><a href="sdt_rating.html">sdt_rating()</a></code>
+
+        </dt>
+        <dd>Confidence Rating Signal Detection Theory Model</dd>
+
+        <dt>
+
+          <code><a href="sdt_yn.html">sdt_yn()</a></code>
+
+        </dt>
+        <dd>Yes/No Signal Detection Theory Model</dd>
       </dl></div><div class="section level2">
       <h2 id="distributions">Distributions<a class="anchor" aria-label="anchor" href="#distributions"></a></h2>
 
@@ -273,6 +479,13 @@
 
         </dt>
         <dd>Distribution functions for the Signal Discrimination Model (SDM)</dd>
+
+        <dt>
+
+          <code><a href="SDTdist.html">sdt_d()</a></code> <code><a href="SDTdist.html">sdt_criterion()</a></code> <code><a href="SDTdist.html">sdt_bias()</a></code>
+
+        </dt>
+        <dd>Utility functions for Signal Detection Theory</dd>
 
         <dt>
 
@@ -318,10 +531,66 @@
 
         <dt>
 
+          <code><a href="mptdist.html">dmpt()</a></code> <code><a href="mptdist.html">rmpt()</a></code>
+
+        </dt>
+        <dd>Distribution functions for Multinomial Processing Tree (MPT) models</dd>
+
+        <dt>
+
           <code><a href="rejection_sampling.html">rejection_sampling()</a></code>
 
         </dt>
         <dd>Rejection Sampling</dd>
+
+        <dt>
+
+          <code><a href="sdt_cdp_dist.html">dsdt_cdp()</a></code> <code><a href="sdt_cdp_dist.html">rsdt_cdp()</a></code>
+
+        </dt>
+        <dd>Distribution functions for Continuous Dual-Process SDT (CDP)</dd>
+
+        <dt>
+
+          <code><a href="sdt_dpsdt_dist.html">dsdt_dpsdt()</a></code> <code><a href="sdt_dpsdt_dist.html">rsdt_dpsdt()</a></code>
+
+        </dt>
+        <dd>Distribution functions for dual-process SDT (DPSDT)</dd>
+
+        <dt>
+
+          <code><a href="sdt_mafc_dist.html">dsdt_mafc()</a></code> <code><a href="sdt_mafc_dist.html">rsdt_mafc()</a></code>
+
+        </dt>
+        <dd>Distribution functions for m-AFC SDT</dd>
+
+        <dt>
+
+          <code><a href="sdt_metad_dist.html">dsdt_metad()</a></code> <code><a href="sdt_metad_dist.html">rsdt_metad()</a></code>
+
+        </dt>
+        <dd>Distribution functions for meta-d' SDT</dd>
+
+        <dt>
+
+          <code><a href="sdt_ranking_dist.html">dsdt_ranking()</a></code> <code><a href="sdt_ranking_dist.html">rsdt_ranking()</a></code>
+
+        </dt>
+        <dd>Distribution functions for Ranking SDT</dd>
+
+        <dt>
+
+          <code><a href="sdt_rating_dist.html">dsdt_rating()</a></code> <code><a href="sdt_rating_dist.html">rsdt_rating()</a></code>
+
+        </dt>
+        <dd>Distribution functions for Confidence Rating SDT</dd>
+
+        <dt>
+
+          <code><a href="sdt_yn_dist.html">dsdt_yn()</a></code> <code><a href="sdt_yn_dist.html">rsdt_yn()</a></code>
+
+        </dt>
+        <dd>Distribution functions for Yes/No SDT</dd>
       </dl></div><div class="section level2">
       <h2 id="data-model-and-parameter-transformations">Data, model and parameter transformations<a class="anchor" aria-label="anchor" href="#data-model-and-parameter-transformations"></a></h2>
 
@@ -337,7 +606,14 @@
           <code><a href="adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code>
 
         </dt>
-        <dd>Adjust Accuracy Counts for Contamination</dd>
+        <dd>Adjust Accuracy Counts for Contamination (deprecated)</dd>
+
+        <dt>
+
+          <code><a href="aggregate_sdt_cdp_data.html">aggregate_sdt_cdp_data()</a></code>
+
+        </dt>
+        <dd>Aggregate long-format Remember/Know data for <code><a href="../reference/sdt_cdp.html">sdt_cdp()</a></code></dd>
 
         <dt>
 
@@ -390,6 +666,13 @@
 
         <dt>
 
+          <code><a href="mpt_data_reshape.html">mpt_data_reshape()</a></code>
+
+        </dt>
+        <dd>Reshape wide MPT frequency tables to the long format of <code><a href="../reference/bmm.html">bmm()</a></code></dd>
+
+        <dt>
+
           <code><a href="restructure.bmmfit.html">restructure(<i>&lt;bmmfit&gt;</i>)</a></code>
 
         </dt>
@@ -427,10 +710,24 @@
 
       <dl><dt>
 
+          <code><a href="broeder_schuetz_2009_e3.html">broeder_schuetz_2009_e3</a></code>
+
+        </dt>
+        <dd>Recognition ROC data from Broeder &amp; Schuetz (2009, Experiment 3)</dd>
+
+        <dt>
+
           <code><a href="data_color_judgement_task.html">data_color_judgement_task</a></code>
 
         </dt>
         <dd>Example Data from a Color Judgement Task</dd>
+
+        <dt>
+
+          <code><a href="meyer_grant_jakob_2025.html">meyer_grant_jakob_2025</a></code>
+
+        </dt>
+        <dd>Ranking recognition data from Meyer-Grant &amp; Jakob (2025)</dd>
 
         <dt>
 
@@ -520,10 +817,45 @@
 
         <dt>
 
+          <code><a href="data_check_finding.html">data_check_finding()</a></code>
+
+        </dt>
+        <dd>Construct a single finding for a pre-fit data report</dd>
+
+        <dt>
+
+          <code><a href="data_check_findings.html">data_check_findings()</a></code>
+
+        </dt>
+        <dd>Generic S3 method for model-specific pre-fit data findings</dd>
+
+        <dt>
+
+          <code><a href="native_transform.html">native_transform()</a></code>
+
+        </dt>
+        <dd>Transform parameter draws from the sampling scale to the native scale</dd>
+
+        <dt>
+
           <code><a href="postprocess_brm.html">postprocess_brm()</a></code>
 
         </dt>
         <dd>Generic S3 method for postprocessing the fitted brm model</dd>
+
+        <dt>
+
+          <code><a href="pp_observables.html">pp_observables()</a></code> <code><a href="pp_observables.html">pp_simulate()</a></code>
+
+        </dt>
+        <dd>Declare the observables of a bmm model for posterior predictive checks</dd>
+
+        <dt>
+
+          <code><a href="print_model_details.html">print_model_details()</a></code>
+
+        </dt>
+        <dd>Generic S3 method for model-specific lines in <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> of a model</dd>
 
         <dt>
 

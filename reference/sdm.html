@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,7 +21,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -37,7 +38,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Signal Discrimination Model (SDM) by Oberauer (2023)</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/model_sdm.R" class="external-link"><code>R/model_sdm.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/model_sdm.R" class="external-link"><code>R/model_sdm.R</code></a></small>
       <div class="d-none name"><code>sdm.Rd</code></div>
     </div>
 
@@ -81,7 +82,7 @@ degrees to radians using the <code>deg2rad</code> function.</p></dd>
     <p>see <a href="https://venpopov.com/bmm/articles/bmm_sdm_simple.html">the online article</a> for a detailed description of the model
 and how to use it. * <strong>Domain:</strong> Visual working memory</p><ul><li><p><strong>Task:</strong> Continuous reproduction</p></li>
 <li><p><strong>Name:</strong> Signal Discrimination Model (SDM) by Oberauer (2023)</p></li>
-<li><p><strong>Citation:</strong></p><ul><li><p>Oberauer, K. (2023). Measurement models for visual working memory - A factorial model comparison. Psychological Review, 130(3), 841-852</p></li>
+<li><p><strong>Citation:</strong></p><ul><li><p>Oberauer, K. (2023). Measurement models for visual working memory—A factorial model comparison. Psychological Review, 130(3), 841-852. https://doi.org/10.1037/rev0000328</p></li>
 </ul></li>
 <li><p><strong>Version:</strong> simple</p></li>
 <li><p><strong>Requirements:</strong></p><ul><li><p>The response variable should be in radians and represent the angular error relative to the target</p></li>
@@ -94,20 +95,24 @@ and how to use it. * <strong>Domain:</strong> Visual working memory</p><ul><li><
 </ul></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>mu = tan_half; c = log; kappa = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu</code>:</p><ul><li><p><code>main</code>: student_t(1, 0, 1)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><code>effects</code>: normal(0, 0.25)</p></li>
+<li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
 <li><p><code>kappa</code>:</p><ul><li><p><code>main</code>: student_t(5, 1.75, 0.75)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: student_t(5, 2, 0.75)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># isTRUE(Sys.getenv("BMM_EXAMPLES"))</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># identical(Sys.getenv("BMM_EXAMPLES"), "true")</span></span></span>
 <span class="r-in"><span><span class="co"># simulate data from the model</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="SDMdist.html">rsdm</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">1000</span>, c <span class="op">=</span> <span class="fl">4</span>, kappa <span class="op">=</span> <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>

@@ -80,8 +80,8 @@ from the context cue of retrieving the cued serial position.
 The activation for each category is then translated into probabilities
 of recalling one item or response from each category with a
 normalization function as a choice rule. In `bmm` we have implemented
-two choice rules, that are different implementations of Luce’s choice
-axiom:
+three choice rules. The first two are different implementations of
+Luce’s choice axiom:
 
 1.  Simple normalization (`"simple"`)
 
@@ -113,6 +113,39 @@ This choice rule can be interpreted as an n-alternative SDT model over
 the different response candidates with a Gumbel (or double-exponential)
 noise distribution.
 
+This interpretation is a helpful intuition, but it is not an empirical
+commitment the data could confirm. Choice probabilities alone do not
+identify the latent noise distribution that generates them: the same
+softmax probabilities arise from latent-strength models in which the
+noise is correlated across response options (Kilani 2025), and with four
+or more response categories infinitely many latent representations are
+consistent with any given set of choice probabilities (Falmagne 1978;
+Kilani and Colonius 2026). The `m3` parameters are therefore best
+interpreted as activation scale values, identified by the choice
+probabilities under the assumed choice rule, rather than as means of a
+specific noise distribution. Comparing the choice rules by model fit
+remains meaningful, because they imply different choice probabilities.
+What categorical response data cannot decide is the distributional story
+behind whichever rule fits better.
+
+3.  Gaussian (`"gaussian"`)
+
+The `gaussian` choice rule is the same n-alternative SDT model with
+normally distributed noise: every candidate receives its category’s
+activation plus independent standard normal noise, and the candidate
+with the largest value is recalled. The probability of choosing category
+\\i\\ is
+
+\\ p_i = n_i \int \phi(z) \\ \Phi(z)^{n_i - 1} \prod\_{j \neq i}
+\Phi(z + A_i - A_j)^{n_j} \\ dz \\
+
+where \\\phi\\ and \\\Phi\\ are the standard normal density and
+distribution function. There is no closed form for this integral, so
+`bmm` approximates it numerically, and fits take much longer than with
+`softmax`. The softmax rule is the only rule for which the noise model
+and Luce’s choice axiom coincide (Yellott 1977), so the two rules are
+genuinely different models, not two parameterizations of one.
+
 The two choice rules differ in how they translate the activation sources
 into probabilities, and this has a consequence for comparing activation
 sources. The default priors for the predefined `ss` and `cs` versions
@@ -128,7 +161,14 @@ activations, so context activation has to exceed general activation
 therefore encode `c > a` and are not suited for directly comparing `c`
 and `a`. If your research question concerns the contrast between
 activation sources, use the `softmax` choice rule (or supply your own
-symmetric priors).
+symmetric priors). The `gaussian` rule also has equal default prior
+means for `a` and `c`, but its activations are on a smaller scale than
+under `softmax`, and not by one constant factor: general activation
+shrinks more than context activation. Comparisons of `c` against `a`,
+and effects of conditions that change the number of candidates (for
+example set size), can therefore differ between `softmax` and
+`gaussian`. If such a contrast is your question, it is worth checking
+whether it holds under both rules.
 
 Finally, the model then links the response frequencies \\Y\\ for each
 response category to the probabilities \\p\\ using a multinomial
@@ -209,7 +249,7 @@ parameter `b`. Thus the values of the other parameters should be
 interpreted relative to the background noise. The value `b` will be
 fixed to depends on the choice rule you choose for fitting the model.
 For the `simple` choice rule, `b` will be fixed to `0.1`, for the
-`softmax` choice rule, `b` will be fixed to `0`.
+`softmax` and `gaussian` choice rules, `b` will be fixed to `0`.
 
 We chose two fix the background noise `b` for scaling for two reasons:
 
@@ -420,7 +460,8 @@ andconsider what parameter ranges are reasonable for the different model
 parameters and provide `default_priors` for all of them. For detailed
 information on priors in `bmm` please see the
 `vignette("extract_info")`. In short, you can provide priors for
-intercepts as `main` and for effects as `effects`.
+intercepts as `main`, for effects as `effects`, and for the standard
+deviations of random effects as `sd`.
 
 Setting up a `m3` object including these info looks like this:
 
@@ -440,58 +481,58 @@ my_model <- m3(resp_cats = c("corr","other","dist","npl"),
 default_prior(full_formula, data, my_model)
 #> Warning: Default priors for each parameter will be specified internally based on the provided link function.
 #> Please check if the used priors are reasonable for your application
-#>                 prior class             coef group resp dpar nlpar   lb   ub
-#>        normal(0, 0.5)     b condoldreordered                     a <NA> <NA>
-#>        normal(0, 0.5)     b      condoldsame                     a <NA> <NA>
-#>  student_t(3, 0, 2.5)    sd                                      a    0     
-#>  student_t(3, 0, 2.5)    sd                     ID               a    0     
-#>  student_t(3, 0, 2.5)    sd condoldreordered    ID               a    0     
-#>  student_t(3, 0, 2.5)    sd      condoldsame    ID               a    0     
-#>  student_t(3, 0, 2.5)    sd        Intercept    ID               a    0     
-#>                (flat)     b                                      b          
-#>        normal(0, 0.5)     b condoldreordered                     c <NA> <NA>
-#>        normal(0, 0.5)     b      condoldsame                     c <NA> <NA>
-#>  student_t(3, 0, 2.5)    sd                                      c    0     
-#>  student_t(3, 0, 2.5)    sd                     ID               c    0     
-#>  student_t(3, 0, 2.5)    sd condoldreordered    ID               c    0     
-#>  student_t(3, 0, 2.5)    sd      condoldsame    ID               c    0     
-#>  student_t(3, 0, 2.5)    sd        Intercept    ID               c    0     
-#>                (flat)     b                                      d          
-#>  student_t(3, 0, 2.5)    sd                                      d    0     
-#>  student_t(3, 0, 2.5)    sd                     ID               d    0     
-#>  student_t(3, 0, 2.5)    sd        Intercept    ID               d    0     
-#>        normal(0, 0.5)     b                                      a <NA> <NA>
-#>          normal(1, 1)     b        Intercept                     a <NA> <NA>
-#>        normal(0, 0.5)     b                                      c <NA> <NA>
-#>          normal(1, 1)     b        Intercept                     c <NA> <NA>
-#>          normal(1, 1)     b        Intercept                     d <NA> <NA>
-#>         constant(0.1)     b        Intercept                     b <NA> <NA>
-#>  tag       source
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>      (vectorized)
-#>           default
-#>           default
-#>      (vectorized)
-#>      (vectorized)
-#>              user
-#>              user
-#>              user
-#>              user
-#>              user
-#>              user
+#>           prior class             coef group resp dpar nlpar   lb   ub tag
+#>  normal(0, 0.5)     b condoldreordered                     a <NA> <NA>    
+#>  normal(0, 0.5)     b      condoldsame                     a <NA> <NA>    
+#>  exponential(1)    sd                     ID               a <NA> <NA>    
+#>  exponential(1)    sd condoldreordered    ID               a <NA> <NA>    
+#>  exponential(1)    sd      condoldsame    ID               a <NA> <NA>    
+#>  exponential(1)    sd        Intercept    ID               a <NA> <NA>    
+#>          (flat)     b                                      b              
+#>  normal(0, 0.5)     b condoldreordered                     c <NA> <NA>    
+#>  normal(0, 0.5)     b      condoldsame                     c <NA> <NA>    
+#>  exponential(1)    sd                     ID               c <NA> <NA>    
+#>  exponential(1)    sd condoldreordered    ID               c <NA> <NA>    
+#>  exponential(1)    sd      condoldsame    ID               c <NA> <NA>    
+#>  exponential(1)    sd        Intercept    ID               c <NA> <NA>    
+#>          (flat)     b                                      d              
+#>  exponential(1)    sd                     ID               d <NA> <NA>    
+#>  exponential(1)    sd        Intercept    ID               d <NA> <NA>    
+#>  exponential(1)    sd                                      a <NA> <NA>    
+#>  normal(0, 0.5)     b                                      a <NA> <NA>    
+#>    normal(1, 1)     b        Intercept                     a <NA> <NA>    
+#>  exponential(1)    sd                                      c <NA> <NA>    
+#>  normal(0, 0.5)     b                                      c <NA> <NA>    
+#>    normal(1, 1)     b        Intercept                     c <NA> <NA>    
+#>  exponential(1)    sd                                      d <NA> <NA>    
+#>    normal(1, 1)     b        Intercept                     d <NA> <NA>    
+#>   constant(0.1)     b        Intercept                     b <NA> <NA>    
+#>        source
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>       default
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>  (vectorized)
+#>       default
+#>  (vectorized)
+#>  (vectorized)
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
+#>          user
 ```
 
 ### 3.4 Running `bmm` to estimate parameters
@@ -753,9 +794,27 @@ ggplot(data = pp_m3,
 
 ## References
 
+Falmagne, Jean-Claude. 1978. “A Representation Theorem for Finite Random
+Scale Systems.” *Journal of Mathematical Psychology* 18 (1): 52–72.
+<https://doi.org/10.1016/0022-2496(78)90048-2>.
+
+Kilani, Karim. 2025. “A Class of Random Utility Models Yielding the
+Exploded Logit.” *Journal of Mathematical Psychology* 124: 102900.
+<https://doi.org/10.1016/j.jmp.2025.102900>.
+
+Kilani, Karim, and Hans Colonius. 2026. “Representing Choice
+Probabilities by Ranking Probabilities via Entropy Maximization.”
+*Journal of Mathematical Psychology* 128: 102970.
+<https://doi.org/10.1016/j.jmp.2026.102970>.
+
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. “Simple Measurement
 Models for Complex Working-Memory Tasks.” *Psychological Review* 126
 (6): 880–932. <https://doi.org/10.1037/rev0000159>.
+
+Yellott, John I. 1977. “The Relationship Between Luce’s Choice Axiom,
+Thurstone’s Theory of Comparative Judgment, and the Double Exponential
+Distribution.” *Journal of Mathematical Psychology* 15 (2): 109–44.
+<https://doi.org/10.1016/0022-2496(77)90026-8>.
 
 [^1]: Traditional complex span tasks, such as the operation span or
     reading span task are thus not suited for the `m3`, as the

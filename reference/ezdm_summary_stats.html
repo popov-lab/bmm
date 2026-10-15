@@ -17,7 +17,7 @@ contaminant responses from true responses."><meta property="og:image" content="h
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -25,7 +25,8 @@ contaminant responses from true responses."><meta property="og:image" content="h
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -41,7 +42,7 @@ contaminant responses from true responses."><meta property="og:image" content="h
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Compute Robust Summary Statistics for EZ-Diffusion Model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/helpers-data.R" class="external-link"><code>R/helpers-data.R</code></a></small>
       <div class="d-none name"><code>ezdm_summary_stats.Rd</code></div>
     </div>
 
@@ -64,8 +65,9 @@ contaminant responses from true responses.</p>
 <span>  min_trials <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  init_contaminant <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  max_contaminant <span class="op">=</span> <span class="fl">0.5</span>,</span>
-<span>  maxit <span class="op">=</span> <span class="fl">100</span>,</span>
-<span>  tol <span class="op">=</span> <span class="fl">1e-06</span></span>
+<span>  maxit <span class="op">=</span> <span class="fl">500</span>,</span>
+<span>  tol <span class="op">=</span> <span class="fl">1e-06</span>,</span>
+<span>  guess_rate <span class="op">=</span> <span class="fl">0.5</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -100,8 +102,11 @@ component. One of "exgaussian" (default), "lognormal", or "invgaussian"</p></dd>
 via mixture modeling, "robust" for non-parametric robust estimation using
 median and IQR/MAD-based variance, or "simple" for standard moment
 calculation. The "robust" method is faster and requires no distributional
-assumptions, but note that the EZ equations were derived for mean and
-variance, so using median may introduce some bias for skewed distributions.</p></dd>
+assumptions, but its moments are not the mean and variance the EZ
+equations were derived for. For right-skewed RTs the median lies below the
+mean and (IQR/1.349)^2 below the variance, so the EZ estimates are offset
+systematically, not just noisier: a larger drift rate and a smaller
+boundary separation than the same data give with "mixture".</p></dd>
 
 
 <dt id="arg-robust-scale">robust_scale<a class="anchor" aria-label="anchor" href="#arg-robust-scale"></a></dt>
@@ -122,8 +127,13 @@ Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)</p></dd>
 
 
 <dt id="arg-min-trials">min_trials<a class="anchor" aria-label="anchor" href="#arg-min-trials"></a></dt>
-<dd><p>Integer. Minimum number of trials required for fitting.
-Returns NA if fewer trials are available. Default is 10</p></dd>
+<dd><p>Integer. Minimum number of trials required for the RT
+summaries, which are NA with fewer. Compared against the total number of
+trials for <code>version = "3par"</code> and against each boundary's own count for
+<code>version = "4par"</code>, so the two versions can disagree about whether the
+same cell is corrected. For <code>version = "4par"</code>, <code><a href="bmm.html">bmm()</a></code> still fits a cell
+whose summaries at one or both boundaries are NA, through its response
+counts. Default is 10</p></dd>
 
 
 <dt id="arg-init-contaminant">init_contaminant<a class="anchor" aria-label="anchor" href="#arg-init-contaminant"></a></dt>
@@ -138,11 +148,23 @@ contaminant proportions. Default is 0.5</p></dd>
 
 
 <dt id="arg-maxit">maxit<a class="anchor" aria-label="anchor" href="#arg-maxit"></a></dt>
-<dd><p>Integer. Maximum number of EM iterations. Default is 100</p></dd>
+<dd><p>Integer. Maximum number of EM iterations. Default is 500. The
+EM converges slowly when the contaminant proportion is close to zero, and
+a cell that reaches <code>maxit</code> without converging falls back to robust
+moments with a warning.</p></dd>
 
 
 <dt id="arg-tol">tol<a class="anchor" aria-label="anchor" href="#arg-tol"></a></dt>
 <dd><p>Numeric. Convergence tolerance for EM algorithm. Default is 1e-6</p></dd>
+
+
+<dt id="arg-guess-rate">guess_rate<a class="anchor" aria-label="anchor" href="#arg-guess-rate"></a></dt>
+<dd><p>Numeric. Accuracy expected of a contaminant response, used
+to split the estimated contaminants of <code>version = "3par"</code> across the two
+boundaries. Default is 0.5, appropriate for a two-choice task; use 0.25 for
+a 4AFC task, or 0 if contaminants are never correct. Ignored for
+<code>version = "4par"</code>, which estimates contamination separately per boundary
+and needs no such assumption.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -151,6 +173,11 @@ contaminant proportions. Default is 0.5</p></dd>
 <code>n_upper</code>, <code>n_trials</code>, <code>contaminant_prop</code>. For version = "4par":
 <code>mean_rt_upper</code>, <code>mean_rt_lower</code>, <code>var_rt_upper</code>, <code>var_rt_lower</code>,
 <code>n_upper</code>, <code>n_trials</code>, <code>contaminant_prop_upper</code>, <code>contaminant_prop_lower</code>.</p>
+<p><code>n_upper</code> and <code>n_trials</code> count the responses the reported moments rest on.
+Whenever a contaminant proportion was estimated, the expected number of
+contaminants is removed from both counts and the result is rounded; with
+<code>method = "simple"</code>, <code>method = "robust"</code>, or an EM that did not converge,
+they are the raw counts.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -160,16 +187,21 @@ the EZ-Diffusion equations. This function addresses this by fitting a
 mixture model with two components: a uniform distribution for
 contaminants and a parametric RT distribution for true responses.
 Robust moments are then extracted from the fitted parametric component.</p>
+<p>The returned counts describe the same responses as the returned moments.
+For <code>version = "3par"</code> the estimated contaminants are shared between the
+boundaries at <code>guess_rate</code>; a cell whose observed accuracy lies outside
+<code>[guess_rate * p, 1 - p * (1 - guess_rate)]</code> for an estimated proportion
+<code>p</code> cannot have arisen that way, so the contaminants are removed
+proportionally from both boundaries instead, leaving the observed accuracy
+unchanged apart from rounding, and a warning is issued. For
+<code>version = "4par"</code> each boundary is corrected by its own estimate.</p>
 <p>This function is designed to work with <code><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">dplyr::group_by()</a></code> and
-<code><a href="https://dplyr.tidyverse.org/reference/reframe.html" class="external-link">dplyr::reframe()</a></code> for grouped operations. Use <code><a href="adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code>
-as a separate step if you need to adjust accuracy counts for
-contamination.</p>
+<code><a href="https://dplyr.tidyverse.org/reference/reframe.html" class="external-link">dplyr::reframe()</a></code> for grouped operations.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="adjust_ezdm_accuracy.html">adjust_ezdm_accuracy()</a></code> for adjusting accuracy counts,
-<code><a href="flag_contaminant_rts.html">flag_contaminant_rts()</a></code> for trial-level contamination probabilities,
-<code><a href="ezdm.html">ezdm()</a></code> for fitting the EZ-Diffusion Model</p></div>
+    <div class="dont-index"><p><code><a href="flag_contaminant_rts.html">flag_contaminant_rts()</a></code> for trial-level contamination
+probabilities, <code><a href="ezdm.html">ezdm()</a></code> for fitting the EZ-Diffusion Model</p></div>
     </div>
 
     <div class="section level2">

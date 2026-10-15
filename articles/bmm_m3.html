@@ -26,7 +26,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,6 +35,7 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -62,7 +63,7 @@
                         <h4 data-toc-skip class="author">Isabel Courage</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/vignettes/articles/bmm_m3.Rmd" class="external-link"><code>vignettes/articles/bmm_m3.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/vignettes/articles/bmm_m3.Rmd" class="external-link"><code>vignettes/articles/bmm_m3.Rmd</code></a></small>
       <div class="d-none name"><code>bmm_m3.Rmd</code></div>
     </div>
 
@@ -117,7 +118,7 @@ npl &amp; = b
 <h3 id="choice-rules-in-the-m3">
 <span class="header-section-number">1.2</span> Choice Rules in the <code>m3</code><a class="anchor" aria-label="anchor" href="#choice-rules-in-the-m3"></a>
 </h3>
-<p>The activation for each category is then translated into probabilities of recalling one item or response from each category with a normalization function as a choice rule. In <code>bmm</code> we have implemented two choice rules, that are different implementations of Luce’s choice axiom:</p>
+<p>The activation for each category is then translated into probabilities of recalling one item or response from each category with a normalization function as a choice rule. In <code>bmm</code> we have implemented three choice rules. The first two are different implementations of Luce’s choice axiom:</p>
 <ol style="list-style-type: decimal">
 <li>Simple normalization (<code>"simple"</code>)</li>
 </ol>
@@ -135,7 +136,16 @@ p_i = \frac{n_i \cdot A_i}{\sum^n_{j = 1} n_j \cdot A_j}
 p_i = \frac{n_i \cdot e^{A_i}}{\sum^n_{j = 1} n_j \cdot e^{A_j}}
 \]</span></p>
 <p>This choice rule can be interpreted as an n-alternative SDT model over the different response candidates with a Gumbel (or double-exponential) noise distribution.</p>
-<p>The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined <code>ss</code> and <code>cs</code> versions are calibrated so that both rules imply a comparable, broad range of average performance. For the <code>softmax</code> rule the priors for general (<code>a</code>) and context (<code>c</code>) activation share the same mean, so the implied prior on their difference is centered at zero. This makes <code>softmax</code> the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The <code>simple</code> rule normalizes the raw activations, so context activation has to exceed general activation (<code>c &gt; a</code>) for the model to predict accurate recall; its default priors therefore encode <code>c &gt; a</code> and are not suited for directly comparing <code>c</code> and <code>a</code>. If your research question concerns the contrast between activation sources, use the <code>softmax</code> choice rule (or supply your own symmetric priors).</p>
+<p>This interpretation is a helpful intuition, but it is not an empirical commitment the data could confirm. Choice probabilities alone do not identify the latent noise distribution that generates them: the same softmax probabilities arise from latent-strength models in which the noise is correlated across response options <span class="citation">(Kilani 2025)</span>, and with four or more response categories infinitely many latent representations are consistent with any given set of choice probabilities <span class="citation">(Falmagne 1978; Kilani and Colonius 2026)</span>. The <code>m3</code> parameters are therefore best interpreted as activation scale values, identified by the choice probabilities under the assumed choice rule, rather than as means of a specific noise distribution. Comparing the choice rules by model fit remains meaningful, because they imply different choice probabilities. What categorical response data cannot decide is the distributional story behind whichever rule fits better.</p>
+<ol start="3" style="list-style-type: decimal">
+<li>Gaussian (<code>"gaussian"</code>)</li>
+</ol>
+<p>The <code>gaussian</code> choice rule is the same n-alternative SDT model with normally distributed noise: every candidate receives its category’s activation plus independent standard normal noise, and the candidate with the largest value is recalled. The probability of choosing category <span class="math inline">\(i\)</span> is</p>
+<p><span class="math display">\[
+p_i = n_i \int \phi(z) \, \Phi(z)^{n_i - 1} \prod_{j \neq i} \Phi(z + A_i - A_j)^{n_j} \, dz
+\]</span></p>
+<p>where <span class="math inline">\(\phi\)</span> and <span class="math inline">\(\Phi\)</span> are the standard normal density and distribution function. There is no closed form for this integral, so <code>bmm</code> approximates it numerically, and fits take much longer than with <code>softmax</code>. The softmax rule is the only rule for which the noise model and Luce’s choice axiom coincide <span class="citation">(Yellott 1977)</span>, so the two rules are genuinely different models, not two parameterizations of one.</p>
+<p>The two choice rules differ in how they translate the activation sources into probabilities, and this has a consequence for comparing activation sources. The default priors for the predefined <code>ss</code> and <code>cs</code> versions are calibrated so that both rules imply a comparable, broad range of average performance. For the <code>softmax</code> rule the priors for general (<code>a</code>) and context (<code>c</code>) activation share the same mean, so the implied prior on their difference is centered at zero. This makes <code>softmax</code> the appropriate choice rule when you want to compare or test activation sources against each other directly (e.g., whether context activation exceeds general activation). The <code>simple</code> rule normalizes the raw activations, so context activation has to exceed general activation (<code>c &gt; a</code>) for the model to predict accurate recall; its default priors therefore encode <code>c &gt; a</code> and are not suited for directly comparing <code>c</code> and <code>a</code>. If your research question concerns the contrast between activation sources, use the <code>softmax</code> choice rule (or supply your own symmetric priors). The <code>gaussian</code> rule also has equal default prior means for <code>a</code> and <code>c</code>, but its activations are on a smaller scale than under <code>softmax</code>, and not by one constant factor: general activation shrinks more than context activation. Comparisons of <code>c</code> against <code>a</code>, and effects of conditions that change the number of candidates (for example set size), can therefore differ between <code>softmax</code> and <code>gaussian</code>. If such a contrast is your question, it is worth checking whether it holds under both rules.</p>
 <p>Finally, the model then links the response frequencies <span class="math inline">\(Y\)</span> for each response category to the probabilities <span class="math inline">\(p\)</span> using a multinomial distribution with the total number of trials:</p>
 <p><span class="math display">\[
 Y \sim multinomial(p, trials)
@@ -181,7 +191,7 @@ npi &amp; = b
 <h3 id="parameter-scaling-the-m3">
 <span class="header-section-number">2.3</span> Parameter Scaling the <code>m3</code><a class="anchor" aria-label="anchor" href="#parameter-scaling-the-m3"></a>
 </h3>
-<p>Generally, one of the <code>m3</code> parameters has to be fixed to set the scaling of the model. In <code>bmm</code> the default is to fix the background noise parameter <code>b</code>. Thus the values of the other parameters should be interpreted relative to the background noise. The value <code>b</code> will be fixed to depends on the choice rule you choose for fitting the model. For the <code>simple</code> choice rule, <code>b</code> will be fixed to <code>0.1</code>, for the <code>softmax</code> choice rule, <code>b</code> will be fixed to <code>0</code>.</p>
+<p>Generally, one of the <code>m3</code> parameters has to be fixed to set the scaling of the model. In <code>bmm</code> the default is to fix the background noise parameter <code>b</code>. Thus the values of the other parameters should be interpreted relative to the background noise. The value <code>b</code> will be fixed to depends on the choice rule you choose for fitting the model. For the <code>simple</code> choice rule, <code>b</code> will be fixed to <code>0.1</code>, for the <code>softmax</code> and <code>gaussian</code> choice rules, <code>b</code> will be fixed to <code>0</code>.</p>
 <p>We chose two fix the background noise <code>b</code> for scaling for two reasons:</p>
 <ol style="list-style-type: decimal">
 <li>Fixing the background noise is similar to fixing noise parameters in other cognitive measurement models, such as the diffusion constant <code>s</code>, or the standard deviation of the noise added to the signal or noise distribution in SDT.</li>
@@ -306,7 +316,7 @@ npi &amp; = b
 <span>               choice_rule <span class="op">=</span> <span class="st">"simple"</span>,</span>
 <span>               version <span class="op">=</span> <span class="st">"custom"</span><span class="op">)</span></span></code></pre></div>
 <p>For the <code>custom</code> version, you additionally need to provide the <code>links</code> that should be used for each of the model parameters.The <code>links</code> ensure that model parameters stay in the correct value range. In particular for the <code>simple</code> choice rule it is essential, that all activation are positive. Thus, we recommend using <code>log</code> link functions for all parameters that represent activation sources, such as general or context activation, especially when using the <code>simple</code> choice rule.</p>
-<p>Based on the provided links for the model parameters, <code>bmm</code> will set <code>default_priors</code> that aim at a reasonable parameter range. We recommend that you check the priors set for the <code>custom</code> version of the <code>m3</code> andconsider what parameter ranges are reasonable for the different model parameters and provide <code>default_priors</code> for all of them. For detailed information on priors in <code>bmm</code> please see the <code>vignette("extract_info")</code>. In short, you can provide priors for intercepts as <code>main</code> and for effects as <code>effects</code>.</p>
+<p>Based on the provided links for the model parameters, <code>bmm</code> will set <code>default_priors</code> that aim at a reasonable parameter range. We recommend that you check the priors set for the <code>custom</code> version of the <code>m3</code> andconsider what parameter ranges are reasonable for the different model parameters and provide <code>default_priors</code> for all of them. For detailed information on priors in <code>bmm</code> please see the <code>vignette("extract_info")</code>. In short, you can provide priors for intercepts as <code>main</code>, for effects as <code>effects</code>, and for the standard deviations of random effects as <code>sd</code>.</p>
 <p>Setting up a <code>m3</code> object including these info looks like this:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">my_links</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
@@ -323,58 +333,58 @@ npi &amp; = b
 <span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span><span class="va">full_formula</span>, <span class="va">data</span>, <span class="va">my_model</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Warning: Default priors for each parameter will be specified internally based on the provided link function.</span></span>
 <span><span class="co">#&gt; Please check if the used priors are reasonable for your application</span></span>
-<span><span class="co">#&gt;                 prior class             coef group resp dpar nlpar   lb   ub</span></span>
-<span><span class="co">#&gt;        normal(0, 0.5)     b condoldreordered                     a &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;        normal(0, 0.5)     b      condoldsame                     a &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd                                      a    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd                     ID               a    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd condoldreordered    ID               a    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd      condoldsame    ID               a    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd        Intercept    ID               a    0     </span></span>
-<span><span class="co">#&gt;                (flat)     b                                      b          </span></span>
-<span><span class="co">#&gt;        normal(0, 0.5)     b condoldreordered                     c &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;        normal(0, 0.5)     b      condoldsame                     c &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd                                      c    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd                     ID               c    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd condoldreordered    ID               c    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd      condoldsame    ID               c    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd        Intercept    ID               c    0     </span></span>
-<span><span class="co">#&gt;                (flat)     b                                      d          </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd                                      d    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd                     ID               d    0     </span></span>
-<span><span class="co">#&gt;  student_t(3, 0, 2.5)    sd        Intercept    ID               d    0     </span></span>
-<span><span class="co">#&gt;        normal(0, 0.5)     b                                      a &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;          normal(1, 1)     b        Intercept                     a &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;        normal(0, 0.5)     b                                      c &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;          normal(1, 1)     b        Intercept                     c &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;          normal(1, 1)     b        Intercept                     d &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;         constant(0.1)     b        Intercept                     b &lt;NA&gt; &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;  tag       source</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;           default</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;           default</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;           default</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;           default</span></span>
-<span><span class="co">#&gt;           default</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;      (vectorized)</span></span>
-<span><span class="co">#&gt;              user</span></span>
-<span><span class="co">#&gt;              user</span></span>
-<span><span class="co">#&gt;              user</span></span>
-<span><span class="co">#&gt;              user</span></span>
-<span><span class="co">#&gt;              user</span></span>
-<span><span class="co">#&gt;              user</span></span></code></pre></div>
+<span><span class="co">#&gt;           prior class             coef group resp dpar nlpar   lb   ub tag</span></span>
+<span><span class="co">#&gt;  normal(0, 0.5)     b condoldreordered                     a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  normal(0, 0.5)     b      condoldsame                     a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd                     ID               a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd condoldreordered    ID               a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd      condoldsame    ID               a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd        Intercept    ID               a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;          (flat)     b                                      b              </span></span>
+<span><span class="co">#&gt;  normal(0, 0.5)     b condoldreordered                     c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  normal(0, 0.5)     b      condoldsame                     c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd                     ID               c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd condoldreordered    ID               c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd      condoldsame    ID               c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd        Intercept    ID               c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;          (flat)     b                                      d              </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd                     ID               d &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd        Intercept    ID               d &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd                                      a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  normal(0, 0.5)     b                                      a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;    normal(1, 1)     b        Intercept                     a &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd                                      c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  normal(0, 0.5)     b                                      c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;    normal(1, 1)     b        Intercept                     c &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;  exponential(1)    sd                                      d &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;    normal(1, 1)     b        Intercept                     d &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;   constant(0.1)     b        Intercept                     b &lt;NA&gt; &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;        source</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;       default</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;       default</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;  (vectorized)</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span>
+<span><span class="co">#&gt;          user</span></span></code></pre></div>
 </div>
 <div class="section level3" number="3.4">
 <h3 id="running-bmm-to-estimate-parameters">
@@ -575,8 +585,20 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
 <div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-Falmagne_1978" class="csl-entry">
+Falmagne, Jean-Claude. 1978. <span>“A Representation Theorem for Finite Random Scale Systems.”</span> <em>Journal of Mathematical Psychology</em> 18 (1): 52–72. <a href="https://doi.org/10.1016/0022-2496(78)90048-2" class="external-link">https://doi.org/10.1016/0022-2496(78)90048-2</a>.
+</div>
+<div id="ref-Kilani_2025" class="csl-entry">
+Kilani, Karim. 2025. <span>“A Class of Random Utility Models Yielding the Exploded Logit.”</span> <em>Journal of Mathematical Psychology</em> 124: 102900. <a href="https://doi.org/10.1016/j.jmp.2025.102900" class="external-link">https://doi.org/10.1016/j.jmp.2025.102900</a>.
+</div>
+<div id="ref-Kilani_Colonius_2026" class="csl-entry">
+Kilani, Karim, and Hans Colonius. 2026. <span>“Representing Choice Probabilities by Ranking Probabilities via Entropy Maximization.”</span> <em>Journal of Mathematical Psychology</em> 128: 102970. <a href="https://doi.org/10.1016/j.jmp.2026.102970" class="external-link">https://doi.org/10.1016/j.jmp.2026.102970</a>.
+</div>
 <div id="ref-oberauerSimpleMeasurementModels2019" class="csl-entry">
 Oberauer, Klaus, and Stephan Lewandowsky. 2019. <span>“Simple Measurement Models for Complex Working-Memory Tasks.”</span> <em>Psychological Review</em> 126 (6): 880–932. <a href="https://doi.org/10.1037/rev0000159" class="external-link">https://doi.org/10.1037/rev0000159</a>.
+</div>
+<div id="ref-Yellott_1977" class="csl-entry">
+Yellott, John I. 1977. <span>“The Relationship Between <span>Luce</span>’s Choice Axiom, <span>Thurstone</span>’s Theory of Comparative Judgment, and the Double Exponential Distribution.”</span> <em>Journal of Mathematical Psychology</em> 15 (2): 109–44. <a href="https://doi.org/10.1016/0022-2496(77)90026-8" class="external-link">https://doi.org/10.1016/0022-2496(77)90026-8</a>.
 </div>
 </div>
 </div>

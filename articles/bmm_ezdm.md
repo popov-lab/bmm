@@ -116,6 +116,58 @@ package implements this Bayesian approach, allowing researchers to:
 - Compare conditions using Bayesian hypothesis testing
 - Leverage the full power of the `brms` modeling framework
 
+### 1.5 The sampling distribution of the summary statistics
+
+Because the summary statistics *are* the data, the likelihood is a
+statement about how they vary from one sample of trials to the next. The
+number of upper-boundary responses is binomial. The mean and the
+variance of the response times are the sample mean and sample variance
+of \\n\\ decision times, and their joint sampling distribution is what
+the model needs.
+
+It is tempting to treat them the way one would for normally distributed
+data: \\\overline{\mathrm{RT}}\\ normal around the predicted mean with
+variance \\\mathrm{VRT}/n\\, \\s^2\\ scaled chi-square, and the two
+independent. All three parts of that hold only if the response times
+themselves are normal, and diffusion decision times are conspicuously
+right-skewed. With a symmetric starting point their kurtosis is 8.8 at
+zero drift and falls towards 3 as drift grows. This inflates the
+sampling variance of \\s^2\\ by a factor of about 3.8 with 100 trials
+per cell and 3.5 to 3.6 with 10 (less at accuracies above .95; with an
+asymmetric starting point it is more at the boundary nearer the starting
+point, up to 5.7 for a relative starting point between .3 and .7, and
+less at the other), and the skew makes the mean and the variance
+correlate at about 0.7. A likelihood that ignores both treats each cell
+as more informative than it is, and the resulting posteriors are too
+narrow — the credible intervals are not wrong about where the parameter
+is, but about how sure one should be.
+
+`bmm` therefore matches the first four cumulants of the first-passage
+time distribution. Writing \\\kappa_3\\ and \\\kappa_4\\ for its third
+and fourth cumulants and \\W = \kappa_4 / n + 2\\\mathrm{VRT}^2 / (n -
+1)\\ for the exact variance of a sample variance, the observed variance
+follows \\\mathrm{Gamma}(\mathrm{VRT}^2 / W,\\ \mathrm{VRT} / W)\\ and
+the observed mean is normal *conditional on it*, centred at
+\\\mathrm{ndt} + \mathrm{MDT} + (\kappa_3 / n)\\W^{-1}(s^2 -
+\mathrm{VRT})\\. Both reduce to the familiar normal and chi-square terms
+when \\\kappa_3\\ and \\\kappa_4\\ vanish, so nothing is lost when the
+decision times happen to be symmetric.
+
+One consequence is worth keeping in mind when designing a study: with a
+symmetric starting point the decision time does not depend on which
+boundary was reached, so all \\n\\ trials in a cell inform one set of
+moments. With a free starting point they do differ, which is why the
+4-parameter version needs the summaries split by boundary — and why a
+boundary reached fewer than twice in a cell has no variance to
+contribute. Such a cell still contributes through the response counts,
+and so does a cell whose summaries at one boundary are missing, as
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/reference/ezdm_summary_stats.md)
+returns them for a boundary reached fewer than `min_trials` times.
+[`bmm()`](https://venpopov.com/bmm/reference/bmm.md) keeps these cells
+and warns how many there are. Dropping them instead would remove exactly
+the cells with the most extreme accuracy, and with them information
+about drift and starting point.
+
 ## 2 Parametrization in the `bmm` package
 
 The `bmm` package implements two versions of the EZ-diffusion model:
@@ -160,8 +212,15 @@ EZ-diffusion model requires **aggregated summary statistics**:
 | `n_upper`  | Number of responses hitting the upper boundary |
 | `n_trials` | Total number of trials                         |
 
-For the **3-parameter version**, `mean_rt` and `var_rt` should be
-computed from all correct responses pooled together.
+For the **3-parameter version**, `mean_rt` and `var_rt` are computed
+from all responses in a cell, correct and error pooled together, and
+`n_trials` counts all of them. The original EZ equations above use the
+RTs of correct responses only. Pooling is valid here because the
+starting point is symmetric: the decision time then has the same
+distribution at both boundaries, so every trial informs the same mean
+and variance. The accuracy enters the likelihood through `n_upper`.
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/reference/ezdm_summary_stats.md)
+pools the RTs for you.
 
 For the **4-parameter version**, you need separate statistics for upper
 and lower boundary responses: - `mean_rt_upper`, `var_rt_upper` for
@@ -284,35 +343,36 @@ print(comparison)
 The mixture method identifies contaminants and provides more accurate
 moment estimates.
 
-### 4.2 Accuracy Adjustment
+### 4.2 Accuracy and Trial Counts
 
-When using the mixture method, the
-[`adjust_ezdm_accuracy()`](https://venpopov.com/bmm/reference/adjust_ezdm_accuracy.md)
-function can adjust accuracy counts by removing estimated contaminants.
-This assumes contaminants are random guesses (50% accuracy by default)
-and is applied as a separate step after computing summary statistics:
+The mixture method also corrects `n_upper` and `n_trials`, so that the
+counts describe the responses the moments were computed from. The
+`simple` and `robust` methods estimate no contaminant proportion and
+return the raw counts:
 
 ``` r
 
-summary_no_adjust <- ezdm_summary_stats(
-  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
+summary_raw <- ezdm_summary_stats(
+  trials_contaminated$rt, trials_contaminated$correct,
+  method = "simple", version = "3par"
 )
 
-summary_adjust <- ezdm_summary_stats(
-  trials_contaminated$rt, trials_contaminated$correct, version = "3par"
-) |>
-  mutate(adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop))
-
-cat("Unadjusted accuracy:",
-    round(summary_no_adjust$n_upper / summary_no_adjust$n_trials, 3), "\n")
-#> Unadjusted accuracy: 0.93
-cat("Adjusted accuracy:",
-    round(summary_adjust$n_upper_adj / summary_adjust$n_trials_adj, 3), "\n")
-#> Adjusted accuracy: 0.948
+cat("Raw counts:", summary_raw$n_upper, "of", summary_raw$n_trials,
+    "- accuracy", round(summary_raw$n_upper / summary_raw$n_trials, 3), "\n")
+#> Raw counts: 186 of 200 - accuracy 0.93
+cat("Contaminant-free:", summary_mixture$n_upper, "of", summary_mixture$n_trials,
+    "- accuracy", round(summary_mixture$n_upper / summary_mixture$n_trials, 3), "\n")
+#> Contaminant-free: 182 of 193 - accuracy 0.943
 cat("True accuracy (no contaminants):",
     round(mean(trials_clean$response == "upper"), 3), "\n")
 #> True accuracy (no contaminants): 0.945
 ```
+
+Splitting the estimated contaminants between the two boundaries needs an
+assumption about how accurate a contaminant response is. The
+`guess_rate` argument carries it and defaults to 0.5, the chance level
+of a two-choice task. The 4-parameter version estimates contamination
+per boundary and ignores it.
 
 ### 4.3 Working with the 4-Parameter Version
 
@@ -343,9 +403,9 @@ summary_4par <- ezdm_summary_stats(
 
 summary_4par
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.3952879            NA   0.01637452           NA     195      200
+#> mu     0.3950143            NA   0.01629836           NA     193      198
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu             0.01116972                     NA
+#> mu             0.01143807                     NA
 ```
 
 Notice the output now includes: - `mean_rt_upper`, `var_rt_upper`:
@@ -466,12 +526,12 @@ sim_data$condition <- factor(sim_data$condition, levels = c("easy", "hard"))
 
 head(sim_data)
 #>     mean_rt     var_rt n_upper n_trials subject condition
-#> 1 0.5821563 0.03227199      99      100       1      easy
-#> 2 0.7580137 0.09254939      95      100       1      hard
-#> 3 0.5170452 0.01770436     100      100       2      easy
-#> 4 0.7777224 0.16780351      85      100       2      hard
-#> 5 0.4981635 0.02285722      97      100       3      easy
-#> 6 0.6836707 0.06894347      93      100       3      hard
+#> 1 0.5849755 0.02704076      96      100       1      easy
+#> 2 0.7349579 0.05481245      89      100       1      hard
+#> 3 0.5064378 0.01015706     100      100       2      easy
+#> 4 0.6327151 0.07406956      91      100       2      hard
+#> 5 0.5354869 0.01897598      98      100       3      easy
+#> 6 0.6624182 0.07254991      85      100       3      hard
 ```
 
 ### 5.2 Specifying the formula
@@ -542,7 +602,7 @@ Loading required namespace: rstan
               n_upper = "n_upper",
               n_trials = "n_trials",
               version = "3par") 
-  Links: drift = log; bound = log; ndt = log; s = log 
+  Links: drift = identity; bound = log; ndt = log; s = log 
 Formula: drift ~ 0 + condition
          bound ~ 1
          ndt ~ 1
@@ -553,10 +613,10 @@ Formula: drift ~ 0 + condition
 
 Regression Coefficients:
                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-bound_Intercept         0.43      0.01     0.41     0.45 1.00     1028     1329
-ndt_Intercept          -1.26      0.02    -1.30    -1.23 1.00     1487     1256
-drift_conditioneasy     1.12      0.01     1.09     1.14 1.00     1455     1466
-drift_conditionhard     0.38      0.02     0.34     0.43 1.00     1145     1217
+bound_Intercept         0.43      0.01     0.41     0.46 1.00     1231     1134
+ndt_Intercept          -1.29      0.02    -1.33    -1.25 1.00     1230     1195
+drift_conditioneasy     2.74      0.06     2.63     2.85 1.00     1358     1196
+drift_conditionhard     1.37      0.04     1.29     1.44 1.00     1424     1365
 
 Constant Parameters:
                 Value
@@ -567,26 +627,26 @@ and Tail_ESS are effective sample size measures, and Rhat is the potential
 scale reduction factor on split chains (at convergence, Rhat = 1).
 ```
 
-To provide stable sampling all parameters use log link functions, so we
-need to exponentiate to get estimates on the natural scale:
+The drift rate has an identity link, so its estimates are already on the
+natural scale. Boundary separation and non-decision time have log links,
+so we exponentiate them:
 
 ``` r
 
 # Extract fixed effects
 fixef_est <- brms::fixef(fit)
 
-# Transform to natural scale
-cat("Drift rate (easy):", exp(fixef_est["drift_conditioneasy", "Estimate"]), "\n")
-#> Drift rate (easy): 3.060362
-cat("Drift rate (hard):", exp(fixef_est["drift_conditionhard", "Estimate"]), "\n")
-#> Drift rate (hard): 1.467012
+cat("Drift rate (easy):", fixef_est["drift_conditioneasy", "Estimate"], "\n")
+#> Drift rate (easy): 2.735912
+cat("Drift rate (hard):", fixef_est["drift_conditionhard", "Estimate"], "\n")
+#> Drift rate (hard): 1.36663
 cat("Boundary:", exp(fixef_est["bound_Intercept", "Estimate"]), "\n")
-#> Boundary: 1.534783
+#> Boundary: 1.543554
 cat("Non-decision time:", exp(fixef_est["ndt_Intercept", "Estimate"]), "\n")
-#> Non-decision time: 0.2827719
+#> Non-decision time: 0.2750842
 ```
 
-As you can see, these match the generating values well:
+The generating values were:
 
 ``` r
 
@@ -595,6 +655,13 @@ print(true_params)
 #> 1      easy   3.0   1.5 0.3
 #> 2      hard   1.5   1.5 0.3
 ```
+
+The boundary (1.54) and the non-decision time (0.275) are close to the
+generating values of 1.5 and 0.3. The drift rates (2.74 and 1.37) sit
+below the generating values of 3.0 and 1.5, and the generating values
+lie outside their 95% credible intervals in the summary above. The data
+were simulated with subject-level variation in all three parameters,
+which this model leaves out.
 
 ### 5.6 Visualizing posterior distributions
 
@@ -608,7 +675,7 @@ library(ggplot2)
 # Extract posterior draws
 draws <- tidybayes::tidy_draws(fit) |>
   select(starts_with("b_")) |>
-  mutate(across(everything(), exp))
+  mutate(across(any_of(c("b_bound_Intercept", "b_ndt_Intercept")), exp))
 
 # Rename for plotting
 colnames(draws) <- gsub("b_", "", colnames(draws))
@@ -636,7 +703,52 @@ draws |>
 
 ![](bmm_ezdm_files/figure-html/unnamed-chunk-10-1.jpeg)
 
-## 6 Comparing conditions
+## 6 Posterior predictive checks
+
+The EZ-diffusion likelihood constrains three statistics per cell — the
+mean RT, the RT variance, and the number of upper-boundary (correct)
+responses — but by default
+[`pp_check()`](https://venpopov.com/bmm/reference/pp_check.bmmfit.md)
+only shows the mean RT. The `resp_var` argument selects the other
+observables of the likelihood;
+[`pp_check_vars()`](https://venpopov.com/bmm/reference/pp_check_vars.md)
+lists the available checks:
+
+``` r
+
+pp_check_vars(fit)
+#>   resp_var                         label default_type          slot default
+#> 1  mean_rt            Mean response time dens_overlay             Y    TRUE
+#> 2   var_rt        Response time variance dens_overlay        vreal1   FALSE
+#> 3  mean_pc Proportion of upper responses  bars_binned vint1, trials   FALSE
+```
+
+The `mean_pc` check is the proportion of correct responses
+(`n_upper / n_trials`), which stays comparable across cells even when
+the number of trials differs. With `resp_var = "all"` all checks are
+drawn from one shared joint simulation. Each panel compares how a
+statistic is distributed across all cells: the RT panels overlay the
+density of the observed statistic (dark line) on the densities of the
+simulated datasets, and the accuracy panel is a histogram of the
+observed proportions (bars) with the predicted number of cells per bin
+(points with 90% intervals):
+
+``` r
+
+pp_check(fit, resp_var = "all", ndraws = 50)
+```
+
+![](bmm_ezdm_files/figure-html/unnamed-chunk-12-1.jpeg)
+
+The observed mean RTs are spread more evenly than the simulated ones,
+which cluster around one value per condition. The data were simulated
+with subject-level variation in all three parameters, which this model
+omits; the model with [random effects](#adding-random-effects) below
+includes it. To compare each cell with its own predictive interval
+instead, select a single check with `type = "intervals"`,
+e.g. `pp_check(fit, resp_var = "mean_rt", type = "intervals")`.
+
+## 7 Comparing conditions
 
 As `bmm` feeds seamlessly into `brms`, we can use Bayesian hypothesis
 testing via Savage-Dickey density ratios to compare drift rates between
@@ -645,10 +757,10 @@ conditions:
 ``` r
 
 # Test if drift rate is higher in easy vs hard condition
-brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
+brms::hypothesis(fit, "drift_conditioneasy > drift_conditionhard")
 #> Hypothesis Tests for class b:
 #>                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
-#> 1 (exp(drift_condit... > 0     1.59      0.04     1.52     1.66        Inf
+#> 1 (drift_conditione... > 0     1.37      0.06     1.27     1.47        Inf
 #>   Post.Prob Star
 #> 1         1    *
 #> ---
@@ -658,7 +770,7 @@ brms::hypothesis(fit, "exp(drift_conditioneasy) > exp(drift_conditionhard)")
 #> Posterior probabilities of point hypotheses assume equal prior probabilities.
 ```
 
-## 7 Adding random effects
+## 8 Adding random effects
 
 For hierarchical models with random effects across subjects:
 

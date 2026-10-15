@@ -21,7 +21,7 @@ decision task."><meta property="og:image" content="https://venpopov.com/bmm/logo
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -29,7 +29,8 @@ decision task."><meta property="og:image" content="https://venpopov.com/bmm/logo
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -45,7 +46,7 @@ decision task."><meta property="og:image" content="https://venpopov.com/bmm/logo
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>The Multinomial / Memory Measurement Model</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/model_m3.R" class="external-link"><code>R/model_m3.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/model_m3.R" class="external-link"><code>R/model_m3.R</code></a></small>
       <div class="d-none name"><code>m3.Rd</code></div>
     </div>
 
@@ -59,7 +60,13 @@ decision task.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">m3</span><span class="op">(</span><span class="va">resp_cats</span>, <span class="va">num_options</span>, choice_rule <span class="op">=</span> <span class="st">"softmax"</span>, version <span class="op">=</span> <span class="st">"custom"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">m3</span><span class="op">(</span></span>
+<span>  <span class="va">resp_cats</span>,</span>
+<span>  <span class="va">num_options</span>,</span>
+<span>  choice_rule <span class="op">=</span> <span class="st">"softmax"</span>,</span>
+<span>  version <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"custom"</span>, <span class="st">"ss"</span>, <span class="st">"cs"</span><span class="op">)</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -76,16 +83,36 @@ response categories used for the M3.</p></dd>
 of candidates in the respective response categories are constant across all conditions
 in the experiment. Or a vector specifying the variable names that contain the number of
 candidates in each response category. The order of these variables should be in the
-same order as the names of the response categories passed to <code>resp_cats</code></p></dd>
+same order as the names of the response categories passed to <code>resp_cats</code>. Numbers
+named after the response categories, e.g. <code>c(corr = 1, other = 4)</code>, are matched to
+the categories by name. Numbers without names, or with other names, are taken in
+the order of <code>resp_cats</code>, and other names become the names of the columns
+bmm adds to the data. Column names given category names, e.g.
+<code>c(other = "n_other", corr = "n_corr")</code>, are matched by name as well, in any order.
+Custom activation formulas can use numbers by these column names; numbers
+without names or named after the categories are called <code>n_opt_&lt;category&gt;</code>.</p></dd>
 
 
 <dt id="arg-choice-rule">choice_rule<a class="anchor" aria-label="anchor" href="#arg-choice-rule"></a></dt>
-<dd><p>The choice rule that should be used for the M3. The options are "softmax"
-or "simple". The "softmax" option implements the softmax normalization of activation into
+<dd><p>The choice rule that should be used for the M3. The options are "softmax",
+"simple", or "gaussian". The "softmax" option implements the softmax normalization of activation into
 probabilities for choosing the different response categories. The "simple" option implements
 a simple normalization of the absolute activations over the sum of all activations. For details
 on the differences of these choice rules please see the appendix of Oberauer &amp; Lewandowsky (2019)
-"Simple measurement models for complex working memory tasks" published in Psychological Review.</p></dd>
+"Simple measurement models for complex working memory tasks" published in Psychological Review.
+The "gaussian" option adds independent standard normal noise to the activation of every
+candidate and chooses the candidate with the largest value (a Thurstonian rule: the choice is the
+maximum of noisy activations); "softmax" is the same with Gumbel noise. Activations under
+"gaussian" are on a smaller scale, and the difference is not one constant factor: <code>a</code> shrinks
+more than <code>c</code>, so a comparison of <code>c</code> with <code>a</code>, and effects of conditions that change the
+number of candidates (such as set size), can differ between the two rules. Sampling under
+"gaussian" costs about 40 times as much per iteration as under "softmax", because each
+probability is a 40-node numerical integral: a 40-subject, three-condition model with random
+intercepts took 15 seconds under "softmax" and about 4 minutes under "gaussian" end to end
+(4 chains, 1000 + 1000 iterations, Stan compilation included), 2.5 minutes with
+<code>threads = threading(2)</code>. In versions <code>ss</code> and <code>cs</code>, <code>c</code> and <code>a</code> have <code>normal(3, 1)</code> main priors
+under "softmax" and <code>normal(2, 1)</code> under "gaussian"; under "simple" <code>c</code> has <code>normal(3, 1)</code> and
+<code>a</code> has <code>normal(0, 1)</code>, on the log scale.</p></dd>
 
 
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
@@ -107,7 +134,7 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 <ul><li><p><strong>Domain:</strong> Working Memory (categorical), Categorical Decision Making</p></li>
 <li><p><strong>Task:</strong> n-AFC retrieval</p></li>
 <li><p><strong>Name:</strong> The Multinomial / Memory Measurement Model</p></li>
-<li><p><strong>Citation:</strong></p><ul><li><p>Oberauer, K., &amp; Lewandowsky, S. (2019). Simple measurement models for complex working-memory tasks. Psychological Review, 126.</p></li>
+<li><p><strong>Citation:</strong></p><ul><li><p>Oberauer, K., &amp; Lewandowsky, S. (2019). Simple measurement models for complex working-memory tasks. Psychological Review, 126(6), 880-932. https://doi.org/10.1037/rev0000159</p></li>
 </ul></li>
 </ul><div class="section">
 <h3 id="version-ss">Version: <code>ss</code><a class="anchor" aria-label="anchor" href="#version-ss"></a></h3>
@@ -127,9 +154,11 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 </ul></li>
 <li><p><strong>Default priors:</strong></p><ul><li><p><code>a</code>:</p><ul><li><p><code>main</code>: normal(3,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: normal(3,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
@@ -153,12 +182,15 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 </ul></li>
 <li><p><strong>Default priors:</strong></p><ul><li><p><code>a</code>:</p><ul><li><p><code>main</code>: normal(3,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>c</code>:</p><ul><li><p><code>main</code>: normal(3,1)</p></li>
 <li><p><code>effects</code>: normal(0,0.5)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>f</code>:</p><ul><li><p><code>main</code>: logistic(0,1)</p></li>
 <li><p><code>effects</code>: normal(0,1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 </ul></li>
 </ul></div>
@@ -180,11 +212,24 @@ on the differences of these choice rules please see the appendix of Oberauer &am
 <li><p><strong>Default priors:</strong></p></li>
 </ul></div>
 
+<div class="section">
+<h3 id="missing-values-and-reserved-names">Missing values and reserved names<a class="anchor" aria-label="anchor" href="#missing-values-and-reserved-names"></a></h3>
+
+
+<p>A missing response count (<code>NA</code>) is counted as 0. If the category has options in that
+row, <code><a href="bmm.html">bmm()</a></code> warns and says how many counts were replaced; if it has none (<code>num_options</code>
+is 0 in that row), the 0 is true and there is no warning, as for <code>dist</code> in
+<a href="oberauer_lewandowsky_2019_e1.html">oberauer_lewandowsky_2019_e1</a>. A missing value in a column named in <code>num_options</code> is
+an error: enter 0 where there were no options. Data columns named <code>Y</code>, <code>nTrials</code> or
+<code>Idx_&lt;category&gt;</code> are refused because <code><a href="bmm.html">bmm()</a></code> creates columns with these names; response
+categories may be called <code>Y</code> or <code>nTrials</code>.</p>
+</div>
+
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># isTRUE(Sys.getenv("BMM_EXAMPLES"))</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># identical(Sys.getenv("BMM_EXAMPLES"), "true")</span></span></span>
 <span class="r-in"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">oberauer_lewandowsky_2019_e1</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># initiate the model object</span></span></span>

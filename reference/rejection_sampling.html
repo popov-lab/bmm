@@ -5,7 +5,13 @@
       fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2"
     }
   };
-</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Rejection Sampling — rejection_sampling"><meta name="description" content="Performs rejection sampling to generate samples from a target distribution."><meta property="og:description" content="Performs rejection sampling to generate samples from a target distribution."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"></head><body>
+</script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Rejection Sampling — rejection_sampling"><meta name="description" content="Performs rejection sampling to generate samples from a target distribution.
+Each draw can come from its own target: draw i is sampled from f
+evaluated at the i-th element of every per-draw argument in ..., under
+the envelope max_f[i]."><meta property="og:description" content="Performs rejection sampling to generate samples from a target distribution.
+Each draw can come from its own target: draw i is sampled from f
+evaluated at the i-th element of every per-draw argument in ..., under
+the envelope max_f[i]."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -13,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,7 +27,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/bmm.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
 <li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
@@ -37,12 +44,15 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Rejection Sampling</h1>
-      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/v1.3.2/R/distributions.R" class="external-link"><code>R/distributions.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/popov-lab/bmm/blob/master/R/distributions.R" class="external-link"><code>R/distributions.R</code></a></small>
       <div class="d-none name"><code>rejection_sampling.Rd</code></div>
     </div>
 
     <div class="ref-description section level2">
-    <p>Performs rejection sampling to generate samples from a target distribution.</p>
+    <p>Performs rejection sampling to generate samples from a target distribution.
+Each draw can come from its own target: draw <code>i</code> is sampled from <code>f</code>
+evaluated at the <code>i</code>-th element of every per-draw argument in <code>...</code>, under
+the envelope <code>max_f[i]</code>.</p>
     </div>
 
     <div class="section level2">
@@ -59,11 +69,16 @@
 
 
 <dt id="arg-f">f<a class="anchor" aria-label="anchor" href="#arg-f"></a></dt>
-<dd><p>Function. The target density function from which to sample.</p></dd>
+<dd><p>Function. The target density divided by the proposal density, up to
+a constant; with a uniform proposal, the target density itself. Its first
+argument takes a vector of proposals, generally not of length <code>n</code>; <code>f</code> must
+be vectorized over it and over the per-draw arguments in <code>...</code>.</p></dd>
 
 
 <dt id="arg-max-f">max_f<a class="anchor" aria-label="anchor" href="#arg-max-f"></a></dt>
-<dd><p>Numeric. The maximum value of the target density function <code>f</code>.</p></dd>
+<dd><p>Numeric. A finite upper bound of <code>f</code>, either a single value or
+one value per draw (length <code>n</code>). A bound below the maximum of <code>f</code> biases
+the draws without a warning.</p></dd>
 
 
 <dt id="arg-proposal-fun">proposal_fun<a class="anchor" aria-label="anchor" href="#arg-proposal-fun"></a></dt>
@@ -71,7 +86,12 @@
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Additional arguments to be passed to the target density function <code>f</code>.</p></dd>
+<dd><p>Additional arguments to be passed to the target density function
+<code>f</code>. With <code>n &gt; 1</code>, arguments of length <code>n</code> are taken per draw, so draw <code>i</code>
+uses their <code>i</code>-th elements. Arguments of any other length are passed whole
+to every call of <code>f</code>; recycle them with <code>rep_len(x, n)</code> to use them per
+draw. Pass constants whose length may equal <code>n</code>, such as a lookup table,
+through the closure of <code>f</code> instead of <code>...</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -87,6 +107,16 @@
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">samples</span>, freq <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/curve.html" class="external-link">curve</a></span><span class="op">(</span><span class="va">target_density</span>, col <span class="op">=</span> <span class="st">"red"</span>, add <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="rejection_sampling-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># one location per draw</span></span></span>
+<span class="r-in"><span><span class="va">mu</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span><span class="op">)</span>, <span class="fl">5000</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">samples</span> <span class="op">&lt;-</span> <span class="fu">rejection_sampling</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fl">10000</span>, <span class="fu">brms</span><span class="fu">::</span><span class="va"><a href="https://paulbuerkner.com/brms/reference/VonMises.html" class="external-link">dvon_mises</a></span>, max_f <span class="op">=</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/VonMises.html" class="external-link">dvon_mises</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">10</span><span class="op">)</span>, <span class="va">proposal</span>,</span></span>
+<span class="r-in"><span>  mu <span class="op">=</span> <span class="va">mu</span>, kappa <span class="op">=</span> <span class="fl">10</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">samples</span>, <span class="va">mu</span>, <span class="va">mean</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           0           2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.003265293 2.006425116 </span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

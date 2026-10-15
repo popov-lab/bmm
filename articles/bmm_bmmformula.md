@@ -214,8 +214,8 @@ my_formula <- bmf(
 
 Let’s assume you have fit a `mixture2p` model to a data set `my_data` as
 described in the [the mixture models
-article](https://venpopov.com/bmm/articles/bmm_mixture_models.html%22).
-For this, you had to specify a `bmmformula` and model object:
+article](https://venpopov.com/bmm/articles/bmm_mixture_models.html). For
+this, you had to specify a `bmmformula` and model object:
 
 ``` r
 

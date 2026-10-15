@@ -45,8 +45,9 @@ Visual working memory
 
 - **Citation:**
 
-  - Oberauer, K. (2023). Measurement models for visual working memory -
-    A factorial model comparison. Psychological Review, 130(3), 841-852
+  - Oberauer, K. (2023). Measurement models for visual working memory—A
+    factorial model comparison. Psychological Review, 130(3), 841-852.
+    https://doi.org/10.1037/rev0000328
 
 - **Version:** simple
 
@@ -76,7 +77,11 @@ Visual working memory
 
   - `mu`:
 
-    - `main`: student_t(1, 0, 1)
+    - `main`: normal(0, 0.5)
+
+    - `effects`: normal(0, 0.25)
+
+    - `sd`: exponential(4)
 
   - `kappa`:
 
@@ -84,16 +89,20 @@ Visual working memory
 
     - `effects`: normal(0, 1)
 
+    - `sd`: exponential(1)
+
   - `c`:
 
     - `main`: student_t(5, 2, 0.75)
 
     - `effects`: normal(0, 1)
 
+    - `sd`: exponential(1)
+
 ## Examples
 
 ``` r
-if (FALSE) { # isTRUE(Sys.getenv("BMM_EXAMPLES"))
+if (FALSE) { # identical(Sys.getenv("BMM_EXAMPLES"), "true")
 # simulate data from the model
 dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 

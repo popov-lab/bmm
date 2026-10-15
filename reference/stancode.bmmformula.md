@@ -30,8 +30,10 @@ stancode(object, data, model, prior = NULL, ...)
   [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.md)
   function. Every model function has a number of required arguments
   which need to be specified within the function call. Call
-  [`supported_models()`](https://venpopov.com/bmm/reference/supported_models.md)
-  to see the list of supported models and their required arguments
+  [`bmm_models()`](https://venpopov.com/bmm/reference/bmm_models.md) to
+  see the list of supported models, and `?modelname` (for example
+  [`?imm`](https://venpopov.com/bmm/reference/imm.md)) for their
+  required arguments.
 
 - prior:
 
@@ -58,7 +60,7 @@ model.
 
 ## See also
 
-[`supported_models()`](https://venpopov.com/bmm/reference/supported_models.md),
+[`bmm_models()`](https://venpopov.com/bmm/reference/bmm_models.md),
 [`brms::stancode()`](https://paulbuerkner.com/brms/reference/stancode.html)
 
 ## Examples
@@ -69,7 +71,7 @@ scode1 <- stancode(bmf(c ~ 1, kappa ~ 1),
   model = sdm(resp_error = "dev_rad")
 )
 cat(scode1)
-#> // generated with brms 2.23.0 and bmm 1.3.2
+#> // generated with brms 2.23.0 and bmm 1.4.0
 #> functions {
 #>   /* compute the tan_half link
 #>    * Args:
@@ -196,8 +198,7 @@ cat(scode1)
 #>       COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;
 #>     }
 #>   }
-#>   // fail fast if the precomputed run metadata does not describe the data Stan
-#>   // received (it is computed in R and can drift out of sync with the data)
+#>   // fail fast if the run metadata computed in R does not match the data Stan received
 #>   {
 #>     int sdm_run_total = 0;
 #>     for (g in 1:G_sdm_runs) {
