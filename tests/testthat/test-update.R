@@ -326,6 +326,34 @@ test_that("update() keeps the fit's control on the same backend and algorithm on
   expect_null(carried_control(no_algorithm, list()))
 })
 
+test_that("update() carries the stored prior rows that are not brms defaults", {
+  stored <- brms::prior(normal(0, 1), class = b) +
+    brms::prior(normal(0, 2), class = b, coef = x) +
+    brms::prior(normal(0, 3), class = sd) +
+    brms::prior(normal(0, 4), class = Intercept)
+  # "" is what brms's restructure() writes into fits that predate the column
+  stored$source <- c("user", "default", "vectorized", "")
+  kept <- carried_prior(stored)
+  expect_s3_class(kept, "brmsprior")
+  expect_equal(kept$prior, c("normal(0, 1)", "normal(0, 3)", "normal(0, 4)"))
+  expect_equal(kept$source, c("user", "vectorized", ""))
+})
+
+test_that("update() carries no stored prior row whose source is unknown (#552)", {
+  stored <- brms::prior(normal(0, 1), class = b) +
+    brms::prior(normal(0, 2), class = sd) +
+    brms::prior(normal(0, 3), class = Intercept)
+  stored$source <- c("user", NA, "default")
+  kept <- carried_prior(stored)
+  expect_equal(kept$prior, "normal(0, 1)")
+  expect_false(anyNA(kept$class))
+
+  stored$source <- NULL
+  kept <- carried_prior(stored)
+  expect_s3_class(kept, "brmsprior")
+  expect_equal(nrow(kept), 0)
+})
+
 test_that("a step size in the call replaces the one the fit stored, either spelling", {
   # configure_control() renames both spellings to the backend's and drops the
   # duplicate, so a merge by name alone would hand the fit's value the win
