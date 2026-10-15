@@ -1,3 +1,8 @@
+# bmm 1.6.0 (development)
+
+### New features
+* Models defined in other packages can now be fitted with `bmm()`. A package registers its model with `register_bmm_model()` when it loads; the model then appears in `bmm_models()` next to the package's name and works with `default_prior()`, `stancode()`, `standata()` and `bmm_data_check()`. Every fit records the package that defines its model and that package's version (#442).
+
 # bmm 1.5.0 (development)
 
 ### Documentation
