@@ -9,7 +9,7 @@ tcc(
   similarity,
   n_options = 360,
   units = c("radians", "bins"),
-  d_max = 12,
+  d_max = 30,
   ...
 )
 }
@@ -30,7 +30,8 @@ number: 360 for a colour wheel in 1-degree steps, 180 for orientation.}
 
 \item{units}{Either \code{"radians"} or \code{"bins"}, see \code{resp_error}.}
 
-\item{d_max}{The upper end of the \code{d} grid of the likelihood table.}
+\item{d_max}{The upper end of the \code{d} grid of the likelihood table; draws
+of \code{d} beyond it are reported after the fit.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -124,11 +125,12 @@ log probability). Beyond \code{d_max} the table is extended
 linearly. This keeps the sampler moving during warmup but is not the
 model: past \code{d_max} the log-likelihood becomes a straight line in \code{d}, so
 a posterior that reaches the end of the grid can run far beyond it, with
-estimates that mean nothing. If any posterior draw of \code{d} exceeds \code{d_max}
-(check \code{max(brms::posterior_linpred(fit, dpar = "d", transform = TRUE))}),
-refit with a
-larger \code{d_max}; each extra unit adds 50 table rows, which costs build time
-and memory but nothing per gradient. A large \code{d} is weakly identified
+estimates that mean nothing. \code{bmm()} warns after the fit when any
+posterior draw of \code{d} passes \code{d_max}; then refit with a larger \code{d_max}.
+The default of 30 lies far above the values of \code{d} from 0.6 to 2.0 that
+\code{tcc()} estimates for set sizes 1 to 8 in \link{oberauer_lin_2017}. Each extra
+unit adds 50 table rows, which costs build time and memory but nothing per
+gradient. A large \code{d} is weakly identified
 when the similarity is broad, because the probability of reporting the
 target then grows slowly with \code{d}.
 }

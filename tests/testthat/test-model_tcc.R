@@ -41,6 +41,7 @@ test_that("tcc() builds an independent model with d on the log link", {
   expect_equal(model$links$d, "log")
   expect_equal(model$other_vars$n_options, 360)
   expect_equal(model$other_vars$units, "radians")
+  expect_equal(model$other_vars$d_max, 30)
   expect_equal(tcc_test_model(180, units = "bins")$other_vars$units, "bins")
 })
 
@@ -193,7 +194,7 @@ test_that("the Stan table is built in transformed data and read by the lpmf", {
   sdata <- brms::standata(tcc_mock_fit())
   expect_equal(sdata$tcc_grid_lo, -2)
   expect_equal(sdata$tcc_grid_step, 0.02)
-  expect_equal(sdata$tcc_grid_rows, 703)
+  expect_equal(sdata$tcc_grid_rows, 1603)
   expect_equal(sdata$tcc_similarity, tcc_test_similarity(360), ignore_attr = TRUE)
 })
 
@@ -214,6 +215,20 @@ test_that("threading passes the table to the sliced likelihood as data", {
   expect_match(code, "data matrix tcc_tab", fixed = TRUE)
   expect_match(code, "tcc_lpmf(Y[start:end] | mu, d, tcc_tab, tcc_grid_lo, tcc_grid_step)",
                fixed = TRUE)
+})
+
+test_that("draws of d beyond the end of the table are reported after the fit", {
+  model <- tcc_test_model(d_max = 6)
+  # draws x observations; d of draws 3 and 4 passes d_max in one observation
+  inside <- epred_prep(list(d = cbind(c(1, 5.9, 2, 3), c(2, 2, 2, 2))))
+  beyond <- epred_prep(list(d = cbind(c(1, 5.9, 7.2, 2), c(2, 2, 2, 6.5))))
+  expect_silent(.tcc_check_grid(model, inside))
+  expect_warning(.tcc_check_grid(model, beyond),
+                 "In 2 of 4 posterior draws, d passes.*-2 to 6.*Refit with d_max = 12")
+})
+
+test_that("a fit without draws is not checked against the table", {
+  expect_silent(postprocess_brm(tcc_test_model(), tcc_mock_fit()))
 })
 
 ############################################################################# !

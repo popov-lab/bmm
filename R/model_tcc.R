@@ -3,7 +3,7 @@
 ############################################################################# !
 
 .model_tcc <- function(resp_error = NULL, similarity = NULL, n_options = 360,
-                       units = "radians", d_max = 12, links = NULL, call = NULL, ...) {
+                       units = "radians", d_max = 30, links = NULL, call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
@@ -39,8 +39,8 @@
       links = list(d = "log"),
       fixed_parameters = list(),
       # d of the uncorrelated model runs from 0.6 to 2.0 over set sizes 1-8 in
-      # oberauer_lin_2017, so the prior is centred at exp(0.5) = 1.65 and puts
-      # the default d_max = 12 two SDs above it
+      # oberauer_lin_2017, so the prior is centred at exp(0.5) = 1.65; d = 12
+      # lies two SDs above it and the default d_max = 30 almost three
       default_priors = list(
         d = list(main = "normal(0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
@@ -102,11 +102,12 @@
 #'   linearly. This keeps the sampler moving during warmup but is not the
 #'   model: past `d_max` the log-likelihood becomes a straight line in `d`, so
 #'   a posterior that reaches the end of the grid can run far beyond it, with
-#'   estimates that mean nothing. If any posterior draw of `d` exceeds `d_max`
-#'   (check `max(brms::posterior_linpred(fit, dpar = "d", transform = TRUE))`),
-#'   refit with a
-#'   larger `d_max`; each extra unit adds 50 table rows, which costs build time
-#'   and memory but nothing per gradient. A large `d` is weakly identified
+#'   estimates that mean nothing. `bmm()` warns after the fit when any
+#'   posterior draw of `d` passes `d_max`; then refit with a larger `d_max`.
+#'   The default of 30 lies far above the values of `d` from 0.6 to 2.0 that
+#'   `tcc()` estimates for set sizes 1 to 8 in [oberauer_lin_2017]. Each extra
+#'   unit adds 50 table rows, which costs build time and memory but nothing per
+#'   gradient. A large `d` is weakly identified
 #'   when the similarity is broad, because the probability of reporting the
 #'   target then grows slowly with `d`.
 #'
@@ -158,7 +159,8 @@
 #' @param n_options The number of response options on the wheel, an even
 #'   number: 360 for a colour wheel in 1-degree steps, 180 for orientation.
 #' @param units Either `"radians"` or `"bins"`, see `resp_error`.
-#' @param d_max The upper end of the `d` grid of the likelihood table.
+#' @param d_max The upper end of the `d` grid of the likelihood table; draws
+#'   of `d` beyond it are reported after the fit.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -169,7 +171,7 @@
 #' dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 #' fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
 tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "bins"),
-                d_max = 12, ...) {
+                d_max = 30, ...) {
   call <- match.call()
   stop_missing_args()
   units <- match.arg(units)
@@ -333,6 +335,55 @@ configure_model.tcc <- function(model, data, formula) {
 .tcc_table <- function(similarity, grid) {
   d_values <- grid$lo + (seq_len(grid$rows) - 2) * grid$step
   t(vapply(d_values, .tcc_logp, numeric(length(similarity)), similarity = similarity))
+}
+
+############################################################################# !
+# POSTPROCESS: DRAWS BEYOND THE TABLE                                    ####
+############################################################################# !
+
+# Past the end of a table the likelihood is a straight line, so a posterior
+# that reaches it can run away: a true d of 11.5 came out at 236 with d_max = 12
+# and at 13.2 [11.8, 14.7] with d_max = 30 (#566)
+#' @export
+postprocess_brm.tcc <- function(model, fit, ...) {
+  fit <- NextMethod("postprocess_brm")
+  # a stanfit can carry sampler settings and no parameter draws (the stub
+  # fits of the update() tests)
+  if (has_draws(fit) && length(fit$fit@sim$samples) && length(fit$fit@sim$samples[[1]])) {
+    .tcc_check_grid(model, brms::prepare_predictions(fit))
+  }
+  fit
+}
+
+.tcc_check_grid <- function(model, prep) {
+  d_max <- model$other_vars$d_max
+  .tcc_warn_beyond_grid(.tcc_dpar_extremes(prep, "d"), .tcc_grid(model)$lo, d_max, "d",
+                        glue("Refit with d_max = {2 * d_max}."))
+}
+
+# The smallest and largest value of a parameter over the observations, per
+# draw, read in blocks that keep the draws x observations matrices small
+.tcc_dpar_extremes <- function(prep, dpar) {
+  lo <- rep(Inf, prep$ndraws)
+  hi <- rep(-Inf, prep$ndraws)
+  for (idx in split(seq_len(prep$nobs), ceiling(seq_len(prep$nobs) / 1000))) {
+    values <- matrix(brms::get_dpar(prep, dpar, i = idx), nrow = prep$ndraws)
+    lo <- pmin(lo, matrixStats::rowMins(values))
+    hi <- pmax(hi, matrixStats::rowMaxs(values))
+  }
+  nlist(lo, hi)
+}
+
+.tcc_warn_beyond_grid <- function(extremes, lower, upper, name, remedy) {
+  beyond <- extremes$lo < lower | extremes$hi > upper
+  warnif(
+    any(beyond),
+    "In {sum(beyond)} of {length(beyond)} posterior draws, {name} passes the range \\
+    from {signif(lower, 3)} to {signif(upper, 3)} that the likelihood table covers. \\
+    Beyond it the table is extended in a straight line, which keeps the sampler \\
+    moving but is not the model, so the posterior can run far past the table and \\
+    its estimates mean nothing. {remedy}"
+  )
 }
 
 ############################################################################# !
