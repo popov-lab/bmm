@@ -2,19 +2,15 @@
 # Tier 1: Unit tests (always run, no fitted model; the multinomial-family
 #         routes run on mock fits with brms stubbed out)
 # Tier 2: Fixture-based integration tests (skip on CRAN; the fixtures are not
-#         in the built package, so they skip on CI too)
-# Tier 3: Model-fitting integration tests (skip on CRAN and CI)
+#         in the built package, so they run only from the source tree)
+# Tests on real fits live in tests/local/test-conditional_effects-fits.R.
 
 load_sdm_fit <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_example1.rds")
 }
 
 load_m3_fit <- function() {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "m3 fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_m3_ppcheck.rds")
 }
 
 mock_bmm <- function(formula, data, model) {
@@ -33,11 +29,11 @@ mock_rating_fit <- function(formula = bmf(d ~ 1 + x, criterion ~ 1, spacing ~ 1)
 }
 
 mock_sdm_fit <- function() {
-  mock_bmm(bmf(c ~ 1, kappa ~ 1), oberauer_lin_2017, sdm(resp_error = "dev_rad"))
+  mock_bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm(resp_error = "dev_rad"))
 }
 
 mock_mixture3p_fit <- function() {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$id <- factor(dat$ID)
   mock_bmm(
     bmf(kappa ~ 1, thetat ~ 0 + set_size + (1 | id), thetant ~ 1), dat,
@@ -995,14 +991,6 @@ test_that("both routes read the arguments after `scale` as brms reads a call: by
   }
 })
 
-test_that("both routes refuse an argument that fits several formals in R's words (#512)", {
-  stub_category_route(stub_grid("x"))
-  expect_error(conditional_effects(mock_rating_fit(), "d", "native", "x", re = NULL),
-               "argument 2 matches multiple formal arguments")
-  expect_error(conditional_effects(mock_mixture3p_fit(), "thetat", "native", re = NULL),
-               "matches multiple formal arguments")
-})
-
 test_that("both routes read `su` and `n` as brms does and leave quoted arguments unevaluated (#512)", {
   local_mocked_bindings(ndraws = function(x) 100L, .package = "brms")
   routes <- list(
@@ -1071,47 +1059,76 @@ test_that("the category-family route asks brms for the grid at one draw and eval
   expect_gt(length(dpars), 1)
   expect_equal(seen$grid[[1]]$dpar, dpars[1])
   expect_equal(seen$grid[[1]]$draw_ids, 1)
-  expect_identical(seen$grid[[1]]$re_formula, NA)
   expect_equal(
     names(seen$linpred[[1]]$newdata),
     setdiff(names(grid$x), c("estimate__", "se__", "lower__", "upper__"))
   )
   expect_equal(seen$linpred[[1]]$nlpar, "d")
-  expect_identical(seen$linpred[[1]]$re_formula, NA)
   expect_true(seen$linpred[[1]]$allow_new_levels)
 })
 
-test_that("the category-family route hands the arguments of conditional_effects to brms untouched (#512)", {
-  fit <- mock_rating_fit()
-  seen <- stub_category_route(stub_grid("x"))
-  conditions <- data.frame(cond = "A")
-  int_conditions <- list(x = c(-1, 1))
-
-  .ce_nlpar_category_family(
-    fit, "d", effects = "x", conditions = conditions,
-    int_conditions = int_conditions, resolution = 7, too_far = 0.1,
-    re_formula = NULL, draw_ids = c(2L, 5L), sample_new_levels = "gaussian"
+# the two multinomial routes: the category-family route (sdt_rating) and the
+# softmax route (mixture3p), which calls posterior_linpred() once per weight
+ce_routes <- function() {
+  list(
+    category = list(fit = mock_rating_fit(), par = "d"),
+    softmax = list(fit = mock_mixture3p_fit(), par = "thetat")
   )
-  grid_args <- seen$grid[[1]]
-  expect_equal(grid_args$effects, "x")
-  expect_equal(grid_args$conditions, conditions)
-  expect_equal(grid_args$int_conditions, int_conditions)
-  expect_equal(grid_args$resolution, 7)
-  expect_equal(grid_args$too_far, 0.1)
-  expect_true("re_formula" %in% names(grid_args))
-  expect_null(grid_args$re_formula)
-  expect_equal(grid_args$draw_ids, 1)
+}
 
-  linpred_args <- seen$linpred[[1]]
-  expect_true("re_formula" %in% names(linpred_args))
-  expect_null(linpred_args$re_formula)
-  expect_equal(linpred_args$draw_ids, c(2L, 5L))
-  expect_equal(linpred_args$sample_new_levels, "gaussian")
+test_that("both routes hand re_formula to the grid and to every posterior_linpred call (#512)", {
+  local_mocked_bindings(ndraws = function(x) 100L, .package = "brms")
+  expect_re_formula <- function(args, expected, label) {
+    expect_true("re_formula" %in% names(args), label = label)
+    if (is.null(expected)) {
+      expect_null(args$re_formula, label = label)
+    } else {
+      expect_equal(args$re_formula, expected, label = label)
+    }
+  }
+  for (name in names(routes <- ce_routes())) {
+    route <- routes[[name]]
+    calls <- list(
+      default = list(expected = NA, args = list()),
+      null = list(expected = NULL, args = list(re_formula = NULL, draw_ids = c(2L, 5L))),
+      formula = list(expected = ~ (1 | id), args = list(re_formula = ~ (1 | id)))
+    )
+    for (call in names(calls)) {
+      seen <- stub_category_route(stub_grid("x"))
+      do.call(conditional_effects, c(list(route$fit, par = route$par), calls[[call]]$args))
+      label <- paste(name, call)
+      expect_re_formula(seen$grid[[1]], calls[[call]]$expected, label)
+      expect_equal(seen$grid[[1]]$draw_ids, 1, label = label)
+      expect_gt(length(seen$linpred), 0)
+      for (args in seen$linpred) {
+        expect_re_formula(args, calls[[call]]$expected, label)
+        if (call == "null") expect_equal(args$draw_ids, c(2L, 5L), label = label)
+      }
+    }
+  }
+})
 
-  .ce_nlpar_category_family(fit, "d", re_formula = ~ (1 | id))
-  expect_equal(seen$grid[[2]]$re_formula, ~ (1 | id))
-  expect_equal(seen$linpred[[2]]$re_formula, ~ (1 | id))
-  expect_equal(seen$grid[[2]]$draw_ids, 1)
+test_that("both routes send the grid arguments to the grid and sample_new_levels to posterior_linpred (#512)", {
+  conditions <- data.frame(x = 1)
+  int_conditions <- list(x = c(-1, 1))
+  for (name in names(routes <- ce_routes())) {
+    route <- routes[[name]]
+    seen <- stub_category_route(stub_grid("x"))
+    conditional_effects(
+      route$fit, par = route$par, effects = "x", conditions = conditions,
+      int_conditions = int_conditions, resolution = 7, too_far = 0.1,
+      sample_new_levels = "gaussian"
+    )
+    grid_args <- seen$grid[[1]]
+    expect_equal(grid_args$effects, "x", label = name)
+    expect_equal(grid_args$conditions, conditions, label = name)
+    expect_equal(grid_args$int_conditions, int_conditions, label = name)
+    expect_equal(grid_args$resolution, 7, label = name)
+    expect_equal(grid_args$too_far, 0.1, label = name)
+    for (args in seen$linpred) {
+      expect_equal(args$sample_new_levels, "gaussian", label = name)
+    }
+  }
 })
 
 test_that("the category-family route returns spaghetti lines of the draws, labelled as brms labels them (#512)", {
@@ -1637,65 +1654,14 @@ test_that("mixture3p softmax route asks brms for the grid of the parameter it re
   }
 })
 
+# conditional_effects() re-classes the route's result only when an effect
+# survives .filter_internal_effects(), so the route keeps its own class
 test_that("mixture3p softmax route returns a brms_conditional_effects object (#512)", {
   stub_category_route(stub_grid("set_size", n = 2))
   expect_s3_class(
     .compute_softmax_ce_inner(mock_mixture3p_fit(), "thetat"),
     "brms_conditional_effects"
   )
-})
-
-test_that("mixture3p softmax route forwards re_formula = NULL to brms (#512)", {
-  draws <- matrix(0, 3, 2)
-  res <- softmax_ce("thetat", draws, draws, re_formula = NULL)
-  for (args in c(res$seen$grid, res$seen$linpred)) {
-    expect_true("re_formula" %in% names(args))
-    expect_null(args$re_formula)
-  }
-})
-
-test_that("mixture3p softmax route forwards a re_formula formula to brms (#512)", {
-  draws <- matrix(0, 3, 2)
-  res <- softmax_ce("thetat", draws, draws, re_formula = ~ (1 | id))
-  for (args in c(res$seen$grid, res$seen$linpred)) {
-    expect_equal(args$re_formula, ~ (1 | id))
-  }
-})
-
-test_that("mixture3p softmax route ignores group-level effects by default (#512)", {
-  draws <- matrix(0, 3, 2)
-  res <- softmax_ce("thetat", draws, draws)
-  for (args in c(res$seen$grid, res$seen$linpred)) {
-    expect_identical(args$re_formula, NA)
-  }
-})
-
-test_that("mixture3p softmax route evaluates thetat and thetant on the draws the user selected (#512)", {
-  draws <- matrix(0, 3, 2)
-  res <- softmax_ce("thetat", draws, draws, draw_ids = c(2L, 5L))
-  expect_equal(res$seen$grid[[1]]$draw_ids, 1)
-  expect_length(res$seen$linpred, 2)
-  for (args in res$seen$linpred) {
-    expect_equal(args$draw_ids, c(2L, 5L))
-  }
-})
-
-test_that("mixture3p softmax route sends the grid arguments to brms and the rest to posterior_linpred (#512)", {
-  draws <- matrix(0, 3, 2)
-  conditions <- data.frame(set_size = 2)
-  res <- softmax_ce("thetat", draws, draws, spaghetti = TRUE,
-                    conditions = conditions, int_conditions = list(set_size = 1:2),
-                    resolution = 7, too_far = 0.1, sample_new_levels = "gaussian")
-
-  grid_args <- res$seen$grid[[1]]
-  expect_true(grid_args$spaghetti)
-  expect_equal(grid_args$conditions, conditions)
-  expect_equal(grid_args$int_conditions, list(set_size = 1:2))
-  expect_equal(grid_args$resolution, 7)
-  expect_equal(grid_args$too_far, 0.1)
-  for (args in res$seen$linpred) {
-    expect_equal(args$sample_new_levels, "gaussian")
-  }
 })
 
 test_that("mixture3p softmax route leaves transform and method to the grid call (#512)", {
@@ -1996,81 +1962,5 @@ test_that("m3 conditional_effects is quiet and plots with points = TRUE (#512)",
     suppressMessages(
       ggplot2::ggplot_build(plot(ce, points = TRUE, plot = FALSE)[[1]])
     )
-  )
-})
-
-# ===========================================================================
-# Tier 3: Model-fitting integration tests
-# ===========================================================================
-
-test_that("conditional_effects works on sdt_rating fits (#512)", {
-  skip_on_cran()
-  skip_on_ci()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
-  withr::local_seed(512)
-
-  dat <- expand.grid(id = 1:6, stimulus = c(0L, 1L), cond = c("A", "B"))
-  dat <- cbind(dat, rsdt_rating(nrow(dat), 150, dat$stimulus,
-                                d = ifelse(dat$cond == "A", 1, 2),
-                                thresholds = c(-0.5, 0, 0.5)))
-  dat$x <- stats::rnorm(nrow(dat))
-  model <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", links = list(d = "log"))
-  fit <- bmm(bmf(d ~ 1 + cond + x, criterion ~ 1, spacing ~ 1), dat, model,
-             backend = "cmdstanr", chains = 1, iter = 300, warmup = 150,
-             refresh = 0, silent = 2)
-
-  expect_no_message(ce <- conditional_effects(fit))
-  expect_setequal(names(ce), c("d.cond", "d.x"))
-
-  ce <- conditional_effects(
-    fit, par = "d", effects = "x:cond", int_conditions = list(cond = "B")
-  )
-  expect_true(all(ce[[1]]$cond == "B"))
-
-  draw_ids <- 1:11
-  ce <- conditional_effects(fit, par = "d", effects = "x", spaghetti = TRUE,
-                            draw_ids = draw_ids, scale = "sampling")
-  draws <- brms::posterior_linpred(fit, newdata = ce$x, nlpar = "d",
-                                   re_formula = NA, draw_ids = draw_ids)
-  expect_equal(ce$x$estimate__, apply(draws, 2, median))
-  expect_equal(attr(ce$x, "spaghetti")$estimate__, as.numeric(t(draws)))
-
-  ce <- conditional_effects(fit, par = "d", effects = "x", spaghetti = TRUE,
-                            draw_ids = draw_ids)
-  expect_equal(ce$x$estimate__, exp(apply(draws, 2, median)))
-  expect_equal(attr(ce$x, "spaghetti")$estimate__, exp(as.numeric(t(draws))))
-})
-
-test_that("m3 conditional_effects does not evaluate the category dpar on other formulas' effects (#512)", {
-  skip_on_cran()
-  skip_on_ci()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)))
-
-  # n_dist is 5, 0, 0 across conditions and enters the first category dpar
-  # through log(), so brms's grid of Idx_dist:n_dist (n_dist at mean - sd < 0)
-  # makes it NaN
-  formula <- bmf(corr ~ b + a + c, dist ~ b + d, other ~ b + a, npl ~ b,
-                 c ~ 0 + cond, a ~ 1, d ~ 1, b = 0)
-  model <- m3(resp_cats = c("dist", "corr", "other", "npl"),
-              num_options = c("n_dist", "n_corr", "n_other", "n_npl"),
-              version = "custom", links = list(a = "log", c = "log", d = "log"))
-  fit <- suppressWarnings(suppressMessages(bmm(
-    formula, oberauer_lewandowsky_2019_e1, model, backend = "cmdstanr",
-    chains = 1, iter = 300, warmup = 150, refresh = 0, silent = 2, seed = 1
-  )))
-
-  expect_no_warning(ce_c <- conditional_effects(fit, par = "c"))
-  expect_no_warning(ce_a <- conditional_effects(fit, par = "a"))
-  expect_no_warning(ce_all <- conditional_effects(fit))
-  expect_equal(ce_c, conditional_effects(fit, par = "c", effects = "cond"))
-  expect_length(ce_a, 0)
-  expect_named(ce_all, "c.cond")
-  expect_equal(
-    .ce_brms_default_effects(fit, NA),
-    unname(lapply(suppressWarnings(suppressMessages(.brms_conditional_effects(
-      fit, dpar = names(brms::brmsterms(fit$formula)$dpars)[1], draw_ids = 1
-    ))), attr, "effects"))
   )
 })

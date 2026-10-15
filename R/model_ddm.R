@@ -94,7 +94,7 @@
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # Simulate data for one subject using rddm
 #' set.seed(123)
 #' n_trials <- 500

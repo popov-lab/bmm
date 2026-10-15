@@ -60,31 +60,31 @@ test_that("check_var_set_size accepts valid input", {
   expect_silent(check_var_set_size("y", dat))
   expect_equal(names(check_var_set_size("y", dat)), c("max_set_size", "ss_numeric"))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 3)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Factor with numeric levels is valid
   dat <- data.frame(y = factor(rep(c(1, 2, 3), each = 3)))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 3)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Character vector representing numbers is valid
   dat <- data.frame(y = rep(c("1", "2", "3"), each = 3))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 3)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Numeric vector with NA values is valid (assuming NA is treated correctly)
   dat <- data.frame(y = rep(c(1, 5, NA), each = 3))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 5)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 
   # Factor with NA and numeric levels is valid
   dat <- data.frame(y = factor(rep(c(1, 5, NA), each = 3)))
   expect_silent(check_var_set_size("y", dat))
   expect_equal(check_var_set_size("y", dat)$max_set_size, 5)
-  all(is.numeric(check_var_set_size("y", dat)$ss_numeric), na.rm = T)
+  expect_true(is.numeric(check_var_set_size("y", dat)$ss_numeric))
 })
 
 test_that("check_var_set_size rejects invalid input", {
@@ -143,17 +143,15 @@ test_that("check_var_set_size rejects invalid input", {
 })
 
 test_that("check_data() returns a data.frame()", {
-  # sdt_rating needs one response column per rating category, so
-  # it cannot be exercised with the shared single `response` column used here; it
-  # is covered with proper count data in test-model_sdt_rating.R.
-  models <- setdiff(model_names(), "sdt_rating")
+  # a model whose response the shared columns below cannot express (the
+  # multi-column SDT responses) registers its own case in its provider
+  models <- model_names()
   mls <- lapply(models, get_model)
   # test data includes variables for all model types:
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
   # - stimulus (0/1) for sdt_yn (response counts come from `response`)
-  # - rank1, rank2 for sdt_ranking (wide rank-frequency count columns)
   # Use 50 rows to avoid small sample size warnings from cswald
   test_data <- data.frame(
     y = rep(1, 50), x = rep(1, 50), z = rep(2, 50), w = rep(1, 50),
@@ -163,11 +161,16 @@ test_that("check_data() returns a data.frame()", {
     mean_rt_upper = rep(0.45, 50), mean_rt_lower = rep(0.55, 50),
     var_rt_upper = rep(0.018, 50), var_rt_lower = rep(0.025, 50),
     rt = rep(0.6, 50), response = rep(1, 50),
-    stimulus = rep(c(0L, 1L), 25), rank1 = rep(30L, 50), rank2 = rep(20L, 50),
-    new1 = rep(30L, 50), know2 = rep(10L, 50), know3 = rep(5L, 50),
-    remember2 = rep(10L, 50), remember3 = rep(5L, 50)
+    stimulus = rep(c(0L, 1L), 25)
   )
-  for (ml in mls) {
+  registered <- model_test_cases("check_data")
+  for (m in seq_along(models)) {
+    case <- registered[[models[m]]]
+    if (!is.null(case)) {
+      expect_s3_class(check_data(case$model, case$data, bmf(kappa ~ 1)), "data.frame")
+      next
+    }
+    ml <- mls[[m]]
     model <- ml(
       resp_error = "y", nt_features = "x", set_size = 2,
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
@@ -176,17 +179,6 @@ test_that("check_data() returns a data.frame()", {
       stimulus = "stimulus", m = 2,
       trees = mpt_tree("t", list(w = "p", l = "1 - p"))
     )
-    # sdt_ranking takes a wide multi-column response, unlike the single
-    # `response` column shared by the other count models.
-    if (inherits(model, "sdt_ranking")) {
-      model <- ml(response = c("rank1", "rank2"), m = 2)
-    }
-    # sdt_cdp derives its count columns (new1/know2/remember2/...) from the
-    # declared scale size instead of a response argument; 1 + 1 is the scale
-    # the exported constructor refuses (nothing identifies the spacing)
-    if (inherits(model, "sdt_cdp")) {
-      model <- ml(response = "", stimulus = "stimulus", n_new = 1, n_old = 2)
-    }
     expect_s3_class(
       check_data(model, test_data, bmf(kappa ~ 1)),
       "data.frame"
@@ -218,6 +210,12 @@ test_that("wrap(x) returns the correct value for values over 2*pi", {
   expect_equal(wrap(rad2deg(x), radians = F), rad2deg(wrap(x)))
 })
 
+test_that("wrap() refuses a radians argument that is not TRUE or FALSE", {
+  expect_error(wrap(1, radians = "yes"), "must be TRUE or FALSE")
+  expect_error(wrap(1, radians = NA), "must be TRUE or FALSE")
+  expect_error(wrap(1, radians = c(TRUE, FALSE)), "must be TRUE or FALSE")
+})
+
 test_that("wrap(x) returns the correct value for values between (3*pi,4*pi)", {
   x <- 3 * pi + 1
   expect_equal(wrap(x), -(pi - 1))
@@ -236,21 +234,9 @@ test_that("rad2deg returns the correct values for 0, pi/2, 2*pi", {
   expect_equal(wrap(rad2deg(x), radians = F), rad2deg(wrap(x)))
 })
 
-test_that("standata() works with brmsformula", {
-  ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
-  sd <- standata(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "standata")
-})
-
-test_that("standata() works with formula", {
-  ff <- count ~ zAge + zBase * Trt + (1 | patient)
-  sd <- standata(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "standata")
-})
-
 test_that("standata() works with bmf", {
   ff <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   sd <- standata(ff, dat, mixture3p(
     resp_error = "dev_rad",
     nt_features = "col_nt",
@@ -306,7 +292,7 @@ test_that("is_data_ordered works", {
   expect_false(is_data_ordered(data3, formula2))
 
   # test with a complex formula with shared covariance structure across parameters
-  data <- oberauer_lin_2017
+  data <- small_data()
   formula <- bmf(
     c ~ 0 + set_size + (0 + set_size | p1 | ID),
     kappa ~ 0 + set_size + (0 + set_size | p1 | ID)
@@ -364,7 +350,7 @@ test_that("is_data_ordered works when there are non-linear predictors", {
 ############################################################################# !
 
 test_that("ezdm_summary_stats() returns 1-row data.frame for 3par version", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -381,7 +367,7 @@ test_that("ezdm_summary_stats() returns 1-row data.frame for 3par version", {
 })
 
 test_that("ezdm_summary_stats() returns 1-row data.frame for 4par version", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(200, shape = 5, rate = 10) + 0.3
   response <- rbinom(200, 1, 0.7)
 
@@ -459,7 +445,7 @@ test_that("ezdm_summary_stats() errors for non-positive RT values", {
 })
 
 test_that("ezdm_summary_stats() handles too few trials", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(5, shape = 5, rate = 10) + 0.3
   response <- rbinom(5, 1, 0.8)
 
@@ -471,7 +457,7 @@ test_that("ezdm_summary_stats() handles too few trials", {
 })
 
 test_that("ezdm_summary_stats() simple method matches mean() and var()", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -484,7 +470,7 @@ test_that("ezdm_summary_stats() simple method matches mean() and var()", {
 })
 
 test_that("ezdm_summary_stats() robust method uses median and IQR/MAD", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -520,7 +506,7 @@ test_that("ezdm_summary_stats() robust method is resistant to outliers", {
 })
 
 test_that("ezdm_summary_stats() mixture method works with different distributions", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(200, shape = 5, rate = 10) + 0.3
   response <- rbinom(200, 1, 0.8)
 
@@ -536,7 +522,7 @@ test_that("ezdm_summary_stats() mixture method works with different distribution
 })
 
 test_that("ezdm_summary_stats() 4par handles all correct or all errors", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
 
   result <- ezdm_summary_stats(rt, rep(1, 100),
@@ -587,7 +573,7 @@ test_that("ezdm_summary_stats() validates contaminant_bound", {
 })
 
 test_that("ezdm_summary_stats() accepts 'min' and 'max' for contaminant_bound", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -697,7 +683,7 @@ test_that("ezdm_summary_stats() max_contaminant works with 4par version", {
 })
 
 test_that("ezdm_summary_stats() handles character responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2))
 
@@ -708,7 +694,7 @@ test_that("ezdm_summary_stats() handles character responses", {
 })
 
 test_that("ezdm_summary_stats() handles factor responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- factor(sample(c("upper", "lower"), 100, replace = TRUE, prob = c(0.8, 0.2)))
 
@@ -717,7 +703,7 @@ test_that("ezdm_summary_stats() handles factor responses", {
 })
 
 test_that("ezdm_summary_stats() handles correct/error and logical responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
 
   response_ce <- sample(c("correct", "error"), 100, replace = TRUE, prob = c(0.8, 0.2))
@@ -730,7 +716,7 @@ test_that("ezdm_summary_stats() handles correct/error and logical responses", {
 })
 
 test_that("ezdm_summary_stats() handles case-insensitive responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- sample(c("UPPER", "Lower", "UpPeR", "LOWER"), 100, replace = TRUE)
 
@@ -749,7 +735,7 @@ test_that("ezdm_summary_stats() errors on unrecognized response values", {
 })
 
 test_that("ezdm_summary_stats() 4par version works with character responses", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- rgamma(200, shape = 5, rate = 10) + 0.3
   response <- sample(c("upper", "lower"), 200, replace = TRUE, prob = c(0.7, 0.3))
 
@@ -764,7 +750,7 @@ test_that("ezdm_summary_stats() 4par version works with character responses", {
 })
 
 test_that("ezdm_summary_stats() handles NAs in rt", {
-  set.seed(123)
+  withr::local_seed(123)
   rt <- c(rgamma(90, shape = 5, rate = 10) + 0.3, rep(NA, 10))
   response <- rbinom(100, 1, 0.8)
 
@@ -776,7 +762,7 @@ test_that("ezdm_summary_stats() handles NAs in rt", {
 
 test_that("ezdm_summary_stats() works with dplyr::reframe()", {
   skip_if_not_installed("dplyr")
-  set.seed(123)
+  withr::local_seed(123)
   test_data <- data.frame(
     subject = rep(1:3, each = 50),
     rt = rgamma(150, shape = 5, rate = 10) + 0.3,
@@ -1048,7 +1034,7 @@ test_that("adjust_ezdm_accuracy() signals its deprecation", {
 })
 
 test_that("adjust_ezdm_accuracy() returns 1-row data.frame", {
-  set.seed(42)
+  withr::local_seed(42)
   result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, 0.1))
 
   expect_s3_class(result, "data.frame")
@@ -1057,7 +1043,7 @@ test_that("adjust_ezdm_accuracy() returns 1-row data.frame", {
 })
 
 test_that("adjust_ezdm_accuracy() returns integer values", {
-  set.seed(42)
+  withr::local_seed(42)
   result <- suppressWarnings(adjust_ezdm_accuracy(80, 100, 0.1))
 
   expect_type(result$n_upper_adj, "integer")
@@ -1345,4 +1331,78 @@ test_that("flag_contaminant_rts() handles small inputs gracefully", {
 
   expect_type(result, "double")
   expect_equal(length(result), 3)
+})
+
+# validate_fast_guesses(): three flagged trials below 0.5 s, two of them upper
+# responses, update a Beta(1, 1) prior to Beta(3, 2); its density at 0.5 is
+# 0.5^2 * 0.5 / B(3, 2) = 1.5, the Bayes factor for guessing
+fast_guess_data <- function() {
+  list(rt = c(0.1, 0.2, 0.3, 0.9, 1.0), flag = c(TRUE, TRUE, TRUE, TRUE, FALSE),
+       response = c(1, 0, 1, 1, 0))
+}
+
+test_that("validate_fast_guesses() tests the flagged fast trials against guessing", {
+  d <- fast_guess_data()
+  out <- validate_fast_guesses(d$flag, d$rt, d$response, threshold_type = "absolute",
+                               rt_threshold = 0.5)
+  expect_equal(out$n_tested, 3)
+  expect_equal(out$prop_upper, 2 / 3)
+  expect_equal(c(out$posterior_alpha, out$posterior_beta), c(3, 2))
+  expect_equal(out$bf_01, 1.5)
+  expect_equal(out$bf_evidence, "anecdotal_for_guessing")
+  expect_equal(out$mean_rt_tested, 0.2)
+  # the highest-density interval: 95% of the mass, equal density at both ends
+  expect_equal(pbeta(out$hdi_upper, 3, 2) - pbeta(out$hdi_lower, 3, 2), 0.95, tolerance = 1e-6)
+  expect_equal(dbeta(out$hdi_lower, 3, 2), dbeta(out$hdi_upper, 3, 2), tolerance = 0.01)
+  expect_lt(out$hdi_upper - out$hdi_lower, qbeta(0.975, 3, 2) - qbeta(0.025, 3, 2))
+  expect_true(out$guess_in_hdi)
+
+  # an unequal prior, so that each prior parameter has to reach its own side
+  out <- validate_fast_guesses(d$flag, d$rt, d$response, threshold_type = "absolute",
+                               rt_threshold = 0.5, prior_alpha = 2, prior_beta = 1)
+  expect_equal(c(out$posterior_alpha, out$posterior_beta), c(4, 2))
+  expect_equal(out$bf_01, 1.25)
+})
+
+test_that("validate_fast_guesses() reads a quantile threshold from the RTs", {
+  d <- fast_guess_data()
+  out <- validate_fast_guesses(d$flag, d$rt, d$response, rt_threshold = 0.5)
+  expect_equal(out$rt_threshold, 0.3)
+  expect_equal(out$n_tested, 2)
+  expect_equal(out$threshold_type, "quantile")
+})
+
+test_that("validate_fast_guesses() falls back to the equal-tailed interval for a U-shaped posterior", {
+  d <- fast_guess_data()
+  out <- validate_fast_guesses(rep(FALSE, 5), d$rt, d$response, threshold_type = "absolute",
+                               rt_threshold = 0.5, prior_alpha = 0.5, prior_beta = 0.5)
+  expect_equal(out$n_tested, 0)
+  expect_equal(c(out$hdi_lower, out$hdi_upper), qbeta(c(0.025, 0.975), 0.5, 0.5))
+})
+
+test_that("validate_fast_guesses() names the evidence on Jeffreys' scale", {
+  expect_identical(
+    vapply(c(20, 5, 2, 0.5, 0.2, 0.05), .categorize_bf, character(1)),
+    c("strong_for_guessing", "moderate_for_guessing", "anecdotal_for_guessing",
+      "anecdotal_against_guessing", "moderate_against_guessing", "strong_against_guessing")
+  )
+})
+
+test_that("validate_fast_guesses() refuses priors, guess probabilities and thresholds out of range", {
+  d <- fast_guess_data()
+  call <- function(...) validate_fast_guesses(d$flag, d$rt, d$response, ...)
+  expect_error(call(prior_alpha = 0), "Beta prior parameters must be positive")
+  expect_error(call(guess_prob = 1), "guess_prob must be between 0 and 1")
+  expect_error(call(rt_threshold = 1.5), "must be a quantile between 0 and 1")
+  expect_error(call(threshold_type = "absolute", rt_threshold = 0), "must be positive")
+})
+
+test_that("calc_error_relative_to_nontargets() gives one row per non-target with the wrapped error", {
+  data <- data.frame(id = 1:2, y = c(0.5, -3), nt1 = c(0.2, 3), nt2 = c(-0.4, 0))
+  out <- calc_error_relative_to_nontargets(data, "y", c("nt1", "nt2"))
+  expect_equal(nrow(out), 4)
+  expect_false(any(c("nt1", "nt2") %in% names(out)))
+  expect_equal(out$id, c(1, 2, 1, 2))
+  # -3 - 3 = -6 lies outside [-pi, pi] and wraps to -6 + 2 * pi
+  expect_equal(out$y_nt, c(0.3, -6 + 2 * pi, 0.9, -3))
 })

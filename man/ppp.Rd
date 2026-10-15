@@ -120,7 +120,7 @@ of both statistics. A cell with a single possible category, such as an
 number of trials fixes its count.
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 trees <- list(
   mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
   mpt_tree("lure", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))

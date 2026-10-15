@@ -1,4 +1,4 @@
-dat <- oberauer_lin_2017
+dat <- small_data()
 model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
 
 test_that("mixture3p works when set_size is not predicted and there is set_size 1", {
