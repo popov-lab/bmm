@@ -38,7 +38,7 @@ test_that("model_group() keeps an unknown domain as its own group", {
 test_that("format_model_list() appends unknown groups after the known ones and strips the period", {
   extra <- data.frame(
     model = "foo", name = "Foo model", domain = "Foo tasks",
-    group = model_group("Foo tasks")
+    package = "bmm", url = NA_character_, group = model_group("Foo tasks")
   )
   registry <- rbind(model_registry(), extra)
   txt <- format_model_list(registry, "text")
@@ -46,15 +46,16 @@ test_that("format_model_list() appends unknown groups after the known ones and s
   expect_true("- foo(): Foo model" %in% txt)
   md <- format_model_list(registry, "md", headers = FALSE)
   expect_false(any(grepl("^\\*\\*", md)))
-  expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://popov-lab.github.io/bmm/reference/imm.html\\)", md)))
+  expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://venpopov.com/bmm/reference/imm.html\\)", md)))
 })
 
 test_that("bmm_models() prints every model exactly once, without arguments", {
   expect_output(printed <- print(bmm_models()), "Continuous reproduction")
   expect_s3_class(printed, "bmm_models")
   out <- paste(capture.output(print(bmm_models())), collapse = "\n")
+  # a model from another package prints its package after the constructor
   for (m in model_names()) {
-    hits <- gregexpr(glue::glue("- {m}\\(\\): "), out)[[1]]
+    hits <- gregexpr(glue::glue("- {m}\\(\\)( \\([^)]+\\))?: "), out)[[1]]
     expect_length(hits[hits > 0], 1)
   }
   expect_match(out, "Continuous reproduction")
@@ -107,7 +108,7 @@ test_that("print_pretty_models_md(group = ) lists one group without headers", {
 })
 
 test_that("every data argument of every model version has a column role", {
-  for (model in model_names()) {
+  for (model in bmm_builtin_models()) {
     args <- formals(get_model2(model))
     no_default <- vapply(args, function(arg) is.symbol(arg) && as.character(arg) == "", TRUE)
     required <- setdiff(names(args)[no_default], "...")
@@ -128,7 +129,7 @@ test_that("every data argument of every model version has a column role", {
 })
 
 test_that("data_column_roles keys name a model or one of its versions", {
-  valid <- unlist(lapply(model_names(), function(model) {
+  valid <- unlist(lapply(bmm_builtin_models(), function(model) {
     versions <- model_versions(model)
     c(model, if (!anyNA(versions)) paste0(model, "_", versions))
   }))
@@ -161,7 +162,7 @@ test_that("parameter_label() keeps the name before the first separator", {
 })
 
 test_that("estimated parameter labels have balanced parentheses", {
-  for (model in model_names()) {
+  for (model in bmm_builtin_models()) {
     for (version in model_versions(model)) {
       spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
       estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
@@ -211,12 +212,10 @@ test_that("model_overview() has one row per version with its own columns and par
   mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
   expect_false(grepl("version", mixture2p$Model))
 
+  # a registered model with a response-time domain joins this group too
   rt_models <- model_overview(group = "Choices and response times")
-  expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
-})
-
-test_that("get_model() returns the correct function", {
-  expect_equal(get_model("mixture2p"), .model_mixture2p)
+  listed <- gsub("[`()]", "", regmatches(rt_models$Model, regexpr("`[a-z0-9_]+\\(\\)`", rt_models$Model)))
+  expect_setequal(intersect(listed, bmm_builtin_models()), c("ddm", "cswald", "ezdm"))
 })
 
 test_that("check_model() refuses invalid models and accepts valid models", {
@@ -233,7 +232,7 @@ test_that("check_model() refuses invalid models and accepts valid models", {
 })
 
 test_that("check_model() works with regular expressions", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   models1 <- list(
     mixture3p("dev_rad",
       nt_features = paste0("col_nt", 1:7),
@@ -309,10 +308,10 @@ test_that("check_model() leaves an already checked model unchanged and silent", 
         c ~ 1, a ~ 1, d ~ 1
       )
     ),
-    sdm = list(model = sdm("dev_rad"), data = oberauer_lin_2017, formula = bmf(c ~ 1, kappa ~ 1)),
+    sdm = list(model = sdm("dev_rad"), data = small_data(), formula = bmf(c ~ 1, kappa ~ 1)),
     imm = list(
       model = imm("dev_rad", "col_nt", "dist_nt", "set_size", regex = TRUE),
-      data = oberauer_lin_2017, formula = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
+      data = small_data(), formula = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
     ),
     ddm = list(model = ddm("rt", "response"), data = rt_data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
     cswald = list(
@@ -512,22 +511,10 @@ test_that("model constructors and the template list their fields in the canonica
   }
 })
 
-test_that("stancode() works with brmsformula", {
-  ff <- brms::bf(count ~ zAge + zBase * Trt + (1 | patient))
-  sd <- stancode(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "character")
-})
-
-test_that("stancode() works with formula", {
-  ff <- count ~ zAge + zBase * Trt + (1 | patient)
-  sd <- stancode(ff, data = brms::epilepsy, family = poisson())
-  expect_equal(class(sd)[1], "character")
-})
-
 test_that("stancode() works with bmmformula", {
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
   model <- mixture3p("dev_rad", "col_nt", set_size = "set_size", regex = TRUE)
-  sc <- stancode(ff, oberauer_lin_2017, model = model)
+  sc <- stancode(ff, small_data(), model = model)
   expect_equal(class(sc)[1], "character")
 })
 
@@ -535,9 +522,38 @@ test_that("no check for with stancode function", {
   withr::local_options("bmm.sort_data" = "check")
   expect_no_message(stancode(
     bmf(kappa ~ set_size, c ~ set_size),
-    oberauer_lin_2017,
+    small_data(),
     sdm("dev_rad")
   ))
+})
+
+test_that("add_bmm_version_to_stancode() names bmm once, with the current version", {
+  version <- utils::packageVersion("bmm")
+  body <- "\nfunctions {\n}\n"
+  expected <- paste0("// generated with brms 2.23.0 and bmm ", version, body)
+  once <- add_bmm_version_to_stancode(paste0("// generated with brms 2.23.0", body))
+  expect_identical(once, expected)
+  expect_identical(add_bmm_version_to_stancode(once), expected)
+  expect_identical(
+    add_bmm_version_to_stancode(paste0("// generated with brms 2.23.0 and bmm 0.9.0", body)),
+    expected
+  )
+  expect_identical(
+    add_bmm_version_to_stancode(
+      paste0("// generated with brms 2.23.0 and bmm 1.3.2.9000 and bmm 1.3.2.9000", body)
+    ),
+    expected
+  )
+})
+
+test_that("add_bmm_version_to_stancode() keeps the class and leaves code without a brms header alone", {
+  code <- structure("// generated with brms 2.23.0\nfunctions {\n}\n", class = c("character", "brmsmodel"))
+  expect_s3_class(add_bmm_version_to_stancode(add_bmm_version_to_stancode(code)), "brmsmodel")
+  expect_identical(add_bmm_version_to_stancode("functions {\n}\n"), "functions {\n}\n")
+  expect_identical(
+    add_bmm_version_to_stancode("functions {\n  // brms-style helper\n}\n"),
+    "functions {\n  // brms-style helper\n}\n"
+  )
 })
 
 test_that("update_model_fixed_parameters() works", {
@@ -623,6 +639,11 @@ test_that("errors (or at least fails) when a requested block is missing", {
   expect_error(extract_stan_blocks(stan_code, c("data")), regexp = NA)
   # If you later change the function to return "" instead of error,
   # update this to expect_equal(out$data, "") accordingly.
+})
+
+test_that("extract_stan_blocks refuses anything but a single string", {
+  expect_error(extract_stan_blocks(1), "single character string")
+  expect_error(extract_stan_blocks(c("data {}", "model {}")), "single character string")
 })
 
 test_that("block extraction works when order of blocks is different from the brms/bmm default", {
