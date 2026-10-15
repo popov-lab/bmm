@@ -9,7 +9,7 @@ library(ggplot2)
 ## 1 Beyond familiarity: two process models
 
 The [confidence-rating SDT
-model](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.md) treats
+model](https://venpopov.com/bmm/dev/articles/bmm_sdt.md) treats
 recognition as a single continuous process: an item generates a sample
 of memory *strength* (or *familiarity*), and the observer maps that one
 number onto an ordered confidence scale. A persistent finding in
@@ -36,7 +36,7 @@ Both are *versions of the same rating model* — they consume identical
 data (counts per confidence category, with a 0/1 `stimulus` column) and
 reduce to the standard model when their extra parameter is switched off.
 They are selected with the `version` argument of
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md):
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md):
 
 | `version` | extra parameter(s) | captures | reduces to standard when |
 |----|----|----|----|
@@ -45,16 +45,14 @@ They are selected with the `version` argument of
 | `"metad"` | `logmratio` | metacognitive efficiency (log M-ratio) | `logmratio` = 0 |
 
 This article assumes the [core SDT
-article](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.md): the
+article](https://venpopov.com/bmm/dev/articles/bmm_sdt.md): the
 four-step fitting workflow, the standard rating model, confidence
 thresholds, and the
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) /
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md) /
+[`sdt_thresholds()`](https://venpopov.com/bmm/dev/reference/sdt_thresholds.md)
 /
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
-/
-[`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
-/
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 toolkit. We focus here on what the second process adds — and because
 both versions are plain `bmm` models, everything from that workflow
 (hierarchical formulas, priors, post-processing) carries over unchanged.
@@ -218,7 +216,7 @@ summary(fit_dp)
 ```
 
 The recollection terms are reported on the logit scale.
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)
 converts them to probabilities and prints them alongside the familiarity
 distributions:
 
@@ -331,7 +329,7 @@ ROC.
 ### 2.4 Posterior predictive checks
 
 As for the standard rating model,
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 compares the observed rating-category proportions against the posterior
 predictive distribution, faceted by `stimulus`:
 
@@ -385,7 +383,7 @@ regularizes it toward `d`, and it anchors the ideal point — perfect
 metacognition, meta-d′ = `d` — at `logmratio = 0`, which recovers the
 standard rating model. Add `logmratio` to the formula to estimate it;
 extract the M-ratio posterior with
-[`mratio()`](https://popov-lab.github.io/bmm/dev/reference/mratio.md).
+[`mratio()`](https://venpopov.com/bmm/dev/reference/mratio.md).
 
 ![Metacognitive efficiency. Both panels have the same type-1 sensitivity
 (old/new discrimination) and the same old/new criterion (solid line).
@@ -479,7 +477,7 @@ summary(fit_md)
 ```
 
 The M-ratio is the headline quantity, so `bmm` provides it directly:
-[`mratio()`](https://popov-lab.github.io/bmm/dev/reference/mratio.md)
+[`mratio()`](https://venpopov.com/bmm/dev/reference/mratio.md)
 reconstructs meta-d′ \\= \exp(\texttt{logmratio}) \times \texttt{d}\\
 from the fit and returns a posterior summary of both the M-ratio and
 meta-d′ (with the full per-draw posteriors kept in the `draws` attribute
@@ -505,12 +503,12 @@ analyses.
 
 The ROC makes the inefficiency visible. For a `metad` fit the smooth
 curve drawn by
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
-is the type-1 (`d`, `sdratio`) ROC, and the threshold points are the
-model’s confidence operating points; they lie inside the curve when the
-M-ratio is below 1, by the amount of the metacognitive inefficiency.
-Only the middle threshold, the old/new criterion, sits on the curve,
-because the type-1 rates are held to `d`.
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) is the
+type-1 (`d`, `sdratio`) ROC, and the threshold points are the model’s
+confidence operating points; they lie inside the curve when the M-ratio
+is below 1, by the amount of the metacognitive inefficiency. Only the
+middle threshold, the old/new criterion, sits on the curve, because the
+type-1 rates are held to `d`.
 
 ``` r
 
@@ -555,7 +553,7 @@ models here, meta-d′ is fit to *aggregated counts*, so the type-2
 estimate is only as informative as the number of trials per confidence
 category. Second, meta-d′ inherits the standard model’s assumptions
 about how confidence criteria are placed; systematic
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 deviations flag when those assumptions strain.
 
 #### 3.3.1 Confidence-threshold parameterization
@@ -564,8 +562,8 @@ In the canonical meta-d′ model the type-2 confidence criteria are
 *free*: their spacing is exactly what makes the metacognitive fit
 informative. In `bmm` those criteria are the rating thresholds, so the
 `threshold_type` you choose ([core SDT
-article](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.md))
-governs how freely they can move. The delta-based parameterizations
+article](https://venpopov.com/bmm/dev/articles/bmm_sdt.md)) governs how
+freely they can move. The delta-based parameterizations
 (`"log_distance"`, `"log_ratio"`) leave each threshold distance free and
 stay closest to the textbook meta-d′ estimator. The two-parameter
 `"parsimonious"` (default) and `"equidistant"` types instead tie the
@@ -575,7 +573,7 @@ type-2 ROC and can mask genuine asymmetries in how confidence is used
 for “old” versus “new” responses. If the metacognitive question hinges
 on that asymmetry, prefer a delta-based `threshold_type`. Whatever the
 parameterization,
-[`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
+[`sdt_thresholds()`](https://venpopov.com/bmm/dev/reference/sdt_thresholds.md)
 reconstructs the fitted confidence criteria on the latent scale — it
 works for all three versions, so the type-2 criterion placements can be
 inspected directly.
@@ -632,9 +630,9 @@ and *Know* otherwise.
 This needs a richer response than the rating versions above — not just a
 confidence rating, but a Remember/Know judgment on every “old” response
 — so bmm provides it as a dedicated model,
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md),
-rather than a `version` of
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md).
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md), rather
+than a `version` of
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md).
 For a target, \\F \sim \mathrm{Normal}(\mu_F, 1)\\ and \\R \sim
 \mathrm{Normal}(\mu_R, \sigma_R)\\ (lures fix both means to 0 and
 \\\sigma_R\\ to 1); `dfam` and `drec` are the two sensitivities and
@@ -680,10 +678,10 @@ head(rotello_long)
 ```
 
 Like
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md),
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
 the model itself is fit to **aggregated counts** — one row per cell and
 one count column per response category.
-[`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+[`aggregate_sdt_cdp_data()`](https://venpopov.com/bmm/dev/reference/aggregate_sdt_cdp_data.md)
 pivots the long rows into these canonical columns; every column other
 than `judgment`, `confidence`, and `count` (here just `stimulus`)
 defines the cells and is carried over:
@@ -705,7 +703,7 @@ The 22 long rows collapse to one row per stimulus class, with columns
 `new1` (the single “new” level) and `know2`…`know6` /
 `remember2`…`remember6` on the unified confidence scale. This is also
 the format
-[`rsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+[`rsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
 simulates directly, and if your own wide columns carry a shared prefix
 (say `cdp_new1`), you declare it once via the constructor’s `response`
 argument. The scale is asymmetric — one “new” level and five “old”
@@ -784,14 +782,14 @@ itself be predicted, e.g. `rho ~ condition`); it is bounded to \\(-1,
 between-subject correlation of random effects (which you would write as
 `(1 |p| id)`). And when the task also collects an explicit *Guess*
 response, include `"guess"` judgments in the long data:
-[`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+[`aggregate_sdt_cdp_data()`](https://venpopov.com/bmm/dev/reference/aggregate_sdt_cdp_data.md)
 turns them into `guess` count columns, whose presence switches on the
 three-way Remember/Know/Guess model with a familiarity criterion `kcrit`
 separating Know from Guess (free it with `kcrit ~ 1`). That model has a
 hard boundary — a Guess response in a confidence bin is possible only
 while `rcrit + kcrit` exceeds the bin’s lower threshold — and
 hierarchical fits can report divergent transitions near it;
-[`?sdt_cdp`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
+[`?sdt_cdp`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
 describes the boundary and what to try.
 
 ## 5 Choosing and comparing the models
@@ -811,7 +809,7 @@ interface and the same familiarity core, so the choice is about which
   suffices; both extensions reduce to it when their extra parameter is
   switched off (`Ro`, `Rn` → 0; `logmratio` = 0, i.e. meta-d′ = `d`).
 - Reach for
-  **[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)**
+  **[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)**
   when the data carry explicit *Remember/Know* judgments: it models that
   richer response directly — recollection as a continuous second axis —
   rather than collapsing it to a confidence rating.
@@ -820,7 +818,7 @@ Because each extension nests the standard model, the most direct
 evidence is the **posterior of the extra parameter**: is `Ro` credibly
 greater than zero, is `logmratio` credibly different from zero (M-ratio
 different from 1)? That, together with
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 and the ROC/zROC fit, is the practical guide. A *formal* predictive
 comparison via [`loo()`](https://mc-stan.org/loo/reference/loo.html) is
 **not** appropriate for these aggregated-count models — leaving out one

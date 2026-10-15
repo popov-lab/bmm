@@ -2,8 +2,8 @@
 
 Density and random generation functions for multinomial processing tree
 models specified with
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md). Please
-note that these functions are currently not vectorized.
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md). Please note
+that these functions are currently not vectorized.
 
 ## Usage
 
@@ -32,11 +32,10 @@ rmpt(
   categories and the vector is reordered accordingly; an unnamed vector
   is read in the order of the model's response categories,
   `mpt_model$resp_vars$resp_cats`, which is the order of the first tree
-  given to
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
-  ([`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
-  stores the branches of every tree in that order, whatever order they
-  were written in). `rmpt()` returns its columns in the same order.
+  given to [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)
+  ([`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) stores the
+  branches of every tree in that order, whatever order they were written
+  in). `rmpt()` returns its columns in the same order.
 
 - pars:
 
@@ -44,17 +43,15 @@ rmpt(
   parameters appearing in the branch expressions of the selected tree,
   on the probability scale and strictly between 0 and 1, as for fixed
   parameters in
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
-  Values for parameters the tree does not use are ignored, so one vector
-  can serve every tree of the model. Parameters of a simplex group must
-  sum to 1.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). Values for
+  parameters the tree does not use are ignored, so one vector can serve
+  every tree of the model. Parameters of a simplex group must sum to 1.
 
 - mpt_model:
 
   A `bmmodel` object created with
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)
-  specifying the model that densities or random samples should be
-  generated for.
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) specifying
+  the model that densities or random samples should be generated for.
 
 - tree:
 
@@ -99,14 +96,13 @@ rmpt(
 ## Note
 
 Unlike the densities of the circular models in this package
-([`dsdm()`](https://popov-lab.github.io/bmm/dev/reference/SDMdist.md),
-[`dmixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p_dist.md),
-[`dmixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p_dist.md),
-[`dimm()`](https://popov-lab.github.io/bmm/dev/reference/IMMdist.md))
-and unlike
-[`stats::dmultinom()`](https://rdrr.io/r/stats/Multinom.html), `dmpt()`
-returns the log density by default, matching
-[`dm3()`](https://popov-lab.github.io/bmm/dev/reference/m3dist.md).
+([`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+[`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+[`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+[`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)) and
+unlike [`stats::dmultinom()`](https://rdrr.io/r/stats/Multinom.html),
+`dmpt()` returns the log density by default, matching
+[`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md).
 
 ## References
 

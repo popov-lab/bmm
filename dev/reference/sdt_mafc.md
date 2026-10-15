@@ -124,13 +124,13 @@ Gamma ratio for `gumbel_min`, Gauss-Hermite quadrature for `normal`
 (\\\Phi(d/\sqrt{2})\\ at m = 2), and Gauss-Legendre quadrature for
 `logistic`.
 
-## Sensitivity is on the same scale as [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+## Sensitivity is on the same scale as [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)
 
 `d` is \\d'\\. m-AFC assumes the signal and distractor distributions
 share an SD, so there is no `sdratio` parameter, and \\d'\\ coincides
 with the balanced index \\d_a\\ that
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-reports once its `sdratio` is estimated.
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) reports
+once its `sdratio` is estimated.
 
 At `m = 2` the two models agree: 2AFC proportion correct equals the area
 under the yes/no ROC (Green's theorem), and for Gaussian noise both give
@@ -138,12 +138,12 @@ under the yes/no ROC (Green's theorem), and for Gaussian noise both give
 `d` whether it is measured by a yes/no ROC or by 2AFC accuracy, which is
 the property that makes \\d_a\\ the right common scale for the SDT
 family. For `dist = "normal"` this holds even when
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-estimates unequal variance. For the other distributions it holds when
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-keeps `sdratio` at its default, because only the Gaussian \\d_a\\ is
-exactly the AUC-equivalent index (see the sensitivity section of
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)).
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) estimates
+unequal variance. For the other distributions it holds when
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) keeps
+`sdratio` at its default, because only the Gaussian \\d_a\\ is exactly
+the AUC-equivalent index (see the sensitivity section of
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)).
 
 ## References
 

@@ -48,8 +48,7 @@ rsdt_mafc(
   Numeric vector. Sensitivity \\d'\\: the distance between the signal
   and distractor distributions in SD units. m-AFC assumes a common scale
   for the two distributions, so this is also the balanced index \\d_a\\
-  that
-  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+  that [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)
   reports.
 
 - dist:

@@ -1,11 +1,11 @@
 # Adjust Accuracy Counts for Contamination (deprecated)
 
 **Deprecated.**
-[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 now returns contaminant-free `n_upper` and `n_trials`, so this second
 step is no longer needed; applying it corrects the same cell twice. Set
 the guess rate with the `guess_rate` argument of
-[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 instead.
 
 Adjusts accuracy counts (`n_upper`, `n_trials`) by removing estimated
@@ -33,7 +33,7 @@ adjust_ezdm_accuracy(n_upper, n_trials, contaminant_prop, guess_rate = 0.5)
 
   Numeric. Estimated proportion of contaminant trials (e.g., from the
   `contaminant_prop` column of
-  [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)),
+  [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)),
   a single value.
 
 - guess_rate:
@@ -51,7 +51,7 @@ original counts unchanged.
 
 The function adjusts one cell at a time. Vectors of length greater than
 one are an error; to correct several cells, use
-[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 on each group.
 
 Uses binomial sampling to estimate the number of contaminant trials and
@@ -61,7 +61,7 @@ unless a seed is set by the user.
 
 ## See also
 
-[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 for computing the summary statistics and contamination proportions
 
 ## Examples
@@ -73,5 +73,5 @@ rt <- c(rnorm(80, 0.55, 0.05), runif(20, 0.1, 4))
 response <- c(rbinom(80, 1, 0.85), rbinom(20, 1, 0.5))
 ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4))
 #>      mean_rt      var_rt n_upper n_trials contaminant_prop
-#> mu 0.5532669 0.002680182      67       80        0.1995584
+#> mu 0.5535652 0.002745709      67       80        0.1990716
 ```

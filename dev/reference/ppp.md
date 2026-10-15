@@ -3,14 +3,13 @@
 Computes the goodness-of-fit statistics \\T_1\\ and \\T_2\\ of Klauer
 (2010) and their posterior predictive p-values (PPP) for models that fit
 aggregated response counts:
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md),
-[`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md),
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md),
-[`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md),
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
-and
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md).
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md),
+[`m3()`](https://venpopov.com/bmm/dev/reference/m3.md),
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md),
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
+[`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md),
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
+and [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md).
 TreeBUGS' `PPP()` reports the same two statistics; Details says where
 their values differ.
 
@@ -36,7 +35,7 @@ ppp(
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md).
 
 - ...:
 
@@ -52,8 +51,8 @@ ppp(
   Character vector naming the columns of the model data that define the
   cells. `NULL` (default) uses the cells described in Details;
   `character(0)` pools all rows into one cell. For
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) fits,
-  the tree column can be named even if it is not a predictor.
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits, the
+  tree column can be named even if it is not a predictor.
 
 - ndraws:
 
@@ -133,9 +132,9 @@ participant who shares the set of cells with nobody else has no
 covariance and is left out, with a message.
 
 **Cells.** By default, a cell is a combination of the tree
-([`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)), the
-stimulus (the SDT models) or the set size
-([`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)),
+([`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)), the stimulus
+(the SDT models) or the set size
+([`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)),
 and the categorical population-level predictors of the model formula.
 Numeric predictors are not part of the default, because every distinct
 value would form a cell of its own. Rows of a cell are summed, so the
@@ -144,15 +143,15 @@ tree's own categories.
 
 **Impossible categories.** Categories with an expected count of about 0
 in every draw, such as the impossible categories of an
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) or
-[`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) model or
-the ranks beyond the set size of an
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) or
+[`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) model or the
+ranks beyond the set size of an
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 model, are left out of both statistics. A cell with a single possible
 category, such as an
-[`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md) set size
-without other candidates, is left out of \\T_2\\: the number of trials
-fixes its count.
+[`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) set size without
+other candidates, is left out of \\T_2\\: the number of trials fixes its
+count.
 
 ## References
 
@@ -162,7 +161,7 @@ https://doi.org/10.1007/s11336-009-9141-0
 
 ## See also
 
-[`pp_check.bmmfit()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check.bmmfit()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 for the graphical check.
 
 ## Examples

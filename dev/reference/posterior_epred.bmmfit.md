@@ -8,18 +8,18 @@ simulates for it. What that is depends on the model:
 |  |  |
 |----|----|
 | Model | Expected response |
-| [`ddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm.md), [`cswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald.md) | Mean response time, averaged over both responses, under the diffusion process that `posterior_predict()` simulates from |
-| [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md), version `"3par"` | Mean response time of the cell |
-| [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md), version `"4par"` | Mean response time of the cell's upper-boundary responses |
-| [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md) | Number of "old"/"signal" responses, the number of trials times their probability |
-| [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md) | Number of correct responses, the number of trials times their probability |
-| [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md), [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md), [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md), [`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md) | Expected count of each response category, from the multinomial family of brms |
-| [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md), [`mixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p.md), [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md), [`imm()`](https://popov-lab.github.io/bmm/dev/reference/imm.md) | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
+| [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md), [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) | Mean response time, averaged over both responses, under the diffusion process that `posterior_predict()` simulates from |
+| [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md), version `"3par"` | Mean response time of the cell |
+| [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md), version `"4par"` | Mean response time of the cell's upper-boundary responses |
+| [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) | Number of "old"/"signal" responses, the number of trials times their probability |
+| [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | Number of correct responses, the number of trials times their probability |
+| [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md), [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md), [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md), [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) | Expected count of each response category, from the multinomial family of brms |
+| [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md), [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md), [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md) | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
 
 With `dpar` or `nlpar`, `posterior_epred()` returns draws of that model
 parameter for every model, as in brms: a `dpar` on its native scale, an
 `nlpar` on the scale of its link.
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 returns the model parameters on their native scale over a grid of
 predictor values.
 
@@ -65,7 +65,7 @@ response categories of the multinomial models).
 ## See also
 
 [`brms::posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html),
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 
 ## Examples
 

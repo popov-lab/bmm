@@ -29,7 +29,7 @@ update(
 - formula.:
 
   A
-  [`bmmformula()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md).
+  [`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md).
   If missing, the original formula is used. Currently you have to
   specify a full `bmmformula`
 
@@ -54,7 +54,7 @@ update(
   Either `NULL` or a character string. If a string, the updated model is
   saved via [saveRDS](https://rdrr.io/r/base/readRDS.html) in a file
   named after the string, as in
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md).
   [`update()`](https://rdrr.io/r/stats/update.html) never writes to the
   file the original fit was read from: pass `file` explicitly to save
   the updated fit.

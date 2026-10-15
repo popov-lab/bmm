@@ -15,7 +15,7 @@ model_citation(x, ...)
 
   A model object (for example `sdm(resp_error = "y")`) or a `bmmfit`
   object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md).
 
 - ...:
 
@@ -37,11 +37,11 @@ model object is returned instead.
 Some versions of a model cite the papers that introduced them instead,
 for example `sdt_rating(version = "dpsdt")`.
 
-A custom [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md)
-model is cited with the paper that introduced the M3 framework. The
-model structure itself is defined by the user, so its source cannot be
-known to bmm. The returned vector then has the attribute `uncited`,
-naming the part of the model you have to cite yourself.
+A custom [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) model is
+cited with the paper that introduced the M3 framework. The model
+structure itself is defined by the user, so its source cannot be known
+to bmm. The returned vector then has the attribute `uncited`, naming the
+part of the model you have to cite yourself.
 
 bmm itself is cited separately, see `citation("bmm")`.
 

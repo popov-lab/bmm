@@ -40,8 +40,8 @@ rsdt_ranking(n, n_trials, m, d, sdratio = 1, dist = c("gumbel_min", "normal"))
   distributions. It is \\d'\\ when `sdratio` is 1 and, for
   `dist = "gumbel_min"`, the \\g'\\ of Meyer-Grant et al. (2026). With
   another `sdratio` it is the balanced index \\d_a\\ that
-  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-  reports (in root-mean-square SD units).
+  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) reports
+  (in root-mean-square SD units).
 
 - sdratio:
 
@@ -76,13 +76,13 @@ rsdt_ranking(n, n_trials, m, d, sdratio = 1, dist = c("gumbel_min", "normal"))
 and one rank-count column per rank position (`rank1` ... `rank max(m)`);
 rows with a smaller set size have structural zeros in the surplus
 columns, matching the wide format
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 expects.
 
 ## Parameter scales
 
 These functions take `sdratio` as the ratio itself, while
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 estimates its logarithm (0 = equal variance): a fitted `sdratio` of
 0.375 is a ratio of `exp(0.375) = 1.455`, and passing `0.375` here
 instead asks for a signal distribution 2.7 times narrower than the

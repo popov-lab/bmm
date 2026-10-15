@@ -2,7 +2,7 @@
 
 R companion to the Stan `sdt_ranking_logmu` function. It returns
 `log(p(rank))` for rank position `cat`, which the
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 multinomial formula uses as the category logit (so `softmax` recovers
 the ranking probabilities). `brms` evaluates the non-linear formula in R
 for `posterior_predict()` and `posterior_epred()`, so this function must

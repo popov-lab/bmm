@@ -18,45 +18,43 @@ function.
 
 | Constructor | Response format | Key parameters | ROC defined? |
 |----|----|----|----|
-| [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md) | counts of “signal”/“old” responses | `d`, `criterion`, `sdratio` | yes |
-| [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md) | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
-| [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md) | counts of correct m-AFC responses | `d` | no |
-| [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md) | counts per rank position | `d`, `sdratio` (`dist = "normal"` only) | no |
+| [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) | counts of “signal”/“old” responses | `d`, `criterion`, `sdratio` | yes |
+| [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md) | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
+| [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | counts of correct m-AFC responses | `d` | no |
+| [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md) | counts per rank position | `d`, `sdratio` (`dist = "normal"` only) | no |
 
 All four assume a latent evidence variable whose noise distribution is
 selected with the `dist` argument: `"normal"` (Gaussian SDT),
 `"logistic"`, `"gumbel_min"` (extreme-value SDT), or `"gumbel_max"`.
 
 Two of the models —
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-and
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
-— have an explicit response criterion, so a **receiver operating
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md) —
+have an explicit response criterion, so a **receiver operating
 characteristic (ROC)** curve and its **area under the curve (AUC)** are
 defined. The m-AFC and ranking models have no criterion: accuracy
 already integrates over the decision rule, so
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
-and
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) and
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md)
 deliberately error for them. The latent decision-variable distributions
-([`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md))
+([`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md))
 and posterior predictive checks
-([`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md))
+([`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md))
 are available for all four — for the criterion-free models the latent
 plot simply shows the noise and signal densities without a boundary
 line.
 
 This article walks through fitting each model and then through the
 post-processing toolkit:
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
-[`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md),
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md),
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md),
-[`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md),
-[`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md),
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md),
+[`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md),
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md),
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md),
+[`sdt_thresholds()`](https://venpopov.com/bmm/dev/reference/sdt_thresholds.md),
+[`sdt_sensitivity()`](https://venpopov.com/bmm/dev/reference/sdt_sensitivity.md),
 the [`plot()`](https://rdrr.io/r/graphics/plot.default.html) methods
 (including the quantile-transformed ROC via `scale = "quantile"`), and
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md).
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md).
 
 ### 1.1 The bmm workflow for SDT models
 
@@ -77,13 +75,13 @@ model; only the ingredients are SDT-specific.
     — and selects the noise distribution via `dist`. Printing the model
     object lists its parameters and data requirements.
 3.  **Specify the formula and fit.**
-    [`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
+    [`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)
     takes one regression formula per model parameter, each with full
     `brms` syntax: predictors for design effects and random effects such
     as `(1 | id)` for hierarchical estimation. Parameters you leave out
     of the formula are held fixed at their default — this is how
     `sdratio` stays at 0 (equal variance) until you add `sdratio ~ 1`.
-    [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) then
+    [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) then
     compiles and samples the model through `brms`/Stan, and all `brms`
     arguments (`cores`, `iter`, `prior`, `file`, …) pass through.
 4.  **Post-process.** The fitted object is a `brmsfit`, so the general
@@ -132,7 +130,7 @@ the separation in units of the root-mean-square of the two SDs, which
 weights noise and signal equally. Dividing by the noise SD instead gives
 \\d_N = \delta\\ (the \\d'\\ of most unequal-variance analyses) and by
 the signal SD gives \\d_S\\;
-[`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
+[`sdt_sensitivity()`](https://venpopov.com/bmm/dev/reference/sdt_sensitivity.md)
 returns all three from a fitted model, and
 [`summary()`](https://rdrr.io/r/base/summary.html) adds a note whenever
 `d` is \\d_a\\. \\d_a\\ is the default because it is the only one that
@@ -224,7 +222,7 @@ the latent evidence follows an extreme-value (Gumbel) distribution
 rather than a Gaussian, the ROC comes out asymmetric *intrinsically* —
 with equal variance and one fewer parameter. This is the extreme-value
 signal detection (EVSDT) model (Meyer-Grant et al. 2026), and it is why
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 defaults to `"gumbel_min"`.
 
 These two routes are easy to conflate, but ROC asymmetry and the
@@ -261,7 +259,7 @@ therefore also choosing a theory of choice, and the link is visible in
 `bmm`: the m-AFC and ranking models decide by comparing the maximum (or
 the rank order) of evidence across the `m` alternatives, so an
 extreme-value distribution is their natural home —
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 defaults to `"gumbel_min"` for exactly this reason.
 
 Whether human evidence is better described as pooled or as maximised is
@@ -293,7 +291,7 @@ complementary-log-log links with the extreme-value models (DeCarlo 1998)
 Only two of these are live theoretical choices. `"normal"` and
 `"gumbel_min"` are the SDT instantiations of the two aggregation rules
 above — pooling and the max rule — and they are the *only* distributions
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 offers, the model where the choice bites hardest. The other two are best
 read as completeness options. `"logistic"` is so close to `"normal"`
 once both are rescaled that the two are nearly indistinguishable in the
@@ -384,9 +382,9 @@ fit_gumbel <- bmm(
 ```
 
 The post-processing helpers
-([`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
-[`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md),
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md),
+([`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md),
+[`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md),
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md),
 detailed in the Binary SDT section) overlay each model-implied ROC on
 the observed operating points.
 
@@ -444,7 +442,7 @@ is mostly a numerical convenience, and `"gumbel_max"` covers the rare
 opposite asymmetry. As always, let the data arbitrate: compare
 candidates with the observed-versus-model ROC overlap and AUC shown
 above, with
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md),
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md),
 or with [`loo()`](https://mc-stan.org/loo/reference/loo.html) for a
 formal information criterion.
 
@@ -473,8 +471,8 @@ units, the \\k\\ of the equations above.
 ### 4.1 A single condition: equal-variance SDT
 
 We simulate one condition with
-[`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
-and fit an equal-variance model.
+[`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md) and
+fit an equal-variance model.
 
 ``` r
 
@@ -554,9 +552,9 @@ A formula places the boundary with `criterion`, measured from the noise
 mean, or with `bias`, measured from the midpoint between the means.
 Under equal variance \\\text{bias} = \text{criterion} - d/2\\, the
 textbook \\c\\
-([`?sdt_yn`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-gives the general form). Naming neither estimates `criterion ~ 1`;
-naming both is an error.
+([`?sdt_yn`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) gives the
+general form). Naming neither estimates `criterion ~ 1`; naming both is
+an error.
 
 `criterion ~ 1` keeps the boundary at one distance from the noise mean
 in every row. `bias ~ 1` keeps it at one distance from the midpoint, so
@@ -632,9 +630,8 @@ constant:
 - Comparing bias between groups or conditions that differ in `d`:
   `bias`.
 
-[`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
-and
-[`sdt_bias()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+[`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
+and [`sdt_bias()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
 compute both quantities from one hit rate and one false-alarm rate, for
 checking a fit against the raw rates.
 
@@ -742,10 +739,10 @@ identifies `sdratio`. A strength manipulation with a constant
 `criterion`, as in the shared-lure design above, would not: the
 false-alarm rate then informs the criterion alone, and every hit rate
 can be matched by trading `sdratio` against `d`.
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
-for that design; the section “Identifying `sdratio`” of
-[`?sdt_yn`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-covers the cases in between.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) warns for that
+design; the section “Identifying `sdratio`” of
+[`?sdt_yn`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) covers the
+cases in between.
 
 #### 4.3.1 Which sensitivity index?
 
@@ -756,7 +753,7 @@ root-mean-square of the two SDs. The note below the coefficient table of
 `summary(fit_uv)` says so. The alternatives are \\d_N\\ (divide by the
 noise SD, the \\d'\\ that most unequal-variance analyses report) and
 \\d_S\\ (divide by the signal SD).
-[`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
+[`sdt_sensitivity()`](https://venpopov.com/bmm/dev/reference/sdt_sensitivity.md)
 returns any of them, converting draw by draw so the intervals carry the
 joint uncertainty in `d` and `sdratio`:
 
@@ -821,19 +818,18 @@ scales. Second, for `dist = "normal"` the index \\d_a\\ is also the
 AUC-equivalent index, \\d_a = \sqrt{2}\\\Phi^{-1}(\mathrm{AUC})\\. Under
 the Gumbel distributions that identity only holds with equal variance,
 so compare unequal-variance Gumbel fits with
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
-rather than on `d`.
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md) rather
+than on `d`.
 
 ### 4.4 ROC and AUC
 
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
-returns the model-implied ROC from the posterior. For a binary fit it
-traces the smooth analytical curve from the posterior of `d` (and
-`sdratio` when estimated). When it detects a predictor that varies the
-criterion only — as `condition` does above — it additionally returns the
-model-implied operating points (one per criterion level) in a `points`
-attribute.
-[`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md)
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) returns
+the model-implied ROC from the posterior. For a binary fit it traces the
+smooth analytical curve from the posterior of `d` (and `sdratio` when
+estimated). When it detects a predictor that varies the criterion only —
+as `condition` does above — it additionally returns the model-implied
+operating points (one per criterion level) in a `points` attribute.
+[`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md)
 gives the empirical operating points straight from the response counts,
 and the [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method
 overlays everything.
@@ -854,9 +850,9 @@ condition, and the open circles are the observed points. A curvilinear
 ROC that is asymmetric about the minor diagonal is the signature of
 unequal variance (`sdratio > 1`).
 
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
-returns the posterior area under the curve. For *equal-variance* binary
-fits it uses the closed forms \\\Phi(d'/\sqrt{2})\\ (Gaussian) and
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md) returns
+the posterior area under the curve. For *equal-variance* binary fits it
+uses the closed forms \\\Phi(d'/\sqrt{2})\\ (Gaussian) and
 \\\mathrm{logistic}(g')\\ (Gumbel-min and Gumbel-max); every other case
 — unequal variance, the logistic distribution, and all rating fits — is
 integrated numerically over the model-implied curve. The returned AUC is
@@ -892,7 +888,7 @@ axis the model ROC is a straight line for every noise distribution, with
 slope \\1/\exp(\mathtt{sdratio})\\ and intercept
 \\\delta/\exp(\mathtt{sdratio})\\, where \\\delta\\ is the separation in
 noise-scale units (the \\d_N\\ that
-[`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
+[`sdt_sensitivity()`](https://venpopov.com/bmm/dev/reference/sdt_sensitivity.md)
 reports, not the fitted `d`), so a slope below 1 is the visual signature
 of unequal variance and observed points that bow away from a straight
 line flag misfit. (The \\(0,0)\\ and \\(1,1)\\ endpoints map to infinity
@@ -910,7 +906,7 @@ For the base-rate data the fitted slope is 0.64 (95% CrI \[0.53,
 section implied a slope of 0.59 through the same operating points,
 without an `sdratio` parameter.
 
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)
 reconstructs the latent decision-variable distributions themselves: the
 noise and signal evidence densities, separated by the noise-SD distance
 \\d_N\\ and scaled by `exp(sdratio)`, with the criterion drawn as a
@@ -918,7 +914,7 @@ dashed line carrying a credible band on its location. This is the
 picture the criterion and `d` estimates describe. Here the criterion
 varies across the base-rate conditions but `d`/`sdratio` do not, so the
 densities are identical across conditions:
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)
 collapses them into one panel and overlays the several criteria,
 colour-coded by condition (pass `collapse = FALSE` for one panel per
 condition).
@@ -932,9 +928,9 @@ plot(latent_sdt(fit_uv))
 
 ### 4.6 Posterior predictive checks
 
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-uses a custom binomial family, so
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) uses a
+custom binomial family, so
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 delegates to `brms`. The “old”-response counts span a wide range whose
 ceiling differs across cells (the base-rate conditions have different
 numbers of trials), so the bar view is cluttered and hard to read. An
@@ -965,7 +961,7 @@ published old/new recognition experiments as per-subject counts of old
 and new items across a 6-point confidence scale. Here we take Pratte et
 al. (2010) (97 subjects, 240 trials per stimulus class — narrow
 posteriors, clear effects) and reshape it to the format
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 expects: one row per (subject × stimulus), with categories `r1` = “sure
 new” … `r6` = “sure old”.
 
@@ -1076,14 +1072,14 @@ Add `sdratio ~ 1` to the formula to estimate unequal variance.
 
 For a rating model the K-1 thresholds define K-1 ROC points per
 posterior draw.
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
-returns those points together with the smooth model-implied ROC curve
-traced from the posterior of `d` (and `sdratio`);
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) returns
+those points together with the smooth model-implied ROC curve traced
+from the posterior of `d` (and `sdratio`);
 [`plot()`](https://rdrr.io/r/graphics/plot.default.html) shows that
 curve as a credible-band ribbon with the K-1 thresholds overlaid as
 colour-coded operating points (`t1`..`t(K-1)`) carrying crosshair
 credible intervals — the same display as the binary ROC.
-[`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md)
+[`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md)
 gives the empirical points from the pooled counts. The quantile axis
 (`scale = "quantile"`) works here too.
 
@@ -1106,11 +1102,11 @@ attr(auc_sdt(fit_rating), "summary")
 ### 5.3 Posterior predictive checks
 
 Because the rating model uses a multinomial family,
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 produces a response-proportion profile (observed bars
 vs. posterior-predictive point-ranges). For SDT the signal and noise
 rating distributions should be checked separately, so
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 **defaults to faceting by `stimulus`**:
 
 ``` r
@@ -1200,7 +1196,7 @@ deltas.
 
 The `delta` parameters are only interpretable through the
 parameterization that maps them to threshold locations.
-[`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
+[`sdt_thresholds()`](https://venpopov.com/bmm/dev/reference/sdt_thresholds.md)
 performs that mapping: it reconstructs the K-1 thresholds per posterior
 draw on the latent decision-variable scale, so the confidence criteria
 can be reported directly, whatever the `threshold_type`.
@@ -1216,7 +1212,7 @@ attr(sdt_thresholds(fit_rating_lr), "summary")
 #> 5     t5  1.7453748  1.6474459  1.8443663
 ```
 
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)
 shows the same thresholds in context — the noise and signal evidence
 densities with the K-1 confidence criteria cutting the axis into the six
 rating bins, each threshold carrying the credible band on its location.
@@ -1238,19 +1234,17 @@ is no criterion and no stimulus column — accuracy alone identifies `d`
 (DeCarlo 2012). A correct response occurs when the target’s evidence
 exceeds that of all \\m-1\\ distractors; `d` is \\d'\\, the
 target–distractor separation.
-[`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
-has no `sdratio`, and its `d` is on the same scale as the `d` of
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
+[`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) has
+no `sdratio`, and its `d` is on the same scale as the `d` of
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md),
 including the \\d_a\\ that
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-reports once its `sdratio` is estimated (exactly so for Gaussian noise;
-see
-[`?sdt_mafc`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)).
-For \\m = 2\\ the Gaussian model has the closed form
-\\\Phi(d/\sqrt{2})\\, and for \\m \geq 3\\ the Gaussian and logistic
-models evaluate the accuracy by quadrature while both Gumbel models stay
-in closed form. The set size `m` may be a constant or a data column (for
-mixed set sizes).
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) reports
+once its `sdratio` is estimated (exactly so for Gaussian noise; see
+[`?sdt_mafc`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)). For
+\\m = 2\\ the Gaussian model has the closed form \\\Phi(d/\sqrt{2})\\,
+and for \\m \geq 3\\ the Gaussian and logistic models evaluate the
+accuracy by quadrature while both Gumbel models stay in closed form. The
+set size `m` may be a constant or a data column (for mixed set sizes).
 
 One caveat matters when interpreting `d` here. At a single set size,
 percent correct is a single number, and any evidence distribution can
@@ -1314,7 +1308,7 @@ summary(fit_mafc)
 ```
 
 ROC curves are undefined here (`roc_sdt(fit_mafc)` errors), but
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)
 still works: it shows the noise and signal evidence densities the
 estimated `d` implies (the noise density stands for each of the \\m-1\\
 distractors), now without a criterion line because the decision is a max
@@ -1427,7 +1421,7 @@ summary(fit_rank)
 ```
 
 ROC/AUC are undefined;
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 shows the rank-position profile. With mixed set sizes, facet by the
 set-size column so each panel has a homogeneous denominator:
 
@@ -1442,14 +1436,14 @@ pp_check(fit_rank, group = "set_size", ndraws = 100)
 
 | Function | Models | Returns |
 |----|----|----|
-| [`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md) | binary, rating | model-implied smooth ROC curve + operating points (criterion levels for multi-criteria binary; confidence thresholds for rating) |
-| [`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md) | binary, rating | empirical ROC points from the data |
-| [`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md) | binary, rating | posterior AUC |
-| [`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md) | all four | noise/signal latent densities + criterion/threshold locations (no boundary for m-AFC/ranking) |
-| [`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md) | rating | K-1 threshold locations per draw on the latent scale, with posterior summary |
-| [`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md) | all four | sensitivity converted per draw to \\d_a\\, \\d_N\\, and \\d_S\\, with posterior summary |
+| [`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) | binary, rating | model-implied smooth ROC curve + operating points (criterion levels for multi-criteria binary; confidence thresholds for rating) |
+| [`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md) | binary, rating | empirical ROC points from the data |
+| [`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md) | binary, rating | posterior AUC |
+| [`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md) | all four | noise/signal latent densities + criterion/threshold locations (no boundary for m-AFC/ranking) |
+| [`sdt_thresholds()`](https://venpopov.com/bmm/dev/reference/sdt_thresholds.md) | rating | K-1 threshold locations per draw on the latent scale, with posterior summary |
+| [`sdt_sensitivity()`](https://venpopov.com/bmm/dev/reference/sdt_sensitivity.md) | all four | sensitivity converted per draw to \\d_a\\, \\d_N\\, and \\d_S\\, with posterior summary |
 | [`plot()`](https://rdrr.io/r/graphics/plot.default.html) | `bmm_sdt_roc` (incl. `scale = "quantile"`), `bmm_sdt_auc`, `bmm_sdt_latent` | `ggplot2` ROC / quantile-ROC / AUC / latent-distribution figures |
-| [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md) | all four | posterior predictive check |
+| [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md) | all four | posterior predictive check |
 
 ## References
 

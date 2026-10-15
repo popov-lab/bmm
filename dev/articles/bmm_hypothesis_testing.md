@@ -19,8 +19,8 @@ with `bmm`. Nothing here is specific to one model: a `bmm` fit is a
 the packages it builds on (`loo`, `bridgesampling`) work on it. We
 assume you have fitted a `bmm` model before (if not, start with the
 [mixture models
-article](https://popov-lab.github.io/bmm/dev/articles/bmm_mixture_models.md)
-or Frischkorn and Popov (2025)), but we do not assume you have tested
+article](https://venpopov.com/bmm/dev/articles/bmm_mixture_models.md) or
+Frischkorn and Popov (2025)), but we do not assume you have tested
 hypotheses in a Bayesian framework before.
 
 Table [1.1](#tab:overview) is the short version of this article.
@@ -98,7 +98,7 @@ remaining trials people guess. The parameter `thetat` sets the
 probability of the first kind of trial. It is estimated as log-odds (the
 logit scale). Question 3 shows how to turn it into a probability. For
 details, see the [mixture models
-article](https://popov-lab.github.io/bmm/dev/articles/bmm_mixture_models.md).
+article](https://venpopov.com/bmm/dev/articles/bmm_mixture_models.md).
 
 ``` r
 
@@ -337,7 +337,7 @@ returns `NA` for `Evid.Ratio` unless every parameter in the hypothesis
 has a proper prior and the model was fitted with `sample_prior = "yes"`.
 Before you report a Bayes factor, look at the prior it was computed
 against.
-[`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
+[`prior_info()`](https://venpopov.com/bmm/dev/reference/prior_info.md)
 lists the prior of every parameter on the scale it was sampled on, and
 flags any parameter left with a flat prior:
 
@@ -523,14 +523,14 @@ ones.
 `kappa` is estimated on the log scale, but most readers think about
 memory precision as a circular standard deviation in degrees. Two
 functions help.
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 returns the posterior draws of each parameter on its native scale, here
 `kappa` instead of log(`kappa`), for every set size. The argument
 `re_formula = NA` asks for the population-level values, ignoring the
 differences between participants.
-[`k2sd()`](https://popov-lab.github.io/bmm/dev/reference/k2sd.md) then
-converts each `kappa` into a circular standard deviation in radians,
-which we multiply by 180 / \\\pi\\ to get degrees.
+[`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md) then converts
+each `kappa` into a circular standard deviation in radians, which we
+multiply by 180 / \\\pi\\ to get degrees.
 
 ``` r
 
@@ -597,8 +597,8 @@ example with fewer trials or participants: when a conversion is not a
 straight line, the mean of the converted draws is not the conversion of
 the mean. Medians and quantiles survive a monotone conversion (such as
 [`exp()`](https://rdrr.io/r/base/Log.html) or
-[`k2sd()`](https://popov-lab.github.io/bmm/dev/reference/k2sd.md)), but
-means do not. The safe rule is to *transform first, then summarise*.
+[`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md)), but means
+do not. The safe rule is to *transform first, then summarise*.
 `native_parameters(..., summary = TRUE)` follows this rule (its
 `Estimate` is the mean of the transformed draws) when you only need
 summaries of the parameters themselves.
@@ -617,11 +617,11 @@ Under the hood: “a typical participant”
 In a hierarchical model, the population-level parameter
 `b_kappa_set_size2` is the mean of the participants’ log-kappa values.
 With `re_formula = NA`,
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 transforms this value, which gives the kappa of the *median*
 participant, not the average kappa across participants. The average also
 depends on how much participants differ, and
-[`?native_parameters`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`?native_parameters`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 shows how to compute it. For most reports, the typical (median)
 participant is the more useful summary, but the two should not be
 confused.
@@ -801,7 +801,7 @@ Bridge sampling has three requirements:
     This is stricter than for the Savage-Dickey method, where only the
     tested parameters need proper priors (Wagenmakers et al. 2010, 170).
     The default priors of `bmm` models are proper, but check with
-    [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
+    [`prior_info()`](https://venpopov.com/bmm/dev/reference/prior_info.md)
     if you have changed priors or formulas: it flags every parameter
     with a flat prior.
 3.  It needs far more posterior draws than estimation, and its result
@@ -903,7 +903,7 @@ separate process. In a comparison of many models on eight data sets,
 Oberauer (2023) found that this model, which combines a von Mises
 activation with a signal-detection choice rule, described the data best.
 Does the same hold for our data? (For details on the model, see the [SDM
-article](https://popov-lab.github.io/bmm/dev/articles/bmm_sdm_simple.md).)
+article](https://venpopov.com/bmm/dev/articles/bmm_sdm_simple.md).)
 
 We fit the SDM with the same structure as the mixture model: one value
 of each parameter per set size, and the same random effects.
@@ -1055,10 +1055,8 @@ which question you are answering and use the tool that answers it.
 over trials, for example the `m3` and some signal detection models. For
 such data, LOO leaves out a whole cell of counts at a time rather than a
 single trial, and the Pareto \\k\\ diagnostic often flags problems. See
-the [SDT
-article](https://popov-lab.github.io/bmm/dev/articles/bmm_sdt.md) and
-the [m3
-article](https://popov-lab.github.io/bmm/dev/articles/bmm_m3.md).
+the [SDT article](https://venpopov.com/bmm/dev/articles/bmm_sdt.md) and
+the [m3 article](https://venpopov.com/bmm/dev/articles/bmm_m3.md).
 Likewise, two models can only be compared with LOO or a Bayes factor if
 they are fitted to the same observations in the same format.
 

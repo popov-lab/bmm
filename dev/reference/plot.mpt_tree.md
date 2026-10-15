@@ -6,9 +6,8 @@ paths (a sum of products, with the factors in writing order), paths with
 a common prefix share the corresponding tree nodes, and the leaves show
 the response categories. Calling
 [`plot()`](https://rdrr.io/r/graphics/plot.default.html) on a model
-created with
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) draws
-all trees of the model.
+created with [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)
+draws all trees of the model.
 
 ## Usage
 
@@ -25,7 +24,7 @@ plot(x, cex = 0.9, ...)
 - x:
 
   An `mpt_tree` object or a `bmmodel` object created with
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md).
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md).
 
 - cex:
 
@@ -72,27 +71,26 @@ a single edge or, when plotting a bare tree, fans of plain parameters
 (which a model may declare as a simplex). Write factors in the same
 order across all categories to avoid mispairing due to different factor
 orders. A bare
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
-whose constants were already substituted (such as the stored restricted
-trees of a model) does not recognise a complement written as a number
-(`0.8` beside `0.2`), so those edges keep the order of first mention;
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md) whose
+constants were already substituted (such as the stored restricted trees
+of a model) does not recognise a complement written as a number (`0.8`
+beside `0.2`), so those edges keep the order of first mention;
 [`plot()`](https://rdrr.io/r/graphics/plot.default.html) of a model
 draws the unrestricted trees and is not affected.
 
 For a model created with
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md), the
-plot draws the trees as written and marks restricted parameters: the
-edge of a fixed parameter reads `g = 0.5`, the edge of an equated
-parameter `Dn (= Do)`, and an edge that contains a restricted parameter
-shows the restriction in parentheses, as in `1 - g (g = 0.5)`.
-Impossible categories are omitted. A literal 0 in an expression (as in
-`D + 0 * x`) is drawn as an edge labelled 0. The `...` argument is
-ignored; the title cannot be changed. Every product of sums is expanded
-into all its paths, so each multiplied sum such as `(a + b)` doubles the
-number of paths: trees with more than about ten multiplied sums draw
-slowly. Leaf labels wider than about 90% of a panel are clipped, and
-long edge labels near the root can be clipped earlier, when the leaf
-labels leave little room.
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), the plot draws
+the trees as written and marks restricted parameters: the edge of a
+fixed parameter reads `g = 0.5`, the edge of an equated parameter
+`Dn (= Do)`, and an edge that contains a restricted parameter shows the
+restriction in parentheses, as in `1 - g (g = 0.5)`. Impossible
+categories are omitted. A literal 0 in an expression (as in `D + 0 * x`)
+is drawn as an edge labelled 0. The `...` argument is ignored; the title
+cannot be changed. Every product of sums is expanded into all its paths,
+so each multiplied sum such as `(a + b)` doubles the number of paths:
+trees with more than about ten multiplied sums draw slowly. Leaf labels
+wider than about 90% of a panel are clipped, and long edge labels near
+the root can be clipped earlier, when the leaf labels leave little room.
 
 ## References
 

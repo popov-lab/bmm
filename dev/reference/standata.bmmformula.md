@@ -27,13 +27,13 @@ standata(object, data, model, ...)
 
   A description of the model to be fitted. This is a call to a `bmmodel`
   such as
-  [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   function. Every model function has a number of required arguments
   which need to be specified within the function call. Call
-  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
+  [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
   to see the list of supported models, and `?modelname` (for example
-  [`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for
-  their required arguments.
+  [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)) for their
+  required arguments.
 
 - ...:
 
@@ -50,7 +50,7 @@ with Stan.
 
 ## See also
 
-[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
+[`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md),
 [`brms::standata()`](https://paulbuerkner.com/brms/reference/standata.html)
 
 ## Examples

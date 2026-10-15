@@ -2,7 +2,7 @@
 
 Called by [`print()`](https://rdrr.io/r/base/print.html) on a `bmmodel`
 after the lines all models share and before the closing pointer to
-[`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md).
+[`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md).
 The default method prints nothing.
 
 ## Usage

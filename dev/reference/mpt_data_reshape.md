@@ -2,10 +2,10 @@
 
 MPTinR and TreeBUGS take one row per participant and one column per
 response category of the EQN file.
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) takes
-one row per participant and tree, a column naming the tree, and one
-count column per *shared* response category (see
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)).
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) takes one row
+per participant and tree, a column naming the tree, and one count column
+per *shared* response category (see
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)).
 `mpt_data_reshape()` reshapes the first layout into the second for a
 given model.
 
@@ -26,12 +26,12 @@ mpt_data_reshape(data, model, id = NULL, columns = c("names", "mptinr"))
 - model:
 
   An `mpt` model from
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md),
-  [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md),
+  [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
   or
-  [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md).
+  [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md).
   For a model from
-  [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+  [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
   the `mpt_renaming` attribute maps the labels of the EQN file onto the
   response categories of the model. For any other model, the columns of
   `data` are named `<tree>.<category>`, e.g. `target.old`, with the tree
@@ -61,13 +61,13 @@ model.
 ## Details
 
 **Named columns (`columns = "names"`).** For a model from
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md),
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md),
 a column is matched to a category by the EQN label (`hit`), or, when
 trees share labels, by the tree name and label (`target.hit`, with the
 bmm name of the tree); the qualified name wins where both exist. A label
 used in several trees must be qualified. Labels that the `categories`
 argument of
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
 merged onto one response category are summed. All columns of `data` that
 are neither count columns nor `id` are carried unchanged to every long
 row, e.g. between-participant covariates.
@@ -88,22 +88,21 @@ numbers, else as character strings in the collation of the R session.
 `mpt_data_reshape()` applies the same rule, so run it in the session
 where MPTinR's order was determined if the labels mix upper and lower
 case. This mode needs a model from
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md):
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md):
 MPTinR's own model format orders the columns by the lines of the model
-text, and
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) reorders
-the branches of every tree to the categories of the first, so the line
-order cannot be recovered from the model. For other models, name the
-columns `<tree>.<category>` and use `columns = "names"`.
+text, and [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)
+reorders the branches of every tree to the categories of the first, so
+the line order cannot be recovered from the model. For other models,
+name the columns `<tree>.<category>` and use `columns = "names"`.
 
 **Impossible categories.** A response category that a tree cannot
 produce (`impossible` in
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md),
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md),
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
 and
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md))
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md))
 has no column in `data` and gets 0 in the long rows of that tree, which
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) accepts.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) accepts.
 
 **Counts.** The count columns must be numeric, without missing values,
 and hold non-negative whole numbers; the long data hold them as
@@ -111,21 +110,20 @@ integers.
 
 **Checks.** The function cannot tell a correct reshape from one that
 swaps columns of equal meaning. Run
-[`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
+[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
 on the result, and compare one participant's long rows with the wide row
 (see the Examples of
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)).
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)).
 
 ## See also
 
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
 and
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
 for importing the model itself;
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) for the
-data layout
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) expects;
-[`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) for the data
+layout [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) expects;
+[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
 to check the result before fitting.
 
 ## Examples

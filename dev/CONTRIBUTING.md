@@ -31,7 +31,7 @@ or a larger feature are also listed with the role `ctb` in
 2.  Open the PR against the branch you started from.
 
 The reasoning is in [ADR
-0002](https://popov-lab.github.io/bmm/.dev/decisions/0002-release-integration-branches.md).
+0002](https://venpopov.com/bmm/.dev/decisions/0002-release-integration-branches.md).
 If you are unsure, ask in the issue.
 
 ## Before you open a PR
@@ -56,7 +56,7 @@ Your PR also needs:
 - **For a new model:** read the [developer
   notes](https://venpopov.com/bmm/dev/dev-notes/) and follow the
   one-constructor-per-response-type rule in
-  [AGENTS.md](https://popov-lab.github.io/bmm/AGENTS.md). Show parameter
+  [AGENTS.md](https://venpopov.com/bmm/AGENTS.md). Show parameter
   recovery in the PR description (see below).
 
 ### Recovery evidence for new models
@@ -79,7 +79,7 @@ commits adds a file larger than 1 MiB, or a new version of one, even if
 a later commit removes the file again, because a merge commit keeps
 every commit of the PR in the history. A squash merge would not, but the
 check cannot know which one will be used ([ADR
-0003](https://popov-lab.github.io/bmm/.dev/decisions/0003-model-fit-files.md)).
+0003](https://venpopov.com/bmm/.dev/decisions/0003-model-fit-files.md)).
 A file whose content is already in the history of `develop` or of the
 PR’s base does not count, wherever it sits. A changed version of a
 tracked large file counts as new. If the check names a commit of yours,
@@ -98,11 +98,11 @@ rebase.
   `article-fits` release, and the website build downloads it from there.
 - The website build checks every relative `file = "..."` that an
   evaluated R chunk passes as a string literal to
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md),
-  `brm()`, [`readRDS()`](https://rdrr.io/r/base/readRDS.html) or
-  `read_rds()`. A `fits/<name>` file must be in the release. Any other
-  file, such as `assets/<name>`, must be tracked. Both must be readable.
-  The build stops, naming the article and the file, when one is not.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md), `brm()`,
+  [`readRDS()`](https://rdrr.io/r/base/readRDS.html) or `read_rds()`. A
+  `fits/<name>` file must be in the release. Any other file, such as
+  `assets/<name>`, must be tracked. Both must be readable. The build
+  stops, naming the article and the file, when one is not.
 - A string that names a `fits/` path and is not such a literal fails the
   build, because the check cannot read it. This includes
   `readRDS("fits/<name>")` without `file =`, a path built with
@@ -189,10 +189,10 @@ This fallback ends when a second person takes on regular reviews.
   their callers.
 - Call functions as `package::function()`.
 
-[AGENTS.md](https://popov-lab.github.io/bmm/AGENTS.md) has the rest, and
-the [developer notes](https://venpopov.com/bmm/dev/dev-notes/) explain
-which file holds which step of the fitting pipeline. If you are unsure
-where code belongs, ask.
+[AGENTS.md](https://venpopov.com/bmm/AGENTS.md) has the rest, and the
+[developer notes](https://venpopov.com/bmm/dev/dev-notes/) explain which
+file holds which step of the fitting pipeline. If you are unsure where
+code belongs, ask.
 
 ## AI-assisted contributions
 

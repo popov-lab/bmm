@@ -1,9 +1,9 @@
 # Check whether this machine can fit bmm models
 
 Fitting a model with
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) needs a
-C++ toolchain (a compiler and `make`) and a Stan backend, the software
-that turns the model into a program and samples from it. There are two
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) needs a C++
+toolchain (a compiler and `make`) and a Stan backend, the software that
+turns the model into a program and samples from it. There are two
 backends: the R package `cmdstanr`, which runs CmdStan, a separate
 program installed with
 [`cmdstanr::install_cmdstan()`](https://mc-stan.org/cmdstanr/reference/install_cmdstan.html);
@@ -20,16 +20,15 @@ the first is the one that decides.
 
 With `smoke_test = TRUE`, it finally compiles and samples a small
 two-parameter mixture model
-([`mixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p.md))
-through [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md),
-on the backend
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) will
+([`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md))
+through [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md), on the
+backend [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) will
 use. This is the only check that shows the whole chain works. On an
 Apple Silicon Mac it takes about 10 seconds with `cmdstanr` and 45
 seconds with `rstan`, and it is skipped when a check it needs has
 failed. Once every check passes, rerun the
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) call
-that failed.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) call that
+failed.
 
 ## Usage
 
@@ -46,11 +45,10 @@ bmm_setup(smoke_test = TRUE, backend = getOption("brms.backend", NULL))
 - backend:
 
   The backend to check, `"cmdstanr"` or `"rstan"`. The default checks
-  the backend
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) would
-  choose: the `brms.backend` option if it is set, otherwise `cmdstanr`
-  whenever the `cmdstanr` package is installed, even when CmdStan is
-  not, and `rstan` otherwise.
+  the backend [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  would choose: the `brms.backend` option if it is set, otherwise
+  `cmdstanr` whenever the `cmdstanr` package is installed, even when
+  CmdStan is not, and `rstan` otherwise.
 
 ## Value
 
@@ -60,8 +58,8 @@ A data frame of class `bmm_setup` with one row per check and the columns
 
 ## See also
 
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md),
-[`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md),
+[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
 
 ## Examples
 

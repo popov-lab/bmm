@@ -116,14 +116,13 @@ recovers the rank distribution exactly. This means `log_lik`,
 `posterior_predict`, `posterior_epred`, and `pp_check` come from brms as
 proper joint multinomial draws.
 
-## Sensitivity is on the same scale as [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+## Sensitivity is on the same scale as [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)
 
 `d` is \\d'\\ whenever the target and lure distributions share an SD:
 always for `dist = "gumbel_min"`, where it is the \\g'\\ of Meyer-Grant
 et al. (2026), and for `dist = "normal"` unless you give `sdratio` a
 formula. With `sdratio` estimated, `d` is the balanced index \\d_a\\
-that
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+that [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)
 reports, the separation divided by the root-mean-square of the two SDs;
 the noise-standardized separation is then
 `d * sqrt((1 + exp(sdratio)^2) / 2)`.
@@ -137,9 +136,9 @@ Ranking is the one SDT design that identifies the variance ratio from a
 single condition. The rank distribution supplies `m - 1` free
 probabilities per set size, so with `m >= 3` there is enough information
 to separate `d` from `sdratio` without the criterion sweep that
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-needs – the *shape* of the rank distribution, not just its mean, carries
-the ratio.
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) needs –
+the *shape* of the rank distribution, not just its mean, carries the
+ratio.
 
 At `m = 2` the model reduces to 2AFC and the two parameters are no
 longer separable: the probability of ranking the target first is the

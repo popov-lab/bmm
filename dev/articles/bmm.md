@@ -43,7 +43,7 @@ it. There are two backends, `cmdstanr` with CmdStan and `rstan`; we
 recommend `cmdstanr`. These are the parts that fail most often on a
 fresh machine, and the error usually shows up only when the first model
 refuses to compile. Therefore, run
-[`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
+[`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
 before anything else:
 
 ``` r
@@ -82,7 +82,7 @@ bmm_setup(smoke_test = FALSE)
 ```
 
 If a check fails, apply the fix it prints, restart R, and run
-[`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
+[`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
 again. Once every check passes, you are ready to fit models.
 
 ## 3 Which model fits your task
@@ -103,8 +103,8 @@ from.
 Participants reproduce a continuous feature, such as a color or an
 orientation, and the response error on the circle is the dependent
 variable. The [continuous reproduction
-article](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html)
-describes the task and compares the models.
+article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html) describes
+the task and compares the models.
 
 [TABLE]
 
@@ -113,8 +113,8 @@ describes the task and compares the models.
 Participants pick one response from a set of categories, for example the
 correct item, an item from another list position, or an item that was
 not studied. The [M3
-article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) shows how
-to set up the response categories and the activation model.
+article](https://venpopov.com/bmm/articles/bmm_m3.html) shows how to set
+up the response categories and the activation model.
 
 [TABLE]
 
@@ -126,23 +126,22 @@ among several alternatives, or rank the alternatives. Signal detection
 theory separates sensitivity from response bias for each of these
 response formats, and `bmm` has one model per format. The models take
 response counts per subject and condition.
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-also accepts one row per trial, as the first fit below shows; the
-rating, ranking and Remember/Know models need one count column per
-response category, which
-[`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) also
+accepts one row per trial, as the first fit below shows; the rating,
+ranking and Remember/Know models need one count column per response
+category, which
+[`aggregate_sdt_cdp_data()`](https://venpopov.com/bmm/dev/reference/aggregate_sdt_cdp_data.md)
 builds for
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
-from trial-level data whose confidence runs on one old/new scale. The
-[signal detection
-article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html) walks
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) from
+trial-level data whose confidence runs on one old/new scale. The [signal
+detection article](https://venpopov.com/bmm/articles/bmm_sdt.html) walks
 through the yes/no, rating, m-AFC and ranking models, and the
 [dual-process and meta-d′
-article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html)
+article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html)
 through the `dpsdt` and `metad` versions of
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 and through
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md).
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md).
 
 [TABLE]
 
@@ -157,25 +156,25 @@ it is part of the version this page was built from.
 
 | Response format | Model | dist | Unequal-variance parameter |
 |:---|:---|:---|:---|
-| yes/no detection, old/new recognition | [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md) | normal, gumbel_min, gumbel_max, logistic | `sdratio` |
-| confidence ratings | [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md), versions `standard`, `dpsdt`, `metad` | normal, gumbel_min, gumbel_max, logistic | `sdratio` |
-| m-alternative forced choice | [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md) | normal, gumbel_min, gumbel_max, logistic | none |
-| ranking | [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md) | gumbel_min, normal | `sdratio` (normal noise only) |
-| old/new confidence with Remember/Know judgments | [`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md) | normal | `sigmar` (recollection) |
+| yes/no detection, old/new recognition | [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) | normal, gumbel_min, gumbel_max, logistic | `sdratio` |
+| confidence ratings | [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md), versions `standard`, `dpsdt`, `metad` | normal, gumbel_min, gumbel_max, logistic | `sdratio` |
+| m-alternative forced choice | [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | normal, gumbel_min, gumbel_max, logistic | none |
+| ranking | [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md) | gumbel_min, normal | `sdratio` (normal noise only) |
+| old/new confidence with Remember/Know judgments | [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) | normal | `sigmar` (recollection) |
 
 ### 3.4 Choices and response times
 
 Participants choose between two options and the response time is
 recorded on every trial. The [DDM
-article](https://popov-lab.github.io/bmm/articles/bmm_ddm.html) and the
+article](https://venpopov.com/bmm/articles/bmm_ddm.html) and the
 [censored shifted Wald
-article](https://popov-lab.github.io/bmm/articles/bmm_cswald.html) cover
+article](https://venpopov.com/bmm/articles/bmm_cswald.html) cover
 trial-level data. The [EZ-diffusion
-article](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html) covers
-the case where you only have the mean and variance of the response times
-and the accuracy per condition. Fast guesses and other contaminant
-responses are the topic of the [response time contamination
-article](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html).
+article](https://venpopov.com/bmm/articles/bmm_ezdm.html) covers the
+case where you only have the mean and variance of the response times and
+the accuracy per condition. Fast guesses and other contaminant responses
+are the topic of the [response time contamination
+article](https://venpopov.com/bmm/articles/bmm_rt_contamination.html).
 
 [TABLE]
 
@@ -186,28 +185,27 @@ processes that lead to each response as a multinomial processing tree,
 for example the two-high-threshold model of recognition or the
 pair-clustering model of free recall. You write each tree’s branch
 probabilities as expressions, and
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) fits
-them to response counts. The [MPT
-article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html) covers
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits them to
+response counts. The [MPT
+article](https://venpopov.com/bmm/articles/bmm_mpt.html) covers
 specifying trees, importing model files from MPTinR and TreeBUGS, and
 constraining parameters.
 
 [TABLE]
 
 You can list the models in R at any time with
-[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
+[`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md),
 and `?modelname` (for example
-[`?sdt_yn`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md))
-documents the data a model expects, its parameters and its default
-priors, that is, what the model assumes about each parameter before it
-sees the data.
+[`?sdt_yn`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)) documents
+the data a model expects, its parameters and its default priors, that
+is, what the model assumes about each parameter before it sees the data.
 
 ## 4 Fit your first model
 
 We fit a yes/no signal detection model to the recognition data of
 Broeder and Schuetz (2009, Experiment 3), which ships with the package
 as `broeder_schuetz_2009_e3` (see
-[`?broeder_schuetz_2009_e3`](https://popov-lab.github.io/bmm/dev/reference/broeder_schuetz_2009_e3.md)
+[`?broeder_schuetz_2009_e3`](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md)
 for the source). 40 participants judged items as old or new under five
 base-rate conditions. A higher proportion of old items makes
 participants more willing to say “old”, so the conditions shift the
@@ -215,9 +213,9 @@ response criterion while sensitivity should stay the same.
 
 ### 4.1 The data
 
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-expects one row per subject, condition and stimulus type, with the
-number of “old” responses and the number of trials in that cell:
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) expects
+one row per subject, condition and stimulus type, with the number of
+“old” responses and the number of trials in that cell:
 
 ``` r
 
@@ -274,9 +272,9 @@ and stays fixed to equal variances unless you add a formula for it.
 In `bmm`, every parameter gets its own formula. This is the main
 difference from `brms`, where you write one formula with the response on
 the left-hand side, such as `n_old ~ condition`.
-[`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
-is short for
-[`bmmformula()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md).
+[`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md) is short
+for
+[`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md).
 Concretely, we let sensitivity vary between participants, and we
 estimate one criterion per base-rate condition, again with
 participant-level variation:
@@ -293,15 +291,14 @@ formula <- bmf(
 mixed-model syntax of `lme4` and `brms`. `0 + condition` drops the
 intercept, so each coefficient is the criterion of one condition rather
 than a difference from a reference condition. The [bmmformula
-article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
-explains the syntax in full, including how to fix a parameter to a
-constant.
+article](https://venpopov.com/bmm/articles/bmm_bmmformula.html) explains
+the syntax in full, including how to fix a parameter to a constant.
 
 ### 4.4 The fit
 
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) takes
-the formula, the data and the model. Its `file` argument caches the fit
-on disk, creating the folder if it does not exist; this is how this page
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) takes the
+formula, the data and the model. Its `file` argument caches the fit on
+disk, creating the folder if it does not exist; this is how this page
 avoids refitting the model every time it is built, and deleting the file
 forces a refit. Everything else goes to
 [`brms::brm()`](https://paulbuerkner.com/brms/reference/brm.html), so
@@ -411,18 +408,17 @@ pp_check(fit, ndraws = 50)
 ## 5 Where to go next
 
 - If you know `brms`, [From brms to
-  bmm](https://popov-lab.github.io/bmm/articles/bmm_brms_to_bmm.html)
-  fits one model in both packages and explains each difference in the
-  code.
+  bmm](https://venpopov.com/bmm/articles/bmm_brms_to_bmm.html) fits one
+  model in both packages and explains each difference in the code.
 - The [bmmformula
-  article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
-  covers the formula syntax: fixed parameters, non-linear predictors,
-  and how parameters on a link scale are read.
+  article](https://venpopov.com/bmm/articles/bmm_bmmformula.html) covers
+  the formula syntax: fixed parameters, non-linear predictors, and how
+  parameters on a link scale are read.
 - The task sections above link to one article per model family, each
   with a worked example on package data.
-- [`?bmm`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
-  documents the fitting function, and [Extracting model
-  information](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
+- [`?bmm`](https://venpopov.com/bmm/dev/reference/bmm.md) documents the
+  fitting function, and [Extracting model
+  information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows how to get the default priors, the Stan code and the Stan data
   of a model before you fit it.
 - If a model you need is missing, or something does not work as this

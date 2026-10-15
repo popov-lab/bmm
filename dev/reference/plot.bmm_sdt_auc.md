@@ -14,7 +14,7 @@ plot(x, condition_col = NULL, ...)
 - x:
 
   A `"bmm_sdt_auc"` object from
-  [`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md).
+  [`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md).
 
 - condition_col:
 
@@ -31,5 +31,5 @@ A `ggplot2` object.
 
 ## See also
 
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md),
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md),
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md)

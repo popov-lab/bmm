@@ -6,7 +6,7 @@ crosshair error bars (uncertainty in both directions). For **binary**
 multi-criteria fits the points are the several criterion levels; for
 **rating** models they are the K-1 confidence thresholds (labelled
 `t1`..`t(K-1)`). Pass `observed` to overlay empirical points from
-[`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md).
+[`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md).
 
 ## Usage
 
@@ -29,12 +29,12 @@ plot(
 - x:
 
   A `"bmm_sdt_roc"` object from
-  [`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md).
+  [`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md).
 
 - observed:
 
   Optional `"bmm_sdt_roc_observed"` object from
-  [`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md)
+  [`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md)
   to overlay as empirical points.
 
 - condition_col:
@@ -90,6 +90,6 @@ endpoints map to infinity and are dropped on the transformed scale.
 
 ## See also
 
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
-[`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md),
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md),
+[`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md),
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md)

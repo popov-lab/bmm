@@ -3,14 +3,14 @@
 Multinomial Processing Tree (MPT) models measure the probabilities of
 discrete latent cognitive states from categorical responses. A model is
 specified as a set of trees created with
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md),
-one per distinct branch structure, such as one tree for targets and one
-for lures in a recognition test. Branch expressions that terminate in
-the same response category are summed within each tree, and parameters
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md), one
+per distinct branch structure, such as one tree for targets and one for
+lures in a recognition test. Branch expressions that terminate in the
+same response category are summed within each tree, and parameters
 shared across trees are equated by giving them the same name. All latent
 probability parameters are estimated on an unconstrained latent scale
 (logit or probit); predictor formulas supplied via
-[`bmmformula()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
+[`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md)
 apply on that latent scale.
 
 ## Usage
@@ -48,16 +48,16 @@ mpt(
   expressions but are not latent parameters, for example design-fixed
   guessing rates. Covariates pass into the model formulas unchanged and
   have no naming restrictions.
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) stops
-  when, with a row's covariate values, the branches of a tree do not sum
-  to 1, leave (0, 1\], are undefined on the rows of another tree, or
-  when a covariate that a branch uses is missing. Every declared
-  covariate needs a numeric column in the data, also one that no branch
-  uses. The range is checked at the vertices of each branch's parameter
-  box, which is exact when no term of the branch contains the same
-  parameter twice (`a * (1 - b) * G + (1 - a) * c`). A parameter that
-  does is also checked at 0.5, which is exact for a factor `u * (1 - u)`
-  and approximate otherwise, e.g. for `u * (1 - u)^2`.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) stops when,
+  with a row's covariate values, the branches of a tree do not sum to 1,
+  leave (0, 1\], are undefined on the rows of another tree, or when a
+  covariate that a branch uses is missing. Every declared covariate
+  needs a numeric column in the data, also one that no branch uses. The
+  range is checked at the vertices of each branch's parameter box, which
+  is exact when no term of the branch contains the same parameter twice
+  (`a * (1 - b) * G + (1 - a) * c`). A parameter that does is also
+  checked at 0.5, which is exact for a factor `u * (1 - u)` and
+  approximate otherwise, e.g. for `u * (1 - u)^2`.
 
 - simplex:
 
@@ -126,14 +126,14 @@ An object of class `bmmodel`
   per condition, if conditions are crossed with the trees), with one
   count column per response category. The count columns must be named
   exactly like the branch names given to
-  [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
+  [`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md)
   (`old` and `new` in the example below);
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) finds
-  them by these names, so no response variable is passed. The `tree_id`
-  column names the tree of each row, and the counts of a row must come
-  from trials of that tree. Wide tables with one column per category of
-  an EQN file, as MPTinR and TreeBUGS take them, are reshaped with
-  [`mpt_data_reshape()`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md).
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) finds them by
+  these names, so no response variable is passed. The `tree_id` column
+  names the tree of each row, and the counts of a row must come from
+  trials of that tree. Wide tables with one column per category of an
+  EQN file, as MPTinR and TreeBUGS take them, are reshaped with
+  [`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md).
 
   A separate tree is needed only when the *branch expressions* differ,
   that is, when the trial determines which latent processes apply or
@@ -156,20 +156,20 @@ An object of class `bmmodel`
   not part of the model, gets no formula and no prior, cannot be a
   simplex member, and is listed by `print(model)` under `Restrictions:`
   but not by
-  [`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md).
+  [`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md).
   A *constant in the formula* (`bmf(D ~ 1, g = 0.5)`) is applied at fit
   time: the parameter stays part of the model, is listed by
   [`print()`](https://rdrr.io/r/base/print.html) under `Fixed:` and by
-  [`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md)
+  [`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md)
   with its value, and is freed again by giving it a formula. The value
   is mapped to the latent scale when the constant prior is built, so
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   shows `constant(0)` for a guessing rate of 0.5 under the logit link,
   and [`summary()`](https://rdrr.io/r/base/summary.html) lists it as
   `g_Intercept 0.00` under "Constant Parameters";
-  [`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
+  [`prior_info()`](https://venpopov.com/bmm/dev/reference/prior_info.md)
   and
-  [`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md)
+  [`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md)
   show the probability, 0.5. Members of a `simplex` group and their
   `praw` components cannot be fixed this way; fix parameters outside the
   group instead. As a rule of thumb, a constant that defines the model
@@ -184,14 +184,14 @@ An object of class `bmmodel`
   correlation matrices get `lkj(2)`. A parameter switched to the other
   link after construction (`model$links$D <- "probit"`) takes that
   link's priors unless its default prior was replaced.
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   lists the rows a given formula produces.
 
   The default prior of a simplex group of K members is the uniform
   (symmetric Dirichlet(1)) distribution on the simplex: each member has
   prior mean 1/K, whatever the listing order. Under stick breaking this
   is a Beta(1, K - k) prior on stick k, which
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   shows as `logitbeta(1, K - k)` (or `probitbeta(1, K - k)`) on the
   intercept of the k-th `praw`; the last stick keeps `logistic(0, 1)`
   (or `normal(0, 1)`), which is the same distribution. The result is
@@ -208,7 +208,7 @@ An object of class `bmmodel`
   the members listed before it. A predictor on the first member
   therefore scales all later members by the same factor, leaving their
   ratios unchanged. Read such effects on the probability scale with
-  [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md).
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md).
 
   **Identifiability.** Printing the model ends with an identifiability
   check for intercept-only formulas. It compares the number of free
@@ -228,8 +228,8 @@ An object of class `bmmodel`
   non-linear formula, the rank line names that formula's parameter as
   not analysed.
 
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
-  when the rank is deficient and every formula is intercept-only. When a
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) warns when
+  the rank is deficient and every formula is intercept-only. When a
   formula has a predictor or is non-linear, it only says that these may
   identify the parameters and that it did not check.
 
@@ -241,7 +241,7 @@ An object of class `bmmodel`
   **Reading the estimates.**
   [`summary()`](https://rdrr.io/r/base/summary.html) reports intercepts
   and regression coefficients on the latent (logit or probit) scale.
-  [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
   returns the posterior draws of every parameter on the probability
   scale for each observed combination of the predictors, e.g.
   `native_parameters(fit, re_formula = NA, summary = TRUE)`; a
@@ -250,7 +250,7 @@ An object of class `bmmodel`
   participant (the quantity TreeBUGS reports as `"mean"`), not the
   population mean of the participants' probabilities; see the section on
   group-level effects in
-  [`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md).
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md).
 
   Person effects written as `(1 | id)` in each parameter's formula are
   independent across parameters. A shared label, `(1 |p| id)` in every
@@ -262,12 +262,12 @@ An object of class `bmmodel`
   returns simulated counts (draws x rows x categories) and
   [`brms::posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
   the expected counts;
-  [`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md)
-  computes the T1 and T2 statistics of Klauer (2010) and their posterior
-  predictive p-values from them. With `newdata`,
+  [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) computes the
+  T1 and T2 statistics of Klauer (2010) and their posterior predictive
+  p-values from them. With `newdata`,
   [`brms::posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
   needs the columns `nTrials`, `Idx_<tree>` and `Poss_<category>` that
-  [`check_data()`](https://popov-lab.github.io/bmm/dev/reference/check_data.md)
+  [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md)
   builds; `fit$data` contains them.
 
   **Non-linear formulas.** Parameters that receive a non-linear
@@ -297,7 +297,7 @@ An object of class `bmmodel`
   A prior given as `class = "b", nlpar = "D"` replaces the defaults of
   all coefficients of `D`, the intercept included; add
   `coef = "Intercept"` to set the intercept alone. Call
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   to see which rows a given formula produces.
 
 ## Examples

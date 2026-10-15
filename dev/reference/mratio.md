@@ -2,7 +2,7 @@
 
 Extracts the posterior of the M-ratio (\\\mathrm{meta\text{-}d'}/d'\\)
 and of meta-d' from a
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 model fit with `version = "metad"`. That model estimates the log M-ratio
 (`logmratio`) directly, so the M-ratio is `exp(logmratio)` and meta-d'
 is `exp(logmratio) * d`. The M-ratio is the standard measure of
@@ -10,7 +10,7 @@ metacognitive efficiency (Maniscalco & Lau, 2012; Fleming, 2017): 1 is
 ideal metacognition, below 1 is inefficiency, and above 1 is
 hyper-efficiency. Type-1 and type-2 sensitivity are reported on one
 scale, \\d'\\ or, once `sdratio` is estimated, \\d_a\\ (see
-[`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)),
+[`sdt_sensitivity()`](https://venpopov.com/bmm/dev/reference/sdt_sensitivity.md)),
 so the ratio is unaffected by `sdratio`. The type-1 criterion keeps its
 location in the meta-d' space, as in the HMeta-d model equations
 (Fleming, 2017, Appendix); maximum-likelihood meta-d' constrains meta-c'
@@ -28,8 +28,8 @@ mratio(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) from
-  an SDT model.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) from an SDT
+  model.
 
 - conditions:
 
@@ -82,5 +82,5 @@ Consciousness*, *2017*(1), nix007.
 
 ## See also
 
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md),
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)

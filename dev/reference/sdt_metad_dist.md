@@ -5,7 +5,7 @@ Density and random generation for the meta-d' model (Maniscalco & Lau,
 sensitivity `metad`, then rescaled so the total "old"/"new" response
 rates match what type-1 `d` predicts. These are the simulation
 counterparts of the `metad` version of
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md).
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md).
 The old/new boundary is the middle threshold, so the number of rating
 categories must be even (an odd number of `thresholds`).
 
@@ -51,8 +51,8 @@ rsdt_metad(
 
   Numeric vector. Sensitivity: \\d'\\ when `sdratio` is 1, and otherwise
   the balanced index \\d_a\\ (see
-  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)).
-  The separation between the distributions in noise units is
+  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)). The
+  separation between the distributions in noise units is
   `d * sqrt((1 + sdratio^2) / 2)`.
 
 - thresholds:
@@ -75,7 +75,7 @@ rsdt_metad(
   Numeric vector. Ratio of signal to noise standard deviations (default
   1, i.e., equal variance). Must be positive. Note that this is the
   natural scale: the `sdratio` parameter of
-  [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
   is sampled on the log scale, so it corresponds to `log(sdratio)` here.
 
 - dist:

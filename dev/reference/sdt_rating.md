@@ -225,7 +225,7 @@ only – the observed ROC is a mixture of familiarity and recollection, so
 it is not the discriminability of that mixture.
 [`summary()`](https://rdrr.io/r/base/summary.html) reports `Ro` and `Rn`
 on the logit scale;
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)
 returns them as probabilities (attribute `extra`). Two cautions. Freeing
 `sdratio` alongside `Ro` is weakly identified from a single ROC: in
 simulation the two are correlated at about -0.8 in the posterior and
@@ -395,7 +395,7 @@ is parameterized, not this constraint. Maximum-likelihood meta-d'
 instead constrains meta-c' = c' (Maniscalco & Lau, 2014), so its
 estimates differ from bmm's when the criterion is far from the midpoint.
 Extract the M-ratio posterior with
-[`mratio()`](https://popov-lab.github.io/bmm/dev/reference/mratio.md).
+[`mratio()`](https://venpopov.com/bmm/dev/reference/mratio.md).
 
 - **Domain:** Perception & Recognition Memory
 
@@ -515,20 +515,20 @@ By default, the model assumes equal variance (sdratio fixed to 0). To
 estimate unequal variance, add `sdratio ~ 1` (or `sdratio ~ predictors`)
 to the formula.
 
-## Sensitivity is on the same scale as [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
+## Sensitivity is on the same scale as [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)
 
 `d` is \\d'\\ whenever `sdratio` stays fixed at 0, which is every fit
 that does not give `sdratio` a formula. With `sdratio` estimated, `d` is
 the balanced index \\d_a\\ that
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-reports: the separation between the signal and noise distributions
-divided by the root-mean-square of their SDs. Unlike the
-noise-standardized \\d'\\, it remains comparable across conditions that
-differ in `sdratio`; see the sensitivity section of
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-for the reasoning, for how far the two indices lie apart, and for the
-caveat that under the Gumbel distributions \\d_a\\ is not the
-AUC-equivalent index once `sdratio` is estimated.
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) reports:
+the separation between the signal and noise distributions divided by the
+root-mean-square of their SDs. Unlike the noise-standardized \\d'\\, it
+remains comparable across conditions that differ in `sdratio`; see the
+sensitivity section of
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) for the
+reasoning, for how far the two indices lie apart, and for the caveat
+that under the Gumbel distributions \\d_a\\ is not the AUC-equivalent
+index once `sdratio` is estimated.
 
 The criterion and the confidence thresholds are **not** rescaled. They
 stay on the noise-standardized axis, so under unequal variance they and
@@ -549,8 +549,7 @@ around it sit half an interval below and above. A shift in the criterion
 therefore moves the whole threshold set, and the threshold parameters
 (`spacing`, `delta`) describe its shape around that point.
 
-As in
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md),
+As in [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md),
 the formula estimates that point either as `criterion`, measured from
 the mean of the noise distribution, or as `bias`, measured from the
 midpoint between the noise and signal means
@@ -558,19 +557,18 @@ midpoint between the noise and signal means
 that names neither estimates `criterion ~ 1`. The two differ in what a
 linear formula holds constant when `d` or `sdratio` varies; the section
 "Choosing between `criterion` and `bias`" of
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-says which to choose. Threshold locations reported by
-[`sdt_thresholds()`](https://popov-lab.github.io/bmm/dev/reference/sdt_thresholds.md)
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) says
+which to choose. Threshold locations reported by
+[`sdt_thresholds()`](https://venpopov.com/bmm/dev/reference/sdt_thresholds.md)
 and
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md),
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md),
 and the `thresholds` taken by
-[`rsdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating_dist.md)
+[`rsdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating_dist.md)
 and its siblings, are positions measured from the noise mean.
 
 ## Identifying `sdratio`
 
-Unlike
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md), a
+Unlike [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md), a
 rating design identifies `sdratio` from a single condition: the K - 1
 thresholds give K - 1 operating points per condition, which trace the
 ROC; under `dist = "normal"` its z-transform is a line with slope
@@ -578,8 +576,8 @@ ROC; under `dist = "normal"` its z-transform is a line with slope
 identified from K = 3 categories, where it uses every degree of freedom
 (the fit is saturated), and leaves the zROC testable from K = 4; the
 identification caveats on the
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-page do not carry over.
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) page do
+not carry over.
 
 ## References
 

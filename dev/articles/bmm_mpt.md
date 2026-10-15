@@ -61,9 +61,9 @@ functions of those packages onto `bmm`.
 ## 2 Specifying an MPT model
 
 An MPT model is specified as a set of trees. Each tree is created with
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md):
-it has a name, and one branch-probability expression per response
-category, written as a formula `category ~ expression`:
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md): it
+has a name, and one branch-probability expression per response category,
+written as a formula `category ~ expression`:
 
 ``` r
 
@@ -89,9 +89,9 @@ same ones. The formulas only carry the expressions and the response
 category on the left-hand side; nothing in them is evaluated. The
 expressions can equally be given as a named list of character strings,
 which is the form that
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
 and
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
 produce. The two spellings give identical trees:
 
 ``` r
@@ -105,9 +105,9 @@ identical(tree_target, tree_target_strings)
 ```
 
 The trees are combined into a model object with
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md). The
-`tree_id` argument names the data column whose values say which tree
-each observation belongs to; here `item_type`, holding `"target"` and
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md). The `tree_id`
+argument names the data column whose values say which tree each
+observation belongs to; here `item_type`, holding `"target"` and
 `"lure"`, which must match the tree names. The response counts go in
 columns named after the response categories, `old` and `new` (see [Data
 format and simulation](#data-format-and-simulation)). Printing the model
@@ -150,12 +150,12 @@ out. *Locally identified* means the rank is full at the test values, so
 no direction in parameter space leaves every category probability
 unchanged there. Both checks assume intercept-only formulas, which is
 why the printed line says so.
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) follows
-two rules: it warns when the rank is deficient and every formula is
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) follows two
+rules: it warns when the rank is deficient and every formula is
 intercept-only, and it only says that predictors or non-linear formulas
 may identify the parameters, without checking, when any formula has a
 predictor or is non-linear. It does not look at the data.
-[`parameter_info()`](https://popov-lab.github.io/bmm/dev/reference/parameter_info.md)
+[`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md)
 lists the parameters with their links and any fixed values.
 
 `tree_id` is about *structure*, not about experimental manipulations. A
@@ -271,13 +271,13 @@ data (one row per trial with a 1 in the chosen category’s column) also
 work and are only needed when predictors vary from trial to trial.
 
 The distribution functions
-[`dmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md) and
-[`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
-provide the multinomial density and random generation for any
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) model.
-[`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md)
-draws the counts for one tree and one parameter vector; a short function
-around it simulates a hierarchical data set in the shape of TreeBUGS’
+[`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) and
+[`rmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) provide
+the multinomial density and random generation for any
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) model.
+[`rmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) draws the
+counts for one tree and one parameter vector; a short function around it
+simulates a hierarchical data set in the shape of TreeBUGS’
 `genTraitMPT()`: population means on the probability scale, participant
 heterogeneity as standard deviations on the latent scale (here the logit
 scale; the `sigma` of `genTraitMPT()` is on the probit scale, see
@@ -418,7 +418,7 @@ included; add `coef = "Intercept"` to set the intercept alone.
 
 ### 5.1 Population-level probabilities
 
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 turns the latent-scale estimates into probabilities. With
 `re_formula = NA` it sets all person effects to zero, and
 `summary = TRUE` summarizes the transformed draws:
@@ -447,12 +447,12 @@ participants’ probabilities: because the inverse link is non-linear,
 that mean lies closer to 0.5, and the two differ noticeably when the
 latent standard deviation is near 1. The median participant is the
 quantity that TreeBUGS reports as `"mean"` in `getParam()`.
-[`?native_parameters`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`?native_parameters`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 (section “Group-level effects”) explains the distinction.
 
 ### 5.2 Participant-level probabilities
 
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 returns a parameter on the probability scale, population effects and
 random effects combined, for every combination of its predictors in the
 data. `D` depends on the participant only, so this is one row per
@@ -482,7 +482,7 @@ every row of the data and every posterior draw.
 ### 5.3 Posterior predictive checks
 
 Because the model uses a multinomial family,
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md)
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 produces a response-proportion plot: the observed proportion of each
 response category against the posterior predictive distribution.
 
@@ -511,8 +511,8 @@ formula.
 ### 6.1 Equality restrictions and constants at construction
 
 The `restrictions` argument of
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) accepts
-the string syntax of MPTinR and TreeBUGS. A restriction either equates a
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) accepts the
+string syntax of MPTinR and TreeBUGS. A restriction either equates a
 parameter with another one or fixes it to a constant, and chains such as
 `"G1 = G2 = G3"` map all earlier names onto the last. Restrictions are
 substituted into the branch expressions before the parameters are
@@ -548,8 +548,8 @@ model_2htm_restricted
 ```
 
 A constant works the same way.
-[`dmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md) and
-the branch-sum check see the restricted expressions, and
+[`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) and the
+branch-sum check see the restricted expressions, and
 [`plot()`](https://rdrr.io/r/graphics/plot.default.html) labels the
 edges of `g` as `g = 0.5`:
 
@@ -585,7 +585,7 @@ a constant that you compare against a free version into the formula.
 Fixed values are written on the probability scale in both cases; the
 formula mechanism maps them to the latent scale when the constant prior
 is built, so
-[`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+[`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
 shows `constant(0)` for `g = 0.5` under the logit link:
 
 ``` r
@@ -662,18 +662,17 @@ overestimated the gap.
 What an order constraint does not do is restore identifiability.
 Replacing `Do` by `phi` leaves three free parameters against the two
 degrees of freedom of a single old/new test, so
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) still
-reports the rank deficit of the branch expressions, as a message here
-because the formula for `Do` is non-linear. The constraint makes the
-posterior proper and the ordering certain, and the hierarchical
-structure contributes what the aggregate counts cannot, but the lower
-parameter is identified mainly by the prior and the order: in the
-validation above, the 95% credible interval of \\D_n\\ averaged 0.3 to
-0.4 in width, two to four times that of \\D_o\\ (0.1 to 0.2), and
-exceeded half the unit interval in 6 of the 20 interpolation fits. Read
-the interval before interpreting the smaller parameter, and prefer a
-design with a second response-bias condition when both detection
-parameters matter.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) still reports
+the rank deficit of the branch expressions, as a message here because
+the formula for `Do` is non-linear. The constraint makes the posterior
+proper and the ordering certain, and the hierarchical structure
+contributes what the aggregate counts cannot, but the lower parameter is
+identified mainly by the prior and the order: in the validation above,
+the 95% credible interval of \\D_n\\ averaged 0.3 to 0.4 in width, two
+to four times that of \\D_o\\ (0.1 to 0.2), and exceeded half the unit
+interval in 6 of the 20 interpolation fits. Read the interval before
+interpreting the smaller parameter, and prefer a design with a second
+response-bias condition when both detection parameters matter.
 
 One pitfall to avoid: do **not** write the latent offset against the
 parameter name directly, as in `Do ~ inv_logit(Dn + exp(delta))`. The
@@ -761,7 +760,7 @@ Dirichlet(1): every way of splitting the guessing probability among
 breaking this is a Beta(1, 2) prior on the first stick (`gA`’s share)
 and a Beta(1, 1) prior on the second (`gB`’s share of what `gA` leaves),
 which
-[`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+[`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
 shows on the latent scale as `logitbeta(1, 2)` for `gAraw` and
 `logistic(0, 1)` for `gBraw`. The 1/3 holds in every cell when the
 members get cell-means formulas (`gA ~ 0 + cond`); under `gA ~ 1 + cond`
@@ -834,14 +833,14 @@ exist as numeric columns in the data (for example,
 MPT software supports, because the guessing rates can vary continuously
 across trials or conditions. When the data are checked, the branch sums
 are re-evaluated with the observed covariate values row by row, and
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) stops
-when covariate columns violate their joint constraints.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) stops when
+covariate columns violate their joint constraints.
 
 ## 8 Fitting real data
 
 The `oberauer_lewandowsky_2019_e1` data set that the [m3
-article](https://popov-lab.github.io/bmm/articles/bmm_m3.html) analyzes
-with activation-based measurement models can equally be described by a
+article](https://venpopov.com/bmm/articles/bmm_m3.html) analyzes with
+activation-based measurement models can equally be described by a
 processing-tree model, which makes for an instructive real-data example.
 Participants recalled a list item from a set of candidates in three
 conditions: in the `new distractors` condition the response set
@@ -892,7 +891,7 @@ without any indicator-variable bookkeeping.
 One response category is impossible in the no-distractor conditions:
 `dist` responses cannot occur there. Listing it in the `impossible`
 argument of
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md)
 removes it from that tree’s branch list (the remaining branches then
 have to sum to 1 among themselves), and `bmm` gives the category a large
 negative linear predictor for the rows concerned. Because the model is
@@ -900,8 +899,8 @@ estimated on the log scale and the multinomial family renormalizes
 across categories, this is an exact zero for practical purposes, and no
 probability has to be taken away from the other branches to compensate.
 Written with candidate-count fractions, which
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
-folds into decimal literals, the trees are:
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md) folds
+into decimal literals, the trees are:
 
 ``` r
 
@@ -1071,8 +1070,7 @@ is computed once for the observed counts and once for counts simulated
 from the model, both against the expected counts of the same posterior
 draw. The PPP is the proportion of draws in which the simulated data
 deviate more than the observed data; a PPP near 0 flags misfit.
-[`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md) computes
-both:
+[`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) computes both:
 
 ``` r
 
@@ -1090,10 +1088,10 @@ By default, a cell combines the tree column with the categorical
 predictors of the formula, here `tree` and `cond`, which gives the three
 conditions; the `by` argument changes this. The participants for \\T_2\\
 come from the grouping variable of the random effects, `ID`.
-[`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md) sums the
-counts of a cell over participants, where Klauer (2010) and TreeBUGS
-average them; with the same number of participants in every cell, as
-here, both give the same PPP.
+[`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) sums the counts
+of a cell over participants, where Klauer (2010) and TreeBUGS average
+them; with the same number of participants in every cell, as here, both
+give the same PPP.
 
 The \\T_1\\ PPP of 0.5 shows that the model reproduces the category
 frequencies of each condition. The \\T_2\\ PPP of 0.024 is small: data
@@ -1106,7 +1104,7 @@ person effects, `(0 + cond | ID)` or the `|p|` syntax described under
 are the first extension to try.
 
 With `level = "participant"`,
-[`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md) computes
+[`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) computes
 \\T_1\\ and its PPP for each participant separately, as TreeBUGS does,
 to find the participants the model fits poorly:
 
@@ -1214,15 +1212,15 @@ post-warmup draws than a posterior summary needs, so that the estimate
 is stable when repeated. The fits in this article were fitted without
 these settings, so the sampler cannot be run on them here. The
 [hypothesis testing
-article](https://popov-lab.github.io/bmm/articles/bmm_hypothesis_testing.html)
+article](https://venpopov.com/bmm/articles/bmm_hypothesis_testing.html)
 shows the full workflow.
 
 ### 8.6 Relation to the m3 model
 
 This MPT is not merely inspired by the [m3 analysis of the same
-data](https://popov-lab.github.io/bmm/articles/bmm_m3.html): under the
-`simple` choice rule the two models are *the same likelihood* in
-different parameterizations. With the m3 activations `corr ~ b + a + c`,
+data](https://venpopov.com/bmm/articles/bmm_m3.html): under the `simple`
+choice rule the two models are *the same likelihood* in different
+parameterizations. With the m3 activations `corr ~ b + a + c`,
 `other ~ b + a`, `dist ~ b + d`, `npl ~ b` (candidate counts 1, 4, 5, 5
 and \\S = 15b + 5a + c + 5d\\), the mapping is
 
@@ -1267,7 +1265,7 @@ zero, the posterior can develop a funnel geometry, and increasing
 ## 10 Importing existing model definitions
 
 Models written for other MPT software can be imported directly.
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
 reads EQN files (used by multiTree, MPTinR and TreeBUGS). Each line
 holds the tree, the response category and one branch expression; lines
 that end in the same category are summed. Parameter names containing
@@ -1328,20 +1326,20 @@ refer to the same response. Lines whose category carries a `<tree>_`
 prefix have the prefix removed automatically. Two more arguments cover
 the remaining differences between files: a tree that has no branch for
 some of the shared categories declares them with `impossible`, as in
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md),
-and numeric tree labels are renamed with `tree_names`,
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md), and
+numeric tree labels are renamed with `tree_names`,
 e.g. `tree_names = c("1" = "target", "2" = "lure")`, because `bmm` tree
 names start with a letter.
 
 The file above starts with the equation count, the first line of
 classical EQN files, which
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
 skips. TreeBUGS and MPTinR skip the first line whatever it holds, while
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
 reads any other first line as an equation. A file without the count line
 therefore gives `bmm` one equation more than those programs read; the
 details of
-[`?mpt_from_eqn`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md)
+[`?mpt_from_eqn`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
 list the cases.
 
 Restrictions are written with the names used in the EQN file and renamed
@@ -1380,7 +1378,7 @@ mpt_from_eqn(
 #> Use parameter_info() for parameter descriptions, links and fixed values.
 ```
 
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
 reads MPTinR-style model definitions (Singmann and Kellen 2013), where
 each line is a branch expression, blank lines separate trees, and inline
 comments name the response categories:
@@ -1423,7 +1421,7 @@ models; 3 trees, 10 response categories, TreeBUGS latent-trait
 structure) can be imported from the model text in their Experiment 1
 TreeBUGS scripts: saved to a file without its title line, it is in EQN
 layout for
-[`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md).
+[`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md).
 Fitting them took two steps beyond the import: the nine guessing
 probabilities that the design fixes went into `restrictions`, and the
 wide frequency table was reshaped as shown under [Migrating from MPTinR
@@ -1445,19 +1443,19 @@ conventions. The table maps the functions and arguments of MPTinR
 
 | MPTinR / TreeBUGS | `bmm` |
 |----|----|
-| model file (EQN, MPTinR text) | [`mpt_from_eqn()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_eqn.md), [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md), or [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md) + [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) |
+| model file (EQN, MPTinR text) | [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md), [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md), or [`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md) + [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) |
 | wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation](#data-format-and-simulation)) |
 | reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_data_reshape(wide, model)`, or `mpt_data_reshape(wide, model, columns = "mptinr")` |
 | `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS’ `FE` has no restriction counterpart: leave the random effect out of that parameter’s formula |
 | `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model](#specifying-an-mpt-model)) |
-| `fit.mpt()`, `betaMPT()`, `traitMPT()` | [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) with the random-effect structure written in the formula (see below) |
+| `fit.mpt()`, `betaMPT()`, `traitMPT()` | [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) with the random-effect structure written in the formula (see below) |
 | `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
 | `transformedParameters` | [`brms::hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html), or arithmetic on the posterior draws |
 | `getParam(fit, "theta")` | `native_parameters(fit, pars = "D", summary = TRUE)` |
 | `getParam(fit, "mean")` | `native_parameters(fit, re_formula = NA, summary = TRUE)`: the probability of the median participant, as in TreeBUGS ([Population-level probabilities](#population-level-probabilities)) |
-| `probitInverse()` | [`?native_parameters`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md), section “Group-level effects” |
-| `genTraitMPT()`, `genBetaMPT()` | [`rmpt()`](https://popov-lab.github.io/bmm/dev/reference/mptdist.md) inside a small simulation function ([Data format and simulation](#data-format-and-simulation)) |
-| `PPP()` | [`ppp()`](https://popov-lab.github.io/bmm/dev/reference/ppp.md): \\T_1\\ and \\T_2\\ with their posterior predictive p-values, and with `level = "participant"` the \\T_1\\ of each participant ([Goodness of fit: T1 and T2](#goodness-of-fit-t1-and-t2)); [`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md) for the plot |
+| `probitInverse()` | [`?native_parameters`](https://venpopov.com/bmm/dev/reference/native_parameters.md), section “Group-level effects” |
+| `genTraitMPT()`, `genBetaMPT()` | [`rmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) inside a small simulation function ([Data format and simulation](#data-format-and-simulation)) |
+| `PPP()` | [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md): \\T_1\\ and \\T_2\\ with their posterior predictive p-values, and with `level = "participant"` the \\T_1\\ of each participant ([Goodness of fit: T1 and T2](#goodness-of-fit-t1-and-t2)); [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md) for the plot |
 | [`WAIC()`](https://paulbuerkner.com/brms/reference/waic.brmsfit.html), `select.mpt()` | [`loo()`](https://mc-stan.org/loo/reference/loo.html), [`waic()`](https://mc-stan.org/loo/reference/waic.html) and [`bayes_factor()`](https://rdrr.io/pkg/bridgesampling/man/bf.html) from **brms**; for aggregated counts see [Model comparison](#model-comparison) before using any of them |
 | `testHetChi()`, `testHetPerm()` | these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In `bmm`, compare models with and without person effects ([Model comparison](#model-comparison)) |
 | `BayesFactorMPT()`, `BayesFactorSlope()` | [`brms::bayes_factor()`](https://rdrr.io/pkg/bridgesampling/man/bf.html) on fits stored with `save_pars = save_pars(all = TRUE)` ([Model comparison](#model-comparison)) |
@@ -1466,7 +1464,7 @@ conventions. The table maps the functions and arguments of MPTinR
 `genTraitMPT()`’s `data`, one row per participant and one column per EQN
 category, becomes one row per participant and tree, with the counts
 under the shared response categories.
-[`mpt_data_reshape()`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md)
+[`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md)
 does the reshape for the imported model, matching the columns by the
 category labels of the EQN file; columns that are no counts, such as a
 between-participant factor, are carried to every row, and `id =` names
@@ -1491,7 +1489,7 @@ tree and then by category label, the order of
 that order. The row sums are the trials per row, but they cannot show
 swapped columns, so compare one participant’s long rows with the wide
 row and run
-[`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
+[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
 before fitting (the identifiability warning it prints is the single-test
 2HTM result discussed above):
 
@@ -1524,9 +1522,9 @@ bmm_data_check(bmf(Do ~ 1, Dn ~ 1, g ~ 1), long, model_eqn)
 ```
 
 For a model from
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
-or [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md), name
-the columns `<tree>.<category>` instead, e.g. `target.old`.
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
+or [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), name the
+columns `<tree>.<category>` instead, e.g. `target.old`.
 
 **The random-effect structure is written as a formula, not chosen from a
 menu.** The two families of hierarchical MPT models map onto the `|` and

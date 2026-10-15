@@ -23,7 +23,7 @@ for, one line per model with its constructor and full name. The groups
 are: continuous reproduction; categorical recall and n-AFC decisions;
 detection, recognition and confidence judgments; choices and response
 times; processing-tree models. Type `?modelname` (for example
-[`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for the
+[`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)) for the
 arguments of a model.
 
 ## Examples

@@ -128,8 +128,8 @@ An object of class `bmmodel`
 By default, `zr` is fixed at 0 on its logit link scale, that is at an
 unbiased starting point of `zr = 0.5`. If you want to estimate `zr`, add
 a formula for `zr` in your
-[`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
-call. Estimates of `zr` are on the logit scale too, so use
+[`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md) call.
+Estimates of `zr` are on the logit scale too, so use
 [`plogis()`](https://rdrr.io/r/stats/Logistic.html) to read them as
 proportions.
 

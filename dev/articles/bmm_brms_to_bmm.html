@@ -40,8 +40,8 @@
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Functions</a></li>
 <li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
-<li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/dev-notes/index.html">Develop</a></li>
-<li class="nav-item"><a class="nav-link" href="https://popov-lab.github.io/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/dev-notes/index.html">Develop</a></li>
+<li class="nav-item"><a class="nav-link" href="https://venpopov.com/bmm/parameter-recovery/index.html">Parameter recovery</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -350,7 +350,7 @@ lists the columns it expects.</p>
 regressions, one for each parameter of the model. Each one is a regular <code>brms</code>
 formula, with population-level effects, group-level effects in the <code>lme4</code>
 syntax, and non-linear terms if you need them. The
-<a href="https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html">bmmformula article</a>
+<a href="https://venpopov.com/bmm/articles/bmm_bmmformula.html">bmmformula article</a>
 covers the syntax in full, including how to fix a parameter to a constant.</p>
 <div class="section level3" number="4.1">
 <h3 id="setsize-or-1-setsize">
@@ -735,7 +735,7 @@ example <code>prior(normal(1.5, 0.5), class = b, nlpar = kappa)</code>, again on
 scale. With <code>0 + setsize</code>, this sets the prior of every cell of <code>kappa</code>. With
 <code>1 + setsize</code>, it sets the prior of the differences only; the intercept takes
 <code>coef = "Intercept"</code>, as <code><a href="../reference/default_prior.bmmformula.html">default_prior()</a></code> shows for that coding. The
-<a href="https://popov-lab.github.io/bmm/articles/bmm_extract_info.html">article on extracting model information</a>
+<a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">article on extracting model information</a>
 shows the details.</li>
 <li>Bayes factors depend on the priors much more than estimates do. If you plan to
 compute them, choose the priors on purpose rather than taking the defaults.</li>
@@ -760,14 +760,14 @@ want to change a model beyond what <code>bmm</code> offers, these give you the <
 </h2>
 <ul>
 <li>
-<a href="https://popov-lab.github.io/bmm/articles/bmm.html">Get started</a> lists the
+<a href="https://venpopov.com/bmm/articles/bmm.html">Get started</a> lists the
 models by task and walks through a first fit.</li>
-<li>The <a href="https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html">bmmformula article</a>
+<li>The <a href="https://venpopov.com/bmm/articles/bmm_bmmformula.html">bmmformula article</a>
 covers the formula syntax.</li>
-<li>The <a href="https://popov-lab.github.io/bmm/articles/bmm_mixture_models.html">mixture models article</a>
+<li>The <a href="https://venpopov.com/bmm/articles/bmm_mixture_models.html">mixture models article</a>
 fits the two- and three-parameter mixture models to a larger data set.</li>
 <li>
-<a href="https://popov-lab.github.io/bmm/articles/bmm_extract_info.html">Extracting model information</a>
+<a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">Extracting model information</a>
 shows how to get the default priors, the Stan code and the Stan data before
 you fit.</li>
 </ul>

@@ -26,7 +26,7 @@ pp_check(
 - object:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md).
 
 - type:
 
@@ -40,8 +40,8 @@ pp_check(
   statistic like a histogram, with bars for the observed number of
   observations per bin and points with intervals for the predicted
   number. It is the default for the
-  [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md)
-  accuracy check.
+  [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) accuracy
+  check.
 
 - ndraws:
 
@@ -57,34 +57,33 @@ pp_check(
   when specified, the grouped variant of `type` (e.g.,
   `"dens_overlay_grouped"`) is auto-selected if available. For
   multinomial models, facets by the named predictor. For the
-  [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
   model `group` defaults to the `stimulus` variable so the signal and
   noise rating distributions are checked separately; pass `group = NA`
   to pool them into a single profile. The
-  [`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+  [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
   model shows the rank positions as the categories of the proportion
   profile; for mixed set sizes, pass the set-size column as `group` so
   each facet has a homogeneous denominator. For
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) fits,
-  the `tree_id` column can be named even if no parameter formula uses
-  it, giving one facet per tree; the default pools the trees. The
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits, the
+  `tree_id` column can be named even if no parameter formula uses it,
+  giving one facet per tree; the default pools the trees. The
   custom-family models
-  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-  and
-  [`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
+  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+  [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)
   delegate to
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html);
   for their aggregated counts an overlaid empirical CDF
   (`type = "ecdf_overlay"`, adding `group = "stimulus"` for
-  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md))
-  is usually clearer than the default bar view.
+  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)) is
+  usually clearer than the default bar view.
 
 - resp_var:
 
   Character. For models that declare several observables, the name of
   the observable to check, or `"all"` for a panel of all available
   checks built from one shared simulation. See
-  [`pp_check_vars()`](https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.md)
+  [`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)
   for the options of a fitted model. The default `NULL` checks the
   primary response via
   [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html),
@@ -117,8 +116,8 @@ pp_check(
 ## Value
 
 For multinomial models, for a 4-parameter
-[`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md) fit
-with placeholders in `mean_rt_upper`, or when `resp_var` is specified, a
+[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) fit with
+placeholders in `mean_rt_upper`, or when `resp_var` is specified, a
 `ggplot2` object (a `bayesplot_grid` for `resp_var = "all"`). For other
 models, the result of
 [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html).
@@ -131,23 +130,23 @@ medians with credible intervals are shown as point-ranges, using the
 bayesplot default colour scheme and theme.
 
 Some models describe several observables jointly (e.g.
-[`ddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm.md):
-response times *and* responses;
-[`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md): mean
-RT, RT variance *and* accuracy), but brms only ever checks the primary
+[`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md): response times
+*and* responses;
+[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md): mean RT, RT
+variance *and* accuracy), but brms only ever checks the primary
 response. For these models the `resp_var` argument selects which
 observable to check;
-[`pp_check_vars()`](https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.md)
+[`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)
 lists the available checks. All selected observables are drawn from
 **one** joint posterior predictive simulation, so `resp_var = "all"`
 panels are mutually consistent.
 
 Some observables are undefined for some cells — an
-[`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md)
-boundary has no mean response time when fewer than two responses reach
-it. Observations whose *observed* value is undefined are dropped from
-the check; undefined values in the *simulated* replicates are absorbed
-by dropping those posterior draws instead, so the number of observations
+[`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) boundary has
+no mean response time when fewer than two responses reach it.
+Observations whose *observed* value is undefined are dropped from the
+check; undefined values in the *simulated* replicates are absorbed by
+dropping those posterior draws instead, so the number of observations
 checked does not depend on `ndraws`. Dropped draws are not missing at
 random — they are draws whose parameters made a boundary sparse — so the
 retained predictive is mildly conditioned; both reductions are reported
@@ -157,4 +156,4 @@ panel, so the panels are computed on the same observations and draws.
 ## See also
 
 [`brms::pp_check()`](https://mc-stan.org/bayesplot/reference/pp_check.html),
-[`pp_check_vars()`](https://popov-lab.github.io/bmm/dev/reference/pp_check_vars.md)
+[`pp_check_vars()`](https://venpopov.com/bmm/dev/reference/pp_check_vars.md)

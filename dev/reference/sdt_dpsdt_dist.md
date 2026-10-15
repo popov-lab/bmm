@@ -6,7 +6,7 @@ Yonelinas, 2024). Extends rating SDT with recollection probabilities
 `Ro` (old items recollected as old) and `Rn` (new items recall-rejected)
 that add mass to the most-confident rating category. These are the
 simulation counterparts of the `dpsdt` version of
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md);
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md);
 here `Ro`/`Rn` are supplied directly as probabilities in `[0, 1]`.
 
 ## Usage
@@ -53,8 +53,8 @@ rsdt_dpsdt(
 
   Numeric vector. Sensitivity: \\d'\\ when `sdratio` is 1, and otherwise
   the balanced index \\d_a\\ (see
-  [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)).
-  The separation between the distributions in noise units is
+  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)). The
+  separation between the distributions in noise units is
   `d * sqrt((1 + sdratio^2) / 2)`.
 
 - thresholds:
@@ -81,7 +81,7 @@ rsdt_dpsdt(
   Numeric vector. Ratio of signal to noise standard deviations (default
   1, i.e., equal variance). Must be positive. Note that this is the
   natural scale: the `sdratio` parameter of
-  [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
   is sampled on the log scale, so it corresponds to `log(sdratio)` here.
 
 - dist:

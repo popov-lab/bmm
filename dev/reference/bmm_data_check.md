@@ -3,11 +3,10 @@
 Inspect whether your data is coded the way a `bmmodel` expects *before*
 committing to Stan compilation and sampling. The function runs the same
 validation pipeline that
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) runs
-internally
-([`check_data()`](https://popov-lab.github.io/bmm/dev/reference/check_data.md)
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) runs internally
+([`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md)
 and
-[`check_formula()`](https://popov-lab.github.io/bmm/dev/reference/check_formula.md)),
+[`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md)),
 but captures all errors, warnings and messages instead of throwing them,
 and combines them with a readable summary of:
 
@@ -26,18 +25,17 @@ and combines them with a readable summary of:
   degrees rather than radians for circular models, or misplaced `NA`
   values in the non-target features of set size varying designs). These
   are provided by
-  [`data_check_findings()`](https://popov-lab.github.io/bmm/dev/reference/data_check_findings.md)
+  [`data_check_findings()`](https://venpopov.com/bmm/dev/reference/data_check_findings.md)
   methods, which new models can extend
 
 Problems are reported as findings rather than errors, so a single call
 shows everything that needs fixing at once.
 
 The report covers the data and the formula only. It stops after
-[`check_formula()`](https://popov-lab.github.io/bmm/dev/reference/check_formula.md)
+[`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md)
 and takes no `prior` argument, so a malformed custom prior or a problem
 with the initial values is out of its reach and will only surface when
-you call
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
+you call [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md).
 
 ## Usage
 
@@ -62,13 +60,13 @@ bmm_data_check(formula, data, model, min_trials = 10)
 
   A description of the model to be fitted. This is a call to a `bmmodel`
   such as
-  [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   function. Every model function has a number of required arguments
   which need to be specified within the function call. Call
-  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
+  [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
   to see the list of supported models, and `?modelname` (for example
-  [`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for
-  their required arguments.
+  [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)) for their
+  required arguments.
 
 - min_trials:
 
@@ -85,9 +83,9 @@ all `findings`, and the captured results of the validation `pipeline`.
 
 ## See also
 
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md),
-[`check_data()`](https://popov-lab.github.io/bmm/dev/reference/check_data.md),
-[`data_check_findings()`](https://popov-lab.github.io/bmm/dev/reference/data_check_findings.md)
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md),
+[`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md),
+[`data_check_findings()`](https://venpopov.com/bmm/dev/reference/data_check_findings.md)
 
 ## Examples
 

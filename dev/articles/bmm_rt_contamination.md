@@ -24,8 +24,8 @@ one for each type of model it supports:
 
 | Model | Data type | Function | Role |
 |----|----|----|----|
-| EZDM | Aggregated stats | [`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md) | Required during aggregation |
-| DDM / csWald | Trial-level | [`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md) | Optional preprocessing |
+| EZDM | Aggregated stats | [`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md) | Required during aggregation |
+| DDM / csWald | Trial-level | [`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md) | Optional preprocessing |
 
 Both fit a mixture model via the EM algorithm, separating cognitive RTs
 from a uniform contaminant distribution (Ratcliff and Tuerlinckx 2002):
@@ -65,7 +65,7 @@ my_data |>
 
 As an example, we use data from Ratcliff and Rouder (1998), available in
 the `rtdists` package. First we show how the
-[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 method options work on a single participant’s data from the accuracy
 instruction condition in this data. The histogram below shows a long
 tail of slow RTs, which are likely contaminants:
@@ -111,7 +111,7 @@ bind_rows(
 #>       method   mean_rt     var_rt  accuracy contaminant_prop
 #> ...1  simple 0.8231905 0.39684254 0.4752726               NA
 #> ...2  robust 0.6440000 0.05804206 0.4752726               NA
-#> mu   mixture 0.7500167 0.11366858 0.4745630       0.02797528
+#> mu   mixture 0.7500098 0.11366415 0.4745630       0.02797548
 ```
 
 The mixture method also returns a contamination proportion estimate. The
@@ -154,8 +154,7 @@ conditions with `ezdm_summary_stats(method = "mixture")`, then fit the
 EZDM to those summary stats. The returned `n_upper` and `n_trials`
 already exclude the estimated contaminants, so they describe the same
 responses as the returned `mean_rt` and `var_rt`, and you can pass them
-to [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md)
-unchanged.
+to [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) unchanged.
 
 ``` r
 
@@ -202,7 +201,7 @@ a cell of ten trials, the default `min_trials`.
 
 DDM and csWald work with individual trials, so contamination handling is
 optional.
-[`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
+[`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
 implements the same mixture modelling approach as
 `ezdm_summary_stats(method = "mixture")` and returns a contamination
 probability for each trial; You can use these probabilities in various
@@ -217,12 +216,12 @@ flagged <- rr98_subset |>
 
 head(flagged)
 #>      rt response strength correct contam_prob
-#> 1 0.801    upper        8    TRUE 0.002307907
-#> 2 0.680    upper        7    TRUE 0.001599956
-#> 3 0.694    lower       19    TRUE 0.001669001
-#> 4 0.582    lower       21   FALSE 0.001215208
-#> 5 0.925    upper       19   FALSE 0.003359717
-#> 6 0.605    upper       10    TRUE 0.001286845
+#> 1 0.801    upper        8    TRUE 0.002307926
+#> 2 0.680    upper        7    TRUE 0.001599957
+#> 3 0.694    lower       19    TRUE 0.001669003
+#> 4 0.582    lower       21   FALSE 0.001215204
+#> 5 0.925    upper       19   FALSE 0.003359771
+#> 6 0.605    upper       10    TRUE 0.001286841
 ```
 
 Diagnostics (convergence, parameters, log-likelihood) are available via
@@ -233,7 +232,7 @@ Diagnostics (convergence, parameters, log-likelihood) are available via
 probs <- flag_contaminant_rts(rr98_subset$rt)
 attr(probs, "diagnostics")
 #>   mixture_params contaminant_prop converged iterations    loglik n_trials
-#> 1   0.420729....       0.02797528      TRUE         12 -926.5735     3943
+#> 1   0.420729....       0.02797548      TRUE         13 -926.5735     3943
 #>   distribution     method
 #> 1   exgaussian mixture_em
 ```
@@ -321,7 +320,7 @@ fit <- bmm(
 
 In 2AFC tasks, if fast contaminants are truly random guesses, their
 accuracy should be around 50%. The helper function
-[`validate_fast_guesses()`](https://popov-lab.github.io/bmm/dev/reference/validate_fast_guesses.md)
+[`validate_fast_guesses()`](https://venpopov.com/bmm/dev/reference/validate_fast_guesses.md)
 checks this with a Bayesian Beta-Binomial test (Savage-Dickey Bayes
 Factor):
 
@@ -396,7 +395,7 @@ ezdm_data |>
 #> 1 jf    speed                      0.00161                0.00145
 #> 2 jf    accuracy                   0.0316                 0.0240 
 #> 3 kr    speed                      0.00241                0.00362
-#> 4 kr    accuracy                   0.0147                 0.0284 
+#> 4 kr    accuracy                   0.0147                 0.0285 
 #> 5 nh    speed                      0.00257                0.00155
 #> 6 nh    accuracy                   0.0396                 0.0506
 ```
@@ -503,7 +502,7 @@ implausible RTs are filtered beforehand.
 The ex-Gaussian distribution is a safe starting point. Try log-normal if
 you have heavy tails, or inverse Gaussian if you want a closer match to
 the Wiener process. See
-[`?ezdm_summary_stats`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`?ezdm_summary_stats`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 for details.
 
 When the EM fails to converge, it usually means too few trials, bounds
@@ -511,10 +510,10 @@ that do not fit the data well, or a contaminant proportion close to
 zero, where the EM converges slowly. In the last case the warning says
 that the EM stopped at `maxit` (default 500), and a larger `maxit`
 usually lets it converge.
-[`flag_contaminant_rts()`](https://popov-lab.github.io/bmm/dev/reference/flag_contaminant_rts.md)
+[`flag_contaminant_rts()`](https://venpopov.com/bmm/dev/reference/flag_contaminant_rts.md)
 then returns `NA` for every trial of the group, and
 `attr(result, "diagnostics")$converged` is `FALSE`.
-[`ezdm_summary_stats()`](https://popov-lab.github.io/bmm/dev/reference/ezdm_summary_stats.md)
+[`ezdm_summary_stats()`](https://venpopov.com/bmm/dev/reference/ezdm_summary_stats.md)
 has no such attribute. It warns and falls back to robust moments, and
 `n_upper` and `n_trials` stay the raw counts.
 

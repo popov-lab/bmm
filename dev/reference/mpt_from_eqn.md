@@ -2,9 +2,9 @@
 
 Reads an EQN model file, the format used by multiTree, MPTinR, and
 TreeBUGS, and returns the corresponding
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) model
-object; model files in MPTinR's own "easy" format are read by
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md).
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) model object;
+model files in MPTinR's own "easy" format are read by
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md).
 Each line of an EQN file contains three whitespace-separated fields –
 tree, response category, branch probability expression – and branch
 lines that terminate in the same response category of a tree are summed.
@@ -35,13 +35,13 @@ mpt_from_eqn(
 - restrictions:
 
   Parameter restrictions as in
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md),
-  written with the parameter names used in the EQN file, e.g.
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), written with
+  the parameter names used in the EQN file, e.g.
   `c("D_n = D_o", "g = 0.5")` or `list(D_n = "D_o", g = 0.5)`. They
   mirror the `restrictions` argument of MPTinR and TreeBUGS and are
   renamed together with the parameters. Restriction files are not read:
   pass their lines (the Examples of
-  [`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+  [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
   read one with [`readLines()`](https://rdrr.io/r/base/readLines.html)).
 
 - categories:
@@ -62,15 +62,14 @@ mpt_from_eqn(
 
   Character. Name of the data column whose values name the tree each
   observation belongs to (see
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)). Add
-  this column to the data yourself: for each row it holds the name of
-  the tree the counts come from, as printed by the model (the file's
-  label, or its replacement from `tree_names`).
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)). Add this
+  column to the data yourself: for each row it holds the name of the
+  tree the counts come from, as printed by the model (the file's label,
+  or its replacement from `tree_names`).
 
 - covariates, simplex, links:
 
-  passed to
-  [`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md).
+  passed to [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md).
   Covariate names are written as in the EQN file and are excluded from
   the renaming; simplex groups use the bmm names. `print(model)` lists
   the symbols that became parameters.
@@ -79,7 +78,7 @@ mpt_from_eqn(
 
   A named list, `list(<tree> = c("<category>", ...))`, of the response
   categories that cannot occur in a tree (see
-  [`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)),
+  [`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md)),
   written with the bmm names of the trees and categories, i.e. the
   `bmm_name` column of the renaming map; `print(model)` lists the shared
   categories under "Response". Trees not listed have no impossible
@@ -98,8 +97,8 @@ mpt_from_eqn(
 ## Value
 
 An object of class `bmmodel` (see
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)), with
-the attributes `mpt_renaming` and `mpt_source` (see Details).
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)), with the
+attributes `mpt_renaming` and `mpt_source` (see Details).
 
 ## Details
 
@@ -138,11 +137,11 @@ tree, that become the same name are an error; mapped values that become
 the same name in different trees are that one shared category. Names are
 case-sensitive, so `P_G1` and `P_g1` stay distinct (`PG1`, `Pg1`). Tree
 labels are kept, unless `tree_names` maps them. The formulas passed to
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) use the
-bmm names (`bmf(Do ~ 1)` for a file parameter `D_o`;
-[`bmf()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md)
-is short for
-[`bmmformula()`](https://popov-lab.github.io/bmm/dev/reference/bmmformula.md));
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) use the bmm
+names (`bmf(Do ~ 1)` for a file parameter `D_o`;
+[`bmf()`](https://venpopov.com/bmm/dev/reference/bmmformula.md) is short
+for
+[`bmmformula()`](https://venpopov.com/bmm/dev/reference/bmmformula.md));
 the `parameter` rows of the renaming map translate them, and
 `print(model)` lists them. Of the arguments that name parameters, only
 `restrictions` and `covariates` use the file's names.
@@ -156,22 +155,22 @@ the two names differ). The names that changed are also reported in a
 message.
 
 **Data for an imported model.**
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) expects
-one row per participant and tree: a column named by `tree_id` holding
-the bmm tree names, and one count column per shared response category,
-named by `bmm_name` in the renaming map (see
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md)). A
-category that is `impossible` in a tree gets 0 (or `NA`) in the rows of
-that tree. TreeBUGS data are wide: one row per participant, one column
-per category label of the EQN file. MPTinR data for an EQN model are
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) expects one row
+per participant and tree: a column named by `tree_id` holding the bmm
+tree names, and one count column per shared response category, named by
+`bmm_name` in the renaming map (see
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)). A category
+that is `impossible` in a tree gets 0 (or `NA`) in the rows of that
+tree. TreeBUGS data are wide: one row per participant, one column per
+category label of the EQN file. MPTinR data for an EQN model are
 unnamed, and their columns do not follow the file: the trees and, within
 each tree, the category labels are sorted (alphabetically, or
 numerically when all labels in the file are numbers);
 `MPTinR::check.mpt("model.eqn")` returns the order in its elements
 `eqn.order.trees` and `eqn.order.categories`. (For MPTinR's own model
 format the columns follow the lines instead; see
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md).)
-[`mpt_data_reshape()`](https://popov-lab.github.io/bmm/dev/reference/mpt_data_reshape.md)
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md).)
+[`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md)
 reshapes both layouts with the renaming map, sums the labels that
 `categories` merged onto one response category, and gives 0 to the
 categories a tree cannot produce (see Examples).
@@ -186,7 +185,7 @@ swapped tree labels and response columns swapped in every tree, but not
 always a column slipped or a map entry wrong in one tree, nor a swap
 between two trees of the same kind; so also compare one participant's
 long rows with the wide row.
-[`bmm_data_check()`](https://popov-lab.github.io/bmm/dev/reference/bmm_data_check.md)
+[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
 runs the remaining checks (columns, tree labels, counts in impossible
 cells) without a fit and prints `Hard checks: passed` when they hold.
 
@@ -197,12 +196,12 @@ file it was built from.
 
 ## See also
 
-[`mpt_from_string()`](https://popov-lab.github.io/bmm/dev/reference/mpt_from_string.md)
+[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
 for model text in MPTinR's own format;
-[`mpt()`](https://popov-lab.github.io/bmm/dev/reference/mpt.md) and
-[`mpt_tree()`](https://popov-lab.github.io/bmm/dev/reference/mpt_tree.md)
-for building the trees in R, including the data layout
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) expects.
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) and
+[`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md) for
+building the trees in R, including the data layout
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) expects.
 
 ## Examples
 

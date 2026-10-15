@@ -1,13 +1,13 @@
-# Aggregate long-format Remember/Know data for [`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
+# Aggregate long-format Remember/Know data for [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
 
 Reshapes long-format Remember/Know recognition data – one row per trial,
 or one row per response category with a count column – into the
 aggregated wide format
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
-is fit to: one row per cell and one count column per response category,
-named `new1 ... new<n_new>`, `know<k>` / `remember<k>` (and `guess<k>`
-when the data contain "guess" judgments), with `k` on the unified
-confidence scale `n_new + 1 ... n_new + n_old`.
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) is fit
+to: one row per cell and one count column per response category, named
+`new1 ... new<n_new>`, `know<k>` / `remember<k>` (and `guess<k>` when
+the data contain "guess" judgments), with `k` on the unified confidence
+scale `n_new + 1 ... n_new + n_old`.
 
 ## Usage
 
@@ -45,16 +45,16 @@ aggregate_sdt_cdp_data(data, judgment, confidence, count = NULL, response = "")
 
   Optional common prefix for the generated count columns (default `""`).
   Pass the same value to the `response` argument of
-  [`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md).
+  [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md).
 
 ## Value
 
 A data frame with one row per cell: the cell-defining columns followed
 by the response count columns, ready to pass to
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) with an
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
-model. The numbers of "new" and "old" confidence levels are inferred
-from the data.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) with an
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) model.
+The numbers of "new" and "old" confidence levels are inferred from the
+data.
 
 ## Examples
 

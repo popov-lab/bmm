@@ -25,7 +25,7 @@ conditional_effects(x, par = NULL, scale = c("native", "sampling"), ...)
 - x:
 
   A bmmfit object (created by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md))
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md))
 
 - par:
 
@@ -92,13 +92,13 @@ bmm models use two types of parameters internally:
 
 - **Non-linear parameters (`nlpar`)**: Model parameters that enter the
   likelihood through a non-linear formula, like `kappa` and `thetat` of
-  [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   or `c` and `a` of
-  [`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md)
+  [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md)
 
 - **Distributional parameters (`dpar`)**: Parameters of the response
   distribution itself, like `kappa` and `c` of
-  [`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)
 
 Users should not need to know this distinction -
 `conditional_effects.bmmfit()` automatically routes to the correct
@@ -125,11 +125,11 @@ sampling.
 `brms` or bmm summarises them on, so for a link other than identity it
 can sit on a different scale than `estimate__`. For example, `se__` of
 `kappa` is on the sampling scale in
-[`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
-and on the native scale in
-[`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md), at
-either `scale`. Use `lower__` and `upper__` to describe uncertainty on
-the requested scale. With `robust = FALSE`, `estimate__` is the mean and
+[`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md) and
+on the native scale in
+[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), at either
+`scale`. Use `lower__` and `upper__` to describe uncertainty on the
+requested scale. With `robust = FALSE`, `estimate__` is the mean and
 `se__` the standard deviation of the draws on that scale, and
 `estimate__` is then mapped to the requested scale: at
 `scale = "native"` the estimate of a non-linear parameter with a log
@@ -139,17 +139,17 @@ exponentiated draws.
 The default of `robust` is `TRUE` (median and MAD), as in
 [`brms::conditional_effects()`](https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html),
 with one exception: `thetat` and `thetant` of
-[`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
-at `scale = "native"` default to `robust = FALSE` (mean and standard
+[`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md) at
+`scale = "native"` default to `robust = FALSE` (mean and standard
 deviation).
 
 ### Models with a multinomial family
 
 In models fitted with a multinomial response
-([`m3()`](https://popov-lab.github.io/bmm/dev/reference/m3.md),
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md),
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md),
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)),
+([`m3()`](https://venpopov.com/bmm/dev/reference/m3.md),
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md),
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)),
 the parameters are latent quantities: they have no predictive
 distribution, no response categories and no response points. For these
 models:

@@ -2,7 +2,7 @@
 
 R companion to the Stan `sdt_rating_logmu` function. It returns
 `log(p_k)` for rating category `cat`, which the
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 multinomial formula uses as the category logit (so `softmax` recovers
 the SDT category probabilities). `brms` evaluates the non-linear formula
 in R for `posterior_predict()` and `posterior_epred()`, so this function

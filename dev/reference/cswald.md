@@ -31,8 +31,8 @@ cswald(rt, response, links = NULL, version = c("simple", "crisk"), ...)
   for `bound`, `ndt` and `s`, and "logit" for `zr`. `drift` has a "log"
   link in "simple", where it is positive, and an "identity" link in
   "crisk", where it can be negative, as in
-  [`ddm()`](https://popov-lab.github.io/bmm/dev/reference/ddm.md) and
-  [`ezdm()`](https://popov-lab.github.io/bmm/dev/reference/ezdm.md). For
+  [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) and
+  [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md). For
   positive parameters, "softplus" is available as an alternative to
   "log" that grows linearly for large values and avoids the numerical
   blow-up of [`exp()`](https://rdrr.io/r/base/Log.html). A name that is
@@ -159,10 +159,9 @@ An object of class `bmmodel`
 
 ## See also
 
-[`dcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
-and
-[`rcswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald_dist.md)
-for the density and random generation functions.
+[`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) and
+[`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) for
+the density and random generation functions.
 
 ## Examples
 

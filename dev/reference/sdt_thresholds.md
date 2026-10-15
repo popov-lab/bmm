@@ -2,17 +2,17 @@
 
 Extracts the \\K-1\\ latent decision thresholds of a rating signal
 detection model fit with
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
-Thresholds are not posterior parameters: they are reconstructed per draw
-from the `criterion` and the parameterization parameters (`spacing`
-and/or `delta*`), whose mapping to ordered thresholds depends on the
-model's `threshold_type`. This function returns those draws on the
-latent decision-variable scale together with a posterior summary, so
-threshold estimates are accessible without knowing the parameterization.
-Which threshold separates "noise" from "signal" responses depends on
-whether the number of categories is even or odd; see the section "Where
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). Thresholds are
+not posterior parameters: they are reconstructed per draw from the
+`criterion` and the parameterization parameters (`spacing` and/or
+`delta*`), whose mapping to ordered thresholds depends on the model's
+`threshold_type`. This function returns those draws on the latent
+decision-variable scale together with a posterior summary, so threshold
+estimates are accessible without knowing the parameterization. Which
+threshold separates "noise" from "signal" responses depends on whether
+the number of categories is even or odd; see the section "Where
 `criterion` sits" in
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md).
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md).
 
 ## Usage
 
@@ -25,8 +25,8 @@ sdt_thresholds(fit, conditions = NULL, probs = c(0.025, 0.975), ...)
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) from
-  an SDT model.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) from an SDT
+  model.
 
 - conditions:
 
@@ -56,14 +56,14 @@ A data frame of class `"bmm_sdt_thresholds"` with columns `marker`
 attribute (`marker`, `position` posterior mean, `lower`, `upper`, plus
 condition columns). The `position`/`lower`/`upper` naming matches the
 `lines` attribute of
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md),
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md),
 which visualises the same quantities. The object also carries `probs`,
 `model_class`, `dist` and `conditions`.
 
 ## See also
 
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md),
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md),
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md)
 
 ## Examples
 

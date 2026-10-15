@@ -5,11 +5,10 @@
 bmm is an R package that translates domain-specific cognitive
 measurement models into brms/Stan syntax for Bayesian hierarchical
 modeling. Users specify models through S3 objects (e.g.,
-[`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md),
-[`imm()`](https://popov-lab.github.io/bmm/dev/reference/imm.md),
-[`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)) which
-are internally transformed into brms distributional families and Stan
-code.
+[`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md),
+[`imm()`](https://venpopov.com/bmm/dev/reference/imm.md),
+[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)) which are
+internally transformed into brms distributional families and Stan code.
 
 **Key Architecture**: Model specification → Formula construction → brms
 translation → Stan compilation
@@ -171,8 +170,8 @@ Each model class needs a `configure_model.*` S3 method in
 
 1.  **Preprocess data** (extract attributes from data checks)
 2.  **Build formula** using
-    [`bmf2bf()`](https://popov-lab.github.io/bmm/dev/reference/bmf2bf.md)
-    to convert bmmformula → brmsformula
+    [`bmf2bf()`](https://venpopov.com/bmm/dev/reference/bmf2bf.md) to
+    convert bmmformula → brmsformula
 3.  **Define family** (often brms mixture distributions)
 4.  **Return** `nlist(formula, data, family, prior, stanvars)`
 
@@ -203,7 +202,7 @@ fixed order. A test must not depend on another file having run, or on
 global state another test leaves behind (options, loaded packages,
 seeds). - Stan compile tests (R-against-Stan parity and gradient checks,
 the two
-[`bmm_setup()`](https://popov-lab.github.io/bmm/dev/reference/bmm_setup.md)
+[`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
 tests that need CmdStan) run on Ubuntu for PRs and on all three OS for
 pushes. Each opens with `skip_unless_stan_tests()`
 (`tests/testthat/helper-tiers.R`; `BMM_TEST_STAN=false` skips them
@@ -238,9 +237,9 @@ mock fit (`backend = "mock", mock_fit = 1`) uses at most two
 participants or 200 rows unless the test is about data size. - R4:
 Cross-model behaviours (default priors, inits, stored frame and
 [`update()`](https://rdrr.io/r/stats/update.html),
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md),
-[`pp_observables()`](https://popov-lab.github.io/bmm/dev/reference/pp_observables.md),
-[`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md),
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md),
+[`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md),
+[`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md),
 report extraction, links) loop over the model-cases registry, never over
 a hand-typed list of models: `model_test_cases(kind)` in
 `helper-model-cases.R` reads one provider per model,
@@ -258,9 +257,9 @@ says in a comment why it needs the time. Run
 `devtools::test(reporter = "slow")` before opening a PR. - R7: A
 `test-model_<name>.R` file tests that model’s contract only: constructor
 validation,
-[`check_data()`](https://popov-lab.github.io/bmm/dev/reference/check_data.md),
-[`configure_model()`](https://popov-lab.github.io/bmm/dev/reference/configure_model.md),
-[`stancode()`](https://popov-lab.github.io/bmm/dev/reference/stancode.bmmformula.md)
+[`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md),
+[`configure_model()`](https://venpopov.com/bmm/dev/reference/configure_model.md),
+[`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
 content (never `nchar(code) > 0`), its d/r functions, Stan parity. - R8:
 A test file seeds through
 [`withr::local_seed()`](https://withr.r-lib.org/reference/with_seed.html),

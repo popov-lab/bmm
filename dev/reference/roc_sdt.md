@@ -2,15 +2,13 @@
 
 Computes the receiver operating characteristic (ROC) curve implied by
 the posterior distribution of a signal detection model fit with
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md). ROC
-curves require a response criterion, so they are defined for
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-and
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). ROC curves
+require a response criterion, so they are defined for
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 only (not the criterion-free
-[`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
-and
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)).
+[`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) and
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)).
 
 ## Usage
 
@@ -30,8 +28,8 @@ roc_sdt(
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) from
-  an SDT model.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) from an SDT
+  model.
 
 - conditions:
 
@@ -93,7 +91,7 @@ For **binary** models the ROC is traced analytically from the posterior
 of `d` (and `sdratio` for unequal-variance SDT) over a grid of criterion
 values. When the criterion varies across conditions but `d`/`sdratio` do
 not (e.g. a base-rate manipulation, as in
-[broeder_schuetz_2009_e3](https://popov-lab.github.io/bmm/dev/reference/broeder_schuetz_2009_e3.md)),
+[broeder_schuetz_2009_e3](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md)),
 the several criteria are operating points on a single curve: `roc_sdt()`
 returns one smooth curve and attaches the model-implied points (one per
 criterion level) as a `points` attribute.
@@ -111,9 +109,9 @@ inefficiency.
 
 ## See also
 
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md),
-[`roc_observed()`](https://popov-lab.github.io/bmm/dev/reference/roc_observed.md),
-[`plot.bmm_sdt_roc()`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_roc.md)
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md),
+[`roc_observed()`](https://venpopov.com/bmm/dev/reference/roc_observed.md),
+[`plot.bmm_sdt_roc()`](https://venpopov.com/bmm/dev/reference/plot.bmm_sdt_roc.md)
 
 ## Examples
 

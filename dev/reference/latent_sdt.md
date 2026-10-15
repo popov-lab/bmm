@@ -2,8 +2,8 @@
 
 Computes the noise and signal latent decision-variable densities implied
 by a fitted
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md) or
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) or
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 model, together with the response criterion (binary) or the K-1
 confidence thresholds (rating). This is the canonical signal detection
 picture: two evidence distributions separated by the sensitivity and cut
@@ -28,8 +28,8 @@ latent_sdt(
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) from
-  an SDT model.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) from an SDT
+  model.
 
 - conditions:
 
@@ -86,7 +86,7 @@ criterion-free `sdt_mafc`/`sdt_ranking` models. When
 `show_competitors = TRUE`, a `competitors` attribute holds the
 max-of-distractors densities. An `extra` attribute carries the
 response-process parameters of the
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 versions as a posterior summary (`parameter`, `mean`, `lower`, `upper`,
 plus condition columns): for `version = "dpsdt"`, `Ro` and `Rn` on the
 probability scale; for `version = "metad"`, the M-ratio (`mratio`) and
@@ -110,13 +110,12 @@ likelihood evaluates the survivor function of the evidence distribution
 at the boundary, which is exactly that area.
 
 Available for all four SDT models.
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-draws the criterion and
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) draws the
+criterion and
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 the K-1 confidence thresholds as boundary lines.
-[`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
-and
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) and
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 have no response criterion – the decision is a max/rank rule over the
 `m` alternatives – so only the densities are drawn (no boundary lines);
 there the noise density represents each of the `m - 1` distractor
@@ -124,7 +123,7 @@ alternatives and the signal density the target.
 
 Because the densities depend only on `d`/`sdratio`, predictors that vary
 the criterion/thresholds *only* (e.g. a base-rate manipulation, as in
-[broeder_schuetz_2009_e3](https://popov-lab.github.io/bmm/dev/reference/broeder_schuetz_2009_e3.md))
+[broeder_schuetz_2009_e3](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md))
 leave the densities unchanged: by default they are collapsed into a
 single panel with their several boundaries overlaid and colour-coded,
 rather than shown as repeated identical panels. Predictors that vary
@@ -134,8 +133,8 @@ predicts `d`. Use `collapse` to override the auto-detection.
 
 ## See also
 
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
-[`plot.bmm_sdt_latent()`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_latent.md)
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md),
+[`plot.bmm_sdt_latent()`](https://venpopov.com/bmm/dev/reference/plot.bmm_sdt_latent.md)
 
 ## Examples
 

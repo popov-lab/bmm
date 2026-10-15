@@ -28,8 +28,8 @@ sdt_sensitivity(
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) from
-  an SDT model.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) from an SDT
+  model.
 
 - measure:
 
@@ -83,11 +83,11 @@ The estimated parameter is \\d_a\\, hence \\\delta = d_a \sqrt{(1 +
 
 All three coincide when `sdratio` is 0 (equal variance), which is the
 case for
-[`sdt_mafc()`](https://popov-lab.github.io/bmm/dev/reference/sdt_mafc.md)
-and for any fit that leaves `sdratio` at its default of 0. The
-conversion is applied draw by draw, so the returned intervals propagate
-the joint posterior uncertainty in `d` and `sdratio` rather than
-combining point estimates.
+[`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) and
+for any fit that leaves `sdratio` at its default of 0. The conversion is
+applied draw by draw, so the returned intervals propagate the joint
+posterior uncertainty in `d` and `sdratio` rather than combining point
+estimates.
 
 Only \\d_a\\ is invariant to which distribution is treated as the
 reference. \\d_N\\ and \\d_S\\ are not comparable across conditions that
@@ -102,14 +102,14 @@ The `criterion` and rating thresholds are not converted: they stay on
 the noise-SD axis whichever sensitivity scale you report. Under the
 Gumbel distributions with `sdratio` estimated, none of the three is the
 AUC-equivalent index; use
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md)
-to compare discriminability on the probability scale.
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md) to
+compare discriminability on the probability scale.
 
 ## See also
 
-[`auc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/auc_sdt.md),
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
-[`latent_sdt()`](https://popov-lab.github.io/bmm/dev/reference/latent_sdt.md)
+[`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md),
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md),
+[`latent_sdt()`](https://venpopov.com/bmm/dev/reference/latent_sdt.md)
 
 ## Examples
 

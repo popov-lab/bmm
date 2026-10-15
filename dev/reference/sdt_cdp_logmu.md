@@ -4,7 +4,7 @@ R companion to the Stan `sdt_cdp_logmu` function. It returns
 `log(p_cat)` for response category `cat` (unnormalized, exactly like the
 Stan function – the category probabilities sum to 1 analytically and
 `softmax` absorbs the shared constant), which the
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
 multinomial formula uses as the category logit. `brms` evaluates the
 non-linear formula in R for `posterior_predict()` and
 `posterior_epred()`, so this function must be on the search path; it is

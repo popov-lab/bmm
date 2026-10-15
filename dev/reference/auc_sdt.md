@@ -28,8 +28,8 @@ auc_sdt(
 - fit:
 
   A `bmmfit` object returned by
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) from
-  an SDT model.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) from an SDT
+  model.
 
 - conditions:
 
@@ -80,8 +80,8 @@ Analytical formulas (equal variance, where \\d_a = d'\\): normal EV-SDT
 
 ## See also
 
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
-[`plot.bmm_sdt_auc()`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_auc.md)
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md),
+[`plot.bmm_sdt_auc()`](https://venpopov.com/bmm/dev/reference/plot.bmm_sdt_auc.md)
 
 ## Examples
 

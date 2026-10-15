@@ -8,8 +8,7 @@ the model. Additionally, it will return all model parameters that have
 no prior specified (flat priors). This can help to get an idea about
 which priors need to be specified and also know which priors were used
 if no user-specified priors were passed to the
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
-function.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function.
 
 The default priors in `bmm` tend to be more informative than the default
 priors in `brms`, as we use domain knowledge to specify the priors.
@@ -55,13 +54,13 @@ default_prior(object, data, model, formula = object, ...)
 
   A description of the model to be fitted. This is a call to a `bmmodel`
   such as
-  [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   function. Every model function has a number of required arguments
   which need to be specified within the function call. Call
-  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
+  [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
   to see the list of supported models, and `?modelname` (for example
-  [`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for
-  their required arguments.
+  [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)) for their
+  required arguments.
 
 - formula:
 
@@ -82,7 +81,7 @@ which priors can be specified.
 
 ## See also
 
-[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
+[`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md),
 [`brms::default_prior()`](https://paulbuerkner.com/brms/reference/default_prior.html)
 
 ## Examples

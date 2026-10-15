@@ -101,12 +101,12 @@ scale, and `exp(-100)` is as close to zero as anyone needs. At the
 default `adapt_delta` of 0.8, the sampler occasionally reports a
 divergent transition for this model, so we raise it; this is a `brms`
 argument and works the same in
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md).
-`file =` saves the fit and loads it on later runs instead of refitting,
-so change the name, or drop the argument, when you change the data or
-the model. The last four priors are not the `brms` defaults. They are
-the priors `bmm` uses for this model, and we pass them here so that both
-fits are the same model. We come back to them in [the section on
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). `file =` saves
+the fit and loads it on later runs instead of refitting, so change the
+name, or drop the argument, when you change the data or the model. The
+last four priors are not the `brms` defaults. They are the priors `bmm`
+uses for this model, and we pass them here so that both fits are the
+same model. We come back to them in [the section on
 priors](#why-the-default-priors-are-informative).
 
 ### 2.3 The model in bmm
@@ -131,7 +131,7 @@ bmm_fit <- bmm(
 ```
 
 The constraints are gone from the code.
-[`mixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p.md)
+[`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
 knows that the locations are 0, that the second component is the
 guessing distribution, and which priors to use. What is left is what you
 want to know: how `kappa` and `thetat`, the weight of the memory
@@ -203,9 +203,9 @@ knitr::kable(comparison, row.names = FALSE)
 For this model, `bmm` adds nothing to the Stan program. It writes the
 `brms` code, checks the data, and picks priors and starting values that
 suit the model. For models that `brms` has no family for, such as
-[`sdm()`](https://popov-lab.github.io/bmm/dev/reference/sdm.md) or
-[`cswald()`](https://popov-lab.github.io/bmm/dev/reference/cswald.md),
-`bmm` also supplies the Stan code of the likelihood.
+[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) or
+[`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md), `bmm`
+also supplies the Stan code of the likelihood.
 
 ## 3 Where the response lives
 
@@ -235,12 +235,12 @@ sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")
 
 Knowing the role of each column lets `bmm` check the data before
 anything is compiled. For instance,
-[`mixture2p()`](https://popov-lab.github.io/bmm/dev/reference/mixture2p.md)
+[`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
 warns if the response error looks like degrees rather than radians. It
 also lets `bmm` build the columns that the Stan model needs from the
 ones you have, such as which of the non-target columns are filled at
 each set size. The help page of each model, such as
-[`?mixture2p`](https://popov-lab.github.io/bmm/dev/reference/mixture2p.md),
+[`?mixture2p`](https://venpopov.com/bmm/dev/reference/mixture2p.md),
 lists the columns it expects.
 
 ## 4 One formula per parameter
@@ -250,9 +250,8 @@ of regressions, one for each parameter of the model. Each one is a
 regular `brms` formula, with population-level effects, group-level
 effects in the `lme4` syntax, and non-linear terms if you need them. The
 [bmmformula
-article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
-covers the syntax in full, including how to fix a parameter to a
-constant.
+article](https://venpopov.com/bmm/articles/bmm_bmmformula.html) covers
+the syntax in full, including how to fix a parameter to a constant.
 
 ### 4.1 `0 + setsize` or `1 + setsize`
 
@@ -321,7 +320,7 @@ reverse also works: a difference between set sizes is the difference of
 two cell coefficients of the `0 + setsize` fit, again taken per draw.
 
 Doing this by hand for every cell and parameter gets tedious.
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 does it for you. It evaluates every parameter in every cell of the
 design, whatever the coding of the formula, and reports it on the scale
 of the model (more on scales in the next section). Here are both fits
@@ -360,7 +359,7 @@ scale of the model: `kappa` is the precision itself, not its log, and
 `thetat` is shown as the probability of a memory response, not its
 logit. `re_formula = NA` sets the participant effects to zero, which
 gives the parameters of a typical participant;
-[`?native_parameters`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md)
+[`?native_parameters`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
 explains how this differs from the population average under a
 non-identity link.
 
@@ -393,7 +392,7 @@ scale, the two fits estimate `thetat` at set size 1 as 5.06 and 4.70,
 and the set-size differences of `thetat` differ by up to 0.42 logits.
 With fewer trials per cell, the priors carry more weight, and the two
 codings can give different estimates. So check
-[`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+[`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
 for the coding you use, as shown in [the section on
 priors](#why-the-default-priors-are-informative), and set your own
 priors if the defaults do not match what you know.
@@ -475,10 +474,9 @@ c(
 #>  6.475063  6.543754
 ```
 
-[`native_parameters()`](https://popov-lab.github.io/bmm/dev/reference/native_parameters.md),
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md),
 used above, follows this order for every parameter. For the mixture
-models,
-[`k2sd()`](https://popov-lab.github.io/bmm/dev/reference/k2sd.md)
+models, [`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md)
 converts `kappa` into the circular standard deviation in radians, which
 is the measure of precision many papers report:
 
@@ -578,22 +576,21 @@ What this means for you:
   depend on the priors. With few trials, the priors pull the estimates
   towards their center.
 - Look at the priors before you fit, with
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   as above, and at the help page of the model, which lists them.
 - If you know more than the defaults, or something different, set your
   own priors with `prior =` in
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md). They
-  are `brms` priors on the `bmm` parameter names, with `nlpar` or `dpar`
-  as
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md). They are
+  `brms` priors on the `bmm` parameter names, with `nlpar` or `dpar` as
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   shows it, for example
   `prior(normal(1.5, 0.5), class = b, nlpar = kappa)`, again on the log
   scale. With `0 + setsize`, this sets the prior of every cell of
   `kappa`. With `1 + setsize`, it sets the prior of the differences
   only; the intercept takes `coef = "Intercept"`, as
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   shows for that coding. The [article on extracting model
-  information](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
+  information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows the details.
 - Bayes factors depend on the priors much more than estimates do. If you
   plan to compute them, choose the priors on purpose rather than taking
@@ -606,8 +603,8 @@ works on it:
 [`fixef()`](https://rdrr.io/pkg/nlme/man/fixed.effects.html),
 [`ranef()`](https://rdrr.io/pkg/nlme/man/random.effects.html),
 [`as_draws_df()`](https://mc-stan.org/posterior/reference/draws_df.html),
-[`pp_check()`](https://popov-lab.github.io/bmm/dev/reference/pp_check.bmmfit.md),
-[`conditional_effects()`](https://popov-lab.github.io/bmm/dev/reference/conditional_effects.bmmfit.md),
+[`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md),
+[`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md),
 [`hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html),
 [`loo()`](https://mc-stan.org/loo/reference/loo.html) and the rest. As
 shown above, `bmm_fit$formula` holds the `brmsformula` that `bmm`
@@ -620,16 +617,16 @@ to start from.
 
 ## 8 Where to go next
 
-- [Get started](https://popov-lab.github.io/bmm/articles/bmm.html) lists
-  the models by task and walks through a first fit.
+- [Get started](https://venpopov.com/bmm/articles/bmm.html) lists the
+  models by task and walks through a first fit.
 - The [bmmformula
-  article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
-  covers the formula syntax.
+  article](https://venpopov.com/bmm/articles/bmm_bmmformula.html) covers
+  the formula syntax.
 - The [mixture models
-  article](https://popov-lab.github.io/bmm/articles/bmm_mixture_models.html)
+  article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
   fits the two- and three-parameter mixture models to a larger data set.
 - [Extracting model
-  information](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
+  information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows how to get the default priors, the Stan code and the Stan data
   before you fit.
 

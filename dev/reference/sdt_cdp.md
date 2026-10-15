@@ -23,9 +23,9 @@ sdt_cdp(
 
   An optional common prefix for the response count columns (default
   `""`, i.e. the bare canonical names `new1`, `know2`, ... that
-  [`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+  [`aggregate_sdt_cdp_data()`](https://venpopov.com/bmm/dev/reference/aggregate_sdt_cdp_data.md)
   and
-  [`rsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+  [`rsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
   produce).
 
 - stimulus:
@@ -52,7 +52,7 @@ sdt_cdp(
   `n_new + n_old - 2` distances between adjacent thresholds freely, each
   as a `deltaN` parameter on the log scale (the log width of the
   interval between thresholds `N` and `N + 1`, as in
-  [`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)).
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)).
   `criterion` stays on the old/new boundary, threshold `n_new`.
 
 - links:
@@ -227,7 +227,7 @@ responses on R (against `rcrit`); an optional Know/Guess split uses F
 (against `kcrit`).
 
 **Response format.** The model is fit to aggregated counts, like
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md):
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md):
 one row per cell (e.g. participant x stimulus class x condition) and one
 integer count column per response category. The columns follow a fixed
 naming scheme – `new1 ... new<n_new>` for "new" judgments, and `know<k>`
@@ -237,9 +237,9 @@ runs over the unified confidence scale `n_new + 1 ... n_new + n_old` (1
 only needs the numbers of confidence levels, not a long vector of column
 names. An optional common prefix is set via `response` (e.g.
 `response = "cdp_"` for columns `cdp_new1`, `cdp_know2`, ...). Use
-[`aggregate_sdt_cdp_data()`](https://popov-lab.github.io/bmm/dev/reference/aggregate_sdt_cdp_data.md)
+[`aggregate_sdt_cdp_data()`](https://venpopov.com/bmm/dev/reference/aggregate_sdt_cdp_data.md)
 to build these columns from long-format (trial-level or count) data;
-[`rsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+[`rsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
 generates them directly. The numbers of "new" and "old" confidence
 levels need not be equal (e.g. the 1-new / 5-old scale of Rotello et
 al., 2005). Whether the Know/Guess split is modelled is **driven by the
@@ -264,12 +264,12 @@ them through the formula:
   contain the `guess<k>` count columns, and data with those columns must
   free `kcrit`: with `kcrit` at its fixed value every Guess response has
   probability 0, so
-  [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
-  refuses that combination. The fixed value -100 is a sentinel that
-  switches the split off;
-  [`dsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) refuses that
+  combination. The fixed value -100 is a sentinel that switches the
+  split off;
+  [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
   and
-  [`rsdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp_dist.md)
+  [`rsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
   use `kcrit = NULL` for the same purpose.
 
 In the three-way model a Guess response in confidence bin k is possible
@@ -298,16 +298,15 @@ there. On the recollection axis the target SD is `exp(sigmar)`, so
 `drec` is standardized by the lure SD alone. With `sigmar` fixed at 0 it
 is \\d'\\ as well; with `sigmar` estimated it is not the balanced index
 \\d_a\\ that
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-and
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 report as `d`.
 
 This matters when `drec` is compared across conditions whose `sigmar`
 differs: a difference in the recollection SD alone can then appear as a
 credible difference in `drec`, the problem the sensitivity section of
-[`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-describes for \\d'\\. To compare such conditions, compute the balanced
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) describes
+for \\d'\\. To compare such conditions, compute the balanced
 recollection sensitivity from the posterior draws as
 `drec / sqrt((1 + exp(2 * sigmar)) / 2)`, or give `sigmar` the same
 formula in every condition being compared.
@@ -317,7 +316,7 @@ decision, which is read off the aggregate strength \\F + R\\ and depends
 on both sensitivities, on `sigmar` and on `rho`.
 
 When no Remember/Know split is available (confidence ratings only), use
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 instead.
 
 ## References

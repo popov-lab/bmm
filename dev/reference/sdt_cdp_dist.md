@@ -7,11 +7,10 @@ the aggregate strength S = F + R that drives old/new confidence;
 Remember/Know judgments split "old" responses on R, and an optional
 Know/Guess split uses F. The response is a vector of counts across the
 response categories (multinomial likelihood), in the same format
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
-is fit to. See
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) is fit
+to. See [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
 for the model and
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 when no R/K split is available.
 
 ## Usage
@@ -55,9 +54,9 @@ rsdt_cdp(
   Integer matrix with one row per observation and one column per
   response category in the canonical order `new`, `[guess]`, `know`,
   `remember` (each block ordered by confidence; see
-  [`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)),
-  or a vector for a single observation. `n_new + 2 * n_old` columns
-  (R/K) or `n_new + 3 * n_old` (R/K/G).
+  [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)), or
+  a vector for a single observation. `n_new + 2 * n_old` columns (R/K)
+  or `n_new + 3 * n_old` (R/K/G).
 
 - stimulus:
 
@@ -126,9 +125,9 @@ rsdt_cdp(
 `dsdt_cdp` returns the (log-)density (multinomial probability).
 `rsdt_cdp` returns an integer matrix with one row per observation and
 the canonical response count columns (`new1`, ..., `remember<K>`) that
-[`sdt_cdp()`](https://popov-lab.github.io/bmm/dev/reference/sdt_cdp.md)
-expects – [`cbind()`](https://rdrr.io/r/base/cbind.html) it to a design
-data frame for a ready-to-fit data set.
+[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) expects
+– [`cbind()`](https://rdrr.io/r/base/cbind.html) it to a design data
+frame for a ready-to-fit data set.
 
 ## References
 

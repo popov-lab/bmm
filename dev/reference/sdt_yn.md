@@ -34,9 +34,9 @@ sdt_yn(
   columns holding "0"/"1", are coerced automatically; anything else
   (e.g. "noise"/"signal" labels) must be recoded by hand, since bmm
   cannot guess which level is the signal.
-  [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+  [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
   and
-  [`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+  [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
   take the same column but are stricter, accepting only numeric or
   logical input.
 
@@ -188,7 +188,7 @@ variance. The classical noise-standardized index is \\d_N = \delta = d_a
 \sqrt{(1 + r^2)/2}\\, so a published \\d'\\ from an unequal-variance
 analysis is larger than `d` when \\r \> 1\\: by 13% at \\r = 1.25\\ and
 by 33% at \\r = 1.6\\.
-[`sdt_sensitivity()`](https://popov-lab.github.io/bmm/dev/reference/sdt_sensitivity.md)
+[`sdt_sensitivity()`](https://venpopov.com/bmm/dev/reference/sdt_sensitivity.md)
 returns \\d_N\\ and the signal-standardized \\d_S\\ from a fitted model,
 and [`summary()`](https://rdrr.io/r/base/summary.html) notes when `d` is
 \\d_a\\.
@@ -216,8 +216,8 @@ larger), so compare such fits on the AUC rather than on `d`.
 
 Because `d` is a short name, a column called `d` in your data that is
 also used as a predictor will collide with this parameter;
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
-when that happens.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) warns when that
+happens.
 
 ## Choosing between `criterion` and `bias`
 
@@ -237,9 +237,8 @@ They are related by \\bias = criterion - \delta / 2\\, where \\\delta =
 d \sqrt{(1 + r^2)/2}\\ is the separation in noise-SD units. Write one of
 them in the formula; a formula that names neither estimates
 `criterion ~ 1`, and one that names both is refused.
-[`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
-and
-[`sdt_bias()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+[`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
+and [`sdt_bias()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
 compute the two from a single hit and false-alarm rate.
 
 **The choice matters whenever `d` or `sdratio` differs between rows that
@@ -282,7 +281,7 @@ holds constant.
 same `d`: give `criterion` a predictor that shifts it while `d` stays
 put, such as a base-rate, payoff, or confidence manipulation (`d ~ 1`,
 `criterion ~ 0 + condition`; see
-[broeder_schuetz_2009_e3](https://popov-lab.github.io/bmm/dev/reference/broeder_schuetz_2009_e3.md)).
+[broeder_schuetz_2009_e3](https://venpopov.com/bmm/dev/reference/broeder_schuetz_2009_e3.md)).
 A criterion that is the same in every row is fixed by the false-alarm
 rate, and each hit rate then fixes only \\(\delta - criterion) / r\\, so
 `sdratio` trades against `d`. A change in `sdratio` is matched by
@@ -303,8 +302,8 @@ then rests on the assumption that `d` is zero where `strength` is zero,
 not on a second operating point in the data. A numeric predictor under a
 log link on `d` barely identifies `sdratio`, and in practice `sdratio`
 returns its prior.
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
-for every criterion that is the same in every row, so it also warns for
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) warns for every
+criterion that is the same in every row, so it also warns for
 `d ~ 0 + strength`. Giving `d` and `criterion` the same condition-wise
 predictors (`d ~ 0 + condition`, `criterion ~ 0 + condition`) fails too,
 because each condition then has two rates for two parameters of its own,
@@ -321,9 +320,8 @@ criterion with the separation, and that movement traces the ROC. The
 identification then rests on that assumption about the observer. The
 design in which every parameter is intercept-only with no random effects
 cannot work: a single (hit, false-alarm) pair is two numbers for three
-unknowns, and
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md) warns
-for it. Neither can `bias` and `d` with the same condition-wise
+unknowns, and [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+warns for it. Neither can `bias` and `d` with the same condition-wise
 predictors, for the reason given above, and that design raises no
 warning.
 
@@ -333,16 +331,15 @@ terms move the operating point, so a predictor with a small effect
 carries little information without a warning. Leaving `sdratio` at its
 default is always identified.
 
-## Reading `sdratio` and carrying it to [`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)/[`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+## Reading `sdratio` and carrying it to [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)/[`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
 
 As in every `bmm` model, the parameters the model *estimates* are on
 their link scale, while the distribution functions take their arguments
 on the *natural* scale. `sdratio` has a log link, so
 [`summary()`](https://rdrr.io/r/base/summary.html) reports \\\log r\\
 whereas
-[`dsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
-and
-[`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+[`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md) and
+[`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
 expect the ratio \\r\\ itself (their default is 1, equal variance).
 Exponentiate before carrying a posterior value across:
 
@@ -350,7 +347,7 @@ Exponentiate before carrying a posterior value across:
 
 A posterior mean of `sdratio = 0.22` is a ratio of `exp(0.22) = 1.25`.
 Passing `0.22` straight to
-[`rsdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn_dist.md)
+[`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md)
 instead asks for a signal distribution 4.5 times *narrower* than the
 noise — a legal value that raises no error, and the one mistake worth
 checking for in a posterior predictive check written by hand. `d`,
@@ -365,10 +362,10 @@ The same log link applies going the other way: a constant you supply
 yourself, whether as `bmf(sdratio = )` or through a hand-written
 `brms::set_prior(..., dpar = "sdratio")`, is read on it too.
 `bmf(sdratio = 1)` does not fix a ratio of 1 — it fixes `exp(1) = 2.72`,
-and [`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
-raises no warning; a fixed ratio of 1.25 needs
-`bmf(sdratio = log(1.25))`. Both `sdratio` defaults
-[`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+and [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) raises no
+warning; a fixed ratio of 1.25 needs `bmf(sdratio = log(1.25))`. Both
+`sdratio` defaults
+[`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
 reports — `normal(0, 0.3)` on the intercept and `exponential(2)` on the
 random-effect SDs — are on that same scale, unannotated.
 
@@ -424,10 +421,9 @@ unequal-variance signal detection model of recognition memory.
 
 ## See also
 
-[`sdt_d()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md),
-[`sdt_criterion()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
-and
-[`sdt_bias()`](https://popov-lab.github.io/bmm/dev/reference/SDTdist.md)
+[`sdt_d()`](https://venpopov.com/bmm/dev/reference/SDTdist.md),
+[`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
+and [`sdt_bias()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
 compute the `d`, `criterion` and `bias` of this model in closed form
 from a single pair of observed hit and false-alarm rates, without
 fitting: use them for a quick check of a fitted value, and this model

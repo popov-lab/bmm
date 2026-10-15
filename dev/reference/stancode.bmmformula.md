@@ -27,13 +27,13 @@ stancode(object, data, model, prior = NULL, ...)
 
   A description of the model to be fitted. This is a call to a `bmmodel`
   such as
-  [`mixture3p()`](https://popov-lab.github.io/bmm/dev/reference/mixture3p.md)
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   function. Every model function has a number of required arguments
   which need to be specified within the function call. Call
-  [`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md)
+  [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
   to see the list of supported models, and `?modelname` (for example
-  [`?imm`](https://popov-lab.github.io/bmm/dev/reference/imm.md)) for
-  their required arguments.
+  [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)) for their
+  required arguments.
 
 - prior:
 
@@ -41,7 +41,7 @@ stancode(object, data, model, prior = NULL, ...)
   [`brms::set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html)
   or related functions and combined using the c method or the +
   operator. See also
-  [`default_prior()`](https://popov-lab.github.io/bmm/dev/reference/default_prior.bmmformula.md)
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
   for more help. Not necessary for the default model fitting, but you
   can provide prior constraints to model parameters
 
@@ -60,7 +60,7 @@ model.
 
 ## See also
 
-[`bmm_models()`](https://popov-lab.github.io/bmm/dev/reference/bmm_models.md),
+[`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md),
 [`brms::stancode()`](https://paulbuerkner.com/brms/reference/stancode.html)
 
 ## Examples

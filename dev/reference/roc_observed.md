@@ -2,14 +2,13 @@
 
 Computes empirical (observed) ROC points from the response-count data
 used to fit a
-[`sdt_rating()`](https://popov-lab.github.io/bmm/dev/reference/sdt_rating.md)
-or [`sdt_yn()`](https://popov-lab.github.io/bmm/dev/reference/sdt_yn.md)
-model. Rating models pool counts across observations within each
-stimulus type (and optional condition) to produce cumulative
-hit/false-alarm rates at each confidence threshold; binary models
-produce one operating point per criterion level (the empirical
-counterpart of the model-implied points from
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md)).
+[`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+or [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) model.
+Rating models pool counts across observations within each stimulus type
+(and optional condition) to produce cumulative hit/false-alarm rates at
+each confidence threshold; binary models produce one operating point per
+criterion level (the empirical counterpart of the model-implied points
+from [`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md)).
 
 ## Usage
 
@@ -38,8 +37,8 @@ and (1,1) endpoints. The attribute `model_type` is `"rating"` or
 
 ## See also
 
-[`roc_sdt()`](https://popov-lab.github.io/bmm/dev/reference/roc_sdt.md),
-[`plot.bmm_sdt_roc()`](https://popov-lab.github.io/bmm/dev/reference/plot.bmm_sdt_roc.md)
+[`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md),
+[`plot.bmm_sdt_roc()`](https://venpopov.com/bmm/dev/reference/plot.bmm_sdt_roc.md)
 
 ## Examples
 

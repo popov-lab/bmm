@@ -3,7 +3,7 @@
 Returns a data frame with information about the model parameters: their
 descriptions, whether they are fixed (and to which value), and their
 link functions. Use
-[`prior_info()`](https://popov-lab.github.io/bmm/dev/reference/prior_info.md)
+[`prior_info()`](https://venpopov.com/bmm/dev/reference/prior_info.md)
 for the priors of a fitted model.
 
 ## Usage
@@ -24,7 +24,7 @@ parameter_info(x, ...)
 
   A `bmmodel` object (e.g., `sdm(resp_error = "y")`) or a `bmmfit`
   object (a fitted model returned by
-  [`bmm`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)).
+  [`bmm`](https://venpopov.com/bmm/dev/reference/bmm.md)).
 
 - ...:
 

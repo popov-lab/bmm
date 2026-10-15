@@ -24,9 +24,8 @@ called ‘group-level’ or ‘varying’ effects.
 As you will typically provide a `bmmformula` for each parameter of a
 `bmmodel`, we recommend to set up the formula in a separate object
 before passing it to the
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
-function. There are two ways to set up formulas, both work equally easy
-and well:
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function. There
+are two ways to set up formulas, both work equally easy and well:
 
 1.  a single call to the function `bmmformula` or its short form `bmf`,
     separating formulas for different parameters by commas.
@@ -59,7 +58,7 @@ more parameters, `bmm` will throw a warning and only estimate a fixed
 intercept for the parameters for which no `bmmformula` was provided. If
 you are unsure about the parameters of a model, call the help via
 `?bmmodel`, replacing ‘bmmodel’ with the name of the model
-(e.g. [`?sdm`](https://popov-lab.github.io/bmm/dev/reference/sdm.md)).
+(e.g. [`?sdm`](https://venpopov.com/bmm/dev/reference/sdm.md)).
 
 As `bmmformula` syntax builds upon `brmsformula` syntax, you can use any
 functionality you might use in `brms` for specifying a `bmmformula`. One
@@ -215,8 +214,8 @@ my_formula <- bmf(
 
 Let’s assume you have fit a `mixture2p` model to a data set `my_data` as
 described in the [the mixture models
-article](https://popov-lab.github.io/bmm/articles/bmm_mixture_models.html).
-For this, you had to specify a `bmmformula` and model object:
+article](https://venpopov.com/bmm/articles/bmm_mixture_models.html). For
+this, you had to specify a `bmmformula` and model object:
 
 ``` r
 
@@ -238,8 +237,7 @@ bmmfit <- bmm(
 If you were now interested to see how the `bmmformula` that you passed
 to `bmm` is converted to a `brmsformula`, you can access the
 `brmsformula` via the `bmmfit` object that will be returned by the
-[`bmm()`](https://popov-lab.github.io/bmm/dev/reference/bmm.md)
-function:
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) function:
 
 ``` r
 

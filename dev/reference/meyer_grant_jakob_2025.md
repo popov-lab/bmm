@@ -5,11 +5,11 @@ participants saw 3, 4, or 5 face images—one a studied target—and ranked
 them by perceived oldness; the rank assigned to the target is recorded.
 The set size varies across trials, so the data are aggregated to target
 rank-frequency counts per subject and set size, in the wide format
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md)
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
 consumes: one count column per rank position, with structural zeros
 where the rank exceeds the trial's set size. Fitting all set sizes
 jointly relies on the per-row set-size feature of
-[`sdt_ranking()`](https://popov-lab.github.io/bmm/dev/reference/sdt_ranking.md):
+[`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md):
 pass the set-size column to `m`.
 
 ## Usage
