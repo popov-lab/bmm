@@ -12,6 +12,8 @@
     for (q in 1:rows(gl_nodes)) {
       vector[D] z = x[q] - means;
       vector[D] lphi = log(Phi(z));
+      // Phi() is 0 below z = -37.5, which the window reaches once d passes about 63
+      for (k in 1:D) if (is_inf(lphi[k])) lphi[k] = std_normal_lcdf(z[k] | );
       out = log_sum_exp(out, logw[q] + dot_product(mult, lphi) - 0.5 * square(z) - lphi);
     }
     return out;

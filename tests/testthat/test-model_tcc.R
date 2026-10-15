@@ -100,6 +100,8 @@ test_that("check_data() refuses responses it cannot bin", {
                "radians")
   expect_error(check_data(tcc_test_model(units = "bins"), data.frame(err = c(1, 2.5)), bmf(d ~ 1)),
                "whole numbers")
+  expect_error(check_data(tcc_test_model(), data.frame(err = c("a", "b")), bmf(d ~ 1)),
+               "must be numeric")
   expect_warning(
     check_data(tcc_test_model(), data.frame(err = 0, tcc_bin = 3), bmf(d ~ 1)),
     "reserved"
@@ -114,22 +116,24 @@ test_that("dtcc() matches adaptive quadrature where the error peaks", {
   # the largest d of the default table and the least likely options, plus
   # negative d (repulsion) at the low end of the table
   cells <- rbind(
-    expand.grid(n = 360, d = c(-1.5, 0, 0.37, 11.97, 12), k = c(0, 1, 179, 180)),
-    expand.grid(n = 180, d = c(0.37, 12), k = c(0, 1, 89, 90))
+    expand.grid(n = 360, d = c(-1.5, 0, 0.37, 12, 29.97, 30), k = c(0, 1, 179, 180)),
+    expand.grid(n = 180, d = c(0.37, 30), k = c(0, 1, 89, 90))
   )
   cells$sharp <- FALSE
   # a far option under a 1-degree similarity peaks halfway between its own
   # mean and the target's, below the window's former lower end
-  cells <- rbind(cells, data.frame(n = 360, d = 12, k = c(0, 1, 5, 90, 180), sharp = TRUE))
+  cells <- rbind(cells, data.frame(n = 360, d = c(12, 30), k = rep(c(0, 1, 5, 90, 180), each = 2),
+                                   sharp = TRUE))
   for (i in seq_len(nrow(cells))) {
     cl <- cells[i, ]
     f <- tcc_test_similarity(cl$n)
     if (cl$sharp) f <- exp(-(0:180)) - exp(-180)
     x <- 2 * pi * cl$k / cl$n
-    # absolute: testthat's tolerance is relative, and log P reaches -100 here
-    error <- dtcc(x, d = cl$d, similarity = f, n_options = cl$n, log = TRUE) -
-      ref_tcc_logp(cl$d, cl$k, f)
-    expect_lt(abs(error), 1e-7,
+    # absolute: testthat's tolerance is relative; at d = 30 the farthest option
+    # (log P about -357) is off by 3.4e-7, a relative error in P
+    logp <- dtcc(x, d = cl$d, similarity = f, n_options = cl$n, log = TRUE)
+    error <- logp - ref_tcc_logp(cl$d, cl$k, f)
+    expect_lt(abs(error), if (logp > -100) 1e-7 else 1e-6,
               label = paste("n =", cl$n, "d =", cl$d, "k =", cl$k, "sharp =", cl$sharp))
   }
 })
@@ -146,6 +150,14 @@ test_that("dtcc() is a probability mass function over the options", {
   expect_equal(dtcc(c(0.1, 0.1), d = c(1, 3), similarity = f),
                c(dtcc(0.1, 1, f), dtcc(0.1, 3, f)))
   expect_equal(dtcc(0.4 * 2 * pi / 360, 2, f), dtcc(0, 2, f))
+})
+
+test_that("dtcc() and rtcc() keep the length of empty input and return NA for a missing d", {
+  f <- tcc_test_similarity(360)
+  expect_length(dtcc(numeric(0), 2, f), 0)
+  expect_equal(is.na(dtcc(c(0, 0.1), c(2, NA), f)), c(FALSE, TRUE))
+  withr::local_seed(566)
+  expect_equal(is.na(rtcc(3, c(1, NA, 2), f)), c(FALSE, TRUE, FALSE))
 })
 
 test_that("rtcc() matches the argmax of independent Gaussian memory-match signals", {
@@ -387,6 +399,17 @@ test_that("the Stan likelihood matches dtcc() on and off the d grid, from either
   expect_equal(out$lp_runs, sum(out$lp), tolerance = 1e-10)
   expect_lt(max(abs(out$lp - dtcc(2 * pi * rows$y / 360, rows$d, f, log = TRUE))), 1e-6)
   expect_lt(max(abs(out$log_lik - out$lp)), 1e-9)
+})
+
+test_that("the Stan table stays finite where Phi() underflows, past d = 63", {
+  skip_on_cran()
+  skip_unless_stan_tests()
+  model <- tcc_test_model(d_max = 70)
+  f <- tcc_test_similarity(360)
+  rows <- data.frame(d = c(62.9, 63.5, 69.9), y = c(0L, 0L, 3L))
+  out <- tcc_stan_lp(model, rows)
+  expect_lt(out$table_diff, 1e-9)
+  expect_lt(max(abs(out$lp - dtcc(2 * pi * rows$y / 360, rows$d, f, log = TRUE))), 1e-6)
 })
 
 test_that("beyond the d grid the Stan likelihood extends the table linearly", {

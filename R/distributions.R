@@ -4484,7 +4484,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @export
 dtcc <- function(x, d, similarity, lambda = NULL, kappa = NULL, n_options = 360, log = FALSE) {
   par <- .tcc_dist_par(similarity, lambda, kappa, n_options)
-  n <- max(length(x), length(d), length(par))
+  n <- if (length(x) && length(d)) max(length(x), length(d), length(par)) else 0L
   dist <- rep_len(abs(.tcc_bin(x, n_options, "radians")) + 1, n)
   out <- rep(NA_real_, n)
   for (cell in .tcc_dist_cells(rep_len(d, n), if (!is.null(par)) rep_len(par, n))) {
@@ -4498,7 +4498,7 @@ dtcc <- function(x, d, similarity, lambda = NULL, kappa = NULL, n_options = 360,
 rtcc <- function(n, d, similarity, lambda = NULL, kappa = NULL, n_options = 360) {
   par <- .tcc_dist_par(similarity, lambda, kappa, n_options)
   offsets <- seq(-n_options / 2 + 1, n_options / 2)
-  out <- numeric(n)
+  out <- rep(NA_real_, n)
   for (cell in .tcc_dist_cells(rep_len(d, n), if (!is.null(par)) rep_len(par, n))) {
     f <- .tcc_dist_similarity(similarity, cell$par, n_options)
     prob <- exp(.tcc_logp(cell$d, f))[abs(offsets) + 1]

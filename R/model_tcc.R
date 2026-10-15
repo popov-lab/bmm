@@ -29,8 +29,8 @@
       ),
       parameters = list(
         d = glue(
-          "Memory strength d': the mean memory-match signal of the target in units \\
-          of the noise SD; an option at distance x has mean d * f(x)"
+          "Memory strength d (the d' of the uncorrelated-noise model): the mean \\
+          memory-match signal of the target in units of the noise SD; an option at distance x has mean d * f(x)"
         )
       ),
       # log, not identity as in the sdt_* models: d f(x) >= 0 in TCC, and a
@@ -39,8 +39,9 @@
       links = list(d = "log"),
       fixed_parameters = list(),
       # d of the uncorrelated model runs from 0.6 to 2.0 over set sizes 1-8 in
-      # oberauer_lin_2017, so the prior is centred at exp(0.5) = 1.65; d = 12
-      # lies two SDs above it and the default d_max = 30 almost three
+      # oberauer_lin_2017 with the similarity of the examples, so the prior is
+      # centred at exp(0.5) = 1.65; d = 12 lies two SDs above it and the
+      # default d_max = 30 almost three
       default_priors = list(
         d = list(main = "normal(0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
@@ -170,9 +171,10 @@
 #'   estimates that mean nothing. `bmm()` warns after the fit when any
 #'   posterior draw of `d` passes `d_max`; then refit with a larger `d_max`.
 #'   The default of 30 lies far above the values of `d` from 0.6 to 2.0 that
-#'   `tcc()` estimates for set sizes 1 to 8 in [oberauer_lin_2017]. Each extra
-#'   unit adds 50 table rows, which costs build time and memory but nothing per
-#'   gradient. A large `d` is weakly identified
+#'   `tcc()` estimates for set sizes 1 to 8 in [oberauer_lin_2017] with the
+#'   similarity of the examples below (`d` depends on the similarity). Each
+#'   extra unit adds 50 table rows, which costs build time and memory but
+#'   nothing per gradient. A large `d` is weakly identified
 #'   when the similarity is broad, because the probability of reporting the
 #'   target then grows slowly with `d`.
 #'
@@ -210,6 +212,8 @@
 #'   give; add `type = "bars_binned"` and name a condition column in `group`
 #'   for histograms per condition. `resp_var = "abs_error"` shows the distance from the target,
 #'   the quantity the likelihood depends on. See [pp_check.bmmfit()].
+#'   `posterior_predict()` and `predict()` return offsets in option steps
+#'   whatever `units` is; multiply by `2 * pi / n_options` for radians.
 #'
 #' ## Comparing with continuous models
 #'
@@ -314,6 +318,8 @@ check_data.tcc <- function(model, data, formula) {
   units <- model$other_vars$units
   stopif(not_in(resp, colnames(data)),
          "The response variable '{resp}' is not present in the data.")
+  stopif(!is.numeric(data[[resp]]),
+         "The response variable '{resp}' must be numeric.")
   stopif(units == "radians" && isTRUE(max(abs(data[[resp]]), na.rm = TRUE) > 2 * pi),
          "The response variable '{resp}' holds values beyond 2*pi, so it is not in \\
          radians. Convert it with deg2rad(), or set units = 'bins' if it counts options.")
