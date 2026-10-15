@@ -2,15 +2,18 @@
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   push:
-    branches: [master, develop]
+    branches: [master, develop, 'dev-*']
   pull_request:
-    branches: [master, develop]
+    branches: [master, develop, 'dev-*']
 
 name: R-CMD-check
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  # a newer push to a pull request supersedes its run; a push to a target
+  # branch (a merge) gets a group of its own commit, so it is never cancelled
+  # or dropped from the queue by the next merge
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   R-CMD-check:
@@ -29,6 +32,16 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # Four testthat workers (Config/testthat/parallel in DESCRIPTION). R CMD
+      # check runs the tests with --vanilla, so the Ncpus option that setup-r
+      # writes to the Rprofile does not reach them and this variable does.
+      TESTTHAT_CPUS: 4
+      # The Stan compile tests (parity and gradient checks, the two
+      # bmm_setup() tests that need CmdStan) run on Ubuntu for every event
+      # and on all three OS for pushes. The Windows and macOS pull-request
+      # jobs get no CmdStan and set this to false, so those tests skip there
+      # (ADR 0004).
+      BMM_TEST_STAN: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -72,16 +85,28 @@ jobs:
             waldo
             fansi
             yaml
+            roxygen2
 
       # Cache the built CmdStan so it is only compiled when a new version is
       # released (the cache key includes the latest release version)
       - name: Get latest CmdStan release
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         id: cmdstan-version
         shell: bash
         run: |
-          tag=$(curl -sSL --retry 3 \
+          set +e
+          response=$(curl -sSL --fail \
+            --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 2 \
             -H "Authorization: Bearer ${GITHUB_PAT}" \
-            https://api.github.com/repos/stan-dev/cmdstan/releases/latest | jq -r '.tag_name // empty')
+            https://api.github.com/repos/stan-dev/cmdstan/releases/latest)
+          curl_status=$?
+          set -e
+          if [ $curl_status -ne 0 ]; then
+            echo "Failed to reach the GitHub API (curl exit ${curl_status})" >&2
+            exit 1
+          fi
+          tag=$(echo "$response" | jq -r '.tag_name // empty')
           if [ -z "$tag" ]; then
             echo "Failed to determine the latest CmdStan release" >&2
             exit 1
@@ -89,6 +114,7 @@ jobs:
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
       - name: Locate CmdStan install path
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         id: cmdstan-path
         run: |
           cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
@@ -96,6 +122,7 @@ jobs:
         shell: Rscript {0}
 
       - name: Cache CmdStan
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         id: cmdstan-cache
         uses: actions/cache@v4
         with:
@@ -103,11 +130,12 @@ jobs:
           key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
 
       - name: Set up CmdStan toolchain
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
         run: cmdstanr::check_cmdstan_toolchain(fix = TRUE)
         shell: Rscript {0}
 
       - name: Build CmdStan
-        if: steps.cmdstan-cache.outputs.cache-hit != 'true'
+        if: ${{ (startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push') && steps.cmdstan-cache.outputs.cache-hit != 'true' }}
         run: |
           cmdstanr::install_cmdstan(
             cores = parallel::detectCores(),
@@ -115,7 +143,14 @@ jobs:
           )
         shell: Rscript {0}
 
+      # Before the test tiers (ADR 0004) the check took 14-28 minutes, Windows
+      # slowest. Without a limit a hung runner holds the job for GitHub's
+      # 6-hour default; on a pull request only until the next push cancels
+      # it, on a push to a target branch for the full six hours. The limit
+      # sits on this step so a cold CmdStan build cannot trip it, and it
+      # stays at 30 until a push run has been measured.
       - uses: r-lib/actions/check-r-package@v2
+        timeout-minutes: 30
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'
           args: 'c("--no-manual", "--as-cran", "--ignore-vignettes")'

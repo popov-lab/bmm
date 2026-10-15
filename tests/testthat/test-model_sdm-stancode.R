@@ -1,5 +1,5 @@
 simulate_sdm_smoke_data <- function() {
-  set.seed(123)
+  withr::local_seed(123)
   condition <- factor(rep(paste0("condition", 1:2), each = 50))
   data.frame(
     y = rsdm(100),
@@ -106,7 +106,7 @@ test_that("SDM accepts numeric threads shorthand", {
 })
 
 test_that("SDM run metadata aligns with brms after NA rows are dropped", {
-  set.seed(1)
+  withr::local_seed(1)
   dat <- data.frame(
     y = rsdm(20),
     condition = factor(rep(c("a", "b"), each = 10))
@@ -166,6 +166,20 @@ test_that("threading(force = TRUE) selects the serial SDM chunk", {
   expect_false(grepl("+= sdm_simple_run_ldenom_slice(", code, fixed = TRUE))
 })
 
+test_that("an explicit threads = NULL beats a global threading option", {
+  dat <- simulate_sdm_smoke_data()
+  formula <- bmf(c ~ 0 + condition, kappa ~ 0 + condition)
+
+  # brms reads threads = NULL as "threading off" and generates serial code, so
+  # the sliced chunk would reference start/end outside partial_log_lik
+  withr::local_options(brms.threads = brms::threading(2))
+  code <- stancode(formula, data = dat, model = sdm(resp_error = "y"), threads = NULL)
+
+  expect_false(grepl("reduce_sum", code, fixed = TRUE))
+  expect_match(code, "+= sdm_simple_run_ldenom(c", fixed = TRUE)
+  expect_false(grepl("+= sdm_simple_run_ldenom_slice(", code, fixed = TRUE))
+})
+
 test_that("SDM Stan code validates run metadata in transformed data", {
   dat <- simulate_sdm_smoke_data()
   formula <- bmf(c ~ 0 + condition, kappa ~ 0 + condition)
@@ -177,7 +191,7 @@ test_that("SDM Stan code validates run metadata in transformed data", {
 })
 
 test_that("update() refreshes SDM run metadata for new data", {
-  set.seed(42)
+  withr::local_seed(42)
   dat20 <- data.frame(y = rsdm(20))
   dat40 <- data.frame(y = rsdm(40))
 
@@ -200,4 +214,11 @@ test_that("update() refreshes SDM run metadata for new data", {
   )
   expect_equal(sum(fit2$stanvars$sdm_run_count$sdata), 40L)
   expect_equal(fit2$stanvars$G_sdm_runs$sdata, 1L)
+})
+
+test_that("the deprecated sdmSimple() warns and builds the model sdm() builds", {
+  expect_warning(old <- sdmSimple("dev_rad"), "`sdmSimple()` is deprecated", fixed = TRUE)
+  current <- sdm("dev_rad")
+  expect_identical(class(old), class(current))
+  expect_identical(old$resp_vars, current$resp_vars)
 })

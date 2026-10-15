@@ -48,6 +48,7 @@ NULL
 #' @rdname emmeans-bmmfit
 #' @exportS3Method emmeans::recover_data
 recover_data.bmmfit <- function(object, ..., dpar = NULL, nlpar = NULL) {
+  object <- restructure(object)
   resolved <- .bmmfit_resolve_par(object, dpar, nlpar)
   class(object) <- class(object)[class(object) != "bmmfit"]
   emmeans::recover_data(object, ..., dpar = resolved$dpar, nlpar = resolved$nlpar)
@@ -58,7 +59,13 @@ recover_data.bmmfit <- function(object, ..., dpar = NULL, nlpar = NULL) {
 #' @exportS3Method emmeans::emm_basis
 emm_basis.bmmfit <- function(object, trms, xlev, grid, ...,
                               dpar = NULL, nlpar = NULL) {
+  # restructured here because brms, which sees a plain brmsfit below, runs only
+  # its own restructure() and not the one that adds posterior_epred (#475)
+  object <- restructure(object)
   resolved <- .bmmfit_resolve_par(object, dpar, nlpar)
+  if (isTRUE(list(...)$epred) && is.null(resolved$dpar) && is.null(resolved$nlpar)) {
+    refuse_undefined_epred(object)
+  }
   class(object) <- class(object)[class(object) != "bmmfit"]
   emmeans::emm_basis(object, trms, xlev, grid, ...,
                      dpar = resolved$dpar, nlpar = resolved$nlpar)

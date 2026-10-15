@@ -2,22 +2,29 @@
 % Please edit documentation in R/helpers-model.R
 \name{supported_models}
 \alias{supported_models}
-\title{Measurement models available in \code{bmm}}
+\title{Deprecated: use \code{bmm_models()}}
 \usage{
 supported_models(print_call = TRUE)
 }
 \arguments{
-\item{print_call}{Logical; If TRUE (default), the function will print
-information about how each model function should be called and its required
-arguments. If FALSE, the function will return a character vector with the
-names of the available models}
+\item{print_call}{Logical. If \code{TRUE} (default), returns the output of
+\code{\link[=bmm_models]{bmm_models()}}, which prints the models grouped by task. If \code{FALSE},
+returns the model names as a plain character vector.}
 }
 \value{
-A character vector of measurement models available in \code{bmm}
+The output of \code{\link[=bmm_models]{bmm_models()}}, or the model names as a plain
+character vector if \code{print_call = FALSE}. Before bmm 1.4.0 the default
+returned the printed list as one string; use
+\code{capture.output(print(bmm_models()))} for the printed list as text,
+one line per element.
 }
 \description{
-Measurement models available in \code{bmm}
+\code{supported_models()} is deprecated as of bmm 1.4.0 and will be
+removed in bmm 1.6.0. It shares its name with \code{insight::supported_models()},
+which the \strong{parameters} package re-exports, so whichever package is
+attached last decides what \code{supported_models()} returns. Replace both
+\code{supported_models()} and \code{supported_models(print_call = FALSE)} with
+\code{\link[=bmm_models]{bmm_models()}}; wrap it in \code{as.character()} if you need a plain
+character vector.
 }
-\examples{
-supported_models()
-}
+\keyword{internal}

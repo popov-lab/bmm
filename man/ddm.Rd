@@ -11,10 +11,13 @@ ddm(rt, response, links = NULL, ...)
 
 \item{response}{Name of the response variable coding the response numerically (0 = lower response / incorrect, 1 = upper response / correct)}
 
-\item{links}{A list of links for the parameters. For positive parameters
+\item{links}{A named list of links for the parameters, e.g.
+\code{links = list(bound = "softplus")}. For positive parameters
 (e.g. \code{bound}, \code{ndt}), "softplus" is available as an alternative to the
 default "log" link that grows linearly for large values and avoids the
-numerical blow-up of \code{exp()}.}
+numerical blow-up of \code{exp()}. A name that is not a parameter of the model
+is an error, and a link that allows values the default link excludes
+(e.g. "identity" for a positive parameter) is a warning.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -31,7 +34,7 @@ Diffusion Decision Model
 \item \strong{Name:} Diffusion Decision Model
 \item \strong{Citation:}
 \itemize{
-\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10/fjwm2f;
+\item Ratcliff, R. (1978). A theory of memory retrieval. Psychological Review, 85(2), 59-108. https://doi.org/10.1037/0033-295X.85.2.59
 }
 \item \strong{Requirements:}
 \itemize{
@@ -47,7 +50,7 @@ Diffusion Decision Model
 \item \code{drift}: Drift rate = Average rate of evidence accumulation of the decision processes
 \item \code{bound}: Boundary separation = Distance between the decision boundaries that need to be reached
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
-\item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
+\item \code{zr}: Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, > 0.5 = biased towards the upper response).
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -64,33 +67,46 @@ Diffusion Decision Model
 \itemize{
 \item \code{main}: cauchy(0,1)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(1)
 }
 \item \code{bound}:
 \itemize{
 \item \code{main}: normal(0,0.5)
 \item \code{effects}: normal(0,0.5)
+\item \code{sd}: exponential(2)
 }
 \item \code{ndt}:
 \itemize{
 \item \code{main}: normal(-1.5,0.5)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 \item \code{zr}:
 \itemize{
 \item \code{main}: normal(0,0.5)
 \item \code{effects}: normal(0,0.3)
+\item \code{sd}: exponential(2)
 }
 }
 }
 }
 \section{Default behavior}{
 
-By default, \code{zr} is fixed at 0. If you want to estimate \code{zr}, add a formula
-for \code{zr} in your \code{bmf()} call.
+By default, \code{zr} is fixed at 0 on its logit link scale, that is at an
+unbiased starting point of \code{zr = 0.5}. If you want to estimate \code{zr}, add a
+formula for \code{zr} in your \code{bmf()} call. Estimates of \code{zr} are on the logit
+scale too, so use \code{plogis()} to read them as proportions.
+
+With accuracy-coded responses (1 = correct, 0 = error) the unbiased default
+is the usual assumption. With response-coded data (1 and 0 for the two
+response options, e.g. "word" and "nonword"), a bias towards one option
+moves the starting point; with \code{zr} fixed, that bias is absorbed by the
+other parameters instead. Estimate \code{zr} for response-coded data, e.g.
+\code{zr ~ 1}, and code \code{drift} so that its sign follows the stimulus.
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # Simulate data for one subject using rddm
 set.seed(123)
 n_trials <- 500

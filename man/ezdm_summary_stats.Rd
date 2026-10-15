@@ -15,8 +15,9 @@ ezdm_summary_stats(
   min_trials = 10,
   init_contaminant = 0.05,
   max_contaminant = 0.5,
-  maxit = 100,
-  tol = 1e-06
+  maxit = 500,
+  tol = 1e-06,
+  guess_rate = 0.5
 )
 }
 \arguments{
@@ -40,8 +41,11 @@ component. One of "exgaussian" (default), "lognormal", or "invgaussian"}
 via mixture modeling, "robust" for non-parametric robust estimation using
 median and IQR/MAD-based variance, or "simple" for standard moment
 calculation. The "robust" method is faster and requires no distributional
-assumptions, but note that the EZ equations were derived for mean and
-variance, so using median may introduce some bias for skewed distributions.}
+assumptions, but its moments are not the mean and variance the EZ
+equations were derived for. For right-skewed RTs the median lies below the
+mean and (IQR/1.349)^2 below the variance, so the EZ estimates are offset
+systematically, not just noisier: a larger drift rate and a smaller
+boundary separation than the same data give with "mixture".}
 
 \item{robust_scale}{Character. Scale estimator for robust method. Either
 "iqr" (default) for IQR-based variance estimation (variance = (IQR/1.349)^2)
@@ -59,8 +63,13 @@ or the special strings "min" and "max" to use data-driven bounds (default):
 The buffer extends data-driven bounds to ensure conservative estimates.
 Examples: c(0.1, 3.0), c("min", "max"), c(0.1, "max"), c("min", 3.0)}
 
-\item{min_trials}{Integer. Minimum number of trials required for fitting.
-Returns NA if fewer trials are available. Default is 10}
+\item{min_trials}{Integer. Minimum number of trials required for the RT
+summaries, which are NA with fewer. Compared against the total number of
+trials for \code{version = "3par"} and against each boundary's own count for
+\code{version = "4par"}, so the two versions can disagree about whether the
+same cell is corrected. For \code{version = "4par"}, \code{\link[=bmm]{bmm()}} still fits a cell
+whose summaries at one or both boundaries are NA, through its response
+counts. Default is 10}
 
 \item{init_contaminant}{Numeric. Initial proportion of contaminants for EM
 algorithm. Default is 0.05}
@@ -69,15 +78,31 @@ algorithm. Default is 0.05}
 (0 < max <= 1). Estimates are clipped to this value to prevent inflated
 contaminant proportions. Default is 0.5}
 
-\item{maxit}{Integer. Maximum number of EM iterations. Default is 100}
+\item{maxit}{Integer. Maximum number of EM iterations. Default is 500. The
+EM converges slowly when the contaminant proportion is close to zero, and
+a cell that reaches \code{maxit} without converging falls back to robust
+moments with a warning.}
 
 \item{tol}{Numeric. Convergence tolerance for EM algorithm. Default is 1e-6}
+
+\item{guess_rate}{Numeric. Accuracy expected of a contaminant response, used
+to split the estimated contaminants of \code{version = "3par"} across the two
+boundaries. Default is 0.5, appropriate for a two-choice task; use 0.25 for
+a 4AFC task, or 0 if contaminants are never correct. Ignored for
+\code{version = "4par"}, which estimates contamination separately per boundary
+and needs no such assumption.}
 }
 \value{
 A 1-row \code{data.frame}. For version = "3par": \code{mean_rt}, \code{var_rt},
 \code{n_upper}, \code{n_trials}, \code{contaminant_prop}. For version = "4par":
 \code{mean_rt_upper}, \code{mean_rt_lower}, \code{var_rt_upper}, \code{var_rt_lower},
 \code{n_upper}, \code{n_trials}, \code{contaminant_prop_upper}, \code{contaminant_prop_lower}.
+
+\code{n_upper} and \code{n_trials} count the responses the reported moments rest on.
+Whenever a contaminant proportion was estimated, the expected number of
+contaminants is removed from both counts and the result is rounded; with
+\code{method = "simple"}, \code{method = "robust"}, or an EM that did not converge,
+they are the raw counts.
 }
 \description{
 Computes robust summary statistics for the EZ-Diffusion Model
@@ -92,10 +117,17 @@ mixture model with two components: a uniform distribution for
 contaminants and a parametric RT distribution for true responses.
 Robust moments are then extracted from the fitted parametric component.
 
+The returned counts describe the same responses as the returned moments.
+For \code{version = "3par"} the estimated contaminants are shared between the
+boundaries at \code{guess_rate}; a cell whose observed accuracy lies outside
+\verb{[guess_rate * p, 1 - p * (1 - guess_rate)]} for an estimated proportion
+\code{p} cannot have arisen that way, so the contaminants are removed
+proportionally from both boundaries instead, leaving the observed accuracy
+unchanged apart from rounding, and a warning is issued. For
+\code{version = "4par"} each boundary is corrected by its own estimate.
+
 This function is designed to work with \code{\link[dplyr:group_by]{dplyr::group_by()}} and
-\code{\link[dplyr:reframe]{dplyr::reframe()}} for grouped operations. Use \code{\link[=adjust_ezdm_accuracy]{adjust_ezdm_accuracy()}}
-as a separate step if you need to adjust accuracy counts for
-contamination.
+\code{\link[dplyr:reframe]{dplyr::reframe()}} for grouped operations.
 }
 \examples{
 # Generate example data
@@ -117,8 +149,7 @@ ezdm_summary_stats(rt, response, version = "4par")
 
 }
 \seealso{
-\code{\link[=adjust_ezdm_accuracy]{adjust_ezdm_accuracy()}} for adjusting accuracy counts,
-\code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} for trial-level contamination probabilities,
-\code{\link[=ezdm]{ezdm()}} for fitting the EZ-Diffusion Model
+\code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} for trial-level contamination
+probabilities, \code{\link[=ezdm]{ezdm()}} for fitting the EZ-Diffusion Model
 }
 \keyword{transform}

@@ -34,7 +34,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 \item \strong{Name:} Signal Discrimination Model (SDM) by Oberauer (2023)
 \item \strong{Citation:}
 \itemize{
-\item Oberauer, K. (2023). Measurement models for visual working memory - A factorial model comparison. Psychological Review, 130(3), 841-852
+\item Oberauer, K. (2023). Measurement models for visual working memory—A factorial model comparison. Psychological Review, 130(3), 841-852. https://doi.org/10.1037/rev0000328
 }
 \item \strong{Version:} simple
 \item \strong{Requirements:}
@@ -59,23 +59,27 @@ and how to use it. * \strong{Domain:} Visual working memory
 \itemize{
 \item \code{mu}:
 \itemize{
-\item \code{main}: student_t(1, 0, 1)
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
 }
 \item \code{kappa}:
 \itemize{
 \item \code{main}: student_t(5, 1.75, 0.75)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 \item \code{c}:
 \itemize{
 \item \code{main}: student_t(5, 2, 0.75)
 \item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
 }
 }
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # simulate data from the model
 dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 

@@ -1,8 +1,6 @@
 test_that("summary has reasonable outputs", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   summary1 <- suppressWarnings(summary(fit))
   expect_true(is.data.frame(summary1$fixed))
   expect_equal(
@@ -67,20 +65,58 @@ test_that("print.bmmsummary handles a single regression coefficient row (#369)",
   expect_true(any(grepl("kappa_Intercept", out)))
 })
 
+test_that("print.bmmsummary lists only constants when no shown coefficient is estimated", {
+  model <- sdm(resp_error = "y")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  fixed <- make_fixed(c("c_Intercept", "kappa_Intercept"))
+  fixed$Rhat <- NA
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+  expect_false(any(grepl("Regression Coefficients", out)))
+  expect_true(any(grepl("Constant Parameters", out)))
+  expect_true(any(grepl("kappa_Intercept", out)))
+})
+
 test_that(".summary_fixed_rows keeps a single fixed-effect row", {
-  # gumbel-min sdt_ranking has one population coefficient (dprime_Intercept) but
-  # two printed parameters (dprime, sdratio); the old sapply+apply errored here.
-  one_row <- data.frame(Estimate = 0.6, Rhat = 1, row.names = "dprime_Intercept")
-  out <- .summary_fixed_rows(one_row, c("dprime", "sdratio"))
+  # gumbel-min sdt_ranking has one population coefficient (d_Intercept) but
+  # two printed parameters (d, sdratio); the old sapply+apply errored here.
+  one_row <- data.frame(Estimate = 0.6, Rhat = 1, row.names = "d_Intercept")
+  out <- .summary_fixed_rows(one_row, c("d", "sdratio"))
   expect_s3_class(out, "data.frame")
-  expect_identical(rownames(out), "dprime_Intercept")
+  expect_identical(rownames(out), "d_Intercept")
 })
 
 test_that(".summary_fixed_rows selects all rows matching the printed parameters", {
   fixed <- data.frame(
     Estimate = 1:3, Rhat = c(1, NA, 1),
-    row.names = c("dprime_Intercept", "sdratio_Intercept", "nuisance_Intercept")
+    row.names = c("d_Intercept", "sdratio_Intercept", "nuisance_Intercept")
   )
-  out <- .summary_fixed_rows(fixed, c("dprime", "sdratio"))
-  expect_identical(sort(rownames(out)), c("dprime_Intercept", "sdratio_Intercept"))
+  out <- .summary_fixed_rows(fixed, c("d", "sdratio"))
+  expect_identical(sort(rownames(out)), c("d_Intercept", "sdratio_Intercept"))
+})
+
+test_that("SDT summaries name d as d_a only when sdratio is not 0", {
+  model <- sdt_yn(response = "y", stimulus = "s", n_trials = "n")
+  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept", "sdratio_Intercept"))
+
+  ev <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1), fixed),
+                             color = FALSE))
+  expect_false(any(grepl("d_a", ev)))
+
+  model$fixed_parameters$sdratio <- NULL
+  uv <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1, sdratio ~ 1),
+                                             fixed), color = FALSE))
+  expect_true(any(grepl("d is d_a", uv)))
+  expect_true(any(grepl("sdt_sensitivity()", uv, fixed = TRUE)))
+})
+
+test_that("the Links line lists only the alternative parameter the formula uses", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1, bias ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "bias = identity", fixed = TRUE)
+  expect_no_match(links, "criterion", fixed = TRUE)
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "criterion = identity", fixed = TRUE)
+  expect_no_match(links, "bias", fixed = TRUE)
 })

@@ -96,7 +96,6 @@ bmf <- bmmformula
 
 # an internal bmmformula constructor
 new_bmmformula <- function(x = nlist()) {
-  stopifnot(is_namedlist(x))
   class(x) <- "bmmformula"
   assign_nl_attr(x)
 }
@@ -151,7 +150,19 @@ check_formula.bmmodel <- function(model, data, formula) {
   )
 
   wpar <- unrecognized_parameters(model, formula)
-  stopif(length(wpar), "Unrecognized model parameters: {collapse_comma(wpar)}")
+  valid_pars <- collapse_comma(names(model$parameters))
+  stopif(length(wpar), "Unrecognized model parameters: \\
+         {collapse_comma(wpar)}. {model$name} has the parameters {valid_pars}")
+
+  for (alternatives in model$alternative_parameters) {
+    given <- intersect(alternatives, names(formula))
+    stopif(
+      length(given) > 1,
+      "The formula gives both {collapse_comma(given)}, which are alternative \\
+      parameterizations of the same quantity, so only one of them can be \\
+      estimated. Keep the one whose meaning your design holds constant."
+    )
+  }
 
   formula <- add_missing_parameters(model, formula)
   warn_predictor_parameter_clash(data, formula)
@@ -239,10 +250,24 @@ bmf2bf.default <- function(model, formula) {
   NULL
 }
 
+# The parameters whose formulas a model's check_formula method generates, so
+# that no user formula is expected for them. Their placeholders are still added
+# below, because the generating method overwrites them by name.
+generated_parameters <- function(model) {
+  UseMethod("generated_parameters")
+}
+
+#' @exportS3Method
+generated_parameters.default <- function(model) {
+  character(0)
+}
+
 add_missing_parameters <- function(model, formula = bmmformula()) {
   formula_pars <- names(formula)
-  model_pars <- names(model$parameters)
+  model_pars <- setdiff(names(model$parameters),
+                        unused_alternative_parameters(model, formula))
   fixed_pars <- names(model$fixed_parameters)
+  generated_pars <- generated_parameters(model)
 
   estimable_formula_pars <- setdiff(formula_pars, fixed_pars)
   missing_pars <- setdiff(model_pars, estimable_formula_pars)
@@ -251,7 +276,7 @@ add_missing_parameters <- function(model, formula = bmmformula()) {
     add <- stats::as.formula(paste(mpar, "~ 1"))
     if (mpar %in% fixed_pars) {
       attr(add, "constant") <- TRUE
-    } else {
+    } else if (!mpar %in% generated_pars) {
       message2("No formula for parameter {mpar} provided. Only a fixed intercept will be estimated.")
     }
     formula[mpar] <- add
@@ -260,6 +285,15 @@ add_missing_parameters <- function(model, formula = bmmformula()) {
   # Ensure formula list matches model parameters order
   all_pars <- unique(c(model_pars, formula_pars))
   formula[all_pars]
+}
+
+# Of a set of alternative parameters only the one the formula names takes
+# part, and the first stands in when the formula names none
+unused_alternative_parameters <- function(model, formula) {
+  unlist(lapply(model$alternative_parameters, function(alternatives) {
+    given <- intersect(alternatives, names(formula))
+    setdiff(alternatives, if (length(given)) given else alternatives[1])
+  }))
 }
 
 unrecognized_parameters <- function(model, formula) {
@@ -439,7 +473,11 @@ apply_links <- function(formula, links = nlist()) {
   if (length(links) == 0) {
     return(formula)
   }
-  stopifnot(is_namedlist(links) || is.null(links), all(vapply(links, is.character, logical(1))))
+  stopif(
+    !is_namedlist(links) || !all(vapply(links, is.character, logical(1))),
+    'The `links` argument must be a named list of link functions, \\
+     e.g. links = list(kappa = "log")'
+  )
   UseMethod("apply_links")
 }
 
@@ -471,7 +509,6 @@ apply_links.formula <- function(formula, links = nlist()) {
 #' identical(inv_link("x", "log"), quote(exp(x))) # TRUE
 #' @noRd
 inv_link <- function(par = character(0), link = c("log", "softplus", "logit", "probit", "identity")) {
-  stopifnot(is.character(par), length(par) == 1)
   par <- as.symbol(par)
   link <- match.arg(link)
   switch(link,

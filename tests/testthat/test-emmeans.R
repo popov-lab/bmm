@@ -2,21 +2,15 @@
 # These test the parameter routing logic without requiring posterior samples
 
 load_mock_mixture2p <- function() {
-  path <- test_path("assets/mock_bmmfit_mixture2p.rds")
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("mock_bmmfit_mixture2p.rds")
 }
 
 load_mock_m3 <- function() {
-  path <- test_path("assets/mock_bmmfit_m3.rds")
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("mock_bmmfit_m3.rds")
 }
 
 load_sdm_fit <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_example1.rds")
 }
 
 test_that(".bmmfit_resolve_par routes dpar to nlpar for mixture2p", {
@@ -101,4 +95,36 @@ test_that("pairs() produces valid contrast from emmGrid", {
   contrasts <- pairs(em)
   expect_s4_class(contrasts, "emmGrid")
   expect_true(nrow(as.data.frame(contrasts)) > 0)
+})
+
+# posterior_epred (#475) ------------------------------------------------------
+
+test_that("emmeans(epred = TRUE) works on a fit saved without posterior_epred", {
+  skip_if_not_installed("emmeans")
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
+  em <- as.data.frame(emmeans::emmeans(fit, ~1, epred = TRUE))
+  expect_true(is.finite(em$emmean))
+  expect_equal(em$emmean, mean(brms::posterior_epred(fit)), tolerance = 0.05)
+})
+
+test_that("emmeans(epred = TRUE) refuses a circular model", {
+  skip_if_not_installed("emmeans")
+  fit <- load_sdm_fit()
+  class(fit$bmm$model) <- c("bmmodel", "circular", "sdm", "sdm_simple")
+  # a stand-in for the number brms would compute for a native family, so that
+  # only the refusal before brms can produce the expected message
+  fit$formula$family$posterior_epred <- function(prep) stop("reached brms")
+  expect_error(emmeans::emmeans(fit, ~set_size, epred = TRUE),
+               "not defined for the sdm model")
+})
+
+test_that("emm_basis.bmmfit() hands brms a fit that stores posterior_epred", {
+  skip_if_not_installed("emmeans")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
+  # under load_all() brms finds posterior_epred_ddm by name even on a fit
+  # that stores none, so only the object handed on shows that restructure() ran
+  local_mocked_bindings(emm_basis = function(object, ...) object, .package = "emmeans")
+  seen <- emm_basis.bmmfit(fit, trms = NULL, xlev = NULL, grid = NULL, epred = TRUE)
+  expect_true(is.function(seen$formula$family$posterior_epred))
 })

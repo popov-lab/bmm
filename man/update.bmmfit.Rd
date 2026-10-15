@@ -4,7 +4,15 @@
 \alias{update.bmmfit}
 \title{Update a bmm model}
 \usage{
-\method{update}{bmmfit}(object, formula., newdata = NULL, recompile = NULL, ...)
+\method{update}{bmmfit}(
+  object,
+  formula.,
+  newdata = NULL,
+  recompile = NULL,
+  file = NULL,
+  file_compress = TRUE,
+  ...
+)
 }
 \arguments{
 \item{object}{An object of class \code{bmmfit}}
@@ -12,17 +20,33 @@
 \item{formula.}{A \code{\link[=bmmformula]{bmmformula()}}. If missing, the original formula
 is used. Currently you have to specify a full \code{bmmformula}}
 
-\item{newdata}{An optional data frame containing the variables in the model}
+\item{newdata}{An optional data frame containing the variables in the model.
+Rows of \code{fit$data} are accepted as they are, which is how \code{\link[brms:kfold]{brms::kfold()}}
+and \code{\link[brms:reloo]{brms::reloo()}} pass them.}
 
 \item{recompile}{Logical, indicating whether the Stan model should be recompiled. If
 NULL (the default), update tries to figure out internally, if recompilation
 is necessary. Setting it to FALSE will cause all Stan code changing
 arguments to be ignored.}
 
+\item{file}{Either \code{NULL} or a character string. If a string, the updated
+model is saved via \link{saveRDS} in a file named after the string, as in
+\code{\link[=bmm]{bmm()}}. \code{update()} never writes to the file the original fit was read
+from: pass \code{file} explicitly to save the updated fit.}
+
+\item{file_compress}{Logical or a character string, specifying one of the
+compression algorithms supported by \link{saveRDS} when saving the updated
+model object.}
+
 \item{...}{Further arguments passed to \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}}
 }
 \value{
-An updated \code{bmmfit} object refit to the new data and/or formula
+An updated \code{bmmfit} object refit to the new data and/or formula. If
+\code{file} is given, it names the newly written file. If not, the \code{file} field
+is carried over from the original fit, so the updated object still points
+at the file it came from -- but that file is \emph{not} rewritten: it still
+holds the fit as it was before this update. Pass \code{file} to save the
+updated fit.
 }
 \description{
 Update an existing bmm mode. This function calls
@@ -39,7 +63,7 @@ your choice before creating the original bmmfit.
 For more information and examples, see \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # generate artificial data from the Signal Discrimination Model
 # generate artificial data from the Signal Discrimination Model
 dat <- data.frame(y = rsdm(2000))
