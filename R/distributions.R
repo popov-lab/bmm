@@ -4477,7 +4477,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 dtcc <- function(x, d, similarity, n_options = 360, log = FALSE) {
   .tcc_check_similarity(similarity, n_options)
   dist <- abs(.tcc_bin(x, n_options, "radians")) + 1
-  n <- max(length(x), length(d))
+  n <- if (length(x) && length(d)) max(length(x), length(d)) else 0L
   dist <- rep_len(dist, n)
   d <- rep_len(d, n)
   out <- rep(NA_real_, n)
@@ -4494,8 +4494,8 @@ rtcc <- function(n, d, similarity, n_options = 360) {
   .tcc_check_similarity(similarity, n_options)
   d <- rep_len(d, n)
   offsets <- seq(-n_options / 2 + 1, n_options / 2)
-  out <- numeric(n)
-  for (value in unique(d)) {
+  out <- rep(NA_real_, n)
+  for (value in unique(d[!is.na(d)])) {
     rows <- which(d == value)
     prob <- exp(.tcc_logp(value, similarity))[abs(offsets) + 1]
     out[rows] <- sample(offsets, length(rows), replace = TRUE, prob = prob)

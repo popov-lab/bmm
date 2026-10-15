@@ -69,7 +69,7 @@ d' to this \code{d} was 1.60.
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{d}: Memory strength d': the mean memory-match signal of the target in units of the noise SD; an option at distance x has mean d * f(x)
+\item \code{d}: Memory strength d (the d' of the uncorrelated-noise model): the mean memory-match signal of the target in units of the noise SD; an option at distance x has mean d * f(x)
 }
 \item \strong{Fixed parameters:}
 \item \strong{Default parameter links:}
@@ -128,9 +128,10 @@ a posterior that reaches the end of the grid can run far beyond it, with
 estimates that mean nothing. \code{bmm()} warns after the fit when any
 posterior draw of \code{d} passes \code{d_max}; then refit with a larger \code{d_max}.
 The default of 30 lies far above the values of \code{d} from 0.6 to 2.0 that
-\code{tcc()} estimates for set sizes 1 to 8 in \link{oberauer_lin_2017}. Each extra
-unit adds 50 table rows, which costs build time and memory but nothing per
-gradient. A large \code{d} is weakly identified
+\code{tcc()} estimates for set sizes 1 to 8 in \link{oberauer_lin_2017} with the
+similarity of the examples below (\code{d} depends on the similarity). Each
+extra unit adds 50 table rows, which costs build time and memory but
+nothing per gradient. A large \code{d} is weakly identified
 when the similarity is broad, because the probability of reporting the
 target then grows slowly with \code{d}.
 }
@@ -143,6 +144,8 @@ target then grows slowly with \code{d}.
 give; add \code{type = "bars_binned"} and name a condition column in \code{group}
 for histograms per condition. \code{resp_var = "abs_error"} shows the distance from the target,
 the quantity the likelihood depends on. See \code{\link[=pp_check.bmmfit]{pp_check.bmmfit()}}.
+\code{posterior_predict()} and \code{predict()} return offsets in option steps
+whatever \code{units} is; multiply by \code{2 * pi / n_options} for radians.
 }
 
 \subsection{Comparing with continuous models}{
