@@ -533,7 +533,7 @@ model_registry <- function(models = model_names()) {
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
-reference_url <- "https://popov-lab.github.io/bmm/reference/"
+reference_url <- "https://venpopov.com/bmm/reference/"
 
 format_model_list <- function(registry, style = "text", headers = TRUE) {
   blocks <- lapply(unique(registry$group), function(group) {
