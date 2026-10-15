@@ -75,7 +75,7 @@ settable_links.sdm <- function(model) {
 #' @return An object of class `bmmodel`
 #' @export
 #' @keywords bmmodel
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # simulate data from the model
 #' dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 #'

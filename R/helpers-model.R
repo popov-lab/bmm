@@ -39,7 +39,7 @@
 #'     nlist(formula, data, family, prior)
 #'  }
 #'  ```
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' configure_model.mixture3p <- function(model, data, formula) {
 #'   # retrieve arguments from the data check
 #'   max_set_size <- attr(data, "max_set_size")
@@ -962,7 +962,7 @@ get_model2 <- function(model) {
 #' @keywords internal developer
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' library(usethis)
 #'
 #'

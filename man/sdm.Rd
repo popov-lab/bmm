@@ -79,7 +79,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # simulate data from the model
 dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 

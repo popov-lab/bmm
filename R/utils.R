@@ -294,7 +294,7 @@ install_and_load_bmm_version <- function(version, path) {
 #'  - "time_mean": A named numeric vector with the mean sampling time
 #' @keywords extract_info
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- bmm(
 #'   formula = bmmformula(c ~ 1, kappa ~ 1),
 #'   data = data.frame(y = rsdm(1000)),

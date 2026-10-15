@@ -104,7 +104,7 @@
 #'
 #' @seealso [pp_check.bmmfit()] for the graphical check.
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' trees <- list(
 #'   mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
 #'   mpt_tree("lure", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))

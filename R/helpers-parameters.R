@@ -524,7 +524,7 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' @seealso [parameter_info()], [native_transform()], [conditional_effects.bmmfit()]
 #' @keywords extract_info
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- bmm(
 #'   bmf(c ~ 0 + set_size, kappa ~ 1),
 #'   data = oberauer_lin_2017,
