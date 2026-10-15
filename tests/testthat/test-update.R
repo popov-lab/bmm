@@ -519,6 +519,11 @@ stored_frame_cases <- function() {
       model = tcc("bin", similarity = exp(-(0:90) / 10), n_options = 180, units = "bins"),
       formula = bmf(d ~ 1), data = data.frame(bin = c(0, 3, -7, 90, 181, 12), id = 1:6)
     ),
+    # a named similarity adds a parameter and a 2-D table
+    tcc_laplace = list(
+      model = tcc("dev_rad", similarity = "laplace"),
+      formula = bmf(d ~ 1 + set_size, lambda ~ 1), data = lin_2017[order(lin_2017$set_size), ]
+    ),
     sdt_yn = list(
       model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
       formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1), data = broeder_schuetz_2009_e3
@@ -966,7 +971,8 @@ test_that("update() takes a slice of the model frame as newdata (kfold(), reloo(
   skip_if_not_installed("rstan")
   for (case_name in c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
                       "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
-                      "mpt", "mpt_tree_predictor", "mpt_single_tree", "tcc", "tcc_bins")) {
+                      "mpt", "mpt_tree_predictor", "mpt_single_tree", "tcc", "tcc_bins",
+                      "tcc_laplace")) {
     case <- stored_frame_cases()[[case_name]]
     fit <- stub_frame_fit(case)
     rows <- seq_len(nrow(fit$data))[-1]

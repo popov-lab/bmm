@@ -21,9 +21,11 @@ the nearest of the \code{n_options} options; with \code{units = "bins"} it is th
 offset of the chosen option from the target in whole option steps (any
 integer, taken modulo \code{n_options}).}
 
-\item{similarity}{A numeric vector of \code{n_options / 2 + 1} values in [0, 1]:
-the similarity of an option to the target at each distance 0, 1, ...,
-\code{n_options / 2} options, starting with 1 at distance 0.}
+\item{similarity}{Either a numeric vector of \code{n_options / 2 + 1} values in
+[0, 1], the fixed similarity of an option to the target at each
+distance 0, 1, ..., \code{n_options / 2} options, starting with 1 at distance
+0; or \code{"laplace"} or \code{"vonmises"} to estimate the similarity with the
+parameter \code{lambda} or \code{kappa}. See the section Similarity.}
 
 \item{n_options}{The number of response options on the wheel, an even
 number: 360 for a colour wheel in 1-degree steps, 180 for orientation.}
@@ -88,15 +90,42 @@ d' to this \code{d} was 1.60.
 }
 \subsection{Similarity}{
 
-\code{similarity} holds the psychophysical similarity of an option to the
-target as a function of their distance on the wheel, one value per
-distance in option steps, in the order 0, 1, ..., \code{n_options / 2}: the
-first value belongs to the target itself and must be 1, the last to the
-option opposite the target. The model assumes the similarity depends only
-on the distance, the same for every target and on both sides of it. The
-values are fixed, not estimated; Schurgin et al. (2020) measured them in
-a separate perceptual matching task. With 360 options in 1-degree steps,
+\code{similarity} says how similar an option is to the target as a function of
+their distance on the wheel. The model assumes the similarity depends only
+on the distance, the same for every target and on both sides of it. It is
+1 at the target and 0 at the option opposite it. There are three choices:
+\itemize{
+\item A numeric vector holds fixed values, one per distance in option steps,
+in the order 0, 1, ..., \code{n_options / 2}: the first value belongs to the
+target itself and must be 1, the last to the option opposite the target.
+Schurgin et al. (2020) measured them in a separate perceptual task and
+scaled them to range from 0 to 1. With 360 options in 1-degree steps,
 \code{similarity[k + 1]} is the similarity at \code{k} degrees.
+\item \code{"laplace"} estimates a similarity that falls exponentially with the
+distance \code{x} in radians, \code{exp(-x / lambda)}, and adds the parameter
+\code{lambda}, its width in radians.
+\item \code{"vonmises"} estimates a similarity of the shape \code{exp(-kappa * (1 -   cos(x)))} and adds the parameter \code{kappa}, its concentration.
+}
+
+The two shapes are the Laplace and von Mises activation functions of
+Oberauer (2021, eq. 2); his Laplace rate is \code{1 / lambda}. Both are scaled
+to run from 1 at the target to 0 opposite it, like a measured similarity.
+Scaling changes the value of \code{d} that describes the data, not the shape.
+The distance is measured on the response circle: with 180 options for
+orientation, \code{x = pi} is the option opposite the target, 90 degrees of
+orientation away.
+
+\code{lambda} and \code{kappa} are modelled on the log scale and take formulas like
+\code{d}, including continuous predictors and random effects. Their default
+priors are \code{normal(-0.5, 1)} on \code{log(lambda)}, centred at 0.61 radians (35
+degrees), and \code{normal(1.5, 1)} on \code{log(kappa)}, centred at 4.5. The
+formula never chooses the similarity: naming \code{lambda} in it requires
+\code{similarity = "laplace"}, and \code{kappa} requires \code{"vonmises"}. A value fixed
+in the formula, such as \code{lambda = -1}, is on the log scale.
+
+Oberauer, K. (2021). Measurement models for visual working memory: A
+factorial model comparison. Psychological Review.
+https://doi.org/10.1037/rev0000328
 }
 
 \subsection{Response}{
@@ -135,6 +164,33 @@ when the similarity is broad, because the probability of reporting the
 target then grows slowly with \code{d}.
 }
 
+\subsection{Grid limits with an estimated similarity}{
+
+With \code{similarity = "laplace"} or \code{"vonmises"} the table has two
+dimensions: \code{d} in steps of 0.1 up to \code{d_max}, and \code{log(lambda)} or
+\code{log(kappa)} in steps of 0.1. \code{lambda} runs from 0.004 to 21.7 radians
+(0.23 to 1245 degrees) and \code{kappa} from 0.02 to 53,500, which reaches
+from a similarity so sharp that no option but the target resembles it,
+to one that falls almost as a straight line (Laplace) or a raised cosine
+(von Mises) with distance. Between the grid nodes the interpolated log
+probability errs by at most 7e-5 on responses with a probability above
+1e-4, and on any response by 5e-4 up to \code{d = 12} and 3e-3 up to \code{d = 30}.
+Beyond either end of either axis the table is extended linearly, as
+for \code{d}, with one exception: above \code{d_max} the log probability of a
+response may fall with \code{d} but never rise. When no response lies far
+from the target, a large \code{d} with a broad similarity describes the data
+almost as well as a small \code{d} with a sharp one, and along that ridge a
+rising extension would let \code{d} run off without bound. \code{bmm()} warns after
+the fit when any posterior draw of \code{d} passes \code{d_max}, or of \code{lambda} or
+\code{kappa} leaves its grid. There is no argument to widen the grid of
+\code{lambda} or \code{kappa}: use a prior that keeps the posterior inside.
+
+Each chain builds this table once before sampling. With the default
+\code{d_max = 30} that took 10 s (Laplace) and 18 s (von Mises) per chain on
+the machine bmm is developed on, and each chain process held 61 MB and
+91 MB.
+}
+
 \subsection{Posterior predictive checks}{
 
 \code{pp_check(fit)} compares observed and predicted offsets in option steps.
@@ -171,6 +227,13 @@ The comparison is fair only if the responses were themselves recorded on
 The fit is fastest when rows that share a value of \code{d} are adjacent, so
 bmm offers to sort the data by the predictors of \code{d}, as for \code{\link[=sdm]{sdm()}}.
 Continuous predictors of \code{d} are supported at the per-trial cost.
+
+With \code{lambda} or \code{kappa} estimated, rows are grouped by their values of
+both parameters. On \link{oberauer_lin_2017} (15,200 trials in 152 cells of
+subject and set size) one gradient took 2.4 ms with both parameters
+predicted by set size and subject, and 28 ms with a continuous predictor
+of \code{lambda} as well, which makes every trial its own cell. Estimating
+the similarity also about doubles the number of gradients per iteration.
 }
 }
 \examples{
@@ -179,6 +242,9 @@ f <- exp(-(0:180) / 20)
 f <- (f - min(f)) / (1 - min(f))
 dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
+
+# the same data, with the width of a Laplace similarity estimated
+fit <- bmm(bmf(d ~ 1, lambda ~ 1), dat, tcc("err", similarity = "laplace"), cores = 4)
 \dontshow{\}) # examplesIf}
 }
 \keyword{bmmodel}

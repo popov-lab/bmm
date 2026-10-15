@@ -4453,8 +4453,14 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   nearest option, as [tcc()] does with `units = "radians"`.
 #' @param n Number of observations to generate.
 #' @param d Memory strength, the mean signal of the target (recycled).
-#' @param similarity Similarity of an option to the target at each distance
-#'   0, 1, ..., `n_options / 2` options, starting with 1 (see [tcc()]).
+#' @param similarity Either a vector of the similarity of an option to the
+#'   target at each distance 0, 1, ..., `n_options / 2` options, starting with
+#'   1, or `"laplace"` or `"vonmises"` for a similarity function with the
+#'   parameter `lambda` or `kappa` (see [tcc()]).
+#' @param lambda Width of the Laplace similarity in radians, for `similarity =
+#'   "laplace"` (recycled).
+#' @param kappa Concentration of the von Mises similarity, for `similarity =
+#'   "vonmises"` (recycled).
 #' @param n_options Number of response options, an even number.
 #' @param log Logical; if `TRUE`, the log probability is returned.
 #'
@@ -4473,32 +4479,73 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' x <- 2 * pi * (-179:180) / 360
 #' plot(x, dtcc(x, d = 2, similarity = f), type = "h")
 #' hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
+#' # the same similarity as a Laplace function with a width of 20 degrees
+#' lines(x, dtcc(x, d = 2, similarity = "laplace", lambda = 20 * pi / 180), col = 2)
 #' @export
-dtcc <- function(x, d, similarity, n_options = 360, log = FALSE) {
-  .tcc_check_similarity(similarity, n_options)
-  dist <- abs(.tcc_bin(x, n_options, "radians")) + 1
-  n <- max(length(x), length(d))
-  dist <- rep_len(dist, n)
-  d <- rep_len(d, n)
+dtcc <- function(x, d, similarity, lambda = NULL, kappa = NULL, n_options = 360, log = FALSE) {
+  par <- .tcc_dist_par(similarity, lambda, kappa, n_options)
+  n <- max(length(x), length(d), length(par))
+  dist <- rep_len(abs(.tcc_bin(x, n_options, "radians")) + 1, n)
   out <- rep(NA_real_, n)
-  for (value in unique(d[!is.na(d)])) {
-    rows <- which(d == value)
-    out[rows] <- .tcc_logp(value, similarity)[dist[rows]]
+  for (cell in .tcc_dist_cells(rep_len(d, n), if (!is.null(par)) rep_len(par, n))) {
+    out[cell$rows] <- .tcc_logp(cell$d, .tcc_dist_similarity(similarity, cell$par, n_options))[dist[cell$rows]]
   }
   if (log) out else exp(out)
 }
 
 #' @rdname tcc_dist
 #' @export
-rtcc <- function(n, d, similarity, n_options = 360) {
-  .tcc_check_similarity(similarity, n_options)
-  d <- rep_len(d, n)
+rtcc <- function(n, d, similarity, lambda = NULL, kappa = NULL, n_options = 360) {
+  par <- .tcc_dist_par(similarity, lambda, kappa, n_options)
   offsets <- seq(-n_options / 2 + 1, n_options / 2)
   out <- numeric(n)
-  for (value in unique(d)) {
-    rows <- which(d == value)
-    prob <- exp(.tcc_logp(value, similarity))[abs(offsets) + 1]
-    out[rows] <- sample(offsets, length(rows), replace = TRUE, prob = prob)
+  for (cell in .tcc_dist_cells(rep_len(d, n), if (!is.null(par)) rep_len(par, n))) {
+    f <- .tcc_dist_similarity(similarity, cell$par, n_options)
+    prob <- exp(.tcc_logp(cell$d, f))[abs(offsets) + 1]
+    out[cell$rows] <- sample(offsets, length(cell$rows), replace = TRUE, prob = prob)
   }
   2 * pi * out / n_options
+}
+
+# The similarity parameter of a named similarity, NULL for a vector
+.tcc_dist_par <- function(similarity, lambda, kappa, n_options) {
+  .tcc_check_similarity(similarity, n_options)
+  if (!is.character(similarity)) {
+    stopif(!is.null(lambda) || !is.null(kappa),
+           "`lambda` and `kappa` go with similarity = 'laplace' or 'vonmises', not with a \\
+           numeric vector of similarities.")
+    return(NULL)
+  }
+  name <- .tcc_shapes[[similarity]]$name
+  given <- list(lambda = lambda, kappa = kappa)
+  stopif(is.null(given[[name]]) || !is.null(given[[setdiff(names(given), name)]]),
+         "similarity = '{similarity}' takes `{name}`, and only `{name}`.")
+  par <- given[[name]]
+  stopif(!is.numeric(par) || anyNA(par) || any(par <= 0), "`{name}` must be positive.")
+  par
+}
+
+.tcc_dist_similarity <- function(similarity, par, n_options) {
+  if (is.null(par)) {
+    return(similarity)
+  }
+  .tcc_shape_similarity(similarity, par, 2 * pi * (0:(n_options / 2)) / n_options)
+}
+
+# The rows sharing each pair of d and similarity parameter; unique() compares
+# the values exactly, which grouping by a factor would not
+.tcc_dist_cells <- function(d, par) {
+  ok <- !is.na(d)
+  cells <- list()
+  for (value in unique(d[ok])) {
+    rows <- which(ok & d == value)
+    if (is.null(par)) {
+      cells[[length(cells) + 1]] <- list(rows = rows, d = value, par = NULL)
+      next
+    }
+    for (p in unique(par[rows])) {
+      cells[[length(cells) + 1]] <- list(rows = rows[par[rows] == p], d = value, par = p)
+    }
+  }
+  cells
 }
