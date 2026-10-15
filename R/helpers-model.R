@@ -1493,15 +1493,14 @@ call_brms_extractor <- function(fun, cfg, dots) {
   brms::do_call(fun, args)
 }
 
+# update() runs postprocess_brm() again on code that may already carry a bmm
+# version, so any existing ones are replaced by the version doing the update
 add_bmm_version_to_stancode <- function(stancode) {
-  version <- packageVersion("bmm")
-  text <- paste0("and bmm ", version)
-  brms_comp <- regexpr("brms.*(?=\\n)", stancode, perl = T)
-  insert_loc <- brms_comp + attr(brms_comp, "match.length") - 1
-  new_stancode <- paste0(
-    substr(stancode, 1, insert_loc),
-    " ", text,
-    substr(stancode, insert_loc + 1, nchar(stancode))
+  new_stancode <- sub(
+    "^([^\\r\\n]*?brms[^\\r\\n]*?)(?: and bmm [^ \\r\\n]+)*(?=\\r?\\n)",
+    paste0("\\1 and bmm ", utils::packageVersion("bmm")),
+    stancode,
+    perl = TRUE
   )
   class(new_stancode) <- class(stancode)
   new_stancode

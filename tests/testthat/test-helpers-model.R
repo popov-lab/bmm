@@ -524,6 +524,35 @@ test_that("no check for with stancode function", {
   ))
 })
 
+test_that("add_bmm_version_to_stancode() names bmm once, with the current version", {
+  version <- utils::packageVersion("bmm")
+  body <- "\nfunctions {\n}\n"
+  expected <- paste0("// generated with brms 2.23.0 and bmm ", version, body)
+  once <- add_bmm_version_to_stancode(paste0("// generated with brms 2.23.0", body))
+  expect_identical(once, expected)
+  expect_identical(add_bmm_version_to_stancode(once), expected)
+  expect_identical(
+    add_bmm_version_to_stancode(paste0("// generated with brms 2.23.0 and bmm 0.9.0", body)),
+    expected
+  )
+  expect_identical(
+    add_bmm_version_to_stancode(
+      paste0("// generated with brms 2.23.0 and bmm 1.3.2.9000 and bmm 1.3.2.9000", body)
+    ),
+    expected
+  )
+})
+
+test_that("add_bmm_version_to_stancode() keeps the class and leaves code without a brms header alone", {
+  code <- structure("// generated with brms 2.23.0\nfunctions {\n}\n", class = c("character", "brmsmodel"))
+  expect_s3_class(add_bmm_version_to_stancode(add_bmm_version_to_stancode(code)), "brmsmodel")
+  expect_identical(add_bmm_version_to_stancode("functions {\n}\n"), "functions {\n}\n")
+  expect_identical(
+    add_bmm_version_to_stancode("functions {\n  // brms-style helper\n}\n"),
+    "functions {\n  // brms-style helper\n}\n"
+  )
+})
+
 test_that("update_model_fixed_parameters() works", {
   model1 <- sdm("y")
   formula <- bmf(mu ~ set_size, kappa = 3, c ~ 1)

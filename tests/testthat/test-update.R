@@ -99,6 +99,20 @@ test_that("update() stores the formula that bmm() stores, without a fixture", {
                ignore_formula_env = TRUE)
 })
 
+test_that("update() that keeps the Stan code names the bmm version once (#551)", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  # the mock backend recompiles and so writes a fresh header; testmode keeps
+  # the fit's code, which already carries the bmm version
+  expected <- paste0("and bmm ", utils::packageVersion("bmm"))
+  header <- function(fit) sub("^.*? (and bmm[^\n]*)\n.*$", "\\1", unclass(fit$model))
+  up <- suppressMessages(update(fit1, testmode = TRUE))
+  expect_identical(header(up), expected)
+  expect_identical(header(suppressMessages(update(up, testmode = TRUE))), expected)
+  up <- suppressMessages(update(fit1, formula. = bmf(c ~ 1, kappa ~ 1), testmode = TRUE))
+  expect_identical(header(up), expected)
+})
+
 test_that("update.bmmfit frees parameters that the new formula predicts", {
   skip_on_cran()
   fit1 <- sdm_fixture()
