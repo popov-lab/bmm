@@ -23,14 +23,16 @@
         "- The response is the error relative to the target, in radians (binned \\
         to the nearest of `n_options` options) or, with units = 'bins', in whole \\
         option steps\n",
-        "- `similarity` gives the psychophysical similarity f of an option to the \\
-        target at each distance 0, 1, ..., n_options / 2 options, scaled so that \\
-        f = 1 at distance 0"
+        "- `similarity` is 'laplace' or 'vonmises', with its width estimated, or \\
+        gives the psychophysical similarity f of an option to the target at each \\
+        distance 0, 1, ..., n_options / 2 options, scaled so that f = 1 at \\
+        distance 0"
       ),
       parameters = list(
         d = glue(
           "Memory strength d (the d' of the uncorrelated-noise model): the mean \\
-          memory-match signal of the target in units of the noise SD; an option at distance x has mean d * f(x)"
+          memory-match signal of the target in units of the noise SD; an option \\
+          at distance x has mean d * f(x)"
         )
       ),
       # log, not identity as in the sdt_* models: d f(x) >= 0 in TCC, and a
@@ -70,17 +72,18 @@
   laplace = list(
     name = "lambda", code = 1L, range = c(0.004, 20), init = c(0.3, 1),
     description = glue(
-      "Width of the Laplace similarity, in radians of the response circle: the \\
-      similarity of an option to the target falls by a factor of e with every \\
-      lambda radians of distance"
+      "Width of the Laplace similarity, in radians of the response circle: an \\
+      option x radians from the target has similarity exp(-x / lambda), rescaled \\
+      to 1 at the target and 0 opposite it"
     ),
     priors = list(main = "normal(-0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
   ),
   vonmises = list(
     name = "kappa", code = 2L, range = c(0.02, 5e4), init = c(2, 8),
     description = glue(
-      "Concentration of the von Mises similarity: the similarity of an option x \\
-      radians from the target falls as exp(-kappa * (1 - cos(x)))"
+      "Concentration of the von Mises similarity: an option x radians from the \\
+      target has similarity exp(-kappa * (1 - cos(x))), rescaled to 1 at the \\
+      target and 0 opposite it"
     ),
     priors = list(main = "normal(1.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
   )
@@ -187,8 +190,9 @@
 #'   from a similarity so sharp that no option but the target resembles it,
 #'   to one that falls almost as a straight line (Laplace) or a raised cosine
 #'   (von Mises) with distance. Between the grid nodes the interpolated log
-#'   probability errs by at most 7e-5 on responses with a probability above
-#'   1e-4, and on any response by 5e-4 up to `d = 12` and 3e-3 up to `d = 30`.
+#'   probability errs by at most 2e-4 on responses with a probability above
+#'   1e-4 up to `d = 12` and by 6e-4 up to `d = 30`; on any response, by
+#'   1.5e-3 up to `d = 12` and 1e-2 up to `d = 30`.
 #'   Beyond either end of either axis the table is extended linearly, as
 #'   for `d`, with one exception: above `d_max` the log probability of a
 #'   response may fall with `d` but never rise. When no response lies far
@@ -464,8 +468,8 @@ configure_model.tcc <- function(model, data, formula) {
   if (is.null(.tcc_shape(model$other_vars$similarity))) {
     return(.tcc_axis(lo, d_max, 0.02))
   }
-  # In the 2-D table, d steps of 0.1 add 1.5e-6 of error against 5e-4 from the
-  # steps of 0.1 in log lambda or log kappa (TCC 2-D table spike, 2026-10).
+  # In the 2-D table, d steps of 0.1 add 1.5e-6 of error against 1.2e-3 from
+  # the steps of 0.1 in log lambda or log kappa (TCC 2-D table spike, 2026-10).
   # With an estimated similarity, d and lambda or kappa can trade off along a
   # ridge that leaves the grid when no response is far from the target: the
   # log-likelihood of such data was flat within 3 nats from (d, kappa) = (3, 20)
@@ -476,10 +480,12 @@ configure_model.tcc <- function(model, data, formula) {
   .tcc_axis(lo, d_max + 0.1, 0.1)
 }
 
-# The grid of u = log(lambda) or log(kappa). A step of 0.1 errs by at most 5e-4
-# in log P on any response and by 6e-5 on responses with P > 1e-4; 0.05 is 16
-# times more accurate for twice the build time and memory and the same cost
-# per gradient (TCC 2-D table spike, 2026-10)
+# The grid of u = log(lambda) or log(kappa). Up to d = 12 a step of 0.1 errs by
+# up to 1.2e-3 in log P on any response and 1.7e-4 on responses with P > 1e-4,
+# measured at random points: at cell midpoints, where the spike measured, the
+# leading error of the cubic vanishes (#566). 0.05 is 16 times more accurate
+# for twice the build time and memory and the same cost per gradient (TCC 2-D
+# table spike, 2026-10)
 .tcc_ugrid <- function(shape) {
   .tcc_axis(log(shape$range[1]), log(shape$range[2]), 0.1)
 }
@@ -540,9 +546,18 @@ postprocess_brm.tcc <- function(model, fit, ...) {
 
 .tcc_check_grid <- function(model, prep) {
   d_max <- model$other_vars$d_max
-  .tcc_warn_beyond_grid(.tcc_dpar_extremes(prep, "d"), .tcc_grid(model)$lo, d_max, "d",
-                        glue("Refit with d_max = {2 * d_max}."))
   shape <- .tcc_shape(model$other_vars$similarity)
+  # with an estimated similarity the table no longer rises past d_max, so a
+  # posterior there is the d-lambda/kappa ridge, which a larger grid does not end
+  remedy <- if (is.null(shape)) {
+    glue("Refit with d_max = {2 * d_max}.")
+  } else {
+    glue("With no responses far from the target, d and {shape$name} trade off: a \\
+         large d with a broad similarity fits almost as well as a small d with a \\
+         sharp one. Use priors on log(d) and log({shape$name}) that keep the \\
+         posterior inside the table.")
+  }
+  .tcc_warn_beyond_grid(.tcc_dpar_extremes(prep, "d"), .tcc_grid(model)$lo, d_max, "d", remedy)
   if (!is.null(shape)) {
     grid <- .tcc_ugrid(shape)
     .tcc_warn_beyond_grid(
@@ -575,8 +590,8 @@ postprocess_brm.tcc <- function(model, fit, ...) {
     any(beyond),
     "In {sum(beyond)} of {length(beyond)} posterior draws, {name} passes the range \\
     from {signif(lower, 3)} to {signif(upper, 3)} that the likelihood table covers. \\
-    Beyond it the table is extended in a straight line, which keeps the sampler \\
-    moving but is not the model, so the posterior can run far past the table and \\
+    Beyond it the table is extrapolated, which keeps the sampler moving but is \\
+    not the model, so the posterior can run far past the table and \\
     its estimates mean nothing. {remedy}"
   )
 }
@@ -698,7 +713,8 @@ postprocess_brm.tcc <- function(model, fit, ...) {
     look <- .tcc_lookup(table, d[idx], u[idx])
     shift <- (seq_len(n_options / 2 + 1) - 1) * look$rows
     logp <- Reduce(`+`, lapply(seq_len(ncol(look$w)), function(m) {
-      look$w[, m] * matrix(look$tab[outer(look$entry[, m], shift, "+")], length(idx))
+      # c(): a 3-column index matrix (n_options = 4) would index the 3-D table by dimension
+      look$w[, m] * matrix(look$tab[c(outer(look$entry[, m], shift, "+"))], length(idx))
     }))
     cum <- matrixStats::rowCumsums(exp(logp[, cols, drop = FALSE]))
     draw <- stats::runif(length(idx)) * cum[, n_options]

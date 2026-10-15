@@ -158,6 +158,8 @@ test_that("dtcc() and rtcc() keep the length of empty input and return NA for a 
   expect_equal(is.na(dtcc(c(0, 0.1), c(2, NA), f)), c(FALSE, TRUE))
   withr::local_seed(566)
   expect_equal(is.na(rtcc(3, c(1, NA, 2), f)), c(FALSE, TRUE, FALSE))
+  expect_equal(is.na(rtcc(3, c(1, NA, 2), "laplace", lambda = 0.5)), c(FALSE, TRUE, FALSE))
+  expect_length(dtcc(numeric(0), 2, "laplace", lambda = 0.5), 0)
 })
 
 test_that("rtcc() matches the argmax of independent Gaussian memory-match signals", {
@@ -538,6 +540,7 @@ test_that("dtcc() and rtcc() refuse a similarity parameter that does not fit the
   expect_error(dtcc(0, 1, "vonmises", lambda = 2), "`kappa`")
   expect_error(dtcc(0, 1, "laplace", lambda = 0), "positive")
   expect_error(dtcc(0, 1, "laplace", lambda = c(1, NA)), "positive")
+  expect_error(dtcc(0, 1, "laplace", lambda = Inf), "positive and finite")
   expect_error(dtcc(0, 1, tcc_test_similarity(), lambda = 2), "numeric vector")
   expect_error(rtcc(5, 1, "vonmises"), "`kappa`")
   expect_error(dtcc(0, 1, "gaussian", lambda = 1), "'laplace', 'vonmises' or a numeric vector")
@@ -605,6 +608,9 @@ test_that("draws of lambda or kappa beyond the similarity grid are reported afte
   vm <- tcc_shape_model("vonmises", d_max = 6)
   expect_warning(.tcc_check_grid(vm, epred_prep(list(d = d, kappa = cbind(c(1, 2, 3, 9e4), 1)))),
                  "In 1 of 4 posterior draws, kappa passes the range from 0.02 to")
+  # past d_max a larger grid does not help: the posterior is on the d-kappa ridge
+  far_d <- epred_prep(list(d = cbind(c(2, 7, 2, 2), 2), kappa = matrix(4, 4, 2)))
+  expect_warning(.tcc_check_grid(vm, far_d), "d passes.*d and kappa trade off")
 })
 
 # a mock prep of the parametric family: one draw per (d, parameter) pair, one
@@ -619,13 +625,15 @@ tcc_shape_prep <- function(model, d, par, k) {
 }
 
 test_that("log_lik_tcc() reads the 2-D table within its accuracy where the error peaks", {
-  # between grid nodes in both directions, where cubic interpolation errs
-  # most, from sharp to broad similarity and up to the top of the d range: up
-  # to 6e-5 where P > 1e-4, and on any response 5e-4 to d = 12 and 3e-3 at 30
-  u_mid <- function(lo, j) exp(lo + (j + 0.5) * 0.1)
+  # a fifth of a cell from a node in both directions, where cubic
+  # interpolation errs most (at the midpoint its leading error vanishes), from
+  # sharp to broad similarity and up to the top of the d range, against the
+  # accuracy the help states
+  u_off <- function(lo, j) exp(lo + (j + c(0.21, 0.79)) * 0.1)
+  d <- c(0.321, 2.079, 11.879, 29.821)
   cells <- list(
-    laplace = expand.grid(d = c(0.35, 2.05, 11.95, 29.85), par = u_mid(log(0.004), c(5, 15, 48, 84))),
-    vonmises = expand.grid(d = c(0.35, 2.05, 11.95, 29.85), par = u_mid(log(0.02), c(5, 60, 120, 145)))
+    laplace = expand.grid(d = d, par = u_off(log(0.004), c(5, 15, 48, 84))),
+    vonmises = expand.grid(d = d, par = u_off(log(0.02), c(5, 60, 120, 145)))
   )
   k <- c(0, 1, 2, 5, 20, 90, 180)
   for (shape in names(cells)) {
@@ -637,9 +645,11 @@ test_that("log_lik_tcc() reads the 2-D table within its accuracy where the error
                         tcc_shape_args(shape, cl$par[j])))
       }, numeric(1))
       error <- abs(log_lik_tcc(i, prep) - exact)
-      expect_lt(max(error[cl$d < 12]), 6e-4, label = paste(shape, "k =", k[i]))
-      expect_lt(max(error), 4e-3, label = paste(shape, "k =", k[i]))
-      expect_lt(max(error[exact > log(1e-4)], 0), 1e-4, label = paste(shape, "k =", k[i], "P > 1e-4"))
+      likely <- exact > log(1e-4)
+      expect_lt(max(error[cl$d < 12]), 1.5e-3, label = paste(shape, "k =", k[i]))
+      expect_lt(max(error), 1e-2, label = paste(shape, "k =", k[i]))
+      expect_lt(max(error[likely & cl$d < 12], 0), 2e-4, label = paste(shape, "k =", k[i], "P > 1e-4"))
+      expect_lt(max(error[likely], 0), 6e-4, label = paste(shape, "k =", k[i], "P > 1e-4"))
     }
   }
 })
@@ -675,17 +685,36 @@ test_that("above the d grid a response's log probability may fall but never rise
   expect_lt(max(abs(log_lik_tcc(2, prep) - (val(top, 90) + (c(top, 8, 20) - top) * slope))), 1e-9)
 })
 
-test_that("posterior_predict_tcc() draws from the 2-D table at each draw's d and lambda", {
+test_that("posterior_predict_tcc() draws from the 2-D table at each draw's d and lambda or kappa", {
   withr::local_seed(571)
   n <- 20000
-  model <- tcc_shape_model("laplace", d_max = 6)
-  prep <- tcc_shape_prep(model, rep(1.6, n), rep(0.5, n), 0)
-  sims <- posterior_predict_tcc(1, prep)
-  p_dist <- dtcc(2 * pi * (0:180) / 360, 1.6, "laplace", lambda = 0.5) * c(1, rep(2, 179), 1)
-  breaks <- c(-1, 0, 1, 2, 5, 10, 20, 90, 180)
-  expected <- tapply(p_dist, cut(0:180, breaks), sum)
-  expect_gt(stats::chisq.test(table(cut(abs(sims), breaks)), p = expected / sum(expected))$p.value,
-            0.001)
+  for (case in list(list(shape = "laplace", par = 0.5), list(shape = "vonmises", par = 4))) {
+    prep <- tcc_shape_prep(tcc_shape_model(case$shape, d_max = 6), rep(1.6, n), rep(case$par, n), 0)
+    sims <- posterior_predict_tcc(1, prep)
+    p_dist <- do.call(dtcc, c(list(2 * pi * (0:180) / 360, 1.6, case$shape),
+                              tcc_shape_args(case$shape, case$par))) * c(1, rep(2, 179), 1)
+    breaks <- c(-1, 0, 1, 2, 5, 10, 20, 90, 180)
+    expected <- tapply(p_dist, cut(0:180, breaks), sum)
+    expect_gt(stats::chisq.test(table(cut(abs(sims), breaks)), p = expected / sum(expected))$p.value,
+              0.001, label = case$shape)
+  }
+})
+
+test_that("posterior_predict_tcc() draws from four options, with a vector or a named similarity", {
+  withr::local_seed(572)
+  n <- 4000
+  for (similarity in list(c(1, 0.4, 0), "laplace")) {
+    model <- tcc("err", similarity = similarity, n_options = 4, d_max = 6)
+    fit <- suppressMessages(bmm(bmf(d ~ 1), data.frame(err = c(0, pi / 2, pi, -pi / 2)), model,
+                                backend = "mock", mock_fit = 1, rename = FALSE))
+    sdata <- brms::standata(fit)
+    dpars <- list(d = matrix(1.6, n, sdata$N))
+    if (is.character(similarity)) dpars$lambda <- matrix(0.5, n, sdata$N)
+    sims <- posterior_predict_tcc(1, epred_prep(dpars, sdata))
+    p <- do.call(dtcc, c(list(2 * pi * (-1:2) / 4, 1.6, similarity, n_options = 4),
+                         if (is.character(similarity)) list(lambda = 0.5)))
+    expect_gt(stats::chisq.test(table(factor(sims, -1:2)), p = p)$p.value, 0.001)
+  }
 })
 
 test_that("the Stan 2-D table and lookup match R on and off both grids", {

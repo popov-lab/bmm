@@ -66,7 +66,7 @@ d' to this \code{d} was 1.60.
 }
 }
 \itemize{
-\item \code{similarity} gives the psychophysical similarity f of an option to the         target at each distance 0, 1, ..., n_options / 2 options, scaled so that         f = 1 at distance 0
+\item \code{similarity} is 'laplace' or 'vonmises', with its width estimated, or         gives the psychophysical similarity f of an option to the target at each         distance 0, 1, ..., n_options / 2 options, scaled so that f = 1 at         distance 0
 }
 \itemize{
 \item \strong{Parameters:}
@@ -174,8 +174,9 @@ dimensions: \code{d} in steps of 0.1 up to \code{d_max}, and \code{log(lambda)} 
 from a similarity so sharp that no option but the target resembles it,
 to one that falls almost as a straight line (Laplace) or a raised cosine
 (von Mises) with distance. Between the grid nodes the interpolated log
-probability errs by at most 7e-5 on responses with a probability above
-1e-4, and on any response by 5e-4 up to \code{d = 12} and 3e-3 up to \code{d = 30}.
+probability errs by at most 2e-4 on responses with a probability above
+1e-4 up to \code{d = 12} and by 6e-4 up to \code{d = 30}; on any response, by
+1.5e-3 up to \code{d = 12} and 1e-2 up to \code{d = 30}.
 Beyond either end of either axis the table is extended linearly, as
 for \code{d}, with one exception: above \code{d_max} the log probability of a
 response may fall with \code{d} but never rise. When no response lies far

@@ -4521,7 +4521,8 @@ rtcc <- function(n, d, similarity, lambda = NULL, kappa = NULL, n_options = 360)
   stopif(is.null(given[[name]]) || !is.null(given[[setdiff(names(given), name)]]),
          "similarity = '{similarity}' takes `{name}`, and only `{name}`.")
   par <- given[[name]]
-  stopif(!is.numeric(par) || anyNA(par) || any(par <= 0), "`{name}` must be positive.")
+  stopif(!is.numeric(par) || !all(is.finite(par)) || any(par <= 0),
+         "`{name}` must be positive and finite.")
   par
 }
 
