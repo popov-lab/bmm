@@ -73,13 +73,13 @@ d' to this \code{d} was 1.60.
 \item \strong{Fixed parameters:}
 \item \strong{Default parameter links:}
 \itemize{
-\item d = identity
+\item d = log
 }
 \item \strong{Default priors:}
 \itemize{
 \item \code{d}:
 \itemize{
-\item \code{main}: normal(2, 1.5)
+\item \code{main}: normal(0.5, 1)
 \item \code{effects}: normal(0, 1)
 \item \code{sd}: exponential(1)
 }
@@ -111,15 +111,22 @@ options the participant could choose from.
 
 \subsection{Grid limit on d}{
 
+\code{d} is modelled on the log scale, so it is positive, effects on it are
+multiplicative, and priors on its coefficients are priors on \code{log(d)}.
+Keep those priors proper: as \code{d} approaches 0 the likelihood levels off
+at that of guessing uniformly, so under a flat prior on \code{log(d)} the
+posterior cannot be normalised, and a cell with little information
+drifts towards \code{d = 0} without end. The default prior is proper.
 The likelihood reads the response probabilities from a table on a grid
-of \code{d} values from -2 to \code{d_max} in steps of 0.02, built once per chain
+of \code{d} values up to \code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
-log probability). Beyond either end of the grid the table is extended
+log probability). Beyond \code{d_max} the table is extended
 linearly. This keeps the sampler moving during warmup but is not the
 model: past \code{d_max} the log-likelihood becomes a straight line in \code{d}, so
 a posterior that reaches the end of the grid can run far beyond it, with
 estimates that mean nothing. If any posterior draw of \code{d} exceeds \code{d_max}
-(check \code{max(brms::posterior_linpred(fit, dpar = "d"))}), refit with a
+(check \code{max(brms::posterior_linpred(fit, dpar = "d", transform = TRUE))}),
+refit with a
 larger \code{d_max}; each extra unit adds 50 table rows, which costs build time
 and memory but nothing per gradient. A large \code{d} is weakly identified
 when the similarity is broad, because the probability of reporting the

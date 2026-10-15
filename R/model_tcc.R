@@ -33,13 +33,16 @@
           of the noise SD; an option at distance x has mean d * f(x)"
         )
       ),
-      links = list(d = "identity"),
+      # log, not identity as in the sdt_* models: d f(x) >= 0 in TCC, and a
+      # subject intercept on set-size cells of oberauer_lin_2017 mixed to Rhat
+      # 1.006 on the log link against 1.018 on the identity link (#566)
+      links = list(d = "log"),
       fixed_parameters = list(),
-      # provisional (#566): d of the uncorrelated model runs from 0.6 to 2.0
-      # over set sizes 1-8 in oberauer_lin_2017; the authors' correlated d'
-      # (tabulated up to 4.5) is 1.60 times the uncorrelated d (median, S3 parity)
+      # d of the uncorrelated model runs from 0.6 to 2.0 over set sizes 1-8 in
+      # oberauer_lin_2017, so the prior is centred at exp(0.5) = 1.65 and puts
+      # the default d_max = 12 two SDs above it
       default_priors = list(
-        d = list(main = "normal(2, 1.5)", effects = "normal(0, 1)", sd = "exponential(1)")
+        d = list(main = "normal(0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
       init_ranges = list(d = c(1, 2))
     ),
@@ -86,15 +89,22 @@
 #'
 #' ## Grid limit on d
 #'
+#'   `d` is modelled on the log scale, so it is positive, effects on it are
+#'   multiplicative, and priors on its coefficients are priors on `log(d)`.
+#'   Keep those priors proper: as `d` approaches 0 the likelihood levels off
+#'   at that of guessing uniformly, so under a flat prior on `log(d)` the
+#'   posterior cannot be normalised, and a cell with little information
+#'   drifts towards `d = 0` without end. The default prior is proper.
 #'   The likelihood reads the response probabilities from a table on a grid
-#'   of `d` values from -2 to `d_max` in steps of 0.02, built once per chain
+#'   of `d` values up to `d_max` in steps of 0.02, built once per chain
 #'   by quadrature and interpolated with a cubic spline (error below 1e-6 in
-#'   log probability). Beyond either end of the grid the table is extended
+#'   log probability). Beyond `d_max` the table is extended
 #'   linearly. This keeps the sampler moving during warmup but is not the
 #'   model: past `d_max` the log-likelihood becomes a straight line in `d`, so
 #'   a posterior that reaches the end of the grid can run far beyond it, with
 #'   estimates that mean nothing. If any posterior draw of `d` exceeds `d_max`
-#'   (check `max(brms::posterior_linpred(fit, dpar = "d"))`), refit with a
+#'   (check `max(brms::posterior_linpred(fit, dpar = "d", transform = TRUE))`),
+#'   refit with a
 #'   larger `d_max`; each extra unit adds 50 table rows, which costs build time
 #'   and memory but nothing per gradient. A large `d` is weakly identified
 #'   when the similarity is broad, because the probability of reporting the
@@ -273,7 +283,8 @@ configure_model.tcc <- function(model, data, formula) {
 ############################################################################# !
 
 # The one place the model's similarity by distance is read, so that a
-# parametric similarity function changes only this function
+# parametric similarity function changes only this function. The similarity
+# argument selects that function, never the formula (#566)
 .tcc_similarity <- function(model) {
   model$other_vars$similarity
 }

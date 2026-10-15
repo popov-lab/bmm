@@ -33,12 +33,12 @@ ref_tcc_logp <- function(d, k, similarity) {
 # CONSTRUCTOR                                                            ####
 ############################################################################# !
 
-test_that("tcc() builds an independent model with d on the identity link", {
+test_that("tcc() builds an independent model with d on the log link", {
   model <- tcc_test_model()
   expect_s3_class(model, "tcc")
   expect_false(inherits(model, "circular"))
   expect_named(model$parameters, "d")
-  expect_equal(model$links$d, "identity")
+  expect_equal(model$links$d, "log")
   expect_equal(model$other_vars$n_options, 360)
   expect_equal(model$other_vars$units, "radians")
   expect_equal(tcc_test_model(180, units = "bins")$other_vars$units, "bins")
@@ -168,6 +168,22 @@ tcc_mock_fit <- function(model = tcc_test_model(), formula = bmf(d ~ 1), ...) {
   dat <- data.frame(err = c(0, 0.1, -0.2, 1, 3, -2), cond = rep(c("a", "b"), 3))
   suppressMessages(bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE, ...))
 }
+
+# #566 design decision (2026-10-15): the similarity argument selects the
+# similarity function, the formula never does
+test_that("a formula for lambda or kappa is refused when the similarity is a vector", {
+  expect_error(tcc_mock_fit(formula = bmf(d ~ 1, lambda ~ 1)),
+               "Unrecognized model parameters: 'lambda'")
+  expect_error(tcc_mock_fit(formula = bmf(d ~ cond, kappa ~ cond)),
+               "Unrecognized model parameters: 'kappa'")
+})
+
+test_that("d reaches the likelihood through exp() of its linear predictor", {
+  code <- brms::stancode(tcc_mock_fit(formula = bmf(d ~ cond)))
+  expect_match(code, "d = exp(d);", fixed = TRUE)
+  expect_match(code, "target += tcc_lpmf(Y | mu, d, tcc_tab, tcc_grid_lo, tcc_grid_step);",
+               fixed = TRUE)
+})
 
 test_that("the Stan table is built in transformed data and read by the lpmf", {
   code <- brms::stancode(tcc_mock_fit(formula = bmf(d ~ cond)))
