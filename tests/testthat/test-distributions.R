@@ -98,6 +98,7 @@ test_that("rejection_sampling validates n and max_f", {
 })
 
 test_that("rejection_sampling errors instead of looping forever", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   # a regression here hangs; fail the test instead of timing out the CI job
   setTimeLimit(elapsed = 20, transient = TRUE)
   withr::defer(setTimeLimit(elapsed = Inf))

@@ -508,6 +508,7 @@ test_that("as_prior_table() maps every correlation class brms stores internally"
 })
 
 test_that("prior_info() attributes the correlation prior to bmm", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
   fit <- bmm(formula, small_data(), mixture2p("dev_rad"),
     backend = "mock", mock_fit = 1, rename = FALSE
@@ -527,6 +528,7 @@ test_that("prior_info() attributes the correlation prior to bmm", {
 })
 
 test_that("prior_info() reconstructs the defaults of a fit that needs data2", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- small_data()
   ids <- levels(factor(dat$ID))
   A <- diag(length(ids))
@@ -551,6 +553,7 @@ test_that("prior_info() still reports a fit whose stored frame fails check_data(
 })
 
 test_that("prior_info() re-checks a fit whose largest set size has no response (#459)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   lin <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
   lin$dev_rad[lin$set_size == "8"] <- NA
   fit <- suppressWarnings(suppressMessages(bmm(
@@ -605,6 +608,7 @@ test_that("print.bmm_prior_info() renders table and text formats", {
 })
 
 test_that("validate_default_priors() warns only when a default prior is dropped", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.silent = 2)
   model <- mpt(
     mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),

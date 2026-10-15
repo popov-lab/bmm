@@ -1,3 +1,5 @@
+skip_on_cran() # cross-model contract file, skipped on CRAN as a whole (ADR 0004, R10)
+
 test_that("default priors are set correctly with fixed effects only", {
   data <- small_data()
   model <- mixture2p("dev_rad")

@@ -1,3 +1,13 @@
+## Resubmission
+
+The first submission of 1.4.0 (2026-10-15) was returned by the incoming pretest with a NOTE on
+r-devel-windows-x86_64: overall check time 16 min, of which the tests took 12 min (Debian: OK,
+tests 302 s). The tests that run every model through the full pipeline now skip on CRAN and run on
+the package's continuous integration instead. The tests CRAN runs take a fifth of the time they did
+(35 s instead of 172 s sequentially on the development machine). On win-builder R-devel an
+intermediate version of this change (57 s locally) brought the check to 553 s with the tests at
+262 s, Status OK; the submitted version skips a further 43 tests.
+
 ## Changes
 
 See NEWS.md. A feature release: signal detection models for five response formats,

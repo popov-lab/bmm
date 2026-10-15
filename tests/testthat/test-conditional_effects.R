@@ -1,9 +1,10 @@
 # Tests for conditional_effects.bmmfit() and its internal helpers
-# Tier 1: Unit tests (always run, no fitted model; the multinomial-family
-#         routes run on mock fits with brms stubbed out)
-# Tier 2: Fixture-based integration tests (skip on CRAN; the fixtures are not
-#         in the built package, so they run only from the source tree)
+# Tier 1: Unit tests (no fitted model; the multinomial-family routes run on
+#         mock fits with brms stubbed out)
+# Tier 2: Fixture-based integration tests (the fixtures are not in the built
+#         package, so they run only from the source tree)
 # Tests on real fits live in tests/local/test-conditional_effects-fits.R.
+skip_on_cran() # cross-model contract file, skipped on CRAN as a whole (ADR 0004, R10)
 
 load_sdm_fit <- function() {
   load_fixture_fit("bmmfit_example1.rds")

@@ -191,6 +191,7 @@ test_that("SDM Stan code validates run metadata in transformed data", {
 })
 
 test_that("update() refreshes SDM run metadata for new data", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(42)
   dat20 <- data.frame(y = rsdm(20))
   dat40 <- data.frame(y = rsdm(40))

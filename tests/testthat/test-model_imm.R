@@ -146,6 +146,7 @@ test_that("IMM models run when set_size is a predictor and intercept is supresse
 })
 
 test_that("constant priors are correct for IMM_abc with set_size1 fixed effect predictor", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size)
   model <- imm(
     resp_error = "dev_rad",
@@ -159,6 +160,7 @@ test_that("constant priors are correct for IMM_abc with set_size1 fixed effect p
 })
 
 test_that("constant priors are correct for IMM_bsc with set_size1 fixed effect predictor", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(kappa ~ 1, c ~ 1, s ~ 0 + set_size)
   model <- imm(
     resp_error = "dev_rad",
@@ -173,6 +175,7 @@ test_that("constant priors are correct for IMM_bsc with set_size1 fixed effect p
 })
 
 test_that("constant priors are correct for IMM_full with set_size1 fixed effect predictor", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.silent = 2)
   model <- imm(
     resp_error = "dev_rad",
@@ -195,6 +198,7 @@ test_that("constant priors are correct for IMM_full with set_size1 fixed effect 
 })
 
 test_that("constant priors are correct for IMM_full with set_size1 RANDOM-EFFECT predictor", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.silent = 2)
   model <- imm(
     resp_error = "dev_rad",
