@@ -25,7 +25,6 @@
 #' softmax(5:7)
 #' softmaxinv(softmax(5:7), ref_position = 1, ref_value = 5)
 softmax <- function(eta, lambda = 1) {
-  stopifnot(requireNamespace("matrixStats", quietly = TRUE))
   denom <- matrixStats::logSumExp(lambda * eta)
   exp(c(lambda * eta) - denom)
 }
@@ -153,11 +152,6 @@ glue_nlf <- function(..., env.frame = -1) {
   brms::nlf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
 }
 
-# like glue_nlf but for lf formulas
-glue_lf <- function(..., env.frame = -1) {
-  brms::lf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
-}
-
 # args$prior is NULL by default or is the combined default and user-provided
 # prior; args$dots holds whatever the user passed to bmm() and so overwrites the
 # configured default for any argument (such as init) they named themselves
@@ -265,21 +259,6 @@ warnif <- function(condition, message) {
 read_lines2 <- function(con) {
   lines <- readLines(con, n = -1L, warn = FALSE)
   paste(lines, collapse = "\n")
-}
-
-# for testing purposes
-install_and_load_bmm_version <- function(version, path) {
-  stopif(missing(path))
-  if ("package:bmm" %in% search()) {
-    detach("package:bmm", unload = TRUE)
-  }
-  path <- file.path(path, paste0("bmm-", version))
-  if (!dir.exists(path) || length(list.files(path)) == 0 ||
-    length(list.files(file.path(path, "bmm"))) == 0) {
-    dir.create(path)
-    remotes::install_github(paste0("popov-lab/bmm@", version), lib = path)
-  }
-  library(bmm, lib.loc = path)
 }
 
 #' Extract information from a brmsfit object
@@ -861,10 +840,6 @@ check_rds_file <- function(file) {
     file <- paste0(file, ".rds")
   }
   file
-}
-
-`%||%` <- function(l, r) {
-  if (!is.null(l)) l else r
 }
 
 # like unlist, but keeps the final outcome a list of all

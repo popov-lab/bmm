@@ -609,6 +609,11 @@ test_that("errors (or at least fails) when a requested block is missing", {
   # update this to expect_equal(out$data, "") accordingly.
 })
 
+test_that("extract_stan_blocks refuses anything but a single string", {
+  expect_error(extract_stan_blocks(1), "single character string")
+  expect_error(extract_stan_blocks(c("data {}", "model {}")), "single character string")
+})
+
 test_that("block extraction works when order of blocks is different from the brms/bmm default", {
   # default order transformed parameters comes after parameters
   stan_code <- "\nparameters {\nreal Intercept;}\ntransformed parameters {\n}"

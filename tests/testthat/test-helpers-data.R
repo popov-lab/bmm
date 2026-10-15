@@ -210,6 +210,12 @@ test_that("wrap(x) returns the correct value for values over 2*pi", {
   expect_equal(wrap(rad2deg(x), radians = F), rad2deg(wrap(x)))
 })
 
+test_that("wrap() refuses a radians argument that is not TRUE or FALSE", {
+  expect_error(wrap(1, radians = "yes"), "must be TRUE or FALSE")
+  expect_error(wrap(1, radians = NA), "must be TRUE or FALSE")
+  expect_error(wrap(1, radians = c(TRUE, FALSE)), "must be TRUE or FALSE")
+})
+
 test_that("wrap(x) returns the correct value for values between (3*pi,4*pi)", {
   x <- 3 * pi + 1
   expect_equal(wrap(x), -(pi - 1))

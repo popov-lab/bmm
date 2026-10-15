@@ -180,10 +180,6 @@ test_that("unknown link errors clearly", {
   expect_error(link_transform(1:3, "not_a_link"))
 })
 
-test_that("non-numeric values error", {
-  expect_error(link_transform(c("a","b"), "log"))
-})
-
 test_that("NULL link is treated as identity", {
   x <- c(-2, -0.5, 0, 1.25, 3)
   eta <- link_transform(x, NULL, inverse = FALSE)

@@ -1554,9 +1554,6 @@ which_positions <- function(x, pat) {
 #' find_matching_brace(y, 8L) # -> 12
 find_matching_brace <- function(x, open_pos,
                                 open_brace = "{", close_brace = "}") {
-  stopifnot(is.character(x), length(x) == 1L)
-  n <- nchar(x)
-  stopifnot(length(open_pos) == 1L, open_pos >= 1L, open_pos <= n)
   stopif(
     substr(x, open_pos, open_pos) != open_brace,
     "Character at open_pos {open_pos} is not open_brace."
@@ -1614,7 +1611,10 @@ find_matching_brace <- function(x, open_pos,
 #'
 #' @export
 extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "transformed data", "parameters", "transformed parameters", "model", "generated quantities")) {
-  stopifnot(is.character(stan_code), length(stan_code) == 1L)
+  stopif(
+    !is.character(stan_code) || length(stan_code) != 1L,
+    "'stan_code' must be a single character string, such as the output of stancode()."
+  )
   blocks <- match.arg(blocks, several.ok = TRUE)
   out <- lapply(blocks, function(b) .extract_stan_block(stan_code, b))
   names(out) <- blocks
@@ -1624,8 +1624,6 @@ extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "tran
 .extract_stan_block <- function(stan_code, block,
                                 include_braces = FALSE,
                                 trim = TRUE) {
-  stopifnot(is.character(block), length(block) == 1L)
-
   # Anchor to start-of-line (multiline mode), allow leading spaces/tabs.
   # Match the exact block name, then optional whitespace, then '{'.
   header_pat <- paste0("(?m)^[[:space:]]*", block, "[[:space:]]*\\{")
