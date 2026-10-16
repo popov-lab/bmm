@@ -84,7 +84,7 @@ test_that("create_initfun keeps the variable-precision gamma shape integrable", 
     inits <- init_fun()
     .circmix_J(exp(inits$Intercept_kappa)) / exp(inits$Intercept_tau)
   })
-  expect_true(all(shapes > 40 / model$vp_nodes))
+  expect_true(all(shapes > 60 / model$vp_nodes))
 })
 
 test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {
