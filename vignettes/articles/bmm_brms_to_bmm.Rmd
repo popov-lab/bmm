@@ -236,7 +236,7 @@ Because the response lives in the model object, a `bmmformula` is a list of
 regressions, one for each parameter of the model. Each one is a regular `brms`
 formula, with population-level effects, group-level effects in the `lme4`
 syntax, and non-linear terms if you need them. The
-[bmmformula article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
+[bmmformula article](https://venpopov.com/bmm/articles/bmm_bmmformula.html)
 covers the syntax in full, including how to fix a parameter to a constant.
 
 ## `0 + setsize` or `1 + setsize`
@@ -518,7 +518,7 @@ What this means for you:
   scale. With `0 + setsize`, this sets the prior of every cell of `kappa`. With
   `1 + setsize`, it sets the prior of the differences only; the intercept takes
   `coef = "Intercept"`, as `default_prior()` shows for that coding. The
-  [article on extracting model information](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
+  [article on extracting model information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows the details.
 - Bayes factors depend on the priors much more than estimates do. If you plan to
   compute them, choose the priors on purpose rather than taking the defaults.
@@ -536,13 +536,13 @@ want to change a model beyond what `bmm` offers, these give you the `brms` code 
 
 # Where to go next
 
-- [Get started](https://popov-lab.github.io/bmm/articles/bmm.html) lists the
+- [Get started](https://venpopov.com/bmm/articles/bmm.html) lists the
   models by task and walks through a first fit.
-- The [bmmformula article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
+- The [bmmformula article](https://venpopov.com/bmm/articles/bmm_bmmformula.html)
   covers the formula syntax.
-- The [mixture models article](https://popov-lab.github.io/bmm/articles/bmm_mixture_models.html)
+- The [mixture models article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
   fits the two- and three-parameter mixture models to a larger data set.
-- [Extracting model information](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
+- [Extracting model information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows how to get the default priors, the Stan code and the Stan data before
   you fit.
 

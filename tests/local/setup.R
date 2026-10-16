@@ -6,7 +6,7 @@
 #
 # (run.R turns the package's parallel workers off and loads the package.)
 # Only files named test-*.R run; scripts without the prefix (make-fixtures.R,
-# conditional_effects_comprehensive.R) are run by hand.
+# make-references.R) are run by hand.
 library(testthat)
 
 options(

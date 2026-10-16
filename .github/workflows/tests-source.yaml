@@ -113,9 +113,16 @@ jobs:
         timeout-minutes: 30
         run: Rscript .github/scripts/test-budget.R
 
+      - name: Run the tests CRAN runs under the CRAN-tier cap
+        if: always()
+        timeout-minutes: 20
+        run: Rscript .github/scripts/cran-budget.R
+
       - name: Upload per-test timings
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-timings
-          path: test-timings.csv
+          path: |
+            test-timings.csv
+            cran-test-timings.csv

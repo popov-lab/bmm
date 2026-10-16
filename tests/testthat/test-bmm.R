@@ -119,8 +119,9 @@ test_that("Available models produce expected errors", {
 })
 
 test_that("bmm() starts the step-size search at the package default unless the user sets it", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.step_size = 0.02)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   formula <- bmf(c ~ 1 + (1 | ID), kappa ~ 1 + (1 | ID))
   mock <- function(...) {
     bmm(formula, dat, sdm("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE, ...)
@@ -140,7 +141,8 @@ test_that("bmm() starts the step-size search at the package default unless the u
 })
 
 test_that("bmm() builds the default prior and the inits from the data2 brm() gets", {
-  dat <- oberauer_lin_2017
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  dat <- small_data()
   ids <- levels(factor(dat$ID))
   A <- diag(length(ids))
   dimnames(A) <- list(ids, ids)
@@ -160,6 +162,7 @@ test_that("bmm() builds the default prior and the inits from the data2 brm() get
 })
 
 test_that("bmm() stores the name of the data the user passed", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options("bmm.silent" = 2)
   my_data <- data.frame(y = rimm(n = 5))
   fit <- bmm(bmf(kappa ~ 1, thetat ~ 1), my_data, mixture2p("y"),
@@ -177,6 +180,7 @@ test_that("bmm() stores the name of the data the user passed", {
 })
 
 test_that("check_data() methods see the name of the user's data", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   seen <- NULL
   local_mocked_bindings(order_data_query = function(model, data, formula) {
     seen <<- attr(data, "data_name")

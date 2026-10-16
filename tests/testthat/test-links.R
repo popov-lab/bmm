@@ -219,28 +219,20 @@ test_that("a link the model does not pass on to the fit is refused", {
   expect_silent(mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "logit")))
 })
 
-test_that("the links a model applies are exactly the settable ones", {
-  expect_equal(
-    settable_links(ddm(rt = "rt", response = "resp")),
-    c("drift", "bound", "ndt", "zr")
-  )
-  expect_equal(
-    settable_links(ezdm("m", "v", "n", "t")),
-    c("drift", "bound", "ndt", "s")
-  )
-  expect_equal(
-    settable_links(cswald(rt = "rt", response = "resp")),
-    names(cswald(rt = "rt", response = "resp")$links)
-  )
-  expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
-  expect_equal(settable_links(sdm(resp_error = "y")), character(0))
+test_that("every model declares which of its links can be set", {
+  # NULL: no closed set of parameters (m3 custom), so no name is refused;
+  # character(0): the model refuses every link change
+  for (name in names(cases <- model_test_cases("links"))) {
+    case <- cases[[name]]
+    expect_identical(settable_links(case$model), case$settable, label = name)
+  }
 })
 
 test_that("a refused model builds the same fit whatever its links say", {
   # the refusal is only correct while configure_model() ignores model$links, so
   # that is measured rather than restated: the family carries the links of a
   # custom or mixture family, the parameter formulas carry imm's log scale
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   fingerprint <- function(model, formula) {
     bf <- configure_model(model, check_data(model, dat, formula), formula)$formula
     list(
