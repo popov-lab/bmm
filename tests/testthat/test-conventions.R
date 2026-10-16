@@ -38,10 +38,7 @@ expect_pattern_counts <- function(pattern, expected, rule) {
 test_that("Stan programs are compiled only at the registered sites (R1)", {
   # each test that reaches a site, directly or through a builder function,
   # opens with skip_unless_stan_tests(). A new site is a new entry here and
-  # the gate in the test. test-model_rdm.R (#502) is registered ahead; the
-  # circmix sites in test-model_imm.R and test-model_mixture3p.R cannot be:
-  # those files exist here with none and a present file must match its count,
-  # so the pull request that adds them registers them.
+  # the gate in the test. test-model_rdm.R (#502) is registered ahead.
   expect_pattern_counts(
     "cmdstan_model\\(",
     c(
@@ -50,6 +47,7 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
       "test-model_ezdm.R" = 3L,
       "test-model_m3.R" = 2L,
       "test-model_mixture2p.R" = 2L,
+      "test-model_mixture3p.R" = 2L,
       "test-model_rdm.R" = 1L,
       "test-model_sdt_cdp.R" = 3L,
       "test-model_sdt_ranking.R" = 1L,
@@ -82,9 +80,7 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
 test_that("compiled Stan programs are sampled only at the registered sites (R1)", {
   # a compiled model can sample without bmm() and its backend argument, so
   # $sample() is counted on its own. test-model_rdm.R (#502) is registered
-  # ahead; the circmix sites in test-model_imm.R and test-model_mixture3p.R
-  # are registered by the pull request that adds them, as for the compile
-  # sites.
+  # ahead.
   expect_pattern_counts(
     "\\$sample\\(",
     c(
@@ -93,6 +89,7 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
       "test-model_ezdm.R" = 1L,
       "test-model_m3.R" = 1L,
       "test-model_mixture2p.R" = 2L,
+      "test-model_mixture3p.R" = 2L,
       "test-model_rdm.R" = 1L,
       "test-model_sdt_cdp.R" = 1L,
       "test-model_sdt_ranking.R" = 1L,
