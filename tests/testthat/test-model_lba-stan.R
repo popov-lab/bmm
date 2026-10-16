@@ -138,8 +138,8 @@ test_that("Stan normal LBA kernel matches the R kernel on the grid", {
 })
 
 test_that("Stan gamma LBA kernel matches the R kernel on the grid", {
-  skip_on_cran()
   skip_unless_stan_tests()
+  skip_on_cran()
 
   G <- .lba_kernel_results()
   d <- G[G$dist == "gamma", ]
@@ -152,8 +152,8 @@ test_that("Stan gamma LBA kernel matches the R kernel on the grid", {
 })
 
 test_that("Stan lognormal LBA kernel matches the R kernel on the grid", {
-  skip_on_cran()
   skip_unless_stan_tests()
+  skip_on_cran()
 
   G <- .lba_kernel_results()
   d <- G[G$dist == "lognormal", ]
@@ -166,8 +166,8 @@ test_that("Stan lognormal LBA kernel matches the R kernel on the grid", {
 })
 
 test_that("Stan frechet LBA kernel matches the R kernel where A/gap <= 6", {
-  skip_on_cran()
   skip_unless_stan_tests()
+  skip_on_cran()
 
   G <- .lba_kernel_results()
   d <- G[G$dist == "frechet" & (G$A / G$gap) <= 6, ]
@@ -180,8 +180,8 @@ test_that("Stan frechet LBA kernel matches the R kernel where A/gap <= 6", {
 })
 
 test_that("Stan frechet LBA kernel stays within its documented envelope where A/gap > 6", {
-  skip_on_cran()
   skip_unless_stan_tests()
+  skip_on_cran()
 
   G <- .lba_kernel_results()
   d <- G[G$dist == "frechet" & (G$A / G$gap) > 6, ]
