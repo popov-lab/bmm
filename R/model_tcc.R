@@ -100,10 +100,11 @@
 #'   of `d` values up to `d_max` in steps of 0.02, built once per chain
 #'   by quadrature and interpolated with a cubic spline (error below 1e-6 in
 #'   log probability). Beyond `d_max` the table is extended
-#'   linearly. This keeps the sampler moving during warmup but is not the
-#'   model: past `d_max` the log-likelihood becomes a straight line in `d`, so
-#'   a posterior that reaches the end of the grid can run far beyond it, with
-#'   estimates that mean nothing. `bmm()` warns after the fit when any
+#'   linearly, with the log probability of each response allowed to fall but
+#'   not to rise. This keeps the sampler moving during warmup but is not the
+#'   model: past `d_max` the likelihood no longer favours a larger `d`, so a
+#'   posterior that reaches the end of the grid follows the prior beyond it,
+#'   with estimates that mean nothing. `bmm()` warns after the fit when any
 #'   posterior draw of `d` passes `d_max`; then refit with a larger `d_max`.
 #'   The default of 30 lies far above the values of `d` from 0.6 to 2.0 that
 #'   `tcc()` estimates for set sizes 1 to 8 in [oberauer_lin_2017] with the
@@ -306,10 +307,17 @@ configure_model.tcc <- function(model, data, formula) {
 # central-difference slope
 .tcc_gl_nodes <- 120L
 
+# The grid starts at 0 under a link that keeps d positive (the default log):
+# rows below 0 are never read and would hide the lower end from the warning on
+# draws beyond the table. Beyond the grid the table is extended along its end
+# slopes. A rising log P extended in a straight line outgrows any prior on
+# log(d) and makes the posterior improper, so the padding row above the grid
+# caps each response's end slope at 0 (.tcc_table(), tcc_tdata.stan), and one
+# extra node keeps the last cell below d_max exact (#566)
 .tcc_grid <- function(model) {
-  lo <- -2
+  lo <- if (.link_ranges[[model$links$d]][1] >= 0) 0 else -2
   step <- 0.02
-  rows <- as.integer(ceiling(round((model$other_vars$d_max - lo) / step, 6)) + 3)
+  rows <- as.integer(ceiling(round((model$other_vars$d_max + step - lo) / step, 6)) + 3)
   nlist(lo, step, rows)
 }
 
@@ -340,16 +348,19 @@ configure_model.tcc <- function(model, data, formula) {
 
 .tcc_table <- function(similarity, grid) {
   d_values <- grid$lo + (seq_len(grid$rows) - 2) * grid$step
-  t(vapply(d_values, .tcc_logp, numeric(length(similarity)), similarity = similarity))
+  tab <- t(vapply(d_values, .tcc_logp, numeric(length(similarity)), similarity = similarity))
+  tab[grid$rows, ] <- pmin(tab[grid$rows, ], tab[grid$rows - 2, ])
+  tab
 }
 
 ############################################################################# !
 # POSTPROCESS: DRAWS BEYOND THE TABLE                                    ####
 ############################################################################# !
 
-# Past the end of a table the likelihood is a straight line, so a posterior
-# that reaches it can run away: a true d of 11.5 came out at 236 with d_max = 12
-# and at 13.2 [11.8, 14.7] with d_max = 30 (#566)
+# Past the end of a table the likelihood is extrapolated, so a posterior that
+# reaches it can run away: with the linear extension before the slope cap, a
+# true d of 11.5 came out at 236 with d_max = 12 and at 13.2 [11.8, 14.7] with
+# d_max = 30 (#566)
 #' @export
 postprocess_brm.tcc <- function(model, fit, ...) {
   fit <- NextMethod("postprocess_brm")
@@ -386,7 +397,7 @@ postprocess_brm.tcc <- function(model, fit, ...) {
     any(beyond),
     "In {sum(beyond)} of {length(beyond)} posterior draws, {name} passes the range \\
     from {signif(lower, 3)} to {signif(upper, 3)} that the likelihood table covers. \\
-    Beyond it the table is extended in a straight line, which keeps the sampler \\
+    Beyond it the table is extrapolated, which keeps the sampler \\
     moving but is not the model, so the posterior can run far past the table and \\
     its estimates mean nothing. {remedy}"
   )

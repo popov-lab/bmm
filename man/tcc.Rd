@@ -122,10 +122,11 @@ The likelihood reads the response probabilities from a table on a grid
 of \code{d} values up to \code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
 log probability). Beyond \code{d_max} the table is extended
-linearly. This keeps the sampler moving during warmup but is not the
-model: past \code{d_max} the log-likelihood becomes a straight line in \code{d}, so
-a posterior that reaches the end of the grid can run far beyond it, with
-estimates that mean nothing. \code{bmm()} warns after the fit when any
+linearly, with the log probability of each response allowed to fall but
+not to rise. This keeps the sampler moving during warmup but is not the
+model: past \code{d_max} the likelihood no longer favours a larger \code{d}, so a
+posterior that reaches the end of the grid follows the prior beyond it,
+with estimates that mean nothing. \code{bmm()} warns after the fit when any
 posterior draw of \code{d} passes \code{d_max}; then refit with a larger \code{d_max}.
 The default of 30 lies far above the values of \code{d} from 0.6 to 2.0 that
 \code{tcc()} estimates for set sizes 1 to 8 in \link{oberauer_lin_2017} with the

@@ -204,9 +204,12 @@ test_that("the Stan table is built in transformed data and read by the lpmf", {
   expect_match(code, "target += tcc_lpmf(Y | mu, d, tcc_tab, tcc_grid_lo, tcc_grid_step);",
                fixed = TRUE)
   sdata <- brms::standata(tcc_mock_fit())
-  expect_equal(sdata$tcc_grid_lo, -2)
+  expect_equal(sdata$tcc_grid_lo, 0)
   expect_equal(sdata$tcc_grid_step, 0.02)
-  expect_equal(sdata$tcc_grid_rows, 1603)
+  expect_equal(sdata$tcc_grid_rows, 1504)
+  # d can be negative only under a link that allows it
+  identity_fit <- suppressWarnings(tcc_mock_fit(model = tcc_test_model(links = list(d = "identity"))))
+  expect_equal(brms::standata(identity_fit)$tcc_grid_lo, -2)
   expect_equal(sdata$tcc_similarity, tcc_test_similarity(360), ignore_attr = TRUE)
 })
 
@@ -215,11 +218,11 @@ test_that("a table from R reaches the same lpmf as data and skips the build", {
   model$other_vars$table <- "r"
   fit <- tcc_mock_fit(model)
   code <- brms::stancode(fit)
-  expect_match(code, "matrix[403, 181] tcc_tab;", fixed = TRUE)
+  expect_match(code, "matrix[304, 181] tcc_tab;", fixed = TRUE)
   expect_false(grepl("tcc_tab[g] = tcc_logp_by_distance(", code, fixed = TRUE))
   expect_match(code, "target += tcc_lpmf(Y | mu, d, tcc_tab, tcc_grid_lo, tcc_grid_step);",
                fixed = TRUE)
-  expect_equal(dim(brms::standata(fit)$tcc_tab), c(403, 181))
+  expect_equal(dim(brms::standata(fit)$tcc_tab), c(304, 181))
 })
 
 test_that("threading passes the table to the sliced likelihood as data", {
@@ -236,7 +239,7 @@ test_that("draws of d beyond the end of the table are reported after the fit", {
   beyond <- epred_prep(list(d = cbind(c(1, 5.9, 7.2, 2), c(2, 2, 2, 6.5))))
   expect_silent(.tcc_check_grid(model, inside))
   expect_warning(.tcc_check_grid(model, beyond),
-                 "In 2 of 4 posterior draws, d passes.*-2 to 6.*Refit with d_max = 12")
+                 "In 2 of 4 posterior draws, d passes.*0 to 6.*Refit with d_max = 12")
 })
 
 test_that("a fit without draws is not checked against the table", {
@@ -270,7 +273,7 @@ tcc_case_prep <- function(case, d) {
 }
 
 test_that("log_lik_tcc() reads the table the fit used, for either response convention", {
-  d <- c(-1.234, 0.011, 2.345, 5.987)
+  d <- c(1.234, 0.011, 2.345, 5.987)
   for (case in tcc_postprocess_cases()) {
     prep <- tcc_case_prep(case, d)
     f <- tcc_test_similarity(case$n)
@@ -376,7 +379,7 @@ test_that("the Stan likelihood matches dtcc() on and off the d grid, from either
   f <- tcc_test_similarity(360)
   # runs of equal d (the per-cell path) and single rows (the per-trial path)
   rows <- data.frame(
-    d = c(rep(-1.234, 3), rep(0.011, 2), 2, 2.345, rep(5.987, 4), 4.4, 6),
+    d = c(rep(1.234, 3), rep(0.011, 2), 2, 2.345, rep(5.987, 4), 4.4, 6),
     y = c(0L, 7L, -180L, 3L, -3L, 0L, 45L, 0L, 1L, -2L, 180L, -90L, 179L)
   )
   out <- tcc_stan_lp(model, rows)
@@ -398,18 +401,19 @@ test_that("the Stan table stays finite where Phi() underflows, past d = 63", {
   expect_lt(max(abs(out$lp - dtcc(2 * pi * rows$y / 360, rows$d, f, log = TRUE))), 1e-6)
 })
 
-test_that("beyond the d grid the Stan likelihood extends the table linearly", {
+test_that("beyond the d grid the Stan likelihood extends the table linearly, never rising above it", {
   skip_on_cran()
   skip_unless_stan_tests()
   model <- tcc_test_model(d_max = 6)
   f <- tcc_test_similarity(360)
-  rows <- data.frame(d = c(-3, 7.5), y = c(0L, 0L))
+  # the target's log P rises with d, the opposite option's falls
+  rows <- data.frame(d = c(-0.5, 7.5, 7.5), y = c(0L, 0L, 180L))
   out <- tcc_stan_lp(model, rows)
-  edge <- function(at, d) {
-    h <- 0.02
-    val <- function(x) dtcc(0, x, f, log = TRUE)
-    val(at) + (d - at) * (val(at + h) - val(at - h)) / (2 * h)
-  }
-  expect_lt(max(abs(out$lp - c(edge(-2, -3), edge(6, 7.5)))), 1e-9)
+  h <- 0.02
+  val <- function(x, y) dtcc(2 * pi * y / 360, x, f, log = TRUE)
+  edge <- function(at, d, y) val(at, y) + (d - at) * (val(at + h, y) - val(at - h, y)) / (2 * h)
+  # the last node is d_max + h
+  expected <- c(edge(0, -0.5, 0), val(6 + h, 0), edge(6 + h, 7.5, 180))
+  expect_lt(max(abs(out$lp - expected)), 1e-9)
   expect_lt(max(abs(out$log_lik - out$lp)), 1e-9)
 })
