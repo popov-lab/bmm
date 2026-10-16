@@ -117,6 +117,22 @@ if (make("bmmfit_m3_ppcheck.rds")) {
   save_fixture(m3_fit, "bmmfit_m3_ppcheck.rds", seed = 5)
 }
 
+# lnr simple with three options, so each trial races one correct and two
+# error accumulators; two conditions so the group tests have a predictor column
+if (make("bmmfit_lnr_ppcheck.rds")) {
+  set.seed(8)
+  lnr_data <- rbind(
+    cbind(rlnr(100, m = c(-0.9, -0.1, -0.1), s = 0.8, ndt = 0.17), cond = "easy"),
+    cbind(rlnr(100, m = c(-0.5, -0.1, -0.1), s = 0.8, ndt = 0.17), cond = "hard")
+  )
+  lnr_fit <- do.call(bmm, c(list(
+    formula = bmf(correct ~ 0 + cond, error ~ 1, ndt ~ 1, s ~ 1),
+    data = lnr_data,
+    model = lnr(rt = "rt", response = "response", n_choices = 3)
+  ), fit_args))
+  save_fixture(lnr_fit, "bmmfit_lnr_ppcheck.rds", seed = 8)
+}
+
 # sdm on rstan, so the tests can read what an rstan fit stores: no warmup
 # saved, draws from the prior; two participants at set sizes 1 to 4
 if (make("bmmfit_example1.rds")) {

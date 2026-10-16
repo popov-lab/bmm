@@ -11,6 +11,12 @@ model_cases_lnr <- function() {
   sim <- withr::with_seed(1, rlnr(20, m = c(-1, 0, 0), s = 0.5, ndt = 0.2))
   sim$label <- c("correct", "lure", "lure")[sim$response]
   observables_custom <- bmf(correct ~ 1, lure ~ 1)
+  re_data <- transform(sim, id = rep(1:2, each = 10))
+  re_shared <- bmf(ndt ~ 1 + (1 | id), s ~ 1 + (1 | id))
+  re_formula <- bmf(correct ~ 1 + (1 | id), error ~ 1 + (1 | id)) + re_shared
+  re_custom <- bmf(correct ~ 1 + (1 | id), lure ~ 1 + (1 | id)) + re_shared
+  simple <- lnr("rt", "response", n_choices = 3)
+  custom <- lnr("rt", "label", version = "custom")
 
   list(
     stored_frame = list(
@@ -33,6 +39,29 @@ model_cases_lnr <- function() {
         formula = custom_formula, data = lnr_data
       )
     ),
+    sd_default = list(
+      lnr = list(
+        model = simple, formula = re_formula, data = re_data,
+        sd = c(correct = "exponential(2)", error = "exponential(2)", ndt = "exponential(4)",
+               s = "exponential(4)")
+      ),
+      lnr_custom = list(
+        model = custom, formula = re_custom, data = re_data,
+        sd = c(correct = "exponential(2)", lure = "exponential(2)", ndt = "exponential(4)",
+               s = "exponential(4)")
+      )
+    ),
+    init = list(
+      lnr = list(model = simple, formula = re_formula, data = re_data),
+      lnr_custom = list(model = custom, formula = re_custom, data = re_data)
+    ),
+    # the custom version learns its accumulators from the formula, so it has no
+    # closed set of names to refuse
+    links = list(
+      lnr = list(model = simple, settable = c("correct", "error", "ndt", "s")),
+      lnr_custom = list(model = custom, settable = NULL)
+    ),
+    fixture = list(lnr = list(file = "bmmfit_lnr_ppcheck.rds")),
     check_data = list(
       lnr = list(
         model = lnr("rt", "response", n_choices = 2),
