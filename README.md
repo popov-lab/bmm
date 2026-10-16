@@ -5,15 +5,16 @@
 
 <!-- badges: start -->
 
-[![Documentation](https://img.shields.io/badge/documentation-bmm-blue.svg)](https://popov-lab.github.io/bmm/)
+[![Documentation](https://img.shields.io/badge/documentation-bmm-blue.svg)](https://venpopov.com/bmm/)
 [![CRAN
 status](https://www.r-pkg.org/badges/version/bmm)](https://CRAN.R-project.org/package=bmm)
 [![bmm status
 badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-universe.dev/bmm)
 [![R-CMD-check](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/R-CMD-check.yaml)
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fpopov-lab%2Fbmm%2Fbadges%2Fcoverage.json)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-13/22-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-15/25-orange?style=flat)](#)
 <!-- badges: end -->
 
 *Bayesian Measurement Models for behavioral research in R*
@@ -27,8 +28,8 @@ as memory precision, the rate of guessing, or the sensitivity in a
 recognition task, in the same formula interface you already use for
 regression.
 
-The [documentation website](https://popov-lab.github.io/bmm/) has a [Get
-started](https://popov-lab.github.io/bmm/articles/bmm.html) page and one
+The [documentation website](https://venpopov.com/bmm/) has a [Get
+started](https://venpopov.com/bmm/articles/bmm.html) page and one
 article per model family. This page gives you the short version.
 
 ## Which model for your task
@@ -40,25 +41,25 @@ the models of the version this page was built from.
 **Continuous reproduction.** Participants reproduce a color, an
 orientation or another continuous feature, and the response error is the
 dependent variable. See the [continuous reproduction
-article](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html).
+article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html).
 
-- [`imm()`](https://popov-lab.github.io/bmm/reference/imm.html):
-  Interference measurement model by Oberauer and Lin (2017)
-- [`mixture2p()`](https://popov-lab.github.io/bmm/reference/mixture2p.html):
+- [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference
+  measurement model by Oberauer and Lin (2017)
+- [`mixture2p()`](https://venpopov.com/bmm/reference/mixture2p.html):
   Two-parameter mixture model by Zhang and Luck (2008)
-- [`mixture3p()`](https://popov-lab.github.io/bmm/reference/mixture3p.html):
+- [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.html):
   Three-parameter mixture model by Bays et al (2009)
-- [`sdm()`](https://popov-lab.github.io/bmm/reference/sdm.html): Signal
+- [`sdm()`](https://venpopov.com/bmm/reference/sdm.html): Signal
   Discrimination Model (SDM) by Oberauer (2023)
 
 **Categorical recall and n-AFC decisions.** Participants choose one
 response from a set of categories (n-alternative forced choice), for
 example the correct item, an item from another position, or an item that
 was not studied. See the [M3
-article](https://popov-lab.github.io/bmm/articles/bmm_m3.html).
+article](https://venpopov.com/bmm/articles/bmm_m3.html).
 
-- [`m3()`](https://popov-lab.github.io/bmm/reference/m3.html): The
-  Multinomial / Memory Measurement Model
+- [`m3()`](https://venpopov.com/bmm/reference/m3.html): The Multinomial
+  / Memory Measurement Model
 
 **Detection, recognition and confidence judgments.** Participants decide
 whether a signal was present or an item was studied, rate their
@@ -66,48 +67,58 @@ confidence, give Remember/Know judgments, pick the target among several
 alternatives, or rank the alternatives. One signal detection model per
 response format, each fit to response counts per participant and
 condition. See the [signal detection
-article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html) and, for
-the dual-process and meta-d′ versions of `sdt_rating()` and the
+article](https://venpopov.com/bmm/articles/bmm_sdt.html) and, for the
+dual-process and meta-d′ versions of `sdt_rating()` and the
 Remember/Know model `sdt_cdp()`, the [dual-process and meta-d′
-article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html).
+article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html).
 The [Get
-started](https://popov-lab.github.io/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
+started](https://venpopov.com/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
 page has a table of the response formats and the noise distributions
 each model offers.
 
-- [`sdt_cdp()`](https://popov-lab.github.io/bmm/reference/sdt_cdp.html):
+- [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.html):
   Continuous Dual-Process Signal Detection Theory (CDP)
-- [`sdt_mafc()`](https://popov-lab.github.io/bmm/reference/sdt_mafc.html):
+- [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.html):
   Signal Detection Theory (m-AFC)
-- [`sdt_ranking()`](https://popov-lab.github.io/bmm/reference/sdt_ranking.html):
+- [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.html):
   Signal Detection Theory (Ranking)
-- [`sdt_rating()`](https://popov-lab.github.io/bmm/reference/sdt_rating.html):
+- [`sdt_rating()`](https://venpopov.com/bmm/reference/sdt_rating.html):
   Signal Detection Theory (Confidence Rating)
-- [`sdt_yn()`](https://popov-lab.github.io/bmm/reference/sdt_yn.html):
-  Signal Detection Theory (Yes/No)
+- [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Signal
+  Detection Theory (Yes/No)
 
 **Choices and response times.** Participants choose between two options
 and the response time is recorded, either on every trial or as means and
 variances per condition. See the
-[DDM](https://popov-lab.github.io/bmm/articles/bmm_ddm.html), [censored
-shifted Wald](https://popov-lab.github.io/bmm/articles/bmm_cswald.html),
-[EZ-diffusion](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html)
-and [response time
-contamination](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html)
+[DDM](https://venpopov.com/bmm/articles/bmm_ddm.html), [censored shifted
+Wald](https://venpopov.com/bmm/articles/bmm_cswald.html),
+[EZ-diffusion](https://venpopov.com/bmm/articles/bmm_ezdm.html) and
+[response time
+contamination](https://venpopov.com/bmm/articles/bmm_rt_contamination.html)
 articles.
 
-- [`cswald()`](https://popov-lab.github.io/bmm/reference/cswald.html):
+- [`cswald()`](https://venpopov.com/bmm/reference/cswald.html):
   Censored-Shifted Wald Model
-- [`ddm()`](https://popov-lab.github.io/bmm/reference/ddm.html):
-  Diffusion Decision Model
-- [`ezdm()`](https://popov-lab.github.io/bmm/reference/ezdm.html):
-  EZ-Diffusion Model
+- [`ddm()`](https://venpopov.com/bmm/reference/ddm.html): Diffusion
+  Decision Model
+- [`ezdm()`](https://venpopov.com/bmm/reference/ezdm.html): EZ-Diffusion
+  Model
+
+**Processing-tree models.** Participants give categorical responses, and
+you describe the discrete processes that lead to each response as a
+multinomial processing tree: the two-high-threshold model of
+recognition, the pair-clustering model of free recall, or a tree of your
+own. The model is fit to response counts per participant and condition.
+See the [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html).
+
+- [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
+  Processing Tree (MPT) models
 
 <img src="man/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%" />
 
-`supported_models()` prints the same list in R, and `?modelname` (for
-example `?imm`) documents what data a model expects and what its
-parameters mean.
+`bmm_models()` prints the same list in R, and `?modelname` (for example
+`?imm`) documents what data a model expects and what its parameters
+mean.
 
 ## Install
 
@@ -205,25 +216,24 @@ summary(fit)
 The fit is a `brms` fit with extras, so `summary()`, posterior
 predictive checks with `pp_check()` and the rest of the `brms` toolbox
 work as usual. The [Get
-started](https://popov-lab.github.io/bmm/articles/bmm.html) page walks
-through this example line by line, including how to read the summary.
+started](https://venpopov.com/bmm/articles/bmm.html) page walks through
+this example line by line, including how to read the summary.
 
 ## Learn more
 
-- [Articles](https://popov-lab.github.io/bmm/articles/index.html): one
-  per model family, plus the [bmmformula
-  syntax](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
-  and how to [extract priors, Stan code and Stan
-  data](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
-  from a model.
-- [Function
-  reference](https://popov-lab.github.io/bmm/reference/index.html)
-- [Changelog](https://popov-lab.github.io/bmm/news/index.html)
+- [Articles](https://venpopov.com/bmm/articles/index.html): one per
+  model family, plus the [bmmformula
+  syntax](https://venpopov.com/bmm/articles/bmm_bmmformula.html) and how
+  to [extract priors, Stan code and Stan
+  data](https://venpopov.com/bmm/articles/bmm_extract_info.html) from a
+  model.
+- [Function reference](https://venpopov.com/bmm/reference/index.html)
+- [Changelog](https://venpopov.com/bmm/news/index.html)
 - Something missing or broken? Open an
   [issue](https://github.com/popov-lab/bmm/issues). For a new model,
   describe it, point to the literature, and link code that already
   implements it if there is any.
 - Want to add a model yourself? Start with the [Developer
-  Notes](https://popov-lab.github.io/bmm/dev-notes/index.html) and the
+  Notes](https://venpopov.com/bmm/dev-notes/index.html) and the
   [Contributor
   Guidelines](https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md).

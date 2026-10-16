@@ -338,11 +338,8 @@ test_that("a mixture2p fit refuses posterior_epred() and its family stores the r
 })
 
 test_that("the Stan and R likelihoods agree for every version", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the mixture2p likelihood"
-  )
 
   tab <- .circmix_kappa_table()
   code <- paste0(
@@ -406,11 +403,8 @@ test_that("the Stan and R likelihoods agree for every version", {
 })
 
 test_that("the generated likelihood passes each parameter to its place in the core", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the mixture2p likelihood"
-  )
   # the cores are checked against R above; this checks the generated wrappers
   # that brms calls, whose argument order is built from the family
   dat <- oberauer_lin_2017

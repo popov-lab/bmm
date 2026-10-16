@@ -40,7 +40,7 @@ k2sd <- function(K) {
 #'   `c_sqrtexp2bessel` converts from the sqrtexp parametrization to the
 #'   bessel parametrization.
 #' @keywords transform
-#' @details See [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for details on the
+#' @details See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
 #'   parameterization. The sqrtexp parametrization is the default in the
 #'   `bmm` package.
 #' @export
@@ -82,7 +82,6 @@ link_transform <- function(values, link, inverse = FALSE) {
   # Handle NULL or missing link as identity (no transformation)
   if (is.null(link)) link <- "identity"
 
-  stopifnot(is.numeric(values), is.character(link), length(link) == 1L, is.logical(inverse), length(inverse) == 1L)
   if(inverse) {
     switch(
       link,
@@ -154,7 +153,9 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'   \code{bmmfit} object (a fitted model returned by \code{\link{bmm}}).
 #' @param formula An optional \code{bmmformula} object. Only relevant for
 #'   M3 custom models, where additional parameters are discovered from
-#'   the formula. Ignored for all other models.
+#'   the formula. Only activation symbols that have their own formula are
+#'   listed; without data, any other symbol is read as a data column.
+#'   Ignored for all other models.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return A data frame of class \code{bmm_parameters} with one row per
@@ -184,14 +185,17 @@ parameter_info.bmmodel <- function(x, formula = NULL, ...) {
   model <- x
 
   if (inherits(model, "m3_custom") && !is.null(formula)) {
-    user_pars <- rhs_vars(formula[is_nl(formula)])
-    user_pars <- setdiff(user_pars, names(formula[is_nl(formula)]))
-    user_pars <- setdiff(user_pars, names(model$parameters))
+    # check_model() requires every new parameter to have its own formula, and
+    # without data this is what tells a parameter from a data column
+    user_pars <- intersect(m3_activation_symbols(model, formula), names(formula))
     model$parameters <- c(model$parameters, setNames(
       as.list(user_pars), user_pars
     ))
   }
 
+  if (!is.null(formula)) {
+    model$parameters[unused_alternative_parameters(model, formula)] <- NULL
+  }
   pars <- names(model$parameters)
   if (length(pars) == 0) {
     message2("This model has no parameters defined.")
@@ -323,8 +327,20 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' @noRd
 .get_parameter_info <- function(bmmfit, par) {
   model <- bmmfit$bmm$model
-  model_pars <- names(model$parameters)
+  unused <- unused_alternative_parameters(model, bmmfit$bmm$user_formula)
+  model_pars <- setdiff(names(model$parameters), unused)
   bterms <- brms::brmsterms(bmmfit$formula)
+
+  if (par %in% unused) {
+    used <- setdiff(
+      unlist(Filter(function(a) par %in% a, model$alternative_parameters)),
+      unused
+    )
+    stop2(
+      "Parameter '{par}' is not estimated in this fit: its formula uses ",
+      "{collapse_comma(used)}, the alternative parameterization."
+    )
+  }
 
   if (!par %in% model_pars) {
     stop2(
@@ -507,7 +523,7 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' @seealso [parameter_info()], [native_transform()], [conditional_effects.bmmfit()]
 #' @keywords extract_info
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- bmm(
 #'   bmf(c ~ 0 + set_size, kappa ~ 1),
 #'   data = oberauer_lin_2017,
@@ -539,7 +555,10 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   x <- restructure(x)
   scale <- match.arg(scale)
 
-  model_pars <- names(x$bmm$model$parameters)
+  model_pars <- setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  )
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
   pars <- pars %||% model_pars
   unknown <- pars[not_in(pars, model_pars)]
@@ -842,6 +861,49 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 }
 
 
+#' The formulas of a parameter and of the parameters its formula names
+#'
+#' @description
+#' A non-linear formula names other parameters on its right-hand side; each has
+#' a formula of its own. The nodes are listed depth first: the parameter, then
+#' each parameter its formula names with the parameters those name in turn.
+#' Constant parameters and parameters without a formula have no node. `bmm()`
+#' refuses formulas that name each other in a circle, so the recursion ends.
+#'
+#' @param x A bmmfit object
+#' @param par Character string. The parameter name.
+#' @return A list with one element per formula: `rhs`, its right-hand side;
+#'   `labels`, its fixed-effects term labels; `term_vars`, the variables of each
+#'   of them, without parameters; `sub_pars`, the parameters they name.
+#'
+#' @keywords internal
+#' @noRd
+.formula_nodes <- function(x, par) {
+  formulas <- x$bmm$user_formula
+  f <- formulas[[par]]
+  if (is.null(f) || is_constant(f)) {
+    return(list())
+  }
+
+  rhs <- stats::formula(f)[-2]
+  labels <- attr(stats::terms(rhs), "term.labels")
+  labels <- labels[!grepl("|", labels, fixed = TRUE)]
+  term_vars <- lapply(labels, function(label) all.vars(str2lang(label)))
+  parameters <- c(names(formulas), names(x$bmm$model$parameters))
+  sub_pars <- intersect(unlist(term_vars), parameters)
+
+  c(
+    list(list(
+      rhs = rhs,
+      labels = labels,
+      term_vars = lapply(term_vars, setdiff, y = parameters),
+      sub_pars = sub_pars
+    )),
+    unlist(lapply(sub_pars, .formula_nodes, x = x), recursive = FALSE)
+  )
+}
+
+
 #' Variables spanning the prediction grid for a set of parameters
 #'
 #' @description
@@ -849,6 +911,8 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 #' grouping variables are retained according to `re_formula`, so that
 #' `re_formula = NA` collapses the grid across grouping levels. A variable that
 #' is both a grouping variable and a population-level predictor is always kept.
+#' A non-linear formula names other parameters on its right-hand side; those
+#' span no grid themselves, but the predictors of their own formulas do.
 #'
 #' @param x A bmmfit object
 #' @param pars Character vector of parameter names
@@ -865,25 +929,15 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
     character(0)
   }
 
-  vars <- lapply(pars, function(par) {
-    f <- x$bmm$user_formula[[par]]
-    if (is.null(f) || is_constant(f)) {
-      return(character(0))
-    }
-    rhs <- stats::formula(f)[-2]
-    labels <- attr(stats::terms(rhs), "term.labels")
-    fe_vars <- lapply(
-      labels[!grepl("|", labels, fixed = TRUE)],
-      function(label) all.vars(str2lang(label))
-    )
-    groups <- .extract_re_grouping_vars(rhs)
-    c(
-      unlist(fe_vars),
-      if (keep_all_groups) groups else groups[groups %in% keep_groups]
-    )
-  })
-
-  unique(unlist(vars))
+  unique(c(character(0), unlist(lapply(pars, function(par) {
+    lapply(.formula_nodes(x, par), function(node) {
+      groups <- .extract_re_grouping_vars(node$rhs)
+      c(
+        unlist(node$term_vars),
+        if (keep_all_groups) groups else groups[groups %in% keep_groups]
+      )
+    })
+  }))))
 }
 
 
