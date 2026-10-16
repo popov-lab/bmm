@@ -101,8 +101,8 @@
 .lba_kernel_meaningful <- function(x) is.finite(x) & x > -40
 
 test_that("Stan normal LBA kernel matches the R kernel on the grid", {
-  skip_on_cran()
   skip_unless_stan_tests()
+  skip_on_cran()
 
   G <- .lba_kernel_results()
   d <- G[G$dist == "normal", ]
@@ -120,8 +120,8 @@ test_that("Stan normal LBA kernel matches the R kernel on the grid", {
 # t >= 0.02 because the 401-point pre-scan cannot resolve the sliver the
 # integrand occupies at faster responses (see local/lba_grid_check.R).
 test_that("Stan normal LBA lpdf matches an independent start-point quadrature", {
-  skip_on_cran()
   skip_unless_stan_tests()
+  skip_on_cran()
 
   lquad <- function(lg, A) {
     lo <- 0
@@ -163,8 +163,8 @@ test_that("Stan normal LBA lpdf matches an independent start-point quadrature", 
 # denominator, both once taken from std_normal_lcdf (whose Stan gradient is a
 # piecewise approximation), were off by 17 %, 7 %, 2.2 % and 0.17 %.
 test_that("Stan normal LBA lpdf drift gradient matches finite differences", {
-  skip_on_cran()
   skip_unless_stan_tests()
+  skip_on_cran()
 
   sc_dir <- system.file("stan_chunks", package = "bmm")
   rl <- function(f) paste(readLines(file.path(sc_dir, paste0(f, ".stan"))), collapse = "\n")
