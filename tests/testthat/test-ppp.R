@@ -252,9 +252,7 @@ test_that(".ppp_complement() adds the second category of a binomial count", {
 })
 
 test_that("ppp() compares each replicated data set with the expectation of its own draw", {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
   withr::local_seed(1)
   res <- ppp(fit, statistic = "T1", by = character(0), ndraws = 5)
   expect_s3_class(res, "bmm_ppp")
@@ -272,8 +270,43 @@ test_that("ppp() compares each replicated data set with the expectation of its o
 })
 
 test_that("ppp() takes ndraws as a whole number of draws", {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
   expect_error(ppp(fit, ndraws = 2.5), "'ndraws' must be a whole number")
+})
+
+test_that("ppp() counts the second category of a yes/no model as trials minus responses", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit <- list(data = data.frame(n_old = c(30, 70), n_trials = c(100, 80)))
+  draws <- matrix(c(28, 31, 69, 72), 2, 2)
+  local_mocked_bindings(posterior_predict = function(...) draws,
+                        posterior_epred = function(...) draws + 0.5, .package = "brms")
+  counts <- .ppp_counts(model, fit, draw_ids = 1:2)
+  expect_equal(counts$observed, cbind(n_old = c(30, 70), other = c(70, 10)))
+  expect_equal(dim(counts$replicated), c(2, 2, 2))
+  expect_equal(counts$replicated[, , 1], draws)
+  expect_equal(counts$replicated[, , 2], cbind(100 - draws[, 1], 80 - draws[, 2]))
+  expect_equal(counts$expected[, , 2], cbind(100 - draws[, 1], 80 - draws[, 2]) - 0.5)
+})
+
+test_that("ppp() rebuilds the tree column of an mpt fit that no formula kept", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  local_ppd <- function(fit) {
+    draws <- array(1, c(2, nrow(fit$data), 2))
+    local_mocked_bindings(posterior_predict = function(...) draws,
+                          posterior_epred = function(...) draws, .package = "brms",
+                          .env = parent.frame())
+  }
+  cases <- model_test_cases("stored_frame")
+  fit <- stored_frame_fit(cases$mpt)
+  expect_false("item_type" %in% names(fit$data))
+  local_ppd(fit)
+  data <- .ppp_counts(fit$bmm$model, fit, draw_ids = 1:2)$data
+  expect_identical(levels(data$item_type), c("old", "new"))
+  expect_identical(as.character(data$item_type), ifelse(fit$data$Idx_old == 1, "old", "new"))
+
+  # a formula that names the tree column keeps it, and it is left as it is
+  fit <- stored_frame_fit(cases$mpt_tree_predictor)
+  local_ppd(fit)
+  expect_identical(.ppp_counts(fit$bmm$model, fit, draw_ids = 1:2)$data$item_type,
+                   fit$data$item_type)
 })

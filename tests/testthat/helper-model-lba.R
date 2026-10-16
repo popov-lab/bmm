@@ -10,6 +10,12 @@ model_cases_lba <- function() {
   sim <- withr::with_seed(1, rlba(20, drift = c(2, 1), gap = 0.5, sp = 0.5, ndt = 0.2))
   sim$label <- c("a", "z")[sim$response]
   observables_custom <- bmf(a ~ 1, z ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+  re_data <- transform(sim, id = rep(1:2, each = 10))
+  re_shared <- bmf(gap ~ 1 + (1 | id), sp ~ 1 + (1 | id), ndt ~ 1 + (1 | id))
+  re_formula <- bmf(driftc ~ 1 + (1 | id), drifte ~ 1 + (1 | id)) + re_shared
+  re_custom <- bmf(a ~ 1 + (1 | id), z ~ 1 + (1 | id)) + re_shared
+  simple <- lba("rt", "response", n_choices = 2)
+  custom <- lba("rt", "label", version = "custom")
 
   list(
     # the frame keeps only the vint() columns: the response and the
@@ -30,6 +36,28 @@ model_cases_lba <- function() {
         ),
         formula = custom_formula, data = lba_data
       )
+    ),
+    sd_default = list(
+      lba = list(
+        model = simple, formula = re_formula, data = re_data,
+        sd = c(driftc = "exponential(1)", drifte = "exponential(1)", gap = "exponential(2)",
+               sp = "exponential(2)", ndt = "exponential(2)")
+      ),
+      lba_custom = list(
+        model = custom, formula = re_custom, data = re_data,
+        sd = c(a = "exponential(1)", z = "exponential(1)", gap = "exponential(2)",
+               sp = "exponential(2)", ndt = "exponential(2)")
+      )
+    ),
+    init = list(
+      lba = list(model = simple, formula = re_formula, data = re_data),
+      lba_custom = list(model = custom, formula = re_custom, data = re_data)
+    ),
+    # the custom version learns its accumulators from the formula, so it has no
+    # closed set of names to refuse
+    links = list(
+      lba = list(model = simple, settable = c("driftc", "drifte", "gap", "sp", "ndt", "s")),
+      lba_custom = list(model = custom, settable = NULL)
     ),
     check_data = list(
       lba = list(
