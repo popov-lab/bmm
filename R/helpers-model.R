@@ -39,7 +39,7 @@
 #'     nlist(formula, data, family, prior)
 #'  }
 #'  ```
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' configure_model.mixture3p <- function(model, data, formula) {
 #'   # retrieve arguments from the data check
 #'   max_set_size <- attr(data, "max_set_size")
@@ -104,11 +104,10 @@ check_model <- function(model, data = NULL, formula = NULL) {
 
 #' @export
 check_model.default <- function(model, data = NULL, formula = NULL) {
-  bmm_models <- supported_models(print_call = FALSE)
   if (is.function(model)) {
     fun_name <- as.character(substitute(model))
     stopif(
-      fun_name %in% bmm_models,
+      fun_name %in% model_names(),
       "Did you forget to provide the required arguments to the model function?
       See ?{fun_name} for details on properly specifying the model argument"
     )
@@ -118,9 +117,9 @@ check_model.default <- function(model, data = NULL, formula = NULL) {
     !is_supported_bmmodel(model),
     "You provided an object of class `{class(model)}` to the model argument.
     The model argument should be a `bmmodel` function.
-    You can see the list of supported models by running `supported_models()`
+    You can see the list of supported models by running `bmm_models()`
 
-    {supported_models()}"
+    {models_text()}"
   )
   model
 }
@@ -303,9 +302,9 @@ validate_links <- function(links, model) {
   )
   defaults <- attr(model, "links_default") %||% model$links
   settable <- settable_links(model)
-  # a model built by use_model_template() is not in supported_models() yet
+  # a model built by use_model_template() is not in bmm_models() yet
   model_name <- c(
-    intersect(class(model), supported_models(print_call = FALSE)),
+    intersect(class(model), model_names()),
     class(model)[2]
   )[1]
   given <- names(links)
@@ -436,7 +435,7 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
-  if (inherits(model, "m3")) {
+  if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
   if (inherits(model, "sdt_yn")) {
@@ -468,8 +467,33 @@ print.bmmodel <- function(x, ...) {
     )
     cat("Fixed:     ", fixed_str, "\n")
   }
-  cat("Use parameter_info() for more details.\n")
+  print_model_details(x)
+  cat("Use parameter_info() for parameter descriptions, links and fixed values.\n")
   invisible(x)
+}
+
+# print.bmmodel dispatches before any model-specific print method (classes
+# are ordered general to specific), so model-specific lines are added here
+
+#' Generic S3 method for model-specific lines in `print()` of a model
+#'
+#' Called by `print()` on a `bmmodel` after the lines all models share and
+#' before the closing pointer to [parameter_info()]. The default method prints
+#' nothing.
+#'
+#' @param model A `bmmodel` object
+#' @param ... Unused
+#'
+#' @return Called for its printed output; returns `NULL` invisibly
+#' @keywords internal developer
+#' @export
+print_model_details <- function(model, ...) {
+  UseMethod("print_model_details")
+}
+
+#' @export
+print_model_details.default <- function(model, ...) {
+  invisible(NULL)
 }
 
 
@@ -478,11 +502,12 @@ print.bmmodel <- function(x, ...) {
 ############################################################################# !
 
 # maps the `domain` field of each `.model_*()` constructor to the task group
-# shown by supported_models(); a domain not listed here prints as its own group,
+# shown by bmm_models(); a domain not listed here prints as its own group,
 # so a new model never disappears from the list
 model_groups <- c(
   "Visual working memory" = "Continuous reproduction",
   "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
+  "Categorical decision making, memory, and reasoning" = "Processing-tree models",
   "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
   "Recognition Memory" = "Detection, recognition and confidence judgments",
   "Decision Making / Response times" = "Choices and response times"
@@ -495,7 +520,7 @@ model_group <- function(domain) {
   group
 }
 
-model_registry <- function(models = supported_models(print_call = FALSE)) {
+model_registry <- function(models = model_names()) {
   specs <- lapply(models, function(m) get_model(m)())
   registry <- data.frame(
     model = models,
@@ -508,7 +533,7 @@ model_registry <- function(models = supported_models(print_call = FALSE)) {
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
-reference_url <- "https://popov-lab.github.io/bmm/reference/"
+reference_url <- "https://venpopov.com/bmm/reference/"
 
 format_model_list <- function(registry, style = "text", headers = TRUE) {
   blocks <- lapply(unique(registry$group), function(group) {
@@ -582,6 +607,11 @@ data_column_roles <- list(
     resp_error = "response error relative to the target, in radians",
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     set_size = "set size (a column, or one number)"
+  ),
+  mpt = c(
+    trees = "number of responses in each response category, one column per category, named after the branches of the trees",
+    tree_id = "the tree each row belongs to (models with several trees)",
+    covariates = "numeric columns used in branch expressions, e.g. design-fixed guessing rates (optional)"
   ),
   sdm = c(
     resp_error = "response error relative to the target, in radians"
@@ -678,48 +708,118 @@ model_overview <- function(group = NULL) {
 
 #' Measurement models available in `bmm`
 #'
-#' @param print_call Logical; If TRUE (default), the function prints the models
-#'   grouped by the task they are meant for, one line per model with its
-#'   constructor and full name. If FALSE, the function returns a character
-#'   vector with the names of the available models.
-#' @details The groups are: continuous reproduction; categorical recall and
-#'   n-AFC decisions; detection, recognition and confidence judgments; choices
-#'   and response times. Type `?modelname` (for example `?imm`) for the
-#'   arguments of a model.
-#' @return If `print_call = FALSE`, a character vector of model names.
-#'   Otherwise an object of class `message` listing the models by group.
+#' @details Printed, the result lists the models grouped by the task they are
+#'   meant for, one line per model with its constructor and full name. The
+#'   groups are: continuous reproduction; categorical recall and n-AFC
+#'   decisions; detection, recognition and confidence judgments; choices and
+#'   response times; processing-tree models. Type `?modelname` (for example
+#'   `?imm`) for the arguments of a model.
+#' @return A character vector of model names with class `bmm_models`, which
+#'   prints as the grouped list. Use it as a character vector in base R or
+#'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
+#'   where a function refuses the class.
 #' @export
 #'
 #' @examples
-#' supported_models()
-#' supported_models(print_call = FALSE)
-supported_models <- function(print_call = TRUE) {
-  supported_models <- lsp("bmm", pattern = "^\\.model_")
-  supported_models <- sub("^\\.model_", "", supported_models)
-  if (!print_call) {
-    return(supported_models)
-  }
+#' bmm_models()
+#' "imm" %in% bmm_models()
+bmm_models <- function() {
+  structure(model_names(), class = "bmm_models")
+}
 
+#' @export
+print.bmm_models <- function(x, ...) {
+  # base functions such as sub() keep the class on vectors that are no longer
+  # model names, so those print as what they are
+  if (!all(x %in% model_names())) {
+    print(unclass(x), ...)
+    return(invisible(x))
+  }
+  cat(models_text(unclass(x)))
+  invisible(x)
+}
+
+# vctrs refuses to combine an unknown class with character, so without these
+# dplyr joins, binds, if_else() and assignment fail on a bmm_models() column
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.bmm_models
+vec_ptype2.bmm_models.bmm_models <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.character
+vec_ptype2.bmm_models.character <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 character.bmm_models
+vec_ptype2.character.bmm_models <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_cast character.bmm_models
+vec_cast.character.bmm_models <- function(x, to, ...) unclass(x)
+
+#' @exportS3Method vctrs::vec_cast bmm_models.character
+vec_cast.bmm_models.character <- function(x, to, ...) structure(x, class = "bmm_models")
+
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.factor
+vec_ptype2.bmm_models.factor <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 factor.bmm_models
+vec_ptype2.factor.bmm_models <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 bmm_models.ordered
+vec_ptype2.bmm_models.ordered <- function(x, y, ...) character()
+
+#' @exportS3Method vctrs::vec_ptype2 ordered.bmm_models
+vec_ptype2.ordered.bmm_models <- function(x, y, ...) character()
+
+# one string, not one per model, so it is not a format() method: tibble and
+# print.data.frame call format() on columns and expect one string per element
+models_text <- function(models = model_names()) {
   out <- paste(
     c(
       "The following models are supported:", "",
-      format_model_list(model_registry(supported_models), "text"),
+      format_model_list(model_registry(models), "text"),
       "Type `?modelname` to get information about a specific model, e.g. `?imm`", ""
     ),
     collapse = "\n"
   )
-  out <- gsub("`", " ", out)
-  class(out) <- "message"
-  out
+  gsub("`", " ", out)
+}
+
+# the registry behind bmm_models(), as plain names for internal lookups
+model_names <- function() {
+  sub("^\\.model_", "", lsp("bmm", pattern = "^\\.model_"))
+}
+
+#' Deprecated: use `bmm_models()`
+#'
+#' @description `supported_models()` is deprecated as of bmm 1.4.0 and will be
+#'   removed in bmm 1.6.0. It shares its name with `insight::supported_models()`,
+#'   which the **parameters** package re-exports, so whichever package is
+#'   attached last decides what `supported_models()` returns. Replace both
+#'   `supported_models()` and `supported_models(print_call = FALSE)` with
+#'   [bmm_models()]; wrap it in `as.character()` if you need a plain
+#'   character vector.
+#'
+#' @param print_call Logical. If `TRUE` (default), returns the output of
+#'   [bmm_models()], which prints the models grouped by task. If `FALSE`,
+#'   returns the model names as a plain character vector.
+#' @return The output of [bmm_models()], or the model names as a plain
+#'   character vector if `print_call = FALSE`. Before bmm 1.4.0 the default
+#'   returned the printed list as one string; use
+#'   `capture.output(print(bmm_models()))` for the printed list as text,
+#'   one line per element.
+#' @keywords internal
+#' @export
+supported_models <- function(print_call = TRUE) {
+  warning2("`supported_models()` is deprecated as of bmm 1.4.0; use `bmm_models()`. \\
+            It will be removed in 1.6.0.")
+  if (print_call) bmm_models() else model_names()
 }
 
 
 #' @title Generate a markdown list of the measurement models available in `bmm`
 #' @description Used internally to populate the README and the "Get started"
-#'   article. Models are grouped as in [supported_models()], and every model
+#'   article. Models are grouped as in [bmm_models()], and every model
 #'   links to its reference page on the website.
 #' @param group Optional character vector of group labels as printed by
-#'   [supported_models()]. Only those groups are listed and the group headers
+#'   [bmm_models()]. Only those groups are listed and the group headers
 #'   are omitted, so a document can add its own text per group.
 #' @return Markdown code for printing the list of measurement models available
 #'   in `bmm`
@@ -862,7 +962,7 @@ get_model2 <- function(model) {
 #' @keywords internal developer
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' library(usethis)
 #'
 #'
@@ -886,7 +986,7 @@ use_model_template <- function(model_name,
   file_name <- paste0("model_", model_name, ".R")
 
   # check if model exists
-  if (model_name %in% supported_models(print_call = FALSE)) {
+  if (model_name %in% model_names()) {
     stop2("Model {model_name} already exists")
   }
   if (file.exists(paste0("R/", file_name))) {
@@ -1312,7 +1412,7 @@ use_model_template <- function(model_name,
 #' @return A character string containing the fully commented Stan code to fit a
 #'   bmm model.
 #'
-#' @seealso [supported_models()], [brms::stancode()]
+#' @seealso [bmm_models()], [brms::stancode()]
 #' @keywords extract_info
 #' @examples
 #' scode1 <- stancode(bmf(c ~ 1, kappa ~ 1),
@@ -1326,38 +1426,81 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
-
-  # check model, formula and data, and transform data if necessary
-  formula <- object
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-
-  # generate the model specification to pass to brms later
-  config_args <- configure_model(model, data, formula)
-
-  # configure the default prior and combine with user-specified prior
-  prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, prior), brms_frame_args(dots))
-  )
-
-  # extract stan code
-  fit_args <- combine_args(nlist(config_args, dots, prior))
-  fit_args$object <- fit_args$formula
-  fit_args$formula <- NULL
-  code <- brms::do_call(brms::stancode, fit_args)
-  add_bmm_version_to_stancode(code)
+  add_bmm_version_to_stancode(call_brms_extractor(
+    brms::stancode,
+    configure_fit(object, data, model, prior, until = "prior", frame_args = brms_frame_args(dots)),
+    dots
+  ))
 }
 
+# Everything brm() needs to fit a specification: the checked model, the brms
+# formula with its stanvars, the prior, and the initial values, plus the model
+# and user formula that postprocess_brm() stores in the fit. Shared by bmm()
+# and the stancode/standata/default_prior extractors. `until` says how far to
+# go, because each step costs a brms frame build: "init" for bmm(), "prior"
+# for stancode() and default_prior(), "model" for standata(), whose Stan data
+# depends on neither. `frame_args` are the brm() arguments besides the formula
+# and data that shape the model frame (see brms_frame_args())
+configure_fit <- function(formula, data = NULL, model = NULL, prior = NULL, until = "init",
+                          frame_args = list()) {
+  UseMethod("configure_fit")
+}
+
+#' @export
+configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior = NULL,
+                                     until = "init", frame_args = list()) {
+  user_formula <- formula
+  # the user's expression for the data lives in the caller of the generic
+  # (bmm() or an extractor). It is set before check_data(), whose methods print
+  # it (order_data_query()), and again after, because some methods rebuild the
+  # data frame without it
+  data_name <- substitute_name(data, envir = parent.frame())
+  if (!missing(data) && !is.null(data) && (is.list(data) || is.atomic(data))) {
+    attr(data, "data_name") <- data_name
+  }
+  model <- check_model(model, data, formula)
+  data <- check_data(model, data, formula)
+  attr(data, "data_name") <- data_name
+  formula <- check_formula(model, data, formula)
+  config_args <- configure_model(model, data, formula)
+  if (until == "model") {
+    return(nlist(config_args, model, user_formula))
+  }
+  prior <- brms::do_call(
+    configure_prior, c(list(model, data, config_args$formula, prior), frame_args)
+  )
+  # the prior decides which parameters exist, so the inits are built from it
+  if (until == "init") {
+    config_args$init <- brms::do_call(
+      create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
+    )
+  }
+  nlist(config_args, prior, model, user_formula)
+}
+
+#' @export
+configure_fit.default <- function(formula, data = NULL, model = NULL, ...) {
+  model <- check_model(model, data, formula)
+  data <- check_data(model, data, formula)
+  check_formula(model, data, formula)
+}
+
+# The brms extractors take the formula as `object`
+call_brms_extractor <- function(fun, cfg, dots) {
+  args <- combine_args(nlist(config_args = cfg$config_args, dots, prior = cfg$prior))
+  args$object <- args$formula
+  args$formula <- NULL
+  brms::do_call(fun, args)
+}
+
+# update() runs postprocess_brm() again on code that may already carry a bmm
+# version, so any existing ones are replaced by the version doing the update
 add_bmm_version_to_stancode <- function(stancode) {
-  version <- packageVersion("bmm")
-  text <- paste0("and bmm ", version)
-  brms_comp <- regexpr("brms.*(?=\\n)", stancode, perl = T)
-  insert_loc <- brms_comp + attr(brms_comp, "match.length") - 1
-  new_stancode <- paste0(
-    substr(stancode, 1, insert_loc),
-    " ", text,
-    substr(stancode, insert_loc + 1, nchar(stancode))
+  new_stancode <- sub(
+    "^([^\\r\\n]*?brms[^\\r\\n]*?)(?: and bmm [^ \\r\\n]+)*(?=\\r?\\n)",
+    paste0("\\1 and bmm ", utils::packageVersion("bmm")),
+    stancode,
+    perl = TRUE
   )
   class(new_stancode) <- class(stancode)
   new_stancode
@@ -1410,9 +1553,6 @@ which_positions <- function(x, pat) {
 #' find_matching_brace(y, 8L) # -> 12
 find_matching_brace <- function(x, open_pos,
                                 open_brace = "{", close_brace = "}") {
-  stopifnot(is.character(x), length(x) == 1L)
-  n <- nchar(x)
-  stopifnot(length(open_pos) == 1L, open_pos >= 1L, open_pos <= n)
   stopif(
     substr(x, open_pos, open_pos) != open_brace,
     "Character at open_pos {open_pos} is not open_brace."
@@ -1470,7 +1610,10 @@ find_matching_brace <- function(x, open_pos,
 #'
 #' @export
 extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "transformed data", "parameters", "transformed parameters", "model", "generated quantities")) {
-  stopifnot(is.character(stan_code), length(stan_code) == 1L)
+  stopif(
+    !is.character(stan_code) || length(stan_code) != 1L,
+    "'stan_code' must be a single character string, such as the output of stancode()."
+  )
   blocks <- match.arg(blocks, several.ok = TRUE)
   out <- lapply(blocks, function(b) .extract_stan_block(stan_code, b))
   names(out) <- blocks
@@ -1480,8 +1623,6 @@ extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "tran
 .extract_stan_block <- function(stan_code, block,
                                 include_braces = FALSE,
                                 trim = TRUE) {
-  stopifnot(is.character(block), length(block) == 1L)
-
   # Anchor to start-of-line (multiline mode), allow leading spaces/tabs.
   # Match the exact block name, then optional whitespace, then '{'.
   header_pat <- paste0("(?m)^[[:space:]]*", block, "[[:space:]]*\\{")

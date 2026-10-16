@@ -5,7 +5,9 @@
 #' @param object An object of class `bmmfit`
 #' @param formula. A [bmmformula()]. If missing, the original formula
 #'  is used. Currently you have to specify a full `bmmformula`
-#' @param newdata An optional data frame containing the variables in the model
+#' @param newdata An optional data frame containing the variables in the model.
+#'   Rows of `fit$data` are accepted as they are, which is how [brms::kfold()]
+#'   and [brms::reloo()] pass them.
 #' @param recompile Logical, indicating whether the Stan model should be recompiled. If
 #'   NULL (the default), update tries to figure out internally, if recompilation
 #'   is necessary. Setting it to FALSE will cause all Stan code changing
@@ -32,7 +34,7 @@
 #'
 #'   For more information and examples, see [brms::update.brmsfit()]
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data from the Signal Discrimination Model
 #' # generate artificial data from the Signal Discrimination Model
 #' dat <- data.frame(y = rsdm(2000))
@@ -119,6 +121,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # than the formula covers all three
   old_fixed <- model$fixed_parameters
   model <- update_model_fixed_parameters(model, user_formula)
+  # the stored model was checked with the old formula and keeps what that
+  # formula derived (mpt: the links switched off for non-linear parameters and
+  # their sub-parameters), so a new formula needs a new check
+  if (!missing(formula.)) {
+    model <- check_model(model, newdata %||% olddata, user_formula)
+  }
   changed_pars <- union(names(old_fixed), names(model$fixed_parameters))
   changed_pars <- changed_pars[!vapply(
     changed_pars,
@@ -126,8 +134,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     logical(1)
   )]
 
-  if (is.null(newdata)) {
-    data <- check_stored_data(model, olddata, user_formula)
+  if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
+    data <- check_stored_data(model, newdata %||% olddata, user_formula)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
@@ -144,7 +152,7 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # parameter and the stale free prior of a newly fixed one alike. brms stores
   # the main dpar without a `dpar` label, so its rows are the ones carrying
   # neither label
-  old_prior <- object$prior
+  old_prior <- carried_prior(object$prior)
   if (length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
@@ -245,6 +253,22 @@ check_stored_data <- function(model, data, formula) {
   data
 }
 
+# brms::kfold() and reloo() hand update() slices of the fit's own model frame,
+# not data in the layout bmm() was given. Data are such a slice when
+# revert_check_data() has something to change in the stored frame, they carry
+# every column of it (the generated ones included) and lack the ones it
+# restores. A user's own column Y is not enough: the other generated columns
+# are missing. A fit that revert_check_data() refuses to rebuild is updated
+# with the user's data (its error says so), so a refusal means no model frame
+is_stored_frame <- function(model, stored, data) {
+  reverted <- tryCatch(revert_check_data(model, stored), error = function(e) NULL)
+  if (is.null(reverted) || setequal(names(reverted), names(stored))) {
+    return(FALSE)
+  }
+  restored <- setdiff(names(reverted), names(stored))
+  all(names(stored) %in% names(data)) && !any(restored %in% names(data))
+}
+
 # Dispatch runs general to specific, so every method chains with NextMethod():
 # without it a method on a domain class silently shadows one on a model class
 # below it, which is how the sdt_yn symptom would come back the moment the SDT
@@ -285,6 +309,31 @@ revert_check_data.m3 <- function(model, data) {
     )
     data[num_options][no_options] <- 0
   }
+  # check_data() refuses these as user columns, but a category named Y or
+  # nTrials was just restored and must stay
+  data[c(setdiff(c("Y", "nTrials"), resp_cats), paste0("Idx_", resp_cats))] <- NULL
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.mpt <- function(model, data) {
+  resp_cats <- model$resp_vars$resp_cats
+  data[resp_cats] <- as.data.frame(unclass(data$Y)[, resp_cats, drop = FALSE])
+  data$Y <- NULL
+  data$nTrials <- NULL
+  tree_id <- model$other_vars$tree_id
+  # brms keeps the tree column only when a formula names it; otherwise the
+  # one-hot tree indicators are the record of each row's tree
+  if (!is.null(tree_id) && !tree_id %in% colnames(data)) {
+    idx_vars <- model$other_vars$indicators$tree
+    data[[tree_id]] <- names(idx_vars)[
+      max.col(as.matrix(data[unname(idx_vars)]), ties.method = "first")
+    ]
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), tree_id)
+  }
+  # check_data() refuses generated indicator columns it finds in the data, and
+  # rebuilds them from the tree column
+  data[unname(c(model$other_vars$indicators$tree, model$other_vars$indicators$possible))] <- NULL
   NextMethod("revert_check_data")
 }
 
@@ -371,6 +420,15 @@ revert_check_data.sdt_cdp <- function(model, data) {
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
+}
+
+# Rows brms filled in itself are left out, as brms::update.brmsfit() leaves them
+# out: a flat default for the class of an intercept-only parameter would
+# otherwise override bmm's prior on the predictors a new formula adds. A row of
+# unknown source (NA, or no `source` column) cannot be told from a default and
+# is left out too, as brms does; an NA in a logical index yields an all-NA row
+carried_prior <- function(prior) {
+  prior[which(prior$source != "default"), ]
 }
 
 # brms::update.brmsfit() merges the fit's stored control key by key with the one

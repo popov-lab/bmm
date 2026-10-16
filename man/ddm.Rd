@@ -50,7 +50,7 @@ Diffusion Decision Model
 \item \code{drift}: Drift rate = Average rate of evidence accumulation of the decision processes
 \item \code{bound}: Boundary separation = Distance between the decision boundaries that need to be reached
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
-\item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
+\item \code{zr}: Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, > 0.5 = biased towards the upper response).
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -92,12 +92,21 @@ Diffusion Decision Model
 }
 \section{Default behavior}{
 
-By default, \code{zr} is fixed at 0. If you want to estimate \code{zr}, add a formula
-for \code{zr} in your \code{bmf()} call.
+By default, \code{zr} is fixed at 0 on its logit link scale, that is at an
+unbiased starting point of \code{zr = 0.5}. If you want to estimate \code{zr}, add a
+formula for \code{zr} in your \code{bmf()} call. Estimates of \code{zr} are on the logit
+scale too, so use \code{plogis()} to read them as proportions.
+
+With accuracy-coded responses (1 = correct, 0 = error) the unbiased default
+is the usual assumption. With response-coded data (1 and 0 for the two
+response options, e.g. "word" and "nonword"), a bias towards one option
+moves the starting point; with \code{zr} fixed, that bias is absorbed by the
+other parameters instead. Estimate \code{zr} for response-coded data, e.g.
+\code{zr ~ 1}, and code \code{drift} so that its sign follows the stimulus.
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # Simulate data for one subject using rddm
 set.seed(123)
 n_trials <- 500
