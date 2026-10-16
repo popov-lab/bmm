@@ -9,9 +9,11 @@ native_parameters(
   newdata = NULL,
   pars = NULL,
   re_formula = NULL,
+  population_summary = c("none", "mean", "median"),
   scale = c("native", "sampling"),
   ndraws = NULL,
   draw_ids = NULL,
+  ndraws_population = 1000,
   summary = FALSE,
   prob = 0.95,
   robust = FALSE,
@@ -32,7 +34,14 @@ constant. This filters the output only; parameters transformed jointly are
 always computed together.}
 
 \item{re_formula}{Which group-level effects to include, as in
-\code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}. See Details.}
+\code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}. With \code{population_summary}, the group-level
+effects to integrate over. See Details.}
+
+\item{population_summary}{\code{"none"} (the default) returns the parameters at
+the group levels in the grid. \code{"mean"} returns, for every draw and grid
+cell, the mean and SD of the parameter across the levels of the grouping
+factors, e.g. across participants; \code{"median"} returns their median and
+quartiles. See \emph{Population summaries}.}
 
 \item{scale}{Either \code{"native"} (the default) to apply the model's inverse link
 functions, or \code{"sampling"} to return the untransformed linear predictor.}
@@ -43,6 +52,10 @@ draws are used. The same draws are used for every parameter.}
 \item{draw_ids}{Indices of the draws to use. Overrides \code{ndraws} and makes the
 result reproducible.}
 
+\item{ndraws_population}{Number of group levels simulated per posterior draw
+for the population summaries that are computed by Monte Carlo. See
+\emph{Population summaries}.}
+
 \item{summary}{Logical. If \code{FALSE} (the default), return draws. If \code{TRUE},
 return posterior summaries computed \emph{after} the transformation.}
 
@@ -52,7 +65,8 @@ return posterior summaries computed \emph{after} the transformation.}
 median absolute deviation instead of the mean and standard deviation.}
 
 \item{...}{Further arguments passed to \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}, such as
-\code{allow_new_levels} and \code{sample_new_levels}.}
+\code{allow_new_levels} and \code{sample_new_levels}. These two cannot be combined
+with \code{population_summary}.}
 }
 \value{
 If \code{summary = FALSE}, a \code{data.frame} with one row per draw, grid cell
@@ -61,6 +75,13 @@ variables, \code{parameter} and \code{value}. The draw indices refer to the draw
 \code{x}, so they can be joined with the output of \code{posterior::as_draws_df(x)}.
 If \code{summary = TRUE}, a \code{data.frame} with one row per grid cell and
 parameter, with columns \code{Estimate}, \code{Est.Error} and the interval bounds.
+
+With \code{population_summary}, both formats have a \code{statistic} column after
+\code{parameter}, and one row per statistic. The attribute \code{"population_method"}
+is a \code{data.frame} with one row per parameter and statistic: the \code{link}, the
+\code{method} (\code{"closed form"}, \code{"Gauss-Hermite"}, \code{"root search"},
+\code{"Monte Carlo"} or \code{"no group-level effects"}), \code{n} (the quadrature nodes
+or the simulated levels per draw) and the \code{groups} integrated over.
 }
 \description{
 \code{bmm} samples all parameters on their link scale (\code{log} for precision and
@@ -97,18 +118,91 @@ are taken between rows of the output rather than read off the coefficients.
 
 \section{Group-level effects}{
 \code{re_formula = NULL} (the default) returns subject-specific parameters and adds
-the grouping variables to the grid. \code{re_formula = NA} sets all group-level
-effects to zero, which under a non-identity link gives the \emph{median} subject,
-not the population mean. The population mean requires marginalising over the
-distribution of group-level effects, which is done by predicting for a new
-level:
+the grouping variables to the grid. For a group-level summary, three
+quantities are easily confused under a non-identity link:
+\enumerate{
+\item \strong{The median subject.} \code{re_formula = NA} sets all group-level effects to
+zero. Because the inverse link is monotone, this is the parameter of the
+\emph{median} subject, not the mean across subjects.
+\item \strong{The population mean.} \code{population_summary = "mean"} averages the
+parameter over the distribution of the group-level effects, separately
+for every posterior draw. Its credible interval describes the uncertainty
+about the population mean, and the \code{sd} statistic is the spread across
+subjects on the native scale.
+\item \strong{A new subject.} Predicting for a new level,
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{native_parameters(fit, newdata = transform(nd, id = "new"),
                   allow_new_levels = TRUE, sample_new_levels = "gaussian")
 }\if{html}{\out{</div>}}
 
-These three quantities differ substantially at between-subject standard
-deviations typical for working memory data.
+draws one new subject per posterior draw. Its interval mixes the
+posterior uncertainty with the variability between subjects: it predicts
+where one more subject would fall. It is \emph{not} a credible interval for
+the population mean.
+}
+
+The three differ substantially at between-subject standard deviations
+typical for working memory data. \code{population_summary = "median"} returns (1)
+together with the quartiles across subjects.
+}
+
+\section{Population summaries}{
+With \code{population_summary = "mean"} or \code{"median"}, each parameter is
+integrated, for every posterior draw and grid cell, over the distribution of
+the group-level effects that \code{re_formula} selects: all of them for \code{NULL},
+the terms it lists for a formula (with the same meaning as in
+\code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}), and none for \code{NA}, which returns the median
+subject with zero spread. Grouping variables never span the grid, and values
+given for them in \code{newdata} are ignored.
+
+\code{"mean"} returns the statistics \code{mean} and \code{sd}, \code{"median"} the statistics
+\code{median}, \code{q25} and \code{q75}. They are computed per posterior draw and
+summarised only afterwards, so \code{summary = TRUE} reports, for example, the
+posterior mean and credible interval of the population mean. Two summaries
+are therefore involved: \code{population_summary} summarises \emph{across subjects}
+within a draw, \code{robust} \emph{across draws}. A difference between two conditions
+is the difference of their population means, taken draw by draw.
+
+\strong{Computation.} A parameter is computed exactly or by quadrature when its
+\code{brms} formula is linear, its group-level terms are plain terms such as
+\code{(1 + x | id)}, \code{(1 + x || id)}, \code{(1 | id:condition)} or terms of several
+grouping factors, and its native value is the inverse link of its own linear
+predictor. Its linear predictor is then normal across subjects, with mean
+\code{eta} (the median subject) and standard deviation \verb{s = sqrt(z' Sigma z)},
+where \code{z} is the group-level design of the grid cell and \code{Sigma} the
+covariance matrix of the group-level effects in that draw, summed over
+independent terms. Then:
+\itemize{
+\item identity link: \code{eta} and \code{s};
+\item log link: \code{exp(eta + s^2 / 2)} and that value times \code{sqrt(exp(s^2) - 1)};
+\item probit link: the mean is \code{pnorm(eta / sqrt(1 + s^2))};
+\item all other links, and the SD under the probit link: Gauss-Hermite
+quadrature with 100 nodes, which for the logit and probit links is
+accurate to better than \code{1e-6} up to \code{s = 3};
+\item the median and quartiles are exact for every link: the inverse link of
+\code{eta} and of \verb{eta -/+ 0.674 * s}.
+}
+
+All other parameters are computed by Monte Carlo. These include mixture
+weights transformed through a softmax, parameters defined by non-linear
+formulas, parameters whose transformation depends on the design, and terms
+such as \code{mm()}, \code{cs()} or \code{gr(by = )}. For every draw, \code{brms} simulates
+\code{ndraws_population} new levels of each grouping factor from that draw's
+covariance matrix. The same simulated levels enter every parameter and every
+grid cell, and the parameters are transformed jointly. The Monte Carlo error
+of a population mean is about \code{sd / sqrt(ndraws_population)} within a draw,
+and it widens the posterior SD of the summary. \code{native_parameters()} warns
+when it widens by more than 2\% and names the \code{ndraws_population} needed. This
+path uses the random number generator, so set a seed before the call for
+reproducible output.
+
+\strong{Circular location parameters} (\code{tan_half} link): \code{"mean"} returns the
+circular mean direction and the circular SD \code{sqrt(-2 * log(rho))}, where
+\code{rho} is the mean resultant length, both by Gauss-Hermite quadrature with 200
+nodes. \code{"median"} returns the circular median, the direction with the
+smallest expected arc distance to the parameter, without quartiles. Once
+enough mass wraps around \code{pi} the circular median is no longer
+\code{2 * atan(eta)}.
 }
 
 \section{What is returned}{
@@ -183,6 +277,15 @@ quantile(
 
 # posterior summaries of the transformed draws
 native_parameters(fit, re_formula = NA, summary = TRUE)
+
+# with group-level effects: the mean and SD across subjects of kappa
+fit_re <- bmm(
+  bmf(c ~ 0 + set_size, kappa ~ 1 + (1 | ID)),
+  data = oberauer_lin_2017,
+  model = sdm(resp_error = "dev_rad")
+)
+native_parameters(fit_re, pars = "kappa", population_summary = "mean",
+                  summary = TRUE)
 \dontshow{\}) # examplesIf}
 }
 \seealso{

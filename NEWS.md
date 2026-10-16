@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New features
+* `native_parameters()` gained `population_summary`. With `"mean"` it returns the mean and SD of each parameter across participants, with `"median"` the median and quartiles, integrated over the group-level effects in every posterior draw. Use it to report group-level results on the native scale. `re_formula = NA` gives the median participant, and predicting for a new level gives one new participant, whose interval is not a credible interval for the population mean (#531).
+
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
 
