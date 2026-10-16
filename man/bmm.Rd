@@ -154,6 +154,7 @@ Choices and response times
 \item cswald(): Censored-Shifted Wald Model
 \item ddm(): Diffusion Decision Model
 \item ezdm(): EZ-Diffusion Model
+\item rdm(): Racing Diffusion Model
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
