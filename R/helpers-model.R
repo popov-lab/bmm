@@ -39,7 +39,7 @@
 #'     nlist(formula, data, family, prior)
 #'  }
 #'  ```
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' configure_model.mixture3p <- function(model, data, formula) {
 #'   # retrieve arguments from the data check
 #'   max_set_size <- attr(data, "max_set_size")
@@ -537,7 +537,7 @@ model_registry <- function(models = model_names()) {
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
-reference_url <- "https://popov-lab.github.io/bmm/reference/"
+reference_url <- "https://venpopov.com/bmm/reference/"
 
 format_model_list <- function(registry, style = "text", headers = TRUE) {
   blocks <- lapply(unique(registry$group), function(group) {
@@ -970,7 +970,7 @@ get_model2 <- function(model) {
 #' @keywords internal developer
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' library(usethis)
 #'
 #'
@@ -1501,15 +1501,14 @@ call_brms_extractor <- function(fun, cfg, dots) {
   brms::do_call(fun, args)
 }
 
+# update() runs postprocess_brm() again on code that may already carry a bmm
+# version, so any existing ones are replaced by the version doing the update
 add_bmm_version_to_stancode <- function(stancode) {
-  version <- packageVersion("bmm")
-  text <- paste0("and bmm ", version)
-  brms_comp <- regexpr("brms.*(?=\\n)", stancode, perl = T)
-  insert_loc <- brms_comp + attr(brms_comp, "match.length") - 1
-  new_stancode <- paste0(
-    substr(stancode, 1, insert_loc),
-    " ", text,
-    substr(stancode, insert_loc + 1, nchar(stancode))
+  new_stancode <- sub(
+    "^([^\\r\\n]*?brms[^\\r\\n]*?)(?: and bmm [^ \\r\\n]+)*(?=\\r?\\n)",
+    paste0("\\1 and bmm ", utils::packageVersion("bmm")),
+    stancode,
+    perl = TRUE
   )
   class(new_stancode) <- class(stancode)
   new_stancode
@@ -1562,9 +1561,6 @@ which_positions <- function(x, pat) {
 #' find_matching_brace(y, 8L) # -> 12
 find_matching_brace <- function(x, open_pos,
                                 open_brace = "{", close_brace = "}") {
-  stopifnot(is.character(x), length(x) == 1L)
-  n <- nchar(x)
-  stopifnot(length(open_pos) == 1L, open_pos >= 1L, open_pos <= n)
   stopif(
     substr(x, open_pos, open_pos) != open_brace,
     "Character at open_pos {open_pos} is not open_brace."
@@ -1622,7 +1618,10 @@ find_matching_brace <- function(x, open_pos,
 #'
 #' @export
 extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "transformed data", "parameters", "transformed parameters", "model", "generated quantities")) {
-  stopifnot(is.character(stan_code), length(stan_code) == 1L)
+  stopif(
+    !is.character(stan_code) || length(stan_code) != 1L,
+    "'stan_code' must be a single character string, such as the output of stancode()."
+  )
   blocks <- match.arg(blocks, several.ok = TRUE)
   out <- lapply(blocks, function(b) .extract_stan_block(stan_code, b))
   names(out) <- blocks
@@ -1632,8 +1631,6 @@ extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "tran
 .extract_stan_block <- function(stan_code, block,
                                 include_braces = FALSE,
                                 trim = TRUE) {
-  stopifnot(is.character(block), length(block) == 1L)
-
   # Anchor to start-of-line (multiline mode), allow leading spaces/tabs.
   # Match the exact block name, then optional whitespace, then '{'.
   header_pat <- paste0("(?m)^[[:space:]]*", block, "[[:space:]]*\\{")

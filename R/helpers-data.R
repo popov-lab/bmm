@@ -224,7 +224,7 @@ calc_error_relative_to_nontargets <- function(data, response, nt_features) {
 #' hist(wrapped_diff)
 #'
 wrap <- function(x, radians = TRUE) {
-  stopifnot(is.logical(radians))
+  stopif(!isTRUE(radians) && !isFALSE(radians), "Argument 'radians' must be TRUE or FALSE.")
   if (radians) {
     return(((x + pi) %% (2 * pi)) - pi)
   }

@@ -106,7 +106,7 @@ other parameters instead. Estimate \code{zr} for response-coded data, e.g.
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # Simulate data for one subject using rddm
 set.seed(123)
 n_trials <- 500

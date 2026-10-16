@@ -11,7 +11,7 @@
 #'  parameters, the model formula, the model, and the data used to fit the model.
 #'
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data from the Signal Discrimination Model
 #' dat <- data.frame(y = rsdm(2000))
 #'
