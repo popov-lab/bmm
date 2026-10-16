@@ -425,3 +425,14 @@ test_that("check_formula() leaves a formula without deprecated parameters untouc
 
   expect_silent(check_formula(model, data, bmf(kappa ~ 1, thetat ~ 1)))
 })
+
+test_that("check_formula() refuses a parameter given under both its old and its new name", {
+  model <- mixture2p(resp_error = "dev_rad")
+  model$deprecated_parameters <- list(precision = "kappa")
+  data <- data.frame(dev_rad = rnorm(10), cond = factor(rep(1:2, 5)))
+
+  expect_error(
+    check_formula(model, data, bmf(precision ~ cond, kappa ~ 1, thetat ~ 1)),
+    "both.*'precision'.*'kappa'"
+  )
+})
