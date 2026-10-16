@@ -98,6 +98,7 @@ test_that("rejection_sampling validates n and max_f", {
 })
 
 test_that("rejection_sampling errors instead of looping forever", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   # a regression here hangs; fail the test instead of timing out the CI job
   setTimeLimit(elapsed = 20, transient = TRUE)
   withr::defer(setTimeLimit(elapsed = Inf))
@@ -1078,7 +1079,7 @@ test_that("rezdm 3par returns plausible values", {
 })
 
 test_that("rezdm 4par returns plausible values", {
-  set.seed(123)
+  withr::local_seed(123)
   res <- rezdm(
     n = 500, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3,
     zr = 0.5, version = "4par"
@@ -1337,7 +1338,7 @@ test_that("dezdm 4par leaves out the RT terms of a boundary without summaries (#
 
 test_that("generated data from rezdm has reasonable density under dezdm", {
   # generate data from known parameters
-  set.seed(123)
+  withr::local_seed(123)
   params <- list(drift = 2, bound = 1.5, ndt = 0.3, s = 1)
   sim_data <- rezdm(n = 1, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 
@@ -1384,7 +1385,7 @@ test_that("dezdm 3par is vectorized over observations", {
 
 test_that("dezdm 3par recycles parameters correctly", {
   # generate test data
-  set.seed(42)
+  withr::local_seed(42)
   sim_data <- rezdm(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 
   # vectorized call with scalar parameters
@@ -1415,7 +1416,7 @@ test_that("dezdm 3par recycles parameters correctly", {
 
 test_that("dezdm 4par works with matrix inputs", {
   # generate test data
-  set.seed(42)
+  withr::local_seed(42)
   sim_data <- rezdm(
     n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3,
     zr = 0.55, version = "4par"

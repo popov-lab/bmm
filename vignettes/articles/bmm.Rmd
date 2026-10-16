@@ -117,7 +117,7 @@ was built from.
 
 Participants reproduce a continuous feature, such as a color or an
 orientation, and the response error on the circle is the dependent variable.
-The [continuous reproduction article](https://popov-lab.github.io/bmm/articles/bmm_vwm_crt.html)
+The [continuous reproduction article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html)
 describes the task and compares the models.
 
 ```{r, echo = FALSE}
@@ -128,7 +128,7 @@ knitr::kable(bmm:::model_overview(group = "Continuous reproduction"))
 
 Participants pick one response from a set of categories, for example the
 correct item, an item from another list position, or an item that was not
-studied. The [M3 article](https://popov-lab.github.io/bmm/articles/bmm_m3.html)
+studied. The [M3 article](https://venpopov.com/bmm/articles/bmm_m3.html)
 shows how to set up the response categories and the activation model.
 
 ```{r, echo = FALSE}
@@ -146,9 +146,9 @@ condition. `sdt_yn()` also accepts one row per trial, as the first fit below
 shows; the rating, ranking and Remember/Know models need one count column per
 response category, which `aggregate_sdt_cdp_data()` builds for `sdt_cdp()`
 from trial-level data whose confidence runs on one old/new scale. The
-[signal detection article](https://popov-lab.github.io/bmm/articles/bmm_sdt.html)
+[signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
 walks through the yes/no, rating, m-AFC and ranking models, and the
-[dual-process and meta-d′ article](https://popov-lab.github.io/bmm/articles/bmm_sdt_dualprocess_metad.html)
+[dual-process and meta-d′ article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html)
 through the `dpsdt` and `metad` versions of `sdt_rating()` and through
 `sdt_cdp()`.
 
@@ -201,13 +201,13 @@ knitr::kable(do.call(rbind, rows))
 ## Choices and response times
 
 Participants choose between two options and the response time is recorded on
-every trial. The [DDM article](https://popov-lab.github.io/bmm/articles/bmm_ddm.html)
-and the [censored shifted Wald article](https://popov-lab.github.io/bmm/articles/bmm_cswald.html)
-cover trial-level data. The [EZ-diffusion article](https://popov-lab.github.io/bmm/articles/bmm_ezdm.html)
+every trial. The [DDM article](https://venpopov.com/bmm/articles/bmm_ddm.html)
+and the [censored shifted Wald article](https://venpopov.com/bmm/articles/bmm_cswald.html)
+cover trial-level data. The [EZ-diffusion article](https://venpopov.com/bmm/articles/bmm_ezdm.html)
 covers the case where you only have the mean and variance of the response
 times and the accuracy per condition. Fast guesses and other contaminant
 responses are the topic of the
-[response time contamination article](https://popov-lab.github.io/bmm/articles/bmm_rt_contamination.html).
+[response time contamination article](https://venpopov.com/bmm/articles/bmm_rt_contamination.html).
 
 ```{r, echo = FALSE}
 knitr::kable(bmm:::model_overview(group = "Choices and response times"))
@@ -220,7 +220,7 @@ processes that lead to each response as a multinomial processing tree, for
 example the two-high-threshold model of recognition or the pair-clustering
 model of free recall. You write each tree's branch probabilities as
 expressions, and `mpt()` fits them to response counts. The
-[MPT article](https://popov-lab.github.io/bmm/articles/bmm_mpt.html) covers
+[MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html) covers
 specifying trees, importing model files from MPTinR and TreeBUGS, and
 constraining parameters.
 
@@ -321,7 +321,7 @@ formula <- bmf(
 syntax of `lme4` and `brms`. `0 + condition` drops the intercept, so each
 coefficient is the criterion of one condition rather than a difference from a
 reference condition. The
-[bmmformula article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
+[bmmformula article](https://venpopov.com/bmm/articles/bmm_bmmformula.html)
 explains the syntax in full, including how to fix a parameter to a constant.
 
 ## The fit
@@ -391,15 +391,15 @@ pp_check(fit, ndraws = 50)
 
 # Where to go next
 
-- If you know `brms`, [From brms to bmm](https://popov-lab.github.io/bmm/articles/bmm_brms_to_bmm.html)
+- If you know `brms`, [From brms to bmm](https://venpopov.com/bmm/articles/bmm_brms_to_bmm.html)
   fits one model in both packages and explains each difference in the code.
-- The [bmmformula article](https://popov-lab.github.io/bmm/articles/bmm_bmmformula.html)
+- The [bmmformula article](https://venpopov.com/bmm/articles/bmm_bmmformula.html)
   covers the formula syntax: fixed parameters, non-linear predictors, and how
   parameters on a link scale are read.
 - The task sections above link to one article per model family, each with a
   worked example on package data.
 - `?bmm` documents the fitting function, and
-  [Extracting model information](https://popov-lab.github.io/bmm/articles/bmm_extract_info.html)
+  [Extracting model information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows how to get the default priors, the Stan code and the Stan data of a
   model before you fit it.
 - If a model you need is missing, or something does not work as this page
