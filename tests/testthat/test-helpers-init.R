@@ -1,7 +1,9 @@
+skip_on_cran() # cross-model contract file, skipped on CRAN as a whole (ADR 0004, R10)
+
 test_that("create_initfun returns function for sdm", {
   # prepare info for tests
   ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
 
@@ -43,7 +45,7 @@ expect_re_inits <- function(inits, correlated = TRUE) {
 }
 
 test_that("create_initfun returns a function with random-effects inits for mixture2p", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   model <- mixture2p(resp_error = "dev_rad")
   init_fun <- configured_initfun(model, bmf(thetat ~ 1, kappa ~ 1), dat)
   expect_true(is.function(init_fun))
@@ -100,7 +102,7 @@ test_that("m3 with a softmax choice rule gets random-effects inits", {
 
 test_that("initfun generates valid numeric initial values", {
   ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
 
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
@@ -119,7 +121,7 @@ test_that("initfun generates valid numeric initial values", {
 
 test_that("initfun generates correct intercept values for sdm", {
   ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
 
@@ -141,7 +143,7 @@ test_that("initfun generates correct intercept values for sdm", {
 # =============================================================================
 
 test_that("initfun handles single predictor without intercept", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
 
   ff <- bmmformula(kappa ~ 0 + condition, c ~ 1)
@@ -158,7 +160,7 @@ test_that("initfun handles single predictor without intercept", {
 })
 
 test_that("initfun handles predictor with intercept", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
 
   ff <- bmmformula(kappa ~ 1 + condition, c ~ 1)
@@ -173,7 +175,7 @@ test_that("initfun handles predictor with intercept", {
 })
 
 test_that("initfun handles multiple predictors", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$cond1 <- factor(rep(c("A", "B"), length.out = nrow(dat)))
   dat$cond2 <- factor(rep(c("X", "Y", "Z"), length.out = nrow(dat)))
 
@@ -191,7 +193,7 @@ test_that("initfun handles multiple predictors", {
 })
 
 test_that("initfun handles interaction terms", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$cond1 <- factor(rep(c("A", "B"), length.out = nrow(dat)))
   dat$cond2 <- factor(rep(c("X", "Y"), length.out = nrow(dat)))
 
@@ -209,7 +211,7 @@ test_that("initfun handles interaction terms", {
 })
 
 test_that("initfun handles interaction terms with other terms", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$cond1 <- factor(rep(c("A", "B"), length.out = nrow(dat)))
   dat$cond2 <- factor(rep(c("X", "Y"), length.out = nrow(dat)))
   dat$cond3 <- factor(rep(c("S", "T"), length.out = nrow(dat)))
@@ -232,7 +234,7 @@ test_that("initfun handles interaction terms with other terms", {
 # =============================================================================
 
 test_that("initfun generates sd parameters for random effects", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
 
   ff <- bmmformula(kappa ~ 1 + (1 | ID), c ~ 1)
   mod <- sdm(resp_error = "dev_rad")
@@ -253,7 +255,7 @@ test_that("initfun generates sd parameters for random effects", {
 })
 
 test_that("initfun generates z values for random effects", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
 
   ff <- bmmformula(kappa ~ 1 + (1 | ID), c ~ 1)
   mod <- sdm(resp_error = "dev_rad")
@@ -273,7 +275,7 @@ test_that("initfun generates z values for random effects", {
 })
 
 test_that("initfun handles correlated random effects", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$condition <- factor(rep(c("A", "B"), length.out = nrow(dat)))
 
   ff <- bmmformula(kappa ~ 1 + condition + (1 + condition | ID), c ~ 1)
@@ -294,7 +296,7 @@ test_that("initfun handles correlated random effects", {
 
 test_that("initfun applies log link correctly for kappa", {
   ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
 
@@ -308,7 +310,7 @@ test_that("initfun applies log link correctly for kappa", {
 })
 
 test_that("initfun handles NULL/missing links as identity", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   mod <- sdm(resp_error = "dev_rad")
 
   # Manually remove a link to simulate NULL case
@@ -332,7 +334,7 @@ test_that("initfun handles NULL/missing links as identity", {
 
 test_that("initfun generates different values on repeated calls", {
   ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
 
@@ -348,7 +350,7 @@ test_that("initfun generates different values on repeated calls", {
 
 test_that("initfun values are within expected ranges", {
   ff <- bmmformula(kappa ~ 1, c ~ 1)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   mod <- sdm(resp_error = "dev_rad")
   config_args <- configure_model(mod, data = dat, formula = ff)
 
@@ -372,7 +374,7 @@ test_that("initfun values are within expected ranges", {
 # =============================================================================
 
 test_that("initfun handles single random effect group correctly", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
 
   # Use a formula that results in single sd parameter per group
   ff <- bmmformula(kappa ~ 1 + (1 | ID), c ~ 1)
@@ -391,7 +393,7 @@ test_that("initfun handles single random effect group correctly", {
 })
 
 test_that("initfun handles numeric predictors", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$continuous_pred <- rnorm(nrow(dat))
 
   ff <- bmmformula(kappa ~ 1 + continuous_pred, c ~ 1)
@@ -411,7 +413,7 @@ test_that("initfun handles numeric predictors", {
 
 test_that("initfun output matches standata dimensions", {
   # Use a model with predictors to ensure b_ parameters exist
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   
   ff <- bmmformula(kappa ~ 1 + set_size, c ~ 1)
   mod <- sdm(resp_error = "dev_rad")
@@ -453,7 +455,7 @@ test_that("initfun output matches standata dimensions", {
 
 test_that("initfun output matches standata dimensions for no-intercept models", {
   # Use a model without intercept to test K_ dimension matching
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   
   ff <- bmmformula(kappa ~ 0 + set_size, c ~ 1)
   mod <- sdm(resp_error = "dev_rad")
@@ -518,7 +520,7 @@ test_that("create_initfun handles a softplus link override on a positive paramet
 # =============================================================================
 
 test_that("imm and mixture3p get random-effects inits", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   imm_model <- imm(
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
@@ -540,7 +542,7 @@ test_that("imm and mixture3p get random-effects inits", {
 })
 
 test_that("the init list names every parameter of the Stan model and nothing else", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   cases <- list(
     list(
       model = mixture2p("dev_rad"),
@@ -577,7 +579,7 @@ test_that("the init list names every parameter of the Stan model and nothing els
 })
 
 test_that("uncorrelated random effects get z inits and no correlation matrix", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   model <- mixture2p("dev_rad")
   formula <- bmf(kappa ~ 0 + set_size + (0 + set_size || ID), thetat ~ 1)
   inits <- configured_initfun(model, formula, dat)()
@@ -587,7 +589,7 @@ test_that("uncorrelated random effects get z inits and no correlation matrix", {
 })
 
 test_that("a user init replaces the package init", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   model <- mixture2p("dev_rad")
   formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1)
   fit <- bmm(formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE)
@@ -606,7 +608,7 @@ central_range <- function(location, scale, inverse) {
 }
 
 test_that("mixture2p starts inside the central 50% of its default priors", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   model <- mixture2p("dev_rad")
   ranges <- model$init_ranges
   expect_equal(ranges$kappa, central_range(2, 1, exp))
@@ -631,7 +633,7 @@ test_that("mixture3p softmax weights start inside their range on the sampling sc
   expect_equal(model$init_ranges$thetat, c(-1.1, 1.1))
   expect_equal(model$init_ranges$thetant, c(-1.1, 1.1))
   formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
-  init_fun <- configured_initfun(model, formula, oberauer_lin_2017)
+  init_fun <- configured_initfun(model, formula, small_data())
   for (i in 1:20) {
     inits <- init_fun()
     expect_true(abs(inits$b_thetat[1]) <= 1.1)
@@ -838,7 +840,7 @@ expect_stan_shapes <- function(model, formula, data) {
 }
 
 test_that("every init has the shape its Stan declaration asks for", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$grp <- factor(as.integer(dat$ID) %% 2)
   mix3p <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
   # size-1 coefficient vectors, which rstan cannot read from a bare number
@@ -855,10 +857,21 @@ test_that("every init has the shape its Stan declaration asks for", {
   ), dat)
 })
 
+# one test per case: each builds the Stan code and data, and together they
+# would take most of the per-test time budget
+for (name in names(model_test_cases("init"))) {
+  test_that(paste0("the init function of ", name, " gives each Stan parameter its declared shape"), {
+    withr::local_options(bmm.silent = 2)
+    case <- model_test_cases("init")[[name]]
+    # the toy RT data have a 50% error rate, which cswald "simple" warns about
+    suppressWarnings(expect_stan_shapes(case$model, case$formula, case$data))
+  })
+}
+
 test_that("mo() and s() terms get a complete init list", {
   # their parameters are sized by an element of a data array, which the parser
   # used to split at the inner bracket; cmdstanr then reported a partial list
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$x <- as.numeric(as.character(dat$set_size))
   dat$xo <- factor(pmin(dat$x, 4), ordered = TRUE)
   expect_stan_shapes(sdm("dev_rad"), bmf(c ~ 1 + mo(xo), kappa ~ 1), dat)
@@ -866,7 +879,7 @@ test_that("mo() and s() terms get a complete init list", {
 })
 
 test_that("the first term of a no-intercept formula starts in range whatever its form", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$ss_num <- as.numeric(as.character(dat$set_size))
   model <- mixture2p("dev_rad")
   log_range <- log(model$init_ranges$kappa)
@@ -941,7 +954,7 @@ test_that("range_coefficients() puts the linear predictor at the target on every
 
 test_that("the coefficients of the main dpar start from its range", {
   withr::local_seed(20260922)
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   model <- sdm("dev_rad")
   upper <- tan(model$init_ranges$mu[2] / 2)
   cells <- configured_initfun(model, bmf(mu ~ 0 + set_size, c ~ 1, kappa ~ 1), dat)()
@@ -954,7 +967,7 @@ test_that("the coefficients of the main dpar start from its range", {
 })
 
 test_that("a declaration whose size the parser cannot resolve is left to the sampler", {
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$x <- as.numeric(as.character(dat$set_size))
   init_fun <- configured_initfun(mixture2p("dev_rad"), bmf(kappa ~ 1 + s(x, k = 4), thetat ~ 1), dat)
   expect_no_error(init_fun())
@@ -963,7 +976,7 @@ test_that("a declaration whose size the parser cannot resolve is left to the sam
 test_that("a 0 + Intercept formula gets finite initial values", {
   # brms's X_<par> carries no assign attribute for this term, and the intercept
   # is not centred, so only its own column starts in range
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   dat$x <- as.numeric(as.character(dat$set_size))
   model <- mixture2p("dev_rad")
   b <- configured_initfun(model, bmf(kappa ~ 0 + Intercept + x, thetat ~ 1), dat)()$b_kappa
@@ -976,7 +989,7 @@ test_that("a 0 + Intercept formula gets finite initial values", {
 test_that("a constant intercept leaves every coefficient of a centred parameter an effect", {
   # Stan has no Intercept_c, but X_c still holds the intercept column and b_c
   # has one entry fewer: none of them may take the intercept's range
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   prior <- brms::set_prior("constant(1)", class = "Intercept", dpar = "c")
   fit <- bmm(bmf(c ~ 1 + set_size, kappa ~ 1), dat, sdm("dev_rad"),
     prior = prior, backend = "mock", mock_fit = 1, rename = FALSE
@@ -1051,4 +1064,33 @@ test_that("a softmax range stays on the sampling scale and a single point is not
   expect_true(init >= -2 && init <= -1)
   # log(0) is -Inf: the one point log cannot represent leaves nothing to draw from
   expect_null(representable_range(c(-1, 0), "log"))
+})
+
+test_that("an init function carries nothing from the frame that built it", {
+  dat <- small_data()
+  model <- sdm(resp_error = "dev_rad")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  # brms stores the init function in the fit, and bmm()'s frame holds the data
+  # and the fit itself, which saveRDS() would then write into the file again
+  init_beside <- function(n) {
+    ballast <- runif(n)
+    configure_fit(formula, dat, model)$config_args$init
+  }
+  # each function is sized on its own, so that the other one's ballast is not counted
+  serialized_size <- function(n) length(serialize(init_beside(n), NULL))
+  expect_equal(serialized_size(1e6), serialized_size(1))
+  inits <- init_beside(1e6)()
+  expect_type(inits, "list")
+  expect_named(inits)
+})
+
+test_that("an init function carries no data column the model does not use", {
+  model <- sdm(resp_error = "dev_rad")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  serialized_size <- function(dat) {
+    length(serialize(configure_fit(formula, dat, model)$config_args$init, NULL))
+  }
+  # check_data() keeps the 18 columns this model does not read, and a copy of
+  # the data in the closure would make every saved fit grow with them
+  expect_equal(serialized_size(oberauer_lin_2017), serialized_size(oberauer_lin_2017["dev_rad"]))
 })

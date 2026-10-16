@@ -181,6 +181,13 @@ test_that("the default backend is the brms.backend option", {
 
 test_that("the Backend detail names why each backend was chosen", {
   local_machine(smoke = smoke_must_not_run)
+  # the default choice reads the real library, not the mocked probes; CRAN
+  # and win-builder check without cmdstanr
+  default_detail <- if (requireNamespace("cmdstanr", quietly = TRUE)) {
+    "bmm() will use cmdstanr (the cmdstanr package is installed)"
+  } else {
+    "bmm() will use rstan (the brms default)"
+  }
 
   withr::with_options(list(brms.backend = "rstan"), {
     option_only <- bmm_setup(smoke_test = FALSE)
@@ -193,18 +200,12 @@ test_that("the Backend detail names why each backend was chosen", {
     expect_equal(row_of(option_and_explicit, "Backend")$detail, "cmdstanr (requested)")
 
     option_and_null <- bmm_setup(smoke_test = FALSE, backend = NULL)
-    expect_equal(
-      row_of(option_and_null, "Backend")$detail,
-      "bmm() will use cmdstanr (the cmdstanr package is installed)"
-    )
+    expect_equal(row_of(option_and_null, "Backend")$detail, default_detail)
   })
 
   withr::local_options(brms.backend = NULL)
   neither <- bmm_setup(smoke_test = FALSE)
-  expect_equal(
-    row_of(neither, "Backend")$detail,
-    "bmm() will use cmdstanr (the cmdstanr package is installed)"
-  )
+  expect_equal(row_of(neither, "Backend")$detail, default_detail)
 })
 
 test_that("probe_package() reports a package that is not installed", {
@@ -439,9 +440,8 @@ test_that("probe_smoke_test() restores PKG_CPPFLAGS, PKG_LIBS and USE_CXX17 a us
 })
 
 test_that("a real machine check without a smoke test finds no failure", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   report <- bmm_setup(smoke_test = FALSE, backend = "cmdstanr")
   expect_false(
@@ -451,9 +451,8 @@ test_that("a real machine check without a smoke test finds no failure", {
 })
 
 test_that("a real smoke test compiles and samples", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
   expect_equal(

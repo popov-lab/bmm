@@ -18,11 +18,24 @@ inst/doc
 # pkgdown site
 /docs/
 
+# Article fits hosted on the article-fits release (ADR 0003)
+/vignettes/articles/fits/
+
 # Local / private directories
 .claude/
-local/
+LOCAL-AGENTS.md
+# the scratch folder at the root only; tests/local is tracked (ADR 0004)
+/local/
 bmm-dev
 
 # Internal test artifacts
 /tests/internal/cmdstanr_output/
 /tests/internal/*cache*
+
+# per-test timings written by .github/scripts/test-budget.R and cran-budget.R
+test-timings.csv
+cran-test-timings.csv
+
+# what testthat 3.3 writes for each failing test
+/tests/testthat/_problems/
+/tests/testthat/testthat-problems.rds
