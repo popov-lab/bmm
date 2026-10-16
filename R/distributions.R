@@ -307,28 +307,38 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
-#' @param kappa Vector of precision values. With `tau > 0` this is the mean
-#'   precision rather than the precision itself.
-#' @param p_mem Vector of probabilities for memory recall. Used by the
-#'   `"simple"` version; the other versions derive it from `K` and `set_size`.
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
+#' @param p_mem Vector of probabilities for memory recall, i.e. `thetat` of
+#'   [mixture2p()] on its native scale. Used by the `"simple"` version; the
+#'   other versions derive it from `K` and `set_size`, and warn if `p_mem` is
+#'   given.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision.
 #' @param K Vector of memory capacities. Used by the `"slot"` and
-#'   `"slot_averaging"` versions and ignored by `"simple"`.
-#' @param set_size Vector of set sizes. Used by the `"slot"` and
-#'   `"slot_averaging"` versions and ignored by `"simple"`.
+#'   `"slot_averaging"` versions; `"simple"` ignores it and warns if it is
+#'   given.
+#' @param set_size Vector of set sizes. Required by the `"slot"` and
+#'   `"slot_averaging"` versions, which stop without it; `"simple"` ignores it
+#'   and warns if it is given.
 #' @param version A character string selecting the storage model: `"simple"`,
 #'   `"slot"` or `"slot_averaging"`. See [mixture2p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
-#'   odd number of at least 41. See [mixture2p()].
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the fifth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
 #' @references Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
-#'   representations in visual working memory. Nature, 453.
+#'   representations in visual working memory. Nature, 453(7192), 233-235.
 #'
 #'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 #'   Variability in encoding precision accounts for visual short-term memory
@@ -351,14 +361,22 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' lines(x, d, type = "l", col = "red")
 #'
 dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
-                       set_size = 1, version = "simple", vp_nodes = 81L,
+                       set_size = NULL, version = "simple", vp_nodes = 81L,
                        log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dmixture2p", "x, mu, kappa, p_mem", tau)
+    log <- tau
+    tau <- 0
+  }
   version <- match.arg(version, names(.mixture2p_version_table))
   .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
   stopif(
     vp_nodes < 41 || vp_nodes %% 2 == 0,
     "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
   )
+  .check_mixture2p_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
 
   density <- switch(version,
     simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
@@ -385,6 +403,33 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   stopif(
     isTRUE(any(set_size < 1 | set_size %% 1 != 0)),
     "set_size must contain positive whole numbers."
+  )
+}
+
+# set_size has no default: at a set size of 1 every capacity version remembers
+# everything, whatever K is, so a forgotten set size would go unnoticed
+.check_mixture2p_version_args <- function(version, set_size, supplied) {
+  needs_set_size <- .mixture2p_version_table[[version]]$needs_set_size
+  stopif(
+    needs_set_size && is.null(set_size),
+    "The '{version}' version of mixture2p predicts the probability of a memory \\
+    response from the set size, so the set_size argument is required."
+  )
+  unused <- if (needs_set_size) "p_mem" else c("K", "set_size")
+  ignored <- intersect(unused, names(supplied)[supplied])
+  warnif(
+    length(ignored) > 0,
+    "The '{version}' version of mixture2p ignores {collapse_comma(ignored)}."
+  )
+}
+
+# 1.4 took log where tau now is, so a logical there is a 1.4 call; the form
+# stays readable until 1.6.0
+.warn_positional_log <- function(fun, before, log) {
+  warning2(
+    "`{fun}({before}, {log})` is deprecated since bmm 1.5.0 and will be \\
+    removed in bmm 1.6.0 at the earliest. Use `{fun}({before}, log = {log})` \\
+    instead. That position now holds `tau`, so pass `log` by name."
   )
 }
 
@@ -453,9 +498,12 @@ qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
 #' @rdname mixture2p_dist
 #' @export
 rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
-                       set_size = 1, version = "simple") {
+                       set_size = NULL, version = "simple") {
   version <- match.arg(version, names(.mixture2p_version_table))
   .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
+  .check_mixture2p_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
 
   recycle <- function(x) rep_len(x, n)
   switch(version,
@@ -476,8 +524,8 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'
 #' @description Density, distribution, and random generation functions for the
 #'   three-parameter mixture model with the location of `mu`, precision of
-#'   memory representations `kappa`, probability of recalling items from memory
-#'   `p_mem`, and probability of recalling non-targets `p_nt`.
+#'   memory representations `kappa`, probability of a target response `p_mem`,
+#'   and probability of a non-target response `p_nt`.
 #'
 #' @name mixture3p_dist
 #'
@@ -488,28 +536,47 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param mu Vector of locations. First value represents the location of the
 #'   target item and any additional values indicate the location of non-target
 #'   items.
-#' @param kappa Vector of precision values
-#' @param p_mem Vector of probabilities for memory recall
-#' @param p_nt Vector of probabilities for swap errors
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
+#' @param p_mem Vector of probabilities of a target response. For a
+#'   [mixture3p()] fit these are `thetat` on its native scale (version
+#'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
+#'   (versions `"slot"` and `"slot_averaging"`).
+#' @param p_nt Vector of probabilities of a non-target response, summed over
+#'   the non-targets, which share it equally. For a [mixture3p()] fit these are
+#'   `thetant` on its native scale (version `"simple"`) or
+#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions). Unlike
+#'   `ptarget`, `p_mem` and `p_nt` are not conditional on a response from
+#'   memory.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision. See [mixture3p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
-#'   odd number of at least 41. See [mixture2p()].
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the sixth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
 #' @references Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
 #'   precision of visual working memory is set by allocation of a shared
-#'   resource. Journal of Vision, 9(10), 7.
+#'   resource. Journal of Vision, 9(10), Article 7.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
 #'   `pmixture3p` gives the cumulative distribution function of the
-#'   two-parameter mixture model, `qmixture3p` gives the quantile function of
-#'   the two-parameter mixture model, and `rmixture3p` gives the random
-#'   generation function for the two-parameter mixture model.
+#'   three-parameter mixture model, `qmixture3p` gives the quantile function of
+#'   the three-parameter mixture model, and `rmixture3p` gives the random
+#'   generation function for the three-parameter mixture model.
 #'
 #' @export
 #'
@@ -523,6 +590,11 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'
 dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
                        tau = 0, vp_nodes = 81L, log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dmixture3p", "x, mu, kappa, p_mem, p_nt", tau)
+    log <- tau
+    tau <- 0
+  }
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
   stopif(
     vp_nodes < 41 || vp_nodes %% 2 == 0,
@@ -576,24 +648,24 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   list(logw = logw - total, logw_guess = -total)
 }
 
-# which stored item is reported: the target with 1 - p_nt and each non-target
-# with an equal share of p_nt; at set size 1 there is nothing to swap to
-.mixture3p_swap_weights <- function(p_nt, set_size) {
-  n <- length(p_nt)
+# which stored item is reported: the target with p_target and each non-target
+# with an equal share of 1 - p_target; at set size 1 there is nothing to swap to
+.mixture3p_swap_weights <- function(p_target, set_size) {
+  n <- length(p_target)
   if (set_size == 1) {
     return(matrix(0, nrow = n))
   }
   cbind(
-    log1p(-p_nt),
-    matrix(log(p_nt) - log(set_size - 1), nrow = n, ncol = set_size - 1)
+    log(p_target),
+    matrix(log1p(-p_target) - log(set_size - 1), nrow = n, ncol = set_size - 1)
   )
 }
 
 # the capacity versions separate storage from swapping: p_mem says how often a
-# response comes from memory and p_nt which stored item is reported
-.mixture3p_nested_weights <- function(p_mem, p_nt, set_size) {
+# response comes from memory and p_target how often that memory is the target
+.mixture3p_nested_weights <- function(p_mem, p_target, set_size) {
   list(
-    logw = log(p_mem) + .mixture3p_swap_weights(p_nt, set_size),
+    logw = log(p_mem) + .mixture3p_swap_weights(p_target, set_size),
     logw_guess = log1p(-p_mem)
   )
 }
@@ -614,12 +686,12 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
-.dmixture3p_slot <- function(x, mu, kappa, K, p_nt, set_size, nt, tau, nodes) {
+.dmixture3p_slot <- function(x, mu, kappa, K, p_target, set_size, nt, tau, nodes) {
   args <- .circmix_recycle(
-    x = x, mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau
+    x = x, mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau
   )
   weights <- .mixture3p_nested_weights(
-    pmin(1, args$K / set_size), args$p_nt, set_size
+    pmin(1, args$K / set_size), args$p_target, set_size
   )
   .circmix_vp_ld(
     .circmix_cos(args$x, args$mu, nt, set_size),
@@ -629,13 +701,13 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 
 # Which item is reported and how many slots it holds are independent, so the
 # swap weights serve both slot counts and only the concentration differs.
-.dmixture3p_slot_averaging <- function(x, mu, kappa, K, p_nt, set_size, nt, tau, nodes) {
+.dmixture3p_slot_averaging <- function(x, mu, kappa, K, p_target, set_size, nt, tau, nodes) {
   args <- .circmix_recycle(
-    x = x, mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau
+    x = x, mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau
   )
   .circmix_slot_averaging_ld(
     .circmix_cos(args$x, args$mu, nt, set_size),
-    .mixture3p_swap_weights(args$p_nt, set_size),
+    .mixture3p_swap_weights(args$p_target, set_size),
     args$K, set_size, args$kappa, args$tau, nodes
   )
 }
@@ -658,11 +730,11 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
-.rmixture3p_slot_averaging <- function(mu, nt, set_size, kappa, K, p_nt, tau) {
-  args <- .circmix_recycle(mu = mu, kappa = kappa, K = K, p_nt = p_nt, tau = tau)
+.rmixture3p_slot_averaging <- function(mu, nt, set_size, kappa, K, p_target, tau) {
+  args <- .circmix_recycle(mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau)
   .rcircmix_slot_averaging(
     .mixture3p_locations(args$mu, nt, set_size),
-    .mixture3p_swap_weights(args$p_nt, set_size),
+    .mixture3p_swap_weights(args$p_target, set_size),
     args$K, set_size, args$kappa, args$tau
   )
 }
@@ -709,7 +781,9 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
 #' @param dist Vector of distances of the item locations to the cued location
-#' @param kappa Vector of precision values
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
 #' @param c Vector of strengths for cue-dependent activation
 #' @param a Vector of strengths for cue-independent activation
 #' @param s Vector of generalization gradients
@@ -719,14 +793,23 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision. See [imm()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
-#'   odd number of at least 41. See [mixture2p()].
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the ninth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
 #' @references Oberauer, K., Stoneking, C., Wabersich, D., & Lin, H.-Y. (2017).
 #'   Hierarchical Bayesian measurement models for continuous reproduction of
 #'   visual features from working memory. Journal of Vision, 17(5), 11.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dimm` gives the density of the interference measurement model,
 #'   `pimm` gives the cumulative distribution function of the interference
@@ -753,6 +836,11 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                  c = 5, a = 2, b = 1, s = 2, kappa = 5, tau = 0,
                  vp_nodes = 81L, log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dimm", "x, mu, dist, c, a, b, s, kappa", tau)
+    log <- tau
+    tau <- 0
+  }
   .check_imm_args(kappa, s, dist, tau, length(mu))
 
   n <- length(x)

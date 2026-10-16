@@ -162,8 +162,9 @@
   stopif(
     any(shape[vp] < 60 / nodes),
     "The variable-precision quadrature needs a gamma shape J(kappa)/tau of at \\
-    least 60 / vp_nodes = {60 / nodes}, but the smallest value here is \\
-    {min(shape[vp])}. Raise vp_nodes."
+    least 60 / vp_nodes = {signif(60 / nodes, 3)}, but the smallest value here is \\
+    {signif(min(shape[vp]), 3)}. Raise vp_nodes to at least \\
+    {2 * ceiling((60 / min(shape[vp]) - 1) / 2) + 1}."
   )
 
   log_integral <- vapply(seq_len(ncol(cosd)), function(k) {
@@ -377,6 +378,14 @@
     gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision \\
     and larger values spread precision more widely across trials."
   )), after = after_kappa)
+  spec$parameters$kappa <- paste(
+    sub("\\.?$", ".", spec$parameters$kappa),
+    glue(
+      "With variable precision, kappa describes the average trial: it is the \\
+      concentration whose Fisher information J(kappa) is the mean of J across \\
+      trials."
+    )
+  )
   spec$links <- append(spec$links, list(tau = "log"),
     after = which(names(spec$links) == "kappa")
   )

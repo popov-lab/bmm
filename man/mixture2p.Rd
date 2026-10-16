@@ -49,8 +49,9 @@ Fisher information.
 from trial to trial rather than being constant (van den Berg et al., 2012;
 Fougnie et al., 2012). This adds the parameter \code{tau}, and the likelihood
 integrates the Fisher information \code{J} of a memory representation over
-\code{gamma(mean = J(kappa), scale = tau)}. \code{kappa} keeps its meaning as the
-mean precision, so \code{tau -> 0} recovers the constant-precision model.
+\code{gamma(mean = J(kappa), scale = tau)}. \code{kappa} then describes the average
+trial: it is the concentration whose Fisher information \code{J(kappa)} is the
+mean of \code{J}, and \code{tau -> 0} recovers the constant-precision model.
 Under \code{version = "slot_averaging"}, the precision of an item held in \code{j}
 slots is the sum of \code{j} independent slot draws,
 \code{gamma(shape = j * J(kappa) / tau, scale = tau)}, so its variance grows
@@ -88,16 +89,15 @@ Two-parameter mixture model by Zhang and Luck (2008).
 \item \strong{Citation:}
 \itemize{
 \item Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in visual working memory. Nature, 453(7192), 233-235. https://doi.org/10.1038/nature06860
+\item van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012). Variability in encoding precision accounts for visual short-term memory limitations. Proceedings of the National Academy of Sciences, 109(22), 8780-8785. https://doi.org/10.1073/pnas.1117465109
 }
-\item \strong{Version:} simple
 \item \strong{Requirements:}
 \itemize{
-\item The response variable should be in radians and represent the         angular error relative to the target
+\item The response variable should be in radians and represent the angular error relative to the target
+\item The 'slot' and 'slot_averaging' versions additionally require a set_size variable, which should vary for the capacity rule to be testable
 }
 }
-\itemize{
-\item The 'slot' and 'slot_averaging' versions additionally require a         set_size variable, which should vary for the capacity rule to be testable
-}
+\subsection{Version: \code{simple}}{
 \itemize{
 \item \strong{Parameters:}
 \itemize{
@@ -136,6 +136,133 @@ Two-parameter mixture model by Zhang and Luck (2008).
 }
 }
 }
+
+\subsection{Version: \code{slot}}{
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{K}: Capacity: the number of items that can be held in memory. An item is either held at full precision or not held at all, so the probability of a memory response is min(1, K / set_size).
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{mu} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; K = log
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
+}
+\item \code{K}:
+\itemize{
+\item \code{main}: normal(1, 0.5)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+}
+}
+}
+
+\subsection{Version: \code{slot_averaging}}{
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution for an item held in a single slot. An item holding several slots is more precise, because averaging independent samples adds their Fisher information.
+\item \code{K}: Capacity: the number of memory slots distributed over the items in the array. An item receives floor(K / set_size) or one more slot, and an item that receives none is guessed.
+}
+\item \strong{Fixed parameters:}
+\itemize{
+\item \code{mu} = 0
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; K = log
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
+}
+\item \code{K}:
+\itemize{
+\item \code{main}: normal(1, 0.5)
+\item \code{effects}: normal(0, 0.3)
+\item \code{sd}: exponential(2)
+}
+}
+}
+}
+
+\subsection{Variable precision}{
+
+With \code{variable_precision = TRUE} every version gains \code{tau}, and \code{kappa}
+becomes the precision of the average trial. Shown for \code{"simple"}:
+\itemize{
+\item \strong{Parameters:}
+\itemize{
+\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of memory responses. With variable precision, kappa describes the average trial: it is the concentration whose Fisher information J(kappa) is the mean of J across trials.
+\item \code{tau}: Scale of the trial-to-trial variability in memory precision. The Fisher information J of a memory representation is drawn from gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision and larger values spread precision more widely across trials.
+\item \code{thetat}: Mixture weight for target responses, i.e. the probability that a response comes from memory rather than from guessing.
+}
+\item \strong{Default parameter links:}
+\itemize{
+\item mu = tan_half; kappa = log; tau = log; thetat = logit
+}
+\item \strong{Default priors:}
+\itemize{
+\item \code{mu}:
+\itemize{
+\item \code{main}: normal(0, 0.5)
+\item \code{effects}: normal(0, 0.25)
+\item \code{sd}: exponential(4)
+}
+\item \code{kappa}:
+\itemize{
+\item \code{main}: normal(2, 1)
+\item \code{effects}: normal(0, 1)
+\item \code{sd}: exponential(1)
+}
+\item \code{thetat}:
+\itemize{
+\item \code{main}: logistic(0, 1)
+\item \code{effects}: normal(0, 2.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{tau}:
+\itemize{
+\item \code{main}: normal(0, 1)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(2)
+}
+}
+}
+}
+}
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
 # generate artificial data
@@ -164,5 +291,8 @@ representations in visual working memory. Nature, 453(7192), 233-235.
 van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 Variability in encoding precision accounts for visual short-term memory
 limitations. PNAS, 109(22), 8780-8785.
+
+Fougnie, D., Suchow, J. W., & Alvarez, G. A. (2012). Variability in the
+quality of visual working memory. Nature Communications, 3(1), 1229.
 }
 \keyword{bmmodel}
