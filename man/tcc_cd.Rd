@@ -116,8 +116,9 @@ This is the likelihood of \code{\link[=sdt_yn]{sdt_yn()}} with equal variance, o
 row, and the probe's similarity in place of its 0/1 stimulus code: a
 probe that matches the target is a signal trial, a probe with \code{f(x) = 0}
 a noise trial. With changes of 180 degrees only, as in Williams et al.
-(2022), \code{tcc_cd()} and \code{\link[=sdt_yn]{sdt_yn()}} fit the same model, with "same" as
-"old". Probes at intermediate distances add operating points along \code{f}.
+(2022), and a similarity of 0 at 180 degrees, \code{tcc_cd()} and \code{\link[=sdt_yn]{sdt_yn()}}
+fit the same model, with "same" as "old". Probes at intermediate distances
+add operating points along \code{f}.
 Schurgin et al. (2020) do not write this rule out; it is their
 familiarity model with the decision stage of yes/no recognition. The
 observer here knows nothing about the state of memory on a trial. For
@@ -163,6 +164,17 @@ Set size is not an argument: name its column in the formula, e.g.
 \code{bmf(d ~ 0 + set_size, criterion ~ 1)}. \code{d} is on the log scale, as in
 \code{\link[=tcc]{tcc()}}, so effects on it are multiplicative and priors on its
 coefficients are priors on \code{log(d)}.
+}
+
+\subsection{Predictions for new data}{
+
+\code{check_data()} stores the binned distance in a column \code{tcc_cd_dist}
+(0 to \code{n / 2}), and brms looks for that column in \code{newdata}. Data passed
+to \code{bmm()} get it automatically; \code{newdata} for \code{predict()},
+\code{posterior_epred()} or \code{posterior_linpred()} needs it as well, e.g.
+\code{newdata$tcc_cd_dist <- round(abs(newdata$dist) * 180 / pi)} for a
+1-degree similarity and distances in radians up to pi.
+\code{posterior_epred()} returns the probability of a "change" response.
 }
 
 \subsection{Identification}{

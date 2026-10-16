@@ -91,8 +91,9 @@
 #'   row, and the probe's similarity in place of its 0/1 stimulus code: a
 #'   probe that matches the target is a signal trial, a probe with `f(x) = 0`
 #'   a noise trial. With changes of 180 degrees only, as in Williams et al.
-#'   (2022), `tcc_cd()` and [sdt_yn()] fit the same model, with "same" as
-#'   "old". Probes at intermediate distances add operating points along `f`.
+#'   (2022), and a similarity of 0 at 180 degrees, `tcc_cd()` and [sdt_yn()]
+#'   fit the same model, with "same" as "old". Probes at intermediate distances
+#'   add operating points along `f`.
 #'   Schurgin et al. (2020) do not write this rule out; it is their
 #'   familiarity model with the decision stage of yes/no recognition. The
 #'   observer here knows nothing about the state of memory on a trial. For
@@ -136,6 +137,16 @@
 #'   `bmf(d ~ 0 + set_size, criterion ~ 1)`. `d` is on the log scale, as in
 #'   [tcc()], so effects on it are multiplicative and priors on its
 #'   coefficients are priors on `log(d)`.
+#'
+#' ## Predictions for new data
+#'
+#'   `check_data()` stores the binned distance in a column `tcc_cd_dist`
+#'   (0 to `n / 2`), and brms looks for that column in `newdata`. Data passed
+#'   to `bmm()` get it automatically; `newdata` for `predict()`,
+#'   `posterior_epred()` or `posterior_linpred()` needs it as well, e.g.
+#'   `newdata$tcc_cd_dist <- round(abs(newdata$dist) * 180 / pi)` for a
+#'   1-degree similarity and distances in radians up to pi.
+#'   `posterior_epred()` returns the probability of a "change" response.
 #'
 #' ## Identification
 #'
@@ -294,6 +305,7 @@ configure_model.tcc_cd <- function(model, data, formula) {
   out <- .sdt_log_p_old(eta, "normal")
   is_change <- which(rep_len(change, n) == 1)
   out[is_change] <- .sdt_log_p_new(eta[is_change], "normal")
+  out[is.na(rep_len(change, n))] <- NA
   out
 }
 

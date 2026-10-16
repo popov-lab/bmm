@@ -718,6 +718,13 @@ test_that("an unbiased observer is bias fixed at 0", {
 # its own; the sdt_yn programs are those of 566-tcc at bc06ef10, before
 # tcc_cd() was added: md5 of the stancode without its brms version line, taken
 # under brms 2.23.0 (other brms versions generate other code)
+test_that("the sdt_yn Stan programs carry none of the tcc_cd kernel", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  code <- bmm::stancode(bmf(d ~ 1, bias ~ 1), data = dat, model = sdt_yn("n_old", "stimulus", "n_trials"))
+  expect_no_match(code, "tcc_cd", fixed = TRUE)
+  expect_match(code, "real sdt_yn_bias_lpmf(", fixed = TRUE)
+})
+
 test_that("the sdt_yn Stan programs stay bit-identical", {
   skip_if_not(packageVersion("brms") == "2.23.0", "hashes taken under brms 2.23.0")
   md5_code <- function(formula, model, ...) {

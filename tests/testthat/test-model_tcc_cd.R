@@ -36,13 +36,12 @@ test_that("tcc_cd() builds an independent model with tcc()'s d and sdt_yn()'s cr
   expect_named(model$parameters, c("d", "criterion", "bias"))
   expect_identical(model$alternative_parameters, list(c("criterion", "bias")))
   expect_identical(model$links, list(d = "log", criterion = "identity", bias = "identity"))
-  # the same memory strength as in continuous report, the same decision
-  # parameters as in yes/no SDT
-  tcc_model <- tcc("err", similarity = tcc_cd_test_similarity())
-  sdt_model <- sdt_yn("n_old", "stimulus", "n_trials")
-  expect_identical(model$default_priors$d, tcc_model$default_priors$d)
-  expect_identical(model$default_priors[c("criterion", "bias")],
-                   sdt_model$default_priors[c("criterion", "bias")])
+  # the priors of tcc()'s d and of sdt_yn()'s criterion and bias
+  expect_identical(model$default_priors, list(
+    d = list(main = "normal(0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+    criterion = list(main = "normal(0.5, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+    bias = list(main = "normal(0, 1.5)", effects = "normal(0, 0.5)", sd = "exponential(2)")
+  ))
   expect_identical(model$other_vars$units, "radians")
   expect_identical(tcc_cd_test_model(units = "bins")$other_vars$units, "bins")
   expect_warning(identity <- tcc_cd_test_model(links = list(d = "identity")), "allow values")
@@ -175,6 +174,7 @@ test_that("dtcc_cd() and rtcc_cd() recycle their arguments and refuse what they 
   expect_length(dtcc_cd(c(0, 1, 1), 0, 1, f, criterion = 0.5), 3)
   expect_length(rtcc_cd(5, c(0, pi), 1, f, criterion = 0.5), 5)
   expect_identical(dtcc_cd(numeric(0), 0, 1, f, criterion = 0.5), numeric(0))
+  expect_identical(is.na(dtcc_cd(c(1, NA, 0), 0, 1, f, criterion = 0.5)), c(FALSE, TRUE, FALSE))
   expect_error(dtcc_cd(2, 0, 1, f, criterion = 0.5), "0 = 'same' and 1 = 'change'")
   expect_error(dtcc_cd(1, 0, 1, f), "exactly one of 'criterion'")
   expect_error(dtcc_cd(1, 0, 1, f, criterion = 0, bias = 0), "exactly one of 'criterion'")

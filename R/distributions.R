@@ -4514,7 +4514,8 @@ rtcc <- function(n, d, similarity, n_options = 360) {
 #'
 #' @name tcc_cd_dist
 #'
-#' @param x Vector of responses, coded 0 = "same" and 1 = "change".
+#' @param x Vector of responses, coded 0 = "same" and 1 = "change"; a missing
+#'   response gives `NA`.
 #' @param n Number of observations to generate.
 #' @param distance The probe minus the target in radians; each is assigned to
 #'   the nearest step of `similarity`, as [tcc_cd()] does with `units =
@@ -4552,7 +4553,7 @@ rtcc <- function(n, d, similarity, n_options = 360) {
 #' @export
 dtcc_cd <- function(x, distance, d, similarity, criterion = NULL, bias = NULL, log = FALSE) {
   .tcc_cd_check_similarity(similarity)
-  stopif(any(!x %in% c(0, 1)), "x must be coded 0 = 'same' and 1 = 'change'.")
+  stopif(any(!x %in% c(0, 1, NA)), "x must be coded 0 = 'same' and 1 = 'change'.")
   criterion <- .sdt_resolve_criterion(criterion, bias, d, 1)
   out <- .tcc_cd_log_p(x, .tcc_cd_strength(distance, similarity), d, criterion)
   if (log) out else exp(out)

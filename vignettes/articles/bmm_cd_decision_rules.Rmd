@@ -87,8 +87,8 @@ origin. It is the likelihood of `sdt_yn()` with equal variance, one trial per
 row, and a graded stimulus strength $f(x)$ in place of the 0/1 stimulus code.
 A probe that matches the target is a signal trial and a probe with
 $f(x) = 0$ is a noise trial. When every change is a change to the opposite
-side of the wheel, as in the experiments of @Williams_2022, `tcc_cd()` and
-`sdt_yn()` are the same model, and Williams et al. found that equal-variance
+side of the wheel, as in the experiments of @Williams_2022, and the similarity
+there is 0, `tcc_cd()` and `sdt_yn()` are the same model, and Williams et al. found that equal-variance
 signal detection without guessing accounted for such data. Probes at
 intermediate distances trace how the probability of "change" follows the
 similarity function. The figure shows it for three memory strengths with the
@@ -147,7 +147,9 @@ What the rule assumes:
 - The observer weighs the evidence with a model of their own memory. When
   precision varies across trials, the observer may know only how precise
   memory is on average (`knowledge = "limited"`, the default) or how precise
-  it is on the current trial (`knowledge = "rich"`). Lin and Oberauer found
+  it is on the current trial (`knowledge = "rich"`). `mixture2p_cd()`,
+  `mixture3p_cd()` and `imm_cd()` take this argument; `sdm_cd()` has a single
+  precision state, where the two coincide. Lin and Oberauer found
   that the decision model "works well in combination with all memory models
   when it is equipped with knowledge about constant characteristics of memory,
   but little or no knowledge about the state of memory representations in a
@@ -169,7 +171,7 @@ versions do.
 | Memory parameters        | `d`; the similarity function is fixed input             | those of `sdm()`, `mixture2p()`, `mixture3p()` or `imm()`                  |
 | Decision parameters      | `criterion` or `bias`                                   | `criterion`                                                                |
 | Guessing                 | none                                                    | as in the memory model                                                     |
-| Observer's knowledge     | none beyond the criterion                               | the memory model, on average or per trial (`knowledge`)                    |
+| Observer's knowledge     | none beyond the criterion                               | the memory model, on average or per trial (`knowledge`, where precision varies) |
 | Data columns             | response, probe minus target                            | response, probe, target (and non-targets and set size for two models)      |
 
 # Comparing the two rules
@@ -219,7 +221,7 @@ equal memory:
   both formats mixed within blocks avoid that.
 
 A fit of both formats with shared parameters, which would test the
-invariance directly, needs models for several responses in one fit. That is
-planned for a later release.
+invariance directly, needs models for several responses in one fit, which
+GitHub issue #394 develops.
 
 # References

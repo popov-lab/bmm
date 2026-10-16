@@ -11,7 +11,8 @@ dtcc_cd(x, distance, d, similarity, criterion = NULL, bias = NULL, log = FALSE)
 rtcc_cd(n, distance, d, similarity, criterion = NULL, bias = NULL)
 }
 \arguments{
-\item{x}{Vector of responses, coded 0 = "same" and 1 = "change".}
+\item{x}{Vector of responses, coded 0 = "same" and 1 = "change"; a missing
+response gives \code{NA}.}
 
 \item{distance}{The probe minus the target in radians; each is assigned to
 the nearest step of \code{similarity}, as \code{\link[=tcc_cd]{tcc_cd()}} does with \code{units = "radians"}.}
