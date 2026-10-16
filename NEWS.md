@@ -1,7 +1,7 @@
 # bmm 1.6.0 (development)
 
 ### New models
-* Add the **Linear Ballistic Accumulator** (`lba`) model (Brown & Heathcote, 2008) for multi-alternative choice reaction time tasks, with **simple** (correct-vs-error) and **custom** (per-accumulator) versions and normally distributed trial-to-trial drift rates. Exports `dlba()`/`rlba()`/`plba()`/`qlba()`; supports `pp_check(resp_var = "response")` and `loo()`. See `?lba` for the defaults. Thanks to @GidonFrischkorn (#349)
+* Add the **Linear Ballistic Accumulator** (`lba`) model (Brown & Heathcote, 2008) for multi-alternative choice reaction time tasks, with **simple** (correct-vs-error) and **custom** (per-accumulator) versions and four trial-to-trial drift-rate distributions (`normal`, `gamma`, `frechet`, `lognormal`). Exports `dlba()`/`rlba()`/`plba()`/`qlba()`; supports `pp_check(resp_var = "response")` and `loo()`. See `?lba` for defaults and numerical notes. Thanks to @GidonFrischkorn (#349)
 
 # bmm (development version)
 

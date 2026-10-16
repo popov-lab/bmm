@@ -7,8 +7,8 @@
 #' @keywords distribution
 #'
 #' @description Density, distribution function, quantile function, and random
-#'   generation for the Linear Ballistic Accumulator (LBA) model with normally
-#'   distributed drift rates. `dlba()` is the joint density of the response
+#'   generation for the Linear Ballistic Accumulator (LBA) model with multiple
+#'   drift rate distributions. `dlba()` is the joint density of the response
 #'   time and the winning accumulator. `plba()` and `qlba()` describe the
 #'   distribution of the race's first finishing time, regardless of which
 #'   accumulator wins.
@@ -19,8 +19,11 @@
 #' @param response Integer vector indicating the winning accumulator
 #'   (1, 2, ..., K). May be recycled to the length of `rt`, and may contain
 #'   `NA`; the corresponding density is `NA`.
-#' @param drift Numeric vector of mean drift rates (one per accumulator). The
-#'   mean may take any real value; the drawn drift rates are truncated at zero.
+#' @param drift Numeric vector of drift rate parameters (one per accumulator).
+#'   Interpretation depends on `distribution`: mean drift for `"normal"`, shape
+#'   for `"gamma"` and `"frechet"`, meanlog for `"lognormal"`. The lognormal
+#'   meanlog may take any real value, unlike the gamma and Frechet shapes,
+#'   which must be positive.
 #' @param gap Numeric. Threshold gap (> 0). The distance between the maximum
 #'   starting point and the decision threshold. The total threshold is computed
 #'   as `b = gap + sp`, ensuring `b > sp` structurally. Recycled with `rt`,
@@ -31,10 +34,12 @@
 #' @param ndt Numeric. Non-decision time in seconds (>= 0). Recycled with
 #'   `rt`, `gap` and `sp` to a common length. `qlba()` requires a single value
 #'   for `ndt`, `gap`, `sp` and `s`.
-#' @param s Numeric. Drift rate SD (> 0, default = 1). Typically fixed to 1
-#'   for identifiability.
-#' @param distribution Character. The drift rate distribution. Currently
-#'   `"normal"`.
+#' @param s Numeric. Scale parameter (> 0, default = 1). Interpretation depends
+#'   on `distribution`: drift SD for `"normal"`, rate for `"gamma"`, scale for
+#'   `"frechet"`, sdlog for `"lognormal"`. Typically fixed to 1 for
+#'   identifiability.
+#' @param distribution Character. The drift rate distribution. One of
+#'   `"normal"` (default), `"gamma"`, `"frechet"`, or `"lognormal"`.
 #' @param log Logical. If `TRUE`, return log-densities. Default `FALSE`.
 #' @param q Numeric vector of quantiles (response times).
 #' @param p Numeric vector of probabilities.
@@ -60,7 +65,7 @@
 #'
 #' @export
 dlba <- function(rt, response, drift, gap, sp, ndt, s = 1,
-                 distribution = "normal",
+                 distribution = c("normal", "gamma", "frechet", "lognormal"),
                  log = FALSE) {
   distribution <- match.arg(distribution)
   validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
@@ -86,7 +91,7 @@ dlba <- function(rt, response, drift, gap, sp, ndt, s = 1,
 #' @rdname lba_dist
 #' @export
 rlba <- function(n, drift, gap, sp, ndt, s = 1,
-                 distribution = "normal") {
+                 distribution = c("normal", "gamma", "frechet", "lognormal")) {
   distribution <- match.arg(distribution)
   validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
   b <- gap + sp
@@ -97,14 +102,14 @@ rlba <- function(n, drift, gap, sp, ndt, s = 1,
 #' @rdname lba_dist
 #' @export
 plba <- function(q, drift, gap, sp, ndt, s = 1,
-                 distribution = "normal",
+                 distribution = c("normal", "gamma", "frechet", "lognormal"),
                  lower.tail = TRUE, log.p = FALSE) {
   distribution <- match.arg(distribution)
   validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
   t <- q - ndt
   b <- gap + sp
   A <- sp
-  # decision times t <= 0 never reach the kernels; those probabilities are 0 below
+  # the gamma and Frechet kernels error on t <= 0; those probabilities are 0 below
   t_kernel <- t
   t_kernel[!is.na(t) & t <= 0] <- NA_real_
   log_surv <- Reduce(`+`, lapply(drift, function(v) {
@@ -121,7 +126,7 @@ plba <- function(q, drift, gap, sp, ndt, s = 1,
 #' @rdname lba_dist
 #' @export
 qlba <- function(p, drift, gap, sp, ndt, s = 1,
-                 distribution = "normal",
+                 distribution = c("normal", "gamma", "frechet", "lognormal"),
                  lower.tail = TRUE, log.p = FALSE) {
   distribution <- match.arg(distribution)
   validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
@@ -130,8 +135,8 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   if (!lower.tail) p <- 1 - p
 
   vapply(p, function(pi) {
-    # p = 0 is ndt: the root search would extend into the flat region below ndt
-    # and stop anywhere in it
+    # a Frechet p(ndt + 1e-6) is already above 0, so the root search would extend
+    # into the flat region below ndt and stop anywhere in it
     if (pi <= 0) {
       ndt
     } else {
@@ -155,7 +160,7 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
   A <- rep_len(A, n)
   s <- rep_len(s, n)
   t <- rt - rep_len(ndt, n)
-  # decision times t <= 0 never reach the kernels
+  # the gamma and Frechet kernels error on t <= 0, so those times never reach them
   masked <- (!is.na(t) & t <= 0) | is.na(response)
   t_kernel <- t
   t_kernel[masked] <- NA_real_
@@ -172,8 +177,9 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 # Draw trial-to-trial drift rates for a single LBA accumulator. `mean` and `s`
 # must be conformable (equal-length vectors or equal-shape matrices). The normal
 # distribution resamples non-positive draws so drifts stay positive, matching the
-# posdrift likelihood. This is the single source of drift sampling shared by
-# rlba() and the posterior predict/epred methods.
+# posdrift likelihood; the other distributions are positive by construction. This
+# is the single source of drift sampling shared by rlba() and the posterior
+# predict/epred methods.
 .rlba_drift <- function(distribution, mean, s) {
   d <- switch(distribution,
     normal = {
@@ -187,7 +193,10 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
         neg <- neg[out[neg] <= 0]
       }
       out
-    }
+    },
+    gamma = stats::rgamma(length(mean), shape = mean, rate = s),
+    frechet = .rfrechet(length(mean), shape = mean, scale = s),
+    lognormal = stats::rlnorm(length(mean), meanlog = mean, sdlog = s)
   )
   if (is.matrix(mean)) dim(d) <- dim(mean)
   d
@@ -244,7 +253,10 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 .lba_lpdf_single <- function(t, v, b, A, s, distribution) {
   args <- recycle_args(t = t, v = v, b = b, A = A, s = s)
   kernel <- switch(distribution,
-    normal = .lba_normal_lpdf
+    normal = .lba_normal_lpdf,
+    gamma = .lba_gamma_lpdf,
+    frechet = .lba_frechet_lpdf,
+    lognormal = .lba_lognormal_lpdf
   )
   do.call(kernel, unname(args))
 }
@@ -252,7 +264,10 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 .lba_lsurv_single <- function(t, v, b, A, s, distribution) {
   args <- recycle_args(t = t, v = v, b = b, A = A, s = s)
   kernel <- switch(distribution,
-    normal = .lba_normal_lsurv
+    normal = .lba_normal_lsurv,
+    gamma = .lba_gamma_lsurv,
+    frechet = .lba_frechet_lsurv,
+    lognormal = .lba_lognormal_lsurv
   )
   pmin(do.call(kernel, unname(args)), 0)
 }
@@ -371,9 +386,188 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 }
 
 
+# --- gamma drift -------------------------------------------------------------
+
+# Gamma drift d ~ Gamma(shape v, rate s). M = (v / s) [F(hi; v + 1) - F(lo; v + 1)].
+#
+# Two facts about Stan Math's gamma CDFs bind the Stan twin (stan-dev/math
+# #3408, measured on 5.3.0 and 5.4.0): gamma_lcdf rounds to 0 once log Q < -37,
+# so a difference of two lcdf values is -Inf for every fast response with
+# b / t >= 10, and its shape partial is off by 2.5e-3 at shape 5, by 0.1 to
+# 50 % for shape >= 10 in the lower tail, NaN once P saturates (shape >= 12,
+# s b / t above ~1e3) and an exception above 5e4. gamma_lccdf is finite far
+# beyond exp underflow. So the difference is taken from the upper tail
+# (lccdf pair) beyond the mean, from the lower tail (lcdf pair) below it, and
+# where the interval is narrow the midpoint rule through gamma_lpdf (exact
+# partials) replaces both; the midpoint test uses the rule's expansion
+# parameter, du |d log f / du| at the midpoint. The shape is v + 1 with v an
+# autodiff parameter, and s b / t grows without bound as ndt approaches the
+# fastest response: the gamma drift is the least robust of the four there.
+.lba_gamma_log_dF <- function(lo, hi, alpha, beta) {
+  du <- hi - lo
+  u_m <- 0.5 * (lo + hi)
+  out <- rep(NA_real_, length(lo))
+  ok <- !is.na(lo)
+
+  i <- ok & du * (abs(alpha - 1) / u_m + beta) < 1e-3
+  if (any(i)) {
+    r <- (alpha[i] - 1) / u_m[i] - beta[i]
+    out[i] <- log(du[i]) + stats::dgamma(u_m[i], shape = alpha[i], rate = beta[i], log = TRUE) +
+      log1p(du[i]^2 / 24 * (r^2 - (alpha[i] - 1) / u_m[i]^2))
+  }
+  i <- ok & is.na(out) & lo * beta > alpha
+  if (any(i)) {
+    out[i] <- log_diff_exp(
+      stats::pgamma(lo[i], shape = alpha[i], rate = beta[i], lower.tail = FALSE, log.p = TRUE),
+      stats::pgamma(hi[i], shape = alpha[i], rate = beta[i], lower.tail = FALSE, log.p = TRUE)
+    )
+  }
+  i <- ok & is.na(out)
+  if (any(i)) {
+    out[i] <- log_diff_exp(
+      stats::pgamma(hi[i], shape = alpha[i], rate = beta[i], log.p = TRUE),
+      stats::pgamma(lo[i], shape = alpha[i], rate = beta[i], log.p = TRUE)
+    )
+  }
+  out
+}
+
+.lba_gamma_lpdf <- function(t, v, b, A, s) {
+  log(v) - log(s) + .lba_gamma_log_dF((b - A) / t, b / t, v + 1, s) - log(A)
+}
+
+# u_num - t M = t int_{lo}^{hi} F(u) du > 0; the difference loses digits only
+# where the survivor itself is negligible
+.lba_gamma_lsurv <- function(t, v, b, A, s) {
+  lo <- (b - A) / t
+  hi <- b / t
+  log_tM <- log(t) + log(v) - log(s) + .lba_gamma_log_dF(lo, hi, v + 1, s)
+  log_u <- log_sum_exp(
+    log(A) + stats::pgamma(lo, shape = v, rate = s, log.p = TRUE),
+    log(b) + .lba_gamma_log_dF(lo, hi, v, s)
+  )
+  log_diff_exp_floored(log_u, log_tM, .lba_log_floor) - log(A)
+}
+
+
+# --- lognormal drift ---------------------------------------------------------
+
+# Lognormal drift d ~ LN(v, s), so z = (log u - v) / s and F(u) = Phi(z). The
+# width of the interval in z-units is dz = log(b / (b - A)) / s, taken from
+# log1m(A / b) rather than as a difference of two logs so that a tiny A keeps
+# its digits. M = exp(v + s^2 / 2) [Phi(z_hi - s) - Phi(z_lo - s)].
+.lba_lognormal_log_dPhi <- function(z_lo, z_hi, dz) {
+  narrow <- !is.na(dz) & dz < 1e-4
+  out <- log_Phi_diff(z_lo, z_hi)
+  out[narrow] <- .lba_log_phi_int_narrow(z_lo[narrow], z_hi[narrow])
+  out
+}
+
+.lba_lognormal_lpdf <- function(t, v, b, A, s) {
+  z_hi <- (log(b / t) - v) / s
+  dz <- -log1p(-A / b) / s
+  v + 0.5 * s^2 + .lba_lognormal_log_dPhi(z_hi - dz - s, z_hi - s, dz) - log(A)
+}
+
+.lba_lognormal_lsurv <- function(t, v, b, A, s) {
+  z_hi <- (log(b / t) - v) / s
+  dz <- -log1p(-A / b) / s
+  z_lo <- z_hi - dz
+  log_tM <- log(t) + v + 0.5 * s^2 + .lba_lognormal_log_dPhi(z_lo - s, z_hi - s, dz)
+  log_u <- log_sum_exp(
+    log(A) + stats::pnorm(z_lo, log.p = TRUE),
+    log(b) + .lba_lognormal_log_dPhi(z_lo, z_hi, dz)
+  )
+  log_diff_exp_floored(log_u, log_tM, .lba_log_floor) - log(A)
+}
+
+
+# --- Frechet drift -----------------------------------------------------------
+
+.rfrechet <- function(n, shape, scale) {
+  scale * (-log(stats::runif(n)))^(-1 / shape)
+}
+
+.lba_frechet_log_F <- function(x, shape, scale) {
+  -(x / scale)^(-shape)
+}
+
+# Frechet drift d ~ Frechet(shape v, scale s), log F(u) = -(u / s)^-v. The
+# survivor is spelled through this closed form and log1m_exp, from the upper
+# tail once F(lo) > 1/2, never through Stan's frechet_lccdf, whose
+# log1m(exp(.)) form is -Inf with an infinite partial once (s / u)^v < 5e-17
+# (u / s = 113 at shape 8).
+.lba_frechet_log_dF <- function(lo, hi, shape, scale) {
+  lF_lo <- .lba_frechet_log_F(lo, shape, scale)
+  lF_hi <- .lba_frechet_log_F(hi, shape, scale)
+  upper <- !is.na(lF_lo) & lF_lo > -log(2)
+  out <- log_diff_exp(lF_hi, lF_lo)
+  out[upper] <- log_diff_exp(log1m_exp(lF_lo[upper]), log1m_exp(lF_hi[upper]))
+  out
+}
+
+# The truncated first moment of a Frechet drift has no closed form: each
+# element is integrated adaptively over the part of (lo, hi) where the
+# integrand u f(u) is within exp(-80) of its peak (at u = scale, or the nearer
+# end point), scaled by that peak. Without the window a fast or slow response
+# concentrates the integrand in a sliver that integrate() cannot see. This is
+# the independent reference for the 16-point rule of the Stan chunk.
+#
+# The Stan chunk integrates M by 16-point Gauss-Legendre in log space.
+# Measured against this adaptive quadrature: within 1e-6 nats for
+# A / gap <= 6, 6e-5 at A / gap = 10, 8.7e-3 at 40, 0.84 nats at gap = 1e-3
+# with A = 2; the default priors put A / gap near 0.6. The survivor inherits
+# that error multiplied by (u / s)^-2v, so for slow responses (b / t well
+# below s) it is off by whole nats where its value is already below -100.
+.lba_frechet_log_M <- function(t, shape, b, A, scale) {
+  log_integrand <- function(u, shape, scale) {
+    log(shape) - shape * log(u / scale) - (u / scale)^(-shape)
+  }
+  window_edge <- function(from, to, shape, scale, floor) {
+    if (log_integrand(from, shape, scale) >= floor) return(from)
+    stats::uniroot(function(u) log_integrand(u, shape, scale) - floor, c(from, to), tol = 1e-12)$root
+  }
+  out <- rep(NA_real_, length(t))
+  ok <- !is.na(t)
+  if (!any(ok)) return(out)
+  out[ok] <- mapply(function(lo, hi, shape, scale) {
+    peak <- min(max(scale, lo), hi)
+    m <- log_integrand(peak, shape, scale)
+    lo <- window_edge(lo, peak, shape, scale, m - 80)
+    hi <- window_edge(hi, peak, shape, scale, m - 80)
+    m + log(stats::integrate(
+      function(u) exp(log_integrand(u, shape, scale) - m),
+      lower = lo, upper = hi
+    )$value)
+  }, (b[ok] - A[ok]) / t[ok], b[ok] / t[ok], shape[ok], scale[ok])
+  out
+}
+
+.lba_frechet_lpdf <- function(t, v, b, A, s) {
+  .lba_frechet_log_M(t, v, b, A, s) - log(A)
+}
+
+.lba_frechet_lsurv <- function(t, v, b, A, s) {
+  lo <- (b - A) / t
+  hi <- b / t
+  log_tM <- log(t) + .lba_frechet_log_M(t, v, b, A, s)
+  log_u <- log_sum_exp(
+    log(A) + .lba_frechet_log_F(lo, v, s),
+    log(b) + .lba_frechet_log_dF(lo, hi, v, s)
+  )
+  log_diff_exp_floored(log_u, log_tM, .lba_log_floor) - log(A)
+}
+
+
 validate_lba_parameters <- function(drift, gap, sp, ndt, s, distribution) {
   stopif(any(gap <= 0), "gap (threshold gap) must be positive.")
   stopif(any(sp <= 0), "sp (maximum starting point) must be positive.")
   stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
   stopif(any(s <= 0), "s (scale parameter) must be positive.")
+  # the normal drift is a mean and the lognormal a meanlog, both unrestricted;
+  # the gamma and Frechet drifts are shape parameters
+  if (distribution %in% c("gamma", "frechet")) {
+    stopif(any(drift <= 0),
+           "drift must be positive for distribution '{distribution}'.")
+  }
 }
