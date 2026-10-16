@@ -6,18 +6,22 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Generic S3 method for configuring the model to be fit by brms — configure_model"><meta name="description" content="Called by bmm() to automatically construct the model
-formula, family objects and default priors for the model specified by the
-user. It will call the appropriate configure_model.* functions based on the
-list of classes defined in the .model_* functions. Currently, we have a
-method only for the last class listed in the .model_* functions. This is to
-keep model configuration as simple as possible. In the future we may add
-shared methods for classes of models that share the same configuration."><meta property="og:description" content="Called by bmm() to automatically construct the model
-formula, family objects and default priors for the model specified by the
-user. It will call the appropriate configure_model.* functions based on the
-list of classes defined in the .model_* functions. Currently, we have a
-method only for the last class listed in the .model_* functions. This is to
-keep model configuration as simple as possible. In the future we may add
-shared methods for classes of models that share the same configuration."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+formula, with its family, and any stanvars for the model specified by the
+user. Default priors are not built here but by configure_prior() from the
+model's default_priors; a model that needs priors beyond those defines
+its own configure_prior.&amp;lt;model&amp;gt;() method (e.g. mixture3p, mpt). It
+will call the appropriate configure_model.* functions based on the list of
+classes defined in the .model_* functions. Each model has one method, for
+its model class, or one per version class when the versions are configured
+differently (e.g. imm, ezdm, cswald)."><meta property="og:description" content="Called by bmm() to automatically construct the model
+formula, with its family, and any stanvars for the model specified by the
+user. Default priors are not built here but by configure_prior() from the
+model's default_priors; a model that needs priors beyond those defines
+its own configure_prior.&amp;lt;model&amp;gt;() method (e.g. mixture3p, mpt). It
+will call the appropriate configure_model.* functions based on the list of
+classes defined in the .model_* functions. Each model has one method, for
+its model class, or one per version class when the versions are configured
+differently (e.g. imm, ezdm, cswald)."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -56,12 +60,14 @@ shared methods for classes of models that share the same configuration."><meta p
 
     <div class="ref-description section level2">
     <p>Called by bmm() to automatically construct the model
-formula, family objects and default priors for the model specified by the
-user. It will call the appropriate configure_model.* functions based on the
-list of classes defined in the .model_* functions. Currently, we have a
-method only for the last class listed in the .model_* functions. This is to
-keep model configuration as simple as possible. In the future we may add
-shared methods for classes of models that share the same configuration.</p>
+formula, with its family, and any stanvars for the model specified by the
+user. Default priors are not built here but by <code><a href="configure_prior.html">configure_prior()</a></code> from the
+model's <code>default_priors</code>; a model that needs priors beyond those defines
+its own <code>configure_prior.&lt;model&gt;()</code> method (e.g. <code>mixture3p</code>, <code>mpt</code>). It
+will call the appropriate configure_model.* functions based on the list of
+classes defined in the .model_* functions. Each model has one method, for
+its model class, or one per version class when the versions are configured
+differently (e.g. <code>imm</code>, <code>ezdm</code>, <code>cswald</code>).</p>
     </div>
 
     <div class="section level2">
@@ -87,12 +93,12 @@ shared methods for classes of models that share the same configuration.</p>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A named list containing at minimum the following elements:</p><ul><li><p>formula: An object of class <code>brmsformula</code>. The constructed model formula</p></li>
+    <p>A named list built with <code>nlist()</code>, containing:</p><ul><li><p>formula: An object of class <code>brmsformula</code>, the constructed model formula
+with the brms family attached as <code>formula$family</code></p></li>
 <li><p>data: the user supplied data.frame, preprocessed by check_data</p></li>
-<li><p>family: the brms family object</p></li>
-<li><p>prior: the brms prior object</p></li>
-<li><p>stanvars: (optional) An object of class <code>stanvars</code> (for custom families).
-See <code><a href="https://paulbuerkner.com/brms/reference/custom_family.html" class="external-link">brms::custom_family()</a></code> for more details.</p></li>
+<li><p>stanvars: (optional) An object of class <code>stanvars</code>, when the model adds
+Stan code (a custom family, or Stan functions called from the formula).
+See <code><a href="https://paulbuerkner.com/brms/reference/custom_family.html" class="external-link">brms::custom_family()</a></code> and <code><a href="https://paulbuerkner.com/brms/reference/stanvar.html" class="external-link">brms::stanvar()</a></code> for more details.</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -103,16 +109,14 @@ See <code><a href="https://paulbuerkner.com/brms/reference/custom_family.html" c
    &lt;preprocessing code&gt;
 
    # construct the formula
-   formula &lt;- bmf2bf(formula, model)
+   formula &lt;- bmf2bf(model, formula)
 
-   # construct the family
-   family &lt;- &lt;code for new family&gt;
+   # attach the family to the formula
+   formula$family &lt;- &lt;code for new family&gt;
 
-   # construct the default prior
-   prior &lt;- &lt;code for new prior&gt;
-
-   # return the list
-   nlist(formula, data, family, prior)
+   # return the list (add stanvars when the model adds Stan code: a custom
+   # family, or Stan functions called from the formula)
+   nlist(formula, data)
 }
 </code></pre><p></p></div>
     </div>

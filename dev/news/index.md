@@ -13,6 +13,14 @@
   breaking changes are announced in a GitHub issue before the release
   that contains them. See the contributing guide
   ([\#441](https://github.com/popov-lab/bmm/issues/441)).
+- For developers: the header of the file
+  [`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)
+  writes named an outdated place for a new model’s test cases. It now
+  points to `model_cases_<name>()` in
+  `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`,
+  `sd_default`, `init` and `links` case, and it lists
+  `tests/testthat/test-model_<name>.R` for the model’s own tests
+  ([\#580](https://github.com/popov-lab/bmm/issues/580)).
 
 ## bmm 1.4.1
 

@@ -46,6 +46,7 @@
 <div class="section level4">
 <h4 id="documentation-development-version">Documentation<a class="anchor" aria-label="anchor" href="#documentation-development-version"></a></h4>
 <ul><li>bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under “Deprecated functions and arguments” in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (<a href="https://github.com/popov-lab/bmm/issues/441" class="external-link">#441</a>).</li>
+<li>For developers: the header of the file <code><a href="../reference/use_model_template.html">use_model_template()</a></code> writes named an outdated place for a new model’s test cases. It now points to <code>model_cases_&lt;name&gt;()</code> in <code>tests/testthat/helper-model-&lt;name&gt;.R</code>, which needs a <code>stored_frame</code>, <code>sd_default</code>, <code>init</code> and <code>links</code> case, and it lists <code>tests/testthat/test-model_&lt;name&gt;.R</code> for the model’s own tests (<a href="https://github.com/popov-lab/bmm/issues/580" class="external-link">#580</a>).</li>
 </ul></div>
 </div>
     <div class="section level2">

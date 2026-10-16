@@ -71,13 +71,13 @@
 <span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/check.html" class="external-link">check</a></span><span class="op">(</span><span class="op">)</span>      <span class="co"># 0 errors, 0 warnings; explain any note in the PR</span></span></code></pre></div>
 <p>Your PR also needs:</p>
 <ul><li>
-<strong>Tests</strong> for new behaviour, in <code>tests/testthat/</code>. Test what your code does, not how R subsets a data frame.</li>
+<strong>Tests</strong> for new behaviour, in <code>tests/testthat/</code>. Test what your code does, not how R subsets a data frame. A new model adds <code>test-model_&lt;name&gt;.R</code> and a provider <code>model_cases_&lt;name&gt;()</code> in <code>tests/testthat/helper-model-&lt;name&gt;.R</code> with a <code>stored_frame</code>, <code>sd_default</code>, <code>init</code> and <code>links</code> case, which the cross-model tests read. Gate tests by tier: <code>skip_unless_stan_tests()</code> for a test that compiles Stan (and update that file’s count of <code>cmdstan_model()</code> and <code>$sample()</code> in <code>test-conventions.R</code>), <code>skip_on_cran()</code> for one over 0.4 s in CRAN mode (rules R1, R4, R9 and R10 in <a href="../.dev/decisions/0004-test-tiers-and-budget.html">ADR 0004</a>; short form in <a href="../AGENTS.html">AGENTS.md</a>, “Testing Requirements”).</li>
 <li>
 <strong>A NEWS bullet</strong> for anything users can see, under the development heading of the branch you target: <code># bmm (development version)</code> on <code>develop</code>, <code># bmm 1.6.0 (development)</code> on <code>dev-1.6.0</code>. Keep it short: what changes for the user and what they should do. Do not describe how the fix works.</li>
 <li>
 <strong>Documentation</strong> for new or changed exported functions (roxygen).</li>
 <li>
-<strong>For a new model:</strong> read the <a href="https://venpopov.com/bmm/dev/dev-notes/">developer notes</a> and follow the one-constructor-per-response-type rule in <a href="../AGENTS.html">AGENTS.md</a>. Show parameter recovery in the PR description (see below).</li>
+<strong>For a new model:</strong> read the <a href="https://venpopov.com/bmm/dev-notes/">developer notes</a> and follow the one-constructor-per-response-type rule in <a href="../AGENTS.html">AGENTS.md</a>. Show parameter recovery in the PR description (see below).</li>
 </ul><div class="section level3">
 <h3 id="recovery-evidence-for-new-models">Recovery evidence for new models<a class="anchor" aria-label="anchor" href="#recovery-evidence-for-new-models"></a></h3>
 <p>Until we have a <code>tests/recovery/</code> folder, the PR description shows the result of a parameter recovery for the new model:</p>
@@ -158,7 +158,7 @@
 <li>Write comments that explain why, not what. If code needs a comment to say what it does, rename or restructure the code.</li>
 <li>Validate arguments in exported functions only. Internal helpers trust their callers.</li>
 <li>Call functions as <code>package::function()</code>.</li>
-</ul><p><a href="../AGENTS.html">AGENTS.md</a> has the rest, and the <a href="https://venpopov.com/bmm/dev/dev-notes/">developer notes</a> explain which file holds which step of the fitting pipeline. If you are unsure where code belongs, ask.</p>
+</ul><p><a href="../AGENTS.html">AGENTS.md</a> has the rest, and the <a href="https://venpopov.com/bmm/dev-notes/">developer notes</a> explain which file holds which step of the fitting pipeline. If you are unsure where code belongs, ask.</p>
 </div>
 <div class="section level2">
 <h2 id="ai-assisted-contributions">AI-assisted contributions<a class="anchor" aria-label="anchor" href="#ai-assisted-contributions"></a></h2>

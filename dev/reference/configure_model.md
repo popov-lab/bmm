@@ -1,12 +1,16 @@
 # Generic S3 method for configuring the model to be fit by brms
 
-Called by bmm() to automatically construct the model formula, family
-objects and default priors for the model specified by the user. It will
-call the appropriate configure_model.\* functions based on the list of
-classes defined in the .model\_\* functions. Currently, we have a method
-only for the last class listed in the .model\_\* functions. This is to
-keep model configuration as simple as possible. In the future we may add
-shared methods for classes of models that share the same configuration.
+Called by bmm() to automatically construct the model formula, with its
+family, and any stanvars for the model specified by the user. Default
+priors are not built here but by
+[`configure_prior()`](https://venpopov.com/bmm/dev/reference/configure_prior.md)
+from the model's `default_priors`; a model that needs priors beyond
+those defines its own `configure_prior.<model>()` method (e.g.
+`mixture3p`, `mpt`). It will call the appropriate configure_model.\*
+functions based on the list of classes defined in the .model\_\*
+functions. Each model has one method, for its model class, or one per
+version class when the versions are configured differently (e.g. `imm`,
+`ezdm`, `cswald`).
 
 ## Usage
 
@@ -30,20 +34,19 @@ configure_model(model, data, formula)
 
 ## Value
 
-A named list containing at minimum the following elements:
+A named list built with `nlist()`, containing:
 
-- formula: An object of class `brmsformula`. The constructed model
-  formula
+- formula: An object of class `brmsformula`, the constructed model
+  formula with the brms family attached as `formula$family`
 
 - data: the user supplied data.frame, preprocessed by check_data
 
-- family: the brms family object
-
-- prior: the brms prior object
-
-- stanvars: (optional) An object of class `stanvars` (for custom
-  families). See
+- stanvars: (optional) An object of class `stanvars`, when the model
+  adds Stan code (a custom family, or Stan functions called from the
+  formula). See
   [`brms::custom_family()`](https://paulbuerkner.com/brms/reference/custom_family.html)
+  and
+  [`brms::stanvar()`](https://paulbuerkner.com/brms/reference/stanvar.html)
   for more details.
 
 ## Details
@@ -56,16 +59,14 @@ A bare bones configure_model.\* method should look like this:
        <preprocessing code>
 
        # construct the formula
-       formula <- bmf2bf(formula, model)
+       formula <- bmf2bf(model, formula)
 
-       # construct the family
-       family <- <code for new family>
+       # attach the family to the formula
+       formula$family <- <code for new family>
 
-       # construct the default prior
-       prior <- <code for new prior>
-
-       # return the list
-       nlist(formula, data, family, prior)
+       # return the list (add stanvars when the model adds Stan code: a custom
+       # family, or Stan functions called from the formula)
+       nlist(formula, data)
     }
 
 ## Examples
