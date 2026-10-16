@@ -307,6 +307,11 @@ test_that(".circmix_slot_averaging_ld() mixes the two slot-count branches", {
     log(0.125 / (2 * pi) + 0.875 * exp(branch_ld(1))),
     tolerance = 1e-12
   )
+  # a missing K leaves its own row NA and the others untouched
+  expect_identical(
+    is.na(.circmix_slot_averaging_ld(cosd[1:2, ], logw[1:2, ], c(NA, 3.5), c(2, 2), c(6, 6), c(0.4, 0.4), 81L)),
+    c(TRUE, FALSE)
+  )
 })
 
 # Compares the sampler against the density it is meant to draw from. n is large
@@ -564,9 +569,12 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 # sig_figs is raised because cmdstan writes only 6 significant digits by default,
 # which alone accounts for differences of ~1e-7.
 circmix_stan_values <- function(data) {
+  chunks <- c("circmix_funs.stan", "mixture2p_funs.stan", "mixture3p_funs.stan", "imm_funs.stan")
   code <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")),
+    paste(vapply(chunks, function(chunk) {
+      read_lines2(system.file("stan_chunks", chunk, package = "bmm"))
+    }, character(1)), collapse = "\n"),
     "\n}\n",
     "data {
       int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
@@ -577,7 +585,7 @@ circmix_stan_values <- function(data) {
       int NI0; vector[NI0] kappa_i0;
       real K_slots; int ss_slots; int ss_empty;
       vector[2] cosd_far; vector[2] logw_far; real kappa_far; int NFAR; vector[NFAR] tau_far;
-      vector[3] nt_loc; int ss_loc;
+      vector[3] nt_loc; int ss_loc; vector[2] dist_w;
     }
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
@@ -585,6 +593,10 @@ circmix_stan_values <- function(data) {
       vector[NTAU] out_sa; vector[NFAR] out_far; vector[NI0] out_logi0; real out_vp0;
       vector[4] out_branches; vector[4] out_branches_empty; vector[ss_loc] out_loc;
       vector[NTAU] out_shape;
+      vector[2] out_w2_simple; vector[2] out_w2_slot; vector[4] out_w3_simple;
+      vector[4] out_w3_slot; vector[3] out_w3_sa; vector[4] out_imm_abc;
+      vector[4] out_imm_bsc; vector[4] out_imm_full; vector[2] out_w2_full;
+      vector[2] out_w3_slot1; vector[1] out_w3_sa1;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -619,6 +631,17 @@ circmix_stan_values <- function(data) {
                                                            kappa_vp, logk, dlogk,
                                                            logJ_min, dlogJ);
       out_loc = circmix_locations(0.3, nt_loc, ss_loc);
+      out_w2_simple = mixture2p_simple_logw(0.7);
+      out_w2_slot = mixture2p_slot_logw(2.5, 3);
+      out_w3_simple = mixture3p_simple_logw(1.2, 0.3, 3);
+      out_w3_slot = mixture3p_slot_logw(2.5, 0.8, 3);
+      out_w3_sa = mixture3p_slot_averaging_logw(0.8, 3);
+      out_imm_abc = imm_abc_logw(2, 0.5, 1, 3);
+      out_imm_bsc = imm_bsc_logw(2, 3, 1, 3, dist_w);
+      out_imm_full = imm_full_logw(2, 0.5, 3, 1, 3, dist_w);
+      out_w2_full = mixture2p_slot_logw(3.5, 3);
+      out_w3_slot1 = mixture3p_slot_logw(0.6, 0.8, 1);
+      out_w3_sa1 = mixture3p_slot_averaging_logw(0.8, 1);
     }"
   )
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
@@ -668,7 +691,7 @@ test_that("the Stan and R implementations of the shared core agree", {
     kappa_vp = 10, nodes = 81L, K_slots = 3.5, ss_slots = 2L, ss_empty = 4L,
     cosd_far = cosd_far, logw_far = logw_far, kappa_far = 200,
     NFAR = length(tau_far), tau_far = tau_far,
-    nt_loc = c(1, 2, 3), ss_loc = 3L
+    nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2)
   ))
 
   n <- length(kappa)
@@ -728,6 +751,28 @@ test_that("the Stan and R implementations of the shared core agree", {
     expect_equal(stan(case[[1]]), as.numeric(unlist(branch)), tolerance = 1e-12)
   }
   expect_equal(stan("out_loc"), c(0.3, 1, 2))
+
+  # each model's weight builder against the R twin its d*() function uses
+  weights <- list(
+    out_w2_simple = .mixture2p_weights(0.7),
+    out_w2_slot = .mixture2p_weights(2.5 / 3),
+    out_w3_simple = .mixture3p_softmax_weights(1.2, 0.3, 3),
+    out_w3_slot = .mixture3p_nested_weights(2.5 / 3, 0.8, 3),
+    out_imm_abc = .imm_log_weights(2, 0.5, 0, 1, 3, c(0.5, 2), "abc"),
+    out_imm_bsc = .imm_log_weights(2, 1, 3, 1, 3, c(0.5, 2), "bsc"),
+    out_imm_full = .imm_log_weights(2, 0.5, 3, 1, 3, c(0.5, 2), "full"),
+    # K at or above the set size stores everything; at set size 1 there is no swap
+    out_w2_full = .mixture2p_weights(1),
+    out_w3_slot1 = .mixture3p_nested_weights(0.6, 0.8, 1)
+  )
+  for (name in names(weights)) {
+    expect_equal(
+      stan(name), c(weights[[name]]$logw, weights[[name]]$logw_guess),
+      tolerance = 1e-12, label = name
+    )
+  }
+  expect_equal(stan("out_w3_sa"), c(.mixture3p_swap_weights(0.8, 3)), tolerance = 1e-12)
+  expect_equal(stan("out_w3_sa1"), c(.mixture3p_swap_weights(0.8, 1)))
 })
 
 test_that("variable precision says what kappa means, in every model and version", {
