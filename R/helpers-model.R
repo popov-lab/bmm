@@ -1,22 +1,24 @@
 #' @title Generic S3 method for configuring the model to be fit by brms
 #' @description Called by bmm() to automatically construct the model
-#'   formula, family objects and default priors for the model specified by the
-#'   user. It will call the appropriate configure_model.* functions based on the
-#'   list of classes defined in the .model_* functions. Currently, we have a
-#'   method only for the last class listed in the .model_* functions. This is to
-#'   keep model configuration as simple as possible. In the future we may add
-#'   shared methods for classes of models that share the same configuration.
+#'   formula, with its family, and any stanvars for the model specified by the
+#'   user. Default priors are not built here but by [configure_prior()] from the
+#'   model's `default_priors`; a model that needs priors beyond those defines
+#'   its own `configure_prior.<model>()` method (e.g. `mixture3p`, `mpt`). It
+#'   will call the appropriate configure_model.* functions based on the list of
+#'   classes defined in the .model_* functions. Each model has one method, for
+#'   its model class, or one per version class when the versions are configured
+#'   differently (e.g. `imm`, `ezdm`, `cswald`).
 #' @param model A model list object returned from check_model()
 #' @param data The user supplied data.frame containing the data to be checked
 #' @param formula The user supplied formula
-#' @return A named list containing at minimum the following elements:
+#' @return A named list built with `nlist()`, containing:
 #'
-#'  - formula: An object of class `brmsformula`. The constructed model formula
+#'  - formula: An object of class `brmsformula`, the constructed model formula
+#'   with the brms family attached as `formula$family`
 #'  - data: the user supplied data.frame, preprocessed by check_data
-#'  - family: the brms family object
-#'  - prior: the brms prior object
-#'  - stanvars: (optional) An object of class `stanvars` (for custom families).
-#'   See [brms::custom_family()] for more details.
+#'  - stanvars: (optional) An object of class `stanvars`, when the model adds
+#'   Stan code (a custom family, or Stan functions called from the formula).
+#'   See [brms::custom_family()] and [brms::stanvar()] for more details.
 #'
 #' @details A bare bones configure_model.* method should look like this:
 #'
@@ -27,16 +29,14 @@
 #'     <preprocessing code>
 #'
 #'     # construct the formula
-#'     formula <- bmf2bf(formula, model)
+#'     formula <- bmf2bf(model, formula)
 #'
-#'     # construct the family
-#'     family <- <code for new family>
+#'     # attach the family to the formula
+#'     formula$family <- <code for new family>
 #'
-#'     # construct the default prior
-#'     prior <- <code for new prior>
-#'
-#'     # return the list
-#'     nlist(formula, data, family, prior)
+#'     # return the list (add stanvars when the model adds Stan code: a custom
+#'     # family, or Stan functions called from the formula)
+#'     nlist(formula, data)
 #'  }
 #'  ```
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
@@ -1003,8 +1003,13 @@ use_model_template <- function(model_name,
      #
      # Besides this file, a new model needs entries in:
      # - `data_column_roles` in R/helpers-model.R (a test requires it)
-     # - `stored_frame_cases()` in tests/testthat/test-update.R (a test requires it)
-     #   plus a `revert_check_data()` method in R/update.R if `check_data()`
+     # - tests/testthat/test-model_{model_name}.R with the model's own contract
+     #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
+     #   their sites are registered in test-conventions.R (a test requires it)
+     # - `model_cases_{model_name}()` in tests/testthat/helper-model-{model_name}.R
+     #   with a `stored_frame`, `sd_default`, `init` and `links` case (a test
+     #   requires them; the case kinds are listed in helper-model-cases.R)
+     # - a `revert_check_data()` method in R/update.R if `check_data()`
      #   consumes or creates columns
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
