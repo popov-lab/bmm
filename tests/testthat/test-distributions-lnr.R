@@ -24,7 +24,7 @@ test_that("dlnr validates inputs and log scale output", {
 })
 
 test_that("rlnr returns valid response times and responses", {
-  set.seed(123)
+  withr::local_seed(123)
   res <- rlnr(200, m = c(-1, 0, 0.5), s = 1, ndt = 0.2)
 
   expect_s3_class(res, "data.frame")

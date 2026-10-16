@@ -1110,7 +1110,7 @@ test_that("lnr refuses each identifier of the Stan program as a category, but no
 })
 
 test_that("log_lik_lnr_custom is finite and matches the reference with zero-count losers", {
-  set.seed(11)
+  withr::local_seed(11)
   nd <- 5L
   no <- 6L
   dp <- list(mu = 0, aa = rnorm(nd * no, -1, .3), bb = rnorm(nd * no, 0, .3),
