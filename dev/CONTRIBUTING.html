@@ -58,7 +58,7 @@
 </div>
 <div class="section level2">
 <h2 id="which-branch-to-target">Which branch to target<a class="anchor" aria-label="anchor" href="#which-branch-to-target"></a></h2>
-<ol style="list-style-type: decimal"><li>Fork the repo and create your branch from <code>develop</code>. If your change is a feature planned for a later release, branch from that release’s integration branch (<code>dev-1.5.0</code>, <code>dev-1.6.0</code>) instead; the milestone of the issue tells you which release it is planned for. Bug fixes always go to <code>develop</code>.</li>
+<ol style="list-style-type: decimal"><li>Fork the repo and create your branch from <code>develop</code>. If your change is a feature planned for a later release, branch from that release’s integration branch (e.g. <code>dev-1.6.0</code>) instead; the milestone of the issue tells you which release it is planned for. Bug fixes always go to <code>develop</code>.</li>
 <li>Open the PR against the branch you started from.</li>
 </ol><p>The reasoning is in <a href="../.dev/decisions/0002-release-integration-branches.html">ADR 0002</a>. If you are unsure, ask in the issue.</p>
 </div>
@@ -73,7 +73,7 @@
 <ul><li>
 <strong>Tests</strong> for new behaviour, in <code>tests/testthat/</code>. Test what your code does, not how R subsets a data frame.</li>
 <li>
-<strong>A NEWS bullet</strong> under <code># bmm (development version)</code> for anything users can see. Keep it short: what changes for the user and what they should do. Do not describe how the fix works.</li>
+<strong>A NEWS bullet</strong> for anything users can see, under the development heading of the branch you target: <code># bmm (development version)</code> on <code>develop</code>, <code># bmm 1.6.0 (development)</code> on <code>dev-1.6.0</code>. Keep it short: what changes for the user and what they should do. Do not describe how the fix works.</li>
 <li>
 <strong>Documentation</strong> for new or changed exported functions (roxygen).</li>
 <li>
@@ -102,6 +102,26 @@
 </div>
 </div>
 <div class="section level2">
+<h2 id="deprecating-and-removing-features">Deprecating and removing features<a class="anchor" aria-label="anchor" href="#deprecating-and-removing-features"></a></h2>
+<p>Users should know how long their scripts keep working. From bmm 1.5.0 on, three rules apply:</p>
+<ol style="list-style-type: decimal"><li>
+<strong>Deprecate before you remove.</strong> A deprecated function or argument keeps working, with a warning, for at least one minor release. Something deprecated in 1.5.0 still works in every 1.5.x release and is removed in 1.6.0 at the earliest.</li>
+<li>
+<strong>List it in NEWS.</strong> Every deprecation and every removal gets a bullet under the heading <code>### Deprecated functions and arguments</code>.</li>
+<li>
+<strong>Announce breaking changes.</strong> A change is breaking when a script that ran before now fails, has to be edited, or gives different results for the same data and model. Removing a deprecated form counts. A bug fix that corrects results is not; it goes in NEWS under the bug fixes. We announce a breaking change in a GitHub issue before the release that contains it, with the old and the new code side by side (use the “Breaking change” issue template).</li>
+</ol><p>The rules cover what users type or read: exported functions and their arguments, model parameter names, documented defaults, and the data layout a model expects. Internal functions are not covered. Fits saved by an earlier release are covered: they keep working with <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> and the extraction functions, through <code><a href="reference/restructure.bmmfit.html">restructure()</a></code> where they need converting, or the NEWS bullet says they must be refitted.</p>
+<p>A changed default has no old form to warn about. Announce it as a breaking change (rule 3) and say in NEWS how to get the old default back. For a changed data layout, accept both layouts for the window and give the old and the new column names as <code>what</code> and <code>with</code>.</p>
+<p>If your PR deprecates something:</p>
+<ul><li>Deprecate in a minor release (1.5.0, 1.6.0), not in a patch release, so that users meet the warning before the release that may remove the form.</li>
+<li>Keep the old form working by passing it on to the new one. If the new form gives a different result, say so in <code>details</code>. Keep a deprecated function exported and mark its help page as deprecated (title <code>Deprecated: use new()</code>, <code>@keywords deprecated</code>). If a call gives both the old and the new argument, stop and name both.</li>
+<li>Warn with <code>warn_deprecated(what, with, since = "1.5.0")</code> where the old form is detected. <code>what</code> and <code>with</code> are the old and the new code as users would type it; pass <code>with = NULL</code> when nothing replaces the old form. The message is fixed: it names the release that deprecated the form, the earliest release that may remove it (the next minor release; set <code>removed_in</code> only to name a later one) and the replacement, if there is one. Use <code>details</code> only for something users would otherwise miss, such as a changed meaning.</li>
+<li>Call <code>warn_deprecated()</code> once per user call. If one call can meet many old forms, such as prior rows, collect them first and pass them as vectors, so users get one warning and not one per row. The message lists the first 20 forms and counts the rest.</li>
+<li>Add the NEWS bullet under <code>### Deprecated functions and arguments</code> in the section of the release that deprecates the form. On a <code>dev-*</code> branch that is the branch’s own section (<a href="../.dev/decisions/0002-release-integration-branches.html">ADR 0002</a>).</li>
+<li>Test that the old form still works and warns.</li>
+</ul><p>When the window has passed, you may remove the old form. Remove its tests with it, list the removal under the same heading in the release that removes it, and announce it in an issue before that release (rule 3). Forms deprecated before 1.5.0 may be removed in any later release once the removal is announced the same way.</p>
+</div>
+<div class="section level2">
 <h2 id="review-and-merging">Review and merging<a class="anchor" aria-label="anchor" href="#review-and-merging"></a></h2>
 <p>How many reviews a PR needs depends on what it touches.</p>
 <table class="table"><colgroup><col width="33%"><col width="33%"><col width="33%"></colgroup><thead><tr><th>Tier</th>
@@ -114,7 +134,7 @@
 <td>Everything else, including bug fixes and new models</td>
 <td>One approving review from someone other than the author.</td>
 </tr><tr><td><strong>Pipeline or exported API</strong></td>
-<td>The shared pipeline files (<code>R/bmm.R</code>, <code>R/bmmformula.R</code>, <code>R/helpers-model.R</code>, <code>R/helpers-data.R</code>, <code>R/helpers-prior.R</code>, <code>R/helpers-postprocess.R</code>, <code>R/helpers-inits.R</code>, <code>R/update.R</code>), or the signature or return value of an exported function</td>
+<td>The shared pipeline files (<code>R/bmm.R</code>, <code>R/bmmformula.R</code>, <code>R/helpers-model.R</code>, <code>R/helpers-data.R</code>, <code>R/helpers-prior.R</code>, <code>R/helpers-postprocess.R</code>, <code>R/helpers-inits.R</code>, <code>R/update.R</code>), the signature or return value of an exported function, or deprecating or removing an exported function or argument</td>
 <td>Two approving reviews.</td>
 </tr></tbody></table><p>A <strong>new model</strong> is a standard PR with one addition: the reviewer works through the reviewer block in the PR template. They read the likelihood against the cited source, run or inspect the recovery, and check the default priors on the natural scale.</p>
 <p>Three rules apply to all tiers:</p>
