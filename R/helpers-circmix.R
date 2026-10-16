@@ -85,17 +85,19 @@
   }
 })
 
-# Cubic Hermite interpolation of log kappa against log J, with the exact
-# asymptotics outside the tabulated range: J -> kappa^2 / 2 as kappa -> 0 and
-# J -> kappa - 1/2 as kappa -> infinity. Max relative error 1.7e-11. Stan's
-# circmix_kappa() receives the same table as data, so the R and Stan inverses
-# cannot drift apart.
+# Cubic Hermite interpolation of log kappa against log J, with the asymptotics
+# outside the tabulated range: below it, inverting
+# J = kappa^2 / 2 - kappa^4 / 16 gives sqrt(2 J) (1 + J / 8), whose relative
+# error is O(J^2), so the value jumps by about 2e-12 at the edge rather than by
+# the 1.25e-6 of sqrt(2 J) alone; above it, J -> kappa - 1/2. Max relative
+# error 1.7e-11. Stan's circmix_kappa() receives the same table as data, so the
+# R and Stan inverses cannot drift apart.
 .circmix_kappa <- function(J, tab = .circmix_kappa_table()) {
   n <- length(tab$logkappa)
   t <- log(J)
   out <- J + 0.5
   low <- which(t <= tab$logJ_min)
-  out[low] <- sqrt(2 * J[low])
+  out[low] <- sqrt(2 * J[low]) * (1 + J[low] / 8)
   mid <- which(t > tab$logJ_min & t < tab$logJ_min + (n - 1) * tab$dlogJ)
   if (!length(mid)) {
     return(out)
@@ -136,14 +138,19 @@
 }
 
 # Marginalises the Fisher information of the memory components over
-# J ~ gamma(shape = J(kappa) / tau, scale = tau) on a composite Simpson grid in
-# log J. tau = 0 is the point mass at J(kappa), so rows with tau = 0 fall back
-# to the constant-precision density, which is why tau is the parameter
-# variable_precision frees. The nodes are centred on
-# E[log J] = digamma(shape) + log(tau) with half width
-# 8 sd(log J) = 8 sqrt(trigamma(shape)); the offsets are constants, so only the
-# centre and the width depend on parameters, and they do so smoothly.
-.circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 41L,
+# J ~ gamma(shape = J(kappa) / tau, scale = tau). tau = 0 is the point mass at
+# J(kappa), so rows with tau = 0 fall back to the constant-precision density,
+# which is why tau is the parameter variable_precision frees. The density is
+# linear in the components, sum_k w_k I_k(y) + w_guess / (2 pi), and each I_k
+# is integrated on its own grid (.circmix_vp_component()). A grid shared by the
+# components and centred on the gamma prior misses the integrand of a response
+# far from a component, which peaks many prior SDs below E[log J]; without a
+# guess weight to mask it, that underestimated the log density by up to 233
+# nats (kappa 500, shape 100, y = pi).
+# Below a shape of 60 / nodes the left tail of log J is too heavy for the grid:
+# with 81 nodes the log density holds to about 1e-5 from that threshold (0.74)
+# up, to 2e-6 from shape 1, and to 1e-9 from shape 10.
+.circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
   shape <- .circmix_J(kappa) / tau
@@ -153,30 +160,89 @@
     return(out)
   }
   stopif(
-    any(shape[vp] < 40 / nodes),
-    "The variable-precision quadrature holds the log density to about 1e-5 \\
-    while the gamma shape J(kappa)/tau stays above {40 / nodes}, but the \\
-    smallest value here is {min(shape[vp])}. Raise vp_nodes."
+    any(shape[vp] < 60 / nodes),
+    "The variable-precision quadrature needs a gamma shape J(kappa)/tau of at \\
+    least 60 / vp_nodes = {60 / nodes}, but the smallest value here is \\
+    {min(shape[vp])}. Raise vp_nodes."
   )
 
-  centre <- digamma(shape[vp]) + log(tau[vp])
-  offsets <- seq(-1, 1, length.out = nodes)
-  simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
-  lp <- vapply(seq_len(nodes), function(i) {
-    t <- centre + half_width[vp] * offsets[i]
-    J <- exp(t)
-    simpson[i] + t +
-      stats::dgamma(J, shape = shape[vp], scale = tau[vp], log = TRUE) +
-      .circmix_ld(
-        cosd[vp, , drop = FALSE], logw[vp, , drop = FALSE], logw_guess[vp],
-        .circmix_kappa(J, tab)
-      )
+  log_integral <- vapply(seq_len(ncol(cosd)), function(k) {
+    .circmix_vp_component(cosd[vp, k], shape[vp], tau[vp], nodes, tab)
   }, numeric(length(vp)))
-
-  step <- 2 * half_width[vp] / (nodes - 1)
-  out[vp] <- matrixStats::rowLogSumExps(matrix(lp, nrow = length(vp))) +
-    log(step / 3)
+  memory <- matrixStats::rowLogSumExps(
+    logw[vp, , drop = FALSE] + matrix(log_integral, nrow = length(vp))
+  )
+  out[vp] <- matrixStats::rowLogSumExps(cbind(memory, logw_guess[vp] - log(2 * pi)))
   out
+}
+
+# log of the integral over J ~ gamma(shape, scale = tau) of one von Mises
+# component with cos(y - mu) = cos_d, on a composite Simpson grid in t = log J.
+# The grid is centred on the mode of the integrand, found by a fixed number of
+# damped Newton steps from the large-kappa mode (shape + 1/2) / (1/tau + 1 -
+# cos_d); a fixed count keeps the grid a smooth function of the parameters, and
+# four steps reach the mode to 1e-4 of the window scale from shape 0.5 to 1e6
+# and kappa 0.01 to 1e4 (the start alone is within 0.4 of it there, which the
+# window absorbs, so the steps guard parameters outside that range). The grid
+# spans -12 to +6 times the integrand's curvature scale, wider below because
+# log J is left-skewed, and never less than sd(log J) = sqrt(trigamma(shape)).
+# The weights are not renormalised: the grid follows the integrand, not the
+# prior, so their sum is not an approximation of the prior's mass.
+.circmix_vp_component <- function(cos_d, shape, tau, nodes, tab) {
+  t <- log((shape + 0.5) / (1 / tau + 1 - cos_d))
+  for (i in 1:4) {
+    slopes <- .circmix_vp_slopes(t, cos_d, shape, tau, tab)
+    step <- ifelse(slopes$d2 < 0, -slopes$d1 / slopes$d2, ifelse(slopes$d1 > 0, 1, -1))
+    t <- t + pmin(pmax(step, -1), 1)
+  }
+  d2 <- .circmix_vp_slopes(t, cos_d, shape, tau, tab)$d2
+  scale <- pmax(1 / sqrt(ifelse(d2 < 0, -d2, Inf)), sqrt(trigamma(shape)))
+
+  n <- length(t)
+  grid <- t + outer(scale, seq(-12, 6, length.out = nodes))
+  log_integrand <- matrix(.circmix_vp_log_integrand(
+    as.vector(grid), rep(cos_d, nodes), rep(shape, nodes), rep(tau, nodes), tab
+  ), nrow = n)
+  simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
+  matrixStats::rowLogSumExps(log_integrand + rep(simpson, each = n)) +
+    log(6 * scale / (nodes - 1))
+}
+
+.circmix_vp_log_integrand <- function(t, cos_d, shape, tau, tab) {
+  J <- exp(t)
+  kappa <- .circmix_kappa(J, tab)
+  t + stats::dgamma(J, shape = shape, scale = tau, log = TRUE) +
+    kappa * cos_d - .circmix_log_besselI0(kappa) - log(2 * pi)
+}
+
+# First and second derivatives of .circmix_vp_log_integrand() in t, from
+# d kappa / d log J = A / (1 - A^2) and dA / d kappa = 1 - A / kappa - A^2.
+.circmix_vp_slopes <- function(t, cos_d, shape, tau, tab) {
+  J <- exp(t)
+  a <- .circmix_A_terms(.circmix_kappa(J, tab))
+  one_minus_A2 <- a$one_minus * (1 + a$A)
+  dkappa <- a$A / one_minus_A2
+  list(
+    d1 = shape - J / tau + (cos_d - a$A) * dkappa,
+    d2 = -J / tau - a$slope * dkappa^2 +
+      (cos_d - a$A) * a$slope * (1 + a$A^2) * dkappa / one_minus_A2^2
+  )
+}
+
+# A, 1 - A and dA / d kappa. Above kappa = 1e3, where .circmix_A() switches to
+# its series, the last two come from that series too, because computing them
+# from A cancels.
+.circmix_A_terms <- function(kappa) {
+  A <- .circmix_A(kappa)
+  one_minus <- 1 - A
+  slope <- 1 - A / kappa - A^2
+  large <- which(kappa > 1e3)
+  if (length(large)) {
+    k <- kappa[large]
+    one_minus[large] <- 1 / (2 * k) + 1 / (8 * k^2) + 1 / (8 * k^3)
+    slope[large] <- 1 / (2 * k^2) + 1 / (4 * k^3) + 3 / (8 * k^4)
+  }
+  nlist(A, one_minus, slope)
 }
 
 # Draws from the mixture by picking a component and then sampling from it, which
@@ -244,10 +310,20 @@
   no_guessing <- rep(-Inf, n)
   single_slot <- .circmix_J(kappa)
 
-  high <- log(allocation$extra) + .circmix_vp_ld(
-    cosd, logw, no_guessing,
-    .circmix_kappa((allocation$slots + 1) * single_slot), tau, nodes
-  )
+  # At a whole K / set_size the extra slot has weight zero, so it is skipped.
+  # Stan cannot skip it: log(0) would give K a NaN gradient, and dropping the
+  # branch would give the wrong slope, so it returns the same value in a form
+  # whose gradient is the right-hand slope.
+  high <- rep(-Inf, n)
+  partial <- which(allocation$extra > 0)
+  if (length(partial)) {
+    high[partial] <- log(allocation$extra[partial]) + .circmix_vp_ld(
+      cosd[partial, , drop = FALSE], logw[partial, , drop = FALSE],
+      no_guessing[partial],
+      .circmix_kappa((allocation$slots[partial] + 1) * single_slot[partial]),
+      tau[partial], nodes
+    )
+  }
 
   low <- log1p(-allocation$extra) - log(2 * pi)
   held <- which(allocation$slots >= 0.5)
@@ -342,7 +418,7 @@
 # The node count travels on the family so that log_lik() uses the grid the Stan
 # likelihood was fitted with.
 .circmix_prep_nodes <- function(prep) {
-  prep$family$vp_nodes %||% 41L
+  prep$family$vp_nodes %||% 81L
 }
 
 # brms wants bounds on the natural scale of each distributional parameter, which
@@ -363,9 +439,60 @@
     "The variable_precision argument must be either TRUE or FALSE."
   )
   stopif(
-    vp_nodes < 41 || vp_nodes %% 2 == 0,
-    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
+    !isTRUE(is.numeric(vp_nodes) && length(vp_nodes) == 1 &&
+      vp_nodes >= 41 && vp_nodes %% 2 == 1),
+    "vp_nodes must be a single, whole, odd number of at least 41, but is \\
+    {collapse_comma(vp_nodes)}."
   )
+}
+
+# A posterior that the shape bound 60 / vp_nodes cuts off does not reach the
+# reject message: the sampler only diverges at the bound. In a diverging
+# mixture3p slot-averaging fit at 81 nodes, 34-50% of the draws sat within 10% of
+# it; refitted at 121 nodes, at most 1% sat near the new bound. Draws stopped at
+# the bound do not show how far below it the posterior reaches, so the node count
+# suggested moves the bound to two thirds of its value instead of to the lowest
+# draw.
+#' @export
+postprocess_brm.circular <- function(model, fit, ...) {
+  fit <- NextMethod("postprocess_brm")
+  if (isTRUE(model$variable_precision) && has_draws(fit) &&
+    identical(fit$algorithm, "sampling")) {
+    .circmix_warn_vp_bound(
+      .circmix_vp_shape_min(fit),
+      divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
+      nodes = model$vp_nodes
+    )
+  }
+  fit
+}
+
+.circmix_warn_vp_bound <- function(shape_min, divergent, nodes) {
+  near <- mean(shape_min < 1.1 * 60 / nodes)
+  suggested <- 2 * ceiling(0.75 * (nodes - 1)) + 1
+  warnif(
+    divergent > 0 && near >= 0.05,
+    "{divergent} transitions after warmup were divergent, and in {round(100 * near)}% \\
+    of the posterior draws the gamma shape J(kappa)/tau lies within 10% of the \\
+    smallest value the variable-precision quadrature accepts, 60 / vp_nodes = \\
+    {signif(60 / nodes, 3)}. That bound may cut off part of the posterior. Refit \\
+    with vp_nodes = {suggested}, which lowers it to {signif(60 / suggested, 3)} \\
+    and takes about 1.5 times as long."
+  )
+}
+
+# The smallest J(kappa)/tau over the observations, per draw. kappa and tau can
+# vary with predictors, so they are read per observation, in blocks that keep the
+# draws x observations matrices small.
+.circmix_vp_shape_min <- function(fit) {
+  prep <- brms::prepare_predictions(fit)
+  out <- rep(Inf, prep$ndraws)
+  for (idx in split(seq_len(prep$nobs), ceiling(seq_len(prep$nobs) / 1000))) {
+    shape <- .circmix_J(brms::get_dpar(prep, "kappa", i = idx)) /
+      brms::get_dpar(prep, "tau", i = idx)
+    out <- pmin(out, matrixStats::rowMins(matrix(shape, nrow = prep$ndraws)))
+  }
+  out
 }
 
 # The non-target locations reach the likelihood as vreal1..vrealK, padded to
@@ -490,7 +617,7 @@
 # in inst/stan_chunks. core_dpars may hold literals, which is how a
 # constant-precision model passes 0 for the tau its family does not estimate.
 .circmix_stan_wrapper <- function(family, dpars, core_dpars = dpars, vint = NULL,
-                                  vreal = list(), nodes = 41L) {
+                                  vreal = list(), nodes = 81L) {
   vreal_names <- lapply(names(vreal), function(g) paste0(g, seq_len(vreal[[g]])))
   vreal_args <- unlist(vreal_names)
   args <- c(

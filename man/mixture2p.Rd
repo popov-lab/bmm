@@ -9,7 +9,7 @@ mixture2p(
   set_size = NULL,
   version = c("simple", "slot", "slot_averaging"),
   variable_precision = FALSE,
-  vp_nodes = 41L,
+  vp_nodes = 81L,
   links = NULL,
   ...
 )
@@ -22,8 +22,9 @@ in degrees to radian using the \code{deg2rad} function.}
 
 \item{set_size}{Name of the variable in the dataset containing the set size,
 or a single number if the set size is constant. Required by the \code{"slot"}
-and \code{"slot_averaging"} versions and ignored by \code{"simple"}. The capacity \code{K}
-is only identified if the set size varies.}
+and \code{"slot_averaging"} versions and ignored by \code{"simple"}. With a single
+set size the capacity rule cannot be tested: \code{K} is then estimated from the
+responses at that set size, and only below it.}
 
 \item{version}{A character string specifying which version of the model to
 use. Options are:
@@ -50,18 +51,22 @@ Fougnie et al., 2012). This adds the parameter \code{tau}, and the likelihood
 integrates the Fisher information \code{J} of a memory representation over
 \code{gamma(mean = J(kappa), scale = tau)}. \code{kappa} keeps its meaning as the
 mean precision, so \code{tau -> 0} recovers the constant-precision model.
-The integral is evaluated by quadrature, which costs about ten times as
+Under \code{version = "slot_averaging"}, the precision of an item held in \code{j}
+slots is the sum of \code{j} independent slot draws,
+\code{gamma(shape = j * J(kappa) / tau, scale = tau)}, so its variance grows
+with \code{j}. The integral is evaluated by quadrature, which costs about ten times as
 much per gradient at the default \code{vp_nodes}; expect a larger factor in wall
 time, since the posterior geometry also needs more leapfrog steps. \code{tau} is
 the parameter that needs the most data, and is often only weakly identified
 in small designs.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
-\code{variable_precision = TRUE}; must be an odd number of at least 41. The
-default holds the log likelihood to about 1e-5 as long as the implied gamma
-shape \code{J(kappa) / tau} stays above roughly 1. Below that the model rejects
-rather than returning a biased likelihood, and asks for more nodes; 81
-nodes reach a shape of about 0.5, and 161 about 0.25.}
+\code{variable_precision = TRUE}; must be an odd number of at least 41. With the
+default of 81, the log likelihood holds to about 1e-5 as long as the
+implied gamma shape \code{J(kappa) / tau} stays above \code{60 / vp_nodes} (0.74 at
+the default), and to about 2e-6 above a shape of 1. Below that threshold
+the model rejects rather than returning a biased likelihood, and asks for
+more nodes; 121 nodes reach a shape of about 0.5, and 241 about 0.25.}
 
 \item{links}{A named list of link functions for the model parameters, e.g.
 \code{list(kappa = "softplus")}. Defaults are \code{"log"} for \code{kappa}, \code{K} and
@@ -91,7 +96,7 @@ Two-parameter mixture model by Zhang and Luck (2008).
 }
 }
 \itemize{
-\item The 'slot' and 'slot_averaging' versions additionally require a         set_size variable, which has to vary for the capacity K to be identified
+\item The 'slot' and 'slot_averaging' versions additionally require a         set_size variable, which should vary for the capacity rule to be testable
 }
 \itemize{
 \item \strong{Parameters:}

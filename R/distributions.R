@@ -351,10 +351,14 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' lines(x, d, type = "l", col = "red")
 #'
 dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
-                       set_size = 1, version = "simple", vp_nodes = 41L,
+                       set_size = 1, version = "simple", vp_nodes = 81L,
                        log = FALSE) {
   version <- match.arg(version, names(.mixture2p_version_table))
-  .check_mixture2p_args(kappa, p_mem, tau, K, version)
+  .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
+  stopif(
+    vp_nodes < 41 || vp_nodes %% 2 == 0,
+    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
+  )
 
   density <- switch(version,
     simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
@@ -369,7 +373,7 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   density
 }
 
-.check_mixture2p_args <- function(kappa, p_mem, tau, K, version) {
+.check_mixture2p_args <- function(kappa, p_mem, tau, K, set_size, version) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
   if (version == "simple") {
@@ -378,6 +382,10 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
     return(invisible())
   }
   stopif(isTRUE(any(K <= 0)), "K must be positive.")
+  stopif(
+    isTRUE(any(set_size < 1 | set_size %% 1 != 0)),
+    "set_size must contain positive whole numbers."
+  )
 }
 
 .dmixture2p_simple <- function(x, mu, kappa, p_mem, tau, nodes) {
@@ -447,7 +455,7 @@ qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
 rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
                        set_size = 1, version = "simple") {
   version <- match.arg(version, names(.mixture2p_version_table))
-  .check_mixture2p_args(kappa, p_mem, tau, K, version)
+  .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
 
   recycle <- function(x) rep_len(x, n)
   switch(version,

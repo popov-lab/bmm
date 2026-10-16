@@ -173,6 +173,14 @@ rename_deprecated_parameters <- function(model, formula) {
   }
 
   new_names <- unlist(renames[used], use.names = FALSE)
+  # renaming would leave two formulas for one parameter, and only the first
+  # would be used
+  both <- new_names %in% names(formula)
+  stopif(
+    any(both),
+    "The formula gives both {collapse_comma(used[both])} and its new name \\
+    {collapse_comma(new_names[both])}. Please keep only the new name."
+  )
   warning2(
     "The parameter(s) {collapse_comma(used)} were renamed to \\
     {collapse_comma(new_names)}. The old name(s) still work, but will be \\
