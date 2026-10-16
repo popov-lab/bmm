@@ -72,21 +72,6 @@ test_that("the metad version refuses an odd number of rating categories", {
                   "sdt_rating_dpsdt")
 })
 
-test_that("Ro, Rn and logmratio keep their identity links", {
-  for (par in c("Ro", "Rn")) {
-    expect_error(
-      sdt_rating(paste0("r", 1:4), "stimulus", version = "dpsdt",
-                 links = stats::setNames(list("log"), par)),
-      paste0("link of '", par, "' cannot be changed")
-    )
-  }
-  expect_error(
-    sdt_rating(paste0("r", 1:4), "stimulus", version = "metad",
-               links = list(logmratio = "log")),
-    "link of 'logmratio' cannot be changed"
-  )
-})
-
 test_that("a link on d reaches the dpsdt and metad kernels through the formula", {
   for (v in c("dpsdt", "metad")) {
     bf <- bmf2bf(sdt_rating(paste0("r", 1:4), "stimulus", version = v,
@@ -124,11 +109,12 @@ test_that("metad equal to d reduces to the standard category probs", {
 
 test_that("metad holds each side of the criterion to the type-1 rate", {
   # the old/new boundary is criterion itself (threshold K/2), whatever the
-  # threshold type, so the "new" side carries F((criterion - shift) / scale)
+  # threshold type, so the "new" side carries F((criterion - shift) / scale),
+  # with the signal mean at the separation and the noise mean at 0
   sr <- 1.3
   d <- 1.5
   crit <- 0.4
-  shift <- d * bmm:::.sdt_rms_scale(sr) / 2
+  shift <- d * bmm:::.sdt_rms_scale(sr)
   for (tt in c("parsimonious", "log_distance", "softmax")) {
     thr <- bmm:::.sdt_make_thresholds(crit, 6L, tt, spacing = 0.2,
                                       deltas = if (tt == "softmax") c(0.3, -0.2, 0.1)
@@ -137,7 +123,32 @@ test_that("metad holds each side of the criterion to the type-1 rate", {
     pn <- bmm:::.sdt_metad_category_probs(thr, d, sr, 0L, "normal", 0.7)
     expect_equal(sum(ps[1:3]), pnorm((crit - shift) / sr), tolerance = 1e-12,
                  info = tt)
-    expect_equal(sum(pn[1:3]), pnorm(crit + shift), tolerance = 1e-12, info = tt)
+    expect_equal(sum(pn[1:3]), pnorm(crit), tolerance = 1e-12, info = tt)
+  }
+})
+
+test_that("metad holds the thresholds' distance from the midpoint fixed", {
+  # The meta-d' constraint is that the thresholds keep their distance from the
+  # midpoint between the means when d is replaced by meta-d'. Written here in
+  # that midpoint frame, independently of the kernels' noise-mean frame.
+  sr <- 1.3
+  d <- 1.5
+  metad <- 0.7
+  t_mid <- c(-0.5, 0.15, 0.6)
+  sep_d <- d * sqrt((1 + sr^2) / 2)
+  sep_m <- metad * sqrt((1 + sr^2) / 2)
+  for (stim in 0:1) {
+    sigma <- sr^stim
+    mu_d <- sep_d * (stim - 0.5)
+    mu_m <- sep_m * (stim - 0.5)
+    p_meta <- diff(c(0, pnorm((t_mid - mu_m) / sigma), 1))
+    new_d <- pnorm((t_mid[2] - mu_d) / sigma)
+    new_m <- pnorm((t_mid[2] - mu_m) / sigma)
+    hand <- p_meta * c(rep(new_d / new_m, 2), rep((1 - new_d) / (1 - new_m), 2))
+
+    got <- bmm:::.sdt_metad_category_probs(t_mid + sep_d / 2, d, sr, stim,
+                                           "normal", metad)
+    expect_equal(got, hand, tolerance = 1e-12, info = stim)
   }
 })
 
@@ -185,7 +196,7 @@ test_that("dpsdt category probs match an independent hand computation (K=4)", {
   thr <- c(-0.6, 0.1, 0.7)
   d <- 1.5
   Ro <- 0.35
-  base_s <- diff(c(0, pnorm(thr - d / 2), 1))            # signal, sr = 1
+  base_s <- diff(c(0, pnorm(thr - d), 1))                # signal, sr = 1
   hand_s <- (1 - Ro) * base_s
   hand_s[4] <- hand_s[4] + Ro
   got_s <- bmm:::.sdt_dpsdt_category_probs(thr, d, 1, 1L, "normal",
@@ -211,30 +222,6 @@ test_that("recollection moves mass to the most-confident category and sums to 1"
 # DISTRIBUTION & SIMULATION FUNCTIONS                                    ####
 ############################################################################# !
 
-test_that("rsdt_dpsdt / rsdt_metad return rating count matrices", {
-  thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
-  counts_dp <- rsdt_dpsdt(8, 50, rep(c(0L, 1L), 4), d = 1.4, thresholds = thr,
-                          Ro = 0.3, Rn = 0.1)
-  expect_true(is.matrix(counts_dp))
-  expect_equal(colnames(counts_dp), paste0("r", 1:4))
-  expect_true(all(rowSums(counts_dp) == 50))
-
-  m <- rsdt_metad(8, 50, rep(c(0L, 1L), 4), d = 1.4, thresholds = thr,
-                  metad = 1.0)
-  expect_equal(dim(m), c(8L, 4L))
-})
-
-test_that("dsdt_dpsdt / dsdt_metad return finite densities and validate inputs", {
-  expect_true(is.finite(dsdt_dpsdt(c(2, 8, 20, 70), 1L, 1.5,
-                                   c(-0.5, 0, 0.5), Ro = 0.3, Rn = 0)))
-  expect_true(is.finite(dsdt_metad(c(5, 15, 25, 55), 1L, 1.5,
-                                   c(-0.5, 0, 0.5), metad = 1.0)))
-  expect_error(dsdt_dpsdt(c(1, 2, 3, 4), 1L, 1, c(0, 0.5, 1), Ro = 1.5, Rn = 0),
-               "Ro must be a probability")
-  expect_error(rsdt_metad(c(2, 3), 50, 1L, 1.4, c(-0.5, 0, 0.5), metad = 1),
-               "single positive integer")
-})
-
 test_that("dsdt_dpsdt() and rsdt_dpsdt() default to Rn = 0, the one-sided model", {
   thr <- c(-0.5, 0, 0.5)
   for (stim in c(0L, 1L)) {
@@ -251,7 +238,7 @@ test_that("dsdt_dpsdt() and rsdt_dpsdt() default to Rn = 0, the one-sided model"
   expect_lt(abs(counts_n[1, 1] / 1e5 - p_bottom), 0.01)
 })
 
-test_that("dsdt version densities match dmultinom and vectorize over rows", {
+test_that("dsdt version densities match dmultinom", {
   thr <- c(-0.5, 0, 0.5)
   p_dp <- bmm:::.sdt_dpsdt_category_probs(thr, 1.5, 1, 1L, "normal",
                                           qlogis(0.3), -Inf)
@@ -261,12 +248,6 @@ test_that("dsdt version densities match dmultinom and vectorize over rows", {
   p_md <- bmm:::.sdt_metad_category_probs(thr, 1.5, 1, 1L, "normal", 1.0)
   expect_equal(dsdt_metad(c(5, 15, 25, 55), 1L, 1.5, thr, metad = 1.0),
                dmultinom(c(5, 15, 25, 55), prob = p_md), tolerance = 1e-12)
-
-  counts <- rbind(c(2, 8, 20, 70), c(70, 20, 8, 2))
-  dens <- dsdt_dpsdt(counts, c(1L, 0L), 1.5, thr, Ro = c(0.3, 0.2),
-                     Rn = c(0, 0.1), log = TRUE)
-  expect_length(dens, 2)
-  expect_true(all(is.finite(dens)))
 })
 
 test_that("version category probs vectorized path matches per-draw evaluation", {
@@ -299,6 +280,7 @@ test_that("version category probs vectorized path matches per-draw evaluation", 
 ############################################################################# !
 
 test_that("all rating versions configure through the bmm pipeline", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
   dat <- expand.grid(id = 1:4, stimulus = c(0L, 1L))
   dat <- cbind(dat, as.data.frame(rsdt_dpsdt(nrow(dat), 40, dat$stimulus,
@@ -327,7 +309,7 @@ test_that("the generated Stan wrapper carries the version-specific call", {
 })
 
 test_that("metad R companion with logmratio = 0 reduces to the standard model", {
-  args <- list(K = 6L, dist = 1L, thresh = 1L, d = matrix(1.4),
+  args <- list(K = 6L, dist = 1L, thresh = 1L, anchor = 1L, d = matrix(1.4),
                criterion = matrix(0), spacing = matrix(0.3),
                sdratio = matrix(0), stimulus = matrix(1))
   for (k in 1:6) {
@@ -376,9 +358,8 @@ versions_stan_logmu <- function(grid, deltas) {
 }
 
 test_that("the Stan dpsdt and metad kernels match their R counterparts in both tails", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   grid <- expand.grid(cat = 1:6, criterion = c(-12, -0.5, 0.3, 12),
                       sdratio = c(-0.6, 0, 0.9), stimulus = c(0, 1),

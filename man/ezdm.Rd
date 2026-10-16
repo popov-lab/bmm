@@ -70,7 +70,7 @@ Provide aggregated statistics for each subject and condition that model paramete
 \item \code{drift}: Drift rate = Average rate of evidence accumulation of the decision processes
 \item \code{bound}: Boundary separation = Distance between the decision boundaries that need to be reached
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
-\item \code{zr}: Relative starting point = Starting point between the decision thresholds relative to the upper bound.
+\item \code{zr}: Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, > 0.5 = biased towards the upper response).
 \item \code{s}: The diffusion constant, that is the standard deviation of the Gaussian noise during sampling
 }
 \item \strong{Fixed parameters:}
@@ -185,8 +185,11 @@ fit <- bmm(
 summary(fit)
 
 # Extract population-level effects
-# True values: drift = 2, bound = 1.5, ndt = 0.3 (on log scale for drift/bound)
-exp(brms::fixef(fit))
+# True values: drift = 2, bound = 1.5, ndt = 0.3
+# drift has an identity link; bound and ndt have log links
+fixed_effects <- brms::fixef(fit)
+fixed_effects["drift_Intercept", "Estimate"]
+exp(fixed_effects[c("bound_Intercept", "ndt_Intercept"), "Estimate"])
 }
 }
 \keyword{bmmodel}

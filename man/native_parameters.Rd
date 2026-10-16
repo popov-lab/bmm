@@ -163,7 +163,7 @@ are filled from the first row of the model data rather than recomputed, and
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 fit <- bmm(
   bmf(c ~ 0 + set_size, kappa ~ 1),
   data = oberauer_lin_2017,

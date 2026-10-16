@@ -287,7 +287,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # load data
 data <- oberauer_lin_2017
 

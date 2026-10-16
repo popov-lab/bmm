@@ -38,7 +38,7 @@
 #'   the information on the parameters (or parameter classes) for which priors
 #'   can be specified.
 #'
-#' @seealso [supported_models()], [brms::default_prior()]
+#' @seealso [bmm_models()], [brms::default_prior()]
 #'
 #' @keywords extract_info
 #'
@@ -50,24 +50,9 @@
 #' @export
 default_prior.bmmformula <- function(object, data, model, formula = object, ...) {
   withr::local_options(bmm.sort_data = FALSE)
-
-  formula <- object
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-  config_args <- configure_model(model, data, formula)
   dots <- list(...)
-  prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, user_prior = NULL), brms_frame_args(dots))
-  )
-
-  prior_args <- combine_args(nlist(config_args, dots, prior))
-  prior_args$object <- prior_args$formula
-  prior_args$formula <- NULL
-
-  brms_priors <- brms::do_call(brms::default_prior, prior_args)
-
-  combine_prior(brms_priors, prior_args$prior)
+  cfg <- configure_fit(object, data, model, until = "prior", frame_args = brms_frame_args(dots))
+  combine_prior(call_brms_extractor(brms::default_prior, cfg, dots), cfg$prior)
 }
 
 #' @title Priors of a fitted bmm model and where they came from
@@ -124,7 +109,7 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   subsetting drops.
 #' @seealso [default_prior()], [parameter_info()]
 #' @keywords extract_info
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- bmm(
 #'   bmf(c ~ 0 + set_size, kappa ~ 1),
 #'   data = oberauer_lin_2017,
@@ -509,7 +494,7 @@ upfirst <- function(x) {
 #'
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' configure_prior.mymodel <- function(model, data, formula, user_prior, ...) {
 #'   # a prior that depends on the data, which the model object cannot declare
 #'   if (!"condition" %in% names(data)) {
@@ -626,10 +611,12 @@ validate_default_priors <- function(model, formula) {
     !is.list(default_priors) || !all(sapply(default_priors, is.list)),
     "The default_priors should be a list of lists"
   )
-  dpars_predicted_by_nlpars <- names(which(sapply(formula$pforms, is_nl)))
-  default_priors[dpars_predicted_by_nlpars] <- NULL
+  dropped <- intersect(
+    names(which(vapply(formula$pforms, is_nl, logical(1)))), names(default_priors)
+  )
+  default_priors[dropped] <- NULL
   warnif(
-    any(dpars_predicted_by_nlpars %in% names(model$parameter)),
+    length(dropped) > 0,
     "Non-linear transformations of model parameters detected in the formula.
     Consider specifying priors for better estimation; otherwise, flat priors will be used."
   )
@@ -746,7 +733,13 @@ combine_prior <- function(prior1, prior2) {
   prior_types <- function(prior) {
     do.call(paste, as_prior_table(prior)[, c("class", "dpar", "nlpar", "coef", "group", "resp")])
   }
-  is_duplicate <- prior_types(prior1) %in% prior_types(prior2)
+  # brms stores the intercept of a non-linear parameter as the coefficient
+  # "Intercept" of class "b", so a prior on the whole nlpar (no coef) must
+  # replace that row too, or the more specific row wins in brms (#526)
+  as_nlpar_wide <- prior1
+  as_nlpar_wide$coef[nzchar(prior1$nlpar) & prior1$coef == "Intercept"] <- ""
+  is_duplicate <- prior_types(prior1) %in% prior_types(prior2) |
+    prior_types(as_nlpar_wide) %in% prior_types(prior2)
   prior <- prior1[!is_duplicate, ] + prior2
   row.names(prior) <- seq_len(nrow(prior))
   prior

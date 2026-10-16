@@ -195,7 +195,7 @@
 #'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 #'   Variability in encoding precision accounts for visual short-term memory
 #'   limitations. PNAS, 109(22), 8780-8785.
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data
 #' dat <- data.frame(y = rmixture2p(n = 2000))
 #'

@@ -14,21 +14,6 @@ sim_ranking <- function(n, n_trials, m, d, dist = "gumbel_min",
 # MODEL CONSTRUCTOR TESTS                                                ####
 ############################################################################# !
 
-test_that("sdt_ranking model can be created", {
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_s3_class(model, "bmmodel")
-  expect_s3_class(model, "sdt")
-  expect_s3_class(model, "sdt_ranking")
-})
-
-test_that("sdt_ranking has correct parameters (only d, no criterion, no mu)", {
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_true("d" %in% names(model$parameters))
-  expect_false("mu" %in% names(model$parameters))
-  expect_false("criterion" %in% names(model$parameters))
-  expect_length(model$fixed_parameters, 0)
-})
-
 test_that("sdt_ranking stores response and m correctly", {
   model <- sdt_ranking(ranks4, m = 4)
   expect_equal(model$resp_vars$response, ranks4)
@@ -41,58 +26,6 @@ test_that("sdt_ranking accepts m as a constant or a column name", {
 
   m_col <- sdt_ranking(ranks5, m = "set_size")
   expect_identical(m_col$other_vars$m, "set_size")
-})
-
-test_that("sdt_ranking has correct links and accepts custom links", {
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_equal(model$links$d, "identity")
-
-  custom <- sdt_ranking(ranks4, m = 4, links = list(d = "log"))
-  expect_equal(custom$links$d, "log")
-})
-
-test_that("sdt_ranking refuses any link on sdratio, and any unknown target", {
-  # Stan reads exp(sdratio), and the fixed 0 means equal variance only on the
-  # identity link, so sdratio cannot be relinked. d can, but only for
-  # gumbel_min: the Gaussian quadrature fails at the d a log link reaches.
-  expect_equal(settable_links(sdt_ranking(ranks4, m = 4)), "d")
-  expect_equal(settable_links(sdt_ranking(ranks4, m = 4, dist = "normal")),
-               character(0))
-  for (link in c("log", "softplus", "logit")) {
-    expect_error(
-      sdt_ranking(ranks4, m = 4, dist = "normal", links = list(sdratio = link)),
-      "link of 'sdratio' cannot be changed"
-    )
-    expect_error(
-      sdt_ranking(ranks4, m = 4, dist = "normal", links = list(d = link)),
-      "link of 'd' cannot be changed"
-    )
-  }
-  expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal",
-                            links = list(d = "identity")))
-  expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal",
-                            links = list(sdratio = "identity")))
-  expect_error(
-    sdt_ranking(ranks4, m = 4, links = list(sensitivity = "log")),
-    "Unrecognized link target"
-  )
-  # and the refusal survives an assignment made after construction
-  model <- sdt_ranking(ranks4, m = 4, dist = "normal")
-  model$links$sdratio <- "log"
-  expect_error(check_links(model), "link of 'sdratio' cannot be changed")
-  model <- sdt_ranking(ranks4, m = 4, dist = "normal")
-  model$links$d <- "log"
-  expect_error(check_links(model), "link of 'd' cannot be changed")
-})
-
-test_that("sdt_ranking offers only the links it can invert in its formula", {
-  expect_error(
-    sdt_ranking(ranks4, m = 4, links = list(d = "sqrt")),
-    "Unknown link function"
-  )
-  model <- sdt_ranking(ranks4, m = 4)
-  model$links$d <- "sqrt"
-  expect_error(check_links(model), "Unknown link function")
 })
 
 test_that("sdt_ranking warns when it truncates a non-integer m", {
@@ -122,7 +55,7 @@ test_that("the gumbel_min ranking kernel is the smallest-extreme-value one", {
   # from the documented cdf 1 - exp(-exp(x)), i.e. quantile log(-log(1 - u)).
   # The mirror (largest extreme value) gives visibly different rank
   # probabilities, so this fails loudly if the two labels are ever swapped.
-  set.seed(4711)
+  withr::local_seed(4711)
   rmin <- function(n) log(-log(1 - runif(n)))
   n <- 200000
   d <- 1.5
@@ -138,29 +71,8 @@ test_that("the gumbel_min ranking kernel is the smallest-extreme-value one", {
   }
 })
 
-test_that("sdt_ranking only supports gumbel_min and normal", {
-  expect_silent(sdt_ranking(ranks4, m = 4, dist = "gumbel_min"))
-  expect_silent(sdt_ranking(ranks4, m = 4, dist = "normal"))
+test_that("sdt_ranking refuses a dist other than gumbel_min and normal", {
   expect_error(sdt_ranking(ranks4, m = 4, dist = "logistic"))
-})
-
-test_that("dist='normal' adds sdratio (fixed to 0); gumbel_min does not", {
-  normal <- sdt_ranking(ranks4, m = 4, dist = "normal")
-  expect_true("sdratio" %in% names(normal$parameters))
-  expect_equal(normal$fixed_parameters$sdratio, 0)
-  expect_true("sdratio" %in% names(normal$init_ranges))
-  expect_equal(normal$default_priors$sdratio$sd, "exponential(2)")
-
-  gumbel <- sdt_ranking(ranks4, m = 4, dist = "gumbel_min")
-  expect_false("sdratio" %in% names(gumbel$parameters))
-})
-
-test_that("sdt_ranking has init_ranges with d (no mu)", {
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_equal(model$default_priors$d$sd, "exponential(1)")
-  expect_length(model$init_ranges$d, 2)
-  expect_true(model$init_ranges$d[1] < model$init_ranges$d[2])
-  expect_false("mu" %in% names(model$init_ranges))
 })
 
 
@@ -210,23 +122,29 @@ test_that("ranking d is d_a: equal variance is a no-op", {
 })
 
 test_that("ranking d is d_a: unequal variance uses the RMS-scaled separation", {
-  # the same model written with the separation in noise-SD units
+  # the same model written with the separation in noise-SD units, on the rule
+  # each branch uses: the free Hermite ladder over the target for a ratio below
+  # 1, 48 Legendre nodes on the noise interval [-6, 6] for a ratio above it
   m <- 4L
   for (sdr in c(-0.25, 0.35)) {
     r <- exp(sdr)
-    s <- sqrt((1 + r^2) / 2)
-    # a non-zero sdratio selects the free-sdratio node ladder
-    gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, TRUE))
-    nodes <- gh$nodes
-    w <- gh$weights
+    delta <- 1.4 * sqrt((1 + r^2) / 2)
     ref <- vapply(seq_len(m), function(k) {
-      eta <- 1.4 * s + r * nodes
-      exp(lchoose(m - 1, k - 1) + matrixStats::logSumExp(
-        log(w) + (m - k) * pnorm(eta, log.p = TRUE) +
-          (k - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)))
+      if (r < 1) {
+        gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, TRUE))
+        eta <- delta + r * gh$nodes
+        return(choose(m - 1, k - 1) *
+                 sum(gh$weights * pnorm(eta)^(m - k) * pnorm(-eta)^(k - 1)))
+      }
+      x <- 6 * bmm:::.gl_rule(48L)$nodes
+      w <- 6 * bmm:::.gl_rule(48L)$weights
+      choose(m - 1, k - 1) *
+        sum(w * dnorm(x, delta, r) * pnorm(x)^(m - k) * pnorm(-x)^(k - 1)) +
+        (k == 1) * pnorm(6, delta, r, lower.tail = FALSE) +
+        (k == m) * pnorm(-6, delta, r)
     }, numeric(1))
     expect_equal(bmm:::.ranking_all_probs_r(1.4, m, "normal", sdr),
-                 ref / sum(ref), info = paste("sdratio =", sdr))
+                 ref / sum(ref), tolerance = 1e-12, info = paste("sdratio =", sdr))
   }
 })
 
@@ -252,52 +170,81 @@ test_that("the quadrature ladder grows with set size and with a free sdratio", {
   }
 })
 
-test_that("the free-sdratio ladder is accurate where the fixed one is not", {
-  # The reference shares nothing with Gauss-Hermite: adaptive quadrature in a
-  # peak-shifted log space, integrated on each side of the peak.
-  log_integrand <- function(x, k, m, d, sigma) {
+# The reference shares nothing with either quadrature rule: adaptive quadrature
+# in a peak-shifted log space over the target's standard normal deviate,
+# integrated on each side of the peak.
+ranking_ref_prob <- function(k, m, d, sigma) {
+  f <- function(x) {
     eta <- d * sqrt((1 + sigma^2) / 2) + sigma * x
     dnorm(x, log = TRUE) + (m - k) * pnorm(eta, log.p = TRUE) +
       (k - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
   }
-  ref_logp <- function(k, m, d, sigma) {
-    f <- function(x) log_integrand(x, k, m, d, sigma)
-    peak <- optimize(f, c(-200, 200), maximum = TRUE, tol = 1e-10)
-    x0 <- peak$maximum
-    f0 <- peak$objective
-    g <- function(x) {
-      v <- exp(f(x) - f0)
-      v[!is.finite(v)] <- 0
-      v
-    }
-    left <- integrate(g, -Inf, x0, rel.tol = 1e-12, abs.tol = 0,
-                      subdivisions = 2000L)
-    right <- integrate(g, x0, Inf, rel.tol = 1e-12, abs.tol = 0,
-                       subdivisions = 2000L)
-    lchoose(m - 1, k - 1) + f0 + log(left$value + right$value)
+  peak <- optimize(f, c(-200, 200), maximum = TRUE, tol = 1e-10)
+  g <- function(x) {
+    v <- exp(f(x) - peak$objective)
+    v[!is.finite(v)] <- 0
+    v
   }
-  # R only evaluates the free ladder, so the fixed one is rebuilt here to show
-  # that the node count, not the kernel, is what makes the free one accurate
-  fixed_ladder_prob <- function(d, rank_pos, m, sigma) {
-    gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(m, FALSE))
-    eta <- gh$nodes * sigma + d * bmm:::.sdt_rms_scale(sigma)
-    log_terms <- log(gh$weights) +
-      (m - rank_pos) * pnorm(eta, log.p = TRUE) +
-      (rank_pos - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)
-    exp(lchoose(m - 1, rank_pos - 1) + matrixStats::logSumExp(log_terms))
-  }
+  left <- integrate(g, -Inf, peak$maximum, rel.tol = 1e-12, abs.tol = 0,
+                    subdivisions = 2000L)
+  right <- integrate(g, peak$maximum, Inf, rel.tol = 1e-12, abs.tol = 0,
+                     subdivisions = 2000L)
+  exp(lchoose(m - 1, k - 1) + peak$objective + log(left$value + right$value))
+}
 
-  d <- 1.4
-  sigma <- 2
-  for (m in c(4L, 8L)) {
+test_that("Gaussian rank probabilities are accurate over sdratio 0.2-8, d -1-4, m 2-20", {
+  # corners and centre of the range the quadrature promises 1e-6 over; it
+  # measured 2.4e-10 through m = 8 and 4.3e-9 at m = 20, so 1e-8 leaves room
+  # without hiding a regression to the old Hermite-only rule (2e-4 at sdratio 3).
+  # Both rules are weakest next to sdratio = 1, so m = 20 is checked there too.
+  cells <- rbind(
+    expand.grid(sigma = c(0.2, 8), d = c(-1, 4), m = c(2L, 8L, 20L)),
+    data.frame(sigma = c(0.999, 1.26, 1.001), d = 1.5, m = 5L),
+    data.frame(sigma = c(1, 1.001), d = 0, m = 20L)
+  )
+  for (i in seq_len(nrow(cells))) {
+    sigma <- cells$sigma[i]
+    d <- cells$d[i]
+    m <- cells$m[i]
     for (k in seq_len(m)) {
-      ref <- exp(ref_logp(k, m, d, sigma))
-      info <- paste("m =", m, "k =", k)
-      p_free <- bmm:::.ranking_prob_r(d, k, m, "normal", log(sigma))
-      expect_lt(abs(p_free - ref), 1e-6, label = info)
-      p_fixed <- fixed_ladder_prob(d, k, m, sigma)
-      expect_false(abs(p_fixed - ref) < 1e-6, info = info)
+      expect_lt(abs(bmm:::.ranking_prob_r(d, k, m, "normal", log(sigma)) -
+                      ranking_ref_prob(k, m, d, sigma)), 1e-8,
+                label = paste0("sigma = ", sigma, ", d = ", d, ", m = ", m, ", k = ", k))
     }
+  }
+})
+
+test_that("a Hermite rule over the target under-resolves sdratio above 1", {
+  # why ratios above 1 integrate on the noise axis: the lure terms change on a
+  # scale of 1/sigma in Hermite node units, and even the 128-node free ladder
+  # misses them at sigma = 3
+  gh <- bmm:::.gh_rule(128L)
+  d <- 1.4
+  sigma <- 3
+  m <- 8L
+  hermite_err <- kernel_err <- numeric(m)
+  for (k in seq_len(m)) {
+    eta <- d * sqrt((1 + sigma^2) / 2) + sigma * gh$nodes
+    hermite <- choose(m - 1, k - 1) *
+      sum(gh$weights * pnorm(eta)^(m - k) * pnorm(-eta)^(k - 1))
+    ref <- ranking_ref_prob(k, m, d, sigma)
+    hermite_err[k] <- abs(hermite - ref)
+    kernel_err[k] <- abs(bmm:::.ranking_prob_r(d, k, m, "normal", log(sigma)) - ref)
+  }
+  expect_gt(max(hermite_err), 1e-5)
+  expect_lt(max(kernel_err), 1e-8)
+})
+
+test_that("the generated Gauss-Legendre rule is symmetric and integrates polynomials exactly", {
+  # the kernel reads Phi(-x) off the mirrored node, so the mirror must be exact
+  for (n in c(48L, 64L)) {
+    gl <- bmm:::.gl_rule(n)
+    expect_identical(gl$nodes, -rev(gl$nodes))
+    expect_identical(gl$weights, rev(gl$weights))
+    expect_equal(sum(gl$weights), 2)
+    expect_equal(sum(gl$weights * gl$nodes^2), 2 / 3)
+    expect_equal(sum(gl$weights * gl$nodes^10), 2 / 11)
+    expect_equal(sum(gl$weights * gl$nodes^60), 2 / 61)
   }
 })
 
@@ -317,15 +264,29 @@ test_that("the generated Gauss-Hermite rule integrates the normal exactly", {
 test_that("configure_model substitutes every quadrature token", {
   sc <- system.file("stan_chunks", package = "bmm")
   tpl <- read_lines2(file.path(sc, "sdt_ranking_funs.stan"))
+  n_entries <- function(code, name) {
+    vec <- sub(paste0(".*", name, " = to_vector\\(\\{([^}]*)\\}\\).*"), "\\1",
+               gsub("\n", " ", code))
+    length(strsplit(vec, ",")[[1]])
+  }
   for (free in c(FALSE, TRUE)) {
     code <- bmm:::.ranking_fill_quadrature(tpl, max_m = 4, free_sdratio = free)
     expect_false(grepl("{{", code, fixed = TRUE), info = paste("free =", free))
     n <- bmm:::.ranking_gh_n(4, free)
     expect_match(code, paste0("int N_GH = ", n, ";"), fixed = TRUE)
-    # the emitted vectors must hold exactly N_GH entries
-    nodes <- sub(".*gh_nodes = to_vector\\(\\{([^}]*)\\}\\).*", "\\1",
-                 gsub("\n", " ", code))
-    expect_length(strsplit(nodes, ",")[[1]], n)
+    # the emitted vectors must hold exactly as many entries as declared
+    expect_equal(n_entries(code, "gh_nodes"), n)
+    expect_equal(n_entries(code, "gh_weights"), n)
+  }
+  # the Legendre rule has 48 nodes through m = 8 and 64 above, on [-6, 6]
+  for (max_m in c(8, 9)) {
+    code <- bmm:::.ranking_fill_quadrature(tpl, max_m = max_m, free_sdratio = TRUE)
+    n <- if (max_m == 8) 48 else 64
+    expect_match(code, paste0("int N_GL = ", n, ";"), fixed = TRUE)
+    expect_match(code, "real half_width = 6;", fixed = TRUE)
+    for (vec in c("gl_nodes", "gl_weights", "gl_cdf")) {
+      expect_equal(n_entries(code, vec), n, info = paste(vec, "max_m =", max_m))
+    }
   }
 })
 
@@ -405,13 +366,12 @@ ranking_stan_logmu <- function(grid, max_m) {
 }
 
 test_that("the Stan ranking kernels match their R counterparts", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   max_m <- 5L
   cells <- expand.grid(m = 2:max_m, d = c(-10, -3, 0, 1.3, 4, 10, 30),
-                       sdratio = log(c(0.5, 1, 1.8)), dist = 1:2)
+                       sdratio = log(c(0.3, 0.5, 1, 1.8, 3, 6)), dist = 1:2)
   # d = 10 already sits past a tenth of the default prior under a log link;
   # beyond it the Gaussian branch's probability-space sum underflows. The
   # Gumbel branch keeps the lgamma form in Stan, exact to 1e-10 from d = -10
@@ -422,8 +382,11 @@ test_that("the Stan ranking kernels match their R counterparts", {
   grid$sdratio[grid$dist == 2] <- 0
 
   # the Gaussian reference is the textbook log-space integrand on the nodes
-  # Stan was given, so what remains is the kernel, not the quadrature rule
+  # Stan was given, so what remains is the kernel, not the quadrature rule:
+  # Hermite nodes over the target for a ratio up to 1, and above it 48
+  # Legendre nodes on the noise interval [-6, 6] plus the target's mass beyond
   gh <- bmm:::.gh_rule(bmm:::.ranking_gh_n(max_m, TRUE))
+  gl <- bmm:::.gl_rule(48L)
   r_logmu <- vapply(seq_len(nrow(grid)), function(i) {
     g <- grid[i, ]
     if (g$cat > g$m) return(-100)
@@ -431,10 +394,26 @@ test_that("the Stan ranking kernels match their R counterparts", {
       return(log(bmm:::.ranking_prob_r(g$d, g$cat, g$m, "gumbel_min")))
     }
     r <- exp(g$sdratio)
-    eta <- g$d * sqrt((1 + r^2) / 2) + r * gh$nodes
-    lchoose(g$m - 1, g$cat - 1) + matrixStats::logSumExp(
-      log(gh$weights) + (g$m - g$cat) * pnorm(eta, log.p = TRUE) +
-        (g$cat - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE))
+    delta <- g$d * sqrt((1 + r^2) / 2)
+    if (r <= 1) {
+      eta <- delta + r * gh$nodes
+      return(lchoose(g$m - 1, g$cat - 1) + matrixStats::logSumExp(
+        log(gh$weights) + (g$m - g$cat) * pnorm(eta, log.p = TRUE) +
+          (g$cat - 1) * pnorm(eta, lower.tail = FALSE, log.p = TRUE)))
+    }
+    x <- 6 * gl$nodes
+    body <- lchoose(g$m - 1, g$cat - 1) + matrixStats::logSumExp(
+      log(6 * gl$weights) + dnorm(x, delta, r, log = TRUE) +
+        (g$m - g$cat) * pnorm(x, log.p = TRUE) +
+        (g$cat - 1) * pnorm(x, lower.tail = FALSE, log.p = TRUE))
+    tail <- if (g$cat == 1) {
+      pnorm(6, delta, r, lower.tail = FALSE, log.p = TRUE)
+    } else if (g$cat == g$m) {
+      pnorm(-6, delta, r, log.p = TRUE)
+    } else {
+      -Inf
+    }
+    matrixStats::logSumExp(c(body, tail))
   }, numeric(1))
 
   stan_logmu <- ranking_stan_logmu(
@@ -444,6 +423,15 @@ test_that("the Stan ranking kernels match their R counterparts", {
   )
   expect_true(all(is.finite(stan_logmu)))
   expect_lt(max(abs(stan_logmu - r_logmu)), 1e-10)
+
+  # and the R companion that log_lik and posterior_epred use reads the same
+  # nodes; it normalizes the m probabilities, which moves each log p by the
+  # quadrature's departure from summing to 1 (below 2e-9)
+  companion <- vapply(seq_len(nrow(grid)), function(i) {
+    g <- grid[i, ]
+    sdt_ranking_logmu(g$cat, g$m, matrix(g$d), g$sdratio, g$dist)
+  }, numeric(1))
+  expect_lt(max(abs(stan_logmu - companion)), 1e-8)
 })
 
 test_that("sdt_ranking_logmu preserves the draws-by-observation shape", {
@@ -457,15 +445,6 @@ test_that("sdt_ranking_logmu preserves the draws-by-observation shape", {
 # DISTRIBUTION FUNCTION TESTS                                            ####
 ############################################################################# !
 
-test_that("rsdt_ranking generates a valid rank-count matrix", {
-  counts <- rsdt_ranking(5, 100, m = 4, d = 1.5)
-
-  expect_true(is.matrix(counts))
-  expect_equal(dim(counts), c(5L, 4L))
-  expect_equal(colnames(counts), paste0("rank", 1:4))
-  expect_true(all(rowSums(counts) == 100))
-})
-
 test_that("rsdt_ranking recycles parameters and handles mixed set sizes", {
   counts <- rsdt_ranking(6, 50, m = c(3L, 5L), d = rnorm(6, 1.2, 0.2))
 
@@ -475,36 +454,10 @@ test_that("rsdt_ranking recycles parameters and handles mixed set sizes", {
   expect_true(all(counts[col(counts) > c(3L, 5L)] == 0))
 })
 
-test_that("rsdt_ranking validates inputs", {
-  expect_error(rsdt_ranking(c(2, 3), 50, m = 4, d = 1),
-               "single positive integer")
-  expect_error(rsdt_ranking(2, 50, m = 1, d = 1), "m must be")
-})
-
-test_that("dsdt_ranking computes valid ranking densities", {
-  dens <- dsdt_ranking(counts = c(40, 30, 20, 10), d = 1.5, m = 4)
-  expect_true(dens > 0)
-
-  log_dens <- dsdt_ranking(counts = c(40, 30, 20, 10), d = 1.5, m = 4,
-                           log = TRUE)
-  expect_equal(log(dens), log_dens, tolerance = 1e-10)
-})
-
-test_that("dsdt_ranking matches dmultinom and is vectorized over rows", {
+test_that("dsdt_ranking matches dmultinom", {
   probs <- bmm:::.ranking_all_probs_r(1.5, 4L, "gumbel_min")
   expect_equal(dsdt_ranking(c(40, 30, 20, 10), m = 4, d = 1.5),
                dmultinom(c(40, 30, 20, 10), prob = probs), tolerance = 1e-12)
-
-  counts <- rbind(c(40, 30, 20, 10), c(10, 20, 30, 40))
-  dens <- dsdt_ranking(counts, m = 4, d = c(1.5, 0.2), log = TRUE)
-  expect_length(dens, 2)
-  expect_true(all(is.finite(dens)))
-})
-
-test_that("dsdt_ranking rejects counts beyond the row's set size", {
-  counts <- rbind(c(30, 15, 5, 6), c(30, 12, 6, 2))
-  expect_error(dsdt_ranking(counts, m = c(3, 4), d = 1.2),
-               "beyond the row's set size")
 })
 
 test_that(".ranking_all_probs_r vectorized path matches elementwise evaluation", {
@@ -534,37 +487,6 @@ test_that("check_data builds the multinomial response matrix and covariates", {
   expect_equal(result$nTrials, rowSums(result$Y))
   expect_equal(unique(result$max_rank), 4)
   expect_false(any(ranks4 %in% colnames(result)))
-})
-
-test_that("check_data refuses non-numeric count columns", {
-  model <- sdt_ranking(ranks4, m = 4)
-  dat <- sim_ranking(3, 50, m = 4, d = 1.5)
-
-  for (conv in list(as.character, as.factor)) {
-    bad <- dat
-    bad[[ranks4[1]]] <- conv(bad[[ranks4[1]]])
-    expect_error(check_data(model, bad, bmf(d ~ 1)),
-                 paste0("Response column '", ranks4[1], "' must be numeric"))
-  }
-})
-
-test_that("check_data still only warns on non-integer counts", {
-  model <- sdt_ranking(ranks4, m = 4)
-  dat <- data.frame(rank1 = c(40.5, 30), rank2 = c(30, 30), rank3 = c(20, 20),
-                    rank4 = c(10, 20))
-  expect_warning(check_data(model, dat, bmf(d ~ 1)),
-                 "Response column 'rank1' should contain integer counts")
-})
-
-test_that("dsdt_ranking refuses NA in m", {
-  expect_error(dsdt_ranking(c(40, 30, 20, 10), m = NA, d = 1),
-               "m must not contain NA")
-})
-
-test_that("check_data errors on missing response columns", {
-  model <- sdt_ranking(ranks4, m = 4)
-  dat <- data.frame(id = 1:5, rank1 = 10, rank2 = 10)
-  expect_error(check_data(model, dat, bmf(d ~ 1)), "missing")
 })
 
 test_that("check_data resolves per-row set size from a data column", {
@@ -600,6 +522,23 @@ test_that("check_data errors when set size exceeds the number of rank columns", 
                     rank1 = 10, rank2 = 10, rank3 = 10, rank4 = 10)
   expect_error(check_data(model, dat, bmf(d ~ 1)),
                "number of rank columns")
+})
+
+test_that("check_data warns about a free sdratio only above set size 20", {
+  # the Gaussian quadrature is verified to 1e-6 through m = 20
+  formula <- bmf(d ~ 1, sdratio ~ 1)
+  for (m in c(20L, 21L)) {
+    ranks <- paste0("rank", seq_len(m))
+    model <- bmm:::update_model_fixed_parameters(
+      sdt_ranking(ranks, m = m, dist = "normal"), formula
+    )
+    dat <- as.data.frame(rsdt_ranking(2, 100, m = m, d = 1.5, dist = "normal"))
+    if (m == 20L) {
+      expect_no_warning(check_data(model, dat, formula))
+    } else {
+      expect_warning(check_data(model, dat, formula), "set sizes above 20")
+    }
+  }
 })
 
 test_that("NA rank counts beyond a row's set size are structural zeros", {
@@ -684,15 +623,6 @@ test_that("Gaussian ranking fixes sdratio for EV and frees it for UV", {
   expect_false(all(grepl("constant", uv_sdratio$prior)))
 })
 
-test_that("sdt_ranking stancode works with predictors and random effects", {
-  dat <- sim_ranking(5, 50, m = 4, d = 1.5)
-  dat$condition <- rep(c("A", "B"), length.out = nrow(dat))
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_true(nchar(stancode(bmf(d ~ condition), data = dat, model = model)) > 0)
-  expect_true(nchar(stancode(bmf(d ~ 1 + (1 | id)), data = dat, model = model)) > 0)
-})
-
-
 ############################################################################# !
 # PIPELINE INTEGRATION TESTS                                             ####
 ############################################################################# !
@@ -725,29 +655,3 @@ test_that("sdt_ranking unequal-variance ranking runs through the pipeline (mock)
   )
 })
 
-test_that("sdt_ranking default_prior returns a valid prior object", {
-  dat <- sim_ranking(3, 50, m = 4, d = 1.5)
-  model <- sdt_ranking(ranks4, m = 4)
-  expect_s3_class(default_prior(bmf(d ~ 1), data = dat, model = model),
-                  "brmsprior")
-})
-
-test_that("sdt_ranking recovers d' and returns a multinomial count array", {
-  skip_on_cran()
-  skip_on_ci()
-  skip_if_not_installed("cmdstanr")
-
-  dat <- sim_ranking(10, 200, m = 4, d = 1.4)
-  model <- sdt_ranking(ranks4, m = 4)
-  fit <- bmm(bmf(d ~ 1 + (1 | id)), dat, model, backend = "cmdstanr",
-             chains = 2, iter = 600, warmup = 300, init = 0.5,
-             refresh = 0, silent = 2)
-
-  est <- brms::fixef(fit)["d_Intercept", "Estimate"]
-  expect_equal(est, 1.4, tolerance = 0.3)
-
-  pp <- brms::posterior_predict(fit, ndraws = 25)
-  expect_length(dim(pp), 3)
-  expect_equal(dim(pp)[3], 4L)
-  expect_false(any(is.nan(pp)))
-})

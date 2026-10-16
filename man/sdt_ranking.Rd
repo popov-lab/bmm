@@ -81,7 +81,9 @@ No stimulus column needed (all trials include exactly one target)
 
 Models the rank ordering of \code{m} items by perceived strength. Only \code{d}
 is estimated (no criterion). Supports \code{dist = "gumbel_min"} (closed-form via
-lgamma ratios) and \code{dist = "normal"} (Gauss-Hermite quadrature).
+lgamma ratios) and \code{dist = "normal"} (numerical quadrature, accurate to
+1e-6 in each rank probability for SD ratios from 0.2 to 8, \code{d} from -1 to 4
+and set sizes up to 20).
 
 The model uses the native brms multinomial family: each rank position is a
 multinomial category whose logit is set to \verb{log p(rank)}, so \code{softmax}
