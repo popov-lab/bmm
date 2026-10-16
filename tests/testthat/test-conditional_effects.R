@@ -1659,6 +1659,42 @@ test_that("mixture3p softmax route asks brms for the grid of the parameter it re
   }
 })
 
+# the weights are dpars of mixture3p's custom family, and brms refuses a dpar
+# requested as an nlpar ("Invalid argument 'nlpar'"), which the stub would not
+test_that("mixture3p softmax route asks brms for dpars, never for nlpars (#434)", {
+  draws <- matrix(0, 3, 2)
+  for (par in c("thetat", "thetant")) {
+    res <- softmax_ce(par, draws, draws)
+    expect_false("nlpar" %in% names(res$seen$grid[[1]]))
+    expect_length(res$seen$linpred, 2)
+    for (args in res$seen$linpred) {
+      expect_true("dpar" %in% names(args))
+      expect_false("nlpar" %in% names(args))
+    }
+  }
+})
+
+test_that("mixture3p softmax route gives no weight to non-targets at set size 1 (#434)", {
+  draws_t <- cbind(c(0.2, 1.1, -0.4, 2.3), c(0.2, 1.1, -0.4, 2.3))
+  draws_nt <- cbind(c(0.5, -0.3, 2, 0.1), c(0.5, -0.3, 2, 0.1))
+  # the stub grid holds set sizes 1 and 2
+  stub_category_route(
+    stub_grid("set_size", n = 2, spaghetti = TRUE),
+    function(args) if (args$dpar == "thetat") draws_t else draws_nt
+  )
+  fit <- mock_mixture3p_fit()
+
+  thetant <- conditional_effects(fit, par = "thetant", effects = "set_size",
+                                 spaghetti = TRUE)[[1]]
+  expect_equal(thetant$estimate__, c(0, mean(softmax_of(draws_nt[, 2], draws_t[, 2]))))
+  spaghetti <- attr(thetant, "spaghetti")
+  expect_true(all(spaghetti$estimate__[spaghetti$set_size == 1] == 0))
+
+  thetat <- conditional_effects(fit, par = "thetat", effects = "set_size")[[1]]
+  at_one <- exp(draws_t[, 1]) / (exp(draws_t[, 1]) + 1)
+  expect_equal(thetat$estimate__, c(mean(at_one), mean(softmax_of(draws_t[, 2], draws_nt[, 2]))))
+})
+
 # conditional_effects() re-classes the route's result only when an effect
 # survives .filter_internal_effects(), so the route keeps its own class
 test_that("mixture3p softmax route returns a brms_conditional_effects object (#512)", {
