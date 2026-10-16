@@ -338,6 +338,7 @@ test_that("a link on d or criterion is inverted inside the rating formula", {
 # log_distance, 4 log_ratio, 5 softmax) and the anchor, then the spacing (0
 # for the delta builders) and the deltas the builder reads
 test_that("the generated rating call passes K, the threshold builder and its deltas", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   counts <- function(K) {
     cells <- expand.grid(id = 1:2, stimulus = c(0L, 1L))
     cbind(cells, as.data.frame(matrix(10L, nrow(cells), K, dimnames = list(NULL, paste0("r", 1:K)))))
@@ -464,6 +465,7 @@ test_that("an upper-tail rating category keeps its mass", {
 ############################################################################# !
 
 test_that("an estimated sdratio gets a prior and a fixed one is the constant 0", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   counts <- expand.grid(id = 1:2, stimulus = c(0L, 1L))
   counts[paste0("r", 1:4)] <- 10L
   for (type in c("parsimonious", "log_distance")) {
@@ -483,6 +485,7 @@ test_that("an estimated sdratio gets a prior and a fixed one is the constant 0",
 ############################################################################# !
 
 test_that("sdt_rating integrates with the bmm pipeline via mock backend", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- sim_rating(6, 80, d = 1.2, criterion = 0, n_ratings = 4,
                     spacing = 0.4)
   for (di in c("normal", "logistic", "gumbel_min", "gumbel_max")) {

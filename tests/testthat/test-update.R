@@ -76,6 +76,7 @@ test_that("update() stores the formula that bmm() stores for the same inputs", {
 })
 
 test_that("update() stores the formula that bmm() stores, without a fixture", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
@@ -625,6 +626,7 @@ test_that("data without the largest set size still fail the nt_features check", 
 })
 
 test_that("an updated fit carries nothing from the frame that called update()", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
@@ -646,6 +648,7 @@ test_that("an updated fit carries nothing from the frame that called update()", 
 })
 
 test_that("update() switches an SDT fit between criterion and bias", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,

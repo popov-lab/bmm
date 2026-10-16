@@ -583,6 +583,7 @@ test_that("the noise distribution reaches Stan as the id the Stan switch reads",
 })
 
 test_that("a predictor and a random effect on d reach every SDT model's program", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   cells <- data.frame(id = rep(1:2, each = 2), stimulus = c(0L, 1L, 0L, 1L),
                       condition = c("A", "A", "B", "B"))
   cases <- list(
