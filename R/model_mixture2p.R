@@ -211,7 +211,7 @@
 #'
 #'   Fougnie, D., Suchow, J. W., & Alvarez, G. A. (2012). Variability in the
 #'   quality of visual working memory. Nature Communications, 3(1), 1229.
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data
 #' dat <- data.frame(y = rmixture2p(n = 2000))
 #'

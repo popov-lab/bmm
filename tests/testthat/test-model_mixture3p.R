@@ -28,6 +28,20 @@ test_that("mixture3p() exposes the parameters each version implies", {
   expect_error(nt_model(vp_nodes = 21), "at least 41")
 })
 
+test_that("the capacity versions put effects priors on K and ptarget", {
+  for (version in c("slot", "slot_averaging")) {
+    pr <- default_prior(
+      bmf(kappa ~ 1, K ~ 1 + session, ptarget ~ 1 + session), small_data(),
+      mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size",
+                version = version)
+    )
+    expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "K", ]$prior, "normal(0, 0.3)")
+    expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "ptarget", ]$prior, "normal(0, 0.5)")
+    # ptarget = 1 - the swap probability it replaced, so its intercept prior is the mirror image
+    expect_equal(pr[pr$class == "Intercept" & pr$dpar == "ptarget", ]$prior, "logistic(1, 1)")
+  }
+})
+
 # The previous implementation was a brms mixture whose weights were a softmax
 # over the target, the active non-targets and guessing, with a -100 sentinel
 # switching off the components a trial's set size did not have. That is what
@@ -398,11 +412,8 @@ test_that("a formula for mu1 still reaches mu, with a warning", {
 })
 
 test_that("the Stan and R likelihoods agree for every version", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the mixture3p likelihood"
-  )
 
   tab <- .circmix_kappa_table()
   code <- paste0(
@@ -484,11 +495,8 @@ test_that("the Stan and R likelihoods agree for every version", {
 })
 
 test_that("the generated likelihood passes each parameter to its place in the core", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the mixture3p likelihood"
-  )
   # the cores are checked against R above; this checks the generated wrappers
   # that brms calls, whose argument order is built from the version tables
   dat <- oberauer_lin_2017

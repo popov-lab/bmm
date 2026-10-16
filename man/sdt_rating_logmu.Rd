@@ -11,6 +11,7 @@ sdt_rating_logmu(
   K,
   dist,
   thresh,
+  anchor,
   d,
   criterion,
   spacing,
@@ -24,6 +25,7 @@ sdt_dpsdt_logmu(
   K,
   dist,
   thresh,
+  anchor,
   d,
   criterion,
   spacing,
@@ -39,6 +41,7 @@ sdt_metad_logmu(
   K,
   dist,
   thresh,
+  anchor,
   d,
   criterion,
   spacing,
@@ -56,6 +59,10 @@ sdt_metad_logmu(
 \item{dist}{Integer noise-distribution id (see the \code{.sdt_dists} registry).}
 
 \item{thresh}{Integer threshold-parameterization id.}
+
+\item{anchor}{Integer: 1 when \code{criterion} is measured from the noise mean, 2
+when it is the \code{bias} parameter, measured from the midpoint between the
+means.}
 
 \item{d, criterion, spacing, sdratio}{Model parameters (draws-by-observation
 matrices supplied by brms). \code{d} is d', or d_a when sdratio is not 0;

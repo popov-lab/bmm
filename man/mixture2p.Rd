@@ -264,7 +264,7 @@ becomes the precision of the average trial. Shown for \code{"simple"}:
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # generate artificial data
 dat <- data.frame(y = rmixture2p(n = 2000))
 

@@ -8,6 +8,10 @@ test_that("an unrecognized link target is refused, not appended", {
        links = list(zzz = "log")),
     "Unrecognized link target"
   )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(zzz = "probit")),
+    "Unrecognized link target"
+  )
 })
 
 test_that("a link target one edit from a parameter is read as that parameter", {
@@ -23,6 +27,13 @@ test_that("a link target one edit from a parameter is read as that parameter", {
     "'bond' read as 'bound'"
   )
   expect_equal(model$links$bound, "softplus")
+
+  expect_warning(
+    model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(gg = "probit")),
+    "'gg' read as 'g'"
+  )
+  expect_equal(model$links$g, "probit")
+  expect_false("gg" %in% names(model$links))
 })
 
 test_that("a link target that abbreviates a parameter is read as that parameter", {
@@ -90,6 +101,25 @@ test_that("a link the model cannot honour is refused at the constructor", {
     settable_link_functions(m3_ss(NULL)),
     c("log", "softplus", "logit", "probit", "identity")
   )
+
+  # mpt applies its links in the generated category formulas, so it honours
+  # the two latent scales it has default priors for, as a list or as a string
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "cauchit")),
+    "Unknown link function\\(s\\): 'cauchit'\\. mpt\\(\\) takes 'logit', 'probit'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = "cauchit"),
+    "Unknown link function\\(s\\): 'cauchit'\\. mpt\\(\\) takes 'logit', 'probit'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = c("logit", "probit")),
+    "one link function for the whole model"
+  )
+  expect_equal(
+    settable_link_functions(mpt(mpt_2htm_trees(), tree_id = "item_type")),
+    c("logit", "probit")
+  )
 })
 
 test_that("a parameter fixed for scaling is refused with its own message", {
@@ -100,7 +130,7 @@ test_that("a parameter fixed for scaling is refused with its own message", {
   )
 })
 
-test_that("a model outside supported_models() is named by its class", {
+test_that("a model outside bmm_models() is named by its class", {
   # what use_model_template() produces before the model is registered
   model <- structure(
     list(parameters = list(par1 = "", par2 = ""), links = list(par1 = "log")),
@@ -165,41 +195,36 @@ test_that("a link the model does not pass on to the fit is refused", {
               links = list(thetat = "logit")),
     "cannot be changed in mixture3p\\(\\)"
   )
+  # a simplex member and its stick-breaking component take the link of the
+  # generated stick-breaking formulas, not one of their own
+  simplex_tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
+  expect_error(
+    mpt(simplex_tree, simplex = c("gA", "gB", "gC"), links = list(gA = "probit")),
+    "cannot be changed in mpt\\(\\)"
+  )
+  expect_error(
+    mpt(simplex_tree, simplex = c("gA", "gB", "gC"), links = list(gAraw = "probit")),
+    "cannot be changed in mpt\\(\\)"
+  )
   # naming the link the model already uses asks for no change
   expect_silent(sdm(resp_error = "y", links = list(kappa = "log")))
+  expect_silent(mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "logit")))
 })
 
-test_that("the links a model applies are exactly the settable ones", {
-  expect_equal(
-    settable_links(ddm(rt = "rt", response = "resp")),
-    c("drift", "bound", "ndt", "zr")
-  )
-  expect_equal(
-    settable_links(ezdm("m", "v", "n", "t")),
-    c("drift", "bound", "ndt", "s")
-  )
-  expect_equal(
-    settable_links(cswald(rt = "rt", response = "resp")),
-    names(cswald(rt = "rt", response = "resp")$links)
-  )
-  expect_null(settable_links(m3(resp_cats = c("a", "b"), num_options = c(1, 4))))
-  expect_equal(settable_links(sdm(resp_error = "y")), character(0))
-  expect_equal(
-    settable_links(mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss")),
-    c("mu", "kappa")
-  )
-  expect_equal(
-    settable_links(mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss",
-                             version = "slot")),
-    c("mu", "kappa", "K", "ptarget")
-  )
+test_that("every model declares which of its links can be set", {
+  # NULL: no closed set of parameters (m3 custom), so no name is refused;
+  # character(0): the model refuses every link change
+  for (name in names(cases <- model_test_cases("links"))) {
+    case <- cases[[name]]
+    expect_identical(settable_links(case$model), case$settable, label = name)
+  }
 })
 
 test_that("a refused model builds the same fit whatever its links say", {
   # the refusal is only correct while configure_model() ignores model$links, so
   # that is measured rather than restated: the family carries the links of a
   # custom or mixture family
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   fingerprint <- function(model, formula) {
     bf <- configure_model(model, check_data(model, dat, formula), formula)$formula
     list(

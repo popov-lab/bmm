@@ -56,7 +56,7 @@ A bare bones configure_model.* method should look like this:
 }\if{html}{\out{</div>}}
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 configure_model.mixture3p <- function(model, data, formula) {
   # the number of non-target covariates the family needs is fixed by the data
   n_nt <- attr(data, "max_set_size") - 1

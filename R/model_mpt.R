@@ -1,0 +1,1935 @@
+############################################################################# !
+# MODELS                                                                 ####
+############################################################################# !
+# see file 'R/bmm_model_mixture3p.R' for an example
+
+#' @title Create a tree for a Multinomial Processing Tree (MPT) model
+#'
+#' @description Specifies a single tree of a multinomial processing tree model
+#'   by naming the tree and providing one branch-probability expression per
+#'   response category. Trees created with `mpt_tree()` are combined into a
+#'   full model specification with [mpt()].
+#'
+#' @param name Character. Label for the tree. For models with multiple trees,
+#'   the label identifies the tree in the data: the column named by the
+#'   `tree_id` argument of [mpt()] holds one such label per observation. A
+#'   tree stands for one kind of trial, such as targets or lures in a
+#'   recognition test, not for a response; the responses are the branch
+#'   names.
+#' @param branches Either a named list of character strings or the first of
+#'   several formulas. Each list element (or formula) gives the branch
+#'   probability expression for one response category; the element names (or
+#'   the left-hand sides) are the response categories. The expressions can use
+#'   latent parameters (e.g., `D + (1 - D) * g`), numeric constants, and
+#'   declared covariates (see [mpt()]).
+#' @param ... Further formulas of the form `category ~ expression`, one per
+#'   response category, when `branches` is a formula; they take no argument
+#'   names. A call uses either
+#'   formulas or a named list of strings, not a mix; both spellings give the
+#'   same tree (see the examples).
+#' @param impossible Character vector. Response categories that cannot occur in
+#'   this tree, for example distractor responses when no distractors were
+#'   presented. Such categories get no branch expression, and the remaining
+#'   branches must sum to 1 on their own. It follows `...`, so it has to be
+#'   named in full.
+#'
+#' @details Nothing in the formulas is evaluated: the left-hand side must be a
+#'   single response category name, the right-hand side is kept as an
+#'   expression (with constant arithmetic folded, see below), and the formula
+#'   environment is dropped. A one-sided formula, a left-hand side that is not
+#'   a name, and a mix of formulas and strings are errors.
+#'
+#'   Constant arithmetic such as `1/4` or `1/(2*2)` is folded into a
+#'   decimal literal (`0.25`) when the tree is created. Stan compiles a bare
+#'   integer fraction as integer division (`1/4 == 0`), which would silently
+#'   corrupt the likelihood.
+#'
+#'   Categories listed in `impossible` keep their column in the data and their
+#'   place in the response matrix, but their probability is set to zero for the
+#'   observations belonging to this tree. Because the model is estimated on the
+#'   log scale, "zero" is implemented as a large negative linear predictor
+#'   rather than a literal zero; no probability has to be taken away from the
+#'   remaining branches to compensate.
+#'
+#' @return An object of class `mpt_tree`
+#'
+#' @keywords bmmodel
+#'
+#' @examples
+#' # the target tree of the two-high-threshold model: targets (studied items)
+#' # end in the responses "old" and "new"
+#' tree_target <- mpt_tree(
+#'   "target",
+#'   old ~ D + (1 - D) * g,
+#'   new ~ (1 - D) * (1 - g)
+#' )
+#' tree_target
+#'
+#' # the same tree with the branches as a named list of strings
+#' tree_target_strings <- mpt_tree(
+#'   name = "target",
+#'   branches = list(
+#'     old = "D + (1 - D) * g",
+#'     new = "(1 - D) * (1 - g)"
+#'   )
+#' )
+#' identical(tree_target, tree_target_strings)
+#'
+#' # a three-alternative recognition task in which lures are shown on some
+#' # trials only: `lure` responses cannot occur on the others
+#' tree_lures <- mpt_tree(
+#'   "lures",
+#'   target ~ D * b + (1 - D) * (1/3),
+#'   lure ~ D * (1 - b) + (1 - D) * (1/3),
+#'   new ~ (1 - D) * (1/3)
+#' )
+#'
+#' # the branches of the lure-free tree sum to 1 without the `lure` category;
+#' # no probability is reserved for it
+#' tree_nolures <- mpt_tree(
+#'   "nolures",
+#'   target ~ D + (1 - D) * (1/2),
+#'   new ~ (1 - D) * (1/2),
+#'   impossible = "lure"
+#' )
+#' tree_nolures
+#'
+#' # a `tree` column in the data holds "lures" or "nolures" per observation;
+#' # effects of experimental conditions go in the parameter formulas instead,
+#' # e.g. bmf(D ~ 0 + cond)
+#' model <- mpt(list(tree_lures, tree_nolures), tree_id = "tree")
+#' @export
+mpt_tree <- function(name, branches, ..., impossible = NULL) {
+  stop_missing_args()
+  stopif(
+    !is.character(name) || length(name) != 1L || !nzchar(name),
+    "The tree name must be a single non-empty character string."
+  )
+  stopif(
+    any(!nzchar(as.character(as.list(substitute(list(...)))[-1]))),
+    "An argument of mpt_tree() is empty, probably from a trailing comma after \\
+    the last branch."
+  )
+  extra <- list(...)
+  # name, branches and impossible match partially, so b = b ~ y would take the
+  # slot of branches and reorder the categories, and imp = binds to ...
+  inexact_names <- setdiff(names(sys.call()), c("", "name", "branches", "impossible"))
+  stopif(
+    length(extra) > 0 && length(inexact_names) > 0,
+    "Write the arguments name, branches and impossible out in full when \\
+    several branches are given, and give the formulas after branches without \\
+    a name: the left-hand side of a formula is its response category. \\
+    Offending: {collapse_comma(inexact_names)}"
+  )
+  from_formulas <- inherits(branches, "formula")
+  mixed <- length(extra) > 0 &&
+    (!from_formulas || !all(vapply(extra, inherits, logical(1), "formula")))
+  stopif(
+    mixed,
+    "Cannot mix formulas and other branch expressions in tree '{name}'. Write \\
+    every branch as a formula, category ~ expression, or pass a named list of \\
+    character strings. The impossible argument has to be named, \\
+    impossible = \"c\"."
+  )
+  stopif(
+    is.list(branches) && any(vapply(branches, inherits, logical(1), "formula")),
+    "Pass the branch formulas as separate arguments, \\
+    mpt_tree(name, a ~ expr_a, b ~ expr_b), not as a list."
+  )
+  if (from_formulas) {
+    branches <- .mpt_formula_branches(c(list(branches), extra), name)
+  }
+  stopif(
+    !is.list(branches) || length(branches) == 0L,
+    "The branches must be a named list with one branch probability expression \\
+    per response category, or formulas of the form category ~ expression."
+  )
+  resp_cats <- names(branches)
+  stopif(
+    is.null(resp_cats) || any(!nzchar(resp_cats)),
+    "Each branch probability expression must be named after its response category."
+  )
+  stopif(
+    anyDuplicated(resp_cats) > 0,
+    "Response category names must be unique within a tree. Branch lines that \\
+    terminate in the same response category must be summed into one expression."
+  )
+  impossible <- impossible %||% character(0)
+  stopif(
+    !is.character(impossible),
+    "The impossible argument must be a character vector of response category names."
+  )
+  stopif(
+    anyDuplicated(impossible) > 0,
+    "Impossible response categories must be unique within a tree. Duplicated: \\
+    {collapse_comma(unique(impossible[duplicated(impossible)]))}"
+  )
+  impossible_with_branch <- intersect(impossible, resp_cats)
+  stopif(
+    length(impossible_with_branch) > 0,
+    "A response category cannot be both impossible and have a branch \\
+    expression in tree '{name}': {collapse_comma(impossible_with_branch)}"
+  )
+  branches[] <- lapply(resp_cats, function(resp_cat) {
+    expr <- branches[[resp_cat]]
+    if (from_formulas) {
+      parsed <- expr
+      expr <- deparse1(parsed)
+    } else {
+      stopif(
+        !is.character(expr) || length(expr) != 1L || !nzchar(expr),
+        "Branch probability expressions must be single character strings \\
+        (tree '{name}', category '{resp_cat}')."
+      )
+      parsed <- try(str2lang(expr), silent = TRUE)
+      stopif(
+        is_try_error(parsed),
+        "Cannot parse the branch expression '{expr}' in tree '{name}'."
+      )
+    }
+    stopif(
+      !is.language(parsed) && !(is.numeric(parsed) && length(parsed) == 1L),
+      "The branch of category '{resp_cat}' in tree '{name}' must be an \\
+      expression in parameters and numbers, such as D + (1 - D) * g, not {expr}."
+    )
+    parsed <- .mpt_fold_numeric_division(parsed)
+    scientific <- .mpt_scientific_constants(parsed)
+    if (length(scientific) > 0) {
+      rescaling <- if (any(abs(scientific) < 1)) {
+        "0.0001 + 0.9999 * p as (1 + 9999 * p) / 10000"
+      } else {
+        "p / 100000 as p / 1000 / 100"
+      }
+      stop2(
+        "brms writes the numeric constant(s) \\
+        {paste(.mpt_written_constants(expr, scientific), collapse = ', ')} in \\
+        tree '{name}' in scientific notation, which breaks the generated Stan \\
+        code. Every spelling of the same number is affected, so please \\
+        rescale the expression instead, e.g. write {rescaling}, or provide the \\
+        value as a data column declared in the covariates argument."
+      )
+    }
+    parsed
+  })
+  structure(nlist(name, branches, impossible), class = "mpt_tree")
+}
+
+#' @export
+print.mpt_tree <- function(x, ...) {
+  branch_lines <- glue(
+    "  P({names(x$branches)}) = {vapply(x$branches, deparse1, character(1))}"
+  )
+  if (length(x$impossible) > 0) {
+    branch_lines <- c(
+      branch_lines, glue("  P({x$impossible}) = 0 (structurally impossible)")
+    )
+  }
+  cat(glue("MPT tree '{x$name}':"), branch_lines, sep = "\n")
+  invisible(x)
+}
+
+.model_mpt <- function(trees = NULL, tree_id = NULL, covariates = NULL,
+                       simplex = NULL, restrictions = NULL,
+                       unrestricted_trees = NULL, links = "logit",
+                       default_priors = NULL, call = NULL, ...) {
+  # a named list sets single parameters on top of the model-wide default link
+  parameter_links <- if (is.list(links)) links
+  links <- if (is.list(links)) "logit" else links
+  trees <- .mpt_as_tree_list(trees)
+  if (length(trees)) names(trees) <- vapply(trees, `[[`, character(1), "name")
+  covariates <- covariates %||% character(0)
+  simplex <- .mpt_as_simplex_list(simplex)
+  resp_cats <- if (length(trees)) {
+    c(names(trees[[1]]$branches), trees[[1]]$impossible)
+  } else {
+    character(0)
+  }
+  parameters <- .mpt_tree_parameters(trees, covariates)
+  simplex_pars <- unlist(simplex)
+  simplex_raw <- unlist(lapply(simplex, function(grp) {
+    free_pars <- grp[-length(grp)]
+    setNames(paste0(free_pars, "raw"), free_pars)
+  }))
+  raw_pars <- unname(simplex_raw)
+  standard_pars <- setdiff(parameters, simplex_pars)
+
+  # generated data columns: one 0/1 indicator per tree, and one per response
+  # category that is impossible in some trees but not others
+  tree_indicators <- if (is.null(tree_id) || length(trees) == 0L) {
+    NULL
+  } else {
+    setNames(paste0("Idx_", names(trees)), names(trees))
+  }
+  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
+  possible_indicators <- if (length(guarded_cats) == 0L) {
+    NULL
+  } else {
+    setNames(paste0("Poss_", guarded_cats), guarded_cats)
+  }
+
+  latent_prior <- .mpt_latent_prior(links)
+
+  parameter_info <- c(
+    # the scale is left out because the link of each parameter can be changed
+    # after construction; print() lists the links
+    .mpt_named_list(
+      standard_pars,
+      "Latent probability parameter from the tree branch expressions."
+    ),
+    .mpt_named_list(
+      simplex_pars,
+      paste0(
+        "Probability parameter constrained within a simplex group via ",
+        "stick-breaking. The last parameter of each group is derived as 1 ",
+        "minus the sum of the other group members."
+      )
+    ),
+    .mpt_named_list(
+      raw_pars,
+      glue("Unconstrained stick-breaking component of a simplex parameter, \\
+           transformed by the inverse {links} into the stick proportion of the \\
+           remaining probability.")
+    )
+  )
+
+  link_info <- c(
+    .mpt_named_list(standard_pars, links),
+    .mpt_named_list(simplex_pars, "identity"),
+    .mpt_named_list(raw_pars, "identity")
+  )
+
+  prior_info <- c(
+    .mpt_named_list(standard_pars, latent_prior),
+    .mpt_stick_priors(simplex, links)
+  )
+
+  out <- structure(
+    list(
+      resp_vars = nlist(resp_cats),
+      other_vars = list(
+        tree_id = tree_id,
+        covariates = covariates,
+        trees = trees,
+        unrestricted_trees = unrestricted_trees,
+        simplex = simplex,
+        restrictions = restrictions,
+        link = links,
+        indicators = list(tree = tree_indicators, possible = possible_indicators),
+        simplex_raw = simplex_raw
+      ),
+      domain = "Categorical decision making, memory, and reasoning",
+      task = "Any task with categorical responses generated by a discrete processing-tree structure",
+      name = "Multinomial Processing Tree (MPT) models",
+      citation = glue(
+        "Batchelder, W. H., & Riefer, D. M. (1999). Theoretical and empirical \\
+        review of multinomial process tree modeling. Psychonomic Bulletin & \\
+        Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812"
+      ),
+      version = "NA",
+      requirements = paste0(
+        "- One tree per distinct branch structure, created with mpt_tree(); ",
+        "all trees share the same response categories\n",
+        "  - The data contain one column with aggregated response counts per ",
+        "response category, named after the branch names\n",
+        "  - For multi-tree models, a column whose values name the tree each ",
+        "observation belongs to, declared via the tree_id argument\n",
+        "  - Data columns used inside branch expressions must be declared via the covariates argument\n"
+      ),
+      parameters = parameter_info,
+      links = link_info,
+      fixed_parameters = list(),
+      default_priors = prior_info
+    ),
+    class = c("bmmodel", "mpt"),
+    call = call
+  )
+  out$default_priors[names(default_priors)] <- default_priors
+  out <- set_links(out, parameter_links)
+  .mpt_match_link_priors(out)
+}
+
+# matched priors: effects get the intercept's own prior, because a narrower
+# effects prior shrinks condition contrasts under `1 + cond` coding (up to 0.04
+# in probability for realistic 2HTM designs at half the scale). The sd rate of
+# the logit link is the one of the mixture weights; a probit SD is about 1/1.7
+# of a logit SD, so the probit rate is about 1.7, rounded to 2
+.mpt_latent_prior <- function(link) {
+  switch(link,
+    logit = list(
+      main = "logistic(0, 1)", effects = "logistic(0, 1)", sd = "exponential(1)"
+    ),
+    probit = list(
+      main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(2)"
+    )
+  )
+}
+
+# under stick breaking, a symmetric Dirichlet(1) on a group of K is stick k ~
+# Beta(1, K - k), which logitbeta()/probitbeta() in mpt_functions.stan put on
+# the latent scale; the last stick is Beta(1, 1), which is the latent prior
+.mpt_stick_priors <- function(simplex, link) {
+  latent_prior <- .mpt_latent_prior(link)
+  priors <- lapply(simplex, function(grp) {
+    n_free <- length(grp) - 1L
+    stick_priors <- lapply(seq_len(n_free), function(k) {
+      if (k == n_free) {
+        return(latent_prior)
+      }
+      utils::modifyList(latent_prior, list(main = paste0(link, "beta(1, ", n_free + 1L - k, ")")))
+    })
+    setNames(stick_priors, paste0(grp[-length(grp)], "raw"))
+  })
+  do.call(c, unname(priors))
+}
+
+# the link of a latent probability parameter can be switched between logit
+# and probit; simplex members and their stick-breaking components carry
+# identity links because the generated simplex formulas apply the model link
+#' @exportS3Method
+settable_links.mpt <- function(model) {
+  defaults <- attr(model, "links_default") %||% model$links
+  names(defaults)[defaults != "identity"]
+}
+
+.mpt_link_functions <- c("logit", "probit")
+
+#' @exportS3Method
+settable_link_functions.mpt <- function(model) {
+  .mpt_link_functions
+}
+
+# the derived member of each simplex group and the stick-breaking components
+# get their formulas from check_formula.mpt(), so none is expected from the user
+#' @exportS3Method
+generated_parameters.mpt <- function(model) {
+  c(
+    vapply(model$other_vars$simplex, function(grp) grp[length(grp)], character(1)),
+    unname(model$other_vars$simplex_raw)
+  )
+}
+
+# user facing alias
+# information in the title and details sections will be filled in
+# automatically based on the information in the .model_mpt()
+
+#' @title `r .model_mpt()$name`
+#' @name mpt
+#'
+#' @description
+#' Multinomial Processing Tree (MPT) models measure the probabilities of
+#' discrete latent cognitive states from categorical responses. A model is
+#' specified as a set of trees created with [mpt_tree()], one per distinct
+#' branch structure, such as one tree for targets and one for lures in a
+#' recognition test. Branch expressions that terminate in the same response
+#' category are summed within each tree, and parameters shared across trees
+#' are equated by giving them the same name. All latent probability
+#' parameters are estimated on an unconstrained latent scale (logit or
+#' probit); predictor formulas supplied via [bmmformula()] apply on that
+#' latent scale.
+#'
+#' @param trees A single `mpt_tree` object or a list of `mpt_tree` objects.
+#'   All trees must share the same set of response categories, counting those
+#'   declared impossible.
+#' @param tree_id Character. Name of the data column whose values name the tree
+#'   each observation belongs to; the values must match the tree names. Can be
+#'   omitted for single-tree models. Effects of experimental conditions belong
+#'   in the parameter formulas, not here; see Details.
+#' @param covariates Character vector. Names of data columns that appear in
+#'   branch expressions but are not latent parameters, for example
+#'   design-fixed guessing rates. Covariates pass into the model formulas
+#'   unchanged and have no naming restrictions. `bmm()` stops when, with a
+#'   row's covariate values, the branches of a tree do not sum to 1, leave
+#'   (0, 1], are undefined on the rows of another tree, or when a covariate
+#'   that a branch uses is missing. Every declared covariate needs a numeric
+#'   column in the data, also one that no branch uses. The range is checked
+#'   at the vertices of each branch's parameter box, which is exact when no
+#'   term of the branch contains the same parameter twice
+#'   (`a * (1 - b) * G + (1 - a) * c`). A parameter that does is also checked
+#'   at 0.5, which is exact for a factor `u * (1 - u)` and approximate
+#'   otherwise, e.g. for `u * (1 - u)^2`.
+#' @param simplex A character vector, or a list of character vectors, naming
+#'   groups of parameters that are jointly constrained to sum to 1. Each group
+#'   is reparameterized via stick-breaking: the last parameter of each group
+#'   is derived as 1 minus the sum of the other members, and each other member
+#'   `p` gets an unconstrained component `praw` that predictor formulas for
+#'   `p` are applied to. The listing order sets the default prior and the
+#'   meaning of the coefficients; see Details.
+#' @param restrictions Parameter restrictions in the string syntax of MPTinR
+#'   and TreeBUGS, e.g. `c("Dn = Do", "g = 0.5")`, or as a named list,
+#'   `list(Dn = "Do", g = 0.5)`. A restriction either equates a parameter with
+#'   another one (chains such as `"G1 = G2 = G3"` map all earlier names onto
+#'   the last) or fixes it to a numeric constant (`"g = 0.5"`; `bmm` also
+#'   reads fractions such as `"g = 1/4"`, which MPTinR rejects).
+#'   Constants must lie strictly between 0 and 1. The unnamed list of MPTinR
+#'   and TreeBUGS, `list("Dn = Do", "g = 0.5")`, works as well. Restriction
+#'   files are not read: in MPTinR and TreeBUGS a character vector names a
+#'   restrictions file, in `bmm` it holds the restrictions. To use such a file,
+#'   pass `readLines(path)`; blank lines and lines starting with `#` are
+#'   skipped, and a `#` after a restriction starts a comment, as in MPTinR.
+#'   A restricted parameter is removed from the model; the Details say how
+#'   this differs from fixing a parameter in the formula. Order constraints
+#'   (`"Do > Dn"`) are not supported here; see Details.
+#' @param links The link function of the latent probability parameters:
+#'   `"logit"` (default) or `"probit"`. A single string sets every parameter;
+#'   a named list, `links = list(D = "probit")`, sets the named parameters
+#'   and leaves the others at `"logit"`. Members of a `simplex` group and
+#'   their `praw` components take no link of their own. A parameter switched
+#'   to the other link, in the list or afterwards with
+#'   `model$links$D <- "probit"`, takes that link's default priors (see
+#'   Details).
+#' @param ... used internally for testing, ignore it
+#'
+#' @details `r model_docs(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
+#'
+#'   The data hold aggregated counts: one row per participant and tree (and
+#'   per condition, if conditions are crossed with the trees), with one count
+#'   column per response category. The count columns must be named exactly
+#'   like the branch names given to [mpt_tree()] (`old` and `new` in the
+#'   example below); `bmm()` finds them by these names, so no response
+#'   variable is passed. The `tree_id` column names the tree of each row, and
+#'   the counts of a row must come from trials of that tree. Wide tables with
+#'   one column per category of an EQN file, as MPTinR and TreeBUGS take them,
+#'   are reshaped with [mpt_data_reshape()].
+#'
+#'   A separate tree is needed only when the *branch expressions* differ, that
+#'   is, when the trial determines which latent processes apply or which
+#'   response categories are reachable (targets versus lures, a response set
+#'   with or without distractors, inclusion versus exclusion instructions).
+#'   Experimental factors whose *effect on the parameters* you want to estimate
+#'   belong in the parameter formulas, exactly as in every other `bmm` model:
+#'   `bmf(D ~ 0 + condition)`. The two roles are independent, and one data
+#'   column can serve both when a factor happens to change the structure as
+#'   well. When several levels of a factor share a branch structure, add a
+#'   column naming the tree and keep the factor for the formulas.
+#'
+#'   **Equating and fixing parameters.** Parameters are equated across trees
+#'   by giving them the same name. Beyond that, there are two mechanisms, and
+#'   they differ in when the constraint is decided. A *restriction*
+#'   (`restrictions = c("Dn = Do", "g = 0.5")`) is applied when the model is
+#'   built: it is substituted into the branch expressions before the
+#'   parameters are identified, so the restricted parameter is not part of
+#'   the model, gets no formula and no prior, cannot be a simplex member, and
+#'   is listed by `print(model)` under `Restrictions:` but not by
+#'   [parameter_info()]. A *constant in the formula* (`bmf(D ~ 1, g = 0.5)`)
+#'   is applied at fit time: the parameter stays part of the model, is listed
+#'   by `print()` under `Fixed:` and by [parameter_info()] with its value, and
+#'   is freed again by giving it a formula. The value is mapped to the latent
+#'   scale when the constant prior is built, so [default_prior()] shows
+#'   `constant(0)` for a guessing rate of 0.5 under the logit link, and
+#'   `summary()` lists it as `g_Intercept 0.00` under "Constant Parameters";
+#'   [prior_info()] and [parameter_info()] show the probability, 0.5. Members
+#'   of a `simplex` group and their `praw` components cannot be fixed this
+#'   way; fix parameters outside the group instead. As a rule of thumb, a
+#'   constant that defines the model goes into `restrictions`, a constant you
+#'   compare against a free version goes into the formula; the section
+#'   "Constraining parameters" of the MPT article walks through both.
+#'
+#'   **Default priors.** Under the logit link, intercepts and regression
+#'   coefficients get a `logistic(0, 1)` prior and random-effect SDs get
+#'   `exponential(1)`. Under the probit link, intercepts and coefficients get
+#'   `normal(0, 1)` and SDs get `exponential(2)`. Group-level correlation
+#'   matrices get `lkj(2)`. A parameter switched to the other link after
+#'   construction (`model$links$D <- "probit"`) takes that link's priors
+#'   unless its default prior was replaced. [default_prior()] lists the rows
+#'   a given formula produces.
+#'
+#'   The default prior of a simplex group of K members is the uniform
+#'   (symmetric Dirichlet(1)) distribution on the simplex: each member has
+#'   prior mean 1/K, whatever the listing order. Under stick breaking this is
+#'   a Beta(1, K - k) prior on stick k, which [default_prior()] shows as
+#'   `logitbeta(1, K - k)` (or `probitbeta(1, K - k)`) on the intercept of
+#'   the k-th `praw`; the last stick keeps `logistic(0, 1)` (or
+#'   `normal(0, 1)`), which is the same distribution. The result is exact
+#'   under both links, and under `0 + cond` it holds in every cell. Under
+#'   `1 + cond` it holds in the reference cell only, because the effects keep
+#'   their own prior. TreeBUGS instead puts a uniform prior on each branch
+#'   parameter, under which the first member has prior mean 0.5 (0.50/0.25/0.25
+#'   for three members). To get it for a group `gA`, `gB`, `gC`, `gD`, pass
+#'   `prior = brms::set_prior("logistic(0, 1)", nlpar = c("gAraw", "gBraw"))`,
+#'   with `"normal(0, 1)"` under the probit link; without `coef`, it covers
+#'   every cell of a `0 + cond` formula.
+#'   A predictor on member `p` acts on the logit (or probit) of `p`'s share of
+#'   the probability left over by the members listed before it. A predictor
+#'   on the first member therefore scales all later members by the same
+#'   factor, leaving their ratios unchanged. Read such effects on the probability scale with
+#'   [native_parameters()].
+#'
+#'   **Identifiability.** Printing the model ends with an identifiability
+#'   check for intercept-only formulas. It compares the number of free
+#'   parameters with the degrees of freedom (response categories minus 1,
+#'   summed over trees) and computes the rank of the Jacobian of the category
+#'   probabilities with respect to the free parameters, from exact derivatives
+#'   at five interior test values (and five test values of each covariate);
+#'   parameters fixed in the formula enter at their values. A rank below the
+#'   number of free parameters means that a combination of the named
+#'   parameters is not identified by the branch expressions, even when the
+#'   count passes. The check is local: it holds at the test values, not at the
+#'   boundaries of the parameter space. A test value with a non-finite
+#'   derivative is left out, and the printout says how many; if [stats::D()]
+#'   cannot differentiate a branch expression, the rank is not computed and
+#'   the count decides. The rank sees the tree parameters only: after a
+#'   non-linear formula, the rank line names that formula's parameter as not
+#'   analysed.
+#'
+#'   `bmm()` warns when the rank is deficient and every formula is
+#'   intercept-only. When a formula has a predictor or is non-linear, it only
+#'   says that these may identify the parameters and that it did not check.
+#'
+#'   Example: separate detection parameters `Do` and `Dn` in a single old/new
+#'   test give three free parameters and rank 2 of 3, so one combination of
+#'   `Do`, `Dn` and `g` cannot be estimated; a second condition that varies
+#'   the response bias identifies them.
+#'
+#'   **Reading the estimates.** `summary()` reports intercepts and regression
+#'   coefficients on the latent (logit or probit) scale. [native_parameters()]
+#'   returns the posterior draws of every parameter on the probability scale
+#'   for each observed combination of the predictors, e.g.
+#'   `native_parameters(fit, re_formula = NA, summary = TRUE)`; a difference
+#'   between conditions is the difference of these draws. With
+#'   `re_formula = NA` these are the probabilities of the median participant
+#'   (the quantity TreeBUGS reports as `"mean"`), not the population mean of
+#'   the participants' probabilities; see the section on group-level effects
+#'   in [native_parameters()].
+#'
+#'   Person effects written as `(1 | id)` in each parameter's formula are
+#'   independent across parameters. A shared label, `(1 |p| id)` in every
+#'   formula, estimates their correlations (prior `lkj(2)`), which
+#'   corresponds to the latent-trait MPT model.
+#'
+#'   For posterior predictive checks, [brms::posterior_predict()] returns
+#'   simulated counts (draws x rows x categories) and [brms::posterior_epred()]
+#'   the expected counts; [ppp()] computes the T1 and T2 statistics of Klauer
+#'   (2010) and their posterior predictive p-values from them. With `newdata`,
+#'   [brms::posterior_predict()] needs the columns `nTrials`, `Idx_<tree>` and
+#'   `Poss_<category>` that `check_data()` builds; `fit$data` contains them.
+#'
+#'   **Non-linear formulas.** Parameters that receive a non-linear predictor
+#'   formula (a formula whose right-hand side references other formula
+#'   parameters, e.g. `D ~ Dmax * (1 - exp(-rate * ptime))`) are not
+#'   transformed by the link function: the user-supplied expression must keep
+#'   the parameter within (0, 1). Sub-parameters of such formulas (e.g.,
+#'   `Dmax` and `rate`) are estimated on the identity scale with
+#'   `normal(0, 1)` default priors on their intercepts and `normal(0, 0.5)`
+#'   on their regression coefficients. Their random-effect SDs keep brms's
+#'   default prior, `student_t(3, 0, 2.5)`, because no single rate fits every
+#'   scale such a formula can give them.
+#'
+#'   Order constraints between parameters (`Do > Dn`) are expressed by
+#'   reparameterizing the larger parameter in the model formula, e.g.
+#'   `bmf(Do ~ Dn + (1 - Dn) * inv_logit(phi), Dn ~ 1, phi ~ 1)`; the section
+#'   "Order constraints" of the MPT article walks through the
+#'   recipe.
+#'
+#'   **Names.** Parameter and response category names must start with a
+#'   letter and may contain only letters and digits, because brms does not
+#'   allow underscores or dots in non-linear parameter names.
+#'
+#'   All latent parameters are non-linear parameters of the underlying brms
+#'   model, and brms has no separate `Intercept` prior class for those: their
+#'   intercept prior is stored as `class = "b", coef = "Intercept"`. A prior
+#'   given as `class = "b", nlpar = "D"` replaces the defaults of all
+#'   coefficients of `D`, the intercept included; add `coef = "Intercept"` to
+#'   set the intercept alone. Call [default_prior()] to see which rows a given
+#'   formula produces.
+#'
+#' @return An object of class `bmmodel`
+#'
+#' @keywords bmmodel
+#'
+#' @examples
+#' \dontrun{
+#' # two-high-threshold (2HTM) model of recognition memory
+#' # one tree per probe type: targets (studied items) and lures (new items),
+#' # each ending in the responses "old" and "new"
+#' tree_target <- mpt_tree("target",
+#'   old ~ D + (1 - D) * g,
+#'   new ~ (1 - D) * (1 - g)
+#' )
+#' tree_lure <- mpt_tree("lure",
+#'   old ~ (1 - D) * g,
+#'   new ~ D + (1 - D) * (1 - g)
+#' )
+#'
+#' model <- mpt(
+#'   trees = list(tree_target, tree_lure),
+#'   tree_id = "item_type"
+#' )
+#'
+#' # simulate data for 20 participants with D = 0.7, g = 0.5:
+#' # one row per participant x tree; count columns named after the branches
+#' data <- data.frame(
+#'   id = rep(1:20, each = 2),
+#'   item_type = rep(c("target", "lure"), 20)
+#' )
+#' counts <- t(sapply(data$item_type, function(cond) {
+#'   rmpt(
+#'     n = 1, size = 50, pars = c(D = 0.7, g = 0.5),
+#'     mpt_model = model, tree = cond, unpack = TRUE
+#'   )
+#' }))
+#' data <- cbind(data, counts)
+#'
+#' # predict both parameters by a fixed intercept and correlated random
+#' # intercepts (the shared label |p| estimates the correlation)
+#' formula <- bmf(
+#'   D ~ 1 + (1 |p| id),
+#'   g ~ 1 + (1 |p| id)
+#' )
+#'
+#' fit <- bmm(
+#'   formula = formula,
+#'   data = data,
+#'   model = model,
+#'   cores = 4
+#' )
+#'
+#' summary(fit)
+#' # population-level D and g on the probability scale
+#' native_parameters(fit, re_formula = NA, summary = TRUE)
+#' }
+#'
+#' @export
+mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
+                restrictions = NULL, links = "logit", ...) {
+  call <- match.call()
+  stop_missing_args()
+  # NULL means the default, as in the other model constructors
+  links <- links %||% "logit"
+  # a named list is validated against the parameters once the model exists
+  stopif(
+    !is.list(links) && !is.character(links),
+    "The links argument must be a single link function for all latent \\
+    parameters, links = \"probit\", or a named list with one link per \\
+    parameter, links = list(D = \"probit\")."
+  )
+  stopif(
+    is.character(links) && length(links) != 1L,
+    "The links argument takes one link function for the whole model. Links \\
+    for single parameters go in a named list, links = list(D = \"probit\")."
+  )
+  stopif(
+    is.character(links) && !links %in% .mpt_link_functions,
+    "Unknown link function(s): {collapse_comma(links)}. mpt() takes \\
+    {collapse_comma(.mpt_link_functions)}"
+  )
+  trees <- .mpt_as_tree_list(trees)
+  covariates <- covariates %||% character(0)
+  simplex <- .mpt_as_simplex_list(simplex)
+  restrictions <- .mpt_parse_restrictions(restrictions)
+  # the link matcher would repair a removed name to a parameter one edit away
+  restricted_links <- intersect(names(links), names(restrictions))
+  stopif(
+    length(restricted_links) > 0,
+    "The link target(s) {collapse_comma(restricted_links)} are removed by the \\
+    restrictions and take no link. Set the link of the parameter a \\
+    restriction equates them to instead."
+  )
+
+  stopif(
+    length(trees) == 0L || !all(vapply(trees, inherits, logical(1), "mpt_tree")),
+    "The trees argument must be an mpt_tree object or a list of mpt_tree \\
+    objects created with mpt_tree()."
+  )
+  tree_names <- vapply(trees, `[[`, character(1), "name")
+  stopif(
+    anyDuplicated(tree_names) > 0,
+    "Tree names must be unique. Duplicated: {collapse_comma(unique(tree_names[duplicated(tree_names)]))}"
+  )
+  bad_tree_names <- tree_names[!grepl("^[A-Za-z][A-Za-z0-9_]*$", tree_names)]
+  stopif(
+    length(bad_tree_names) > 0,
+    "Tree names must start with a letter and contain only letters, digits, or \\
+    underscores. Please rename: {collapse_comma(bad_tree_names)}"
+  )
+
+  tree_cats <- lapply(trees, function(tree) c(names(tree$branches), tree$impossible))
+  resp_cats <- tree_cats[[1]]
+  cats_match <- vapply(tree_cats, setequal, logical(1), resp_cats)
+  stopif(
+    !all(cats_match),
+    "All trees must have the same response categories, counting those declared
+    impossible.
+    Tree '{trees[[1]]$name}' has: {collapse_comma(resp_cats)}
+    Tree '{tree_names[!cats_match][1]}' has: {collapse_comma(tree_cats[!cats_match][[1]])}"
+  )
+  always_impossible <- Reduce(intersect, lapply(trees, `[[`, "impossible"))
+  stopif(
+    length(always_impossible) > 0,
+    "The response category(ies) {collapse_comma(always_impossible)} are \\
+    impossible in every tree and are therefore not identified. Please remove \\
+    them from the model."
+  )
+  trees <- lapply(trees, function(tree) {
+    tree$branches <- tree$branches[intersect(resp_cats, names(tree$branches))]
+    tree
+  })
+  names(trees) <- tree_names
+
+  stopif(
+    length(trees) > 1L && is.null(tree_id),
+    "Models with multiple trees require the tree_id argument: the name of the \\
+    data column whose values identify the tree each observation belongs to."
+  )
+  stopif(
+    !is.null(tree_id) && (!is.character(tree_id) || length(tree_id) != 1L),
+    "The tree_id argument must be a single character string naming a data column."
+  )
+  stopif(
+    length(covariates) > 0L && !is.character(covariates),
+    "The covariates argument must be a character vector of data column names."
+  )
+
+  # plot() labels the restricted edges from the trees as written
+  unrestricted_trees <- if (length(restrictions)) trees
+  trees <- .mpt_restrict_trees(trees, restrictions, covariates)
+
+  # a zero probability makes log(p) undefined in Stan; mpt_tree(impossible = )
+  # switches a category off with a finite linear predictor instead. The guard
+  # runs after the restrictions, which can fold a branch to 0 (a = 0.5 in "1 - 2 * a").
+  zero_branches <- unlist(lapply(trees, function(tree) {
+    is_zero <- vapply(tree$branches, function(b) is.numeric(b) && b == 0, logical(1))
+    glue("'{names(tree$branches)[is_zero]}' in tree '{tree$name}'")
+  }))
+  stopif(
+    length(zero_branches) > 0,
+    "Branch probabilities that are the constant 0: \\
+    {paste(zero_branches, collapse = ', ')}. A zero probability makes the \\
+    likelihood undefined. Declare a response category that a tree cannot \\
+    produce with mpt_tree(impossible = ) instead of giving it a zero branch."
+  )
+
+  parameters <- .mpt_tree_parameters(trees, covariates)
+  stopif(
+    length(parameters) == 0L,
+    "The tree branch expressions contain no latent parameters. Symbols listed \\
+    in the covariates argument are not treated as parameters."
+  )
+
+  .mpt_check_names(parameters, "parameter")
+  .mpt_check_names(resp_cats, "response category")
+
+  par_cat_overlap <- intersect(parameters, resp_cats)
+  stopif(
+    length(par_cat_overlap) > 0,
+    "Names cannot be used for both a parameter and a response category: \\
+    {collapse_comma(par_cat_overlap)}"
+  )
+  cov_collisions <- intersect(covariates, c(resp_cats, parameters))
+  stopif(
+    length(cov_collisions) > 0,
+    "Covariate names collide with parameter or response category names: \\
+    {collapse_comma(cov_collisions)}"
+  )
+  reserved <- intersect(c(parameters, resp_cats, covariates), c("Y", "nTrials"))
+  stopif(
+    length(reserved) > 0,
+    "The names 'Y' and 'nTrials' are reserved for the response matrix and \\
+    trial counts. Please rename: {collapse_comma(reserved)}"
+  )
+
+  simplex_pars <- unlist(simplex)
+  stopif(
+    anyDuplicated(simplex_pars) > 0,
+    "Parameters cannot appear in more than one simplex group: \\
+    {collapse_comma(unique(simplex_pars[duplicated(simplex_pars)]))}"
+  )
+  restricted_simplex <- intersect(simplex_pars, names(restrictions))
+  stopif(
+    length(restricted_simplex) > 0,
+    "The simplex parameter(s) {collapse_comma(restricted_simplex)} are also \\
+    restricted, and the restriction removed them from the trees. Restrict \\
+    simplex members only through the group itself."
+  )
+  unknown_simplex <- setdiff(simplex_pars, parameters)
+  stopif(
+    length(unknown_simplex) > 0,
+    "Simplex groups can only contain latent parameters from the tree \\
+    expressions. Unknown: {collapse_comma(unknown_simplex)}"
+  )
+  short_groups <- lengths(simplex) < 2L
+  stopif(
+    any(short_groups),
+    "Each simplex group needs at least two parameters."
+  )
+  raw_pars <- unlist(lapply(simplex, function(grp) paste0(grp[-length(grp)], "raw")))
+  raw_collisions <- intersect(raw_pars, c(parameters, resp_cats, covariates))
+  stopif(
+    length(raw_collisions) > 0,
+    "The stick-breaking components of simplex parameters are named by \\
+    appending 'raw' to the parameter name, but these names are already in \\
+    use: {collapse_comma(raw_collisions)}"
+  )
+
+  # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
+  # so check_data() decides for trees that use covariates, with the observed
+  # values; every other tree is decided here, whether covariates are declared or not
+  uses_covariates <- vapply(
+    trees, function(tree) any(.mpt_expr_vars(tree) %in% covariates), logical(1)
+  )
+  branch_errors <- .mpt_tree_branch_errors(trees[!uses_covariates], parameters, simplex)
+  branch_errors <- branch_errors[!is.na(branch_errors)]
+  stopif(length(branch_errors) > 0, "{branch_errors[1]}")
+  vertex_errors <- .mpt_tree_vertex_errors(trees[!uses_covariates], parameters, simplex)
+  stopif(!all(is.na(vertex_errors)), "{vertex_errors[!is.na(vertex_errors)][1]}")
+  .mpt_message_sampled(attr(vertex_errors, "sampled"))
+
+  .model_mpt(
+    trees = trees, tree_id = tree_id, covariates = covariates,
+    simplex = simplex, restrictions = restrictions,
+    unrestricted_trees = unrestricted_trees, links = links, call = call, ...
+  )
+}
+
+# restrictions are checked against the symbols of the unrestricted trees and
+# then substituted, so every later step sees the restricted model only
+.mpt_restrict_trees <- function(trees, restrictions, covariates) {
+  if (length(restrictions) == 0L) {
+    return(trees)
+  }
+  restricted <- names(restrictions)
+  stopif(
+    anyDuplicated(restricted) > 0,
+    "Parameters cannot be restricted more than once: \\
+    {collapse_comma(unique(restricted[duplicated(restricted)]))}"
+  )
+  restricted_covariates <- intersect(restricted, covariates)
+  stopif(
+    length(restricted_covariates) > 0,
+    "Covariates are data columns and cannot be restricted: \\
+    {collapse_comma(restricted_covariates)}"
+  )
+  parameters <- .mpt_tree_parameters(trees, covariates)
+  restrictions <- .mpt_resolve_restrictions(restrictions)
+  targets <- unique(unlist(lapply(restrictions, all.vars)))
+  unknown <- setdiff(c(restricted, targets), parameters)
+  stopif(
+    "FE" %in% setdiff(targets, parameters),
+    "FE is TreeBUGS syntax for a parameter without person effects. In bmm, \\
+    leave the random effects out of that parameter's formula instead \\
+    (e.g. g ~ 1 instead of g ~ 1 + (1 | id))."
+  )
+  stopif(
+    length(unknown) > 0,
+    "Restrictions refer to parameters that do not appear in the tree branch \\
+    expressions: {collapse_comma(unknown)}"
+  )
+  circular <- intersect(targets, restricted)
+  stopif(
+    length(circular) > 0,
+    "The restrictions on {collapse_comma(circular)} are circular."
+  )
+  # a restriction takes only a bare constant, so the rescaling that
+  # mpt_tree() suggests has to move into the branch expressions
+  scientific <- restrictions[
+    lengths(lapply(restrictions, .mpt_scientific_constants)) > 0
+  ]
+  stopif(
+    length(scientific) > 0,
+    "brms writes the constant in the restriction(s) \\
+    {paste(names(scientific), vapply(scientific, deparse1, character(1)),
+           sep = ' = ', collapse = ', ')} in scientific notation, which \\
+    breaks the generated Stan code. Every spelling of the same number is \\
+    affected, so please leave the parameter out of the restrictions and \\
+    write the constant into the branch expressions as a product instead, \\
+    e.g. 0.0002 as 0.02 * 0.01, or provide the value as a data column \\
+    declared in the covariates argument."
+  )
+  lapply(trees, .mpt_apply_restrictions, restrictions)
+}
+
+#' @export
+print_model_details.mpt <- function(model, ...) {
+  for (tree in model$other_vars$trees) {
+    print(tree)
+  }
+  if (length(model$other_vars$restrictions) > 0) {
+    cat(
+      "Restrictions:",
+      paste(
+        names(model$other_vars$restrictions),
+        vapply(model$other_vars$restrictions, deparse1, character(1)),
+        sep = " = ", collapse = ", "
+      ),
+      "\n"
+    )
+  }
+  # the links field lists the members and sticks as identity because their
+  # generated formulas apply the model link; the display says which one
+  for (grp in model$other_vars$simplex) {
+    cat(glue(
+      "Simplex:    {collapse_comma(grp)} via stick-breaking; the components \\
+      {collapse_comma(model$other_vars$simplex_raw[grp[-length(grp)]])} pass \\
+      through {inv_link('x', model$other_vars$link)[[1]]}() in the generated \\
+      formulas (hence the identity links above)"
+    ), "\n")
+    cat(strrep(" ", 12), glue(
+      "default prior: symmetric Dirichlet(1), prior mean 1/{length(grp)} = \\
+      {round(1 / length(grp), 3)} for each member"
+    ), "\n", sep = "")
+  }
+  # the classical parameters-versus-categories bound, followed by the Jacobian
+  # rank, which also catches redundant parameters when the count passes; each
+  # tree contributes its possible categories minus one. A simplex group counts
+  # through its stick-breaking components, one fewer than its members.
+  identifiability <- .mpt_identifiability(model)
+  cat(glue(
+    "Identifiability (intercept-only formulas): {identifiability$n_free} free \\
+    parameter(s), {identifiability$df} degrees of freedom (response \\
+    categories minus 1, summed over trees)"
+  ), "\n")
+  if (identifiability$n_free > identifiability$df && .mpt_uses_covariates(model)) {
+    cat(
+      "  More free parameters than degrees of freedom in one design cell;",
+      "covariate values that differ between rows can add information.\n"
+    )
+  } else if (identifiability$n_free > identifiability$df) {
+    cat(
+      "  More free parameters than degrees of freedom: the model is not",
+      "identified without further constraints.\n"
+    )
+  }
+  # set by check_model.mpt() for parameters with a non-linear formula
+  tied <- names(attr(model, "mpt_bypassed_links"))
+  cat(
+    strwrap(.mpt_rank_text(identifiability, tied), indent = 2, exdent = 4),
+    sep = "\n"
+  )
+  invisible(NULL)
+}
+
+.mpt_uses_covariates <- function(model) {
+  any(vapply(model$other_vars$trees, function(tree) {
+    any(.mpt_expr_vars(tree) %in% model$other_vars$covariates)
+  }, logical(1)))
+}
+
+# the rank holds only at the test values where every derivative is finite
+.mpt_left_out_text <- function(identifiability) {
+  left_out <- identifiability$left_out
+  if (left_out == 0L) {
+    return(NULL)
+  }
+  glue(
+    "At {left_out} of the {identifiability$n_points} interior test values a \\
+    derivative of the branch expressions is not finite, so the rank is taken \\
+    at the other {identifiability$n_points - left_out}."
+  )
+}
+
+# rank of the category probabilities in the free tree parameters; a parameter
+# fixed in the formula enters at its value. A simplex group is free through its
+# stick-breaking components, which users never write, so the text names the
+# group's members instead. Covariates are data, never free parameters; the rank
+# is taken at five test values of each
+.mpt_identifiability <- function(model) {
+  trees <- model$other_vars$trees
+  simplex <- model$other_vars$simplex
+  sticks <- model$other_vars$simplex_raw
+  covariates <- model$other_vars$covariates
+  parameters <- setdiff(.mpt_tree_parameters(trees, covariates), unlist(simplex))
+  fixed <- model$fixed_parameters[
+    intersect(names(model$fixed_parameters), parameters)
+  ]
+  free <- c(
+    setdiff(parameters, names(fixed)),
+    setdiff(unname(sticks), names(model$fixed_parameters))
+  )
+  labels <- setNames(paste0("'", free, "'"), free)
+  for (grp in simplex) {
+    labels[intersect(free, sticks[grp])] <- glue(
+      "the simplex group {collapse_comma(grp)}"
+    )
+  }
+  settings <- NULL
+  where <- "at interior test values"
+  if (.mpt_uses_covariates(model)) {
+    test_values <- as.data.frame(do.call(rbind, .mpt_test_points(covariates, list())))
+    settings <- lapply(trees, function(tree) {
+      used <- intersect(covariates, .mpt_expr_vars(tree))
+      if (length(used) == 0L) data.frame(row.names = 1L) else test_values[used]
+    })
+    where <- "at interior test values and 5 test values of the covariates"
+  }
+  c(
+    .mpt_jacobian_rank(trees, free, fixed, simplex, sticks, settings),
+    list(labels = labels, where = where)
+  )
+}
+
+.mpt_rank_text <- function(identifiability, tied = NULL) {
+  rank_line <- glue(
+    "Jacobian rank {identifiability$rank} of {identifiability$n_free} \\
+    {identifiability$where}:"
+  )
+  # the rank sees the tree parameters only, not what a non-linear formula ties
+  # together or builds from sub-parameters
+  not_analysed <- if (length(tied) > 0) {
+    glue("; non-linear formula(s) for {collapse_comma(tied)} not analysed")
+  } else {
+    ""
+  }
+  if (!is.null(identifiability$error)) {
+    glue("Jacobian rank not computed: {identifiability$error}.")
+  } else if (identifiability$rank < identifiability$n_free) {
+    paste(c(
+      glue(
+        "{rank_line} {.mpt_deficit_subject(identifiability)} not identified \\
+        by the branch expressions{not_analysed}."
+      ),
+      .mpt_left_out_text(identifiability)
+    ), collapse = " ")
+  } else {
+    paste(c(
+      glue("{rank_line} locally identified{not_analysed}."),
+      .mpt_left_out_text(identifiability)
+    ), collapse = " ")
+  }
+}
+
+.mpt_deficit_pars <- function(identifiability) {
+  # without a rank, every free parameter is suspect
+  if (is.null(identifiability$error)) identifiability$involved else identifiability$free
+}
+
+.mpt_deficit_params <- function(identifiability) {
+  pars <- .mpt_deficit_pars(identifiability)
+  if (length(pars) == 1L) {
+    .mpt_labels(pars, identifiability$labels)
+  } else {
+    .mpt_parameter_set(pars, identifiability$free, identifiability$labels)
+  }
+}
+
+.mpt_deficit_subject <- function(identifiability) {
+  params <- .mpt_deficit_params(identifiability)
+  if (length(.mpt_deficit_pars(identifiability)) == 1L) {
+    glue("{params} is")
+  } else {
+    glue("the combination of {params} is")
+  }
+}
+
+.mpt_deficit_text <- function(identifiability) {
+  if (is.null(identifiability$error)) {
+    .mpt_rank_text(identifiability)
+  } else {
+    glue(
+      "{identifiability$n_free} free parameters for {identifiability$df} \\
+      degrees of freedom (response categories minus 1, summed over trees); \\
+      {.mpt_rank_text(identifiability)}"
+    )
+  }
+}
+
+# a list longer than half the free parameters reads better as its complement
+.mpt_parameter_set <- function(pars, free, labels) {
+  if (length(pars) <= length(free) / 2) {
+    return(.mpt_labels(pars, labels))
+  }
+  rest <- setdiff(free, pars)
+  if (length(rest) == 0L) {
+    return("all free parameters")
+  }
+  glue("all free parameters except {.mpt_labels(rest, labels)}")
+}
+
+.mpt_labels <- function(pars, labels) {
+  paste(unique(labels[pars]), collapse = ", ")
+}
+
+############################################################################# !
+# CHECK_MODEL S3 methods                                                 ####
+############################################################################# !
+
+#' @export
+check_model.mpt <- function(model, data = NULL, formula = NULL) {
+  model <- .mpt_undo_formula_state(model)
+  model <- .mpt_match_link_priors(model)
+  if (!is.null(formula)) {
+    resp_cats <- model$resp_vars$resp_cats
+    user_cat_formulas <- intersect(resp_cats, names(formula))
+    stopif(
+      length(user_cat_formulas) > 0,
+      "The response category probabilities are fully determined by the tree \\
+      branch expressions and cannot be predicted directly. Please remove the \\
+      formula(s) for: {collapse_comma(user_cat_formulas)}"
+    )
+    # brms would refuse the circular dependency only after the identifiability
+    # check has read the count column as a predictor
+    rhs_cats <- lapply(rhs_vars(formula, collapse = FALSE), intersect, resp_cats)
+    cat_predictor_formulas <- names(rhs_cats)[lengths(rhs_cats) > 0]
+    stopif(
+      length(cat_predictor_formulas) > 0,
+      "The response counts {collapse_comma(unique(unlist(rhs_cats)))} are what \\
+      the model predicts and cannot be predictors in a parameter formula. \\
+      Please remove them from the formula(s) for: \\
+      {collapse_comma(cat_predictor_formulas)}"
+    )
+    nl_pars <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
+    nl_simplex <- intersect(nl_pars, unlist(model$other_vars$simplex))
+    stopif(
+      length(nl_simplex) > 0,
+      "Non-linear predictor formulas are not supported for simplex parameters: \\
+      {collapse_comma(nl_simplex)}"
+    )
+    sub_pars <- .mpt_nl_subparameters(model, formula, data)
+    no_formula <- setdiff(sub_pars, names(formula))
+    stopif(
+      length(no_formula) > 0,
+      "{collapse_comma(no_formula)} in your non-linear formula(s) is neither a \\
+      data column nor a model parameter. Give each new parameter its own \\
+      formula (e.g. {no_formula[1]} ~ 1), or add the column to the data."
+    )
+    .mpt_check_names(sub_pars, "parameter")
+    if (length(sub_pars) > 0) {
+      message2(
+        "The parameter(s) {collapse_comma(sub_pars)} from your non-linear \\
+        formulas are estimated on the identity scale with normal(0, 1) default \\
+        priors, and their random-effect SDs keep brms's student_t(3, 0, 2.5) \\
+        default. Apply any required transformation inside your formula and \\
+        adjust the priors to the scale of your predictors. Whether the data \\
+        identify these parameters is not checked."
+      )
+    }
+    model <- .mpt_bypass_links(model, nl_pars)
+    model <- .mpt_add_subparameters(model, sub_pars)
+    # these links are the pipeline's own doing, so a later check_links() must
+    # not read them as user changes
+    attr(model, "links_checked") <- model$links
+
+    # fixed values from the bmmformula (e.g. g = 0.5) stay on the probability
+    # scale in the model object; configure_prior.mpt() maps them to the
+    # latent scale when it builds the constant priors
+    fixed_simplex <- intersect(
+      names(model$fixed_parameters),
+      c(unlist(model$other_vars$simplex), model$other_vars$simplex_raw)
+    )
+    stopif(
+      length(fixed_simplex) > 0,
+      "Fixing simplex parameters to constants is not supported: \\
+      {collapse_comma(fixed_simplex)}. Fix parameters outside the group \\
+      instead."
+    )
+    for (par in .mpt_latent_fixed_pars(model)) {
+      value <- model$fixed_parameters[[par]]
+      stopif(
+        !is.numeric(value) || value <= 0 || value >= 1,
+        "The fixed value for parameter '{par}' must be a probability strictly \\
+        between 0 and 1. Provided: {value}"
+      )
+    }
+
+    # a deficit of the branch expressions alone is certain only when no
+    # predictor or non-linear formula can identify the parameters involved; the
+    # count bound stands in when the rank cannot be computed
+    identifiability <- .mpt_identifiability(model)
+    deficit <- if (is.null(identifiability$error)) {
+      identifiability$rank < identifiability$n_free
+    } else {
+      identifiability$n_free > identifiability$df
+    }
+    if (deficit && .mpt_no_predictors(formula, names(model$parameters))) {
+      warning2(
+        "The model is not identified. {.mpt_deficit_text(identifiability)} \\
+        Along the non-identified direction(s), the posterior follows the prior."
+      )
+    } else if (deficit) {
+      message2(
+        "The branch expressions alone do not identify \\
+        {.mpt_deficit_params(identifiability)}. Predictors or non-linear \\
+        formulas may identify them; this was not checked."
+      )
+    }
+  }
+  NextMethod("check_model")
+}
+
+# a population-level term uses a data column; random-effect terms carry a bar,
+# and parameters inside a non-linear formula are not data. A formula terms()
+# cannot read counts as having predictors, which gives the message rather than
+# a false warning
+.mpt_no_predictors <- function(formula, parameters) {
+  formula <- formula[!is_constant(formula)]
+  !any(is_nl(formula)) && !any(vapply(formula, function(par_formula) {
+    formula_terms <- try(stats::terms(par_formula), silent = TRUE)
+    is_try_error(formula_terms) || length(setdiff(
+      unlist(lapply(
+        attr(formula_terms, "term.labels")[
+          !grepl("|", attr(formula_terms, "term.labels"), fixed = TRUE)
+        ],
+        function(label) all.vars(str2lang(label))
+      )),
+      c(names(formula), parameters)
+    )) > 0
+  }, logical(1)))
+}
+
+# a parameter whose link was switched after construction gets the matched
+# prior of its new link, unless the user replaced its default prior
+.mpt_match_link_priors <- function(model) {
+  model_prior <- .mpt_latent_prior(model$other_vars$link)
+  for (par in settable_links(model)) {
+    link <- model$links[[par]]
+    if (identical(link, model$other_vars$link)) next
+    if (!identical(model$default_priors[[par]], model_prior)) next
+    model$default_priors[[par]] <- .mpt_latent_prior(link)
+  }
+  model
+}
+
+# symbols of non-linear formulas that are neither parameters, formula
+# parameters nor data columns are sub-parameters the user introduces
+.mpt_nl_subparameters <- function(model, formula, data) {
+  nl_formulas <- formula[is_nl(formula)]
+  setdiff(
+    rhs_vars(nl_formulas),
+    c(
+      names(nl_formulas), names(model$parameters), colnames(data),
+      model$other_vars$covariates, model$other_vars$tree_id
+    )
+  )
+}
+
+# a model checked before (fit$bmm$model, re-checked by update()) carries the
+# bypassed links and the sub-parameters of the formula it was checked with;
+# the new formula may make a parameter linear again or drop a sub-parameter
+.mpt_undo_formula_state <- function(model) {
+  sub_pars <- setdiff(names(model$parameters), names(attr(model, "links_default")))
+  model$parameters[sub_pars] <- NULL
+  model$links[sub_pars] <- NULL
+  model$default_priors[sub_pars] <- NULL
+  # back to the prior from construction (a simplex stick's beta prior, else the
+  # latent prior, which check_model.mpt() then matches to a switched link)
+  bypassed <- attr(model, "mpt_bypassed_links")
+  model$links[names(bypassed)] <- bypassed
+  construction_priors <- .mpt_stick_priors(model$other_vars$simplex, model$other_vars$link)
+  model$default_priors[names(bypassed)] <- lapply(names(bypassed), function(par) {
+    construction_priors[[par]] %||% .mpt_latent_prior(model$other_vars$link)
+  })
+  attr(model, "mpt_bypassed_links") <- NULL
+  attr(model, "links_checked") <- model$links
+  model
+}
+
+# parameters with a user-supplied non-linear formula own their (0,1)
+# constraint, so the automatic link transformation is switched off for them;
+# their links are kept for a later check with another formula
+.mpt_bypass_links <- function(model, pars) {
+  attr(model, "mpt_bypassed_links") <- model$links[pars]
+  for (par in pars) {
+    model$links[[par]] <- "identity"
+    model$default_priors[[par]] <- NULL
+  }
+  model
+}
+
+# no sd default: a sub-parameter lives on whatever scale the user's formula
+# gives it, so no rate fits all of them and brms's default applies
+.mpt_add_subparameters <- function(model, sub_pars) {
+  if (length(sub_pars) == 0L) {
+    return(model)
+  }
+  model$parameters[sub_pars] <- .mpt_named_list(
+    sub_pars, "User-defined sub-parameter of a non-linear parameter formula."
+  )
+  model$links[sub_pars] <- .mpt_named_list(sub_pars, "identity")
+  model$default_priors[sub_pars] <- .mpt_named_list(
+    sub_pars, list(main = "normal(0, 1)", effects = "normal(0, 0.5)")
+  )
+  model
+}
+
+# fixed latent probability parameters; sub-parameters of non-linear formulas
+# have an identity link and take their fixed value as is
+.mpt_latent_fixed_pars <- function(model) {
+  fixed_pars <- intersect(names(model$fixed_parameters), names(model$parameters))
+  fixed_pars[vapply(fixed_pars, function(par) {
+    model$links[[par]] != "identity"
+  }, logical(1))]
+}
+
+############################################################################# !
+# CHECK_data S3 methods                                                  ####
+############################################################################# !
+
+#' @export
+check_data.mpt <- function(model, data, formula) {
+  resp_cats <- model$resp_vars$resp_cats
+  col_names <- colnames(data)
+
+  missing_cats <- setdiff(resp_cats, col_names)
+  stopif(
+    length(missing_cats) > 0,
+    "The data must contain one column of response counts per response category,
+    named after the branch names of the trees.
+    Expected columns: {collapse_comma(resp_cats)}
+    Missing columns: {collapse_comma(missing_cats)}"
+  )
+
+  reserved_cols <- intersect(c("Y", "nTrials"), col_names)
+  stopif(
+    length(reserved_cols) > 0,
+    "The data column(s) {collapse_comma(reserved_cols)} would be overwritten by \\
+    the response matrix and trial counts that bmm builds. Please rename them."
+  )
+
+  resp_matrix <- as.matrix(data[resp_cats])
+  stopif(
+    !is.numeric(resp_matrix) || any(resp_matrix < 0, na.rm = TRUE),
+    "The response category columns must contain non-negative response counts."
+  )
+  missing_counts <- is.na(resp_matrix)
+  resp_matrix[missing_counts] <- 0
+  data <- data[!col_names %in% resp_cats]
+  # an integer column keeps conditional_effects() grids at a valid trial count
+  data$nTrials <- as.integer(rowSums(resp_matrix))
+  data$Y <- resp_matrix
+
+  tree_id <- model$other_vars$tree_id
+  if (!is.null(tree_id)) {
+    stopif(
+      !tree_id %in% colnames(data),
+      "The tree identifier column '{tree_id}' is not present in the data."
+    )
+    tree_values <- as.character(data[[tree_id]])
+    tree_names <- names(model$other_vars$trees)
+    unmatched <- setdiff(unique(tree_values), tree_names)
+    stopif(
+      length(unmatched) > 0,
+      "All values of the tree identifier column '{tree_id}' must match a tree name.
+      Tree names: {collapse_comma(tree_names)}
+      Unmatched values: {collapse_comma(unmatched)}
+      Values of an experimental factor that share a branch structure belong to
+      the same tree; add a column that names the tree for each observation and
+      keep the factor for the parameter formulas."
+    )
+    unused_trees <- setdiff(tree_names, unique(tree_values))
+    warnif(
+      length(unused_trees) > 0,
+      "The data contain no rows for tree(s): {collapse_comma(unused_trees)}"
+    )
+    # brms needs the indicators as data columns, so they are handed on through
+    # the data rather than through the attribute bridge
+    idx_vars <- model$other_vars$indicators$tree
+    idx_collisions <- intersect(idx_vars, colnames(data))
+    stopif(
+      length(idx_collisions) > 0,
+      "The data contain column(s) {collapse_comma(idx_collisions)}, which are \\
+      reserved for the generated tree indicator variables. Please rename them."
+    )
+    for (tree_name in tree_names) {
+      data[[idx_vars[[tree_name]]]] <- as.integer(tree_values == tree_name)
+    }
+  }
+
+  raw_collisions <- intersect(model$other_vars$simplex_raw, colnames(data))
+  stopif(
+    length(raw_collisions) > 0,
+    "The data contain column(s) {collapse_comma(raw_collisions)}, which are \\
+    the names of the stick-breaking components of the simplex parameters. \\
+    Please rename them."
+  )
+
+  data <- .mpt_possibility_indicators(model, data)
+  .mpt_warn_missing_counts(model, data, missing_counts)
+
+  covariates <- model$other_vars$covariates
+  missing_covariates <- setdiff(covariates, colnames(data))
+  stopif(
+    length(missing_covariates) > 0,
+    "The declared covariates {collapse_comma(missing_covariates)} are missing \\
+    from the data."
+  )
+  non_numeric <- covariates[
+    !vapply(covariates, function(v) is.numeric(data[[v]]), logical(1))
+  ]
+  stopif(
+    length(non_numeric) > 0,
+    "The declared covariates must be numeric data columns. Not numeric: \\
+    {collapse_comma(non_numeric)}"
+  )
+
+  .mpt_validate_covariate_sums(model, data)
+
+  NextMethod("check_data")
+}
+
+# a missing count in a category that the row's tree cannot produce is a known
+# 0 (the OL2019 data record no distractor count where none was shown)
+.mpt_warn_missing_counts <- function(model, data, missing_counts) {
+  poss_vars <- model$other_vars$indicators$possible
+  for (resp_cat in names(poss_vars)) {
+    missing_counts[data[[poss_vars[[resp_cat]]]] == 0L, resp_cat] <- FALSE
+  }
+  warnif(
+    any(missing_counts),
+    "The response count columns contain {sum(missing_counts)} missing \\
+    value(s), which are counted as 0 responses."
+  )
+}
+
+# structurally impossible categories are switched off per row rather than per
+# tree, because a category can be impossible in some trees and not in others
+.mpt_possibility_indicators <- function(model, data) {
+  poss_vars <- model$other_vars$indicators$possible
+  if (is.null(poss_vars)) {
+    return(data)
+  }
+  poss_collisions <- intersect(poss_vars, colnames(data))
+  stopif(
+    length(poss_collisions) > 0,
+    "The data contain column(s) {collapse_comma(poss_collisions)}, which are \\
+    reserved for the generated indicators of structurally impossible response \\
+    categories. Please rename them."
+  )
+  # a category impossible in every tree is rejected by mpt(), so any model that
+  # reaches here has several trees and therefore tree indicator columns
+  for (resp_cat in names(poss_vars)) {
+    impossible_rows <- logical(nrow(data))
+    for (tree in model$other_vars$trees) {
+      if (!resp_cat %in% tree$impossible) next
+      impossible_rows <- impossible_rows |
+        data[[model$other_vars$indicators$tree[[tree$name]]]] == 1L
+    }
+    observed <- which(impossible_rows & data$Y[, resp_cat] > 0)
+    stopif(
+      length(observed) > 0,
+      "The response category '{resp_cat}' is declared impossible for \\
+      {length(observed)} row(s), but the data record responses in it \\
+      (first: row {observed[1]}, count {data$Y[observed[1], resp_cat]}). \\
+      Please check the impossible argument of mpt_tree() and the response counts."
+    )
+    data[[poss_vars[[resp_cat]]]] <- as.integer(!impossible_rows)
+  }
+  data
+}
+
+# the construction-time check skips trees that use covariates, because it
+# cannot use real covariate values, so the sums of those trees are checked per
+# row with the observed values, at several parameter test points: a single
+# symmetric point (all 0.5) hides swapped complements. Trees without covariates
+# are left to mpt() and enter only through the NA check of the covariates. The
+# range is also checked with all parameters near 0 and near 1, and then for
+# each branch at the vertices of its own parameter box, which are exact for a
+# branch multilinear in its parameters (.mpt_check_branch_vertices()).
+# brms evaluates every tree's branches on every row, so the branches of such a
+# tree must also be finite on the rows of the other trees.
+# Covariates themselves are not range-checked: one may be a set size entering
+# as 1/ss.
+.mpt_validate_covariate_sums <- function(model, data, tolerance = 1e-6) {
+  covariates <- model$other_vars$covariates
+  if (length(covariates) == 0L) {
+    return(invisible(NULL))
+  }
+  symbols <- names(model$parameters)
+  simplex <- model$other_vars$simplex
+  interior_points <- .mpt_test_points(symbols, simplex)
+  points <- c(interior_points, .mpt_boundary_points(symbols, simplex))
+  idx_vars <- model$other_vars$indicators$tree
+  # a declared covariate that no branch uses never reaches brms
+  used_covariates <- intersect(
+    covariates, unlist(lapply(model$other_vars$trees, .mpt_expr_vars))
+  )
+  approximate <- character(0)
+  for (tree in model$other_vars$trees) {
+    rows <- if (is.null(idx_vars)) {
+      seq_len(nrow(data))
+    } else {
+      which(data[[idx_vars[[tree$name]]]] == 1L)
+    }
+    # a tree without rows skips only its own-row checks (they see no rows);
+    # its branches are still evaluated on the rows of the other trees
+    na_covariates <- used_covariates[vapply(
+      used_covariates, function(v) anyNA(data[[v]][rows]), logical(1)
+    )]
+    if (length(na_covariates) > 0L) {
+      na_cov <- na_covariates[1]
+      na_row <- rows[is.na(data[[na_cov]][rows])][1]
+      stopif(
+        na_cov %in% .mpt_expr_vars(tree),
+        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
+        '{tree$name}', so the branch probabilities of this tree cannot be \\
+        computed. Please fill in the value."
+      )
+      stop2(
+        "The covariate '{na_cov}' is missing in row {na_row} of tree \\
+        '{tree$name}', and brms would drop that row from the model. Tree \\
+        '{tree$name}' does not use '{na_cov}', so fill in a value that keeps \\
+        the branches of the other trees finite (0 works unless one of them \\
+        divides by '{na_cov}')."
+      )
+    }
+    tree_covariates <- intersect(covariates, .mpt_expr_vars(tree))
+    # mpt() checked a tree without covariates at construction, and its
+    # branches take the same values on every row
+    if (length(tree_covariates) == 0L) {
+      next
+    }
+    check_what <- paste0(
+      "the branch expressions of this tree and the covariate column(s): ",
+      collapse_comma(tree_covariates)
+    )
+    for (point in seq_along(points)) {
+      env <- c(
+        as.list(points[[point]]), as.list(data[, covariates, drop = FALSE])
+      )
+      all_branches <- lapply(tree$branches, function(branch) {
+        rep(eval(branch, envir = env), length.out = nrow(data))
+      })
+      branches <- lapply(all_branches, `[`, rows)
+      total <- Reduce(`+`, branches)
+      deviates <- is.na(total) | abs(total - 1) > tolerance
+      stopif(
+        any(deviates),
+        "With the covariate values in the data, the branch probabilities of \\
+        tree '{tree$name}' do not sum to 1 for {sum(deviates)} row(s) \\
+        (first: row {rows[deviates][1]}, sum = {signif(total[deviates][1], 6)}) \\
+        at the test parameter values. Please check {check_what}"
+      )
+      undefined <- lapply(all_branches, function(b) {
+        setdiff(which(is.infinite(b) | is.nan(b)), rows)
+      })
+      resp_cat <- names(which(lengths(undefined) > 0L))[1]
+      if (!is.na(resp_cat)) {
+        row <- undefined[[resp_cat]][1]
+        row_tree <- names(idx_vars)[vapply(
+          idx_vars, function(v) data[[v]][row] == 1L, logical(1)
+        )][1]
+        stop2(
+          "With the covariate values in the data, the branch probability of \\
+          category '{resp_cat}' in tree '{tree$name}' is not finite in row \\
+          {row}. That row belongs to tree '{row_tree}', whose covariate \\
+          value makes this branch undefined, and brms evaluates \\
+          every tree's branches on every row. Please check {check_what}"
+        )
+      }
+      # branches that sum to 1 can still be negative or above 1 (e.g. G = 1.2).
+      # A valid branch may underflow to 0 at the corners (and at an interior
+      # point for (1 - D)^n from a few hundred, by the symbol's test value;
+      # accepted as unrealistic), and one written as 1 minus the others may
+      # cancel to just below 0 at the corners, so only a branch below
+      # -tolerance counts there
+      out_of_range <- lapply(branches, function(b) {
+        which(
+          (if (point <= length(interior_points)) b <= 0 else b < -tolerance) |
+            b > 1 + tolerance
+        )
+      })
+      resp_cat <- names(which(lengths(out_of_range) > 0L))[1]
+      if (!is.na(resp_cat)) {
+        row <- out_of_range[[resp_cat]][1]
+        .mpt_stop_branch_range(
+          tree$name, resp_cat, branches[[resp_cat]][row], rows[row], check_what
+        )
+      }
+    }
+    approximate <- c(approximate, .mpt_check_branch_vertices(
+      tree, data, rows, covariates, symbols, simplex, tolerance, check_what
+    ))
+  }
+  .mpt_message_sampled(approximate)
+  invisible(NULL)
+}
+
+# every branch of a covariate tree, at the vertices of its own parameter box:
+# the points above visit only two corners and five interior points, so a branch
+# that mixes a parameter with another one's complement (a * (1 - b) * G) can
+# leave (0, 1] at a vertex that none of them reaches. The vertices are exact for
+# branches multilinear in their parameters (see .mpt_branch_vertices()). The
+# rule at the corners applies: a branch may underflow to 0 there, so only a
+# value below -tolerance counts. The result names the branches whose vertices
+# were only sampled.
+.mpt_check_branch_vertices <- function(tree, data, rows, covariates, parameters,
+                                       simplex, tolerance, check_what) {
+  sampled <- character(0)
+  if (length(rows) == 0L) {
+    return(sampled)
+  }
+  for (resp_cat in names(tree$branches)) {
+    branch <- tree$branches[[resp_cat]]
+    vertices <- .mpt_branch_vertices(branch, parameters, simplex)
+    if (!attr(vertices, "exact")) {
+      sampled <- c(sampled, glue("category '{resp_cat}' in tree '{tree$name}'"))
+    }
+    # rows with the same covariate values give the same branch value
+    branch_covariates <- intersect(covariates, all.vars(branch))
+    distinct <- if (length(branch_covariates) == 0L) {
+      rows[1]
+    } else {
+      rows[!duplicated(data[rows, branch_covariates, drop = FALSE])]
+    }
+    covariate_values <- as.list(data[distinct, branch_covariates, drop = FALSE])
+    violation <- .mpt_first_range_violation(
+      branch, vertices, covariate_values, tolerance
+    )
+    if (!is.null(violation)) {
+      .mpt_stop_branch_range(
+        tree$name, resp_cat, violation$value, distinct[violation$row],
+        check_what, at = violation$at
+      )
+    }
+  }
+  sampled
+}
+
+.mpt_stop_branch_range <- function(tree_name, resp_cat, value, row, check_what,
+                                   at = NULL) {
+  value <- signif(value, 6)
+  zero_hint <- if (isTRUE(value == 0)) {
+    " A branch that is exactly 0 belongs in mpt_tree(impossible = )."
+  } else {
+    ""
+  }
+  at_values <- if (is.null(at)) "" else paste0(" ", at)
+  stop2(
+    "With the covariate values in the data, the branch probability of \\
+    category '{resp_cat}' in tree '{tree_name}' is {value} in row {row}, \\
+    outside (0, 1] at the test parameter values{at_values}. Please check \\
+    {check_what}.{zero_hint}"
+  )
+}
+
+############################################################################# !
+# CHECK_Formula S3 methods                                               ####
+############################################################################# !
+
+#' @export
+check_formula.mpt <- function(model, data, formula) {
+  for (grp in model$other_vars$simplex) {
+    free_pars <- grp[-length(grp)]
+    derived_par <- grp[length(grp)]
+    conflicts <- free_pars[vapply(free_pars, function(par) {
+      .mpt_formulas_conflict(formula[[par]], formula[[model$other_vars$simplex_raw[[par]]]])
+    }, logical(1))]
+    stopif(
+      length(conflicts) > 0,
+      "Conflicting predictor formulas for the simplex parameter(s) \\
+      {collapse_comma(conflicts)} and the stick-breaking component(s) \\
+      {collapse_comma(model$other_vars$simplex_raw[conflicts])}. Specify predictors for \\
+      the simplex parameters only."
+    )
+    stopif(
+      !.mpt_intercept_only(formula[[derived_par]]),
+      "The parameter '{derived_par}' is derived as 1 minus the sum of \\
+      {collapse_comma(free_pars)} and cannot have its own predictors. Specify \\
+      predictors for the other parameters of the simplex group instead."
+    )
+  }
+  formula <- .mpt_move_simplex_formulas(model, formula)
+
+  generated <- .mpt_category_formulas(model)
+  simplex_formulas <- .mpt_simplex_formulas(model)
+  if (!is.null(simplex_formulas)) {
+    generated <- generated + simplex_formulas
+  }
+  formula <- generated + formula
+
+  formula <- apply_links(formula, model$links)
+  formula <- assign_nl_attr(formula)
+  # category probabilities must always be non-linear formulas, even if a
+  # branch expression happens to contain no latent parameters
+  for (resp_cat in model$resp_vars$resp_cats) {
+    attr(formula[[resp_cat]], "nl") <- TRUE
+  }
+
+  NextMethod("check_formula")
+}
+
+# predictor formulas for the free parameters of a simplex group apply to
+# their unconstrained stick-breaking components; the parameters themselves
+# receive generated stick-breaking formulas. check_formula.bmmodel() has added
+# `par ~ 1` for every parameter by the time these run, so a user's explicit
+# `par ~ 1` counts as "no predictors" and the raw component's formula stands.
+.mpt_move_simplex_formulas <- function(model, formula) {
+  for (grp in model$other_vars$simplex) {
+    for (par in grp[-length(grp)]) {
+      if (.mpt_intercept_only(formula[[par]])) next
+      raw_par <- model$other_vars$simplex_raw[[par]]
+      formula[raw_par] <- list(.mpt_formula(raw_par, formula[[par]][[3]]))
+    }
+    formula <- formula[setdiff(names(formula), grp)]
+  }
+  formula
+}
+
+.mpt_intercept_only <- function(pform) {
+  identical(pform[[3]], 1)
+}
+
+.mpt_formulas_conflict <- function(par_form, raw_form) {
+  !.mpt_intercept_only(par_form) && !.mpt_intercept_only(raw_form) &&
+    !identical(par_form[[3]], raw_form[[3]])
+}
+
+.mpt_category_formulas <- function(model) {
+  trees <- model$other_vars$trees
+  idx_vars <- model$other_vars$indicators$tree
+  category_formulas <- lapply(model$resp_vars$resp_cats, function(resp_cat) {
+    # a placeholder keeps log() defined for trees where the category is
+    # impossible; bmf2bf.mpt() overrides the linear predictor for those rows
+    terms <- lapply(names(trees), function(tree_name) {
+      branch <- call("(", trees[[tree_name]]$branches[[resp_cat]] %||% 1)
+      if (is.null(idx_vars)) {
+        branch
+      } else {
+        call("*", as.name(idx_vars[[tree_name]]), branch)
+      }
+    })
+    .mpt_formula(resp_cat, .mpt_reduce_calls("+", terms))
+  })
+  do.call(bmf, category_formulas)
+}
+
+.mpt_simplex_formulas <- function(model) {
+  if (length(model$other_vars$simplex) == 0L) {
+    return(NULL)
+  }
+  simplex_formulas <- list()
+  for (grp in model$other_vars$simplex) {
+    n_grp <- length(grp)
+    free_pars <- grp[-n_grp]
+    sticks <- lapply(model$other_vars$simplex_raw[free_pars], inv_link, link = model$other_vars$link)
+    for (k in seq_len(n_grp - 1L)) {
+      remaining <- lapply(sticks[seq_len(k - 1L)], function(stick) {
+        call("(", call("-", 1, stick))
+      })
+      simplex_formulas <- c(
+        simplex_formulas,
+        list(.mpt_formula(grp[k], .mpt_reduce_calls("*", c(remaining, sticks[k]))))
+      )
+    }
+    free_sum <- .mpt_reduce_calls("+", lapply(free_pars, as.name))
+    simplex_formulas <- c(
+      simplex_formulas,
+      list(.mpt_formula(grp[n_grp], call("-", 1, call("(", free_sum))))
+    )
+  }
+  do.call(bmf, simplex_formulas)
+}
+
+.mpt_formula <- function(lhs, rhs) {
+  stats::as.formula(call("~", as.name(lhs), rhs))
+}
+
+.mpt_reduce_calls <- function(op, calls) {
+  Reduce(function(lhs, rhs) call(op, lhs, rhs), calls)
+}
+
+############################################################################# !
+# Convert bmmformula to brmsformula methods                              ####
+############################################################################# !
+
+#' @export
+bmf2bf.mpt <- function(model, formula) {
+  resp_cats <- model$resp_vars$resp_cats
+  poss_vars <- model$other_vars$indicators$possible
+
+  # -100 on the log scale is an effectively zero probability that stays finite;
+  # the multinomial family renormalizes, so nothing has to compensate for it
+  linpreds <- vapply(resp_cats, function(resp_cat) {
+    if (!resp_cat %in% names(poss_vars)) {
+      return(glue("log({resp_cat})"))
+    }
+    poss <- poss_vars[[resp_cat]]
+    glue("{poss} * log({resp_cat}) + (1 - {poss}) * (-100)")
+  }, character(1))
+
+  brms_formula <- brms::bf(
+    glue("Y | trials(nTrials) ~ {linpreds[1]}"),
+    nl = TRUE
+  )
+  for (i in seq_along(resp_cats)[-1]) {
+    brms_formula <- brms_formula + glue_nlf("mu{resp_cats[i]} ~ {linpreds[i]}")
+  }
+
+  brms_formula
+}
+
+############################################################################# !
+# CONFIGURE_MODEL S3 METHODS                                             ####
+############################################################################# !
+
+# no expected_response_defined() method: brms's multinomial posterior_epred() gives
+# the expected count per category, trials times the tree's branch probabilities
+#' @export
+configure_model.mpt <- function(model, data, formula) {
+  formula <- bmf2bf(model, formula)
+
+  formula$family <- brms::multinomial(refcat = NA)
+  formula$family$cats <- model$resp_vars$resp_cats
+  formula$family$dpars <- paste0("mu", model$resp_vars$resp_cats)
+
+  # the stick priors of simplex groups need the beta densities on the latent
+  # scale; models without a group keep their Stan code
+  if (length(model$other_vars$simplex) == 0L) {
+    return(nlist(formula, data))
+  }
+  stanvars <- brms::stanvar(
+    scode = read_lines2(system.file("stan_chunks", "mpt_functions.stan", package = "bmm")),
+    block = "functions"
+  )
+  nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# CONFIGURE_PRIOR S3 METHODS                                             ####
+############################################################################# !
+
+# the constant() prior applies to the latent intercept, so the fixed
+# probability is mapped through the link; combined last by
+# configure_prior.bmmodel, it overrides the probability-scale constant from
+# fixed_pars_priors()
+#' @export
+configure_prior.mpt <- function(model, data, formula, user_prior, ...) {
+  fixed_pars <- .mpt_latent_fixed_pars(model)
+  if (length(fixed_pars) == 0L) {
+    return(brms::empty_prior())
+  }
+  brms::set_prior(
+    paste0("constant(", vapply(fixed_pars, function(par) {
+      link_transform(model$fixed_parameters[[par]], model$links[[par]])
+    }, numeric(1)), ")"),
+    class = "b", coef = "Intercept", nlpar = fixed_pars
+  )
+}
+
+############################################################################# !
+# HELPERS                                                                ####
+############################################################################# !
+
+.mpt_as_tree_list <- function(trees) {
+  if (is.null(trees)) {
+    return(list())
+  }
+  if (inherits(trees, "mpt_tree")) {
+    return(list(trees))
+  }
+  trees
+}
+
+.mpt_as_simplex_list <- function(simplex) {
+  if (is.null(simplex)) {
+    return(list())
+  }
+  if (!is.list(simplex)) {
+    return(list(simplex))
+  }
+  simplex
+}
+
+.mpt_check_names <- function(names, what) {
+  bad_names <- names[!grepl("^[A-Za-z][A-Za-z0-9]*$", names)]
+  stopif(
+    length(bad_names) > 0,
+    "MPT {what} names must start with a letter and contain only letters and \\
+    digits, because brms does not allow underscores or dots in non-linear \\
+    parameter names. Please rename (e.g., 'd_A' -> 'dA'): {collapse_comma(bad_names)}"
+  )
+}
+
+.mpt_named_list <- function(names, value) {
+  if (length(names) == 0L) {
+    return(list())
+  }
+  setNames(rep(list(value), length(names)), names)
+}

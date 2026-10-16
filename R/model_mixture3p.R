@@ -262,7 +262,7 @@ settable_links.mixture3p <- function(model) {
 #'   Variability in encoding precision accounts for visual short-term memory
 #'   limitations. PNAS, 109(22), 8780-8785.
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data from the Bays et al (2009) 3-parameter mixture model
 #' dat <- data.frame(
 #'   y = rmixture3p(n = 2000, mu = c(0, 1, -1.5, 2)),

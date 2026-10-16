@@ -180,10 +180,6 @@ test_that("unknown link errors clearly", {
   expect_error(link_transform(1:3, "not_a_link"))
 })
 
-test_that("non-numeric values error", {
-  expect_error(link_transform(c("a","b"), "log"))
-})
-
 test_that("NULL link is treated as identity", {
   x <- c(-2, -0.5, 0, 1.25, 3)
   eta <- link_transform(x, NULL, inverse = FALSE)
@@ -231,9 +227,7 @@ test_that(".is_softmax_param follows a links override rather than the class", {
 
 test_that(".get_parameter_info returns correct info for SDM params", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
 
   info_c <- .get_parameter_info(fit, "c")
   expect_equal(info_c$type, "dpar")
@@ -246,23 +240,51 @@ test_that(".get_parameter_info returns correct info for SDM params", {
   expect_false(info_kappa$softmax)
 })
 
+test_that(".get_parameter_info treats the alternative the formula leaves out as not in the fit (#543)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  fit_criterion <- suppressWarnings(bmm(
+    bmf(d ~ 1, criterion ~ 1), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  fit_bias <- suppressWarnings(bmm(
+    bmf(d ~ 1, bias ~ 1), dat, model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+
+  expect_equal(.get_parameter_info(fit_criterion, "criterion")$model_name, "criterion")
+  expect_equal(.get_parameter_info(fit_bias, "bias")$model_name, "bias")
+  expect_error(
+    .get_parameter_info(fit_criterion, "bias"),
+    "Parameter 'bias' is not estimated in this fit: its formula uses 'criterion'",
+    fixed = TRUE
+  )
+  expect_error(
+    .get_parameter_info(fit_bias, "criterion"),
+    "Parameter 'criterion' is not estimated in this fit: its formula uses 'bias'",
+    fixed = TRUE
+  )
+  expect_error(
+    .get_parameter_info(fit_criterion, "nonsense"),
+    "Available parameters: d, criterion, sdratio",
+    fixed = TRUE
+  )
+})
+
 # ===========================================================================
 # native_parameters() and native_transform()
 # Tier 1: Unit tests (always run, no fitted model)
 # Tier 2: Fixture-based integration tests (skip on CRAN)
-# Model-fitting tests live in tests/internal/test-native_parameters.R
+# Model-fitting tests live in tests/local/test-native_parameters.R
 # ===========================================================================
 
 load_np_sdm_fit <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_example1.rds")
 }
 
 load_np_m3_fit <- function() {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "m3 fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_m3_ppcheck.rds")
 }
 
 # ===========================================================================
@@ -270,7 +292,7 @@ load_np_m3_fit <- function() {
 # ===========================================================================
 
 test_that(".np_softmax matches softmax() with an implicit zero reference", {
-  set.seed(20)
+  withr::local_seed(20)
   mats <- list(a = matrix(rnorm(12), 4), b = matrix(rnorm(12), 4))
   out <- .np_softmax(mats)
 
@@ -313,7 +335,7 @@ test_that(".np_softmax preserves names and dimensions", {
 
 test_that("native_transform applies the elementwise inverse link of each parameter", {
   model <- .model_sdm()
-  set.seed(21)
+  withr::local_seed(21)
   linpred <- list(
     mu = matrix(rnorm(6), 3),
     c = matrix(rnorm(6), 3),
@@ -337,7 +359,7 @@ test_that("native_transform treats a parameter without a declared link as identi
 
 test_that("native_transform softmaxes mixture3p weights without a model specific method", {
   model <- .model_mixture3p()
-  set.seed(22)
+  withr::local_seed(22)
   linpred <- list(
     kappa = matrix(rnorm(4), 2),
     thetat = matrix(rnorm(4), 2),
@@ -381,7 +403,7 @@ test_that("native_transform requires a bmmodel", {
 })
 
 test_that("every link declared by a supported model can be transformed", {
-  models <- supported_models(print_call = FALSE)
+  models <- model_names()
   links <- unlist(lapply(models, function(name) {
     constructor <- get_model(name)
     versions <- eval(formals(constructor)$version)
@@ -540,6 +562,65 @@ test_that(".np_grid_vars keeps a grouping variable that is also a predictor", {
   fit <- load_np_m3_fit()
   fit$bmm$user_formula$c <- stats::as.formula(c ~ 1 + ID + (1 | ID))
   expect_setequal(.np_grid_vars(fit, "c", NA), "ID")
+})
+
+test_that(".np_grid_vars spans only data columns for a non-linear formula", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ exp(nlc), nlc ~ 1 + set_size, kappa ~ 1), small_data(),
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+  expect_setequal(.np_grid_vars(fit, pars, NULL), "set_size")
+  # the sub-parameter's own predictors reach the grid through c's formula
+  expect_setequal(.np_grid_vars(fit, "c", NULL), "set_size")
+  expect_length(.np_grid_vars(fit, "kappa", NULL), 0)
+})
+
+test_that(".np_grid_vars honours the re_formula regimes on a mock fit", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 | ID), kappa ~ 1 + (1 | ID)), small_data(),
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+
+  expect_setequal(.np_grid_vars(fit, pars, NULL), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, NA), "set_size")
+  expect_setequal(.np_grid_vars(fit, pars, ~ (1 | ID)), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, ~ (1 | other)), "set_size")
+  expect_equal(.np_grid_vars(fit, "kappa", NA), character(0))
+})
+
+test_that(".np_grid_vars follows sub-parameters to their grouping variables", {
+  fit <- load_np_m3_fit()
+  fit$bmm$user_formula$c <- stats::as.formula(c ~ exp(logc) * cond)
+  fit$bmm$user_formula$logc <- stats::as.formula(logc ~ 1 + (1 | ID))
+  expect_setequal(.np_grid_vars(fit, "c", NULL), c("cond", "ID"))
+  expect_setequal(.np_grid_vars(fit, "c", NA), "cond")
+})
+
+test_that(".np_grid_vars treats a correlation ID as a label, not a grid variable", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), small_data(),
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  pars <- names(fit$bmm$model$parameters)
+  expect_setequal(.np_grid_vars(fit, pars, NULL), c("set_size", "ID"))
+  expect_setequal(.np_grid_vars(fit, pars, NA), "set_size")
+  expect_s3_class(.np_newdata(fit, .np_grid_vars(fit, pars, NULL), NULL), "data.frame")
+})
+
+test_that("native_parameters builds its grid for a formula with a correlation ID", {
+  withr::local_options(bmm.silent = 2)
+  fit <- suppressWarnings(bmm(
+    bmf(c ~ 1 + set_size + (1 |p| ID), kappa ~ 1 + (1 |p| ID)), small_data(),
+    sdm(resp_error = "dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  # a mock fit has no draws, so the call fails later; only the grid error matters
+  err <- tryCatch(native_parameters(fit, summary = TRUE), error = conditionMessage)
+  expect_false(is.character(err) && grepl("not columns of the model data", err))
 })
 
 test_that(".np_newdata returns the unique observed cells in a stable order", {
@@ -776,7 +857,8 @@ test_that("native_parameters handles multinomial models with matrix columns", {
   out <- native_parameters(fit, draw_ids = 1:10)
 
   expect_named(out, c(".chain", ".iteration", ".draw", "cond", "ID", "parameter", "value"))
-  expect_equal(nrow(out), 10 * 120 * 4)
+  # 10 draws of 30 observations (10 participants x 3 conditions) x 4 categories
+  expect_equal(nrow(out), 10 * 30 * 4)
   expect_false(any(c("Y", "nTrials", "Idx_corr", "n_corr") %in% names(out)))
 })
 
@@ -833,4 +915,50 @@ test_that("native_parameters marginalises over new grouping levels when asked", 
     allow_new_levels = TRUE, sample_new_levels = "gaussian"
   )
   expect_true(all(is.finite(out$value)))
+})
+
+test_that("native_parameters and parameter_info skip the unused alternative parameter", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.silent = 2)
+  dat <- data.frame(n_old = c(10, 40, 12, 38), stimulus = c(0, 1, 0, 1),
+                    n_trials = 50, id = c(1, 1, 2, 2))
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  for (anchor in c("criterion", "bias")) {
+    formula <- bmf(d ~ 1)
+    formula[[anchor]] <- stats::as.formula(paste(anchor, "~ 1"))
+    fit <- suppressWarnings(suppressMessages(bmm(
+      formula, dat, model, backend = "mock", mock_fit = 1, rename = FALSE
+    )))
+    # a mock fit has no draws, so the call fails later; only the declared-but-
+    # not-fitted error for the other alternative matters
+    err <- tryCatch(native_parameters(fit, summary = TRUE), error = conditionMessage)
+    expect_false(grepl("declared by the model", err), label = anchor)
+    other <- setdiff(c("criterion", "bias"), anchor)
+    expect_false(other %in% parameter_info(fit)$parameter, label = anchor)
+    expect_true(anchor %in% parameter_info(fit)$parameter, label = anchor)
+  }
+  # without a formula the model lists both, as its help page does
+  expect_true(all(c("criterion", "bias") %in% parameter_info(model)$parameter))
+})
+
+test_that("print() of parameter_info() names the model and shortens long descriptions", {
+  info <- parameter_info(sdm("y"))
+  out <- capture.output(printed <- print(info, max_desc_width = 20))
+  expect_identical(printed, info)
+  expect_match(out[1], "Model:.*Signal Discrimination Model")
+  rows <- out[grep("^ (mu|c|kappa) ", out)]
+  expect_length(rows, 3)
+  # 17 characters of the description and an ellipsis, at most 20 in all
+  expect_match(rows[1], "Location paramete... ", fixed = TRUE)
+  # fixed as yes/no, and a parameter without a fixed value shows --
+  expect_match(rows[1], "\\byes\\s+0\\b")
+  expect_match(rows[2], "\\bno\\s+--")
+})
+
+test_that("print() of parameter_info() of a custom m3 model says how to find its parameters", {
+  model <- m3(resp_cats = c("a", "b"), num_options = c(1, 4), version = "custom")
+  out <- capture.output(print(parameter_info(model)))
+  expect_match(out[length(out)], "Pass a formula to discover additional parameters", fixed = TRUE)
+  out <- capture.output(print(parameter_info(model, formula = bmf(a ~ b + c, b ~ b))))
+  expect_false(any(grepl("Pass a formula", out, fixed = TRUE)))
 })

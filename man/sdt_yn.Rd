@@ -44,8 +44,8 @@ given here by its cumulative distribution function. One of:
 }}
 
 \item{links}{A named list of link functions for the parameters, one entry
-per parameter you want to change, e.g. \code{links = list(d = "log")}. Only \code{d}
-and \code{criterion} can be set. \code{sdratio} keeps its log link, because the
+per parameter you want to change, e.g. \code{links = list(d = "log")}. Only \code{d},
+\code{criterion} and \code{bias} can be set. \code{sdratio} keeps its log link, because the
 model's default of an equal-variance SD ratio is stored as the 0 that the
 log link maps to 1; read on any other link that same 0 is a different
 ratio, and on an identity link it is a ratio of zero that makes the signal
@@ -58,8 +58,11 @@ An object of class \code{bmmodel}
 }
 \description{
 Estimates sensitivity (\code{d}, which is \eqn{d'} under equal
-variance and \eqn{d_a} once \code{sdratio} is estimated) and response bias
-(\code{criterion}) from yes/no detection or old/new recognition counts.
+variance and \eqn{d_a} once \code{sdratio} is estimated) and the decision
+criterion from yes/no detection or old/new recognition counts. The
+criterion is estimated either as \code{criterion}, measured from the mean of the
+noise distribution, or as \code{bias}, measured from the midpoint between the
+noise and signal means; the formula names the one to estimate.
 }
 \details{
 \itemize{
@@ -83,7 +86,8 @@ Provide pre-aggregated data with the following columns:
 \item \strong{Parameters:}
 \itemize{
 \item \code{d}: d_a sensitivity (= d' when sdratio is fixed): the distance between the signal and noise distributions in units of their root-mean-square SD
-\item \code{criterion}: Response bias: location of decision boundary
+\item \code{criterion}: Decision criterion, measured from the mean of the noise distribution in noise-SD units; the false-alarm rate depends on it alone
+\item \code{bias}: Alternative to criterion: the decision criterion measured from the midpoint between the noise and signal means (0 = neutral, positive = conservative). Use one of the two
 \item \code{sdratio}: SD ratio signal/noise, log link (0 = equal SDs): summary() prints the log of this ratio, not the ratio itself, so exp() a posterior value to read it
 }
 \item \strong{Fixed parameters:}
@@ -92,7 +96,7 @@ Provide pre-aggregated data with the following columns:
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item d = identity; criterion = identity; sdratio = log
+\item d = identity; criterion = identity; bias = identity; sdratio = log
 }
 \item \strong{Default priors:}
 \itemize{
@@ -103,6 +107,12 @@ Provide pre-aggregated data with the following columns:
 \item \code{sd}: exponential(1)
 }
 \item \code{criterion}:
+\itemize{
+\item \code{main}: normal(0.5, 1.5)
+\item \code{effects}: normal(0, 0.5)
+\item \code{sd}: exponential(1)
+}
+\item \code{bias}:
 \itemize{
 \item \code{main}: normal(0, 1.5)
 \item \code{effects}: normal(0, 0.5)
@@ -147,11 +157,10 @@ in \eqn{d_N}. When \code{sdratio} is estimated but constant across the condition
 you compare, the two indices differ by one common factor and give the same
 contrasts up to scale.
 
-\strong{Units of the other parameters.} \code{criterion} is \emph{not} rescaled. It is the
-location of the decision boundary relative to the midpoint between the two
-distributions, in noise-SD units, so under unequal variance \code{d} (in
-root-mean-square SD units) and \code{criterion} (in noise-SD units) are on
-different scales, and a ratio such as \code{criterion / d} mixes them.
+\strong{Units of the other parameters.} \code{criterion} and \code{bias} are \emph{not}
+rescaled: both are in noise-SD units, so under unequal variance \code{d} (in
+root-mean-square SD units) and the criterion are on different scales, and a
+ratio such as \code{bias / d} mixes them.
 
 \strong{Extreme-value distributions.} For \code{dist = "normal"}, \eqn{d_a} is also the
 AUC-equivalent index, \eqn{d_a = \sqrt{2}\,\Phi^{-1}(\mathrm{AUC})}{d_a = sqrt(2) * Phi^-1(AUC)}, so it
@@ -167,31 +176,110 @@ used as a predictor will collide with this parameter; \code{bmm()} warns when th
 happens.
 }
 
+\section{Choosing between \code{criterion} and \code{bias}}{
+
+Both parameters place the same decision boundary on the noise-standardized
+evidence axis, and they differ only in the point they measure it from:
+\itemize{
+\item \code{criterion} is the distance from the mean of the noise distribution.
+The false-alarm rate depends on it alone: \eqn{FA = 1 - F(criterion)}.
+\item \code{bias} is the distance from the midpoint between the noise and signal
+means: 0 is the neutral point, positive values a conservative bias toward
+"new"/"noise". Under equal variance it is the index usually written
+\eqn{c}.
+}
+They are related by \eqn{bias = criterion - \delta / 2}{bias = criterion -
+delta / 2}, where \eqn{\delta = d \sqrt{(1 + r^2)/2}}{delta = d * sqrt((1 +
+r^2) / 2)} is the separation in noise-SD units. Write one of them in the
+formula; a formula that names neither estimates \code{criterion ~ 1}, and one
+that names both is refused. \code{\link[=sdt_criterion]{sdt_criterion()}} and \code{\link[=sdt_bias]{sdt_bias()}} compute the
+two from a single hit and false-alarm rate.
+
+\strong{The choice matters whenever \code{d} or \code{sdratio} differs between rows that
+share a criterion term}, because a linear formula holds constant the
+parameter you write. \code{criterion ~ 1} with \code{d ~ 1 + strength} says the
+observer keeps one boundary while targets get stronger; \code{bias ~ 1} with the
+same \code{d} formula says the boundary moves up by half of every change in
+separation. When the criterion and \code{d} share condition-wise (factor)
+predictors and \code{sdratio} does not vary within those cells, or share
+predictors while \code{d} keeps its identity link and \code{sdratio} is the same in
+every row, the two give the same likelihood and their coefficients differ
+by \eqn{\delta / 2}.
+Otherwise they are different models. Even with the same likelihood, the
+posteriors differ through the default priors: \code{criterion} takes
+\code{normal(0.5, 1.5)} for its intercept, or for each cell under
+\code{~ 0 + condition}, and \code{exponential(1)} for its random-effect SDs, while
+\code{bias} takes \code{normal(0, 1.5)} and \code{exponential(2)}.
+
+Use \code{criterion} when the lures, and the observer's boundary, do not depend
+on the manipulation of \code{d}: the classic recognition design in which weak and
+strong targets are tested against one shared set of lures under the same
+criteria. Its lure rows have no strength level, and with \code{criterion} they
+need none, because the false-alarm rate does not involve \code{d}. Use \code{bias}
+when you want to hold, or compare, the observer's position relative to the
+two distributions, e.g. a bias contrast between groups that differ in
+sensitivity.
+
+\code{bias} is measured from the midpoint, which is the point where the two
+densities are equal -- the optimal boundary for equal base rates and
+payoffs -- only for the symmetric distributions (\code{"normal"}, \code{"logistic"})
+under equal variance. Under unequal variance, or for the Gumbel
+distributions, \code{bias = 0} is the midpoint, not the optimum.
+}
+
 \section{Identifying \code{sdratio}}{
 
-\code{sdratio} needs a design that supplies more than one operating point. A single
-(hit, false-alarm) pair is two numbers for three unknowns, so when every
-parameter is intercept-only with no random effects, \code{sdratio ~ 1} returns its
-prior and \code{d} is pulled along the resulting ridge: sampling converges, \code{Rhat}
-is fine, and the profile likelihood over \code{sdratio} is flat to 1e-12. \code{bmm()}
-warns for that one design, which is the only shape that provably cannot work.
+\code{sdratio} needs a design that supplies more than one operating point, and
+whether it gets one depends on which criterion parameter the formula holds
+constant.
 
-Any linear predictor that moves the operating point along the ROC supplies
-what is missing, and it need not sit on \code{criterion}: a sensitivity
-manipulation (\code{d ~ 0 + condition}, a study-time or strength manipulation with
-bias held constant) identifies \code{sdratio} just as a criterion manipulation
-does, and so does between-subject variation entering through a random effect
-such as \code{criterion ~ 1 + (1 | id)} — though, like any predictor, only in
-proportion to how far it actually moves the operating point: a random
-effect with little between-subject spread carries little information and
-will not trigger the warning above, because that warning counts formula
-terms, not how much they move the design.
+\strong{With \code{criterion}}, the boundary must move among rows that share the
+same \code{d}: give \code{criterion} a predictor that shifts it while \code{d} stays put,
+such as a base-rate, payoff, or confidence manipulation (\code{d ~ 1},
+\code{criterion ~ 0 + condition}; see \link{broeder_schuetz_2009_e3}). A criterion
+that is the same in every row is fixed by the false-alarm rate, and each
+hit rate then fixes only \eqn{(\delta - criterion) / r}{(delta -
+criterion) / r}, so \code{sdratio} trades against \code{d}. A change in \code{sdratio} is
+matched by shifting the separation of every cell by one common amount and
+rescaling it by one common factor, and whenever the formula for \code{d} can
+make that change, \code{sdratio} returns its prior. A factor can, under the
+identity and the log link alike (\code{d ~ 0 + condition} or \code{d ~ 1 + condition}), because it gives every cell a value of its own. An intercept
+with a numeric predictor can under the identity link (\code{d ~ 1 + strength}),
+because the intercept shifts and the slope rescales. \code{sdratio} is
+identified only when the formula constrains \code{d} across cells beyond that.
+A numeric predictor without an intercept (\code{d ~ 0 + strength}) holds \code{d}
+proportional to \code{strength}. It identifies \code{sdratio} when \code{strength} takes
+at least two nonzero values and the criterion lies clearly away from the
+noise mean (for \code{"normal"}, a false-alarm rate clearly away from .5); at a
+criterion of 0 it does not. The estimate then rests on the assumption that
+\code{d} is zero where \code{strength} is zero, not on a second operating point in
+the data. A numeric predictor under a log link on \code{d} barely identifies
+\code{sdratio}, and in practice \code{sdratio} returns its prior. \code{bmm()} warns for
+every criterion that is the same in every row, so it also warns for
+\code{d ~ 0 + strength}. Giving \code{d} and \code{criterion} the same condition-wise
+predictors (\code{d ~ 0 + condition}, \code{criterion ~ 0 + condition}) fails too,
+because each condition then has two rates for two parameters of its own,
+and no warning catches it. A random effect such as
+\code{criterion ~ 1 + (1 | id)} moves the boundary between subjects and does not
+trigger the warning, but it informs \code{sdratio}
+only weakly, through the assumption that the subject effects on \code{d} and on
+the criterion are independent.
 
-A criterion manipulation is still the cleanest design, because it traces the
-ROC at fixed sensitivity: give \code{criterion} a predictor that shifts the
-decision boundary — a base-rate, payoff, or confidence manipulation — as in
-\code{criterion ~ 0 + condition}; see \link{broeder_schuetz_2009_e3}. Leaving \code{sdratio}
-at its default is always identified.
+\strong{With \code{bias}}, any predictor that moves the operating point supplies what
+is missing, including a sensitivity manipulation such as \code{d ~ 0 + condition}
+with \code{bias ~ 1}: holding the bias constant moves the criterion with the
+separation, and that movement traces the ROC. The identification then rests
+on that assumption about the observer. The design in which every parameter
+is intercept-only with no random effects cannot work: a single (hit,
+false-alarm) pair is two numbers for three unknowns, and \code{bmm()} warns for
+it. Neither can \code{bias} and \code{d} with the same condition-wise predictors, for
+the reason given above, and that design raises no warning.
+
+Sampling converges and \code{Rhat} is fine in every unidentified case, so the
+warnings are the only signal. They count formula terms, not how far the
+terms move the operating point, so a predictor with a small effect carries
+little information without a warning. Leaving \code{sdratio} at its default is
+always identified.
 }
 
 \section{Reading \code{sdratio} and carrying it to \code{\link[=dsdt_yn]{dsdt_yn()}}/\code{\link[=rsdt_yn]{rsdt_yn()}}}{
@@ -210,8 +298,8 @@ A posterior mean of \code{sdratio = 0.22} is a ratio of \code{exp(0.22) = 1.25}.
 Passing \code{0.22} straight to \code{rsdt_yn()} instead asks for a signal
 distribution 4.5 times \emph{narrower} than the noise — a legal value that
 raises no error, and the one mistake worth checking for in a posterior
-predictive check written by hand. \code{d} and \code{criterion} have identity links,
-so they carry across unchanged.
+predictive check written by hand. \code{d}, \code{criterion} and \code{bias} have identity
+links, so they carry across unchanged.
 
 The \strong{zROC slope} reported in the recognition-memory literature is the
 reciprocal of that ratio, \code{1 / exp(sdratio)}, so a \code{sdratio} posterior mean
@@ -231,7 +319,9 @@ random-effect SDs — are on that same scale, unannotated.
 
 \itemize{
 \item \strong{noise-standardized axis} — latent evidence expressed in units of
-the noise distribution's SD. \code{criterion} always lives on this axis.
+the noise distribution's SD, with its origin at the noise mean.
+\code{criterion} is a position on this axis; \code{bias} is a distance on it,
+measured from the midpoint between the means.
 \item \eqn{\delta} (\strong{separation}) — the distance between the signal and
 noise means, on that axis.
 \item \eqn{d_N} — the classical \eqn{d'}: \eqn{\delta} itself, i.e. the
@@ -257,7 +347,7 @@ the standard deviations of the parameter's random effects.
 dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 dat$n_trials <- 100L
 dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
-                     d = 1.5, criterion = 0.2)
+                     d = 1.5, criterion = 0.9)
 
 model <- sdt_yn(
   response = "n_old",
@@ -293,11 +383,39 @@ fit_uv <- bmm(
   backend = "cmdstanr"
 )
 
+# The same observer, with the boundary measured from the midpoint
+fit_bias <- bmm(
+  formula = bmf(d ~ 1 + (1 | id), bias ~ 1 + (1 | id)),
+  data = dat,
+  model = model,
+  cores = 4,
+  backend = "cmdstanr"
+)
+
+# Weak and strong targets against one shared set of lures, one criterion per
+# subject: `strong` is 1 for strong targets and 0 for weak targets and lures
+# (the lure rows' value does not matter, their false-alarm rate depends on
+# the criterion alone)
+lure_dat <- expand.grid(id = 1:20, cell = c("lure", "weak", "strong"))
+lure_dat$stimulus <- as.integer(lure_dat$cell != "lure")
+lure_dat$strong <- as.integer(lure_dat$cell == "strong")
+lure_dat$n_trials <- 100L
+lure_dat$n_old <- rsdt_yn(nrow(lure_dat), lure_dat$n_trials,
+                          lure_dat$stimulus, d = 1 + 0.8 * lure_dat$strong,
+                          criterion = 0.7)
+fit_strength <- bmm(
+  formula = bmf(d ~ 1 + strong + (1 | id), criterion ~ 1 + (1 | id)),
+  data = lure_dat,
+  model = model,
+  cores = 4,
+  backend = "cmdstanr"
+)
+
 # Simulating from a fitted unequal-variance model: the model reports
 # sdratio on its log link, rsdt_yn() takes the ratio itself.
 sdratio_posterior <- 0.375
 rsdt_yn(2, 100L, c(0L, 1L),
-        d = 1.3, criterion = 0.1, sdratio = exp(sdratio_posterior))
+        d = 1.3, criterion = 0.75, sdratio = exp(sdratio_posterior))
 }
 }
 \references{
@@ -321,9 +439,9 @@ unequal-variance signal detection model of recognition memory.
 \doi{10.3758/BF03194112}
 }
 \seealso{
-\code{\link[=sdt_d]{sdt_d()}} and \code{\link[=sdt_criterion]{sdt_criterion()}} compute the \code{d} and \code{criterion} of
-this model in closed form from a single pair of observed hit and false-alarm
-rates, without fitting: use them for a quick check of a fitted value, and
+\code{\link[=sdt_d]{sdt_d()}}, \code{\link[=sdt_criterion]{sdt_criterion()}} and \code{\link[=sdt_bias]{sdt_bias()}} compute the \code{d},
+\code{criterion} and \code{bias} of this model in closed form from a single pair of
+observed hit and false-alarm rates, without fitting: use them for a quick check of a fitted value, and
 this model when you need a hierarchical or condition-wise estimate, or
 unequal variance.
 }

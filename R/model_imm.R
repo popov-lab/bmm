@@ -181,7 +181,7 @@ settable_links.imm <- function(model) {
 #'
 #'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
 #'   in visual working memory. Nature, 453(7192), 233-235.
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # load data
 #' data <- oberauer_lin_2017
 #'

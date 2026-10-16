@@ -1,4 +1,4 @@
-url: https://popov-lab.github.io/bmm/
+url: https://venpopov.com/bmm/
 template:
   bootstrap: 5
   math-rendering: mathjax
@@ -21,10 +21,10 @@ navbar:
         href: news/index.html
      develop:
         text: Develop
-        href: https://popov-lab.github.io/bmm/dev-notes/index.html
+        href: https://venpopov.com/bmm/dev-notes/index.html
      parameter_recovery:
         text: Parameter recovery
-        href: https://popov-lab.github.io/bmm/parameter-recovery/index.html
+        href: https://venpopov.com/bmm/parameter-recovery/index.html
 
 
 
@@ -33,7 +33,7 @@ reference:
     desc: "These pages provide a summary of the functionality available in bmm"
   - contents:
     - "bmm-package"
-    - "supported_models"
+    - "bmm_models"
     - "bmm_options"
     - "bmm_setup"
   - title: "Fitting models"
@@ -46,6 +46,7 @@ reference:
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "pp_check.bmmfit"
+    - "ppp"
     - "posterior_epred.bmmfit"
   - title: "Model evaluation & post-processing"
     desc: "ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for signal detection models"
@@ -109,6 +110,7 @@ articles:
     desc: Fitting models to categorical decision tasks (e.g. cued or free recall, n-AFC, etc)
     contents:
     - articles/bmm_m3
+    - articles/bmm_mpt
 
   - title: Signal detection & recognition
     desc: Fitting signal detection models and analysing ROC/AUC

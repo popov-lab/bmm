@@ -205,7 +205,7 @@ fit_dp <- bmm(
   thin = 6,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_dpsdt_vignette"
+  file = "fits/bmmfit_sdt_dpsdt_vignette"
 )
 summary(fit_dp)
 ```
@@ -266,7 +266,7 @@ fit_uv <- bmm(
   thin = 3,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_dp_uv_vignette"
+  file = "fits/bmmfit_sdt_dp_uv_vignette"
 )
 ```
 
@@ -402,7 +402,7 @@ fit_md <- bmm(
   thin = 6,
   refresh = 0,
   silent = 2,
-  file = "assets/bmmfit_sdt_metad_pratte_vignette"
+  file = "fits/bmmfit_sdt_metad_pratte_vignette"
 )
 summary(fit_md)
 ```
@@ -484,8 +484,10 @@ directly.
 
 Meta-d′ models must fix the type-2 confidence scale relative to the type-1
 criterion. `bmm` uses the **absolute** convention — the confidence criteria are
-anchored at the same boundary as the old/new decision (meta-$c = c$), as in the
-HMeta-d toolbox [@Fleming_2017]. The maximum-likelihood estimator instead
+anchored at the same boundary as the old/new decision (meta-$c = c$, with $c$
+measured from the midpoint between the means), as in the HMeta-d toolbox
+[@Fleming_2017]. This holds whether the formula estimates the type-1 boundary
+as `criterion` or as `bias`. The maximum-likelihood estimator instead
 uses a **relative** convention that scales the anchor with metacognitive
 efficiency (meta-$c' = c'$, i.e. meta-$c = M \cdot c$) [@Maniscalco_Lau_2014];
 @Fleming_2017 states that relative constraint for the maximum-likelihood

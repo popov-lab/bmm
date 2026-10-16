@@ -35,7 +35,7 @@ configure_prior.* method for the model. No model in bmm needs one at
 present; the example shows the form such a method takes.
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 configure_prior.mymodel <- function(model, data, formula, user_prior, ...) {
   # a prior that depends on the data, which the model object cannot declare
   if (!"condition" \%in\% names(data)) {

@@ -177,7 +177,7 @@ With \code{variable_precision = TRUE}, \code{tau} is returned on its native scal
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 fit <- bmm(
   bmf(c ~ 0 + set_size, kappa ~ 1),
   data = oberauer_lin_2017,

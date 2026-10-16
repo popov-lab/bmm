@@ -19,6 +19,27 @@
 
 
 ############################################################################# !
+# CRITERION PARAMETERIZATION                                              ####
+############################################################################# !
+
+# `criterion` and `bias` are alternative parameters (see alternative_parameters
+# in the model objects); check_formula() has already made sure the formula
+# names exactly one of them
+.sdt_anchor_parameter <- function(formula) {
+  if ("bias" %in% names(formula)) "bias" else "criterion"
+}
+
+# The likelihood works with the criterion measured from the noise mean, so a
+# fit that estimated `bias` converts it draw by draw
+.sdt_criterion_dpar <- function(prep, d, sdratio, i = NULL) {
+  if (!"bias" %in% names(prep$dpars)) {
+    return(brms::get_dpar(prep, "criterion", i = i))
+  }
+  .sdt_bias_to_criterion(brms::get_dpar(prep, "bias", i = i), d, sdratio)
+}
+
+
+############################################################################# !
 # FORMULA CHECKS                                                          ####
 ############################################################################# !
 

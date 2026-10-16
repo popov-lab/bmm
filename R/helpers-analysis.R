@@ -154,9 +154,10 @@
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -252,11 +253,13 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 
 # Classify the formula predictors of a binary fit into criterion "operating
-# points" (predict the criterion only) and "curves" (predict d/sdratio).
+# points" (predict the criterion or bias only) and "curves" (predict
+# d/sdratio).
 .sdt_criterion_point_dims <- function(fit) {
   preds <- .sdt_stripped_preds(fit)
+  anchor <- .sdt_anchor_parameter(fit$bmm$user_formula)
   curve_vars <- union(preds[["d"]], preds[["sdratio"]]) %||% character(0)
-  list(points = setdiff(preds[["criterion"]] %||% character(0), curve_vars),
+  list(points = setdiff(preds[[anchor]] %||% character(0), curve_vars),
        curves = curve_vars)
 }
 
@@ -396,9 +399,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # conditions overriding the first data row so every formula variable is
 # present. The parameters are nlpars for the multinomial models (rating,
 # ranking) and dpars for the custom-family models (binary, mafc); which applies
-# is derived from the model class so callers never need to know. d and
-# criterion reach the kernels through the model's inverse link, so they get it
-# here too; sdratio and the threshold parameters stay on the log scale that
+# is derived from the model class so callers never need to know. d,
+# criterion and bias reach the kernels through the model's inverse link, so
+# they get it here too; sdratio and the threshold parameters stay on the log scale that
 # the SDT helpers exponentiate themselves.
 .sdt_par_draws <- function(fit, param, conditions, ...) {
   newdata <- fit$data[rep(1L, max(1L, nrow(conditions))), , drop = FALSE]
@@ -415,8 +418,21 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     brms::posterior_linpred(fit, dpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   }
-  if (!param %in% c("d", "criterion")) return(linpred)
+  if (!param %in% c("d", "criterion", "bias")) return(linpred)
   link_transform(linpred, model$links[[param]], inverse = TRUE)
+}
+
+
+# Posterior draws of the criterion measured from the noise mean, whichever of
+# `criterion` and `bias` the fit estimated: a bias sits half the separation
+# closer to the signal mean.
+.sdt_criterion_draws <- function(fit, conditions, ...) {
+  if (.sdt_anchor_parameter(fit$bmm$user_formula) == "criterion") {
+    return(.sdt_par_draws(fit, "criterion", conditions, ...))
+  }
+  has_sdratio <- .sdt_has_estimated_sdratio(fit$bmm$model, fit)
+  geom <- .sdt_latent_geometry(fit, conditions, has_sdratio, ...)
+  .sdt_par_draws(fit, "bias", conditions, ...) + geom$sep / 2
 }
 
 
@@ -437,7 +453,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 
 # The K-1 rating thresholds are not posterior parameters: they are rebuilt per
-# draw from the criterion plus the parameterization parameters (spacing and/or
+# draw from the criterion (measured from the noise mean) plus the parameterization parameters (spacing and/or
 # delta*), whose mapping to ordered thresholds differs by threshold_type.
 # Keeping that reconstruction here lets roc_sdt(), latent_sdt(), and
 # sdt_thresholds() share it. .sdt_make_thresholds is vectorized over draws, so
@@ -445,7 +461,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 .sdt_rating_thresholds <- function(fit, model, conditions, ...) {
   n_ratings      <- model$other_vars$n_ratings
   threshold_type <- model$other_vars$threshold_type
-  crit    <- .sdt_par_draws(fit, "criterion", conditions, ...)
+  crit    <- .sdt_criterion_draws(fit, conditions, ...)
   spacing <- if ("spacing" %in% names(model$parameters)) {
     .sdt_par_draws(fit, "spacing", conditions, ...)
   }
@@ -550,6 +566,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     cond_row <- if (curve_has_cols) curve_cond[c_i, , drop = FALSE]
     # Anchor the criterion grid to the mean separation so FA is ~evenly spaced;
     # the noise scale is 1, so FA = 1 - cdf(sep/2 + criterion) inverts to this.
+    # c_grid is measured from the midpoint, internal to the sweep: only the
+    # (FA, Hit) pairs are returned, never a criterion position.
     c_grid  <- -mean(dp) / 2 + qf(1 - fa_grid)
     # P("old") is the survival function of the evidence distribution, matching
     # the likelihood; cdf(eta) would trace the mirror ROC for the asymmetric
@@ -587,7 +605,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
   n_pt <- max(1L, nrow(point_cond))
 
   geom     <- .sdt_latent_geometry(fit, point_cond, has_sdratio, ...)
-  crit_mat <- .sdt_par_draws(fit, "criterion", point_cond, ...)
+  crit_mat <- .sdt_criterion_draws(fit, point_cond, ...)
 
   rows <- vector("list", n_pt)
   for (c_i in seq_len(n_pt)) {
@@ -629,7 +647,8 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # threshold operating points with a credible band (`points`, labelled t1..tK-1).
 # The smooth curve uses the rating model's own probability map -- FA = 1 - cdf(t
 # + sep/2), Hit = 1 - cdf((t - sep/2) / sdratio), where sep is the separation in
-# noise-SD units -- the continuous envelope of the discrete points, so the
+# noise-SD units and t is measured from the midpoint (internal to the sweep,
+# never returned) -- the continuous envelope of the discrete points, so the
 # thresholds fall on it for every distribution (the binary curve's criterion
 # sign convention would mismatch for the asymmetric Gumbel distributions).
 .roc_sdt_rating <- function(fit, model, conditions, n_points,
@@ -690,6 +709,7 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
       .draw = rep(seq_len(n_draws), each = K1 + 2L)
     )
 
+    # Midpoint frame, internal to the sweep; only (FA, Hit) pairs leave it.
     t_grid  <- qf(1 - fa_grid) - mean(sep_vec) / 2
     fa_mat  <- 1 - cdf(outer(sep_vec / 2, t_grid, "+"))
     hit_mat <- 1 - cdf(sweep(outer(-sep_vec / 2, t_grid, "+"), 1L, sr_vec, "/"))
@@ -780,9 +800,10 @@ print.bmm_sdt_roc <- function(x, ...) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -892,10 +913,11 @@ roc_observed <- function(fit, conditions = NULL) {
 #' the sensitivity and cut by one or more decision boundaries.
 #'
 #' Densities are evaluated at the posterior-mean parameters of each condition,
-#' on the centred evidence axis the model uses internally: noise at `-sep/2`
-#' with unit SD and signal at `+sep/2` with SD `exp(sdratio)`, where
+#' on the evidence axis the model's `criterion` is measured on: noise at 0 with
+#' unit SD and signal at `sep` with SD `exp(sdratio)`, where
 #' `sep = d * sqrt((1 + exp(sdratio)^2) / 2)` is the separation in noise-SD
-#' units. `d` is \eqn{d_a}, measured in root-mean-square SD units, so `sep`
+#' units. A fit that estimated `bias` has its boundaries drawn on the same
+#' axis, at `bias + sep / 2`. `d` is \eqn{d_a}, measured in root-mean-square SD units, so `sep`
 #' equals `d` whenever `sdratio` is fixed at 0. The decision
 #' boundaries additionally carry a posterior credible band on their location.
 #' The area beyond a boundary equals the corresponding hit/false-alarm rate for
@@ -959,9 +981,10 @@ roc_observed <- function(fit, conditions = NULL) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -992,7 +1015,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   pdf           <- .sdt_dists[[dist]]$pdf
   cdf           <- .sdt_dists[[dist]]$cdf
   is_rating     <- inherits(model, "sdt_rating")
-  # criterion exists only for the models with an explicit response boundary
+  # a criterion exists only for the models with an explicit response boundary
   # (binary, rating)
   has_criterion <- "criterion" %in% names(model$parameters)
   has_sdratio   <- .sdt_has_estimated_sdratio(model, fit)
@@ -1006,14 +1029,13 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
   n_panel    <- max(1L, nrow(panel_cond))
 
   # The densities live on the noise-standardized axis, so the signal mean is
-  # half the separation (geom$sep), not half of d_a. The two coincide under
-  # equal variance.
+  # the separation (geom$sep), not d_a. The two coincide under equal variance.
   geom <- .sdt_latent_geometry(fit, panel_cond, has_sdratio, ...)
 
   # Boundary positions are evaluated over the density x boundary combinations so
   # that each density panel can carry all its criteria/thresholds.
   if (has_criterion) {
-    crit_line <- .sdt_par_draws(fit, "criterion", line_cond, ...)
+    crit_line <- .sdt_criterion_draws(fit, line_cond, ...)
     thr_list  <- if (is_rating) {
       .sdt_rating_thresholds(fit, model, line_cond, ...)
     }
@@ -1065,11 +1087,11 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
 
     positions <- if (!is.null(lines)) lines$position else numeric(0)
     pad <- 4 * max(1, s)
-    x   <- seq(min(-dp / 2, positions) - pad, max(dp / 2, positions) + pad,
+    x   <- seq(min(0, positions) - pad, max(dp, positions) + pad,
                length.out = n_grid)
     dens <- data.frame(
       x            = rep(x, 2L),
-      density      = c(pdf(x + dp / 2), pdf((x - dp / 2) / s) / s),
+      density      = c(pdf(x), pdf((x - dp) / s) / s),
       distribution = rep(c("noise", "signal"), each = n_grid)
     )
 
@@ -1082,7 +1104,7 @@ latent_sdt <- function(fit, conditions = NULL, n_grid = 200,
       do.call(rbind, lapply(ms, function(mv) {
         data.frame(
           x        = x,
-          density  = (mv - 1) * cdf(x + dp / 2)^(mv - 2) * pdf(x + dp / 2),
+          density  = (mv - 1) * cdf(x)^(mv - 2) * pdf(x),
           set_size = factor(mv, levels = set_sizes)
         )
       }))
@@ -1195,7 +1217,7 @@ print.bmm_sdt_latent <- function(x, ...) {
 #' \dontrun{
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L))
 #' dat <- cbind(dat, rsdt_rating(nrow(dat), 200, dat$stimulus, d = 1.5,
-#'                               thresholds = c(-0.5, 0, 0.5), sdratio = 1.3))
+#'                               thresholds = c(0.25, 0.75, 1.25), sdratio = 1.3))
 #'
 #' fit <- bmm(
 #'   formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
@@ -1410,9 +1432,10 @@ print.bmm_sdt_mratio <- function(x, ...) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
@@ -1484,12 +1507,14 @@ auc_sdt <- function(fit, conditions = NULL, probs = c(0.025, 0.975),
 
 
 # Area under the swept model curve, the map of .roc_sdt_rating()'s `summary`.
-# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. Against
-# integrate(), the error is at most 5e-4 when every draw has the same sep: the
-# grid starts at FA = 0.001, and the straight first segment from (0, 0) loses
-# up to 0.001 / 2 once Hit is near 1 there (sep >= 4). On real rating fits it
-# was at most 1.1e-4. The grid is placed by mean(sep), so a wide sep spread
-# across draws costs more (3e-2 for gumbel_min with sep from 0.2 to 8).
+# FA and Hit increase along t_grid, hence the (0, ..., 1) endpoints. t_grid is
+# measured from the midpoint, internal to the sweep: only (FA, Hit) leave it.
+# Against integrate(), the error is at most 5e-4 when every draw has the same
+# sep: the grid starts at FA = 0.001, and the straight first segment from
+# (0, 0) loses up to 0.001 / 2 once Hit is near 1 there (sep >= 4). On real
+# rating fits it was at most 1.1e-4. The grid is placed by mean(sep), so a wide
+# sep spread across draws costs more (3e-2 for gumbel_min with sep from 0.2 to
+# 8).
 # Dual-process recollection lifts the curve as in .roc_sdt_rating(): its ends
 # move to (0, Ro) and (1 - Rn, 1), and the last column closes it at (1, 1).
 .sdt_auc_swept <- function(sep, sdratio, dist, ro = 0, rn = 0,
@@ -1650,9 +1675,10 @@ print.bmm_sdt_auc <- function(x, ...) {
 #' dat <- expand.grid(id = 1:20, stimulus = c(0L, 1L),
 #'                    condition = c("liberal", "neutral", "strict"))
 #' dat$n_trials <- 100L
+#' # simulated as bias, measured from the midpoint between the means (0 = boundary at the midpoint)
 #' criteria <- c(liberal = -0.5, neutral = 0, strict = 0.5)
 #' dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus, d = 1.5,
-#'                      criterion = criteria[as.character(dat$condition)],
+#'                      bias = criteria[as.character(dat$condition)],
 #'                      sdratio = 1.3)
 #'
 #' fit <- bmm(
