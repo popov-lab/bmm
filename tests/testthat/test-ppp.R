@@ -289,6 +289,7 @@ test_that("ppp() counts the second category of a yes/no model as trials minus re
 })
 
 test_that("ppp() rebuilds the tree column of an mpt fit that no formula kept", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   local_ppd <- function(fit) {
     draws <- array(1, c(2, nrow(fit$data), 2))
     local_mocked_bindings(posterior_predict = function(...) draws,

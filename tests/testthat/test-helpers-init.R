@@ -1,3 +1,5 @@
+skip_on_cran() # cross-model contract file, skipped on CRAN as a whole (ADR 0004, R10)
+
 test_that("create_initfun returns function for sdm", {
   # prepare info for tests
   ff <- bmmformula(kappa ~ 1, c ~ 1)
