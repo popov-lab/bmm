@@ -64,7 +64,7 @@ dang::checkPackageAsciiCode(dir = ".")
 usually rewriting the numbers (issue, page numbers) manually fixes it
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 library(usethis)
 
 

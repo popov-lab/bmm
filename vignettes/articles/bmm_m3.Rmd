@@ -106,6 +106,8 @@ $$
 
 This choice rule can be interpreted as an n-alternative SDT model over the different response candidates with a Gumbel (or double-exponential) noise distribution.
 
+This interpretation is a helpful intuition, but it is not an empirical commitment the data could confirm. Choice probabilities alone do not identify the latent noise distribution that generates them: the same softmax probabilities arise from latent-strength models in which the noise is correlated across response options [@Kilani_2025], and with four or more response categories infinitely many latent representations are consistent with any given set of choice probabilities [@Falmagne_1978; @Kilani_Colonius_2026]. The `m3` parameters are therefore best interpreted as activation scale values, identified by the choice probabilities under the assumed choice rule, rather than as means of a specific noise distribution. Comparing the choice rules by model fit remains meaningful, because they imply different choice probabilities. What categorical response data cannot decide is the distributional story behind whichever rule fits better.
+
 3.  Gaussian (`"gaussian"`)
 
 The `gaussian` choice rule is the same n-alternative SDT model with normally distributed noise: every candidate receives its category's activation plus independent standard normal noise, and the candidate with the largest value is recalled. The probability of choosing category $i$ is

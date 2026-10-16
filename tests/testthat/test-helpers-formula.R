@@ -411,4 +411,10 @@ test_that("apply_links is case sensitive for link names", {
   expect_error(apply_links(form, links), "should be one of")
 })
 
+test_that("apply_links refuses links that are not a named list of strings", {
+  form <- bmf(x ~ a + c, kappa ~ 1, a ~ 1, c ~ 1)
+  expect_error(apply_links(form, list("log")), "named list of link functions")
+  expect_error(apply_links(form, list(a = 1)), "named list of link functions")
+})
+
 

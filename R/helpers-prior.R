@@ -109,7 +109,7 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   subsetting drops.
 #' @seealso [default_prior()], [parameter_info()]
 #' @keywords extract_info
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- bmm(
 #'   bmf(c ~ 0 + set_size, kappa ~ 1),
 #'   data = oberauer_lin_2017,
@@ -494,7 +494,7 @@ upfirst <- function(x) {
 #'
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
 #'   # if there is set_size 1 in the data, set constant prior over thetant for set_size1
 #'   prior <- brms::empty_prior()
