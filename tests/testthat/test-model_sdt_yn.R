@@ -713,3 +713,28 @@ test_that("an unbiased observer is bias fixed at 0", {
   expect_true(any(prior$dpar == "bias" & grepl("constant\\(0\\)", prior$prior)))
   expect_false(any(prior$dpar == "criterion"))
 })
+
+# tcc_cd() (#566) reuses this kernel's distribution functions from a chunk of
+# its own; the sdt_yn programs are those of 566-tcc at bc06ef10, before
+# tcc_cd() was added: md5 of the stancode without its brms version line, taken
+# under brms 2.23.0 (other brms versions generate other code)
+test_that("the sdt_yn Stan programs stay bit-identical", {
+  skip_if_not(packageVersion("brms") == "2.23.0", "hashes taken under brms 2.23.0")
+  md5_code <- function(formula, model, ...) {
+    code <- suppressMessages(bmm::stancode(formula, data = dat, model = model, ...))
+    lines <- strsplit(code, "\n")[[1]]
+    path <- withr::local_tempfile(fileext = ".stan")
+    writeLines(paste(lines[!grepl("generated with brms", lines)], collapse = "\n"), path)
+    unname(tools::md5sum(path))
+  }
+  dat <- data.frame(n_old = c(10, 40, 15, 35), stimulus = c(0L, 1L, 0L, 1L),
+                    n_trials = 50, cond = c("a", "a", "b", "b"), id = c(1, 1, 2, 2))
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  expect_equal(md5_code(bmf(d ~ cond + (1 | id), criterion ~ cond, sdratio ~ 1), model),
+               "02462f41df758b5753ff92e2896dfe64")
+  expect_equal(md5_code(bmf(d ~ cond, bias ~ 1), model), "c84a1adb26ccdf2f69990ddfde5b497c")
+  expect_equal(md5_code(bmf(d ~ 1, criterion ~ cond),
+                        sdt_yn("n_old", "stimulus", "n_trials", dist = "gumbel_min"),
+                        threads = brms::threading(2)),
+               "90a812214e92e1cd3880b4358e169180")
+})
