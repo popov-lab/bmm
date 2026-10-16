@@ -1,6 +1,11 @@
 # Changelog
 
-## bmm 1.4.0
+## bmm 1.4.1
+
+This is the 1.4.0 release resubmitted: 1.4.0 was sent to CRAN on
+2026-10-15 and returned by the incoming checks because its check took
+too long on Windows. 1.4.1 runs fewer tests on CRAN and is otherwise the
+same package.
 
 #### New models
 

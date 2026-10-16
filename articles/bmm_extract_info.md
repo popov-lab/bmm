@@ -246,7 +246,7 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
          model = sdm(resp_error = 'dev_rad'))
 ```
 
-    // generated with brms 2.23.0 and bmm 1.4.0
+    // generated with brms 2.23.0 and bmm 1.4.1
     functions {
       /* compute the tan_half link
        * Args:
