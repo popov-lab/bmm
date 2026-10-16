@@ -6,15 +6,6 @@
 # through a generated quantities block under fixed_param instead.
 # =============================================================================
 
-skip_unless_cmdstan <- function() {
-  skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if_not(
-    !is.null(tryCatch(cmdstanr::cmdstan_version(), error = function(e) NULL)),
-    "CmdStan is not installed"
-  )
-}
-
 # the winner contributes its density and its own n - 1 survivors, every other
 # category n_j survivors; this is the likelihood the model is defined by, not a
 # transcription of either implementation
@@ -79,7 +70,8 @@ lnr_stan_values <- function(grid_simple, grid_custom, cat_names) {
 }
 
 test_that("the generated Stan likelihood equals the R reference", {
-  skip_unless_cmdstan()
+  skip_unless_stan_tests()
+  skip_on_cran()
 
   # decision times down to 1e-3 s and sdlogs down to 0.1 drive the losers'
   # survivors to log S well past -30, which is where a naive lccdf gives up
@@ -185,7 +177,8 @@ lnr_custom3_stan_values <- function(grid, stan_code) {
 }
 
 test_that("the generated Stan likelihood handles categories with no accumulators", {
-  skip_unless_cmdstan()
+  skip_unless_stan_tests()
+  skip_on_cran()
 
   # a category may have zero accumulators on a trial it does not win; it then
   # contributes nothing, which is why the reference drops it outright instead
