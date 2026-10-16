@@ -372,5 +372,8 @@ importFrom(brms,
   standata
 )
 importFrom(glue,glue)
-importFrom(rlang,.data)
+importFrom(rlang,
+  "%||%",
+  .data
+)
 importFrom(utils,packageVersion)

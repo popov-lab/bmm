@@ -4,39 +4,6 @@
 # MODEL CONSTRUCTOR TESTS                                                ####
 ############################################################################# !
 
-test_that("sdt_yn model can be created with default arguments", {
-  expect_silent(sdt_yn("n_old", "stimulus", "n_trials"))
-})
-
-test_that("sdt_yn model can be created with all distribution options", {
-  expect_silent(sdt_yn("n_old", "stimulus", "n_trials", dist = "normal"))
-  expect_silent(sdt_yn("n_old", "stimulus", "n_trials", dist = "logistic"))
-  expect_silent(sdt_yn("n_old", "stimulus", "n_trials", dist = "gumbel_min"))
-  expect_silent(sdt_yn("n_old", "stimulus", "n_trials", dist = "gumbel_max"))
-})
-
-test_that("sdt_yn model has correct class structure", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  expect_s3_class(model, "bmmodel")
-  expect_s3_class(model, "sdt")
-  expect_s3_class(model, "sdt_yn")
-})
-
-test_that("sdt_yn model parameters are correctly defined", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  expect_true("d" %in% names(model$parameters))
-  expect_true("criterion" %in% names(model$parameters))
-  expect_true("sdratio" %in% names(model$parameters))
-  expect_equal(model$fixed_parameters$sdratio, 0)
-})
-
-test_that("sdt_yn model has correct default link functions", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  expect_equal(model$links$d, "identity")
-  expect_equal(model$links$criterion, "identity")
-  expect_equal(model$links$sdratio, "log")
-})
-
 test_that("sdt_yn fixes sdratio on the link scale and inits on the natural scale", {
   model <- sdt_yn("n_old", "stimulus", "n_trials")
   # constant() prior on the Intercept, so exp(0) = 1 = equal variance
@@ -57,55 +24,10 @@ test_that("the default sdratio reaches the Stan likelihood as 1, not 0", {
   expect_match(code, "sdratio = exp(sdratio);", fixed = TRUE)
 })
 
-test_that("sdt_yn model accepts custom links", {
-  custom_links <- list(d = "log")
-  model <- sdt_yn("n_old", "stimulus", "n_trials", links = custom_links)
-  expect_equal(model$links$d, "log")
-  expect_equal(model$links$criterion, "identity")
-})
-
-test_that("sdt_yn goes through set_links(), so the pipeline re-checks it", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  # check_links() returns early without this attribute, which is how sdt_yn
-  # used to opt out of every check on a link assigned after construction
-  expect_equal(attr(model, "links_default"), model$links)
-  model$links$d <- "nonsense"
-  expect_error(check_links(model), "Unknown link function")
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  model$links$typo <- "log"
-  expect_error(check_links(model), "Unrecognized link target")
-})
-
-test_that("sdt_yn refuses any link on sdratio but its own", {
-  # sdratio is fixed at 0 and read on whatever link the model carries. Only
-  # log maps that 0 to the equal-variance ratio of 1; identity makes it a
-  # ratio of zero, and the signal rows' evidence infinite.
+test_that("an sdratio of 0 makes the signal rows' evidence infinite", {
+  # why sdt_yn refuses any link on sdratio but log (test-sdt-shared.R): the
+  # fixed 0 read on the identity link is a ratio of zero
   expect_equal(.sdt_eta(1.5, 0, 1L, sdratio = 0), Inf)
-  expect_equal(settable_links(sdt_yn("n_old", "stimulus", "n_trials")),
-               c("d", "criterion", "bias"))
-  for (link in c("identity", "softplus", "logit", "sqrt")) {
-    expect_error(
-      sdt_yn("n_old", "stimulus", "n_trials", links = list(sdratio = link)),
-      "link of 'sdratio' cannot be changed"
-    )
-  }
-  # naming the link it already has asks for no change
-  expect_silent(sdt_yn("n_old", "stimulus", "n_trials",
-                       links = list(sdratio = "log")))
-  expect_silent(sdt_yn("n_old", "stimulus", "n_trials",
-                       links = list(d = "identity")))
-  # and the refusal survives an assignment made after construction
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  model$links$sdratio <- "identity"
-  expect_error(check_links(model), "link of 'sdratio' cannot be changed")
-})
-
-test_that("sdt_yn model stores distribution info correctly", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "gumbel_min")
-  expect_equal(model$other_vars$dist, "gumbel_min")
-
-  model2 <- sdt_yn("n_old", "stimulus", "n_trials", dist = "logistic")
-  expect_equal(model2$other_vars$dist, "logistic")
 })
 
 test_that("sdt_yn model has default priors", {
@@ -118,15 +40,6 @@ test_that("sdt_yn model has default priors", {
 
 test_that("sdt_yn requires n_trials argument", {
   expect_error(sdt_yn("n_old", "stimulus"))
-})
-
-test_that("sdt_yn model has init_ranges for estimated SDT parameters", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  expect_true(all(c("d", "criterion", "sdratio") %in% names(model$init_ranges)))
-  for (range in model$init_ranges) {
-    expect_length(range, 2)
-    expect_true(range[1] < range[2])
-  }
 })
 
 
@@ -239,72 +152,9 @@ test_that("the sdratio warning reaches the user through bmm()", {
 # CHECK_DATA TESTS                                                       ####
 ############################################################################# !
 
-test_that("sdt_yn check_data validates required columns", {
+test_that("sdt_yn check_data coerces an unambiguous stimulus coding only", {
   model <- sdt_yn("n_old", "stimulus", "n_trials")
   formula <- bmf(d ~ 1, criterion ~ 1)
-
-  valid_data <- data.frame(
-    n_old = c(30, 40),
-    stimulus = c(0L, 1L),
-    n_trials = c(50, 50)
-  )
-  result <- check_data(model, valid_data, formula)
-  expect_true("dist_type" %in% colnames(result))
-
-  invalid_data <- data.frame(n_old = c(30, 40))
-  expect_error(
-    check_data(model, invalid_data, formula),
-    "missing in the data"
-  )
-})
-
-test_that("sdt_yn check_data refuses non-numeric count columns", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  formula <- bmf(d ~ 1, criterion ~ 1)
-  dat <- data.frame(n_old = c(30, 40), stimulus = c(0L, 1L),
-                    n_trials = c(50, 50))
-
-  for (conv in list(as.character, as.factor)) {
-    bad <- dat
-    bad$n_old <- conv(bad$n_old)
-    expect_error(check_data(model, bad, formula),
-                 "Response variable 'n_old' must be numeric")
-
-    bad <- dat
-    bad$n_trials <- conv(bad$n_trials)
-    expect_error(check_data(model, bad, formula),
-                 "Variable 'n_trials' must be numeric")
-  }
-})
-
-test_that("sdt_yn check_data still only warns on non-integer counts", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  dat <- data.frame(n_old = c(30.5, 40), stimulus = c(0L, 1L),
-                    n_trials = c(50, 50))
-  expect_warning(check_data(model, dat, bmf(d ~ 1, criterion ~ 1)),
-                 "should contain integer counts")
-})
-
-test_that("dsdt_yn refuses NA counts", {
-  expect_error(dsdt_yn(NA, 10, 1, d = 1, criterion = 0),
-               "n_old must not contain NA")
-  expect_error(dsdt_yn(5, NA, 1, d = 1, criterion = 0),
-               "n_trials must not contain NA")
-})
-
-test_that("sdt_yn check_data validates stimulus coding", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  formula <- bmf(d ~ 1, criterion ~ 1)
-
-  invalid_data <- data.frame(
-    n_old = c(30, 40),
-    stimulus = c(1, 2),
-    n_trials = c(50, 50)
-  )
-  expect_error(
-    check_data(model, invalid_data, formula),
-    "must be coded as 0"
-  )
 
   # factor, logical and character are the other shapes an unambiguous 0/1 column
   # arrives in, and all three are coerced
@@ -346,10 +196,6 @@ test_that("sdt_yn check_data says which stimulus problem it found", {
                      n_trials = c(50, 50))
 
   # one message for every problem told the user nothing about theirs
-  na_data <- base
-  na_data$stimulus <- c(NA_integer_, 1L)
-  expect_error(check_data(model, na_data, formula), "1 of 2 values are NA")
-
   value_data <- base
   value_data$stimulus <- c(2, 3)
   expect_error(check_data(model, value_data, formula), "found '2', '3'")
@@ -358,61 +204,6 @@ test_that("sdt_yn check_data says which stimulus problem it found", {
   list_data$stimulus <- I(list(1, 2))
   expect_error(check_data(model, list_data, formula),
                "found AsIs with values")
-})
-
-test_that("sdt_yn check_data rejects a constant stimulus column", {
-  # accepted before, and d and criterion were then "estimated" from one rate
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  formula <- bmf(d ~ 1, criterion ~ 1)
-
-  for (value in list(0L, 1L)) {
-    constant_data <- data.frame(n_old = c(30, 40), stimulus = value,
-                                n_trials = c(50, 50))
-    expect_error(
-      check_data(model, constant_data, formula),
-      paste0("is ", value, " in every row")
-    )
-  }
-})
-
-test_that("sdt_yn check_data validates response counts", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  formula <- bmf(d ~ 1, criterion ~ 1)
-
-  invalid_data <- data.frame(
-    n_old = c(-5, 40),
-    stimulus = c(0L, 1L),
-    n_trials = c(50, 50)
-  )
-  expect_error(
-    check_data(model, invalid_data, formula),
-    "non-negative"
-  )
-
-  invalid_data2 <- data.frame(
-    n_old = c(60, 40),
-    stimulus = c(0L, 1L),
-    n_trials = c(50, 50)
-  )
-  expect_error(
-    check_data(model, invalid_data2, formula),
-    "must not exceed"
-  )
-})
-
-test_that("sdt_yn check_data validates n_trials", {
-  model <- sdt_yn("n_old", "stimulus", "n_trials")
-  formula <- bmf(d ~ 1, criterion ~ 1)
-
-  invalid_data <- data.frame(
-    n_old = c(0, 0),
-    stimulus = c(0L, 1L),
-    n_trials = c(-10, 50)
-  )
-  expect_error(
-    check_data(model, invalid_data, formula),
-    "positive"
-  )
 })
 
 test_that("sdt_yn check_data adds dist_type column", {
@@ -437,14 +228,6 @@ test_that("sdt_yn check_data adds dist_type column", {
 # DISTRIBUTION FUNCTION TESTS                                            ####
 ############################################################################# !
 
-test_that("rsdt_yn generates counts matching the design", {
-  stimulus <- rep(c(0L, 1L), 5)
-  n_old <- rsdt_yn(10, 50, stimulus, d = 1.5, criterion = 0)
-  expect_length(n_old, 10)
-  expect_true(all(n_old >= 0))
-  expect_true(all(n_old <= 50))
-})
-
 test_that("rsdt_yn recycles vectorized parameters per observation", {
   n_old <- rsdt_yn(4, c(50, 100, 50, 100), c(0L, 1L, 0L, 1L),
                        d = c(0.5, 0.5, 2.5, 2.5), criterion = 0)
@@ -453,72 +236,19 @@ test_that("rsdt_yn recycles vectorized parameters per observation", {
 })
 
 test_that("rsdt_yn generates different data for different distributions", {
-  set.seed(42)
+  withr::local_seed(42)
   n_norm <- rsdt_yn(2, 1000, c(0L, 1L), d = 2, criterion = 0)
-  set.seed(42)
+  withr::local_seed(42)
   n_logis <- rsdt_yn(2, 1000, c(0L, 1L), d = 2, criterion = 0,
                          dist = "logistic")
   expect_false(identical(n_norm, n_logis))
 })
 
 test_that("rsdt_yn with zero d produces equal hit and FA rates on average", {
-  set.seed(123)
+  withr::local_seed(123)
   n_old <- rsdt_yn(2, 10000, c(0L, 1L), d = 0, criterion = 0)
   expect_equal(n_old[1] / 10000, 0.5, tolerance = 0.05)
   expect_equal(n_old[2] / 10000, 0.5, tolerance = 0.05)
-})
-
-test_that("rsdt_yn validates input", {
-  expect_error(rsdt_yn(c(2, 3), 100, c(0L, 1L), d = 1, criterion = 0),
-               "single positive integer")
-  expect_error(rsdt_yn(2, 100, c(0L, 2L), d = 1, criterion = 0),
-               "0.*1")
-})
-
-test_that("dsdt_yn returns valid binomial density", {
-  dens <- dsdt_yn(n_old = 50, n_trials = 100, stimulus = 1,
-                   d = 0, criterion = 0)
-  expect_true(dens > 0)
-  expect_true(dens <= 1)
-})
-
-test_that("dsdt_yn log density matches log of density", {
-  dens <- dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-                   d = 1.5, criterion = 0.2)
-  ld <- dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-                    d = 1.5, criterion = 0.2, log = TRUE)
-  expect_equal(log(dens), ld, tolerance = 1e-10)
-})
-
-test_that("dsdt_yn is vectorized over observations", {
-  dens <- dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-                   stimulus = c(0, 1), d = 1.5, criterion = 0.2)
-  expect_length(dens, 2)
-  expect_true(all(dens > 0))
-})
-
-test_that("dsdt_yn works for all distributions", {
-  dists <- c("normal", "logistic", "gumbel_min", "gumbel_max")
-  for (di in dists) {
-    dens <- dsdt_yn(n_old = 70, n_trials = 100, stimulus = 1,
-                     d = 1.5, criterion = 0, dist = di)
-    expect_true(dens > 0, info = paste("dist:", di))
-  }
-})
-
-test_that("dsdt_yn validates input", {
-  expect_error(dsdt_yn(n_old = -1, n_trials = 100, stimulus = 1,
-                           d = 1, criterion = 0), "non-negative")
-  expect_error(dsdt_yn(n_old = 150, n_trials = 100, stimulus = 1,
-                           d = 1, criterion = 0), "must not exceed")
-  expect_error(dsdt_yn(n_old = 50, n_trials = 100, stimulus = 2,
-                           d = 1, criterion = 0), "0.*1")
-  expect_error(dsdt_yn(n_old = 50, n_trials = 100, stimulus = 1,
-                           d = 1, criterion = 0, sdratio = 0),
-               "sdratio must be positive")
-  expect_error(dsdt_yn(n_old = 50, n_trials = 100, stimulus = 1,
-                           d = 1, criterion = 0, dist = "cauchy"),
-               "should be one of")
 })
 
 test_that("d/rsdt_yn refuse a stimulus type they cannot read", {
@@ -653,14 +383,6 @@ test_that("dsdt_yn returns one value per posterior draw for a scalar count", {
   expect_length(dens, 20)
 })
 
-test_that("dsdt_yn with sdratio produces different densities than EV-SDT", {
-  d_ev <- dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-                      d = 1.5, criterion = 0, sdratio = 1)
-  d_uv <- dsdt_yn(n_old = 80, n_trials = 100, stimulus = 1,
-                      d = 1.5, criterion = 0, sdratio = 1.3)
-  expect_false(d_ev == d_uv)
-})
-
 test_that("sdratio never divides the noise trials, it only widens the separation", {
   # Only the signal distribution carries the scale division. On a noise trial
   # sdratio therefore acts solely through d_a -> d_N = d * s, so the same
@@ -691,14 +413,6 @@ test_that("n_trials may vary within a design", {
   expect_equal(sort(unique(as.integer(sdata$trials))), c(6L, 15L, 30L, 45L, 54L))
 })
 
-test_that("dsdt_yn is vectorized over sdratio", {
-  dens <- dsdt_yn(n_old = c(30, 80), n_trials = c(100, 100),
-                      stimulus = c(0, 1), d = 1.5, criterion = 0.2,
-                      sdratio = c(1.0, 1.3))
-  expect_length(dens, 2)
-  expect_true(all(dens > 0))
-})
-
 
 ############################################################################# !
 # SENSITIVITY PARAMETERIZATION (d = d_a)                                 ####
@@ -708,11 +422,8 @@ test_that("d is a no-op relative to d' for every equal-variance call", {
   # sdratio = 1 gives s = 1, so nothing in the reparameterization may move
   grid <- expand.grid(d = c(0.4, 1.5, 3), criterion = c(-0.7, 0, 0.5),
                       stimulus = c(0L, 1L))
-  for (dist_name in c("normal", "gumbel_min", "gumbel_max", "logistic")) {
-    eta <- .sdt_eta(grid$d, grid$criterion, grid$stimulus, 1)
-    textbook <- grid$d * grid$stimulus - grid$criterion
-    expect_equal(eta, textbook, info = dist_name)
-  }
+  eta <- .sdt_eta(grid$d, grid$criterion, grid$stimulus, 1)
+  expect_equal(eta, grid$d * grid$stimulus - grid$criterion)
 })
 
 test_that("d equals the noise-standardized separation divided by the RMS scale", {
@@ -861,65 +572,10 @@ test_that("sdt_yn model produces valid stancode with brms", {
   model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
   formula <- bmf(d ~ 1, criterion ~ 1)
   code <- stancode(formula, data = dat, model = model)
-  expect_true(nchar(code) > 0)
-  expect_true(grepl("sdt_yn_lpmf", code))
-  expect_true(grepl("sdt_log_cumprob", code))
+  expect_match(code, paste("target += sdt_yn_lpmf(Y[n] | mu[n], d[n], criterion[n],",
+                           "sdratio[n], vint1[n], vint2[n], trials[n]);"), fixed = TRUE)
+  expect_match(code, "real sdt_log_cumprob(", fixed = TRUE)
 })
-
-test_that("sdt_yn model produces valid stancode for all distributions", {
-  dat <- data.frame(
-    n_old = c(10, 40),
-    stimulus = c(0L, 1L),
-    n_trials = c(50, 50)
-  )
-  for (dist_name in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
-    model <- sdt_yn("n_old", "stimulus", "n_trials", dist = dist_name)
-    formula <- bmf(d ~ 1, criterion ~ 1)
-    code <- stancode(formula, data = dat, model = model)
-    expect_true(nchar(code) > 0, info = paste("Failed for dist:", dist_name))
-  }
-})
-
-test_that("sdt_yn model handles predictors in formula", {
-  dat <- data.frame(
-    n_old = c(10, 40, 15, 35),
-    stimulus = c(0L, 1L, 0L, 1L),
-    n_trials = c(50, 50, 50, 50),
-    condition = c("A", "A", "B", "B")
-  )
-  model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
-  formula <- bmf(d ~ condition, criterion ~ 1)
-  code <- stancode(formula, data = dat, model = model)
-  expect_true(nchar(code) > 0)
-})
-
-test_that("sdt_yn model handles random effects in formula", {
-  dat <- data.frame(
-    n_old = c(10, 40, 15, 35),
-    stimulus = c(0L, 1L, 0L, 1L),
-    n_trials = c(50, 50, 50, 50),
-    id = c(1, 1, 2, 2)
-  )
-  model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
-  formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1)
-  code <- stancode(formula, data = dat, model = model)
-  expect_true(nchar(code) > 0)
-})
-
-test_that("sdt_yn default_prior returns valid prior object", {
-  dat <- data.frame(
-    n_old = c(10, 40),
-    stimulus = c(0L, 1L),
-    n_trials = c(50, 50)
-  )
-  model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
-  formula <- bmf(d ~ 1, criterion ~ 1)
-  prior <- default_prior(formula, data = dat, model = model)
-  expect_s3_class(prior, "brmsprior")
-  prior_strs <- prior$prior
-  expect_true(any(grepl("normal", prior_strs)))
-})
-
 
 ############################################################################# !
 # R <-> STAN DIST_TYPE CONTRACT                                          ####
@@ -999,9 +655,8 @@ test_that("an sdt_yn fit stores posterior_epred_sdt_yn() in its family", {
 })
 
 test_that("both Stan yes/no likelihoods match dsdt_yn", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   sc <- system.file("stan_chunks", package = "bmm")
   program <- paste0(

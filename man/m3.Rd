@@ -200,7 +200,7 @@ categories may be called \code{Y} or \code{nTrials}.
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 data <- oberauer_lewandowsky_2019_e1
 
 # initiate the model object

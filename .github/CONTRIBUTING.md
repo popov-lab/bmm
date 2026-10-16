@@ -21,7 +21,7 @@ larger feature are also listed with the role `ctb` in `DESCRIPTION`.
 
 1. Fork the repo and create your branch from `develop`. If your change is a
    feature planned for a later release, branch from that release's integration
-   branch (`dev-1.5.0`, `dev-1.6.0`) instead; the milestone of the issue tells
+   branch (e.g. `dev-1.6.0`) instead; the milestone of the issue tells
    you which release it is planned for. Bug fixes always go to `develop`.
 2. Open the PR against the branch you started from.
 
@@ -44,7 +44,7 @@ Your PR also needs:
   not how R subsets a data frame.
 - **A NEWS bullet** for anything users can see, under the development heading of
   the branch you target: `# bmm (development version)` on `develop`,
-  `# bmm 1.5.0 (development)` on `dev-1.5.0`. Keep it short: what changes for the
+  `# bmm 1.6.0 (development)` on `dev-1.6.0`. Keep it short: what changes for the
   user and what they should do. Do not describe how the fix works.
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
