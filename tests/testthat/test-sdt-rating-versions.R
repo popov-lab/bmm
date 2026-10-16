@@ -280,6 +280,7 @@ test_that("version category probs vectorized path matches per-draw evaluation", 
 ############################################################################# !
 
 test_that("all rating versions configure through the bmm pipeline", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
   dat <- expand.grid(id = 1:4, stimulus = c(0L, 1L))
   dat <- cbind(dat, as.data.frame(rsdt_dpsdt(nrow(dat), 40, dat$stimulus,

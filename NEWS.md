@@ -1,5 +1,9 @@
 # bmm (development version)
 
+# bmm 1.4.1
+
+This is the 1.4.0 release resubmitted: 1.4.0 was sent to CRAN on 2026-10-15 and returned by the incoming checks because its check took too long on Windows. 1.4.1 runs fewer tests on CRAN and is otherwise the same package.
+
 ### New models
 * Add **Yes/No Signal Detection Theory** (`sdt_yn`) for detection and old/new recognition tasks with aggregated response counts. It estimates sensitivity (`d`), the decision criterion and optionally the unequal-variance ratio (`sdratio`). The criterion is estimated as `criterion`, measured from the noise mean, or as `bias`, measured from the midpoint between the means: write the one your design holds constant, e.g. `criterion` for weak and strong targets tested against shared lures (#543). Also adds `dsdt_yn()`, `rsdt_yn()`, `sdt_d()`, `sdt_criterion()` and `sdt_bias()`. See `?sdt_yn` for the parameters, links, default priors and the designs that identify `sdratio`. Thanks to @GidonFrischkorn
 * Add **m-Alternative Forced Choice Signal Detection Theory** (`sdt_mafc`) for accuracy-only m-AFC tasks, where one of `m` alternatives carries the signal (DeCarlo, 2012). It estimates sensitivity (`d`) from response counts and has no bias parameter. `m` may be a constant or the name of a data column, so trials with different numbers of alternatives can be fit jointly. Also adds `dsdt_mafc()` and `rsdt_mafc()`. See `?sdt_mafc` for the parameters, the noise distributions, the default priors and how `d` relates to the sensitivity `sdt_yn()` reports. Thanks to @GidonFrischkorn

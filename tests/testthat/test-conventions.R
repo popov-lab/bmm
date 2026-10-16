@@ -110,6 +110,14 @@ test_that("skip_on_ci() is not used as a tier gate (R2)", {
   expect_pattern_counts("skip_on_ci\\(\\)", integer(), rule = "R2: skip_on_ci() per file")
 })
 
+test_that("whole files skip on CRAN only at the registered cross-model contract files (R10)", {
+  expect_pattern_counts(
+    "^skip_on_cran\\(\\)",
+    c("test-conditional_effects.R" = 1L, "test-default-priors.R" = 1L, "test-helpers-init.R" = 1L),
+    rule = "R10: file-level skip_on_cran() per file"
+  )
+})
+
 test_that("stancode() tests assert content, not that the code is non-empty (R7)", {
   expect_pattern_counts("expect_true\\(nchar\\(", integer(),
                         rule = "R7: expect_true(nchar(code) > 0) per file")

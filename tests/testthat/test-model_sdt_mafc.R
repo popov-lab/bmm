@@ -171,6 +171,7 @@ test_that("sdt_mafc produces valid stancode including its custom functions", {
 })
 
 test_that("sdt_mafc integrates with the bmm pipeline via mock backend", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- data.frame(n_trials = rep(100L, 8))
   dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4, d = 1.2)
   for (d in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
@@ -428,6 +429,7 @@ test_that("the gumbel_min logit is -Inf, not NaN, once exp(-d') overflows", {
 # posterior_epred (#475) ------------------------------------------------------
 
 test_that("posterior_epred_sdt_mafc() is the mean count posterior_predict_sdt_mafc() simulates", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(475)
   sets <- data.frame(d = c(1.5, 0.5, 2, 1))
   for (dist in .sdt_dist_names) {

@@ -89,6 +89,7 @@ test_that("m3 compiles for the simple_span / softmax choice rule", {
 })
 
 test_that("m3 compiles for the complex_span / simple choice rule", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   data <- oberauer_lewandowsky_2019_e1
   data$distother <- data$dist
   data$n_dist_other <- data$n_dist
@@ -116,6 +117,7 @@ test_that("m3 compiles for the complex_span / simple choice rule", {
 })
 
 test_that("m3 compiles for the complex_span / softmax choice rule", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   data <- oberauer_lewandowsky_2019_e1
   data$distother <- data$dist
   data$n_dist_other <- data$n_dist
@@ -143,6 +145,7 @@ test_that("m3 compiles for the complex_span / softmax choice rule", {
 })
 
 test_that("m3 compiles for the custom model / simple choice rule", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(
     corr ~ b + a + c,
     other ~ b + a,
@@ -180,6 +183,7 @@ test_that("m3 compiles for the custom model / simple choice rule", {
 })
 
 test_that("m3 compiles for the custom model / softmax choice rule", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(
     corr ~ b + a + c,
     other ~ b + a,
@@ -218,6 +222,7 @@ test_that("m3 compiles for the custom model / softmax choice rule", {
 
 
 test_that("m3 custom accepts softplus links and generates default priors", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(
     corr ~ b + a + c,
     other ~ b + a,
@@ -400,6 +405,7 @@ test_that("m3_custom refuses an unknown symbol in an activation without formula 
 })
 
 test_that("m3_custom activations can use numeric num_options by their names (#495)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   cats <- c("corr", "other", "dist", "npl")
   counts <- c(1, 4, 5, 5)
   dat <- as.data.frame(oberauer_lewandowsky_2019_e1)
@@ -430,6 +436,7 @@ test_that("m3_custom activations can use numeric num_options by their names (#49
 })
 
 test_that("m3_custom linear activations can use nTrials and Idx_ columns (#495)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   fit_with <- function(activation) {
     suppressWarnings(bmm(
       bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, c ~ 1, a ~ 1) + bmf(activation),
@@ -484,6 +491,7 @@ m3_num_options_fit <- function(num_options, choice_rule = "simple") {
 }
 
 test_that("num_options named after the response categories are matched by name (#449)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   for (choice_rule in c("simple", "softmax")) {
     unnamed <- m3_num_options_fit(c(1, 4, 5, 5), choice_rule)
     by_category <- m3_num_options_fit(c(npl = 5, other = 4, corr = 1, dist = 5), choice_rule)
@@ -493,6 +501,7 @@ test_that("num_options named after the response categories are matched by name (
 })
 
 test_that("character num_options named after the response categories are matched by name (#457)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   by_position <- c("n_corr", "n_other", "n_dist", "n_npl")
   by_category <- c(other = "n_other", npl = "n_npl", corr = "n_corr", dist = "n_dist")
   for (choice_rule in c("simple", "softmax")) {
@@ -504,6 +513,7 @@ test_that("character num_options named after the response categories are matched
 })
 
 test_that("the ss version matches character num_options named after the categories (#457)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   fit_ss <- function(num_options) {
     bmm(
       bmf(c ~ 1, a ~ 1),
@@ -561,6 +571,7 @@ m3_data_fit <- function(data) {
 }
 
 test_that("m3 warns about missing counts only where the category has options (#496)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lewandowsky_2019_e1
   expect_true(all(is.na(dat$dist) == (dat$n_dist == 0)))
   expect_silent(m3_data_fit(dat))
@@ -579,6 +590,7 @@ test_that("m3 refuses data columns it would overwrite (#496)", {
 })
 
 test_that("a response category may be called Y or nTrials, also in the stored frame (#496)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   for (cat in c("Y", "nTrials")) {
     dat <- oberauer_lewandowsky_2019_e1
     names(dat)[names(dat) == "corr"] <- cat
@@ -638,6 +650,7 @@ test_that("no activation effect prior is wider than the shared normal(0,0.5)", {
 })
 
 test_that("m3 runs through the pipeline with the gaussian choice rule in all versions", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   ss <- m3(c("corr", "other", "npl"), c("n_corr", "n_other", "n_npl"),
            choice_rule = "gaussian", version = "ss")
   expect_silent(bmm(bmf(c ~ 1 + cond + (1 | ID), a ~ 1 + cond + (1 | ID)),

@@ -1479,6 +1479,7 @@ test_that("stick-breaking members form a simplex for any raw values", {
 })
 
 test_that("generated simplex formulas are neither announced as missing nor listed in the summary", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   tree <- mpt_tree("t", list(A = "gA", B = "gB", New = "gNew"))
   model <- mpt(tree, simplex = c("gA", "gB", "gNew"))
   dat <- data.frame(A = 10L, B = 10L, New = 10L)

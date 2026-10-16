@@ -114,6 +114,7 @@ test_that("validate_file_refit normalizes the user-facing values", {
 })
 
 test_that("try_save_bmmfit works", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.sort_data = FALSE)
   file <- tempfile()
   mock_fit <- bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
@@ -149,6 +150,7 @@ test_that("try_save_bmmfit works", {
 # value it was fitted with, so a returned fit whose $fit differs from the value
 # passed to the current call is the cached one
 test_that('file_refit = "on_change" returns the cached fit while nothing changes', {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.sort_data = FALSE)
   file <- tempfile()
   cached <- bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
@@ -166,6 +168,7 @@ test_that('file_refit = "on_change" returns the cached fit while nothing changes
 })
 
 test_that('file_refit = "on_change" refits when the model changes', {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.sort_data = FALSE)
   fit_cache <- function(formula, data, ..., file, mock_fit) {
     bmm(formula, data, sdm("dev_rad"),
@@ -230,6 +233,7 @@ test_that('file_refit = "on_change" refits when the model changes', {
 })
 
 test_that('file_refit = "on_change" falls back when the cached fit has no algorithm', {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.sort_data = FALSE)
   fit_cache <- function(mock_fit) {
     bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
@@ -282,6 +286,7 @@ test_that('file_refit = "on_change" rejects a cached file that is not a bmmfit',
 })
 
 test_that('file_refit = "on_change" reports why it refits at silent = 0', {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.sort_data = FALSE)
   file <- tempfile()
   suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
@@ -299,6 +304,7 @@ test_that('file_refit = "on_change" reports why it refits at silent = 0', {
 })
 
 test_that('bmm_options() accepts and applies file_refit = "on_change"', {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.sort_data = FALSE)
   old_op <- suppressMessages(bmm_options(file_refit = "on_change"))
   withr::defer(options(old_op))

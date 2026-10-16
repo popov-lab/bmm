@@ -1285,6 +1285,7 @@ test_that("flag_contaminant_rts() diagnostics report convergence correctly", {
 # Without contaminants the EM approaches a contaminant proportion of zero
 # slowly; this sample needs about 250 iterations
 test_that("the EM converges by default where it needs more than 100 iterations", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(8)
   rt <- 0.3 + rnorm(60, 0.15, 0.03) + rexp(60, 10)
   response <- rep(c(1, 0), c(54, 6))

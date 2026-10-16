@@ -509,6 +509,7 @@ test_that("model constructors and the template list their fields in the canonica
 })
 
 test_that("stancode() works with bmmformula", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
   model <- mixture3p("dev_rad", "col_nt", set_size = "set_size", regex = TRUE)
   sc <- stancode(ff, small_data(), model = model)
