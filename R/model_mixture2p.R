@@ -74,7 +74,7 @@ settable_links.mixture2p <- function(model) {
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data
 #' dat <- data.frame(y = rmixture2p(n = 2000))
 #'

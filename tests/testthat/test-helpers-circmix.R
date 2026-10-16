@@ -250,11 +250,8 @@ test_that(".circmix_slot_averaging_ld() sums the information of the slots an ite
 })
 
 test_that("the slot-averaging gradient in K is the right-hand slope at a whole K / set_size", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the shared Stan functions"
-  )
   tab <- .circmix_kappa_table()
   code <- paste0(
     "functions {\n",
@@ -514,11 +511,8 @@ test_that(".circmix_stan_wrapper() can pass the core a value its family omits", 
 })
 
 test_that(".circmix_stan_wrapper() emits Stan that parses", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to check the generated Stan"
-  )
   wrappers <- c(
     .circmix_stan_wrapper("no_covariates", c("mu", "kappa")),
     .circmix_stan_wrapper("with_set_size", c("mu", "kappa"), vint = "ss"),
@@ -600,11 +594,8 @@ circmix_stan_values <- function(data) {
 }
 
 test_that("the Stan and R implementations of the shared core agree", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the shared Stan functions"
-  )
 
   tab <- .circmix_kappa_table()
   y <- 0.4

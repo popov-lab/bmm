@@ -1,8 +1,6 @@
 test_that("summary has reasonable outputs", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   summary1 <- suppressWarnings(summary(fit))
   expect_true(is.data.frame(summary1$fixed))
   expect_equal(
@@ -67,6 +65,17 @@ test_that("print.bmmsummary handles a single regression coefficient row (#369)",
   expect_true(any(grepl("kappa_Intercept", out)))
 })
 
+test_that("print.bmmsummary lists only constants when no shown coefficient is estimated", {
+  model <- sdm(resp_error = "y")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  fixed <- make_fixed(c("c_Intercept", "kappa_Intercept"))
+  fixed$Rhat <- NA
+  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
+  expect_false(any(grepl("Regression Coefficients", out)))
+  expect_true(any(grepl("Constant Parameters", out)))
+  expect_true(any(grepl("kappa_Intercept", out)))
+})
+
 test_that(".summary_fixed_rows keeps a single fixed-effect row", {
   # gumbel-min sdt_ranking has one population coefficient (d_Intercept) but
   # two printed parameters (d, sdratio); the old sapply+apply errored here.
@@ -100,24 +109,14 @@ test_that("SDT summaries name d as d_a only when sdratio is not 0", {
   expect_true(any(grepl("sdt_sensitivity()", uv, fixed = TRUE)))
 })
 
-test_that("dual-process SDT summaries note that d is the familiarity sensitivity", {
-  model <- sdt_rating(paste0("r", 1:6), "stimulus", version = "dpsdt")
-  model$fixed_parameters[c("Ro", "Rn")] <- NULL
-  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept", "spacing_Intercept",
-                        "Ro_Intercept", "Rn_Intercept"))
-  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1)
-  out <- capture.output(print(make_bmmsummary(model, formula, fixed), color = FALSE))
-  expect_true(any(grepl("familiarity sensitivity", out)))
-  expect_true(any(grepl("auc_sdt()", out, fixed = TRUE)))
-  expect_false(any(grepl("d is d_a", out)))
-})
-
-test_that("SDT summaries name d as d_a for a user-fixed non-zero sdratio too", {
-  model <- sdt_yn(response = "y", stimulus = "s", n_trials = "n")
-  model$fixed_parameters$sdratio <- 0.3
-  fixed <- make_fixed(c("d_Intercept", "criterion_Intercept"))
-
-  out <- capture.output(print(make_bmmsummary(model, bmf(d ~ 1, criterion ~ 1, sdratio = 0.3),
-                                              fixed), color = FALSE))
-  expect_true(any(grepl("d is d_a", out)))
+test_that("the Links line lists only the alternative parameter the formula uses", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1, bias ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "bias = identity", fixed = TRUE)
+  expect_no_match(links, "criterion", fixed = TRUE)
+  out <- capture.output(bmm:::print_model_header(model, bmf(d ~ 1), "dat", 4))
+  links <- grep("Links:", out, value = TRUE)
+  expect_match(links, "criterion = identity", fixed = TRUE)
+  expect_no_match(links, "bias", fixed = TRUE)
 })

@@ -199,11 +199,8 @@ test_that("check_data() still validates the non-target distances", {
 })
 
 test_that("the Stan and R likelihoods agree for every version", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the imm likelihood"
-  )
 
   tab <- .circmix_kappa_table()
   code <- paste0(
@@ -385,11 +382,8 @@ test_that("the set-size-1 warning names exactly the coefficients no other trial 
 })
 
 test_that("the generated likelihood passes each parameter to its place in the core", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(
-    requireNamespace("cmdstanr", quietly = TRUE),
-    "cmdstanr is required to compile the imm likelihood"
-  )
   # the cores are checked against R above; this checks the generated wrappers
   # that brms calls, whose argument order is built from the version tables
   cases <- list(
@@ -501,4 +495,36 @@ test_that("the set-size-1 warnings of s and of a with c share one wording", {
       "on their priors."
     )
   ))
+})
+
+test_that("the deprecated IMM constructors warn and build the model imm() builds", {
+  nt <- paste0("col_nt", 1:7)
+  dist <- paste0("dist_nt", 1:7)
+  cases <- list(
+    full = list(old = function(...) IMMfull("dev_rad", nt, dist, ...), name = "IMMfull"),
+    bsc = list(old = function(...) IMMbsc("dev_rad", nt, dist, ...), name = "IMMbsc"),
+    abc = list(old = function(...) IMMabc("dev_rad", nt, ...), name = "IMMabc")
+  )
+  for (version in names(cases)) {
+    case <- cases[[version]]
+    current <- if (version == "abc") {
+      imm("dev_rad", nt_features = nt, set_size = "set_size", version = "abc")
+    } else {
+      imm("dev_rad", nt_features = nt, nt_distances = dist, set_size = "set_size",
+          version = version)
+    }
+    expect_warning(old <- case$old(set_size = "set_size"),
+                   paste0("`", case$name, "()` is deprecated"), fixed = TRUE)
+    expect_identical(class(old), class(current))
+    expect_identical(old$resp_vars, current$resp_vars)
+    expect_identical(old$other_vars, current$other_vars)
+    # the argument name of bmm < 0.4 still reaches set_size, with a warning
+    warnings <- character()
+    withCallingHandlers(old <- case$old(setsize = "set_size"), warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
+    expect_true(any(grepl("'setsize' is deprecated", warnings, fixed = TRUE)), label = version)
+    expect_identical(old$other_vars, current$other_vars)
+  }
 })
