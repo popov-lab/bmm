@@ -15,7 +15,7 @@ dmixture3p(
   p_mem = 0.6,
   p_nt = 0.2,
   tau = 0,
-  vp_nodes = 41L,
+  vp_nodes = 81L,
   log = FALSE
 )
 

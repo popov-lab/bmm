@@ -121,7 +121,7 @@
 
 .model_mixture3p <- function(resp_error = NULL, nt_features = NULL, set_size = NULL,
                              regex = FALSE, links = NULL, version = "simple",
-                             variable_precision = FALSE, vp_nodes = 41L,
+                             variable_precision = FALSE, vp_nodes = 81L,
                              call = NULL, ...) {
   spec <- .mixture3p_version_table[[version]]
   if (variable_precision) {
@@ -214,10 +214,13 @@ settable_links.mixture3p <- function(model) {
 #'   the shared normalisation, so neither weight is separately interpretable.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
 #'   from trial to trial (van den Berg et al., 2012). See [mixture2p()] for
-#'   details of the parameterisation.
+#'   details of the parameterisation. Under `version = "slot_averaging"`, the
+#'   precision of an item held in `j` slots is the sum of `j` independent slot
+#'   draws, `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance
+#'   grows with `j`.
 #' @param vp_nodes Number of quadrature nodes used when
-#'   `variable_precision = TRUE`; must be an odd number of at least 41. See
-#'   [mixture2p()].
+#'   `variable_precision = TRUE`; must be an odd number of at least 41, and
+#'   defaults to 81. See [mixture2p()] for the accuracy this gives.
 #' @param links A named list of link functions for the model parameters. The
 #'   links of `thetat` and `thetant` cannot be changed, because the softmax over
 #'   them is part of the likelihood.
@@ -275,7 +278,7 @@ settable_links.mixture3p <- function(model) {
 #' )
 mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
                       version = c("simple", "slot", "slot_averaging"),
-                      variable_precision = FALSE, vp_nodes = 41L, links = NULL,
+                      variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
   dots <- list(...)
@@ -300,23 +303,73 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
 
 #' @export
 check_formula.mixture3p <- function(model, data, formula) {
-  swap <- .mixture3p_version_table[[model$version]]$swap_parameter
-  set_size_var <- model$other_vars$set_size
-
-  # A trial with one item has no non-target to swap to, so that level of the
-  # swap parameter is absent from the likelihood and samples its prior. The
-  # previous mixture implementation hid this by pinning the level to a constant,
-  # which it had to do anyway to switch off the sentinel weight.
-  predicted_by_set_size <- set_size_var %in% rhs_vars(formula[[swap]])
-  warnif(
-    predicted_by_set_size && isTRUE(any(data[["ss_numeric"]] == 1)),
-    "Your data contain trials with a set size of 1, where no swap can occur, \\
-    so the set-size-1 level of '{swap}' is not identified and will sample its \\
-    prior. Drop those trials from the formula for '{swap}', or read that level \\
-    as prior-only."
-  )
-
+  .mixture3p_warn_set_size_one(model, data, formula)
   NextMethod("check_formula")
+}
+
+# A trial with one item has no non-target to swap to, so the swap parameter is
+# absent from its likelihood. The previous mixture implementation hid this by
+# pinning the set-size-1 level to a constant, which it had to do anyway to
+# switch off the sentinel weight.
+.mixture3p_warn_set_size_one <- function(model, data, formula) {
+  swap <- .mixture3p_version_table[[model$version]]$swap_parameter
+  swap_formula <- formula[[swap]]
+  if (is.null(swap_formula) || is_constant(swap_formula) || is_nl(swap_formula) ||
+    !isTRUE(any(data[["ss_numeric"]] == 1))) {
+    return(invisible())
+  }
+  coefs <- .set_size_one_unidentified(swap, swap_formula, data)
+  warnif(
+    length(coefs) > 0,
+    "Trials with a set size of 1 have no non-target, so they say nothing about \\
+    '{swap}'. The other trials do not determine {collapse_comma(coefs)} in the \\
+    formula for '{swap}', so the posteriors of these coefficients depend on \\
+    their priors. Give set size 1 a level of its own in a factor, and read that \\
+    level's coefficient as prior-only."
+  )
+}
+
+# The coefficients of `formula` that the trials with more than one item leave
+# undetermined, named as in the fit's draws. Group-level terms are judged by
+# their columns pooled over groups, which is what their sd is estimated from.
+.set_size_one_unidentified <- function(par, formula, data) {
+  # a variable missing from the data is left to brms, which names it
+  vars <- all.vars(formula[[3]])
+  if (!all(vars %in% names(data))) {
+    return(character(0))
+  }
+  data <- data[stats::complete.cases(data[vars]), ]
+  informed <- data[["ss_numeric"]] > 1
+  bterms <- brms::brmsterms(brms::bf(formula))$dpars$mu
+  X <- get_model_matrix(bterms$fe, data)
+  out <- if (!is.null(X)) glue("b_{par}_{.undetermined_columns(X, informed)}")
+  re <- bterms$re
+  if (is.data.frame(re)) {
+    for (i in seq_len(nrow(re))) {
+      Z <- get_model_matrix(re$form[[i]], data)
+      out <- c(out, glue("sd_{re$group[i]}__{par}_{.undetermined_columns(Z, informed)}"))
+    }
+  }
+  as.character(out)
+}
+
+# Columns of X involved in a direction that X[rows, ] leaves free but X fixes
+.undetermined_columns <- function(X, rows) {
+  norms <- sqrt(colSums(X^2))
+  X <- sweep(X, 2, ifelse(norms > 0, norms, 1), "/")
+  free <- .null_space(X)
+  free_in_rows <- .null_space(X[rows, , drop = FALSE])
+  lost <- free_in_rows - free %*% crossprod(free, free_in_rows)
+  colnames(X)[rowSums(abs(lost)) > 1e-8]
+}
+
+.null_space <- function(M) {
+  if (!nrow(M)) {
+    return(diag(ncol(M)))
+  }
+  s <- svd(M, nu = 0, nv = ncol(M))
+  d <- c(s$d, rep(0, ncol(M) - length(s$d)))
+  s$v[, d <= 1e-8 * max(d), drop = FALSE]
 }
 
 ############################################################################# !

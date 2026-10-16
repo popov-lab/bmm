@@ -522,8 +522,12 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' lines(x, d, type = "l", col = "red")
 #'
 dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
-                       tau = 0, vp_nodes = 41L, log = FALSE) {
+                       tau = 0, vp_nodes = 81L, log = FALSE) {
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  stopif(
+    vp_nodes < 41 || vp_nodes %% 2 == 0,
+    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
+  )
 
   set_size <- length(mu)
   weights <- .mixture3p_marginal_weights(p_mem, p_nt, set_size, length(x))
