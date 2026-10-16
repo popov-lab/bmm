@@ -109,6 +109,7 @@ test_that("slot averaging guesses whenever fewer slots than items are available"
 })
 
 test_that("rmixture2p() draws from dmixture2p() for every version", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   compare <- function(n = 2e5, n_bins = 20, ...) {
     draws <- rmixture2p(n, ...)
     breaks <- seq(-pi, pi, length.out = n_bins + 1)
@@ -152,6 +153,7 @@ test_that("dmixture2p() and rmixture2p() refuse what the model refuses", {
 })
 
 test_that("rmixture2p() is exact at high precision", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   # a sampler that bounds the density on a grid misses the peak between grid
   # points: develop's rmixture3p() gave an SD of 0.01067 at this mu (#434)
   # 1e-4 is about six Monte Carlo standard errors of the SD at 2e5 draws
@@ -165,6 +167,7 @@ test_that("rmixture2p() is exact at high precision", {
 })
 
 test_that("posterior_predict() samples the density log_lik() evaluates, for every version", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(398)
   n <- 2e5
   # K / set_size = 1.5: the slot version stores every item, slot averaging
@@ -244,6 +247,7 @@ test_that("a formula for mu1 frees mu, with a warning", {
 })
 
 test_that("every version runs through the bmm() pipeline", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017
   expect_silent(bmm(
     bmf(kappa ~ 1, thetat ~ 1), dat, mixture2p("dev_rad"),
@@ -308,6 +312,7 @@ test_that("mixture2p cites van den Berg et al. only with variable precision", {
 })
 
 test_that("a mixture2p fit refuses posterior_epred() and its family stores the refusal", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
   cases <- list(
     simple = list(bmf(kappa ~ 1, thetat ~ 1), mixture2p("dev_rad")),
