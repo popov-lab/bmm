@@ -10,6 +10,18 @@
 #   shared by the other models cannot serve the model
 # - observables: list(model, data, formula), for test-pp_observables.R: the
 #   model's pp_observables() must name standata slots and be elementwise
+# - sd_default: list(model, formula, data, sd), for test-default-priors.R: sd
+#   names the blanket sd prior default_prior() gives each parameter with
+#   random effects in formula; every model needs one
+# - init: list(model, formula, data), for test-helpers-init.R: the init
+#   function bmm() builds names every Stan parameter with its declared shape;
+#   every model needs one
+# - links: list(model, settable), for test-links.R: settable is what
+#   settable_links(model) returns, written out; every model needs one
+# - fixture: list(file), for the tests that read a stored fit
+#   (test-pp_check.R, test-report-extract.R): a file in tests/testthat/assets
+#   written by tests/local/make-fixtures.R
+# Case names start with the model's name and are unique across providers.
 model_test_cases <- function(kind) {
   env <- environment(model_test_cases)
   providers <- ls(env, pattern = "^model_cases_")

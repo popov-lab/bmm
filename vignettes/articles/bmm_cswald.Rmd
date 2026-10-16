@@ -200,7 +200,7 @@ diffusion model available in `brms::wiener()`. Key differences:
 | Feature | cswald (simple) | cswald (crisk) | brms::wiener |
 |---------|-----------------|----------------|--------------|
 | Boundaries | Single | Both | Both |
-| Starting point | Fixed (unbiased) | Estimated | Estimated |
+| Starting point | Fixed (unbiased) | Fixed (unbiased) by default; estimated with a `zr` formula | Estimated |
 | Bound param | Half separation | Full separation | Full separation |
 | Drift sign | Positive only | Positive/negative | Positive/negative |
 | Best for | High accuracy | Moderate accuracy | Any accuracy |

@@ -7,7 +7,7 @@
     drift = "Drift rate = Average rate of evidence accumulation of the decision processes",
     bound = "Boundary separation = Distance between the decision boundaries that need to be reached",
     ndt   = "Non-decision time = Additional time required beyond the evidence accumulation process",
-    zr    = "Relative starting point = Starting point between the decision thresholds relative to the upper bound."
+    zr    = "Relative starting point = Starting point as a proportion of the boundary separation, measured from the lower boundary (0.5 = unbiased, > 0.5 = biased towards the upper response)."
   ),
   links = list(
     drift = "identity", bound = "log", ndt = "log", zr = "logit"
@@ -79,13 +79,22 @@
 #'   is an error, and a link that allows values the default link excludes
 #'   (e.g. "identity" for a positive parameter) is a warning.
 #' @section Default behavior:
-#' By default, `zr` is fixed at 0. If you want to estimate `zr`, add a formula
-#' for `zr` in your `bmf()` call.
+#' By default, `zr` is fixed at 0 on its logit link scale, that is at an
+#' unbiased starting point of `zr = 0.5`. If you want to estimate `zr`, add a
+#' formula for `zr` in your `bmf()` call. Estimates of `zr` are on the logit
+#' scale too, so use `plogis()` to read them as proportions.
+#'
+#' With accuracy-coded responses (1 = correct, 0 = error) the unbiased default
+#' is the usual assumption. With response-coded data (1 and 0 for the two
+#' response options, e.g. "word" and "nonword"), a bias towards one option
+#' moves the starting point; with `zr` fixed, that bias is absorbed by the
+#' other parameters instead. Estimate `zr` for response-coded data, e.g.
+#' `zr ~ 1`, and code `drift` so that its sign follows the stimulus.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # Simulate data for one subject using rddm
 #' set.seed(123)
 #' n_trials <- 500
