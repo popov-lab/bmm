@@ -1339,8 +1339,8 @@ test_that("qrdm(prdm(q)) recovers q", {
 # but broke the survival grid from max rel error 2.5e-10 to 0.53, far past the
 # 1e-7 gate below.
 test_that("Stan rdm_log_pdf()/rdm_log_surv() match the quadrature reference on a grid", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
 
   lse <- function(a, b) {
     m <- pmax(a, b)
