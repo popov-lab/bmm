@@ -181,6 +181,7 @@ test_that("imm cites van den Berg et al. only with variable precision", {
 })
 
 test_that("an intercept next to set_size reaches imm without a set-size-1 pin", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   # set size 1 is left to the priors; check_formula.imm() says which coefficients
   fit <- suppressWarnings(
     bmm(bmf(kappa ~ 1 + set_size, c ~ 1, a ~ 1 + set_size, s ~ 0 + set_size),
