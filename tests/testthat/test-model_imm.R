@@ -17,6 +17,14 @@ test_that("imm() exposes the parameters each version implies", {
   expect_error(imm_model(vp_nodes = 21), "at least 41")
 })
 
+test_that("imm() and dimm() default to 81 quadrature nodes", {
+  # the core refuses gamma shapes below 60 / vp_nodes, which at 41 nodes is 1.46
+  # and reaches into real-data posteriors of mixture2p and mixture3p (#398)
+  expect_equal(imm_model(variable_precision = TRUE)$vp_nodes, 81L)
+  expect_equal(formals(imm)$vp_nodes, 81L)
+  expect_equal(formals(dimm)$vp_nodes, 81L)
+})
+
 test_that("the background activation is a visible fixed parameter", {
   model <- imm_model()
   expect_equal(model$fixed_parameters, list(mu = 0, b = 0))
@@ -108,6 +116,15 @@ test_that("rimm() draws from dimm()", {
   }
   compare(mu = c(0, 2, -1.5), dist = c(0, 0.5, 2), c = 5, a = 2, b = 1, s = 2, kappa = 8)
   compare(mu = c(0, 2, -1.5), dist = c(0, 0.5, 2), c = 5, a = 2, b = 1, s = 2, kappa = 8, tau = 1)
+})
+
+test_that("rimm() keeps its spread at high precision", {
+  # a sampler on a grid of locations loses spread at large kappa (#434); b is
+  # tiny so that no draw is a guess
+  withr::local_seed(434)
+  draws <- rimm(1e5, mu = 0, dist = 0, c = 1, a = 1, b = 1e-12, s = 1, kappa = 1e4)
+  # 1 / sqrt(J(1e4)), the sd of a von Mises at this precision
+  expect_equal(sd(draws), 0.0100003, tolerance = 0.01)
 })
 
 test_that("configure_model() drops the set-size sentinel machinery", {
@@ -276,4 +293,235 @@ test_that("the Stan and R likelihoods agree for every version", {
   expect_equal(stan("out_full"), r_side("full"), tolerance = 1e-12)
   expect_equal(stan("out_bsc"), r_side("bsc"), tolerance = 1e-12)
   expect_equal(stan("out_abc"), r_side("abc"), tolerance = 1e-12)
+})
+
+# names of the coefficients the set-size-1 warnings name, from the warnings
+# check_formula() gives for the formula
+set_size_one_names <- function(formula, data = oberauer_lin_2017, version = "full") {
+  model <- check_model(imm_model(version), data, formula)
+  data <- check_data(model, data, formula)
+  messages <- character(0)
+  withCallingHandlers(
+    check_formula(model, data, formula),
+    warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  messages <- grep("set size of 1", messages, value = TRUE)
+  as.character(sort(unlist(regmatches(messages, gregexpr("(b|sd)_[A-Za-z0-9_.]+(?=')", messages, perl = TRUE)))))
+}
+
+test_that("set size 1 leaves a and s to their priors instead of pinning them", {
+  formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID),
+    s ~ 0 + set_size + (0 + set_size | ID))
+  pr <- suppressWarnings(default_prior(formula, oberauer_lin_2017, imm_model()))
+  expect_false(any(grepl("constant", pr$prior[pr$dpar %in% c("a", "s")], fixed = TRUE)))
+  expect_equal(unique(pr$prior[pr$class == "sd" & pr$dpar %in% c("a", "s") & pr$group == ""]),
+    "exponential(1)")
+})
+
+test_that("an intercept next to set_size is accepted, with the set-size-1 warning", {
+  expect_warning(
+    bmm(bmf(kappa ~ 1 + set_size, c ~ 1, a ~ 1 + set_size, s ~ 1 + set_size),
+      oberauer_lin_2017, imm_model(),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "set size of 1"
+  )
+})
+
+test_that("the set-size-1 warning names exactly the coefficients no other trial informs", {
+  set_sizes <- paste0("set_size", 2:8)
+  # s is absent at set size 1
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)), character(0))
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 0 + set_size)),
+    "b_s_set_size1")
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1 + set_size)),
+    sort(c("b_s_Intercept", paste0("b_s_", set_sizes))))
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1,
+      s ~ 0 + set_size + (0 + set_size | ID))),
+    c("b_s_set_size1", "sd_ID__s_set_size1")
+  )
+  # a enters set size 1 through c + a, so c from the other trials fixes it
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size, s ~ 1)),
+    character(0))
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1 + set_size, s ~ 1)),
+    character(0))
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID), s ~ 1)),
+    character(0)
+  )
+  expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 1, s ~ 1)),
+    character(0))
+  # with c free per set size too, set size 1 fixes only their sum
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size, s ~ 1)),
+    c("b_a_set_size1", "b_c_set_size1")
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 1 + set_size, s ~ 1)),
+    sort(c("b_a_Intercept", paste0("b_a_", set_sizes), "b_c_set_size1"))
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size,
+      a ~ 0 + set_size + (0 + set_size | ID), s ~ 1)),
+    c("b_a_set_size1", "b_c_set_size1")
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size + (0 + set_size | ID),
+      a ~ 0 + set_size + (0 + set_size | ID), s ~ 1)),
+    c("b_a_set_size1", "b_c_set_size1", "sd_ID__a_set_size1", "sd_ID__c_set_size1")
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size),
+      version = "abc"),
+    c("b_a_set_size1", "b_c_set_size1")
+  )
+  # bsc has no a, and c alone is the target's activation at set size 1
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, s ~ 0 + set_size),
+      version = "bsc"),
+    "b_s_set_size1"
+  )
+  # a numeric set size draws its line through the set sizes above 1
+  numeric_ss <- oberauer_lin_2017
+  numeric_ss$set_size <- as.numeric(as.character(numeric_ss$set_size))
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 1 + set_size, a ~ 1 + set_size,
+      s ~ 1 + set_size), numeric_ss),
+    character(0)
+  )
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size,
+      s ~ 0 + set_size), numeric_ss),
+    character(0)
+  )
+  # without set size 1 nothing is left to the prior
+  no_single <- oberauer_lin_2017[oberauer_lin_2017$set_size != 1, ]
+  expect_equal(
+    set_size_one_names(bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size,
+      s ~ 0 + set_size), no_single),
+    character(0)
+  )
+})
+
+test_that("the generated likelihood passes each parameter to its place in the core", {
+  skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required to compile the imm likelihood"
+  )
+  # the cores are checked against R above; this checks the generated wrappers
+  # that brms calls, whose argument order is built from the version tables
+  cases <- list(
+    full = list(version = "full", formula = bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)),
+    bsc = list(version = "bsc", formula = bmf(kappa ~ 1, c ~ 1, s ~ 1)),
+    abc = list(version = "abc", formula = bmf(kappa ~ 1, c ~ 1, a ~ 1)),
+    full_vp = list(version = "full", formula = bmf(kappa ~ 1, tau ~ 1, c ~ 1, a ~ 1, s ~ 1),
+      variable_precision = TRUE)
+  )
+  values <- c(
+    y = 0.7, mu = 0.1, kappa = 6, tau = 0.8, c = 3, a = 0.5, s = 1.5, b = 1.2,
+    ss = 5, setNames(c(2, -1.5, 1, -0.4, 2.8, 0.3, -2), paste0("nt", 1:7)),
+    setNames(c(0.3, 1.5, 2, 0.8, 2.5, 1.1, 0.6), paste0("dist", 1:7))
+  )
+  wrappers <- character(0)
+  calls <- character(0)
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    model <- check_model(
+      imm_model(case$version, variable_precision = isTRUE(case$variable_precision)),
+      oberauer_lin_2017, case$formula
+    )
+    data <- check_data(model, oberauer_lin_2017, case$formula)
+    family <- paste0("imm_", case$version)
+    code <- configure_model(model, data, case$formula)$stanvars[[paste0(family, "_lpdf")]]$scode
+    code <- gsub(paste0(family, "_lpdf"), paste0("w_", name, "_lpdf"), code, fixed = TRUE)
+    wrappers <- c(wrappers, code)
+    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1", strsplit(code, "\n")[[1]][1])
+    arg_names <- sub(".* ", "", strsplit(signature, ", ")[[1]])
+    arg_values <- ifelse(arg_names %in% names(values),
+      format(values[arg_names], digits = 17), arg_names
+    )
+    arg_values[arg_names == "ss"] <- as.character(as.integer(values[["ss"]]))
+    calls <- c(calls, glue::glue(
+      "out[{length(calls) + 1}] = w_{name}_lpdf({arg_values[1]} | ",
+      "{paste(arg_values[-1], collapse = ', ')});"
+    ))
+  }
+  program <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "imm_funs.stan", package = "bmm")), "\n",
+    paste(wrappers, collapse = "\n"), "}\n",
+    "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
+    " real circmix_logJ_min; real circmix_dlogJ; }\n",
+    "generated quantities { vector[", length(calls), "] out;\n",
+    paste(calls, collapse = "\n"), "\n}\n"
+  )
+  tab <- .circmix_kappa_table()
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = list(
+      NK = length(tab$logkappa), circmix_logk = tab$logkappa,
+      circmix_dlogk = tab$dlogkappa, circmix_logJ_min = tab$logJ_min,
+      circmix_dlogJ = tab$dlogJ
+    ),
+    fixed_param = TRUE, iter_sampling = 1, chains = 1, refresh = 0,
+    show_messages = FALSE, sig_figs = 18
+  )
+  r_side <- vapply(cases, function(case) {
+    v <- case$version
+    .dimm_version(values[["y"]], values[["mu"]], values[["kappa"]],
+      c = values[["c"]], a = if (v != "bsc") values[["a"]],
+      s = if (v != "abc") values[["s"]], b = values[["b"]], set_size = values[["ss"]],
+      nt = values[paste0("nt", 1:7)], dist = values[paste0("dist", 1:7)],
+      tau = if (isTRUE(case$variable_precision)) values[["tau"]] else 0,
+      nodes = 81L, version = v
+    )
+  }, numeric(1))
+  expect_equal(as.numeric(fit$draws("out")), unname(r_side), tolerance = 1e-10)
+})
+
+test_that("the link of the fixed background activation cannot be changed", {
+  # b = 0 on the log link is the background of 1 the activations are weighed
+  # against; on another link the same fixed value is another model
+  expect_error(
+    imm_model(links = list(b = "identity")),
+    "The link of 'b' cannot be changed in imm"
+  )
+  expect_error(imm_model("abc", links = list(b = "softplus")), "cannot be changed")
+  expect_silent(imm_model(links = list(c = "softplus")))
+  expect_silent(imm_model(links = list(b = "log")))
+})
+
+test_that("the set-size-1 warnings of s and of a with c share one wording", {
+  formula <- bmf(kappa ~ 1, c ~ 0 + set_size, a ~ 0 + set_size, s ~ 0 + set_size)
+  model <- check_model(imm_model(), oberauer_lin_2017, formula)
+  data <- check_data(model, oberauer_lin_2017, formula)
+  messages <- character(0)
+  withCallingHandlers(
+    check_formula(model, data, formula),
+    warning = function(w) {
+      messages <<- c(messages, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_equal(sort(gsub("\\s+", " ", messages)), c(
+    paste(
+      "Trials with a set size of 1 have no non-target, so they inform 'a' and 'c'",
+      "only through their sum. The other trials do not determine 'b_a_set_size1',",
+      "'b_c_set_size1' in the formulas for 'a' and 'c', so the posteriors of these",
+      "coefficients depend on their priors. Give set size 1 a level of its own in a",
+      "factor, so that only the set-size-1 coefficients depend on their priors."
+    ),
+    paste(
+      "Trials with a set size of 1 have no non-target, so they say nothing about 's'.",
+      "The other trials do not determine 'b_s_set_size1' in the formula for 's', so",
+      "the posteriors of these coefficients depend on their priors. Give set size 1 a",
+      "level of its own in a factor, so that only the set-size-1 coefficients depend",
+      "on their priors."
+    )
+  ))
 })

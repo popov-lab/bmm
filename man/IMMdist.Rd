@@ -18,7 +18,7 @@ dimm(
   s = 2,
   kappa = 5,
   tau = 0,
-  vp_nodes = 41L,
+  vp_nodes = 81L,
   log = FALSE
 )
 
