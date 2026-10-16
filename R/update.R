@@ -34,7 +34,7 @@
 #'
 #'   For more information and examples, see [brms::update.brmsfit()]
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data from the Signal Discrimination Model
 #' # generate artificial data from the Signal Discrimination Model
 #' dat <- data.frame(y = rsdm(2000))
@@ -151,11 +151,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # freshly configured one -- the stale constant() of a freed or re-valued
   # parameter and the stale free prior of a newly fixed one alike. brms stores
   # the main dpar without a `dpar` label, so its rows are the ones carrying
-  # neither label. Rows brms filled in itself are left out, as
-  # brms::update.brmsfit() leaves them out: a flat default for the class of an
-  # intercept-only parameter would otherwise override bmm's prior on the
-  # predictors a new formula adds
-  old_prior <- object$prior[object$prior$source != "default", ]
+  # neither label
+  old_prior <- carried_prior(object$prior)
   if (length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
@@ -429,6 +426,15 @@ revert_check_data.sdt_cdp <- function(model, data) {
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
+}
+
+# Rows brms filled in itself are left out, as brms::update.brmsfit() leaves them
+# out: a flat default for the class of an intercept-only parameter would
+# otherwise override bmm's prior on the predictors a new formula adds. A row of
+# unknown source (NA, or no `source` column) cannot be told from a default and
+# is left out too, as brms does; an NA in a logical index yields an all-NA row
+carried_prior <- function(prior) {
+  prior[which(prior$source != "default"), ]
 }
 
 # brms::update.brmsfit() merges the fit's stored control key by key with the one

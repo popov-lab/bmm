@@ -2,9 +2,7 @@ save_pars <- brms::save_pars
 
 test_that("update.bmmfit works", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit1 <- restructure(readRDS(path))
+  fit1 <- restructure(load_fixture_fit("bmmfit_example1.rds"))
   data <- fit1$data
 
   # formula is replaced
@@ -46,9 +44,7 @@ test_that("update.bmmfit works", {
 })
 
 sdm_fixture <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  restructure(readRDS(path))
+  restructure(load_fixture_fit("bmmfit_example1.rds"))
 }
 
 update_mock <- function(object, ...) {
@@ -80,6 +76,7 @@ test_that("update() stores the formula that bmm() stores for the same inputs", {
 })
 
 test_that("update() stores the formula that bmm() stores, without a fixture", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
@@ -103,25 +100,18 @@ test_that("update() stores the formula that bmm() stores, without a fixture", {
                ignore_formula_env = TRUE)
 })
 
-test_that("brms::combine_models() merges a fit with its update() refit", {
+test_that("update() that keeps the Stan code names the bmm version once (#551)", {
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
-
-  fit_args <- list(chains = 1, iter = 200, warmup = 100, refresh = 0, silent = 2)
-  fit1 <- suppressWarnings(suppressMessages(brms::do_call(bmm, c(list(
-    bmf(thetat ~ 1, kappa ~ 1),
-    oberauer_lin_2017[oberauer_lin_2017$ID == 1, ],
-    mixture2p("dev_rad"),
-    backend = "cmdstanr", seed = 1
-  ), fit_args))))
-  fit2 <- suppressWarnings(suppressMessages(
-    brms::do_call(update, c(list(fit1, seed = 2), fit_args))
-  ))
-
-  combined <- brms::combine_models(fit1, fit2)
-  expect_s3_class(combined, "bmmfit")
-  expect_equal(brms::nchains(combined), 2)
+  fit1 <- sdm_fixture()
+  # the mock backend recompiles and so writes a fresh header; testmode keeps
+  # the fit's code, which already carries the bmm version
+  expected <- paste0("and bmm ", utils::packageVersion("bmm"))
+  header <- function(fit) sub("^.*? (and bmm[^\n]*)\n.*$", "\\1", unclass(fit$model))
+  up <- suppressMessages(update(fit1, testmode = TRUE))
+  expect_identical(header(up), expected)
+  expect_identical(header(suppressMessages(update(up, testmode = TRUE))), expected)
+  up <- suppressMessages(update(fit1, formula. = bmf(c ~ 1, kappa ~ 1), testmode = TRUE))
+  expect_identical(header(up), expected)
 })
 
 test_that("update.bmmfit frees parameters that the new formula predicts", {
@@ -311,7 +301,8 @@ test_that("update() applies the package step-size default to a fit that had none
   skip_on_cran()
   withr::local_options(bmm.step_size = 0.02)
   fit1 <- sdm_fixture()
-  expect_null(fit1$stan_args$control)
+  # as a fit from before the package had a step-size default
+  fit1$stan_args$control <- NULL
 
   up <- update_mock(fit1)
   expect_equal(up$stan_args$control, list(step_size = 0.02))
@@ -348,6 +339,34 @@ test_that("update() keeps the fit's control on the same backend and algorithm on
   no_algorithm <- object
   no_algorithm$algorithm <- NULL
   expect_null(carried_control(no_algorithm, list()))
+})
+
+test_that("update() carries the stored prior rows that are not brms defaults", {
+  stored <- brms::prior(normal(0, 1), class = b) +
+    brms::prior(normal(0, 2), class = b, coef = x) +
+    brms::prior(normal(0, 3), class = sd) +
+    brms::prior(normal(0, 4), class = Intercept)
+  # "" is what brms's restructure() writes into fits that predate the column
+  stored$source <- c("user", "default", "vectorized", "")
+  kept <- carried_prior(stored)
+  expect_s3_class(kept, "brmsprior")
+  expect_equal(kept$prior, c("normal(0, 1)", "normal(0, 3)", "normal(0, 4)"))
+  expect_equal(kept$source, c("user", "vectorized", ""))
+})
+
+test_that("update() carries no stored prior row whose source is unknown (#552)", {
+  stored <- brms::prior(normal(0, 1), class = b) +
+    brms::prior(normal(0, 2), class = sd) +
+    brms::prior(normal(0, 3), class = Intercept)
+  stored$source <- c("user", NA, "default")
+  kept <- carried_prior(stored)
+  expect_equal(kept$prior, "normal(0, 1)")
+  expect_false(anyNA(kept$class))
+
+  stored$source <- NULL
+  kept <- carried_prior(stored)
+  expect_s3_class(kept, "brmsprior")
+  expect_equal(nrow(kept), 0)
 })
 
 test_that("a step size in the call replaces the one the fit stored, either spelling", {
@@ -388,267 +407,21 @@ test_that("update() of a fit with a stored control keeps it next to the step siz
 # =============================================================================
 
 m3_fixture <- function() {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  restructure(readRDS(path))
+  restructure(load_fixture_fit("bmmfit_m3_ppcheck.rds"))
 }
 
-# one mock-fittable (model, formula, data) per model, each chosen so that the
-# stored model frame is the hard case: m3 with a category that has zero options
-# in some rows and with generated option columns, and the two non-target models
-# with a formula that leaves brms no reason to keep the set_size column;
-# mixture3p_set_size covers the opposite case, where the formula names set_size
-# directly and brms keeps the real column instead
-cdp_data <- function(guess, prefix = "rk") {
-  cols <- .sdt_cdp_response_cols(2, 2, guess, prefix)
-  counts <- matrix(c(30L, 20L, 5L, 7L, 9L, 11L, 4L, 14L), 12, 8, byrow = TRUE)
-  cbind(
-    data.frame(stimulus = rep(0:1, 6), id = factor(rep(1:6, each = 2))),
-    stats::setNames(as.data.frame(counts[, seq_along(cols)]), cols)
-  )
-}
-
-stored_frame_cases <- function() {
-  rt_data <- data.frame(
-    rt = rep(c(0.6, 0.8, 1.1, 0.7), 5),
-    response = rep(c(1, 0), 10),
-    id = factor(rep(1:5, each = 4))
-  )
-  rt_formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
-  ez_data <- data.frame(
-    mean_rt = rep(c(0.5, 0.6), 10), var_rt = rep(c(0.02, 0.03), 10),
-    n_upper = rep(c(60, 70), 10), n_trials = 100, id = factor(rep(1:10, each = 2))
-  )
-  nt_features <- paste0("col_nt", 1:7)
-  # two participants still carry every set size from 1 to 8, so they exercise
-  # the same LureIdx columns at a tenth of the mock-fitting cost
-  lin_2017 <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
-  m3_cats <- c("corr", "other", "dist", "npl")
-  m3_formula <- bmf(
-    corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b,
-    c ~ 1, a ~ 1, d ~ 1
-  )
-  m3_links <- list(c = "log", a = "log", d = "log")
-  mpt_data <- data.frame(
-    id = factor(rep(1:5, 2)), item_type = factor(rep(c("old", "new"), each = 5)),
-    old = c(40:44, 8:12)
-  )
-  mpt_data$new <- 50L - mpt_data$old
-  mafc_data <- data.frame(
-    n_correct = c(80, 55, 78, 60, 85, 52, 81, 58), n_trials = 100,
-    n_afc = rep(c(2, 4), 4), cond = factor(rep(c("a", "b"), each = 4))
-  )
-  ranking_data <- meyer_grant_jakob_2025[as.integer(meyer_grant_jakob_2025$id) <= 4, ]
-  rating_data <- data.frame(
-    stimulus = rep(c(0L, 1L), 4), id = factor(rep(1:4, each = 2)),
-    r1 = c(30, 8, 26, 10, 33, 6, 28, 9), r2 = c(25, 12, 27, 14, 22, 11, 24, 13),
-    r3 = c(20, 15, 21, 16, 19, 17, 22, 15), r4 = c(15, 25, 16, 22, 17, 28, 14, 26),
-    r5 = c(10, 40, 10, 38, 9, 38, 12, 37)
-  )
-
-  list(
-    cswald = list(
-      model = cswald("rt", "response", version = "simple"),
-      formula = rt_formula, data = rt_data
-    ),
-    ddm = list(model = ddm("rt", "response"), formula = rt_formula, data = rt_data),
-    ezdm = list(
-      model = ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par"),
-      formula = rt_formula, data = ez_data
-    ),
-    imm = list(
-      model = imm("dev_rad",
-        nt_features = nt_features,
-        nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
-      ),
-      formula = bmf(c ~ 1, a ~ 1, s ~ 1, kappa ~ 1), data = lin_2017
-    ),
-    m3 = list(
-      model = m3(
-        resp_cats = m3_cats, num_options = paste0("n_", m3_cats),
-        choice_rule = "simple", links = m3_links
-      ),
-      formula = m3_formula, data = oberauer_lewandowsky_2019_e1
-    ),
-    m3_num_options = list(
-      model = m3(
-        resp_cats = m3_cats,
-        num_options = c(opt_corr = 1, opt_other = 4, opt_dist = 5, opt_npl = 5),
-        choice_rule = "simple", links = m3_links
-      ),
-      formula = m3_formula, data = oberauer_lewandowsky_2019_e1
-    ),
-    m3_num_options_by_category = list(
-      model = m3(
-        resp_cats = m3_cats,
-        num_options = c(other = 4, corr = 1, npl = 5, dist = 5),
-        choice_rule = "simple", links = m3_links
-      ),
-      formula = m3_formula, data = oberauer_lewandowsky_2019_e1
-    ),
-    m3_char_num_options_by_category = list(
-      model = m3(
-        resp_cats = m3_cats,
-        num_options = c(other = "n_other", corr = "n_corr", npl = "n_npl", dist = "n_dist"),
-        choice_rule = "simple", links = m3_links
-      ),
-      formula = m3_formula, data = oberauer_lewandowsky_2019_e1
-    ),
-    mixture2p = list(
-      model = mixture2p("dev_rad"), formula = bmf(kappa ~ 1, thetat ~ 1),
-      data = lin_2017
-    ),
-    mixture3p = list(
-      model = mixture3p("dev_rad", nt_features = nt_features, set_size = "set_size"),
-      formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), data = lin_2017
-    ),
-    mixture3p_set_size = list(
-      model = mixture3p("dev_rad", nt_features = nt_features, set_size = "set_size"),
-      formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size), data = lin_2017
-    ),
-    sdm = list(
-      model = sdm("dev_rad"), formula = bmf(c ~ 1, kappa ~ 1),
-      data = lin_2017
-    ),
-    psychometric = list(
-      model = psychometric("correct", "x"),
-      formula = bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
-      data = data.frame(x = rep(c(-1, 0, 1, 2), 5), correct = rep(c(0L, 1L), 10))
-    ),
-    psychometric_counts = list(
-      model = psychometric("n_correct", "contrast", n_trials = "n_trials",
-                           sigmoid = "weibull", guess = "chance", lapse = 0),
-      formula = bmf(midpoint ~ 1, width ~ 1),
-      data = data.frame(
-        contrast = rep(c(0.01, 0.02, 0.04, 0.08), 4), n_trials = 20L,
-        n_correct = rep(c(9L, 12L, 16L, 19L), 4), chance = rep(c(0.5, 0.25), each = 8)
-      )
-    ),
-    sdt_yn = list(
-      model = sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials"),
-      formula = bmf(d ~ 1, criterion ~ 1, sdratio ~ 1), data = broeder_schuetz_2009_e3
-    ),
-    sdt_mafc = list(
-      model = sdt_mafc("n_correct", "n_trials", m = 4),
-      formula = bmf(d ~ 1 + cond), data = mafc_data
-    ),
-    sdt_mafc_m_column = list(
-      model = sdt_mafc("n_correct", "n_trials", m = "n_afc"),
-      formula = bmf(d ~ 1 + cond), data = mafc_data
-    ),
-    sdt_mafc_m_predictor = list(
-      model = sdt_mafc("n_correct", "n_trials", m = "n_afc"),
-      formula = bmf(d ~ 1 + n_afc), data = mafc_data
-    ),
-    sdt_ranking = list(
-      model = sdt_ranking(paste0("rank", 1:5), m = 5),
-      formula = bmf(d ~ 1), data = ranking_data[ranking_data$set_size == 5, ]
-    ),
-    sdt_ranking_m_column = list(
-      model = sdt_ranking(paste0("rank", 1:5), m = "set_size", dist = "normal"),
-      formula = bmf(d ~ 1, sdratio ~ 1), data = ranking_data
-    ),
-    sdt_ranking_m_predictor = list(
-      model = sdt_ranking(paste0("rank", 1:5), m = "set_size"),
-      formula = bmf(d ~ 1 + set_size), data = ranking_data
-    ),
-    sdt_rating = list(
-      model = sdt_rating(paste0("r", 1:5), "stimulus"),
-      formula = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, sdratio ~ 1),
-      data = rating_data
-    ),
-    sdt_rating_deltas = list(
-      model = sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = "log_distance"),
-      formula = bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1, delta3 ~ 1),
-      data = rating_data
-    ),
-    sdt_rating_dpsdt = list(
-      model = sdt_rating(paste0("r", 1:5), "stimulus", version = "dpsdt"),
-      formula = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, Ro ~ 1),
-      data = rating_data
-    ),
-    # a column prefix and the Know/Guess split, which check_data() infers from
-    # the guess columns alone
-    sdt_cdp = list(
-      model = sdt_cdp("rk", "stimulus", n_new = 2, n_old = 2),
-      formula = bmf(dfam ~ 1 + (1 | id), drec ~ 1, criterion ~ 1, spacing ~ 1,
-                    rcrit ~ 1, kcrit ~ 1),
-      data = cdp_data(guess = TRUE)
-    ),
-    sdt_cdp_deltas = list(
-      model = sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
-                      threshold_type = "log_distance"),
-      formula = bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, rcrit ~ 1, sigmar ~ 1,
-                    delta1 ~ 1, delta2 ~ 1),
-      data = cdp_data(guess = FALSE, prefix = "")
-    ),
-    # meta-d' needs an even number of categories
-    sdt_rating_metad = list(
-      model = sdt_rating(paste0("r", 1:4), "stimulus", version = "metad"),
-      formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1 + (1 | id)),
-      data = rating_data[setdiff(names(rating_data), "r5")]
-    ),
-    # brms drops the tree column unless a formula names it, so it is rebuilt
-    mpt = list(
-      model = mpt(mpt_2htm_trees(), tree_id = "item_type"),
-      formula = bmf(D ~ 1 + (1 | id), g ~ 1),
-      data = mpt_data
-    ),
-    mpt_tree_predictor = list(
-      model = mpt(mpt_2htm_trees(), tree_id = "item_type"),
-      formula = bmf(D ~ 1 + item_type, g ~ 1),
-      data = mpt_data
-    ),
-    mpt_single_tree = list(
-      model = mpt(mpt_tree("study", list(
-        C = "cp + (1 - cp) * rp * rp",
-        E = "2 * (1 - cp) * rp * (1 - rp)",
-        U = "(1 - cp) * (1 - rp) * (1 - rp)"
-      ))),
-      formula = bmf(cp ~ 1 + (1 | id), rp ~ 1),
-      data = data.frame(id = factor(1:6), C = 30:35, E = 20L, U = 10L)
-    ),
-    mpt_impossible = list(
-      model = mpt(mpt_impossible_trees(), tree_id = "tree"),
-      formula = bmf(Pm ~ 1 + (1 | id), Pb ~ 1),
-      data = mpt_impossible_data()
-    ),
-    mpt_covariates = list(
-      model = mpt(
-        mpt_tree("main", list(
-          correct = "D + (1 - D) * Gcorr",
-          incorrect = "(1 - D) * (1 - Gcorr)"
-        )),
-        covariates = "Gcorr"
-      ),
-      formula = bmf(D ~ 1 + (1 | id)),
-      data = data.frame(
-        id = factor(1:10), Gcorr = rep(c(0.25, 0.5), 5),
-        correct = 21:30, incorrect = 19:10
-      )
-    )
-  )
-}
-
-stored_frame_fit <- function(case) {
-  # the toy rt_data has a 50% error rate, which cswald "simple" warns about
-  suppressWarnings(suppressMessages(
-    bmm(case$formula, case$data, case$model,
-      backend = "mock", mock_fit = 1, rename = FALSE
-    )
-  ))
-}
-
-test_that("every supported model has a stored-frame case", {
-  covered <- unlist(lapply(stored_frame_cases(), function(case) {
-    intersect(class(case$model), model_names())
-  }))
-  uncovered <- setdiff(model_names(), covered)
-  expect(length(uncovered) == 0, glue::glue(
-    "No stored-frame case for {collapse_comma(uncovered)}. Add one to stored_frame_cases(); ",
-    "a model whose check_data() consumes or creates columns also needs a ",
-    "revert_check_data() method in R/update.R"
-  ))
+# the stored-frame cases come from the model-case providers
+# (helper-model-<model>.R): one mock-fittable (model, formula, data) per model,
+# each chosen so that the stored model frame is the hard case, such as an m3
+# category with zero options in some rows, or a non-target model whose formula
+# leaves brms no reason to keep the set_size column
+# built once per file: every provider builds all its cases on each call
+stored_frame_cases <- local({
+  cases <- NULL
+  function() {
+    if (is.null(cases)) cases <<- model_test_cases("stored_frame")
+    cases
+  }
 })
 
 test_that("update.bmmfit needs no newdata for a model that packs its response", {
@@ -853,6 +626,7 @@ test_that("data without the largest set size still fail the nt_features check", 
 })
 
 test_that("an updated fit carries nothing from the frame that called update()", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
@@ -874,6 +648,7 @@ test_that("an updated fit carries nothing from the frame that called update()", 
 })
 
 test_that("update() switches an SDT fit between criterion and bias", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
@@ -908,9 +683,9 @@ test_that("update() switches an SDT fit between criterion and bias", {
 # nothing to route
 frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
 
-test_that("only a slice of a fit's model frame counts as stored data", {
-  skip_on_cran()
-  for (case_name in names(stored_frame_cases())) {
+for (case_name in names(stored_frame_cases())) {
+  test_that(paste0("only a slice of a fit's model frame counts as stored data (", case_name, ")"), {
+    skip_on_cran()
     case <- stored_frame_cases()[[case_name]]
     fit <- stored_frame_fit(case)
     model <- fit$bmm$model
@@ -924,8 +699,8 @@ test_that("only a slice of a fit's model frame counts as stored data", {
     if (case_name %in% frame_is_user_layout) {
       expect_no_error(suppressWarnings(check_data(model, slice, fit$bmm$user_formula)))
     }
-  }
-})
+  })
+}
 
 test_that("user data that hold a column of the stored layout stay user data", {
   skip_on_cran()
@@ -966,29 +741,47 @@ stub_update <- function(fit, ...) {
   update(fit, ..., backend = "mock", mock_fit = stub_stanfit(), rename = FALSE, recompile = TRUE)
 }
 
-test_that("update() takes a slice of the model frame as newdata (kfold(), reloo())", {
-  skip_on_cran()
-  skip_if_not_installed("rstan")
-  for (case_name in c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
-                      "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
-                      "mpt", "mpt_tree_predictor", "mpt_single_tree")) {
-    case <- stored_frame_cases()[[case_name]]
-    fit <- stub_frame_fit(case)
+slice_cases <- c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
+                 "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
+                 "mpt", "mpt_tree_predictor", "mpt_single_tree")
+
+# one stub fit per case, shared by the two tests below
+stub_frame_fits <- local({
+  fits <- list()
+  function(case_name) {
+    if (is.null(fits[[case_name]])) {
+      fits[[case_name]] <<- stub_frame_fit(stored_frame_cases()[[case_name]])
+    }
+    fits[[case_name]]
+  }
+})
+
+for (case_name in slice_cases) {
+  test_that(paste0("update() takes a slice of the model frame as newdata (kfold(), reloo()) (", case_name, ")"), {
+    skip_on_cran()
+    skip_if_not_installed("rstan")
+    fit <- stub_frame_fits(case_name)
     rows <- seq_len(nrow(fit$data))[-1]
     up <- quietly(stub_update(fit, newdata = fit$data[rows, , drop = FALSE]))
     expect_true(is(up, "bmmfit"), label = case_name)
     expect_equal(nrow(up$data), length(rows), label = case_name)
     expect_equal(brms::standata(up)$N, length(rows), label = case_name)
     expect_equal(attr(up$data, "data_name"), attr(fit$data, "data_name"), label = case_name)
+  })
+}
 
-    # the whole frame is the same update as passing no newdata
+for (case_name in slice_cases) {
+  test_that(paste0("update() with the whole model frame as newdata is update() without newdata (", case_name, ")"), {
+    skip_on_cran()
+    skip_if_not_installed("rstan")
+    fit <- stub_frame_fits(case_name)
     expect_equal(
       brms::standata(quietly(stub_update(fit, newdata = fit$data))),
       brms::standata(quietly(stub_update(fit))),
       label = case_name
     )
-  }
-})
+  })
+}
 
 test_that("update() still treats data with a column Y as the user's data", {
   skip_on_cran()
