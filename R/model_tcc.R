@@ -3,13 +3,14 @@
 ############################################################################# !
 
 .model_tcc <- function(resp_error = NULL, similarity = NULL, n_options = 360,
-                       units = "radians", d_max = 30, links = NULL, call = NULL, ...) {
+                       units = "radians", noise = "gaussian", d_max = 30, links = NULL,
+                       call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
       # table = "r" passes the d table from R instead of building it in Stan;
       # an internal switch for table transforms (correlated or motor noise)
-      other_vars = nlist(similarity, n_options, units, d_max, table = "stan"),
+      other_vars = nlist(similarity, n_options, units, noise, d_max, table = "stan"),
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = "Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)",
@@ -29,11 +30,19 @@
         distance 0"
       ),
       parameters = list(
-        d = glue(
-          "Memory strength d (the d' of the uncorrelated-noise model): the mean \\
-          memory-match signal of the target in units of the noise SD; an option \\
-          at distance x has mean d * f(x)"
-        )
+        d = if (noise == "gumbel") {
+          glue(
+            "Memory strength d: the mean memory-match signal of the target in units \\
+            of the scale of the standard Gumbel noise (whose SD is pi / sqrt(6)); an \\
+            option at distance x has mean d * f(x)"
+          )
+        } else {
+          glue(
+            "Memory strength d (the d' of the uncorrelated-noise model): the mean \\
+            memory-match signal of the target in units of the noise SD; an option \\
+            at distance x has mean d * f(x)"
+          )
+        }
       ),
       # log, not identity as in the sdt_* models: d f(x) >= 0 in TCC, and a
       # subject intercept on set-size cells of oberauer_lin_2017 mixed to Rhat
@@ -43,7 +52,9 @@
       # d of the uncorrelated model runs from 0.6 to 2.0 over set sizes 1-8 in
       # oberauer_lin_2017 with the similarity of the examples, so the prior is
       # centred at exp(0.5) = 1.65; d = 12 lies two SDs above it and the
-      # default d_max = 30 almost three
+      # default d_max = 30 almost three. Gumbel noise puts d higher: 1.4 to 6.3
+      # for set sizes 8 to 1 with a von Mises similarity, within 1.4 SDs of the
+      # prior's centre, so both noises share the prior (#566)
       default_priors = list(
         d = list(main = "normal(0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
@@ -104,7 +115,9 @@
 #'   uncorrelated-noise model of Schurgin et al. (2020). The d' they report
 #'   comes from a correlated-noise version and is larger: across the
 #'   subjects and set sizes of their Figure 3 data, the median ratio of their
-#'   d' to this `d` was 1.60.
+#'   d' to this `d` was 1.60. With `noise = "gumbel"` the signals carry
+#'   standard Gumbel noise instead, and the response probabilities become a
+#'   softmax (see the section Noise).
 #' @details `r model_docs(.model_tcc())`
 #'
 #' ## Similarity
@@ -146,6 +159,52 @@
 #'   factorial model comparison. Psychological Review.
 #'   https://doi.org/10.1037/rev0000328
 #'
+#' ## Noise
+#'
+#'   `noise` sets the distribution of the noise on each option's signal.
+#'   `"gaussian"`, the default, is the model of Schurgin et al. (2020), with
+#'   normal noise of unit variance. Its response probabilities have no closed
+#'   form, so the likelihood reads them from a table (see the grid limits
+#'   below). With `"gumbel"` the noise follows the standard Gumbel (type I
+#'   extreme value) distribution. The largest of independent Gumbel variables
+#'   is again Gumbel distributed, which turns the probability of choosing an
+#'   option into the softmax of `d * f(x)` over all options:
+#'   `exp(d * f(x)) / sum(exp(d * f(x')))` (Oberauer, 2021, eq. 4). This needs
+#'   no table, so there are no grid limits on `d`, `lambda` or `kappa`, and
+#'   `d_max` is not used.
+#'
+#'   Oberauer (2021) crossed three choices: the activation function (von
+#'   Mises or Laplace), the response-selection rule (Luce's choice rule, or
+#'   signal detection with Gumbel or with normal noise) and whether the
+#'   precision `kappa` is the same in all conditions. `tcc()` fits the cells
+#'   with a signal-detection rule: `noise` selects the noise, `similarity`
+#'   the activation function, and the formula for `kappa` or `lambda` holds it
+#'   constant (`kappa ~ 1`) or lets it vary with the conditions. The von Mises
+#'   similarity with Gumbel noise is the cell that fit best in his comparison
+#'   and that he named the signal discrimination model, which [sdm()] fits on
+#'   a continuous response scale. On a wheel of `n_options` options,
+#'   `tcc(similarity = "vonmises", noise = "gumbel")` gives the [sdm()] density
+#'   at each option's centre times the option width `2 * pi / n_options`, with
+#'   the same `kappa` and `c = d * sqrt(2 * pi / kappa) / (1 - exp(-2 *
+#'   kappa))` in the default parametrization of [sdm()].
+#'
+#'   Oberauer found the fits with Gumbel and with normal noise always very
+#'   close (p. 5). Gumbel noise needs no table, so it skips the build before
+#'   sampling and has no grid limits, and it is the noise to compare with
+#'   [sdm()]. Per gradient it is not cheaper: on [oberauer_lin_2017], with `d`
+#'   and `kappa` per subject and set size, it cost 1.4 times the normal noise
+#'   with a von Mises similarity (about as much as [sdm()]) and 1.5 times with
+#'   a fixed similarity; with a continuous predictor of `kappa`, which makes
+#'   every trial its own cell, it cost 6.2 times (174 against 28 ms). Keep
+#'   normal noise to stay with the model of Schurgin et al. and to compare `d`
+#'   with their d'. The two `d` are not on one scale.
+#'   The standard Gumbel distribution has an SD of `pi / sqrt(6)` = 1.28, but
+#'   matching the response probabilities takes a larger factor. On the
+#'   probabilities of the normal-noise model, the Gumbel `d` with the smallest
+#'   Kullback-Leibler divergence was 2.6 to 2.9 times the normal `d` for
+#'   values of the latter from 0.5 to 2, and 1.9 to 2.4 times at 8, for the
+#'   similarities of the examples below.
+#'
 #' ## Response
 #'
 #'   With `units = "radians"`, `resp_error` is the response minus the target
@@ -163,8 +222,9 @@
 #'   Keep those priors proper: as `d` approaches 0 the likelihood levels off
 #'   at that of guessing uniformly, so under a flat prior on `log(d)` the
 #'   posterior cannot be normalised, and a cell with little information
-#'   drifts towards `d = 0` without end. The default prior is proper.
-#'   The likelihood reads the response probabilities from a table on a grid
+#'   drifts towards `d = 0` without end. The default prior is proper. This
+#'   holds for either noise; the rest of this section and the next apply to
+#'   normal noise only. The likelihood reads the response probabilities from a table on a grid
 #'   of `d` values up to `d_max` in steps of 0.02, built once per chain
 #'   by quadrature and interpolated with a cubic spline (error below 1e-6 in
 #'   log probability). Beyond `d_max` the table is extended
@@ -268,8 +328,12 @@
 #' @param n_options The number of response options on the wheel, an even
 #'   number: 360 for a colour wheel in 1-degree steps, 180 for orientation.
 #' @param units Either `"radians"` or `"bins"`, see `resp_error`.
+#' @param noise The noise on each option's signal: `"gaussian"` (normal, as in
+#'   Schurgin et al., 2020) or `"gumbel"` (standard Gumbel, which makes the
+#'   response probabilities a softmax). See the section Noise.
 #' @param d_max The upper end of the `d` grid of the likelihood table; draws
-#'   of `d` beyond it are reported after the fit.
+#'   of `d` beyond it are reported after the fit. Not used with `noise =
+#'   "gumbel"`, which needs no table.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -282,16 +346,22 @@
 #'
 #' # the same data, with the width of a Laplace similarity estimated
 #' fit <- bmm(bmf(d ~ 1, lambda ~ 1), dat, tcc("err", similarity = "laplace"), cores = 4)
+#'
+#' # Gumbel noise with a von Mises similarity: Oberauer's (2021) signal
+#' # discrimination model on 360 discrete options
+#' fit <- bmm(bmf(d ~ 1, kappa ~ 1), dat,
+#'            tcc("err", similarity = "vonmises", noise = "gumbel"), cores = 4)
 tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "bins"),
-                d_max = 30, ...) {
+                noise = c("gaussian", "gumbel"), d_max = 30, ...) {
   call <- match.call()
   stop_missing_args()
   units <- match.arg(units)
+  noise <- match.arg(noise)
   .tcc_check_similarity(similarity, n_options)
   stopif(!is.numeric(d_max) || length(d_max) != 1 || !isTRUE(d_max > 0),
          "`d_max` must be a single positive number.")
   .model_tcc(resp_error = resp_error, similarity = similarity, n_options = n_options,
-             units = units, d_max = d_max, call = call, ...)
+             units = units, noise = noise, d_max = d_max, call = call, ...)
 }
 
 .tcc_check_similarity <- function(similarity, n_options) {
@@ -361,23 +431,34 @@ bmf2bf.tcc <- function(model, formula) {
 configure_model.tcc <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
   shape <- .tcc_shape(model$other_vars$similarity)
+  gumbel <- .tcc_gumbel(model)
   formula$family <- brms::custom_family(
-    if (is.null(shape)) "tcc" else "tcc_parametric",
+    paste0("tcc", if (gumbel) "_gumbel", if (!is.null(shape)) "_parametric"),
     dpars = c("mu", "d", shape$name),
     links = c("identity", unlist(model$links[c("d", shape$name)], use.names = FALSE)),
     type = "int",
     loop = FALSE,
-    log_lik = log_lik_tcc,
-    posterior_predict = posterior_predict_tcc,
+    log_lik = if (gumbel) log_lik_tcc_gumbel else log_lik_tcc,
+    posterior_predict = if (gumbel) posterior_predict_tcc_gumbel else posterior_predict_tcc,
     posterior_epred = posterior_epred_tcc,
-    vars = if (is.null(shape)) {
-      c("tcc_tab", "tcc_grid_lo", "tcc_grid_step")
-    } else {
-      c("tcc_tab2", "tcc_grid_lo", "tcc_grid_step", "tcc_u_lo", "tcc_u_step")
-    }
+    vars = .tcc_family_vars(gumbel, shape)
   )
   stanvars <- .tcc_stanvars(model, model$other_vars$table)
   nlist(formula, data, stanvars)
+}
+
+.tcc_gumbel <- function(model) {
+  identical(model$other_vars$noise, "gumbel")
+}
+
+.tcc_family_vars <- function(gumbel, shape) {
+  if (gumbel) {
+    return(if (is.null(shape)) "tcc_similarity" else c("tcc_delta", "tcc_shape"))
+  }
+  if (is.null(shape)) {
+    return(c("tcc_tab", "tcc_grid_lo", "tcc_grid_step"))
+  }
+  c("tcc_tab2", "tcc_grid_lo", "tcc_grid_step", "tcc_u_lo", "tcc_u_step")
 }
 
 # One kernel, two sources for its table: built in transformed data from the
@@ -385,6 +466,9 @@ configure_model.tcc <- function(model, data, formula) {
 # similarity has a 2-D table, always built in transformed data: from R it would
 # be 40-70 MB of data per fit
 .tcc_stanvars <- function(model, table) {
+  if (.tcc_gumbel(model)) {
+    return(.tcc_gumbel_stanvars(model))
+  }
   grid <- .tcc_grid(model)
   sc_path <- system.file("stan_chunks", package = "bmm")
   out <- brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_funs.stan")),
@@ -425,6 +509,23 @@ configure_model.tcc <- function(model, data, formula) {
     brms::stanvar(x = log(rule$weights), name = "tcc_gl_logw") +
     brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_parametric_tdata.stan")),
                   block = "tdata", pll_args = "data array[] matrix tcc_tab2")
+}
+
+# Gumbel noise has a closed form and needs no table (#566)
+.tcc_gumbel_stanvars <- function(model) {
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  funs <- function(file) {
+    brms::stanvar(scode = read_lines2(file.path(sc_path, file)), block = "functions")
+  }
+  shape <- .tcc_shape(model$other_vars$similarity)
+  if (is.null(shape)) {
+    return(funs("tcc_gumbel_funs.stan") +
+             brms::stanvar(x = .tcc_similarity(model), name = "tcc_similarity"))
+  }
+  n_options <- model$other_vars$n_options
+  funs("tcc_gumbel_funs.stan") + funs("tcc_gumbel_parametric_funs.stan") +
+    brms::stanvar(x = shape$code, name = "tcc_shape") +
+    brms::stanvar(x = 2 * pi * (0:(n_options / 2)) / n_options, name = "tcc_delta")
 }
 
 ############################################################################# !
@@ -526,6 +627,21 @@ configure_model.tcc <- function(model, data, formula) {
   matrixStats::colLogSumExps(terms)
 }
 
+# how many options lie at each distance 0, 1, ..., n / 2 from the target
+.tcc_mult <- function(n_dist) {
+  c(1, rep(2, n_dist - 2), 1)
+}
+
+# log P of one option at each distance under standard Gumbel noise. The largest
+# of independent Gumbel(mu_x, 1) signals is Gumbel(log sum exp(mu), 1), and the
+# argmax integral reduces to the softmax of the means (Yellott, 1977;
+# Oberauer, 2021, eq. 4; derivation in the TCC design note, #566).
+# tcc_gumbel_lpmf() in tcc_gumbel_funs.stan is the Stan twin
+.tcc_gumbel_logp <- function(d, similarity) {
+  a <- d * similarity
+  a - matrixStats::logSumExp(log(.tcc_mult(length(similarity))) + a)
+}
+
 .tcc_table <- function(similarity, grid) {
   d_values <- grid$lo + (seq_len(grid$rows) - 2) * grid$step
   tab <- t(vapply(d_values, .tcc_logp, numeric(length(similarity)), similarity = similarity))
@@ -553,6 +669,9 @@ postprocess_brm.tcc <- function(model, fit, ...) {
 }
 
 .tcc_check_grid <- function(model, prep) {
+  if (.tcc_gumbel(model)) {
+    return(invisible())
+  }
   d_max <- model$other_vars$d_max
   shape <- .tcc_shape(model$other_vars$similarity)
   # with an estimated similarity the table no longer rises past d_max, so a
@@ -713,8 +832,6 @@ postprocess_brm.tcc <- function(model, fit, ...) {
 # signed option offsets drawn at each (d, u) from the interpolated table, by
 # inverse CDF over all options at once, in chunks to bound the memory
 .tcc_rbins <- function(d, u, table, n_options, chunk = 5000) {
-  offsets <- seq(-n_options / 2 + 1, n_options / 2)
-  cols <- abs(offsets) + 1
   out <- integer(length(d))
   for (start in seq(1, length(d), by = chunk)) {
     idx <- start:min(length(d), start + chunk - 1)
@@ -724,9 +841,51 @@ postprocess_brm.tcc <- function(model, fit, ...) {
       # c(): a 3-column index matrix (n_options = 4) would index the 3-D table by dimension
       look$w[, m] * matrix(look$tab[c(outer(look$entry[, m], shift, "+"))], length(idx))
     }))
-    cum <- matrixStats::rowCumsums(exp(logp[, cols, drop = FALSE]))
-    draw <- stats::runif(length(idx)) * cum[, n_options]
-    out[idx] <- as.integer(offsets[rowSums(cum < draw) + 1])
+    out[idx] <- .tcc_draw_offsets(logp, n_options)
+  }
+  out
+}
+
+# one signed offset per row of logp, which holds log P of one option at each
+# distance, by inverse CDF over all options at once
+.tcc_draw_offsets <- function(logp, n_options) {
+  offsets <- seq(-n_options / 2 + 1, n_options / 2)
+  cum <- matrixStats::rowCumsums(exp(logp[, abs(offsets) + 1, drop = FALSE]))
+  draw <- stats::runif(nrow(logp)) * cum[, n_options]
+  as.integer(offsets[rowSums(cum < draw) + 1])
+}
+
+# log P of one option at each distance under Gumbel noise, one row per value of
+# d (and of u = log lambda or log kappa), from the similarity in the standata
+.tcc_gumbel_logp_rows <- function(data, d, u) {
+  f <- if (is.null(data$tcc_shape)) {
+    matrix(as.numeric(data$tcc_similarity), length(d), length(data$tcc_similarity), byrow = TRUE)
+  } else {
+    shape <- names(.tcc_shapes)[data$tcc_shape]
+    outer(exp(u), as.numeric(data$tcc_delta), function(p, x) .tcc_shape_similarity(shape, p, x))
+  }
+  a <- d * f
+  a - matrixStats::rowLogSumExps(a + rep(log(.tcc_mult(ncol(a))), each = nrow(a)))
+}
+
+# brms calls log_lik and posterior_predict once per observation, and the
+# observations of one cell share their draws, so the last rows are kept
+.tcc_gumbel_logp_draws <- function(prep, i) {
+  d <- brms::get_dpar(prep, "d", i = i)
+  u <- .tcc_prep_u(prep, i)
+  key <- list(d, u, prep$data$tcc_similarity, prep$data$tcc_delta, prep$data$tcc_shape)
+  if (!identical(.tcc_cache$gumbel_key, key)) {
+    .tcc_cache$gumbel_logp <- .tcc_gumbel_logp_rows(prep$data, d, u)
+    .tcc_cache$gumbel_key <- key
+  }
+  .tcc_cache$gumbel_logp
+}
+
+.tcc_gumbel_rbins <- function(data, d, u, n_options, chunk = 5000) {
+  out <- integer(length(d))
+  for (start in seq(1, length(d), by = chunk)) {
+    idx <- start:min(length(d), start + chunk - 1)
+    out[idx] <- .tcc_draw_offsets(.tcc_gumbel_logp_rows(data, d[idx], u[idx]), n_options)
   }
   out
 }
@@ -750,6 +909,15 @@ posterior_predict_tcc <- function(i, prep, ...) {
   table <- .tcc_prep_table(prep)
   .tcc_rbins(brms::get_dpar(prep, "d", i = i), .tcc_prep_u(prep, i), table,
              2 * (dim(table$cache$tab)[2] - 1))
+}
+
+log_lik_tcc_gumbel <- function(i, prep) {
+  .tcc_gumbel_logp_draws(prep, i)[, abs(prep$data$Y[i]) + 1]
+}
+
+posterior_predict_tcc_gumbel <- function(i, prep, ...) {
+  logp <- .tcc_gumbel_logp_draws(prep, i)
+  .tcc_draw_offsets(logp, 2 * (ncol(logp) - 1))
 }
 
 posterior_epred_tcc <- posterior_epred_undefined("tcc")
@@ -776,8 +944,13 @@ pp_observables.tcc <- function(model) {
 
 #' @export
 pp_simulate.tcc <- function(model, prep) {
-  bins <- .tcc_rbins(.pp_dpar_vector(prep, "d"), .tcc_prep_u(prep), .tcc_prep_table(prep),
-                     model$other_vars$n_options)
+  d <- .pp_dpar_vector(prep, "d")
+  n_options <- model$other_vars$n_options
+  bins <- if (.tcc_gumbel(model)) {
+    .tcc_gumbel_rbins(prep$data, d, .tcc_prep_u(prep), n_options)
+  } else {
+    .tcc_rbins(d, .tcc_prep_u(prep), .tcc_prep_table(prep), n_options)
+  }
   list(error = matrix(bins, nrow = prep$ndraws))
 }
 
