@@ -318,14 +318,9 @@ check_formula.mixture3p <- function(model, data, formula) {
     !isTRUE(any(data[["ss_numeric"]] == 1))) {
     return(invisible())
   }
-  coefs <- .set_size_one_unidentified(swap, swap_formula, data)
-  warnif(
-    length(coefs) > 0,
-    "Trials with a set size of 1 have no non-target, so they say nothing about \\
-    '{swap}'. The other trials do not determine {collapse_comma(coefs)} in the \\
-    formula for '{swap}', so the posteriors of these coefficients depend on \\
-    their priors. Give set size 1 a level of its own in a factor, and read that \\
-    level's coefficient as prior-only."
+  .warn_set_size_one(
+    .set_size_one_undetermined(swap, formula, data), swap,
+    reason = glue("say nothing about '{swap}'")
   )
 }
 

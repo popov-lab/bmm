@@ -283,6 +283,39 @@ test_that("the set-size-1 warning names exactly the coefficients no other trial 
   )
 })
 
+test_that("mixture3p and imm end their set-size-1 warnings with the same sentence", {
+  dat <- oberauer_lin_2017
+  last_sentence <- function(model, formula) {
+    model <- check_model(model, dat, formula)
+    messages <- character(0)
+    withCallingHandlers(
+      check_formula(model, check_data(model, dat, formula), formula),
+      warning = function(w) {
+        messages <<- c(messages, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+    expect_length(messages, 1)
+    sub(".*\\. ([^.]+\\.)$", "\\1", gsub("\\s+", " ", messages))
+  }
+  imm_bsc <- imm(
+    "dev_rad", nt_features = "col_nt", nt_distances = "dist_nt",
+    set_size = "set_size", regex = TRUE, version = "bsc"
+  )
+  from_mixture3p <- last_sentence(
+    nt_model(), bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size)
+  )
+  from_imm <- last_sentence(imm_bsc, bmf(kappa ~ 1, c ~ 1, s ~ 0 + set_size))
+  expect_equal(from_mixture3p, from_imm)
+  expect_equal(
+    from_mixture3p,
+    paste(
+      "Give set size 1 a level of its own in a factor, so that only the",
+      "set-size-1 coefficients depend on their priors."
+    )
+  )
+})
+
 test_that("every version runs through the bmm() pipeline", {
   dat <- oberauer_lin_2017
   expect_silent(bmm(
