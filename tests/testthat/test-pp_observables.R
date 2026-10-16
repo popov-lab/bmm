@@ -13,48 +13,15 @@ fake_bmmfit <- function(model) {
   structure(list(bmm = list(model = model)), class = "bmmfit")
 }
 
-registered_models <- list(
-  ddm(rt = "rt", response = "resp"),
-  cswald(rt = "rt", response = "resp", version = "simple"),
-  cswald(rt = "rt", response = "resp", version = "crisk"),
-  ezdm(mean_rt = "mrt", var_rt = "vrt", n_upper = "nu", n_trials = "nt"),
-  ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
-       n_trials = "nt", version = "4par"),
-  ezcdm(mean_angle = "ma", var_angle = "va", mean_rt = "mrt", var_rt = "vrt",
-        n_trials = "nt"),
-  ezcdm(mean_angle = "ma", var_angle = "va", mean_rt = "mrt", var_rt = "vrt",
-        n_trials = "nt", version = "4par")
-)
+# every model that declares observables registers a case in its provider
+# (helper-model-<model>.R)
+registered_models <- lapply(unname(model_test_cases("observables")), `[[`, "model")
 
 test_that("declared observables name real standata slots", {
-  withr::local_seed(1)
-  cases <- list(
-    list(ddm(rt = "rt", response = "response"),
-         rddm(20, drift = 1, bound = 1.5, ndt = 0.3)),
-    list(cswald(rt = "rt", response = "response"),
-         rcswald(20, drift = 2, bound = 1, ndt = 0.3)),
-    list(ezdm(mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
-              n_trials = "n_trials"),
-         rezdm(5, n_trials = 40, drift = 0.3, bound = 1.2, ndt = 0.3)),
-    list(ezdm(mean_rt = c("mean_rt_upper", "mean_rt_lower"),
-              var_rt = c("var_rt_upper", "var_rt_lower"),
-              n_upper = "n_upper", n_trials = "n_trials", version = "4par"),
-         rezdm(5, n_trials = 40, drift = 0.3, bound = 1.2, ndt = 0.3,
-               version = "4par"))
-  )
-  for (case in cases) {
-    slots <- names(suppressMessages(standata(bmf(drift ~ 1), case[[2]], case[[1]])))
-    expect_true(all(pp_observables(case[[1]])$observed %in% slots))
+  for (case in model_test_cases("observables")) {
+    slots <- names(suppressMessages(standata(case$formula, case$data, case$model)))
+    expect_true(all(pp_observables(case$model)$observed %in% slots))
   }
-
-  ezcdm_model <- ezcdm(mean_angle = "mean_angle", var_angle = "var_angle",
-                       mean_rt = "mean_rt", var_rt = "var_rt",
-                       n_trials = "n_trials")
-  slots <- names(standata(bmf(driftrate ~ 1, bound ~ 1, ndt ~ 1),
-                          rezcdm(5, n_trials = 40, driftrate = 2, bound = 1.5,
-                                 ndt = 0.3),
-                          ezcdm_model))
-  expect_true(all(pp_observables(ezcdm_model)$observed %in% slots))
 })
 
 test_that("the default check of every registered spec is the brms Y observable", {
@@ -98,7 +65,9 @@ test_that("every registered compute closure is elementwise", {
       expected[[key]] <- .pp_expand_data(compute(observed), n_draws)
     }
   }
-  expect_length(actual, 25L)
+  # a key collision would drop a closure from the audit without an error
+  n_checks <- sum(vapply(registered_models, function(m) length(pp_observables(m)$checks), 0L))
+  expect_length(actual, n_checks)
   expect_equal(actual, expected)
 })
 

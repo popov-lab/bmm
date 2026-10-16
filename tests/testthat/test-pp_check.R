@@ -1,15 +1,11 @@
 # Tests for pp_check.bmmfit() — multinomial model support
 
 load_m3_fit <- function() {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_m3_ppcheck.rds")
 }
 
 load_sdm_fit <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_example1.rds")
 }
 
 test_that("pp_check() returns ggplot for m3 model", {
@@ -188,24 +184,19 @@ test_that(".pp_check_restore_set_size() lets sdt_ranking facet by its m column",
 
 # Multi-observable checks: pp_check(fit, resp_var = ...) (#401)
 
-load_ppcheck_fit <- function(name) {
-  path <- test_path("assets", name)
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
-}
 
 # expect_equal rather than expect_setequal: y comes from prep$data while the
 # group vector comes from object$data, so their row alignment is load-bearing
 # and an order-blind comparison would pass through a permutation
 test_that("pp_check(resp_var = 'rt') checks the observed response times", {
-  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "rt", ndraws = 5)
   expect_s3_class(p, "ggplot")
   expect_equal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
 })
 
 test_that("pp_check(resp_var = 'signed_rt') signs RTs by the response", {
-  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "signed_rt", ndraws = 5)
   expect_s3_class(p, "ggplot")
   y <- p$data$value[p$data$is_y_label == "italic(y)"]
@@ -214,17 +205,17 @@ test_that("pp_check(resp_var = 'signed_rt') signs RTs by the response", {
 })
 
 test_that("pp_check(negative_rt = TRUE) redirects to the signed_rt check", {
-  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
-  set.seed(99)
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
+  withr::local_seed(99)
   expect_message(p1 <- pp_check(fit, negative_rt = TRUE, ndraws = 5),
                  "signed_rt")
-  set.seed(99)
+  withr::local_seed(99)
   p2 <- pp_check(fit, resp_var = "signed_rt", ndraws = 5)
   expect_equal(p1$data, p2$data)
 })
 
 test_that("pp_check(resp_var = 'all') panels all checks", {
-  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "all", ndraws = 5)
   expect_s3_class(p, "bayesplot_grid")
   expect_length(p$bayesplots, 3L)
@@ -233,7 +224,7 @@ test_that("pp_check(resp_var = 'all') panels all checks", {
 })
 
 test_that("pp_check(resp_var = 'all') groups every panel, bars included", {
-  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "all", group = "cond", ndraws = 5)
   expect_s3_class(p, "bayesplot_grid")
   expect_length(p$bayesplots, 3L)
@@ -243,7 +234,7 @@ test_that("pp_check(resp_var = 'all') groups every panel, bars included", {
 })
 
 test_that("pp_check(resp_var) supports grouping and type overrides", {
-  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "rt", group = "cond", ndraws = 5)
   expect_s3_class(p, "ggplot")
   expect_s3_class(p$facet, "FacetWrap")
@@ -258,14 +249,14 @@ test_that("pp_check(resp_var) supports grouping and type overrides", {
 })
 
 test_that("pp_check(resp_var) accepts draw_ids and rejects newdata", {
-  fit <- load_ppcheck_fit("bmmfit_ddm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ddm_ppcheck.rds")
   expect_s3_class(pp_check(fit, resp_var = "rt", draw_ids = 1:3), "ggplot")
   expect_error(pp_check(fit, resp_var = "rt", newdata = fit$data),
                "not supported")
 })
 
 test_that("pp_check(resp_var) works for the cswald model", {
-  fit <- load_ppcheck_fit("bmmfit_cswald_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_cswald_ppcheck.rds")
   p <- pp_check(fit, resp_var = "rt", ndraws = 5)
   expect_s3_class(p, "ggplot")
   expect_equal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
@@ -284,7 +275,7 @@ test_that("pp_check(resp_var) works for the cswald model", {
 # non-trivial parameter transform in the resp_var path: on a real fit the
 # simulated RTs must cover the observed ones rather than a rescaled boundary
 test_that("pp_check(resp_var) simulates cswald RTs on the fitted scale", {
-  fit <- load_ppcheck_fit("bmmfit_cswald_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_cswald_ppcheck.rds")
   prep <- brms::prepare_predictions(fit, ndraws = 50)
   sims <- pp_simulate(fit$bmm$model, prep)
   expect_identical(dim(sims$rt), c(50L, nrow(fit$data)))
@@ -294,7 +285,7 @@ test_that("pp_check(resp_var) simulates cswald RTs on the fitted scale", {
 })
 
 test_that("pp_check(resp_var) works for the 3par ezdm model", {
-  fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezdm3_ppcheck.rds")
   p <- pp_check(fit, resp_var = "mean_pc", type = "intervals", ndraws = 5)
   expect_s3_class(p, "ggplot")
   expect_equal(p$data$y_obs, fit$data$n_upper / fit$data$n_trials)
@@ -302,7 +293,7 @@ test_that("pp_check(resp_var) works for the 3par ezdm model", {
 })
 
 test_that("the ezdm checks show each statistic's distribution across cells", {
-  fit <- load_ppcheck_fit("bmmfit_ezdm3_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezdm3_ppcheck.rds")
   expect_identical(pp_check_vars(fit)$default_type,
                    c("dens_overlay", "dens_overlay", "bars_binned"))
   p <- pp_check(fit, resp_var = "mean_pc", ndraws = 5)
@@ -312,7 +303,7 @@ test_that("the ezdm checks show each statistic's distribution across cells", {
 })
 
 test_that("pp_check(resp_var) drops undefined 4par ezdm cells with a warning", {
-  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")
   expect_warning(p <- pp_check(fit, resp_var = "mean_rt_lower", ndraws = 20),
                  "Dropped")
   expect_s3_class(p, "ggplot")
@@ -321,7 +312,7 @@ test_that("pp_check(resp_var) drops undefined 4par ezdm cells with a warning", {
 })
 
 test_that("pp_check(resp_var) checks all four ezcdm summary statistics", {
-  fit <- load_ppcheck_fit("bmmfit_ezcdm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezcdm_ppcheck.rds")
   expect_identical(pp_check_vars(fit)$resp_var,
                    c("mean_angle", "var_angle", "mean_rt", "var_rt"))
   p <- pp_check(fit, resp_var = "var_rt", ndraws = 5)
@@ -334,7 +325,7 @@ test_that("pp_check(resp_var) checks all four ezcdm summary statistics", {
 })
 
 test_that("the fixed 3par ezcdm drift angle reaches pp_simulate() as zeros", {
-  fit <- load_ppcheck_fit("bmmfit_ezcdm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezcdm_ppcheck.rds")
   prep <- brms::prepare_predictions(fit, ndraws = 5)
   expect_identical(.pp_dpar_vector(prep, "driftangle"),
                    rep(0, prep$ndraws * prep$nobs))
@@ -343,7 +334,7 @@ test_that("the fixed 3par ezcdm drift angle reaches pp_simulate() as zeros", {
 # reducing the observation dimension would make the retained count decay as
 # (1 - p)^ndraws, so a user asking for more draws would silently check less data
 test_that("pp_check(resp_var) retains every defined observation at any ndraws", {
-  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")
   retained <- vapply(c(10L, 50L, 150L), function(nd) {
     withr::with_seed(7, {
       p <- suppressWarnings(pp_check(fit, resp_var = "mean_rt_lower",
@@ -357,7 +348,7 @@ test_that("pp_check(resp_var) retains every defined observation at any ndraws", 
 # without a shared reduction the mean_rt_lower panel would be computed on
 # fewer observations than mean_rt_upper, under an identical-looking subtitle
 test_that("pp_check(resp_var = 'all') panels share one set of observations", {
-  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")
   p <- suppressWarnings(pp_check(fit, resp_var = "all", ndraws = 50))
   is_density <- vapply(p$bayesplots, function(panel) {
     "is_y" %in% names(panel$data)
@@ -378,7 +369,7 @@ test_that("pp_check(resp_var = 'all') panels share one set of observations", {
 # The fixture's draws on a modified copy of its data. Every parameter is
 # intercept-only, so the draws do not depend on the data.
 mock_ezdm4_fit <- function(data) {
-  old <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  old <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")
   suppressWarnings(suppressMessages(bmm(
     old$bmm$user_formula, data, old$bmm$model,
     backend = "mock", mock_fit = old$fit, rename = FALSE
@@ -389,7 +380,7 @@ mock_ezdm4_fit <- function(data) {
 # response, one, then enough responses but no summaries, the min_trials case),
 # rows 4-5 the upper ones (one upper response, then no summaries).
 sparse_ezdm4_fit <- function() {
-  data <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")$data
+  data <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")$data
   data$n_upper[1:2] <- as.integer(data$n_trials[1:2] - c(0, 1))
   data$n_upper[4] <- 1L
   data[1:3, c("mean_rt_lower", "var_rt_lower")] <- NA
@@ -442,7 +433,7 @@ test_that("pp_check() without resp_var says why a 4par fit with upper placeholde
 # placeholders at the lower boundary leave Y an observation in every cell, so
 # the default stays with brms and keeps what only brms offers
 test_that("pp_check() without resp_var plots every cell of a 4par fit with lower placeholders only", {
-  data <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")$data
+  data <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")$data
   data[1:3, c("mean_rt_lower", "var_rt_lower")] <- NA
   fit <- mock_ezdm4_fit(data)
   expect_identical(fit$data$rt_used_lower[1:3], rep(0L, 3))
@@ -455,7 +446,7 @@ test_that("pp_check() without resp_var plots every cell of a 4par fit with lower
 })
 
 test_that("pp_check() still checks a 4par fit saved without RT indicators", {
-  fit <- load_ppcheck_fit("bmmfit_ezdm4_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_ezdm4_ppcheck.rds")
   expect_false("vint3" %in% names(brms::standata(fit)))
 
   p <- suppressWarnings(pp_check(fit, ndraws = 5))
@@ -472,12 +463,20 @@ test_that("pp_check() still checks a 4par fit saved without RT indicators", {
   expect_s3_class(pp_check(fit, newdata = fit$data, ndraws = 5), "ggplot")
 })
 
-# only the ezdm 4par default leaves brms; the other models with declared
-# observables must still plot exactly what brms plots
-test_that("pp_check() without resp_var still delegates to brms for the other RT models", {
+test_that("pp_check() without arguments plots the stored fit of every model", {
+  for (name in vapply(model_test_cases("fixture"), `[[`, character(1), "file")) {
+    fit <- load_fixture_fit(name)
+    expect_s3_class(suppressMessages(pp_check(fit, ndraws = 5)), "ggplot")
+  }
+})
+
+# the ezdm 4par default leaves brms, and brms has no pp_check() for the m3
+# family; every other model with a stored fit must plot exactly what brms plots
+test_that("pp_check() without resp_var delegates to brms for every other model", {
   brms_method <- getS3method("pp_check", "brmsfit", envir = asNamespace("brms"))
-  for (name in c("bmmfit_ezdm3_ppcheck.rds", "bmmfit_ddm_ppcheck.rds")) {
-    fit <- load_ppcheck_fit(name)
+  files <- vapply(model_test_cases("fixture"), `[[`, character(1), "file")
+  for (name in setdiff(files, c("bmmfit_ezdm4_ppcheck.rds", "bmmfit_m3_ppcheck.rds"))) {
+    fit <- load_fixture_fit(name)
     withr::with_seed(1, mine <- pp_check(fit, ndraws = 5))
     withr::with_seed(1, theirs <- brms_method(fit, type = "dens_overlay", ndraws = 5))
     expect_equal(mine$data, theirs$data, info = name)

@@ -17,7 +17,7 @@
 #' @return An object of class brmsfit, with any necessary postprocessing applied
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- readRDS("my_saved_fit.rds")
 #' postprocessed_fit <- prostprocess_brm(fit)
 #'
@@ -82,7 +82,7 @@ get_mu_pars <- function(object) {
 #' @return An object of class brmsfit, with any necessary postprocessing applied
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- readRDS("my_saved_fit.rds")
 #' postprocessed_fit <- prostprocess_brm(fit)
 #' reverted_fit <- revert_postprocess_brm(postprocessed_fit)

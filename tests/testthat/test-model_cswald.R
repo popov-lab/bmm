@@ -544,12 +544,8 @@ cswald_parity_data <- function(n = 200) {
 }
 
 test_that("the vectorized cswald likelihood matches the scalar and R versions", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   # seeded so a failure reproduces. Under this seed the log-space fallback,
   # with both clamp conditions firing, takes 23 survivor terms for simple and 7
@@ -642,12 +638,8 @@ test_that("the R cswald likelihood is 0 or -Inf where rt <= ndt, not NaN (#453)"
 })
 
 test_that("the cswald survivor keeps a finite gradient where Phi() nears underflow", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   file <- file.path(tempdir(), "bmm_cswald_surv_grad.stan")
@@ -679,12 +671,8 @@ test_that("the cswald survivor keeps a finite gradient where Phi() nears underfl
 })
 
 test_that("swald_log_Phi keeps a finite gradient on its own where Phi() nears underflow", {
+  skip_unless_stan_tests()
   skip_on_cran() # compiles a Stan program
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   file <- file.path(tempdir(), "bmm_cswald_log_phi_grad.stan")
@@ -774,4 +762,37 @@ test_that("posterior_epred() works on a cswald fit saved without the function", 
   epred <- brms::posterior_epred(fit, ndraws = 20)
   expect_equal(dim(epred), c(20L, nrow(fit$data)))
   expect_true(all(is.finite(epred)))
+})
+
+test_that("log_lik() of a cswald fit is the density of each observation under each draw", {
+  # two draws (rows) of two observations (columns), every value different, so
+  # an observation or a parameter read from the wrong place shows
+  dpars <- list(
+    drift = matrix(c(1.5, 2, 2.5, 3), 2, 2), bound = matrix(c(1, 1.2, 0.9, 1.1), 2, 2),
+    ndt = matrix(c(0.2, 0.25, 0.22, 0.18), 2, 2), s = matrix(c(1, 1.1, 0.9, 1.2), 2, 2),
+    zr = matrix(c(0.4, 0.6, 0.5, 0.55), 2, 2)
+  )
+  data <- list(Y = c(0.6, 0.9), dec = c(1, 0))
+  prep <- epred_prep(dpars, data)
+  for (i in 1:2) {
+    density <- function(...) {
+      dcswald(data$Y[i], data$dec[i], dpars$drift[, i], dpars$bound[, i], dpars$ndt[, i],
+              s = dpars$s[, i], ...)
+    }
+    expect_equal(log_lik_cswald_simple(i, prep), density(version = "simple"))
+    expect_equal(log_lik_cswald_crisk(i, prep), density(zr = dpars$zr[, i], version = "crisk"))
+  }
+})
+
+test_that("cswald check_data refuses RTs and responses it cannot read", {
+  model <- cswald("rt", "response")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  expect_error(
+    check_data(model, data.frame(rt = c("0.5", "0.6"), response = c(1, 0)), formula),
+    "The RT variable 'rt' needs to be of type double or integer"
+  )
+  expect_error(
+    check_data(model, data.frame(rt = c(0.5, 0.6), response = as.complex(c(1, 0))), formula),
+    "is of type 'complex'"
+  )
 })

@@ -40,7 +40,7 @@ k2sd <- function(K) {
 #'   `c_sqrtexp2bessel` converts from the sqrtexp parametrization to the
 #'   bessel parametrization.
 #' @keywords transform
-#' @details See [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for details on the
+#' @details See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
 #'   parameterization. The sqrtexp parametrization is the default in the
 #'   `bmm` package.
 #' @export
@@ -82,7 +82,6 @@ link_transform <- function(values, link, inverse = FALSE) {
   # Handle NULL or missing link as identity (no transformation)
   if (is.null(link)) link <- "identity"
 
-  stopifnot(is.numeric(values), is.character(link), length(link) == 1L, is.logical(inverse), length(inverse) == 1L)
   if(inverse) {
     switch(
       link,
@@ -524,7 +523,7 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' @seealso [parameter_info()], [native_transform()], [conditional_effects.bmmfit()]
 #' @keywords extract_info
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' fit <- bmm(
 #'   bmf(c ~ 0 + set_size, kappa ~ 1),
 #'   data = oberauer_lin_2017,
