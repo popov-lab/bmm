@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -79,10 +79,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-893fe9ddc644446a6c1ebe867bb6f684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-a39e03fd81b1f0a766df5ad9e59ab707.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -185,7 +185,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./git-workflow.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and Github workflow</span></span></a>
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and GitHub workflow</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -197,7 +197,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./example-model.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example model file</span></span></a>
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example models</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -212,6 +212,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
   </div>
 </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./reference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Reference</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
     </ul>
     </div>
 </nav>
@@ -222,17 +239,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#what-use_model_template-does" id="toc-what-use_model_template-does" class="nav-link active" data-scroll-target="#what-use_model_template-does">What <code>use_model_template()</code> does</a></li>
+  <li><a href="#what-use_model_template-does" id="toc-what-use_model_template-does" class="nav-link active" data-scroll-target="#what-use_model_template-does">What <code>use_model_template()</code> does</a>
+  <ul class="collapse">
+  <li><a href="#what-the-template-leaves-for-you" id="toc-what-the-template-leaves-for-you" class="nav-link" data-scroll-target="#what-the-template-leaves-for-you">What the template leaves for you</a></li>
+  </ul></li>
   <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example"><span class="header-section-number">5.1</span> Example</a></li>
-  <li><a href="#failure-modes-to-expect" id="toc-failure-modes-to-expect" class="nav-link" data-scroll-target="#failure-modes-to-expect"><span class="header-section-number">5.2</span> Failure modes to expect</a></li>
+  <li><a href="#filling-in-the-template" id="toc-filling-in-the-template" class="nav-link" data-scroll-target="#filling-in-the-template"><span class="header-section-number">5.2</span> Filling in the template</a></li>
   <li><a href="#testing" id="toc-testing" class="nav-link" data-scroll-target="#testing"><span class="header-section-number">5.3</span> Testing</a>
   <ul class="collapse">
   <li><a href="#parameter-recovery" id="toc-parameter-recovery" class="nav-link" data-scroll-target="#parameter-recovery"><span class="header-section-number">5.3.1</span> Parameter recovery</a></li>
   <li><a href="#distribution-functions" id="toc-distribution-functions" class="nav-link" data-scroll-target="#distribution-functions"><span class="header-section-number">5.3.2</span> Distribution functions</a></li>
   </ul></li>
-  <li><a href="#post-processing-infrastructure" id="toc-post-processing-infrastructure" class="nav-link" data-scroll-target="#post-processing-infrastructure"><span class="header-section-number">5.4</span> Post-processing infrastructure</a></li>
-  <li><a href="#add-an-example-dataset" id="toc-add-an-example-dataset" class="nav-link" data-scroll-target="#add-an-example-dataset"><span class="header-section-number">5.5</span> Add an example dataset</a></li>
-  <li><a href="#add-an-article" id="toc-add-an-article" class="nav-link" data-scroll-target="#add-an-article"><span class="header-section-number">5.6</span> Add an article</a></li>
+  <li><a href="#before-you-open-the-pull-request" id="toc-before-you-open-the-pull-request" class="nav-link" data-scroll-target="#before-you-open-the-pull-request"><span class="header-section-number">5.4</span> Before you open the pull request</a></li>
+  <li><a href="#failure-modes-to-expect" id="toc-failure-modes-to-expect" class="nav-link" data-scroll-target="#failure-modes-to-expect"><span class="header-section-number">5.5</span> Failure modes to expect</a></li>
+  <li><a href="#post-processing" id="toc-post-processing" class="nav-link" data-scroll-target="#post-processing"><span class="header-section-number">5.6</span> Post-processing</a></li>
+  <li><a href="#add-an-example-dataset" id="toc-add-an-example-dataset" class="nav-link" data-scroll-target="#add-an-example-dataset"><span class="header-section-number">5.7</span> Add an example dataset</a></li>
+  <li><a href="#add-an-article" id="toc-add-an-article" class="nav-link" data-scroll-target="#add-an-article"><span class="header-section-number">5.8</span> Add an article</a></li>
   </ul>
 </nav>
     </div>
@@ -259,298 +281,244 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p>If you have read <a href="bmm-architecture.html" class="quarto-xref">Section&nbsp;<span>3</span></a> and <a href="example-model.html" class="quarto-xref">Section&nbsp;<span>4</span></a>, you should have a pretty good idea of how the <code>bmm</code> package functions. Now it’s time to add your new model.</p>
-<p>The good news are, you don’t have to add any of the files manually. The <code>bmm</code> package includes a function <code>use_model_template()</code> that generates all the files with templates for all necessary functions. Thus, you can focus on the important work of filling these templates with the relevant information without worrying about missing something critical.</p>
+<p>You don’t have to create the files by hand. <code>use_model_template()</code> generates the model file with stubs for every method a model needs, so you can focus on filling them in. The chapter ends with a checklist of everything a new model has to touch <em>outside</em> its own file, because the test suite fails on some of those and review catches the rest.</p>
 <section id="what-use_model_template-does" class="level2 unnumbered">
 <h2 class="unnumbered anchored" data-anchor-id="what-use_model_template-does">What <code>use_model_template()</code> does</h2>
-<p>Run it from the root of the package. It writes <code>R/model_&lt;model_name&gt;.R</code> containing the parameter specification, the model constructor, the user-facing alias, and stub methods for <code>check_data</code>, <code>bmf2bf</code>, <code>configure_model</code> and <code>postprocess_brm</code>. With <code>custom_family = TRUE</code> it also creates one empty <code>inst/stan_chunks/&lt;model_name&gt;_&lt;block&gt;.stan</code> file per entry in <code>stanvar_blocks</code>, and wires the code that reads them into <code>configure_model</code>.</p>
-<p>The full argument list is on the <a href="../reference/use_model_template.html">reference page for <code>use_model_template()</code></a>, which is generated from the function itself and is therefore never out of date. Four things about it are worth knowing before you call it:</p>
+<p>Run it from the root of the package. It writes <code>R/model_&lt;model_name&gt;.R</code> containing the parameter specification, the model constructor, the user-facing alias, and stub methods for <code>check_data</code>, <code>bmf2bf</code>, <code>configure_model</code> and <code>postprocess_brm</code>. With <code>custom_family = TRUE</code> it also creates one empty <code>inst/stan_chunks/&lt;model_name&gt;_&lt;block&gt;.stan</code> file per entry in <code>stanvar_blocks</code>, wires the code that reads them into <code>configure_model</code>, and adds empty <code>log_lik</code>, <code>posterior_predict</code> and <code>posterior_epred</code> functions that the family already points to.</p>
+<p>The full argument list is on the <a href="../reference/use_model_template.html">reference page for <code>use_model_template()</code></a>. Three things about the call are worth knowing:</p>
 <ul>
-<li><p><strong><code>versions</code> is the second positional argument.</strong> <code>use_model_template("gcm", TRUE)</code> means <code>versions = TRUE</code>, not <code>custom_family = TRUE</code>. Name the arguments.</p></li>
-<li><p><strong>The stan files are created before the R file is written.</strong> If the call fails partway through, empty <code>.stan</code> files are already on disk and you have to remove them by hand before you can call the function again.</p></li>
-<li><p><strong>An unversioned model gets <code>version = "NA"</code></strong> — the literal string, not <code>NA</code>. That is what <code>print()</code> and the generated documentation will show unless you pass <code>versions</code>.</p></li>
-<li><p><strong>The template does not generate everything you may need.</strong> There are no stubs for <code>check_formula()</code>, <code>configure_prior()</code> or <code>create_initfun()</code>; add those yourself only if your model needs them. The generated alias also omits the <code>@keywords bmmodel</code> tag, which the package’s pkgdown test expects on a user-facing model alias — add it (see <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a>).</p></li>
+<li><strong><code>versions</code> is the second positional argument.</strong> <code>use_model_template("gcm", TRUE)</code> means <code>versions = TRUE</code>, not <code>custom_family = TRUE</code>. Name the arguments.</li>
+<li><strong>The stan files are created before the R file is written.</strong> If the call fails partway through, empty <code>.stan</code> files are already on disk and you have to remove them by hand before you can call the function again.</li>
+<li><strong>An unversioned model gets <code>version = "NA"</code></strong> — the literal string, not <code>NA</code>.</li>
 </ul>
+<section id="what-the-template-leaves-for-you" class="level3 unnumbered">
+<h3 class="unnumbered anchored" data-anchor-id="what-the-template-leaves-for-you">What the template leaves for you</h3>
+<p>The generated file follows the package’s conventions. Two things in it are placeholders that <code>check()</code> will not flag:</p>
+<ul>
+<li><strong>The prediction functions are empty.</strong> With <code>custom_family = TRUE</code>, the family passes <code>log_lik_&lt;model&gt;()</code>, <code>posterior_predict_&lt;model&gt;()</code> and <code>posterior_epred_&lt;model&gt;()</code> to brms, but their bodies are empty, so <code>loo()</code>, <code>pp_check()</code> and <code>posterior_epred()</code> cannot work on your model until you fill them (step 8 below).</li>
+<li><strong>The <code>settable_links</code> stub is commented out.</strong> Uncomment it, so that its tag line reads <code>#' @exportS3Method</code>, if <code>configure_model()</code> builds links into the family or the formulas; otherwise delete it (step 2 below).</li>
+</ul>
+<p>There are no stubs for <code>check_formula()</code>, <code>configure_prior()</code>, <code>create_initfun()</code>, <code>revert_check_data()</code> or the optional post-fit methods; add those only if your model needs them.</p>
+</section>
 </section>
 <section id="example" class="level2" data-number="5.1">
 <h2 data-number="5.1" class="anchored" data-anchor-id="example"><span class="header-section-number">5.1</span> Example</h2>
-<p>Let’s add a new model called <code>gcm</code>. Let’s assume that you have tested the model in Stan and you have the Stan code ready. We want to define a custom family for the <code>gcm</code> model, and we want to define the following blocks: <code>likelihood</code>, <code>functions</code> (see <code>?brms::stanvar</code> for an explanation of the blocks).</p>
-<p>First you set up your system and git environment as described in <a href="setup.html" class="quarto-xref">Section&nbsp;<span>1</span></a>. Then you can run the following code from R in the root directory of the <code>bmm</code> package:</p>
+<p>Let’s add a new model called <code>gcm</code>. Assume you have tested the model in Stan and have the Stan code ready. We want a custom family with two Stan blocks, <code>likelihood</code> and <code>functions</code> (see <code>?brms::stanvar</code> for the blocks).</p>
+<p>First set up your system and git environment as described in <a href="setup.html" class="quarto-xref">Section&nbsp;<span>1</span></a>. Then load the development version with <code>devtools::load_all()</code> and run, from the root directory of the <code>bmm</code> package:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-label="1"></a><span class="fu">use_model_template</span>(<span class="st">"gcm"</span>, <span class="at">custom_family =</span> <span class="cn">TRUE</span>, <span class="at">stanvar_blocks =</span> <span class="fu">c</span>(<span class="st">"likelihood"</span>, <span class="st">"functions"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>This will create the file <code>model_gcm.R</code> in the <code>R/</code> directory and the files <code>gcm_likelihood.stan</code> and <code>gcm_functions.stan</code> in the <code>inst/stan_chunks/</code> directory. The function will also open the files in your editor, through <code>usethis::edit_file()</code>. You will see the following output in the console:</p>
-<pre><code>• Modify 'inst/stan_chunks/gcm_likelihood.stan'
-• Modify 'inst/stan_chunks/gcm_functions.stan'
-• Modify 'R/model_gcm.R'</code></pre>
-<p>Now you can fill the files with the appropriate code. The Stan files will be empty, but the R file will have the following structure:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-label="1"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-label="2"></a><span class="co"># MODELS                                                                 ####</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-label="3"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-label="4"></a><span class="co"># see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-label="5"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-label="6"></a>.gcm_defaults <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
-<span id="cb3-7"><a href="#cb3-7" aria-label="7"></a>  <span class="at">parameters =</span> <span class="fu">list</span>(</span>
-<span id="cb3-8"><a href="#cb3-8" aria-label="8"></a>    <span class="at">par1 =</span> <span class="st">"Parameter 1 = description of parameter 1"</span>,</span>
-<span id="cb3-9"><a href="#cb3-9" aria-label="9"></a>    <span class="at">par2 =</span> <span class="st">"Parameter 2 = description of parameter 2"</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-label="10"></a>  ),</span>
-<span id="cb3-11"><a href="#cb3-11" aria-label="11"></a>  <span class="at">links =</span> <span class="fu">list</span>(</span>
-<span id="cb3-12"><a href="#cb3-12" aria-label="12"></a>    <span class="at">par1 =</span> <span class="st">"identity"</span>,</span>
-<span id="cb3-13"><a href="#cb3-13" aria-label="13"></a>    <span class="at">par2 =</span> <span class="st">"log"</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-label="14"></a>  ),</span>
-<span id="cb3-15"><a href="#cb3-15" aria-label="15"></a>  <span class="at">fixed_parameters =</span> <span class="fu">list</span>(</span>
-<span id="cb3-16"><a href="#cb3-16" aria-label="16"></a>    <span class="at">mu =</span> <span class="dv">0</span></span>
-<span id="cb3-17"><a href="#cb3-17" aria-label="17"></a>  ),</span>
-<span id="cb3-18"><a href="#cb3-18" aria-label="18"></a>  <span class="at">priors =</span> <span class="fu">list</span>(</span>
-<span id="cb3-19"><a href="#cb3-19" aria-label="19"></a>    <span class="at">par1 =</span> <span class="fu">list</span>(<span class="at">main =</span> <span class="st">"normal(0, 1)"</span>, <span class="at">effects =</span> <span class="st">"normal(0, 0.5)"</span>),</span>
-<span id="cb3-20"><a href="#cb3-20" aria-label="20"></a>    <span class="at">par2 =</span> <span class="fu">list</span>(<span class="at">main =</span> <span class="st">"normal(0, 0.5)"</span>, <span class="at">effects =</span> <span class="st">"normal(0, 0.5)"</span>)</span>
-<span id="cb3-21"><a href="#cb3-21" aria-label="21"></a>  ),</span>
-<span id="cb3-22"><a href="#cb3-22" aria-label="22"></a>  <span class="at">init_ranges =</span> <span class="fu">list</span>(</span>
-<span id="cb3-23"><a href="#cb3-23" aria-label="23"></a>    <span class="at">par1 =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>),</span>
-<span id="cb3-24"><a href="#cb3-24" aria-label="24"></a>    <span class="at">par2 =</span> <span class="fu">c</span>(<span class="fl">0.5</span>, <span class="fl">1.5</span>)</span>
-<span id="cb3-25"><a href="#cb3-25" aria-label="25"></a>  )</span>
-<span id="cb3-26"><a href="#cb3-26" aria-label="26"></a>)</span>
-<span id="cb3-27"><a href="#cb3-27" aria-label="27"></a></span>
-<span id="cb3-28"><a href="#cb3-28" aria-label="28"></a></span>
-<span id="cb3-29"><a href="#cb3-29" aria-label="29"></a>.model_gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">resp_var1 =</span> <span class="cn">NULL</span>, <span class="at">required_arg1 =</span> <span class="cn">NULL</span>, <span class="at">required_arg2 =</span> <span class="cn">NULL</span>,</span>
-<span id="cb3-30"><a href="#cb3-30" aria-label="30"></a>                                  <span class="at">links =</span> <span class="cn">NULL</span>, <span class="at">call =</span> <span class="cn">NULL</span>, ...) {</span>
-<span id="cb3-31"><a href="#cb3-31" aria-label="31"></a>  out <span class="ot">&lt;-</span> <span class="fu">structure</span>(</span>
-<span id="cb3-32"><a href="#cb3-32" aria-label="32"></a>    <span class="fu">list</span>(</span>
-<span id="cb3-33"><a href="#cb3-33" aria-label="33"></a>      <span class="at">resp_vars =</span> <span class="fu">nlist</span>(resp_var1),</span>
-<span id="cb3-34"><a href="#cb3-34" aria-label="34"></a>      <span class="at">other_vars =</span> <span class="fu">nlist</span>(required_arg1, required_arg2),</span>
-<span id="cb3-35"><a href="#cb3-35" aria-label="35"></a>      <span class="at">domain =</span> <span class="st">""</span>,</span>
-<span id="cb3-36"><a href="#cb3-36" aria-label="36"></a>      <span class="at">task =</span> <span class="st">""</span>,</span>
-<span id="cb3-37"><a href="#cb3-37" aria-label="37"></a>      <span class="at">name =</span> <span class="st">""</span>,</span>
-<span id="cb3-38"><a href="#cb3-38" aria-label="38"></a>      <span class="at">citation =</span> <span class="st">""</span>,</span>
-<span id="cb3-39"><a href="#cb3-39" aria-label="39"></a>      <span class="at">version =</span> <span class="st">"NA"</span>,</span>
-<span id="cb3-40"><a href="#cb3-40" aria-label="40"></a>      <span class="at">requirements =</span> <span class="st">""</span>,</span>
-<span id="cb3-41"><a href="#cb3-41" aria-label="41"></a>      <span class="at">parameters =</span> .gcm_defaults[[<span class="st">"parameters"</span>]],</span>
-<span id="cb3-42"><a href="#cb3-42" aria-label="42"></a>      <span class="at">links =</span> .gcm_defaults[[<span class="st">"links"</span>]],</span>
-<span id="cb3-43"><a href="#cb3-43" aria-label="43"></a>      <span class="at">fixed_parameters =</span> .gcm_defaults[[<span class="st">"fixed_parameters"</span>]],</span>
-<span id="cb3-44"><a href="#cb3-44" aria-label="44"></a>      <span class="at">default_priors =</span> .gcm_defaults[[<span class="st">"priors"</span>]],</span>
-<span id="cb3-45"><a href="#cb3-45" aria-label="45"></a>      <span class="at">init_ranges =</span> .gcm_defaults[[<span class="st">"init_ranges"</span>]]</span>
-<span id="cb3-46"><a href="#cb3-46" aria-label="46"></a>    ),</span>
-<span id="cb3-47"><a href="#cb3-47" aria-label="47"></a>    <span class="at">class =</span> <span class="fu">c</span>(<span class="st">"bmmodel"</span>, <span class="st">"gcm"</span>),</span>
-<span id="cb3-48"><a href="#cb3-48" aria-label="48"></a>    <span class="at">call =</span> call</span>
-<span id="cb3-49"><a href="#cb3-49" aria-label="49"></a>  )</span>
-<span id="cb3-50"><a href="#cb3-50" aria-label="50"></a>  out<span class="sc">$</span>links[<span class="fu">names</span>(links)] <span class="ot">&lt;-</span> links</span>
-<span id="cb3-51"><a href="#cb3-51" aria-label="51"></a>  out</span>
-<span id="cb3-52"><a href="#cb3-52" aria-label="52"></a>}</span>
-<span id="cb3-53"><a href="#cb3-53" aria-label="53"></a><span class="co"># user facing alias</span></span>
-<span id="cb3-54"><a href="#cb3-54" aria-label="54"></a><span class="co"># information in the title and details sections will be filled in</span></span>
-<span id="cb3-55"><a href="#cb3-55" aria-label="55"></a><span class="co"># automatically based on the information in the .model_gcm()$info</span></span>
-<span id="cb3-56"><a href="#cb3-56" aria-label="56"></a></span>
-<span id="cb3-57"><a href="#cb3-57" aria-label="57"></a><span class="co">#' @title `r .model_gcm()$name`</span></span>
-<span id="cb3-58"><a href="#cb3-58" aria-label="58"></a><span class="co">#' @name gcm</span></span>
-<span id="cb3-59"><a href="#cb3-59" aria-label="59"></a><span class="co">#' @details `r model_info(.model_gcm())`</span></span>
-<span id="cb3-60"><a href="#cb3-60" aria-label="60"></a><span class="co">#' @param resp_var1 A description of the response variable</span></span>
-<span id="cb3-61"><a href="#cb3-61" aria-label="61"></a><span class="co">#' @param required_arg1 A description of the required argument</span></span>
-<span id="cb3-62"><a href="#cb3-62" aria-label="62"></a><span class="co">#' @param required_arg2 A description of the required argument</span></span>
-<span id="cb3-63"><a href="#cb3-63" aria-label="63"></a><span class="co">#' @param links A list of links for the model parameters.</span></span>
-<span id="cb3-64"><a href="#cb3-64" aria-label="64"></a><span class="co">#' @param ... used internally for testing, ignore it</span></span>
-<span id="cb3-65"><a href="#cb3-65" aria-label="65"></a><span class="co">#' @return An object of class `bmmodel`</span></span>
-<span id="cb3-66"><a href="#cb3-66" aria-label="66"></a><span class="co">#' @export</span></span>
-<span id="cb3-67"><a href="#cb3-67" aria-label="67"></a><span class="co">#' @examples</span></span>
-<span id="cb3-68"><a href="#cb3-68" aria-label="68"></a><span class="co">#' \dontrun{</span></span>
-<span id="cb3-69"><a href="#cb3-69" aria-label="69"></a><span class="co">#' # put a full example here (see 'R/model_ddm.R' for an example)</span></span>
-<span id="cb3-70"><a href="#cb3-70" aria-label="70"></a><span class="co">#' }</span></span>
-<span id="cb3-71"><a href="#cb3-71" aria-label="71"></a>gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(resp_var1, required_arg1, required_arg2, <span class="at">links =</span> <span class="cn">NULL</span>, ...) {</span>
-<span id="cb3-72"><a href="#cb3-72" aria-label="72"></a>   call <span class="ot">&lt;-</span> <span class="fu">match.call</span>()</span>
-<span id="cb3-73"><a href="#cb3-73" aria-label="73"></a>   <span class="fu">stop_missing_args</span>()</span>
-<span id="cb3-74"><a href="#cb3-74" aria-label="74"></a>   <span class="co"># uncomment if your model requires a specific backend:</span></span>
-<span id="cb3-75"><a href="#cb3-75" aria-label="75"></a>   <span class="co"># stopif(!requireNamespace("cmdstanr", quietly = TRUE),</span></span>
-<span id="cb3-76"><a href="#cb3-76" aria-label="76"></a>   <span class="co">#        'The "cmdstanr" package is required for this model.')</span></span>
-<span id="cb3-77"><a href="#cb3-77" aria-label="77"></a>   <span class="fu">.model_gcm</span>(<span class="at">resp_var1 =</span> resp_var1, <span class="at">required_arg1 =</span> required_arg1, <span class="at">required_arg2 =</span> required_arg2,</span>
-<span id="cb3-78"><a href="#cb3-78" aria-label="78"></a>                <span class="at">links =</span> links, <span class="at">call =</span> call, ...)</span>
-<span id="cb3-79"><a href="#cb3-79" aria-label="79"></a>}</span>
-<span id="cb3-80"><a href="#cb3-80" aria-label="80"></a></span>
-<span id="cb3-81"><a href="#cb3-81" aria-label="81"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-82"><a href="#cb3-82" aria-label="82"></a><span class="co"># CHECK_DATA S3 methods                                                  ####</span></span>
-<span id="cb3-83"><a href="#cb3-83" aria-label="83"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-84"><a href="#cb3-84" aria-label="84"></a><span class="co"># A check_data.* function should be defined for each class of the model.</span></span>
-<span id="cb3-85"><a href="#cb3-85" aria-label="85"></a><span class="co"># If a model shares methods with other models, the shared methods should be</span></span>
-<span id="cb3-86"><a href="#cb3-86" aria-label="86"></a><span class="co"># defined in helpers-data.R. Put here only the methods that are specific to</span></span>
-<span id="cb3-87"><a href="#cb3-87" aria-label="87"></a><span class="co"># the model. See ?check_data for details.</span></span>
-<span id="cb3-88"><a href="#cb3-88" aria-label="88"></a><span class="co"># (YOU CAN DELETE THIS SECTION IF YOU DO NOT REQUIRE ADDITIONAL DATA CHECKS)</span></span>
-<span id="cb3-89"><a href="#cb3-89" aria-label="89"></a></span>
-<span id="cb3-90"><a href="#cb3-90" aria-label="90"></a><span class="co">#' @export</span></span>
-<span id="cb3-91"><a href="#cb3-91" aria-label="91"></a>check_data.gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(model, data, formula) {</span>
-<span id="cb3-92"><a href="#cb3-92" aria-label="92"></a>   <span class="co"># retrieve required arguments</span></span>
-<span id="cb3-93"><a href="#cb3-93" aria-label="93"></a>   required_arg1 <span class="ot">&lt;-</span> model<span class="sc">$</span>other_vars<span class="sc">$</span>required_arg1</span>
-<span id="cb3-94"><a href="#cb3-94" aria-label="94"></a>   required_arg2 <span class="ot">&lt;-</span> model<span class="sc">$</span>other_vars<span class="sc">$</span>required_arg2</span>
-<span id="cb3-95"><a href="#cb3-95" aria-label="95"></a></span>
-<span id="cb3-96"><a href="#cb3-96" aria-label="96"></a>   <span class="co"># check the data (required)</span></span>
-<span id="cb3-97"><a href="#cb3-97" aria-label="97"></a></span>
-<span id="cb3-98"><a href="#cb3-98" aria-label="98"></a>   <span class="co"># compute any necessary transformations (optional)</span></span>
-<span id="cb3-99"><a href="#cb3-99" aria-label="99"></a></span>
-<span id="cb3-100"><a href="#cb3-100" aria-label="100"></a>   <span class="co"># save some variables as attributes of the data for later use (optional)</span></span>
-<span id="cb3-101"><a href="#cb3-101" aria-label="101"></a></span>
-<span id="cb3-102"><a href="#cb3-102" aria-label="102"></a>   <span class="fu">NextMethod</span>(<span class="st">'check_data'</span>)</span>
-<span id="cb3-103"><a href="#cb3-103" aria-label="103"></a>}</span>
-<span id="cb3-104"><a href="#cb3-104" aria-label="104"></a></span>
-<span id="cb3-105"><a href="#cb3-105" aria-label="105"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-106"><a href="#cb3-106" aria-label="106"></a><span class="co"># Convert bmmformula to brmsformla methods                               ####</span></span>
-<span id="cb3-107"><a href="#cb3-107" aria-label="107"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-108"><a href="#cb3-108" aria-label="108"></a><span class="co"># A bmf2bf.* function should be defined if the default method for constructing</span></span>
-<span id="cb3-109"><a href="#cb3-109" aria-label="109"></a><span class="co"># the brmsformula from the bmmformula does not apply (e.g if aterms are required).</span></span>
-<span id="cb3-110"><a href="#cb3-110" aria-label="110"></a><span class="co"># The shared method for all `bmmodels` is defined in bmmformula.R.</span></span>
-<span id="cb3-111"><a href="#cb3-111" aria-label="111"></a><span class="co"># See ?bmf2bf for details.</span></span>
-<span id="cb3-112"><a href="#cb3-112" aria-label="112"></a><span class="co"># (YOU CAN DELETE THIS SECTION IF YOUR MODEL USES A STANDARD FORMULA WITH 1 RESPONSE VARIABLE)</span></span>
-<span id="cb3-113"><a href="#cb3-113" aria-label="113"></a></span>
-<span id="cb3-114"><a href="#cb3-114" aria-label="114"></a><span class="co">#' @export</span></span>
-<span id="cb3-115"><a href="#cb3-115" aria-label="115"></a>bmf2bf.gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(model, formula) {</span>
-<span id="cb3-116"><a href="#cb3-116" aria-label="116"></a>   <span class="co"># retrieve required response arguments</span></span>
-<span id="cb3-117"><a href="#cb3-117" aria-label="117"></a>   resp_var1 <span class="ot">&lt;-</span> model<span class="sc">$</span>resp_vars<span class="sc">$</span>resp_var1</span>
-<span id="cb3-118"><a href="#cb3-118" aria-label="118"></a>   resp_var2 <span class="ot">&lt;-</span> model<span class="sc">$</span>resp_vars<span class="sc">$</span>resp_arg2</span>
-<span id="cb3-119"><a href="#cb3-119" aria-label="119"></a></span>
-<span id="cb3-120"><a href="#cb3-120" aria-label="120"></a>   <span class="co"># set the base brmsformula based</span></span>
-<span id="cb3-121"><a href="#cb3-121" aria-label="121"></a>   brms_formula <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">bf</span>(<span class="fu">paste0</span>(resp_var1, <span class="st">" | "</span>, <span class="fu">vreal</span>(resp_var2), <span class="st">" ~ 1"</span>))</span>
-<span id="cb3-122"><a href="#cb3-122" aria-label="122"></a></span>
-<span id="cb3-123"><a href="#cb3-123" aria-label="123"></a>   <span class="co"># return the brms_formula to add the remaining bmmformulas to it.</span></span>
-<span id="cb3-124"><a href="#cb3-124" aria-label="124"></a>   brms_formula</span>
-<span id="cb3-125"><a href="#cb3-125" aria-label="125"></a>}</span>
-<span id="cb3-126"><a href="#cb3-126" aria-label="126"></a></span>
-<span id="cb3-127"><a href="#cb3-127" aria-label="127"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-128"><a href="#cb3-128" aria-label="128"></a><span class="co"># CONFIGURE_MODEL S3 METHODS                                             ####</span></span>
-<span id="cb3-129"><a href="#cb3-129" aria-label="129"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-130"><a href="#cb3-130" aria-label="130"></a><span class="co"># Each model should have a corresponding configure_model.* function. See</span></span>
-<span id="cb3-131"><a href="#cb3-131" aria-label="131"></a><span class="co"># ?configure_model for more information.</span></span>
-<span id="cb3-132"><a href="#cb3-132" aria-label="132"></a></span>
-<span id="cb3-133"><a href="#cb3-133" aria-label="133"></a><span class="co">#' @export</span></span>
-<span id="cb3-134"><a href="#cb3-134" aria-label="134"></a>configure_model.gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(model, data, formula) {</span>
-<span id="cb3-135"><a href="#cb3-135" aria-label="135"></a>   <span class="co"># retrieve required arguments</span></span>
-<span id="cb3-136"><a href="#cb3-136" aria-label="136"></a>   required_arg1 <span class="ot">&lt;-</span> model<span class="sc">$</span>other_vars<span class="sc">$</span>required_arg1</span>
-<span id="cb3-137"><a href="#cb3-137" aria-label="137"></a>   required_arg2 <span class="ot">&lt;-</span> model<span class="sc">$</span>other_vars<span class="sc">$</span>required_arg2</span>
-<span id="cb3-138"><a href="#cb3-138" aria-label="138"></a></span>
-<span id="cb3-139"><a href="#cb3-139" aria-label="139"></a>   <span class="co"># retrieve arguments from the data check</span></span>
-<span id="cb3-140"><a href="#cb3-140" aria-label="140"></a>   my_precomputed_var <span class="ot">&lt;-</span> <span class="fu">attr</span>(data, <span class="st">'my_precomputed_var'</span>)</span>
-<span id="cb3-141"><a href="#cb3-141" aria-label="141"></a></span>
-<span id="cb3-142"><a href="#cb3-142" aria-label="142"></a>   <span class="co"># construct brms formula from the bmm formula</span></span>
-<span id="cb3-143"><a href="#cb3-143" aria-label="143"></a>   formula <span class="ot">&lt;-</span> <span class="fu">bmf2bf</span>(model, formula)</span>
-<span id="cb3-144"><a href="#cb3-144" aria-label="144"></a></span>
-<span id="cb3-145"><a href="#cb3-145" aria-label="145"></a>   <span class="co"># construct the family &amp; add to formula object</span></span>
-<span id="cb3-146"><a href="#cb3-146" aria-label="146"></a>   gcm_family <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">custom_family</span>(</span>
-<span id="cb3-147"><a href="#cb3-147" aria-label="147"></a>     <span class="st">'gcm'</span>,</span>
-<span id="cb3-148"><a href="#cb3-148" aria-label="148"></a>     <span class="at">dpars =</span> <span class="fu">c</span>(),</span>
-<span id="cb3-149"><a href="#cb3-149" aria-label="149"></a>     <span class="at">links =</span> <span class="fu">c</span>(),</span>
-<span id="cb3-150"><a href="#cb3-150" aria-label="150"></a>     <span class="at">lb =</span> <span class="fu">c</span>(), <span class="co"># upper bounds for parameters</span></span>
-<span id="cb3-151"><a href="#cb3-151" aria-label="151"></a>     <span class="at">ub =</span> <span class="fu">c</span>(), <span class="co"># lower bounds for parameters</span></span>
-<span id="cb3-152"><a href="#cb3-152" aria-label="152"></a>     <span class="at">type =</span> <span class="st">''</span>, <span class="co"># real for continous dv, int for discrete dv</span></span>
-<span id="cb3-153"><a href="#cb3-153" aria-label="153"></a>     <span class="at">loop =</span> <span class="cn">TRUE</span>, <span class="co"># is the likelihood vectorized</span></span>
-<span id="cb3-154"><a href="#cb3-154" aria-label="154"></a>   )</span>
-<span id="cb3-155"><a href="#cb3-155" aria-label="155"></a>   formula<span class="sc">$</span>family <span class="ot">&lt;-</span> gcm_family</span>
-<span id="cb3-156"><a href="#cb3-156" aria-label="156"></a></span>
-<span id="cb3-157"><a href="#cb3-157" aria-label="157"></a>   <span class="co"># prepare initial stanvars to pass to brms, model formula and priors</span></span>
-<span id="cb3-158"><a href="#cb3-158" aria-label="158"></a>   sc_path <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">'stan_chunks'</span>, <span class="at">package=</span><span class="st">'bmm'</span>)</span>
-<span id="cb3-159"><a href="#cb3-159" aria-label="159"></a>   stan_likelihood <span class="ot">&lt;-</span> <span class="fu">read_lines2</span>(<span class="fu">paste0</span>(sc_path, <span class="st">'/gcm_likelihood.stan'</span>))</span>
-<span id="cb3-160"><a href="#cb3-160" aria-label="160"></a>   stan_functions <span class="ot">&lt;-</span> <span class="fu">read_lines2</span>(<span class="fu">paste0</span>(sc_path, <span class="st">'/gcm_functions.stan'</span>))</span>
-<span id="cb3-161"><a href="#cb3-161" aria-label="161"></a></span>
-<span id="cb3-162"><a href="#cb3-162" aria-label="162"></a>   stanvars <span class="ot">&lt;-</span> <span class="fu">stanvar</span>(<span class="at">scode =</span> stan_likelihood, <span class="at">block =</span> <span class="st">'likelihood'</span>) <span class="sc">+</span></span>
-<span id="cb3-163"><a href="#cb3-163" aria-label="163"></a>      <span class="fu">stanvar</span>(<span class="at">scode =</span> stan_functions, <span class="at">block =</span> <span class="st">'functions'</span>)</span>
-<span id="cb3-164"><a href="#cb3-164" aria-label="164"></a></span>
-<span id="cb3-165"><a href="#cb3-165" aria-label="165"></a>   <span class="co"># return the list</span></span>
-<span id="cb3-166"><a href="#cb3-166" aria-label="166"></a>   <span class="fu">nlist</span>(formula, data, stanvars)</span>
-<span id="cb3-167"><a href="#cb3-167" aria-label="167"></a>}</span>
-<span id="cb3-168"><a href="#cb3-168" aria-label="168"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-169"><a href="#cb3-169" aria-label="169"></a><span class="co"># POSTPROCESS METHODS                                                    ####</span></span>
-<span id="cb3-170"><a href="#cb3-170" aria-label="170"></a><span class="do">#############################################################################!</span></span>
-<span id="cb3-171"><a href="#cb3-171" aria-label="171"></a><span class="co"># A postprocess_brm.* function should be defined for the model class. See</span></span>
-<span id="cb3-172"><a href="#cb3-172" aria-label="172"></a><span class="co"># ?postprocess_brm for details</span></span>
-<span id="cb3-173"><a href="#cb3-173" aria-label="173"></a></span>
-<span id="cb3-174"><a href="#cb3-174" aria-label="174"></a><span class="co">#' @export</span></span>
-<span id="cb3-175"><a href="#cb3-175" aria-label="175"></a>postprocess_brm.gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(model, fit) {</span>
-<span id="cb3-176"><a href="#cb3-176" aria-label="176"></a>   <span class="co"># any required postprocessing (if none, delete this section)</span></span>
-<span id="cb3-177"><a href="#cb3-177" aria-label="177"></a>   fit</span>
-<span id="cb3-178"><a href="#cb3-178" aria-label="178"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Now you have to:</p>
-<ol type="1">
-<li><p><strong>Fill the <code>.gcm_defaults</code> specification and the <code>.model_gcm</code> constructor.</strong> Most of your work is in <code>.gcm_defaults</code>: specify the model’s parameters (with descriptions), their link functions, which parameters are fixed (and to what value), the default priors, and the initialization ranges. It’s crucial that you set default priors for every parameter, informed by knowledge in the field — see <code>.ddm_defaults</code> in <code>model_ddm.R</code> for a worked example. In <code>.model_gcm()</code>, rename the response and required arguments (or delete the extras if you have none) and fill in the metadata (<code>domain</code>, <code>task</code>, <code>name</code>, <code>citation</code>, <code>requirements</code>). The constructor lists every field of the model object inline and reads the parameter specification from <code>.gcm_defaults</code>; its class must be <code>c('bmmodel', 'gcm')</code>.</p>
-<p>If your model has multiple versions with different parameter sets, generate the scaffold with <code>use_model_template("gcm", versions = c("v1", "v2"))</code>. Instead of the flat <code>.gcm_defaults</code>, this produces a <code>.gcm_version_table</code> with one entry per version; a constructor that reads each field out of it (<code>parameters = .gcm_version_table[[version]][["parameters"]]</code>, and so on) and appends <code>paste0("gcm_", version)</code> to the class vector; and an alias whose <code>version</code> argument is validated with <code>match.arg()</code>.</p>
-<p>The released versioned models do not all validate <code>version</code> this way, so do not read one of them as the norm. <code>cswald()</code> uses <code>match.arg()</code> as the template does (<code>R/model_cswald.R:177</code>), <code>m3()</code> checks the string with <code>stopif()</code> (<code>R/model_m3.R:183-186</code>), and <code>ezdm()</code> does not validate in the constructor at all — an unknown version reaches <code>check_data.ezdm()</code> and errors there (<code>R/model_ezdm.R:200</code>). Use the template’s <code>match.arg()</code> for a new model: it rejects the bad value where the user typed it.</p></li>
-<li><p><strong>Adjust the user-facing alias.</strong> Here you should only rename the required arguments and fill in the <code>@examples</code> section with a full example. Everything else will be filled in automatically based on the information in the <code>.model_gcm</code> function.</p></li>
-<li><p><strong>Fill the <code>check_data.gcm</code> function</strong> with the appropriate code. This function should check the data and return the data. You may or may not need to compute any transformations or save some variables as attributes of the data.</p></li>
-<li><p><strong>If necessary, define the <code>bmf2bf.gcm</code> method</strong> to convert the <code>bmmformula</code> to a <code>brmsformula</code>. You need a custom <code>bmf2bf</code> method if:</p>
-<ul>
-<li>Your model has <strong>multiple response variables</strong> (e.g., DDM needs <code>rt | dec(response) ~ 1</code>)</li>
-<li>Your model uses <strong>aggregate data</strong> with <code>vreal()</code>, <code>vint()</code>, <code>trials()</code> (e.g., EZDM)</li>
-<li>Your model needs special response wrapping</li>
-</ul>
-<p>Keep in mind that <code>brms</code> automatically interprets this formula as the linear model formula for the <code>mu</code> parameter of your custom family. If your model does not have a natural <code>mu</code> parameter, suppress it: include <code>mu = 0</code> in <code>fixed_parameters</code>, add a dummy <code>mu</code> (identity link) to the family’s <code>dpars</code>, and write the first formula line yourself (as DDM does with <code>rt | dec(response) ~ 1</code>). See the DDM example in <a href="example-model.html" class="quarto-xref">Section&nbsp;<span>4</span></a> and the <em>Suppressing <code>mu</code></em> section of the architecture chapter for details. <em>If your model has a single response variable and no special wrapping, you can delete this section.</em></p></li>
-<li><p><strong>Fill the <code>configure_model.gcm</code> function</strong> with the appropriate code. This function should construct the formula, the family, and the stanvars, and return them as <code>nlist(formula, data, stanvars)</code>. Note that <code>configure_model</code> does <strong>not</strong> return initial values — initialization is handled separately by <code>create_initfun()</code> using the <code>init_ranges</code> field in your model definition.</p>
-<p>You need to fill information about your custom family, and then fill the STAN files with your STAN code. Conveniently, loading the STAN files and setting up the stanvars is set up automatically when calling the <code>use_model_template</code> function. Should you need to add more STAN files after you created the template, you can add the files in <code>inst/stan_chunks/</code> manually and edit those lines to additionally load the manually added files.</p></li>
-<li><p><strong>Define <code>init_ranges</code> if needed.</strong> If your model uses a custom family (especially RT models), you should define <code>init_ranges</code> in your model definition to provide plausible starting ranges for MCMC sampling. This is particularly important for models where parameters have hard constraints relative to observed data – for example, non-decision time must be less than the fastest observed RT, otherwise the likelihood is undefined. The <code>create_initfun()</code> step will automatically use these to generate an initialization function. Each entry maps a parameter name to a <code>c(lower, upper)</code> range. If <code>init_ranges</code> is <code>NULL</code>, brms’ default initialization is used.</p></li>
-<li><p><strong>Fill the <code>postprocess_brm.gcm</code> function</strong> with the appropriate code. By post-processing, we mean changes to the fitted brms model - like renaming parameters, etc. If you don’t need any post-processing, you can delete this section.</p></li>
-<li><p><strong>Define <code>log_lik</code> and <code>posterior_predict</code> functions</strong> if your model uses a custom family. These R functions must be passed to <code>brms::custom_family()</code> and enable posterior predictive checks, model comparison (via LOO/WAIC), and <code>posterior_predict()</code>. They should use the <code>d*()</code> and <code>r*()</code> distribution functions from <code>R/distributions.R</code>. See the DDM example in <a href="example-model.html" class="quarto-xref">Section&nbsp;<span>4</span></a>.</p></li>
-</ol>
+<p>This creates <code>R/model_gcm.R</code> and the empty files <code>inst/stan_chunks/gcm_likelihood.stan</code> and <code>inst/stan_chunks/gcm_functions.stan</code>, and opens them in your editor. The top of the R file holds the specification and the constructor:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-label="1"></a>.gcm_defaults <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-label="2"></a>  <span class="at">parameters =</span> <span class="fu">list</span>(</span>
+<span id="cb2-3"><a href="#cb2-3" aria-label="3"></a>    <span class="at">par1 =</span> <span class="st">"Parameter 1 = description of parameter 1"</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-label="4"></a>    <span class="at">par2 =</span> <span class="st">"Parameter 2 = description of parameter 2"</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-label="5"></a>  ),</span>
+<span id="cb2-6"><a href="#cb2-6" aria-label="6"></a>  <span class="at">links =</span> <span class="fu">list</span>(</span>
+<span id="cb2-7"><a href="#cb2-7" aria-label="7"></a>    <span class="at">par1 =</span> <span class="st">"identity"</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-label="8"></a>    <span class="at">par2 =</span> <span class="st">"log"</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-label="9"></a>  ),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-label="10"></a>  <span class="at">fixed_parameters =</span> <span class="fu">list</span>(</span>
+<span id="cb2-11"><a href="#cb2-11" aria-label="11"></a>    <span class="at">mu =</span> <span class="dv">0</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-label="12"></a>  ),</span>
+<span id="cb2-13"><a href="#cb2-13" aria-label="13"></a>  <span class="co"># pick the sd rate by meaning: 1 for sensitivity, strength, concentration</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-label="14"></a>  <span class="co"># (kappa), mixing weights and identity-linked drift; 2 for criteria,</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-label="15"></a>  <span class="co"># thresholds, boundary, ndt, start point, log-linked drift, diffusion</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-label="16"></a>  <span class="co"># constant, log ratios, log SDs and correlations; 4 for circular bias</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-label="17"></a>  <span class="at">priors =</span> <span class="fu">list</span>(</span>
+<span id="cb2-18"><a href="#cb2-18" aria-label="18"></a>    <span class="at">par1 =</span> <span class="fu">list</span>(<span class="at">main =</span> <span class="st">"normal(0, 1)"</span>, <span class="at">effects =</span> <span class="st">"normal(0, 0.5)"</span>, <span class="at">sd =</span> <span class="st">"exponential(1)"</span>),</span>
+<span id="cb2-19"><a href="#cb2-19" aria-label="19"></a>    <span class="at">par2 =</span> <span class="fu">list</span>(<span class="at">main =</span> <span class="st">"normal(0, 0.5)"</span>, <span class="at">effects =</span> <span class="st">"normal(0, 0.5)"</span>, <span class="at">sd =</span> <span class="st">"exponential(2)"</span>)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-label="20"></a>  ),</span>
+<span id="cb2-21"><a href="#cb2-21" aria-label="21"></a>  <span class="at">init_ranges =</span> <span class="fu">list</span>(</span>
+<span id="cb2-22"><a href="#cb2-22" aria-label="22"></a>    <span class="at">par1 =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb2-23"><a href="#cb2-23" aria-label="23"></a>    <span class="at">par2 =</span> <span class="fu">c</span>(<span class="fl">0.5</span>, <span class="fl">1.5</span>)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-label="24"></a>  )</span>
+<span id="cb2-25"><a href="#cb2-25" aria-label="25"></a>)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-label="26"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-label="27"></a></span>
+<span id="cb2-28"><a href="#cb2-28" aria-label="28"></a>.model_gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">resp_var1 =</span> <span class="cn">NULL</span>, <span class="at">required_arg1 =</span> <span class="cn">NULL</span>, <span class="at">required_arg2 =</span> <span class="cn">NULL</span>,</span>
+<span id="cb2-29"><a href="#cb2-29" aria-label="29"></a>                                  <span class="at">links =</span> <span class="cn">NULL</span>, <span class="at">call =</span> <span class="cn">NULL</span>, ...) {</span>
+<span id="cb2-30"><a href="#cb2-30" aria-label="30"></a>  out <span class="ot">&lt;-</span> <span class="fu">structure</span>(</span>
+<span id="cb2-31"><a href="#cb2-31" aria-label="31"></a>    <span class="fu">list</span>(</span>
+<span id="cb2-32"><a href="#cb2-32" aria-label="32"></a>      <span class="at">resp_vars =</span> <span class="fu">nlist</span>(resp_var1),</span>
+<span id="cb2-33"><a href="#cb2-33" aria-label="33"></a>      <span class="at">other_vars =</span> <span class="fu">nlist</span>(required_arg1, required_arg2),</span>
+<span id="cb2-34"><a href="#cb2-34" aria-label="34"></a>      <span class="at">domain =</span> <span class="st">""</span>,</span>
+<span id="cb2-35"><a href="#cb2-35" aria-label="35"></a>      <span class="at">task =</span> <span class="st">""</span>,</span>
+<span id="cb2-36"><a href="#cb2-36" aria-label="36"></a>      <span class="at">name =</span> <span class="st">""</span>,</span>
+<span id="cb2-37"><a href="#cb2-37" aria-label="37"></a>      <span class="at">citation =</span> <span class="fu">character</span>(),</span>
+<span id="cb2-38"><a href="#cb2-38" aria-label="38"></a>      <span class="at">version =</span> <span class="st">"NA"</span>,</span>
+<span id="cb2-39"><a href="#cb2-39" aria-label="39"></a>      <span class="at">requirements =</span> <span class="st">""</span>,</span>
+<span id="cb2-40"><a href="#cb2-40" aria-label="40"></a>      <span class="at">parameters =</span> .gcm_defaults[[<span class="st">"parameters"</span>]],</span>
+<span id="cb2-41"><a href="#cb2-41" aria-label="41"></a>      <span class="at">links =</span> .gcm_defaults[[<span class="st">"links"</span>]],</span>
+<span id="cb2-42"><a href="#cb2-42" aria-label="42"></a>      <span class="at">fixed_parameters =</span> .gcm_defaults[[<span class="st">"fixed_parameters"</span>]],</span>
+<span id="cb2-43"><a href="#cb2-43" aria-label="43"></a>      <span class="at">default_priors =</span> .gcm_defaults[[<span class="st">"priors"</span>]],</span>
+<span id="cb2-44"><a href="#cb2-44" aria-label="44"></a>      <span class="at">init_ranges =</span> .gcm_defaults[[<span class="st">"init_ranges"</span>]]</span>
+<span id="cb2-45"><a href="#cb2-45" aria-label="45"></a>    ),</span>
+<span id="cb2-46"><a href="#cb2-46" aria-label="46"></a>    <span class="at">class =</span> <span class="fu">c</span>(<span class="st">"bmmodel"</span>, <span class="st">"gcm"</span>),</span>
+<span id="cb2-47"><a href="#cb2-47" aria-label="47"></a>    <span class="at">call =</span> call</span>
+<span id="cb2-48"><a href="#cb2-48" aria-label="48"></a>  )</span>
+<span id="cb2-49"><a href="#cb2-49" aria-label="49"></a>  out <span class="ot">&lt;-</span> <span class="fu">set_links</span>(out, links)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-label="50"></a>  out</span>
+<span id="cb2-51"><a href="#cb2-51" aria-label="51"></a>}</span>
+<span id="cb2-52"><a href="#cb2-52" aria-label="52"></a></span>
+<span id="cb2-53"><a href="#cb2-53" aria-label="53"></a><span class="co"># uncomment if configure_model() builds the links into the family or into</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-label="54"></a><span class="co"># the non-linear formulas rather than reading them from the list above,</span></span>
+<span id="cb2-55"><a href="#cb2-55" aria-label="55"></a><span class="co"># so that a link set by the user is refused instead of silently ignored:</span></span>
+<span id="cb2-56"><a href="#cb2-56" aria-label="56"></a><span class="co"># #' @exportS3Method</span></span>
+<span id="cb2-57"><a href="#cb2-57" aria-label="57"></a><span class="co"># settable_links.gcm &lt;- function(model) character(0)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Above the specification, a header comment lists the registries outside the file that a new model must update and the format <code>citation</code> must follow. One line of that header is out of date in bmm 1.4.1: the stored-frame test case no longer goes into <code>stored_frame_cases()</code> in <code>test-update.R</code> but into your model’s test-case file (see <a href="#testing">Testing</a>). The other entries, <code>data_column_roles</code>, <code>revert_check_data()</code>, <code>response_annotations()</code> and the <code>citation</code> format, are correct. Below it come the user-facing alias <code>gcm()</code> with its roxygen block, and the stubs <code>check_data.gcm()</code>, <code>bmf2bf.gcm()</code>, <code>configure_model.gcm()</code> (with a <code>custom_family()</code> skeleton and the lines that read your two Stan files), <code>log_lik_gcm()</code>, <code>posterior_predict_gcm()</code>, <code>posterior_epred_gcm()</code> and <code>postprocess_brm.gcm()</code>. The <code>check_data</code>, <code>bmf2bf</code> and <code>postprocess_brm</code> stubs carry a header comment saying when you may delete them.</p>
+<p>For a complete model written to the current conventions, read <code>R/model_sdt_yn.R</code>: a custom family on aggregated counts, with its own <code>log_lik</code>, <code>posterior_predict</code> and <code>posterior_epred</code> functions and a <code>settable_links</code> method. Most of its length is documentation.</p>
 </section>
-<section id="failure-modes-to-expect" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="failure-modes-to-expect"><span class="header-section-number">5.2</span> Failure modes to expect</h2>
-<p>Five things in 1.3.2 will bite you while the model is still half-written. All of them are new or newly strict, so an older model file will not warn you about them.</p>
-<p><strong><code>configure_prior()</code> errors if <code>fixed_parameters</code> names a parameter the formula never gets.</strong> Every name in <code>fixed_parameters</code> has to be wired into the formula by your <code>configure_model()</code>, as either a distributional parameter or a non-linear one. If it is neither, bmm stops with a model-definition error rather than letting a malformed <code>b_Intercept ~ constant()</code> prior reach <code>brm()</code> (#377, <code>R/helpers-prior.R:165-174</code>). This is the error you get when you add <code>mu = 0</code> to <code>fixed_parameters</code> but forget to put a dummy <code>mu</code> in the family’s <code>dpars</code>.</p>
-<p><strong>Short parameter names are risky, and the rule is a word boundary.</strong> <code>create_initfun()</code> has to map Stan parameter names back to your model parameters to know which <code>init_ranges</code> entry applies. It matches with the regex <code>(^|_)param(_|$)</code> and takes the longest match when several apply (#354, #355, <code>R/helpers-inits.R:75-87</code>). So a parameter called <code>s</code> matches <code>b_s_Intercept</code> but not <code>sd_id__sim</code>, which is the point — before 1.3.2 this was a substring match and <code>s</code> collided with <code>sim</code>. Two consequences for naming: a parameter name that is a substring of another is now safe, but a name that appears as a whole underscore-delimited token somewhere else in the Stan parameter names is not. If nothing matches at all, the fallback is the first underscore-delimited token of the Stan name, which is usually wrong and silently so.</p>
-<p><strong>A parameter that is not a dpar is looked up in <code>nlpars</code>.</strong> <code>create_initfun()</code> resolves each parameter’s terms as <code>bterms$dpars[[parameter]] %||% bterms$nlpars[[parameter]]</code> (<code>R/helpers-inits.R:56</code>). Before #362 it only looked in <code>dpars</code>, and a model built as a non-linear brms formula — a native-multinomial model, for instance — failed with <code>no applicable method for 'has_intercept' applied to an object of class "NULL"</code>. If you see that error on an older bmm, this is what it was.</p>
-<p><strong>A predictor that is also a parameter name and also a data column now warns.</strong> bmm decides whether a formula component is non-linear purely by whether one of its predictors is also a predicted parameter, and emits <code>nlf()</code> rather than <code>lf()</code> in that case. When the same name is also a column in the data, that choice changes the likelihood and the user has no way to see it. <code>check_formula.bmmodel</code> warns (#378, <code>R/bmmformula.R:165-180</code>). Short parameter names collide naturally with column names like <code>accuracy</code> or a condition coded <code>c</code>, which is another reason to avoid one-letter parameters in a new model.</p>
-<p><strong>Add your model to <code>response_annotations()</code>.</strong> Since #392, <code>print.bmmodel()</code> shows the required response variables with the coding they expect (“radians in [-pi, pi]”, “seconds”) and the default links, which answers “what does my data frame need to look like?” at the console. The annotations come from <code>response_annotations()</code> (<code>R/helpers-model.R:184-205</code>), a lookup keyed on the model’s class. A model whose class is not in that chain falls through to an empty list and prints its response variables bare. Add a branch for your class.</p>
+<section id="filling-in-the-template" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="filling-in-the-template"><span class="header-section-number">5.2</span> Filling in the template</h2>
+<ol type="1">
+<li><p><strong>The specification and the constructor.</strong> Most of your work is in <code>.gcm_defaults</code>: the parameters (with descriptions), their links, which parameters are fixed and to what value, the default priors, and the initialization ranges. Set default priors (<code>main</code>, <code>effects</code> and <code>sd</code>) for every parameter, informed by knowledge in the field; <code>.ddm_defaults</code> in <code>R/model_ddm.R</code> is a worked example. Give <code>init_ranges</code> only to parameters whose likelihood is undefined in part of their range, such as a non-decision time that must stay below the fastest RT (see <a href="reference.html#sec-init-ranges" class="quarto-xref"><span>Section A.3</span></a>). Prefer parameter names of more than one letter that do not match a likely data column (see <a href="#failure-modes-to-expect">Failure modes to expect</a>).</p>
+<p>In <code>.model_gcm()</code>, rename the response and required arguments and fill in the metadata (<code>domain</code>, <code>task</code>, <code>name</code>, <code>citation</code>, <code>requirements</code>). <code>citation</code> holds one reference per element, each on a single line, without a <code>-</code> bullet, and ending in <code>.</code> or a <code>https://doi.org/</code> URL; <code>model_citation()</code> hands them to users for their reference lists. Two more things about the constructor are checked by tests: it must run with <strong>no arguments</strong> (the tests call every <code>.model_*()</code> bare, which is why every argument defaults to <code>NULL</code>), and its fields must stay in the <strong>order the template emits them</strong>. For <code>domain</code>, reuse the string of the models your model sits with, so that <code>bmm_models()</code> and the website list it under the right task group: <code>"Visual working memory"</code>, <code>"Working Memory (categorical), Categorical Decision Making"</code>, <code>"Categorical decision making, memory, and reasoning"</code> (MPT), <code>"Perception &amp; Recognition Memory"</code> (or <code>"Recognition Memory"</code>, which lands in the same group) or <code>"Decision Making / Response times"</code>. A new string becomes a group of its own.</p>
+<p>For a model with several versions, generate the scaffold with <code>use_model_template("gcm", versions = c("v1", "v2"))</code>. You get a <code>.gcm_version_table</code> with one entry per version, a constructor that reads each field from it and appends <code>paste0("gcm_", version)</code> to the class, and an alias with <code>version = c("v1", "v2")</code> validated by <code>match.arg()</code>. Keep the default as a literal <code>c(...)</code>: <code>model_versions()</code> reads it to build the per-version documentation tables.</p></li>
+<li><p><strong>Links.</strong> The constructor passes the user’s <code>links</code> through <code>set_links()</code>, which refuses names that are not parameters, repairs one-letter typos with a warning, and warns when a link widens the parameter’s range (say <code>identity</code> instead of <code>log</code>). By default every link in your <code>links</code> list can be changed by the user. If <code>configure_model()</code> writes a link into the family, the Stan code or the non-linear formulas instead of reading it from the list, a user’s choice would be silently ignored, so declare which links can be set:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-label="1"></a><span class="co">#' @exportS3Method</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-label="2"></a>settable_links.gcm <span class="ot">&lt;-</span> <span class="cf">function</span>(model) <span class="fu">character</span>(<span class="dv">0</span>)   <span class="co"># or c("par1")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Name the method for your model class, not for <code>bmmodel</code>, which comes first in every class vector and would shadow it. A model that substitutes the inverse link into its formulas itself also overrides <code>settable_link_functions()</code>; the multinomial SDT models are the examples.</p></li>
+<li><p><strong>The user-facing alias.</strong> Rename the required arguments and fill in <code>@examples</code> with a full example. Keep the generated <code>@keywords bmmodel</code>: the pkgdown test needs it and is skipped inside <code>check()</code> (see <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a>). Title and details are generated from the constructor.</p></li>
+<li><p><strong><code>check_data.gcm()</code></strong> checks the data and returns it, ending with <code>NextMethod("check_data")</code>. It may compute transformations or store values as data attributes for <code>configure_model</code> (see <a href="bmm-architecture.html#sec-attribute-bridge" class="quarto-xref"><span>Section 3.6</span></a>). If it adds, renames or packs columns, <code>update()</code> needs to undo that before it can re-run it on a fitted model’s data; see <a href="bmm-architecture.html#sec-revert-check-data" class="quarto-xref"><span>Section 3.7</span></a>.</p></li>
+<li><p><strong><code>bmf2bf.gcm()</code>, if needed.</strong> You need a custom method if your model has several response variables (DDM: <code>rt | dec(response) ~ 1</code>), uses aggregate data through <code>vreal()</code>, <code>vint()</code> or <code>trials()</code> (EZDM, <code>sdt_yn</code>), or needs other response wrapping. brms reads this formula as the linear model for the family’s <code>mu</code>. If your model has no natural <code>mu</code>, suppress it: put <code>mu = 0</code> in <code>fixed_parameters</code>, add a dummy <code>mu</code> (identity link) to the family’s <code>dpars</code>, and write the first formula line yourself (see <a href="reference.html#sec-suppress-mu" class="quarto-xref"><span>Section A.2</span></a>). Leave the dummy <code>mu</code> out of <code>parameters</code>, so that <code>prior_info()</code> and <code>parameter_info()</code> do not report it.</p></li>
+<li><p><strong><code>configure_model.gcm()</code></strong> builds the formula, the family and the stanvars and returns <code>nlist(formula, data, stanvars)</code>. It does not return initial values. brms connects the family to your Stan code by name: a custom family <code>"gcm"</code> with <code>dpars = c("mu", "par1", "par2")</code> calls a Stan function <code>gcm_lpdf(y | mu, par1, par2)</code> (<code>gcm_lpmf</code> for an integer response) that you define in <code>gcm_functions.stan</code>. The DDM method in <a href="example-model.html" class="quarto-xref"><span>Chapter 4</span></a> shows the whole pattern, and the <a href="https://cran.r-project.org/web/packages/brms/vignettes/brms_customfamilies.html">brms custom families vignette</a> explains it. Add further Stan files to <code>inst/stan_chunks/</code> and read them here. If your Stan code has to differ when the user asks for within-chain threading, see <a href="reference.html#sec-threading" class="quarto-xref"><span>Section A.5</span></a>.</p></li>
+<li><p><strong><code>postprocess_brm.gcm()</code></strong> changes the fitted object (renaming parameters and the like). Delete the section if you need none. If you keep it, also write <code>revert_postprocess_brm.gcm()</code>, which undoes the change: <code>update()</code> calls it to get the fit back into the shape brms built before refitting. <code>R/model_sdm.R</code> has both.</p></li>
+<li><p><strong><code>log_lik</code>, <code>posterior_predict</code> and <code>posterior_epred</code></strong>, for a custom family. These are plain R functions passed to <code>brms::custom_family()</code>; the template generates them empty and already passes them to the family, and their contracts are in <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a>. They power LOO and WAIC, posterior predictive checks, and <code>posterior_epred()</code>/<code>fitted()</code>. Build them on <code>d*()</code> and <code>r*()</code> functions for your model in <code>R/distributions.R</code>, which you write first (see <a href="#distribution-functions">Distribution functions</a>). If the mean of your response is not a useful quantity, pass <code>posterior_epred_undefined("gcm")</code>, as SDM does, so the user gets an error that points to <code>native_parameters()</code>. Models built on a native brms family (<code>brms::mixture()</code>, <code>brms::multinomial()</code>) get all three from brms.</p></li>
+</ol>
 </section>
 <section id="testing" class="level2" data-number="5.3">
 <h2 data-number="5.3" class="anchored" data-anchor-id="testing"><span class="header-section-number">5.3</span> Testing</h2>
-<p>Unit testing is extremely important. You should test your model with the <code>testthat</code> package. You can use the <code>use_test()</code> function to create a test file for your model. See files like <code>tests/testthat/test-model_ddm.R</code> or <code>tests/testthat/test-model_cswald.R</code> for examples of how we test models. BRMS models take a long time to fit, so we don’t test the actual fitting process.</p>
-<p>Instead we use brms’ mock backend. This is not a bmm feature — <code>backend = "mock"</code> and <code>mock_fit</code> are arguments of <code>brms::brm()</code>, and they reach it because <code>bmm()</code> passes <code>...</code> through. The whole backend is two lines: whatever you pass as <code>mock_fit</code> is returned in place of the fitted Stan object (a function is called first). Everything before the fit — data checks, formula translation, family construction, stanvars, initial values — runs for real, which is exactly what you want to test. For example, here’s a mock test pattern:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-label="1"></a><span class="fu">test_that</span>(<span class="st">"gcm model runs without errors"</span>, {</span>
-<span id="cb4-2"><a href="#cb4-2" aria-label="2"></a>  withr<span class="sc">::</span><span class="fu">local_options</span>(<span class="st">"bmm.silent"</span> <span class="ot">=</span> <span class="dv">2</span>)</span>
-<span id="cb4-3"><a href="#cb4-3" aria-label="3"></a>  <span class="fu">skip_on_cran</span>()</span>
-<span id="cb4-4"><a href="#cb4-4" aria-label="4"></a></span>
-<span id="cb4-5"><a href="#cb4-5" aria-label="5"></a>  dat <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb4-6"><a href="#cb4-6" aria-label="6"></a>    <span class="at">resp =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
-<span id="cb4-7"><a href="#cb4-7" aria-label="7"></a>    <span class="at">exemplar =</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="st">"A"</span>, <span class="st">"B"</span>), <span class="dv">5</span>),</span>
-<span id="cb4-8"><a href="#cb4-8" aria-label="8"></a>    <span class="at">category =</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>), <span class="at">each =</span> <span class="dv">5</span>)</span>
-<span id="cb4-9"><a href="#cb4-9" aria-label="9"></a>  )</span>
-<span id="cb4-10"><a href="#cb4-10" aria-label="10"></a></span>
-<span id="cb4-11"><a href="#cb4-11" aria-label="11"></a>  f <span class="ot">&lt;-</span> <span class="fu">bmmformula</span>(param1 <span class="sc">~</span> <span class="dv">1</span>, param2 <span class="sc">~</span> <span class="dv">1</span>)</span>
-<span id="cb4-12"><a href="#cb4-12" aria-label="12"></a>  mock_fit <span class="ot">&lt;-</span> <span class="fu">bmm</span>(</span>
-<span id="cb4-13"><a href="#cb4-13" aria-label="13"></a>    f, dat,</span>
-<span id="cb4-14"><a href="#cb4-14" aria-label="14"></a>    <span class="fu">gcm</span>(<span class="at">resp_var1 =</span> <span class="st">"resp"</span>, <span class="at">required_arg1 =</span> <span class="st">"exemplar"</span>, <span class="at">required_arg2 =</span> <span class="st">"category"</span>),</span>
-<span id="cb4-15"><a href="#cb4-15" aria-label="15"></a>    <span class="at">backend =</span> <span class="st">"mock"</span>, <span class="at">mock_fit =</span> <span class="dv">1</span>, <span class="at">rename =</span> <span class="cn">FALSE</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-label="16"></a>  )</span>
-<span id="cb4-17"><a href="#cb4-17" aria-label="17"></a>  <span class="fu">expect_equal</span>(mock_fit<span class="sc">$</span>fit, <span class="dv">1</span>)</span>
-<span id="cb4-18"><a href="#cb4-18" aria-label="18"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Two things about that call are easy to get wrong. The alias generated by the template calls <code>stop_missing_args()</code>, so every argument without a default has to be supplied — a test that passes only the response variable errors before it reaches the pipeline. And the argument is <code>mock_fit</code>, not <code>mock</code>. You will see <code>mock = 1</code> in the existing test files (48 occurrences against 21 of <code>mock_fit = 1</code> in 1.3.2); it works only because R partial-matches it to <code>mock_fit</code> on the way through <code>...</code>. Write <code>mock_fit</code>.</p>
-<p>The tests based on the <code>testthat</code> package are run every time you call the <code>check()</code> command. Before you submit your changes, make sure that all tests pass.</p>
+<p>A new model adds two files to <code>tests/testthat/</code>:</p>
+<ul>
+<li><p><strong><code>test-model_gcm.R</code></strong> tests your model’s own contract: constructor validation, <code>check_data()</code>, <code>configure_model()</code>, the content of the generated Stan code, and your <code>d*</code>/<code>r*</code> functions. <code>tests/testthat/test-model_ddm.R</code> and <code>test-model_sdt_yn.R</code> are examples.</p></li>
+<li><p><strong><code>helper-model-gcm.R</code></strong> registers your model with the tests that run over every model (default priors, initial values, <code>update()</code>, links, posterior predictive checks). It defines one function, <code>model_cases_gcm()</code>, which returns small cases those tests use. A <code>stored_frame</code>, an <code>sd_default</code>, an <code>init</code> and a <code>links</code> case are required; <code>check_data</code>, <code>observables</code> and <code>fixture</code> cases apply only to some models. Copy <code>tests/testthat/helper-model-ddm.R</code> and adapt it. For a model without random-effect quirks or extra observables, it looks like this:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-label="1"></a>model_cases_gcm <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb4-2"><a href="#cb4-2" aria-label="2"></a>  model <span class="ot">&lt;-</span> <span class="fu">gcm</span>(<span class="st">"resp"</span>, <span class="st">"exemplar"</span>, <span class="st">"category"</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-label="3"></a>  data <span class="ot">&lt;-</span> <span class="fu">toy_gcm_data</span>()  <span class="co"># write a small dataset next to those in helper-model-data.R</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-label="4"></a>  re_formula <span class="ot">&lt;-</span> <span class="fu">bmf</span>(par1 <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> id), par2 <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> id))</span>
+<span id="cb4-5"><a href="#cb4-5" aria-label="5"></a>  <span class="fu">list</span>(</span>
+<span id="cb4-6"><a href="#cb4-6" aria-label="6"></a>    <span class="at">stored_frame =</span> <span class="fu">list</span>(<span class="at">gcm =</span> <span class="fu">list</span>(<span class="at">model =</span> model, <span class="at">formula =</span> <span class="fu">bmf</span>(par1 <span class="sc">~</span> <span class="dv">1</span>, par2 <span class="sc">~</span> <span class="dv">1</span>), <span class="at">data =</span> data)),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-label="7"></a>    <span class="at">sd_default =</span> <span class="fu">list</span>(<span class="at">gcm =</span> <span class="fu">list</span>(</span>
+<span id="cb4-8"><a href="#cb4-8" aria-label="8"></a>      <span class="at">model =</span> model, <span class="at">formula =</span> re_formula, <span class="at">data =</span> data,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-label="9"></a>      <span class="at">sd =</span> <span class="fu">c</span>(<span class="at">par1 =</span> <span class="st">"exponential(1)"</span>, <span class="at">par2 =</span> <span class="st">"exponential(2)"</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-label="10"></a>    )),</span>
+<span id="cb4-11"><a href="#cb4-11" aria-label="11"></a>    <span class="at">init =</span> <span class="fu">list</span>(<span class="at">gcm =</span> <span class="fu">list</span>(<span class="at">model =</span> model, <span class="at">formula =</span> re_formula, <span class="at">data =</span> data)),</span>
+<span id="cb4-12"><a href="#cb4-12" aria-label="12"></a>    <span class="at">links =</span> <span class="fu">list</span>(<span class="at">gcm =</span> <span class="fu">list</span>(<span class="at">model =</span> model, <span class="at">settable =</span> <span class="fu">c</span>(<span class="st">"par1"</span>, <span class="st">"par2"</span>)))</span>
+<span id="cb4-13"><a href="#cb4-13" aria-label="13"></a>  )</span>
+<span id="cb4-14"><a href="#cb4-14" aria-label="14"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>sd</code> repeats your default <code>sd</code> priors and <code>settable</code> what <code>settable_links()</code> returns. The header of <code>helper-model-cases.R</code> describes the optional cases.</p></li>
+</ul>
+<p>Tests must not sample, so pipeline tests use brms’ mock backend. <code>backend = "mock"</code> is a <code>brms::brm()</code> argument, and whatever you pass as <code>mock_fit</code> is returned in place of the fitted Stan object. Everything before the fit (data checks, formula, family, Stan code, priors, initial values) runs for real, which is what you want to test:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-label="1"></a><span class="fu">test_that</span>(<span class="st">"gcm model runs without errors"</span>, {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-label="2"></a>  withr<span class="sc">::</span><span class="fu">local_options</span>(<span class="st">"bmm.silent"</span> <span class="ot">=</span> <span class="dv">2</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-label="3"></a>  <span class="fu">skip_on_cran</span>()</span>
+<span id="cb5-4"><a href="#cb5-4" aria-label="4"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-label="5"></a>  dat <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb5-6"><a href="#cb5-6" aria-label="6"></a>    <span class="at">resp =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
+<span id="cb5-7"><a href="#cb5-7" aria-label="7"></a>    <span class="at">exemplar =</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="st">"A"</span>, <span class="st">"B"</span>), <span class="dv">5</span>),</span>
+<span id="cb5-8"><a href="#cb5-8" aria-label="8"></a>    <span class="at">category =</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>), <span class="at">each =</span> <span class="dv">5</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-label="9"></a>  )</span>
+<span id="cb5-10"><a href="#cb5-10" aria-label="10"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-label="11"></a>  f <span class="ot">&lt;-</span> <span class="fu">bmmformula</span>(par1 <span class="sc">~</span> <span class="dv">1</span>, par2 <span class="sc">~</span> <span class="dv">1</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-label="12"></a>  mock_fit <span class="ot">&lt;-</span> <span class="fu">bmm</span>(</span>
+<span id="cb5-13"><a href="#cb5-13" aria-label="13"></a>    f, dat,</span>
+<span id="cb5-14"><a href="#cb5-14" aria-label="14"></a>    <span class="fu">gcm</span>(<span class="at">resp_var1 =</span> <span class="st">"resp"</span>, <span class="at">required_arg1 =</span> <span class="st">"exemplar"</span>, <span class="at">required_arg2 =</span> <span class="st">"category"</span>),</span>
+<span id="cb5-15"><a href="#cb5-15" aria-label="15"></a>    <span class="at">backend =</span> <span class="st">"mock"</span>, <span class="at">mock_fit =</span> <span class="dv">1</span>, <span class="at">rename =</span> <span class="cn">FALSE</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-label="16"></a>  )</span>
+<span id="cb5-17"><a href="#cb5-17" aria-label="17"></a>  <span class="fu">expect_equal</span>(mock_fit<span class="sc">$</span>fit, <span class="dv">1</span>)</span>
+<span id="cb5-18"><a href="#cb5-18" aria-label="18"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Every argument of the alias without a default has to be supplied, because the alias calls <code>stop_missing_args()</code>. Older test files write <code>mock = 1</code>, which works only because R partial-matches it to <code>mock_fit</code>.</p>
+<p>The rest of the rules are numbered R1 to R10 in bmm’s <a href="https://github.com/popov-lab/bmm/blob/develop/AGENTS.md">AGENTS.md</a>, with the reasoning in <a href="https://github.com/popov-lab/bmm/blob/develop/.dev/decisions/0004-test-tiers-and-budget.md">ADR 0004</a>. The ones a new model meets:</p>
+<ul>
+<li>Seed with <code>withr::local_seed()</code>, never <code>set.seed()</code>.</li>
+<li>A test that compiles Stan code opens with <code>skip_unless_stan_tests()</code>. A test that takes more than 0.4 s with <code>NOT_CRAN</code> unset on your machine opens with <code>skip_on_cran()</code>, so that the package’s check stays within CRAN’s time limit.</li>
+<li>The suite has a time budget. Check your tests with <code>devtools::test(reporter = "slow")</code>.</li>
+<li><code>tests/testthat/test-conventions.R</code> checks several of these rules and fails with the rule’s number.</li>
+</ul>
+<p><code>tests/testthat/helper-epred.R</code> has <code>epred_vs_predict()</code> and <code>expect_epred_by_cell()</code> for testing a <code>posterior_epred</code> function against <code>posterior_predict</code>. If your Stan code changes with threading, test the generated code with and without it (<a href="reference.html#sec-threading" class="quarto-xref"><span>Section A.5</span></a>).</p>
 <section id="parameter-recovery" class="level3" data-number="5.3.1">
 <h3 data-number="5.3.1" class="anchored" data-anchor-id="parameter-recovery"><span class="header-section-number">5.3.1</span> Parameter recovery</h3>
-<p>Additionally, you should perform a full test of the model by running it in a separate script and ensuring it gives meaningful results. At the very least, you should perform basic parameter recovery simulations for hyper-parameters (i.e., means and standard deviations) as well as subject-level parameters to give users an idea of how much data they need to adequately estimate the model. <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a> covers what the study has to show — in particular why you must not simulate and fit with the same distribution function — and how to report it.</p>
+<p>A new model needs a parameter recovery study on simulated data. The pull request description shows true against recovered values, as a table or a plot, from a hierarchical design with several subjects whose parameters vary, on data simulated with an independent generator rather than your own <code>r*</code> function. Attach the script as a gist or in a collapsed block. <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a> explains why the generator matters, and <a href="https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md">CONTRIBUTING.md</a> has the requirements.</p>
 </section>
 <section id="distribution-functions" class="level3" data-number="5.3.2">
 <h3 data-number="5.3.2" class="anchored" data-anchor-id="distribution-functions"><span class="header-section-number">5.3.2</span> Distribution functions</h3>
-<p>If your model uses a custom family, you should also add distribution functions (<code>d*</code>, <code>r*</code>, and optionally <code>p*</code>, <code>q*</code>) to <code>R/distributions.R</code>. These are used for:</p>
+<p>A custom family also needs distribution functions in <code>R/distributions.R</code>: <code>d*</code> and <code>r*</code>, optionally <code>p*</code> and <code>q*</code>. They simulate data, back <code>log_lik</code>, <code>posterior_predict</code> and <code>posterior_epred</code>, and drive the plots. Write them before the prediction functions.</p>
+</section>
+</section>
+<section id="before-you-open-the-pull-request" class="level2" data-number="5.4">
+<h2 data-number="5.4" class="anchored" data-anchor-id="before-you-open-the-pull-request"><span class="header-section-number">5.4</span> Before you open the pull request</h2>
+<p>Everything below lives outside your model file.</p>
+<p><strong>The test suite fails without these:</strong></p>
 <ul>
-<li>Data simulation (useful for parameter recovery and examples)</li>
-<li>Posterior predictive checks via the <code>log_lik</code> and <code>posterior_predict</code> functions</li>
-<li>Plotting model fits</li>
+<li>The two test files above, with all four required cases in your <code>model_cases_gcm()</code>.</li>
+<li>An entry in <code>data_column_roles</code> (<code>R/helpers-model.R</code>) describing in a few words what the column named by each alias argument without a default holds. Use <code>&lt;model&gt;_&lt;version&gt;</code> keys where versions differ, and <code>NA</code> for an argument that names no column. The <em>Get started</em> article builds its model tables from it.</li>
+<li>A <code>revert_check_data()</code> method if your <code>check_data()</code> adds, renames or packs columns (<a href="bmm-architecture.html#sec-revert-check-data" class="quarto-xref"><span>Section 3.7</span></a>). The <code>stored_frame</code> case is what tests it.</li>
+<li><code>@keywords bmmodel</code> on the alias, and a constructor that runs without arguments and keeps the template’s field order.</li>
+<li>At least one reference in <code>citation</code>, in the format of step 1.</li>
+</ul>
+<p><strong>Review expects these:</strong></p>
+<ul>
+<li>A branch in <code>response_annotations()</code> (<code>R/helpers-model.R</code>) giving the coding each response variable needs (“radians in [-pi, pi]”, “seconds”). <code>print()</code> shows it next to each response.</li>
+<li>A <code>domain</code> that places the model in the right task group (step 1).</li>
+<li>A parameter recovery study, an example dataset, an article, and a <code>NEWS.md</code> bullet.</li>
+</ul>
+<p><strong>Optional extension points.</strong> The defaults cover most models; write a method only when its condition applies.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 40%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Write it when</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>pp_observables()</code>, <code>pp_simulate()</code></td>
+<td>the likelihood has more than one observable (RT and choice), so <code>pp_check()</code> should check each. Add an <code>observables</code> case to your test cases.</td>
+<td><code>R/model_ddm.R</code></td>
+</tr>
+<tr class="even">
+<td><code>native_transform()</code></td>
+<td>the map from sampling to native scale is not elementwise <code>links</code> plus at most one softmax group</td>
+<td><code>native_transform.non_targets()</code></td>
+</tr>
+<tr class="odd">
+<td><code>data_check_findings()</code></td>
+<td>users commonly make a data mistake that <code>check_data()</code> tolerates; <code>bmm_data_check()</code> reports it</td>
+<td><code>data_check_findings.circular()</code></td>
+</tr>
+<tr class="even">
+<td><code>create_initfun()</code>, <code>configure_prior()</code></td>
+<td><code>init_ranges</code> and the default priors cannot express what the model needs</td>
+<td><code>create_initfun.m3()</code></td>
+</tr>
+</tbody>
+</table>
+<p>A model fitted to counts or summary statistics has a few more things to set up (<a href="reference.html#sec-aggregate-data" class="quarto-xref"><span>Section A.4</span></a>).</p>
+</section>
+<section id="failure-modes-to-expect" class="level2" data-number="5.5">
+<h2 data-number="5.5" class="anchored" data-anchor-id="failure-modes-to-expect"><span class="header-section-number">5.5</span> Failure modes to expect</h2>
+<ul>
+<li><strong><code>configure_prior()</code> errors when <code>fixed_parameters</code> names a parameter the formula never gets.</strong> Every fixed parameter has to be wired into the formula by <code>configure_model()</code>. The usual cause is <code>mu = 0</code> without a dummy <code>mu</code> in the family (<a href="reference.html#sec-suppress-mu" class="quarto-xref"><span>Section A.2</span></a>).</li>
+<li><strong>Method signatures must match the generics.</strong> <code>create_initfun()</code> receives the prior as its fourth argument, and <code>configure_prior()</code> methods receive <code>data2</code>, <code>knots</code> or <code>drop_unused_levels</code> through <code>...</code> when the user passes them; a method without <code>...</code> fails only in that case. <code>R CMD check</code> reports both.</li>
+<li><strong>Short parameter names collide</strong> with Stan parameter names and data columns. Prefer names of more than one letter (<a href="reference.html#sec-naming-traps" class="quarto-xref"><span>Section A.8</span></a>).</li>
 </ul>
 </section>
+<section id="post-processing" class="level2" data-number="5.6">
+<h2 data-number="5.6" class="anchored" data-anchor-id="post-processing"><span class="header-section-number">5.6</span> Post-processing</h2>
+<p>Most post-fit tools read the model object and need no code from you. <code>native_parameters()</code>, <code>parameter_info()</code> and <code>prior_info()</code> read the specification; <code>conditional_effects()</code> and <code>emmeans()</code> work through the <code>bmmfit</code> class; <code>posterior_epred()</code> and <code>fitted()</code> call your family’s <code>posterior_epred</code> function; <code>pp_check()</code> checks the response, and further observables if you declared them; <code>bmm_data_check()</code> runs your <code>check_data()</code> without compiling.</p>
 </section>
-<section id="post-processing-infrastructure" class="level2" data-number="5.4">
-<h2 data-number="5.4" class="anchored" data-anchor-id="post-processing-infrastructure"><span class="header-section-number">5.4</span> Post-processing infrastructure</h2>
-<p>The bmm package provides several post-processing tools that work automatically for most models:</p>
-<ul>
-<li><strong><code>conditional_effects()</code></strong> — visualize marginal effects of predictors on model parameters. Works automatically via the bmmfit class.</li>
-<li><strong><code>emmeans</code> integration</strong> — estimated marginal means via the emmeans package. Works automatically.</li>
-<li><strong><code>pp_check()</code></strong> — posterior predictive checks. Works automatically for standard families; custom support exists for multinomial families (like M3).</li>
-</ul>
-<p>For these to work with your custom family, you need to have defined <code>log_lik</code> and <code>posterior_predict</code> functions and passed them to <code>brms::custom_family()</code>. No additional code is typically needed in your model file.</p>
+<section id="add-an-example-dataset" class="level2" data-number="5.7">
+<h2 data-number="5.7" class="anchored" data-anchor-id="add-an-example-dataset"><span class="header-section-number">5.7</span> Add an example dataset</h2>
+<p>Every new model needs an example dataset that users can load and that the examples use: a new dataset added to the package, one already in it, or one from another package loaded with <code>data()</code>. The IMM and the SDT models use datasets shipped with bmm; the <code>mixture2p</code> and <code>mixture3p</code> articles use <code>data('bays2009_full', package = 'mixtur')</code>. <a href="https://r-pkgs.org/data.html">R Packages</a> explains how to add one.</p>
 </section>
-<section id="add-an-example-dataset" class="level2" data-number="5.5">
-<h2 data-number="5.5" class="anchored" data-anchor-id="add-an-example-dataset"><span class="header-section-number">5.5</span> Add an example dataset</h2>
-<p>All new models should come with an example dataset, that can be loaded by users and can be used in the examples section. This should be either:</p>
-<ul>
-<li>A new dataset that you add to the package</li>
-<li>A dataset that already exists in the package but that can be used with the new model</li>
-<li>A dataset that exists in another package that you can load with <code>data()</code> and use with the new model</li>
-</ul>
-<p>For example, the vignettes for the <code>mixture2p</code> and <code>mixture3p</code> use an external dataset from the <code>mixtur</code> package that can be loaded with <code>data('bays2009_full', package='mixtur')</code>. The <code>IMM</code> models use a dataset included in the current package. For instructions on how to add a new dataset see <a href="https://r-pkgs.org/data.html">here</a>.</p>
-</section>
-<section id="add-an-article" class="level2" data-number="5.6">
-<h2 data-number="5.6" class="anchored" data-anchor-id="add-an-article"><span class="header-section-number">5.6</span> Add an article</h2>
-<p>All new models should come with an article that explains some basic information about the model and how to estimate it with <code>bmm</code>. You can use the <code>use_article()</code> function to create a new article. See <a href="https://r-pkgs.org/vignettes.html">here</a> for more information. The articles will be published automatically on the package website under “Articles” when the pull request is approved. You can browse the source code for the existing articles in the <code>vignettes/articles/</code> directory. You can see the published version of the existing vignettes <a href="../articles/">here</a>.</p>
-<p>And that’s it! You have added a new model to the <code>bmm</code> package. You can now submit your changes to the <code>bmm</code> package repository.</p>
+<section id="add-an-article" class="level2" data-number="5.8">
+<h2 data-number="5.8" class="anchored" data-anchor-id="add-an-article"><span class="header-section-number">5.8</span> Add an article</h2>
+<p>Every new model needs an article explaining the model and how to fit it. Create it with <code>usethis::use_article()</code>; the existing ones are in <code>vignettes/articles/</code>, and the published versions are <a href="../articles/">here</a>. Articles load their fits from cached files, which are not committed; CONTRIBUTING.md says how to hand over the fit. The README, the home page and the <em>Get started</em> tables list your model automatically, from its constructor and its <code>data_column_roles</code> entry.</p>
 
 
 </section>
@@ -958,8 +926,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </script>
 <nav class="page-navigation">
   <div class="nav-page nav-page-previous">
-      <a href="./example-model.html" class="pagination-link" aria-label="Example model file">
-        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example model file</span></span>
+      <a href="./example-model.html" class="pagination-link" aria-label="Example models">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example models</span></span>
       </a>          
   </div>
   <div class="nav-page nav-page-next">
