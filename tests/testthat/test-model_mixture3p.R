@@ -588,6 +588,7 @@ test_that("the generated likelihood passes each parameter to its place in the co
 })
 
 test_that("the capacity versions warn when the set size does not vary", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   one_size <- droplevels(oberauer_lin_2017[oberauer_lin_2017$set_size == 4, ])
   capacity_model <- function(version) {
     mixture3p("dev_rad", nt_features = paste0("col_nt", 1:3), set_size = "set_size", version = version)
