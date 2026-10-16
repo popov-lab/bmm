@@ -133,6 +133,7 @@ test_that("rmixture3p() is exact at high precision", {
 })
 
 test_that("posterior_predict() samples the density log_lik() evaluates, for every version", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(398)
   n <- 2e5
   nt <- c(2, -1.5)
@@ -329,6 +330,7 @@ test_that("mixture3p and imm end their set-size-1 warnings with the same sentenc
 })
 
 test_that("every version runs through the bmm() pipeline", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017
   expect_silent(bmm(
     bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), dat, nt_model(),
@@ -346,6 +348,7 @@ test_that("every version runs through the bmm() pipeline", {
 })
 
 test_that("every version's family refuses the expected response by name", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017
   formulas <- list(
     simple = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1),
