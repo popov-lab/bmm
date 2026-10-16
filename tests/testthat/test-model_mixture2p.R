@@ -10,6 +10,15 @@ test_that("mixture2p() validates its arguments", {
   expect_error(mixture2p("y", vp_nodes = 42), "odd number of at least 41")
 })
 
+test_that("mixture2p() and dmixture2p() default to 81 quadrature nodes", {
+  # 41 nodes put the reject threshold inside a real-data posterior: slot
+  # averaging + VP on three subjects of zhang_luck_2008 diverged on 143 of 200
+  # transitions at 41 nodes and on none at 81 (#398)
+  expect_equal(mixture2p("y", variable_precision = TRUE)$vp_nodes, 81L)
+  expect_equal(formals(mixture2p)$vp_nodes, 81L)
+  expect_equal(formals(dmixture2p)$vp_nodes, 81L)
+})
+
 test_that("mixture2p() exposes the parameters each version implies", {
   expect_equal(names(mixture2p("y")$parameters), c("mu", "kappa", "thetat"))
   expect_equal(
@@ -112,8 +121,73 @@ test_that("rmixture2p() draws from dmixture2p() for every version", {
   compare(kappa = 6, p_mem = 0.7)
   compare(kappa = 6, p_mem = 0.7, tau = 1.5)
   compare(kappa = 6, K = 3, set_size = 5, version = "slot")
+  compare(kappa = 6, K = 7, set_size = 2, version = "slot")
   compare(kappa = 6, K = 7, set_size = 2, version = "slot_averaging")
   compare(kappa = 6, K = 7, set_size = 2, version = "slot_averaging", tau = 1)
+})
+
+test_that("dmixture2p() and rmixture2p() refuse what the model refuses", {
+  # a set size of 0 used to give p_mem = 1 in the slot version and NA or
+  # uniform draws in slot averaging, without an error
+  for (version in c("slot", "slot_averaging")) {
+    for (set_size in c(0, -2, 2.5)) {
+      expect_error(
+        dmixture2p(0.1, K = 3, set_size = set_size, version = version),
+        "positive whole numbers"
+      )
+      expect_error(
+        rmixture2p(5, K = 3, set_size = set_size, version = version),
+        "positive whole numbers"
+      )
+    }
+  }
+  # the simple version ignores set_size, as the model does
+  expect_equal(
+    dmixture2p(0.1, kappa = 6, p_mem = 0.7, set_size = 0),
+    dmixture2p(0.1, kappa = 6, p_mem = 0.7)
+  )
+  # 21 nodes miss the log density by about 1e-2 at a gamma shape near 3
+  expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 21), "odd number of at least 41")
+  expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
+})
+
+test_that("rmixture2p() is exact at high precision", {
+  # a sampler that bounds the density on a grid misses the peak between grid
+  # points: develop's rmixture3p() gave an SD of 0.01067 at this mu (#434)
+  # 1e-4 is about six Monte Carlo standard errors of the SD at 2e5 draws
+  withr::local_seed(434)
+  for (version in c("simple", "slot", "slot_averaging")) {
+    draws <- rmixture2p(
+      2e5, mu = 0.0087, kappa = 1e4, p_mem = 1, K = 4, set_size = 4, version = version
+    )
+    expect_lt(abs(sd(draws) - 0.01), 1e-4)
+  }
+})
+
+test_that("posterior_predict() samples the density log_lik() evaluates, for every version", {
+  withr::local_seed(398)
+  n <- 2e5
+  # K / set_size = 1.5: the slot version stores every item, slot averaging
+  # gives the reported item one or two slots
+  pars <- list(mu = 0, kappa = 6, thetat = 0.7, K = 3)
+  breaks <- seq(-pi, pi, length.out = 21)
+  for (tau in c(0, 1)) {
+    dpars <- lapply(c(pars, if (tau > 0) list(tau = tau)), function(x) matrix(x, n, 1))
+    prep <- structure(
+      list(dpars = dpars, data = list(Y = 0, vint1 = 2L), ndraws = n, family = list(vp_nodes = 41L)),
+      class = "brmsprep"
+    )
+    for (version in c("simple", "slot", "slot_averaging")) {
+      draws <- .mixture2p_posterior_predict(version)(1, prep)
+      observed <- as.numeric(table(cut(draws, breaks))) / n
+      expected <- vapply(seq_len(20), function(i) {
+        stats::integrate(function(x) {
+          dmixture2p(x, kappa = 6, p_mem = 0.7, K = 3, set_size = 2, tau = tau, version = version)
+        }, breaks[i], breaks[i + 1])$value
+      }, numeric(1))
+      expect_lt(max(abs(observed - expected)), 0.005)
+    }
+  }
 })
 
 test_that("configure_model() builds a custom family without the mixture machinery", {
@@ -131,13 +205,18 @@ test_that("the set-size versions pass the set size as an integer covariate", {
   expect_match(code, "mixture2p_slot_lpdf(Y[n] | mu[n], kappa[n], K[n], vint1[n]", fixed = TRUE)
 })
 
-test_that("check_data() warns when the set size cannot identify the capacity", {
-  model <- mixture2p("dev_rad", set_size = "set_size", version = "slot")
+test_that("check_data() says what a single set size leaves of the capacity", {
+  # with one set size N, p_mem = min(1, K / N) still identifies K below N
+  # (on 375 trials at N = 6, log K contracted 95% from its prior); only the
+  # capacity rule itself, and K at or above N, are beyond the data
   constant_set_size <- subset(oberauer_lin_2017, set_size == 4)
-  expect_warning(
-    check_data(model, constant_set_size, bmf(kappa ~ 1, K ~ 1)),
-    "not identified by the data"
-  )
+  for (version in c("slot", "slot_averaging")) {
+    model <- mixture2p("dev_rad", set_size = "set_size", version = version)
+    expect_warning(
+      check_data(model, constant_set_size, bmf(kappa ~ 1, K ~ 1)),
+      "cannot test the capacity rule.*reflects only its prior where it reaches 4"
+    )
+  }
 })
 
 test_that("mu1 keeps working as a deprecated name for mu", {
@@ -323,4 +402,94 @@ test_that("the Stan and R likelihoods agree for every version", {
     .dmixture2p_slot_averaging(y, 0, kappa, K, ss, tau, 41L),
     tolerance = 1e-12
   )
+})
+
+test_that("the generated likelihood passes each parameter to its place in the core", {
+  skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required to compile the mixture2p likelihood"
+  )
+  # the cores are checked against R above; this checks the generated wrappers
+  # that brms calls, whose argument order is built from the family
+  dat <- oberauer_lin_2017
+  cases <- list(
+    simple = list(version = "simple", formula = bmf(kappa ~ 1, thetat ~ 1)),
+    simple_vp = list(
+      version = "simple", variable_precision = TRUE,
+      formula = bmf(kappa ~ 1, tau ~ 1, thetat ~ 1)
+    ),
+    slot = list(version = "slot", formula = bmf(kappa ~ 1, K ~ 1)),
+    slot_averaging = list(version = "slot_averaging", formula = bmf(kappa ~ 1, K ~ 1))
+  )
+  values <- c(
+    y = 0.7, mu = 0.1, kappa = 6, tau = 0.8, thetat = 0.75, K = 4.5, ss = 5
+  )
+  wrappers <- character(0)
+  calls <- character(0)
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    model <- check_model(
+      mixture2p(
+        "dev_rad",
+        set_size = if (case$version != "simple") "set_size",
+        version = case$version,
+        variable_precision = isTRUE(case$variable_precision)
+      ),
+      dat, case$formula
+    )
+    data <- check_data(model, dat, case$formula)
+    family <- paste0("mixture2p_", case$version)
+    code <- configure_model(model, data, case$formula)$stanvars[[paste0(family, "_lpdf")]]$scode
+    code <- gsub(paste0(family, "_lpdf"), paste0("w_", name, "_lpdf"), code, fixed = TRUE)
+    wrappers <- c(wrappers, code)
+    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1", strsplit(code, "\n")[[1]][1])
+    arg_names <- sub(".* ", "", strsplit(signature, ", ")[[1]])
+    arg_values <- ifelse(arg_names %in% names(values),
+      format(values[arg_names], digits = 17), arg_names
+    )
+    arg_values[arg_names == "ss"] <- as.character(as.integer(values[["ss"]]))
+    calls <- c(calls, glue::glue(
+      "out[{length(calls) + 1}] = w_{name}_lpdf({arg_values[1]} | ",
+      "{paste(arg_values[-1], collapse = ', ')});"
+    ))
+  }
+  program <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "mixture2p_funs.stan", package = "bmm")), "\n",
+    paste(wrappers, collapse = "\n"), "}\n",
+    "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
+    " real circmix_logJ_min; real circmix_dlogJ; }\n",
+    "generated quantities { vector[", length(calls), "] out;\n",
+    paste(calls, collapse = "\n"), "\n}\n"
+  )
+  tab <- .circmix_kappa_table()
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = list(
+      NK = length(tab$logkappa), circmix_logk = tab$logkappa,
+      circmix_dlogk = tab$dlogkappa, circmix_logJ_min = tab$logJ_min,
+      circmix_dlogJ = tab$dlogJ
+    ),
+    fixed_param = TRUE, iter_sampling = 1, chains = 1, refresh = 0,
+    show_messages = FALSE, sig_figs = 18
+  )
+  r_side <- c(
+    simple = .dmixture2p_simple(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["thetat"]], 0, 81L
+    ),
+    simple_vp = .dmixture2p_simple(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["thetat"]],
+      values[["tau"]], 81L
+    ),
+    slot = .dmixture2p_slot(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["K"]],
+      values[["ss"]], 0, 81L
+    ),
+    slot_averaging = .dmixture2p_slot_averaging(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["K"]],
+      values[["ss"]], 0, 81L
+    )
+  )
+  expect_equal(as.numeric(fit$draws("out")), unname(r_side), tolerance = 1e-10)
 })

@@ -121,7 +121,7 @@
 
 .model_mixture3p <- function(resp_error = NULL, nt_features = NULL, set_size = NULL,
                              regex = FALSE, links = NULL, version = "simple",
-                             variable_precision = FALSE, vp_nodes = 41L,
+                             variable_precision = FALSE, vp_nodes = 81L,
                              call = NULL, ...) {
   spec <- .mixture3p_version_table[[version]]
   if (variable_precision) {
@@ -214,10 +214,13 @@ settable_links.mixture3p <- function(model) {
 #'   the shared normalisation, so neither weight is separately interpretable.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
 #'   from trial to trial (van den Berg et al., 2012). See [mixture2p()] for
-#'   details of the parameterisation.
+#'   details of the parameterisation. Under `version = "slot_averaging"`, the
+#'   precision of an item held in `j` slots is the sum of `j` independent slot
+#'   draws, `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance
+#'   grows with `j`.
 #' @param vp_nodes Number of quadrature nodes used when
-#'   `variable_precision = TRUE`; must be an odd number of at least 41. See
-#'   [mixture2p()].
+#'   `variable_precision = TRUE`; must be an odd number of at least 41, and
+#'   defaults to 81. See [mixture2p()] for the accuracy this gives.
 #' @param links A named list of link functions for the model parameters. The
 #'   links of `thetat` and `thetant` cannot be changed, because the softmax over
 #'   them is part of the likelihood.
@@ -275,7 +278,7 @@ settable_links.mixture3p <- function(model) {
 #' )
 mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
                       version = c("simple", "slot", "slot_averaging"),
-                      variable_precision = FALSE, vp_nodes = 41L, links = NULL,
+                      variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
   dots <- list(...)
@@ -300,23 +303,25 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
 
 #' @export
 check_formula.mixture3p <- function(model, data, formula) {
-  swap <- .mixture3p_version_table[[model$version]]$swap_parameter
-  set_size_var <- model$other_vars$set_size
-
-  # A trial with one item has no non-target to swap to, so that level of the
-  # swap parameter is absent from the likelihood and samples its prior. The
-  # previous mixture implementation hid this by pinning the level to a constant,
-  # which it had to do anyway to switch off the sentinel weight.
-  predicted_by_set_size <- set_size_var %in% rhs_vars(formula[[swap]])
-  warnif(
-    predicted_by_set_size && isTRUE(any(data[["ss_numeric"]] == 1)),
-    "Your data contain trials with a set size of 1, where no swap can occur, \\
-    so the set-size-1 level of '{swap}' is not identified and will sample its \\
-    prior. Drop those trials from the formula for '{swap}', or read that level \\
-    as prior-only."
-  )
-
+  .mixture3p_warn_set_size_one(model, data, formula)
   NextMethod("check_formula")
+}
+
+# A trial with one item has no non-target to swap to, so the swap parameter is
+# absent from its likelihood. The previous mixture implementation hid this by
+# pinning the set-size-1 level to a constant, which it had to do anyway to
+# switch off the sentinel weight.
+.mixture3p_warn_set_size_one <- function(model, data, formula) {
+  swap <- .mixture3p_version_table[[model$version]]$swap_parameter
+  swap_formula <- formula[[swap]]
+  if (is.null(swap_formula) || is_constant(swap_formula) || is_nl(swap_formula) ||
+    !isTRUE(any(data[["ss_numeric"]] == 1))) {
+    return(invisible())
+  }
+  .warn_set_size_one(
+    .set_size_one_undetermined(swap, formula, data), swap,
+    reason = glue("say nothing about '{swap}'")
+  )
 }
 
 ############################################################################# !

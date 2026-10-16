@@ -87,7 +87,7 @@
 
 .model_mixture2p <- function(resp_error = NULL, set_size = NULL, links = NULL,
                              version = "simple", variable_precision = FALSE,
-                             vp_nodes = 41L, call = NULL, ...) {
+                             vp_nodes = 81L, call = NULL, ...) {
   spec <- .mixture2p_version_table[[version]]
   if (variable_precision) {
     spec <- .circmix_add_variable_precision(spec)
@@ -113,7 +113,7 @@
         "- The response variable should be in radians and represent the \\
         angular error relative to the target", "\n",
         "- The 'slot' and 'slot_averaging' versions additionally require a \\
-        set_size variable, which has to vary for the capacity K to be identified"
+        set_size variable, which should vary for the capacity rule to be testable"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -141,8 +141,9 @@
 #'   in degrees to radian using the `deg2rad` function.
 #' @param set_size Name of the variable in the dataset containing the set size,
 #'   or a single number if the set size is constant. Required by the `"slot"`
-#'   and `"slot_averaging"` versions and ignored by `"simple"`. The capacity `K`
-#'   is only identified if the set size varies.
+#'   and `"slot_averaging"` versions and ignored by `"simple"`. With a single
+#'   set size the capacity rule cannot be tested: `K` is then estimated from the
+#'   responses at that set size, and only below it.
 #' @param version A character string specifying which version of the model to
 #'   use. Options are:
 #'   \itemize{
@@ -167,17 +168,21 @@
 #'   integrates the Fisher information `J` of a memory representation over
 #'   `gamma(mean = J(kappa), scale = tau)`. `kappa` keeps its meaning as the
 #'   mean precision, so `tau -> 0` recovers the constant-precision model.
-#'   The integral is evaluated by quadrature, which costs about ten times as
+#'   Under `version = "slot_averaging"`, the precision of an item held in `j`
+#'   slots is the sum of `j` independent slot draws,
+#'   `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance grows
+#'   with `j`. The integral is evaluated by quadrature, which costs about ten times as
 #'   much per gradient at the default `vp_nodes`; expect a larger factor in wall
 #'   time, since the posterior geometry also needs more leapfrog steps. `tau` is
 #'   the parameter that needs the most data, and is often only weakly identified
 #'   in small designs.
 #' @param vp_nodes Number of quadrature nodes used when
-#'   `variable_precision = TRUE`; must be an odd number of at least 41. The
-#'   default holds the log likelihood to about 1e-5 as long as the implied gamma
-#'   shape `J(kappa) / tau` stays above roughly 1. Below that the model rejects
-#'   rather than returning a biased likelihood, and asks for more nodes; 81
-#'   nodes reach a shape of about 0.5, and 161 about 0.25.
+#'   `variable_precision = TRUE`; must be an odd number of at least 41. With the
+#'   default of 81, the log likelihood holds to about 1e-5 as long as the
+#'   implied gamma shape `J(kappa) / tau` stays above `60 / vp_nodes` (0.74 at
+#'   the default), and to about 2e-6 above a shape of 1. Below that threshold
+#'   the model rejects rather than returning a biased likelihood, and asks for
+#'   more nodes; 121 nodes reach a shape of about 0.5, and 241 about 0.25.
 #' @param links A named list of link functions for the model parameters, e.g.
 #'   `list(kappa = "softplus")`. Defaults are `"log"` for `kappa`, `K` and
 #'   `tau`, and `"logit"` for `thetat`.
@@ -211,7 +216,7 @@
 #' @export
 mixture2p <- function(resp_error, set_size = NULL,
                       version = c("simple", "slot", "slot_averaging"),
-                      variable_precision = FALSE, vp_nodes = 41L, links = NULL,
+                      variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
   stop_missing_args()
@@ -244,8 +249,10 @@ check_data.mixture2p <- function(model, data, formula) {
   ss <- check_var_set_size(model$other_vars$set_size, data)
   warnif(
     length(unique(ss$ss_numeric)) == 1,
-    "The set size does not vary, so the capacity K of the '{model$version}' \\
-    version is not identified by the data and will only reflect its prior."
+    "The set size does not vary, so the data cannot test the capacity rule of \\
+    the '{model$version}' version. K is estimated from the responses at set \\
+    size {ss$max_set_size}, and reflects only its prior where it reaches \\
+    {ss$max_set_size}."
   )
   data$ss_numeric <- ss$ss_numeric
   attr(data, "max_set_size") <- ss$max_set_size

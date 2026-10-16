@@ -674,15 +674,14 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
 #'   columns. These are [brms::posterior_linpred()] output, so they are on the
 #'   *link* scale for distributional parameters and are the raw value for
 #'   non-linear parameters. For `bmm`'s `nlpar`-based models the link is a
-#'   fiction maintained by the model's own `nlf()` expression — `imm` declares
-#'   `c = "log"` because `configure_model.imm_abc()` writes `exp(c)` into the
-#'   formula, not because `brms` applies a link — so a model that declares a link
-#'   it does not actually apply in its `nlf()` will get silently wrong output
-#'   here.
+#'   fiction maintained by the model's own `nlf()` expression, which has to
+#'   apply the inverse of the declared link itself, so a model that declares a
+#'   link it does not actually apply in its `nlf()` will get silently wrong
+#'   output here.
 #' @param data The prediction grid the draws were computed on, with one row per
 #'   column of the `linpred` matrices. These are rows of the fitted model's own
 #'   data, so they carry the `bmm`-internal columns a design-dependent
-#'   transformation keys on (`LureIdx*`, `inv_ss`, `Idx_*`, matrix columns).
+#'   transformation keys on (`ss_numeric`, `Idx_*`, matrix columns).
 #'   `native_transform.non_targets()` is the worked example.
 #' @param ... Currently unused.
 #'

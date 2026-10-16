@@ -60,7 +60,7 @@
 
 .model_imm <- function(resp_error = NULL, nt_features = NULL, nt_distances = NULL,
                        set_size = NULL, regex = FALSE, version = "full", links = NULL,
-                       variable_precision = FALSE, vp_nodes = 41L,
+                       variable_precision = FALSE, vp_nodes = 81L,
                        call = NULL, ...) {
   spec <- .imm_version_spec(version)
   if (variable_precision) {
@@ -109,6 +109,14 @@
   out
 }
 
+# b is fixed to 0 on its log link, the background of 1 that the other
+# activations are weighed against; on another link that fixed value would be
+# another background, so its link stays
+#' @exportS3Method
+settable_links.imm <- function(model) {
+  setdiff(names(model$links), "b")
+}
+
 # user facing alias
 
 #' @title `r .model_imm()$name`
@@ -153,8 +161,8 @@
 #'   -- its bottleneck is the ratio of context to general activation -- so
 #'   variable precision is the only additional version offered here.
 #' @param vp_nodes Number of quadrature nodes used when
-#'   `variable_precision = TRUE`; must be an odd number of at least 41. See
-#'   [mixture2p()].
+#'   `variable_precision = TRUE`; must be an odd number of at least 41, default
+#'   81. See [mixture2p()] for the accuracy this buys and the shapes it refuses.
 #' @param links A named list of link functions for the model parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
@@ -225,7 +233,7 @@
 #' )
 #' @export
 imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
-                version = c("full", "bsc", "abc"), variable_precision = FALSE, vp_nodes = 41L,
+                version = c("full", "bsc", "abc"), variable_precision = FALSE, vp_nodes = 81L,
                 links = NULL, ...) {
   call <- match.call()
   version <- match.arg(version)
@@ -291,23 +299,33 @@ check_data.imm_full <- function(model, data, formula) {
 # CHECK_FORMULA METHODS                                                  ####
 ############################################################################# !
 
-# configure_prior.imm() pins the set_size1 coefficient, which exists only
-# without an intercept; with one, brms rejects the pin as matching no parameter
 #' @export
 check_formula.imm <- function(model, data, formula) {
-  set_size_var <- model$other_vars$set_size
-  pred_list <- rhs_vars(formula, collapse = FALSE)
-  has_set_size <- vapply(pred_list, function(x) set_size_var %in% x, logical(1))
-  ss_forms <- formula[has_set_size]
-  intercepts <- vapply(ss_forms, has_intercept, logical(1))
-  stopif(
-    any(intercepts),
-    "The formula for parameter(s) {names(ss_forms)[intercepts]} contains \\
-    an intercept and also uses set_size as a predictor. This model requires \\
-    that the intercept is supressed when set_size is used as predictor. \\
-    Try using 0 + {set_size_var} instead."
-  )
+  .imm_warn_set_size_one(model, data, formula)
   NextMethod("check_formula")
+}
+
+# A trial with one item has no non-target, so s is absent from its likelihood
+# and a enters only through the target's activation c + a. The previous mixture
+# implementation hid this by pinning the set-size-1 levels of a and s to a
+# constant, which it had to do anyway to switch off the sentinel weight.
+.imm_warn_set_size_one <- function(model, data, formula) {
+  if (!isTRUE(any(data[["ss_numeric"]] == 1))) {
+    return(invisible())
+  }
+  pars <- names(model$parameters)
+  if ("s" %in% pars) {
+    .warn_set_size_one(
+      .set_size_one_undetermined("s", formula, data), "s",
+      reason = "say nothing about 's'"
+    )
+  }
+  if ("a" %in% pars) {
+    .warn_set_size_one(
+      .set_size_one_undetermined(c("a", "c"), formula, data, summed = TRUE), c("a", "c"),
+      reason = "inform 'a' and 'c' only through their sum"
+    )
+  }
 }
 
 ############################################################################# !
@@ -352,28 +370,6 @@ configure_model.imm <- function(model, data, formula) {
       vint = "ss", vreal = groups
     )
   )
-}
-
-############################################################################# !
-# CONFIGURE_PRIOR METHODS                                                ####
-############################################################################# !
-
-# A set-size-1 trial has no non-target, so s is absent from its likelihood and
-# a enters only through its sum with c. With set size as a factor, those levels
-# are pinned to a constant, as they were before imm moved to a custom family
-#' @export
-configure_prior.imm <- function(model, data, formula, user_prior, ...) {
-  set_size_var <- model$other_vars$set_size
-  if (!any(data$ss_numeric == 1) || is.numeric(data[[set_size_var]])) {
-    return(NULL)
-  }
-  pars <- intersect(c("a", "s"), names(model$parameters))
-  prior <- brms::empty_prior() +
-    constrain_set_size1_fixef(formula, pars, set_size_var, "constant(0)") +
-    constrain_set_size1_ranef(formula, pars, set_size_var, "constant(1e-8)")
-  prior$dpar <- prior$nlpar
-  prior$nlpar <- rep("", nrow(prior))
-  prior
 }
 
 ############################################################################# !

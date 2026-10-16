@@ -15,7 +15,7 @@ imm(
   regex = FALSE,
   version = c("full", "bsc", "abc"),
   variable_precision = FALSE,
-  vp_nodes = 41L,
+  vp_nodes = 81L,
   links = NULL,
   ...
 )
@@ -62,8 +62,8 @@ Zhang and Luck (2008) do not apply to the IMM, which has no discrete slots
 variable precision is the only additional version offered here.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
-\code{variable_precision = TRUE}; must be an odd number of at least 41. See
-\code{\link[=mixture2p]{mixture2p()}}.}
+\code{variable_precision = TRUE}; must be an odd number of at least 41, default
+81. See \code{\link[=mixture2p]{mixture2p()}} for the accuracy this buys and the shapes it refuses.}
 
 \item{links}{A named list of link functions for the model parameters.}
 

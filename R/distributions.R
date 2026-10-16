@@ -351,10 +351,14 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' lines(x, d, type = "l", col = "red")
 #'
 dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
-                       set_size = 1, version = "simple", vp_nodes = 41L,
+                       set_size = 1, version = "simple", vp_nodes = 81L,
                        log = FALSE) {
   version <- match.arg(version, names(.mixture2p_version_table))
-  .check_mixture2p_args(kappa, p_mem, tau, K, version)
+  .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
+  stopif(
+    vp_nodes < 41 || vp_nodes %% 2 == 0,
+    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
+  )
 
   density <- switch(version,
     simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
@@ -369,7 +373,7 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   density
 }
 
-.check_mixture2p_args <- function(kappa, p_mem, tau, K, version) {
+.check_mixture2p_args <- function(kappa, p_mem, tau, K, set_size, version) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
   if (version == "simple") {
@@ -378,6 +382,10 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
     return(invisible())
   }
   stopif(isTRUE(any(K <= 0)), "K must be positive.")
+  stopif(
+    isTRUE(any(set_size < 1 | set_size %% 1 != 0)),
+    "set_size must contain positive whole numbers."
+  )
 }
 
 .dmixture2p_simple <- function(x, mu, kappa, p_mem, tau, nodes) {
@@ -447,7 +455,7 @@ qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
 rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
                        set_size = 1, version = "simple") {
   version <- match.arg(version, names(.mixture2p_version_table))
-  .check_mixture2p_args(kappa, p_mem, tau, K, version)
+  .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
 
   recycle <- function(x) rep_len(x, n)
   switch(version,
@@ -514,8 +522,12 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' lines(x, d, type = "l", col = "red")
 #'
 dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
-                       tau = 0, vp_nodes = 41L, log = FALSE) {
+                       tau = 0, vp_nodes = 81L, log = FALSE) {
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  stopif(
+    vp_nodes < 41 || vp_nodes %% 2 == 0,
+    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
+  )
 
   set_size <- length(mu)
   weights <- .mixture3p_marginal_weights(p_mem, p_nt, set_size, length(x))
@@ -740,7 +752,7 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'
 dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                  c = 5, a = 2, b = 1, s = 2, kappa = 5, tau = 0,
-                 vp_nodes = 41L, log = FALSE) {
+                 vp_nodes = 81L, log = FALSE) {
   .check_imm_args(kappa, s, dist, tau, length(mu))
 
   n <- length(x)

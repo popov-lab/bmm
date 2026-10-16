@@ -11,7 +11,7 @@ mixture3p(
   regex = FALSE,
   version = c("simple", "slot", "slot_averaging"),
   variable_precision = FALSE,
-  vp_nodes = 41L,
+  vp_nodes = 81L,
   links = NULL,
   ...
 )
@@ -56,11 +56,14 @@ the shared normalisation, so neither weight is separately interpretable.}
 
 \item{variable_precision}{Logical; if \code{TRUE}, the precision of memory varies
 from trial to trial (van den Berg et al., 2012). See \code{\link[=mixture2p]{mixture2p()}} for
-details of the parameterisation.}
+details of the parameterisation. Under \code{version = "slot_averaging"}, the
+precision of an item held in \code{j} slots is the sum of \code{j} independent slot
+draws, \code{gamma(shape = j * J(kappa) / tau, scale = tau)}, so its variance
+grows with \code{j}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
-\code{variable_precision = TRUE}; must be an odd number of at least 41. See
-\code{\link[=mixture2p]{mixture2p()}}.}
+\code{variable_precision = TRUE}; must be an odd number of at least 41, and
+defaults to 81. See \code{\link[=mixture2p]{mixture2p()}} for the accuracy this gives.}
 
 \item{links}{A named list of link functions for the model parameters. The
 links of \code{thetat} and \code{thetant} cannot be changed, because the softmax over

@@ -17,7 +17,7 @@ dmixture2p(
   K = 3,
   set_size = 1,
   version = "simple",
-  vp_nodes = 41L,
+  vp_nodes = 81L,
   log = FALSE
 )
 
