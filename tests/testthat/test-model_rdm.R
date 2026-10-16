@@ -975,9 +975,7 @@ test_that("posterior_epred for rdm lines up draws and observations", {
 # ndraws. posterior_epred() picks a random subset of draws unless draw_ids is
 # given, so the determinism is pinned at fixed draw_ids.
 test_that("posterior_epred for rdm recovers the mean RT of a fitted model", {
-  path <- test_path("assets", "bmmfit_rdm_ppcheck.rds")
-  skip_if_not(file.exists(path), "fixture not available")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_rdm_ppcheck.rds")
 
   epred <- brms::posterior_epred(fit, draw_ids = 1:20)
   expect_identical(epred, brms::posterior_epred(fit, draw_ids = 1:20))
@@ -1516,7 +1514,7 @@ test_that("pp_simulate.rdm() races the per-observation accumulator counts", {
 })
 
 test_that("pp_check(resp_var) works for the rdm model", {
-  fit <- load_ppcheck_fit("bmmfit_rdm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_rdm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "rt", ndraws = 5)
   expect_s3_class(p, "ggplot")
   expect_equal(p$data$value[p$data$is_y_label == "italic(y)"], fit$data$rt)
@@ -1532,7 +1530,7 @@ test_that("pp_check(resp_var) works for the rdm model", {
 # visible only through pp_simulate(); on a real fit the simulated categories must
 # reproduce the observed accuracy, not just the RT distribution
 test_that("pp_check(resp_var) simulates rdm rt and response jointly", {
-  fit <- load_ppcheck_fit("bmmfit_rdm_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_rdm_ppcheck.rds")
   prep <- brms::prepare_predictions(fit, ndraws = 50)
   sims <- withr::with_seed(2, pp_simulate(fit$bmm$model, prep))
 
