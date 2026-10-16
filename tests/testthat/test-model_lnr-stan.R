@@ -228,9 +228,7 @@ test_that("the generated Stan likelihood handles categories with no accumulators
 
 test_that("log_lik for the simple version carries the category constant", {
   skip_on_cran()
-  path <- test_path("assets", "bmmfit_lnr_ppcheck.rds")
-  skip_if_not(file.exists(path), "fixture not available")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_lnr_ppcheck.rds")
 
   ll <- brms::log_lik(fit, draw_ids = 1)[1, ]
   prep <- brms::prepare_predictions(fit, draw_ids = 1)

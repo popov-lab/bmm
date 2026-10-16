@@ -1014,7 +1014,7 @@ test_that("an lnr response and accumulator columns rebuilt for check_data() stay
 })
 
 test_that("pp_check(resp_var) works for the lnr model", {
-  fit <- load_ppcheck_fit("bmmfit_lnr_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_lnr_ppcheck.rds")
 
   expect_equal(pp_check_vars(fit)$resp_var, c("rt", "response"))
   expect_equal(pp_check_vars(fit)$default_type, c("dens_overlay", "bars"))
@@ -1035,7 +1035,7 @@ test_that("pp_check(resp_var) works for the lnr model", {
 # is the same posterior draw, so the simulated pairs are i.i.d. from one
 # parameter set and can be compared with the defective CDF plnr() computes
 test_that("pp_simulate.lnr draws the response time and the winner jointly", {
-  fit <- load_ppcheck_fit("bmmfit_lnr_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_lnr_ppcheck.rds")
   prep <- brms::prepare_predictions(fit, draw_ids = rep(1L, 200L))
   sims <- pp_simulate(fit$bmm$model, prep)
 
@@ -1068,7 +1068,7 @@ test_that("pp_simulate.lnr draws the response time and the winner jointly", {
 })
 
 test_that("posterior_epred.lnr is deterministic and equals the race mean", {
-  fit <- load_ppcheck_fit("bmmfit_lnr_ppcheck.rds")
+  fit <- load_fixture_fit("bmmfit_lnr_ppcheck.rds")
   ids <- 1:20
 
   epred <- brms::posterior_epred(fit, draw_ids = ids)
