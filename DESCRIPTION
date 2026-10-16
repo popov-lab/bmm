@@ -73,4 +73,4 @@ Config/Needs/website: rmarkdown
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-Config/roxygen2/version: 8.1.1
+Config/roxygen2/version: 8.1.0
