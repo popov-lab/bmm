@@ -8,6 +8,12 @@ model_cases_rdm <- function() {
   sim <- withr::with_seed(1, rrdm(20, drift = c(3, 1.4, 1.4), gap = 1, ndt = 0.3))
   sim$label <- c("correct", "lure", "lure")[sim$response]
   custom_formula <- bmf(correct ~ 1, lure ~ 1, gap ~ 1, ndt ~ 1)
+  re_data <- transform(sim, id = rep(1:2, each = 10))
+  re_shared <- bmf(gap ~ 1 + (1 | id), ndt ~ 1 + (1 | id))
+  re_formula <- bmf(driftc ~ 1 + (1 | id), drifte ~ 1 + (1 | id)) + re_shared
+  re_custom <- bmf(correct ~ 1 + (1 | id), lure ~ 1 + (1 | id)) + re_shared
+  simple <- rdm("rt", "response", n_choices = 3)
+  custom <- rdm("rt", "label", version = "custom")
 
   list(
     # three alternatives, so the error code check_data() lumps into 2 stands
@@ -19,6 +25,29 @@ model_cases_rdm <- function() {
         data = rt_data
       )
     ),
+    sd_default = list(
+      rdm = list(
+        model = simple, formula = re_formula, data = re_data,
+        sd = c(driftc = "exponential(2)", drifte = "exponential(2)", gap = "exponential(2)",
+               ndt = "exponential(4)")
+      ),
+      rdm_custom = list(
+        model = custom, formula = re_custom, data = re_data,
+        sd = c(correct = "exponential(2)", lure = "exponential(2)", gap = "exponential(2)",
+               ndt = "exponential(4)")
+      )
+    ),
+    init = list(
+      rdm = list(model = simple, formula = re_formula, data = re_data),
+      rdm_custom = list(model = custom, formula = re_custom, data = re_data)
+    ),
+    # the custom version learns its accumulators from the formula, so it has no
+    # closed set of names to refuse
+    links = list(
+      rdm = list(model = simple, settable = c("driftc", "drifte", "gap", "ndt", "s", "sp")),
+      rdm_custom = list(model = custom, settable = NULL)
+    ),
+    fixture = list(rdm = list(file = "bmmfit_rdm_ppcheck.rds")),
     check_data = list(
       rdm = list(
         model = rdm("rt", "response", n_choices = 2),

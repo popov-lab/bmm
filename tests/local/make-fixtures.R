@@ -117,6 +117,18 @@ if (make("bmmfit_m3_ppcheck.rds")) {
   save_fixture(m3_fit, "bmmfit_m3_ppcheck.rds", seed = 5)
 }
 
+# rdm simple with three options and the start point off (its default)
+if (make("bmmfit_rdm_ppcheck.rds")) {
+  set.seed(9)
+  rdm_data <- rrdm(150, drift = c(3.2, 1.65, 1.65), gap = 1.1, ndt = 0.18)
+  rdm_fit <- do.call(bmm, c(list(
+    formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1),
+    data = rdm_data,
+    model = rdm(rt = "rt", response = "response", n_choices = 3)
+  ), fit_args))
+  save_fixture(rdm_fit, "bmmfit_rdm_ppcheck.rds", seed = 9)
+}
+
 # sdm on rstan, so the tests can read what an rstan fit stores: no warmup
 # saved, draws from the prior; two participants at set sizes 1 to 4
 if (make("bmmfit_example1.rds")) {
