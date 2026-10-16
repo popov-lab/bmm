@@ -126,7 +126,7 @@ test_that("posterior_predict() samples the density log_lik() evaluates, for ever
   nt <- c(2, -1.5)
   # K / set_size = 1.5: the slot version stores every item, slot averaging
   # gives the reported item one or two slots
-  pars <- list(mu = 0, kappa = 6, thetat = 0.6, thetant = -0.4, K = 4.5, pnt = 0.3)
+  pars <- list(mu = 0, kappa = 6, thetat = 0.6, thetant = -0.4, K = 4.5, ptarget = 0.3)
   density <- function(x, version, tau) {
     exp(switch(version,
       simple = .dmixture3p_simple(x, 0, 6, 0.6, -0.4, 3, nt, tau, 41L),
@@ -245,7 +245,7 @@ test_that("the set-size-1 warning names exactly the coefficients no other trial 
   dat$ss_num <- dat$ss_numeric
   dat$single <- factor(ifelse(dat$ss_numeric == 1, "single", "multi"))
   named <- function(rhs, data = dat, version = "slot") {
-    par <- if (version == "simple") "thetant" else "pnt"
+    par <- if (version == "simple") "thetant" else "ptarget"
     ff <- bmf(kappa ~ 1) + bmf(stats::as.formula(paste(par, rhs)))
     msg <- NULL
     withCallingHandlers(
@@ -270,32 +270,32 @@ test_that("the set-size-1 warning names exactly the coefficients no other trial 
   expect_equal(named("~ 1 + ss_num"), character(0))
   expect_equal(named("~ 0 + ss_num"), character(0))
 
-  expect_equal(named("~ 0 + set_size"), "b_pnt_set_size1")
+  expect_equal(named("~ 0 + set_size"), "b_ptarget_set_size1")
   expect_equal(named("~ 0 + set_size", version = "simple"), "b_thetant_set_size1")
   # with set size 1 as the reference, every coefficient is a contrast with it
-  expect_equal(named("~ 1 + set_size"), paste0("b_pnt_", c("Intercept", levels_2_to_8)))
+  expect_equal(named("~ 1 + set_size"), paste0("b_ptarget_", c("Intercept", levels_2_to_8)))
   expect_equal(
     named("~ set_size + (set_size | ID)"),
     c(
-      paste0("b_pnt_", c("Intercept", levels_2_to_8)),
-      paste0("sd_ID__pnt_", c("Intercept", levels_2_to_8))
+      paste0("b_ptarget_", c("Intercept", levels_2_to_8)),
+      paste0("sd_ID__ptarget_", c("Intercept", levels_2_to_8))
     )
   )
   expect_equal(
     named("~ 0 + set_size + (0 + set_size || ID)"),
-    c("b_pnt_set_size1", "sd_ID__pnt_set_size1")
+    c("b_ptarget_set_size1", "sd_ID__ptarget_set_size1")
   )
   # a predictor that only varies at set size 1 is just as uninformed
-  expect_equal(named("~ 0 + single"), "b_pnt_singlesingle")
+  expect_equal(named("~ 0 + single"), "b_ptarget_singlesingle")
   # two set sizes, one of them 1: the line through them has one point left
   expect_equal(
     named("~ 1 + ss_num", droplevels(dat[dat$ss_numeric %in% c(1, 4), ])),
-    c("b_pnt_Intercept", "b_pnt_ss_num")
+    c("b_ptarget_Intercept", "b_ptarget_ss_num")
   )
   # a variable missing from the data is left to brms, which names it
   expect_equal(named("~ 0 + typo"), character(0))
   expect_error(
-    bmm(bmf(kappa ~ 1, K ~ 1, pnt ~ 0 + typo), oberauer_lin_2017, nt_model(version = "slot"),
+    bmm(bmf(kappa ~ 1, K ~ 1, ptarget ~ 0 + typo), oberauer_lin_2017, nt_model(version = "slot"),
       backend = "mock", mock_fit = 1, rename = FALSE
     ),
     "can neither be found in 'data'"
@@ -500,14 +500,14 @@ test_that("the generated likelihood passes each parameter to its place in the co
       version = "simple", variable_precision = TRUE,
       formula = bmf(kappa ~ 1, tau ~ 1, thetat ~ 1, thetant ~ 1)
     ),
-    slot = list(version = "slot", formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1)),
+    slot = list(version = "slot", formula = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1)),
     slot_averaging = list(
-      version = "slot_averaging", formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1)
+      version = "slot_averaging", formula = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1)
     )
   )
   values <- c(
     y = 0.7, mu = 0.1, kappa = 6, tau = 0.8, thetat = 0.9, thetant = -0.4,
-    K = 4.5, pnt = 0.3, ss = 5,
+    K = 4.5, ptarget = 0.3, ss = 5,
     setNames(c(2, -1.5, 1, -0.4, 2.8, 0.3, -2), paste0("nt", 1:7))
   )
   wrappers <- character(0)
@@ -566,11 +566,11 @@ test_that("the generated likelihood passes each parameter to its place in the co
     ),
     slot = .dmixture3p_slot(
       values[["y"]], values[["mu"]], values[["kappa"]], values[["K"]],
-      values[["pnt"]], values[["ss"]], nt, 0, 81L
+      values[["ptarget"]], values[["ss"]], nt, 0, 81L
     ),
     slot_averaging = .dmixture3p_slot_averaging(
       values[["y"]], values[["mu"]], values[["kappa"]], values[["K"]],
-      values[["pnt"]], values[["ss"]], nt, 0, 81L
+      values[["ptarget"]], values[["ss"]], nt, 0, 81L
     )
   )
   expect_equal(as.numeric(fit$draws("out")), unname(r_side), tolerance = 1e-10)

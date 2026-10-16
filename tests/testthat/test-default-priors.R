@@ -447,7 +447,7 @@ test_that("every model ships an sd default on the link scale of each parameter",
     )
     expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "K", ]$prior, "normal(0, 0.3)")
     expect_equal(pr[pr$class == "b" & pr$coef == "" & pr$dpar == "ptarget", ]$prior, "normal(0, 0.5)")
-    # ptarget = 1 - the previous pnt, so its intercept prior is the mirror image
+    # ptarget = 1 - the swap probability it replaced, so its intercept prior is the mirror image
     expect_equal(pr[pr$class == "Intercept" & pr$dpar == "ptarget", ]$prior, "logistic(1, 1)")
     for (par in c("kappa", "ptarget")) expect_equal(sd_default(pr, par), "exponential(1)")
     expect_equal(sd_default(pr, "K"), "exponential(2)")
