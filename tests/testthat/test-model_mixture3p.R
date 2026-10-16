@@ -425,3 +425,96 @@ test_that("the Stan and R likelihoods agree for every version", {
     tolerance = 1e-12
   )
 })
+
+test_that("the generated likelihood passes each parameter to its place in the core", {
+  skip_on_cran()
+  skip_if_not(
+    requireNamespace("cmdstanr", quietly = TRUE),
+    "cmdstanr is required to compile the mixture3p likelihood"
+  )
+  # the cores are checked against R above; this checks the generated wrappers
+  # that brms calls, whose argument order is built from the version tables
+  dat <- oberauer_lin_2017
+  cases <- list(
+    simple = list(
+      version = "simple", formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
+    ),
+    simple_vp = list(
+      version = "simple", variable_precision = TRUE,
+      formula = bmf(kappa ~ 1, tau ~ 1, thetat ~ 1, thetant ~ 1)
+    ),
+    slot = list(version = "slot", formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1)),
+    slot_averaging = list(
+      version = "slot_averaging", formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1)
+    )
+  )
+  values <- c(
+    y = 0.7, mu = 0.1, kappa = 6, tau = 0.8, thetat = 0.9, thetant = -0.4,
+    K = 4.5, pnt = 0.3, ss = 5,
+    setNames(c(2, -1.5, 1, -0.4, 2.8, 0.3, -2), paste0("nt", 1:7))
+  )
+  wrappers <- character(0)
+  calls <- character(0)
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    model <- check_model(
+      nt_model(version = case$version, variable_precision = isTRUE(case$variable_precision)),
+      dat, case$formula
+    )
+    data <- check_data(model, dat, case$formula)
+    family <- paste0("mixture3p_", case$version)
+    code <- configure_model(model, data, case$formula)$stanvars[[paste0(family, "_lpdf")]]$scode
+    code <- gsub(paste0(family, "_lpdf"), paste0("w_", name, "_lpdf"), code, fixed = TRUE)
+    wrappers <- c(wrappers, code)
+    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1", strsplit(code, "\n")[[1]][1])
+    arg_names <- sub(".* ", "", strsplit(signature, ", ")[[1]])
+    arg_values <- ifelse(arg_names %in% names(values),
+      format(values[arg_names], digits = 17), arg_names
+    )
+    arg_values[arg_names == "ss"] <- as.character(as.integer(values[["ss"]]))
+    calls <- c(calls, glue::glue(
+      "out[{length(calls) + 1}] = w_{name}_lpdf({arg_values[1]} | ",
+      "{paste(arg_values[-1], collapse = ', ')});"
+    ))
+  }
+  program <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "mixture3p_funs.stan", package = "bmm")), "\n",
+    paste(wrappers, collapse = "\n"), "}\n",
+    "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
+    " real circmix_logJ_min; real circmix_dlogJ; }\n",
+    "generated quantities { vector[", length(calls), "] out;\n",
+    paste(calls, collapse = "\n"), "\n}\n"
+  )
+  tab <- .circmix_kappa_table()
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = list(
+      NK = length(tab$logkappa), circmix_logk = tab$logkappa,
+      circmix_dlogk = tab$dlogkappa, circmix_logJ_min = tab$logJ_min,
+      circmix_dlogJ = tab$dlogJ
+    ),
+    fixed_param = TRUE, iter_sampling = 1, chains = 1, refresh = 0,
+    show_messages = FALSE, sig_figs = 18
+  )
+  nt <- values[paste0("nt", seq_len(values[["ss"]] - 1))]
+  r_side <- c(
+    simple = .dmixture3p_simple(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["thetat"]],
+      values[["thetant"]], values[["ss"]], nt, 0, 81L
+    ),
+    simple_vp = .dmixture3p_simple(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["thetat"]],
+      values[["thetant"]], values[["ss"]], nt, values[["tau"]], 81L
+    ),
+    slot = .dmixture3p_slot(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["K"]],
+      values[["pnt"]], values[["ss"]], nt, 0, 81L
+    ),
+    slot_averaging = .dmixture3p_slot_averaging(
+      values[["y"]], values[["mu"]], values[["kappa"]], values[["K"]],
+      values[["pnt"]], values[["ss"]], nt, 0, 81L
+    )
+  )
+  expect_equal(as.numeric(fit$draws("out")), unname(r_side), tolerance = 1e-10)
+})
