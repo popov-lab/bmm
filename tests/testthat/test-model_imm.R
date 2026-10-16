@@ -144,6 +144,7 @@ test_that("the abc version asks for no distances", {
 })
 
 test_that("every version runs through the bmm() pipeline", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017
   expect_silent(bmm(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1), dat, imm_model(),
     backend = "mock", mock_fit = 1, rename = FALSE))
@@ -319,6 +320,7 @@ test_that("set size 1 leaves a and s to their priors instead of pinning them", {
 })
 
 test_that("an intercept next to set_size is accepted, with the set-size-1 warning", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   expect_warning(
     bmm(bmf(kappa ~ 1 + set_size, c ~ 1, a ~ 1 + set_size, s ~ 1 + set_size),
       oberauer_lin_2017, imm_model(),
@@ -329,6 +331,7 @@ test_that("an intercept next to set_size is accepted, with the set-size-1 warnin
 })
 
 test_that("the set-size-1 warning names exactly the coefficients no other trial informs", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   set_sizes <- paste0("set_size", 2:8)
   # s is absent at set size 1
   expect_equal(set_size_one_names(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)), character(0))
