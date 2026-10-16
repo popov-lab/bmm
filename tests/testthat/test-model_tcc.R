@@ -1057,6 +1057,7 @@ test_that("the Stan Gumbel likelihood matches dtcc() for runs and single rows", 
       "  real lp_runs_vm = tcc_gumbel_parametric_lpmf(y | rep_vector(0, N), d, par, tcc_delta, tcc_shape);\n",
       "  vector[N] lp;\n",
       "  vector[N] lp_vm;\n",
+      "  real lp_lap = tcc_gumbel_parametric_lpmf(y | rep_vector(0, N), d, par, tcc_delta, 1);\n",
       "  for (i in 1:N) {\n",
       "    lp[i] = tcc_gumbel_lpmf({y[i]} | rep_vector(0, 1), rep_vector(d[i], 1), tcc_similarity);\n",
       "    lp_vm[i] = tcc_gumbel_parametric_lpmf({y[i]} | rep_vector(0, 1), rep_vector(d[i], 1),\n",
@@ -1073,4 +1074,7 @@ test_that("the Stan Gumbel likelihood matches dtcc() for runs and single rows", 
             1e-10)
   expect_equal(run$draw[["lp_runs"]], sum(lp), tolerance = 1e-12)
   expect_equal(run$draw[["lp_runs_vm"]], sum(lp_vm), tolerance = 1e-12)
+  expect_equal(run$draw[["lp_lap"]],
+               sum(dtcc(x, rows$d, "laplace", lambda = rows$par, noise = "gumbel", log = TRUE)),
+               tolerance = 1e-10)
 })
