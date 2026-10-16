@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Appendix A — Reference – BMM Developer Notes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./coding-conventions.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-a39e03fd81b1f0a766df5ad9e59ab707.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">BMM Developer Notes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./../reference/index.html"> 
+<span class="menu-text">Functions</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./../articles/index.html"> 
+<span class="menu-text">Articles</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./../news/index.html"> 
+<span class="menu-text">Changelog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./../dev-notes/index.html"> 
+<span class="menu-text">Develop</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./reference.html">Appendices</a></li><li class="breadcrumb-item"><a href="./reference.html"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Reference</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Overview</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./setup.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">System setup</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./git-workflow.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and GitHub workflow</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./bmm-architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">BMM code structure</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./example-model.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example models</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./add-new-model.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Adding a new model</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./coding-conventions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./reference.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Reference</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#sec-links" id="toc-sec-links" class="nav-link active" data-scroll-target="#sec-links"><span class="header-section-number">A.1</span> Links</a></li>
+  <li><a href="#sec-suppress-mu" id="toc-sec-suppress-mu" class="nav-link" data-scroll-target="#sec-suppress-mu"><span class="header-section-number">A.2</span> Models without a location parameter</a></li>
+  <li><a href="#sec-init-ranges" id="toc-sec-init-ranges" class="nav-link" data-scroll-target="#sec-init-ranges"><span class="header-section-number">A.3</span> Initial values</a></li>
+  <li><a href="#sec-aggregate-data" id="toc-sec-aggregate-data" class="nav-link" data-scroll-target="#sec-aggregate-data"><span class="header-section-number">A.4</span> Aggregated data and <code>vars</code></a></li>
+  <li><a href="#sec-threading" id="toc-sec-threading" class="nav-link" data-scroll-target="#sec-threading"><span class="header-section-number">A.5</span> Within-chain threading</a></li>
+  <li><a href="#sec-version-tables" id="toc-sec-version-tables" class="nav-link" data-scroll-target="#sec-version-tables"><span class="header-section-number">A.6</span> Version tables</a></li>
+  <li><a href="#sec-sd-rates" id="toc-sec-sd-rates" class="nav-link" data-scroll-target="#sec-sd-rates"><span class="header-section-number">A.7</span> Choosing the <code>sd</code> prior rate</a></li>
+  <li><a href="#sec-naming-traps" id="toc-sec-naming-traps" class="nav-link" data-scroll-target="#sec-naming-traps"><span class="header-section-number">A.8</span> Naming traps</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./reference.html">Appendices</a></li><li class="breadcrumb-item"><a href="./reference.html"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Reference</span></a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title"><span id="sec-reference" class="quarto-section-identifier">Appendix A — Reference</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This appendix collects details you need only in particular situations. Each section starts by saying when that is.</p>
+<section id="sec-links" class="level2" data-number="A.1">
+<h2 data-number="A.1" class="anchored" data-anchor-id="sec-links"><span class="header-section-number">A.1</span> Links</h2>
+<p><em>You need this when your model’s links cannot all be changed by the user, or when a user reports that a link they set had no effect.</em></p>
+<p>bmm implements the links <code>"identity"</code>, <code>"log"</code>, <code>"softplus"</code>, <code>"log1p"</code>, <code>"logm1"</code>, <code>"inverse"</code>, <code>"sqrt"</code>, <code>"logit"</code>, <code>"probit"</code>, <code>"cloglog"</code> and <code>"tan_half"</code>. A model may also declare <code>"loglog"</code> or <code>"softmax"</code> as its own default, but users cannot ask for them. <code>"softplus"</code> is an alternative to <code>"log"</code> for positive parameters: it grows linearly rather than exponentially, so predictor effects are additive on the natural scale and large values do not overflow.</p>
+<p>The constructor assigns the user’s links with <code>set_links()</code>. It refuses a name that is not a parameter (a one-letter typo is repaired, with a warning), refuses a link the model cannot apply, and warns when the new link admits values the default excludes, such as <code>identity</code> for a positive parameter. <code>check_model()</code> runs the same validation on links assigned after construction.</p>
+<p>By default every link can be changed. A model that writes its links into the family, the Stan code or the non-linear formulas, instead of reading them from <code>model$links</code> at fit time, must say so with a <code>settable_links()</code> method that returns <code>character(0)</code> or the subset that works. Otherwise a user’s link would show in <code>print()</code> and in the priors while the sampler ignored it. SDM, the mixture models and the IMM return <code>character(0)</code>; the SDT models return the parameters whose links reach the likelihood. A model that substitutes the inverse link into its formulas itself also overrides <code>settable_link_functions()</code>, as M3, MPT and the multinomial SDT models do.</p>
+</section>
+<section id="sec-suppress-mu" class="level2" data-number="A.2">
+<h2 data-number="A.2" class="anchored" data-anchor-id="sec-suppress-mu"><span class="header-section-number">A.2</span> Models without a location parameter</h2>
+<p><em>You need this when your model has no natural <code>mu</code>, as is typical for response time models.</em></p>
+<p>brms requires every custom family to have a <code>mu</code> parameter. DDM, EZDM and cswald have none, and suppress it rather than promote one of their parameters to it:</p>
+<ol type="1">
+<li>The family’s <code>dpars</code> include a dummy <code>mu</code> with an <code>identity</code> link.</li>
+<li><code>fixed_parameters</code> contains <code>mu = 0</code>.</li>
+<li><code>mu</code> is left out of <code>parameters</code>, so <code>prior_info()</code> and <code>parameter_info()</code> do not report it, and users do not give it a formula.</li>
+<li>The model’s <code>bmf2bf()</code> method writes the first formula line itself, such as <code>rt | dec(response) ~ 1</code> for the DDM.</li>
+</ol>
+<p>If you add <code>mu = 0</code> to <code>fixed_parameters</code> but forget the dummy <code>mu</code> in <code>dpars</code>, <code>configure_prior()</code> errors, because every fixed parameter has to exist in the formula.</p>
+</section>
+<section id="sec-init-ranges" class="level2" data-number="A.3">
+<h2 data-number="A.3" class="anchored" data-anchor-id="sec-init-ranges"><span class="header-section-number">A.3</span> Initial values</h2>
+<p><em>You need this when chains fail at initialization or diverge immediately, typically because the likelihood is undefined for part of a parameter’s range.</em></p>
+<p>brms’ default initialization draws every parameter from a wide symmetric range on the sampling scale. For a non-decision time that must stay below the fastest observed RT, that often starts chains where the likelihood is undefined. <code>init_ranges</code> gives such parameters a narrow window on the native scale:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-label="1"></a>init_ranges <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-label="2"></a>  <span class="at">mu    =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="fl">0.1</span>, <span class="fl">0.1</span>),</span>
+<span id="cb1-3"><a href="#cb1-3" aria-label="3"></a>  <span class="at">drift =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb1-4"><a href="#cb1-4" aria-label="4"></a>  <span class="at">bound =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>),</span>
+<span id="cb1-5"><a href="#cb1-5" aria-label="5"></a>  <span class="at">ndt   =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.05</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-label="6"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>create_initfun.default()</code> in <code>R/helpers-inits.R</code> reads the parameter dimensions from the Stan code and builds an initialization function:</p>
+<ol type="1">
+<li>Random effects start tight: standard deviations between 0.05 and 0.1, standardized effects near zero, correlation matrices at the identity.</li>
+<li>Population-level parameters with an <code>init_ranges</code> entry start inside that range. The range is transformed through the parameter’s link (for softmax mixing weights it is already on the sampling scale), so it stays valid when the user changes the link. With predictors, the coefficients are solved so that each design cell starts inside the range.</li>
+<li>Everything else gets brms’ default draw.</li>
+</ol>
+<p><code>create_initfun()</code> maps Stan parameter names back to model parameters with the regular expression <code>(^|_)param(_|$)</code>, taking the longest match. A parameter called <code>s</code> therefore matches <code>b_s_Intercept</code> but not <code>b_sim_Intercept</code>. A name that appears as a whole underscore-delimited token elsewhere in the Stan parameter names is not safe.</p>
+</section>
+<section id="sec-aggregate-data" class="level2" data-number="A.4">
+<h2 data-number="A.4" class="anchored" data-anchor-id="sec-aggregate-data"><span class="header-section-number">A.4</span> Aggregated data and <code>vars</code></h2>
+<p><em>You need this when your model is fitted to counts or summary statistics instead of one row per trial.</em></p>
+<p>brms has special response terms that pass further columns to the Stan likelihood: <code>vreal()</code> for real values, <code>vint()</code> for integers and <code>trials()</code> for a trial count. The EZDM’s <code>bmf2bf()</code> method builds <code>mean_rt | vreal(var_rt) + vint(n_upper) + trials(n_trials) ~ 1</code>, which makes the columns available in Stan as <code>vreal1[n]</code>, <code>vint1[n]</code> and <code>trials[n]</code>. The family names them in <code>vars</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-label="1"></a>brms<span class="sc">::</span><span class="fu">custom_family</span>(..., <span class="at">loop =</span> <span class="cn">TRUE</span>, <span class="at">vars =</span> <span class="fu">c</span>(<span class="st">"vreal1[n]"</span>, <span class="st">"vint1[n]"</span>, <span class="st">"trials[n]"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>loop</code> decides the shape of the generated Stan code. With <code>loop = TRUE</code>, brms emits one likelihood call per observation; with <code>loop = FALSE</code>, one vectorized call. You may index <code>vars</code> with <code>[n]</code> only in a looped likelihood; otherwise brms stops with “Invalid use of index ‘[n]’ in an unlooped custom likelihood”. SDM uses <code>loop = FALSE</code> and no <code>vars</code>.</p>
+<p>Add a model fitted to counts to <code>uses_aggregate_data()</code> in <code>R/data_check.R</code> (currently <code>m3</code>, <code>ezdm</code> and <code>mpt</code>), so that <code>bmm_data_check()</code> does not report too few observations per cell.</p>
+</section>
+<section id="sec-threading" class="level2" data-number="A.5">
+<h2 data-number="A.5" class="anchored" data-anchor-id="sec-threading"><span class="header-section-number">A.5</span> Within-chain threading</h2>
+<p><em>You need this when your Stan code injects data or likelihood code through <code>stanvar()</code>, or your custom family uses <code>vars</code> with <code>loop = FALSE</code>.</em></p>
+<p>Passing <code>threads</code> to <code>bmm()</code> asks brms to split each chain’s likelihood across cores. brms slices the response and calls the likelihood inside <code>partial_log_lik</code>, where the row bounds <code>start</code> and <code>end</code> exist. Two things it does <em>not</em> slice:</p>
+<ul>
+<li><strong>A custom family’s <code>vars</code>.</strong> brms pastes them in as written, so a vectorized likelihood would receive the whole vector next to a slice of the response. cswald therefore passes <code>vars = "dec[start:end]"</code> when threading and <code>"dec"</code> otherwise.</li>
+<li><strong>Stan code injected through <code>stanvar()</code></strong>, which has to be written differently depending on whether it ends up inside <code>partial_log_lik</code> or in the model block.</li>
+</ul>
+<p>Both decisions rest on <code>brms_slices_likelihood()</code> in <code>R/utils.R</code>. Call it in <code>configure_model()</code> rather than reading the <code>brms.threads</code> option yourself: it normalizes the option as brms does and is <code>FALSE</code> for <code>threading(force = TRUE)</code>, where brms compiles with threading support but emits unsliced code. SDM, cswald and <code>sdt_mafc</code> use it.</p>
+<p>SDM is the fullest example. <code>inst/stan_chunks/</code> holds <code>sdm_simple_likelihood.stan</code> and <code>sdm_simple_likelihood_threaded.stan</code>, and <code>configure_model.sdm()</code> reads one of them:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-label="1"></a>likelihood_file <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">brms_slices_likelihood</span>()) {</span>
+<span id="cb3-2"><a href="#cb3-2" aria-label="2"></a>  <span class="st">"sdm_simple_likelihood_threaded.stan"</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-label="3"></a>} <span class="cf">else</span> {</span>
+<span id="cb3-4"><a href="#cb3-4" aria-label="4"></a>  <span class="st">"sdm_simple_likelihood.stan"</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-label="5"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Data the threaded likelihood needs must also be declared in the partial-log-likelihood signature through the <code>pll_args</code> argument of <code>stanvar()</code>. SDM passes <code>"data matrix COSN"</code> and, through its helper <code>sdm_stanvar_int_array()</code>, the run-index arrays. Without that, the variable is out of scope inside <code>partial_log_lik</code> and the model does not compile.</p>
+<p>Test the generated Stan code with no <code>threads</code>, with <code>threads = 2</code> and with <code>threading(2, force = TRUE)</code>, as <code>test-model_sdm-stancode.R</code> does.</p>
+</section>
+<section id="sec-version-tables" class="level2" data-number="A.6">
+<h2 data-number="A.6" class="anchored" data-anchor-id="sec-version-tables"><span class="header-section-number">A.6</span> Version tables</h2>
+<p><em>You need this when your model has several versions, or when you read an older model file and its structure differs from what the template generates.</em></p>
+<p><code>use_model_template("mymodel", versions = c("v1", "v2"))</code> generates a version table: the specification of each version in one lookup list, which the constructor indexes with <code>version</code>. EZDM, cswald and M3 use it:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>R/model_ezdm.R</strong></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" data-filename="R/model_ezdm.R" data-bmm-src=".ezdm_version_table" data-bmm-excerpt="abridged"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-label="1"></a>.ezdm_version_table <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-label="2"></a>  <span class="st">"3par"</span> <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" aria-label="3"></a>    <span class="at">parameters =</span> <span class="fu">list</span>(...),</span>
+<span id="cb4-4"><a href="#cb4-4" aria-label="4"></a>    <span class="at">links =</span> <span class="fu">list</span>(...),</span>
+<span id="cb4-5"><a href="#cb4-5" aria-label="5"></a>    <span class="at">fixed_parameters =</span> <span class="fu">list</span>(...),</span>
+<span id="cb4-6"><a href="#cb4-6" aria-label="6"></a>    <span class="at">priors =</span> <span class="fu">list</span>(...),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-label="7"></a>    <span class="at">init_ranges =</span> <span class="fu">list</span>(...)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-label="8"></a>  ),</span>
+<span id="cb4-9"><a href="#cb4-9" aria-label="9"></a>  <span class="st">"4par"</span> <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb4-10"><a href="#cb4-10" aria-label="10"></a>    <span class="at">parameters =</span> <span class="fu">list</span>(...),</span>
+<span id="cb4-11"><a href="#cb4-11" aria-label="11"></a>    <span class="at">links =</span> <span class="fu">list</span>(...),</span>
+<span id="cb4-12"><a href="#cb4-12" aria-label="12"></a>    ...</span>
+<span id="cb4-13"><a href="#cb4-13" aria-label="13"></a>  )</span>
+<span id="cb4-14"><a href="#cb4-14" aria-label="14"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-label="1"></a>parameters <span class="ot">=</span> .ezdm_version_table[[version]][[<span class="st">"parameters"</span>]],</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Keep the default of the alias’s <code>version</code> argument a literal <code>c(...)</code>: <code>model_versions()</code> reads it to build the per-version documentation.</p>
+<p>Two departures from this shape exist in the package:</p>
+<ul>
+<li><strong>M3 nests one level deeper.</strong> Its <code>links</code> and <code>priors</code> are indexed by the choice rule before the parameter (<code>.m3_version_table[[version]][["links"]][[choice_rule]]</code>), <code>fixed_parameters</code> is computed in the constructor, and the default version <code>"custom"</code> is not in the table at all, because the user supplies the specification. Copy this only if your model has a second axis of variation.</li>
+<li><strong>Some models write their specification inline.</strong> <code>sdm</code>, <code>mixture2p</code>, <code>mixture3p</code>, <code>imm</code> and most SDT models have no defaults list or version table, because they predate it. New models use the separated specification.</li>
+</ul>
+</section>
+<section id="sec-sd-rates" class="level2" data-number="A.7">
+<h2 data-number="A.7" class="anchored" data-anchor-id="sec-sd-rates"><span class="header-section-number">A.7</span> Choosing the <code>sd</code> prior rate</h2>
+<p><em>You need this when you set the <code>sd</code> default priors of a new model.</em></p>
+<p>The shipped models use <code>exponential()</code> on the link scale, with the rate chosen by what the parameter measures:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 9%">
+<col style="width: 90%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Rate</th>
+<th>Parameters</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>sensitivity, memory strength, concentration (<code>kappa</code>), mixing weights, identity-linked drift</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>criteria and thresholds, boundary, non-decision time, start point, log-linked drift, diffusion constant, log ratios, log SDs, correlations</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>circular bias</td>
+</tr>
+</tbody>
+</table>
+<p>The template repeats this table as a comment above the priors. Every model declares an <code>sd</code> prior, except the custom version of M3, which has no default priors at all.</p>
+</section>
+<section id="sec-naming-traps" class="level2" data-number="A.8">
+<h2 data-number="A.8" class="anchored" data-anchor-id="sec-naming-traps"><span class="header-section-number">A.8</span> Naming traps</h2>
+<p><em>You need this when brms or Stan fails with an error that does not point at the cause, or when a parameter gets a prior you did not set.</em></p>
+<p><strong>A custom family’s <code>dpars</code> may not contain <code>_</code> or <code>.</code>, and may not end with a digit.</strong> <code>brms::custom_family()</code> checks both, so neither <code>delta_1</code> nor <code>delta1</code> is a legal name. The digits on IMM parameters (<code>kappa1</code>, <code>theta3</code>) are generated by <code>brms::mixture()</code>, and parameters introduced through <code>nlf()</code> are not subject to this check.</p>
+<p><strong>Reusing a brms dpar name inherits its default prior.</strong> brms attaches default priors by name to <code>mu</code>, <code>sigma</code>, <code>shape</code>, <code>nu</code>, <code>phi</code>, <code>kappa</code>, <code>beta</code>, <code>zi</code>, <code>hu</code>, <code>zoi</code>, <code>coi</code>, <code>bs</code>, <code>ndt</code>, <code>bias</code>, <code>quantile</code>, <code>xi</code>, <code>alpha</code>, <code>disc</code> and <code>theta</code>, and strips trailing digits first, so <code>kappa1</code> is treated as <code>kappa</code>. bmm reuses several of these names and sets its own defaults; the trap is a reused name you forget to give a default prior.</p>
+<p><strong>A dpar must not be uniquely prefixed by <code>thres</code>.</strong> brms reads <code>p$thres</code> when it builds a custom likelihood call, and <code>$</code> partial-matches on lists, so a dpar named <code>threshold</code> is passed where ordinal thresholds belong. The result is Stan code that does not parse.</p>
+<p><strong>Stan probability-function suffixes need the bar syntax.</strong> A function whose name ends in <code>_lpdf</code>, <code>_lupdf</code>, <code>_lpmf</code>, <code>_lupmf</code>, <code>_cdf</code>, <code>_lcdf</code> or <code>_lccdf</code> must be called with a vertical bar between its first two arguments, as <code>swald_lpdf(rt | drift, bound, ndt, s)</code>. If your helper is not really a distribution function, give it another name.</p>
+<p><strong>An <code>nlf()</code> right-hand side is pasted together as text</strong>, so operator precedence is yours to manage. The IMM parenthesizes every sub-expression it interpolates: <code>"{lure_idx} * (-expS*{nt_distances} + c) + (1 - {lure_idx}) * (-100)"</code>.</p>
+<p><strong>Short parameter names collide.</strong> Besides the initial-value matching above (<a href="#sec-init-ranges" class="quarto-xref"><span>Section A.3</span></a>), bmm treats a formula component as non-linear when one of its predictors is also a parameter. When the same name is also a data column, <code>check_formula()</code> warns, because the choice changes the likelihood without the user seeing it. One-letter parameters collide with columns such as a condition coded <code>c</code>.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./coding-conventions.html" class="pagination-link" aria-label="Coding conventions">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

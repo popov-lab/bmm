@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -43,10 +43,10 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-893fe9ddc644446a6c1ebe867bb6f684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-a39e03fd81b1f0a766df5ad9e59ab707.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -149,7 +149,7 @@ ul.task-list li input[type="checkbox"] {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./git-workflow.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and Github workflow</span></span></a>
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and GitHub workflow</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -161,7 +161,7 @@ ul.task-list li input[type="checkbox"] {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./example-model.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example model file</span></span></a>
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example models</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -176,6 +176,23 @@ ul.task-list li input[type="checkbox"] {
  <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
   </div>
 </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./reference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Reference</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
     </ul>
     </div>
 </nav>
@@ -186,7 +203,12 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a>
+  <ul class="collapse">
+  <li><a href="#from-idea-to-merged-model" id="toc-from-idea-to-merged-model" class="nav-link" data-scroll-target="#from-idea-to-merged-model">From idea to merged model</a></li>
+  <li><a href="#how-to-read-these-notes" id="toc-how-to-read-these-notes" class="nav-link" data-scroll-target="#how-to-read-these-notes">How to read these notes</a></li>
+  <li><a href="#the-rules-for-contributing" id="toc-the-rules-for-contributing" class="nav-link" data-scroll-target="#the-rules-for-contributing">The rules for contributing</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -214,26 +236,41 @@ ul.task-list li input[type="checkbox"] {
 
 <section id="overview" class="level1 unnumbered">
 <h1 class="unnumbered">Overview</h1>
-<p><em>Last update: 16.09.2026</em></p>
-<p>This guide aims to help developers contribute new models to bmm. It is a work in progress and will be updated as the package evolves. It explains how to set-up your system for package development, the structure of the package, and the workflow for contributing new models to the package.</p>
-<p>The bmm package now supports models across multiple domains, including visual working memory models (mixture models, IMM, SDM), response time / decision models (DDM, EZDM, Censored-Shifted Wald), and categorical response models (M3). The package requires <strong>R &gt;= 4.1.0</strong> and uses the native pipe operator <code>|&gt;</code> throughout. Further models are in development on feature branches; they are not part of a release and not covered here until they are.</p>
-<p>This guide describes bmm at the <strong>v1.3.2</strong> tag. Anything merged after that tag may not be reflected here yet, and the version on CRAN can lag behind the tag while a submission is being processed. If you run into problems, don’t hesitate to <a href="https://github.com/popov-lab/bmm/issues">open an issue on github</a>.</p>
-<p>We follow a <a href="https://jeffkreeftmeijer.com/git-flow/">github flow workflow</a>. The repository contains two main branches:</p>
+<p><em>Last update: 16.10.2026</em></p>
+<p>These notes are for developers who want to add a model to bmm. They explain how the package is put together and walk through the steps of contributing a model, from setting up your system to opening the pull request.</p>
+<p>bmm covers five kinds of tasks: continuous reproduction (mixture models, IMM, SDM), categorical recall and n-AFC decisions (M3), processing-tree models (MPT), detection, recognition and confidence judgments (the signal detection models), and choices with response times (DDM, EZDM, Censored-Shifted Wald). <code>bmm_models()</code> lists them. The package requires <strong>R &gt;= 4.1.0</strong> and uses the native pipe <code>|&gt;</code> throughout.</p>
+<p>This guide describes bmm at the <strong>v1.4.1</strong> tag. Anything merged after that tag may not be reflected here yet. If you run into problems, <a href="https://github.com/popov-lab/bmm/issues">open an issue on GitHub</a>.</p>
+<section id="from-idea-to-merged-model" class="level2 unnumbered">
+<h2 class="unnumbered anchored" data-anchor-id="from-idea-to-merged-model">From idea to merged model</h2>
+<ol type="1">
+<li>Open an issue with the <a href="https://github.com/popov-lab/bmm/issues/new?template=new_model.md"><code>new_model</code> template</a> and agree with the maintainers on the model and the release it targets.</li>
+<li>Fork bmm, set up your system and create a branch named after the issue (<a href="setup.html" class="quarto-xref"><span>1&nbsp; System setup</span></a>).</li>
+<li>Generate the model file with <code>use_model_template()</code> and fill it in (<a href="add-new-model.html" class="quarto-xref"><span>5&nbsp; Adding a new model</span></a>). Write the distribution functions first and the prediction functions after.</li>
+<li>Add the model’s tests and its test cases, and run <code>document()</code>, <code>test()</code> and <code>check()</code>.</li>
+<li>Run a parameter recovery study, and add an example dataset, an article and a NEWS bullet.</li>
+<li>Open the pull request against the branch you started from and fill in the template (<a href="add-new-model.html" class="quarto-xref"><span>5&nbsp; Adding a new model</span></a> has the checklist).</li>
+</ol>
+</section>
+<section id="how-to-read-these-notes" class="level2 unnumbered">
+<h2 class="unnumbered anchored" data-anchor-id="how-to-read-these-notes">How to read these notes</h2>
+<ol type="1">
+<li><a href="./setup.html">System setup</a> and <a href="./git-workflow.html">Git workflow</a> get you a working fork.</li>
+<li><a href="./bmm-architecture.html">Code structure</a> explains what happens when a user calls <code>bmm()</code>, and <a href="./example-model.html">Example models</a> shows two real model files.</li>
+<li><a href="./add-new-model.html">Adding a new model</a> is the step-by-step guide, ending with a checklist for the pull request.</li>
+<li><a href="./coding-conventions.html">Coding conventions</a> lists what review will check your code against.</li>
+</ol>
+<p>The appendix, <a href="./reference.html">Reference</a>, collects details you need only when you hit a particular problem, such as within-chain threading or a parameter name that collides with brms.</p>
+</section>
+<section id="the-rules-for-contributing" class="level2 unnumbered">
+<h2 class="unnumbered anchored" data-anchor-id="the-rules-for-contributing">The rules for contributing</h2>
+<p>Which branch to target, what a pull request must contain, how many reviews it needs and how model fits for articles are handled are set out in bmm’s <a href="https://github.com/popov-lab/bmm/blob/develop/.github/CONTRIBUTING.md">CONTRIBUTING.md</a>. These notes do not repeat those rules. For a new model, two things matter from the start:</p>
 <ul>
-<li><p>Master (contains the latest released stable version of the <code>bmm</code> package)</p></li>
-<li><p>Develop (contains the latest stable development branch)</p></li>
+<li><strong>Open an issue with the <code>new_model</code> template first</strong>, so that you agree with the maintainers that the model fits the package and in which release it will appear.</li>
+<li><strong>Make the model easy to check.</strong> The reviewer reads your likelihood against its published source and looks at your parameter recovery. Include a short, runnable example with a small simulated dataset, and say in the pull request how long it takes to fit and what output to expect.</li>
 </ul>
-<p>All new feature development should occur on an independent branch from Develop. If you want to contribute a new model to the <code>bmm</code> package, you need to fork the repository, create a new branch for your model off Develop, extensively test the model, and eventually submit a pull request into the Develop branch of the main repository.</p>
-<p>How that pull request is reviewed:</p>
-<ul>
-<li><p>One reviewer approval is required to merge. Two are required when the pull request changes shared infrastructure rather than a single model — the pipeline helpers under <code>R/helpers-*.R</code>, or the exported API — because those changes affect every model rather than only yours.</p></li>
-<li><p>A pull request that adds a new model is approved by a human who has installed your branch and fitted the model. Reading the diff is not sufficient for a new model, because the failure modes that matter (a likelihood that compiles but samples badly, priors that make the model unidentifiable, initial values that hit the boundary) only show up in a fit.</p></li>
-</ul>
-<p>Accordingly, make the model easy to fit for whoever reviews it: include a short, runnable example with a small simulated dataset, and say in the pull request how long it takes to fit and what output to expect.</p>
-<p>Once your changes are merged into the Develop branch, they will be included in the next release of the package.</p>
-<p><img src="images/clipboard-674159866.png" class="img-fluid"></p>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

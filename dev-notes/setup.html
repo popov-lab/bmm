@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -79,10 +79,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-893fe9ddc644446a6c1ebe867bb6f684.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-a39e03fd81b1f0a766df5ad9e59ab707.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -185,7 +185,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./git-workflow.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and Github workflow</span></span></a>
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and GitHub workflow</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -197,7 +197,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./example-model.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example model file</span></span></a>
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Example models</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -212,6 +212,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Coding conventions</span></span></a>
   </div>
 </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./reference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Reference</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
     </ul>
     </div>
 </nav>
@@ -225,7 +242,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#setting-up-a-local-fork-of-the-bmm-repository" id="toc-setting-up-a-local-fork-of-the-bmm-repository" class="nav-link active" data-scroll-target="#setting-up-a-local-fork-of-the-bmm-repository"><span class="header-section-number">1.1</span> Setting up a local fork of the bmm repository</a></li>
   <li><a href="#prerequisites" id="toc-prerequisites" class="nav-link" data-scroll-target="#prerequisites"><span class="header-section-number">1.2</span> Prerequisites</a></li>
   <li><a href="#package-development-with-devtools" id="toc-package-development-with-devtools" class="nav-link" data-scroll-target="#package-development-with-devtools"><span class="header-section-number">1.3</span> Package development with devtools</a></li>
-  <li><a href="#untracked-scratch-work" id="toc-untracked-scratch-work" class="nav-link" data-scroll-target="#untracked-scratch-work"><span class="header-section-number">1.4</span> Untracked scratch work</a></li>
+  <li><a href="#running-the-tests" id="toc-running-the-tests" class="nav-link" data-scroll-target="#running-the-tests"><span class="header-section-number">1.4</span> Running the tests</a></li>
+  <li><a href="#untracked-scratch-work" id="toc-untracked-scratch-work" class="nav-link" data-scroll-target="#untracked-scratch-work"><span class="header-section-number">1.5</span> Untracked scratch work</a></li>
   </ul>
 </nav>
     </div>
@@ -254,47 +272,48 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="setting-up-a-local-fork-of-the-bmm-repository" class="level2" data-number="1.1">
 <h2 data-number="1.1" class="anchored" data-anchor-id="setting-up-a-local-fork-of-the-bmm-repository"><span class="header-section-number">1.1</span> Setting up a local fork of the bmm repository</h2>
 <ol type="1">
-<li><p>Fork the bmm github repository. This will create a copy of the current development branch into your own github account</p>
+<li><p>Fork the bmm GitHub repository. This creates a copy of the repository in your own GitHub account.</p>
 <p><img src="images/clipboard-758253314.png" class="img-fluid"></p></li>
-<li><p><a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository">Clone</a> your fork to your local machine</p></li>
-<li><p><a href="https://github.com/Kunena/Kunena-Forum/wiki/Create-a-new-branch-with-git-and-manage-branches">Create a new branch</a> for your model off <code>develop</code>. Open an issue first and name the branch after it, as <code>&lt;issue-number&gt;-short-description</code> (for example <code>349-lba-model</code>). That is what the branches in the main repository look like, and it makes the branch, the issue and the eventual pull request easy to line up.</p></li>
+<li><p><a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository">Clone</a> your fork to your local machine, and add the main repository as a remote so that you can keep your branch up to date: <code>git remote add upstream https://github.com/popov-lab/bmm.git</code>.</p></li>
+<li><p>Create a branch for your model. Branch from <code>develop</code>, or, if the issue for your model is planned for a later release, from that release’s integration branch (<code>dev-x.y.0</code>); the issue’s milestone tells you which. Name the branch after the issue, as <code>&lt;issue-number&gt;-short-description</code> (for example <code>349-lba-model</code>), so that branch, issue and pull request are easy to line up.</p></li>
 </ol>
 </section>
 <section id="prerequisites" class="level2" data-number="1.2">
 <h2 data-number="1.2" class="anchored" data-anchor-id="prerequisites"><span class="header-section-number">1.2</span> Prerequisites</h2>
-<p>The bmm package requires <strong>R &gt;= 4.1.0</strong> (for native pipe <code>|&gt;</code> support). The package works with both <code>rstan</code> and <code>cmdstanr</code> backends. <code>cmdstanr</code> is generally recommended for faster compilation and better error messages. You can install it with:</p>
+<p>The bmm package requires <strong>R &gt;= 4.1.0</strong> (for the native pipe <code>|&gt;</code>). It works with both the <code>rstan</code> and the <code>cmdstanr</code> backend. We recommend <code>cmdstanr</code>, which compiles faster and gives better error messages, and the tests that compile Stan code need it:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-label="1"></a><span class="fu">install.packages</span>(<span class="st">"cmdstanr"</span>, <span class="at">repos =</span> <span class="fu">c</span>(<span class="st">"https://stan-dev.r-universe.dev"</span>, <span class="fu">getOption</span>(<span class="st">"repos"</span>)))</span>
 <span id="cb1-2"><a href="#cb1-2" aria-label="2"></a>cmdstanr<span class="sc">::</span><span class="fu">install_cmdstan</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Once bmm is loaded (with <code>load_all()</code>, below), <code>bmm_setup()</code> checks the C++ toolchain, <code>cmdstanr</code> with CmdStan, <code>rstan</code>, and the backend <code>bmm()</code> will use. It then compiles and samples a small test model and suggests a fix for every check that failed. Run it before your first fit.</p>
 </section>
 <section id="package-development-with-devtools" class="level2" data-number="1.3">
 <h2 data-number="1.3" class="anchored" data-anchor-id="package-development-with-devtools"><span class="header-section-number">1.3</span> Package development with devtools</h2>
-<p>Development runs on the <code>devtools</code> package, and the steps below are the same whichever editor you work in. The repository ships a <code>bmm.Rproj</code> file, so opening it starts a session with the package root as the working directory in RStudio or Positron; opening the directory in any other editor, or starting R in it from a terminal, gets you to the same place. A great tutorial on package development can be found <a href="https://r-pkgs.org/">here</a>. Below is a summary of the most important steps</p>
+<p>Development runs on the <code>devtools</code> package, whichever editor you work in. The repository ships a <code>bmm.Rproj</code> file, so opening it in RStudio or Positron starts a session in the package root; in any other editor, start R in the repository directory. <a href="https://r-pkgs.org/">R Packages</a> is the standard tutorial. The steps you will repeat:</p>
 <ol type="1">
-<li><p>Make sure you have the devtools package and a few others installed and loaded</p>
+<li><p>Install the development tools and bmm’s dependencies once:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-label="1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">"devtools"</span>, <span class="st">"roxygen2"</span>, <span class="st">"testthat"</span>, <span class="st">"knitr"</span>))</span>
 <span id="cb2-2"><a href="#cb2-2" aria-label="2"></a><span class="fu">library</span>(devtools)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-label="3"></a><span class="fu">install_dev_deps</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Optionally, to avoid loading <strong>devtools</strong> in every session, you can add the following to your <code>.Rprofile</code></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-label="1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) {</span>
-<span id="cb3-2"><a href="#cb3-2" aria-label="2"></a>  <span class="fu">suppressMessages</span>(<span class="fu">require</span>(devtools))</span>
-<span id="cb3-3"><a href="#cb3-3" aria-label="3"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>As noted <a href="https://r-pkgs.org/setup.html#personal-startup-configuration">here</a>, you can create and open an <code>.Rprofile</code> file, if you don’t already have one with</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-label="1"></a><span class="fu">use_devtools</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-<li><p>Load the current version of the <code>bmm</code> package based on your local files</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-label="1"></a><span class="fu">load_all</span>()  <span class="co"># ctrl+shift+L in RStudio</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>you can use this command whenever you make changes to the package code to see the changes in action. You should not call <code>library(bmm)</code> or source the files manually, as this will load the installed version of the package, not the one you are developing.</p></li>
-<li><p>Make any changes to the package code that you need to make (elaborated in the next section)</p></li>
-<li><p>Use <code>check()</code> to check the package for errors and warnings</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-label="1"></a><span class="fu">check</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>you should always ensure that check() produces no errors before submitting a pull request</p></li>
-<li><p>Use <code>document()</code> to update the documentation</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-label="1"></a><span class="fu">document</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<span id="cb2-3"><a href="#cb2-3" aria-label="3"></a><span class="fu">install_dev_deps</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p>Load the package from your local files whenever you change the code:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-label="1"></a><span class="fu">load_all</span>()  <span class="co"># ctrl+shift+L in RStudio</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Do not call <code>library(bmm)</code> or source the files, as that loads the installed version, not the one you are working on.</p></li>
+<li><p>Before you open a pull request, regenerate the documentation, run the tests and check the package, in this order:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-label="1"></a><span class="fu">document</span>()  <span class="co"># regenerates man/ and NAMESPACE; never edit those by hand</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-label="2"></a><span class="fu">test</span>()</span>
+<span id="cb4-3"><a href="#cb4-3" aria-label="3"></a><span class="fu">check</span>()     <span class="co"># 0 errors, 0 warnings; explain any note in the pull request</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
 </ol>
 </section>
-<section id="untracked-scratch-work" class="level2" data-number="1.4">
-<h2 data-number="1.4" class="anchored" data-anchor-id="untracked-scratch-work"><span class="header-section-number">1.4</span> Untracked scratch work</h2>
-<p>Development produces files that belong on your machine rather than in the package: exploratory scripts, fitted model objects, scratch data. bmm’s <code>.gitignore</code> excludes <code>local/</code> for this purpose — <code>AGENTS.md</code> describes it as machine-specific scratch that is neither synced nor shared — so anything you put there stays out of your commits. Nothing requires you to use it; any location git ignores will do.</p>
-<p>Parameter recovery scripts are the main thing you will keep out of the package this way. What the study has to show, and how it reaches the reviewer given that it is not committed, is in <a href="coding-conventions.html" class="quarto-xref"><span>Chapter 6</span></a>.</p>
+<section id="running-the-tests" class="level2" data-number="1.4">
+<h2 data-number="1.4" class="anchored" data-anchor-id="running-the-tests"><span class="header-section-number">1.4</span> Running the tests</h2>
+<p><code>test()</code> runs <code>tests/testthat/</code> in parallel. Two kinds of test there skip themselves when your machine cannot run them:</p>
+<ul>
+<li>Tests that compile Stan code need CmdStan. Set <code>BMM_TEST_STAN=false</code> in your environment to skip them deliberately.</li>
+<li>Tests that read a stored fit need <code>tests/testthat/assets/</code>, which is left out of the built package, so they skip inside <code>check()</code>.</li>
+</ul>
+<p>Tests that actually sample live in <code>tests/local/</code> and never run in <code>test()</code> or <code>check()</code>. They are not required for a pull request, because a weekly CI job runs them, but you can run them with <code>Rscript tests/local/run.R</code>. Run <code>test(reporter = "slow")</code> before a pull request as well: the suite has a time budget that CI enforces, and this reporter shows which of your tests are slow. <a href="add-new-model.html" class="quarto-xref"><span>Chapter 5</span></a> says which tests a new model needs.</p>
+</section>
+<section id="untracked-scratch-work" class="level2" data-number="1.5">
+<h2 data-number="1.5" class="anchored" data-anchor-id="untracked-scratch-work"><span class="header-section-number">1.5</span> Untracked scratch work</h2>
+<p>Development produces files that belong on your machine rather than in the package: exploratory scripts, fitted model objects, scratch data. bmm’s <code>.gitignore</code> excludes a <code>local/</code> folder at the root of the repository for this purpose, so anything you put there stays out of your commits. (<code>tests/local/</code> is a different folder and is tracked.) Your parameter recovery script can live there, but the reviewer has to see its results; <a href="add-new-model.html" class="quarto-xref"><span>Chapter 5</span></a> says how.</p>
 
 
 </section>
@@ -707,8 +726,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="./git-workflow.html" class="pagination-link" aria-label="Git and Github workflow">
-        <span class="nav-page-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and Github workflow</span></span> <i class="bi bi-arrow-right-short"></i>
+      <a href="./git-workflow.html" class="pagination-link" aria-label="Git and GitHub workflow">
+        <span class="nav-page-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Git and GitHub workflow</span></span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav>
