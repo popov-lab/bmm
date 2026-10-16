@@ -243,19 +243,11 @@ check_data.ezdm <- function(model, data, formula) {
     "The following required variables are missing from the data: {collapse_comma(missing_vars)}"
   )
 
-  # check that n_trials is a positive integer
-  n_trials_values <- data[[n_trials]]
-  stopif(
-    any(n_trials_values <= 2, na.rm = TRUE),
-    "Number of trials (n_trials) must be larger than two."
-  )
-  warnif(
-    any(n_trials_values != round(n_trials_values), na.rm = TRUE),
-    "Number of trials (n_trials) should be whole numbers. Found non-integer values."
-  )
+  check_n_trials_var(data, n_trials)
 
   # check that n_upper is a non-negative integer
   n_upper_values <- data[[n_upper]]
+  n_trials_values <- data[[n_trials]]
   stopif(
     any(n_upper_values < 0, na.rm = TRUE),
     "Number of upper boundary responses (n_upper) needs to be positive."
@@ -286,28 +278,7 @@ check_data.ezdm <- function(model, data, formula) {
     TRUE
   }
 
-  # check that mean RT values are plausible (warn if likely in milliseconds)
-  # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
-  mean_rt_values <- as.matrix(data[mean_rt])[rt_used %in% TRUE]
-  warnif(
-    any(mean_rt_values > 10, na.rm = TRUE),
-    "Some mean RT values are greater than 10. If your reaction times are in
-    milliseconds, please convert them to seconds before fitting the model.
-    The model assumes reaction times are measured in seconds."
-  )
-
-  # check that mean RT values are positive
-  stopif(
-    any(mean_rt_values <= 0, na.rm = TRUE),
-    "Mean RT values must be positive. Found non-positive values in the data."
-  )
-
-  # check that variance values are positive
-  var_rt_values <- as.matrix(data[var_rt])[rt_used %in% TRUE]
-  stopif(
-    any(var_rt_values <= 0, na.rm = TRUE),
-    "Variance of RT must be positive. Found non-positive values in the data."
-  )
+  check_rt_summary_vars(data, mean_rt, var_rt, used = rt_used)
 
   if (model$version == "4par") {
     # brms drops every row holding an NA, response counts included (#430), so

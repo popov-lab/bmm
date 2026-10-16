@@ -135,6 +135,28 @@ test_that("pp_simulate() for ezdm respects per-observation trial counts", {
   }
 })
 
+test_that("pp_simulate() for ezcdm respects per-observation trial counts", {
+  withr::local_seed(7)
+  model <- ezcdm(mean_angle = "ma", var_angle = "va", mean_rt = "mrt",
+                 var_rt = "vrt", n_trials = "nt")
+  n_trials <- c(3L, 30L, 500L)
+  # driftangle as a scalar, the form get_dpar() returns for a fixed dpar
+  prep <- fake_prep(200L, 3L, dpars = list(
+    driftrate = rep(1, 600), driftangle = 0, bound = rep(1.5, 600),
+    ndt = rep(0.3, 600)
+  ), data = list(trials = n_trials))
+  sims <- pp_simulate(model, prep)
+
+  expect_named(sims, c("mean_angle", "var_angle", "mean_rt", "var_rt",
+                       "n_trials"))
+  expect_identical(dim(sims$mean_rt), c(200L, 3L))
+  expect_identical(sims$n_trials, .pp_expand_data(n_trials, 200L))
+  for (stat in c("mean_angle", "var_angle", "mean_rt")) {
+    spread <- apply(sims[[stat]], 2, stats::sd)
+    expect_true(all(diff(spread) < 0), info = stat)
+  }
+})
+
 test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses", {
   model <- ezdm(mean_rt = c("mu", "ml"), var_rt = c("vu", "vl"), n_upper = "nu",
                 n_trials = "nt", version = "4par")

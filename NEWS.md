@@ -1,5 +1,11 @@
 # bmm (development version)
 
+### New models
+* Add the **EZ Circular Diffusion Model** (`ezcdm`) for continuous-report tasks with response times (Qarehdaghi & Amani Rad, 2024). It estimates drift rate, boundary and non-decision time, and in `version = "4par"` the drift angle, from the circular mean and variance of the response angles and the mean and variance of the response times per participant and condition. `ezcdm_summary_stats()` computes these statistics from trial data and by default corrects them for contaminant trials. Also adds `dezcdm()` and `rezcdm()`. See `?ezcdm` and the EZ circular diffusion article (#150). Thanks to @GidonFrischkorn
+
+### Bug fixes
+* `ezdm` now stops with an error naming the column when `n_trials` holds non-integer values. It used to warn that the counts "should be whole numbers" and continue, after which brms stopped with "Number of trials must be non-negative integers".
+
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
 
