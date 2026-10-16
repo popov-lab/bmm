@@ -149,6 +149,28 @@ test_that("add_missing_parameters works", {
   )
 })
 
+test_that("add_missing_parameters adds only the first of a set of alternatives", {
+  model <- imm(NA, NA, NA, NA)
+  model$alternative_parameters <- list(c("a", "s"))
+
+  out <- suppressMessages(add_missing_parameters(model, bmf(c ~ 1)))
+  expect_equal(names(out), c("mu1", "kappa", "a", "c"))
+
+  out <- suppressMessages(add_missing_parameters(model, bmf(s ~ 1)))
+  expect_equal(names(out), c("mu1", "kappa", "c", "s"))
+  expect_message(add_missing_parameters(model, bmf(s ~ 1)), "parameter c ")
+  expect_no_message(add_missing_parameters(model, bmf(c ~ 1, s ~ 1, kappa ~ 1)))
+})
+
+test_that("check_formula refuses two alternatives to the same parameter", {
+  model <- imm(NA, NA, NA, NA)
+  model$alternative_parameters <- list(c("a", "s"))
+  expect_error(
+    check_formula(model, data = NULL, formula = bmf(a ~ 1, s ~ 1)),
+    "gives both 'a', 's'"
+  )
+})
+
 test_that("check_formula gives expected errors", {
   expect_error(
     check_formula(sdm("dev_rad"),
@@ -387,6 +409,12 @@ test_that("apply_links is case sensitive for link names", {
   form <- bmf(x ~ a + c, kappa ~ 1, a ~ 1, c ~ 1)
   links <- list(a = "LOG")
   expect_error(apply_links(form, links), "should be one of")
+})
+
+test_that("apply_links refuses links that are not a named list of strings", {
+  form <- bmf(x ~ a + c, kappa ~ 1, a ~ 1, c ~ 1)
+  expect_error(apply_links(form, list("log")), "named list of link functions")
+  expect_error(apply_links(form, list(a = 1)), "named list of link functions")
 })
 
 

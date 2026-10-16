@@ -67,7 +67,7 @@ model does declare are reported, since the user can estimate them: \code{mu}
 for \code{sdm()}, \code{mu1} for the circular mixture models, \code{zr} for \code{ddm()}.
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 fit <- bmm(
   bmf(c ~ 0 + set_size, kappa ~ 1),
   data = oberauer_lin_2017,

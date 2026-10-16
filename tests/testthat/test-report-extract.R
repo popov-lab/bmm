@@ -1,10 +1,11 @@
+# the stored fit of every model that registers one (helper-model-<model>.R)
 fixture_fits <- function() {
-  paths <- list.files(test_path("assets"), pattern = "^bmmfit_.*\\.rds$", full.names = TRUE)
-  stats::setNames(lapply(paths, readRDS), basename(paths))
+  files <- vapply(model_test_cases("fixture"), `[[`, character(1), "file")
+  stats::setNames(lapply(files, load_fixture_fit), files)
 }
 
 all_model_versions <- function() {
-  models <- supported_models(print_call = FALSE)
+  models <- model_names()
   out <- lapply(models, function(m) {
     lapply(model_versions(m), function(v) {
       if (is.na(v)) get_model(m)() else get_model(m)(version = v)
@@ -50,18 +51,15 @@ test_that("a custom m3 marks its user-defined structure as uncited", {
 
 test_that("model_citation() of a fit reads the current constructor first", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  # as a fit that stored the reference of an older bmm
+  fit$bmm$model$citation <- "Oberauer, K. (2023). An older reference."
   expect_identical(model_citation(fit), model_citation(.model_sdm()))
-  expect_false(identical(model_citation(fit), as.character(fit$bmm$model$citation)))
 })
 
 test_that("model_citation() falls back to the copy stored on an old fit", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   blank_sdm <- function(...) {
     model <- .model_sdm(...)
     model$citation <- character()
@@ -96,13 +94,12 @@ test_that("model_citation() cites the default version of a model stored without 
 
 test_that("model_citation() splits the single string older fits stored into references", {
   skip_on_cran()
-  paths <- c(
-    cswald = test_path("assets/bmmfit_cswald_ppcheck.rds"),
-    ezdm = test_path("assets/bmmfit_ezdm3_ppcheck.rds")
+  fits <- list(
+    cswald = load_fixture_fit("bmmfit_cswald_ppcheck.rds"),
+    ezdm = load_fixture_fit("bmmfit_ezdm3_ppcheck.rds")
   )
-  skip_if_not(all(file.exists(paths)), "Fixtures not available (excluded by .Rbuildignore)")
   local_mocked_bindings(current_constructor = function(model) NULL)
-  refs <- lapply(paths, function(path) model_citation(readRDS(path)))
+  refs <- lapply(fits, model_citation)
   expect_identical(lengths(refs), c(cswald = 1L, ezdm = 2L))
   refs <- unlist(refs)
   expect_false(any(grepl("\n", refs, fixed = TRUE)))
@@ -137,9 +134,7 @@ test_that("use_model_template() scaffolds an empty citation vector", {
 
 test_that("summarise_formula() returns one line per parameter, constants included", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
   lines <- summarise_formula(fit$bmm$user_formula, model = fit$bmm$model)
   expect_type(lines, "character")
   expect_false(any(grepl("\n", lines, fixed = TRUE)))
@@ -152,7 +147,6 @@ test_that("summarise_formula() returns one line per parameter, constants include
 test_that("print(summary()) shows the formula text summarise_formula() returns", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   for (name in names(fits)) {
     fit <- fits[[name]]
     printed <- trimws(capture.output(print(suppressWarnings(summary(fit)), color = FALSE)), "right")
@@ -170,7 +164,6 @@ nuts_count <- function(fit, par, at_least = 1) {
 test_that("fit_settings() reads the sampler settings and versions stored on the fit", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   for (name in names(fits)) {
     fit <- fits[[name]]
     settings <- fit_settings(fit)
@@ -200,18 +193,16 @@ test_that("fit_settings() reads the sampler settings and versions stored on the 
 
 test_that("fit_settings() counts the draws that summary() reports", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  # n_save of this fixture says 80 draws, but it stores 4000
-  expect_equal(fit_settings(readRDS(path))$ndraws_stored, 4000)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
+  # a trimmed fit can keep an n_save that disagrees with the 200 draws it stores
+  fit$fit@sim$n_save <- 80L
+  expect_equal(fit_settings(fit)$ndraws_stored, 200)
 })
 
 test_that("fit_settings() does not count saved warmup draws", {
   skip_on_cran()
   skip_if_not_installed("rstan")
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   # the fixture saved no warmup; prepend 20 warmup iterations as rstan stores them
   with_warmup <- function(x) c(x[seq_len(20)], x)
   fit$fit@sim$samples <- lapply(fit$fit@sim$samples, function(chain) {
@@ -222,18 +213,16 @@ test_that("fit_settings() does not count saved warmup draws", {
   })
   fit$fit@sim$warmup2 <- rep(20L, fit$fit@sim$chains)
   fit$fit@sim$n_save <- fit$fit@sim$n_save + 20
-  expect_equal(posterior::ndraws(brms::as_draws_array(fit)), 50)
-  expect_equal(fit_settings(fit)$ndraws_stored, 50)
+  expect_equal(posterior::ndraws(brms::as_draws_array(fit)), 200)
+  expect_equal(fit_settings(fit)$ndraws_stored, 200)
 })
 
 test_that("fit_settings() reads the Stan version of an rstan fit from its compiled model", {
   skip_on_cran()
   skip_if_not_installed("rstan")
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
-  # StanHeaders 2.32.7 built this fit, with stanc3 2.32.2
-  expect_identical(fit_settings(fit)$versions[["stan"]], "2.32.2")
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  # StanHeaders 2.39.1 built this fit, with stanc3 2.39.0
+  expect_identical(fit_settings(fit)$versions[["stan"]], "2.39.0")
   fit$fit@stanmodel@model_cpp <- list()
   expect_identical(fit_settings(fit)$versions[["stan"]], as.character(fit$version$stanHeaders))
   # bmm(..., empty = TRUE) leaves no stanfit
@@ -244,9 +233,7 @@ test_that("fit_settings() reads the Stan version of an rstan fit from its compil
 test_that("fit_settings() and convergence_summary() treat a stanfit without draws as a mock", {
   skip_on_cran()
   skip_if_not_installed("rstan")
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   fit$fit <- methods::new("stanfit")
   settings <- fit_settings(fit)
   expect_true(is.na(settings$ndraws_stored))
@@ -256,9 +243,7 @@ test_that("fit_settings() and convergence_summary() treat a stanfit without draw
 
 test_that("fit_settings() works on mock fits, with NA where the fit has no draws", {
   skip_on_cran()
-  path <- test_path("assets/mock_bmmfit_mixture2p.rds")
-  skip_if_not(file.exists(path), "Mock fixture not available (excluded by .Rbuildignore)")
-  settings <- fit_settings(readRDS(path))
+  settings <- fit_settings(load_fixture_fit("mock_bmmfit_mixture2p.rds"))
   expect_true(all(is.na(unlist(settings[c("chains", "iter", "warmup", "thin", "ndraws_stored", "date")]))))
   expect_true(all(is.na(settings$versions)))
 
@@ -273,7 +258,6 @@ test_that("fit_settings() works on mock fits, with NA where the fit has no draws
 test_that("convergence_summary() equals R-hat and ESS computed per variable from the draws", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   for (name in names(fits)) {
     fit <- fits[[name]]
     # tiny fixture fits: posterior warns that it caps the ESS estimates
@@ -300,10 +284,8 @@ test_that("convergence_summary() equals R-hat and ESS computed per variable from
 
 test_that("convergence_summary() leaves out the draws from the prior", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
   withr::local_options(list(warn = -1))
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   expect_true(any(grepl("^prior_", posterior::variables(brms::as_draws_array(fit)))))
   expect_false(any(grepl("^prior_", convergence_summary(fit)$parameter)))
 })
@@ -311,7 +293,6 @@ test_that("convergence_summary() leaves out the draws from the prior", {
 test_that("convergence_summary() marks the parameters that summary() shows", {
   skip_on_cran()
   fits <- fixture_fits()
-  skip_if(length(fits) == 0, "Fixtures not available (excluded by .Rbuildignore)")
   withr::local_options(list(warn = -1))
   for (name in names(fits)) {
     fit <- fits[[name]]
@@ -334,10 +315,8 @@ test_that("convergence_summary() marks the parameters that summary() shows", {
 
 test_that("convergence_summary() counts divergent and maximum-depth transitions", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
   withr::local_options(list(warn = -1))
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   params <- attr(fit$fit@sim$samples[[1]], "sampler_params")
   last <- length(params$divergent__) - 0:2
   params$divergent__[last] <- 1
@@ -350,9 +329,7 @@ test_that("convergence_summary() counts divergent and maximum-depth transitions"
 
 test_that("convergence_summary() has no rows for algorithms other than sampling", {
   skip_on_cran()
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   fit$algorithm <- "meanfield"
   conv <- convergence_summary(fit)
   expect_identical(nrow(conv), 0L)

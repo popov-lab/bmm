@@ -63,7 +63,7 @@ settable_links.sdm <- function(model) {
 
 #' @title `r .model_sdm()$name`
 #' @name sdm
-#' @details see [the online article](https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
+#' @details see [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
 #'   and how to use it. `r model_docs(.model_sdm())`
 #' @param resp_error The name of the variable in the dataset containing the
 #'   response error. The response error should code the response relative to the
@@ -75,7 +75,7 @@ settable_links.sdm <- function(model) {
 #' @return An object of class `bmmodel`
 #' @export
 #' @keywords bmmodel
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # simulate data from the model
 #' dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 #'

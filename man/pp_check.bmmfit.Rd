@@ -41,7 +41,9 @@ signal and noise rating distributions are checked separately; pass
 \code{group = NA} to pool them into a single profile. The \code{\link[=sdt_ranking]{sdt_ranking()}} model
 shows the rank positions as the categories of the proportion profile; for
 mixed set sizes, pass the set-size column as \code{group} so each facet has a
-homogeneous denominator. The custom-family
+homogeneous denominator. For \code{\link[=mpt]{mpt()}} fits, the \code{tree_id} column can be
+named even if no parameter formula uses it, giving one facet per tree;
+the default pools the trees. The custom-family
 models \code{\link[=sdt_yn]{sdt_yn()}} and \code{\link[=sdt_mafc]{sdt_mafc()}} delegate to \code{\link[brms:pp_check]{brms::pp_check()}}; for
 their aggregated counts an overlaid empirical CDF (\code{type = "ecdf_overlay"},
 adding \code{group = "stimulus"} for \code{\link[=sdt_yn]{sdt_yn()}}) is usually clearer than the

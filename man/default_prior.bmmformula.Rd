@@ -17,8 +17,8 @@ passed to the \code{bmmodel} object for required argurments.}
 \item{model}{A description of the model to be fitted. This is a call to a
 \code{bmmodel} such as \code{mixture3p()} function. Every model function has a
 number of required arguments which need to be specified within the function
-call. Call \code{\link[=supported_models]{supported_models()}} to see the list of supported models and
-their required arguments}
+call. Call \code{\link[=bmm_models]{bmm_models()}} to see the list of supported models, and
+\code{?modelname} (for example \code{?imm}) for their required arguments.}
 
 \item{formula}{An object of class \code{bmmformula}. A symbolic description of the
 model to be fitted.}
@@ -66,6 +66,6 @@ default_prior(bmf(c ~ 1, kappa ~ 1),
 )
 }
 \seealso{
-\code{\link[=supported_models]{supported_models()}}, \code{\link[brms:default_prior]{brms::default_prior()}}
+\code{\link[=bmm_models]{bmm_models()}}, \code{\link[brms:default_prior]{brms::default_prior()}}
 }
 \keyword{extract_info}

@@ -31,7 +31,7 @@ skip this method, and the default method will be used (which returns the same
 brmsfit object that was passed to it).
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 fit <- readRDS("my_saved_fit.rds")
 postprocessed_fit <- prostprocess_brm(fit)
 \dontshow{\}) # examplesIf}
