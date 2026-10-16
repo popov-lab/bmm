@@ -117,6 +117,7 @@ articles:
     contents:
     - articles/bmm_sdt
     - articles/bmm_sdt_dualprocess_metad
+    - articles/bmm_cd_decision_rules
 
   - title: Evidence accumulation models
     desc: Fitting evidence accumulation models to response time and choice data
