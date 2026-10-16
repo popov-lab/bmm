@@ -73,5 +73,5 @@ rt <- c(rnorm(80, 0.55, 0.05), runif(20, 0.1, 4))
 response <- c(rbinom(80, 1, 0.85), rbinom(20, 1, 0.5))
 ezdm_summary_stats(rt, response, contaminant_bound = c(0.1, 4))
 #>      mean_rt      var_rt n_upper n_trials contaminant_prop
-#> mu 0.5532669 0.002680182      67       80        0.1995584
+#> mu 0.5535652 0.002745709      67       80        0.1990716
 ```
