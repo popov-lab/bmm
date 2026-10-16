@@ -7,17 +7,15 @@
 #
 # The caps are 1.5x the maxima of the first four-worker run on the runner
 # (ADR 0004), rounded: suite 532 s, slowest file 450 s, slowest test outside
-# the allowlist 44 s, the two allowlisted tests 88 s and 56 s. Four workers on
+# the allowlist 44 s. Four workers on
 # the 4-vCPU runner double each test's time against one worker, so caps from
 # a one-worker run do not carry over. Every later change goes through the ADR.
 # Seconds throughout.
 caps <- list(suite = 800, file = 680, test = 66)
 
-# known offenders with their own caps, emptied by the #422 consolidation
-allowed <- c(
-  "test-update.R | update() takes a slice of the model frame as newdata (kfold(), reloo())" = 131,
-  "test-update.R | only a slice of a fit's model frame counts as stored data" = 83
-)
+# tests with a cap of their own, "file | test" = seconds; empty since #422,
+# and an entry needs one in ADR 0004
+allowed <- stats::setNames(numeric(), character())
 
 Sys.setenv(NOT_CRAN = "true")
 # setup-r writes options(Ncpus = 1) to the site Rprofile and testthat reads

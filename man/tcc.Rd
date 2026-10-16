@@ -151,10 +151,11 @@ The likelihood reads the response probabilities from a table on a grid
 of \code{d} values up to \code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
 log probability). Beyond \code{d_max} the table is extended
-linearly. This keeps the sampler moving during warmup but is not the
-model: past \code{d_max} the log-likelihood becomes a straight line in \code{d}, so
-a posterior that reaches the end of the grid can run far beyond it, with
-estimates that mean nothing. \code{bmm()} warns after the fit when any
+linearly, with the log probability of each response allowed to fall but
+not to rise. This keeps the sampler moving during warmup but is not the
+model: past \code{d_max} the likelihood no longer favours a larger \code{d}, so a
+posterior that reaches the end of the grid follows the prior beyond it,
+with estimates that mean nothing. \code{bmm()} warns after the fit when any
 posterior draw of \code{d} passes \code{d_max}; then refit with a larger \code{d_max}.
 The default of 30 lies far above the values of \code{d} from 0.6 to 2.0 that
 \code{tcc()} estimates for set sizes 1 to 8 in \link{oberauer_lin_2017} with the
@@ -177,8 +178,8 @@ to one that falls almost as a straight line (Laplace) or a raised cosine
 probability errs by at most 2e-4 on responses with a probability above
 1e-4 up to \code{d = 12} and by 6e-4 up to \code{d = 30}; on any response, by
 1.5e-3 up to \code{d = 12} and 1e-2 up to \code{d = 30}.
-Beyond either end of either axis the table is extended linearly, as
-for \code{d}, with one exception: above \code{d_max} the log probability of a
+Beyond either end of either axis the table is extended linearly, and
+above \code{d_max}, as with a fixed similarity, the log probability of a
 response may fall with \code{d} but never rise. When no response lies far
 from the target, a large \code{d} with a broad similarity describes the data
 almost as well as a small \code{d} with a sharp one, and along that ridge a

@@ -2,21 +2,15 @@
 # These test the parameter routing logic without requiring posterior samples
 
 load_mock_mixture2p <- function() {
-  path <- test_path("assets/mock_bmmfit_mixture2p.rds")
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("mock_bmmfit_mixture2p.rds")
 }
 
 load_mock_m3 <- function() {
-  path <- test_path("assets/mock_bmmfit_m3.rds")
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("mock_bmmfit_m3.rds")
 }
 
 load_sdm_fit <- function() {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  readRDS(path)
+  load_fixture_fit("bmmfit_example1.rds")
 }
 
 test_that(".bmmfit_resolve_par routes dpar to nlpar for mixture2p", {
