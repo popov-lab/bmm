@@ -779,3 +779,298 @@ test_that("the Stan 2-D table and lookup match R on and off both grids", {
   }, numeric(1))
   expect_lt(max(abs(lp[inside] - exact)), 1e-3)
 })
+
+############################################################################# !
+# GUMBEL NOISE                                                           ####
+############################################################################# !
+
+# log P of one option at distance k under Gumbel noise, by integrate() over the
+# argmax of all n options of the wheel, written without the closed form:
+# P(j) = int g(m - d f_j) prod_{o != j} G(m - d f_o) dm, with g and G the
+# density and CDF of the standard Gumbel distribution
+ref_tcc_gumbel_logp <- function(d, k, similarity) {
+  n <- 2 * (length(similarity) - 1)
+  offsets <- 0:(n - 1)
+  means <- d * similarity[pmin(offsets, n - offsets) + 1]
+  own <- k + 1
+  logint <- function(m) {
+    z <- m - means[own]
+    -z - exp(-z) - rowSums(exp(-outer(m, means[-own], "-")))
+  }
+  grid <- seq(-10, max(means) + 30, by = 0.01)
+  values <- logint(grid)
+  peak <- max(values)
+  at <- grid[which.max(values)]
+  part <- function(lo, hi) {
+    integrate(function(m) exp(logint(m) - peak), lo, hi,
+              rel.tol = 1e-12, abs.tol = 0, subdivisions = 2000L)$value
+  }
+  peak + log(part(-Inf, at) + part(at, Inf))
+}
+
+tcc_gumbel_model <- function(similarity = tcc_test_similarity(360), ...) {
+  tcc("err", similarity = similarity, noise = "gumbel", ...)
+}
+
+test_that("tcc(noise = 'gumbel') keeps the parameters, links and priors and refuses other noise", {
+  for (similarity in list(tcc_test_similarity(360), "laplace", "vonmises")) {
+    gaussian <- tcc("err", similarity = similarity)
+    gumbel <- tcc_gumbel_model(similarity)
+    expect_s3_class(gumbel, "tcc")
+    expect_equal(gumbel$other_vars$noise, "gumbel")
+    expect_equal(gaussian$other_vars$noise, "gaussian")
+    expect_named(gumbel$parameters, names(gaussian$parameters))
+    expect_equal(gumbel$links, gaussian$links)
+    expect_equal(gumbel$default_priors, gaussian$default_priors)
+  }
+  expect_match(tcc_gumbel_model()$parameters$d, "Gumbel")
+  expect_error(tcc("err", similarity = tcc_test_similarity(360), noise = "logistic"),
+               "should be one of")
+})
+
+test_that("dtcc(noise = 'gumbel') matches the argmax integral of Gumbel signals", {
+  for (case in list(list(sim = "vector", par = NULL), list(sim = "laplace", par = 0.6),
+                    list(sim = "vonmises", par = 4))) {
+    f <- if (is.null(case$par)) tcc_test_similarity(360) else ref_similarity(case$sim, case$par)
+    similarity <- if (is.null(case$par)) f else case$sim
+    args <- if (is.null(case$par)) list() else tcc_shape_args(case$sim, case$par)
+    for (d in c(0.3, 2, 7)) {
+      k <- c(0, 5, 60, 180)
+      got <- do.call(dtcc, c(list(2 * pi * k / 360, d, similarity), args,
+                             list(noise = "gumbel", log = TRUE)))
+      ref <- vapply(k, ref_tcc_gumbel_logp, numeric(1), d = d, similarity = f)
+      expect_lt(max(abs(got - ref)), 1e-9, label = paste(case$sim, "d", d))
+    }
+  }
+})
+
+test_that("dtcc(noise = 'gumbel') is the softmax arm of m3() with one category per distance", {
+  f <- tcc_test_similarity(36)
+  mult <- c(1, rep(2, 17), 1)
+  cats <- paste0("k", 0:18)
+  model <- m3(resp_cats = cats, num_options = mult, choice_rule = "softmax")
+  act_funs <- do.call(bmf, lapply(0:18, function(k) stats::as.formula(paste0("k", k, " ~ a", k))))
+  for (d in c(0.5, 3, 9)) {
+    pars <- stats::setNames(d * f, paste0("a", 0:18))
+    p_cat <- vapply(seq_along(cats), function(j) {
+      exp(dm3(as.numeric(seq_along(cats) == j), pars, model, act_funs, log = TRUE))
+    }, numeric(1))
+    got <- dtcc(2 * pi * (0:18) / 36, d, f, n_options = 36, noise = "gumbel")
+    expect_equal(got * mult, p_cat, tolerance = 1e-12, info = paste("d =", d))
+  }
+})
+
+test_that("dtcc(noise = 'gumbel') sums to one and rtcc() matches the argmax of Gumbel signals", {
+  x <- 2 * pi * (-179:180) / 360
+  for (d in c(0, 1.3, 12, 60)) {
+    expect_equal(sum(dtcc(x, d, tcc_test_similarity(360), noise = "gumbel")), 1, tolerance = 1e-12)
+  }
+  expect_equal(dtcc(x, 0, "vonmises", kappa = 3, noise = "gumbel"), rep(1 / 360, 360))
+  withr::local_seed(573)
+  n <- 20000
+  offsets <- -179:180
+  breaks <- c(-1, 0, 2, 5, 10, 20, 45, 90, 180)
+  for (case in list(list(sim = "vector", par = NULL), list(sim = "vonmises", par = 4))) {
+    f <- if (is.null(case$par)) tcc_test_similarity(360) else ref_similarity(case$sim, case$par)
+    similarity <- if (is.null(case$par)) f else case$sim
+    args <- if (is.null(case$par)) list() else tcc_shape_args(case$sim, case$par)
+    gumbel <- -log(-log(matrix(stats::runif(n * 360), n)))
+    direct <- abs(offsets[max.col(gumbel + rep(3 * f[abs(offsets) + 1], each = n),
+                                  ties.method = "first")])
+    sim <- do.call(rtcc, c(list(n, 3, similarity), args, list(noise = "gumbel")))
+    expect_true(all(sim > -pi & sim <= pi))
+    counts <- rbind(table(cut(direct, breaks)), table(cut(abs(round(sim * 360 / (2 * pi))), breaks)))
+    expect_gt(stats::chisq.test(counts)$p.value, 0.001, label = case$sim)
+  }
+})
+
+# Parity with sdm(): softmax of d f with the scaled von Mises similarity
+# f = (exp(kappa (cos x - 1)) - exp(-2 kappa)) / (1 - exp(-2 kappa)) is the sdm
+# density exp(c sqrt(kappa / (2 pi)) exp(kappa (cos x - 1))) / Z at the option
+# centres, with c = d sqrt(2 pi / kappa) / (1 - exp(-2 kappa)) in bmm's sqrtexp
+# parametrization. They differ by the log option width, and by the sum over
+# options that replaces Z: the trapezoid rule on a smooth periodic function,
+# far below the error of the integrate() call in dsdm()
+test_that("tcc(similarity = 'vonmises', noise = 'gumbel') is sdm() on the option centres", {
+  x <- 2 * pi * (-179:180) / 360
+  for (kappa in c(0.5, 4, 30)) {
+    for (d in c(0.5, 3, 12)) {
+      c_sdm <- d * sqrt(2 * pi / kappa) / -expm1(-2 * kappa)
+      expect_lt(max(abs(dtcc(x, d, "vonmises", kappa = kappa, noise = "gumbel", log = TRUE) -
+                          dsdm(x, 0, c_sdm, kappa, log = TRUE) - log(2 * pi / 360))),
+                1e-8, label = paste("kappa", kappa, "d", d))
+    }
+  }
+})
+
+test_that("the Gumbel likelihood reads no table and passes the similarity to its own lpmf", {
+  code <- brms::stancode(tcc_mock_fit(tcc_gumbel_model(), bmf(d ~ cond)))
+  expect_match(code, "d = exp(d);", fixed = TRUE)
+  expect_match(code, "target += tcc_gumbel_lpmf(Y | mu, d, tcc_similarity);", fixed = TRUE)
+  expect_false(grepl("tcc_tab", code, fixed = TRUE))
+  expect_false(grepl("tcc_logp_by_distance(", code, fixed = TRUE))
+
+  fit <- tcc_mock_fit(tcc_gumbel_model("vonmises"), bmf(d ~ cond, kappa ~ cond))
+  code <- brms::stancode(fit)
+  expect_match(code, "kappa = exp(kappa);", fixed = TRUE)
+  expect_match(code, "target += tcc_gumbel_parametric_lpmf(Y | mu, d, kappa, tcc_delta, tcc_shape);",
+               fixed = TRUE)
+  expect_false(grepl("tcc_tab2", code, fixed = TRUE))
+  sdata <- brms::standata(fit)
+  expect_equal(sdata$tcc_shape, 2)
+  expect_equal(sdata$tcc_delta, 2 * pi * (0:180) / 360, ignore_attr = TRUE)
+  expect_null(sdata$tcc_grid_rows)
+
+  code <- brms::stancode(tcc_mock_fit(tcc_gumbel_model(), threads = brms::threading(2)))
+  expect_match(code, "tcc_gumbel_lpmf(Y[start:end] | mu, d, tcc_similarity)", fixed = TRUE)
+  code <- brms::stancode(tcc_mock_fit(tcc_gumbel_model("laplace"), threads = brms::threading(2)))
+  expect_match(code, "tcc_gumbel_parametric_lpmf(Y[start:end] | mu, d, lambda, tcc_delta, tcc_shape)",
+               fixed = TRUE)
+})
+
+# The Stan programs of the Gaussian model are those of 566-tcc-similarity at
+# 2b209f88, before Gumbel noise was added: md5 of the stancode without its brms
+# version line, taken under brms 2.23.0 (other brms versions generate other code)
+test_that("adding Gumbel noise leaves the Gaussian Stan programs bit-identical", {
+  skip_if_not(packageVersion("brms") == "2.23.0", "hashes taken under brms 2.23.0")
+  md5_code <- function(model, formula, ...) {
+    lines <- strsplit(brms::stancode(tcc_mock_fit(model, formula, ...)), "\n")[[1]]
+    path <- withr::local_tempfile(fileext = ".stan")
+    writeLines(paste(lines[!grepl("generated with brms", lines)], collapse = "\n"), path)
+    unname(tools::md5sum(path))
+  }
+  f <- exp(-(0:180) / 20)
+  expect_equal(md5_code(tcc("err", similarity = f), bmf(d ~ cond)),
+               "04bdce756d2707a5935d8b47a8659bbc")
+  expect_equal(md5_code(tcc("err", similarity = f), bmf(d ~ cond), threads = brms::threading(2)),
+               "469c32bb5406606ccb69137c690e6fe2")
+  expect_equal(md5_code(tcc("err", similarity = "laplace"), bmf(d ~ cond, lambda ~ cond)),
+               "d3d4dcafb973bdad3589d3df88a9645f")
+  expect_equal(md5_code(tcc("err", similarity = "vonmises"), bmf(d ~ 1, kappa ~ cond)),
+               "71dc4d2c58632c8d21c553451e5f6b4d")
+})
+
+test_that("a Gumbel fit is not checked against a table, whatever its draws", {
+  model <- tcc_gumbel_model("laplace")
+  prep <- epred_prep(list(d = cbind(c(1, 45, 300), 2), lambda = cbind(c(1e-4, 1, 50), 1)))
+  expect_silent(.tcc_check_grid(model, prep))
+  expect_silent(postprocess_brm(tcc_gumbel_model(), tcc_mock_fit(tcc_gumbel_model())))
+})
+
+test_that("log_lik_tcc_gumbel() is dtcc() at each draw, with a vector or a named similarity", {
+  d <- c(0.4, 2.2, 9, 41)
+  for (case in list(list(sim = "vector", par = NULL), list(sim = "laplace", par = c(0.05, 0.6, 3, 20)),
+                    list(sim = "vonmises", par = c(0.1, 4, 30, 400)))) {
+    similarity <- if (is.null(case$par)) tcc_test_similarity(360) else case$sim
+    model <- tcc_gumbel_model(similarity)
+    prep <- if (is.null(case$par)) {
+      fit <- suppressMessages(bmm(bmf(d ~ 1), data.frame(err = 2 * pi * c(0, 7, -180, 33) / 360),
+                                  model, backend = "mock", mock_fit = 1, rename = FALSE))
+      sdata <- brms::standata(fit)
+      epred_prep(list(d = matrix(d, 4, sdata$N)), sdata)
+    } else {
+      tcc_shape_prep(model, d, case$par, c(0, 7, -180, 33))
+    }
+    args <- if (is.null(case$par)) list() else tcc_shape_args(case$sim, case$par)
+    for (i in seq_len(prep$nobs)) {
+      exact <- do.call(dtcc, c(list(2 * pi * prep$data$Y[i] / 360, d, similarity), args,
+                               list(noise = "gumbel", log = TRUE)))
+      expect_lt(max(abs(log_lik_tcc_gumbel(i, prep) - exact)), 1e-12, label = case$sim)
+    }
+  }
+  # observations that share their draws of d but not of kappa read their own rows
+  prep <- tcc_shape_prep(tcc_gumbel_model("vonmises"), d, c(1, 2, 3, 4), rep(0, 4))
+  prep$dpars$kappa[, 2] <- 50
+  expect_equal(log_lik_tcc_gumbel(1, prep), dtcc(0, d, "vonmises", kappa = 1:4, noise = "gumbel", log = TRUE))
+  expect_equal(log_lik_tcc_gumbel(2, prep), dtcc(0, d, "vonmises", kappa = 50, noise = "gumbel", log = TRUE))
+
+  # d ~ cond: the observations of each cell share their draws of d, and the next
+  # cell has other draws (180 options in bins, one cell per sign of the offset)
+  f <- tcc_test_similarity(180)
+  model <- tcc("bin", similarity = f, n_options = 180, units = "bins", noise = "gumbel")
+  fit <- suppressMessages(bmm(bmf(d ~ 1), data.frame(bin = c(0, 4, -4, 90)), model,
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  sdata <- brms::standata(fit)
+  d_obs <- cbind(c(1, 2, 3), c(1, 2, 3), c(6, 0.5, 30), c(6, 0.5, 30))
+  prep <- epred_prep(list(d = d_obs), sdata)
+  for (i in 1:4) {
+    expect_equal(log_lik_tcc_gumbel(i, prep),
+                 dtcc(2 * pi * sdata$Y[i] / 180, d_obs[, i], f, n_options = 180, noise = "gumbel", log = TRUE),
+                 info = paste("observation", i))
+  }
+  withr::local_seed(575)
+  prep <- epred_prep(list(d = cbind(rep(40, 2000), rep(0.01, 2000))), sdata)
+  expect_lt(mean(abs(posterior_predict_tcc_gumbel(1, prep))), 3)
+  expect_gt(mean(abs(posterior_predict_tcc_gumbel(2, prep))), 30)
+
+  family <- tcc_mock_fit(tcc_gumbel_model())$formula$family
+  expect_identical(family$log_lik, log_lik_tcc_gumbel)
+  expect_identical(family$posterior_predict, posterior_predict_tcc_gumbel)
+  expect_error(family$posterior_epred(NULL), "not defined for the tcc model")
+})
+
+test_that("posterior_predict_tcc_gumbel() and pp_simulate() draw from the Gumbel pmf", {
+  withr::local_seed(574)
+  n <- 20000
+  breaks <- c(-1, 0, 1, 2, 5, 10, 20, 90, 180)
+  mult <- c(1, rep(2, 179), 1)
+  for (case in list(list(sim = "laplace", par = 0.5), list(sim = "vonmises", par = 4))) {
+    model <- tcc_gumbel_model(case$sim)
+    prep <- tcc_shape_prep(model, rep(3, n), rep(case$par, n), 0)
+    p_dist <- do.call(dtcc, c(list(2 * pi * (0:180) / 360, 3, case$sim), tcc_shape_args(case$sim, case$par),
+                              list(noise = "gumbel"))) * mult
+    expected <- tapply(p_dist, cut(0:180, breaks), sum)
+    for (sims in list(posterior_predict_tcc_gumbel(1, prep), pp_simulate(model, prep)$error[, 1])) {
+      expect_true(all(sims > -180 & sims <= 180 & sims == round(sims)))
+      expect_gt(stats::chisq.test(table(cut(abs(sims), breaks)), p = expected)$p.value, 0.001,
+                label = case$sim)
+    }
+  }
+  # each observation from its own d
+  model <- tcc_gumbel_model()
+  fit <- suppressMessages(bmm(bmf(d ~ 1), data.frame(err = rep(0, 4)), model,
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  sdata <- brms::standata(fit)
+  sims <- pp_simulate(model, epred_prep(list(d = matrix(c(40, 40, 0.01, 0.01), 50, 4, byrow = TRUE)),
+                                        sdata))$error
+  expect_lt(max(colMeans(abs(sims[, 1:2]))), 3)
+  expect_gt(min(colMeans(abs(sims[, 3:4]))), 60)
+})
+
+test_that("the Stan Gumbel likelihood matches dtcc() for runs and single rows", {
+  skip_on_cran()
+  skip_unless_stan_tests()
+  rows <- data.frame(
+    d = c(rep(1.234, 3), rep(0.011, 2), 2, 2.345, rep(45, 2), 4.4),
+    par = c(rep(0.31, 3), rep(0.62, 2), 0.0189, 21.5, 7, 7, 3000),
+    y = c(0L, 7L, -180L, 3L, -3L, 0L, 45L, 1L, -2L, 90L)
+  )
+  f <- tcc_test_similarity(360)
+  # the program of a named similarity carries both Gumbel lpmfs
+  stanvars <- bmm:::.tcc_stanvars(tcc_gumbel_model("vonmises"), table = "stan") +
+    brms::stanvar(x = f, name = "tcc_similarity")
+  run <- tcc_stan_run(
+    stanvars,
+    decl = paste("int<lower=1> N;", "array[N] int y;", "vector[N] d;", "vector[N] par;", sep = "\n"),
+    gq = paste0(
+      "  real lp_runs = tcc_gumbel_lpmf(y | rep_vector(0, N), d, tcc_similarity);\n",
+      "  real lp_runs_vm = tcc_gumbel_parametric_lpmf(y | rep_vector(0, N), d, par, tcc_delta, tcc_shape);\n",
+      "  vector[N] lp;\n",
+      "  vector[N] lp_vm;\n",
+      "  for (i in 1:N) {\n",
+      "    lp[i] = tcc_gumbel_lpmf({y[i]} | rep_vector(0, 1), rep_vector(d[i], 1), tcc_similarity);\n",
+      "    lp_vm[i] = tcc_gumbel_parametric_lpmf({y[i]} | rep_vector(0, 1), rep_vector(d[i], 1),\n",
+      "                                          rep_vector(par[i], 1), tcc_delta, tcc_shape);\n",
+      "  }\n"
+    ),
+    data = list(N = nrow(rows), y = rows$y, d = rows$d, par = rows$par)
+  )
+  lp <- unname(run$draw[paste0("lp.", seq_len(nrow(rows)))])
+  lp_vm <- unname(run$draw[paste0("lp_vm.", seq_len(nrow(rows)))])
+  x <- 2 * pi * rows$y / 360
+  expect_lt(max(abs(lp - dtcc(x, rows$d, f, noise = "gumbel", log = TRUE))), 1e-10)
+  expect_lt(max(abs(lp_vm - dtcc(x, rows$d, "vonmises", kappa = rows$par, noise = "gumbel", log = TRUE))),
+            1e-10)
+  expect_equal(run$draw[["lp_runs"]], sum(lp), tolerance = 1e-12)
+  expect_equal(run$draw[["lp_runs_vm"]], sum(lp_vm), tolerance = 1e-12)
+})
