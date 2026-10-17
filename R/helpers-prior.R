@@ -482,8 +482,8 @@ upfirst <- function(x) {
 #' parameters should be fixed to a constant and put the appropriate constant
 #' priors. Any additional priors that a developer wants to specify, which are
 #' not based on information in the model object, can be defined in the
-#' configure_prior.* method for the model. No model in bmm needs one at
-#' present; the example shows the form such a method takes.
+#' configure_prior.* method for the model, as `mpt` does; the example shows
+#' the form such a method takes.
 #' @param model A `bmmodel` object
 #' @param data A data.frame containing the data used in the model
 #' @param formula A `brmsformula` object returned from configure_model()

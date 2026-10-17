@@ -90,7 +90,7 @@
                              vp_nodes = 81L, call = NULL, ...) {
   spec <- .mixture2p_version_table[[version]]
   if (variable_precision) {
-    spec <- .circmix_add_variable_precision(spec)
+    spec <- .circmix_add_variable_precision(spec, per_slot = version == "slot_averaging")
   }
 
   out <- structure(

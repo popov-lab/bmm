@@ -151,6 +151,9 @@ test_that("dmixture2p() and rmixture2p() refuse what the model refuses", {
   # 21 nodes miss the log density by about 1e-2 at a gamma shape near 3
   expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 21), "odd number of at least 41")
   expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
+  # a fractional or vector count built a grid that recycled with a warning
+  expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 42.5), "odd number of at least 41")
+  expect_error(dmixture2p(0.1, tau = 1, vp_nodes = c(41, 43)), "odd number of at least 41")
 })
 
 test_that("rmixture2p() is exact at high precision", {
