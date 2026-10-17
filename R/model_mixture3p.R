@@ -128,7 +128,7 @@
                              call = NULL, ...) {
   spec <- .mixture3p_version_table[[version]]
   if (variable_precision) {
-    spec <- .circmix_add_variable_precision(spec)
+    spec <- .circmix_add_variable_precision(spec, per_slot = version == "slot_averaging")
   }
 
   out <- structure(
