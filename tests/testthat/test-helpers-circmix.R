@@ -714,3 +714,29 @@ test_that("the Stan and R implementations of the shared core agree", {
     tolerance = 1e-12
   )
 })
+
+test_that("Stan rejects the same shapes as R, below 60 / nodes", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  # shape 0.73 sits just under 60 / 81 = 0.741; the agreement test above runs
+  # the passing twin at 0.75. A reject in generated quantities under
+  # fixed_param leaves NaN in the draw instead of stopping the run.
+  tab <- .circmix_kappa_table()
+  cosd <- cos(0.4 - c(0, 1.2))
+  tau <- .circmix_J(10) / 0.73
+  stan <- circmix_stan_values(list(
+    NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+    logJ_min = tab$logJ_min, dlogJ = tab$dlogJ,
+    NC = 2L, cosd = cosd, logw = log(c(0.5, 0.3)), logw_guess = log(0.2),
+    kappa_het = c(3, 12), NKAP = 1L, kappa = array(2), NJ = 1L, Jtest = array(0.5),
+    NTAU = 1L, tau = array(tau), NI0 = 1L, kappa_i0 = array(1),
+    kappa_vp = 10, nodes = 81L, K_slots = 1.5, ss_slots = 2L,
+    cosd_far = cosd, logw_far = log(c(0.7, 0.3)), kappa_far = 200,
+    NFAR = 1L, tau_far = array(.circmix_J(200) / 10)
+  ))
+
+  expect_error(.circmix_vp_ld(matrix(cosd, nrow = 1), matrix(log(c(0.5, 0.3)), nrow = 1),
+                              log(0.2), 10, tau, 81L), "60 / vp_nodes")
+  expect_true(is.nan(stan("out_vp")))
+})
