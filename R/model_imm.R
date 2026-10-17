@@ -358,7 +358,7 @@ check_formula.imm <- function(model, data, formula) {
   if (!length(pars) || !all(vars %in% names(data))) {
     return(character(0))
   }
-  data <- data[stats::complete.cases(data[vars]), ]
+  data <- data[stats::complete.cases(data[c(vars, "ss_numeric")]), ]
   informed <- data[["ss_numeric"]] > 1
   bterms <- lapply(forms, function(f) brms::brmsterms(brms::bf(f))$dpars$mu)
 
