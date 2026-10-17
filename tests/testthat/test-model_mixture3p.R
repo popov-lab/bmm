@@ -105,6 +105,9 @@ test_that("dmixture3p() refuses node counts the model refuses", {
     "odd number of at least 41"
   )
   expect_error(dmixture3p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
+  # a fractional or vector count built a grid that recycled with a warning
+  expect_error(dmixture3p(0.1, tau = 1, vp_nodes = 41.5), "odd number of at least 41")
+  expect_error(dmixture3p(0.1, tau = 1, vp_nodes = c(41, 43)), "odd number of at least 41")
 })
 
 test_that("rmixture3p() draws from dmixture3p()", {
