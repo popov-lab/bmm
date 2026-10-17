@@ -9,6 +9,7 @@
 
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
+* For developers: the header of the file `use_model_template()` writes named an outdated place for a new model's test cases. It now points to `model_cases_<name>()` in `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`, `sd_default`, `init` and `links` case, and it lists `tests/testthat/test-model_<name>.R` for the model's own tests (#580).
 
 ### Other changes
 * **mixture3p** no longer fixes the non-target weight `thetant` to zero at set size 1 when a formula estimates one value per set size. With one item there is nothing to swap to, so that value is not informed by the data and only reflects its prior. `bmm()` now warns and names every coefficient the other trials leave undetermined, including those of a formula with an intercept or a predictor that varies only at set size 1. Read the set-size-1 coefficient as prior-only (#398).
