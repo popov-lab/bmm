@@ -16,7 +16,7 @@
 
 ### Other changes
 * **mixture3p** no longer fixes the non-target weight `thetant` to zero at set size 1 when a formula estimates one value per set size. With one item there is nothing to swap to, so that value is not informed by the data and only reflects its prior. `bmm()` now warns and names every coefficient the other trials leave undetermined, including those of a formula with an intercept or a predictor that varies only at set size 1. Read the set-size-1 coefficient as prior-only (#398).
-* **imm** no longer fixes the set-size-1 levels of `a` and `s` when a formula estimates one value per set size. With one item there is no non-target, so set size 1 says nothing about `s`, and about `a` only through its sum with `c`; `bmm()` now warns and names the coefficients that depend on their priors. Read those as prior-only, or let `c` take one value across set sizes (#398).
+* **imm** no longer fixes the set-size-1 levels of `a` and `s` when a formula estimates one value per set size. With one item there is no non-target, so set size 1 says nothing about `s`, and about `a` only through its sum with `c`; `bmm()` now warns and names the coefficients that depend on their priors. Give set size 1 a level of its own in a factor, so that only its coefficients depend on their priors, or let `c` take one value across set sizes (#398).
 * **mixture3p** and **imm** now accept an intercept together with `set_size` as a predictor, e.g. `kappa ~ 1 + set_size`; they used to require `0 + set_size` (#398).
 * For developers: `check_data()` no longer adds the `LureIdx*` and `inv_ss` columns for **mixture3p** and **imm**, whose likelihoods read the set size directly (#398).
 
