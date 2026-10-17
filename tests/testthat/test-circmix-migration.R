@@ -544,8 +544,12 @@ test_that("emmeans() routing takes nlpar = and mu1 as the dpar, warning only whe
 
 test_that("emmeans() routing leaves a real nlpar and a model without dpar_since alone", {
   case <- migration_case("mixture2p")
-  fit <- suppressMessages(bmm(bmf(kappa ~ exp(lk), lk ~ 1 + set_size, thetat ~ 1),
-                              small_data(), case$model, backend = "mock", mock_fit = 1, rename = FALSE))
+  # lk has no default prior, which bmm() reports
+  expect_warning(
+    fit <- suppressMessages(bmm(bmf(kappa ~ exp(lk), lk ~ 1 + set_size, thetat ~ 1),
+                                small_data(), case$model, backend = "mock", mock_fit = 1, rename = FALSE)),
+    "Non-linear transformations of model parameters detected"
+  )
   expect_silent(expect_identical(.bmmfit_resolve_par(fit, dpar = NULL, nlpar = "lk", warn = TRUE),
                                  list(dpar = NULL, nlpar = "lk")))
   fit$bmm$model$dpar_since <- NULL
