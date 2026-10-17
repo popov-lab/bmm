@@ -89,9 +89,18 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   )
 
   object <- restructure(object)
+  # a mixture2p, mixture3p or imm fit from before bmm 1.5.0 is refitted under
+  # the custom family of the current version, from a model object rebuilt for it
+  old_family <- is_mixture_family_fit(object)
+  if (old_family) {
+    old_fit_model <- object$bmm$model
+    object <- upgrade_mixture_family_model(object)
+  }
 
   model <- object$bmm$model
-  old_user_formula <- object$bmm$user_formula
+  # the stored formula is not what the user typed in this call, so a mu1 in it
+  # is renamed without a warning
+  old_user_formula <- rename_deprecated_parameters(model, object$bmm$user_formula, warn = FALSE)
   olddata <- object$data
   old_file <- object$file
   configure_opts <- object$bmm$configure_opts
@@ -153,6 +162,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # the main dpar without a `dpar` label, so its rows are the ones carrying
   # neither label
   old_prior <- carried_prior(object$prior)
+  if (old_family) {
+    stored <- translate_stored_prior(old_fit_model, model, config_args$formula, old_prior,
+                                     fitted_with = object$version$bmm)
+    old_prior <- stored$prior
+    message2("{stored$message}")
+  }
   if (length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
@@ -165,7 +180,7 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   prior <- brms::do_call(
     configure_prior, c(list(model, data, config_args$formula, old_prior), fit_frame_args(object, dots))
   )
-  prior <- combine_prior(prior, dots$prior)
+  prior <- combine_prior(prior, translate_deprecated_priors(model, config_args$formula, dots$prior))
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 

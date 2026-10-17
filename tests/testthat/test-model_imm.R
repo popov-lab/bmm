@@ -163,7 +163,7 @@ test_that("a formula naming mu1 still fits, with a warning", {
       imm_model("abc"),
       backend = "mock", mock_fit = 1, rename = FALSE
     ),
-    "'mu1' were renamed to 'mu'"
+    "Use `bmf\\(mu ~ 1\\)` instead"
   )
   expect_true("mu" %in% names(fit$formula$pforms))
   # mu is fixed to 0 unless a formula frees it, so a default intercept prior

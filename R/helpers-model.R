@@ -300,6 +300,20 @@ validate_links <- function(links, model) {
     class(model)[2]
   )[1]
   given <- names(links)
+  # a link named after a parameter's old name goes to the new one
+  renames <- model$deprecated_parameters
+  old <- given %in% names(renames)
+  if (any(old)) {
+    new_names <- unlist(renames[given[old]], use.names = FALSE)
+    link_values <- unlist(links[old], use.names = FALSE)
+    warn_deprecated(
+      what = glue('links = list({given[old]} = "{link_values}")'),
+      with = glue('links = list({new_names} = "{link_values}")'),
+      since = model$dpar_since
+    )
+    given[old] <- new_names
+    names(links) <- given
+  }
 
   if (!is.null(settable)) {
     known <- unique(c(names(model$parameters), names(defaults)))

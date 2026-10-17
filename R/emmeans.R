@@ -24,7 +24,10 @@
 #'   `"c"`, `"thetat"`). Automatically resolved to the correct brms parameter
 #'   type.
 #' @param nlpar Character string. Explicit non-linear parameter name. If
-#'   provided, takes precedence over `dpar`.
+#'   provided, takes precedence over `dpar`. The parameters of `mixture2p()`,
+#'   `mixture3p()` and `imm()` are distributional since bmm 1.5.0, so on their
+#'   fits `nlpar = "kappa"` and `dpar = "mu1"`, the bmm 1.4 forms, are read as
+#'   `dpar = "kappa"` and `dpar = "mu"`, with a deprecation warning.
 #' @param ... Additional arguments passed to the brmsfit methods.
 #' @param trms,xlev,grid Arguments passed by emmeans internally.
 #'
@@ -49,7 +52,9 @@ NULL
 #' @exportS3Method emmeans::recover_data
 recover_data.bmmfit <- function(object, ..., dpar = NULL, nlpar = NULL) {
   object <- restructure(object)
-  resolved <- .bmmfit_resolve_par(object, dpar, nlpar)
+  # emmeans() calls recover_data() and then emm_basis() with the same
+  # arguments, so only this one warns about a deprecated parameter
+  resolved <- .bmmfit_resolve_par(object, dpar, nlpar, warn = TRUE)
   class(object) <- class(object)[class(object) != "bmmfit"]
   emmeans::recover_data(object, ..., dpar = resolved$dpar, nlpar = resolved$nlpar)
 }
@@ -72,7 +77,15 @@ emm_basis.bmmfit <- function(object, trms, xlev, grid, ...,
 }
 
 
-.bmmfit_resolve_par <- function(object, dpar, nlpar) {
+.bmmfit_resolve_par <- function(object, dpar, nlpar, warn = FALSE) {
+  deprecated <- .bmmfit_deprecated_par(object, dpar, nlpar)
+  if (!is.null(deprecated)) {
+    if (warn) {
+      warn_deprecated(deprecated$what, deprecated$with, since = object$bmm$model$dpar_since)
+    }
+    dpar <- deprecated$dpar
+    nlpar <- NULL
+  }
   if (!is.null(dpar) && is.null(nlpar) && !is.null(object$bmm$model)) {
     par_info <- .get_parameter_info(object, dpar)
     if (par_info$type == "nlpar") {
@@ -81,4 +94,26 @@ emm_basis.bmmfit <- function(object, trms, xlev, grid, ...,
     }
   }
   list(dpar = dpar, nlpar = nlpar)
+}
+
+# On the custom families of mixture2p, mixture3p and imm (bmm 1.5.0), a
+# parameter named the 1.4 way, as an nlpar or as mu1, is the dpar it became.
+# Fits made with 1.4 still have their nlpars, so nothing is translated for them
+.bmmfit_deprecated_par <- function(object, dpar, nlpar) {
+  model <- object$bmm$model
+  given <- if (is.null(dpar)) nlpar else dpar
+  if (is.null(model$dpar_since) || length(given) != 1 || (!is.null(dpar) && !is.null(nlpar))) {
+    return(NULL)
+  }
+  bterms <- brms::brmsterms(object$formula)
+  new <- model$deprecated_parameters[[given]] %||% given
+  if (not_in(new, names(bterms$dpars)) || (identical(new, given) && is.null(nlpar))) {
+    return(NULL)
+  }
+  arg <- if (is.null(nlpar)) "dpar" else "nlpar"
+  list(
+    dpar = new,
+    what = glue('emmeans(..., {arg} = "{given}")'),
+    with = glue('emmeans(..., dpar = "{new}")')
+  )
 }
