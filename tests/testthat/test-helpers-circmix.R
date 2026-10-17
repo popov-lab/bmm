@@ -857,9 +857,10 @@ test_that("Stan rejects the same shapes as R, below 60 / nodes", {
     NC = 2L, cosd = cosd, logw = log(c(0.5, 0.3)), logw_guess = log(0.2),
     kappa_het = c(3, 12), NKAP = 1L, kappa = array(2), NJ = 1L, Jtest = array(0.5),
     NTAU = 1L, tau = array(tau), NI0 = 1L, kappa_i0 = array(1),
-    kappa_vp = 10, nodes = 81L, K_slots = 1.5, ss_slots = 2L,
+    kappa_vp = 10, nodes = 81L, K_slots = 1.5, ss_slots = 2L, ss_empty = 4L,
     cosd_far = cosd, logw_far = log(c(0.7, 0.3)), kappa_far = 200,
-    NFAR = 1L, tau_far = array(.circmix_J(200) / 10)
+    NFAR = 1L, tau_far = array(.circmix_J(200) / 10),
+    nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2)
   ))
 
   expect_error(.circmix_vp_ld(matrix(cosd, nrow = 1), matrix(log(c(0.5, 0.3)), nrow = 1),
