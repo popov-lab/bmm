@@ -355,10 +355,7 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
                        log = FALSE) {
   version <- match.arg(version, names(.mixture2p_version_table))
   .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
-  stopif(
-    vp_nodes < 41 || vp_nodes %% 2 == 0,
-    "vp_nodes must be an odd number of at least 41, but is {vp_nodes}."
-  )
+  .circmix_check_variable_precision(FALSE, vp_nodes)
 
   density <- switch(version,
     simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
