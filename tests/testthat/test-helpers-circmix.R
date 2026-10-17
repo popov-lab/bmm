@@ -425,6 +425,36 @@ test_that("the shape-bound warning stays silent without divergences or without a
   )
 })
 
+test_that("a variable-precision fit reaches the shape-bound warning after sampling", {
+  model <- structure(list(variable_precision = TRUE, vp_nodes = 81L), class = "circular")
+  fit <- list(algorithm = "sampling")
+  local_mocked_bindings(
+    has_draws = function(fit) TRUE,
+    .circmix_vp_shape_min = function(fit) c(rep(0.75, 50), rep(0.9, 50))
+  )
+  local_mocked_bindings(
+    nuts_params = function(...) data.frame(Value = c(rep(1, 153), rep(0, 47))),
+    .package = "brms"
+  )
+  expect_warning(postprocess_brm(model, fit), "153 transitions.*vp_nodes = 121")
+  model$variable_precision <- FALSE
+  expect_no_warning(postprocess_brm(model, fit))
+})
+
+test_that(".circmix_vp_shape_min() takes the minimum over every block of observations", {
+  kappa <- matrix(20, nrow = 2, ncol = 1500)
+  kappa[1, 1200] <- 2
+  kappa[2, 10] <- 3
+  local_mocked_bindings(
+    prepare_predictions = function(fit) list(ndraws = 2L, nobs = 1500L),
+    get_dpar = function(prep, dpar, i) {
+      if (dpar == "kappa") kappa[, i, drop = FALSE] else matrix(0.5, 2, length(i))
+    },
+    .package = "brms"
+  )
+  expect_equal(.circmix_vp_shape_min(NULL), .circmix_J(c(2, 3)) / 0.5)
+})
+
 test_that(".circmix_prep_nt() returns the covariates in numeric order", {
   prep <- list(data = list(
     Y = 1:3, vreal10 = c(10, 0, 0), vreal2 = c(2, 0, 0), vreal1 = c(1, 0, 0)
