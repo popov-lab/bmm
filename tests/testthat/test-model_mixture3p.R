@@ -258,6 +258,7 @@ test_that("the swap parameter is flagged as prior-only at set size 1", {
 })
 
 test_that("a missing set size leaves the set-size-1 check to the complete rows", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   # the check read the rows complete in the formula's variables only, so one
   # NA set size reached svd() and stopped every fit with set-size-1 trials
   dat <- oberauer_lin_2017
