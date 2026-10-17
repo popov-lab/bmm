@@ -369,22 +369,42 @@
 )
 
 # tau means the same in every model that offers variable precision, so it is
-# defined once and inserted next to the kappa it modifies.
-.circmix_add_variable_precision <- function(spec) {
+# defined once and inserted next to the kappa it modifies. Under slot averaging
+# the gamma describes one slot, and an item held in j slots sums j draws.
+.circmix_add_variable_precision <- function(spec, per_slot = FALSE) {
   after_kappa <- which(names(spec$parameters) == "kappa")
-  spec$parameters <- append(spec$parameters, list(tau = glue(
-    "Scale of the trial-to-trial variability in memory precision. The Fisher \\
-    information J of a memory representation is drawn from \\
-    gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision \\
-    and larger values spread precision more widely across trials."
-  )), after = after_kappa)
+  tau <- if (per_slot) {
+    glue(
+      "Scale of the trial-to-trial variability in memory precision. The Fisher \\
+      information J of one slot is drawn from gamma(mean = J(kappa), scale = tau), \\
+      and an item held in j slots has the sum of j such draws, so tau -> 0 \\
+      recovers constant precision and larger values spread precision more widely \\
+      across trials."
+    )
+  } else {
+    glue(
+      "Scale of the trial-to-trial variability in memory precision. The Fisher \\
+      information J of a memory representation is drawn from \\
+      gamma(mean = J(kappa), scale = tau), so tau -> 0 recovers constant precision \\
+      and larger values spread precision more widely across trials."
+    )
+  }
+  spec$parameters <- append(spec$parameters, list(tau = tau), after = after_kappa)
   spec$parameters$kappa <- paste(
     sub("\\.?$", ".", spec$parameters$kappa),
-    glue(
-      "With variable precision, kappa describes the average trial: it is the \\
-      concentration whose Fisher information J(kappa) is the mean of J across \\
-      trials."
-    )
+    if (per_slot) {
+      glue(
+        "With variable precision, kappa describes the average slot: it is the \\
+        concentration whose Fisher information J(kappa) is the mean Fisher \\
+        information of one slot."
+      )
+    } else {
+      glue(
+        "With variable precision, kappa describes the average trial: it is the \\
+        concentration whose Fisher information J(kappa) is the mean of J across \\
+        trials."
+      )
+    }
   )
   spec$links <- append(spec$links, list(tau = "log"),
     after = which(names(spec$links) == "kappa")
