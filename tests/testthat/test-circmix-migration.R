@@ -570,6 +570,18 @@ test_that("a mu1 prior keeps its class: mu1 was a dpar in 1.4 already", {
   )
 })
 
+test_that("standata() takes a prior written for bmm 1.4", {
+  case <- migration_case("mixture2p")
+  formula <- bmf(kappa ~ 1 + set_size, thetat ~ 1)
+  old <- brms::set_prior("normal(1, 0.5)", class = "b", coef = "Intercept", nlpar = "kappa")
+  new <- brms::set_prior("normal(1, 0.5)", class = "Intercept", dpar = "kappa")
+  expect_warning(
+    old_data <- standata(formula, small_data(), case$model, prior = old),
+    "deprecated since bmm 1.5.0"
+  )
+  expect_identical(unclass(old_data), unclass(standata(formula, small_data(), case$model, prior = new)))
+})
+
 test_that("the replacement code leaves out the intercept half that an explicit intercept prior replaces", {
   skip_on_cran()
   warnings <- expect_old_prior_translated(
