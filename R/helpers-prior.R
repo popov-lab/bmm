@@ -845,9 +845,13 @@ translate_nlpar_priors <- function(model, formula, prior) {
   n_new <- vapply(old_rows, function(i) sum(source == i), integer(1))
   to_intercept <- vapply(old_rows, function(i) any(out$class[source == i] == "Intercept"), logical(1))
   split <- new_par[old_rows][n_new == 2]
+  dropped <- what[n_new == 0]
   moved <- new_par[old_rows][shifts[old_rows] & to_intercept]
 
   details <- c(
+    if (length(dropped) > 0) {
+      glue("`{dropped}` is now covered by the intercept prior given with it, so it is dropped.")
+    },
     if (length(split) > 0) {
       glue(
         "In bmm 1.4 a class \"b\" prior also covered the intercept, so it is now \\

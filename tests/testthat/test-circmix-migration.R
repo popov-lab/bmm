@@ -570,6 +570,24 @@ test_that("a mu1 prior keeps its class: mu1 was a dpar in 1.4 already", {
   )
 })
 
+test_that("a class prior that an explicit intercept prior replaces names no empty replacement", {
+  skip_on_cran()
+  # on kappa ~ 1 the class "b" row covered only the intercept, which the
+  # coef = "Intercept" row sets, so the class row translates to nothing
+  warnings <- expect_old_prior_translated(
+    "mixture2p", list(kappa ~ 1),
+    brms::set_prior("normal(0, 0.3)", class = "b", nlpar = "kappa") +
+      brms::set_prior("normal(1, 0.5)", class = "b", coef = "Intercept", nlpar = "kappa"),
+    brms::set_prior("normal(1, 0.5)", class = "Intercept", dpar = "kappa")
+  )
+  expect_no_match(warnings, "``", fixed = TRUE)
+  expect_match(
+    warnings,
+    '`set_prior("normal(0, 0.3)", class = "b", nlpar = "kappa")` is now covered by the intercept prior given with it, so it is dropped.',
+    fixed = TRUE
+  )
+})
+
 test_that("standata() takes a prior written for bmm 1.4", {
   case <- migration_case("mixture2p")
   formula <- bmf(kappa ~ 1 + set_size, thetat ~ 1)
