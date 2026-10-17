@@ -105,6 +105,9 @@ test_that("dmixture3p() refuses node counts the model refuses", {
     "odd number of at least 41"
   )
   expect_error(dmixture3p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
+  # a fractional or vector count built a grid that recycled with a warning
+  expect_error(dmixture3p(0.1, tau = 1, vp_nodes = 41.5), "odd number of at least 41")
+  expect_error(dmixture3p(0.1, tau = 1, vp_nodes = c(41, 43)), "odd number of at least 41")
 })
 
 test_that("rmixture3p() draws from dmixture3p()", {
@@ -231,6 +234,28 @@ test_that("the swap parameter is flagged as prior-only at set size 1", {
     ),
     "do not determine 'b_thetant_set_size1' in the formula for 'thetant'"
   )
+})
+
+test_that("a missing set size leaves the set-size-1 check to the complete rows", {
+  # the check read the rows complete in the formula's variables only, so one
+  # NA set size reached svd() and stopped every fit with set-size-1 trials
+  dat <- oberauer_lin_2017
+  dat$set_size[5] <- NA
+  fit_mock <- function(formula, version = "simple") {
+    withCallingHandlers(
+      bmm(formula, dat, nt_model(version = version),
+        backend = "mock", mock_fit = 1, rename = FALSE
+      ),
+      # brms dropping the row is the expected outcome; any other warning shows
+      warning = function(w) {
+        if (grepl("Rows containing NAs were excluded", conditionMessage(w))) {
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
+  }
+  expect_s3_class(fit_mock(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)), "bmmfit")
+  expect_s3_class(fit_mock(bmf(kappa ~ 1, K ~ 1, pnt ~ 1), "slot"), "bmmfit")
 })
 
 test_that("the set-size-1 warning names exactly the coefficients no other trial informs", {
