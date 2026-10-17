@@ -232,6 +232,28 @@ test_that("the swap parameter is flagged as prior-only at set size 1", {
   )
 })
 
+test_that("a missing set size leaves the set-size-1 check to the complete rows", {
+  # the check read the rows complete in the formula's variables only, so one
+  # NA set size reached svd() and stopped every fit with set-size-1 trials
+  dat <- oberauer_lin_2017
+  dat$set_size[5] <- NA
+  fit_mock <- function(formula, version = "simple") {
+    withCallingHandlers(
+      bmm(formula, dat, nt_model(version = version),
+        backend = "mock", mock_fit = 1, rename = FALSE
+      ),
+      # brms dropping the row is the expected outcome; any other warning shows
+      warning = function(w) {
+        if (grepl("Rows containing NAs were excluded", conditionMessage(w))) {
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
+  }
+  expect_s3_class(fit_mock(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)), "bmmfit")
+  expect_s3_class(fit_mock(bmf(kappa ~ 1, K ~ 1, pnt ~ 1), "slot"), "bmmfit")
+})
+
 test_that("the set-size-1 warning names exactly the coefficients no other trial informs", {
   dat <- oberauer_lin_2017
   dat$ss_numeric <- as.numeric(as.character(dat$set_size))

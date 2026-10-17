@@ -337,7 +337,7 @@ check_formula.mixture3p <- function(model, data, formula) {
   if (!all(vars %in% names(data))) {
     return(character(0))
   }
-  data <- data[stats::complete.cases(data[vars]), ]
+  data <- data[stats::complete.cases(data[c(vars, "ss_numeric")]), ]
   informed <- data[["ss_numeric"]] > 1
   bterms <- brms::brmsterms(brms::bf(formula))$dpars$mu
   X <- get_model_matrix(bterms$fe, data)
