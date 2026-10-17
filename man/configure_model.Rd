@@ -14,24 +14,26 @@ configure_model(model, data, formula)
 \item{formula}{The user supplied formula}
 }
 \value{
-A named list containing at minimum the following elements:
+A named list built with \code{nlist()}, containing:
 \itemize{
-\item formula: An object of class \code{brmsformula}. The constructed model formula
+\item formula: An object of class \code{brmsformula}, the constructed model formula
+with the brms family attached as \code{formula$family}
 \item data: the user supplied data.frame, preprocessed by check_data
-\item family: the brms family object
-\item prior: the brms prior object
-\item stanvars: (optional) An object of class \code{stanvars} (for custom families).
-See \code{\link[brms:custom_family]{brms::custom_family()}} for more details.
+\item stanvars: (optional) An object of class \code{stanvars}, when the model adds
+Stan code (a custom family, or Stan functions called from the formula).
+See \code{\link[brms:custom_family]{brms::custom_family()}} and \code{\link[brms:stanvar]{brms::stanvar()}} for more details.
 }
 }
 \description{
 Called by bmm() to automatically construct the model
-formula, family objects and default priors for the model specified by the
-user. It will call the appropriate configure_model.* functions based on the
-list of classes defined in the .model_* functions. Currently, we have a
-method only for the last class listed in the .model_* functions. This is to
-keep model configuration as simple as possible. In the future we may add
-shared methods for classes of models that share the same configuration.
+formula, with its family, and any stanvars for the model specified by the
+user. Default priors are not built here but by \code{\link[=configure_prior]{configure_prior()}} from the
+model's \code{default_priors}; a model that needs priors beyond those defines
+its own \verb{configure_prior.<model>()} method (e.g. \code{mixture3p}, \code{mpt}). It
+will call the appropriate configure_model.* functions based on the list of
+classes defined in the .model_* functions. Each model has one method, for
+its model class, or one per version class when the versions are configured
+differently (e.g. \code{imm}, \code{ezdm}, \code{cswald}).
 }
 \details{
 A bare bones configure_model.* method should look like this:
@@ -42,16 +44,14 @@ A bare bones configure_model.* method should look like this:
    <preprocessing code>
 
    # construct the formula
-   formula <- bmf2bf(formula, model)
+   formula <- bmf2bf(model, formula)
 
-   # construct the family
-   family <- <code for new family>
+   # attach the family to the formula
+   formula$family <- <code for new family>
 
-   # construct the default prior
-   prior <- <code for new prior>
-
-   # return the list
-   nlist(formula, data, family, prior)
+   # return the list (add stanvars when the model adds Stan code: a custom
+   # family, or Stan functions called from the formula)
+   nlist(formula, data)
 \}
 }\if{html}{\out{</div>}}
 }
