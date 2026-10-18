@@ -117,11 +117,11 @@ test_that("every data argument of every model version has a column role", {
       stale <- setdiff(names(roles), names(args))
       expect(
         length(unlabeled) == 0,
-        glue::glue("{model} {version}: no entry in data_column_roles for {collapse_comma(unlabeled)}")
+        glue::glue("{model} {version}: no column role for {collapse_comma(unlabeled)}; add a model_column_roles.{model}() method in the model's file (see R/helpers-model.R)")
       )
       expect(
         length(stale) == 0,
-        glue::glue("{model} {version}: data_column_roles names unknown arguments {collapse_comma(stale)}")
+        glue::glue("{model} {version}: column roles name arguments the constructor does not have: {collapse_comma(stale)}")
       )
     }
   }
@@ -212,7 +212,9 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_false(grepl("version", mixture2p$Model))
 
   rt_models <- model_overview(group = "Choices and response times")
-  expect_true(all(grepl("`(ddm|cswald|ezdm)\\(\\)`", rt_models$Model)))
+  registry <- model_registry()
+  in_group <- registry$model[registry$group == "Choices and response times"]
+  expect_setequal(unique(sub("^\\[`([a-z0-9_]+)\\(\\)`.*$", "\\1", rt_models$Model)), in_group)
 })
 
 test_that("check_model() refuses invalid models and accepts valid models", {
