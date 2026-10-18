@@ -74,9 +74,11 @@
 # categories cannot be named after (see race_reserved_names())
 .lba_shared_pars <- c("gap", "sp", "ndt", "s")
 
-# the identifiers .lba_stan_code() declares, which a category would shadow
-# (measured: each made a category and the program handed to stanc)
-.lba_stan_names <- c("rt", "response", "t", "b", "A", "drift", "n", "win", "lp", "reps", "i", "j")
+# the identifiers of .lba_stan_code()'s likelihood that a category could
+# shadow (stanc refuses the program). Its locals carry an lba_ prefix, which a
+# category cannot have because brms refuses underscores in dpar names, and N
+# is reserved for every model (.stan_reserved)
+.lba_stan_names <- c("rt", "response")
 
 .model_lba <- function(
     rt = NULL,
@@ -356,11 +358,11 @@ bmf2bf.lba_custom <- function(model, formula) {
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
   drift_assignments <- paste(
-    paste0("drift[", seq_len(n_cats), "] = ", cat_names, "[i];"),
+    paste0("lba_drift[", seq_len(n_cats), "] = ", cat_names, "[lba_i];"),
     collapse = "\n    "
   )
   n_assignments <- paste(
-    paste0("n[", seq_len(n_cats), "] = n", seq_len(n_cats), "[i];"),
+    paste0("lba_cnt[", seq_len(n_cats), "] = n", seq_len(n_cats), "[lba_i];"),
     collapse = "\n    "
   )
 
@@ -378,26 +380,28 @@ bmf2bf.lba_custom <- function(model, formula) {
     "{n_args}) {{\n",
     "  int N = num_elements(rt);\n",
     "  real log_lik = 0;\n",
-    "  for (i in 1:N) {{\n",
-    "    real b = gap[i] + sp[i];\n",
-    "    real A = sp[i];\n",
-    "    real t = rt[i] - ndt[i];\n",
-    "    array[{n_cats}] real drift;\n",
-    "    array[{n_cats}] int n;\n",
-    "    int win;\n",
-    "    real lp;\n",
-    "    if (t <= 0) return negative_infinity();\n",
+    "  for (lba_i in 1:N) {{\n",
+    "    real lba_thr = gap[lba_i] + sp[lba_i];\n",
+    "    real lba_sp = sp[lba_i];\n",
+    "    real lba_dt = rt[lba_i] - ndt[lba_i];\n",
+    "    array[{n_cats}] real lba_drift;\n",
+    "    array[{n_cats}] int lba_cnt;\n",
+    "    int lba_win;\n",
+    "    real lba_lp;\n",
+    "    if (lba_dt <= 0) return negative_infinity();\n",
     "    {drift_assignments}\n",
     "    {n_assignments}\n",
-    "    win = response[i];\n",
-    "    lp = log(n[win]) + {prefix}_single_lpdf(t | drift[win], b, A, s[i]);\n",
-    "    for (j in 1:{n_cats}) {{\n",
-    "      int reps = (j == win) ? n[j] - 1 : n[j];\n",
-    "      if (reps > 0) {{\n",
-    "        lp += reps * {prefix}_single_lccdf(t | drift[j], b, A, s[i]);\n",
+    "    lba_win = response[lba_i];\n",
+    "    lba_lp = log(lba_cnt[lba_win]) + ",
+    "{prefix}_single_lpdf(lba_dt | lba_drift[lba_win], lba_thr, lba_sp, s[lba_i]);\n",
+    "    for (lba_j in 1:{n_cats}) {{\n",
+    "      int lba_reps = (lba_j == lba_win) ? lba_cnt[lba_j] - 1 : lba_cnt[lba_j];\n",
+    "      if (lba_reps > 0) {{\n",
+    "        lba_lp += lba_reps * ",
+    "{prefix}_single_lccdf(lba_dt | lba_drift[lba_j], lba_thr, lba_sp, s[lba_i]);\n",
     "      }}\n",
     "    }}\n",
-    "    log_lik += lp;\n",
+    "    log_lik += lba_lp;\n",
     "  }}\n",
     "  return log_lik;\n",
     "}}"
