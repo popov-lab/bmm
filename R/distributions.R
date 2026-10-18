@@ -748,6 +748,7 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                  c = 5, a = 2, b = 1, s = 2, kappa = 5, tau = 0,
                  vp_nodes = 81L, log = FALSE) {
   .check_imm_args(kappa, s, dist, tau, length(mu))
+  .circmix_check_variable_precision(FALSE, vp_nodes)
 
   n <- length(x)
   weights <- .imm_item_weights(
