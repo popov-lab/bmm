@@ -2713,15 +2713,33 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 }
 
 # Log-likelihood of the one-component model, the null the mixture is gated
-# against: same parametric families, every trial a cognitive trial.
-.ezcdm_single_loglik <- function(angle, rt, distribution) {
-  params <- .fit_dist_params(
-    rt, distribution, rep_len(1, length(rt)),
-    .init_dist_params(rt, distribution)
-  )
+# against: same parametric families, every trial a cognitive trial. The null
+# must fit at least as well as the mixture's RT component, or the gate compares
+# a fitted mixture with an unfitted null. .fit_dist_params() returns its start
+# whenever L-BFGS-B stops with code 52, which happened for the null in 8 of 200
+# clean simulated cells, so here the optimiser's value counts whenever it
+# improves on the start, and the better of the moment start and the mixture's
+# final RT parameters (`rt_params`) is kept.
+.ezcdm_single_loglik <- function(angle, rt, distribution, rt_params) {
+  bounds <- .get_param_bounds(distribution)
+  rt_loglik <- function(start) {
+    fit <- tryCatch(
+      stats::optim(
+        par = start,
+        fn = \(par) neg_loglik(rt, par, distribution),
+        method = "L-BFGS-B",
+        lower = bounds$lower,
+        upper = bounds$upper
+      ),
+      error = function(e) NULL
+    )
+    -min(neg_loglik(rt, start, distribution), fit$value, na.rm = TRUE)
+  }
   kappa <- .vm_kappa_from_R(sqrt(mean(cos(angle))^2 + mean(sin(angle))^2))
   mu <- atan2(mean(sin(angle)), mean(cos(angle)))
-  -neg_loglik(rt, params, distribution) +
+  max(vapply(
+    list(.init_dist_params(rt, distribution), rt_params), rt_loglik, numeric(1)
+  )) +
     sum(brms::dvon_mises(angle, mu = mu, kappa = kappa, log = TRUE))
 }
 
@@ -2734,15 +2752,16 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 .fit_ezcdm_mixture <- function(angle, rt, distribution, contaminant_bound,
                                init_contaminant, max_contaminant, maxit, tol) {
   n <- length(rt)
-  rt_fit <- .fit_rt_mixture(
+  # the RT-only fit only supplies start values, so a clipping warning from it
+  # would describe a model the user never sees
+  rt_fit <- suppressWarnings(.fit_rt_mixture(
     rt, distribution, contaminant_bound,
     init_contaminant, max_contaminant, maxit, tol
-  )
+  ))
 
   dist_params <- rt_fit$params %||% .init_dist_params(rt, distribution)
-  pi_rt_only <- rt_fit$contaminant_prop
   # a start of exactly zero is absorbing: log(pi_c) = -Inf makes every weight 1
-  pi_c <- if (is.na(pi_rt_only)) init_contaminant else max(pi_rt_only, init_contaminant)
+  pi_c <- max(rt_fit$contaminant_prop, init_contaminant, na.rm = TRUE)
 
   mu <- atan2(mean(sin(angle)), mean(cos(angle)))
   kappa <- .vm_kappa_from_R(sqrt(mean(cos(angle))^2 + mean(sin(angle))^2))
@@ -2751,6 +2770,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
   log_uniform <- -log(contaminant_bound[2] - contaminant_bound[1]) - log(2 * pi)
 
   w <- rep_len(1, n)
+  loglik <- NA_real_
   prev_loglik <- -Inf
   converged <- FALSE
 
@@ -2772,11 +2792,13 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
 
     w <- 1 / (1 + exp(log_u - log_c))
     w[!in_bounds] <- 1
-    if (anyNA(w)) break
-
     hi <- pmax(log_c, log_u)
     loglik <- sum(hi + log1p(exp(-abs(log_c - log_u))))
-    if (!is.finite(loglik)) break
+    # after a numerical failure there is no iterate to gate, so the gate rejects
+    if (anyNA(w) || !is.finite(loglik)) {
+      loglik <- NA_real_
+      break
+    }
 
     if (abs(loglik - prev_loglik) < tol) {
       converged <- TRUE
@@ -2794,22 +2816,25 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
     kappa <- .vm_kappa_from_R(sqrt(cos_sum^2 + sin_sum^2) / sum(w))
   }
 
-  if (pi_c >= max_contaminant) {
-    warning2("Contaminant proportion was clipped to max_contaminant \\
-             ({max_contaminant}). This may indicate data quality issues.",
-      env.frame = -1
-    )
-  }
-
   # A handful of genuinely slow first-passage times look like contaminants to
   # any parametric RT component, and because var_rt is dominated by its tail,
   # down-weighting one of them can cut the variance by a quarter. The mixture
   # therefore has to earn its extra parameter on BIC before it is applied at
-  # all; otherwise the plain statistics are returned unchanged.
-  if (converged && 2 * (loglik - .ezcdm_single_loglik(angle, rt, distribution)) < log(n)) {
+  # all; otherwise the plain statistics are returned unchanged. The gate also
+  # judges an EM that stopped at maxit: without contaminants pi_c creeps toward
+  # zero for hundreds of iterations, and such a cell has nothing to correct.
+  applied <- isTRUE(
+    2 * (loglik - .ezcdm_single_loglik(angle, rt, distribution, dist_params)) >= log(n)
+  )
+  if (!applied) {
     w <- rep_len(1, n)
-    pi_c <- 0
   }
+
+  warnif(
+    applied && pi_c >= max_contaminant,
+    "Contaminant proportion was clipped to max_contaminant \\
+     ({max_contaminant}). This may indicate data quality issues."
+  )
 
   weight_sum <- sum(w)
   mean_rt <- sum(w * rt) / weight_sum
@@ -2820,7 +2845,7 @@ neg_loglik <- function(x, params, distribution, weights = NULL) {
       var_rt = sum(w * (rt - mean_rt)^2) / (weight_sum - 1),
       n_eff = weight_sum,
       contaminant_prop = 1 - weight_sum / n,
-      contaminant_prop_rt = pi_rt_only,
+      applied = applied,
       converged = converged,
       iterations = iter
     )

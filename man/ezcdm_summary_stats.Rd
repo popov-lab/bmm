@@ -9,14 +9,14 @@ ezcdm_summary_stats(
   rt,
   target = NULL,
   radians = TRUE,
-  method = c("mixture", "simple", "robust"),
   distribution = c("exgaussian", "lognormal", "invgaussian"),
+  method = c("mixture", "simple", "robust"),
   robust_scale = c("iqr", "mad"),
   contaminant_bound = c("min", "max"),
   min_trials = 10,
   init_contaminant = 0.05,
   max_contaminant = 0.5,
-  maxit = 100,
+  maxit = 500,
   tol = 1e-06
 )
 }
@@ -36,28 +36,30 @@ the target. If \code{NULL} (default), \code{angle} is used as is.}
 \item{radians}{Logical. Are \code{angle} and \code{target} in radians (\code{TRUE},
 default) or degrees (\code{FALSE})?}
 
-\item{method}{Character. How contaminant trials are handled. One of
-"mixture" (default), "robust", or "simple". See Details.}
-
 \item{distribution}{Character. The parametric distribution for the reaction
 times of the cognitive component. One of "exgaussian" (default),
 "lognormal", or "invgaussian". Only used when \code{method = "mixture"}.}
 
+\item{method}{Character. How contaminant trials are handled. One of
+"mixture" (default), "robust", or "simple". See Details.}
+
 \item{robust_scale}{Character. Scale estimator for the robust method. Either
 "iqr" (default), giving \code{(IQR/1.349)^2}, or "mad", giving \code{mad()^2}. Only
-used when \code{method = "robust"}, and for the fallback when the mixture fails
-to converge.}
+used when \code{method = "robust"}.}
 
 \item{contaminant_bound}{Vector of length 2 specifying the bounds (in
 seconds) of the uniform contaminant distribution over reaction times. Can
 be numeric values or the strings "min" and "max" for data-driven bounds
-(default), which are extended by a 50\\% buffer. Only used when
-\code{method = "mixture"}.}
+(default), which are extended by half the data range on each side (at
+least 0.1 s), as in \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}}. Only used when
+\code{method = "mixture"}. See Details for what the buffer costs.}
 
 \item{min_trials}{Integer. Minimum number of complete trials required to fit
 the mixture. Cells with fewer trials fall back to \code{method = "simple"} with
 a warning, rather than returning \code{NA}, so that small cells still yield
-usable statistics. Default is 10.}
+usable statistics. Default is 10. This differs from
+\code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}}, where a cell below \code{min_trials} gets \code{NA}
+reaction-time statistics under every method.}
 
 \item{init_contaminant}{Numeric. Initial contaminant proportion for the EM
 algorithm. Default is 0.05.}
@@ -65,7 +67,7 @@ algorithm. Default is 0.05.}
 \item{max_contaminant}{Numeric. Maximum allowed contaminant proportion
 (0 < max <= 1). Estimates are clipped to this value. Default is 0.5.}
 
-\item{maxit}{Integer. Maximum number of EM iterations. Default is 100.}
+\item{maxit}{Integer. Maximum number of EM iterations. Default is 500.}
 
 \item{tol}{Numeric. Convergence tolerance for the EM algorithm.
 Default is 1e-6.}
@@ -79,14 +81,20 @@ in \eqn{(-\pi, \pi]}
 length, in \eqn{[0, 1]}
 \item \code{mean_rt}: mean reaction time
 \item \code{var_rt}: variance of the reaction times (denominator \code{n - 1})
-\item \code{n_trials}: number of complete trials used. For
+\item \code{n_trials}: integer, the number of complete trials used. For
 \code{method = "mixture"} this is the \emph{effective} number of non-contaminant
 trials, \code{round(sum(w))} over the mixture responsibilities \code{w}, because
-that is the count the corrected statistics actually rest on
-\item \code{contaminant_prop}: estimated proportion of contaminant trials,
-\code{NA} for the "simple" and "robust" methods
+that is the count the corrected statistics actually rest on; it is the
+number of complete trials when the mixture fails the BIC gate
+\item \code{contaminant_prop}: for \code{method = "mixture"}, the share of trials
+the mixture assigns to the contaminant component, \code{1 - sum(w) / n}. It
+is 0 when the mixture fails the BIC gate, and it can lie slightly above
+\code{max_contaminant} when the proportion is clipped, because the clip
+bounds the mixing proportion, not the responsibilities. \code{NA} for the
+"simple" and "robust" methods
 }
-If no trial is complete, all statistics are \code{NA} and \code{n_trials} is 0.
+If no trial is complete, including for empty input, all statistics are
+\code{NA} and \code{n_trials} is 0.
 }
 \description{
 Computes the four summary statistics required by \code{\link[=ezcdm]{ezcdm()}}
@@ -118,24 +126,31 @@ driven toward zero.
 \item{\code{"simple"}}{The plain moments. Appropriate when the data are
 already cleaned.}
 \item{\code{"robust"}}{Median and an IQR- or MAD-based variance for the
-reaction times. The angle statistics are left untouched: \code{var_angle}
-is a sufficient statistic for \eqn{\kappa}, so down-weighting angles
-far from the mean direction would not remove contaminants but bias
-\eqn{\kappa} upward. Note also that the median and IQR have a wider
-sampling distribution than the mean and variance the likelihood
-assumes, so the reaction-time terms become roughly 1.5 times
-overconfident, and the median lies below the mean for skewed reaction
-times.}
+reaction times; with \code{robust_scale = "iqr"} this is the robust EZ-CDM
+of Qarehdaghi and Amani Rad (2024, Eq. 5). The angle statistics are
+left untouched: \code{var_angle} is a sufficient statistic for
+\eqn{\kappa}, so down-weighting angles far from the mean direction
+would not remove contaminants but bias \eqn{\kappa} upward. The
+likelihood reads the robust statistics as the mean and the variance,
+and for right-skewed reaction times both lie lower even without
+contaminants. In simulations from the model (three parameter sets,
+100 trials per cell) the median was 9-12\\% below the mean and
+\eqn{(IQR/1.349)^2} 27-32\\% below the variance; with 200,000 trials
+this raised drift rate by 8-10\\% and lowered boundary by 7-9\\%.
+Qarehdaghi and Amani Rad (2024, p. 2074) report the same direction of
+bias for the robust EZ-CDM.}
 \item{\code{"mixture"}}{A joint EM over reaction times and angles. Contaminant
 trials are uniform on \code{contaminant_bound} \emph{and} uniform on the circle;
 cognitive trials follow \code{distribution} in time and a von Mises in
 angle. All four statistics are then computed as
 responsibility-weighted moments, and \code{n_trials} is the effective number
-of clean trials. The angle channel identifies the contaminant
-proportion far more sharply than the reaction times alone. If the
-contaminant reaction times are indistinguishable from the cognitive
-ones, the proportion rests on the angles alone and the correction
-becomes noisy; this case raises a warning.}
+of clean trials. Qarehdaghi and Amani Rad (2024, pp. 2081-2086)
+estimate the proportion of guesses from a uniform and von Mises
+mixture over the angles and then recover the decision-time moments
+from a split of the trials by accuracy; the mixture here puts both
+channels into one likelihood instead. The angle channel identifies
+the contaminant proportion far more sharply than the reaction times
+alone.}
 }
 
 Weighted moments, rather than the moments of the fitted parametric
@@ -150,8 +165,24 @@ model. Decision times are right-skewed, so a handful of genuinely slow
 trials look like contaminants to any parametric reaction-time component,
 and because \code{var_rt} is dominated by its tail, down-weighting even one of
 them can cut the variance substantially. Gating on BIC makes
-\code{method = "mixture"} return the plain statistics unchanged when there is no
-evidence of contamination, which is why it is a safe default.
+\code{method = "mixture"} return the plain statistics, with
+\code{contaminant_prop = 0}, when there is no evidence of contamination: in 200
+simulated contaminant-free cells of 150 trials, every row equalled the
+\code{"simple"} one. If the EM stops at \code{maxit} without converging, the gate
+judges its last iterate, which is returned if it passes; otherwise the
+plain statistics are returned. Both cases warn.
+
+The data-driven bounds are widened by half the data range on each side, as
+in \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}}. The wider uniform has a lower density, so the
+mixture detects less contamination than there is. In simulations with
+contaminants uniform on 0.1-4 s and 150 trials per cell, the estimated
+proportion averaged 0.034 at a true 0.050 and 0.147 at 0.200, and the
+non-decision time implied by the statistics stayed 5\\% and 13\\% too low
+(median over cells; 52\\% and 104\\% too low with \code{"simple"}). With the true
+range as \code{contaminant_bound = c(0.1, 4)} the proportions were 0.042 and
+0.192 and the non-decision time 2.5\\% and 7\\% too low. If you know the
+range contaminant reaction times can take, for example the response
+window, pass it as numeric bounds.
 }
 }
 \examples{
