@@ -278,6 +278,34 @@ test_that("update() builds the initial values for the data and formula it fits",
   expect_equal(update_mock(fit1, newdata = new_data, init = 0, recompile = TRUE)$stan_args$init, 0)
 })
 
+test_that("update() without recompiling stores the init it sampled with (#520)", {
+  # brms reuses the compiled model only on a real backend (the mock backend always
+  # recompiles), so this test compiles and samples with rstan, about 25 s
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  withr::local_seed(520)
+  dat <- data.frame(y = rsdm(120, c = 4, kappa = 5), set_size = factor(rep(1:3, each = 40)))
+  fit <- suppressMessages(suppressWarnings(bmm(
+    bmf(c ~ 0 + set_size, kappa ~ 1), dat, sdm("y"),
+    backend = "rstan", chains = 1, iter = 40, warmup = 20, refresh = 0, silent = 2, rename = FALSE
+  )))
+  new_data <- droplevels(dat[dat$set_size %in% 1:2, ])
+  update_rstan <- function(...) suppressMessages(suppressWarnings(
+    update(fit, newdata = new_data, ..., chains = 1, iter = 40, warmup = 20, refresh = 0,
+           silent = 2, rename = FALSE)
+  ))
+
+  up <- update_rstan()
+  # the same compiled model means brms took the route that leaves stan_args alone
+  expect_identical(up$fit@stanmodel, fit$fit@stanmodel)
+  expect_length(fit$stan_args$init()$b_c, 3)
+  expect_length(up$stan_args$init()$b_c, brms::standata(up)$K_c)
+
+  up <- update_rstan(init = 0)
+  expect_identical(up$fit@stanmodel, fit$fit@stanmodel)
+  expect_identical(up$stan_args$init, 0)
+})
+
 test_that("update() configures the prior and the inits with the fit's data2", {
   skip_on_cran()
   fit1 <- sdm_fixture()

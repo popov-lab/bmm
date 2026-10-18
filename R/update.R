@@ -209,6 +209,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
       dots$algorithm %||% object$algorithm %||% "sampling"
     ), ...
   )
+  # without a recompile brms samples with `init` but keeps the old fit's stan_args
+  object$stan_args$init <- init
 
   # bmm postprocessing
   object <- postprocess_brm(model, object,
