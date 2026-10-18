@@ -865,9 +865,12 @@ check_rds_file <- function(file) {
   "target", "then", "transformed", "true", "tuple", "typedef", "unit_vector",
   "until", "upper", "vector", "void", "while",
   "N", "Y", "lprior",
-  # brms declares these only under threading: the index sequence and the slice
-  # bounds of partial_log_lik
-  "seq", "start", "end"
+  # brms adds group-level effects to a parameter in a `for (n in 1:N)` loop
+  "n",
+  # brms declares these only under threading: the index sequence, the slice
+  # bounds of partial_log_lik, its parameter pointer and the group-level loop
+  # index
+  "seq", "start", "end", "ptarget", "nn"
 )
 
 # like unlist, but keeps the final outcome a list of all

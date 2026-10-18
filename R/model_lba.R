@@ -270,13 +270,13 @@ settable_links.lba_custom <- function(model) {
 #'   simulation-based. It integrates the race for every draw and observation,
 #'   at about half a millisecond each for the normal drift (some 30 minutes
 #'   for 4000 draws of 1000 observations); `posterior_epred(fit, ndraws = )`
-#'   limits the cost. The
-#'   mean is infinite for a race in which only one normal-drift accumulator
-#'   runs (an `accumulators` column that leaves one category with one
-#'   accumulator on a trial) and for a gamma drift whose shapes sum to at most
-#'   1; the integral is then truncated at 1e7 s and the returned value is not
-#'   meaningful; treat it as missing. `posterior_epred()` warns once per call
-#'   with the number of observations it truncated.
+#'   limits the cost. The mean is infinite for a race in which only one
+#'   normal-drift accumulator runs (an `accumulators` column that leaves one
+#'   category with one accumulator on a trial) and for a gamma drift whose
+#'   shapes sum to at most 1; `posterior_epred()` returns `Inf` for it,
+#'   because that is its mean, and warns once per call with the number of
+#'   observations affected. The median or other quantiles of
+#'   `posterior_predict()` describe such trials instead.
 #'
 #'   `pp_check(fit, resp_var = "rt")` checks the response times and
 #'   `pp_check(fit, resp_var = "response")` checks the response category
@@ -289,8 +289,8 @@ settable_links.lba_custom <- function(model) {
 #'   vs. error) over the general per-accumulator case handled by `"custom"`.
 #' @export
 #' @keywords bmmodel
-#' @seealso [dlba()] and [rlba()] for the density and random generation
-#'   functions.
+#' @seealso [dlba()], [plba()], [qlba()] and [rlba()] for the density,
+#'   distribution, quantile and random generation functions.
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
 #' dat <- rlba(n = 500, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)
@@ -619,44 +619,55 @@ configure_model.lba_custom <- function(model, data, formula) {
   dist <- .lba_dist_from_family(prep$family$name)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
-  truncated <- logical(n_obs)
+  infinite_obs <- logical(n_obs)
   for (i in seq_len(n_obs)) {
     gap <- brms::get_dpar(prep, "gap", i = i)
     sp <- brms::get_dpar(prep, "sp", i = i)
-    ndt <- brms::get_dpar(prep, "ndt", i = i)
+    ndt <- rep_len(brms::get_dpar(prep, "ndt", i = i), n_draws)
     s <- brms::get_dpar(prep, "s", i = i)
     drift <- lapply(cat_names, function(p) brms::get_dpar(prep, p, i = i))
     n_cat <- race_counts(prep, i, n_cats)
     b <- gap + sp
-    log_surv <- function(t) {
-      t_all <- rep(t, each = n_draws)
-      matrix(Reduce(`+`, lapply(which(n_cat > 0), function(j) {
-        n_cat[j] * .lba_lsurv_single(t_all, drift[[j]], b, sp, s, dist)
-      })), nrow = n_draws)
+    # the log survivor of the draws `keep`; a fixed dpar may be one number
+    draw_log_surv <- function(keep) {
+      pick <- function(x) if (length(x) == 1L) x else x[keep]
+      function(t) {
+        t_all <- rep(t, each = length(keep))
+        matrix(Reduce(`+`, lapply(which(n_cat > 0), function(j) {
+          n_cat[j] * .lba_lsurv_single(t_all, pick(drift[[j]]), pick(b), pick(sp), pick(s), dist)
+        })), nrow = length(keep))
+      }
     }
+    log_surv <- draw_log_surv(seq_len(n_draws))
     range <- race_time_range(log_surv)
     # race_time_range() calls a bracket truncated whenever S(t) t is above
     # 1e-12 at t_max = 1e7 s, and every two-accumulator normal race is (S(t) t
     # 1e-11 to 1e-8 there) although the mean it leaves out is that small. The
-    # mean is infinite where the survivor decays like 1/t or slower, and rests
-    # on times far beyond t_max where it decays only a little faster; a
+    # mean is infinite where the survivor decays like 1/t or slower; a
     # normal-drift race decays like t^-k for k racing accumulators, so a local
-    # order below 1.5 picks out the race of a single accumulator
+    # order below 1.5 picks out the draws where a single accumulator races
+    infinite <- rep(FALSE, n_draws)
     if (attr(range, "truncated")) {
       lsurv <- log_surv(range[2] * c(0.1, 1))
-      truncated[i] <- any((lsurv[, 1] - lsurv[, 2]) / log(10) < 1.5, na.rm = TRUE)
+      infinite <- (lsurv[, 1] - lsurv[, 2]) / log(10) < 1.5
+      infinite[is.na(infinite)] <- FALSE
     }
-    epred[, i] <- rep_len(ndt, n_draws) + race_expected_time(log_surv, range[1], range[2])
+    infinite_obs[i] <- any(infinite)
+    epred[infinite, i] <- Inf
+    # the other draws keep the range searched over all draws, so their values
+    # do not depend on whether a draw beside them has an infinite mean
+    finite <- which(!infinite)
+    if (length(finite)) {
+      epred[finite, i] <- ndt[finite] +
+        race_expected_time(draw_log_surv(finite), range[1], range[2])
+    }
   }
-  # the values stay as they are: the caller decides whether a lower bound is
-  # good enough, and one warning per call keeps a large newdata readable
   warnif(
-    any(truncated),
-    "posterior_epred(): on {sum(truncated)} observation(s) the race of at least \\
-    one draw decays like t^-1.5 or slower, as when a single normal-drift \\
-    accumulator races, so its mean response time is infinite or rests on \\
-    times beyond 1e7 s. Their expected value is the mean of the race \\
-    truncated at 1e7 s, which underestimates that mean. See ?lba."
+    any(infinite_obs),
+    "posterior_epred(): on {sum(infinite_obs)} observation(s) the race of at \\
+    least one draw has no finite mean response time, as when a single \\
+    normal-drift accumulator races, so those draws return Inf. Summarise \\
+    posterior_predict() by its median or other quantiles instead. See ?lba."
   )
   epred
 }

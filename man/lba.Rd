@@ -224,13 +224,13 @@ integral of the race survivor); it is deterministic, not
 simulation-based. It integrates the race for every draw and observation,
 at about half a millisecond each for the normal drift (some 30 minutes
 for 4000 draws of 1000 observations); \code{posterior_epred(fit, ndraws = )}
-limits the cost. The
-mean is infinite for a race in which only one normal-drift accumulator
-runs (an \code{accumulators} column that leaves one category with one
-accumulator on a trial) and for a gamma drift whose shapes sum to at most
-1; the integral is then truncated at 1e7 s and the returned value is not
-meaningful; treat it as missing. \code{posterior_epred()} warns once per call
-with the number of observations it truncated.
+limits the cost. The mean is infinite for a race in which only one
+normal-drift accumulator runs (an \code{accumulators} column that leaves one
+category with one accumulator on a trial) and for a gamma drift whose
+shapes sum to at most 1; \code{posterior_epred()} returns \code{Inf} for it,
+because that is its mean, and warns once per call with the number of
+observations affected. The median or other quantiles of
+\code{posterior_predict()} describe such trials instead.
 
 \code{pp_check(fit, resp_var = "rt")} checks the response times and
 \code{pp_check(fit, resp_var = "response")} checks the response category
@@ -248,7 +248,7 @@ fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=dlba]{dlba()}} and \code{\link[=rlba]{rlba()}} for the density and random generation
-functions.
+\code{\link[=dlba]{dlba()}}, \code{\link[=plba]{plba()}}, \code{\link[=qlba]{qlba()}} and \code{\link[=rlba]{rlba()}} for the density,
+distribution, quantile and random generation functions.
 }
 \keyword{bmmodel}
