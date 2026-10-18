@@ -374,8 +374,8 @@ race_pp_observables <- function(model) {
 # u = log(t) turns a race survivor, which decays over several orders of
 # magnitude in t, into an integrand S(e^u) e^u that a uniform grid in u
 # resolves. `log_surv` takes the grid times and returns a draws x grid matrix of
-# log survivors. Below `t_lo` the survivor is 1 to the caller's chosen
-# tolerance, so that stretch contributes t_lo exactly. On lognormal and Wald
+# log survivors. The stretch below `t_lo` contributes t_lo, which is exact as
+# far as the caller chose `t_lo` where the survivor is still 1. On lognormal and Wald
 # races the error is below 4e-7 relative to stats::integrate(), against up to
 # 2e-5 for a trapezoid of 20 points per decade
 race_expected_time <- function(log_surv, t_lo, t_hi, n_grid = 1024L) {
@@ -394,7 +394,11 @@ race_expected_time <- function(log_surv, t_lo, t_hi, n_grid = 1024L) {
 # of t (the normal-drift LBA race decays like 1/t^2). A survivor that decays
 # more slowly than 1/t has no finite mean; t_max stops the search for it. A
 # draw whose survivor is not finite at a decade counts as not yet inside `tol`.
-# The `truncated` attribute tells the caller that the search stopped at the cap
+# t_lo stops 12 decades below t_hi (13 where the repeated division rounds just
+# above the floor), so the grid keeps its resolution; draws spread wider than
+# that lose the guarantee on t_lo, and the fastest come out slow (14 % for
+# lognormal draws with medians 9 decades apart, a spread no posterior of
+# response times reaches). The `truncated` attribute tells the caller that the search stopped at the cap
 # rather than converging, so a mean over this range is the mean of the race
 # truncated at t_max; a single normal-drift LBA accumulator, with no finite mean, is the
 # case it exists for. A bracket that converges exactly at t_max is not truncated
