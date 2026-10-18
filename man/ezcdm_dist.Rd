@@ -13,13 +13,13 @@ dezcdm(
   var_rt,
   n_trials,
   drift,
-  driftangle = 0,
   bound,
   ndt,
+  driftangle = 0,
   log = TRUE
 )
 
-rezcdm(n, n_trials, drift, driftangle = 0, bound, ndt)
+rezcdm(n, n_trials, drift, bound, ndt, driftangle = 0)
 }
 \arguments{
 \item{mean_angle}{Observed circular mean of the response angles, in radians.}
@@ -32,21 +32,23 @@ minus the mean resultant length), in \eqn{[0, 1]}.}
 \item{var_rt}{Observed variance of the reaction times in seconds^2
 (denominator \code{n_trials - 1}).}
 
-\item{n_trials}{Number of trials the summary statistics were computed from.
-Must be larger than 2.}
+\item{n_trials}{Number of trials the summary statistics were computed from,
+a whole number larger than 2.}
 
 \item{drift}{Drift rate, the length of the drift vector (positive).}
-
-\item{driftangle}{Drift angle, the direction of the drift vector in radians
-(default 0).}
 
 \item{bound}{Boundary, the radius of the circular decision boundary
 (positive).}
 
-\item{ndt}{Non-decision time in seconds (non-negative).}
+\item{ndt}{Non-decision time in seconds (positive).}
+
+\item{driftangle}{Drift angle, the direction of the drift vector in radians
+(default 0).}
 
 \item{log}{Logical; if \code{TRUE} (default), values are returned on the log
-scale.}
+scale. The angle term is a likelihood, not a normalised density (see
+Details), so \code{log = FALSE} overflows to \code{Inf} for cells with many trials
+or concentrated angles.}
 
 \item{n}{Number of sets of summary statistics to generate.}
 }
@@ -63,16 +65,25 @@ mean and variance of the reaction times, computed over \code{n_trials} trials
 (see \code{\link[=ezcdm_summary_stats]{ezcdm_summary_stats()}}).
 }
 \details{
-In the circular diffusion model without across-trial variability,
-the response angle is independent of the decision time and follows a von
-Mises distribution with mean \code{driftangle} and concentration
-\eqn{\kappa = a v} (boundary radius times drift rate). The mean cosine and mean
-sine of the angles are therefore sufficient statistics, and the angle term
-of \code{dezcdm()} is the exact log-likelihood of the \code{n_trials} angles expressed
-through them,
+The model is the circular diffusion model of Smith (2016) without
+across-trial variability, with the within-trial noise fixed at
+\eqn{\sigma = 1}, as in Qarehdaghi and Amani Rad (2024); \code{drift} and
+\code{bound} are in units of that noise. In their notation, \eqn{v} is
+\code{drift}, \eqn{a} is \code{bound}, \eqn{\theta_v} is \code{driftangle} and
+\eqn{t_0} is \code{ndt}.
+
+The response angle is independent of the decision time and follows a von
+Mises distribution with mean \eqn{\theta_v} and concentration
+\eqn{\kappa = a v}. The mean cosine and mean sine of the angles are
+therefore sufficient statistics, and the angle term of \code{dezcdm()} is the
+exact log-likelihood of the \code{n_trials} angles expressed through them,
 \deqn{n \kappa (1 - \mathrm{var\_angle}) \cos(\mathrm{mean\_angle} - \theta_v) - n \log I_0(\kappa),}
-up to the parameter-free constant \eqn{-n \log(2\pi)}. It is the likelihood
-at the sufficient statistic, not a normalised density of
+up to the parameter-free constant \eqn{-n \log(2\pi)}. This holds for
+unweighted angle summaries, as \code{\link[=ezcdm_summary_stats]{ezcdm_summary_stats()}} computes them with
+\code{method = "simple"} or \code{"robust"}. With \code{method = "mixture"}, the angle
+summaries are weighted by the mixture responsibilities and \code{n_trials} is
+an effective count, so the term is a weighted pseudo-likelihood. It is the
+likelihood at the sufficient statistic, not a normalised density of
 \verb{(mean_angle, var_angle)}: it is valid for posterior inference and for
 comparing \code{ezcdm} fits to the same data, but not for comparisons with
 models of other data.
@@ -100,7 +111,8 @@ so that the variance VRT / \code{n_trials} of the mean and its covariance
   \frac{24}{\kappa^2}\right).}
 Decision times are right-skewed (kurtosis 3 + \eqn{\kappa_4 / \mathrm{VRT}^2}
 lies between 3 and 8.5), so the EZ form that assumes normal reaction
-times, independent normal and scaled chi-square
+times (Chávez De la Peña & Vandekerckhove, 2025), independent normal and
+scaled chi-square
 \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms,
 understates the sampling variance of \code{var_rt} by a factor of up to 3.75
 and ignores the correlation of the two statistics (up to about 0.69); the
@@ -111,7 +123,9 @@ summarises them, draws \code{var_rt} from the moment-matched Gamma distribution
 and then \code{mean_rt} from the conditional normal, so it simulates the same
 distribution that \code{dezcdm()} evaluates. Simulated \code{mean_rt} is not
 truncated at \code{ndt}; values below it occur only at the smallest trial
-counts, in about 0.2\\% of replicates at \code{n_trials = 3}.
+counts, in at most about 0.2\\% of replicates at \code{n_trials = 3}. That
+share is largest at small \eqn{\kappa} and falls to zero by
+\eqn{\kappa = 5}.
 }
 \examples{
 dezcdm(
@@ -123,7 +137,7 @@ dezcdm(
 dezcdm(
   mean_angle = c(0.1, -0.2), var_angle = c(0.2, 0.3),
   mean_rt = c(0.9, 1), var_rt = c(0.1, 0.12), n_trials = 100,
-  drift = 2, driftangle = 0.1, bound = 1.5, ndt = 0.3
+  drift = 2, bound = 1.5, ndt = 0.3, driftangle = 0.1
 )
 
 # generate random summary statistics
@@ -131,6 +145,11 @@ rezcdm(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 
 }
 \references{
+Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian
+hierarchical drift diffusion model for response time and accuracy.
+Psychonomic Bulletin & Review, 32(6), 3067-3087.
+https://doi.org/10.3758/s13423-025-02729-y
+
 Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple, robust, and
 accurate estimation of circular diffusion model parameters. Psychonomic
 Bulletin & Review, 31(5), 2058-2091. https://doi.org/10.3758/s13423-024-02483-7

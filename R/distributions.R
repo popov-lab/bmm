@@ -2150,28 +2150,39 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #' @param mean_rt Observed mean reaction time in seconds.
 #' @param var_rt Observed variance of the reaction times in seconds^2
 #'   (denominator `n_trials - 1`).
-#' @param n_trials Number of trials the summary statistics were computed from.
-#'   Must be larger than 2.
+#' @param n_trials Number of trials the summary statistics were computed from,
+#'   a whole number larger than 2.
 #' @param drift Drift rate, the length of the drift vector (positive).
-#' @param driftangle Drift angle, the direction of the drift vector in radians
-#'   (default 0).
 #' @param bound Boundary, the radius of the circular decision boundary
 #'   (positive).
-#' @param ndt Non-decision time in seconds (non-negative).
+#' @param ndt Non-decision time in seconds (positive).
+#' @param driftangle Drift angle, the direction of the drift vector in radians
+#'   (default 0).
 #' @param n Number of sets of summary statistics to generate.
 #' @param log Logical; if `TRUE` (default), values are returned on the log
-#'   scale.
+#'   scale. The angle term is a likelihood, not a normalised density (see
+#'   Details), so `log = FALSE` overflows to `Inf` for cells with many trials
+#'   or concentrated angles.
 #'
-#' @details In the circular diffusion model without across-trial variability,
-#'   the response angle is independent of the decision time and follows a von
-#'   Mises distribution with mean `driftangle` and concentration
-#'   \eqn{\kappa = a v} (boundary radius times drift rate). The mean cosine and mean
-#'   sine of the angles are therefore sufficient statistics, and the angle term
-#'   of `dezcdm()` is the exact log-likelihood of the `n_trials` angles expressed
-#'   through them,
+#' @details The model is the circular diffusion model of Smith (2016) without
+#'   across-trial variability, with the within-trial noise fixed at
+#'   \eqn{\sigma = 1}, as in Qarehdaghi and Amani Rad (2024); `drift` and
+#'   `bound` are in units of that noise. In their notation, \eqn{v} is
+#'   `drift`, \eqn{a} is `bound`, \eqn{\theta_v} is `driftangle` and
+#'   \eqn{t_0} is `ndt`.
+#'
+#'   The response angle is independent of the decision time and follows a von
+#'   Mises distribution with mean \eqn{\theta_v} and concentration
+#'   \eqn{\kappa = a v}. The mean cosine and mean sine of the angles are
+#'   therefore sufficient statistics, and the angle term of `dezcdm()` is the
+#'   exact log-likelihood of the `n_trials` angles expressed through them,
 #'   \deqn{n \kappa (1 - \mathrm{var\_angle}) \cos(\mathrm{mean\_angle} - \theta_v) - n \log I_0(\kappa),}
-#'   up to the parameter-free constant \eqn{-n \log(2\pi)}. It is the likelihood
-#'   at the sufficient statistic, not a normalised density of
+#'   up to the parameter-free constant \eqn{-n \log(2\pi)}. This holds for
+#'   unweighted angle summaries, as [ezcdm_summary_stats()] computes them with
+#'   `method = "simple"` or `"robust"`. With `method = "mixture"`, the angle
+#'   summaries are weighted by the mixture responsibilities and `n_trials` is
+#'   an effective count, so the term is a weighted pseudo-likelihood. It is the
+#'   likelihood at the sufficient statistic, not a normalised density of
 #'   `(mean_angle, var_angle)`: it is valid for posterior inference and for
 #'   comparing `ezcdm` fits to the same data, but not for comparisons with
 #'   models of other data.
@@ -2199,7 +2210,8 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #'   \frac{24}{\kappa^2}\right).}
 #'   Decision times are right-skewed (kurtosis 3 + \eqn{\kappa_4 / \mathrm{VRT}^2}
 #'   lies between 3 and 8.5), so the EZ form that assumes normal reaction
-#'   times, independent normal and scaled chi-square
+#'   times (Chávez De la Peña & Vandekerckhove, 2025), independent normal and
+#'   scaled chi-square
 #'   \eqn{\mathrm{Gamma}((n - 1)/2, (n - 1)/(2\,\mathrm{VRT}))} terms,
 #'   understates the sampling variance of `var_rt` by a factor of up to 3.75
 #'   and ignores the correlation of the two statistics (up to about 0.69); the
@@ -2210,11 +2222,18 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #'   and then `mean_rt` from the conditional normal, so it simulates the same
 #'   distribution that `dezcdm()` evaluates. Simulated `mean_rt` is not
 #'   truncated at `ndt`; values below it occur only at the smallest trial
-#'   counts, in about 0.2\% of replicates at `n_trials = 3`.
+#'   counts, in at most about 0.2\% of replicates at `n_trials = 3`. That
+#'   share is largest at small \eqn{\kappa} and falls to zero by
+#'   \eqn{\kappa = 5}.
 #'
 #' @keywords distribution
 #'
 #' @references
+#' Chávez De la Peña, A. F., & Vandekerckhove, J. (2025). An EZ Bayesian
+#'   hierarchical drift diffusion model for response time and accuracy.
+#'   Psychonomic Bulletin & Review, 32(6), 3067-3087.
+#'   https://doi.org/10.3758/s13423-025-02729-y
+#'
 #' Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple, robust, and
 #'   accurate estimation of circular diffusion model parameters. Psychonomic
 #'   Bulletin & Review, 31(5), 2058-2091. https://doi.org/10.3758/s13423-024-02483-7
@@ -2239,22 +2258,22 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #' dezcdm(
 #'   mean_angle = c(0.1, -0.2), var_angle = c(0.2, 0.3),
 #'   mean_rt = c(0.9, 1), var_rt = c(0.1, 0.12), n_trials = 100,
-#'   drift = 2, driftangle = 0.1, bound = 1.5, ndt = 0.3
+#'   drift = 2, bound = 1.5, ndt = 0.3, driftangle = 0.1
 #' )
 #'
 #' # generate random summary statistics
 #' rezcdm(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 #'
 dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
-                   drift, driftangle = 0, bound, ndt, log = TRUE) {
+                   drift, bound, ndt, driftangle = 0, log = TRUE) {
   .check_ezcdm_pars(drift, bound, ndt, n_trials)
   stopif(isTRUE(any(var_angle < 0 | var_angle > 1)), "var_angle must be between 0 and 1")
   stopif(isTRUE(any(var_rt <= 0)), "var_rt must be positive")
 
   n <- max(
     length(mean_angle), length(var_angle), length(mean_rt), length(var_rt),
-    length(n_trials), length(drift), length(driftangle),
-    length(bound), length(ndt)
+    length(n_trials), length(drift), length(bound), length(ndt),
+    length(driftangle)
   )
   mean_angle <- rep_len(mean_angle, n)
   var_angle <- rep_len(var_angle, n)
@@ -2278,21 +2297,20 @@ dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
 
 #' @rdname ezcdm_dist
 #' @export
-rezcdm <- function(n, n_trials, drift, driftangle = 0, bound, ndt) {
+rezcdm <- function(n, n_trials, drift, bound, ndt, driftangle = 0) {
   stopif(length(n) != 1 || n < 1 || n %% 1 != 0, "n must be a single positive integer")
   .check_ezcdm_pars(drift, bound, ndt, n_trials)
-  stopif(anyNA(n_trials) || any(n_trials %% 1 != 0), "n_trials must be whole numbers, without missing values")
+  stopif(anyNA(n_trials), "n_trials must not contain missing values")
 
   n_trials <- rep_len(n_trials, n)
   driftangle <- rep_len(driftangle, n)
   ndt <- rep_len(ndt, n)
   moments <- .ezcdm_moments(rep_len(drift, n), rep_len(bound, n), ndt)
 
-  angles <- brms::rvon_mises(
-    sum(n_trials),
-    mu = rep(driftangle, n_trials),
-    kappa = rep(moments$kappa, n_trials)
-  )
+  kappa <- rep(moments$kappa, n_trials)
+  angles <- brms::rvon_mises(sum(n_trials), mu = rep(driftangle, n_trials), kappa = kappa)
+  # brms::rvon_mises() returns an angle for an NA kappa
+  angles[is.na(kappa)] <- NA
   rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n_trials)
   var_rt <- stats::rgamma(n, shape = rt$shape, rate = rt$rate)
   mean_rt <- stats::rnorm(n, mean = moments$MRT + rt$slope * (var_rt - moments$VRT), sd = rt$sd)
@@ -2306,15 +2324,17 @@ rezcdm <- function(n, n_trials, drift, driftangle = 0, bound, ndt) {
 }
 
 # Parameter checks shared by dezcdm() and rezcdm(). isTRUE(any()) lets NA
-# parameters through, as the other d*/r* functions do; they propagate as NA.
+# parameters through, as in dezdm(); they propagate as NA.
 .check_ezcdm_pars <- function(drift, bound, ndt, n_trials) {
   stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
-  stopif(isTRUE(any(ndt < 0)), "ndt must be non-negative")
+  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
   stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
+  stopif(isTRUE(any(n_trials %% 1 != 0)), "n_trials must be whole numbers")
 }
 
-# Internal: moments of the EZ circular diffusion model - vectorized, inputs
+# Internal: moments of the EZ circular diffusion model with sigma = 1, as in
+# Qarehdaghi & Amani Rad (2024) - vectorized, inputs
 # recycled as in bound * drift. Returns the von Mises concentration,
 # log I0(kappa), the mean resultant length R = I1/I0, and the mean, variance,
 # third and fourth cumulant of the response time.
@@ -2324,14 +2344,16 @@ rezcdm <- function(n, n_trials, drift, driftangle = 0, bound, ndt) {
   k2 <- kappa^2
   u <- 1 / kappa
 
-  # regimes and polynomials must match inst/stan_chunks/ezcdm_functions.stan
-  tiny <- kappa < 1e-2
-  series <- kappa < 0.25
-  asymptotic <- kappa > 100
-  # besselI() underflows to 0 from kappa ~ 2e5, while the four-term
-  # asymptotic expansion agrees with 50-digit references to double precision
-  # from kappa = 1000; Stan switches R to the same expansion there
-  huge <- kappa > 1000
+  # regimes and polynomials must match inst/stan_chunks/ezcdm_functions.stan;
+  # an NA kappa takes the Bessel path, which returns NA
+  known <- !is.na(kappa)
+  tiny <- known & kappa < 1e-2
+  series <- known & kappa < 0.25
+  asymptotic <- known & kappa > 100
+  # besselI() returns 0 above kappa = 1e5, while the four-term asymptotic
+  # expansion agrees with 50-digit references to double precision from
+  # kappa = 1000; Stan switches R to the same expansion there
+  huge <- known & kappa > 1000
 
   log_I0 <- R <- numeric(length(kappa))
   uh <- u[huge]
@@ -2354,7 +2376,7 @@ rezcdm <- function(n, n_trials, drift, driftangle = 0, bound, ndt) {
   v <- R^2 - 1 + 2 * R * u
   kt <- k2[tiny]
   r[tiny] <- 0.5 - kt / 16 + kt^2 / 96
-  v[tiny] <- 1 / 8 - kt / 24
+  v[tiny] <- 1 / 8 - kt / 24 + 11 * kt^2 / 1024
   R[tiny] <- kappa[tiny] * r[tiny]
 
   # The closed forms of c3 and c4 in R cancel catastrophically at both ends

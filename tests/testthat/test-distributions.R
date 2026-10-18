@@ -1781,12 +1781,13 @@ test_that(".ezcdm_moments reaches the zero-drift limits", {
   expect_equal(moments$VRT, 1.3^4 / 8)
 })
 
-test_that(".ezcdm_moments small-kappa series matches the Bessel expressions", {
-  kappa <- 0.0099
-  R_direct <- besselI(kappa, 1, TRUE) / besselI(kappa, 0, TRUE)
-  moments <- .ezcdm_moments(drift = kappa, bound = 1, ndt = 0)
-  expect_equal(moments$R, R_direct, tolerance = 1e-9)
-  expect_equal(moments$VRT / (1 / kappa)^2, R_direct^2 - 1 + 2 * R_direct / kappa, tolerance = 1e-6)
+test_that(".ezcdm_moments small-kappa series matches high-precision references", {
+  # 60-digit mpmath values of R = I1/I0 and (R^2 - 1 + 2R/kappa) / kappa^2 at
+  # kappa = 0.0099, just inside the series branch; with bound = 1, VRT is the
+  # latter. Dropping the kappa^4 term of the variance series errs by 8e-10
+  moments <- .ezcdm_moments(drift = 0.0099, bound = 1, ndt = 0)
+  expect_equal(moments$R, 0.004949939357303097948227113, tolerance = 1e-14)
+  expect_equal(moments$VRT, 0.1249959163531866953783885, tolerance = 1e-13)
 })
 
 test_that(".ezcdm_moments k4 matches high-precision references in every branch", {
@@ -1803,7 +1804,9 @@ test_that(".ezcdm_moments k4 matches high-precision references in every branch",
     )
   )
   moments <- .ezcdm_moments(ref$v, ref$a, ndt = 0)
-  expect_equal(moments$k4, ref$k4, tolerance = 1e-10)
+  # elementwise: expect_equal() scales by the mean reference, which the
+  # small-kappa values set, so the asymptotic ones would go unchecked
+  expect_lt(max(abs(moments$k4 / ref$k4 - 1)), 1e-10)
 })
 
 test_that(".ezcdm_moments k4 reaches the zero-drift limit", {
@@ -1835,7 +1838,7 @@ test_that(".ezcdm_moments k3 matches high-precision references in every branch",
     )
   )
   moments <- .ezcdm_moments(ref$v, ref$a, ndt = 0)
-  expect_equal(moments$k3, ref$k3, tolerance = 1e-11)
+  expect_lt(max(abs(moments$k3 / ref$k3 - 1)), 1e-11)
 })
 
 test_that(".ezcdm_moments k3 reaches the zero-drift limit", {
@@ -1862,8 +1865,8 @@ test_that(".ezcdm_moments large-kappa expansion matches 50-digit Bessel referenc
           0.999997499996874984374877928418, 0.999999499999874999874999804687)
   )
   moments <- .ezcdm_moments(drift = ref$kappa, bound = 1, ndt = 0)
-  expect_equal(moments$log_I0, ref$log_I0, tolerance = 1e-14)
-  expect_equal(moments$R, ref$R, tolerance = 1e-14)
+  expect_lt(max(abs(moments$log_I0 / ref$log_I0 - 1)), 1e-14)
+  expect_lt(max(abs(moments$R / ref$R - 1)), 1e-14)
 
   below <- .ezcdm_moments(drift = 1000 * (1 - 1e-12), bound = 1, ndt = 0)
   above <- .ezcdm_moments(drift = 1000 * (1 + 1e-12), bound = 1, ndt = 0)
@@ -1952,11 +1955,24 @@ test_that("dezcdm validates parameters", {
   bad <- function(...) do.call(dezcdm, utils::modifyList(args, list(...)))
   expect_error(bad(drift = 0), "drift must be positive")
   expect_error(bad(bound = -1), "bound must be positive")
-  expect_error(bad(ndt = -0.1), "ndt must be non-negative")
+  expect_error(bad(ndt = 0), "ndt must be positive")
   expect_error(bad(n_trials = 2), "n_trials must be larger than 2")
+  expect_error(bad(n_trials = 2.5), "n_trials must be whole numbers")
   expect_error(bad(var_angle = 1.1), "var_angle must be between 0 and 1")
   expect_error(bad(var_angle = -0.1), "var_angle must be between 0 and 1")
   expect_error(bad(var_rt = 0), "var_rt must be positive")
+})
+
+test_that("dezcdm propagates NA parameters row by row", {
+  ll <- function(...) dezcdm(0.1, 0.2, 0.9, 0.1, 100, ...)
+  reference <- ll(drift = 2, bound = 1.5, ndt = 0.3)
+  expect_equal(ll(drift = c(NA, 2), bound = 1.5, ndt = 0.3), c(NA, reference))
+  expect_equal(ll(drift = 2, bound = c(1.5, NA), ndt = 0.3), c(reference, NA))
+  expect_equal(ll(drift = 2, bound = 1.5, ndt = c(NA, 0.3)), c(NA, reference))
+  expect_equal(ll(drift = 2, bound = 1.5, ndt = 0.3, driftangle = c(0, NA)), c(reference, NA))
+  # next to a kappa in each of the series and asymptotic branches
+  drift <- c(0.001, 0.1, 200, 2000)
+  expect_equal(ll(drift = c(NA, drift), bound = 1, ndt = 0.3), c(NA, ll(drift = drift, bound = 1, ndt = 0.3)))
 })
 
 test_that("rezcdm returns plausible summary statistics", {
@@ -1981,14 +1997,16 @@ test_that("rezcdm reproduces the moments used by dezcdm", {
   moments <- .ezcdm_moments(pars$drift, pars$bound, pars$ndt)
 
   expect_equal(mean(sim$mean_rt), moments$MRT, tolerance = 0.01)
-  expect_equal(var(sim$mean_rt), moments$VRT / n_trials, tolerance = 0.05)
   expect_equal(mean(sim$var_rt), moments$VRT, tolerance = 0.02)
+  # ratios: the second moments lie below their tolerance, where expect_equal()
+  # compares absolute differences and a flipped covariance would pass
+  expect_equal(var(sim$mean_rt) / (moments$VRT / n_trials), 1, tolerance = 0.05)
   expect_equal(
-    var(sim$var_rt),
-    moments$k4 / n_trials + 2 * moments$VRT^2 / (n_trials - 1),
+    var(sim$var_rt) / (moments$k4 / n_trials + 2 * moments$VRT^2 / (n_trials - 1)),
+    1,
     tolerance = 0.1
   )
-  expect_equal(cov(sim$mean_rt, sim$var_rt), moments$k3 / n_trials, tolerance = 0.1)
+  expect_equal(cov(sim$mean_rt, sim$var_rt) / (moments$k3 / n_trials), 1, tolerance = 0.1)
   resultant <- mean((1 - sim$var_angle) * cos(sim$mean_angle - pars$driftangle))
   expect_equal(atan2(mean(sin(sim$mean_angle)), mean(cos(sim$mean_angle))), pars$driftangle, tolerance = 0.02)
   expect_equal(resultant, moments$R, tolerance = 0.02)
@@ -2004,19 +2022,41 @@ test_that("rezcdm does not truncate mean_rt, and values below ndt stay rare", {
 
 test_that("rezcdm recycles parameters and n_trials across replicates", {
   withr::local_seed(1)
-  sim <- rezcdm(n = 4, n_trials = c(10, 20), drift = c(1, 3), bound = 1, ndt = c(0.2, 0.4))
-  expect_equal(sim$n_trials, c(10, 20, 10, 20))
-  expect_true(all(sim$mean_rt > c(0.2, 0.4, 0.2, 0.4)))
+  sim <- rezcdm(n = 4000, n_trials = c(10, 20), drift = c(1, 3), bound = 1, ndt = c(0.2, 0.6))
+  expect_equal(sim$n_trials[1:4], c(10, 20, 10, 20))
+  odd <- seq(1, 4000, by = 2)
+  moments <- .ezcdm_moments(drift = c(1, 3), bound = 1, ndt = c(0.2, 0.6))
+  # MRT 0.65 vs 0.87 (drift and ndt), VRT 0.092 vs 0.022 (drift alone)
+  expect_equal(mean(sim$mean_rt[odd]), moments$MRT[1], tolerance = 0.01)
+  expect_equal(mean(sim$mean_rt[-odd]), moments$MRT[2], tolerance = 0.01)
+  expect_equal(mean(sim$var_rt[odd]) / moments$VRT[1], 1, tolerance = 0.05)
+  expect_equal(mean(sim$var_rt[-odd]) / moments$VRT[2], 1, tolerance = 0.05)
+})
+
+test_that("rezcdm returns NA summaries for NA parameters", {
+  withr::local_seed(2)
+  sim <- suppressWarnings(rezcdm(n = 2, n_trials = 20, drift = c(NA, 2), bound = 1.5, ndt = 0.3))
+  expect_true(all(is.na(sim[1, c("mean_angle", "var_angle", "mean_rt", "var_rt")])))
+  expect_true(all(is.finite(unlist(sim[2, ]))))
 })
 
 test_that("rezcdm validates parameters", {
   expect_error(rezcdm(n = c(1, 2), n_trials = 10, drift = 1, bound = 1, ndt = 0.3), "n must be")
   expect_error(rezcdm(n = 5, n_trials = 2, drift = 1, bound = 1, ndt = 0.3), "n_trials must be larger than 2")
   expect_error(rezcdm(n = 5, n_trials = 10.5, drift = 1, bound = 1, ndt = 0.3), "whole numbers")
-  expect_error(rezcdm(n = 2, n_trials = c(10, NA), drift = 1, bound = 1, ndt = 0.3), "without missing values")
+  expect_error(rezcdm(n = 2, n_trials = c(10, NA), drift = 1, bound = 1, ndt = 0.3), "missing values")
   expect_error(rezcdm(n = 5, n_trials = 10, drift = -1, bound = 1, ndt = 0.3), "drift must be positive")
   expect_error(rezcdm(n = 5, n_trials = 10, drift = 1, bound = 0, ndt = 0.3), "bound must be positive")
-  expect_error(rezcdm(n = 5, n_trials = 10, drift = 1, bound = 1, ndt = -0.3), "ndt must be non-negative")
+  expect_error(rezcdm(n = 5, n_trials = 10, drift = 1, bound = 1, ndt = 0), "ndt must be positive")
+})
+
+test_that(".vm_kappa_from_R() inverts the mean resultant length", {
+  kappa <- c(0.05, 0.5, 2, 8, 50, 500)
+  R <- besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
+  expect_equal(vapply(R, .vm_kappa_from_R, numeric(1)), kappa, tolerance = 1e-6)
+  expect_equal(.vm_kappa_from_R(0), 0)
+  expect_equal(.vm_kappa_from_R(-1), 0)
+  expect_lte(.vm_kappa_from_R(1), 1e4)
 })
 
 # Tests for the ezdm decision-time cumulants (issue #407) ----------------------
