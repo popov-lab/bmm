@@ -236,8 +236,8 @@ settable_link_functions.rdm <- function(model) {
 #' rather than one per model. Every estimated parameter is on the log link by
 #' default and gets `exponential(2)`: its median of 0.35 on the log scale is a
 #' between-subject ratio of about 1.4 for one standard deviation. `ndt` and `s`
-#' have the same rate in the **lba**, **cswald** and **ezdm** models, and
-#' `ndt` in the **ddm** model. The drift-rate rate is anchored on hierarchical
+#' have the same rate in the **lba**, **lnr**, **cswald** and **ezdm** models,
+#' and `ndt` in the **ddm** model. The drift-rate rate is anchored on hierarchical
 #' recovery fits of simulated multi-subject data for the **lnr** model, and the
 #' `gap`/`sp` rate is reused from the **lba** model.
 #' @section Identifiability of `s`:
@@ -261,8 +261,8 @@ settable_link_functions.rdm <- function(model) {
 #'   vs. error) over the general per-accumulator case handled by `"custom"`.
 #' @export
 #' @keywords bmmodel
-#' @seealso [drdm()] and [rrdm()] for the density and random generation
-#'   functions.
+#' @seealso [drdm()], [prdm()], [qrdm()] and [rrdm()] for the density,
+#'   distribution, quantile and random generation functions.
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
 #' dat <- rrdm(n = 500, drift = c(3, 1.5), gap = 1, sp = 0, ndt = 0.2)

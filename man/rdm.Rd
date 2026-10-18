@@ -196,8 +196,8 @@ The group-level standard deviations get one rate per parameter meaning
 rather than one per model. Every estimated parameter is on the log link by
 default and gets \code{exponential(2)}: its median of 0.35 on the log scale is a
 between-subject ratio of about 1.4 for one standard deviation. \code{ndt} and \code{s}
-have the same rate in the \strong{lba}, \strong{cswald} and \strong{ezdm} models, and
-\code{ndt} in the \strong{ddm} model. The drift-rate rate is anchored on hierarchical
+have the same rate in the \strong{lba}, \strong{lnr}, \strong{cswald} and \strong{ezdm} models,
+and \code{ndt} in the \strong{ddm} model. The drift-rate rate is anchored on hierarchical
 recovery fits of simulated multi-subject data for the \strong{lnr} model, and the
 \code{gap}/\code{sp} rate is reused from the \strong{lba} model.
 }
@@ -234,7 +234,7 @@ fit2 <- bmm(formula2, dat, model, cores = 4, backend = "cmdstanr")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=drdm]{drdm()}} and \code{\link[=rrdm]{rrdm()}} for the density and random generation
-functions.
+\code{\link[=drdm]{drdm()}}, \code{\link[=prdm]{prdm()}}, \code{\link[=qrdm]{qrdm()}} and \code{\link[=rrdm]{rrdm()}} for the density,
+distribution, quantile and random generation functions.
 }
 \keyword{bmmodel}
