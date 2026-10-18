@@ -775,6 +775,15 @@ test_that("posterior_epred_lba_custom() returns Inf and warns once for a lone ac
   expect_identical(suppressWarnings(posterior_epred_lba_custom(prep)), out)
 })
 
+# with a high mean drift the 1/t tail sits below any numerical tolerance, but
+# the mean is still infinite, and one draw must not decide for the others
+test_that("posterior_epred_lba_custom() returns Inf for a lone accumulator whatever its drift", {
+  prep <- lba_custom_epred_prep(n_left = 1L, n_right = 0L)
+  prep$dpars$left <- matrix(c(10, 20), 2, 1)
+  expect_warning(out <- posterior_epred_lba_custom(prep), "1 observation(s)", fixed = TRUE)
+  expect_equal(out, matrix(Inf, 2, 1))
+})
+
 # race_time_range() marks these brackets truncated too: a two-accumulator normal
 # race decays like 1/t^2, too slowly for its tolerance, but leaves out < 1e-8 s
 test_that("posterior_epred_lba_custom() does not warn for a race with a finite mean", {
