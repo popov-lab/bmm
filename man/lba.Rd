@@ -161,10 +161,10 @@ on the log scale (median 0.22 s), the same as \code{ddm()}'s. An earlier
 \code{ndt} down and drift rates/thresholds up on a 400-trial recovery.
 
 Random-effects SDs get \code{exponential(1)} for the identity-linked normal
-mean drift and \code{exponential(2)} for \code{gap}, \code{sp}, \code{ndt} and \code{s},
-following the package-wide rule of rate 1 for identity-linked drift
-parameters and rate 2 for log-linked, boundary, non-decision-time and
-start-point parameters. These rates are anchored on the hierarchical
+mean drift and \code{exponential(2)} for \code{gap}, \code{sp}, \code{ndt} and \code{s}, the
+rates \code{ddm()} and \code{ezdm()} use: rate 1 for an identity-linked drift rate
+and rate 2 for log-linked, boundary, non-decision-time and start-point
+parameters. These rates are anchored on the hierarchical
 simulation design used for the LBA recovery (between-subject SDs
 0.30-0.60 for \code{driftc}, 0.20-0.50 for \code{drifte}, and 0.10-0.25 on the log
 scale for \code{gap}, \code{sp}, \code{ndt}): \code{exponential(1)} puts 36\% of its mass

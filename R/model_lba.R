@@ -180,10 +180,10 @@ settable_links.lba_custom <- function(model) {
 #'   `ndt` down and drift rates/thresholds up on a 400-trial recovery.
 #'
 #'   Random-effects SDs get `exponential(1)` for the identity-linked normal
-#'   mean drift and `exponential(2)` for `gap`, `sp`, `ndt` and `s`,
-#'   following the package-wide rule of rate 1 for identity-linked drift
-#'   parameters and rate 2 for log-linked, boundary, non-decision-time and
-#'   start-point parameters. These rates are anchored on the hierarchical
+#'   mean drift and `exponential(2)` for `gap`, `sp`, `ndt` and `s`, the
+#'   rates `ddm()` and `ezdm()` use: rate 1 for an identity-linked drift rate
+#'   and rate 2 for log-linked, boundary, non-decision-time and start-point
+#'   parameters. These rates are anchored on the hierarchical
 #'   simulation design used for the LBA recovery (between-subject SDs
 #'   0.30-0.60 for `driftc`, 0.20-0.50 for `drifte`, and 0.10-0.25 on the log
 #'   scale for `gap`, `sp`, `ndt`): `exponential(1)` puts 36% of its mass
