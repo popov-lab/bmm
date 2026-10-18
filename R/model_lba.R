@@ -204,11 +204,15 @@ settable_links.lba_custom <- function(model) {
 #'
 #'   `posterior_epred()` returns the expected response time (`ndt` plus the
 #'   integral of the race survivor); it is deterministic, not
-#'   simulation-based. The mean is infinite for a race in which only one
-#'   normal-drift accumulator runs (an `accumulators` column that leaves one
-#'   category with one accumulator on a trial); the integral is then truncated at 1e7 s and the returned value is not
-#'   meaningful; treat it as missing. `posterior_epred()` warns once per call
-#'   with the number of observations it truncated.
+#'   simulation-based. It integrates the race for every draw and observation,
+#'   at about half a millisecond each (some 30 minutes for 4000 draws of 1000
+#'   observations); `posterior_epred(fit, ndraws = )` limits the cost. The
+#'   mean is infinite for a race in which only one normal-drift accumulator
+#'   runs (an `accumulators` column that leaves one category with one
+#'   accumulator on a trial); the integral is then truncated at 1e7 s and the
+#'   returned value is not meaningful; treat it as missing.
+#'   `posterior_epred()` warns once per call with the number of observations
+#'   it truncated.
 #'
 #'   `pp_check(fit, resp_var = "rt")` checks the response times and
 #'   `pp_check(fit, resp_var = "response")` checks the response category
