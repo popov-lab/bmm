@@ -545,8 +545,8 @@ test_that(".lnr_stan_code generates valid Stan for 2 categories", {
   expect_true(grepl("array\\[\\] int n1", code))
   expect_true(grepl("array\\[\\] int n2", code))
   # single-pass race combination shared with lba/rdm
-  expect_true(grepl("log\\(n\\[win\\]\\)", code))
-  expect_true(grepl("reps", code))
+  expect_true(grepl("log\\(lnr_cnt\\[lnr_win\\]\\)", code))
+  expect_true(grepl("lnr_reps", code))
 })
 
 test_that(".lnr_stan_code generates valid Stan for 4 categories", {
@@ -556,8 +556,8 @@ test_that(".lnr_stan_code generates valid Stan for 4 categories", {
   expect_true(grepl("lnr_custom_lpdf", code))
   for (cat in cats) expect_true(grepl(paste0("vector ", cat), code))
   expect_true(grepl("array\\[\\] int n4", code))
-  expect_true(grepl("array\\[4\\] real m", code))
-  expect_true(grepl("array\\[4\\] int n", code))
+  expect_true(grepl("array\\[4\\] real lnr_m;", code))
+  expect_true(grepl("array\\[4\\] int lnr_cnt;", code))
 })
 
 test_that("LNR generated Stan code uses vectorized custom likelihoods", {
@@ -1087,14 +1087,13 @@ test_that("posterior_epred.lnr is deterministic and equals the race mean", {
 # a variable that likelihood declares would make stanc refuse the program
 test_that("lnr refuses a category named after an identifier of its Stan code", {
   expect_error(
-    check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL, bmf(t ~ 1, other ~ 1, ndt ~ 1)),
+    check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL, bmf(rt ~ 1, other ~ 1, ndt ~ 1)),
     "Stan code uses"
   )
 })
 
 test_that("lnr refuses each identifier of the Stan program as a category, but not other names", {
-  refused <- c("rt", "response", "t", "m", "n", "win", "lp", "reps", "i", "j",
-               "ptarget", "nn")
+  refused <- c("rt", "response", "n", "ptarget", "nn")
   for (nm in refused) {
     expect_error(
       check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL,
@@ -1116,6 +1115,17 @@ test_that("lnr refuses each identifier of the Stan program as a category, but no
     check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL,
                 bmf(alpha ~ 1, other ~ 1, ndt ~ 1))
   )
+})
+
+# the likelihood's locals carry the lnr_ prefix, so the short names they used to
+# have are free for categories
+test_that("lnr accepts the names the likelihood's locals used to have as categories", {
+  for (nm in c("t", "m", "i", "j", "win", "lp", "reps")) {
+    expect_no_error(
+      check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL,
+                  bmf(stats::as.formula(paste(nm, "~ 1")), other ~ 1, ndt ~ 1))
+    )
+  }
 })
 
 test_that("log_lik_lnr_custom is finite and matches the reference with zero-count losers", {

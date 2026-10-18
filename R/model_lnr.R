@@ -77,11 +77,11 @@
 # around it for the models this package builds, which a category would shadow.
 # Measured with stanc (rstan::stanc): each name, used as a category, makes the
 # program fail with "Identifier ... is already in use". Relied on: the
-# likelihood's own arguments and locals, and that a threaded program declares
-# `ptarget` and its random-effects loop `nn`. brms's other threading names
-# (`seq`, `start`, `end`) are in .stan_reserved, which is checked first.
-.lnr_stan_names <- c("rt", "response", "t", "m", "n", "win", "lp", "reps", "i", "j",
-                     "ptarget", "nn")
+# likelihood's arguments `rt` and `response`, that brms adds random effects in a
+# loop over `n`, and that a threaded program declares `ptarget` and its
+# random-effects loop `nn`. brms's other threading names (`seq`, `start`,
+# `end`) are in .stan_reserved, which is checked first.
+.lnr_stan_names <- c("rt", "response", "n", "ptarget", "nn")
 
 .model_lnr <- function(
     rt = NULL,
@@ -379,37 +379,39 @@ bmf2bf.lnr_custom <- function(model, formula) {
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
   m_assignments <- paste(
-    paste0("m[", seq_len(n_cats), "] = ", cat_names, "[i];"),
+    paste0("lnr_m[", seq_len(n_cats), "] = ", cat_names, "[lnr_i];"),
     collapse = "\n    "
   )
   n_assignments <- paste(
-    paste0("n[", seq_len(n_cats), "] = n", seq_len(n_cats), "[i];"),
+    paste0("lnr_cnt[", seq_len(n_cats), "] = n", seq_len(n_cats), "[lnr_i];"),
     collapse = "\n    "
   )
 
+  # the locals carry an underscore, which no category name can, so a category
+  # never shadows them
   glue(
     "real {family_name}_lpdf(vector rt, vector mu, {cat_args}, ",
     "vector ndt, vector s, array[] int response, {n_args}) {{\n",
     "  int N = num_elements(rt);\n",
     "  real log_lik = 0;\n",
-    "  for (i in 1:N) {{\n",
-    "    real t = rt[i] - ndt[i];\n",
-    "    array[{n_cats}] real m;\n",
-    "    array[{n_cats}] int n;\n",
-    "    int win;\n",
-    "    real lp;\n",
-    "    if (t <= 0) return negative_infinity();\n",
+    "  for (lnr_i in 1:N) {{\n",
+    "    real lnr_dt = rt[lnr_i] - ndt[lnr_i];\n",
+    "    array[{n_cats}] real lnr_m;\n",
+    "    array[{n_cats}] int lnr_cnt;\n",
+    "    int lnr_win;\n",
+    "    real lnr_lp;\n",
+    "    if (lnr_dt <= 0) return negative_infinity();\n",
     "    {m_assignments}\n",
     "    {n_assignments}\n",
-    "    win = response[i];\n",
-    "    lp = log(n[win]) + lognormal_lpdf(t | m[win], s[i]);\n",
-    "    for (j in 1:{n_cats}) {{\n",
-    "      int reps = (j == win) ? n[j] - 1 : n[j];\n",
-    "      if (reps > 0) {{\n",
-    "        lp += reps * lognormal_lccdf(t | m[j], s[i]);\n",
+    "    lnr_win = response[lnr_i];\n",
+    "    lnr_lp = log(lnr_cnt[lnr_win]) + lognormal_lpdf(lnr_dt | lnr_m[lnr_win], s[lnr_i]);\n",
+    "    for (lnr_j in 1:{n_cats}) {{\n",
+    "      int lnr_reps = (lnr_j == lnr_win) ? lnr_cnt[lnr_j] - 1 : lnr_cnt[lnr_j];\n",
+    "      if (lnr_reps > 0) {{\n",
+    "        lnr_lp += lnr_reps * lognormal_lccdf(lnr_dt | lnr_m[lnr_j], s[lnr_i]);\n",
     "      }}\n",
     "    }}\n",
-    "    log_lik += lp;\n",
+    "    log_lik += lnr_lp;\n",
     "  }}\n",
     "  return log_lik;\n",
     "}}"
