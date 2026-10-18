@@ -1093,7 +1093,7 @@ test_that("lnr refuses a category named after an identifier of its Stan code", {
 })
 
 test_that("lnr refuses each identifier of the Stan program as a category, but not other names", {
-  refused <- c("rt", "response", "n", "ptarget", "nn")
+  refused <- c("rt", "response")
   for (nm in refused) {
     expect_error(
       check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL,
@@ -1102,8 +1102,8 @@ test_that("lnr refuses each identifier of the Stan program as a category, but no
       info = nm
     )
   }
-  # the race core refuses brms's threading identifiers for every race model
-  for (nm in c("start", "end", "seq")) {
+  # the race core refuses the identifiers brms declares, for every race model
+  for (nm in c("n", "start", "end", "seq", "ptarget", "nn")) {
     expect_error(
       check_model(lnr(rt = "rt", response = "resp", version = "custom"), NULL,
                   bmf(stats::as.formula(paste(nm, "~ 1")), other ~ 1, ndt ~ 1)),

@@ -77,11 +77,10 @@
 # around it for the models this package builds, which a category would shadow.
 # Measured with stanc (rstan::stanc): each name, used as a category, makes the
 # program fail with "Identifier ... is already in use". Relied on: the
-# likelihood's arguments `rt` and `response`, that brms adds random effects in a
-# loop over `n`, and that a threaded program declares `ptarget` and its
-# random-effects loop `nn`. brms's other threading names (`seq`, `start`,
-# `end`) are in .stan_reserved, which is checked first.
-.lnr_stan_names <- c("rt", "response", "n", "ptarget", "nn")
+# likelihood's arguments `rt` and `response`. The names brms itself declares
+# (`n`, and under threading `seq`, `start`, `end`, `ptarget`, `nn`) are in
+# .stan_reserved, which is checked first.
+.lnr_stan_names <- c("rt", "response")
 
 .model_lnr <- function(
     rt = NULL,
