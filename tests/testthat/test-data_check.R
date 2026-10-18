@@ -218,7 +218,7 @@ test_that("bmm_data_check treats ezcdm rows as aggregates", {
     n_trials = 100, cond = c("a", "b", "a", "b")
   )
   res <- bmm_data_check(
-    bmf(driftrate ~ cond, bound ~ 1, ndt ~ 1), dat,
+    bmf(drift ~ cond, bound ~ 1, ndt ~ 1), dat,
     ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials")
   )
   expect_null(res$pipeline$error)

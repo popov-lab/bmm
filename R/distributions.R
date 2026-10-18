@@ -2152,7 +2152,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #'   (denominator `n_trials - 1`).
 #' @param n_trials Number of trials the summary statistics were computed from.
 #'   Must be larger than 2.
-#' @param driftrate Drift rate, the length of the drift vector (positive).
+#' @param drift Drift rate, the length of the drift vector (positive).
 #' @param driftangle Drift angle, the direction of the drift vector in radians
 #'   (default 0).
 #' @param bound Boundary, the radius of the circular decision boundary
@@ -2232,28 +2232,28 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #' @examples
 #' dezcdm(
 #'   mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
-#'   n_trials = 100, driftrate = 2, bound = 1.5, ndt = 0.3
+#'   n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
 #' )
 #'
 #' # vectorised over observations
 #' dezcdm(
 #'   mean_angle = c(0.1, -0.2), var_angle = c(0.2, 0.3),
 #'   mean_rt = c(0.9, 1), var_rt = c(0.1, 0.12), n_trials = 100,
-#'   driftrate = 2, driftangle = 0.1, bound = 1.5, ndt = 0.3
+#'   drift = 2, driftangle = 0.1, bound = 1.5, ndt = 0.3
 #' )
 #'
 #' # generate random summary statistics
-#' rezcdm(n = 5, n_trials = 100, driftrate = 2, bound = 1.5, ndt = 0.3)
+#' rezcdm(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 #'
 dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
-                   driftrate, driftangle = 0, bound, ndt, log = TRUE) {
-  .check_ezcdm_pars(driftrate, bound, ndt, n_trials)
+                   drift, driftangle = 0, bound, ndt, log = TRUE) {
+  .check_ezcdm_pars(drift, bound, ndt, n_trials)
   stopif(isTRUE(any(var_angle < 0 | var_angle > 1)), "var_angle must be between 0 and 1")
   stopif(isTRUE(any(var_rt <= 0)), "var_rt must be positive")
 
   n <- max(
     length(mean_angle), length(var_angle), length(mean_rt), length(var_rt),
-    length(n_trials), length(driftrate), length(driftangle),
+    length(n_trials), length(drift), length(driftangle),
     length(bound), length(ndt)
   )
   mean_angle <- rep_len(mean_angle, n)
@@ -2264,7 +2264,7 @@ dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
   driftangle <- rep_len(driftangle, n)
 
   moments <- .ezcdm_moments(
-    rep_len(driftrate, n), rep_len(bound, n), rep_len(ndt, n)
+    rep_len(drift, n), rep_len(bound, n), rep_len(ndt, n)
   )
 
   rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n_trials)
@@ -2278,15 +2278,15 @@ dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
 
 #' @rdname ezcdm_dist
 #' @export
-rezcdm <- function(n, n_trials, driftrate, driftangle = 0, bound, ndt) {
+rezcdm <- function(n, n_trials, drift, driftangle = 0, bound, ndt) {
   stopif(length(n) != 1 || n < 1 || n %% 1 != 0, "n must be a single positive integer")
-  .check_ezcdm_pars(driftrate, bound, ndt, n_trials)
+  .check_ezcdm_pars(drift, bound, ndt, n_trials)
   stopif(anyNA(n_trials) || any(n_trials %% 1 != 0), "n_trials must be whole numbers, without missing values")
 
   n_trials <- rep_len(n_trials, n)
   driftangle <- rep_len(driftangle, n)
   ndt <- rep_len(ndt, n)
-  moments <- .ezcdm_moments(rep_len(driftrate, n), rep_len(bound, n), ndt)
+  moments <- .ezcdm_moments(rep_len(drift, n), rep_len(bound, n), ndt)
 
   angles <- brms::rvon_mises(
     sum(n_trials),
@@ -2307,19 +2307,19 @@ rezcdm <- function(n, n_trials, driftrate, driftangle = 0, bound, ndt) {
 
 # Parameter checks shared by dezcdm() and rezcdm(). isTRUE(any()) lets NA
 # parameters through, as the other d*/r* functions do; they propagate as NA.
-.check_ezcdm_pars <- function(driftrate, bound, ndt, n_trials) {
-  stopif(isTRUE(any(driftrate <= 0)), "driftrate must be positive")
+.check_ezcdm_pars <- function(drift, bound, ndt, n_trials) {
+  stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt < 0)), "ndt must be non-negative")
   stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
 }
 
 # Internal: moments of the EZ circular diffusion model - vectorized, inputs
-# recycled as in bound * driftrate. Returns the von Mises concentration,
+# recycled as in bound * drift. Returns the von Mises concentration,
 # log I0(kappa), the mean resultant length R = I1/I0, and the mean, variance,
 # third and fourth cumulant of the response time.
-.ezcdm_moments <- function(driftrate, bound, ndt) {
-  kappa <- bound * driftrate
+.ezcdm_moments <- function(drift, bound, ndt) {
+  kappa <- bound * drift
   bound <- rep_len(bound, length(kappa))
   k2 <- kappa^2
   u <- 1 / kappa
@@ -2344,11 +2344,11 @@ rezcdm <- function(n, n_trials, driftrate, driftangle = 0, bound, ndt) {
   R[!huge] <- besselI(kappa[!huge], 1, expon.scaled = TRUE) / I0_scaled
 
   # The decision-time moments are written as MRT = ndt + L r, VRT = L^2 v,
-  # k3 = L^3 c3 and k4 = L^4 c4. The length scale is L = tau = bound / driftrate,
+  # k3 = L^3 c3 and k4 = L^4 c4. The length scale is L = tau = bound / drift,
   # except below kappa = 0.01, where L = bound^2 and r, v, c3, c4 are the
   # series divided by powers of kappa: there R^2 - 1 + 2R/kappa cancels, and
-  # tau overflows when driftrate underflows, which would give VRT = Inf * 0.
-  L <- bound / driftrate
+  # tau overflows when drift underflows, which would give VRT = Inf * 0.
+  L <- bound / drift
   L[tiny] <- bound[tiny]^2
   r <- R
   v <- R^2 - 1 + 2 * R * u

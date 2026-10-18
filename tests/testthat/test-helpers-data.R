@@ -1297,7 +1297,7 @@ test_that("ezcdm_summary_stats(method = 'mixture') returns a row check_data() ac
 
   dat <- ezcdm_summary_stats(angle, rt)
   model <- ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials")
-  formula <- bmf(driftrate ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
 
   expect_silent(check_data(model, dat, formula))
 })

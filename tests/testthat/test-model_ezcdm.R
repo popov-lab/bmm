@@ -5,10 +5,10 @@ ezcdm_test_model <- function(...) {
 }
 
 ezcdm_test_data <- function(n = 10, ...) {
-  rezcdm(n, n_trials = 100, driftrate = 2, bound = 1.5, ndt = 0.3, ...)
+  rezcdm(n, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, ...)
 }
 
-ezcdm_test_formula <- bmf(driftrate ~ 1, bound ~ 1, ndt ~ 1)
+ezcdm_test_formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
 
 # columns passed as NULL are dropped, as in utils::modifyList()
 ezcdm_valid_data <- function(...) {
@@ -28,7 +28,7 @@ ezcdm_valid_data <- function(...) {
 ezcdm_prep <- function(data, dpars) {
   structure(
     list(
-      ndraws = nrow(dpars$driftrate),
+      ndraws = nrow(dpars$drift),
       nobs = nrow(data),
       dpars = dpars,
       data = list(
@@ -63,21 +63,21 @@ test_that("ezcdm model has correct class structure", {
 test_that("ezcdm 3par fixes the drift angle and 4par estimates it", {
   model_3par <- ezcdm_test_model(version = "3par")
   model_4par <- ezcdm_test_model(version = "4par")
-  expect_named(model_3par$parameters, c("driftrate", "driftangle", "bound", "ndt"))
+  expect_named(model_3par$parameters, c("drift", "driftangle", "bound", "ndt"))
   expect_identical(model_3par$parameters, model_4par$parameters)
   expect_identical(model_3par$fixed_parameters, list(mu = 0, driftangle = 0))
   expect_identical(model_4par$fixed_parameters, list(mu = 0))
 })
 
 test_that("ezcdm versions share the same default links", {
-  expected <- list(driftrate = "log", driftangle = "identity", bound = "log", ndt = "log")
+  expected <- list(drift = "log", driftangle = "identity", bound = "log", ndt = "log")
   expect_identical(ezcdm_test_model(version = "3par")$links, expected)
   expect_identical(ezcdm_test_model(version = "4par")$links, expected)
 })
 
 test_that("ezcdm model accepts custom links", {
-  model <- ezcdm_test_model(links = list(driftrate = "softplus"))
-  expect_equal(model$links$driftrate, "softplus")
+  model <- ezcdm_test_model(links = list(drift = "softplus"))
+  expect_equal(model$links$drift, "softplus")
   expect_equal(model$links$bound, "log")
 })
 
@@ -174,7 +174,7 @@ test_that("ezcdm works with mock backend - 3par version", {
 test_that("ezcdm works with mock backend - 4par version", {
   skip_on_cran()
   withr::local_seed(2)
-  formula <- bmf(driftrate ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
   expect_silent(
     bmm(formula, ezcdm_test_data(driftangle = 0.3), ezcdm_test_model(version = "4par"),
       backend = "mock", mock_fit = 1, rename = FALSE
@@ -190,7 +190,7 @@ test_that("ezcdm uses one family for both versions", {
   fit_3par <- bmm(ezcdm_test_formula, sim_data, ezcdm_test_model(),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
-  fit_4par <- bmm(bmf(driftrate ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1), sim_data,
+  fit_4par <- bmm(bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1), sim_data,
     ezcdm_test_model(version = "4par"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
@@ -199,7 +199,7 @@ test_that("ezcdm uses one family for both versions", {
     expect_s3_class(fit$formula, "brmsformula")
     expect_s3_class(fit$formula$family, "customfamily")
     expect_equal(fit$formula$family$name, "ezcdm")
-    expect_equal(fit$formula$family$dpars, c("mu", "driftrate", "driftangle", "bound", "ndt"))
+    expect_equal(fit$formula$family$dpars, c("mu", "drift", "driftangle", "bound", "ndt"))
   }
 })
 
@@ -224,7 +224,7 @@ test_that("ezcdm 3par fixes driftangle to exactly zero", {
 test_that("ezcdm 3par with a driftangle formula frees the drift angle", {
   skip_on_cran()
   withr::local_seed(14)
-  formula <- bmf(driftrate ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
   fit <- bmm(formula, ezcdm_test_data(driftangle = 0.3), ezcdm_test_model(),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
@@ -248,14 +248,14 @@ test_that("ezcdm 4par asks for a driftangle formula when it is missing", {
 test_that("ezcdm with condition effects works", {
   skip_on_cran()
   withr::local_seed(6)
-  data_a <- rezcdm(10, n_trials = 100, driftrate = 2.5, bound = 1.5, ndt = 0.3)
+  data_a <- rezcdm(10, n_trials = 100, drift = 2.5, bound = 1.5, ndt = 0.3)
   data_a$condition <- "A"
-  data_b <- rezcdm(10, n_trials = 100, driftrate = 1.5, bound = 1.5, ndt = 0.3)
+  data_b <- rezcdm(10, n_trials = 100, drift = 1.5, bound = 1.5, ndt = 0.3)
   data_b$condition <- "B"
   sim_data <- rbind(data_a, data_b)
   sim_data$condition <- factor(sim_data$condition)
 
-  formula <- bmf(driftrate ~ 0 + condition, bound ~ 1, ndt ~ 1)
+  formula <- bmf(drift ~ 0 + condition, bound ~ 1, ndt ~ 1)
   expect_silent(bmm(formula, sim_data, ezcdm_test_model(), backend = "mock", mock_fit = 1, rename = FALSE))
 })
 
@@ -263,27 +263,27 @@ test_that("ezcdm with hierarchical structure works", {
   skip_on_cran()
   withr::local_seed(7)
   sim_data <- do.call(rbind, lapply(1:3, function(i) {
-    d <- rezcdm(5, n_trials = 100, driftrate = rnorm(1, 2, 0.3), bound = 1.5, ndt = 0.3)
+    d <- rezcdm(5, n_trials = 100, drift = rnorm(1, 2, 0.3), bound = 1.5, ndt = 0.3)
     d$id <- paste0("S", i)
     d
   }))
   sim_data$id <- factor(sim_data$id)
 
-  formula <- bmf(driftrate ~ 1 + (1 | id), bound ~ 1 + (1 | id), ndt ~ 1)
+  formula <- bmf(drift ~ 1 + (1 | id), bound ~ 1 + (1 | id), ndt ~ 1)
   expect_silent(bmm(formula, sim_data, ezcdm_test_model(), backend = "mock", mock_fit = 1, rename = FALSE))
 })
 
 test_that("ezcdm default priors are correctly set", {
   skip_on_cran()
   withr::local_seed(8)
-  formula <- bmf(driftrate ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
   fit <- bmm(formula, ezcdm_test_data(), ezcdm_test_model(version = "4par"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
   priors <- brms::prior_summary(fit)
   intercept_prior <- function(dpar) priors$prior[priors$dpar == dpar & priors$class == "Intercept"]
 
-  expect_equal(intercept_prior("driftrate"), "normal(0.5, 1)")
+  expect_equal(intercept_prior("drift"), "normal(0.5, 1)")
   expect_equal(intercept_prior("bound"), "normal(0.5, 1)")
   expect_equal(intercept_prior("ndt"), "normal(-1.5, 0.5)")
   expect_equal(intercept_prior("driftangle"), "normal(0, 1)")
@@ -297,7 +297,7 @@ test_that("ezcdm initial values cover every parameter create_initfun() sees", {
   sim_data <- ezcdm_test_data()
   formulas <- list(
     "3par" = ezcdm_test_formula,
-    "4par" = bmf(driftrate ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+    "4par" = bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
   )
   for (version in names(formulas)) {
     model <- check_model(ezcdm_test_model(version = version), sim_data, formulas[[version]])
@@ -307,7 +307,7 @@ test_that("ezcdm initial values cover every parameter create_initfun() sees", {
     inits <- create_initfun(model, data, brms_formula)()
     expect_setequal(
       names(inits),
-      c("Intercept", "Intercept_driftrate", "Intercept_driftangle", "Intercept_bound", "Intercept_ndt")
+      c("Intercept", "Intercept_drift", "Intercept_driftangle", "Intercept_bound", "Intercept_ndt")
     )
     expect_true(all(vapply(inits, is.finite, logical(1))))
   }
@@ -320,7 +320,7 @@ test_that("ezcdm Stan code calls ezcdm_lpdf and parses", {
   sim_data$cond <- factor(rep(c("a", "b"), 5))
 
   code <- stancode(
-    bmf(driftrate ~ cond, driftangle ~ 1, bound ~ 1, ndt ~ 1),
+    bmf(drift ~ cond, driftangle ~ 1, bound ~ 1, ndt ~ 1),
     data = sim_data,
     model = ezcdm_test_model(version = "4par")
   )
@@ -337,7 +337,7 @@ test_that("ezcdm 4par with a tan_half drift angle link wraps the angle in Stan",
   skip_on_cran()
   withr::local_seed(11)
   model <- ezcdm_test_model(version = "4par", links = list(driftangle = "tan_half"))
-  formula <- bmf(driftrate ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
   sim_data <- ezcdm_test_data(driftangle = 3)
 
   code <- stancode(formula, sim_data, model)
@@ -352,10 +352,10 @@ test_that("ezcdm 4par with a tan_half drift angle link wraps the angle in Stan",
 
 test_that("log_lik_ezcdm() maps the standata slots onto dezcdm()", {
   withr::local_seed(12)
-  sim_data <- rezcdm(3, n_trials = c(20, 50, 200), driftrate = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3)
+  sim_data <- rezcdm(3, n_trials = c(20, 50, 200), drift = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3)
   ndraws <- 4
   draws <- list(
-    driftrate = matrix(runif(12, 1, 3), ndraws),
+    drift = matrix(runif(12, 1, 3), ndraws),
     driftangle = matrix(runif(12, -0.3, 0.3), ndraws),
     bound = matrix(runif(12, 1, 2), ndraws),
     ndt = matrix(runif(12, 0.2, 0.4), ndraws)
@@ -368,7 +368,7 @@ test_that("log_lik_ezcdm() maps the standata slots onto dezcdm()", {
       dezcdm(
         sim_data$mean_angle[i], sim_data$var_angle[i], sim_data$mean_rt[i],
         sim_data$var_rt[i], sim_data$n_trials[i],
-        driftrate = draws$driftrate[, i], driftangle = draws$driftangle[, i],
+        drift = draws$drift[, i], driftangle = draws$driftangle[, i],
         bound = draws$bound[, i], ndt = draws$ndt[, i]
       )
     )
@@ -380,7 +380,7 @@ test_that("posterior_predict_ezcdm() returns one circular mean per draw", {
   sim_data <- ezcdm_valid_data()
   ndraws <- 50
   prep <- ezcdm_prep(sim_data, list(
-    driftrate = matrix(20, ndraws, 2),
+    drift = matrix(20, ndraws, 2),
     driftangle = matrix(1, ndraws, 2),
     bound = matrix(2, ndraws, 2),
     ndt = matrix(0.3, ndraws, 2)
@@ -399,7 +399,7 @@ test_that("posterior_predict_ezcdm() returns one circular mean per draw", {
 
 # RT summaries near the implied moments keep the lpdf moderate at every kappa;
 # kappa 1e3 to 1e6 cross the asymptotic Bessel branch of .ezcdm_moments(), and
-# driftrate = 1e-300 the branch that avoids the overflow of bound / driftrate
+# drift = 1e-300 the branch that avoids the overflow of bound / drift
 ezcdm_parity_grid <- function() {
   grid <- expand.grid(
     kappa = c(1e-4, 5e-3, 0.2, 0.3, 1, 10, 100, 150, 800, 1e3, 1e4, 1e6),
@@ -408,14 +408,14 @@ ezcdm_parity_grid <- function() {
     n_trials = c(3L, 500L),
     bound = c(0.7, 2.5)
   )
-  grid$driftrate <- grid$kappa / grid$bound
+  grid$drift <- grid$kappa / grid$bound
   grid <- rbind(grid, data.frame(
     kappa = 1e-300, driftangle = 0, var_angle = 0.3, n_trials = 30L, bound = 1,
-    driftrate = 1e-300
+    drift = 1e-300
   ))
   grid$ndt <- 0.3
   grid$mean_angle <- 0.5
-  moments <- .ezcdm_moments(grid$driftrate, grid$bound, grid$ndt)
+  moments <- .ezcdm_moments(grid$drift, grid$bound, grid$ndt)
   grid$mean_rt <- moments$MRT * 1.02
   grid$var_rt <- moments$VRT * 0.9
   grid
@@ -433,7 +433,7 @@ data {
   vector[N] mean_rt;
   vector[N] var_rt;
   array[N] int trials;
-  vector[N] driftrate;
+  vector[N] drift;
   vector[N] driftangle;
   vector[N] bound;
   vector[N] ndt;
@@ -441,7 +441,7 @@ data {
 generated quantities {
   vector[N] stan_lpdf;
   for (i in 1:N) {
-    stan_lpdf[i] = ezcdm_lpdf(mean_angle[i] | 0.0, driftrate[i], driftangle[i],
+    stan_lpdf[i] = ezcdm_lpdf(mean_angle[i] | 0.0, drift[i], driftangle[i],
                               bound[i], ndt[i], var_angle[i], mean_rt[i],
                               var_rt[i], trials[i]);
   }
@@ -451,7 +451,7 @@ generated quantities {
   fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
     data = c(
       list(N = nrow(grid), trials = grid$n_trials),
-      as.list(grid[c("mean_angle", "var_angle", "mean_rt", "var_rt", "driftrate", "driftangle", "bound", "ndt")])
+      as.list(grid[c("mean_angle", "var_angle", "mean_rt", "var_rt", "drift", "driftangle", "bound", "ndt")])
     ),
     # 17 significant figures round-trip a double; 18 switches to plain
     # decimals that misparse
@@ -472,7 +472,7 @@ test_that("ezcdm_lpdf in Stan matches dezcdm() in R", {
   stan_lpdf <- ezcdm_parity_stan_lpdf(grid)
   r_lpdf <- with(grid, dezcdm(
     mean_angle, var_angle, mean_rt, var_rt, n_trials,
-    driftrate = driftrate, driftangle = driftangle, bound = bound, ndt = ndt
+    drift = drift, driftangle = driftangle, bound = bound, ndt = ndt
   ))
 
   expect_true(all(is.finite(r_lpdf)))
@@ -488,7 +488,7 @@ test_that("posterior_epred() and fitted() refuse ezcdm and point to native_param
   expect_error(brms::posterior_epred(fit, ndraws = 5),
                "not defined for the ezcdm model; use native_parameters()")
   expect_error(fitted(fit, ndraws = 5), "not defined for the ezcdm model")
-  expect_equal(dim(brms::posterior_epred(fit, dpar = "driftrate", ndraws = 5)),
+  expect_equal(dim(brms::posterior_epred(fit, dpar = "drift", ndraws = 5)),
                c(5L, nrow(fit$data)))
   expect_false(expected_response_defined(ezcdm_test_model()))
 })

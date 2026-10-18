@@ -33,7 +33,7 @@ times in seconds^2 in the data.}
 used to calculate the aggregated statistics.}
 
 \item{links}{A list of links for the parameters. For the positive parameters
-(\code{driftrate}, \code{bound}, \code{ndt}), "softplus" is available as an
+(\code{drift}, \code{bound}, \code{ndt}), "softplus" is available as an
 alternative to the default "log" link that grows linearly for large values
 and avoids the numerical blow-up of \code{exp()}. The drift angle \code{driftangle}
 has an identity link on the radian scale. Coding the responses as
@@ -84,7 +84,7 @@ ezcdm_summary_stats() computes all of them from trial-level data.
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{driftrate}: Drift rate = Length of the drift vector, the average speed of evidence accumulation
+\item \code{drift}: Drift rate = Length of the drift vector, the average speed of evidence accumulation
 \item \code{driftangle}: Drift angle = Direction of the drift vector in radians, the average response bias relative to the target
 \item \code{bound}: Boundary = Radius of the circular decision boundary that the accumulated evidence has to reach
 \item \code{ndt}: Non-decision time = Additional time required beyond the evidence accumulation process
@@ -95,11 +95,11 @@ ezcdm_summary_stats() computes all of them from trial-level data.
 }
 \item \strong{Default parameter links:}
 \itemize{
-\item driftrate = log; driftangle = identity; bound = log; ndt = log
+\item drift = log; driftangle = identity; bound = log; ndt = log
 }
 \item \strong{Default priors:}
 \itemize{
-\item \code{driftrate}:
+\item \code{drift}:
 \itemize{
 \item \code{main}: normal(0.5, 1)
 \item \code{effects}: normal(0, 0.5)
@@ -127,7 +127,7 @@ ezcdm_summary_stats() computes all of them from trial-level data.
 
 The response angle of the circular diffusion model follows a von Mises
 distribution with mean \code{driftangle} and concentration
-\code{bound * driftrate}, independent of the decision time. The likelihood
+\code{bound * drift}, independent of the decision time. The likelihood
 of the angle summaries is therefore exact for any number of trials, while
 the variance of the reaction times enters through a Gamma approximation
 matched to the first two moments of the sample variance of the
@@ -145,7 +145,7 @@ with its \code{target} argument.
 set.seed(123)
 sim_data <- rezcdm(
   n = 20, n_trials = 100,
-  driftrate = 2, bound = 1.5, ndt = 0.3
+  drift = 2, bound = 1.5, ndt = 0.3
 )
 sim_data$id <- 1:20
 
@@ -155,7 +155,7 @@ model <- ezcdm(
 )
 
 formula <- bmf(
-  driftrate ~ 1 + (1 | id),
+  drift ~ 1 + (1 | id),
   bound ~ 1 + (1 | id),
   ndt ~ 1
 )

@@ -1,8 +1,8 @@
 // EZ-CDM summaries, exact von Mises angle term; R twins dezcdm(), .ezcdm_moments(), .ez_rt_terms()
-real ezcdm_lpdf(real mean_angle, real mu, real driftrate, real driftangle,
+real ezcdm_lpdf(real mean_angle, real mu, real drift, real driftangle,
                 real bound, real ndt,
                 real var_angle, real mean_rt, real var_rt, int trials) {
-  real kappa = bound * driftrate;
+  real kappa = bound * drift;
   real log_I0 = log_modified_bessel_first_kind(0, kappa);
   real k2 = square(kappa);
   // MRT = ndt + L r, VRT = L^2 v, k3 = L^3 c3, k4 = L^4 c4; regimes and L as in .ezcdm_moments()
@@ -16,7 +16,7 @@ real ezcdm_lpdf(real mean_angle, real mu, real driftrate, real driftangle,
     r = 0.5 - k2 / 16 + square(k2) / 96;
     v = 1.0 / 8 - k2 / 24;
   } else {
-    L = bound / driftrate;
+    L = bound / drift;
     if (kappa > 1000) {
       // asymptotic I1/I0: exp(log I1 - log I0) loses ~1e-12, which v amplifies
       real u = inv(kappa);

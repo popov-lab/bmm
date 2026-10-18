@@ -3,7 +3,7 @@
 ############################################################################# !
 
 .ezcdm_parameters <- list(
-  driftrate = "Drift rate = Length of the drift vector, the average speed of evidence accumulation",
+  drift = "Drift rate = Length of the drift vector, the average speed of evidence accumulation",
   driftangle = "Drift angle = Direction of the drift vector in radians, the average response bias relative to the target",
   bound = "Boundary = Radius of the circular decision boundary that the accumulated evidence has to reach",
   ndt = "Non-decision time = Additional time required beyond the evidence accumulation process"
@@ -12,17 +12,17 @@
 # sd rates by meaning (#342): 2 for the log-linked drift rate, boundary and
 # non-decision time, 4 for the drift angle, a circular bias like mu
 .ezcdm_priors <- list(
-  driftrate = list(main = "normal(0.5, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
+  drift = list(main = "normal(0.5, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
   driftangle = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(4)"),
   bound = list(main = "normal(0.5, 1)", effects = "normal(0, 0.5)", sd = "exponential(2)"),
   ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
 )
 
-.ezcdm_links <- list(driftrate = "log", driftangle = "identity", bound = "log", ndt = "log")
+.ezcdm_links <- list(drift = "log", driftangle = "identity", bound = "log", ndt = "log")
 
 .ezcdm_init_ranges <- list(
   mu = c(0, 1),
-  driftrate = c(1, 2),
+  drift = c(1, 2),
   driftangle = c(-0.1, 0.1),
   bound = c(1, 2),
   ndt = c(0.25, 0.5)
@@ -70,7 +70,7 @@
 #'
 #'   The response angle of the circular diffusion model follows a von Mises
 #'   distribution with mean `driftangle` and concentration
-#'   `bound * driftrate`, independent of the decision time. The likelihood
+#'   `bound * drift`, independent of the decision time. The likelihood
 #'   of the angle summaries is therefore exact for any number of trials, while
 #'   the variance of the reaction times enters through a Gamma approximation
 #'   matched to the first two moments of the sample variance of the
@@ -93,7 +93,7 @@
 #' @param n_trials The name of the variable coding the number of trials that was
 #'   used to calculate the aggregated statistics.
 #' @param links A list of links for the parameters. For the positive parameters
-#'   (`driftrate`, `bound`, `ndt`), "softplus" is available as an
+#'   (`drift`, `bound`, `ndt`), "softplus" is available as an
 #'   alternative to the default "log" link that grows linearly for large values
 #'   and avoids the numerical blow-up of `exp()`. The drift angle `driftangle`
 #'   has an identity link on the radian scale. Coding the responses as
@@ -117,7 +117,7 @@
 #' set.seed(123)
 #' sim_data <- rezcdm(
 #'   n = 20, n_trials = 100,
-#'   driftrate = 2, bound = 1.5, ndt = 0.3
+#'   drift = 2, bound = 1.5, ndt = 0.3
 #' )
 #' sim_data$id <- 1:20
 #'
@@ -127,7 +127,7 @@
 #' )
 #'
 #' formula <- bmf(
-#'   driftrate ~ 1 + (1 | id),
+#'   drift ~ 1 + (1 | id),
 #'   bound ~ 1 + (1 | id),
 #'   ndt ~ 1
 #' )
@@ -219,8 +219,8 @@ configure_model.ezcdm <- function(model, data, formula) {
 
   formula$family <- brms::custom_family(
     "ezcdm",
-    dpars = c("mu", "driftrate", "driftangle", "bound", "ndt"),
-    links = c("identity", links$driftrate, links$driftangle, links$bound, links$ndt),
+    dpars = c("mu", "drift", "driftangle", "bound", "ndt"),
+    links = c("identity", links$drift, links$driftangle, links$bound, links$ndt),
     lb = c(NA, 0, NA, 0, 0),
     ub = rep(NA, 5),
     type = "real",
@@ -247,7 +247,7 @@ log_lik_ezcdm <- function(i, prep) {
     mean_rt = prep$data$vreal2[i],
     var_rt = prep$data$vreal3[i],
     n_trials = prep$data$trials[i],
-    driftrate = brms::get_dpar(prep, "driftrate", i = i),
+    drift = brms::get_dpar(prep, "drift", i = i),
     driftangle = brms::get_dpar(prep, "driftangle", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
     ndt = brms::get_dpar(prep, "ndt", i = i),
@@ -269,7 +269,7 @@ posterior_predict_ezcdm <- function(i, prep, ...) {
   rezcdm(
     n = prep$ndraws,
     n_trials = prep$data$trials[i],
-    driftrate = brms::get_dpar(prep, "driftrate", i = i),
+    drift = brms::get_dpar(prep, "drift", i = i),
     driftangle = brms::get_dpar(prep, "driftangle", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
     ndt = brms::get_dpar(prep, "ndt", i = i)
@@ -300,6 +300,6 @@ pp_observables.ezcdm <- function(model) {
 
 #' @export
 pp_simulate.ezcdm <- function(model, prep) {
-  .pp_simulate_joint(prep, rezcdm, c("driftrate", "driftangle", "bound", "ndt"),
+  .pp_simulate_joint(prep, rezcdm, c("drift", "driftangle", "bound", "ndt"),
                      n_trials = rep(prep$data$trials, each = prep$ndraws))
 }

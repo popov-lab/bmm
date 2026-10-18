@@ -142,7 +142,7 @@ test_that("pp_simulate() for ezcdm respects per-observation trial counts", {
   n_trials <- c(3L, 30L, 500L)
   # driftangle as a scalar, the form get_dpar() returns for a fixed dpar
   prep <- fake_prep(200L, 3L, dpars = list(
-    driftrate = rep(1, 600), driftangle = 0, bound = rep(1.5, 600),
+    drift = rep(1, 600), driftangle = 0, bound = rep(1.5, 600),
     ndt = rep(0.3, 600)
   ), data = list(trials = n_trials))
   sims <- pp_simulate(model, prep)

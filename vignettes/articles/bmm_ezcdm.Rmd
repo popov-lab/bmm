@@ -143,7 +143,7 @@ The `ezcdm` model has four parameters, of which the three-parameter version esti
 
 | Parameter | Description | Default link | `3par` | `4par` |
 |-----------|-------------|--------------|--------|--------|
-| `driftrate` | Drift rate ($v$), the length of the drift vector | log | estimated | estimated |
+| `drift` | Drift rate ($v$), the length of the drift vector | log | estimated | estimated |
 | `bound` | Boundary ($a$), the radius of the decision circle | log | estimated | estimated |
 | `ndt` | Non-decision time ($t_0$) in seconds | log | estimated | estimated |
 | `driftangle` | Drift angle ($\theta_v$) in radians, relative to the target | identity | fixed to 0 | estimated |
@@ -158,7 +158,7 @@ Drift rate, boundary and non-decision time are positive and use a log link by de
 ezcdm(
   mean_angle = "mean_angle", var_angle = "var_angle",
   mean_rt = "mean_rt", var_rt = "var_rt", n_trials = "n_trials",
-  links = list(driftrate = "softplus")
+  links = list(drift = "softplus")
 )
 ```
 
@@ -191,9 +191,9 @@ bessel_j0_zeros <- local({
   z
 })
 
-rcdm_rt <- function(n, driftrate, bound, ndt, n_grid = 4000) {
+rcdm_rt <- function(n, drift, bound, ndt, n_grid = 4000) {
   j <- bessel_j0_zeros
-  v <- driftrate
+  v <- drift
   a <- bound
   # below t_min the density is < 1e-10 and the truncated series is unreliable
   s_min <- (-7 + sqrt(49 + 4 * v * a / sqrt(2))) / (2 * v)
@@ -220,19 +220,19 @@ n_subjects <- 24
 n_trials <- 150
 
 # population values on the log scale; subjects vary around them
-pop <- list(driftrate = log(2), quality_effect = 0.4,
+pop <- list(drift = log(2), quality_effect = 0.4,
             bound = log(1.5), ndt = log(0.3))
 
 subjects <- data.frame(
   id = factor(seq_len(n_subjects)),
-  log_driftrate = rnorm(n_subjects, pop$driftrate, 0.3),
+  log_drift = rnorm(n_subjects, pop$drift, 0.3),
   log_bound = rnorm(n_subjects, pop$bound, 0.3),
   log_ndt = rnorm(n_subjects, pop$ndt, 0.2)
 )
 
 cells <- tidyr::expand_grid(subjects, quality = factor(c("low", "high"), levels = c("low", "high"))) |>
   mutate(
-    driftrate = exp(log_driftrate + ifelse(quality == "high", pop$quality_effect, 0)),
+    drift = exp(log_drift + ifelse(quality == "high", pop$quality_effect, 0)),
     bound = exp(log_bound),
     ndt = exp(log_ndt)
   )
@@ -240,8 +240,8 @@ cells <- tidyr::expand_grid(subjects, quality = factor(c("low", "high"), levels 
 trials <- cells |>
   reframe(
     target = runif(n_trials, -180, 180),
-    error = rad2deg(brms::rvon_mises(n_trials, mu = 0, kappa = bound * driftrate)),
-    rt = rcdm_rt(n_trials, driftrate, bound, ndt),
+    error = rad2deg(brms::rvon_mises(n_trials, mu = 0, kappa = bound * drift)),
+    rt = rcdm_rt(n_trials, drift, bound, ndt),
     .by = c(id, quality)
   ) |>
   mutate(response = (target + error + 180) %% 360 - 180) |>
@@ -283,7 +283,7 @@ In the formula, drift rate varies with stimulus quality, and all three parameter
 
 ```{r formula}
 model_formula <- bmf(
-  driftrate ~ 1 + quality + (1 | id),
+  drift ~ 1 + quality + (1 | id),
   bound ~ 1 + (1 | id),
   ndt ~ 1 + (1 | id)
 )
@@ -343,10 +343,10 @@ est <- function(par, fun = exp, digits = 2) {
   x <- formatC(fun(fixef_est[par, c("Estimate", "Q2.5", "Q97.5")]), format = "f", digits = digits)
   paste0(x[1], ", 95% CrI [", x[2], ", ", x[3], "]")
 }
-effect <- fixef_est["driftrate_qualityhigh", "Estimate"]
+effect <- fixef_est["drift_qualityhigh", "Estimate"]
 ```
 
-All parameters are estimated on the log scale. The effect of stimulus quality on the log drift rate is `r est("driftrate_qualityhigh", identity)` (generating value `r pop$quality_effect`), which means that drift rates in the high-quality condition are `r formatC(exp(effect), format = "f", digits = 2)` times those in the low-quality condition. Back-transformed to the natural scale, the group-level boundary is `r est("bound_Intercept")` (generating value `r exp(pop$bound)`) and the group-level non-decision time is `r est("ndt_Intercept", digits = 3)` s (generating value `r exp(pop$ndt)` s). Figure \@ref(fig:condition-plot) shows the posterior distributions of the group-level drift rate in both conditions on the natural scale.
+All parameters are estimated on the log scale. The effect of stimulus quality on the log drift rate is `r est("drift_qualityhigh", identity)` (generating value `r pop$quality_effect`), which means that drift rates in the high-quality condition are `r formatC(exp(effect), format = "f", digits = 2)` times those in the low-quality condition. Back-transformed to the natural scale, the group-level boundary is `r est("bound_Intercept")` (generating value `r exp(pop$bound)`) and the group-level non-decision time is `r est("ndt_Intercept", digits = 3)` s (generating value `r exp(pop$ndt)` s). Figure \@ref(fig:condition-plot) shows the posterior distributions of the group-level drift rate in both conditions on the natural scale.
 
 ```{r condition-plot, message = FALSE, warning = FALSE, fig.width = 7, fig.asp = 0.5, fig.cap = "Posterior distributions of the group-level drift rate in the two stimulus-quality conditions, back-transformed to the natural scale. Red diamonds mark the generating population values."}
 library(ggplot2)
@@ -355,17 +355,17 @@ library(tidybayes)
 draws <- posterior::as_draws_df(fit)
 drift_draws <- data.frame(
   quality = rep(c("low", "high"), each = nrow(draws)),
-  driftrate = c(
-    exp(draws$b_driftrate_Intercept),
-    exp(draws$b_driftrate_Intercept + draws$b_driftrate_qualityhigh)
+  drift = c(
+    exp(draws$b_drift_Intercept),
+    exp(draws$b_drift_Intercept + draws$b_drift_qualityhigh)
   )
 )
 true_drift <- data.frame(
   quality = c("low", "high"),
-  driftrate = exp(pop$driftrate + c(0, pop$quality_effect))
+  drift = exp(pop$drift + c(0, pop$quality_effect))
 )
 
-ggplot(drift_draws, aes(x = driftrate, y = quality)) +
+ggplot(drift_draws, aes(x = drift, y = quality)) +
   stat_halfeye(fill = "steelblue", alpha = 0.7) +
   geom_point(data = true_drift, color = "red", shape = 18, size = 4) +
   labs(x = "Drift rate (v)", y = "Stimulus quality") +
@@ -375,7 +375,7 @@ ggplot(drift_draws, aes(x = driftrate, y = quality)) +
 The condition effect can also be tested with `brms::hypothesis()`:
 
 ```{r}
-brms::hypothesis(fit, "driftrate_qualityhigh > 0")
+brms::hypothesis(fit, "drift_qualityhigh > 0")
 ```
 
 ## Posterior predictive check

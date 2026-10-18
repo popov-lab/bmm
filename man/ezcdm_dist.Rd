@@ -12,14 +12,14 @@ dezcdm(
   mean_rt,
   var_rt,
   n_trials,
-  driftrate,
+  drift,
   driftangle = 0,
   bound,
   ndt,
   log = TRUE
 )
 
-rezcdm(n, n_trials, driftrate, driftangle = 0, bound, ndt)
+rezcdm(n, n_trials, drift, driftangle = 0, bound, ndt)
 }
 \arguments{
 \item{mean_angle}{Observed circular mean of the response angles, in radians.}
@@ -35,7 +35,7 @@ minus the mean resultant length), in \eqn{[0, 1]}.}
 \item{n_trials}{Number of trials the summary statistics were computed from.
 Must be larger than 2.}
 
-\item{driftrate}{Drift rate, the length of the drift vector (positive).}
+\item{drift}{Drift rate, the length of the drift vector (positive).}
 
 \item{driftangle}{Drift angle, the direction of the drift vector in radians
 (default 0).}
@@ -116,18 +116,18 @@ counts, in about 0.2\\% of replicates at \code{n_trials = 3}.
 \examples{
 dezcdm(
   mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
-  n_trials = 100, driftrate = 2, bound = 1.5, ndt = 0.3
+  n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
 )
 
 # vectorised over observations
 dezcdm(
   mean_angle = c(0.1, -0.2), var_angle = c(0.2, 0.3),
   mean_rt = c(0.9, 1), var_rt = c(0.1, 0.12), n_trials = 100,
-  driftrate = 2, driftangle = 0.1, bound = 1.5, ndt = 0.3
+  drift = 2, driftangle = 0.1, bound = 1.5, ndt = 0.3
 )
 
 # generate random summary statistics
-rezcdm(n = 5, n_trials = 100, driftrate = 2, bound = 1.5, ndt = 0.3)
+rezcdm(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 
 }
 \references{
