@@ -641,3 +641,126 @@ test_that("validate_default_priors() warns only when a default prior is dropped"
     )
   }
 })
+
+displacement_messages <- function(expr) {
+  msgs <- capture_messages(expr)
+  msgs[grepl("constraint of the model", msgs, fixed = TRUE)]
+}
+
+test_that("bmm() says when a model constraint replaces a user prior (#549)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.silent = 1)
+  model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size)
+  fit_with <- function(prior) {
+    bmm(formula, small_data(), model, prior = prior, backend = "mock", mock_fit = 1, rename = FALSE)
+  }
+
+  user <- brms::set_prior("normal(-1, 0.5)", class = "b", coef = "set_size1", nlpar = "thetant")
+  msgs <- displacement_messages(fit <- fit_with(user))
+  expect_length(msgs, 1)
+  expect_match(
+    msgs, 'nlpar = "thetant", class = "b", coef = "set_size1": normal(-1, 0.5) replaced by constant(-100)',
+    fixed = TRUE
+  )
+  expect_equal(fit$prior$prior[fit$prior$coef == "set_size1"], "constant(-100)")
+
+  other <- brms::set_prior("normal(-1, 0.5)", class = "b", coef = "set_size2", nlpar = "thetant")
+  expect_length(displacement_messages(fit <- fit_with(other)), 0)
+  expect_equal(fit$prior$prior[fit$prior$coef == "set_size2"], "normal(-1, 0.5)")
+  expect_length(displacement_messages(fit_with(NULL)), 0)
+})
+
+test_that("a constraint from a model's own configure_prior method replaces a user prior with a message (#549)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.silent = 1)
+  # a test-only model class with its own method, so the test does not depend on
+  # which shipped model sets constraints; local_mocked_s3_method() registers the
+  # method for this test only, which local_mocked_bindings() cannot do for a
+  # class that has no method yet
+  local_mocked_s3_method(
+    "configure_prior", "constraint_test",
+    function(model, data, formula, user_prior, ...) {
+      brms::prior_("constant(5)", class = "Intercept", dpar = "kappa")
+    }
+  )
+  model <- sdm("dev_rad")
+  class(model) <- c(class(model), "constraint_test")
+  fit_with <- function(prior) {
+    bmm(bmf(c ~ 1, kappa ~ 1), small_data(n = 1), model,
+      prior = prior, backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  }
+
+  user <- brms::prior_("normal(2, 1)", class = "Intercept", dpar = "kappa") +
+    brms::prior_("normal(1, 1)", class = "Intercept", dpar = "c")
+  msgs <- displacement_messages(fit <- fit_with(user))
+  expect_length(msgs, 1)
+  expect_match(msgs, 'dpar = "kappa", class = "Intercept": normal(2, 1) replaced by constant(5)', fixed = TRUE)
+  expect_no_match(msgs, 'dpar = "c"', fixed = TRUE)
+  expect_equal(fit$prior$prior[fit$prior$dpar == "kappa"], "constant(5)")
+  expect_equal(fit$prior$prior[fit$prior$dpar == "c"], "normal(1, 1)")
+
+  # the bmm default on kappa's intercept is replaced too, but the user set none
+  expect_length(displacement_messages(fit_with(NULL)), 0)
+  restated <- brms::prior_("constant(5)", class = "Intercept", dpar = "kappa")
+  expect_length(displacement_messages(fit_with(restated)), 0)
+})
+
+test_that("mpt says when the constant of a fixed parameter replaces a user prior (#549)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.silent = 1)
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  fit_with <- function(prior) {
+    bmm(bmf(D ~ 1, g = 0.5), mpt_2htm_data(), model,
+      prior = prior, backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  }
+
+  user <- brms::set_prior("normal(0, 1)", class = "b", coef = "Intercept", nlpar = "g")
+  msgs <- displacement_messages(fit <- fit_with(user))
+  expect_length(msgs, 1)
+  expect_match(msgs, 'nlpar = "g", class = "b", coef = "Intercept": normal(0, 1) replaced by constant(0)',
+    fixed = TRUE
+  )
+  expect_equal(fit$prior$prior[fit$prior$nlpar == "g" & fit$prior$coef == "Intercept"], "constant(0)")
+
+  # configure_prior.mpt() also replaces the constant fixed_pars_priors() builds,
+  # which is bmm's own row
+  expect_length(displacement_messages(fit_with(NULL)), 0)
+  on_d <- brms::set_prior("normal(0, 1)", class = "b", coef = "Intercept", nlpar = "D")
+  expect_length(displacement_messages(fit_with(on_d)), 0)
+})
+
+test_that("the constraint message fires exactly for the user rows combine_prior() drops (#549)", {
+  withr::local_options(bmm.silent = 1)
+  constraint <- brms::prior_("constant(0)", class = "b", coef = "x1", nlpar = "a") +
+    brms::prior_("constant(1e-8)", class = "sd", coef = "x1", group = "id", nlpar = "a") +
+    brms::prior_("constant(-3)", class = "b", nlpar = "w")
+  # each user row with whether combine_prior() drops it, written out rather than
+  # derived from combine_prior(), and whether the message names it
+  cases <- list(
+    list(brms::prior_("normal(0, 1)", class = "b", coef = "x1", nlpar = "a"), TRUE, TRUE),
+    list(brms::prior_("normal(0, 1)", class = "sd", coef = "x1", group = "id", nlpar = "a"), TRUE, TRUE),
+    # brms stores an nlpar's intercept as coef "Intercept" of class "b", which
+    # a prior on the whole nlpar replaces
+    list(brms::prior_("normal(0, 1)", class = "b", coef = "Intercept", nlpar = "w"), TRUE, TRUE),
+    list(brms::prior_("normal(0, 1)", class = "b", nlpar = "a"), FALSE, FALSE),
+    list(brms::prior_("normal(0, 1)", class = "b", coef = "Intercept", nlpar = "a"), FALSE, FALSE),
+    list(brms::prior_("normal(0, 1)", class = "sd", nlpar = "a"), FALSE, FALSE),
+    list(brms::prior_("normal(0, 1)", class = "b", coef = "x1", dpar = "a"), FALSE, FALSE),
+    list(brms::prior_("constant(0)", class = "b", coef = "x1", nlpar = "a"), TRUE, FALSE),
+    list(brms::prior_("", class = "b", coef = "x1", nlpar = "a"), TRUE, FALSE)
+  )
+  for (case in cases) {
+    user <- case[[1]]
+    label <- paste(user$prior, user$class, user$coef, user$dpar, user$nlpar)
+    combined <- combine_prior(user, constraint)
+    expect_equal(nrow(combined) == nrow(constraint), case[[2]], info = label)
+    msgs <- displacement_messages(message_displaced_priors(user, constraint))
+    expect_equal(length(msgs) == 1, case[[3]], info = label)
+  }
+
+  expect_length(displacement_messages(message_displaced_priors(NULL, constraint)), 0)
+  expect_length(displacement_messages(message_displaced_priors(constraint, NULL)), 0)
+})
