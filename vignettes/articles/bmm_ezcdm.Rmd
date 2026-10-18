@@ -46,13 +46,13 @@ fansi::set_knit_hooks(knitr::knit_hooks, which = c("output", "message", "error")
 
 # Introduction to the model
 
-In continuous report tasks, participants reproduce a feature of a stimulus on a circular scale, for example the orientation of a bar or the colour of a probed item on a colour wheel. Most analyses of these tasks use only the response error, the angular distance between the reported and the true feature. Yet, a response always takes time, and the time to respond carries information about the decision process that produced the response. The EZ circular diffusion model (EZ-CDM) implemented in `bmm` uses both: the distribution of response errors and the distribution of response times.
+In continuous report tasks, participants reproduce a feature of a stimulus on a circular scale, for example the orientation of a bar or the color of a probed item on a color wheel. Most analyses of these tasks use only the response error, the angular distance between the reported and the true feature. Yet, a response always takes time, and the time to respond carries information about the decision process that produced the response. The EZ circular diffusion model (EZ-CDM) implemented in `bmm` uses both: the distribution of response errors and the distribution of response times.
 
 ## The circular diffusion model
 
-@Smith_2016 proposed a diffusion model for continuous report that is the two-dimensional counterpart of the diffusion model for two-choice decisions. Evidence accumulates as a two-dimensional Wiener process that starts at the centre of a disk. The drift vector has a direction and a length: its direction (the *drift angle*, $\theta_v$) reflects the identity of the stimulus in memory, and its length (the *drift rate*, $v$) the quality of that representation. The process moves in the average direction of the drift vector but is perturbed by noise in both dimensions. A response is made as soon as the process reaches the circle bounding the disk. The radius of this circle (the *boundary*, $a$) is the amount of evidence required for a response, and the angle at which the process exits the disk is the reported feature. The response time is the time to reach the boundary plus a *non-decision time*, $t_0$, for encoding and motor processes [@Smith_2016, pp. 425-428; @Qarehdaghi_AmaniRad_2024, pp. 2062-2063]. As in the two-choice diffusion model, the within-trial noise is fixed to $\sigma = 1$ to identify the model [@Qarehdaghi_AmaniRad_2024, p. 2063].
+@Smith_2016 proposed a diffusion model for continuous report that is the two-dimensional counterpart of the diffusion model for two-choice decisions. Evidence accumulates as a two-dimensional Wiener process that starts at the center of a disk. The drift vector has a direction and a length: its direction (the *drift angle*, $\theta_v$) reflects the identity of the stimulus in memory, and its length (the *drift rate*, $v$) the quality of that representation. The process moves in the average direction of the drift vector but is perturbed by noise in both dimensions. A response is made as soon as the process reaches the circle bounding the disk. The radius of this circle (the *boundary*, $a$) is the amount of evidence required for a response, and the angle at which the process exits the disk is the reported feature. The response time is the time to reach the boundary plus a *non-decision time*, $t_0$, for encoding and motor processes [@Smith_2016, pp. 425-428; @Qarehdaghi_AmaniRad_2024, pp. 2062-2063]. As in the two-choice diffusion model, the within-trial noise is fixed to $\sigma = 1$ to identify the model [@Qarehdaghi_AmaniRad_2024, p. 2063]. This sets the scale: with time in seconds, the boundary is measured in units of the within-trial noise, and the drift rate in these units per second.
 
-Figure \@ref(fig:cdm-illustration) shows a few simulated evidence paths. Each path wanders from the centre towards the boundary; the point where it exits determines the response, and the length of the path in time determines the decision time.
+Figure \@ref(fig:cdm-illustration) shows a few simulated evidence paths. Each path wanders from the center toward the boundary; the point where it exits determines the response, and the length of the path in time determines the decision time.
 
 ```{r cdm-illustration, echo = FALSE, fig.cap = "Six simulated evidence paths of the circular diffusion model with drift rate $v = 1.5$, drift angle $\\theta_v = 0$ and boundary $a = 1.8$. The dashed circle is the decision boundary, filled points mark where each path reached it (the response), and the arrow shows the direction of the drift vector.", fig.asp = 1, out.width = "60%"}
 set.seed(2016)
@@ -88,7 +88,7 @@ segments(0, 0, bound * cos(3 * pi / 4), bound * sin(3 * pi / 4), lty = 3, col = 
 text(-0.75, 0.5, expression(italic(a)), cex = 1.2, col = "gray30")
 ```
 
-Two properties of this model make it attractive for continuous report. First, the response angle follows a von Mises distribution centred on the drift angle, with concentration equal to the product of boundary and drift rate, $\kappa = a \cdot v$. The circular diffusion model thus provides a process account of the von Mises distribution that measurement models of continuous report typically assume, and it decomposes precision into the quality of the evidence ($v$) and the amount of evidence required ($a$). Second, if the only source of variability is the moment-to-moment noise within a trial, decision times are independent of the reported angle [@Smith_2016, p. 427]. Response times therefore carry the information that separates $v$ from $a$: a precise report can come from high-quality evidence, which is also fast, or from a cautious boundary, which is slow.
+Two properties of this model make it attractive for continuous report. First, the response angle follows a von Mises distribution centered on the drift angle, with concentration equal to the product of boundary and drift rate, $\kappa = a \cdot v$. The circular diffusion model thus provides a process account of the von Mises distribution that measurement models of continuous report typically assume, and it decomposes precision into the quality of the evidence ($v$) and the amount of evidence required ($a$) [@Smith_2016, p. 427]. Second, if the only source of variability is the moment-to-moment noise within a trial, decision times are independent of the reported angle [@Smith_2016, p. 427]. Response times therefore carry the information that separates $v$ from $a$: a precise report can come from high-quality evidence, which is also fast, or from a cautious boundary, which is slow.
 
 # The EZ idea
 
@@ -124,7 +124,7 @@ $$
 
 # Bayesian EZ-CDM in `bmm`
 
-The closed-form solution gives one set of point estimates per participant and condition, and it ignores that the four statistics are themselves noisy. As for the EZ-diffusion model (see the `ezdm` article), `bmm` instead treats the summary statistics as data with a known sampling distribution, which gives a likelihood. Parameters then get posterior distributions, conditions and participants can share information through a hierarchical model, and effects of experimental conditions can be estimated with the `bmmformula` syntax.
+The closed-form solution gives one set of point estimates per participant and condition, and it ignores that the four statistics are themselves noisy. @Chavez_Vandekerckhove_2025 addressed this for the EZ-diffusion model: they treat the summary statistics as data with known sampling distributions, which turns the EZ equations into a likelihood that can be used in a hierarchical Bayesian model (see the [EZ-diffusion article](https://venpopov.com/bmm/articles/bmm_ezdm.html)). `bmm` takes the same approach for the circular model. Parameters then get posterior distributions, conditions and participants can share information through a hierarchical model, and effects of experimental conditions can be estimated with the `bmmformula` syntax.
 
 The circular mean and circular variance of the angles enter the likelihood exactly: under the model, they carry all the information that the individual response angles contain about the drift angle and the concentration $\kappa = a \cdot v$. For the mean and variance of the response times, `bmm` uses sampling distributions whose expected values, sampling variances and covariance are derived from the circular diffusion model itself. These distributions take into account that decision times are right-skewed, so the posterior uncertainty about boundary and drift rate reflects how informative the response times actually are. The technical details are documented in `?ezcdm_dist`.
 
@@ -133,6 +133,7 @@ library(bmm)
 prior_ratio <- dnorm(2 * pi, 0, 1) / dnorm(0, 0, 1)
 prior_exponent <- floor(log10(prior_ratio))
 rec <- readRDS("assets/ezcdm_recovery_summary.rds")
+rec_settings <- rec$settings[rec$settings$run == "cov", ]
 ```
 
 # Parametrization in `bmm`
@@ -148,7 +149,9 @@ The `ezcdm` model has four parameters, of which the three-parameter version esti
 | `ndt` | Non-decision time ($t_0$) in seconds | log | estimated | estimated |
 | `driftangle` | Drift angle ($\theta_v$) in radians, relative to the target | identity | fixed to 0 | estimated |
 
-The three-parameter version (`version = "3par"`, the default) assumes that responses are centred on the target. This fits data in which responses scatter symmetrically around the true feature. The four-parameter version (`version = "4par"`) estimates the drift angle, for example to measure a systematic bias of responses towards a reference orientation. Writing a formula for `driftangle` (e.g. `driftangle ~ 1`) with the three-parameter version frees the drift angle as well.
+The three-parameter version (`version = "3par"`, the default) assumes that responses are centered on the target. This fits data in which responses scatter symmetrically around the true feature. The four-parameter version (`version = "4par"`) estimates the drift angle, for example to measure a systematic bias of responses toward a reference orientation. If the formula contains a term for `driftangle` (e.g. `driftangle ~ 1`) while the version is `"3par"`, `bmm()` fits the four-parameter version and says so in a message.
+
+Note that `bound` is the radius of the circle, the distance from the starting point to the boundary in every direction. In `ezdm`, `bound` is the separation between two boundaries, so the boundary estimates of the two models are not on the same scale.
 
 ## Link functions
 
@@ -162,7 +165,7 @@ ezcdm(
 )
 ```
 
-The drift angle uses the identity link. The likelihood is periodic in $\theta_v$, so there is no range to constrain. The identity link keeps effects additive in radians around 0 and keeps the gradient constant, whereas the `tan_half` link that `brms` uses for the von Mises family compresses the scale away from 0. Because the default prior for the drift angle is centred on 0 with a standard deviation of 1 radian, the prior density at $\pm 2\pi$ is $`r formatC(prior_ratio / 10^prior_exponent, format = "f", digits = 1)` \times 10^{`r prior_exponent`}$ times the density at 0, which suppresses the additional modes of the likelihood at these values. This works as long as the drift angle is near 0, which is the case when angles are coded relative to the target. If responses are biased far away from 0, recode the angles relative to a reference that is close to the average response. Alternatively, `links = list(driftangle = "tan_half")` keeps the drift angle within $(-\pi, \pi]$, at the cost of effects that are no longer additive in radians.
+The drift angle uses the identity link. The likelihood is periodic in $\theta_v$, so there is no range to constrain. The identity link keeps effects additive in radians around 0 and keeps the gradient constant, whereas the `tan_half` link that `brms` uses for the von Mises family compresses the scale away from 0. Because the default prior for the drift angle is centered on 0 with a standard deviation of 1 radian, the prior density at $\pm 2\pi$ is $`r formatC(prior_ratio / 10^prior_exponent, format = "f", digits = 1)` \times 10^{`r prior_exponent`}$ times the density at 0, which suppresses the additional modes of the likelihood at these values. This works as long as the drift angle is near 0, which is the case when angles are coded relative to the target. If responses are biased far away from 0, recode the angles relative to a reference that is close to the average response. Alternatively, `links = list(driftangle = "tan_half")` keeps the drift angle within $(-\pi, \pi]$, at the cost of effects that are no longer additive in radians.
 
 ## Priors
 
@@ -170,18 +173,21 @@ The default priors are set on the link scale. For drift rate and boundary, the `
 
 # Preparing data with `ezcdm_summary_stats()`
 
-The `ezcdm` model works with aggregated data: one row per participant and condition, containing the circular mean and circular variance of the response angles (in radians), the mean and variance of the response times (in seconds), and the number of trials. The function `ezcdm_summary_stats()` computes these statistics from trial-level data. It takes the response angles, the response times and optionally the target angles. If targets are provided, the statistics are computed on the response error, `response - target`, so that a drift angle of 0 means responses centred on the target. The argument `radians = FALSE` handles data coded in degrees. The response-time variance uses the denominator $n - 1$, which is what the likelihood assumes.
+The `ezcdm` model works with aggregated data: one row per participant and condition, containing the circular mean and circular variance of the response angles (in radians), the mean and variance of the response times (in seconds), and the number of trials. The function `ezcdm_summary_stats()` computes these statistics from trial-level data. It takes the response angles, the response times and optionally the target angles. If targets are provided, the statistics are computed on the response error, `response - target`, so that a drift angle of 0 means responses centered on the target. The argument `radians = FALSE` handles data coded in degrees. The response-time variance uses the denominator $n - 1$, which is what the likelihood assumes.
 
-By default the function also handles contaminant trials, through a mixture that is joint over response times and angles (`method = "mixture"`); `method = "simple"` turns this off and returns the plain statistics. The section on limitations below says why this matters for the circular diffusion model in particular, and `vignette("bmm_rt_contamination")` covers the options.
+By default the function also handles contaminant trials (`method = "mixture"`). This builds on the treatment of guesses by @Qarehdaghi_AmaniRad_2024 [pp. 2081-2087]: they separate guesses from the decision process with a mixture of a uniform and a von Mises distribution over the response angles, and then recover the response-time moments of the decision process without a model for the response times of guesses. `ezcdm_summary_stats()` instead fits one mixture jointly over response times and angles, in which contaminant trials are uniform in time and uniform on the circle, and computes all four statistics with each trial weighted by its probability of being a clean trial. The mixture is used only if it improves the BIC over a model without contaminants; otherwise the function returns the plain statistics. Two alternatives are available. `method = "robust"` replaces the mean and variance of the response times by the median and $(\mathrm{IQR}/1.349)^2$, the robust EZ-CDM of @Qarehdaghi_AmaniRad_2024 [Eq. 5]; on clean data it overestimates drift rate and underestimates boundary [@Qarehdaghi_AmaniRad_2024, p. 2074]. `method = "simple"` returns the plain statistics. The section on limitations below says why contaminants matter for the circular diffusion model in particular, and the [response time contamination article](https://venpopov.com/bmm/articles/bmm_rt_contamination.html) covers the options in more detail.
 
 ```{r design, include = FALSE}
 n_subjects <- 24
 n_trials <- 150
 ```
 
-To illustrate, we simulate trial-level data from the circular diffusion model for `r n_subjects` participants, each completing `r n_trials` trials in each of two conditions that differ in stimulus quality. Stimulus quality affects the drift rate, while each participant has their own drift rate, boundary and non-decision time. Response angles are drawn from the von Mises distribution with concentration $a \cdot v$, and response times by inverse-transform sampling from the first-passage time density of @Qarehdaghi_AmaniRad_2024 [Eq. 2], using the independence of angles and times. The sampler (a hidden code chunk in the source of this article) does not use `bmm`.
+To illustrate, we simulate trial-level data from the circular diffusion model for `r n_subjects` participants, each completing `r n_trials` trials in each of two conditions that differ in stimulus quality. Stimulus quality affects the drift rate, while each participant has their own drift rate, boundary and non-decision time. Response angles are drawn from the von Mises distribution with concentration $a \cdot v$, and response times by inverse-transform sampling from the response-time factor of the joint density of angles and times [@Qarehdaghi_AmaniRad_2024, Eq. 2 and p. 2064], using the independence of angles and times. The response-time sampler does not use `bmm`; click below to see its code.
 
-```{r trial-sampler, echo = FALSE}
+<details>
+<summary>Response-time sampler</summary>
+
+```{r trial-sampler}
 # Decision times: inverse-transform sampling from the first-passage density
 # g(t) = I0(a v) / a^2 * exp(-v^2 t / 2) * sum_i j_i / J1(j_i) * exp(-j_i^2 t / (2 a^2)),
 # with j_i the zeros of the Bessel function J0, tabulated on a grid.
@@ -210,6 +216,8 @@ rcdm_rt <- function(n, drift, bound, ndt, n_grid = 4000) {
   ndt + stats::approx(cdf[keep] / cdf[n_grid], t[keep], xout = stats::runif(n))$y
 }
 ```
+
+</details>
 
 ```{r simulate-trials, message = FALSE}
 library(bmm)
@@ -262,6 +270,8 @@ summary_data <- trials |>
 head(summary_data)
 ```
 
+Besides the four statistics and `n_trials`, the default `method = "mixture"` returns a column `contaminant_prop` with the estimated proportion of contaminant trials. When the mixture is applied, `n_trials` is the effective number of clean trials, that is the sum of the trial weights, rounded, and the model uses this count. When the mixture does not clear the BIC gate, `contaminant_prop` is 0 and `n_trials` is the number of trials. In the simulated data, which contain no contaminants, the mixture was applied in `r sum(summary_data$contaminant_prop > 0, na.rm = TRUE)` of the `r nrow(summary_data)` cells.
+
 # Fitting the model with `bmm`
 
 ## Specifying the model and formula
@@ -295,6 +305,8 @@ The default priors for this formula are:
 default_prior(model_formula, data = summary_data, model = model)
 ```
 
+The two rows with the prior `constant(0)` are not estimated. The row with an empty `dpar` fixes `mu`, a placeholder that `brms` needs for the response, and the `driftangle` row fixes the drift angle to 0 in the three-parameter version.
+
 ## Fitting the model
 
 ```{r fit, message = FALSE, warning = FALSE, results = "hide"}
@@ -314,7 +326,7 @@ fit <- bmm(
 )
 ```
 
-We run 4000 post-warmup iterations per chain, instead of the default 1000, and keep every fourth draw so that the saved fit stays small. When participants contribute many trials, the chains for the group-level intercepts are strongly autocorrelated, and we also increase `adapt_delta` to 0.95. We validated these settings in a parameter recovery study with data from an independent trial-level simulator of the circular diffusion model, which does not use code from `bmm`. Across its `r nrow(rec$conv_cov)` scenarios, the fits had a maximum $\hat{R}$ of `r round(max(rec$conv_cov$max_rhat), 3)`, a minimum bulk effective sample size of `r round(min(rec$conv_cov$min_ess_bulk))` and `r sum(rec$conv_cov$divergences)` divergent transitions. Before interpreting the fit, we check the convergence diagnostics across all parameters:
+We run 4000 post-warmup iterations per chain, instead of the default 1000, and keep every fourth draw so that the saved fit stays small. When participants contribute many trials, the chains for the group-level intercepts are strongly autocorrelated, and we also increase `adapt_delta` to 0.95. We checked these settings in a parameter recovery study with trial-level data from a generator that does not use code from `bmm`: response angles from `rvm()` and response times by inverse-CDF sampling from the density `dcddm()`, both from the R package [CircularDDM](https://CRAN.R-project.org/package=CircularDDM) (version 0.1.0). The study had `r nrow(rec$scenarios)` scenarios with `r rec_settings$n_subjects` simulated participants each: the three-parameter version with 200 trials, with two conditions of 150 trials and with 50 trials per participant, and the four-parameter version with 200 trials. Each fit used `r rec_settings$chains` chains of `r rec_settings$draws_per_chain` draws and an `adapt_delta` of `r rec_settings$adapt_delta`. The study is described in the pull request that added the model (popov-lab/bmm#524). Across its `r nrow(rec$conv_cov)` scenarios, the fits had a maximum $\hat{R}$ of `r round(max(rec$conv_cov$max_rhat), 3)`, a minimum bulk effective sample size of `r round(min(rec$conv_cov$min_ess_bulk))` and `r sum(rec$conv_cov$divergences)` divergent transitions. Before interpreting the fit, we check the convergence diagnostics across all parameters:
 
 ```{r convergence}
 draws_summary <- posterior::summarise_draws(
@@ -380,13 +392,13 @@ brms::hypothesis(fit, "drift_qualityhigh > 0")
 
 ## Posterior predictive check
 
-A posterior predictive check compares the observed summary statistics with statistics generated from the fitted model. The `resp_var` argument of `pp_check()` selects the statistic, and `resp_var = "all"` shows all four in one panel, drawn from the same simulations (`pp_check_vars(fit)` lists the available checks):
+A posterior predictive check compares the observed summary statistics with statistics generated from the fitted model. The `resp_var` argument of `pp_check()` selects the statistic, and `resp_var = "all"` shows all four in one figure, drawn from the same simulations (`pp_check_vars(fit)` lists the available checks):
 
 ```{r ppc, fig.width = 8, fig.asp = 0.75, fig.cap = "Posterior predictive checks of the four summary statistics. Each panel shows the distribution of the observed statistic across participant-by-condition cells (dark line) and of 100 simulated replications (light lines)."}
 pp_check(fit, resp_var = "all", ndraws = 100)
 ```
 
-The density overlays pool the cells. To check each cell against its own prediction, `pp_simulate()` returns the simulated statistics as matrices with one row per posterior draw and one column per cell:
+The density overlays pool the cells. To check each cell against its own prediction, we call `pp_simulate()`, the simulator that `pp_check()` uses internally. It is a function for model developers rather than a user-level interface, and it returns the simulated statistics as matrices with one row per posterior draw and one column per cell:
 
 ```{r ppc-coverage}
 prep <- brms::prepare_predictions(fit, ndraws = 1000)
@@ -404,13 +416,33 @@ The observed statistics fall within their 95% posterior predictive intervals for
 
 # Limitations and relation to other models
 
-**No across-trial variability.** The model assumes that drift rate, drift angle and boundary are constant across trials. With trial-to-trial variability in drift rate, inaccurate responses become slow, and with variability in the boundary, inaccurate responses become fast [@Smith_2016, p. 427]. Angle and response time are then no longer independent, and the von Mises distribution of responses turns into a mixture of von Mises distributions. `ezcdm` cannot represent these patterns, and neither can the closed-form EZ-CDM estimator it builds on.
+**No across-trial variability.** The model assumes that drift rate, drift angle and boundary are constant across trials. With trial-to-trial variability in drift rate, inaccurate responses become slow, and with variability in the boundary, inaccurate responses become fast [@Smith_2016, p. 427]. Angle and response time are then no longer independent, and the von Mises distribution of responses turns into a mixture of von Mises distributions. `ezcdm` cannot represent these patterns, and neither can the closed-form EZ-CDM estimator it builds on. @Qarehdaghi_AmaniRad_2024 [pp. 2075-2081] applied the closed-form estimator to data generated with across-trial variability. It underestimated drift rate and boundary, but the authors conclude that it still measures the main parameters reliably [-@Qarehdaghi_AmaniRad_2024, p. 2058]. The model itself still cannot describe a dependence of response time on accuracy.
 
 **Aggregation discards information.** Four statistics per participant and condition summarize the trial-level data only partly. The angle summaries are sufficient under the model, but the mean and variance of the response times are not sufficient for their distribution, and a relation between response angle and response time within a condition, which the model rules out, would go unnoticed.
 
-**Contaminant trials distort all four statistics.** A fast guess or a lapse of attention produces a response time from some other process and a response angle unrelated to the target, so it inflates the response-time variance and deflates the mean resultant length at the same time. Because $\kappa = a v$ is identified by the mean resultant length alone, and the non-decision time is a residual, $MRT - (a/v)R$, the distortion accumulates in the non-decision time. Simulating from the model with drift rate 2, boundary 1.5 and non-decision time 0.3 s, and adding lapse response times uniform on $[0.1, 4]$ s, 5% contamination biases the non-decision time by $-55\%$ and 10% by $-84\%$, which puts it on its lower bound. `ezcdm_summary_stats()` therefore corrects both channels by default, with a mixture that is joint over response times and angles; see `vignette("bmm_rt_contamination")`.
+```{r contamination-bias, include = FALSE}
+# closed-form EZ-CDM solution applied to the population moments of a mixture
+# of clean trials and lapses; base R only
+bessel_ratio <- function(kappa) besselI(kappa, 1, TRUE) / besselI(kappa, 0, TRUE)
+contaminated_ndt <- function(p, drift = 2, bound = 1.5, ndt = 0.3, lapse = c(0.1, 4)) {
+  kappa <- bound * drift
+  R <- bessel_ratio(kappa)
+  mrt_clean <- ndt + bound / drift * R
+  vrt_clean <- (bound / drift)^2 * (R^2 - 1 + 2 * R / kappa)
+  mrt <- (1 - p) * mrt_clean + p * mean(lapse)
+  vrt <- (1 - p) * vrt_clean + p * diff(lapse)^2 / 12 +
+    p * (1 - p) * (mrt_clean - mean(lapse))^2
+  r_obs <- (1 - p) * R
+  kappa_hat <- uniroot(function(k) bessel_ratio(k) - r_obs, c(1e-6, 500), tol = 1e-12)$root
+  drift_hat <- ((kappa_hat^2 * r_obs^2 + 2 * kappa_hat * r_obs - kappa_hat^2) / vrt)^(1 / 4)
+  mrt - kappa_hat / drift_hat^2 * r_obs
+}
+contam_ndt <- vapply(c(0.05, 0.10), contaminated_ndt, numeric(1))
+```
 
-**Few trials per participant.** The response-time terms rest on large-sample approximations for the shapes of the two distributions, and non-decision time is the least precisely estimated parameter. In the recovery scenario with 50 trials per participant and condition, the population standard deviation of the log non-decision time was overestimated: `r round(rec$sd_ndt_n50$median, 2)` (posterior median, 95% CrI [`r round(rec$sd_ndt_n50$q2.5, 2)`, `r round(rec$sd_ndt_n50$q97.5, 2)`]) against a standard deviation of `r round(rec$sd_ndt_n50$true_sample_sd, 2)` among the simulated participants. With few trials, interpret individual differences in non-decision time with caution.
+**Contaminant trials distort all four statistics.** A fast guess or a lapse of attention produces a response time from some other process and a response angle unrelated to the target, so it inflates the response-time variance and deflates the mean resultant length at the same time. Because $\kappa = a v$ is identified by the mean resultant length alone, and the non-decision time is a residual, $MRT - (a/v)R$, the distortion accumulates in the non-decision time. Take drift rate 2, boundary 1.5 and non-decision time 0.3 s, with lapse response times uniform on $[0.1, 4]$ s and lapse angles uniform on the circle. Applied to the population values of the four statistics, that is without sampling noise, the closed-form solution gives a non-decision time of `r round(contam_ndt[1], 2)` s at 5% contamination (`r round(100 * (contam_ndt[1] / 0.3 - 1))`%) and `r round(contam_ndt[2], 2)` s at 10% contamination (`r round(100 * (contam_ndt[2] / 0.3 - 1))`%). `ezcdm_summary_stats()` therefore corrects both channels by default, with a mixture that is joint over response times and angles; see the [response time contamination article](https://venpopov.com/bmm/articles/bmm_rt_contamination.html).
+
+**Few trials per participant.** The response-time terms rest on large-sample approximations for the shapes of the two distributions, and non-decision time is the least precisely estimated parameter. In the recovery scenario with 50 trials per participant, which is one simulated data set of `r rec_settings$n_subjects` participants, the posterior median of the population standard deviation of the log non-decision time was `r round(rec$sd_ndt_n50$median, 2)`, about twice the standard deviation of `r round(rec$sd_ndt_n50$true_sample_sd, 2)` among the simulated participants, which lay at the lower end of the 95% CrI [`r round(rec$sd_ndt_n50$q2.5, 2)`, `r round(rec$sd_ndt_n50$q97.5, 2)`]. One data set cannot show whether this is a systematic overestimate. With few trials, interpret individual differences in non-decision time with caution.
 
 **Relation to other models.** The mixture models (`mixture2p`, `mixture3p`) and the signal discrimination model (`sdm`) describe the distribution of response errors in continuous report without response times, at the level of single trials. They separate components of the response distribution, such as guessing, that the circular diffusion model without variability does not include. `ezcdm` instead explains the precision of responses by the decision process, at the price of aggregation. A trial-level implementation of the circular diffusion model, which would use the full joint distribution of angles and response times, is not yet available in `bmm`.
 
