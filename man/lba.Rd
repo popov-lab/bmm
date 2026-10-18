@@ -42,7 +42,8 @@ scale parameter \code{s} is shared and fixed to 1 by default (\code{s = 0} on
 the log scale). This covers the common case where interest is in the
 speed of correct vs. error processing.
 \item \code{"custom"}: Per-category drift parameters. Response categories
-are defined by the formula LHS names (e.g., \verb{cat1 ~ 1, cat2 ~ 1}).
+are defined by the formula LHS names (e.g., \verb{left ~ 1, right ~ 1}),
+at least two of them.
 The response column must contain character labels matching these names.
 Supports per-category \code{accumulators}.
 }}
@@ -172,9 +173,10 @@ on the log scale (median 0.22 s), the same as \code{ddm()}'s. An earlier
 
 Random-effects SDs get \code{exponential(1)} for the identity-linked normal
 mean drift and \code{exponential(2)} for the log-linked shape drifts (gamma,
-Frechet), the lognormal meanlog, and for \code{gap}, \code{sp}, \code{ndt} and \code{s},
-following the package-wide rule of rate 1 for identity-linked drift
-parameters and rate 2 for log-linked, boundary, non-decision-time and
+Frechet), the lognormal meanlog (a log-scale quantity), and for \code{gap},
+\code{sp}, \code{ndt} and \code{s}. For the normal drift and the shared parameters these
+are the rates \code{ddm()} and \code{ezdm()} use: rate 1 for an identity-linked
+drift rate and rate 2 for log-linked, boundary, non-decision-time and
 start-point parameters. These rates are anchored on the hierarchical
 simulation design used for the LBA recovery (between-subject SDs
 0.30-0.60 for \code{driftc}, 0.20-0.50 for \code{drifte}, and 0.10-0.25 on the log
@@ -219,11 +221,16 @@ rather than of the specific error observed. Because of that constant,
 
 \code{posterior_epred()} returns the expected response time (\code{ndt} plus the
 integral of the race survivor); it is deterministic, not
-simulation-based. The mean is infinite for a race in which only one
-normal-drift accumulator runs (a custom version with a single category, or
-an \code{accumulators} column that leaves one category on a trial) and for a
-gamma drift whose shapes sum to at most 1; the integral is then truncated
-at 1e7 s and the returned value is not meaningful; treat it as missing.
+simulation-based. It integrates the race for every draw and observation,
+at about half a millisecond each for the normal drift (some 30 minutes
+for 4000 draws of 1000 observations); \code{posterior_epred(fit, ndraws = )}
+limits the cost. The
+mean is infinite for a race in which only one normal-drift accumulator
+runs (an \code{accumulators} column that leaves one category with one
+accumulator on a trial) and for a gamma drift whose shapes sum to at most
+1; the integral is then truncated at 1e7 s and the returned value is not
+meaningful; treat it as missing. \code{posterior_epred()} warns once per call
+with the number of observations it truncated.
 
 \code{pp_check(fit, resp_var = "rt")} checks the response times and
 \code{pp_check(fit, resp_var = "response")} checks the response category

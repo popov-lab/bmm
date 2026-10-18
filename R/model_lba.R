@@ -110,9 +110,11 @@
 # categories cannot be named after (see race_reserved_names())
 .lba_shared_pars <- c("gap", "sp", "ndt", "s")
 
-# the identifiers .lba_stan_code() declares, which a category would shadow
-# (measured: each made a category and the program handed to stanc)
-.lba_stan_names <- c("rt", "response", "t", "b", "A", "drift", "n", "win", "lp", "reps", "i", "j")
+# the identifiers of .lba_stan_code()'s likelihood that a category could
+# shadow (stanc refuses the program). Its locals carry an lba_ prefix, which a
+# category cannot have because brms refuses underscores in dpar names, and N
+# is reserved for every model (.stan_reserved)
+.lba_stan_names <- c("rt", "response")
 
 .model_lba <- function(
     rt = NULL,
@@ -192,7 +194,8 @@ settable_links.lba_custom <- function(model) {
 #'       the log scale). This covers the common case where interest is in the
 #'       speed of correct vs. error processing.
 #'     \item `"custom"`: Per-category drift parameters. Response categories
-#'       are defined by the formula LHS names (e.g., `cat1 ~ 1, cat2 ~ 1`).
+#'       are defined by the formula LHS names (e.g., `left ~ 1, right ~ 1`),
+#'       at least two of them.
 #'       The response column must contain character labels matching these names.
 #'       Supports per-category `accumulators`.
 #'   }
@@ -225,9 +228,10 @@ settable_links.lba_custom <- function(model) {
 #'
 #'   Random-effects SDs get `exponential(1)` for the identity-linked normal
 #'   mean drift and `exponential(2)` for the log-linked shape drifts (gamma,
-#'   Frechet), the lognormal meanlog, and for `gap`, `sp`, `ndt` and `s`,
-#'   following the package-wide rule of rate 1 for identity-linked drift
-#'   parameters and rate 2 for log-linked, boundary, non-decision-time and
+#'   Frechet), the lognormal meanlog (a log-scale quantity), and for `gap`,
+#'   `sp`, `ndt` and `s`. For the normal drift and the shared parameters these
+#'   are the rates `ddm()` and `ezdm()` use: rate 1 for an identity-linked
+#'   drift rate and rate 2 for log-linked, boundary, non-decision-time and
 #'   start-point parameters. These rates are anchored on the hierarchical
 #'   simulation design used for the LBA recovery (between-subject SDs
 #'   0.30-0.60 for `driftc`, 0.20-0.50 for `drifte`, and 0.10-0.25 on the log
@@ -263,11 +267,16 @@ settable_links.lba_custom <- function(model) {
 #'
 #'   `posterior_epred()` returns the expected response time (`ndt` plus the
 #'   integral of the race survivor); it is deterministic, not
-#'   simulation-based. The mean is infinite for a race in which only one
-#'   normal-drift accumulator runs (a custom version with a single category, or
-#'   an `accumulators` column that leaves one category on a trial) and for a
-#'   gamma drift whose shapes sum to at most 1; the integral is then truncated
-#'   at 1e7 s and the returned value is not meaningful; treat it as missing.
+#'   simulation-based. It integrates the race for every draw and observation,
+#'   at about half a millisecond each for the normal drift (some 30 minutes
+#'   for 4000 draws of 1000 observations); `posterior_epred(fit, ndraws = )`
+#'   limits the cost. The
+#'   mean is infinite for a race in which only one normal-drift accumulator
+#'   runs (an `accumulators` column that leaves one category with one
+#'   accumulator on a trial) and for a gamma drift whose shapes sum to at most
+#'   1; the integral is then truncated at 1e7 s and the returned value is not
+#'   meaningful; treat it as missing. `posterior_epred()` warns once per call
+#'   with the number of observations it truncated.
 #'
 #'   `pp_check(fit, resp_var = "rt")` checks the response times and
 #'   `pp_check(fit, resp_var = "response")` checks the response category
@@ -348,6 +357,14 @@ check_model.lba <- function(model, data = NULL, formula = NULL) {
 check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
     cat_pars <- race_category_names(formula, .lba_shared_pars, .lba_stan_names)
+    # a one-horse race has no choice to model, and a single normal-drift
+    # accumulator has no finite mean response time
+    stopif(
+      length(cat_pars) < 2,
+      "The custom version of lba() needs at least two response categories in \\
+      the formula, but it names only {collapse_comma(cat_pars)}. A single \\
+      category leaves no choice to model."
+    )
 
     known <- c(cat_pars, .lba_shared_pars)
     unknown <- setdiff(names(model$links), known)
@@ -409,11 +426,11 @@ bmf2bf.lba_custom <- function(model, formula) {
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
   drift_assignments <- paste(
-    paste0("drift[", seq_len(n_cats), "] = ", cat_names, "[i];"),
+    paste0("lba_drift[", seq_len(n_cats), "] = ", cat_names, "[lba_i];"),
     collapse = "\n    "
   )
   n_assignments <- paste(
-    paste0("n[", seq_len(n_cats), "] = n", seq_len(n_cats), "[i];"),
+    paste0("lba_cnt[", seq_len(n_cats), "] = n", seq_len(n_cats), "[lba_i];"),
     collapse = "\n    "
   )
 
@@ -431,26 +448,28 @@ bmf2bf.lba_custom <- function(model, formula) {
     "{n_args}) {{\n",
     "  int N = num_elements(rt);\n",
     "  real log_lik = 0;\n",
-    "  for (i in 1:N) {{\n",
-    "    real b = gap[i] + sp[i];\n",
-    "    real A = sp[i];\n",
-    "    real t = rt[i] - ndt[i];\n",
-    "    array[{n_cats}] real drift;\n",
-    "    array[{n_cats}] int n;\n",
-    "    int win;\n",
-    "    real lp;\n",
-    "    if (t <= 0) return negative_infinity();\n",
+    "  for (lba_i in 1:N) {{\n",
+    "    real lba_thr = gap[lba_i] + sp[lba_i];\n",
+    "    real lba_sp = sp[lba_i];\n",
+    "    real lba_dt = rt[lba_i] - ndt[lba_i];\n",
+    "    array[{n_cats}] real lba_drift;\n",
+    "    array[{n_cats}] int lba_cnt;\n",
+    "    int lba_win;\n",
+    "    real lba_lp;\n",
+    "    if (lba_dt <= 0) return negative_infinity();\n",
     "    {drift_assignments}\n",
     "    {n_assignments}\n",
-    "    win = response[i];\n",
-    "    lp = log(n[win]) + {prefix}_single_lpdf(t | drift[win], b, A, s[i]);\n",
-    "    for (j in 1:{n_cats}) {{\n",
-    "      int reps = (j == win) ? n[j] - 1 : n[j];\n",
-    "      if (reps > 0) {{\n",
-    "        lp += reps * {prefix}_single_lccdf(t | drift[j], b, A, s[i]);\n",
+    "    lba_win = response[lba_i];\n",
+    "    lba_lp = log(lba_cnt[lba_win]) + ",
+    "{prefix}_single_lpdf(lba_dt | lba_drift[lba_win], lba_thr, lba_sp, s[lba_i]);\n",
+    "    for (lba_j in 1:{n_cats}) {{\n",
+    "      int lba_reps = (lba_j == lba_win) ? lba_cnt[lba_j] - 1 : lba_cnt[lba_j];\n",
+    "      if (lba_reps > 0) {{\n",
+    "        lba_lp += lba_reps * ",
+    "{prefix}_single_lccdf(lba_dt | lba_drift[lba_j], lba_thr, lba_sp, s[lba_i]);\n",
     "      }}\n",
     "    }}\n",
-    "    log_lik += lp;\n",
+    "    log_lik += lba_lp;\n",
     "  }}\n",
     "  return log_lik;\n",
     "}}"
@@ -600,6 +619,7 @@ configure_model.lba_custom <- function(model, data, formula) {
   dist <- .lba_dist_from_family(prep$family$name)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
+  truncated <- logical(n_obs)
   for (i in seq_len(n_obs)) {
     gap <- brms::get_dpar(prep, "gap", i = i)
     sp <- brms::get_dpar(prep, "sp", i = i)
@@ -615,8 +635,29 @@ configure_model.lba_custom <- function(model, data, formula) {
       })), nrow = n_draws)
     }
     range <- race_time_range(log_surv)
+    # race_time_range() calls a bracket truncated whenever S(t) t is above
+    # 1e-12 at t_max = 1e7 s, and every two-accumulator normal race is (S(t) t
+    # 1e-11 to 1e-8 there) although the mean it leaves out is that small. The
+    # mean is infinite where the survivor decays like 1/t or slower, and rests
+    # on times far beyond t_max where it decays only a little faster; a
+    # normal-drift race decays like t^-k for k racing accumulators, so a local
+    # order below 1.5 picks out the race of a single accumulator
+    if (attr(range, "truncated")) {
+      lsurv <- log_surv(range[2] * c(0.1, 1))
+      truncated[i] <- any((lsurv[, 1] - lsurv[, 2]) / log(10) < 1.5, na.rm = TRUE)
+    }
     epred[, i] <- rep_len(ndt, n_draws) + race_expected_time(log_surv, range[1], range[2])
   }
+  # the values stay as they are: the caller decides whether a lower bound is
+  # good enough, and one warning per call keeps a large newdata readable
+  warnif(
+    any(truncated),
+    "posterior_epred(): on {sum(truncated)} observation(s) the race of at least \\
+    one draw decays like t^-1.5 or slower, as when a single normal-drift \\
+    accumulator races, so its mean response time is infinite or rests on \\
+    times beyond 1e7 s. Their expected value is the mean of the race \\
+    truncated at 1e7 s, which underestimates that mean. See ?lba."
+  )
   epred
 }
 

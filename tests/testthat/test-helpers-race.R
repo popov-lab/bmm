@@ -47,7 +47,9 @@ test_that("race_time_range() brackets power-law tails for race_expected_time()",
   log_surv <- function(t) matrix(-k * rep(log1p(t), each = 2), nrow = 2)
   range <- race_time_range(log_surv)
   expect_true(all(exp(log_surv(range[2])) * range[2] <= 1e-12))
-  expect_true(all(-expm1(log_surv(range[1])) <= 1e-12) || range[1] <= range[2] * 1e-12)
+  # 1 - S(t) ~ k t reaches 1e-12 only near 1e-13, so t_lo stops at the floor;
+  # 1e-6 reached by division rounds above 1e-6, hence one decade more
+  expect_equal(as.numeric(range), c(1e-7, 1e6))
   expect_equal(race_expected_time(log_surv, range[1], range[2]), 1 / (k - 1), tolerance = 1e-6)
   expect_false(attr(range, "truncated"))
 })
