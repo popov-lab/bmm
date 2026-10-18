@@ -278,7 +278,7 @@ fit <- bmm(formula, dat_simple, model,
            # Reduce iterations to keep file size manageable
            iter = 1000,
            warmup = 500,
-           file = "assets/bmmfit_lnr_simple_vignette.rds")
+           file = "fits/bmmfit_lnr_simple_vignette")
 ```
 
 ```{r}
@@ -351,7 +351,7 @@ fit_k4 <- bmm(bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1),
               cores = 4, backend = "cmdstanr",
               iter = 1000,
               warmup = 500,
-              file = "assets/bmmfit_lnr_k4_vignette.rds")
+              file = "fits/bmmfit_lnr_k4_vignette")
 ```
 
 ```{r}
@@ -375,7 +375,7 @@ fit_custom <- bmm(formula_custom, dat_custom, model_custom,
                   cores = 4, backend = "cmdstanr",
                   iter = 1000,
                   warmup = 500,
-                  file = "assets/bmmfit_lnr_custom_vignette.rds")
+                  file = "fits/bmmfit_lnr_custom_vignette")
 ```
 
 ```{r}
@@ -446,7 +446,7 @@ fit_hier <- bmm(formula_hier, dat_hier, model_hier,
                 iter = 1000,
                 warmup = 500,
                 control = list(adapt_delta = 0.95),
-                file = "assets/bmmfit_lnr_hierarchical_vignette.rds")
+                file = "fits/bmmfit_lnr_hierarchical_vignette")
 ```
 
 ```{r}
@@ -516,7 +516,7 @@ fit_ch <- bmm(formula_ch, dat_ch, model_custom,
               warmup = 500,
               thin = 4,
               control = list(adapt_delta = 0.95),
-              file = "assets/bmmfit_lnr_custom_hierarchical_vignette.rds")
+              file = "fits/bmmfit_lnr_custom_hierarchical_vignette")
 ```
 
 The cached fit is thinned (`thin = 4`) to keep the file small.
