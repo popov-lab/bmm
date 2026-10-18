@@ -109,7 +109,7 @@ Models are S3 objects created by internal `.model_*()` functions with user-facin
       fixed_parameters = list(mu1 = 0),
       default_priors = list(...)
     ),
-    class = c("bmmodel", "circular", "mixture3p")
+    class = c("bmmodel", "circular", "non_targets", "mixture3p")
   )
 }
 ```
@@ -121,18 +121,25 @@ Models are S3 objects created by internal `.model_*()` functions with user-facin
 mixture3p <- function(...) { .model_mixture3p(...) }
 ```
 
+### One Constructor per Response Type
+One model constructor handles exactly one response type/format. If a conceptually related model applies to tasks with different response structures (e.g., binary decisions vs. confidence ratings), create separate constructors with independent distribution functions.
+- Good: `sdt_yn()`, `sdt_rating()`, `sdt_mafc()` - each with its own `check_data`, `configure_model` and `d*/r*` functions
+- Bad: a single `sdt()` with a `type` argument that changes the response format and branches throughout the pipeline
+
 ### Model Configuration Pipeline
-Each model class needs a `configure_model.*` S3 method in `R/helpers-model.R`:
+Each model needs a `configure_model.*` S3 method (one per version class when the versions are configured differently, as for `imm`, `ezdm` and `cswald`), in the model's own file (`R/model_<name>.R`); the generic is in `R/helpers-model.R`:
 
 1. **Preprocess data** (extract attributes from data checks)
 2. **Build formula** using `bmf2bf()` to convert bmmformula → brmsformula
-3. **Define family** (often brms mixture distributions)
-4. **Return** `nlist(formula, data, family, prior, stanvars)`
+3. **Define family** and attach it to the formula (`formula$family <- ...`; a brms family such as `brms::mixture()` or `brms::multinomial()`, or a `brms::custom_family()`)
+4. **Return** `nlist(formula, data)`, plus `stanvars` when the model adds Stan code (a custom family, or Stan functions called from the formula, as in `sdt_rating` and `mpt`): `nlist(formula, data, stanvars)`. The list is passed on to `brms::brm()`; default priors do not belong here, `configure_prior()` builds them from the model's `default_priors`. Priors beyond the defaults go in the model's own `configure_prior.<model>()` method, as in `R/model_mixture3p.R` and `R/model_mpt.R`.
 
-Find more details about the typical model code structure in `code-structure.md`.
+`use_model_template()` generates this skeleton.
+
+Find more details about the typical model code structure in the [developer notes](https://venpopov.com/bmm/dev-notes/).
 
 ### Stan Code Integration
-Stan code snippets go in `inst/stan_chunks/*.stan` - these are injected into brms-generated models via stanvars for custom families.
+Stan code snippets go in `inst/stan_chunks/*.stan` - these are injected into brms-generated models via stanvars, for a custom family or for Stan functions called from the formula.
 
 ## Testing Requirements
 
@@ -148,7 +155,7 @@ Test tiers (ADR 0004, the architecture decision record `.dev/decisions/0004-test
 - `bmm-dev/feature_tests/` - exploratory/development scripts (synced via SWITCHdrive, not tracked by git)
 - `local/` - machine-specific scratch scripts (not tracked by git)
 
-Rules, with the ADR's rule ids. `tests/testthat/test-conventions.R` checks R1, R2, R4, R7, R8 and part of R5 (size, draws, listed in `make-fixtures.R`) and runs with the rest of the suite; a violation fails with the file name and the rule. The `tests-source` budget job checks R6, and R3 only indirectly. R9 and the rest of R5 are checked in review.
+Rules, with the ADR's rule ids. `tests/testthat/test-conventions.R` checks R1, R2, R4, R7, R8, the file-level part of R10 and part of R5 (size, draws, listed in `make-fixtures.R`) and runs with the rest of the suite; a violation fails with the file name and the rule. The `tests-source` budget job checks R6, and R3 only indirectly; its CRAN budget step (`.github/scripts/cran-budget.R`) checks the cap of R10. R9 and the rest of R5 are checked in review.
 - R1: No sampling in `tests/testthat/`. `cmdstan_model()`, `$sample()` and `backend = "cmdstanr"` appear only at registered sites: files whose count of each pattern is written as a literal in `test-conventions.R`. A new site opens with `skip_unless_stan_tests()` and updates that count in the same PR. A model's parity test lives in its `test-model_<name>.R` (R7).
 - R2: The tier gates are `skip_unless_stan_tests()` and `skip_unless_fixtures()`; `skip_on_cran()` is the CRAN gate. `skip_on_ci()` is not a gate.
 - R3: A mock fit (`backend = "mock", mock_fit = 1`) uses at most two participants or 200 rows unless the test is about data size.
@@ -158,6 +165,7 @@ Rules, with the ADR's rule ids. `tests/testthat/test-conventions.R` checks R1, R
 - R7: A `test-model_<name>.R` file tests that model's contract only: constructor validation, `check_data()`, `configure_model()`, `stancode()` content (never `nchar(code) > 0`), its d/r functions, Stan parity.
 - R8: A test file seeds through `withr::local_seed()`, never `set.seed()`; a script such as `tests/local/make-fixtures.R` may.
 - R9: A new model adds `test-model_<name>.R`, a `helper-model-<name>.R` provider (R4), a fixture only when post-processing needs one (then also a `fixture` case and a block in `make-fixtures.R`), and stays inside the budget (R6).
+- R10: CRAN tier. The three cross-model contract files (`test-conditional_effects.R`, `test-default-priors.R`, `test-helpers-init.R`) open with a file-level `skip_on_cran()`, the only file-level ones (count pinned in `test-conventions.R`). A test that takes more than 0.4 s in CRAN mode on a developer machine (the installed tarball's tests, `NOT_CRAN` unset, one worker) opens with `skip_on_cran()`. `cran-budget.R` runs the tests CRAN runs, fails on a failing test or when the wall time exceeds its cap, and writes `cran-test-timings.csv` to find slow tests.
 
 Test patterns from codebase:
 ```r
