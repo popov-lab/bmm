@@ -962,6 +962,15 @@ test_that("initfun starts every LBA parameter inside its init range", {
   }
 })
 
+test_that("the custom version refuses a formula with a single category", {
+  model <- lba(rt = "rt", response = "resp", version = "custom")
+  expect_error(
+    check_model(model, NULL, bmf(left ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)),
+    "at least two response categories"
+  )
+  expect_no_error(check_model(model, NULL, bmf(left ~ 1, right ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)))
+})
+
 # a category becomes an argument of the generated likelihood, so one named after
 # a variable that likelihood declares would make stanc refuse the program
 test_that("lba refuses a category named after an identifier of its Stan code", {

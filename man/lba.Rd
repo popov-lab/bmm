@@ -42,7 +42,8 @@ scale parameter \code{s} is shared and fixed to 1 by default (\code{s = 0} on
 the log scale). This covers the common case where interest is in the
 speed of correct vs. error processing.
 \item \code{"custom"}: Per-category drift parameters. Response categories
-are defined by the formula LHS names (e.g., \verb{cat1 ~ 1, cat2 ~ 1}).
+are defined by the formula LHS names (e.g., \verb{left ~ 1, right ~ 1}),
+at least two of them.
 The response column must contain character labels matching these names.
 Supports per-category \code{accumulators}.
 }}
@@ -191,9 +192,8 @@ rather than of the specific error observed. Because of that constant,
 \code{posterior_epred()} returns the expected response time (\code{ndt} plus the
 integral of the race survivor); it is deterministic, not
 simulation-based. The mean is infinite for a race in which only one
-normal-drift accumulator runs (a custom version with a single category, or
-an \code{accumulators} column that leaves one category on a trial); the
-integral is then truncated at 1e7 s and the returned value is not
+normal-drift accumulator runs (an \code{accumulators} column that leaves one
+category with one accumulator on a trial); the integral is then truncated at 1e7 s and the returned value is not
 meaningful; treat it as missing. \code{posterior_epred()} warns once per call
 with the number of observations it truncated.
 
