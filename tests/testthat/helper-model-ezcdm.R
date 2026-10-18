@@ -12,15 +12,21 @@ model_cases_ezcdm <- function() {
   re_formula_4par <- re_formula + bmf(driftangle ~ 1 + (1 | id))
   list(
     stored_frame = list(
-      ezcdm = list(model = three, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1), data = toy_data)
+      ezcdm = list(model = three, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1), data = toy_data),
+      ezcdm_4par = list(
+        model = four, formula = bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1),
+        data = toy_data
+      )
     ),
     sd_default = list(
       ezcdm_4par = list(
         model = four, formula = re_formula_4par, data = toy_data,
-        sd = c(drift = "exponential(2)", driftangle = "exponential(4)",
+        sd = c(drift = "exponential(2)", driftangle = "exponential(2)",
                bound = "exponential(2)", ndt = "exponential(2)")
       )
     ),
+    # create_initfun() builds its Stan code without the constant priors, so the
+    # mu intercept is still a sampled parameter there and needs an init range
     init = list(
       ezcdm = list(model = three, formula = re_formula, data = toy_data),
       ezcdm_4par = list(model = four, formula = re_formula_4par, data = toy_data)
@@ -32,7 +38,10 @@ model_cases_ezcdm <- function() {
     fixture = list(ezcdm = list(file = "bmmfit_ezcdm_ppcheck.rds")),
     observables = list(
       ezcdm = list(model = three, data = sim_data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),
-      ezcdm_4par = list(model = four, data = sim_data, formula = bmf(drift ~ 1, driftangle ~ 1))
+      ezcdm_4par = list(
+        model = four, data = sim_data,
+        formula = bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+      )
     )
   )
 }

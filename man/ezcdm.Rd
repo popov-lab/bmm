@@ -17,7 +17,9 @@ ezcdm(
 }
 \arguments{
 \item{mean_angle}{The name of the variable coding the circular mean of the
-response angles (in radians) in the data.}
+response angles (in radians) in the data. Circular means coded on
+[0, \eqn{2\pi}) are wrapped to [\eqn{-\pi}, \eqn{\pi}), the range of the
+circular means that \code{posterior_predict()} and \code{pp_check()} simulate.}
 
 \item{var_angle}{The name of the variable coding the circular variance of the
 response angles (one minus the mean resultant length, in [0, 1]) in the
@@ -30,24 +32,29 @@ seconds in the data.}
 times in seconds^2 in the data.}
 
 \item{n_trials}{The name of the variable coding the number of trials that was
-used to calculate the aggregated statistics.}
+used to calculate the aggregated statistics: whole numbers, at least 3.}
 
-\item{links}{A list of links for the parameters. For the positive parameters
+\item{links}{A named list of links for the parameters, e.g.
+\code{links = list(bound = "softplus")}. For the positive parameters
 (\code{drift}, \code{bound}, \code{ndt}), "softplus" is available as an
 alternative to the default "log" link that grows linearly for large values
 and avoids the numerical blow-up of \code{exp()}. The drift angle \code{driftangle}
 has an identity link on the radian scale. Coding the responses as
 deviations from the target keeps it near 0, far from the wrap-around at
-\eqn{\pm\pi}; for data centred near \eqn{\pm\pi},
+\eqn{\pm\pi}; for data centered near \eqn{\pm\pi},
 \code{links = list(driftangle = "tan_half")} keeps the angle in
-\eqn{(-\pi, \pi]}.}
+\eqn{(-\pi, \pi]}. A name that is not a parameter of the model is an
+error (a close misspelling is read as the parameter, with a warning), and
+a link that allows values the default link excludes (e.g. "identity" for
+a positive parameter) is a warning.}
 
 \item{version}{A character label for the version of the model. The
 three-parameter version (\code{version = "3par"}, default) fixes the drift angle
-\code{driftangle} to 0, i.e. responses centred on the target; the four-parameter
-version (\code{version = "4par"}) estimates it. Note that providing a formula
-for \code{driftangle} (e.g. \code{driftangle ~ 1}) with the 3par version frees the
-drift angle, which makes it equivalent to the 4par version.}
+\code{driftangle} to 0, i.e. responses centered on the target; the
+four-parameter version (\code{version = "4par"}) estimates it. A formula for
+\code{driftangle} (e.g. \code{driftangle ~ 1}) with version "3par" switches the
+model to version "4par", with a message, so that the fit, its \code{summary()}
+and \code{update()} carry the version that was estimated.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -67,20 +74,18 @@ EZ Circular Diffusion Model
 \item Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple, robust, and accurate estimation of circular diffusion model parameters. Psychonomic Bulletin & Review, 31(5), 2058-2091. https://doi.org/10.3758/s13423-024-02483-7
 \item Smith, P. L. (2016). Diffusion theory of decision making in continuous report. Psychological Review, 123(4), 425-451. https://doi.org/10.1037/rev0000023
 }
-\item \strong{Version:} 4par
+\item \strong{Version:} 3par
 \item \strong{Requirements:}
 
 Provide aggregated statistics for each subject and condition that model parameters should vary over:
+}
 \itemize{
 \item Circular mean of the response angles (mean_angle) in radians
 \item Circular variance of the response angles (var_angle), one minus the mean resultant length
 \item Mean reaction time (mean_rt) in seconds
 \item Variance of the reaction times (var_rt) in seconds^2
-\item Total number of trials used to calculate the aggregated statistics (n_trials)
+\item Total number of trials used to calculate the aggregated statistics (n_trials), at least 3
 }
-}
-
-ezcdm_summary_stats() computes all of them from trial-level data.
 \itemize{
 \item \strong{Parameters:}
 \itemize{
@@ -92,6 +97,7 @@ ezcdm_summary_stats() computes all of them from trial-level data.
 \item \strong{Fixed parameters:}
 \itemize{
 \item \code{mu} = 0
+\item \code{driftangle} = 0
 }
 \item \strong{Default parameter links:}
 \itemize{
@@ -109,7 +115,7 @@ ezcdm_summary_stats() computes all of them from trial-level data.
 \itemize{
 \item \code{main}: normal(0, 1)
 \item \code{effects}: normal(0, 0.5)
-\item \code{sd}: exponential(4)
+\item \code{sd}: exponential(2)
 }
 \item \code{bound}:
 \itemize{
@@ -125,6 +131,17 @@ ezcdm_summary_stats() computes all of them from trial-level data.
 }
 }
 
+The default version "3par" fixes the drift angle \code{driftangle} to 0;
+version "4par" estimates it.
+
+The within-trial noise of the two-dimensional diffusion is fixed to
+\eqn{\sigma = 1}, which sets the scale of the model. Unlike \code{\link[=ezdm]{ezdm()}},
+\code{ezcdm()} therefore has no diffusion constant \code{s}. With time in seconds,
+\code{bound} is in evidence units, that is in units of the noise, and \code{drift}
+in evidence units per second. \code{bound} is the radius of the circular
+decision boundary, not a separation between two boundaries as in
+\code{\link[=ezdm]{ezdm()}}, so the \code{bound} estimates of the two models are not comparable.
+
 The response angle of the circular diffusion model follows a von Mises
 distribution with mean \code{driftangle} and concentration
 \code{bound * drift}, independent of the decision time. The likelihood
@@ -135,19 +152,24 @@ right-skewed decision times, and the mean reaction time through a normal
 approximation conditional on the variance that keeps the exact covariance
 of the two statistics (see \link{ezcdm_dist}).
 Angles should be coded relative to the target, so that a drift angle of 0
-means responses centred on the target; \code{\link[=ezcdm_summary_stats]{ezcdm_summary_stats()}} does this
-with its \code{target} argument.
+means responses centered on the target; \code{\link[=ezcdm_summary_stats]{ezcdm_summary_stats()}} computes
+all five summaries from trial-level data and does this with its \code{target}
+argument.
 }
 }
 \examples{
 \dontrun{
-# simulate summary statistics for 20 subjects from known parameters
+# simulate summary statistics for 20 subjects whose drift rate and boundary
+# vary around known population values (drift = 2, bound = 1.5)
 set.seed(123)
+n_subjects <- 20
 sim_data <- rezcdm(
-  n = 20, n_trials = 100,
-  drift = 2, bound = 1.5, ndt = 0.3
+  n = n_subjects, n_trials = 100,
+  drift = exp(rnorm(n_subjects, log(2), 0.2)),
+  bound = exp(rnorm(n_subjects, log(1.5), 0.2)),
+  ndt = 0.3
 )
-sim_data$id <- 1:20
+sim_data$id <- seq_len(n_subjects)
 
 model <- ezcdm(
   mean_angle = "mean_angle", var_angle = "var_angle",
@@ -170,6 +192,9 @@ fit <- bmm(
 )
 
 summary(fit)
+
+# drift, bound and ndt have log links
+exp(brms::fixef(fit)[c("drift_Intercept", "bound_Intercept", "ndt_Intercept"), "Estimate"])
 }
 }
 \keyword{bmmodel}

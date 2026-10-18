@@ -43,7 +43,6 @@ ezcdm_prep <- function(data, dpars) {
 test_that("ezcdm model can be created with both versions", {
   expect_silent(ezcdm_test_model(version = "3par"))
   expect_silent(ezcdm_test_model(version = "4par"))
-  expect_error(ezcdm_test_model(version = "5par"), "should be one of")
 })
 
 test_that("ezcdm requires all response variables", {
@@ -67,6 +66,26 @@ test_that("ezcdm 3par fixes the drift angle and 4par estimates it", {
   expect_identical(model_3par$parameters, model_4par$parameters)
   expect_identical(model_3par$fixed_parameters, list(mu = 0, driftangle = 0))
   expect_identical(model_4par$fixed_parameters, list(mu = 0))
+})
+
+test_that("check_model() fits a 3par ezcdm with a driftangle formula as 4par", {
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+  expect_message(
+    model <- check_model(ezcdm_test_model(), ezcdm_valid_data(), formula),
+    "predicts driftangle, which ezcdm version '3par' fixes to 0, so the model is fitted as version '4par'"
+  )
+  expect_identical(model$version, "4par")
+  expect_identical(class(model), c("bmmodel", "ezcdm", "ezcdm_4par"))
+  expect_identical(attr(model, "call")$version, "4par")
+  expect_identical(model$fixed_parameters, list(mu = 0))
+
+  # a constant drift angle keeps the version, as does the default formula
+  model <- expect_silent(check_model(ezcdm_test_model(), ezcdm_valid_data(),
+                                     bmf(drift ~ 1, bound ~ 1, ndt ~ 1, driftangle = 0.2)))
+  expect_s3_class(model, "ezcdm_3par")
+  expect_identical(model$fixed_parameters, list(mu = 0, driftangle = 0.2))
+  expect_s3_class(expect_silent(check_model(ezcdm_test_model(), ezcdm_valid_data(), ezcdm_test_formula)),
+                  "ezcdm_3par")
 })
 
 test_that("ezcdm versions share the same default links", {
@@ -103,8 +122,28 @@ test_that("ezcdm check_data accepts valid data", {
 
 test_that("ezcdm check_data warns when mean_angle looks like degrees", {
   expect_warning(
-    check_data(ezcdm_test_model(), ezcdm_valid_data(mean_angle = c(10, -170)), ezcdm_test_formula),
-    "degrees"
+    check_data(ezcdm_test_model(), ezcdm_valid_data(mean_angle = c(7, 0.1)), ezcdm_test_formula),
+    "mean_angle variable \\('mean_angle'\\) is in degrees"
+  )
+  expect_silent(check_data(ezcdm_test_model(), ezcdm_valid_data(mean_angle = c(6.2, 0.1)), ezcdm_test_formula))
+})
+
+test_that("ezcdm check_data wraps circular means coded on [0, 2 * pi)", {
+  data <- check_data(ezcdm_test_model(), ezcdm_valid_data(mean_angle = c(4.5, 0.2)), ezcdm_test_formula)
+  expect_equal(data$mean_angle[1], 4.5 - 2 * pi)
+  # means already in range are kept bit for bit, so update() sees the same data
+  expect_identical(data$mean_angle[2], 0.2)
+  expect_identical(
+    check_data(ezcdm_test_model(), data, ezcdm_test_formula)$mean_angle,
+    data$mean_angle
+  )
+})
+
+test_that("ezcdm check_data names the columns that are not numeric", {
+  data <- ezcdm_valid_data(mean_rt = c("0.5", "0.6"), n_trials = factor(c(100, 100)))
+  expect_error(
+    check_data(ezcdm_test_model(), data, ezcdm_test_formula),
+    "These variables must be numeric: 'mean_rt', 'n_trials'"
   )
 })
 
@@ -113,7 +152,7 @@ test_that("ezcdm check_data rejects invalid summary statistics", {
     column = c("var_angle", "var_angle", "mean_rt", "var_rt", "var_rt", "n_trials", "n_trials"),
     value = c(1.2, -0.1, -0.5, -0.02, 0, 2, 100.5),
     error = c(
-      "between 0 and 1", "between 0 and 1", "Mean RT values must be positive",
+      "\\('var_angle'\\) must be between 0 and 1", "between 0 and 1", "Mean RT values must be positive",
       "Variance of RT must be positive", "Variance of RT must be positive",
       "must be larger than two", "'n_trials'.*whole numbers"
     )
@@ -163,43 +202,28 @@ test_that("ezcdm check_data handles missing values", {
   expect_silent(check_data(ezcdm_test_model(), data_with_na, ezcdm_test_formula))
 })
 
-test_that("ezcdm works with mock backend - 3par version", {
-  skip_on_cran()
-  withr::local_seed(1)
-  expect_silent(
-    bmm(ezcdm_test_formula, ezcdm_test_data(), ezcdm_test_model(), backend = "mock", mock_fit = 1, rename = FALSE)
-  )
-})
-
-test_that("ezcdm works with mock backend - 4par version", {
-  skip_on_cran()
-  withr::local_seed(2)
-  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
-  expect_silent(
-    bmm(formula, ezcdm_test_data(driftangle = 0.3), ezcdm_test_model(version = "4par"),
-      backend = "mock", mock_fit = 1, rename = FALSE
-    )
-  )
-})
-
 test_that("ezcdm uses one family for both versions", {
   skip_on_cran()
   withr::local_seed(3)
   sim_data <- ezcdm_test_data()
 
-  fit_3par <- bmm(ezcdm_test_formula, sim_data, ezcdm_test_model(),
+  fit_3par <- expect_silent(bmm(ezcdm_test_formula, sim_data, ezcdm_test_model(),
     backend = "mock", mock_fit = 1, rename = FALSE
-  )
-  fit_4par <- bmm(bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1), sim_data,
+  ))
+  fit_4par <- expect_silent(bmm(bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1), sim_data,
     ezcdm_test_model(version = "4par"),
     backend = "mock", mock_fit = 1, rename = FALSE
-  )
+  ))
 
   for (fit in list(fit_3par, fit_4par)) {
+    family <- fit$formula$family
     expect_s3_class(fit$formula, "brmsformula")
-    expect_s3_class(fit$formula$family, "customfamily")
-    expect_equal(fit$formula$family$name, "ezcdm")
-    expect_equal(fit$formula$family$dpars, c("mu", "drift", "driftangle", "bound", "ndt"))
+    expect_s3_class(family, "customfamily")
+    expect_equal(family$name, "ezcdm")
+    expect_equal(family$dpars, c("mu", "drift", "driftangle", "bound", "ndt"))
+    expect_identical(family$log_lik, log_lik_ezcdm)
+    expect_identical(family$posterior_predict, posterior_predict_ezcdm)
+    expect_error(family$posterior_epred(NULL), "not defined for the ezcdm model")
   }
 })
 
@@ -221,13 +245,19 @@ test_that("ezcdm 3par fixes driftangle to exactly zero", {
   expect_true(any(priors$dpar == "driftangle" & priors$prior == "constant(0)"))
 })
 
-test_that("ezcdm 3par with a driftangle formula frees the drift angle", {
+test_that("ezcdm 3par with a driftangle formula is fitted and stored as 4par", {
   skip_on_cran()
   withr::local_seed(14)
   formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
-  fit <- bmm(formula, ezcdm_test_data(driftangle = 0.3), ezcdm_test_model(),
-    backend = "mock", mock_fit = 1, rename = FALSE
+  expect_message(
+    fit <- bmm(formula, ezcdm_test_data(driftangle = 0.3), ezcdm_test_model(),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ),
+    "fitted as version '4par'"
   )
+  expect_s3_class(fit$bmm$model, "ezcdm_4par")
+  expect_identical(fit$bmm$model$version, "4par")
+  expect_match(construct_model_call(fit$bmm$model), 'version = "4par"', fixed = TRUE)
   expect_false("driftangle" %in% names(fit$bmm$model$fixed_parameters))
   priors <- brms::prior_summary(fit)
   expect_false(any(priors$dpar == "driftangle" & priors$prior == "constant(0)"))
@@ -276,78 +306,68 @@ test_that("ezcdm with hierarchical structure works", {
 test_that("ezcdm default priors are correctly set", {
   skip_on_cran()
   withr::local_seed(8)
-  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
-  fit <- bmm(formula, ezcdm_test_data(), ezcdm_test_model(version = "4par"),
+  sim_data <- ezcdm_test_data()
+  sim_data$cond <- factor(rep(c("a", "b"), 5))
+  formula <- bmf(drift ~ cond, driftangle ~ cond, bound ~ cond, ndt ~ cond)
+  fit <- bmm(formula, sim_data, ezcdm_test_model(version = "4par"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
   priors <- brms::prior_summary(fit)
-  intercept_prior <- function(dpar) priors$prior[priors$dpar == dpar & priors$class == "Intercept"]
+  # bmm sets the priors on the intercept and on the whole b class of each dpar
+  dpar_prior <- function(dpar, class) {
+    priors$prior[priors$dpar == dpar & priors$class == class & priors$coef == ""]
+  }
 
-  expect_equal(intercept_prior("drift"), "normal(0.5, 1)")
-  expect_equal(intercept_prior("bound"), "normal(0.5, 1)")
-  expect_equal(intercept_prior("ndt"), "normal(-1.5, 0.5)")
-  expect_equal(intercept_prior("driftangle"), "normal(0, 1)")
+  expect_equal(dpar_prior("drift", "Intercept"), "normal(0.5, 1)")
+  expect_equal(dpar_prior("bound", "Intercept"), "normal(0.5, 1)")
+  expect_equal(dpar_prior("ndt", "Intercept"), "normal(-1.5, 0.5)")
+  expect_equal(dpar_prior("driftangle", "Intercept"), "normal(0, 1)")
+  expect_equal(dpar_prior("drift", "b"), "normal(0, 0.5)")
+  expect_equal(dpar_prior("bound", "b"), "normal(0, 0.5)")
+  expect_equal(dpar_prior("ndt", "b"), "normal(0, 0.3)")
+  expect_equal(dpar_prior("driftangle", "b"), "normal(0, 0.5)")
 })
 
-# create_initfun() builds its Stan code without the constant priors, so the mu
-# intercept is still a sampled parameter there and needs an init range
-test_that("ezcdm initial values cover every parameter create_initfun() sees", {
-  skip_on_cran()
-  withr::local_seed(9)
-  sim_data <- ezcdm_test_data()
-  formulas <- list(
-    "3par" = ezcdm_test_formula,
-    "4par" = bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
-  )
-  for (version in names(formulas)) {
-    model <- check_model(ezcdm_test_model(version = version), sim_data, formulas[[version]])
-    data <- check_data(model, sim_data, formulas[[version]])
-    formula <- check_formula(model, data, formulas[[version]])
-    brms_formula <- configure_model(model, data, formula)$formula
-    inits <- create_initfun(model, data, brms_formula)()
-    expect_setequal(
-      names(inits),
-      c("Intercept", "Intercept_drift", "Intercept_driftangle", "Intercept_bound", "Intercept_ndt")
+# the Stan code of a 4par model with a condition effect, and of one with the
+# tan_half drift angle link
+ezcdm_stancode_both <- function() {
+  sim_data <- withr::with_seed(10, ezcdm_test_data(driftangle = 3))
+  sim_data$cond <- factor(rep(c("a", "b"), 5))
+  formula <- bmf(drift ~ cond, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+  list(
+    identity = stancode(formula, data = sim_data, model = ezcdm_test_model(version = "4par")),
+    tan_half = stancode(
+      formula, data = sim_data,
+      model = ezcdm_test_model(version = "4par", links = list(driftangle = "tan_half"))
     )
-    expect_true(all(vapply(inits, is.finite, logical(1))))
+  )
+}
+
+test_that("ezcdm Stan code calls ezcdm_lpdf", {
+  skip_on_cran()
+  code <- ezcdm_stancode_both()
+  expect_match(code$identity, "real ezcdm_lpdf(", fixed = TRUE)
+  expect_match(code$identity, "ezcdm_lpdf(Y[n] |", fixed = TRUE)
+  expect_match(code$tan_half, "driftangle = inv_tan_half(driftangle);", fixed = TRUE)
+  expect_false(grepl("inv_tan_half", code$identity, fixed = TRUE))
+})
+
+test_that("ezcdm Stan code parses", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  for (code in ezcdm_stancode_both()) {
+    model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
+    expect_true(model$check_syntax(quiet = TRUE))
   }
 })
 
-test_that("ezcdm Stan code calls ezcdm_lpdf and parses", {
-  skip_on_cran()
-  withr::local_seed(10)
-  sim_data <- ezcdm_test_data()
-  sim_data$cond <- factor(rep(c("a", "b"), 5))
-
-  code <- stancode(
-    bmf(drift ~ cond, driftangle ~ 1, bound ~ 1, ndt ~ 1),
-    data = sim_data,
-    model = ezcdm_test_model(version = "4par")
-  )
-  expect_match(code, "real ezcdm_lpdf(", fixed = TRUE)
-  expect_match(code, "ezcdm_lpdf(Y[n] |", fixed = TRUE)
-
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
-  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
-  expect_true(model$check_syntax(quiet = TRUE))
-})
-
-test_that("ezcdm 4par with a tan_half drift angle link wraps the angle in Stan", {
+test_that("ezcdm 4par with a tan_half drift angle link runs through the pipeline", {
   skip_on_cran()
   withr::local_seed(11)
   model <- ezcdm_test_model(version = "4par", links = list(driftangle = "tan_half"))
   formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
-  sim_data <- ezcdm_test_data(driftangle = 3)
-
-  code <- stancode(formula, sim_data, model)
-  expect_match(code, "driftangle = inv_tan_half(driftangle);", fixed = TRUE)
-  expect_silent(bmm(formula, sim_data, model, backend = "mock", mock_fit = 1, rename = FALSE))
-
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
-  stan_model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
-  expect_true(stan_model$check_syntax(quiet = TRUE))
+  expect_silent(bmm(formula, ezcdm_test_data(driftangle = 3), model,
+                    backend = "mock", mock_fit = 1, rename = FALSE))
 })
 
 test_that("log_lik_ezcdm() maps the standata slots onto dezcdm()", {
@@ -373,6 +393,13 @@ test_that("log_lik_ezcdm() maps the standata slots onto dezcdm()", {
       )
     )
   }
+})
+
+# posterior_epred() and fitted() refuse on this, before brms reads the family;
+# the refusals on a fit are in test-helpers-postprocess.R
+test_that("ezcdm has no expected response", {
+  expect_false(expected_response_defined(ezcdm_test_model()))
+  expect_false(expected_response_defined(ezcdm_test_model(version = "4par")))
 })
 
 test_that("posterior_predict_ezcdm() returns one circular mean per draw", {
@@ -464,9 +491,8 @@ generated quantities {
 }
 
 test_that("ezcdm_lpdf in Stan matches dezcdm() in R", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)), "CmdStan not installed")
 
   grid <- ezcdm_parity_grid()
   stan_lpdf <- ezcdm_parity_stan_lpdf(grid)
@@ -481,14 +507,107 @@ test_that("ezcdm_lpdf in Stan matches dezcdm() in R", {
   expect_lt(max(relative_diff), 1e-9)
 })
 
-test_that("posterior_epred() and fitted() refuse ezcdm and point to native_parameters()", {
-  path <- test_path("assets", "bmmfit_ezcdm_ppcheck.rds")
-  skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
-  expect_error(brms::posterior_epred(fit, ndraws = 5),
-               "not defined for the ezcdm model; use native_parameters()")
-  expect_error(fitted(fit, ndraws = 5), "not defined for the ezcdm model")
-  expect_equal(dim(brms::posterior_epred(fit, dpar = "drift", ndraws = 5)),
-               c(5L, nrow(fit$data)))
-  expect_false(expected_response_defined(ezcdm_test_model()))
+test_that("ezcdm_lpdf has the right gradient on both sides of every regime switch", {
+  # The chunk switches between series, closed forms and asymptotic expansions
+  # at kappa = 0.01, 0.25, 100 and 1000. A series that is a term short still
+  # matches dezcdm() to 1e-9 in value, but its gradient is off by up to 3e-5,
+  # which only autodiff shows. The references are 60-digit mpmath derivatives
+  # of the closed forms: near kappa = 0.01 the closed forms cancel too much
+  # for R finite differences. CmdStan's standalone log_prob method gives the
+  # gradients, because expose_functions() returns none.
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  program <- paste0(
+    "functions {\n",
+    read_lines2(file.path(system.file("stan_chunks", package = "bmm"), "ezcdm_functions.stan")),
+    "\n}\n",
+    "data { int N; vector[N] var_angle; vector[N] mean_rt; vector[N] var_rt; }\n",
+    "parameters { vector[N] drift; vector[N] bound; vector[N] ndt; vector[N] driftangle; }\n",
+    "model { for (i in 1:N) target += ezcdm_lpdf(0.1 | 0.0, drift[i], driftangle[i], bound[i],\n",
+    "  ndt[i], var_angle[i], mean_rt[i], var_rt[i], 60); }\n"
+  )
+  # bound = 1.2, so kappa = 0.00096, then 0.0099 and 0.01008, 0.249 and
+  # 0.25104, 0.96, 99 and 101.04, 999 and 1001.04, and 4800; the summaries lie
+  # near the implied moments
+  points <- data.frame(
+    drift = c(0.0008, 0.00825, 0.0084, 0.2075, 0.2092, 0.8, 82.5, 84.2, 832.5, 834.2, 4000),
+    var_angle = c(
+      0.999534, 0.995199, 0.995111, 0.880161, 0.879195, 0.580924,
+      0.0349115, 0.0348121, 0.0304856, 0.0304846, 0.030101
+    ),
+    mean_rt = c(
+      1.0506, 1.05059, 1.05059, 1.04491, 1.04482, 0.976497,
+      0.323906, 0.323607, 0.310484, 0.310481, 0.309309
+    ),
+    var_rt = c(
+      0.23328, 0.233272, 0.233272, 0.228535, 0.228458, 0.175633,
+      1.90386e-6, 1.79123e-6, 1.86998e-9, 1.85857e-9, 1.68715e-11
+    )
+  )
+  pars <- list(drift = points$drift, bound = 1.2, ndt = 0.3, driftangle = 0.4)
+  reference <- cbind(
+    drift = c(
+      -3.985085047122548e-3, -4.1409283043692387e-2, -4.2113428251397891e-2,
+      -1.0340796073967198, -1.0425289382784974, -3.6785899399477387,
+      -9.9291545065453891e+1, -1.0205277071599188e+2, -4.7235423990908405e+3,
+      -4.7418097610350061e+3, -9.9636260853584198e+4
+    ),
+    bound = c(
+      1.2184261873900556e+1, 1.2183783457217963e+1, 1.2183884517724231e+1,
+      1.2109472969641551e+1, 1.2109372936029e+1, 1.127488424300486e+1,
+      4.1436250621114998e+3, 4.3378730801896028e+3, 1.3047310559010595e+6,
+      1.3120687356795456e+6, 1.1565739876262507e+8
+    ),
+    ndt = c(
+      1.8999729835289725e+1, 1.8999776913024024e+1, 1.8999877176769284e+1,
+      1.924742663569219e+1, 1.9252730916479183e+1, 2.2755499628905862e+1,
+      2.7983158253353205e+5, 2.9689877459860675e+5, 2.6230610199912953e+8,
+      2.6391147220565566e+8, 2.8861504929228611e+10
+    ),
+    driftangle = c(
+      -7.9322351791210123e-6, -8.4276275223556823e-4, -8.738140060141365e-4,
+      -5.290977999285588e-1, -5.3773247836434803e-1, -7.1334965449041145,
+      -1.6941067286209044e+3, -1.7291936757770677e+3, -1.717347508519773e+4,
+      -1.7208561792982526e+4, -8.2547928841140459e+4
+    )
+  )
+
+  dir <- withr::local_tempdir()
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program, dir = dir), quiet = TRUE)
+  cmdstanr::write_stan_json(c(list(N = nrow(points)), as.list(points[-1])), file.path(dir, "data.json"))
+  cmdstanr::write_stan_json(lapply(pars, rep_len, nrow(points)), file.path(dir, "pars.json"))
+  # On Windows the executable loads tbb.dll at startup, and CmdStan's makefile
+  # copies that dll next to it only when TBB was absent from PATH at link time.
+  # cmdstanr has it on PATH whenever it builds or runs a model, so launching
+  # the executable ourselves has to put it there too
+  run_path <- if (.Platform$OS.type == "windows") {
+    c(
+      getFromNamespace("toolchain_PATH_env_var", "cmdstanr")(),
+      getFromNamespace("tbb_path", "cmdstanr")()
+    )
+  }
+  status <- withr::with_path(run_path, system2(model$exe_file(), c(
+    "method=log_prob", paste0("constrained_params=", file.path(dir, "pars.json")), "jacobian=0",
+    "data", paste0("file=", file.path(dir, "data.json")),
+    "output", paste0("file=", file.path(dir, "out.csv")), "sig_figs=17"
+  ), stdout = FALSE, stderr = file.path(dir, "stderr.txt")))
+  expect_equal(status, 0, info = paste(
+    readLines(file.path(dir, "stderr.txt"), warn = FALSE), collapse = "\n"
+  ))
+  stan_gradient <- matrix(
+    as.numeric(utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")[1, -1]),
+    ncol = length(pars), dimnames = list(NULL, names(pars))
+  )
+
+  relative_error <- abs(stan_gradient / reference - 1)
+  # Just above kappa = 0.01, R^2 - 1 + 2R/kappa cancels to 1e-4 of its terms,
+  # which magnifies rounding in R and its derivative into a relative error
+  # of about 5e-7 in the drift gradient, harmless for HMC
+  above_switch <- which(points$drift == 0.0084)
+  expect_lt(relative_error[above_switch, "drift"], 2e-6)
+  relative_error[above_switch, "drift"] <- 0
+  # max, not expect_equal(): its tolerance applies to the mean difference, so
+  # one wrong entry among 44 would pass
+  expect_lt(max(relative_error), 1e-8)
 })

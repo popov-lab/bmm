@@ -156,7 +156,7 @@ check_n_trials_var <- function(data, n_trials) {
   n_trials_values <- data[[n_trials]]
   stopif(
     any(n_trials_values <= 2, na.rm = TRUE),
-    "Number of trials (n_trials) must be larger than two."
+    "Number of trials ('{n_trials}') must be larger than two."
   )
   stopif(
     any(n_trials_values %% 1 != 0, na.rm = TRUE),

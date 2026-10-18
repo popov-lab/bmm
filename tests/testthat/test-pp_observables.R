@@ -18,6 +18,7 @@ fake_bmmfit <- function(model) {
 registered_models <- lapply(unname(model_test_cases("observables")), `[[`, "model")
 
 test_that("declared observables name real standata slots", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   for (case in model_test_cases("observables")) {
     slots <- names(suppressMessages(standata(case$formula, case$data, case$model)))
     expect_true(all(pp_observables(case$model)$observed %in% slots))
@@ -151,10 +152,17 @@ test_that("pp_simulate() for ezcdm respects per-observation trial counts", {
                        "n_trials"))
   expect_identical(dim(sims$mean_rt), c(200L, 3L))
   expect_identical(sims$n_trials, .pp_expand_data(n_trials, 200L))
-  for (stat in c("mean_angle", "var_angle", "mean_rt")) {
+  for (stat in c("mean_angle", "var_angle", "mean_rt", "var_rt")) {
     spread <- apply(sims[[stat]], 2, stats::sd)
     expect_true(all(diff(spread) < 0), info = stat)
   }
+})
+
+test_that("the fixed 3par ezcdm drift angle reaches pp_simulate() as zeros", {
+  fit <- load_fixture_fit("bmmfit_ezcdm_ppcheck.rds")
+  prep <- brms::prepare_predictions(fit, ndraws = 5)
+  expect_identical(.pp_dpar_vector(prep, "driftangle"),
+                   rep(0, prep$ndraws * prep$nobs))
 })
 
 test_that("pp_simulate.ezdm_4par() emits NA where a boundary has < 2 responses", {
