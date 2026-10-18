@@ -225,8 +225,8 @@ settable_links.lba_custom <- function(model) {
 #'   vs. error) over the general per-accumulator case handled by `"custom"`.
 #' @export
 #' @keywords bmmodel
-#' @seealso [dlba()] and [rlba()] for the density and random generation
-#'   functions.
+#' @seealso [dlba()], [plba()], [qlba()] and [rlba()] for the density,
+#'   distribution, quantile and random generation functions.
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
 #' # simple version with 2 alternatives
 #' dat <- rlba(n = 500, drift = c(3, 1.5), gap = 0.5, sp = 0.5, ndt = 0.2)

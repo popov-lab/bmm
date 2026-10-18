@@ -217,7 +217,7 @@ fit <- bmm(formula, dat, model, cores = 4, backend = "cmdstanr")
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=dlba]{dlba()}} and \code{\link[=rlba]{rlba()}} for the density and random generation
-functions.
+\code{\link[=dlba]{dlba()}}, \code{\link[=plba]{plba()}}, \code{\link[=qlba]{qlba()}} and \code{\link[=rlba]{rlba()}} for the density,
+distribution, quantile and random generation functions.
 }
 \keyword{bmmodel}
