@@ -978,8 +978,8 @@ test_that("posterior_epred() works on an lnr fit saved without the function", {
 # =============================================================================
 
 test_that("lnr ships an sd default on the link scale of each parameter", {
-  # a meanlog gets the rate of the racing models' accumulator locations, and the
-  # log-link ndt and sdlog the tighter one; the custom version's categories
+  # a meanlog and the log-link ndt and sdlog get the same rate, the one ndt and
+  # s have in the other response-time models; the custom version's categories
   # inherit the meanlog rate
   lnr_data <- data.frame(rt = rep(c(0.6, 0.8, 1.1, 0.7), 5), response = rep(1:2, 10),
                          id = factor(rep(1:5, each = 4)))
@@ -988,14 +988,14 @@ test_that("lnr ships an sd default on the link scale of each parameter", {
     lnr_data, lnr("rt", "response", n_choices = 2)
   )
   for (par in c("correct", "error")) expect_equal(sd_default(pr, par), "exponential(2)")
-  for (par in c("ndt", "s")) expect_equal(sd_default(pr, par), "exponential(4)")
+  for (par in c("ndt", "s")) expect_equal(sd_default(pr, par), "exponential(2)")
   lnr_data$label <- c("correct", "other")[lnr_data$response]
   pr <- default_prior(
     bmf(correct ~ 1 + (1 | id), other ~ 1 + (1 | id), ndt ~ 1 + (1 | id), s ~ 1 + (1 | id)),
     lnr_data, lnr("rt", "label", version = "custom")
   )
   for (par in c("correct", "other")) expect_equal(sd_default(pr, par), "exponential(2)")
-  for (par in c("ndt", "s")) expect_equal(sd_default(pr, par), "exponential(4)")
+  for (par in c("ndt", "s")) expect_equal(sd_default(pr, par), "exponential(2)")
 })
 
 test_that("an lnr response and accumulator columns rebuilt for check_data() stay out of the model frame", {

@@ -28,9 +28,9 @@
   links = list(ndt = "log", s = "log"),
   priors = list(
     ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)",
-               sd = "exponential(4)"),
+               sd = "exponential(2)"),
     s = list(main = "normal(0, 0.5)", effects = "normal(0, 0.2)",
-             sd = "exponential(4)")
+             sd = "exponential(2)")
   ),
   inits = list(mu = c(-0.5, 0.5), ndt = c(0.025, 0.05), s = c(0.8, 1.2))
 )
@@ -207,12 +207,14 @@ settable_links.lnr <- function(model) {
 #' upper bound sits below the true value drags the meanlogs with it.
 #'
 #' The group-level standard deviations get one rate per kind of parameter
-#' rather than one per model, shared with the other racing models, so that the
-#' same quantity is given the same prior wherever it appears. A meanlog gets
-#' `exponential(2)` (median 0.35) and the two log-link parameters `ndt` and `s`
-#' get `exponential(4)` (median 0.17). Those medians come from hierarchical
-#' fits of simulated multi-subject data, which put the between-subject standard
-#' deviation of a meanlog at 0.26 to 0.43 and of `ndt` and `s` at 0.17 to 0.19.
+#' rather than one per model, so that the same quantity is given the same prior
+#' wherever it appears. All of them get `exponential(2)` (median 0.35, 95%
+#' below 1.5): the meanlogs, and the two log-link parameters `ndt` and `s`,
+#' which get the same rate in `lba()`, `cswald()` and `ezdm()` (`ndt` also in
+#' `ddm()`, which has no `s`).
+#' Hierarchical fits of simulated multi-subject data put the between-subject
+#' standard deviation of a meanlog at 0.26 to 0.43, around that median, and of
+#' `ndt` and `s` at 0.17 to 0.19, well inside it.
 #' @section Likelihood and `loo()`:
 #' For `version = "simple"` the likelihood is the probability of the *category*
 #' that was observed, not of one named accumulator: an error trial contributes

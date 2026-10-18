@@ -42,13 +42,13 @@ model_cases_lnr <- function() {
     sd_default = list(
       lnr = list(
         model = simple, formula = re_formula, data = re_data,
-        sd = c(correct = "exponential(2)", error = "exponential(2)", ndt = "exponential(4)",
-               s = "exponential(4)")
+        sd = c(correct = "exponential(2)", error = "exponential(2)", ndt = "exponential(2)",
+               s = "exponential(2)")
       ),
       lnr_custom = list(
         model = custom, formula = re_custom, data = re_data,
-        sd = c(correct = "exponential(2)", lure = "exponential(2)", ndt = "exponential(4)",
-               s = "exponential(4)")
+        sd = c(correct = "exponential(2)", lure = "exponential(2)", ndt = "exponential(2)",
+               s = "exponential(2)")
       )
     ),
     init = list(
