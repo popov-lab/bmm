@@ -574,7 +574,8 @@ configure_model.lba_custom <- function(model, data, formula) {
     # race_time_range() calls a bracket truncated whenever S(t) t is above
     # 1e-12 at t_max = 1e7 s, and every two-accumulator normal race is (S(t) t
     # 1e-11 to 1e-8 there) although the mean it leaves out is that small. The
-    # mean is infinite only where the survivor decays like 1/t or slower; a
+    # mean is infinite where the survivor decays like 1/t or slower, and rests
+    # on times far beyond t_max where it decays only a little faster; a
     # normal-drift race decays like t^-k for k racing accumulators, so a local
     # order below 1.5 picks out the race of a single accumulator
     if (attr(range, "truncated")) {
@@ -588,10 +589,10 @@ configure_model.lba_custom <- function(model, data, formula) {
   warnif(
     any(truncated),
     "posterior_epred(): on {sum(truncated)} observation(s) the race of at least \\
-    one draw has no finite mean response time: its survivor decays like 1/t or \\
-    slower, as when a single normal-drift accumulator races. Their expected \\
-    value is the mean of the race truncated at 1e7 s, which underestimates an \\
-    infinite or very long mean. See ?lba."
+    one draw decays like t^-1.5 or slower, as when a single normal-drift \\
+    accumulator races, so its mean response time is infinite or rests on \\
+    times beyond 1e7 s. Their expected value is the mean of the race \\
+    truncated at 1e7 s, which underestimates that mean. See ?lba."
   )
   epred
 }
