@@ -758,16 +758,21 @@ lba_custom_epred_prep <- function(n_left, n_right) {
   ), class = "brmsprep")
 }
 
-# a single normal-drift accumulator has no finite mean, so the integral stops at
-# t_max and the value is only a lower bound
-test_that("posterior_epred_lba_custom() warns once for the races it truncates", {
+# a single normal-drift accumulator has no finite mean, so its expected
+# response time is Inf in every draw
+test_that("posterior_epred_lba_custom() returns Inf and warns once for a lone accumulator", {
   prep <- lba_custom_epred_prep(n_left = c(1L, 1L, 1L), n_right = c(0L, 1L, 0L))
   warnings <- testthat::capture_warnings(out <- posterior_epred_lba_custom(prep))
   expect_length(warnings, 1)
   expect_match(warnings, "2 observation(s)", fixed = TRUE)
-  expect_match(warnings, "1e7 s", fixed = TRUE)
-  expect_true(all(is.finite(out)))
-  expect_gt(min(out[, c(1, 3)]), out[1, 2])
+  expect_match(warnings, "posterior_predict()", fixed = TRUE)
+  expect_equal(out[, c(1, 3)], matrix(Inf, 2, 2))
+  expect_true(all(is.finite(out[, 2])))
+  finite_only <- lba_custom_epred_prep(n_left = 1L, n_right = 1L)
+  expect_identical(out[, 2], posterior_epred_lba_custom(finite_only)[, 1])
+  # a fixed s may reach the prep as one number
+  prep$dpars$s <- 1
+  expect_identical(suppressWarnings(posterior_epred_lba_custom(prep)), out)
 })
 
 # race_time_range() marks these brackets truncated too: a two-accumulator normal
