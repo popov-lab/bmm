@@ -9,23 +9,23 @@ test_that("rdm() default ndt prior is the ddm's normal(-1.5, 0.5)", {
   expect_equal(model$default_priors$ndt$main, "normal(-1.5, 0.5)")
 })
 
-test_that("rdm() default sd priors follow the racing-model rate", {
+test_that("rdm() default sd priors are exponential(2) for every parameter", {
   model <- rdm(rt = "rt", response = "response", n_choices = 2)
 
   expect_equal(model$default_priors$driftc$sd, "exponential(2)")
   expect_equal(model$default_priors$drifte$sd, "exponential(2)")
   expect_equal(model$default_priors$gap$sd, "exponential(2)")
   expect_equal(model$default_priors$sp$sd, "exponential(2)")
-  expect_equal(model$default_priors$ndt$sd, "exponential(4)")
-  expect_equal(model$default_priors$s$sd, "exponential(4)")
+  expect_equal(model$default_priors$ndt$sd, "exponential(2)")
+  expect_equal(model$default_priors$s$sd, "exponential(2)")
 })
 
 test_that("custom version inherits the same sd rates for its accumulator parameters", {
   model <- rdm(rt = "rt", response = "resp", version = "custom")
 
   expect_equal(model$default_priors$gap$sd, "exponential(2)")
-  expect_equal(model$default_priors$ndt$sd, "exponential(4)")
-  expect_equal(model$default_priors$s$sd, "exponential(4)")
+  expect_equal(model$default_priors$ndt$sd, "exponential(2)")
+  expect_equal(model$default_priors$s$sd, "exponential(2)")
   expect_equal(model$default_priors$sp$sd, "exponential(2)")
 })
 
@@ -49,14 +49,14 @@ test_that("a hierarchical mock fit reports the sd default priors in prior_info()
   expect_equal(sd_rows$prior[sd_rows$dpar == "driftc"], "exponential(2)")
   expect_equal(sd_rows$prior[sd_rows$dpar == "drifte"], "exponential(2)")
   expect_equal(sd_rows$prior[sd_rows$dpar == "gap"], "exponential(2)")
-  expect_equal(sd_rows$prior[sd_rows$dpar == "ndt"], "exponential(4)")
+  expect_equal(sd_rows$prior[sd_rows$dpar == "ndt"], "exponential(2)")
 
   out <- prior_info(fit)
   sd_out <- out[out$class == "sd", ]
   expect_equal(sd_out$prior[sd_out$parameter == "driftc"], "exponential(2)")
   expect_equal(sd_out$prior[sd_out$parameter == "drifte"], "exponential(2)")
   expect_equal(sd_out$prior[sd_out$parameter == "gap"], "exponential(2)")
-  expect_equal(sd_out$prior[sd_out$parameter == "ndt"], "exponential(4)")
+  expect_equal(sd_out$prior[sd_out$parameter == "ndt"], "exponential(2)")
   expect_true(all(sd_out$source == "bmm default"))
 })
 
@@ -75,5 +75,5 @@ test_that("the sd default priors reach the generated Stan code", {
   expect_true(grepl("lprior \\+= exponential_lpdf\\(sd_1 \\| 2\\);", code))
   expect_true(grepl("lprior \\+= exponential_lpdf\\(sd_2 \\| 2\\);", code))
   expect_true(grepl("lprior \\+= exponential_lpdf\\(sd_3 \\| 2\\);", code))
-  expect_true(grepl("lprior \\+= exponential_lpdf\\(sd_4 \\| 4\\);", code))
+  expect_true(grepl("lprior \\+= exponential_lpdf\\(sd_4 \\| 2\\);", code))
 })

@@ -29,12 +29,12 @@ model_cases_rdm <- function() {
       rdm = list(
         model = simple, formula = re_formula, data = re_data,
         sd = c(driftc = "exponential(2)", drifte = "exponential(2)", gap = "exponential(2)",
-               ndt = "exponential(4)")
+               ndt = "exponential(2)")
       ),
       rdm_custom = list(
         model = custom, formula = re_custom, data = re_data,
         sd = c(correct = "exponential(2)", lure = "exponential(2)", gap = "exponential(2)",
-               ndt = "exponential(4)")
+               ndt = "exponential(2)")
       )
     ),
     init = list(

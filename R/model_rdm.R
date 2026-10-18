@@ -26,8 +26,8 @@
   links = list(gap = "log", ndt = "log", s = "log", sp = "log"),
   priors = list(
     gap = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
-    ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(4)"),
-    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)", sd = "exponential(4)"),
+    ndt = list(main = "normal(-1.5, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
+    s = list(main = "normal(0, 0.3)", effects = "normal(0, 0.2)", sd = "exponential(2)"),
     sp = list(main = "normal(-1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)")
   ),
   inits = list(
@@ -232,14 +232,14 @@ settable_link_functions.rdm <- function(model) {
 #' `ndt` below 0.244 s and gave P(ndt > 0.3 s) = 0.004, too tight for
 #' multi-alternative choice tasks.
 #'
-#' The group-level standard deviations get one rate per kind of parameter
-#' rather than one per model, shared with the **lnr** and **lba** models: a
-#' drift rate gets `exponential(2)` (median 0.35 on the log link, i.e. a
-#' between-subject ratio around 1.4), `ndt` and `s` get `exponential(4)`
-#' (median 0.17), and `gap`/`sp` get `exponential(2)`. These rates come from
-#' hierarchical fits of simulated multi-subject data for the racing models
-#' (drift/`ndt`/`s` anchored on the **lnr** recovery, `gap`/`sp` reused from
-#' the **lba** model).
+#' The group-level standard deviations get one rate per parameter meaning
+#' rather than one per model. Every estimated parameter is on the log link by
+#' default and gets `exponential(2)`: its median of 0.35 on the log scale is a
+#' between-subject ratio of about 1.4 for one standard deviation. `ndt` and `s`
+#' have the same rate in the **lba**, **cswald** and **ezdm** models, and
+#' `ndt` in the **ddm** model. The drift-rate rate is anchored on hierarchical
+#' recovery fits of simulated multi-subject data for the **lnr** model, and the
+#' `gap`/`sp` rate is reused from the **lba** model.
 #' @section Identifiability of `s`:
 #' The likelihood is invariant to scaling every drift rate, `gap`, `sp` and
 #' `s` by the same positive constant, so only their ratios are identified.

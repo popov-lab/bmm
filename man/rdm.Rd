@@ -126,13 +126,13 @@ Racing Diffusion Model
 \itemize{
 \item \code{main}: normal(-1.5, 0.5)
 \item \code{effects}: normal(0, 0.3)
-\item \code{sd}: exponential(4)
+\item \code{sd}: exponential(2)
 }
 \item \code{s}:
 \itemize{
 \item \code{main}: normal(0, 0.3)
 \item \code{effects}: normal(0, 0.2)
-\item \code{sd}: exponential(4)
+\item \code{sd}: exponential(2)
 }
 \item \code{sp}:
 \itemize{
@@ -192,14 +192,14 @@ uses, rather than an earlier \code{normal(-2, 0.3)} whose 95\% interval put
 \code{ndt} below 0.244 s and gave P(ndt > 0.3 s) = 0.004, too tight for
 multi-alternative choice tasks.
 
-The group-level standard deviations get one rate per kind of parameter
-rather than one per model, shared with the \strong{lnr} and \strong{lba} models: a
-drift rate gets \code{exponential(2)} (median 0.35 on the log link, i.e. a
-between-subject ratio around 1.4), \code{ndt} and \code{s} get \code{exponential(4)}
-(median 0.17), and \code{gap}/\code{sp} get \code{exponential(2)}. These rates come from
-hierarchical fits of simulated multi-subject data for the racing models
-(drift/\code{ndt}/\code{s} anchored on the \strong{lnr} recovery, \code{gap}/\code{sp} reused from
-the \strong{lba} model).
+The group-level standard deviations get one rate per parameter meaning
+rather than one per model. Every estimated parameter is on the log link by
+default and gets \code{exponential(2)}: its median of 0.35 on the log scale is a
+between-subject ratio of about 1.4 for one standard deviation. \code{ndt} and \code{s}
+have the same rate in the \strong{lba}, \strong{cswald} and \strong{ezdm} models, and
+\code{ndt} in the \strong{ddm} model. The drift-rate rate is anchored on hierarchical
+recovery fits of simulated multi-subject data for the \strong{lnr} model, and the
+\code{gap}/\code{sp} rate is reused from the \strong{lba} model.
 }
 
 \section{Identifiability of \code{s}}{
