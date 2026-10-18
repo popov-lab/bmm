@@ -272,11 +272,15 @@ settable_links.lba_custom <- function(model) {
 #'   for 4000 draws of 1000 observations); `posterior_epred(fit, ndraws = )`
 #'   limits the cost. The mean is infinite for a race in which only one
 #'   normal-drift accumulator runs (an `accumulators` column that leaves one
-#'   category with one accumulator on a trial) and for a gamma drift whose
-#'   shapes sum to at most 1; `posterior_epred()` returns `Inf` for it,
-#'   because that is its mean, and warns once per call with the number of
-#'   observations affected. The median or other quantiles of
-#'   `posterior_predict()` describe such trials instead.
+#'   category with one accumulator on a trial); `posterior_epred()` returns
+#'   `Inf` for it, because that is its mean, and warns once per call with the
+#'   number of observations affected. The median or other quantiles of
+#'   `posterior_predict()` describe such trials instead. The mean is also
+#'   infinite for a gamma drift whose shapes sum to at most 1; for the gamma,
+#'   Frechet and lognormal drifts a race that decays like t^-1.5 or slower is
+#'   integrated up to 1e7 s instead, the returned value is then not meaningful
+#'   (treat it as missing), and `posterior_epred()` warns with the number of
+#'   observations it truncated.
 #'
 #'   `pp_check(fit, resp_var = "rt")` checks the response times and
 #'   `pp_check(fit, resp_var = "response")` checks the response category
@@ -620,6 +624,7 @@ configure_model.lba_custom <- function(model, data, formula) {
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
   infinite_obs <- logical(n_obs)
+  truncated_obs <- logical(n_obs)
   for (i in seq_len(n_obs)) {
     gap <- brms::get_dpar(prep, "gap", i = i)
     sp <- brms::get_dpar(prep, "sp", i = i)
@@ -645,14 +650,19 @@ configure_model.lba_custom <- function(model, data, formula) {
     # 1e-11 to 1e-8 there) although the mean it leaves out is that small. The
     # mean is infinite where the survivor decays like 1/t or slower; a
     # normal-drift race decays like t^-k for k racing accumulators, so a local
-    # order below 1.5 picks out the draws where a single accumulator races
-    infinite <- rep(FALSE, n_draws)
+    # order below 1.5 picks out the draws where a single accumulator races.
+    # A gamma race decays like t^-k for k the sum of its shapes, so its mean is
+    # finite for k in (1, 1.5); where the gamma, Frechet and lognormal races
+    # should switch to Inf is open in this PR, so they keep the truncated mean
+    slow <- rep(FALSE, n_draws)
     if (attr(range, "truncated")) {
       lsurv <- log_surv(range[2] * c(0.1, 1))
-      infinite <- (lsurv[, 1] - lsurv[, 2]) / log(10) < 1.5
-      infinite[is.na(infinite)] <- FALSE
+      slow <- (lsurv[, 1] - lsurv[, 2]) / log(10) < 1.5
+      slow[is.na(slow)] <- FALSE
     }
+    infinite <- slow & dist == "normal"
     infinite_obs[i] <- any(infinite)
+    truncated_obs[i] <- any(slow & dist != "normal")
     epred[infinite, i] <- Inf
     # the other draws keep the range searched over all draws, so their values
     # do not depend on whether a draw beside them has an infinite mean
@@ -668,6 +678,14 @@ configure_model.lba_custom <- function(model, data, formula) {
     least one draw has no finite mean response time, as when a single \\
     normal-drift accumulator races, so those draws return Inf. Summarise \\
     posterior_predict() by its median or other quantiles instead. See ?lba."
+  )
+  warnif(
+    any(truncated_obs),
+    "posterior_epred(): on {sum(truncated_obs)} observation(s) the race of at \\
+    least one draw decays like t^-1.5 or slower, as when the shapes of a gamma \\
+    drift sum to at most 1.5, so its mean response time is infinite or rests \\
+    on times beyond 1e7 s. Their expected value is the mean of the race \\
+    truncated at 1e7 s, which underestimates that mean. See ?lba."
   )
   epred
 }

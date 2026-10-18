@@ -226,11 +226,15 @@ at about half a millisecond each for the normal drift (some 30 minutes
 for 4000 draws of 1000 observations); \code{posterior_epred(fit, ndraws = )}
 limits the cost. The mean is infinite for a race in which only one
 normal-drift accumulator runs (an \code{accumulators} column that leaves one
-category with one accumulator on a trial) and for a gamma drift whose
-shapes sum to at most 1; \code{posterior_epred()} returns \code{Inf} for it,
-because that is its mean, and warns once per call with the number of
-observations affected. The median or other quantiles of
-\code{posterior_predict()} describe such trials instead.
+category with one accumulator on a trial); \code{posterior_epred()} returns
+\code{Inf} for it, because that is its mean, and warns once per call with the
+number of observations affected. The median or other quantiles of
+\code{posterior_predict()} describe such trials instead. The mean is also
+infinite for a gamma drift whose shapes sum to at most 1; for the gamma,
+Frechet and lognormal drifts a race that decays like t^-1.5 or slower is
+integrated up to 1e7 s instead, the returned value is then not meaningful
+(treat it as missing), and \code{posterior_epred()} warns with the number of
+observations it truncated.
 
 \code{pp_check(fit, resp_var = "rt")} checks the response times and
 \code{pp_check(fit, resp_var = "response")} checks the response category

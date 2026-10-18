@@ -926,6 +926,18 @@ test_that("posterior_epred_lba_custom() returns Inf and warns once for a lone ac
   expect_identical(suppressWarnings(posterior_epred_lba_custom(prep)), out)
 })
 
+# a gamma race with shapes summing to at most 1.5 keeps the truncated mean
+test_that("posterior_epred_lba_custom() truncates a slow gamma race and warns once", {
+  prep <- lba_custom_epred_prep(n_left = c(1L, 1L), n_right = c(0L, 0L))
+  prep$family$name <- "lba_gamma_custom"
+  prep$dpars$left[] <- 1
+  warnings <- testthat::capture_warnings(out <- posterior_epred_lba_custom(prep))
+  expect_length(warnings, 1)
+  expect_match(warnings, "2 observation(s)", fixed = TRUE)
+  expect_match(warnings, "truncated at 1e7 s", fixed = TRUE)
+  expect_true(all(is.finite(out)))
+})
+
 # race_time_range() marks these brackets truncated too: a two-accumulator normal
 # race decays like 1/t^2, too slowly for its tolerance, but leaves out < 1e-8 s
 test_that("posterior_epred_lba_custom() does not warn for a race with a finite mean", {
