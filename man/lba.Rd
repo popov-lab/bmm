@@ -194,7 +194,8 @@ simulation-based. The mean is infinite for a race in which only one
 normal-drift accumulator runs (a custom version with a single category, or
 an \code{accumulators} column that leaves one category on a trial); the
 integral is then truncated at 1e7 s and the returned value is not
-meaningful; treat it as missing.
+meaningful; treat it as missing. \code{posterior_epred()} warns once per call
+with the number of observations it truncated.
 
 \code{pp_check(fit, resp_var = "rt")} checks the response times and
 \code{pp_check(fit, resp_var = "response")} checks the response category

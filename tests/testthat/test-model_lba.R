@@ -745,6 +745,38 @@ test_that("posterior_epred_lba_simple() reaches the tail of a slow race", {
   expect_equal(posterior_epred_lba_simple(prep)[1, 1], reference, tolerance = 1e-4)
 })
 
+lba_custom_epred_prep <- function(n_left, n_right) {
+  nobs <- length(n_left)
+  cell <- function(x) matrix(x, 2, nobs)
+  structure(list(
+    ndraws = 2L, nobs = nobs,
+    dpars = list(left = cell(3), right = cell(1.5), gap = cell(0.5), sp = cell(0.5),
+                 ndt = cell(0.2), s = cell(1)),
+    data = list(Y = rep(0.6, nobs), vint1 = rep(1L, nobs), vint2 = n_left, vint3 = n_right),
+    family = list(dpars = c("mu", "left", "right", "gap", "sp", "ndt", "s"),
+                  name = "lba_normal_custom")
+  ), class = "brmsprep")
+}
+
+# a single normal-drift accumulator has no finite mean, so the integral stops at
+# t_max and the value is only a lower bound
+test_that("posterior_epred_lba_custom() warns once for the races it truncates", {
+  prep <- lba_custom_epred_prep(n_left = c(1L, 1L, 1L), n_right = c(0L, 1L, 0L))
+  warnings <- testthat::capture_warnings(out <- posterior_epred_lba_custom(prep))
+  expect_length(warnings, 1)
+  expect_match(warnings, "2 observation(s)", fixed = TRUE)
+  expect_match(warnings, "1e7 s", fixed = TRUE)
+  expect_true(all(is.finite(out)))
+  expect_gt(min(out[, c(1, 3)]), out[1, 2])
+})
+
+# race_time_range() marks these brackets truncated too: a two-accumulator normal
+# race decays like 1/t^2, too slowly for its tolerance, but leaves out < 1e-8 s
+test_that("posterior_epred_lba_custom() does not warn for a race with a finite mean", {
+  prep <- lba_custom_epred_prep(n_left = c(1L, 2L), n_right = c(1L, 1L))
+  expect_no_warning(posterior_epred_lba_custom(prep))
+})
+
 
 # -----------------------------------------------------------------------------
 # log_lik category-level convention (log(n[win]) for an error response)

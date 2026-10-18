@@ -205,7 +205,8 @@ settable_links.lba_custom <- function(model) {
 #'   normal-drift accumulator runs (a custom version with a single category, or
 #'   an `accumulators` column that leaves one category on a trial); the
 #'   integral is then truncated at 1e7 s and the returned value is not
-#'   meaningful; treat it as missing.
+#'   meaningful; treat it as missing. `posterior_epred()` warns once per call
+#'   with the number of observations it truncated.
 #'
 #'   `pp_check(fit, resp_var = "rt")` checks the response times and
 #'   `pp_check(fit, resp_var = "response")` checks the response category
@@ -538,6 +539,7 @@ configure_model.lba_custom <- function(model, data, formula) {
   dist <- .lba_dist_from_family(prep$family$name)
 
   epred <- matrix(NA_real_, nrow = n_draws, ncol = n_obs)
+  truncated <- logical(n_obs)
   for (i in seq_len(n_obs)) {
     gap <- brms::get_dpar(prep, "gap", i = i)
     sp <- brms::get_dpar(prep, "sp", i = i)
@@ -553,8 +555,28 @@ configure_model.lba_custom <- function(model, data, formula) {
       })), nrow = n_draws)
     }
     range <- race_time_range(log_surv)
+    # race_time_range() calls a bracket truncated whenever S(t) t is above
+    # 1e-12 at t_max = 1e7 s, and every two-accumulator normal race is (S(t) t
+    # 1e-11 to 1e-8 there) although the mean it leaves out is that small. The
+    # mean is infinite only where the survivor decays like 1/t or slower; a
+    # normal-drift race decays like t^-k for k racing accumulators, so a local
+    # order below 1.5 picks out the race of a single accumulator
+    if (attr(range, "truncated")) {
+      lsurv <- log_surv(range[2] * c(0.1, 1))
+      truncated[i] <- any((lsurv[, 1] - lsurv[, 2]) / log(10) < 1.5, na.rm = TRUE)
+    }
     epred[, i] <- rep_len(ndt, n_draws) + race_expected_time(log_surv, range[1], range[2])
   }
+  # the values stay as they are: the caller decides whether a lower bound is
+  # good enough, and one warning per call keeps a large newdata readable
+  warnif(
+    any(truncated),
+    "posterior_epred(): on {sum(truncated)} observation(s) the race of at least \\
+    one draw has no finite mean response time: its survivor decays like 1/t or \\
+    slower, as when a single normal-drift accumulator races. Their expected \\
+    value is the mean of the race truncated at 1e7 s, which underestimates an \\
+    infinite or very long mean. See ?lba."
+  )
   epred
 }
 
