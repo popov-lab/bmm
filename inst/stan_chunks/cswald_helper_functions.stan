@@ -23,7 +23,7 @@ real swald_log_surv(real z1, real z2, real log_c) {
 // log-PDF of the shifted Wald distribution, computed in log space
 real swald_lpdf(real rt, real drift, real bound, real ndt, real sigma) {
   real t_shifted = rt - ndt;
-  if (t_shifted <= 0) return negative_infinity();
+  if (t_shifted <= 0 || bound <= 0) return negative_infinity();
 
   real sigma_sq = square(sigma);
   real log_t = log(t_shifted);

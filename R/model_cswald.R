@@ -475,6 +475,18 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
 }
 
 ############################################################################# !
+# CREATE_INITFUN S3 method                                               ####
+############################################################################# !
+
+# The likelihood is -Inf wherever ndt >= min(rt), so the start for ndt has to
+# come from the data; the other ranges do not depend on it
+#' @export
+create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
+  model$init_ranges$ndt <- c(0.4, 0.6) * min(data[[model$resp_vars$rt]])
+  NextMethod()
+}
+
+############################################################################# !
 # PP_CHECK OBSERVABLES                                                    ####
 ############################################################################# !
 
