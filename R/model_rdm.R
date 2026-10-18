@@ -85,9 +85,11 @@
 # categories cannot be named after (see race_reserved_names())
 .rdm_shared_pars <- c("gap", "ndt", "s", "sp")
 
-# the identifiers .rdm_stan_code() declares, which a category would shadow
-# (measured: each made a category and the program handed to stanc)
-.rdm_stan_names <- c("rt", "response", "t", "lp", "i")
+# the argument names of the likelihood .rdm_stan_code() writes, which a
+# category would shadow (measured: each made a category and the program handed
+# to stanc). Its locals carry an rdm_ prefix, and a category cannot contain an
+# underscore, so they need no entry here
+.rdm_stan_names <- c("rt", "response")
 
 .model_rdm <- function(
     rt = NULL,
@@ -433,26 +435,26 @@ bmf2bf.rdm_custom <- function(model, formula) {
   cat_args <- paste(paste0("vector ", cat_names), collapse = ", ")
   n_args <- paste(paste0("array[] int n", seq_len(n_cats)), collapse = ", ")
   pdf <- if (start_var) {
-    "rdm_log_pdf(t, {cat}[i], gap[i], sp[i], s[i])"
+    "rdm_log_pdf(rdm_dt, {cat}[rdm_i], gap[rdm_i], sp[rdm_i], s[rdm_i])"
   } else {
-    "swald_lpdf(rt[i] | {cat}[i], gap[i] + sp[i], ndt[i], s[i])"
+    "swald_lpdf(rt[rdm_i] | {cat}[rdm_i], gap[rdm_i] + sp[rdm_i], ndt[rdm_i], s[rdm_i])"
   }
   surv <- if (start_var) {
-    "rdm_log_surv(t, {cat}[i], gap[i], sp[i], s[i])"
+    "rdm_log_surv(rdm_dt, {cat}[rdm_i], gap[rdm_i], sp[rdm_i], s[rdm_i])"
   } else {
-    "swald_lccdf(rt[i] | {cat}[i], gap[i] + sp[i], ndt[i], s[i])"
+    "swald_lccdf(rt[rdm_i] | {cat}[rdm_i], gap[rdm_i] + sp[rdm_i], ndt[rdm_i], s[rdm_i])"
   }
   per_cat <- function(template, j) glue(template, cat = cat_names[j], j = j)
   reps <- vapply(seq_len(n_cats), function(j) {
-    per_cat("    int reps{j} = (response[i] == {j}) ? n{j}[i] - 1 : n{j}[i];", j)
+    per_cat("    int reps{j} = (response[rdm_i] == {j}) ? n{j}[rdm_i] - 1 : n{j}[rdm_i];", j)
   }, character(1))
   winner <- vapply(seq_len(n_cats), function(j) {
     head <- if (n_cats == 1) "   " else if (j == 1) "    if" else if (j < n_cats) "    else if" else "    else"
-    cond <- if (j < n_cats) glue(" (response[i] == {j})") else ""
-    per_cat(paste0(head, cond, " lp = log(n{j}[i]) + ", pdf, ";"), j)
+    cond <- if (j < n_cats) glue(" (response[rdm_i] == {j})") else ""
+    per_cat(paste0(head, cond, " rdm_lp = log(n{j}[rdm_i]) + ", pdf, ";"), j)
   }, character(1))
   survivals <- vapply(seq_len(n_cats), function(j) {
-    per_cat(paste0("    if (reps{j} > 0) lp += reps{j} * ", surv, ";"), j)
+    per_cat(paste0("    if (reps{j} > 0) rdm_lp += reps{j} * ", surv, ";"), j)
   }, character(1))
 
   paste(c(
@@ -460,12 +462,12 @@ bmf2bf.rdm_custom <- function(model, formula) {
          "vector ndt, vector s, vector sp, array[] int response, {n_args}) {{"),
     "  int N = rows(rt);",
     "  real log_lik = 0;",
-    "  for (i in 1:N) {",
-    "    real t = rt[i] - ndt[i];",
-    "    real lp;",
-    "    if (t <= 0) return negative_infinity();",
+    "  for (rdm_i in 1:N) {",
+    "    real rdm_dt = rt[rdm_i] - ndt[rdm_i];",
+    "    real rdm_lp;",
+    "    if (rdm_dt <= 0) return negative_infinity();",
     reps, winner, survivals,
-    "    log_lik += lp;",
+    "    log_lik += rdm_lp;",
     "  }",
     "  return log_lik;",
     "}"

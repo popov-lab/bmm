@@ -499,18 +499,18 @@ test_that("bmf2bf.rdm_custom creates correct brms formula", {
 test_that(".rdm_stan_code unrolls the plain-Wald race for sp off (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), start_var = FALSE)
   expect_match(code, "real rdm_simple_lpdf(vector rt, vector mu, vector driftc, vector drifte, vector gap, vector ndt, vector s, vector sp, array[] int response, array[] int n1, array[] int n2)", fixed = TRUE)
-  expect_match(code, "if (response[i] == 1) lp = log(n1[i]) + swald_lpdf(rt[i] | driftc[i], gap[i] + sp[i], ndt[i], s[i]);", fixed = TRUE)
-  expect_match(code, "else lp = log(n2[i]) + swald_lpdf(rt[i] | drifte[i], gap[i] + sp[i], ndt[i], s[i]);", fixed = TRUE)
-  expect_match(code, "if (reps2 > 0) lp += reps2 * swald_lccdf(rt[i] | drifte[i], gap[i] + sp[i], ndt[i], s[i]);", fixed = TRUE)
+  expect_match(code, "if (response[rdm_i] == 1) rdm_lp = log(n1[rdm_i]) + swald_lpdf(rt[rdm_i] | driftc[rdm_i], gap[rdm_i] + sp[rdm_i], ndt[rdm_i], s[rdm_i]);", fixed = TRUE)
+  expect_match(code, "else rdm_lp = log(n2[rdm_i]) + swald_lpdf(rt[rdm_i] | drifte[rdm_i], gap[rdm_i] + sp[rdm_i], ndt[rdm_i], s[rdm_i]);", fixed = TRUE)
+  expect_match(code, "if (reps2 > 0) rdm_lp += reps2 * swald_lccdf(rt[rdm_i] | drifte[rdm_i], gap[rdm_i] + sp[rdm_i], ndt[rdm_i], s[rdm_i]);", fixed = TRUE)
   expect_false(grepl("rdm_log_pdf", code, fixed = TRUE))
   expect_false(grepl("array[", code, fixed = TRUE) && grepl("drift_i", code, fixed = TRUE))
 })
 
 test_that(".rdm_stan_code unrolls the start-point race for sp on (2 categories)", {
   code <- .rdm_stan_code("rdm_simple", c("driftc", "drifte"), start_var = TRUE)
-  expect_match(code, "int reps1 = (response[i] == 1) ? n1[i] - 1 : n1[i];", fixed = TRUE)
-  expect_match(code, "if (response[i] == 1) lp = log(n1[i]) + rdm_log_pdf(t, driftc[i], gap[i], sp[i], s[i]);", fixed = TRUE)
-  expect_match(code, "if (reps1 > 0) lp += reps1 * rdm_log_surv(t, driftc[i], gap[i], sp[i], s[i]);", fixed = TRUE)
+  expect_match(code, "int reps1 = (response[rdm_i] == 1) ? n1[rdm_i] - 1 : n1[rdm_i];", fixed = TRUE)
+  expect_match(code, "if (response[rdm_i] == 1) rdm_lp = log(n1[rdm_i]) + rdm_log_pdf(rdm_dt, driftc[rdm_i], gap[rdm_i], sp[rdm_i], s[rdm_i]);", fixed = TRUE)
+  expect_match(code, "if (reps1 > 0) rdm_lp += reps1 * rdm_log_surv(rdm_dt, driftc[rdm_i], gap[rdm_i], sp[rdm_i], s[rdm_i]);", fixed = TRUE)
   expect_false(grepl("swald_", code, fixed = TRUE))
 })
 
@@ -519,15 +519,15 @@ test_that(".rdm_stan_code chains the winner branches for 4 categories", {
   code <- .rdm_stan_code("rdm_custom", cats, start_var = FALSE)
   expect_match(code, "real rdm_custom_lpdf(", fixed = TRUE)
   expect_match(code, "array[] int n4)", fixed = TRUE)
-  expect_match(code, "else if (response[i] == 3) lp = log(n3[i]) + swald_lpdf(rt[i] | cat3[i]", fixed = TRUE)
-  expect_match(code, "else lp = log(n4[i]) + swald_lpdf(rt[i] | cat4[i]", fixed = TRUE)
+  expect_match(code, "else if (response[rdm_i] == 3) rdm_lp = log(n3[rdm_i]) + swald_lpdf(rt[rdm_i] | cat3[rdm_i]", fixed = TRUE)
+  expect_match(code, "else rdm_lp = log(n4[rdm_i]) + swald_lpdf(rt[rdm_i] | cat4[rdm_i]", fixed = TRUE)
   expect_equal(lengths(regmatches(code, gregexpr("if (reps", code, fixed = TRUE))), 4)
 })
 
 test_that(".rdm_stan_code assigns the winner unconditionally for one category", {
   code <- .rdm_stan_code("rdm_custom", "corr", start_var = FALSE)
-  expect_match(code, "    lp = log(n1[i]) + swald_lpdf(rt[i] | corr[i]", fixed = TRUE)
-  expect_false(grepl("if lp", code, fixed = TRUE))
+  expect_match(code, "    rdm_lp = log(n1[rdm_i]) + swald_lpdf(rt[rdm_i] | corr[rdm_i]", fixed = TRUE)
+  expect_false(grepl("if rdm_lp", code, fixed = TRUE))
   dat <- data.frame(rt = c(0.5, 0.6), resp = c("corr", "corr"))
   model <- rdm(rt = "rt", response = "resp", version = "custom")
   expect_no_error(stancode(bmf(corr ~ 1, gap ~ 1, ndt ~ 1), dat, model, backend = "cmdstanr"))
@@ -536,8 +536,8 @@ test_that(".rdm_stan_code assigns the winner unconditionally for one category", 
 test_that(".rdm_stan_code generates the start-point race for the custom version", {
   cats <- c("target", "lure", "npl")
   code <- .rdm_stan_code("rdm_custom", cats, start_var = TRUE)
-  expect_match(code, "rdm_log_pdf(t, lure[i], gap[i], sp[i], s[i])", fixed = TRUE)
-  expect_match(code, "reps3 * rdm_log_surv(t, npl[i], gap[i], sp[i], s[i])", fixed = TRUE)
+  expect_match(code, "rdm_log_pdf(rdm_dt, lure[rdm_i], gap[rdm_i], sp[rdm_i], s[rdm_i])", fixed = TRUE)
+  expect_match(code, "reps3 * rdm_log_surv(rdm_dt, npl[rdm_i], gap[rdm_i], sp[rdm_i], s[rdm_i])", fixed = TRUE)
 })
 
 # -----------------------------------------------------------------------------
@@ -1548,7 +1548,7 @@ test_that("pp_check(resp_var) simulates rdm rt and response jointly", {
 # a variable that likelihood declares would make stanc refuse the program
 test_that("rdm refuses a category named after an identifier of its Stan code", {
   expect_error(
-    check_model(rdm(rt = "rt", response = "resp", version = "custom"), NULL, bmf(t ~ 1, other ~ 1, gap ~ 1, ndt ~ 1)),
+    check_model(rdm(rt = "rt", response = "resp", version = "custom"), NULL, bmf(rt ~ 1, other ~ 1, gap ~ 1, ndt ~ 1)),
     "Stan code uses"
   )
 })
@@ -1557,7 +1557,7 @@ test_that("rdm refuses a category named after an identifier of its Stan code", {
 # generated likelihood declares are listed here literally: a loop over the
 # vector itself would pass whatever it held
 test_that("rdm refuses every identifier of its Stan code as a category name", {
-  for (name in c("rt", "response", "t", "lp", "i")) {
+  for (name in c("rt", "response")) {
     f <- bmf(other ~ 1, gap ~ 1, ndt ~ 1)
     f[[name]] <- stats::as.formula(paste(name, "~ 1"))
     expect_error(
@@ -1565,5 +1565,24 @@ test_that("rdm refuses every identifier of its Stan code as a category name", {
       "Stan code uses",
       info = name
     )
+  }
+})
+
+# the locals of the generated likelihood carry an rdm_ prefix, and a category
+# cannot contain an underscore, so short names such as t and i are free for
+# categories; stanc is the judge of whether the program still parses
+test_that("rdm accepts the categories t, i and lp on both start-point paths", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  model <- rdm(rt = "rt", response = "resp", version = "custom")
+  dat <- data.frame(rt = c(0.5, 0.6, 0.7), resp = c("t", "i", "lp"))
+  fixed_sp <- bmf(t ~ 1, i ~ 1, lp ~ 1, gap ~ 1, ndt ~ 1)
+  free_sp <- bmf(t ~ 1, i ~ 1, lp ~ 1, gap ~ 1, ndt ~ 1, sp ~ 1)
+  for (f in list(fixed_sp, free_sp)) {
+    expect_no_error(check_model(model, NULL, f))
+    code <- suppressWarnings(stancode(f, dat, model))
+    expect_match(code, "real rdm_custom_lpdf(vector rt, vector mu, vector t, vector i, vector lp,",
+                 fixed = TRUE)
+    expect_true(rstan::stanc(model_code = code, verbose = FALSE)$status)
   }
 })
