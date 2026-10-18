@@ -61,7 +61,7 @@ runs:
 | Fixture post-processing | tests on the stored fits in `tests/testthat/assets/` | every pull request and push, Ubuntu, from the source tree | the `tests-source` workflow |
 | Stan compile | parity and gradient checks, the two `bmm_setup()` tests that need CmdStan | every pull request on Ubuntu; every push on three OS | `skip_unless_stan_tests()` reads `BMM_TEST_STAN`; the Windows and macOS pull-request jobs set it to `false` and install no CmdStan |
 | Sampling | recovery, `posterior_predict()` and `conditional_effects()` on real fits, refits, reference comparisons | a developer machine; the weekly `local-tests` workflow, not required | `tests/local/`, build-ignored |
-| CRAN | the unit and mock pipeline tier minus the three cross-model contract files and the tests over a second in CRAN mode (added 2026-10-15, R10) | CRAN's incoming pretest and daily checks: the built tarball, one worker on Windows, no CmdStan, no fixtures | a file-level `skip_on_cran()` in the contract files, `skip_on_cran()` on the slow tests; `cran-budget.R` caps the subset |
+| CRAN | the unit and mock pipeline tier minus the three cross-model contract files and the tests over 0.4 s in CRAN mode (added 2026-10-15, R10) | CRAN's incoming pretest and daily checks: the built tarball, one worker on Windows, no CmdStan, no fixtures | a file-level `skip_on_cran()` in the contract files, `skip_on_cran()` on the slow tests; `cran-budget.R` caps the subset |
 
 The Stan compile tier stays automated because its tests are the only ones
 that execute `inst/stan_chunks/*.stan`; running them on Windows and macOS
@@ -101,12 +101,12 @@ of 2026-10-12 the check step took 28.7 min on one worker. Once a push run
 is measured, the timeout becomes 1.5 times the larger of the pull-request
 and push measurements.
 
-Rules. `tests/testthat/test-conventions.R` checks R1, R2, R7, R8, the
+Rules. `tests/testthat/test-conventions.R` checks R1, R2, R4, R7, R8, the
 file-level part of R10 and part of R5 (size, draws, and that
 `make-fixtures.R` lists the fixture); it pins counts per file as literals,
 so a new occurrence fails loudly and names the rule. The budget job checks
-R6, and R3 only indirectly; the CRAN budget checks the cap of R10. R4's
-checker comes with #422. R9 and the rest of R5 are checked in review.
+R6, and R3 only indirectly; the CRAN budget checks the cap of R10. R9 and
+the rest of R5 are checked in review.
 
 - **R1 Tier placement.** `cmdstan_model()`, `backend = "cmdstanr"` and
   `$sample()` appear in `tests/testthat` only at the registered sites, each
@@ -151,9 +151,8 @@ checker comes with #422. R9 and the rest of R5 are checked in review.
   `tests/testthat`; a script such as
   `tests/local/make-fixtures.R` may use `set.seed()`.
 - **R9 New model checklist.** A model pull request adds
-  `test-model_<name>.R`, a fixture only when post-processing needs one,
-  and stays inside the budget; once the model-cases registry exists (R4),
-  also a `helper-model-<name>.R` provider.
+  `test-model_<name>.R`, a `helper-model-<name>.R` provider (R4), a
+  fixture only when post-processing needs one, and stays inside the budget.
 - **R10 CRAN tier.** CRAN returns a package whose check takes more than
   10 min, and its Windows machine runs the tests on one worker, several
   times slower than a developer machine. The three cross-model contract
@@ -313,4 +312,9 @@ last.
   (refits with three other seeds moved estimates by at most 0.16 SDs).
   `tests/local/conditional_effects_comprehensive.R` became
   `tests/local/test-conditional_effects-models.R`, on the same fits.
-
+- 2026-10-16, #580. Three corrections to this record, no rule changed: the
+  CRAN row of the tier table said "over a second", left from the first
+  round; the threshold is 0.4 s (R10). The rules summary listed R4's checker
+  as still to come; it landed with #422 (the registry entry above), and R4
+  is now listed among the rules `test-conventions.R` checks. R9 named the
+  provider as conditional on the registry; it is now unconditional.
