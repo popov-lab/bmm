@@ -128,7 +128,9 @@ if (make("bmmfit_lnr_ppcheck.rds")) {
   lnr_fit <- do.call(bmm, c(list(
     formula = bmf(correct ~ 0 + cond, error ~ 1, ndt ~ 1, s ~ 1),
     data = lnr_data,
-    model = lnr(rt = "rt", response = "response", n_choices = 3)
+    model = lnr(rt = "rt", response = "response", n_choices = 3),
+    # at the default 0.8 this fit had 5 divergent transitions in 150 draws
+    control = list(adapt_delta = 0.95)
   ), fit_args))
   save_fixture(lnr_fit, "bmmfit_lnr_ppcheck.rds", seed = 8)
 }
