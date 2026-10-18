@@ -25,6 +25,16 @@ test_that("imm() and dimm() default to 81 quadrature nodes", {
   expect_equal(formals(dimm)$vp_nodes, 81L)
 })
 
+test_that("dimm() refuses node counts the model refuses", {
+  # 21 nodes miss the density by about 2e-3, and a fractional count built a grid
+  # that recycled with a warning
+  expect_error(dimm(0.1, tau = 1, vp_nodes = 21), "odd number of at least 41")
+  expect_error(dimm(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
+  expect_error(dimm(0.1, tau = 1, vp_nodes = 80.5), "odd number of at least 41")
+  expect_error(dimm(0.1, tau = 1, vp_nodes = c(81, 121)), "odd number of at least 41")
+  expect_equal(dimm(0.1, tau = 1, vp_nodes = 81), dimm(0.1, tau = 1, vp_nodes = 81L))
+})
+
 test_that("the background activation is a visible fixed parameter", {
   model <- imm_model()
   expect_equal(model$fixed_parameters, list(mu = 0, b = 0))
