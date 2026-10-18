@@ -156,6 +156,12 @@ settable_link_functions.sdt_cdp <- function(model) {
 
 
 #' @title Continuous Dual-Process Signal Detection Theory Model
+#' @description Fits the continuous dual-process signal detection model to old/new
+#'   recognition data with Remember/Know judgments, separating familiarity and
+#'   recollection on continuous strength axes.
+#' @seealso The online article
+#'   [Dual-process and meta-d' SDT models](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html)
+#'   shows how to fit the model step by step.
 #' @name sdt_cdp
 #' @details `r model_docs(.model_sdt_cdp())`
 #'

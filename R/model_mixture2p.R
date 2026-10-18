@@ -66,6 +66,12 @@ settable_links.mixture2p <- function(model) {
 # user facing alias
 
 #' @title `r .model_mixture2p()$name`
+#' @description Fits the two-parameter mixture model of Zhang and Luck (2008) to response
+#'   errors from continuous reproduction tasks in visual working memory: the
+#'   precision of memory and the probability of guessing.
+#' @seealso The online article
+#'   [Mixture models for visual working memory](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
+#'   shows how to fit the model step by step.
 #' @details `r model_docs(.model_mixture2p())`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to

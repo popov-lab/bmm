@@ -38,7 +38,9 @@ keeps the identity link.}
 An object of class \code{bmmodel}
 }
 \description{
-Ranking Signal Detection Theory Model
+Fits a signal detection model to ranking data, where the target's rank
+among \code{m} alternatives is recorded, estimating sensitivity from how often
+the target is ranked first, second, and so on.
 }
 \details{
 \itemize{
@@ -156,5 +158,10 @@ Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026).
 Extreme-value signal detection theory for recognition memory: The
 parametric road not taken. \emph{Psychological Review}. Advance online
 publication. \doi{10.1037/rev0000615}
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_sdt.html}{Signal Detection Theory models}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

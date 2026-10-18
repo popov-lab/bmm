@@ -78,7 +78,11 @@ and fixed off by default, and for \code{logmratio}, read through \code{exp()}.}
 An object of class \code{bmmodel}
 }
 \description{
-Confidence Rating Signal Detection Theory Model
+Fits signal detection models to confidence ratings from detection or old/new
+recognition tasks: sensitivity, the ratio of the signal and noise standard
+deviations, and ordered confidence thresholds. The \code{dpsdt} version adds a
+recollection threshold (dual-process SDT), and the \code{metad} version estimates
+meta-d'.
 }
 \details{
 Three versions share the confidence-rating response interface,
@@ -505,5 +509,11 @@ Parsimonious estimation of signal detection models from confidence ratings.
 
 Paulewicz, B., & Blaut, A. (2022). The general causal cumulative model of
 ordinal response. \emph{PsyArXiv}. \doi{10.31234/osf.io/e7a3x}
+}
+\seealso{
+The online articles
+\href{https://venpopov.com/bmm/articles/bmm_sdt.html}{Signal Detection Theory models} and
+\href{https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html}{Dual-process and meta-d' SDT models}
+show how to fit the model step by step.
 }
 \keyword{bmmodel}

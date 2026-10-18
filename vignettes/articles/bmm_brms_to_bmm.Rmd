@@ -1,5 +1,6 @@
 ---
 title: "From brms to bmm"
+description: "For brms users: the same two-parameter mixture model fitted in brms and in bmm, and what each difference in the bmm code means for formulas, links and priors."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

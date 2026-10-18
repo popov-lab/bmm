@@ -94,9 +94,16 @@ settable_links.imm <- function(model) {
 # user facing alias
 
 #' @title `r .model_imm()$name`
-#' @description Three versions of the `r .model_imm()$name` - the full, bsc, and abc.
-#' `IMMfull()`, `IMMbsc()`, and `IMMabc()` are deprecated and will be removed in the future.
-#' Please use `imm(version = 'full')`, `imm(version = 'bsc')`, or `imm(version = 'abc')` instead.
+#' @seealso The online article
+#'   [The Interference Measurement Model (IMM)](https://venpopov.com/bmm/articles/bmm_imm.html)
+#'   shows how to fit the model step by step.
+#' @description Fits the interference measurement model of Oberauer and Lin (2017)
+#' to response errors from continuous reproduction tasks in visual working
+#' memory. Three versions are available: `imm(version = 'full')`,
+#' `imm(version = 'bsc')`, and `imm(version = 'abc')`.
+#'
+#' `IMMfull()`, `IMMbsc()`, and `IMMabc()` are deprecated and will be removed in
+#' the future; use `imm(version = ...)` instead.
 #'
 #' @name imm
 #' @details `r model_docs(.model_imm(), components =c('domain', 'task', 'name', 'citation'))`

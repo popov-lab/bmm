@@ -24,7 +24,9 @@ degrees to radians using the \code{deg2rad} function.}
 An object of class \code{bmmodel}
 }
 \description{
-Signal Discrimination Model (SDM) by Oberauer (2023)
+Fits the signal discrimination model of Oberauer (2023) to response errors
+from continuous reproduction tasks in visual working memory, with memory
+strength (\code{c}) and precision (\code{kappa}) as parameters.
 }
 \details{
 see \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for a detailed description of the model

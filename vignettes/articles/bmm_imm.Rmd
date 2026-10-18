@@ -1,5 +1,6 @@
 ---
 title: "The Interference Measurement Model (IMM)"
+description: "Fit the interference measurement model (IMM) of visual working memory to continuous reproduction data in R, with hierarchical Bayesian estimation in bmm."
 output: bookdown::html_document2
 author: 
   - Gidon Frischkorn

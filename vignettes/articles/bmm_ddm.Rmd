@@ -1,5 +1,6 @@
 ---
 title: "The Diffusion Decision Model (ddm)"
+description: "Fit the diffusion decision model (Wiener DDM) to trial-level response times and choices in R, with hierarchical Bayesian estimation in bmm and brms."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

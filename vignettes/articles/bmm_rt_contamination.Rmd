@@ -1,5 +1,6 @@
 ---
 title: "Handling RT Contamination in Evidence Accumulation Models"
+description: "Handle contaminant response times (fast guesses, lapses) before fitting EZ-diffusion, diffusion or shifted Wald models in R, with mixture-based flagging in bmm."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

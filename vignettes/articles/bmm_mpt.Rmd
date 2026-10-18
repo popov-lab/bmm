@@ -1,5 +1,6 @@
 ---
 title: "Multinomial Processing Tree (MPT) models"
+description: "Specify and fit hierarchical Bayesian multinomial processing tree (MPT) models in R, from the two-high-threshold model to parameter constraints and covariates."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

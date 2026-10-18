@@ -243,4 +243,9 @@ m3_fit <- bmm(
 summary(m3_fit)
 \dontshow{\}) # examplesIf}
 }
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_m3.html}{The Multinomial / Memory Measurement Model (M3)}
+shows how to fit the model step by step.
+}
 \keyword{bmmodel}

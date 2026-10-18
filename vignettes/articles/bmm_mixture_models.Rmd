@@ -1,5 +1,6 @@
 ---
 title: "Mixture models for visual working memory"
+description: "Fit the two- and three-parameter mixture models (Zhang & Luck, 2008; Bays et al., 2009) to continuous reproduction data in R with hierarchical Bayesian estimation."
 output: bookdown::html_document2
 author:
   - Ven Popov

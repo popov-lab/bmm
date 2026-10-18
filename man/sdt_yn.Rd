@@ -444,5 +444,8 @@ unequal-variance signal detection model of recognition memory.
 observed hit and false-alarm rates, without fitting: use them for a quick check of a fitted value, and
 this model when you need a hierarchical or condition-wise estimate, or
 unequal variance.
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_sdt.html}{Signal Detection Theory models}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

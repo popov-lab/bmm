@@ -106,6 +106,13 @@
 # automatically based on the information in the .model_ezdm()$info
 
 #' @title `r .model_ezdm()$name`
+#' @description Fits the EZ-diffusion model to summary statistics of choice response times
+#'   (mean RT, RT variance, and the number of upper-boundary responses per
+#'   condition), estimating drift rate, boundary separation, non-decision time
+#'   and, in the 4-parameter version, the starting point.
+#' @seealso The online article
+#'   [The EZ-Diffusion Model (EZDM)](https://venpopov.com/bmm/articles/bmm_ezdm.html)
+#'   shows how to fit the model step by step.
 #' @name ezdm
 #' @details `r model_docs(.model_ezdm(version = "4par"))`
 #'

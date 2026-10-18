@@ -1,5 +1,6 @@
 ---
 title: "The Signal Discrimination Model (SDM)"
+description: "Fit the signal discrimination model (SDM; Oberauer, 2023) to continuous reproduction data in R, with hierarchical Bayesian estimation in bmm."
 output: bookdown::html_document2
 author: 
   - Ven Popov

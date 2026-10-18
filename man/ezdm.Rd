@@ -41,7 +41,10 @@ four parameter version (version = "4par"), that allows to freely estimate the st
 An object of class \code{bmmodel}
 }
 \description{
-EZ-Diffusion Model
+Fits the EZ-diffusion model to summary statistics of choice response times
+(mean RT, RT variance, and the number of upper-boundary responses per
+condition), estimating drift rate, boundary separation, non-decision time
+and, in the 4-parameter version, the starting point.
 }
 \details{
 \itemize{
@@ -191,5 +194,10 @@ fixed_effects <- brms::fixef(fit)
 fixed_effects["drift_Intercept", "Estimate"]
 exp(fixed_effects[c("bound_Intercept", "ndt_Intercept"), "Estimate"])
 }
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_ezdm.html}{The EZ-Diffusion Model (EZDM)}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

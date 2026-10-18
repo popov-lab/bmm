@@ -1,5 +1,6 @@
 ---
 title: "Testing hypotheses and comparing models"
+description: "Test hypotheses about measurement model parameters in R: posterior differences, Savage-Dickey and bridge sampling Bayes factors, and LOO model comparison with bmm."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

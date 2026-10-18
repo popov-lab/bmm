@@ -44,7 +44,9 @@ its cumulative distribution function. One of:
 An object of class \code{bmmodel}
 }
 \description{
-m-Alternative Forced Choice Signal Detection Theory Model
+Fits a signal detection model to m-alternative forced choice (m-AFC) data,
+estimating sensitivity from the number of correct choices among \code{m}
+alternatives.
 }
 \details{
 \itemize{
@@ -142,5 +144,10 @@ DeCarlo, L. T. (2012). On a signal detection approach to m-alternative
 forced choice with bias, with maximum likelihood and Bayesian approaches
 to estimation. \emph{Journal of Mathematical Psychology}, \emph{56}(3),
 196--207. \doi{10.1016/j.jmp.2012.02.004}
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_sdt.html}{Signal Detection Theory models}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

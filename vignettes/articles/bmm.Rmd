@@ -1,5 +1,6 @@
 ---
 title: "Get started with bmm"
+description: "Install bmm, check that your machine can fit Stan models, find the measurement model for your task, and fit a first hierarchical Bayesian model in R."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

@@ -114,6 +114,9 @@
 }
 
 #' @title `r .model_cswald()$name`
+#' @description Fits the censored shifted Wald model to response times from choice tasks
+#'   with few errors, estimating drift rate, boundary and non-decision time;
+#'   error responses enter the likelihood as censored observations.
 #' @name cswald
 #' @details `r model_docs(.model_cswald())`
 #' @param rt The name of the variable in the dataset containing the response
@@ -159,6 +162,9 @@
 #' @keywords bmmodel
 #' @seealso [dcswald()] and [rcswald()] for the density and random generation
 #'   functions.
+#'   The online article
+#'   [The Censored Shifted Wald Model (cswald)](https://venpopov.com/bmm/articles/bmm_cswald.html)
+#'   shows how to fit the model step by step.
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate simulated data from the diffusion model
 #' dat <- rcswald(n = 500, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5, s = 1)

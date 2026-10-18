@@ -18,7 +18,9 @@ in degrees to radian using the \code{deg2rad} function.}
 An object of class \code{bmmodel}
 }
 \description{
-Two-parameter mixture model by Zhang and Luck (2008).
+Fits the two-parameter mixture model of Zhang and Luck (2008) to response
+errors from continuous reproduction tasks in visual working memory: the
+precision of memory and the probability of guessing.
 }
 \details{
 \itemize{
@@ -92,5 +94,10 @@ fit <- bmm(
   backend = "cmdstanr"
 )
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_mixture_models.html}{Mixture models for visual working memory}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

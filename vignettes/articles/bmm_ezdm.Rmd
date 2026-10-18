@@ -1,5 +1,6 @@
 ---
 title: "The EZ-Diffusion Model (EZDM)"
+description: "Fit the EZ-diffusion model as a hierarchical Bayesian model in R: drift rate, boundary separation and non-decision time from mean RT, RT variance and accuracy."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

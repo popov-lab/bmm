@@ -372,6 +372,9 @@ settable_links.sdt_yn <- function(model) {
 #'   observed hit and false-alarm rates, without fitting: use them for a quick check of a fitted value, and
 #'   this model when you need a hierarchical or condition-wise estimate, or
 #'   unequal variance.
+#'   The online article
+#'   [Signal Detection Theory models](https://venpopov.com/bmm/articles/bmm_sdt.html)
+#'   shows how to fit the model step by step.
 #'
 #' @references
 #' Green, D. M., & Swets, J. A. (1966). \emph{Signal detection theory and

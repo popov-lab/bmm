@@ -31,7 +31,10 @@ a regular expression to match the non-target feature columns in the dataset.}
 An object of class \code{bmmodel}
 }
 \description{
-Three-parameter mixture model by Bays et al (2009).
+Fits the three-parameter mixture model of Bays, Catalao and Husain (2009) to
+response errors from continuous reproduction tasks in visual working memory:
+the precision of memory and the probabilities of reporting the target, a
+non-target, or a random guess.
 }
 \details{
 \itemize{
@@ -141,5 +144,10 @@ fit <- bmm(
   backend = "cmdstanr"
 )
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_mixture_models.html}{Mixture models for visual working memory}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

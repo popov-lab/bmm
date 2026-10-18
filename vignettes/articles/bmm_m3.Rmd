@@ -1,5 +1,6 @@
 ---
 title: "The Multinomial / Memory Measurement Model (M3)"
+description: "Fit the memory measurement model (M3) to categorical recall and n-alternative choice data in R: define response categories and activation sources, then estimate them."
 output: bookdown::html_document2
 author: 
   - Gidon Frischkorn

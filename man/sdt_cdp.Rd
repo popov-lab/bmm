@@ -54,7 +54,9 @@ next to 0 on the native scale and cannot reach negative values.}
 An object of class \code{bmmodel}
 }
 \description{
-Continuous Dual-Process Signal Detection Theory Model
+Fits the continuous dual-process signal detection model to old/new
+recognition data with Remember/Know judgments, separating familiarity and
+recollection on continuous strength axes.
 }
 \details{
 \itemize{
@@ -275,5 +277,10 @@ Rotello, C. M., Macmillan, N. A., Reeder, J. A., & Wong, M. (2005). The
 remember response: Subject to bias, graded, and not a process-pure
 indicator of recollection. \emph{Psychonomic Bulletin & Review},
 \emph{12}(5), 865--873. \doi{10.3758/BF03196778}
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html}{Dual-process and meta-d' SDT models}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

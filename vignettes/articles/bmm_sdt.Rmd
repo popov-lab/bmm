@@ -1,5 +1,6 @@
 ---
 title: "Signal Detection Theory models"
+description: "Fit hierarchical Bayesian signal detection models in R to yes/no, confidence rating, m-AFC and ranking data, with unequal variance and ROC/AUC from the posterior."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

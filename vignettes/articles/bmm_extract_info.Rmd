@@ -1,5 +1,6 @@
 ---
 title: "Extracting default priors, the generated Stan code and Stan data"
+description: "Inspect a bmm model before fitting it: the informative default priors, the generated Stan code and the Stan data, with default_prior(), stancode() and standata()."
 output: bookdown::html_document2
 author: 
   - Ven Popov

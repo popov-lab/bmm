@@ -113,6 +113,12 @@ settable_link_functions.sdt_ranking <- function(model) {
 
 
 #' @title Ranking Signal Detection Theory Model
+#' @description Fits a signal detection model to ranking data, where the target's rank
+#'   among `m` alternatives is recorded, estimating sensitivity from how often
+#'   the target is ranked first, second, and so on.
+#' @seealso The online article
+#'   [Signal Detection Theory models](https://venpopov.com/bmm/articles/bmm_sdt.html)
+#'   shows how to fit the model step by step.
 #' @name sdt_ranking
 #' @details `r model_docs(.model_sdt_ranking())`
 #'

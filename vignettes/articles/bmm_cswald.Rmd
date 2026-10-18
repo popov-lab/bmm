@@ -1,5 +1,6 @@
 ---
 title: "The Censored Shifted Wald Model (cswald)"
+description: "Fit the censored shifted Wald model to response times from high-accuracy choice tasks in R: hierarchical Bayesian estimates of drift, boundary and non-decision time."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

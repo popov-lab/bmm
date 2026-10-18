@@ -79,6 +79,13 @@ settable_links.mixture3p <- function(model) {
 
 # user facing alias
 #' @title `r .model_mixture3p()$name`
+#' @description Fits the three-parameter mixture model of Bays, Catalao and Husain (2009) to
+#'   response errors from continuous reproduction tasks in visual working memory:
+#'   the precision of memory and the probabilities of reporting the target, a
+#'   non-target, or a random guess.
+#' @seealso The online article
+#'   [Mixture models for visual working memory](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
+#'   shows how to fit the model step by step.
 #' @details `r model_docs(.model_mixture3p())`
 #' @param resp_error The name of the variable in the dataset containing
 #'   the response error. The response error should code the response relative to

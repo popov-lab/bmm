@@ -446,7 +446,10 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   [dplyr::reframe()] for grouped operations.
 #'
 #' @seealso [flag_contaminant_rts()] for trial-level contamination
-#'   probabilities, [ezdm()] for fitting the EZ-Diffusion Model
+#'   probabilities, [ezdm()] for fitting the EZ-Diffusion Model.
+#'   The online article
+#'   [Handling RT contamination](https://venpopov.com/bmm/articles/bmm_rt_contamination.html)
+#'   shows when and how to use it.
 #'
 #' @keywords transform
 #' @export
@@ -884,7 +887,10 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 #'
 #' @seealso [ezdm_summary_stats()] for aggregated RT statistics with contamination
 #'   handling, [validate_fast_guesses()] for testing whether flagged contaminants
-#'   show random guessing behavior
+#'   show random guessing behavior.
+#'   The online article
+#'   [Handling RT contamination](https://venpopov.com/bmm/articles/bmm_rt_contamination.html)
+#'   shows when and how to use it.
 #'
 #' @keywords transform
 #' @export

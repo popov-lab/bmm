@@ -4,6 +4,9 @@
 # see file 'R/bmm_model_mixture3p.R' for an example
 
 #' @title Create a tree for a Multinomial Processing Tree (MPT) model
+#' @seealso The online article
+#'   [Multinomial Processing Tree (MPT) models](https://venpopov.com/bmm/articles/bmm_mpt.html)
+#'   shows how to fit the model step by step.
 #'
 #' @description Specifies a single tree of a multinomial processing tree model
 #'   by naming the tree and providing one branch-probability expression per
@@ -413,6 +416,9 @@ generated_parameters.mpt <- function(model) {
 # automatically based on the information in the .model_mpt()
 
 #' @title `r .model_mpt()$name`
+#' @seealso The online article
+#'   [Multinomial Processing Tree (MPT) models](https://venpopov.com/bmm/articles/bmm_mpt.html)
+#'   shows how to fit the model step by step.
 #' @name mpt
 #'
 #' @description

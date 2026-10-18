@@ -67,6 +67,12 @@ settable_links.sdt_mafc <- function(model) {
 
 
 #' @title m-Alternative Forced Choice Signal Detection Theory Model
+#' @description Fits a signal detection model to m-alternative forced choice (m-AFC) data,
+#'   estimating sensitivity from the number of correct choices among `m`
+#'   alternatives.
+#' @seealso The online article
+#'   [Signal Detection Theory models](https://venpopov.com/bmm/articles/bmm_sdt.html)
+#'   shows how to fit the model step by step.
 #' @name sdt_mafc
 #' @details `r model_docs(.model_sdt_mafc())`
 #'

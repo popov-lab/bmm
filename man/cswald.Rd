@@ -54,7 +54,9 @@ For more details, see Miller et al. (2018).}
 An object of class \code{bmmodel}
 }
 \description{
-Censored-Shifted Wald Model
+Fits the censored shifted Wald model to response times from choice tasks
+with few errors, estimating drift rate, boundary and non-decision time;
+error responses enter the likelihood as censored observations.
 }
 \details{
 \itemize{
@@ -148,5 +150,8 @@ fit <- bmm(
 \seealso{
 \code{\link[=dcswald]{dcswald()}} and \code{\link[=rcswald]{rcswald()}} for the density and random generation
 functions.
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_cswald.html}{The Censored Shifted Wald Model (cswald)}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

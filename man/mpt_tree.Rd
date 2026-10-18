@@ -105,4 +105,9 @@ tree_nolures
 # e.g. bmf(D ~ 0 + cond)
 model <- mpt(list(tree_lures, tree_nolures), tree_id = "tree")
 }
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_mpt.html}{Multinomial Processing Tree (MPT) models}
+shows how to fit the model step by step.
+}
 \keyword{bmmodel}

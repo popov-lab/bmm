@@ -57,9 +57,13 @@ columns in the dataset.}
 An object of class \code{bmmodel}
 }
 \description{
-Three versions of the Interference measurement model by Oberauer and Lin (2017). - the full, bsc, and abc.
-\code{IMMfull()}, \code{IMMbsc()}, and \code{IMMabc()} are deprecated and will be removed in the future.
-Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{imm(version = 'abc')} instead.
+Fits the interference measurement model of Oberauer and Lin (2017)
+to response errors from continuous reproduction tasks in visual working
+memory. Three versions are available: \code{imm(version = 'full')},
+\code{imm(version = 'bsc')}, and \code{imm(version = 'abc')}.
+
+\code{IMMfull()}, \code{IMMbsc()}, and \code{IMMabc()} are deprecated and will be removed in
+the future; use \code{imm(version = ...)} instead.
 }
 \details{
 \itemize{
@@ -325,6 +329,11 @@ fit <- bmm(
   backend = "cmdstanr"
 )
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_imm.html}{The Interference Measurement Model (IMM)}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}
 \keyword{deprecated}

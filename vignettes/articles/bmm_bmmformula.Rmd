@@ -1,5 +1,6 @@
 ---
 title: "Introduction to the bmmformula syntax"
+description: "How to write a bmmformula: predict each parameter of a measurement model from conditions and random effects, fix parameters to constants, and see the brms formula."
 output: bookdown::html_document2
 author: 
   - Ven Popov

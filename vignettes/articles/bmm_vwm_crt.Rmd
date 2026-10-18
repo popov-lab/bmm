@@ -1,5 +1,6 @@
 ---
 title: "Continuous reproduction tasks (CRT)"
+description: "Measurement models for continuous reproduction (delayed estimation) tasks in visual working memory, and which bmm model to use: mixture models, IMM or SDM."
 output: 
   bookdown::html_document2:
     keep_md: true

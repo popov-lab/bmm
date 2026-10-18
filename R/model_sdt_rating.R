@@ -335,6 +335,15 @@ settable_link_functions.sdt_rating <- function(model) {
 
 
 #' @title Confidence Rating Signal Detection Theory Model
+#' @description Fits signal detection models to confidence ratings from detection or old/new
+#'   recognition tasks: sensitivity, the ratio of the signal and noise standard
+#'   deviations, and ordered confidence thresholds. The `dpsdt` version adds a
+#'   recollection threshold (dual-process SDT), and the `metad` version estimates
+#'   meta-d'.
+#' @seealso The online articles
+#'   [Signal Detection Theory models](https://venpopov.com/bmm/articles/bmm_sdt.html) and
+#'   [Dual-process and meta-d' SDT models](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html)
+#'   show how to fit the model step by step.
 #' @name sdt_rating
 #' @details Three versions share the confidence-rating response interface,
 #'   selected with `version`:

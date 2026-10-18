@@ -1,5 +1,6 @@
 ---
 title: "Dual-process and meta-d′ signal detection models"
+description: "Fit dual-process SDT, meta-d′ and continuous dual-process (Remember/Know) models to confidence-rating recognition data in R with bmm."
 output: bookdown::html_document2
 author:
   - Gidon Frischkorn

@@ -67,6 +67,12 @@
 # automatically based on the information in the .model_ddm()$info
 
 #' @title `r .model_ddm()$name`
+#' @description Fits the Wiener diffusion decision model to trial-level response times and
+#'   binary choices, estimating drift rate, boundary separation, non-decision
+#'   time and the starting point.
+#' @seealso The online article
+#'   [The Diffusion Decision Model (ddm)](https://venpopov.com/bmm/articles/bmm_ddm.html)
+#'   shows how to fit the model step by step.
 #' @name ddm
 #' @details `r model_docs(.model_ddm())`
 #' @param rt Name of the reaction time variable coding reaction time in seconds in the data.

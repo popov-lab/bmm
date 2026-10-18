@@ -25,7 +25,9 @@ is an error, and a link that allows values the default link excludes
 An object of class \code{bmmodel}
 }
 \description{
-Diffusion Decision Model
+Fits the Wiener diffusion decision model to trial-level response times and
+binary choices, estimating drift rate, boundary separation, non-decision
+time and the starting point.
 }
 \details{
 \itemize{
@@ -149,5 +151,10 @@ fit <- bmm(
 # Check parameter recovery
 summary(fit)
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_ddm.html}{The Diffusion Decision Model (ddm)}
+shows how to fit the model step by step.
 }
 \keyword{bmmodel}

@@ -62,6 +62,9 @@ settable_links.sdm <- function(model) {
 # automatically based on the information in the .model_sdm_simple(NA)$info
 
 #' @title `r .model_sdm()$name`
+#' @description Fits the signal discrimination model of Oberauer (2023) to response errors
+#'   from continuous reproduction tasks in visual working memory, with memory
+#'   strength (`c`) and precision (`kappa`) as parameters.
 #' @name sdm
 #' @details see [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for a detailed description of the model
 #'   and how to use it. `r model_docs(.model_sdm())`

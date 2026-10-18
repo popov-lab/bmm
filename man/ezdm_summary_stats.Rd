@@ -150,6 +150,9 @@ ezdm_summary_stats(rt, response, version = "4par")
 }
 \seealso{
 \code{\link[=flag_contaminant_rts]{flag_contaminant_rts()}} for trial-level contamination
-probabilities, \code{\link[=ezdm]{ezdm()}} for fitting the EZ-Diffusion Model
+probabilities, \code{\link[=ezdm]{ezdm()}} for fitting the EZ-Diffusion Model.
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_rt_contamination.html}{Handling RT contamination}
+shows when and how to use it.
 }
 \keyword{transform}

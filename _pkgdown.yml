@@ -2,6 +2,18 @@ url: https://venpopov.com/bmm/
 template:
   bootstrap: 5
   math-rendering: mathjax
+  opengraph:
+    image:
+      src: logo.png
+      alt: "bmm package logo"
+
+# The CRAN Title and Description are written for CRAN; search results show
+# these instead, so they name the models people search for.
+home:
+  title: "bmm: Bayesian measurement models for cognitive data in R"
+  description: >
+    Fit cognitive measurement models in R with hierarchical Bayesian estimation:
+    mixture models, IMM, SDM, signal detection, MPT, M3 and diffusion models via brms.
 
 development:
   mode: auto

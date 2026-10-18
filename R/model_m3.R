@@ -130,6 +130,9 @@ settable_link_functions.m3 <- function(model) {
 # automatically based on the information in the .model_M3()$info
 
 #' @title `r .model_m3()$name`
+#' @seealso The online article
+#'   [The Multinomial / Memory Measurement Model (M3)](https://venpopov.com/bmm/articles/bmm_m3.html)
+#'   shows how to fit the model step by step.
 #' @name m3
 #'
 #' @description

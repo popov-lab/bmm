@@ -112,6 +112,9 @@ attr(probs, "diagnostics")
 \seealso{
 \code{\link[=ezdm_summary_stats]{ezdm_summary_stats()}} for aggregated RT statistics with contamination
 handling, \code{\link[=validate_fast_guesses]{validate_fast_guesses()}} for testing whether flagged contaminants
-show random guessing behavior
+show random guessing behavior.
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_rt_contamination.html}{Handling RT contamination}
+shows when and how to use it.
 }
 \keyword{transform}

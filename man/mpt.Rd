@@ -303,4 +303,9 @@ native_parameters(fit, re_formula = NA, summary = TRUE)
 }
 
 }
+\seealso{
+The online article
+\href{https://venpopov.com/bmm/articles/bmm_mpt.html}{Multinomial Processing Tree (MPT) models}
+shows how to fit the model step by step.
+}
 \keyword{bmmodel}
