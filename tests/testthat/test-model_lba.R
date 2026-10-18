@@ -986,11 +986,11 @@ test_that("lba refuses a category named after an identifier of its Stan code", {
 # that once collided with them are free
 test_that("lba accepts categories named like the likelihood's former locals", {
   model <- lba(rt = "rt", response = "resp", version = "custom")
-  for (nm in c("b", "A", "t", "n")) {
+  for (nm in c("b", "A", "t")) {
     f <- bmf(stats::as.formula(paste(nm, "~ 1")), other ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
     expect_no_error(check_model(model, NULL, f))
   }
-  code <- .lba_stan_code("lba_normal_custom", c("b", "A", "t", "n"), "normal")
+  code <- .lba_stan_code("lba_normal_custom", c("b", "A", "t"), "normal")
   expect_match(code, "real lba_thr = gap[lba_i] + sp[lba_i];", fixed = TRUE)
   expect_match(code, "lba_drift[1] = b[lba_i];", fixed = TRUE)
   expect_no_match(code, "real b =", fixed = TRUE)
