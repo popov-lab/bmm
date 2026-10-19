@@ -1152,8 +1152,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   rt_shifted[!started] <- 1
   # a bound at or below 0 has neither density nor survival; the Wald terms would
   # warn about log(bound) there, so they get a placeholder like rt does
-  has_bound <- rep_len(bound, length(rt_shifted)) > 0
-  bound <- rep_len(bound, length(rt_shifted))
+  has_bound <- bound > 0
   bound[!has_bound] <- 1
 
   if (version == "simple") {

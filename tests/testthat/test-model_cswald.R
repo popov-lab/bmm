@@ -758,9 +758,11 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
     )
 
     # a bound of zero or below has neither density nor survival: -Inf for both
-    # responses, never the NaN that log(bound) or the survivor would give for the
-    # negative one (#548). The vectorized overload is what fits compile, so its
-    # total needs the check too; the last element keeps a valid bound
+    # responses, never the NaN that log(bound) would give for the negative one
+    # (#548). The vectorized overload is what fits compile, so its total needs
+    # the check too; the last element keeps a valid bound. The density guards
+    # make every element here -Inf already, so the survivor guards are pinned
+    # by the separate data below
     guard <- list(
       N = 5, rt = rep(1, 5), dec = c(0L, 1L, 0L, 1L, 1L), mu = rep(0, 5),
       drift = rep(2, 5), bound = c(0, 0, -0.5, -0.5, 1.5), ndt = rep(0.2, 5),
@@ -771,9 +773,10 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
       refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
     ))
     lp_guard <- as.numeric(guard_fit$draws("lp_scalar", format = "draws_matrix")[1, ])
-    lp_guard_r <- with(guard, .dcswald(rt, dec, drift, bound, ndt, zr, s,
+    # silent: without the bound placeholder the Wald terms warn about log(bound)
+    lp_guard_r <- expect_silent(with(guard, .dcswald(rt, dec, drift, bound, ndt, zr, s,
       version = version, log = TRUE
-    ))
+    )))
     expect_identical(lp_guard[1:4], rep(-Inf, 4))
     expect_identical(lp_guard_r[1:4], rep(-Inf, 4))
     expect_identical(
@@ -781,6 +784,59 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
       -Inf
     )
     expect_equal(lp_guard[5], lp_guard_r[5], tolerance = 1e-10)
+
+    # the survivor alone, at a bound of exactly 0 with drift * (rt - ndt) large:
+    # there it is finite (about -49.9 for drift 5, rt - ndt 1) unless the guards
+    # in swald_lccdf and swald_log_surv_vec return -Inf. A bound below 0 already
+    # gives -Inf without them. Row 1 reaches the survivor as the censored trial
+    # (simple) or as the losing accumulator (crisk, zr = 1 puts the upper bound
+    # at 0 while the lower one wins); row 2 is valid, so the vectorized total is
+    # -Inf only through row 1's survivor
+    surv <- list(
+      N = 2, rt = rep(1.2, 2), dec = c(0L, 1L), mu = rep(0, 2),
+      drift = rep(5, 2), bound = c(if (version == "simple") 0 else 1.5, 1.5),
+      ndt = rep(0.2, 2), s = rep(1, 2), zr = c(1, 0.5)
+    )
+    surv_fit <- withr::with_preserve_seed(model$sample(
+      data = surv, chains = 1, iter_sampling = 1, fixed_param = TRUE,
+      refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
+    ))
+    lp_surv <- as.numeric(surv_fit$draws("lp_scalar", format = "draws_matrix")[1, ])
+    expect_identical(lp_surv[1], -Inf)
+    expect_true(is.finite(lp_surv[2]))
+    expect_identical(
+      as.numeric(surv_fit$draws("lp_vector", format = "draws_matrix")[1, 1]),
+      -Inf
+    )
+  }
+})
+
+test_that("the R cswald likelihood keeps the recycled length of its arguments at bound <= 0 (#548)", {
+  # one rt against several bounds: the result has one value per bound, as the
+  # Wald terms recycle (the three values per version are the unguarded results)
+  expect_equal(
+    dcswald(rt = 1, response = 1, drift = 2, bound = c(1, 1.5, 2), ndt = 0.2, log = TRUE),
+    c(-0.809223206, -0.185008098, 0.008923974),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    dcswald(
+      rt = 1, response = 1, drift = 2, bound = c(1, 1.5, 2), ndt = 0.2,
+      version = "crisk", log = TRUE
+    ),
+    c(-2.1728514, -1.3701162, -0.8248858),
+    tolerance = 1e-8
+  )
+
+  # -Inf exactly where the bound is at or below 0, finite elsewhere
+  for (version in c("simple", "crisk")) {
+    ll <- expect_silent(.dcswald(
+      rt = rep(1, 5), response = c(1, 0, 1, 0, 1), drift = 2,
+      bound = c(1.5, 0, 1.5, -0.5, 2), ndt = 0.2, zr = 0.5, s = 1,
+      version = version, log = TRUE
+    ))
+    expect_identical(is.finite(ll), c(TRUE, FALSE, TRUE, FALSE, TRUE))
+    expect_identical(ll[c(2, 4)], c(-Inf, -Inf))
   }
 })
 
