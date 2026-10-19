@@ -196,6 +196,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     create_initfun, c(list(model, data, config_args$formula, prior), fit_frame_args(object, dots))
   )
 
+  control <- sampler_control(object, dots, configure_control(
+    carried_control(object, dots),
+    dots$backend %||% object$backend %||% "rstan",
+    dots$algorithm %||% object$algorithm %||% "sampling"
+  ))
+
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
   # sdm run metadata) were computed for the original data and formula. The
@@ -203,15 +209,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   object <- NextMethod("update", object,
     newdata = newdata,
     prior = prior, recompile = recompile,
-    stanvars = new_fit_args$stanvars, init = init,
-    control = configure_control(
-      carried_control(object, dots),
-      dots$backend %||% object$backend %||% "rstan",
-      dots$algorithm %||% object$algorithm %||% "sampling"
-    ), ...
+    stanvars = new_fit_args$stanvars, init = init, control = control, ...
   )
-  # without a recompile brms samples with `init` but keeps the old fit's stan_args
-  object$stan_args$init <- init
+  # without a recompile brms samples with `init` and `control` but keeps the old
+  # fit's stan_args, and a chained update() would carry the control from before
+  # this one. Single brackets, because `init = NULL` must keep its slot
+  object$stan_args[c("init", "control")] <- list(init, control)
 
   # bmm postprocessing
   object <- postprocess_brm(model, object,
@@ -436,19 +439,15 @@ carried_prior <- function(prior) {
 
 # brms::update.brmsfit() merges the fit's stored control key by key with the one
 # the call names, and keeps none of it when backend or algorithm changes.
-# update.bmmfit() always names a control, so the rule is applied here. rstan fits
-# also get the rest of the old sampler's control from brms itself; cmdstanr fits
-# store it nowhere else. A fit without a backend or algorithm field counts as
-# changed, because brms resolves the missing field to its first choice and then
-# finds it different. step_size and stepsize are one argument under two
-# spellings, so a call naming either replaces whichever the fit stored; merged
-# by name they would survive as two keys and configure_control() would then
-# resolve the duplicate in the fit's favour
+# update.bmmfit() always names a control, so the rule is applied here. The
+# stored control is the one the fit was sampled with, also after an update()
+# that did not recompile, because update.bmmfit() writes it back.
+# step_size and stepsize are one argument under two spellings, so a call naming
+# either replaces whichever the fit stored; merged by name they would survive as
+# two keys and configure_control() would then resolve the duplicate in the fit's
+# favour
 carried_control <- function(object, dots) {
-  same_run <- !is.null(object$backend) && !is.null(object$algorithm) &&
-    identical(dots$backend %||% object$backend, object$backend) &&
-    identical(dots$algorithm %||% object$algorithm, object$algorithm)
-  if (!same_run) {
+  if (!is_same_run(object, dots)) {
     return(dots$control)
   }
   stored <- object$stan_args$control %||% list()
@@ -456,4 +455,25 @@ carried_control <- function(object, dots) {
     stored <- stored[not_in(names(stored), c("step_size", "stepsize"))]
   }
   utils::modifyList(stored, dots$control %||% list())
+}
+
+# On the same run brms::update.brmsfit() fills the keys the control leaves out
+# from the old rstan sampler's own arguments (cmdstanr fits keep none there),
+# after configure_control() has set the step size. Filled in here instead, brms
+# has nothing left to add, and the control update.bmmfit() stores is the one the
+# sampler got on either route, key for key what brms stores when it recompiles
+sampler_control <- function(object, dots, control) {
+  if (!is_same_run(object, dots)) {
+    return(control)
+  }
+  sampler <- attr(object$fit@sim$samples[[1]], "args")$control
+  c(control, sampler[not_in(names(sampler), names(control))])
+}
+
+# A fit without a backend or algorithm field counts as changed, because brms
+# resolves the missing field to its first choice and then finds it different
+is_same_run <- function(object, dots) {
+  !is.null(object$backend) && !is.null(object$algorithm) &&
+    identical(dots$backend %||% object$backend, object$backend) &&
+    identical(dots$algorithm %||% object$algorithm, object$algorithm)
 }
