@@ -1150,6 +1150,11 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   # return NaN there, so they are evaluated at a placeholder and overwritten
   started <- rt_shifted > 0
   rt_shifted[!started] <- 1
+  # a bound at or below 0 has neither density nor survival; the Wald terms would
+  # warn about log(bound) there, so they get a placeholder like rt does
+  has_bound <- rep_len(bound, length(rt_shifted)) > 0
+  bound <- rep_len(bound, length(rt_shifted))
+  bound[!has_bound] <- 1
 
   if (version == "simple") {
     log_ll <- .pwald(rt_shifted, drift = drift, bound = bound, s = s, lower.tail = FALSE, log.p = TRUE)
@@ -1167,6 +1172,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   # simple-version error there is certain, since no response can have arrived
   log_ll[!started] <- -Inf
   if (version == "simple") log_ll[!started & response == 0] <- 0
+  log_ll[started & !has_bound] <- -Inf
 
   if (log) log_ll else exp(log_ll)
 }

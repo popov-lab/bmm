@@ -42,6 +42,7 @@ real swald_lpdf(real rt, real drift, real bound, real ndt, real sigma) {
 real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
   real t_shifted = rt - ndt;
   if (t_shifted <= 0) return 0;  // process hasn't started, survival = 1
+  if (bound <= 0) return negative_infinity();  // a boundary at or below the start is crossed at once
 
   real sigma_sqrt_t = sigma * sqrt(t_shifted);
   real z1 = (drift * t_shifted - bound) / sigma_sqrt_t;
@@ -53,10 +54,10 @@ real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
 
 // vectorized forms on t = rt - ndt; keep in step with the scalar forms and .dwald() / .pwald()
 
-// t <= 0 anywhere makes the summed target -inf, exactly as the scalar sum would
+// t <= 0 or bound <= 0 anywhere makes the summed target -inf, exactly as the scalar sum would
 vector swald_log_dens_vec(vector t, vector drift, vector bound, vector sigma) {
   int n = rows(t);
-  if (min(t) <= 0) return rep_vector(negative_infinity(), n);
+  if (min(t) <= 0 || min(bound) <= 0) return rep_vector(negative_infinity(), n);
   vector[n] residual = bound - drift .* t;
   return log(bound)
          - 0.5 * (log(2 * pi()) + 2 * log(sigma) + 3 * log(t))
@@ -66,6 +67,7 @@ vector swald_log_dens_vec(vector t, vector drift, vector bound, vector sigma) {
 // requires t > 0; the fmax/fmin clamps keep discarded elements from injecting NaN adjoints
 vector swald_log_surv_vec(vector t, vector drift, vector bound, vector sigma) {
   int n = rows(t);
+  if (min(bound) <= 0) return rep_vector(negative_infinity(), n);
   vector[n] denom = sigma .* sqrt(t);
   vector[n] dxt = drift .* t;
   vector[n] z1 = (dxt - bound) ./ denom;

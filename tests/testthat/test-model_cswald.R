@@ -757,27 +757,30 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
       tolerance = 1e-10
     )
 
-    # a bound of zero or below has no density: -Inf, as for rt <= ndt, where
-    # log(bound) would give NaN for the negative one (#548). Only the scalar
-    # density has the guard, and only the simple version calls it with a
-    # response of 1 on a bound as given; the third element keeps a valid bound
-    if (version == "simple") {
-      guard <- list(
-        N = 3, rt = rep(1, 3), dec = rep(1L, 3), mu = rep(0, 3), drift = rep(2, 3),
-        bound = c(0, -0.5, 1.5), ndt = rep(0.2, 3), s = rep(1, 3), zr = rep(0.5, 3)
-      )
-      guard_fit <- withr::with_preserve_seed(model$sample(
-        data = guard, chains = 1, iter_sampling = 1, fixed_param = TRUE,
-        refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
-      ))
-      lp_guard <- as.numeric(guard_fit$draws("lp_scalar", format = "draws_matrix")[1, ])
-      expect_identical(lp_guard[1:2], c(-Inf, -Inf))
-      expect_equal(
-        lp_guard[3],
-        .dcswald(1, 1L, 2, 1.5, 0.2, zr = 0.5, s = 1, version = "simple", log = TRUE),
-        tolerance = 1e-10
-      )
-    }
+    # a bound of zero or below has neither density nor survival: -Inf for both
+    # responses, never the NaN that log(bound) or the survivor would give for the
+    # negative one (#548). The vectorized overload is what fits compile, so its
+    # total needs the check too; the last element keeps a valid bound
+    guard <- list(
+      N = 5, rt = rep(1, 5), dec = c(0L, 1L, 0L, 1L, 1L), mu = rep(0, 5),
+      drift = rep(2, 5), bound = c(0, 0, -0.5, -0.5, 1.5), ndt = rep(0.2, 5),
+      s = rep(1, 5), zr = rep(0.5, 5)
+    )
+    guard_fit <- withr::with_preserve_seed(model$sample(
+      data = guard, chains = 1, iter_sampling = 1, fixed_param = TRUE,
+      refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
+    ))
+    lp_guard <- as.numeric(guard_fit$draws("lp_scalar", format = "draws_matrix")[1, ])
+    lp_guard_r <- with(guard, .dcswald(rt, dec, drift, bound, ndt, zr, s,
+      version = version, log = TRUE
+    ))
+    expect_identical(lp_guard[1:4], rep(-Inf, 4))
+    expect_identical(lp_guard_r[1:4], rep(-Inf, 4))
+    expect_identical(
+      as.numeric(guard_fit$draws("lp_vector", format = "draws_matrix")[1, 1]),
+      -Inf
+    )
+    expect_equal(lp_guard[5], lp_guard_r[5], tolerance = 1e-10)
   }
 })
 
