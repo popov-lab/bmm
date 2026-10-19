@@ -771,3 +771,45 @@ test_that("the constraint message fires exactly for the user rows combine_prior(
     "fixed at", fixed = TRUE
   )
 })
+
+test_that("a parameter fixed in the formula keeps its constant over a user prior on its intercept (#549)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.silent = 1)
+  # sdm has no configure_prior method of its own, so the constant comes from
+  # fixed_pars_priors() alone; bmm writes the fixed value as given, onto the
+  # link-scale intercept
+  fit_with <- function(prior) {
+    bmm(bmf(c ~ 1, kappa = 3), small_data(), sdm("dev_rad"),
+      prior = prior, backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  }
+
+  on_kappa <- brms::set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")
+  msgs <- displacement_messages(fit <- fit_with(on_kappa))
+  expect_length(msgs, 1)
+  expect_match(msgs, 'dpar = "kappa", class = "Intercept": normal(2, 1) replaced by constant(3)', fixed = TRUE)
+  expect_equal(fit$prior$prior[fit$prior$dpar == "kappa"], "constant(3)")
+
+  on_c <- brms::set_prior("normal(1, 1)", class = "Intercept", dpar = "c")
+  expect_length(displacement_messages(fit <- fit_with(on_c)), 0)
+  expect_equal(fit$prior$prior[fit$prior$dpar == "c"], "normal(1, 1)")
+  expect_equal(fit$prior$prior[fit$prior$dpar == "kappa"], "constant(3)")
+})
+
+test_that("a user prior on a parameter mpt fixes on the link scale is messaged once (#549)", {
+  withr::local_options(bmm.silent = 1)
+  # the probability-scale constant of fixed_pars_priors() and the link-scale
+  # one of configure_prior.mpt() both replace the user's row, which is one
+  # displaced prior, not two
+  user <- brms::set_prior("normal(0, 1)", class = "b", coef = "Intercept", nlpar = "g")
+  msgs <- displacement_messages(
+    fit <- bmm(bmf(D ~ 1, g = 0.5), mpt_2htm_data(), mpt(mpt_2htm_trees(), tree_id = "item_type"),
+      prior = user, backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  )
+  expect_length(msgs, 1)
+  expect_match(msgs, 'nlpar = "g", class = "b", coef = "Intercept": normal(0, 1) replaced by constant(0)',
+    fixed = TRUE
+  )
+  expect_equal(fit$prior$prior[fit$prior$nlpar == "g" & fit$prior$coef == "Intercept"], "constant(0)")
+})
