@@ -83,7 +83,10 @@
 
  test_that("RDM Stan fixed-sp wrapper matches R likelihood for simple grids", {
    skip_on_cran()
+   skip_unless_stan_tests()
    skip_if_not_installed("rstan")
+   # stan_model() needs the BH headers, which a binary rstan install leaves out
+   skip_if_not_installed("BH")
 
    .rdm_expose_stan_functions("simple_fixed")
 
@@ -129,7 +132,10 @@
 
  test_that("RDM Stan free-sp wrapper matches R likelihood for simple grids", {
    skip_on_cran()
+   skip_unless_stan_tests()
    skip_if_not_installed("rstan")
+   # stan_model() needs the BH headers, which a binary rstan install leaves out
+   skip_if_not_installed("BH")
 
    .rdm_expose_stan_functions("simple_free")
 
@@ -179,7 +185,10 @@
 
  test_that("RDM Stan free-sp wrapper matches R likelihood for custom grids", {
    skip_on_cran()
+   skip_unless_stan_tests()
    skip_if_not_installed("rstan")
+   # stan_model() needs the BH headers, which a binary rstan install leaves out
+   skip_if_not_installed("BH")
 
    .rdm_expose_stan_functions("custom_free")
 
