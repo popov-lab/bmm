@@ -573,7 +573,7 @@ message_displaced_priors <- function(user_prior, model_prior, fixed = list()) {
   if (length(displaced) == 0) {
     return(invisible())
   }
-  rows <- vapply(displaced, function(i) {
+  rows <- paste(vapply(displaced, function(i) {
     row <- user_prior[i, ]
     fields <- c("dpar", "nlpar", "class", "coef", "group", "resp")
     named <- fields[nzchar(unlist(row[fields]))]
@@ -581,8 +581,7 @@ message_displaced_priors <- function(user_prior, model_prior, fixed = list()) {
     par <- intersect(c(row$nlpar, row$dpar), names(fixed))
     fixed_at <- if (length(par)) glue(" ({par} fixed at {fixed[[par]]})") else ""
     glue("  {where}: {row$prior} replaced by {model_prior$prior[by[i]]}{fixed_at}")
-  }, character(1))
-  rows <- paste(rows, collapse = "\n")
+  }, character(1)), collapse = "\n")
   message2(
     "A constraint of the model, or a fixed parameter, replaces the prior you \\
     set on these coefficients, so it is not used:
