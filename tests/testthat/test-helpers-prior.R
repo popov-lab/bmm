@@ -750,6 +750,15 @@ test_that("the constraint message fires exactly for the user rows combine_prior(
   expect_length(displacement_messages(message_displaced_priors(NULL, constraint)), 0)
   expect_length(displacement_messages(message_displaced_priors(constraint, NULL)), 0)
 
+  # each row names its own location, group included, and the constraint that
+  # replaced it, not the first constraint
+  sd_row <- brms::prior_("normal(0, 1)", class = "sd", coef = "x1", group = "id", nlpar = "a")
+  expect_match(
+    displacement_messages(message_displaced_priors(sd_row, constraint)),
+    'nlpar = "a", class = "sd", coef = "x1", group = "id": normal(0, 1) replaced by constant(1e-8)',
+    fixed = TRUE
+  )
+
   # a row on a fixed parameter names the fixed value, whoever fixed it
   user <- brms::prior_("normal(0, 1)", class = "b", coef = "x1", nlpar = "a")
   expect_match(
