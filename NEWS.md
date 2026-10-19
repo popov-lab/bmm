@@ -1,7 +1,7 @@
 # bmm (development version)
 
 ### Bug fixes
-* A prior you set on a coefficient the model constrains, such as the intercept of a parameter fixed in an `mpt()` formula (`bmf(g = 0.5)`), was replaced by the constraint without notice. The fit still uses the constraint, but bmm now prints a message naming each such coefficient with your prior and the one used instead. Your prior on that coefficient has no effect, so you can remove it from `prior` (#549).
+* A prior you set on a coefficient the model constrains, such as the intercept of a parameter fixed in an `mpt()` formula (`bmf(g = 0.5)`), was replaced by the constraint without notice. The fit still uses the constraint, but bmm now prints a message naming each such coefficient, your prior and the constant used instead. `update(fit, prior = )` now behaves the same; before, a prior given there replaced the constraint, so the refit sampled a coefficient the model fixes. Your prior on that coefficient has no effect, so you can remove it from `prior` (#549).
 
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
