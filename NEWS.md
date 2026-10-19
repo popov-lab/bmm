@@ -1,7 +1,7 @@
 # bmm (development version)
 
 ### Bug fixes
-* A fit updated without recompiling the Stan model (`rstan`, or `cmdstanr` while its compiled model file exists) now stores the initial values it was sampled with. It kept those of the fit you started from, which after `update(newdata = )` described the old data. A fit saved before the oversized-file fix (see 1.4.1) now shrinks through such an `update()`. Estimates were never affected (#520).
+* A fit updated without recompiling the Stan model (`rstan`, or `cmdstanr` while its compiled model file exists) now stores the initial values and sampler settings it ran with. It kept those of the fit you started from: after `update(newdata = )` the initial values described the old data, and a chained `update()` sampled with the `adapt_delta` and step size from before the previous `update()`. A fit saved before the oversized-file fix (#518) now shrinks through such an `update()` (#520).
 
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
