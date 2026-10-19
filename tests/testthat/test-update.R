@@ -438,9 +438,24 @@ test_that("a chained update() after a switch of algorithm hands the sampler no s
   expect_equal(run$sampled$control, list())
 })
 
+test_that("an abbreviated algorithm or backend is the fit's own run, as brms reads it", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  run <- local_reused_model_fit(control = list(step_size = 0.05))
+  up1 <- update_reused(run$fit, algorithm = "samp")
+  expect_equal(run$sampled$control, list(step_size = 0.05))
+  expect_equal(up1$stan_args$control, list(step_size = 0.05))
+
+  update_reused(up1)
+  expect_equal(run$sampled$control, list(step_size = 0.05))
+
+  up2 <- update_reused(run$fit, backend = "mo")
+  expect_equal(up2$stan_args$control, list(step_size = 0.05))
+})
+
 test_that("update() fills the control from the old rstan sampler as brms does", {
   skip_if_not_installed("rstan")
-  stub <-methods::new("stanfit", sim = list(samples = list(structure(list(), args = list(
+  stub <- methods::new("stanfit", sim = list(samples = list(structure(list(), args = list(
     control = list(adapt_delta = 0.8, max_treedepth = 10, stepsize = 1)
   )))))
   object <- list(backend = "rstan", algorithm = "sampling", fit = stub)
