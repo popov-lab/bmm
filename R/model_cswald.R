@@ -479,10 +479,13 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
 ############################################################################# !
 
 # The likelihood is -Inf wherever ndt >= min(rt), so the start for ndt has to
-# come from the data; the other ranges do not depend on it
+# come from the data; the other ranges do not depend on it. rt = 0 is left out:
+# a censored response there never binds, and a response of 1 there cannot be
+# fitted with any positive ndt
 #' @export
 create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
-  model$init_ranges$ndt <- c(0.4, 0.6) * min(data[[model$resp_vars$rt]])
+  rt <- data[[model$resp_vars$rt]]
+  model$init_ranges$ndt <- c(0.4, 0.6) * min(rt[rt > 0])
   NextMethod()
 }
 

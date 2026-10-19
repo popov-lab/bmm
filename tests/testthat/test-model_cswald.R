@@ -424,9 +424,8 @@ test_that("the initial ndt of cswald starts below the fastest response on every 
 
   for (version in c("simple", "crisk")) {
     case <- cswald_init_case(formula, cswald_fast_data(0.03), version)
-    # 2000 draws, as in the report of the bug: the largest of them decides, and
-    # the draws are the time this test takes
-    ndt <- replicate(2000, cswald_row_ndt(case$init(), case$sdata))
+    # the bound is deterministic, so 200 draws test what 2000 would
+    ndt <- replicate(200, cswald_row_ndt(case$init(), case$sdata))
     expect_true(all(is.finite(ndt)), info = version)
     expect_lt(max(ndt), 0.03, label = paste("largest initial ndt,", version))
   }
@@ -467,7 +466,7 @@ test_that("the initial ndt of cswald follows a link the user sets (#548)", {
   for (link in names(natural)) {
     # identity on a positive parameter is allowed with a warning
     case <- suppressWarnings(cswald_init_case(formula, data, links = list(ndt = link)))
-    ndt <- natural[[link]](replicate(2000, case$init()$Intercept_ndt))
+    ndt <- natural[[link]](replicate(200, case$init()$Intercept_ndt))
     expect_gte(min(ndt), 0.012 - 1e-9, label = link)
     expect_lte(max(ndt), 0.018 + 1e-9, label = link)
   }
@@ -500,6 +499,20 @@ test_that("the initial ndt of cswald is set from the data of bmm() and of update
   expect_lte(ndt_range(slower)[2], 0.3 + 1e-9)
   same <- mock(update, fit, recompile = TRUE)
   expect_lte(ndt_range(same)[2], 0.018 + 1e-9)
+})
+
+test_that("the initial ndt of cswald ignores a response at rt = 0 (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(548)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  data <- rbind(cswald_fast_data(0.03), data.frame(rt = 0, response = 0, id = factor(1), cond = factor("a")))
+
+  for (version in c("simple", "crisk")) {
+    case <- cswald_init_case(formula, data, version)
+    ndt <- exp(replicate(200, case$init()$Intercept_ndt))
+    expect_gte(min(ndt), 0.012 - 1e-9, label = version)
+    expect_lte(max(ndt), 0.018 + 1e-9, label = version)
+  }
 })
 
 test_that("the init function of cswald carries neither the calling frame nor unused data", {
