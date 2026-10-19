@@ -279,31 +279,33 @@ test_that("update() builds the initial values for the data and formula it fits",
 })
 
 test_that("update() without recompiling stores the init it sampled with (#520)", {
-  # brms reuses the compiled model only on a real backend (the mock backend always
-  # recompiles), so this test compiles and samples with rstan, about 25 s
   skip_on_cran()
   skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
   withr::local_seed(520)
   dat <- data.frame(y = rsdm(120, c = 4, kappa = 5), set_size = factor(rep(1:3, each = 40)))
-  fit <- suppressMessages(suppressWarnings(bmm(
-    bmf(c ~ 0 + set_size, kappa ~ 1), dat, sdm("y"),
-    backend = "rstan", chains = 1, iter = 40, warmup = 20, refresh = 0, silent = 2, rename = FALSE
-  )))
+  fit <- suppressMessages(bmm(bmf(c ~ 0 + set_size, kappa ~ 1), dat, sdm("y"),
+                              backend = "mock", mock_fit = stub, rename = FALSE))
   new_data <- droplevels(dat[dat$set_size %in% 1:2, ])
-  update_rstan <- function(...) suppressMessages(suppressWarnings(
-    update(fit, newdata = new_data, ..., chains = 1, iter = 40, warmup = 20, refresh = 0,
-           silent = 2, rename = FALSE)
+  # rstan and cmdstanr fits reuse their compiled model, and brms then keeps the
+  # old fit's stan_args; a mock fit has no model to reuse until compiled_model()
+  # returns one, and a recompile, which rebuilds stan_args, fails the test
+  local_mocked_bindings(
+    compiled_model = function(x) NULL,
+    compile_model = function(...) stop("update() recompiled the model"),
+    .package = "brms"
+  )
+  update_reuse <- function(...) suppressWarnings(suppressMessages(
+    update(fit, newdata = new_data, ..., mock_fit = stub, rename = FALSE)
   ))
 
-  up <- update_rstan()
-  # the same compiled model means brms took the route that leaves stan_args alone
-  expect_identical(up$fit@stanmodel, fit$fit@stanmodel)
   expect_length(fit$stan_args$init()$b_c, 3)
-  expect_length(up$stan_args$init()$b_c, brms::standata(up)$K_c)
-
-  up <- update_rstan(init = 0)
-  expect_identical(up$fit@stanmodel, fit$fit@stanmodel)
-  expect_identical(up$stan_args$init, 0)
+  expect_length(update_reuse()$stan_args$init()$b_c, 2)
+  expect_identical(update_reuse(init = 0)$stan_args$init, 0)
+  expect_identical(update_reuse(inits = 0)$stan_args$init, 0)
 })
 
 test_that("update() configures the prior and the inits with the fit's data2", {
