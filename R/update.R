@@ -191,7 +191,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # lazy argument of that call surfaces as "promise already under evaluation"
   # rather than as itself
   attr(prior, "allow_invalid_prior") <- TRUE
-  init <- if ("init" %in% names(dots)) dots$init else brms::do_call(
+  # brms::brm() samples with the deprecated `inits` whenever it is given
+  init <- dots$inits %||% if ("init" %in% names(dots)) dots$init else brms::do_call(
     create_initfun, c(list(model, data, config_args$formula, prior), fit_frame_args(object, dots))
   )
 
