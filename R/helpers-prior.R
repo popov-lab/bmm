@@ -544,13 +544,14 @@ configure_prior.default <- function(model, data, formula, user_prior, ...) {
 
 #' @export
 configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...) {
-  prior <- fixed_pars_priors(model, formula)
-  default_prior <- set_default_prior(model, data, formula, ...)
-  prior <- combine_prior(default_prior, prior)
-  prior <- combine_prior(prior, user_prior)
-  additional_prior <- NextMethod("configure_prior")
-  message_displaced_priors(user_prior, additional_prior, fixed = model$fixed_parameters)
-  combine_prior(prior, additional_prior)
+  prior <- combine_prior(set_default_prior(model, data, formula, ...), user_prior)
+  # a parameter fixed in the formula is a constraint like the rows of the
+  # model's own method, so its constant() is combined after the user prior, or
+  # a user prior on its intercept would free it (#549); the model's rows come
+  # last because mpt restates such a constant on the link scale
+  constraints <- combine_prior(fixed_pars_priors(model, formula), NextMethod("configure_prior"))
+  message_displaced_priors(user_prior, constraints, fixed = model$fixed_parameters)
+  combine_prior(prior, constraints)
 }
 
 # The model-specific priors are constraints the model needs, so they replace a
