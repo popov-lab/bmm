@@ -672,7 +672,14 @@ test_that("a constraint from a model's own configure_prior method replaces a use
     brms::prior_("normal(1, 1)", class = "Intercept", dpar = "c")
   msgs <- displacement_messages(fit <- fit_with(user))
   expect_length(msgs, 1)
+  expect_match(
+    msgs,
+    "A constraint of the model, or a parameter fixed in the formula, replaces the prior you set on these coefficients, so it is not used:",
+    fixed = TRUE
+  )
   expect_match(msgs, 'dpar = "kappa", class = "Intercept": normal(2, 1) replaced by constant(5)', fixed = TRUE)
+  # kappa is estimated, so the row carries no formula value
+  expect_no_match(msgs, "in the formula)", fixed = TRUE)
   expect_no_match(msgs, 'dpar = "c"', fixed = TRUE)
   expect_equal(fit$prior$prior[fit$prior$dpar == "kappa"], "constant(5)")
   expect_equal(fit$prior$prior[fit$prior$dpar == "c"], "normal(1, 1)")
@@ -696,7 +703,10 @@ test_that("mpt says when the constant of a fixed parameter replaces a user prior
   user <- brms::set_prior("normal(0, 1)", class = "b", coef = "Intercept", nlpar = "g")
   msgs <- displacement_messages(fit <- fit_with(user))
   expect_length(msgs, 1)
-  expect_match(msgs, 'nlpar = "g", class = "b", coef = "Intercept": normal(0, 1) replaced by constant(0)',
+  # the constant is logit(0.5); the row names the value the user wrote
+  expect_match(
+    msgs,
+    'nlpar = "g", class = "b", coef = "Intercept": normal(0, 1) replaced by constant(0) (g = 0.5 in the formula)',
     fixed = TRUE
   )
   expect_equal(fit$prior$prior[fit$prior$nlpar == "g" & fit$prior$coef == "Intercept"], "constant(0)")
@@ -739,4 +749,16 @@ test_that("the constraint message fires exactly for the user rows combine_prior(
 
   expect_length(displacement_messages(message_displaced_priors(NULL, constraint)), 0)
   expect_length(displacement_messages(message_displaced_priors(constraint, NULL)), 0)
+
+  # a parameter fixed in the formula is named with the value the user wrote
+  user <- brms::prior_("normal(0, 1)", class = "b", coef = "x1", nlpar = "a")
+  expect_match(
+    displacement_messages(message_displaced_priors(user, constraint, fixed = list(a = 0))),
+    'nlpar = "a", class = "b", coef = "x1": normal(0, 1) replaced by constant(0) (a = 0 in the formula)',
+    fixed = TRUE
+  )
+  expect_no_match(
+    displacement_messages(message_displaced_priors(user, constraint, fixed = list(w = -3))),
+    "in the formula)", fixed = TRUE
+  )
 })

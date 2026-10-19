@@ -549,15 +549,18 @@ configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...
   prior <- combine_prior(default_prior, prior)
   prior <- combine_prior(prior, user_prior)
   additional_prior <- NextMethod("configure_prior")
-  message_displaced_priors(user_prior, additional_prior)
+  message_displaced_priors(user_prior, additional_prior, fixed = model$fixed_parameters)
   combine_prior(prior, additional_prior)
 }
 
 # The model-specific priors are constraints the model needs, so they replace a
 # user prior on the same coefficient; the user is told, because the fit then
 # differs from the priors they asked for (#549). A user row without a prior
-# string (rows update() carries over from a fit) states no prior to lose
-message_displaced_priors <- function(user_prior, model_prior) {
+# string (rows update() carries over from a fit) states no prior to lose. When
+# the constraint is the user's own `g = 0.5` in the formula, the row names that
+# value: the constant is on the link scale (constant(0) for mpt's g), which
+# does not show where the replacement came from
+message_displaced_priors <- function(user_prior, model_prior, fixed = list()) {
   if (NROW(user_prior) == 0 || NROW(model_prior) == 0) {
     return(invisible())
   }
@@ -575,12 +578,14 @@ message_displaced_priors <- function(user_prior, model_prior) {
     fields <- c("dpar", "nlpar", "class", "coef", "group", "resp")
     named <- fields[nzchar(unlist(row[fields]))]
     where <- paste0(named, ' = "', unlist(row[named]), '"', collapse = ", ")
-    glue("  {where}: {row$prior} replaced by {model_prior$prior[by[i]]}")
+    par <- intersect(c(row$nlpar, row$dpar), names(fixed))
+    in_formula <- if (length(par)) glue(" ({par} = {fixed[[par]]} in the formula)") else ""
+    glue("  {where}: {row$prior} replaced by {model_prior$prior[by[i]]}{in_formula}")
   }, character(1))
   rows <- paste(rows, collapse = "\n")
   message2(
-    "A constraint of the model replaces the prior you set on these \\
-    coefficients, so the fit does not use your prior:
+    "A constraint of the model, or a parameter fixed in the formula, replaces \\
+    the prior you set on these coefficients, so it is not used:
     {rows}"
   )
 }
