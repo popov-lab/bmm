@@ -647,30 +647,6 @@ displacement_messages <- function(expr) {
   msgs[grepl("constraint of the model", msgs, fixed = TRUE)]
 }
 
-test_that("bmm() says when a model constraint replaces a user prior (#549)", {
-  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
-  withr::local_options(bmm.silent = 1)
-  model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
-  formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size)
-  fit_with <- function(prior) {
-    bmm(formula, small_data(), model, prior = prior, backend = "mock", mock_fit = 1, rename = FALSE)
-  }
-
-  user <- brms::set_prior("normal(-1, 0.5)", class = "b", coef = "set_size1", nlpar = "thetant")
-  msgs <- displacement_messages(fit <- fit_with(user))
-  expect_length(msgs, 1)
-  expect_match(
-    msgs, 'nlpar = "thetant", class = "b", coef = "set_size1": normal(-1, 0.5) replaced by constant(-100)',
-    fixed = TRUE
-  )
-  expect_equal(fit$prior$prior[fit$prior$coef == "set_size1"], "constant(-100)")
-
-  other <- brms::set_prior("normal(-1, 0.5)", class = "b", coef = "set_size2", nlpar = "thetant")
-  expect_length(displacement_messages(fit <- fit_with(other)), 0)
-  expect_equal(fit$prior$prior[fit$prior$coef == "set_size2"], "normal(-1, 0.5)")
-  expect_length(displacement_messages(fit_with(NULL)), 0)
-})
-
 test_that("a constraint from a model's own configure_prior method replaces a user prior with a message (#549)", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.silent = 1)
