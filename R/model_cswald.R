@@ -247,10 +247,8 @@ check_data.cswald <- function(model, data, formula) {
     warnif(
       any(data[, rt_var] < 0.100),
       "Your data contains reaction times smaller than 0.100 seconds.\n
-      It is likely that the model will not be able to sample with the \\
-      current settings of the initial values.\n
-      Either pass your own initial value function or consider filtering \\
-      reaction times below 0.100 seconds."
+      Such fast responses are often anticipations and pull the estimate of \\
+      `ndt` down; consider filtering them."
     )
   } else {
     stop2("The RT variable '{rt_var}' needs to be of type double or integer.")
