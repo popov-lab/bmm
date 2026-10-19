@@ -813,3 +813,39 @@ test_that("a user prior on a parameter mpt fixes on the link scale is messaged o
   )
   expect_equal(fit$prior$prior[fit$prior$nlpar == "g" & fit$prior$coef == "Intercept"], "constant(0)")
 })
+
+test_that("the displaced-prior message names the main parameter, which brms stores unlabelled (#549)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.silent = 1)
+  # brms::set_prior(dpar = "mu") stores dpar as "", so without the main
+  # parameter's name the row would read `class = "Intercept"` alone
+  on_mu <- brms::set_prior("normal(0, 0.3)", class = "Intercept", dpar = "mu")
+  msgs <- displacement_messages(
+    fit <- bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
+      prior = on_mu, backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  )
+  expect_length(msgs, 1)
+  expect_match(
+    msgs, 'dpar = "mu", class = "Intercept": normal(0, 0.3) replaced by constant(0) (mu fixed at 0)',
+    fixed = TRUE
+  )
+  expect_equal(fit$prior$prior[fit$prior$class == "Intercept" & fit$prior$dpar == ""], "constant(0)")
+
+  # with bare lists: an unlabelled row is the main parameter's, a cor row is nobody's
+  unlabelled <- brms::prior_("normal(0, 1)", class = "Intercept")
+  expect_match(
+    displacement_messages(message_displaced_priors(
+      unlabelled, brms::prior_("constant(0)", class = "Intercept"), fixed = list(mu = 0), main_dpar = "mu"
+    )),
+    'dpar = "mu", class = "Intercept": normal(0, 1) replaced by constant(0) (mu fixed at 0)',
+    fixed = TRUE
+  )
+  expect_match(
+    displacement_messages(message_displaced_priors(
+      brms::prior_("lkj(2)", class = "cor"), brms::prior_("lkj(1)", class = "cor"), main_dpar = "mu"
+    )),
+    '\n  class = "cor": lkj(2) replaced by lkj(1)',
+    fixed = TRUE
+  )
+})
