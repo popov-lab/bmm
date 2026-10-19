@@ -19,6 +19,9 @@ test file; &quot;CmdStan toolchain&quot; is cmdstanr's own check, which only loo
 for make and a compiler on the PATH. The second can pass while the
 first fails, e.g. on a Mac whose command line tools are missing, and the
 first is the one that decides.
+With cmdstanr 1.0 or later, a &quot;brms&quot; row warns when the installed brms
+was released before it. New fits still work, but update() can fail on a
+fit saved with an older cmdstanr.
 With smoke_test = TRUE, it finally compiles and samples a small
 two-parameter mixture model (mixture2p()) through bmm(), on the
 backend bmm() will use. This is the only check that shows the whole
@@ -39,6 +42,9 @@ test file; &quot;CmdStan toolchain&quot; is cmdstanr's own check, which only loo
 for make and a compiler on the PATH. The second can pass while the
 first fails, e.g. on a Mac whose command line tools are missing, and the
 first is the one that decides.
+With cmdstanr 1.0 or later, a &quot;brms&quot; row warns when the installed brms
+was released before it. New fits still work, but update() can fail on a
+fit saved with an older cmdstanr.
 With smoke_test = TRUE, it finally compiles and samples a small
 two-parameter mixture model (mixture2p()) through bmm(), on the
 backend bmm() will use. This is the only check that shows the whole
@@ -97,6 +103,9 @@ test file; "CmdStan toolchain" is <code>cmdstanr</code>'s own check, which only 
 for <code>make</code> and a compiler on the <code>PATH</code>. The second can pass while the
 first fails, e.g. on a Mac whose command line tools are missing, and the
 first is the one that decides.</p>
+<p>With <code>cmdstanr</code> 1.0 or later, a "brms" row warns when the installed <code>brms</code>
+was released before it. New fits still work, but <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> can fail on a
+fit saved with an older <code>cmdstanr</code>.</p>
 <p>With <code>smoke_test = TRUE</code>, it finally compiles and samples a small
 two-parameter mixture model (<code><a href="mixture2p.html">mixture2p()</a></code>) through <code><a href="bmm.html">bmm()</a></code>, on the
 backend <code><a href="bmm.html">bmm()</a></code> will use. This is the only check that shows the whole
@@ -130,8 +139,9 @@ installed, even when CmdStan is not, and <code>rstan</code> otherwise.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A data frame of class <code>bmm_setup</code> with one row per check and the
-columns <code>check</code>, <code>status</code> (<code>"pass"</code>, <code>"fail"</code> or <code>"skip"</code>), <code>detail</code> and
-<code>fix</code> (<code>NA</code> unless the check failed). It prints as a report.</p>
+columns <code>check</code>, <code>status</code> (<code>"pass"</code>, <code>"warn"</code>, <code>"fail"</code> or <code>"skip"</code>),
+<code>detail</code> and <code>fix</code> (<code>NA</code> unless the check failed or warned). It prints as
+a report.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

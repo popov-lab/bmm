@@ -44,13 +44,17 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="development version" id="bmm-development-version">bmm (development version)<a class="anchor" aria-label="anchor" href="#bmm-development-version"></a></h2>
 <div class="section level4">
+<h4 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h4>
+<ul><li>bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> can fail on a fit saved with an older CmdStanR, with <code>argument "show_progress_bar" is missing</code>. Install brms from GitHub with <code>remotes::install_github("paul-buerkner/brms")</code> until a newer brms is on CRAN, or call <code>update(fit, recompile = TRUE)</code>. <code><a href="../reference/bmm_setup.html">bmm_setup()</a></code> now warns about this combination.</li>
+</ul></div>
+<div class="section level4">
 <h4 id="documentation-development-version">Documentation<a class="anchor" aria-label="anchor" href="#documentation-development-version"></a></h4>
 <ul><li>bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under “Deprecated functions and arguments” in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (<a href="https://github.com/popov-lab/bmm/issues/441" class="external-link">#441</a>).</li>
 <li>For developers: the header of the file <code><a href="../reference/use_model_template.html">use_model_template()</a></code> writes named an outdated place for a new model’s test cases. It now points to <code>model_cases_&lt;name&gt;()</code> in <code>tests/testthat/helper-model-&lt;name&gt;.R</code>, which needs a <code>stored_frame</code>, <code>sd_default</code>, <code>init</code> and <code>links</code> case, and it lists <code>tests/testthat/test-model_&lt;name&gt;.R</code> for the model’s own tests (<a href="https://github.com/popov-lab/bmm/issues/580" class="external-link">#580</a>).</li>
 </ul></div>
 </div>
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="1.4.1" id="bmm-141">bmm 1.4.1<a class="anchor" aria-label="anchor" href="#bmm-141"></a></h2>
+<h2 class="pkg-version" data-toc-text="1.4.1" id="bmm-141">bmm 1.4.1<a class="anchor" aria-label="anchor" href="#bmm-141"></a></h2><p class="text-muted">CRAN release: 2026-10-16</p>
 <p>This is the 1.4.0 release resubmitted: 1.4.0 was sent to CRAN on 2026-10-15 and returned by the incoming checks because its check took too long on Windows. 1.4.1 runs fewer tests on CRAN and is otherwise the same package.</p>
 <div class="section level4">
 <h4 id="new-models-1-4-1">New models<a class="anchor" aria-label="anchor" href="#new-models-1-4-1"></a></h4>

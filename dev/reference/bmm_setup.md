@@ -18,6 +18,11 @@ looks for `make` and a compiler on the `PATH`. The second can pass while
 the first fails, e.g. on a Mac whose command line tools are missing, and
 the first is the one that decides.
 
+With `cmdstanr` 1.0 or later, a "brms" row warns when the installed
+`brms` was released before it. New fits still work, but
+[`update()`](https://rdrr.io/r/stats/update.html) can fail on a fit
+saved with an older `cmdstanr`.
+
 With `smoke_test = TRUE`, it finally compiles and samples a small
 two-parameter mixture model
 ([`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md))
@@ -53,8 +58,9 @@ bmm_setup(smoke_test = TRUE, backend = getOption("brms.backend", NULL))
 ## Value
 
 A data frame of class `bmm_setup` with one row per check and the columns
-`check`, `status` (`"pass"`, `"fail"` or `"skip"`), `detail` and `fix`
-(`NA` unless the check failed). It prints as a report.
+`check`, `status` (`"pass"`, `"warn"`, `"fail"` or `"skip"`), `detail`
+and `fix` (`NA` unless the check failed or warned). It prints as a
+report.
 
 ## See also
 

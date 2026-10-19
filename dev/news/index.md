@@ -2,6 +2,17 @@
 
 ## bmm (development version)
 
+#### Other changes
+
+- bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or
+  older, [`update()`](https://rdrr.io/r/stats/update.html) can fail on a
+  fit saved with an older CmdStanR, with
+  `argument "show_progress_bar" is missing`. Install brms from GitHub
+  with `remotes::install_github("paul-buerkner/brms")` until a newer
+  brms is on CRAN, or call `update(fit, recompile = TRUE)`.
+  [`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
+  now warns about this combination.
+
 #### Documentation
 
 - bmm now follows a written lifecycle policy. A deprecated function or
@@ -23,6 +34,8 @@
   ([\#580](https://github.com/popov-lab/bmm/issues/580)).
 
 ## bmm 1.4.1
+
+CRAN release: 2026-10-16
 
 This is the 1.4.0 release resubmitted: 1.4.0 was sent to CRAN on
 2026-10-15 and returned by the incoming checks because its check took
