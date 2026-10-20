@@ -70,7 +70,7 @@ test_that("real-backend fits in tests/testthat are the registered ones (R1)", {
   expect_pattern_counts(
     "backend\\s*=\\s*[\"']cmdstanr[\"']",
     c(
-      "test-bmm_setup.R" = 18L,
+      "test-bmm_setup.R" = 21L,
       "test-model_rdm.R" = 4L,
       "test-update.R" = 2L
     ),

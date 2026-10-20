@@ -5,13 +5,14 @@
 # slowest tests in the job summary, and exits with status 1 when a test fails
 # or a cap is breached.
 #
-# The caps are 1.5x the maxima of the first four-worker run on the runner
-# (ADR 0004), rounded: suite 532 s, slowest file 450 s, slowest test outside
-# the allowlist 44 s. Four workers on
+# The caps are 1.5x the maxima of twelve runs on the runner from 2026-10-19
+# and 2026-10-20 (ADR 0004), rounded: suite 668 s, slowest file 561 s,
+# slowest test 76.1 s. The same test took 51 s on other runs of the same
+# code, so a cap closer to the maxima fails on runner load. Four workers on
 # the 4-vCPU runner double each test's time against one worker, so caps from
 # a one-worker run do not carry over. Every later change goes through the ADR.
 # Seconds throughout.
-caps <- list(suite = 800, file = 680, test = 66)
+caps <- list(suite = 1000, file = 840, test = 115)
 
 # tests with a cap of their own, "file | test" = seconds; empty since #422,
 # and an entry needs one in ADR 0004

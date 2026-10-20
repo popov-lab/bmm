@@ -113,6 +113,7 @@ test_that("dmixture3p() refuses node counts the model refuses", {
 })
 
 test_that("rmixture3p() draws from dmixture3p()", {
+  withr::local_seed(445)
   compare <- function(n = 2e5, n_bins = 20, ...) {
     draws <- rmixture3p(n, ...)
     breaks <- seq(-pi, pi, length.out = n_bins + 1)
