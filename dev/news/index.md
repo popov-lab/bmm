@@ -2,6 +2,20 @@
 
 ## bmm (development version)
 
+#### Bug fixes
+
+- A prior you set on a coefficient the model constrains, such as the
+  intercept of a parameter fixed in an
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) formula
+  (`bmf(g = 0.5)`), was replaced by the constraint without notice. The
+  fit still uses the constraint, but bmm now prints a message naming
+  each such coefficient, your prior and the constant used instead.
+  `update(fit, prior = )` now behaves the same; before, a prior given
+  there replaced the constraint, so the refit sampled a coefficient the
+  model fixes. Your prior on that coefficient has no effect, so you can
+  remove it from `prior`
+  ([\#549](https://github.com/popov-lab/bmm/issues/549)).
+
 #### Other changes
 
 - bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or
