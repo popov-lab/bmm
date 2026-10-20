@@ -403,6 +403,7 @@ test_that("initfun handles single random effect group correctly", {
 })
 
 test_that("initfun handles numeric predictors", {
+  withr::local_seed(445)
   dat <- small_data()
   dat$continuous_pred <- rnorm(nrow(dat))
 
@@ -1077,6 +1078,7 @@ test_that("a softmax range stays on the sampling scale and a single point is not
 })
 
 test_that("an init function carries nothing from the frame that built it", {
+  withr::local_seed(445)
   dat <- small_data()
   model <- sdm(resp_error = "dev_rad")
   formula <- bmf(c ~ 1, kappa ~ 1)
