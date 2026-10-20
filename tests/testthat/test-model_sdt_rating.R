@@ -191,6 +191,7 @@ test_that("sdt_rating check_data refuses an all-NA column as NA, not a type", {
 ############################################################################# !
 
 test_that("rsdt_rating recycles vectorized parameters per observation", {
+  withr::local_seed(445)
   counts <- rsdt_rating(6, c(50, 100), c(0L, 1L), d = rnorm(6, 1.5, 0.2),
                         thresholds = c(-0.5, 0, 0.5), sdratio = c(1, 1.3))
   expect_equal(dim(counts), c(6L, 4L))
