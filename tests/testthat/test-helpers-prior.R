@@ -66,6 +66,7 @@ test_that("combine_prior() lets a prior on a whole nlpar replace its intercept p
 
 test_that("a user prior on a non-linear parameter reaches its intercept (#526)", {
   skip_on_cran()
+  withr::local_seed(445)
   dat <- data.frame(y = rmixture2p(n = 100), cond = rep(c("a", "b"), 50))
   user <- brms::set_prior("normal(0, 2)", class = "b", nlpar = "kappa")
 
@@ -151,6 +152,7 @@ test_that("fixed_pars_priors errors clearly when a fixed parameter is absent fro
 test_that("the fixed-parameter guard fires through the full default_prior pipeline", {
   # a fixed parameter that no configure_model wires into the formula survives
   # check_model/check_formula reconciliation and must be caught before brms
+  withr::local_seed(445)
   model <- sdm(resp_error = "y")
   model$fixed_parameters$sdratio <- 0
   dat <- data.frame(y = rsdm(30, mu = 0, c = 3, kappa = 4))
@@ -692,6 +694,7 @@ test_that("a constraint from a model's own configure_prior method replaces a use
 
 test_that("mpt says when the constant of a fixed parameter replaces a user prior (#549)", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   withr::local_options(bmm.silent = 1)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   fit_with <- function(prior) {
