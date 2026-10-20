@@ -259,16 +259,19 @@ test_that("pp_check_vars() messages and returns NULL without a declaration", {
 })
 
 test_that("pp_check() rejects resp_var for models without a declaration", {
+  withr::local_seed(445)
   fit <- fake_bmmfit(sdm(resp_error = "y"))
   expect_error(pp_check(fit, resp_var = "rt"), "declares no additional")
 })
 
 test_that("pp_check() rejects an unknown resp_var and lists the options", {
+  withr::local_seed(445)
   fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
   expect_error(pp_check(fit, resp_var = "accuracy"), "'rt', 'response', 'signed_rt'")
 })
 
 test_that("pp_check() rejects negative_rt without a signed_rt observable", {
+  withr::local_seed(445)
   fit <- fake_bmmfit(sdm(resp_error = "y"))
   expect_error(pp_check(fit, negative_rt = TRUE), "not supported")
 })
@@ -337,12 +340,14 @@ test_that(".ppc_bars_binned_grouped() counts per group and facets", {
 # the fake fit carries no draws, so prepare_predictions() would fail: reaching
 # the type error proves 'type' is validated before anything is simulated
 test_that("pp_check() rejects an unknown type before simulating", {
+  withr::local_seed(445)
   fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
   expect_error(pp_check(fit, resp_var = "rt", type = "no_such_type"),
                "not a supported")
 })
 
 test_that("pp_check() rejects negative_rt combined with another resp_var", {
+  withr::local_seed(445)
   fit <- fake_bmmfit(ddm(rt = "rt", response = "resp"))
   expect_error(pp_check(fit, resp_var = "rt", negative_rt = TRUE),
                "cannot be combined")
