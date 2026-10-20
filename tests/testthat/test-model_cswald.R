@@ -426,6 +426,7 @@ test_that("cswald simple version runs with mock backend", {
 
 test_that("cswald refuses a negative fixed sndt", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
   model <- cswald(rt = "rt", response = "response")

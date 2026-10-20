@@ -1152,6 +1152,7 @@ test_that("pcswald and qcswald are inverses with sndt", {
 })
 
 test_that("cswald parameter validation works for sndt", {
+  withr::local_seed(445)
   expect_error(
     dcswald(0.8, 1, drift = 2, bound = 1, ndt = 0.3, sndt = -0.1),
     "must be non-negative"
