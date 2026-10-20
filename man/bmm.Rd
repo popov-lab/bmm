@@ -148,6 +148,7 @@ Detection, recognition and confidence judgments
 \item sdt_ranking(): Signal Detection Theory (Ranking)
 \item sdt_rating(): Signal Detection Theory (Confidence Rating)
 \item sdt_yn(): Signal Detection Theory (Yes/No)
+\item tcc_cd(): Target Confusability Competition (TCC) model for single-probe change detection
 }
 
 Choices and response times

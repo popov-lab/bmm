@@ -441,6 +441,9 @@ response_annotations <- function(model) {
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
   }
+  if (inherits(model, "tcc_cd")) {
+    return(list(response = "0/1 or logical; 1 = 'change'"))
+  }
   if (inherits(model, "tcc")) {
     units <- model$other_vars$units %||% "radians"
     return(list(resp_error = if (units == "bins") "option steps" else "radians in [-pi, pi]"))
@@ -514,6 +517,7 @@ model_groups <- c(
   "Categorical decision making, memory, and reasoning" = "Processing-tree models",
   "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
   "Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Visual working memory (change detection)" = "Detection, recognition and confidence judgments",
   "Decision Making / Response times" = "Choices and response times"
 )
 
@@ -646,6 +650,11 @@ data_column_roles <- list(
   ),
   tcc = c(
     resp_error = "response error relative to the target, in radians or, with `units = \"bins\"`, in option steps",
+    similarity = NA
+  ),
+  tcc_cd = c(
+    response = "change-detection response, 0 = 'same' and 1 = 'change'",
+    distance = "probe minus target, in radians or, with `units = \"bins\"`, in similarity steps",
     similarity = NA
   )
 )

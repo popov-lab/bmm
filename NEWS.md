@@ -2,6 +2,7 @@
 
 ### New models
 * Add the **Target Confusability Competition model** (`tcc`) for continuous reproduction (Schurgin, Wixted & Brady, 2020). It estimates memory strength `d` from response errors in radians or option steps, given the similarity of each option to the target as a vector by distance. Also adds `dtcc()` and `rtcc()`. Its log-likelihood is a probability over options: `?tcc` shows how to compare it with `sdm()` or `mixture2p()` by LOO, and what to do when `d` reaches the grid limit `d_max` (#566). Thanks to @GidonFrischkorn
+* Add `tcc_cd()`, the TCC model for single-probe change detection: the probe's familiarity, `d` times its similarity to the target, is compared with a criterion, as in `sdt_yn()`. It takes the same similarity vector as `tcc()` and estimates `d` with `criterion` or `bias`, from responses coded 0 = "same" and 1 = "change". Also adds `dtcc_cd()` and `rtcc_cd()`. The new article *Two decision rules for change detection* sets it beside the decision rule of Lin & Oberauer (2022) (#566). Thanks to @GidonFrischkorn
 
 ### Other changes
 * bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
