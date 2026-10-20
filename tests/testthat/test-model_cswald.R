@@ -389,6 +389,159 @@ test_that("an explicit threads = NULL beats a global threading option", {
 })
 
 # -----------------------------------------------------------------------------
+# Initial values (#548)
+# -----------------------------------------------------------------------------
+
+# 40 trials whose fastest response is `fastest` seconds, the next 0.005 s slower;
+# all others take at least 0.1 s longer
+cswald_fast_data <- function(fastest = 0.03) {
+  data.frame(
+    rt = c(fastest, fastest + 0.005, fastest + rep(c(0.1, 0.3, 0.5, 0.8), length.out = 38)),
+    response = rep(c(1, 1, 1, 0), length.out = 40),
+    id = factor(rep(1:5, length.out = 40)),
+    cond = factor(rep(c("a", "b"), length.out = 40))
+  )
+}
+
+# What bmm() hands to brm(): the init function and the Stan data it was built for
+cswald_init_case <- function(formula, data, version = "simple", links = NULL) {
+  model <- cswald("rt", "response", version = version, links = links)
+  # the 0.100 s warning of check_data() is tested above
+  cfg <- suppressWarnings(configure_fit(formula, data, model))
+  list(
+    init = cfg$config_args$init,
+    sdata = brms::standata(
+      cfg$config_args$formula, cfg$config_args$data, cfg$config_args$formula$family,
+      prior = cfg$prior
+    )
+  )
+}
+
+# ndt in seconds on every row at one draw of the init function, built as the
+# Stan program builds it for ndt ~ cond + (1 | id) on the log link: intercept,
+# centred fixed effects, and the random intercept sd * z of the row's group
+cswald_row_ndt <- function(inits, sdata) {
+  centred <- scale(sdata$X_ndt[, -1, drop = FALSE], scale = FALSE)
+  random <- inits$sd_1[1] * inits$z_1[1, sdata$J_1] * sdata$Z_1_ndt_1
+  exp(inits$Intercept_ndt + drop(centred %*% inits$b_ndt) + random)
+}
+
+test_that("the initial ndt of cswald starts below the fastest response on every row (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(548)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ cond + (1 | id))
+
+  for (version in c("simple", "crisk")) {
+    case <- cswald_init_case(formula, cswald_fast_data(0.03), version)
+    # the bound is deterministic, so 200 draws test what 2000 would
+    ndt <- replicate(200, cswald_row_ndt(case$init(), case$sdata))
+    expect_true(all(is.finite(ndt)), info = version)
+    expect_lt(max(ndt), 0.03, label = paste("largest initial ndt,", version))
+  }
+})
+
+test_that("the initial ndt of cswald is drawn from 0.4 to 0.6 times the fastest response (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(548)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+
+  # the range is written out for each fastest response, not computed from it
+  expected <- list(`0.03` = c(0.012, 0.018), `0.5` = c(0.2, 0.3))
+  for (version in c("simple", "crisk")) {
+    for (fastest in names(expected)) {
+      case <- cswald_init_case(formula, cswald_fast_data(as.numeric(fastest)), version)
+      ndt <- exp(replicate(500, case$init()$Intercept_ndt))
+      bounds <- expected[[fastest]]
+      label <- paste(version, "fastest", fastest)
+      expect_gte(min(ndt), bounds[1] - 1e-9, label = label)
+      expect_lte(max(ndt), bounds[2] + 1e-9, label = label)
+      # the draws cover the range instead of sitting on one value
+      expect_lt(min(ndt), bounds[1] + 0.05 * diff(bounds), label = label)
+      expect_gt(max(ndt), bounds[2] - 0.05 * diff(bounds), label = label)
+    }
+  }
+})
+
+test_that("the initial ndt of cswald follows a link the user sets (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(548)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  data <- cswald_fast_data(0.03)
+  natural <- list(
+    identity = function(x) x,
+    softplus = function(x) log1p(exp(x))
+  )
+
+  for (link in names(natural)) {
+    # identity on a positive parameter is allowed with a warning
+    case <- suppressWarnings(cswald_init_case(formula, data, links = list(ndt = link)))
+    ndt <- natural[[link]](replicate(200, case$init()$Intercept_ndt))
+    expect_gte(min(ndt), 0.012 - 1e-9, label = link)
+    expect_lte(max(ndt), 0.018 + 1e-9, label = link)
+  }
+})
+
+test_that("the initial ndt of cswald is set from the data of bmm() and of update() (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  skip_if_not_installed("rstan")
+  withr::local_seed(548)
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  mock <- function(fun, ...) {
+    suppressWarnings(suppressMessages(
+      fun(..., backend = "mock", mock_fit = stub, rename = FALSE)
+    ))
+  }
+  ndt_range <- function(fit) {
+    range(exp(replicate(500, fit$stan_args$init()$Intercept_ndt)))
+  }
+  model <- cswald("rt", "response")
+  fit <- mock(bmm, bmf(drift ~ 1, bound ~ 1, ndt ~ 1), cswald_fast_data(0.03), model)
+  expect_gte(ndt_range(fit)[1], 0.012 - 1e-9)
+  expect_lte(ndt_range(fit)[2], 0.018 + 1e-9)
+
+  # a mock fit cannot be reused, so update() takes the recompile path
+  slower <- mock(update, fit, newdata = cswald_fast_data(0.5), recompile = TRUE)
+  expect_gte(ndt_range(slower)[1], 0.2 - 1e-9)
+  expect_lte(ndt_range(slower)[2], 0.3 + 1e-9)
+  same <- mock(update, fit, recompile = TRUE)
+  expect_lte(ndt_range(same)[2], 0.018 + 1e-9)
+})
+
+test_that("the initial ndt of cswald ignores a response at rt = 0 (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(548)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  data <- rbind(cswald_fast_data(0.03), data.frame(rt = 0, response = 0, id = factor(1), cond = factor("a")))
+
+  for (version in c("simple", "crisk")) {
+    case <- cswald_init_case(formula, data, version)
+    ndt <- exp(replicate(200, case$init()$Intercept_ndt))
+    expect_gte(min(ndt), 0.012 - 1e-9, label = version)
+    expect_lte(max(ndt), 0.018 + 1e-9, label = version)
+  }
+})
+
+test_that("the init function of cswald carries neither the calling frame nor unused data", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  data <- cswald_fast_data(0.03)
+  model <- cswald("rt", "response")
+  init_beside <- function(n, data) {
+    ballast <- runif(n)
+    suppressWarnings(configure_fit(formula, data, model))$config_args$init
+  }
+  size <- function(init) length(serialize(init, NULL))
+
+  expect_equal(size(init_beside(1e6, data)), size(init_beside(1, data)))
+  wide <- cbind(data, matrix(0, nrow(data), 500))
+  expect_equal(size(init_beside(1, wide)), size(init_beside(1, data)))
+})
+
+# -----------------------------------------------------------------------------
 # Integration tests with mock backend
 # -----------------------------------------------------------------------------
 
@@ -619,6 +772,87 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
       ))),
       tolerance = 1e-10
     )
+
+    # a bound of zero or below has neither density nor survival: -Inf for both
+    # responses, never the NaN that log(bound) would give for the negative one
+    # (#548). The vectorized overload is what fits compile, so its total needs
+    # the check too; the last element keeps a valid bound. The density guards
+    # make every element here -Inf already, so the survivor guards are pinned
+    # by the separate data below
+    guard <- list(
+      N = 5, rt = rep(1, 5), dec = c(0L, 1L, 0L, 1L, 1L), mu = rep(0, 5),
+      drift = rep(2, 5), bound = c(0, 0, -0.5, -0.5, 1.5), ndt = rep(0.2, 5),
+      s = rep(1, 5), zr = rep(0.5, 5)
+    )
+    guard_fit <- withr::with_preserve_seed(model$sample(
+      data = guard, chains = 1, iter_sampling = 1, fixed_param = TRUE,
+      refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
+    ))
+    lp_guard <- as.numeric(guard_fit$draws("lp_scalar", format = "draws_matrix")[1, ])
+    # silent: without the bound placeholder the Wald terms warn about log(bound)
+    lp_guard_r <- expect_silent(with(guard, .dcswald(rt, dec, drift, bound, ndt, zr, s,
+      version = version, log = TRUE
+    )))
+    expect_identical(lp_guard[1:4], rep(-Inf, 4))
+    expect_identical(lp_guard_r[1:4], rep(-Inf, 4))
+    expect_identical(
+      as.numeric(guard_fit$draws("lp_vector", format = "draws_matrix")[1, 1]),
+      -Inf
+    )
+    expect_equal(lp_guard[5], lp_guard_r[5], tolerance = 1e-10)
+
+    # the survivor alone, at a bound of exactly 0 with drift * (rt - ndt) large:
+    # there it is finite (about -49.9 for drift 5, rt - ndt 1) unless the guards
+    # in swald_lccdf and swald_log_surv_vec return -Inf. A bound below 0 already
+    # gives -Inf without them. Row 1 reaches the survivor as the censored trial
+    # (simple) or as the losing accumulator (crisk, zr = 1 puts the upper bound
+    # at 0 while the lower one wins); row 2 is valid, so the vectorized total is
+    # -Inf only through row 1's survivor
+    surv <- list(
+      N = 2, rt = rep(1.2, 2), dec = c(0L, 1L), mu = rep(0, 2),
+      drift = rep(5, 2), bound = c(if (version == "simple") 0 else 1.5, 1.5),
+      ndt = rep(0.2, 2), s = rep(1, 2), zr = c(1, 0.5)
+    )
+    surv_fit <- withr::with_preserve_seed(model$sample(
+      data = surv, chains = 1, iter_sampling = 1, fixed_param = TRUE,
+      refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
+    ))
+    lp_surv <- as.numeric(surv_fit$draws("lp_scalar", format = "draws_matrix")[1, ])
+    expect_identical(lp_surv[1], -Inf)
+    expect_true(is.finite(lp_surv[2]))
+    expect_identical(
+      as.numeric(surv_fit$draws("lp_vector", format = "draws_matrix")[1, 1]),
+      -Inf
+    )
+  }
+})
+
+test_that("the R cswald likelihood keeps the recycled length of its arguments at bound <= 0 (#548)", {
+  # one rt against several bounds: the result has one value per bound, as the
+  # Wald terms recycle (the three values per version are the unguarded results)
+  expect_equal(
+    dcswald(rt = 1, response = 1, drift = 2, bound = c(1, 1.5, 2), ndt = 0.2, log = TRUE),
+    c(-0.809223206, -0.185008098, 0.008923974),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    dcswald(
+      rt = 1, response = 1, drift = 2, bound = c(1, 1.5, 2), ndt = 0.2,
+      version = "crisk", log = TRUE
+    ),
+    c(-2.1728514, -1.3701162, -0.8248858),
+    tolerance = 1e-8
+  )
+
+  # -Inf exactly where the bound is at or below 0, finite elsewhere
+  for (version in c("simple", "crisk")) {
+    ll <- expect_silent(.dcswald(
+      rt = rep(1, 5), response = c(1, 0, 1, 0, 1), drift = 2,
+      bound = c(1.5, 0, 1.5, -0.5, 2), ndt = 0.2, zr = 0.5, s = 1,
+      version = version, log = TRUE
+    ))
+    expect_identical(is.finite(ll), c(TRUE, FALSE, TRUE, FALSE, TRUE))
+    expect_identical(ll[c(2, 4)], c(-Inf, -Inf))
   }
 })
 
