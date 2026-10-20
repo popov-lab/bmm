@@ -175,6 +175,7 @@ test_that(".sdt_cdp_category_probs guess + know recover the 2-way know total", {
 })
 
 test_that(".sdt_cdp_category_probs vectorizes over observations", {
+  withr::local_seed(445)
   n <- 10
   thr <- .cdp_make_thresholds(rnorm(n, 0, 0.2), rnorm(n, -0.3, 0.1), 3, 3,
                               "parsimonious")
@@ -270,6 +271,7 @@ test_that("dsdt_cdp matches dmultinom against the category probabilities", {
 })
 
 test_that("aggregate_sdt_cdp_data pivots long data to the wide count columns", {
+  withr::local_seed(445)
   long <- expand.grid(id = 1:4, stimulus = c(0L, 1L),
                       judgment = c("new", "know", "remember"),
                       confidence = 1:6)
@@ -287,6 +289,7 @@ test_that("aggregate_sdt_cdp_data pivots long data to the wide count columns", {
 })
 
 test_that("aggregate_sdt_cdp_data aggregates trial-level data without counts", {
+  withr::local_seed(445)
   long <- expand.grid(id = 1:3, stimulus = c(0L, 1L),
                       judgment = c("new", "know", "remember"),
                       confidence = 1:6)

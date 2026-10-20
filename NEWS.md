@@ -10,6 +10,9 @@
 ### Deprecated functions and arguments
 * mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
 
+### Other changes
+* bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
+
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
 * For developers: the header of the file `use_model_template()` writes named an outdated place for a new model's test cases. It now points to `model_cases_<name>()` in `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`, `sd_default`, `init` and `links` case, and it lists `tests/testthat/test-model_<name>.R` for the model's own tests (#580).
