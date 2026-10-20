@@ -526,6 +526,7 @@ test_that("the initial ndt of cswald ignores a response at rt = 0 (#548)", {
 
 test_that("the init function of cswald carries neither the calling frame nor unused data", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
   data <- cswald_fast_data(0.03)
   model <- cswald("rt", "response")
