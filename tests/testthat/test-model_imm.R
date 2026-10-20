@@ -115,6 +115,7 @@ test_that("dimm() is a normalised density with and without variable precision", 
 })
 
 test_that("rimm() draws from dimm()", {
+  withr::local_seed(445)
   compare <- function(n = 2e5, n_bins = 20, ...) {
     draws <- rimm(n, ...)
     breaks <- seq(-pi, pi, length.out = n_bins + 1)
