@@ -141,6 +141,7 @@ test_that("the inverse link has no population mean", {
 })
 
 test_that("the population statistics keep the dimensions of the draws", {
+  withr::local_seed(445)
   eta <- matrix(stats::rnorm(6), 2, 3)
   s <- matrix(abs(stats::rnorm(6)), 2, 3)
   for (summary in c("mean", "median")) {
