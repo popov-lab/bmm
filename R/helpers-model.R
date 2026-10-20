@@ -1,22 +1,24 @@
 #' @title Generic S3 method for configuring the model to be fit by brms
 #' @description Called by bmm() to automatically construct the model
-#'   formula, family objects and default priors for the model specified by the
-#'   user. It will call the appropriate configure_model.* functions based on the
-#'   list of classes defined in the .model_* functions. Currently, we have a
-#'   method only for the last class listed in the .model_* functions. This is to
-#'   keep model configuration as simple as possible. In the future we may add
-#'   shared methods for classes of models that share the same configuration.
+#'   formula, with its family, and any stanvars for the model specified by the
+#'   user. Default priors are not built here but by [configure_prior()] from the
+#'   model's `default_priors`; a model that needs priors beyond those defines
+#'   its own `configure_prior.<model>()` method (e.g. `mixture3p`, `mpt`). It
+#'   will call the appropriate configure_model.* functions based on the list of
+#'   classes defined in the .model_* functions. Each model has one method, for
+#'   its model class, or one per version class when the versions are configured
+#'   differently (e.g. `imm`, `ezdm`, `cswald`).
 #' @param model A model list object returned from check_model()
 #' @param data The user supplied data.frame containing the data to be checked
 #' @param formula The user supplied formula
-#' @return A named list containing at minimum the following elements:
+#' @return A named list built with `nlist()`, containing:
 #'
-#'  - formula: An object of class `brmsformula`. The constructed model formula
+#'  - formula: An object of class `brmsformula`, the constructed model formula
+#'   with the brms family attached as `formula$family`
 #'  - data: the user supplied data.frame, preprocessed by check_data
-#'  - family: the brms family object
-#'  - prior: the brms prior object
-#'  - stanvars: (optional) An object of class `stanvars` (for custom families).
-#'   See [brms::custom_family()] for more details.
+#'  - stanvars: (optional) An object of class `stanvars`, when the model adds
+#'   Stan code (a custom family, or Stan functions called from the formula).
+#'   See [brms::custom_family()] and [brms::stanvar()] for more details.
 #'
 #' @details A bare bones configure_model.* method should look like this:
 #'
@@ -27,19 +29,17 @@
 #'     <preprocessing code>
 #'
 #'     # construct the formula
-#'     formula <- bmf2bf(formula, model)
+#'     formula <- bmf2bf(model, formula)
 #'
-#'     # construct the family
-#'     family <- <code for new family>
+#'     # attach the family to the formula
+#'     formula$family <- <code for new family>
 #'
-#'     # construct the default prior
-#'     prior <- <code for new prior>
-#'
-#'     # return the list
-#'     nlist(formula, data, family, prior)
+#'     # return the list (add stanvars when the model adds Stan code: a custom
+#'     # family, or Stan functions called from the formula)
+#'     nlist(formula, data)
 #'  }
 #'  ```
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' configure_model.mixture3p <- function(model, data, formula) {
 #'   # retrieve arguments from the data check
 #'   max_set_size <- attr(data, "max_set_size")
@@ -436,8 +436,15 @@ warn_link_range <- function(links, defaults) {
 }
 
 # kept central rather than as a field in each model constructor so the console
-# annotations stay short, uniform and reviewable in one place
+# annotations stay short, uniform and reviewable in one place. A model added
+# since declares its own with a response_annotations.<model> method in its
+# file, so that adding it touches no shared file
 response_annotations <- function(model) {
+  UseMethod("response_annotations")
+}
+
+#' @exportS3Method
+response_annotations.default <- function(model) {
   if (inherits(model, "circular")) {
     return(list(resp_error = "radians in [-pi, pi]"))
   }
@@ -552,7 +559,7 @@ model_registry <- function(models = model_names()) {
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
-reference_url <- "https://popov-lab.github.io/bmm/reference/"
+reference_url <- "https://venpopov.com/bmm/reference/"
 
 format_model_list <- function(registry, style = "text", headers = TRUE) {
   blocks <- lapply(unique(registry$group), function(group) {
@@ -573,7 +580,8 @@ format_model_list <- function(registry, style = "text", headers = TRUE) {
 # response_annotations(); the `@param` text is too long for a table cell. A
 # `<model>_<version>` entry replaces the model's entry for that version, and NA
 # marks an argument that names no data column. A test requires an entry for
-# every argument without a default, so a new model needs its labels here
+# every argument without a default; a model added since gives its labels with a
+# model_column_roles.<model> method in its own file instead
 data_column_roles <- list(
   cswald = c(
     rt = "response time in seconds",
@@ -667,7 +675,21 @@ model_versions <- function(model) {
 }
 
 column_roles <- function(model, version) {
-  data_column_roles[[paste0(model, "_", version)]] %||% data_column_roles[[model]]
+  spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+  model_column_roles(spec) %||%
+    data_column_roles[[paste0(model, "_", version)]] %||%
+    data_column_roles[[model]]
+}
+
+# the column roles of one model version, as a data_column_roles entry; NULL
+# defers to data_column_roles
+model_column_roles <- function(model) {
+  UseMethod("model_column_roles")
+}
+
+#' @exportS3Method
+model_column_roles.default <- function(model) {
+  NULL
 }
 
 format_data_columns <- function(roles) {
@@ -688,7 +710,12 @@ format_key_parameters <- function(spec) {
     "None by default: your formula defines them"
   } else {
     descriptions <- vapply(spec$parameters[estimated], as.character, "")
-    paste0("`", estimated, "`: ", parameter_label(descriptions))
+    c(
+      # a custom version takes one parameter per response category from the
+      # formula, next to the ones it always estimates
+      if (identical(spec$version, "custom")) "One per response category: your formula defines them",
+      paste0("`", estimated, "`: ", parameter_label(descriptions))
+    )
   }
   if (length(fixed) > 0) {
     lines <- c(lines, paste0("Fixed by default: ", paste0("`", fixed, "`", collapse = ", ")))
@@ -981,7 +1008,7 @@ get_model2 <- function(model) {
 #' @keywords internal developer
 #' @export
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' library(usethis)
 #'
 #'
@@ -1020,13 +1047,19 @@ use_model_template <- function(model_name,
      #############################################################################!
      # see 'R/model_ddm.R' (flat defaults) or 'R/model_cswald.R' (versioned) for examples
      #
-     # Besides this file, a new model needs entries in:
-     # - `data_column_roles` in R/helpers-model.R (a test requires it)
-     # - `stored_frame_cases()` in tests/testthat/test-update.R (a test requires it)
-     #   plus a `revert_check_data()` method in R/update.R if `check_data()`
-     #   consumes or creates columns
-     # - `response_annotations()` in R/helpers-model.R, if the response columns
-     #   need a unit or a coding note in the console output
+     # Keep everything the model needs in its own files, so that adding it touches
+     # no shared file. Besides this file, a new model needs:
+     # - a `model_column_roles.<model>()` method saying what each data argument
+     #   holds (a test requires it); see R/helpers-model.R
+     # - tests/testthat/test-model_{model_name}.R with the model's own contract
+     #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
+     #   their sites are registered in test-conventions.R (a test requires it)
+     # - a provider model_cases_<model>() in tests/testthat/helper-model-<model>.R
+     #   with stored_frame, sd_default, init and links cases (a test requires
+     #   them); see tests/testthat/helper-model-cases.R. If `check_data()`
+     #   consumes or creates columns, also a `revert_check_data.<model>()` method
+     # - a `response_annotations.<model>()` method, if the response columns need
+     #   a unit or a coding note in the console output
      #
      # In this file, `citation` needs at least one reference, one per element, each
      # on a single line without a \"- \" bullet and ending in \".\" or a
@@ -1512,15 +1545,14 @@ call_brms_extractor <- function(fun, cfg, dots) {
   brms::do_call(fun, args)
 }
 
+# update() runs postprocess_brm() again on code that may already carry a bmm
+# version, so any existing ones are replaced by the version doing the update
 add_bmm_version_to_stancode <- function(stancode) {
-  version <- packageVersion("bmm")
-  text <- paste0("and bmm ", version)
-  brms_comp <- regexpr("brms.*(?=\\n)", stancode, perl = T)
-  insert_loc <- brms_comp + attr(brms_comp, "match.length") - 1
-  new_stancode <- paste0(
-    substr(stancode, 1, insert_loc),
-    " ", text,
-    substr(stancode, insert_loc + 1, nchar(stancode))
+  new_stancode <- sub(
+    "^([^\\r\\n]*?brms[^\\r\\n]*?)(?: and bmm [^ \\r\\n]+)*(?=\\r?\\n)",
+    paste0("\\1 and bmm ", utils::packageVersion("bmm")),
+    stancode,
+    perl = TRUE
   )
   class(new_stancode) <- class(stancode)
   new_stancode
@@ -1573,9 +1605,6 @@ which_positions <- function(x, pat) {
 #' find_matching_brace(y, 8L) # -> 12
 find_matching_brace <- function(x, open_pos,
                                 open_brace = "{", close_brace = "}") {
-  stopifnot(is.character(x), length(x) == 1L)
-  n <- nchar(x)
-  stopifnot(length(open_pos) == 1L, open_pos >= 1L, open_pos <= n)
   stopif(
     substr(x, open_pos, open_pos) != open_brace,
     "Character at open_pos {open_pos} is not open_brace."
@@ -1633,7 +1662,10 @@ find_matching_brace <- function(x, open_pos,
 #'
 #' @export
 extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "transformed data", "parameters", "transformed parameters", "model", "generated quantities")) {
-  stopifnot(is.character(stan_code), length(stan_code) == 1L)
+  stopif(
+    !is.character(stan_code) || length(stan_code) != 1L,
+    "'stan_code' must be a single character string, such as the output of stancode()."
+  )
   blocks <- match.arg(blocks, several.ok = TRUE)
   out <- lapply(blocks, function(b) .extract_stan_block(stan_code, b))
   names(out) <- blocks
@@ -1643,8 +1675,6 @@ extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "tran
 .extract_stan_block <- function(stan_code, block,
                                 include_braces = FALSE,
                                 trim = TRUE) {
-  stopifnot(is.character(block), length(block) == 1L)
-
   # Anchor to start-of-line (multiline mode), allow leading spaces/tabs.
   # Match the exact block name, then optional whitespace, then '{'.
   header_pat <- paste0("(?m)^[[:space:]]*", block, "[[:space:]]*\\{")

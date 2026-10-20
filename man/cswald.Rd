@@ -194,7 +194,7 @@ interpreting the parameters.
 }
 
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # generate simulated data from the diffusion model
 dat <- rcswald(n = 500, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5, s = 1)
 

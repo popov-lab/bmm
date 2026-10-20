@@ -1,5 +1,18 @@
 # Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
+#
+# Measures test coverage with covr and reports the line coverage in the job
+# summary. It runs the unit, mock-pipeline and fixture tiers of ADR 0004 with
+# four workers; the Stan compile tier is off (BMM_TEST_STAN=false, no CmdStan
+# installed). On develop 1917e81f that tier reached 16 R lines no other test
+# reaches, all real-machine probes in R/bmm_setup.R (95.65 % with it, 95.52 %
+# without, R/brms-misc.R excluded), so the reported number is slightly lower
+# than a run with CmdStan would give, never higher.
+#
+# The README badge needs no third-party service and no secret: on a push to
+# develop the badge job force-pushes coverage.json, in the endpoint format of
+# shields.io, as the only commit of the `badges` branch, and the badge reads it
+# from raw.githubusercontent.com. Only that job can write to the repository.
 on:
   push:
     branches: [master, develop, 'dev-*']
@@ -8,11 +21,20 @@ on:
 
 name: test-coverage
 
+permissions: read-all
+
+concurrency:
+  group: test-coverage-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test-coverage:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: true
+      BMM_TEST_STAN: false
+      TESTTHAT_CPUS: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -21,25 +43,74 @@ jobs:
         with:
           use-public-rspm: true
 
+      # cmdstanr is not on CRAN, so the Suggests are listed by hand, as in
+      # R-CMD-check; cmdstanr comes without CmdStan
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::covr
-          needs: coverage
+          dependencies: NA
+          extra-packages: |
+            any::covr
+            bookdown
+            stan-dev/cmdstanr
+            cowplot
+            dplyr
+            emmeans
+            fansi
+            ggplot2
+            ggthemes
+            knitr
+            loo
+            mixtur
+            MPTinR
+            pkgbuild
+            remotes
+            rmarkdown
+            roxygen2
+            rstan
+            stringr
+            testthat
+            tidybayes
+            tidyr
+            usethis
+            vctrs
+            waldo
+            yaml
+            withr
+            posterior
+            here
 
       - name: Test coverage
         run: |
-          covr::codecov(
+          cov <- covr::package_coverage(
             quiet = FALSE,
             clean = FALSE,
+            line_exclusions = list("R/brms-misc.R"),
             install_path = file.path(normalizePath(Sys.getenv("RUNNER_TEMP"), winslash = "/"), "package")
           )
+          print(cov)
+          pct <- covr::percent_coverage(cov)
+          color <- if (pct >= 90) "brightgreen" else if (pct >= 80) "green" else
+            if (pct >= 70) "yellowgreen" else if (pct >= 60) "yellow" else "red"
+          writeLines(sprintf(
+            '{"schemaVersion": 1, "label": "coverage", "message": "%.1f%%", "color": "%s"}',
+            pct, color
+          ), "coverage.json")
+          cat(sprintf("Line coverage: %.2f %% (R/brms-misc.R excluded, Stan compile tier off)\n", pct),
+              file = Sys.getenv("GITHUB_STEP_SUMMARY"), append = TRUE)
         shell: Rscript {0}
+
+      - name: Keep the badge for the badge job
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-badge
+          path: coverage.json
 
       - name: Show testthat output
         if: always()
         run: |
           ## --------------------------------------------------------------------
-          find ${{ runner.temp }}/package -name 'testthat.Rout*' -exec cat '{}' \; || true
+          find '${{ runner.temp }}/package' -name 'testthat.Rout*' -exec cat '{}' \; || true
         shell: bash
 
       - name: Upload test results
@@ -48,3 +119,34 @@ jobs:
         with:
           name: coverage-test-failures
           path: ${{ runner.temp }}/package
+
+  badge:
+    needs: test-coverage
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # one badge push at a time; a queued newer push replaces an older one
+    concurrency:
+      group: coverage-badge
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-badge
+
+      # the branch holds one commit, replaced on every push, so it never grows
+      - name: Publish the badge to the badges branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q -b badges site
+          cp coverage.json site/
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage.json
+          git commit -q -m "Coverage of ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+        shell: bash

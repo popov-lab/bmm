@@ -195,7 +195,7 @@ settable_link_functions.m3 <- function(model) {
 #'
 #' @keywords bmmodel
 #'
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' data <- oberauer_lewandowsky_2019_e1
 #'
 #' # initiate the model object

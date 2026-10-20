@@ -37,6 +37,7 @@ test_that("decimal constants are emitted literally, never in scientific notation
 })
 
 test_that("simplex sticks get the beta priors of a symmetric Dirichlet(1)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC", D = "gD"))
   dat <- data.frame(cond = factor(c("x", "y")), A = 5L, B = 3L, C = 2L, D = 1L)
   formula <- bmf(gA ~ 1, gB ~ 1, gC ~ 1)
@@ -58,6 +59,7 @@ test_that("simplex sticks get the beta priors of a symmetric Dirichlet(1)", {
 })
 
 test_that("the per-stick uniform prior of ?mpt replaces the beta priors in every cell", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC", D = "gD"))
   dat <- data.frame(cond = factor(c("x", "y")), A = 5L, B = 3L, C = 2L, D = 1L)
   latent <- c(logit = "logistic(0, 1)", probit = "normal(0, 1)")
@@ -73,6 +75,7 @@ test_that("the per-stick uniform prior of ?mpt replaces the beta priors in every
 })
 
 test_that("models without a simplex group carry no simplex prior functions", {
+  withr::local_seed(445)
   pcm_tree <- mpt_tree("study", list(
     C = "cp + (1 - cp) * rp * rp",
     E = "2 * (1 - cp) * rp * (1 - rp)",

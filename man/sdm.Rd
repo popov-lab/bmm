@@ -27,7 +27,7 @@ An object of class \code{bmmodel}
 Signal Discrimination Model (SDM) by Oberauer (2023)
 }
 \details{
-see \href{https://popov-lab.github.io/bmm/articles/bmm_sdm_simple.html}{the online article} for a detailed description of the model
+see \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for a detailed description of the model
 and how to use it. * \strong{Domain:} Visual working memory
 \itemize{
 \item \strong{Task:} Continuous reproduction
@@ -79,7 +79,7 @@ and how to use it. * \strong{Domain:} Visual working memory
 }
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # simulate data from the model
 dat <- data.frame(y = rsdm(n = 1000, c = 4, kappa = 3))
 

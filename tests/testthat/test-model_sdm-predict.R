@@ -1,7 +1,5 @@
 test_that("sdm posterior_predict draws each prediction from its own posterior draw", {
-  path <- test_path("assets/bmmfit_example1.rds")
-  skip_if_not(file.exists(path), "SDM fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_example1.rds")
   withr::local_seed(445)
   yrep <- brms::posterior_predict(fit)
   c_draws <- brms::posterior_linpred(fit, dpar = "c", transform = TRUE)
@@ -32,6 +30,7 @@ test_that("sdm posterior_predict draws each prediction from its own posterior dr
 
 test_that("an sdm fit refuses posterior_epred() with a message naming the model", {
   skip_on_cran()
+  withr::local_seed(445)
   dat <- data.frame(y = rsdm(50))
   fit <- bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm(resp_error = "y"),
              backend = "mock", mock = 1, rename = FALSE)
@@ -48,4 +47,20 @@ test_that("posterior_epred() on an sdm fit saved without the function gives the 
   # the model parameters stay available
   expect_equal(dim(brms::posterior_epred(fit, dpar = "c", ndraws = 5)),
                c(5L, nrow(fit$data)))
+})
+
+test_that("log_lik() and posterior_predict() of an sdm fit read each observation's draws", {
+  dpars <- list(
+    mu = matrix(c(0, 0.1, -0.1, 0.2), 2, 2), c = matrix(c(2, 3, 4, 5), 2, 2),
+    kappa = matrix(c(5, 6, 7, 8), 2, 2)
+  )
+  prep <- epred_prep(dpars, list(Y = c(0.3, -0.5)))
+  for (i in 1:2) {
+    expect_equal(log_lik_sdm_simple(i, prep),
+                 dsdm(prep$data$Y[i], dpars$mu[, i], dpars$c[, i], dpars$kappa[, i], log = TRUE))
+    expect_identical(
+      withr::with_seed(1, posterior_predict_sdm_simple(i, prep)),
+      withr::with_seed(1, rsdm(2, dpars$mu[, i], dpars$c[, i], dpars$kappa[, i]))
+    )
+  }
 })

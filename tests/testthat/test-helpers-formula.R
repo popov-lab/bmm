@@ -208,6 +208,7 @@ test_that("check_formula works", {
 })
 
 test_that("check_formula warns when a predictor clashes with a parameter name", {
+  withr::local_seed(445)
   withr::local_options(bmm.silent = 2, bmm.sort_data = FALSE)
   model <- sdm(resp_error = "y")
 
@@ -409,6 +410,12 @@ test_that("apply_links is case sensitive for link names", {
   form <- bmf(x ~ a + c, kappa ~ 1, a ~ 1, c ~ 1)
   links <- list(a = "LOG")
   expect_error(apply_links(form, links), "should be one of")
+})
+
+test_that("apply_links refuses links that are not a named list of strings", {
+  form <- bmf(x ~ a + c, kappa ~ 1, a ~ 1, c ~ 1)
+  expect_error(apply_links(form, list("log")), "named list of link functions")
+  expect_error(apply_links(form, list(a = 1)), "named list of link functions")
 })
 
 

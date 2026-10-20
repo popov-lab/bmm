@@ -96,7 +96,6 @@ bmf <- bmmformula
 
 # an internal bmmformula constructor
 new_bmmformula <- function(x = nlist()) {
-  stopifnot(is_namedlist(x))
   class(x) <- "bmmformula"
   assign_nl_attr(x)
 }
@@ -474,7 +473,11 @@ apply_links <- function(formula, links = nlist()) {
   if (length(links) == 0) {
     return(formula)
   }
-  stopifnot(is_namedlist(links) || is.null(links), all(vapply(links, is.character, logical(1))))
+  stopif(
+    !is_namedlist(links) || !all(vapply(links, is.character, logical(1))),
+    'The `links` argument must be a named list of link functions, \\
+     e.g. links = list(kappa = "log")'
+  )
   UseMethod("apply_links")
 }
 
@@ -506,7 +509,6 @@ apply_links.formula <- function(formula, links = nlist()) {
 #' identical(inv_link("x", "log"), quote(exp(x))) # TRUE
 #' @noRd
 inv_link <- function(par = character(0), link = c("log", "softplus", "logit", "probit", "identity")) {
-  stopifnot(is.character(par), length(par) == 1)
   par <- as.symbol(par)
   link <- match.arg(link)
   switch(link,

@@ -21,7 +21,7 @@ larger feature are also listed with the role `ctb` in `DESCRIPTION`.
 
 1. Fork the repo and create your branch from `develop`. If your change is a
    feature planned for a later release, branch from that release's integration
-   branch (`dev-1.5.0`, `dev-1.6.0`) instead; the milestone of the issue tells
+   branch (e.g. `dev-1.6.0`) instead; the milestone of the issue tells
    you which release it is planned for. Bug fixes always go to `develop`.
 2. Open the PR against the branch you started from.
 
@@ -41,14 +41,22 @@ devtools::check()      # 0 errors, 0 warnings; explain any note in the PR
 Your PR also needs:
 
 - **Tests** for new behaviour, in `tests/testthat/`. Test what your code does,
-  not how R subsets a data frame.
+  not how R subsets a data frame. A new model adds `test-model_<name>.R` and a
+  provider `model_cases_<name>()` in `tests/testthat/helper-model-<name>.R`
+  with a `stored_frame`, `sd_default`, `init` and `links` case, which the
+  cross-model tests read. Gate tests by tier: `skip_unless_stan_tests()` for a
+  test that compiles Stan (and update that file's count of `cmdstan_model()`
+  and `$sample()` in `test-conventions.R`), `skip_on_cran()` for one over 0.4 s in CRAN mode
+  (rules R1, R4, R9 and R10 in
+  [ADR 0004](../.dev/decisions/0004-test-tiers-and-budget.md); short form in
+  [AGENTS.md](../AGENTS.md), "Testing Requirements").
 - **A NEWS bullet** for anything users can see, under the development heading of
   the branch you target: `# bmm (development version)` on `develop`,
-  `# bmm 1.5.0 (development)` on `dev-1.5.0`. Keep it short: what changes for the
+  `# bmm 1.6.0 (development)` on `dev-1.6.0`. Keep it short: what changes for the
   user and what they should do. Do not describe how the fix works.
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
-  [developer notes](https://venpopov.com/bmm/dev/dev-notes/) and follow the
+  [developer notes](https://venpopov.com/bmm/dev-notes/) and follow the
   one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Show
   parameter recovery in the PR description (see below).
 
@@ -229,7 +237,7 @@ fallback ends when a second person takes on regular reviews.
 - Call functions as `package::function()`.
 
 [AGENTS.md](../AGENTS.md) has the rest, and the
-[developer notes](https://venpopov.com/bmm/dev/dev-notes/) explain which file
+[developer notes](https://venpopov.com/bmm/dev-notes/) explain which file
 holds which step of the fitting pipeline. If you are unsure where code
 belongs, ask.
 

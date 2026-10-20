@@ -1,4 +1,5 @@
 test_that("bmm version is added to mock model", {
+  withr::local_seed(445)
   fit <- bmm(
     formula = bmmformula(c ~ 1, kappa ~ 1),
     data = data.frame(y = rsdm(n = 10)),
@@ -34,7 +35,7 @@ test_that("posterior_epred() refuses the circular mixture models by name", {
                "The expected response is not defined for the mixture2p model")
 
   skip_on_cran()
-  dat <- oberauer_lin_2017
+  dat <- small_data()
   fit <- bmm(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), dat,
              mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
              backend = "mock", mock = 1, rename = FALSE)
@@ -63,7 +64,7 @@ test_that("posterior_epred() refuses a circular model with newdata passed by pos
 
 test_that("circular models saved under their pre-1.0.1 class refuse as well", {
   fit <- load_fixture_fit("bmmfit_example1.rds")
-  expect_true(inherits(fit$bmm$model, "vwm"))
+  class(fit$bmm$model) <- c("bmmodel", "vwm", "sdm", "sdm_simple")
   expect_false(expected_response_defined(fit$bmm$model))
 })
 

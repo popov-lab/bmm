@@ -104,6 +104,7 @@ test_that("check_data.cswald errors when RT contains negative values", {
 
 test_that("check_data.cswald warns when RT > 10 seconds", {
   # Use crisk version and large dataset to avoid other warnings
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(
     rt = c(runif(99, 0.4, 1.5), 15),
@@ -118,6 +119,7 @@ test_that("check_data.cswald warns when RT > 10 seconds", {
 
 test_that("check_data.cswald warns when RT < 0.1 seconds", {
   # Use crisk version and large dataset to avoid other warnings
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(
     rt = c(0.05, runif(99, 0.4, 1.5)),
@@ -132,6 +134,7 @@ test_that("check_data.cswald warns when RT < 0.1 seconds", {
 
 test_that("check_data.cswald handles different response formats", {
   # Use crisk version to avoid error rate warning, and use larger datasets
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
 
   # integer 0/1 - should work silently
@@ -174,6 +177,7 @@ test_that("check_data.cswald handles different response formats", {
 
 test_that("check_data.cswald errors on invalid response values", {
   # Use crisk version to avoid error rate warning
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
 
   # invalid integer values
@@ -198,6 +202,7 @@ test_that("check_data.cswald errors on invalid response values", {
 })
 
 test_that("check_data.cswald warns about high error rate for simple version", {
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "simple")
 
   # 30% error rate
@@ -213,6 +218,7 @@ test_that("check_data.cswald warns about high error rate for simple version", {
 })
 
 test_that("check_data.cswald does not warn about error rate for crisk version", {
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
 
   # 30% error rate - no warning for crisk
@@ -226,6 +232,7 @@ test_that("check_data.cswald does not warn about error rate for crisk version", 
 
 test_that("check_data.cswald returns a data.frame", {
   # Use crisk version to avoid error rate warning
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(rt = runif(100, 0.4, 1.5), response = rep(c(0, 1), 50))
 
@@ -254,6 +261,7 @@ test_that("bmf2bf.cswald creates correct brms formula", {
 
 test_that("configure_model.cswald_simple returns correct components", {
   skip_on_cran()
+  withr::local_seed(445)
 
   model <- cswald(rt = "rt", response = "response", version = "simple")
   dat <- data.frame(
@@ -272,6 +280,7 @@ test_that("configure_model.cswald_simple returns correct components", {
 
 test_that("configure_model.cswald_crisk returns correct components", {
   skip_on_cran()
+  withr::local_seed(445)
 
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(
@@ -404,6 +413,7 @@ test_that("threading a non-zero sndt indexes the decisions with the sliced row",
 
 test_that("cswald simple version runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
   model <- cswald(rt = "rt", response = "response", version = "simple")
@@ -435,6 +445,7 @@ test_that("cswald refuses a negative fixed sndt", {
 
 test_that("cswald crisk version runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
@@ -447,6 +458,7 @@ test_that("cswald crisk version runs with mock backend", {
 
 test_that("cswald simple version with predictors runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- rcswald(n = 200, drift = 2, bound = 1.5, ndt = 0.3)
   dat$condition <- rep(c("A", "B"), each = 100)
@@ -460,6 +472,7 @@ test_that("cswald simple version with predictors runs with mock backend", {
 
 test_that("cswald crisk version allows negative drift (more lower responses)", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Generate data with negative drift (biased toward lower boundary)
   dat <- rcswald(n = 100, drift = -1.5, bound = 1.5, ndt = 0.3, zr = 0.5)
@@ -478,6 +491,7 @@ test_that("cswald crisk version allows negative drift (more lower responses)", {
 
 test_that("cswald handles all-correct responses", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Data with all correct responses
   dat <- data.frame(
@@ -496,6 +510,7 @@ test_that("cswald handles all-correct responses", {
 
 test_that("cswald handles high error rate data with crisk version", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Data with 50% error rate
   dat <- data.frame(
@@ -583,12 +598,8 @@ cswald_parity_data <- function(n = 200, sndt = 0) {
 }
 
 test_that("the vectorized cswald likelihood matches the scalar and R versions", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   # seeded so a failure reproduces. Under this seed the log-space fallback,
   # with both clamp conditions firing, takes 23 survivor terms for simple and 7
@@ -744,12 +755,8 @@ test_that("the vectorized family is chosen by the value of sndt, not its fixedne
 })
 
 test_that("the cswald survivor keeps a finite gradient where Phi() nears underflow", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   file <- file.path(tempdir(), "bmm_cswald_surv_grad.stan")
@@ -781,12 +788,8 @@ test_that("the cswald survivor keeps a finite gradient where Phi() nears underfl
 })
 
 test_that("swald_log_Phi keeps a finite gradient on its own where Phi() nears underflow", {
+  skip_unless_stan_tests()
   skip_on_cran() # compiles a Stan program
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(nzchar(Sys.getenv("CMDSTAN", unset = "")) ||
-    !is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-  "CmdStan not installed"
-  )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   file <- file.path(tempdir(), "bmm_cswald_log_phi_grad.stan")
@@ -859,6 +862,7 @@ test_that("cswald posterior_epred returns one column per observation", {
 
 test_that("both cswald versions store their posterior_epred in the family", {
   skip_on_cran()
+  withr::local_seed(445)
   dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
   fit <- bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1), dat,
              cswald(rt = "rt", response = "response", version = "simple"),
@@ -879,4 +883,37 @@ test_that("posterior_epred() works on a cswald fit saved without the function", 
   epred <- brms::posterior_epred(fit, ndraws = 20)
   expect_equal(dim(epred), c(20L, nrow(fit$data)))
   expect_true(all(is.finite(epred)))
+})
+
+test_that("log_lik() of a cswald fit is the density of each observation under each draw", {
+  # two draws (rows) of two observations (columns), every value different, so
+  # an observation or a parameter read from the wrong place shows
+  dpars <- list(
+    drift = matrix(c(1.5, 2, 2.5, 3), 2, 2), bound = matrix(c(1, 1.2, 0.9, 1.1), 2, 2),
+    ndt = matrix(c(0.2, 0.25, 0.22, 0.18), 2, 2), s = matrix(c(1, 1.1, 0.9, 1.2), 2, 2),
+    zr = matrix(c(0.4, 0.6, 0.5, 0.55), 2, 2)
+  )
+  data <- list(Y = c(0.6, 0.9), dec = c(1, 0))
+  prep <- epred_prep(dpars, data)
+  for (i in 1:2) {
+    density <- function(...) {
+      dcswald(data$Y[i], data$dec[i], dpars$drift[, i], dpars$bound[, i], dpars$ndt[, i],
+              s = dpars$s[, i], ...)
+    }
+    expect_equal(log_lik_cswald_simple(i, prep), density(version = "simple"))
+    expect_equal(log_lik_cswald_crisk(i, prep), density(zr = dpars$zr[, i], version = "crisk"))
+  }
+})
+
+test_that("cswald check_data refuses RTs and responses it cannot read", {
+  model <- cswald("rt", "response")
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  expect_error(
+    check_data(model, data.frame(rt = c("0.5", "0.6"), response = c(1, 0)), formula),
+    "The RT variable 'rt' needs to be of type double or integer"
+  )
+  expect_error(
+    check_data(model, data.frame(rt = c(0.5, 0.6), response = as.complex(c(1, 0))), formula),
+    "is of type 'complex'"
+  )
 })

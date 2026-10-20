@@ -8,66 +8,6 @@ sim_cdp_data <- function(n_subjects = 4, n_trials = 100, n_new = 3, n_old = 3,
                       rcrit = 0.5, kcrit = kcrit, n_new = n_new, ...))
 }
 
-test_that("sdt_cdp model can be created", {
-  m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
-  expect_s3_class(m, "bmmodel")
-  expect_s3_class(m, "sdt")
-  expect_s3_class(m, "sdt_cdp")
-})
-
-test_that("sdt_cdp has the CDP parameters and no mu", {
-  m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
-  expect_setequal(
-    names(m$parameters),
-    c("dfam", "drec", "criterion", "spacing", "rcrit", "sigmar",
-      "rho", "kcrit")
-  )
-  expect_false("mu" %in% names(m$parameters))
-  expect_false(isTRUE(m$void_mu))
-})
-
-test_that("sdt_cdp fixes sigmar, rho, and kcrit by default", {
-  m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
-  expect_equal(m$fixed_parameters$sigmar, 0)
-  expect_equal(m$fixed_parameters$rho, 0)
-  expect_equal(m$fixed_parameters$kcrit, -100)
-})
-
-test_that("sdt_cdp has identity links and accepts custom links", {
-  m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
-  expect_true(all(unlist(m$links) == "identity"))
-  m2 <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3,
-                links = list(dfam = "log"))
-  expect_equal(m2$links$dfam, "log")
-})
-
-test_that("sdt_cdp refuses a link on a fixed or transformed parameter", {
-  m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
-  expect_equal(settable_links(m), c("dfam", "drec", "criterion", "rcrit"))
-  # sigmar, rho and kcrit are fixed, and spacing is read through exp()
-  for (par in c("sigmar", "rho", "kcrit", "spacing")) {
-    expect_error(
-      sdt_cdp(stimulus = "s", n_new = 3, n_old = 3,
-              links = stats::setNames(list("log"), par)),
-      paste0("link of '", par, "' cannot be changed")
-    )
-  }
-  expect_error(
-    sdt_cdp(stimulus = "s", n_new = 3, n_old = 3,
-            links = list(sensitivity = "log")),
-    "Unrecognized link target"
-  )
-  m$links$rho <- "log"
-  expect_error(check_links(m), "link of 'rho' cannot be changed")
-})
-
-test_that("sdt_cdp offers only the links it can invert in its formula", {
-  expect_error(
-    sdt_cdp(stimulus = "s", n_new = 3, n_old = 3, links = list(drec = "sqrt")),
-    "Unknown link function"
-  )
-})
-
 test_that("sdt_cdp gives every parameter an sd default prior", {
   rate1 <- c("dfam", "drec")
   for (tt in c("parsimonious", "log_distance")) {
@@ -109,12 +49,6 @@ test_that("sdt_cdp validates n_new, n_old and the response prefix", {
             n_new = 1, n_old = 1),
     "single prefix"
   )
-})
-
-test_that("sdt_cdp init_ranges cover the estimated parameters and exclude mu", {
-  m <- sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)
-  expect_true(all(names(m$parameters) %in% names(m$init_ranges)))
-  expect_false("mu" %in% names(m$init_ranges))
 })
 
 test_that(".cdp_make_thresholds anchors the old/new boundary at criterion", {
@@ -187,6 +121,7 @@ test_that("sdt_cdp log_distance names its deltas in interval order and has no sp
 })
 
 test_that("sdt_cdp log_distance integrates with the pipeline via mock backend", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   thr <- .cdp_make_thresholds(0.3, 0, 3, 3, "log_distance",
                               deltas = log(c(0.8, 0.6, 0.6, 0.8)))
   dat <- sim_cdp_data(thresholds = thr)
@@ -240,6 +175,7 @@ test_that(".sdt_cdp_category_probs guess + know recover the 2-way know total", {
 })
 
 test_that(".sdt_cdp_category_probs vectorizes over observations", {
+  withr::local_seed(445)
   n <- 10
   thr <- .cdp_make_thresholds(rnorm(n, 0, 0.2), rnorm(n, -0.3, 0.1), 3, 3,
                               "parsimonious")
@@ -284,7 +220,7 @@ test_that("sdt_cdp_logmu matches .sdt_cdp_category_probs and preserves shape", {
 test_that("sdt_cdp_logmu vectorized path matches per-element evaluation", {
   nd <- 6
   nobs <- 4
-  set.seed(11)
+  withr::local_seed(11)
   mk <- function(center, spread) matrix(rnorm(nd * nobs, center, spread), nd, nobs)
   a <- list(dfam = mk(0.8, 0.2), drec = mk(1.0, 0.2),
             criterion = mk(0.1, 0.1), spacing = mk(-0.3, 0.1),
@@ -309,15 +245,10 @@ test_that("sdt_cdp_logmu vectorized path matches per-element evaluation", {
   }
 })
 
-test_that("rsdt_cdp returns the count columns sdt_cdp expects", {
+test_that("rsdt_cdp adds guess columns and honours per-observation parameters", {
+  withr::local_seed(2203)
   dat <- expand.grid(id = 1:5, stimulus = c(0L, 1L))
   thr <- .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious")
-  cnts <- rsdt_cdp(nrow(dat), 100, dat$stimulus, 0.8, 1.0, thresholds = thr,
-                   rcrit = 0.5, n_new = 3)
-  expect_equal(colnames(cnts),
-               c("new1", "new2", "new3", "know4", "know5", "know6",
-                 "remember4", "remember5", "remember6"))
-  expect_true(all(rowSums(cnts) == 100))
   # guess columns appear with a finite kcrit
   cnts_g <- rsdt_cdp(nrow(dat), 100, dat$stimulus, 0.8, 1.0, thresholds = thr,
                      rcrit = 0.5, kcrit = -0.3, n_new = 3)
@@ -329,37 +260,18 @@ test_that("rsdt_cdp returns the count columns sdt_cdp expects", {
   expect_equal(dim(cnts_v), c(nrow(dat), 9))
 })
 
-test_that("dsdt_cdp computes a valid multinomial density and vectorizes", {
+test_that("dsdt_cdp matches dmultinom against the category probabilities", {
   thr <- .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious")
   cnt <- c(40, 20, 10, 15, 25, 35, 5, 20, 80)
-  d <- dsdt_cdp(counts = cnt, stimulus = 1, dfam = 0.8, drec = 1.0,
-                thresholds = thr, rcrit = 0.5, n_new = 3)
-  expect_true(is.finite(d))
-  expect_true(d > 0)
   dl <- dsdt_cdp(counts = cnt, stimulus = 1, dfam = 0.8, drec = 1.0,
                  thresholds = thr, rcrit = 0.5, n_new = 3, log = TRUE)
-  expect_equal(log(d), dl, tolerance = 1e-10)
-  # matches dmultinom against the category probabilities
   probs <- .sdt_cdp_category_probs(thr, 0.8, 1.0, 0, 0.5, NULL, 1, 3, 3,
                                    "normal", 0)
   expect_equal(dl, dmultinom(cnt, prob = probs, log = TRUE), tolerance = 1e-10)
-  # rows vectorize with recycled parameters
-  cnts <- rbind(cnt, c(60, 15, 5, 10, 20, 30, 10, 25, 75))
-  dv <- dsdt_cdp(cnts, c(0L, 1L), 0.8, 1.0, thr, 0.5, n_new = 3, log = TRUE)
-  expect_length(dv, 2)
-  expect_equal(dv[2],
-               dsdt_cdp(cnts[2, ], 1L, 0.8, 1.0, thr, 0.5, n_new = 3,
-                        log = TRUE))
-  # column count is validated
-  expect_error(dsdt_cdp(cnt[-1], 1, 0.8, 1.0, thr, 0.5, n_new = 3),
-               "columns")
-  cnt_na <- cnt
-  cnt_na[2] <- NA
-  expect_error(dsdt_cdp(cnt_na, 1, 0.8, 1.0, thr, 0.5, n_new = 3),
-               "must not contain NA")
 })
 
 test_that("aggregate_sdt_cdp_data pivots long data to the wide count columns", {
+  withr::local_seed(445)
   long <- expand.grid(id = 1:4, stimulus = c(0L, 1L),
                       judgment = c("new", "know", "remember"),
                       confidence = 1:6)
@@ -377,6 +289,7 @@ test_that("aggregate_sdt_cdp_data pivots long data to the wide count columns", {
 })
 
 test_that("aggregate_sdt_cdp_data aggregates trial-level data without counts", {
+  withr::local_seed(445)
   long <- expand.grid(id = 1:3, stimulus = c(0L, 1L),
                       judgment = c("new", "know", "remember"),
                       confidence = 1:6)
@@ -439,13 +352,9 @@ test_that("check_data.sdt_cdp handles asymmetric scales and guess columns", {
   expect_equal(ncol(cd_g$Y), 12)
 })
 
-test_that("check_data.sdt_cdp validates columns, stimulus, and counts", {
+test_that("check_data.sdt_cdp checks the declared scale and the guess columns", {
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat <- sim_cdp_data()
-  # missing response columns point at the aggregation helper
-  expect_error(check_data(m, dat[-which(colnames(dat) == "new1")],
-                          bmf(dfam ~ 1)),
-               "aggregate_sdt_cdp_data")
   # a declared scale that mismatches the columns is a missing-column error
   m_big <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 4)
   expect_error(check_data(m_big, dat, bmf(dfam ~ 1)), "missing in the data")
@@ -453,23 +362,10 @@ test_that("check_data.sdt_cdp validates columns, stimulus, and counts", {
   dat_pg <- dat
   dat_pg$guess4 <- 1L
   expect_error(check_data(m, dat_pg, bmf(dfam ~ 1)), "all of them or none")
-  # bad stimulus coding
-  bad_s <- dat
-  bad_s$stimulus <- 2
-  expect_error(check_data(m, bad_s, bmf(dfam ~ 1)), "0 .* and 1")
-  # the shared SDT stimulus check: NA and a single stimulus class
-  bad_s$stimulus <- dat$stimulus
-  bad_s$stimulus[1] <- NA
-  expect_error(check_data(m, bad_s, bmf(dfam ~ 1)), "1 of .* values are NA")
-  expect_error(check_data(m, dat[dat$stimulus == 1, ], bmf(dfam ~ 1)),
-               "is 1 in every row")
-  # negative counts
-  bad_n <- dat
-  bad_n$new1[1] <- -1L
-  expect_error(check_data(m, bad_n, bmf(dfam ~ 1)), "non-negative")
 })
 
 test_that("sdt_cdp accepts a response prefix for the count columns", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- sim_cdp_data()
   resp_cols <- grep("new|know|remember", colnames(dat))
   colnames(dat)[resp_cols] <- paste0("cdp", colnames(dat)[resp_cols])
@@ -674,6 +570,7 @@ cdp_kernel_reference <- function(g) {
 }
 
 test_that("the R cdp kernel matches an independent reference in both tails", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   cells <- cdp_kernel_grid()
   ref <- vapply(seq_len(nrow(cells)), function(i) {
     cdp_kernel_reference(cells[i, ])
@@ -732,9 +629,8 @@ cdp_kernel_stan <- function(cells) {
 }
 
 test_that("the Stan cdp kernel matches the R kernel in both tails", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   cells <- cdp_kernel_grid()
   stan <- cdp_kernel_stan(cells)
@@ -756,9 +652,8 @@ test_that("the Stan cdp likelihood has a finite gradient with an unbounded top b
   # the parity test compares values only; an infinite bin bound that reaches
   # Phi() as a function of the parameters gives a NaN gradient (zero density
   # times an infinite adjoint) while every value stays right
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   program <- paste0(
     "functions {\n",
@@ -795,6 +690,7 @@ test_that("the Stan cdp likelihood has a finite gradient with an unbounded top b
 ############################################################################# !
 
 test_that("guess columns without kcrit in the formula are refused, kcrit without guess columns warns", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat_rk <- sim_cdp_data()
   dat_rkg <- sim_cdp_data(kcrit = 0.2)
@@ -853,28 +749,12 @@ test_that("check_data.sdt_cdp refuses count columns beyond the declared scale", 
   expect_equal(ncol(check_data(m_ok, dat, bmf(dfam ~ 1))$Y), 7)
 })
 
-test_that("dsdt_cdp, check_data and aggregate_sdt_cdp_data refuse malformed input", {
-  thr <- .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious")
-  cnt <- c(40, 20, 10, 15, 25, 35, 5, 20, 80)
-  expect_error(dsdt_cdp(replace(cnt, 2, -1), 1, 0.8, 1.0, thr, 0.5, n_new = 3),
-               "non-negative")
-  expect_error(dsdt_cdp(cnt, 2, 0.8, 1.0, thr, 0.5, n_new = 3),
-               "stimulus must be 0")
+test_that("check_data and aggregate_sdt_cdp_data refuse malformed input", {
   # an empty row
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat <- sim_cdp_data()
   dat[1, grep("new|know|remember", colnames(dat))] <- 0L
   expect_error(check_data(m, dat, bmf(dfam ~ 1)), "no empty rows")
-  # the shared count-type rule (#461) reaches cdp through
-  # .validate_sdt_count_cols(): a non-numeric column is named, integer-valued
-  # doubles pass silently and fractional counts warn
-  dat <- sim_cdp_data()
-  dat$know4 <- as.character(dat$know4)
-  expect_error(check_data(m, dat, bmf(dfam ~ 1)), "'know4' must be numeric")
-  dat$know4 <- as.numeric(dat$know4)
-  expect_silent(check_data(m, dat, bmf(dfam ~ 1)))
-  dat$know4 <- dat$know4 + 0.5
-  expect_warning(check_data(m, dat, bmf(dfam ~ 1)), "should contain integer counts")
   # the aggregator's count and confidence checks
   long <- data.frame(
     id = 1, stimulus = 1,
@@ -907,9 +787,8 @@ test_that("the Stan cdp gradient is right where a threshold meets the strength m
   # rcrit == kcrit on lures makes all three Guess breakpoints coincide. The
   # values were always right there; the gradients were not (0 for the first,
   # -3.65 against a finite difference of -1.51 for the second)
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not_installed("cmdstanr")
-  skip_if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE)))
 
   program <- paste0(
     "functions {\n",

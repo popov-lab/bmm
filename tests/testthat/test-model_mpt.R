@@ -20,6 +20,7 @@ test_that("mpt_tree validates its inputs", {
 })
 
 test_that("mpt_tree takes formulas and strings interchangeably", {
+  withr::local_seed(445)
   mpt_formula_tree_pairs <- list(
     twohtm_old = list(
       formulas = mpt_tree("old",
@@ -205,6 +206,7 @@ test_that("importers record their own call", {
 })
 
 test_that("an empty formula fits every parameter with an intercept", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   fit <- suppressMessages(bmm(
     bmf(), mpt_2htm_data(), model, backend = "mock", mock_fit = 1, rename = FALSE
@@ -214,6 +216,7 @@ test_that("an empty formula fits every parameter with an intercept", {
 })
 
 test_that("update() re-runs the mpt data preparation for new data", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat10 <- mpt_2htm_data(n_id = 10)
   dat20 <- mpt_2htm_data(n_id = 20)
@@ -331,6 +334,7 @@ test_that("the links of simplex parameters cannot be changed", {
 })
 
 test_that("check_formula generates linked category formulas", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1 + (1 | id), g ~ 1)
@@ -346,6 +350,7 @@ test_that("check_formula generates linked category formulas", {
 })
 
 test_that("check_formula uses Phi for the probit link", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = "probit")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1, g ~ 1)
@@ -358,6 +363,7 @@ test_that("check_formula uses Phi for the probit link", {
 })
 
 test_that("links = list() sets one parameter's link and matched prior at construction", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "probit"))
   expect_equal(model$links, list(D = "probit", g = "logit"))
   expect_equal(model$default_priors$D, bmm:::.mpt_latent_prior("probit"))
@@ -438,6 +444,7 @@ test_that("mpt() refuses a link for a parameter the restrictions removed", {
 })
 
 test_that("formulas for response categories are rejected", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(old ~ 1, D ~ 1, g ~ 1)
@@ -448,6 +455,7 @@ test_that("formulas for response categories are rejected", {
 })
 
 test_that("response categories are refused as predictors before brms sees them", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   expect_error(
@@ -461,6 +469,7 @@ test_that("response categories are refused as predictors before brms sees them",
 })
 
 test_that("mpt compiles for a multi-tree binary-category model", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1 + (1 | id), g ~ 1)
@@ -471,6 +480,7 @@ test_that("mpt compiles for a multi-tree binary-category model", {
 })
 
 test_that("mpt compiles for a single-tree multinomial model", {
+  withr::local_seed(445)
   pcm_tree <- mpt_tree("study", list(
     C = "cp + (1 - cp) * rp * rp",
     E = "2 * (1 - cp) * rp * (1 - rp)",
@@ -489,6 +499,7 @@ test_that("mpt compiles for a single-tree multinomial model", {
 })
 
 test_that("mpt compiles with design-fixed covariates", {
+  withr::local_seed(445)
   tree <- mpt_tree("main", list(
     correct = "D + (1 - D) * Gcorr",
     incorrect = "(1 - D) * (1 - Gcorr)"
@@ -506,6 +517,7 @@ test_that("mpt compiles with design-fixed covariates", {
 })
 
 test_that("generated indicator and covariate columns do not trigger the clash warning", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   expect_no_warning(bmm(
@@ -530,6 +542,7 @@ test_that("generated indicator and covariate columns do not trigger the clash wa
 })
 
 test_that("a fixed non-linear sub-parameter reaches the constant prior", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$ptime <- rep(c(1, 2), length.out = nrow(dat))
@@ -544,6 +557,7 @@ test_that("a fixed non-linear sub-parameter reaches the constant prior", {
 })
 
 test_that("non-linear parameter formulas bypass the link transformation", {
+  withr::local_seed(445)
   tree <- mpt_tree("main", list(
     correct = "D + (1 - D) * 0.25",
     incorrect = "(1 - D) * 0.75"
@@ -577,6 +591,7 @@ test_that("non-linear parameter formulas bypass the link transformation", {
 })
 
 test_that("the message on non-linear sub-parameters names the sd prior they get", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$x <- rep(c(0, 1), length.out = nrow(dat))
@@ -593,6 +608,7 @@ test_that("the message on non-linear sub-parameters names the sd prior they get"
 })
 
 test_that("a symbol of a non-linear formula that is neither column nor parameter errors", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data(n_id = 4)
   formula <- bmf(D ~ inv_logit(a + b * x), a ~ 1, b ~ 1, g ~ 1)
@@ -613,6 +629,7 @@ test_that("a symbol of a non-linear formula that is neither column nor parameter
 })
 
 test_that("links set after construction are checked like any other model's", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1, g ~ 1)
@@ -630,6 +647,7 @@ test_that("model_docs() names no scale that contradicts a switched link", {
 })
 
 test_that("a per-parameter probit link gets the probit default prior", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   model$links$D <- "probit"
   dat <- mpt_2htm_data()
@@ -640,6 +658,7 @@ test_that("a per-parameter probit link gets the probit default prior", {
 })
 
 test_that("random-effects SDs get a default prior on the scale of the link", {
+  withr::local_seed(445)
   sd_prior <- function(model, par) {
     pr <- suppressMessages(default_prior(
       bmf(D ~ 1 + (1 | id), g ~ 1 + (1 | id)), mpt_2htm_data(), model
@@ -655,6 +674,7 @@ test_that("random-effects SDs get a default prior on the scale of the link", {
 })
 
 test_that("condition effects under reference coding get the intercept's prior scale", {
+  withr::local_seed(445)
   dat <- mpt_2htm_data()
   dat$cond <- rep(c("a", "b"), length.out = nrow(dat))
   effect_prior <- function(model) {
@@ -669,6 +689,7 @@ test_that("condition effects under reference coding get the intercept's prior sc
 })
 
 test_that("the links a non-linear formula switches off survive a second check", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$ptime <- rep(c(1, 2), length.out = nrow(dat))
@@ -682,6 +703,7 @@ test_that("the links a non-linear formula switches off survive a second check", 
 })
 
 test_that("a parameter made linear again in a re-check gets back its link and prior", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$x <- rep(c(0, 1), length.out = nrow(dat))
@@ -715,6 +737,7 @@ test_that("a stick-breaking component made linear again in a re-check gets back 
 })
 
 test_that("update() to a linear formula restores the link and prior of a non-linear parameter", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$x <- rep(c(0, 1), length.out = nrow(dat))
@@ -740,6 +763,7 @@ test_that("update() to a linear formula restores the link and prior of a non-lin
 })
 
 test_that("printing an mpt model lists trees, restrictions and the identifiability bound", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   expect_output(print(model), "MPT tree 'old':")
   expect_output(print(model), "P\\(new\\) = \\(1 - D\\) \\* \\(1 - g\\)")
@@ -922,6 +946,7 @@ test_that("print() reports full Jacobian rank for identified models", {
 })
 
 test_that("the identifiability check counts a parameter fixed in the formula as known", {
+  withr::local_seed(445)
   model <- mpt(mpt_sep_trees(), tree_id = "item_type")
   printed <- mpt_printed(model)
   expect_match(printed, "More free parameters than degrees of freedom")
@@ -937,6 +962,7 @@ test_that("the identifiability check counts a parameter fixed in the formula as 
 })
 
 test_that("bmm() warns about a rank deficit when every formula is intercept-only", {
+  withr::local_seed(445)
   model <- mpt(mpt_sep_trees(), tree_id = "item_type")
   expect_warning(
     check_model(model, mpt_2htm_data(), bmf(Do ~ 1 + (1 | id), Dn ~ 1, g ~ 1)),
@@ -948,6 +974,7 @@ test_that("bmm() warns about a rank deficit when every formula is intercept-only
 })
 
 test_that("bmm() only announces a rank deficit when a formula may identify it", {
+  withr::local_seed(445)
   model <- mpt(mpt_sep_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$bias <- rep(c("low", "high"), length.out = nrow(dat))
@@ -989,6 +1016,7 @@ test_that("a formula outside the deficit still gives the message, not the warnin
 })
 
 test_that("a formula that ties parameters together is not reported as a rank deficit", {
+  withr::local_seed(445)
   model <- mpt(mpt_sep_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
 
@@ -1373,6 +1401,7 @@ test_that("a rank that only one finite test value would give is not computed", {
 })
 
 test_that("fixed parameter values stay probabilities and reach the prior on the latent scale", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   formula <- bmf(D ~ 1, g = 0.7)
@@ -1410,6 +1439,7 @@ test_that("simplex parameters cannot be fixed to constants", {
 })
 
 test_that("mpt compiles with a simplex group via stick-breaking", {
+  withr::local_seed(445)
   trees <- list(
     mpt_tree("sourceA", list(
       A = "dA + (1 - dA) * gA",
@@ -1479,6 +1509,8 @@ test_that("stick-breaking members form a simplex for any raw values", {
 })
 
 test_that("generated simplex formulas are neither announced as missing nor listed in the summary", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   tree <- mpt_tree("t", list(A = "gA", B = "gB", New = "gNew"))
   model <- mpt(tree, simplex = c("gA", "gB", "gNew"))
   dat <- data.frame(A = 10L, B = 10L, New = 10L)
@@ -1538,6 +1570,7 @@ test_that("a non-linear formula reading a simplex member announces the sticks' d
 })
 
 test_that("check_data errors are informative", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
 
@@ -1581,6 +1614,7 @@ test_that("check_data requires a column for every declared covariate, used or no
 })
 
 test_that("check_data warns on missing counts and refuses the columns it builds", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
 
@@ -1704,6 +1738,7 @@ test_that("mpt supports multiple simplex groups", {
 })
 
 test_that("factor tree identifier columns are matched to tree names", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   dat$item_type <- factor(dat$item_type, levels = c("old", "new"))
@@ -1774,6 +1809,7 @@ test_that("check_data builds possibility indicators for impossible categories", 
 })
 
 test_that("check_data warns about a tree without rows in units of rows", {
+  withr::local_seed(445)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   dat <- mpt_2htm_data()
   expect_warning(
@@ -2516,6 +2552,7 @@ test_that("the item-memory-first MPT matches the simple-rule m3 with a distracto
 })
 
 test_that("bmm() stores the name of the data the user passed to an mpt fit", {
+  withr::local_seed(445)
   withr::local_options("bmm.silent" = 2)
   my_counts <- mpt_2htm_data()
   fit <- bmm(bmf(D ~ 1, g ~ 1), my_counts, mpt(mpt_2htm_trees(), "item_type"),
@@ -2525,6 +2562,7 @@ test_that("bmm() stores the name of the data the user passed to an mpt fit", {
 })
 
 test_that("bmm_data_check() reads the correlation ID that ?mpt recommends as a label", {
+  withr::local_seed(445)
   dat <- mpt_2htm_data()
   dat$id <- rep(1:2, length.out = nrow(dat))
   res <- bmm_data_check(

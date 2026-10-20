@@ -129,9 +129,7 @@ test_that("parameter_info() includes descriptions", {
 })
 
 test_that("parameter_info() reads the model and user formula of a fit", {
-  path <- test_path("assets/bmmfit_m3_ppcheck.rds")
-  skip_if_not(file.exists(path), "M3 fixture not available (excluded by .Rbuildignore)")
-  fit <- readRDS(path)
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
 
   expect_identical(
     parameter_info(fit),
