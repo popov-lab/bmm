@@ -111,6 +111,7 @@ test_that("bmm_data_check captures hard check failures instead of throwing", {
 })
 
 test_that("bmm_data_check reports predictor coding and design cells", {
+  withr::local_seed(445)
   dat <- data.frame(
     y = runif(40, -3, 3),
     cond = rep(c("a", "b"), each = 20),
@@ -133,6 +134,7 @@ test_that("bmm_data_check reports predictor coding and design cells", {
 })
 
 test_that("bmm_data_check flags formula predictors missing from the data", {
+  withr::local_seed(445)
   res <- bmm_data_check(
     bmf(kappa ~ nonexistent, thetat ~ 1),
     data.frame(y = runif(10, -3, 3)),
@@ -142,6 +144,7 @@ test_that("bmm_data_check flags formula predictors missing from the data", {
 })
 
 test_that("bmm_data_check does not read a correlation ID as a data column", {
+  withr::local_seed(445)
   dat <- data.frame(
     y = runif(40, -3, 3),
     cond = rep(c("a", "b"), each = 20),
@@ -226,6 +229,7 @@ test_that("bmm_data_check treats ezcdm rows as aggregates", {
 })
 
 test_that("bmm_data_check does not count mpt rows as trials", {
+  withr::local_seed(445)
   res <- bmm_data_check(
     bmf(D ~ 0 + item_type, g ~ 1),
     mpt_2htm_data(n_id = 4),
@@ -236,6 +240,7 @@ test_that("bmm_data_check does not count mpt rows as trials", {
 })
 
 test_that("bmm_data_check needs nothing beyond check_data and check_formula", {
+  withr::local_seed(445)
   dat <- data.frame(y = runif(40, -3, 3), cond = rep(c("a", "b"), 20))
   model <- sdm(resp_error = "y")
   class(model) <- setdiff(class(model), "circular")
