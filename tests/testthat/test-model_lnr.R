@@ -185,6 +185,7 @@ test_that("check_data.lnr_simple names a non-numeric response label", {
 })
 
 test_that("check_data.lnr_simple warns about a response option nobody chose", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 3)
   dat <- data.frame(rt = runif(20, 0.4, 1.5), response = rep(c(1L, 2L), 10))
 
@@ -195,6 +196,7 @@ test_that("check_data.lnr_simple warns about a response option nobody chose", {
 })
 
 test_that("check_data.lnr warns when RT > 10 seconds", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = c(runif(99, 0.4, 1.5), 15),
@@ -208,6 +210,7 @@ test_that("check_data.lnr warns when RT > 10 seconds", {
 })
 
 test_that("check_data.lnr warns when RT < 0.1 seconds", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = c(0.05, runif(99, 0.4, 1.5)),
@@ -221,6 +224,7 @@ test_that("check_data.lnr warns when RT < 0.1 seconds", {
 })
 
 test_that("check_data.lnr_simple errors on response out of range", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 2)
 
   dat <- data.frame(
@@ -235,6 +239,7 @@ test_that("check_data.lnr_simple errors on response out of range", {
 })
 
 test_that("check_data.lnr_simple creates category mapping columns", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 4)
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
@@ -252,6 +257,7 @@ test_that("check_data.lnr_simple creates category mapping columns", {
 })
 
 test_that("check_data.lnr_simple handles factor responses", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 3)
   dat <- data.frame(
     rt = runif(90, 0.4, 1.5),
@@ -263,6 +269,7 @@ test_that("check_data.lnr_simple handles factor responses", {
 })
 
 test_that("check_data.lnr returns a data.frame", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5), response = rep(c(1, 2), 50)
@@ -277,6 +284,7 @@ test_that("check_data.lnr returns a data.frame", {
 # -----------------------------------------------------------------------------
 
 test_that("check_data.lnr_custom maps character responses to integers", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom")
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
@@ -292,6 +300,7 @@ test_that("check_data.lnr_custom maps character responses to integers", {
 })
 
 test_that("check_data.lnr_custom handles accumulators (integer)", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = c(correct = 1, other = 3, npl = 5))
   model$other_vars$resp_cats <- c("correct", "other", "npl")
@@ -309,6 +318,7 @@ test_that("check_data.lnr_custom handles accumulators (integer)", {
 })
 
 test_that("check_data.lnr_custom handles accumulators (column names)", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = c(target = "n_tgt", lure = "n_lure"))
   model$other_vars$resp_cats <- c("target", "lure")
@@ -325,6 +335,7 @@ test_that("check_data.lnr_custom handles accumulators (column names)", {
 })
 
 test_that("check_data.lnr_custom requires exact accumulators names", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = c(target = 1, extra = 3))
   model$other_vars$resp_cats <- c("target", "lure")
@@ -340,6 +351,7 @@ test_that("check_data.lnr_custom requires exact accumulators names", {
 })
 
 test_that("check_data.lnr_custom errors on invalid accumulators counts", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = c(target = 1, lure = 0))
   model$other_vars$resp_cats <- c("target", "lure")
@@ -361,6 +373,7 @@ test_that("check_data.lnr_custom errors on invalid accumulators counts", {
 })
 
 test_that("check_data.lnr_custom validates accumulators columns", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = c(target = "n_tgt", lure = "n_lure"))
   model$other_vars$resp_cats <- c("target", "lure")
@@ -393,6 +406,7 @@ test_that("check_data.lnr_custom validates accumulators columns", {
 })
 
 test_that("check_data.lnr_custom errors on unsupported accumulators types", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = list(target = 1, lure = 3))
   model$other_vars$resp_cats <- c("target", "lure")
@@ -408,6 +422,7 @@ test_that("check_data.lnr_custom errors on unsupported accumulators types", {
 })
 
 test_that("check_data.lnr_custom errors on mismatched response levels", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom")
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
@@ -422,6 +437,7 @@ test_that("check_data.lnr_custom errors on mismatched response levels", {
 })
 
 test_that("check_data.lnr_custom errors on non-character responses", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom")
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(rt = runif(10, 0.4, 1.5), resp = rep(c(1, 2), 5))
@@ -433,6 +449,7 @@ test_that("check_data.lnr_custom errors on non-character responses", {
 })
 
 test_that("check_data.lnr_custom errors on reserved internal response levels", {
+  withr::local_seed(445)
   model <- lnr(rt = "rt", response = "resp", version = "custom")
   model$other_vars$resp_cats <- c("target", "lure")
   dat <- data.frame(
@@ -595,6 +612,7 @@ test_that("LNR generated Stan code uses vectorized custom likelihoods", {
 
 test_that("a threading request switches the vectorized family to sliced vars", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- data.frame(
     rt = runif(100, 0.4, 1.5),
@@ -637,6 +655,7 @@ test_that("a threading request switches the vectorized family to sliced vars", {
 
 test_that("the custom version slices every vint column when threading", {
   skip_on_cran()
+  withr::local_seed(445)
 
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = c(fast = 1, mid = 2, slow = 3))
@@ -699,6 +718,7 @@ test_that("stancode emits thread-safe slicing when threads is passed", {
 
 test_that("configure_model.lnr_simple returns correct components", {
   skip_on_cran()
+  withr::local_seed(445)
 
   model <- lnr(rt = "rt", response = "response", n_choices = 2)
   dat <- data.frame(
@@ -720,6 +740,7 @@ test_that("configure_model.lnr_simple returns correct components", {
 
 test_that("configure_model.lnr_custom returns correct components", {
   skip_on_cran()
+  withr::local_seed(445)
 
   model <- lnr(rt = "rt", response = "resp", version = "custom",
                accumulators = c(fast = 1, slow = 3))
@@ -822,6 +843,7 @@ test_that("lnr simple with predictors runs with mock backend", {
 
 test_that("lnr custom version runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- data.frame(
     rt = runif(150, 0.3, 2.0),
@@ -840,6 +862,7 @@ test_that("lnr custom version runs with mock backend", {
 
 test_that("lnr custom with accumulators runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- data.frame(
     rt = runif(100, 0.3, 2.0),
@@ -859,6 +882,7 @@ test_that("lnr custom with accumulators runs with mock backend", {
 
 test_that("lnr custom with predictors runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- data.frame(
     rt = runif(200, 0.3, 2.0),
@@ -1014,6 +1038,7 @@ test_that("an lnr response and accumulator columns rebuilt for check_data() stay
 })
 
 test_that("pp_check(resp_var) works for the lnr model", {
+  withr::local_seed(445)
   fit <- load_fixture_fit("bmmfit_lnr_ppcheck.rds")
 
   expect_equal(pp_check_vars(fit)$resp_var, c("rt", "response"))
