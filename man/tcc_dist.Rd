@@ -13,10 +13,19 @@ dtcc(
   lambda = NULL,
   kappa = NULL,
   n_options = 360,
+  noise = c("gaussian", "gumbel"),
   log = FALSE
 )
 
-rtcc(n, d, similarity, lambda = NULL, kappa = NULL, n_options = 360)
+rtcc(
+  n,
+  d,
+  similarity,
+  lambda = NULL,
+  kappa = NULL,
+  n_options = 360,
+  noise = c("gaussian", "gumbel")
+)
 }
 \arguments{
 \item{x}{Vector of response errors in radians; each is binned to the
@@ -35,6 +44,9 @@ parameter \code{lambda} or \code{kappa} (see \code{\link[=tcc]{tcc()}}).}
 
 \item{n_options}{Number of response options, an even number.}
 
+\item{noise}{The noise on each option's signal, \code{"gaussian"} or \code{"gumbel"}
+(see the section Noise of \code{\link[=tcc]{tcc()}}).}
+
 \item{log}{Logical; if \code{TRUE}, the log probability is returned.}
 
 \item{n}{Number of observations to generate.}
@@ -47,9 +59,11 @@ option centres, in (-pi, pi].
 }
 \description{
 Probability mass and random generation for the response error
-under \code{\link[=tcc]{tcc()}}: each of \code{n_options} options produces a Gaussian
-memory-match signal with mean \code{d * f(x)} and unit variance, and the
-response is the option with the strongest signal.
+under \code{\link[=tcc]{tcc()}}: each of \code{n_options} options produces a memory-match signal
+with mean \code{d * f(x)} plus independent noise, and the response is the
+option with the strongest signal. The noise is normal with unit variance
+or, with \code{noise = "gumbel"}, standard Gumbel, which makes the probability
+of an option the softmax of \code{d * f(x)} over all options.
 }
 \examples{
 f <- exp(-(0:180) / 20)
@@ -59,6 +73,8 @@ plot(x, dtcc(x, d = 2, similarity = f), type = "h")
 hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
 # the same similarity as a Laplace function with a width of 20 degrees
 lines(x, dtcc(x, d = 2, similarity = "laplace", lambda = 20 * pi / 180), col = 2)
+# Gumbel noise: the softmax of d * f(x)
+lines(x, dtcc(x, d = 5, similarity = f, noise = "gumbel"), col = 4)
 }
 \references{
 Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical scaling reveals a unified theory of visual memory strength. Nature Human Behaviour, 4(11), 1156-1172. https://doi.org/10.1038/s41562-020-00938-0

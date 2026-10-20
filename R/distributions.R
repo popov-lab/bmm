@@ -4443,9 +4443,11 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @title Distribution functions for the target confusability competition model
 #'
 #' @description Probability mass and random generation for the response error
-#'   under [tcc()]: each of `n_options` options produces a Gaussian
-#'   memory-match signal with mean `d * f(x)` and unit variance, and the
-#'   response is the option with the strongest signal.
+#'   under [tcc()]: each of `n_options` options produces a memory-match signal
+#'   with mean `d * f(x)` plus independent noise, and the response is the
+#'   option with the strongest signal. The noise is normal with unit variance
+#'   or, with `noise = "gumbel"`, standard Gumbel, which makes the probability
+#'   of an option the softmax of `d * f(x)` over all options.
 #'
 #' @name tcc_dist
 #'
@@ -4462,6 +4464,8 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @param kappa Concentration of the von Mises similarity, for `similarity =
 #'   "vonmises"` (recycled).
 #' @param n_options Number of response options, an even number.
+#' @param noise The noise on each option's signal, `"gaussian"` or `"gumbel"`
+#'   (see the section Noise of [tcc()]).
 #' @param log Logical; if `TRUE`, the log probability is returned.
 #'
 #' @return `dtcc()` returns the probability of the option each `x` falls on (a
@@ -4481,30 +4485,40 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
 #' # the same similarity as a Laplace function with a width of 20 degrees
 #' lines(x, dtcc(x, d = 2, similarity = "laplace", lambda = 20 * pi / 180), col = 2)
+#' # Gumbel noise: the softmax of d * f(x)
+#' lines(x, dtcc(x, d = 5, similarity = f, noise = "gumbel"), col = 4)
 #' @export
-dtcc <- function(x, d, similarity, lambda = NULL, kappa = NULL, n_options = 360, log = FALSE) {
+dtcc <- function(x, d, similarity, lambda = NULL, kappa = NULL, n_options = 360,
+                 noise = c("gaussian", "gumbel"), log = FALSE) {
+  logp <- .tcc_noise_logp(match.arg(noise))
   par <- .tcc_dist_par(similarity, lambda, kappa, n_options)
   n <- if (length(x) && length(d)) max(length(x), length(d), length(par)) else 0L
   dist <- rep_len(abs(.tcc_bin(x, n_options, "radians")) + 1, n)
   out <- rep(NA_real_, n)
   for (cell in .tcc_dist_cells(rep_len(d, n), if (!is.null(par)) rep_len(par, n))) {
-    out[cell$rows] <- .tcc_logp(cell$d, .tcc_dist_similarity(similarity, cell$par, n_options))[dist[cell$rows]]
+    out[cell$rows] <- logp(cell$d, .tcc_dist_similarity(similarity, cell$par, n_options))[dist[cell$rows]]
   }
   if (log) out else exp(out)
 }
 
 #' @rdname tcc_dist
 #' @export
-rtcc <- function(n, d, similarity, lambda = NULL, kappa = NULL, n_options = 360) {
+rtcc <- function(n, d, similarity, lambda = NULL, kappa = NULL, n_options = 360,
+                 noise = c("gaussian", "gumbel")) {
+  logp <- .tcc_noise_logp(match.arg(noise))
   par <- .tcc_dist_par(similarity, lambda, kappa, n_options)
   offsets <- seq(-n_options / 2 + 1, n_options / 2)
   out <- rep(NA_real_, n)
   for (cell in .tcc_dist_cells(rep_len(d, n), if (!is.null(par)) rep_len(par, n))) {
     f <- .tcc_dist_similarity(similarity, cell$par, n_options)
-    prob <- exp(.tcc_logp(cell$d, f))[abs(offsets) + 1]
+    prob <- exp(logp(cell$d, f))[abs(offsets) + 1]
     out[cell$rows] <- sample(offsets, length(cell$rows), replace = TRUE, prob = prob)
   }
   2 * pi * out / n_options
+}
+
+.tcc_noise_logp <- function(noise) {
+  if (noise == "gumbel") .tcc_gumbel_logp else .tcc_logp
 }
 
 # The similarity parameter of a named similarity, NULL for a vector
