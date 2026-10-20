@@ -1,5 +1,6 @@
 test_that("k2sd works", {
   # Test format
+  withr::local_seed(445)
   kappa <- runif(10)
   expect_length(k2sd(kappa), 10)
   expect_type(k2sd(kappa), "double")
@@ -232,6 +233,7 @@ test_that(".get_parameter_info returns correct info for SDM params", {
 })
 
 test_that(".get_parameter_info treats the alternative the formula leaves out as not in the fit (#543)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
   model <- sdt_yn("n_old", "stimulus", "n_trials")
   fit_criterion <- suppressWarnings(bmm(
@@ -908,6 +910,7 @@ test_that("native_parameters marginalises over new grouping levels when asked", 
 })
 
 test_that("native_parameters and parameter_info skip the unused alternative parameter", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.silent = 2)
   dat <- data.frame(n_old = c(10, 40, 12, 38), stimulus = c(0, 1, 0, 1),
                     n_trials = 50, id = c(1, 1, 2, 2))

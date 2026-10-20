@@ -86,6 +86,7 @@ test_that("sdt_mafc check_data errors when the set-size column is missing", {
 ############################################################################# !
 
 test_that("rsdt_mafc recycles vectorized parameters per observation", {
+  withr::local_seed(445)
   n_correct <- rsdt_mafc(12, 100, m = 4, d = rnorm(12, 1.5, 0.3))
   expect_length(n_correct, 12)
 
@@ -98,6 +99,7 @@ test_that("rsdt_mafc stays inside the binomial's domain in the far tail", {
   # gumbel_min Gamma ratio fails: at d' = -36.4 it has cancelled to 7.9e13,
   # which rbinom() answers with NA, and from d' = -40 it returns exactly 1,
   # which is silent and simulates all-correct where P(correct) is near 4e-18.
+  withr::local_seed(445)
   expect_equal(rsdt_mafc(5, 100L, m = 2L, d = -36.4, dist = "gumbel_min"),
                rep(0L, 5))
   expect_equal(rsdt_mafc(5, 100L, m = 2L, d = -40, dist = "gumbel_min"),
@@ -171,6 +173,8 @@ test_that("sdt_mafc produces valid stancode including its custom functions", {
 })
 
 test_that("sdt_mafc integrates with the bmm pipeline via mock backend", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   dat <- data.frame(n_trials = rep(100L, 8))
   dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4, d = 1.2)
   for (d in c("normal", "logistic", "gumbel_min", "gumbel_max")) {
@@ -182,6 +186,7 @@ test_that("sdt_mafc integrates with the bmm pipeline via mock backend", {
 })
 
 test_that("sdt_mafc fits mixed set sizes through the pipeline (mock)", {
+  withr::local_seed(445)
   dat <- data.frame(set_size = rep(c(2L, 4L, 6L), each = 8), n_trials = 100L)
   dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = dat$set_size,
                              d = 1.2)
@@ -428,6 +433,7 @@ test_that("the gumbel_min logit is -Inf, not NaN, once exp(-d') overflows", {
 # posterior_epred (#475) ------------------------------------------------------
 
 test_that("posterior_epred_sdt_mafc() is the mean count posterior_predict_sdt_mafc() simulates", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(475)
   sets <- data.frame(d = c(1.5, 0.5, 2, 1))
   for (dist in .sdt_dist_names) {
@@ -447,6 +453,7 @@ test_that("posterior_epred_sdt_mafc() returns one column per observation", {
 })
 
 test_that("an sdt_mafc fit stores posterior_epred_sdt_mafc() in its family", {
+  withr::local_seed(445)
   dat <- data.frame(n_trials = rep(100L, 8))
   dat$n_correct <- rsdt_mafc(nrow(dat), dat$n_trials, m = 4, d = 1.2)
   fit <- bmm(bmf(d ~ 1), dat, sdt_mafc("n_correct", "n_trials", m = 4),

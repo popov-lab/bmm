@@ -187,6 +187,7 @@ test_that("check_data() returns a data.frame()", {
 })
 
 test_that("wrap(x) returns the same for values between -pi and pi", {
+  withr::local_seed(445)
   x <- runif(100, -pi, pi)
   expect_equal(wrap(x), x)
   expect_equal(wrap(rad2deg(x), radians = F), rad2deg(wrap(x)))
@@ -246,6 +247,7 @@ test_that("standata() works with bmf", {
 })
 
 test_that("standata() returns a standata class", {
+  withr::local_seed(445)
   ff <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
   dat <- data.frame(y = rmixture3p(n = 3), nt1_loc = 2, nt2_loc = -1.5)
 
@@ -383,6 +385,7 @@ test_that("ezdm_summary_stats() returns 1-row data.frame for 4par version", {
 })
 
 test_that("ezdm_summary_stats() validates required arguments", {
+  withr::local_seed(445)
   expect_error(
     ezdm_summary_stats(response = rbinom(10, 1, 0.5)),
     "required arguments are missing"
@@ -412,6 +415,7 @@ test_that("ezdm_summary_stats() validates rt and response have same length", {
 })
 
 test_that("ezdm_summary_stats() validates parameter options", {
+  withr::local_seed(445)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -425,6 +429,7 @@ test_that("ezdm_summary_stats() validates parameter options", {
 })
 
 test_that("ezdm_summary_stats() warns for potential data issues", {
+  withr::local_seed(445)
   rt_ms <- rgamma(100, shape = 5, rate = 10) * 1000
   response <- rbinom(100, 1, 0.8)
 
@@ -435,6 +440,7 @@ test_that("ezdm_summary_stats() warns for potential data issues", {
 })
 
 test_that("ezdm_summary_stats() errors for non-positive RT values", {
+  withr::local_seed(445)
   rt <- c(-0.1, 0, rgamma(98, shape = 5, rate = 10) + 0.3)
   response <- rbinom(100, 1, 0.8)
 
@@ -555,6 +561,7 @@ test_that("ezdm_summary_stats() 4par codes a boundary below min_trials as NA", {
 })
 
 test_that("ezdm_summary_stats() validates contaminant_bound", {
+  withr::local_seed(445)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -594,6 +601,7 @@ test_that("ezdm_summary_stats() accepts 'min' and 'max' for contaminant_bound", 
 })
 
 test_that("ezdm_summary_stats() validates init_contaminant", {
+  withr::local_seed(445)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -608,6 +616,7 @@ test_that("ezdm_summary_stats() validates init_contaminant", {
 })
 
 test_that("ezdm_summary_stats() validates max_contaminant", {
+  withr::local_seed(445)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -623,6 +632,7 @@ test_that("ezdm_summary_stats() validates max_contaminant", {
 })
 
 test_that("ezdm_summary_stats() validates init < max contaminant", {
+  withr::local_seed(445)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- rbinom(100, 1, 0.8)
 
@@ -725,6 +735,7 @@ test_that("ezdm_summary_stats() handles case-insensitive responses", {
 })
 
 test_that("ezdm_summary_stats() errors on unrecognized response values", {
+  withr::local_seed(445)
   rt <- rgamma(100, shape = 5, rate = 10) + 0.3
   response <- sample(c("fast", "slow"), 100, replace = TRUE)
 
@@ -1285,6 +1296,7 @@ test_that("flag_contaminant_rts() diagnostics report convergence correctly", {
 # Without contaminants the EM approaches a contaminant proportion of zero
 # slowly; this sample needs about 250 iterations
 test_that("the EM converges by default where it needs more than 100 iterations", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(8)
   rt <- 0.3 + rnorm(60, 0.15, 0.03) + rexp(60, 10)
   response <- rep(c(1, 0), c(54, 6))

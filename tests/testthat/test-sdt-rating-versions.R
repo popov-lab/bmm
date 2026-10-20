@@ -61,6 +61,7 @@ test_that("recollection is freed from fixed_parameters via the formula", {
 test_that("the metad version refuses an odd number of rating categories", {
   # at odd K the criterion is the centre of the middle category, so there is no
   # old/new boundary for the type-1 normalisation to split at
+  withr::local_seed(445)
   expect_error(sdt_rating(paste0("r", 1:5), "stimulus", version = "metad"),
                "even number of rating categories")
   thr5 <- c(-1, -0.3, 0.3, 1)
@@ -223,6 +224,7 @@ test_that("recollection moves mass to the most-confident category and sums to 1"
 ############################################################################# !
 
 test_that("dsdt_dpsdt() and rsdt_dpsdt() default to Rn = 0, the one-sided model", {
+  withr::local_seed(445)
   thr <- c(-0.5, 0, 0.5)
   for (stim in c(0L, 1L)) {
     counts <- if (stim == 1L) c(2, 8, 20, 70) else c(70, 20, 8, 2)
@@ -280,6 +282,8 @@ test_that("version category probs vectorized path matches per-draw evaluation", 
 ############################################################################# !
 
 test_that("all rating versions configure through the bmm pipeline", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   thr <- bmm:::.sdt_make_thresholds(0, 4L, "parsimonious", 0.3)
   dat <- expand.grid(id = 1:4, stimulus = c(0L, 1L))
   dat <- cbind(dat, as.data.frame(rsdt_dpsdt(nrow(dat), 40, dat$stimulus,

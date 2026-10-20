@@ -1,9 +1,10 @@
 # Tests for conditional_effects.bmmfit() and its internal helpers
-# Tier 1: Unit tests (always run, no fitted model; the multinomial-family
-#         routes run on mock fits with brms stubbed out)
-# Tier 2: Fixture-based integration tests (skip on CRAN; the fixtures are not
-#         in the built package, so they run only from the source tree)
+# Tier 1: Unit tests (no fitted model; the multinomial-family routes run on
+#         mock fits with brms stubbed out)
+# Tier 2: Fixture-based integration tests (the fixtures are not in the built
+#         package, so they run only from the source tree)
 # Tests on real fits live in tests/local/test-conditional_effects-fits.R.
+skip_on_cran() # cross-model contract file, skipped on CRAN as a whole (ADR 0004, R10)
 
 load_sdm_fit <- function() {
   load_fixture_fit("bmmfit_example1.rds")
@@ -390,6 +391,7 @@ test_that(".apply_link_transform copes with effects that carry no spaghetti", {
 # ===========================================================================
 
 test_that(".has_category_dpars is TRUE for the multinomial models only (#512)", {
+  withr::local_seed(445)
   ranking <- as.data.frame(rsdt_ranking(2, 50, m = 4, d = 1))
   cdp <- cbind(data.frame(stimulus = c(0L, 1L)),
                rsdt_cdp(2, 50, c(0L, 1L), dfam = 0.8, drec = 1, rcrit = 0.5,

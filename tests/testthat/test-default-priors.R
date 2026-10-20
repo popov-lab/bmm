@@ -1,3 +1,5 @@
+skip_on_cran() # cross-model contract file, skipped on CRAN as a whole (ADR 0004, R10)
+
 test_that("default priors are set correctly with fixed effects only", {
   data <- small_data()
   model <- mixture2p("dev_rad")
@@ -219,10 +221,6 @@ test_that("default priors work when there are no fixed parameters", {
   expect_s3_class(pr, "brmsprior")
 })
 
-sd_rows <- function(pr) {
-  pr[pr$class == "sd" & pr$coef == "" & pr$group == "" & pr$prior != "", ]
-}
-
 test_that("an sd default becomes one blanket prior per parameter with random effects", {
   data <- small_data()
   model <- mixture2p("dev_rad")
@@ -396,11 +394,6 @@ test_that("bmm.default_priors = FALSE also disables the cor default", {
   )
   expect_equal(cor_default(pr), "lkj(1)")
 })
-
-sd_default <- function(pr, par) {
-  rows <- sd_rows(pr)
-  rows[rows$nlpar == par | rows$dpar == par, ]$prior
-}
 
 test_that("every model ships an sd default on the link scale of each parameter", {
   # the rates are one per parameter meaning: 1 for the parameters that carry

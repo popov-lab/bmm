@@ -121,6 +121,7 @@ test_that("sdt_cdp log_distance names its deltas in interval order and has no sp
 })
 
 test_that("sdt_cdp log_distance integrates with the pipeline via mock backend", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   thr <- .cdp_make_thresholds(0.3, 0, 3, 3, "log_distance",
                               deltas = log(c(0.8, 0.6, 0.6, 0.8)))
   dat <- sim_cdp_data(thresholds = thr)
@@ -174,6 +175,7 @@ test_that(".sdt_cdp_category_probs guess + know recover the 2-way know total", {
 })
 
 test_that(".sdt_cdp_category_probs vectorizes over observations", {
+  withr::local_seed(445)
   n <- 10
   thr <- .cdp_make_thresholds(rnorm(n, 0, 0.2), rnorm(n, -0.3, 0.1), 3, 3,
                               "parsimonious")
@@ -269,6 +271,7 @@ test_that("dsdt_cdp matches dmultinom against the category probabilities", {
 })
 
 test_that("aggregate_sdt_cdp_data pivots long data to the wide count columns", {
+  withr::local_seed(445)
   long <- expand.grid(id = 1:4, stimulus = c(0L, 1L),
                       judgment = c("new", "know", "remember"),
                       confidence = 1:6)
@@ -286,6 +289,7 @@ test_that("aggregate_sdt_cdp_data pivots long data to the wide count columns", {
 })
 
 test_that("aggregate_sdt_cdp_data aggregates trial-level data without counts", {
+  withr::local_seed(445)
   long <- expand.grid(id = 1:3, stimulus = c(0L, 1L),
                       judgment = c("new", "know", "remember"),
                       confidence = 1:6)
@@ -361,6 +365,7 @@ test_that("check_data.sdt_cdp checks the declared scale and the guess columns", 
 })
 
 test_that("sdt_cdp accepts a response prefix for the count columns", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- sim_cdp_data()
   resp_cols <- grep("new|know|remember", colnames(dat))
   colnames(dat)[resp_cols] <- paste0("cdp", colnames(dat)[resp_cols])
@@ -565,6 +570,7 @@ cdp_kernel_reference <- function(g) {
 }
 
 test_that("the R cdp kernel matches an independent reference in both tails", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   cells <- cdp_kernel_grid()
   ref <- vapply(seq_len(nrow(cells)), function(i) {
     cdp_kernel_reference(cells[i, ])
@@ -684,6 +690,7 @@ test_that("the Stan cdp likelihood has a finite gradient with an unbounded top b
 ############################################################################# !
 
 test_that("guess columns without kcrit in the formula are refused, kcrit without guess columns warns", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   m <- sdt_cdp(stimulus = "stimulus", n_new = 3, n_old = 3)
   dat_rk <- sim_cdp_data()
   dat_rkg <- sim_cdp_data(kcrit = 0.2)

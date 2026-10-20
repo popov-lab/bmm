@@ -118,11 +118,11 @@ test_that("every data argument of every model version has a column role", {
       stale <- setdiff(names(roles), names(args))
       expect(
         length(unlabeled) == 0,
-        glue::glue("{model} {version}: no entry in data_column_roles for {collapse_comma(unlabeled)}")
+        glue::glue("{model} {version}: no column role for {collapse_comma(unlabeled)}; add a model_column_roles.{model}() method in the model's file (see R/helpers-model.R)")
       )
       expect(
         length(stale) == 0,
-        glue::glue("{model} {version}: data_column_roles names unknown arguments {collapse_comma(stale)}")
+        glue::glue("{model} {version}: column roles name arguments the constructor does not have: {collapse_comma(stale)}")
       )
     }
   }
@@ -214,8 +214,9 @@ test_that("model_overview() has one row per version with its own columns and par
 
   # a registered model with a response-time domain joins this group too
   rt_models <- model_overview(group = "Choices and response times")
-  listed <- gsub("[`()]", "", regmatches(rt_models$Model, regexpr("`[a-z0-9_]+\\(\\)`", rt_models$Model)))
-  expect_setequal(intersect(listed, bmm_builtin_models()), c("ddm", "cswald", "ezdm"))
+  registry <- model_registry()
+  in_group <- registry$model[registry$group == "Choices and response times"]
+  expect_setequal(unique(sub("^\\[`([a-z0-9_]+)\\(\\)`.*$", "\\1", rt_models$Model)), in_group)
 })
 
 test_that("check_model() refuses invalid models and accepts valid models", {
@@ -512,6 +513,7 @@ test_that("model constructors and the template list their fields in the canonica
 })
 
 test_that("stancode() works with bmmformula", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
   model <- mixture3p("dev_rad", "col_nt", set_size = "set_size", regex = TRUE)
   sc <- stancode(ff, small_data(), model = model)
@@ -565,6 +567,7 @@ test_that("update_model_fixed_parameters() works", {
 })
 
 test_that("extracts all blocks and names are correct", {
+  withr::local_seed(445)
   data <- data.frame(y = runif(100, min = -pi, pi))
   model <- mixture2p(resp_error = "y")
   formula <- bmf(thetat ~ 1, kappa ~ 1)
@@ -581,6 +584,7 @@ test_that("extracts all blocks and names are correct", {
 })
 
 test_that("extracts only requested subset of blocks", {
+  withr::local_seed(445)
   data <- data.frame(y = runif(100, min = -pi, pi))
   model <- mixture2p(resp_error = "y")
   formula <- bmf(thetat ~ 1, kappa ~ 1)

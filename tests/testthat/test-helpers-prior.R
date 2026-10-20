@@ -66,6 +66,7 @@ test_that("combine_prior() lets a prior on a whole nlpar replace its intercept p
 
 test_that("a user prior on a non-linear parameter reaches its intercept (#526)", {
   skip_on_cran()
+  withr::local_seed(445)
   dat <- data.frame(y = rmixture2p(n = 100), cond = rep(c("a", "b"), 50))
   user <- brms::set_prior("normal(0, 2)", class = "b", nlpar = "kappa")
 
@@ -151,6 +152,7 @@ test_that("fixed_pars_priors errors clearly when a fixed parameter is absent fro
 test_that("the fixed-parameter guard fires through the full default_prior pipeline", {
   # a fixed parameter that no configure_model wires into the formula survives
   # check_model/check_formula reconciliation and must be caught before brms
+  withr::local_seed(445)
   model <- sdm(resp_error = "y")
   model$fixed_parameters$sdratio <- 0
   dat <- data.frame(y = rsdm(30, mu = 0, c = 3, kappa = 4))
@@ -508,6 +510,7 @@ test_that("as_prior_table() maps every correlation class brms stores internally"
 })
 
 test_that("prior_info() attributes the correlation prior to bmm", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(kappa ~ set_size + (set_size | ID), thetat ~ 1)
   fit <- bmm(formula, small_data(), mixture2p("dev_rad"),
     backend = "mock", mock_fit = 1, rename = FALSE
@@ -527,6 +530,7 @@ test_that("prior_info() attributes the correlation prior to bmm", {
 })
 
 test_that("prior_info() reconstructs the defaults of a fit that needs data2", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- small_data()
   ids <- levels(factor(dat$ID))
   A <- diag(length(ids))
@@ -551,6 +555,7 @@ test_that("prior_info() still reports a fit whose stored frame fails check_data(
 })
 
 test_that("prior_info() re-checks a fit whose largest set size has no response (#459)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   lin <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2, ]
   lin$dev_rad[lin$set_size == "8"] <- NA
   fit <- suppressWarnings(suppressMessages(bmm(
@@ -605,6 +610,7 @@ test_that("print.bmm_prior_info() renders table and text formats", {
 })
 
 test_that("validate_default_priors() warns only when a default prior is dropped", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_options(bmm.silent = 2)
   model <- mpt(
     mpt_tree("t", list(A = "gA", B = "gB", C = "gC")),

@@ -97,7 +97,8 @@ jobs:
           key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
 
       - name: Set up CmdStan toolchain
-        run: cmdstanr::check_cmdstan_toolchain(fix = TRUE)
+        # cmdstanr 1.0 ignores fix and warns when it is TRUE
+        run: cmdstanr::check_cmdstan_toolchain(fix = packageVersion("cmdstanr") < "0.99.0")
         shell: Rscript {0}
 
       - name: Build CmdStan
@@ -113,9 +114,16 @@ jobs:
         timeout-minutes: 30
         run: Rscript .github/scripts/test-budget.R
 
+      - name: Run the tests CRAN runs under the CRAN-tier cap
+        if: always()
+        timeout-minutes: 20
+        run: Rscript .github/scripts/cran-budget.R
+
       - name: Upload per-test timings
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-timings
-          path: test-timings.csv
+          path: |
+            test-timings.csv
+            cran-test-timings.csv

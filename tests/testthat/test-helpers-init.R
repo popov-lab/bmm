@@ -1,3 +1,5 @@
+skip_on_cran() # cross-model contract file, skipped on CRAN as a whole (ADR 0004, R10)
+
 test_that("create_initfun returns function for sdm", {
   # prepare info for tests
   ff <- bmmformula(kappa ~ 1, c ~ 1)
@@ -13,16 +15,6 @@ test_that("create_initfun returns function for sdm", {
   expect_equal(class(unlist(init_fun())), "numeric")
 })
 
-
-# the init function bmm() builds: the prior decides which parameters exist
-configured_initfun <- function(model, formula, data) {
-  model <- check_model(model, data, formula)
-  data <- check_data(model, data, formula)
-  formula <- check_formula(model, data, formula)
-  config_args <- configure_model(model, data, formula)
-  prior <- configure_prior(model, data, config_args$formula, NULL)
-  create_initfun(model, data, config_args$formula, prior)
-}
 
 stan_parameter_names <- function(model, formula, data) {
   names(extract_parameter_dimensions(
@@ -401,6 +393,7 @@ test_that("initfun handles single random effect group correctly", {
 })
 
 test_that("initfun handles numeric predictors", {
+  withr::local_seed(445)
   dat <- small_data()
   dat$continuous_pred <- rnorm(nrow(dat))
 
@@ -1075,6 +1068,7 @@ test_that("a softmax range stays on the sampling scale and a single point is not
 })
 
 test_that("an init function carries nothing from the frame that built it", {
+  withr::local_seed(445)
   dat <- small_data()
   model <- sdm(resp_error = "dev_rad")
   formula <- bmf(c ~ 1, kappa ~ 1)

@@ -20,6 +20,7 @@ test_that("mixture3p gives an error if set_size is a predictor but there is an i
 })
 
 test_that("constant priors are correct for mixture3p with set_size1 fixed effect predictor", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size)
   fit <- bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
   prior <- brms::prior_summary(fit)
@@ -28,6 +29,7 @@ test_that("constant priors are correct for mixture3p with set_size1 fixed effect
 })
 
 test_that("constant priors are correct for mixture3p with set_size1 RANDOM-EFFECT predictor", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size + (0 + set_size | ID))
   fit <- bmm(formula, dat, model, backend = "mock", mock = 1, rename = FALSE)
   prior <- brms::prior_summary(fit)
