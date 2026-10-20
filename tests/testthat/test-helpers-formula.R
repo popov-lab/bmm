@@ -421,6 +421,7 @@ test_that("apply_links refuses links that are not a named list of strings", {
 
 
 test_that("check_formula() renames a deprecated parameter in both the name and the formula", {
+  withr::local_seed(445)
   model <- mixture2p(resp_error = "dev_rad")
   model$deprecated_parameters <- list(precision = "kappa")
   data <- data.frame(dev_rad = rnorm(10), cond = factor(rep(1:2, 5)))
@@ -436,6 +437,7 @@ test_that("check_formula() renames a deprecated parameter in both the name and t
 })
 
 test_that("check_formula() renames a deprecated parameter fixed to a constant", {
+  withr::local_seed(445)
   model <- mixture2p(resp_error = "dev_rad")
   model$deprecated_parameters <- list(precision = "kappa")
   data <- data.frame(dev_rad = rnorm(10))
@@ -448,6 +450,7 @@ test_that("check_formula() renames a deprecated parameter fixed to a constant", 
 })
 
 test_that("check_formula() leaves a formula without deprecated parameters untouched", {
+  withr::local_seed(445)
   model <- mixture2p(resp_error = "dev_rad")
   model$deprecated_parameters <- list(precision = "kappa")
   data <- data.frame(dev_rad = rnorm(10))
@@ -456,6 +459,7 @@ test_that("check_formula() leaves a formula without deprecated parameters untouc
 })
 
 test_that("check_formula() refuses a parameter given under both its old and its new name", {
+  withr::local_seed(445)
   model <- mixture2p(resp_error = "dev_rad")
   model$deprecated_parameters <- list(precision = "kappa")
   data <- data.frame(dev_rad = rnorm(10), cond = factor(rep(1:2, 5)))
