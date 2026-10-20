@@ -986,9 +986,15 @@ test_that("ezdm Stan code calls the model lpdf", {
 test_that("ezdm Stan code parses", {
   skip_unless_stan_tests()
   skip_on_cran()
+  # cmdstanr 1.0 drops the compile = FALSE argument; check_syntax_stan_file()
+  # replaces it from the development version 0.9.0.9006 on, the version brms checks
   for (code in ezdm_stancode_both()) {
-    model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
-    expect_true(model$check_syntax(quiet = TRUE))
+    file <- cmdstanr::write_stan_file(code)
+    if (utils::packageVersion("cmdstanr") >= "0.9.0.9006") {
+      expect_true(cmdstanr::check_syntax_stan_file(file, quiet = TRUE))
+    } else {
+      expect_true(cmdstanr::cmdstan_model(file, compile = FALSE)$check_syntax(quiet = TRUE))
+    }
   }
 })
 
