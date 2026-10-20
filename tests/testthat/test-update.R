@@ -2,6 +2,7 @@ save_pars <- brms::save_pars
 
 test_that("update.bmmfit works", {
   skip_on_cran()
+  withr::local_seed(445)
   fit1 <- restructure(load_fixture_fit("bmmfit_example1.rds"))
   data <- fit1$data
 
@@ -78,6 +79,7 @@ test_that("update() stores the formula that bmm() stores for the same inputs", {
 test_that("update() stores the formula that bmm() stores, without a fixture", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
+  withr::local_seed(445)
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
     samples = list(structure(list(), args = list(control = list())))
@@ -116,6 +118,7 @@ test_that("update() that keeps the Stan code names the bmm version once (#551)",
 
 test_that("update.bmmfit frees parameters that the new formula predicts", {
   skip_on_cran()
+  withr::local_seed(445)
   fit1 <- sdm_fixture()
 
   # mu is fixed to 0 by default in sdm; predicting it must drop the constant()
@@ -161,6 +164,7 @@ test_that("update.bmmfit fixes parameters that the new formula sets to a constan
 test_that("a predictor added by update() gets the prior bmm() gives it", {
   skip_on_cran()
   skip_if_not_installed("rstan")
+  withr::local_seed(445)
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
     samples = list(structure(list(), args = list(control = list())))
@@ -765,6 +769,7 @@ test_that("data without the largest set size still fail the nt_features check", 
 test_that("an updated fit carries nothing from the frame that called update()", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
+  withr::local_seed(445)
   stub <- methods::new("stanfit", sim = list(
     iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
     samples = list(structure(list(), args = list(control = list())))
