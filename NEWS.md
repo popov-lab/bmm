@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New features
+* `native_parameters()` gained `population_summary`. With `"mean"` it returns the mean and SD of each parameter across participants, with `"median"` the median and quartiles, integrated over the group-level effects in every posterior draw. Use it to report group-level results on the native scale. `re_formula = NA` gives the median participant, and predicting for a new level gives one new participant, whose interval is not a credible interval for the population mean (#531).
+
 ### Other changes
 * bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
 
