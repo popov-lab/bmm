@@ -2080,6 +2080,7 @@ test_that("a logical in tau's position is read as log, with a deprecation warnin
 })
 
 test_that("the capacity versions of dmixture2p() and rmixture2p() need set_size", {
+  withr::local_seed(445)
   expect_error(
     dmixture2p(0.3, K = 2, version = "slot"),
     "set_size argument is required"
@@ -2092,6 +2093,7 @@ test_that("the capacity versions of dmixture2p() and rmixture2p() need set_size"
 })
 
 test_that("dmixture2p() and rmixture2p() warn about arguments the version ignores", {
+  withr::local_seed(445)
   expect_warning(
     dmixture2p(0.3, K = 2, set_size = 4),
     "The 'simple' version of mixture2p ignores 'K', 'set_size'",
