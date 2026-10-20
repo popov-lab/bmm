@@ -1,4 +1,5 @@
 test_that("sdm distribution functions run without errors", {
+  withr::local_seed(445)
   n <- 10
   res <- dsdm(runif(n, -pi, pi), mu = 1, c = 3, kappa = 1:n)
   expect_true(length(res) == n)
@@ -19,6 +20,7 @@ test_that("dsdm integrates to 1", {
 
 
 test_that("psdm is between 0 and 1", {
+  withr::local_seed(445)
   res <- psdm(runif(1000, -pi, pi), mu = runif(1000, -pi, pi), c = 3, kappa = 3)
   expect_true(all(res >= 0) && all(res <= 1))
 })
@@ -31,6 +33,7 @@ test_that("psdm returns 0 for q == -pi, 0.5 for q = mu, and 1 for q almost pi, w
 
 
 test_that("rsdm returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rsdm(1000, mu = 0, c = 3, kappa = 3)
   expect_true(all(res >= -pi) && all(res <= pi))
 
@@ -92,6 +95,7 @@ test_that("rejection_sampling takes arguments of length n per draw", {
 })
 
 test_that("rejection_sampling validates n and max_f", {
+  withr::local_seed(445)
   expect_error(rejection_sampling(2.5, stats::dunif, 1, stats::runif), "whole number")
   expect_error(rejection_sampling(5, stats::dunif, 0, stats::runif), "max_f")
   expect_error(rejection_sampling(5, stats::dunif, c(1, 2), stats::runif), "max_f")
@@ -100,6 +104,7 @@ test_that("rejection_sampling validates n and max_f", {
 test_that("rejection_sampling errors instead of looping forever", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   # a regression here hangs; fail the test instead of timing out the CI job
+  withr::local_seed(445)
   setTimeLimit(elapsed = 20, transient = TRUE)
   withr::defer(setTimeLimit(elapsed = Inf))
   expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
@@ -109,6 +114,7 @@ test_that("rejection_sampling errors instead of looping forever", {
 })
 
 test_that("conversion between sdm parametrizations works", {
+  withr::local_seed(445)
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
   c_se <- c_bessel2sqrtexp(c_b, kappa)
@@ -117,6 +123,7 @@ test_that("conversion between sdm parametrizations works", {
 })
 
 test_that("dsdm parametrization conversion returns accurate results", {
+  withr::local_seed(445)
   y <- seq(-pi, pi, length.out = 100)
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
@@ -127,23 +134,30 @@ test_that("dsdm parametrization conversion returns accurate results", {
 })
 
 test_that("dmixture2p integrates to 1", {
+  withr::local_seed(445)
+  # integrate()'s default rel.tol (1.2e-4) misses by up to 7e-6 when the peak
+  # sits near -pi or pi, which fails the 1e-6 check on some draws
   expect_equal(integrate(dmixture2p, -pi, pi,
     mu = runif(1, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
-    p_mem = runif(1, min = 0, max = 1)
+    p_mem = runif(1, min = 0, max = 1),
+    rel.tol = 1e-10
   )$value, 1, tolerance = 1e-6)
 })
 
 test_that("dmixture3p integrates to 1", {
+  withr::local_seed(445)
   expect_equal(integrate(dmixture3p, -pi, pi,
     mu = runif(3, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
     p_mem = runif(1, min = 0, max = 0.6),
-    p_nt = runif(1, min = 0, max = 0.3)
+    p_nt = runif(1, min = 0, max = 0.3),
+    rel.tol = 1e-10
   )$value, 1, tolerance = 1e-6)
 })
 
 test_that("dimm integrates to 1", {
+  withr::local_seed(445)
   expect_equal(integrate(dimm, -pi, pi,
     mu = runif(3, min = -pi, pi),
     dist = c(0, runif(2, min = 0.1, max = pi)),
@@ -151,11 +165,13 @@ test_that("dimm integrates to 1", {
     c = runif(1, min = 0, max = 3),
     a = runif(1, min = 0, max = 1),
     s = runif(1, min = 1, max = 20),
-    b = 0
+    b = 0,
+    rel.tol = 1e-10
   )$value, 1, tolerance = 1e-6)
 })
 
 test_that("rmixture2p returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rmixture2p(500,
     mu = runif(1, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
@@ -188,6 +204,7 @@ test_that("rmixture2p recycles parameters to n", {
 })
 
 test_that("rmixture3p returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rmixture3p(500,
     mu = runif(3, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
@@ -198,6 +215,7 @@ test_that("rmixture3p returns values between -pi and pi", {
 })
 
 test_that("rimm returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rimm(500,
     mu = runif(3, min = -pi, pi),
     dist = c(0, runif(2, min = 0.1, max = pi)),
@@ -292,6 +310,7 @@ test_that("dm3 works for a custom m3 model", {
 })
 
 test_that("rm3 works for a simple m3 model", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 50),
@@ -308,6 +327,7 @@ test_that("rm3 works for a simple m3 model", {
 })
 
 test_that("rm3 works for a complexspan m3 model", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "dist_context", "other", "dist_other", "npl"),
     num_options = c(1, 10, 4, 100, 5),
@@ -354,6 +374,7 @@ test_that("dddm log parameter works correctly", {
 
 test_that("dddm vectorizes correctly with scalar rt/response and vector parameters", {
   # This is the log_lik case: single observation, multiple posterior samples
+  withr::local_seed(445)
   rt_single <- 0.5
   resp_single <- 1
   drift_vec <- rnorm(10, 2, 0.3)
@@ -377,6 +398,7 @@ test_that("dddm vectorizes correctly with vector rt/response and scalar paramete
 })
 
 test_that("dddm vectorizes correctly with vector rt/response and vector parameters", {
+  withr::local_seed(445)
   n <- 5
   rt_vec <- runif(n, 0.3, 0.8)
   resp_vec <- sample(0:1, n, replace = TRUE)
@@ -413,6 +435,7 @@ test_that("dddm rejects mismatched rt and response lengths", {
 })
 
 test_that("rddm returns data frame with correct structure", {
+  withr::local_seed(445)
   res <- rddm(10, drift = 2, bound = 1.5, ndt = 0.3)
   expect_s3_class(res, "data.frame")
   expect_equal(nrow(res), 10)
@@ -422,6 +445,7 @@ test_that("rddm returns data frame with correct structure", {
 })
 
 test_that("rddm handles vector parameters correctly", {
+  withr::local_seed(445)
   n <- 5
   drift_vec <- rnorm(n, 2, 0.3)
   res <- rddm(n, drift = drift_vec, bound = 1.5, ndt = 0.3)
@@ -430,6 +454,7 @@ test_that("rddm handles vector parameters correctly", {
 
 test_that("rddm samples from correct boundaries based on drift", {
   # Positive drift should favor upper boundary (response = 1)
+  withr::local_seed(445)
   res_pos <- rddm(1000, drift = 3, bound = 1.5, ndt = 0.3)
   expect_gt(mean(res_pos$response == 1), 0.8)
   
@@ -439,12 +464,14 @@ test_that("rddm samples from correct boundaries based on drift", {
 })
 
 test_that("rddm respects non-decision time", {
+  withr::local_seed(445)
   res <- rddm(100, drift = 2, bound = 1.5, ndt = 0.3)
   expect_true(all(res$rt >= 0.3))
 })
 
 test_that("rddm starting point bias affects response proportions", {
   # Bias toward upper boundary
+  withr::local_seed(445)
   res_upper <- rddm(1000, drift = 0, bound = 1.5, ndt = 0.3, zr = 0.7)
   expect_gt(mean(res_upper$response == 1), 0.6)
   
@@ -458,6 +485,7 @@ test_that("rddm starting point bias affects response proportions", {
 # -----------------------------------------------------------------------------
 
 test_that("dcswald runs without errors and returns correct output", {
+  withr::local_seed(445)
   n <- 10
   rt <- runif(n, 0.4, 1.5)
   response <- sample(c(0, 1), n, replace = TRUE)
@@ -488,6 +516,7 @@ test_that("dcswald runs without errors and returns correct output", {
 })
 
 test_that("dcswald handles vectorized parameters", {
+  withr::local_seed(445)
   n <- 5
   rt <- runif(n, 0.4, 1.5)
   response <- sample(c(0, 1), n, replace = TRUE)
@@ -508,6 +537,7 @@ test_that("dcswald handles vectorized parameters", {
 })
 
 test_that("rcswald generates valid output", {
+  withr::local_seed(445)
   n <- 100
   out <- rcswald(n, drift = 2, bound = 1.5, ndt = 0.3)
 
@@ -519,6 +549,7 @@ test_that("rcswald generates valid output", {
 })
 
 test_that("rcswald handles vectorized parameters", {
+  withr::local_seed(445)
   n <- 10
   out <- rcswald(n,
     drift = runif(n, 1, 3), bound = runif(n, 1, 2),
@@ -786,6 +817,7 @@ test_that("dcswald handles boundary zr values for crisk version", {
 
 test_that("rcswald generates valid data with extreme parameters", {
   # High drift - should produce mostly correct responses
+  withr::local_seed(445)
   dat_high <- rcswald(n = 100, drift = 5, bound = 1.5, ndt = 0.2)
   expect_true(mean(dat_high$response == 1) > 0.9)
   expect_true(all(dat_high$rt > 0.2)) # all RTs > ndt
@@ -837,6 +869,7 @@ test_that("dcswald error-response survival equals 1 - CDF in mid-range (#376)", 
 })
 
 test_that("rm3 works without providing b parameter", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -853,6 +886,7 @@ test_that("rm3 works without providing b parameter", {
 })
 
 test_that("rm3 works with full bmmformula", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -940,6 +974,7 @@ test_that("dm3 and rm3 use Gaussian-rule probabilities for choice_rule = 'gaussi
 })
 
 test_that("rm3 errors when full formula has no activation functions", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -961,6 +996,7 @@ test_that("rm3 errors when full formula has no activation functions", {
 })
 
 test_that("rm3 with unpack=TRUE returns named vector for n=1", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -982,6 +1018,7 @@ test_that("rm3 with unpack=TRUE returns named vector for n=1", {
 })
 
 test_that("rm3 with unpack=TRUE still returns matrix for n>1", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -1037,6 +1074,7 @@ test_that("dezdm log and non-log outputs are consistent", {
 })
 
 test_that("rezdm 3par returns correct output structure", {
+  withr::local_seed(445)
   res <- rezdm(n = 100, n_trials = 50, drift = 2, bound = 1.5, ndt = 0.3)
   expect_s3_class(res, "data.frame")
   expect_equal(nrow(res), 100)
@@ -1045,6 +1083,7 @@ test_that("rezdm 3par returns correct output structure", {
 })
 
 test_that("rezdm 4par returns correct output structure", {
+  withr::local_seed(445)
   res <- rezdm(
     n = 100, n_trials = 50, drift = 2, bound = 1.5, ndt = 0.3,
     zr = 0.55, version = "4par"
@@ -1061,6 +1100,7 @@ test_that("rezdm 4par returns correct output structure", {
 })
 
 test_that("rezdm 3par returns plausible values", {
+  withr::local_seed(445)
   res <- rezdm(n = 500, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 
   # mean RT should be greater than ndt
@@ -1204,6 +1244,7 @@ test_that("rezdm 4par handles cells with fewer than 2 responses at a boundary", 
 
 test_that("rezdm validates parameters correctly", {
   # n must be single integer
+  withr::local_seed(445)
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
     "n must be a single integer"
@@ -1517,6 +1558,7 @@ test_that("dmpt evaluates covariates in branch expressions", {
 })
 
 test_that("rmpt generates counts with category names and unpacks", {
+  withr::local_seed(445)
   tree <- mpt_tree("study", list(
     C = "cp + (1 - cp) * rp * rp",
     E = "2 * (1 - cp) * rp * (1 - rp)",
@@ -1537,6 +1579,7 @@ test_that("rmpt generates counts with category names and unpacks", {
 })
 
 test_that("dmpt and rmpt give impossible categories zero probability", {
+  withr::local_seed(445)
   model <- mpt(
     list(
       mpt_tree("withdist", list(
@@ -1588,6 +1631,7 @@ test_that("the categorical densities default to the log scale", {
 })
 
 test_that("dmpt validates its inputs", {
+  withr::local_seed(445)
   tree_old <- mpt_tree("old", list(
     old = "D + (1 - D) * g",
     new = "(1 - D) * (1 - g)"
@@ -1662,6 +1706,7 @@ test_that("dmpt matches named counts to the categories", {
 })
 
 test_that("dmpt and rmpt take log and unpack in the fifth position", {
+  withr::local_seed(445)
   model <- mpt(mpt_tree("t", list(
     corr = "D + (1 - D) * G", other = "(1 - D) * (1 - G)"
   )), covariates = "G")
@@ -1670,6 +1715,7 @@ test_that("dmpt and rmpt take log and unpack in the fifth position", {
 })
 
 test_that("dmpt and rmpt refuse a value given more than once", {
+  withr::local_seed(445)
   model <- mpt(mpt_tree("t", list(
     corr = "D + (1 - D) * G", other = "(1 - D) * (1 - G)"
   )), covariates = "G")
@@ -2011,6 +2057,7 @@ test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.
 })
 
 test_that("dmpt and rmpt ignore parameters the selected tree does not use", {
+  withr::local_seed(445)
   model <- mpt(list(
     mpt_tree("a", list(x = "Do + (1 - Do) * g", y = "(1 - Do) * (1 - g)")),
     mpt_tree("b", list(x = "(1 - Dn) * g", y = "Dn + (1 - Dn) * (1 - g)"))
