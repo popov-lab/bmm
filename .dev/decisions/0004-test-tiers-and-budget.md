@@ -71,15 +71,16 @@ which the push-time run keeps. The gate is opt-out so a local
 
 A time budget is enforced by the `tests-source` job
 (`.github/scripts/test-budget.R`): the job fails when the suite, a file or a
-test exceeds its cap. The caps are 1.5 times the maxima of the first
-four-worker run on the runner (this record's pull request with develop at
-dfde3d25 merged, 2026-10-13), rounded:
+test exceeds its cap. The caps are 1.5 times the maxima of twelve
+four-worker runs on the runner (2026-10-19 and 2026-10-20, develop and
+eleven pull-request branches), rounded; the first caps, from this record's
+pull request, are in § Changes (2026-10-20):
 
 | Applies to | Measured maximum | Cap |
 | --- | --- | --- |
-| a test | 44.1 s | 66 s |
-| a file | 450 s (`test-update.R`) | 680 s |
-| the suite | 532 s | 800 s |
+| a test | 76.1 s | 115 s |
+| a file | 561 s (`test-update.R`) | 840 s |
+| the suite | 668 s | 1000 s |
 
 Two known offenders in `test-update.R` carry their own cap until the #422
 consolidation removes them: "update() takes a slice of the model frame as
@@ -318,3 +319,20 @@ last.
   as still to come; it landed with #422 (the registry entry above), and R4
   is now listed among the rules `test-conventions.R` checks. R9 named the
   provider as conditional on the registry; it is now unconditional.
+- 2026-10-20. R6 and R10 caps raised; they failed pull requests on runner
+  load, not on code. The first caps (test 66 s, file 680 s, suite 800 s)
+  came from one run on 2026-10-13. "the Stan rating kernel matches its R
+  counterpart in both tails" took 51 s on develop and 75.6 to 76.1 s on
+  two branches that do not touch it, and failed both. The provisional CRAN
+  cap of 120 s failed a branch at 126 s while develop ran it in 112 s and
+  other branches on the same base in 104 to 119 s. New caps are 1.5 times
+  the maxima of twelve `tests-source` runs from 2026-10-19 and 2026-10-20
+  (develop and eleven branches): test 76.1 s to 115 s, file 561 s
+  (`test-update.R`) to 840 s, suite 668 s to 1000 s, CRAN tier 126 s to
+  190 s. The CRAN cap now guards less: projected from the 2026-10-15
+  ratios, 190 s on the runner is about 250 s of tests on CRAN's Windows,
+  near the 262 s with which win-builder passed at 553 s. Keep the CRAN
+  subset near its current size and do not read the cap as room. The same
+  change seeds every test that draws random numbers
+  (`withr::local_seed()`, R8) and sets `rel.tol` in the circular
+  integrate-to-1 tests, whose default tolerance failed a check of 1e-6.
