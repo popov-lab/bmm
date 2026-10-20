@@ -131,7 +131,8 @@ jobs:
 
       - name: Set up CmdStan toolchain
         if: ${{ startsWith(matrix.config.os, 'ubuntu') || github.event_name == 'push' }}
-        run: cmdstanr::check_cmdstan_toolchain(fix = TRUE)
+        # cmdstanr 1.0 ignores fix and warns when it is TRUE
+        run: cmdstanr::check_cmdstan_toolchain(fix = packageVersion("cmdstanr") < "0.99.0")
         shell: Rscript {0}
 
       - name: Build CmdStan

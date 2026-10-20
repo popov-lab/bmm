@@ -408,6 +408,7 @@ test_that("standata() keeps raw 4par cells appended to fit$data", {
 
 test_that("ezdm works with mock backend - 3par version", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Simulate summary statistics
   sim_data <- rezdm(10, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, version = "3par")
@@ -419,6 +420,7 @@ test_that("ezdm works with mock backend - 3par version", {
 
 test_that("ezdm works with mock backend - 4par version", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # For 4par, create data with separate upper/lower variables to match model expectations
   sim_data <- data.frame(
@@ -438,6 +440,7 @@ test_that("ezdm works with mock backend - 4par version", {
 
 test_that("ezdm formula conversion works correctly for 3par", {
   skip_on_cran()
+  withr::local_seed(445)
 
   sim_data <- rezdm(10, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, version = "3par")
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
@@ -483,6 +486,7 @@ test_that("ezdm formula conversion works correctly for 4par", {
 
 test_that("ezdm with condition effects works", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Simulate data with condition effects
   n_per_cond <- 10
@@ -501,6 +505,7 @@ test_that("ezdm with condition effects works", {
 
 test_that("ezdm with hierarchical structure works", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Simulate hierarchical data
   n_subjects <- 3
@@ -528,6 +533,7 @@ test_that("ezdm with hierarchical structure works", {
 
 test_that("ezdm allows missing parameters with message", {
   skip_on_cran()
+  withr::local_seed(445)
 
   sim_data <- rezdm(10, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, version = "3par")
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
@@ -542,6 +548,7 @@ test_that("ezdm allows missing parameters with message", {
 
 test_that("ezdm default priors are correctly set for 3par", {
   skip_on_cran()
+  withr::local_seed(445)
 
   sim_data <- rezdm(10, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, version = "3par")
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials", version = "3par")
@@ -986,9 +993,15 @@ test_that("ezdm Stan code calls the model lpdf", {
 test_that("ezdm Stan code parses", {
   skip_unless_stan_tests()
   skip_on_cran()
+  # cmdstanr 1.0 drops the compile = FALSE argument; check_syntax_stan_file()
+  # replaces it from the development version 0.9.0.9006 on, the version brms checks
   for (code in ezdm_stancode_both()) {
-    model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
-    expect_true(model$check_syntax(quiet = TRUE))
+    file <- cmdstanr::write_stan_file(code)
+    if (utils::packageVersion("cmdstanr") >= "0.9.0.9006") {
+      expect_true(cmdstanr::check_syntax_stan_file(file, quiet = TRUE))
+    } else {
+      expect_true(cmdstanr::cmdstan_model(file, compile = FALSE)$check_syntax(quiet = TRUE))
+    }
   }
 })
 
