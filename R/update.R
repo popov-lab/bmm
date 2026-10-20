@@ -162,10 +162,16 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
          old_prior$class %in% c("Intercept", "b") & is_main_dpar_row)
     old_prior <- old_prior[!stale, ]
   }
+  # the prior of this call joins the carried rows before configure_prior() runs,
+  # not after: the constraints a model sets in its own configure_prior method
+  # must win over it, and the message naming the displaced rows is printed
+  # there, exactly as for the prior of bmm() (#549). Combined afterwards, a
+  # prior on a constrained coefficient would replace the constraint in silence
   prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, old_prior), fit_frame_args(object, dots))
+    configure_prior,
+    c(list(model, data, config_args$formula, combine_prior(old_prior, dots$prior)),
+      fit_frame_args(object, dots))
   )
-  prior <- combine_prior(prior, dots$prior)
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 
