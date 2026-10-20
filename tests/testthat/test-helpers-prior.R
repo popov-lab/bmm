@@ -800,6 +800,7 @@ test_that("a parameter fixed in the formula keeps its constant over a user prior
 })
 
 test_that("a user prior on a parameter mpt fixes on the link scale is messaged once (#549)", {
+  withr::local_seed(445)
   withr::local_options(bmm.silent = 1)
   # the probability-scale constant of fixed_pars_priors() and the link-scale
   # one of configure_prior.mpt() both replace the user's row, which is one
