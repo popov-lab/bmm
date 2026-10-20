@@ -3,6 +3,9 @@
 ### New models
 * Add the **Target Confusability Competition model** (`tcc`) for continuous reproduction (Schurgin, Wixted & Brady, 2020). It estimates memory strength `d` from response errors in radians or option steps, given the similarity of each option to the target as a vector by distance. Also adds `dtcc()` and `rtcc()`. Its log-likelihood is a probability over options: `?tcc` shows how to compare it with `sdm()` or `mixture2p()` by LOO, and what to do when `d` reaches the grid limit `d_max` (#566). Thanks to @GidonFrischkorn
 
+### Other changes
+* bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
+
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
 * For developers: the header of the file `use_model_template()` writes named an outdated place for a new model's test cases. It now points to `model_cases_<name>()` in `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`, `sd_default`, `init` and `links` case, and it lists `tests/testthat/test-model_<name>.R` for the model's own tests (#580).
