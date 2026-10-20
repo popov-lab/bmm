@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New models
+* Add the **Target Confusability Competition model** (`tcc`) for continuous reproduction (Schurgin, Wixted & Brady, 2020). It estimates memory strength `d` from response errors in radians or option steps, given the similarity of each option to the target as a vector by distance. Also adds `dtcc()` and `rtcc()`. Its log-likelihood is a probability over options: `?tcc` shows how to compare it with `sdm()` or `mixture2p()` by LOO, and what to do when `d` reaches the grid limit `d_max` (#566). Thanks to @GidonFrischkorn
+
 ### Other changes
 * bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
 

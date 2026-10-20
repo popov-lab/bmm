@@ -441,6 +441,10 @@ response_annotations <- function(model) {
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
   }
+  if (inherits(model, "tcc")) {
+    units <- model$other_vars$units %||% "radians"
+    return(list(resp_error = if (units == "bins") "option steps" else "radians in [-pi, pi]"))
+  }
   list()
 }
 
@@ -639,6 +643,10 @@ data_column_roles <- list(
     response = "number of 'old'/'signal' responses",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
     n_trials = "number of trials"
+  ),
+  tcc = c(
+    resp_error = "response error relative to the target, in radians or, with `units = \"bins\"`, in option steps",
+    similarity = NA
   )
 )
 
