@@ -694,6 +694,7 @@ test_that("a constraint from a model's own configure_prior method replaces a use
 
 test_that("mpt says when the constant of a fixed parameter replaces a user prior (#549)", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   withr::local_options(bmm.silent = 1)
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   fit_with <- function(prior) {
