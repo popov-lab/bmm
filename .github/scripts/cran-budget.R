@@ -10,9 +10,10 @@
 # them tests, which ran 4 to 5 times slower there than sequentially on a
 # developer machine; the non-test steps take about 5 min there. A test
 # over 0.4 s here on a developer machine (about 2 s on that machine) opens
-# with skip_on_cran() (R10). The cap is provisional until the first run on
-# the runner is measured (ADR 0004 § Changes). Seconds throughout.
-cap <- 120
+# with skip_on_cran() (R10). The cap is 1.5x the maximum of twelve runs on
+# the runner from 2026-10-19 and 2026-10-20 (126 s; 104 to 126 s on the same
+# develop base), rounded (ADR 0004 § Changes). Seconds throughout.
+cap <- 190
 
 Sys.unsetenv("NOT_CRAN")
 Sys.setenv(TESTTHAT_PARALLEL = "false", BMM_TEST_STAN = "false")
