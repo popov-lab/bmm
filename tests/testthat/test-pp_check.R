@@ -335,6 +335,7 @@ test_that("pp_check(resp_var) drops undefined 4par ezdm cells with a warning", {
 })
 
 test_that("pp_check(resp_var) checks all four ezcdm summary statistics", {
+  withr::local_seed(445)
   fit <- load_fixture_fit("bmmfit_ezcdm_ppcheck.rds")
   expect_identical(pp_check_vars(fit)$resp_var,
                    c("mean_angle", "var_angle", "mean_rt", "var_rt"))
