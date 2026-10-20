@@ -3,8 +3,12 @@
 ### New models
 * Add the **psychometric function** (`psychometric()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric()` and `rpsychometric()`. See `?psychometric`. Thanks to @GidonFrischkorn
 
+### Other changes
+* bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
+
 ### Documentation
 * bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
+* For developers: the header of the file `use_model_template()` writes named an outdated place for a new model's test cases. It now points to `model_cases_<name>()` in `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`, `sd_default`, `init` and `links` case, and it lists `tests/testthat/test-model_<name>.R` for the model's own tests (#580).
 
 # bmm 1.4.1
 

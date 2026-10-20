@@ -17,8 +17,9 @@ installed, even when CmdStan is not, and \code{rstan} otherwise.}
 }
 \value{
 A data frame of class \code{bmm_setup} with one row per check and the
-columns \code{check}, \code{status} (\code{"pass"}, \code{"fail"} or \code{"skip"}), \code{detail} and
-\code{fix} (\code{NA} unless the check failed). It prints as a report.
+columns \code{check}, \code{status} (\code{"pass"}, \code{"warn"}, \code{"fail"} or \code{"skip"}),
+\code{detail} and \code{fix} (\code{NA} unless the check failed or warned). It prints as
+a report.
 }
 \description{
 Fitting a model with \code{\link[=bmm]{bmm()}} needs a C++ toolchain (a compiler
@@ -36,6 +37,10 @@ test file; "CmdStan toolchain" is \code{cmdstanr}'s own check, which only looks
 for \code{make} and a compiler on the \code{PATH}. The second can pass while the
 first fails, e.g. on a Mac whose command line tools are missing, and the
 first is the one that decides.
+
+With \code{cmdstanr} 1.0 or later, a "brms" row warns when the installed \code{brms}
+was released before it. New fits still work, but \code{\link[=update]{update()}} can fail on a
+fit saved with an older \code{cmdstanr}.
 
 With \code{smoke_test = TRUE}, it finally compiles and samples a small
 two-parameter mixture model (\code{\link[=mixture2p]{mixture2p()}}) through \code{\link[=bmm]{bmm()}}, on the
