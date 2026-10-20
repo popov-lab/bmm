@@ -23,14 +23,16 @@
         "- The response is the error relative to the target, in radians (binned \\
         to the nearest of `n_options` options) or, with units = 'bins', in whole \\
         option steps\n",
-        "- `similarity` gives the psychophysical similarity f of an option to the \\
-        target at each distance 0, 1, ..., n_options / 2 options, scaled so that \\
-        f = 1 at distance 0"
+        "- `similarity` is 'laplace' or 'vonmises', with its width estimated, or \\
+        gives the psychophysical similarity f of an option to the target at each \\
+        distance 0, 1, ..., n_options / 2 options, scaled so that f = 1 at \\
+        distance 0"
       ),
       parameters = list(
         d = glue(
           "Memory strength d (the d' of the uncorrelated-noise model): the mean \\
-          memory-match signal of the target in units of the noise SD; an option at distance x has mean d * f(x)"
+          memory-match signal of the target in units of the noise SD; an option \\
+          at distance x has mean d * f(x)"
         )
       ),
       # log, not identity as in the sdt_* models: d f(x) >= 0 in TCC, and a
@@ -50,7 +52,46 @@
     class = c("bmmodel", "tcc"),
     call = call
   )
+  shape <- .tcc_shape(similarity)
+  if (!is.null(shape)) {
+    out$parameters[[shape$name]] <- shape$description
+    out$links[[shape$name]] <- "log"
+    out$default_priors[[shape$name]] <- shape$priors
+    out$init_ranges[[shape$name]] <- shape$init
+  }
   set_links(out, links)
+}
+
+# The named similarities, each with the parameter it adds and the range of its
+# table. The table covers what the 2-D table spike measured (TCC, 2026-10):
+# from a similarity so sharp that only the target stands out, to one that falls
+# almost linearly (Laplace) or as a raised cosine (von Mises) with distance. On
+# oberauer_lin_2017 the spike estimated lambda at 0.6 to 1.2 radians and kappa
+# at 3.7 to 4.7 over set sizes 1-8, where the priors are centred
+.tcc_shapes <- list(
+  laplace = list(
+    name = "lambda", code = 1L, range = c(0.004, 20), init = c(0.3, 1),
+    description = glue(
+      "Width of the Laplace similarity, in radians of the response circle: an \\
+      option x radians from the target has similarity exp(-x / lambda), rescaled \\
+      to 1 at the target and 0 opposite it"
+    ),
+    priors = list(main = "normal(-0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
+  ),
+  vonmises = list(
+    name = "kappa", code = 2L, range = c(0.02, 5e4), init = c(2, 8),
+    description = glue(
+      "Concentration of the von Mises similarity: an option x radians from the \\
+      target has similarity exp(-kappa * (1 - cos(x))), rescaled to 1 at the \\
+      target and 0 opposite it"
+    ),
+    priors = list(main = "normal(1.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
+  )
+)
+
+# NULL for a similarity vector
+.tcc_shape <- function(similarity) {
+  if (is.character(similarity)) .tcc_shapes[[similarity]]
 }
 
 #' @title `r .model_tcc()$name`
@@ -68,15 +109,42 @@
 #'
 #' ## Similarity
 #'
-#'   `similarity` holds the psychophysical similarity of an option to the
-#'   target as a function of their distance on the wheel, one value per
-#'   distance in option steps, in the order 0, 1, ..., `n_options / 2`: the
-#'   first value belongs to the target itself and must be 1, the last to the
-#'   option opposite the target. The model assumes the similarity depends only
-#'   on the distance, the same for every target and on both sides of it. The
-#'   values are fixed, not estimated; Schurgin et al. (2020) measured them in
-#'   a separate perceptual matching task. With 360 options in 1-degree steps,
+#'   `similarity` says how similar an option is to the target as a function of
+#'   their distance on the wheel. The model assumes the similarity depends only
+#'   on the distance, the same for every target and on both sides of it. It is
+#'   1 at the target and 0 at the option opposite it. There are three choices:
+#'
+#'   - A numeric vector holds fixed values, one per distance in option steps,
+#'   in the order 0, 1, ..., `n_options / 2`: the first value belongs to the
+#'   target itself and must be 1, the last to the option opposite the target.
+#'   Schurgin et al. (2020) measured them in a separate perceptual task and
+#'   scaled them to range from 0 to 1. With 360 options in 1-degree steps,
 #'   `similarity[k + 1]` is the similarity at `k` degrees.
+#'   - `"laplace"` estimates a similarity that falls exponentially with the
+#'   distance `x` in radians, `exp(-x / lambda)`, and adds the parameter
+#'   `lambda`, its width in radians.
+#'   - `"vonmises"` estimates a similarity of the shape `exp(-kappa * (1 -
+#'   cos(x)))` and adds the parameter `kappa`, its concentration.
+#'
+#'   The two shapes are the Laplace and von Mises activation functions of
+#'   Oberauer (2021, eq. 2); his Laplace rate is `1 / lambda`. Both are scaled
+#'   to run from 1 at the target to 0 opposite it, like a measured similarity.
+#'   Scaling changes the value of `d` that describes the data, not the shape.
+#'   The distance is measured on the response circle: with 180 options for
+#'   orientation, `x = pi` is the option opposite the target, 90 degrees of
+#'   orientation away.
+#'
+#'   `lambda` and `kappa` are modelled on the log scale and take formulas like
+#'   `d`, including continuous predictors and random effects. Their default
+#'   priors are `normal(-0.5, 1)` on `log(lambda)`, centred at 0.61 radians (35
+#'   degrees), and `normal(1.5, 1)` on `log(kappa)`, centred at 4.5. The
+#'   formula never chooses the similarity: naming `lambda` in it requires
+#'   `similarity = "laplace"`, and `kappa` requires `"vonmises"`. A value fixed
+#'   in the formula, such as `lambda = -1`, is on the log scale.
+#'
+#'   Oberauer, K. (2021). Measurement models for visual working memory: A
+#'   factorial model comparison. Psychological Review.
+#'   https://doi.org/10.1037/rev0000328
 #'
 #' ## Response
 #'
@@ -113,6 +181,33 @@
 #'   nothing per gradient. A large `d` is weakly identified
 #'   when the similarity is broad, because the probability of reporting the
 #'   target then grows slowly with `d`.
+#'
+#' ## Grid limits with an estimated similarity
+#'
+#'   With `similarity = "laplace"` or `"vonmises"` the table has two
+#'   dimensions: `d` in steps of 0.1 up to `d_max`, and `log(lambda)` or
+#'   `log(kappa)` in steps of 0.1. `lambda` runs from 0.004 to 21.7 radians
+#'   (0.23 to 1245 degrees) and `kappa` from 0.02 to 53,500, which reaches
+#'   from a similarity so sharp that no option but the target resembles it,
+#'   to one that falls almost as a straight line (Laplace) or a raised cosine
+#'   (von Mises) with distance. Between the grid nodes the interpolated log
+#'   probability errs by at most 2e-4 on responses with a probability above
+#'   1e-4 up to `d = 12` and by 6e-4 up to `d = 30`; on any response, by
+#'   1.5e-3 up to `d = 12` and 1e-2 up to `d = 30`.
+#'   Beyond either end of either axis the table is extended linearly, and
+#'   above `d_max`, as with a fixed similarity, the log probability of a
+#'   response may fall with `d` but never rise. When no response lies far
+#'   from the target, a large `d` with a broad similarity describes the data
+#'   almost as well as a small `d` with a sharp one, and along that ridge a
+#'   rising extension would let `d` run off without bound. `bmm()` warns after
+#'   the fit when any posterior draw of `d` passes `d_max`, or of `lambda` or
+#'   `kappa` leaves its grid. There is no argument to widen the grid of
+#'   `lambda` or `kappa`: use a prior that keeps the posterior inside.
+#'
+#'   Each chain builds this table once before sampling. With the default
+#'   `d_max = 30` that took 10 s (Laplace) and 18 s (von Mises) per chain on
+#'   the machine bmm is developed on, and each chain process held 61 MB and
+#'   91 MB.
 #'
 #' ## Posterior predictive checks
 #'
@@ -152,15 +247,24 @@
 #'   The fit is fastest when rows that share a value of `d` are adjacent, so
 #'   bmm offers to sort the data by the predictors of `d`, as for [sdm()].
 #'   Continuous predictors of `d` are supported at the per-trial cost.
+#'
+#'   With `lambda` or `kappa` estimated, rows are grouped by their values of
+#'   both parameters. On [oberauer_lin_2017] (15,200 trials in 152 cells of
+#'   subject and set size) one gradient took 2.4 ms with both parameters
+#'   predicted by set size and subject, and 28 ms with a continuous predictor
+#'   of `lambda` as well, which makes every trial its own cell. Estimating
+#'   the similarity also about doubles the number of gradients per iteration.
 #' @param resp_error The name of the variable in the data holding the response
 #'   error. With `units = "radians"` (the default) it is the error relative to
 #'   the target in radians, as for the other circular models, and is binned to
 #'   the nearest of the `n_options` options; with `units = "bins"` it is the
 #'   offset of the chosen option from the target in whole option steps (any
 #'   integer, taken modulo `n_options`).
-#' @param similarity A numeric vector of `n_options / 2 + 1` values in \[0, 1\]:
-#'   the similarity of an option to the target at each distance 0, 1, ...,
-#'   `n_options / 2` options, starting with 1 at distance 0.
+#' @param similarity Either a numeric vector of `n_options / 2 + 1` values in
+#'   \[0, 1\], the fixed similarity of an option to the target at each
+#'   distance 0, 1, ..., `n_options / 2` options, starting with 1 at distance
+#'   0; or `"laplace"` or `"vonmises"` to estimate the similarity with the
+#'   parameter `lambda` or `kappa`. See the section Similarity.
 #' @param n_options The number of response options on the wheel, an even
 #'   number: 360 for a colour wheel in 1-degree steps, 180 for orientation.
 #' @param units Either `"radians"` or `"bins"`, see `resp_error`.
@@ -175,6 +279,9 @@
 #' f <- (f - min(f)) / (1 - min(f))
 #' dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 #' fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
+#'
+#' # the same data, with the width of a Laplace similarity estimated
+#' fit <- bmm(bmf(d ~ 1, lambda ~ 1), dat, tcc("err", similarity = "laplace"), cores = 4)
 tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "bins"),
                 d_max = 30, ...) {
   call <- match.call()
@@ -192,7 +299,11 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
            n_options %% 2 != 0,
          "`n_options` must be an even number of at least 4.")
   n_values <- n_options / 2 + 1
-  stopif(!is.numeric(similarity), "`similarity` must be a numeric vector.")
+  if (is.character(similarity) && length(similarity) == 1 && similarity %in% names(.tcc_shapes)) {
+    return(invisible())
+  }
+  stopif(!is.numeric(similarity),
+         "`similarity` must be 'laplace', 'vonmises' or a numeric vector of similarities.")
   stopif(length(similarity) != n_values,
          "`similarity` must hold {n_values} values, one for each distance from 0 to \\
          {n_options / 2} options, but it holds {length(similarity)}.")
@@ -249,31 +360,42 @@ bmf2bf.tcc <- function(model, formula) {
 #' @export
 configure_model.tcc <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
+  shape <- .tcc_shape(model$other_vars$similarity)
   formula$family <- brms::custom_family(
-    "tcc",
-    dpars = c("mu", "d"),
-    links = c("identity", model$links$d),
+    if (is.null(shape)) "tcc" else "tcc_parametric",
+    dpars = c("mu", "d", shape$name),
+    links = c("identity", unlist(model$links[c("d", shape$name)], use.names = FALSE)),
     type = "int",
     loop = FALSE,
     log_lik = log_lik_tcc,
     posterior_predict = posterior_predict_tcc,
     posterior_epred = posterior_epred_tcc,
-    vars = c("tcc_tab", "tcc_grid_lo", "tcc_grid_step")
+    vars = if (is.null(shape)) {
+      c("tcc_tab", "tcc_grid_lo", "tcc_grid_step")
+    } else {
+      c("tcc_tab2", "tcc_grid_lo", "tcc_grid_step", "tcc_u_lo", "tcc_u_step")
+    }
   )
   stanvars <- .tcc_stanvars(model, model$other_vars$table)
   nlist(formula, data, stanvars)
 }
 
 # One kernel, two sources for its table: built in transformed data from the
-# similarity, or computed in R and passed as data under the same name
+# similarity, or computed in R and passed as data under the same name. A named
+# similarity has a 2-D table, always built in transformed data: from R it would
+# be 40-70 MB of data per fit
 .tcc_stanvars <- function(model, table) {
   grid <- .tcc_grid(model)
-  similarity <- .tcc_similarity(model)
   sc_path <- system.file("stan_chunks", package = "bmm")
   out <- brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_funs.stan")),
                        block = "functions") +
     brms::stanvar(x = grid$lo, name = "tcc_grid_lo") +
     brms::stanvar(x = grid$step, name = "tcc_grid_step")
+  shape <- .tcc_shape(model$other_vars$similarity)
+  if (!is.null(shape)) {
+    return(out + .tcc_shape_stanvars(model, shape, grid, sc_path))
+  }
+  similarity <- .tcc_similarity(model)
   if (table == "r") {
     return(out + brms::stanvar(x = .tcc_table(similarity, grid), name = "tcc_tab"))
   }
@@ -287,15 +409,49 @@ configure_model.tcc <- function(model, data, formula) {
                   block = "tdata", pll_args = "data matrix tcc_tab")
 }
 
+.tcc_shape_stanvars <- function(model, shape, grid, sc_path) {
+  ugrid <- .tcc_ugrid(shape)
+  rule <- .gl_rule(.tcc_gl_nodes)
+  n_options <- model$other_vars$n_options
+  brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_parametric_funs.stan")),
+                block = "functions") +
+    brms::stanvar(x = grid$rows, name = "tcc_grid_rows") +
+    brms::stanvar(x = ugrid$lo, name = "tcc_u_lo") +
+    brms::stanvar(x = ugrid$step, name = "tcc_u_step") +
+    brms::stanvar(x = ugrid$rows, name = "tcc_u_rows") +
+    brms::stanvar(x = shape$code, name = "tcc_shape") +
+    brms::stanvar(x = 2 * pi * (0:(n_options / 2)) / n_options, name = "tcc_delta") +
+    brms::stanvar(x = rule$nodes, name = "tcc_gl_nodes") +
+    brms::stanvar(x = log(rule$weights), name = "tcc_gl_logw") +
+    brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_parametric_tdata.stan")),
+                  block = "tdata", pll_args = "data array[] matrix tcc_tab2")
+}
+
 ############################################################################# !
 # THE LIKELIHOOD TABLE                                                   ####
 ############################################################################# !
 
-# The one place the model's similarity by distance is read, so that a
-# parametric similarity function changes only this function. The similarity
-# argument selects that function, never the formula (#566)
+# The similarity vector of a model with a fixed similarity. The similarity
+# argument selects fixed or named, never the formula (#566)
 .tcc_similarity <- function(model) {
   model$other_vars$similarity
+}
+
+# A named similarity at distances `delta` in radians, scaled to 1 at the target
+# and 0 opposite it, as Schurgin et al. (2020) scale theirs. The shapes are
+# Oberauer's (2021, eq. 2 and footnote 2): exp(-delta / lambda) and
+# exp(-kappa * (1 - cos(delta))). Scaling is an affine map of the signals, and
+# the part that is the same for every option does not change which one is
+# largest, so it only rescales d. expm1() and 1 - cos(x) = 2 sin(x / 2)^2 keep
+# the forms exact at both ends of the grids, where the scaled shapes tend to a
+# straight line (Laplace) or a raised cosine (von Mises).
+# tcc_similarity() in tcc_parametric_funs.stan is the Stan twin
+.tcc_shape_similarity <- function(similarity, par, delta) {
+  if (similarity == "laplace") {
+    return(exp(-delta / par) * expm1(-(pi - delta) / par) / expm1(-pi / par))
+  }
+  s <- sin(delta / 2)^2
+  exp(-2 * par * s) * expm1(-2 * par * (1 - s)) / expm1(-2 * par)
 }
 
 # The quadrature error peaks at small |d|, where the winning signal is a
@@ -316,9 +472,33 @@ configure_model.tcc <- function(model, data, formula) {
 # extra node keeps the last cell below d_max exact (#566)
 .tcc_grid <- function(model) {
   lo <- if (.link_ranges[[model$links$d]][1] >= 0) 0 else -2
-  step <- 0.02
-  rows <- as.integer(ceiling(round((model$other_vars$d_max + step - lo) / step, 6)) + 3)
-  nlist(lo, step, rows)
+  d_max <- model$other_vars$d_max
+  if (is.null(.tcc_shape(model$other_vars$similarity))) {
+    return(.tcc_axis(lo, d_max + 0.02, 0.02))
+  }
+  # In the 2-D table, d steps of 0.1 add 1.5e-6 of error against 1.2e-3 from
+  # the steps of 0.1 in log lambda or log kappa (TCC 2-D table spike, 2026-10).
+  # With an estimated similarity, d and lambda or kappa can trade off along a
+  # ridge that leaves the grid when no response is far from the target: the
+  # log-likelihood of such data was flat within 3 nats from (d, kappa) = (3, 20)
+  # to (100, 0.15), and before the slope cap d ran to 1e5 in recovery (#566)
+  .tcc_axis(lo, d_max + 0.1, 0.1)
+}
+
+# The grid of u = log(lambda) or log(kappa). Up to d = 12 a step of 0.1 errs by
+# up to 1.2e-3 in log P on any response and 1.7e-4 on responses with P > 1e-4,
+# measured at random points: at cell midpoints, where the spike measured, the
+# leading error of the cubic vanishes (#566). 0.05 is 16 times more accurate
+# for twice the build time and memory and the same cost per gradient (TCC 2-D
+# table spike, 2026-10)
+.tcc_ugrid <- function(shape) {
+  .tcc_axis(log(shape$range[1]), log(shape$range[2]), 0.1)
+}
+
+# value of row g is lo + (g - 2) * step; rows 1 and `rows` pad the grid
+.tcc_axis <- function(lo, hi, step) {
+  rows <- as.integer(ceiling(round((hi - lo) / step, 6)) + 3)
+  nlist(lo, step, rows, top = lo + (rows - 3) * step)
 }
 
 # log P of responding one particular option at each distance 0, ..., n / 2
@@ -374,8 +554,29 @@ postprocess_brm.tcc <- function(model, fit, ...) {
 
 .tcc_check_grid <- function(model, prep) {
   d_max <- model$other_vars$d_max
-  .tcc_warn_beyond_grid(.tcc_dpar_extremes(prep, "d"), .tcc_grid(model)$lo, d_max, "d",
-                        glue("Refit with d_max = {2 * d_max}."))
+  shape <- .tcc_shape(model$other_vars$similarity)
+  # with an estimated similarity the table no longer rises past d_max, so a
+  # posterior there is the d-lambda/kappa ridge, which a larger grid does not end
+  remedy <- if (is.null(shape)) {
+    glue("Refit with d_max = {2 * d_max}.")
+  } else {
+    glue("With no responses far from the target, d and {shape$name} trade off: a \\
+         large d with a broad similarity fits almost as well as a small d with a \\
+         sharp one. Use priors on log(d) and log({shape$name}) that keep the \\
+         posterior inside the table.")
+  }
+  .tcc_warn_beyond_grid(.tcc_dpar_extremes(prep, "d"), .tcc_grid(model)$lo, d_max, "d", remedy)
+  if (!is.null(shape)) {
+    grid <- .tcc_ugrid(shape)
+    .tcc_warn_beyond_grid(
+      .tcc_dpar_extremes(prep, shape$name), exp(grid$lo), exp(grid$top), shape$name,
+      glue("Outside this range the similarity hardly changes with {shape$name}: at \\
+           one end no option but the target resembles it, at the other the \\
+           similarity falls almost as a straight line (Laplace) or a raised cosine \\
+           (von Mises) with distance. Use a prior on log({shape$name}) that keeps \\
+           the posterior inside the range.")
+    )
+  }
 }
 
 # The smallest and largest value of a parameter over the observations, per
@@ -397,8 +598,8 @@ postprocess_brm.tcc <- function(model, fit, ...) {
     any(beyond),
     "In {sum(beyond)} of {length(beyond)} posterior draws, {name} passes the range \\
     from {signif(lower, 3)} to {signif(upper, 3)} that the likelihood table covers. \\
-    Beyond it the table is extrapolated, which keeps the sampler \\
-    moving but is not the model, so the posterior can run far past the table and \\
+    Beyond it the table is extrapolated, which keeps the sampler moving but is \\
+    not the model, so the posterior can run far past the table and \\
     its estimates mean nothing. {remedy}"
   )
 }
@@ -407,32 +608,54 @@ postprocess_brm.tcc <- function(model, fit, ...) {
 # LOG_LIK, POSTERIOR_PREDICT AND PP_CHECK                                ####
 ############################################################################# !
 
-# brms calls these once per observation, so the table that a fit built in
-# transformed data is rebuilt in R (about 1 s) once and kept for the next call
+# brms calls these once per observation, so the table a fit built in
+# transformed data is rebuilt in R from the standata once and kept for the next
+# call. One table node takes about 1 ms, so the 1-D table costs 1.6 s and the
+# 2-D one 30 to 50 s in full; only the nodes the draws reach are computed, as
+# they are reached, by the quadrature the fit used
 .tcc_cache <- new.env(parent = emptyenv())
 
 # The table the fit read, from the standata in the prep: passed from R, or
-# rebuilt from the similarity and grid the fit built it from
+# rebuilt from the similarity (fixed, or named with the u grid) and the d grid.
+# The R table is an array rows of d x distances x rows of u, with one row of u
+# for a fixed similarity
 .tcc_prep_table <- function(prep) {
   data <- prep$data
-  grid <- list(lo = data$tcc_grid_lo, step = data$tcc_grid_step, rows = data$tcc_grid_rows)
+  table <- list(lo = data$tcc_grid_lo, step = data$tcc_grid_step, rows = data$tcc_grid_rows,
+                u_rows = 1L)
   if (!is.null(data$tcc_tab)) {
-    return(c(grid, list(tab = data$tcc_tab)))
+    table$rows <- nrow(data$tcc_tab)
+    cache <- list2env(list(tab = data$tcc_tab, done = matrix(TRUE, table$rows, 1)))
+    return(c(table, list(cache = cache)))
   }
-  key <- rlang::hash(list(as.numeric(data$tcc_similarity), grid))
+  if (is.null(data$tcc_shape)) {
+    similarity <- function(j) as.numeric(data$tcc_similarity)
+  } else {
+    table$u_lo <- data$tcc_u_lo
+    table$u_step <- data$tcc_u_step
+    table$u_rows <- data$tcc_u_rows
+    shape <- names(.tcc_shapes)[data$tcc_shape]
+    similarity <- function(j) {
+      .tcc_shape_similarity(shape, exp(table$u_lo + (j - 2) * table$u_step), as.numeric(data$tcc_delta))
+    }
+  }
+  key <- rlang::hash(list(table, data$tcc_shape, as.numeric(data$tcc_delta),
+                          as.numeric(data$tcc_similarity)))
   if (!identical(.tcc_cache$key, key)) {
-    .tcc_cache$tab <- .tcc_table(as.numeric(data$tcc_similarity), grid)
+    .tcc_cache$tab <- array(NA_real_, c(table$rows, length(similarity(2)), table$u_rows))
+    .tcc_cache$done <- matrix(FALSE, table$rows, table$u_rows)
+    .tcc_cache$similarity <- similarity
     .tcc_cache$key <- key
   }
-  c(grid, list(tab = .tcc_cache$tab))
+  c(table, list(cache = .tcc_cache))
 }
 
-# Catmull-Rom rows and weights at each d, as tcc_first_row() and
+# Catmull-Rom rows and weights at each x on one axis, as tcc_first_row() and
 # tcc_row_weights() compute them in Stan, linear beyond the grid
-.tcc_weights <- function(d, table) {
-  u <- (d - table$lo) / table$step + 2
-  first <- pmin(pmax(floor(u) - 1, 1), nrow(table$tab) - 3)
-  t <- u - first - 1
+.tcc_weights <- function(x, lo, step, n_rows) {
+  g <- (x - lo) / step + 2
+  first <- pmin(pmax(floor(g) - 1, 1), n_rows - 3)
+  t <- g - first - 1
   w <- 0.5 * cbind(-t + 2 * t^2 - t^3, 2 - 5 * t^2 + 3 * t^3, t + 4 * t^2 - 3 * t^3, t^3 - t^2)
   below <- t < 0
   above <- t > 1
@@ -441,38 +664,92 @@ postprocess_brm.tcc <- function(model, fit, ...) {
   nlist(first, w)
 }
 
-# log P of distance index `col` (1 = the target) at each d, the R twin of tcc_lpmf()
-.tcc_interp <- function(d, col, table) {
-  at <- .tcc_weights(d, table)
-  col <- rep_len(col, length(d))
-  Reduce(`+`, lapply(1:4, function(k) at$w[, k] * table$tab[cbind(at$first + k - 1, col)]))
+# The table entries that interpolate each (d, u) and their weights, 4 for a
+# fixed similarity and 4 x 4 for a named one; `entry` indexes the table at the
+# first distance, and the distance k adds (k - 1) * rows. Nodes not yet in the
+# table are computed first
+.tcc_lookup <- function(table, d, u = NULL) {
+  at_d <- .tcc_weights(d, table$lo, table$step, table$rows)
+  a <- if (table$u_rows > 1) rep(0:3, 4) else 0:3
+  rows <- outer(at_d$first, a, "+")
+  w <- at_d$w[, a + 1, drop = FALSE]
+  urows <- 1
+  if (table$u_rows > 1) {
+    b <- rep(0:3, each = 4)
+    at_u <- .tcc_weights(u, table$u_lo, table$u_step, table$u_rows)
+    urows <- outer(at_u$first, b, "+")
+    w <- w * at_u$w[, b + 1, drop = FALSE]
+  }
+  node <- rows + (urows - 1) * table$rows
+  .tcc_fill(table, unique(as.vector(node)))
+  tab <- table$cache$tab
+  list(entry = rows + (urows - 1) * table$rows * dim(tab)[2], w = w, tab = tab, rows = table$rows)
 }
 
-# signed option offsets drawn at each d from the interpolated table, by
+.tcc_fill <- function(table, node) {
+  cache <- table$cache
+  node <- node[!cache$done[node]]
+  if (!length(node)) {
+    return(invisible())
+  }
+  r <- (node - 1) %% table$rows + 1
+  j <- (node - 1) %/% table$rows + 1
+  values <- vapply(seq_along(node), function(m) {
+    at <- function(g) .tcc_logp(table$lo + (g - 2) * table$step, cache$similarity(j[m]))
+    # the capped padding row, as in .tcc_table() and the Stan tables (.tcc_grid())
+    if (r[m] == table$rows) pmin(at(r[m]), at(r[m] - 2)) else at(r[m])
+  }, numeric(dim(cache$tab)[2]))
+  n_dist <- nrow(values)
+  cache$tab[cbind(rep(r, each = n_dist), seq_len(n_dist), rep(j, each = n_dist))] <- values
+  cache$done[node] <- TRUE
+}
+
+# log P of distance index `col` (1 = the target) at each (d, u), the R twin of
+# tcc_lpmf() and tcc_parametric_lpmf()
+.tcc_interp <- function(look, col) {
+  rowSums(look$w * matrix(look$tab[look$entry + (col - 1) * look$rows], nrow(look$w)))
+}
+
+# signed option offsets drawn at each (d, u) from the interpolated table, by
 # inverse CDF over all options at once, in chunks to bound the memory
-.tcc_rbins <- function(d, table, n_options, chunk = 5000) {
+.tcc_rbins <- function(d, u, table, n_options, chunk = 5000) {
   offsets <- seq(-n_options / 2 + 1, n_options / 2)
   cols <- abs(offsets) + 1
   out <- integer(length(d))
   for (start in seq(1, length(d), by = chunk)) {
     idx <- start:min(length(d), start + chunk - 1)
-    at <- .tcc_weights(d[idx], table)
-    logp <- Reduce(`+`, lapply(1:4, function(k) at$w[, k] * table$tab[at$first + k - 1, , drop = FALSE]))
+    look <- .tcc_lookup(table, d[idx], u[idx])
+    shift <- (seq_len(n_options / 2 + 1) - 1) * look$rows
+    logp <- Reduce(`+`, lapply(seq_len(ncol(look$w)), function(m) {
+      # c(): a 3-column index matrix (n_options = 4) would index the 3-D table by dimension
+      look$w[, m] * matrix(look$tab[c(outer(look$entry[, m], shift, "+"))], length(idx))
+    }))
     cum <- matrixStats::rowCumsums(exp(logp[, cols, drop = FALSE]))
-    u <- stats::runif(length(idx)) * cum[, n_options]
-    out[idx] <- as.integer(offsets[rowSums(cum < u) + 1])
+    draw <- stats::runif(length(idx)) * cum[, n_options]
+    out[idx] <- as.integer(offsets[rowSums(cum < draw) + 1])
   }
   out
 }
 
+# log of the similarity parameter at observation i, NULL for a fixed similarity
+.tcc_prep_u <- function(prep, i = NULL) {
+  shape <- prep$data$tcc_shape
+  if (is.null(shape)) {
+    return(NULL)
+  }
+  name <- .tcc_shapes[[shape]]$name
+  log(if (is.null(i)) .pp_dpar_vector(prep, name) else brms::get_dpar(prep, name, i = i))
+}
+
 log_lik_tcc <- function(i, prep) {
-  d <- brms::get_dpar(prep, "d", i = i)
-  .tcc_interp(d, abs(prep$data$Y[i]) + 1, .tcc_prep_table(prep))
+  look <- .tcc_lookup(.tcc_prep_table(prep), brms::get_dpar(prep, "d", i = i), .tcc_prep_u(prep, i))
+  .tcc_interp(look, abs(prep$data$Y[i]) + 1)
 }
 
 posterior_predict_tcc <- function(i, prep, ...) {
   table <- .tcc_prep_table(prep)
-  .tcc_rbins(brms::get_dpar(prep, "d", i = i), table, 2 * (ncol(table$tab) - 1))
+  .tcc_rbins(brms::get_dpar(prep, "d", i = i), .tcc_prep_u(prep, i), table,
+             2 * (dim(table$cache$tab)[2] - 1))
 }
 
 posterior_epred_tcc <- posterior_epred_undefined("tcc")
@@ -499,7 +776,8 @@ pp_observables.tcc <- function(model) {
 
 #' @export
 pp_simulate.tcc <- function(model, prep) {
-  bins <- .tcc_rbins(.pp_dpar_vector(prep, "d"), .tcc_prep_table(prep), model$other_vars$n_options)
+  bins <- .tcc_rbins(.pp_dpar_vector(prep, "d"), .tcc_prep_u(prep), .tcc_prep_table(prep),
+                     model$other_vars$n_options)
   list(error = matrix(bins, nrow = prep$ndraws))
 }
 

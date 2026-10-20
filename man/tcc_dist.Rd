@@ -6,9 +6,17 @@
 \alias{rtcc}
 \title{Distribution functions for the target confusability competition model}
 \usage{
-dtcc(x, d, similarity, n_options = 360, log = FALSE)
+dtcc(
+  x,
+  d,
+  similarity,
+  lambda = NULL,
+  kappa = NULL,
+  n_options = 360,
+  log = FALSE
+)
 
-rtcc(n, d, similarity, n_options = 360)
+rtcc(n, d, similarity, lambda = NULL, kappa = NULL, n_options = 360)
 }
 \arguments{
 \item{x}{Vector of response errors in radians; each is binned to the
@@ -16,8 +24,14 @@ nearest option, as \code{\link[=tcc]{tcc()}} does with \code{units = "radians"}.
 
 \item{d}{Memory strength, the mean signal of the target (recycled).}
 
-\item{similarity}{Similarity of an option to the target at each distance
-0, 1, ..., \code{n_options / 2} options, starting with 1 (see \code{\link[=tcc]{tcc()}}).}
+\item{similarity}{Either a vector of the similarity of an option to the
+target at each distance 0, 1, ..., \code{n_options / 2} options, starting with
+1, or \code{"laplace"} or \code{"vonmises"} for a similarity function with the
+parameter \code{lambda} or \code{kappa} (see \code{\link[=tcc]{tcc()}}).}
+
+\item{lambda}{Width of the Laplace similarity in radians, for \code{similarity = "laplace"} (recycled).}
+
+\item{kappa}{Concentration of the von Mises similarity, for \code{similarity = "vonmises"} (recycled).}
 
 \item{n_options}{Number of response options, an even number.}
 
@@ -43,6 +57,8 @@ f <- (f - min(f)) / (1 - min(f))
 x <- 2 * pi * (-179:180) / 360
 plot(x, dtcc(x, d = 2, similarity = f), type = "h")
 hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
+# the same similarity as a Laplace function with a width of 20 degrees
+lines(x, dtcc(x, d = 2, similarity = "laplace", lambda = 20 * pi / 180), col = 2)
 }
 \references{
 Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical scaling reveals a unified theory of visual memory strength. Nature Human Behaviour, 4(11), 1156-1172. https://doi.org/10.1038/s41562-020-00938-0
