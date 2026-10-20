@@ -391,6 +391,7 @@ test_that(".apply_link_transform copes with effects that carry no spaghetti", {
 # ===========================================================================
 
 test_that(".has_category_dpars is TRUE for the multinomial models only (#512)", {
+  withr::local_seed(445)
   ranking <- as.data.frame(rsdt_ranking(2, 50, m = 4, d = 1))
   cdp <- cbind(data.frame(stimulus = c(0L, 1L)),
                rsdt_cdp(2, 50, c(0L, 1L), dfam = 0.8, drec = 1, rcrit = 0.5,

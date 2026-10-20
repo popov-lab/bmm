@@ -570,6 +570,7 @@ test_that("update_model_fixed_parameters() works", {
 })
 
 test_that("extracts all blocks and names are correct", {
+  withr::local_seed(445)
   data <- data.frame(y = runif(100, min = -pi, pi))
   model <- mixture2p(resp_error = "y")
   formula <- bmf(thetat ~ 1, kappa ~ 1)
@@ -586,6 +587,7 @@ test_that("extracts all blocks and names are correct", {
 })
 
 test_that("extracts only requested subset of blocks", {
+  withr::local_seed(445)
   data <- data.frame(y = runif(100, min = -pi, pi))
   model <- mixture2p(resp_error = "y")
   formula <- bmf(thetat ~ 1, kappa ~ 1)
