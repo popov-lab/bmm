@@ -4,6 +4,11 @@
 
 #### Bug fixes
 
+- [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) fits
+  with very fast responses no longer fail to start (cmdstanr: “Unable to
+  retrieve the metadata”; rstan: “sampling not done”). The initial value
+  of `ndt` now stays below your fastest response time
+  ([\#548](https://github.com/popov-lab/bmm/issues/548)).
 - A prior you set on a coefficient the model constrains, such as the
   intercept of a parameter fixed in an
   [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) formula
