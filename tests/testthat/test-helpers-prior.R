@@ -68,6 +68,7 @@ test_that("a user intercept prior on a distributional parameter replaces the def
   skip_on_cran()
   # mixture2p's parameters are dpars, whose intercept is its own class; the
   # nlpar case of #526 is the mpt test below
+  withr::local_seed(445)
   dat <- data.frame(y = rmixture2p(n = 100), cond = rep(c("a", "b"), 50))
   user <- brms::set_prior("normal(0, 2)", class = "Intercept", dpar = "kappa")
 
@@ -152,6 +153,7 @@ test_that("fixed_pars_priors errors clearly when a fixed parameter is absent fro
 test_that("the fixed-parameter guard fires through the full default_prior pipeline", {
   # a fixed parameter that no configure_model wires into the formula survives
   # check_model/check_formula reconciliation and must be caught before brms
+  withr::local_seed(445)
   model <- sdm(resp_error = "y")
   model$fixed_parameters$sdratio <- 0
   dat <- data.frame(y = rsdm(30, mu = 0, c = 3, kappa = 4))
