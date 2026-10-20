@@ -716,6 +716,7 @@ test_that("a threading request switches the vectorized family to sliced vars", {
 })
 
 test_that("the custom version slices every vint column when threading", {
+  withr::local_seed(445)
   dat <- data.frame(
     rt = runif(99, 0.4, 1.5),
     resp = rep(c("fast", "mid", "slow"), 33)
@@ -1514,6 +1515,7 @@ test_that("pp_simulate.rdm() races the per-observation accumulator counts", {
 })
 
 test_that("pp_check(resp_var) works for the rdm model", {
+  withr::local_seed(445)
   fit <- load_fixture_fit("bmmfit_rdm_ppcheck.rds")
   p <- pp_check(fit, resp_var = "rt", ndraws = 5)
   expect_s3_class(p, "ggplot")
