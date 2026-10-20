@@ -26,8 +26,8 @@ model_cases_cswald <- function() {
       )
     ),
     links = list(
-      cswald = list(model = simple, settable = c("drift", "bound", "ndt", "s")),
-      cswald_crisk = list(model = crisk, settable = c("drift", "bound", "ndt", "zr", "s"))
+      cswald = list(model = simple, settable = c("drift", "bound", "ndt", "s", "sndt")),
+      cswald_crisk = list(model = crisk, settable = c("drift", "bound", "ndt", "zr", "s", "sndt"))
     ),
     fixture = list(cswald = list(file = "bmmfit_cswald_ppcheck.rds")),
     observables = list(

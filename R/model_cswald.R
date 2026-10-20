@@ -466,7 +466,7 @@ posterior_predict_cswald_simple <- function(i, prep, ...) {
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  sndt <- brms::get_dpar(prep, "sndt", i = i)
+  sndt <- .cswald_sndt(prep, i)
 
   # convert single-boundary bound to total separation for the full DDM generator
   out <- .rcswald(
@@ -505,12 +505,16 @@ posterior_epred_cswald <- function(prep) {
   (prep$dpars$sndt %||% 0) / 2
 }
 
+.cswald_sndt <- function(prep, i) {
+  if (is.null(prep$dpars$sndt)) 0 else brms::get_dpar(prep, "sndt", i = i)
+}
+
 log_lik_cswald_simple <- function(i, prep) {
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  sndt <- brms::get_dpar(prep, "sndt", i = i)
+  sndt <- .cswald_sndt(prep, i)
 
   rt <- rep(prep$data$Y[i], length(drift))
   response <- rep(prep$data$dec[i], length(drift))
@@ -560,7 +564,7 @@ log_lik_cswald_crisk <- function(i, prep) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   zr <- brms::get_dpar(prep, "zr", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  sndt <- brms::get_dpar(prep, "sndt", i = i)
+  sndt <- .cswald_sndt(prep, i)
 
   rt <- rep(prep$data$Y[i], length(drift))
   response <- rep(prep$data$dec[i], length(drift))
@@ -584,7 +588,7 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
   ndt <- brms::get_dpar(prep, "ndt", i = i)
   zr <- brms::get_dpar(prep, "zr", i = i)
   s <- brms::get_dpar(prep, "s", i = i)
-  sndt <- brms::get_dpar(prep, "sndt", i = i)
+  sndt <- .cswald_sndt(prep, i)
 
   # rtdists shares one non-decision-time draw between the accumulators, the
   # crisk likelihood does not; see the sndt section of ?cswald
