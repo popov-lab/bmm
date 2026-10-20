@@ -110,6 +110,7 @@ test_that("slot averaging guesses whenever fewer slots than items are available"
 
 test_that("rmixture2p() draws from dmixture2p() for every version", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   compare <- function(n = 2e5, n_bins = 20, ...) {
     draws <- rmixture2p(n, ...)
     breaks <- seq(-pi, pi, length.out = n_bins + 1)
@@ -130,6 +131,7 @@ test_that("rmixture2p() draws from dmixture2p() for every version", {
 test_that("dmixture2p() and rmixture2p() refuse what the model refuses", {
   # a set size of 0 used to give p_mem = 1 in the slot version and NA or
   # uniform draws in slot averaging, without an error
+  withr::local_seed(445)
   for (version in c("slot", "slot_averaging")) {
     for (set_size in c(0, -2, 2.5)) {
       expect_error(
