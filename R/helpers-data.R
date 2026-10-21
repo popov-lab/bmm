@@ -299,6 +299,59 @@ standata.bmmformula <- function(object, data, model, ...) {
   )
 }
 
+#' @title Stan data of a fitted `bmm` model
+#' @description The prediction methods of `brms`, such as [brms::log_lik()],
+#'   [brms::posterior_predict()], [brms::posterior_epred()],
+#'   [brms::predict.brmsfit()], [brms::fitted.brmsfit()] and [brms::loo()],
+#'   turn `newdata` into Stan data through `standata()`. For a `bmmfit`,
+#'   `newdata` can be in the layout of the data you gave to [bmm()]: the
+#'   columns `bmm` built from those data when it fitted the model are built
+#'   again. Rows of the fit's model frame,
+#'   `fit$data`, are used as they are.
+#' @param object A `bmmfit` object
+#' @param newdata An optional data frame, in the layout of the data given to
+#'   [bmm()] or a subset of the rows of `object$data`. Its rows keep their
+#'   order.
+#' @param ... Further arguments passed to [brms::standata()]
+#' @return A named list of objects containing the data to evaluate the model
+#'   with Stan.
+#' @seealso [brms::standata()], [bmm()]
+#' @keywords extract_info
+#' @export
+standata.bmmfit <- function(object, newdata = NULL, ...) {
+  if (lacks_built_columns(object, newdata)) {
+    newdata <- check_newdata(object, newdata)
+  }
+  NextMethod()
+}
+
+# The model frame holds the columns check_data() built, and data in the layout
+# given to bmm() lack some of them. Slices of the frame carry them all: those
+# of kfold() and reloo(), and the grids that conditional_effects() and
+# native_parameters() cut from it. So does any newdata for a model that
+# builds no columns, which brms then checks as it always did
+lacks_built_columns <- function(object, newdata) {
+  !is.null(newdata) && any(not_in(
+    intersect(built_data_columns(object$bmm$model), names(object$data)),
+    names(newdata)
+  ))
+}
+
+# brms returns predictions in the rows of newdata, so the data are not sorted,
+# and a check_data() method that dropped or reordered rows would misalign them
+# without an error
+check_newdata <- function(object, newdata) {
+  withr::local_options(bmm.sort_data = FALSE)
+  newdata <- as.data.frame(newdata)
+  checked <- check_data(object$bmm$model, newdata, object$bmm$user_formula)
+  stopif(
+    !identical(row.names(checked), row.names(newdata)),
+    "Preparing 'newdata' for this model changed its rows. Please report this \\
+    as a bug of bmm."
+  )
+  checked
+}
+
 # check if the data is sorted by the predictors
 is_data_ordered <- function(data, formula) {
   predictors <- data_predictor_vars(data, formula)
