@@ -80,6 +80,11 @@
   dropped the panel, and those of its interactions, without a message.
   bmm now hides only the columns it creates itself
   ([\#550](https://github.com/popov-lab/bmm/issues/550)).
+- [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) now
+  accepts a vector `n_trials`, one value per draw, as
+  [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) does.
+  It stopped with “the condition has length \> 1”
+  ([\#564](https://github.com/popov-lab/bmm/issues/564)).
 
 #### Other changes
 
