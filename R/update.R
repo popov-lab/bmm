@@ -153,14 +153,18 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     stop_unstored_variables(config_args, fit_frame_args(object, dots)$data2)
   }
 
-  # configure_prior() treats every row of the old fit's prior as a user prior, so
-  # for a parameter whose constant changed each of those rows would override the
-  # freshly configured one -- the stale constant() of a freed or re-valued
-  # parameter and the stale free prior of a newly fixed one alike. brms stores
-  # the main dpar without a `dpar` label, so its rows are the ones carrying
-  # neither label
-  old_prior <- carried_prior(object$prior)
-  if (length(changed_pars) > 0) {
+  # bmm() stores the prior the user gave it, and configure_prior() rebuilds the
+  # defaults around it for the new formula and data as bmm() would (#538). A fit
+  # saved before that has only its whole prior, in which brms marks bmm's
+  # defaults for the old formula as user rows; configure_prior() treats each of
+  # those rows as a user prior, so for a parameter whose constant changed each
+  # would override the freshly configured one -- the stale constant() of a freed
+  # or re-valued parameter and the stale free prior of a newly fixed one alike.
+  # brms stores the main dpar without a `dpar` label, so its rows are the ones
+  # carrying neither label
+  stored_prior <- object$bmm$user_prior
+  old_prior <- stored_prior %||% carried_prior(object$prior)
+  if (is.null(stored_prior) && length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
     stale <- old_prior$dpar %in% changed_pars |
@@ -174,10 +178,10 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # must win over it, and the message naming the displaced rows is printed
   # there, exactly as for the prior of bmm() (#549). Combined afterwards, a
   # prior on a constrained coefficient would replace the constraint in silence
+  user_prior <- combine_prior(old_prior, dots$prior)
   prior <- brms::do_call(
     configure_prior,
-    c(list(model, data, config_args$formula, combine_prior(old_prior, dots$prior)),
-      fit_frame_args(object, dots))
+    c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
   )
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
@@ -224,6 +228,15 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     carried_control(object, dots), dots$backend, dots$algorithm
   ))
 
+  # brms::update.brmsfit() adds back every row of the old prior marked "user"
+  # that the new prior does not restate, and brms marks bmm's defaults so: the
+  # old default of a coefficient the new formula keeps would replace the new
+  # one, and the stored L row of a correlation would duplicate the new cor row.
+  # The user's own rows are in the stored prior already (#538)
+  if (!is.null(stored_prior)) {
+    object$prior$source[] <- "default"
+  }
+
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
   # sdm run metadata) were computed for the original data and formula. The
@@ -239,9 +252,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # this one. Single brackets, because `init = NULL` must keep its slot
   object$stan_args[c("init", "control")] <- list(init, control)
 
-  # bmm postprocessing
+  # bmm postprocessing. A fit saved before bmm stored the user's prior stays
+  # without one: its user rows cannot be told from the defaults, and storing the
+  # prior of this call alone would drop them at the next update()
   object <- postprocess_brm(model, object,
     fit_args = new_fit_args, user_formula = user_formula,
+    user_prior = if (!is.null(stored_prior)) user_prior,
     configure_opts = configure_opts
   )
 
