@@ -272,17 +272,20 @@ read_lines2 <- function(con) {
 #'   information about the single fit is returned. For `brmsfit_list` objects, a
 #'   list or data.frame with the information for each fit is returned.
 #'  - "time": A data.frame with the sampling time per chain
-#'  - "time_mean": A named numeric vector with the mean sampling time
+#'  - "time_mean": A named numeric vector with the mean warmup, sampling and
+#'    total time across chains
 #'  - "inv_metric": A list with one numeric vector per chain (the diagonal), or
 #'    one matrix per chain for `metric = "dense_e"`
 #'  - "step_size": A list with one number per chain
 #'
 #'   Every chain of the fit is reported, also in a fit combined from several
 #'   fits with [brms::combine_models()]. `NULL` is returned for what the sampler
-#'   did not record: a fit without a stanfit, an algorithm other than NUTS, or,
-#'   for "inv_metric", `metric = "unit_e"`. The values of a fit combined from
-#'   several fits are read from Stan's printed output, which gives six significant
-#'   digits by default.
+#'   did not record: anything for a fit without a stanfit or without chains,
+#'   "time" and "time_mean" for variational and Laplace runs, "inv_metric" and
+#'   "step_size" for any algorithm other than NUTS, and "inv_metric" for
+#'   `metric = "unit_e"`. The values of a fit combined from several fits are
+#'   read from Stan's printed output, which gives six significant digits by
+#'   default.
 #' @keywords extract_info
 #' @export
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
@@ -306,19 +309,23 @@ fit_info.brmsfit <- function(fit, what) {
   }
   switch(what,
     time = chain_times(stanfit),
-    time_mean = if (!is.null(times <- chain_times(stanfit))) colMeans(times),
+    time_mean = if (!is.null(times <- chain_times(stanfit))) {
+      colMeans(times[c("warmup", "sampling", "total")])
+    },
     inv_metric = chain_adaptation(stanfit, "inv_metric"),
     step_size = chain_adaptation(stanfit, "step_size")
   )
 }
 
-# The cmdstanr metadata is read from the first fit only when brms::combine_models()
-# merges fits, so it is used only while it covers every chain of the stanfit.
-# Each chain of the stanfit carries its own timing and adaptation output
-# whatever the backend, and combine_models() concatenates the chains.
+# brms::combine_models() keeps the cmdstanr metadata of the first fit only, and
+# a fit trimmed or refitted with chains = 0 keeps metadata of chains it no
+# longer has, so the metadata is used only when it describes exactly the
+# stanfit's chains. Each chain of the stanfit carries its own timing and
+# adaptation output whatever the backend, and combine_models() concatenates the
+# chains.
 stored_metadata <- function(stanfit) {
   metadata <- attr(stanfit, "metadata")
-  if (NROW(metadata$time$chains) >= length(stanfit@sim$samples)) metadata
+  if (NROW(metadata$time$chains) == length(stanfit@sim$samples)) metadata
 }
 
 chain_times <- function(stanfit) {
@@ -332,7 +339,7 @@ chain_times <- function(stanfit) {
   }
   elapsed <- do.call(rbind, elapsed)
   data.frame(
-    chain_id = seq_len(nrow(elapsed)),
+    chain_id = as.numeric(seq_len(nrow(elapsed))),
     warmup = unname(elapsed[, "warmup"]),
     sampling = unname(elapsed[, "sample"]),
     total = unname(rowSums(elapsed))
@@ -341,11 +348,11 @@ chain_times <- function(stanfit) {
 
 chain_adaptation <- function(stanfit, what) {
   stored <- stored_metadata(stanfit)
+  # cmdstanr stores an empty list for metric = "unit_e"
   if (!is.null(stored)) {
-    return(stored[[what]])
+    return(if (length(stored[[what]])) stored[[what]])
   }
-  chains <- stanfit@sim$samples
-  parsed <- lapply(chains, function(chain) {
+  parsed <- lapply(stanfit@sim$samples, function(chain) {
     info <- parse_adaptation_info(attr(chain, "adaptation_info"))
     info$step_size <- info$step_size %||% last_step_size(chain)
     info[[what]]
@@ -356,7 +363,8 @@ chain_adaptation <- function(stanfit, what) {
   stats::setNames(parsed, seq_along(parsed))
 }
 
-# the step size of the last draw: adaptation_info holds none for metric = "unit_e"
+# the step size of the last draw: adaptation_info holds none for
+# metric = "unit_e"
 last_step_size <- function(chain) {
   utils::tail(attr(chain, "sampler_params")$stepsize__, 1)
 }
@@ -365,20 +373,36 @@ last_step_size <- function(chain) {
 #   # Step size = 0.0981616
 #   # Diagonal elements of inverse mass matrix:
 #   # 0.0298361, 0.0410393
-# and, for metric = "dense_e", "Elements of inverse mass matrix:" and a row per line
+# and, for metric = "dense_e", "Elements of inverse mass matrix:" and a row per
+# line. A non-finite element is printed as C++ writes it (nan, -nan, inf), and
+# lines after the metric, such as "Elapsed Time", are not numbers.
 parse_adaptation_info <- function(info) {
-  lines <- trimws(sub("^#", "", unlist(strsplit(paste(info, collapse = "\n"), "\n"))))
+  lines <- unlist(strsplit(paste(info, collapse = "\n"), "\n"))
+  lines <- trimws(sub("^#", "", lines))
   step_size <- grep("^Step size = ", lines, value = TRUE)
-  header <- grep("^(Diagonal elements|Elements) of inverse mass matrix:$", lines)
+  header <- grep(
+    "^(Diagonal elements|Elements) of inverse mass matrix:$", lines
+  )
   inv_metric <- NULL
   if (length(header) == 1) {
+    num <- "[-+]?([0-9.]+([eE][-+]?[0-9]+)?|nan|inf)"
     rows <- utils::tail(lines, -header)
-    rows <- rows[grepl("^[-+0-9.eE, ]+$", rows)]
+    rows <- rows[grepl(paste0("^", num, "(, *", num, ")*$"), rows,
+      ignore.case = TRUE
+    )]
     rows <- lapply(strsplit(rows, ",", fixed = TRUE), as.numeric)
-    inv_metric <- if (grepl("^Diagonal", lines[header])) rows[[1]] else do.call(rbind, rows)
+    if (length(rows)) {
+      inv_metric <- if (grepl("^Diagonal", lines[header])) {
+        rows[[1]]
+      } else {
+        do.call(rbind, rows)
+      }
+    }
   }
   list(
-    step_size = if (length(step_size) == 1) as.numeric(sub("^Step size = ", "", step_size)),
+    step_size = if (length(step_size) == 1) {
+      as.numeric(sub("^Step size = ", "", step_size))
+    },
     inv_metric = inv_metric
   )
 }

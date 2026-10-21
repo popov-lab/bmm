@@ -23,7 +23,8 @@ information about the single fit is returned. For \code{brmsfit_list} objects, a
 list or data.frame with the information for each fit is returned.
 \itemize{
 \item "time": A data.frame with the sampling time per chain
-\item "time_mean": A named numeric vector with the mean sampling time
+\item "time_mean": A named numeric vector with the mean warmup, sampling and
+total time across chains
 \item "inv_metric": A list with one numeric vector per chain (the diagonal), or
 one matrix per chain for \code{metric = "dense_e"}
 \item "step_size": A list with one number per chain
@@ -31,10 +32,12 @@ one matrix per chain for \code{metric = "dense_e"}
 
 Every chain of the fit is reported, also in a fit combined from several
 fits with \code{\link[brms:combine_models]{brms::combine_models()}}. \code{NULL} is returned for what the sampler
-did not record: a fit without a stanfit, an algorithm other than NUTS, or,
-for "inv_metric", \code{metric = "unit_e"}. The values of a fit combined from
-several fits are read from Stan's printed output, which gives six significant
-digits by default.
+did not record: anything for a fit without a stanfit or without chains,
+"time" and "time_mean" for variational and Laplace runs, "inv_metric" and
+"step_size" for any algorithm other than NUTS, and "inv_metric" for
+\code{metric = "unit_e"}. The values of a fit combined from several fits are
+read from Stan's printed output, which gives six significant digits by
+default.
 }
 \description{
 Extract information from a brmsfit object

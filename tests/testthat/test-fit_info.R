@@ -7,11 +7,11 @@ test_that("fit_info() of a single cmdstanr fit reports the stored metadata", {
 
   expect_equal(
     fit_info(fit, "time"),
-    data.frame(chain_id = 1L, warmup = 0.428, sampling = 0.279, total = 0.707)
+    data.frame(chain_id = 1, warmup = 0.428, sampling = 0.279, total = 0.707)
   )
   expect_equal(
     fit_info(fit, "time_mean"),
-    c(chain_id = 1, warmup = 0.428, sampling = 0.279, total = 0.707)
+    c(warmup = 0.428, sampling = 0.279, total = 0.707)
   )
   expect_length(fit_info(fit, "inv_metric"), 1)
   expect_length(fit_info(fit, "inv_metric")[[1]], 84)
@@ -22,19 +22,49 @@ test_that("fit_info() of a single cmdstanr fit reports the stored metadata", {
   expect_equal(unlist(fit_info(fit, "step_size"), use.names = FALSE), 0.0981616)
 })
 
-test_that("fit_info() of a fit with four chains keeps each chain's own metric", {
+# the fixture was trimmed to one chain but kept the metadata of all four
+test_that("fit_info() reports the chains the stanfit has, not those of leftover metadata", {
   fit <- load_info_fit("bmmfit_legacy_sdm_v0.2.1.rds")
-  inv_metric <- fit_info(fit, "inv_metric")
 
-  expect_length(inv_metric, 4)
-  expect_length(unique(inv_metric), 4)
-  expect_equal(inv_metric[[2]][1], 0.00316, tolerance = 0.01)
-  expect_equal(fit_info(fit, "time")$chain_id, 1:4)
+  expect_equal(brms::nchains(fit), 1)
   expect_equal(
-    unlist(fit_info(fit, "step_size"), use.names = FALSE),
-    c(0.313, 0.333, 0.335, 0.31),
-    tolerance = 0.01
+    fit_info(fit, "time"),
+    data.frame(chain_id = 1, warmup = 6.165, sampling = 7.183, total = 13.348)
   )
+  expect_equal(
+    fit_info(fit, "inv_metric"),
+    list(`1` = c(0.00273441, 0.00153782, 0.00133636, 0.0014172, 0.00173459))
+  )
+  expect_equal(fit_info(fit, "step_size"), list(`1` = 0.313261))
+})
+
+test_that("fit_info() of a single cmdstanr fit takes the stored metadata over the stanfit", {
+  fit <- load_info_fit("bmmfit_m3_ppcheck.rds")
+  metadata <- attr(fit$fit, "metadata")
+  metadata$inv_metric <- list(`1` = c(1, 2))
+  metadata$step_size <- list(`1` = 0.5)
+  metadata$time$chains$warmup <- 9
+  attr(fit$fit, "metadata") <- metadata
+
+  expect_equal(fit_info(fit, "inv_metric"), list(`1` = c(1, 2)))
+  expect_equal(fit_info(fit, "step_size"), list(`1` = 0.5))
+  expect_equal(fit_info(fit, "time")$warmup, 9)
+})
+
+test_that("fit_info() of a single cmdstanr unit_e fit returns NULL for the metric", {
+  fit <- load_info_fit("bmmfit_m3_ppcheck.rds")
+  attr(fit$fit, "metadata")$inv_metric <- list()
+
+  expect_null(fit_info(fit, "inv_metric"))
+})
+
+test_that("fit_info() of a fit without chains returns NULL despite stored metadata", {
+  fit <- load_info_fit("bmmfit_m3_ppcheck.rds")
+  fit$fit@sim$samples <- list()
+
+  for (what in c("time", "time_mean", "inv_metric", "step_size")) {
+    expect_null(fit_info(fit, what))
+  }
 })
 
 test_that("fit_info() of a combined cmdstanr fit reports every chain", {
@@ -43,11 +73,14 @@ test_that("fit_info() of a combined cmdstanr fit reports every chain", {
 
   expect_equal(brms::nchains(cmb), 2)
   expect_equal(fit_info(cmb, "time")$chain_id, 1:2)
+  expect_type(fit_info(cmb, "time")$chain_id, "double")
   expect_equal(fit_info(cmb, "time")[2, -1], fit_info(fit, "time")[1, -1], ignore_attr = TRUE)
   expect_equal(fit_info(cmb, "time_mean")[["total"]], 0.707)
+  expect_named(fit_info(cmb, "time_mean"), c("warmup", "sampling", "total"))
 
   inv_metric <- fit_info(cmb, "inv_metric")
-  expect_length(inv_metric, 2)
+  expect_named(inv_metric, c("1", "2"))
+  expect_named(fit_info(cmb, "step_size"), c("1", "2"))
   expect_equal(inv_metric[[2]], fit_info(fit, "inv_metric")[[1]], tolerance = 1e-5)
   expect_equal(
     unlist(fit_info(cmb, "step_size"), use.names = FALSE),
@@ -97,7 +130,9 @@ test_that("fit_info() of fits combined one after the other reports each chain's 
   expect_equal(fit_info(cmb, "time")$sampling, c(0.279, 0.75, 1.25))
   expect_equal(fit_info(cmb, "time")$total, c(0.707, 2.25, 3.75))
   expect_equal(unlist(fit_info(cmb, "step_size"), use.names = FALSE), c(0.0981616, 0.2, 0.3))
+  expect_named(fit_info(cmb, "step_size"), c("1", "2", "3"))
   inv_metric <- fit_info(cmb, "inv_metric")
+  expect_named(inv_metric, c("1", "2", "3"))
   expect_equal(inv_metric[[1]], fit_info(fit1, "inv_metric")[[1]], tolerance = 1e-5)
   expect_equal(inv_metric[[2]], metric2, tolerance = 1e-5)
   expect_equal(inv_metric[[3]], metric3, tolerance = 1e-5)
@@ -118,7 +153,8 @@ test_that("fit_info() of a combined fit takes the step size of a unit_e chain fr
   fit1 <- load_info_fit("bmmfit_m3_ppcheck.rds")
   chain <- fit1$fit@sim$samples[[1]]
   attr(chain, "adaptation_info") <- " "
-  attr(chain, "sampler_params")$stepsize__ <- rep(0.117, length(attr(chain, "sampler_params")$stepsize__))
+  n <- length(attr(chain, "sampler_params")$stepsize__)
+  attr(chain, "sampler_params")$stepsize__ <- c(rep(1, n - 1), 0.117)
   fit1$fit@sim$samples[[1]] <- chain
   attr(fit1$fit, "metadata") <- NULL
 
@@ -133,7 +169,7 @@ test_that("fit_info() reads the stanfit of an rstan fit", {
 
   expect_equal(
     fit_info(fit, "time"),
-    data.frame(chain_id = 1L, warmup = 1.133, sampling = 1.396, total = 2.529)
+    data.frame(chain_id = 1, warmup = 1.133, sampling = 1.396, total = 2.529)
   )
   expect_equal(
     fit_info(fit, "inv_metric")[[1]],
@@ -171,4 +207,44 @@ test_that("fit_info() returns NULL for a fit without a stanfit", {
   expect_null(fit_info(fit, "time_mean"))
   expect_null(fit_info(fit, "inv_metric"))
   expect_null(fit_info(fit, "step_size"))
+})
+
+test_that("parse_adaptation_info() reads non-finite elements as C++ prints them", {
+  info <- paste(
+    "# Step size = 0.5",
+    "# Diagonal elements of inverse mass matrix:",
+    "# NaN, Inf, 0.3, -inf, nan, -nan",
+    "# Elapsed Time: 0.1 seconds (Warm-up)",
+    sep = "\n"
+  )
+
+  expect_equal(
+    bmm:::parse_adaptation_info(info),
+    list(step_size = 0.5, inv_metric = c(NaN, Inf, 0.3, -Inf, NaN, NaN))
+  )
+})
+
+test_that("parse_adaptation_info() keeps a dense row with a non-finite element", {
+  info <- paste(
+    "# Step size = 0.5",
+    "# Elements of inverse mass matrix:",
+    "# 1, 0.1",
+    "# nan, 2",
+    "# Elapsed Time: 0.1 seconds (Warm-up)",
+    sep = "\n"
+  )
+
+  expect_equal(
+    bmm:::parse_adaptation_info(info)$inv_metric,
+    matrix(c(1, NaN, 0.1, 2), 2)
+  )
+})
+
+test_that("parse_adaptation_info() returns no metric for a header without rows", {
+  info <- "# Step size = 0.5\n# Diagonal elements of inverse mass matrix:\n# "
+
+  expect_equal(
+    bmm:::parse_adaptation_info(info),
+    list(step_size = 0.5, inv_metric = NULL)
+  )
 })
