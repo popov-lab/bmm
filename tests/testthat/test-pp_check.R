@@ -152,7 +152,9 @@ test_that(".resolve_pp_conditions() excludes infrastructure columns", {
   expect_false("nTrials" %in% conds)
   expect_false("ID" %in% conds)
   expect_false(any(grepl("^Idx_", conds)))
-  expect_false(any(grepl("^n_", conds)))
+  # the fixture's num_options name data columns of the user's own, which are
+  # valid groups; only the columns bmm builds are hidden (#550)
+  expect_true(all(c("n_corr", "n_other", "n_dist", "n_npl") %in% conds))
 })
 
 test_that(".resolve_pp_conditions() works when fit has no group-level effects", {
@@ -542,6 +544,57 @@ test_that(".resolve_pp_conditions() keeps a user column named Poss_*", {
   expect_true("Poss_load" %in% .resolve_pp_conditions(mock_sdm_poss_fit()))
 })
 
+
+# Only the columns bmm builds are hidden, not every name with a prefix (#550)
+
+mock_rating_user_columns_fit <- function() {
+  dat <- toy_rating_data()
+  dat$n_block <- rep_len(1:2, nrow(dat))
+  dat$Idx_load <- rep_len(c(0, 1), nrow(dat))
+  dat$block <- dat$n_block
+  suppressMessages(bmm(
+    bmf(d ~ 1 + n_block + Idx_load + block, criterion ~ 1, spacing ~ 1, sdratio ~ 1),
+    dat, sdt_rating(paste0("r", 1:5), "stimulus"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+}
+
+test_that("pp_check(group = ) takes a user predictor named n_* or Idx_* on a multinomial fit", {
+  fit <- mock_rating_user_columns_fit()
+  for (group in c("block", "n_block", "Idx_load")) {
+    expect_silent(res <- .validate_group_arg(group, fit))
+    expect_identical(res, group)
+  }
+})
+
+test_that("pp_check(group = ) refuses every column bmm builds on a multinomial fit", {
+  built <- list(
+    rating = list(fit = mock_rating_user_columns_fit(), columns = "nTrials"),
+    mpt = list(
+      fit = mock_poss_fit(),
+      columns = c("nTrials", "Idx_withdist", "Idx_nodist", "Poss_dist")
+    ),
+    ranking = list(
+      fit = stored_frame_fit(model_test_cases("stored_frame")$sdt_ranking),
+      columns = c("nTrials", "max_rank")
+    ),
+    m3 = list(
+      fit = stored_frame_fit(model_test_cases("stored_frame")$m3_num_options_by_category),
+      columns = c("nTrials", "Idx_corr", "n_opt_corr", "n_opt_npl")
+    )
+  )
+  for (name in names(built)) {
+    fit <- built[[name]]$fit
+    for (column in built[[name]]$columns) {
+      expect_true(column %in% names(fit$data), info = paste(name, column))
+      expect_warning(
+        res <- .validate_group_arg(column, fit),
+        "Ignoring 'group'", info = paste(name, column)
+      )
+      expect_identical(res, character(0))
+    }
+  }
+})
 
 # The tree column of an mpt fit is a valid group even when no formula uses it
 
