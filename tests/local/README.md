@@ -37,7 +37,9 @@ Files:
   test files share the fits.
 - `test-*.R`: the tests, among them `test-kfold-update.R` (refits through
   `update()` on a slice of the fit's data, grouped `kfold()`),
-  `test-update-fits.R` (`brms::combine_models()` on a fit and its refit),
+  `test-update-fits.R` (`brms::combine_models()` on a fit and its refit, and
+  the init an rstan refit without a recompile stores; that test needs rstan,
+  not CmdStan),
   `test-conditional_effects-fits.R` (`conditional_effects()` on `sdt_rating()`
   and `m3()` fits), `test-conditional_effects-models.R` (`conditional_effects()`
   and its plots for every parameter with a predictor in each model's reference
