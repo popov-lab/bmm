@@ -189,10 +189,14 @@ test_that("check_data() returns a data.frame()", {
 # A model's check_data() adds columns that pp_check(group = ) and
 # conditional_effects() must not offer as the user's predictors, and that
 # formula checks must not call unknown. built_data_columns() is the one
-# declaration, so a column added without it fails here (#550). Cases of the
-# check_data kind are read too, for models whose stored-frame case cannot
-# show a column (the ezdm 4par indicators).
-test_that("built_data_columns() declares every column check_data() adds", {
+# declaration, so a column added without it fails here (#550). The reverse
+# fails too: a declared name check_data() does not build hides a user column
+# of that name and lets a formula naming a missing column pass the data
+# check. It is compared with all returned columns, since a declared column may
+# overwrite one the user supplied. Cases of the check_data kind are read too,
+# for models whose stored-frame case cannot show a column (the ezdm 4par
+# indicators).
+test_that("built_data_columns() declares exactly the columns check_data() adds", {
   cases <- c(model_test_cases("stored_frame"), model_test_cases("check_data"))
   for (name in names(cases)) {
     case <- cases[[name]]
@@ -201,9 +205,14 @@ test_that("built_data_columns() declares every column check_data() adds", {
     ))
     # Y is a matrix column that is no predictor, left out of the declaration
     added <- setdiff(names(checked), c(names(case$data), "Y"))
+    declared <- built_data_columns(case$model)
     expect_identical(
-      setdiff(added, built_data_columns(case$model)), character(0),
+      setdiff(added, declared), character(0),
       info = paste0(name, ": check_data() adds a column built_data_columns() does not declare")
+    )
+    expect_identical(
+      setdiff(declared, names(checked)), character(0),
+      info = paste0(name, ": built_data_columns() declares a column check_data() does not build")
     )
   }
 })
