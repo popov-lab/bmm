@@ -136,18 +136,22 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 
   if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
     data <- check_stored_data(model, newdata %||% olddata, user_formula)
-    if (!missing(formula.)) {
-      stop_unstored_variables(model, data, user_formula, fit_frame_args(object, dots)$data2)
-    }
+    from_stored_frame <- !missing(formula.)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
+    from_stored_frame <- FALSE
     attr(data, "data_name") <- substitute_name(newdata)
   }
 
   # standard bmm checks and transformations
   formula <- check_formula(model, data, user_formula)
   config_args <- configure_model(model, data, formula)
+  # checked on the configured formula, because only there does brms say which
+  # of its symbols are variables
+  if (from_stored_frame) {
+    stop_unstored_variables(config_args, fit_frame_args(object, dots)$data2)
+  }
 
   # configure_prior() treats every row of the old fit's prior as a user prior, so
   # for a parameter whose constant changed each of those rows would override the
@@ -282,12 +286,14 @@ check_stored_data <- function(model, data, formula) {
 # those its own formula used, and none of the ones check_stored_data() rebuilt
 # and dropped again. brms refuses the others only after bmm has configured the
 # prior, with a message that does not say where the data come from
-stop_unstored_variables <- function(model, data, formula, data2) {
-  known <- c(
-    colnames(data), names(data2), names(formula),
-    names(model$parameters), names(model$fixed_parameters)
+stop_unstored_variables <- function(config_args, data2) {
+  # the variables brms::validate_data() looks up, by its own rule: allvars
+  # leaves out the correlation ID p of (1 | p | id), cov matrices and non-linear
+  # parameters, and Intercept is a column brms adds itself
+  unstored <- setdiff(
+    all.vars(brms::brmsterms(config_args$formula)$allvars),
+    c(colnames(config_args$data), names(data2), "Intercept")
   )
-  unstored <- setdiff(rhs_vars(formula), known)
   stopif(
     length(unstored) > 0,
     "The model frame of this fit does not hold {collapse_comma(unstored)}. It keeps \\

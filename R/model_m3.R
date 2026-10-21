@@ -302,6 +302,10 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
       reserved and cannot be a data column)."
     )
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
+    # a constant of the old formula is no parameter of a new one that drops it
+    model$fixed_parameters <- model$fixed_parameters[
+      names(model$fixed_parameters) %in% names(model$parameters)
+    ]
     model$default_priors <- model$default_priors[
       not_in(names(model$default_priors), m3_stale_default_priors(model, setdiff(added_pars, user_pars)))
     ]

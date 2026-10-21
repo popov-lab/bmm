@@ -311,6 +311,14 @@ test_that("check_model() on a custom m3 derives its parameters from the formula 
   back <- check(twice, f_d)
   expect_equal(back, check(model, f_d))
   expect_equal(back$default_priors$d$main, "normal(2, 0.5)")
+
+  # a constant the old formula set is not kept by one that drops it
+  f_dfix <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d = 0.5)
+  model_dfix <- update_model_fixed_parameters(model, f_dfix)
+  expect_equal(model_dfix$fixed_parameters$d, 0.5)
+  twice <- check(check(model_dfix, f_dfix), f_e)
+  expect_equal(twice, check(model, f_e))
+  expect_equal(names(twice$fixed_parameters), "b")
 })
 
 test_that("a custom m3 fit stored before #552 is re-checked like a fresh model", {
