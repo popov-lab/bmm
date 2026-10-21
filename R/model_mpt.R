@@ -337,6 +337,7 @@ print.mpt_tree <- function(x, ...) {
       ),
       parameters = parameter_info,
       links = link_info,
+      links_fixed = .mpt_named_list(c(simplex_pars, raw_pars), "identity"),
       fixed_parameters = list(),
       default_priors = prior_info
     ),
@@ -396,6 +397,87 @@ settable_links.mpt <- function(model) {
 #' @exportS3Method
 settable_link_functions.mpt <- function(model) {
   .mpt_link_functions
+}
+
+# validate_links() words its refusal around another model's example, so the
+# shape of a links list is checked here, where the reader knows the parameters
+.mpt_check_link_list <- function(links) {
+  unnamed <- which(!nzchar(names(links) %||% character(length(links))))
+  stopif(
+    length(unnamed) > 0,
+    "The links argument takes a named list with one link per parameter, \\
+    links = list(D = \"probit\"). Entries without a parameter name: \\
+    position(s) {paste(unnamed, collapse = ', ')}"
+  )
+  not_a_link <- names(links)[!vapply(links, function(link) {
+    is.character(link) && length(link) == 1L
+  }, logical(1))]
+  stopif(
+    length(not_a_link) > 0,
+    "The link of {collapse_comma(not_a_link)} must be a single link function \\
+    name: mpt() takes {collapse_comma(.mpt_link_functions)}"
+  )
+}
+
+# validate_links() reads a name against the parameters left after the
+# restrictions, so a restriction would change what a misspelling resolves to
+# (Dm is one edit from both Dn and Do, but from Do alone once Dn is removed).
+# The names are resolved against the parameters as written instead, and one that
+# resolves to a removed or a simplex parameter, or to no unique one, stops here
+# before validate_links() can repair it onto another parameter.
+.mpt_check_link_targets <- function(links, parameters, restrictions, simplex) {
+  targets <- names(links)
+  restricted <- names(restrictions)
+  sticks <- .mpt_stick_names(simplex)
+  known <- unique(c(parameters, sticks, restricted))
+  resolved <- vapply(targets, match_link_target, character(1), known = known)
+  stopif(
+    anyNA(resolved),
+    "Unrecognized link target(s): {collapse_comma(targets[is.na(resolved)])}. \\
+    mpt() takes links for {collapse_comma(setdiff(parameters, unlist(simplex)))}"
+  )
+  removed <- resolved %in% restricted
+  labels <- paste0("'", targets, "'", ifelse(
+    targets == resolved, "", paste0(" (read as '", resolved, "')")
+  ))
+  stopif(
+    any(removed),
+    "The link target(s) {paste(labels[removed], collapse = ', ')} are removed by \\
+    the restrictions and take no link. Set the link of the parameter a \\
+    restriction equates them to instead."
+  )
+  .mpt_check_simplex_links(resolved, simplex)
+}
+
+.mpt_stick_names <- function(simplex) {
+  unlist(lapply(simplex, function(grp) paste0(grp[-length(grp)], "raw")))
+}
+
+# a simplex group follows the model-wide link through its generated
+# stick-breaking formulas, so no member or stick component has a link to set
+.mpt_check_simplex_links <- function(targets, simplex) {
+  in_group <- lapply(simplex, function(grp) {
+    intersect(targets, c(grp, .mpt_stick_names(list(grp))))
+  })
+  hit_groups <- vapply(simplex[lengths(in_group) > 0], collapse_comma, character(1))
+  stopif(
+    length(hit_groups) > 0,
+    "The link target(s) {collapse_comma(unlist(in_group))} belong to the simplex \\
+    group(s) {paste(hit_groups, collapse = '; ')}: the stick-breaking formulas \\
+    apply the model's link, so a group follows links = \"probit\" for the whole \\
+    model and takes no link of its own."
+  )
+}
+
+# check_model.bmmodel() runs before this class's method and would refuse such a
+# change with the generic wording of validate_links(); .model_mpt() lists the
+# simplex parameters in links_fixed so that check_links() leaves them to this
+.mpt_changed_simplex_links <- function(model) {
+  checked <- attr(model, "links_checked") %||% attr(model, "links_default") %||% model$links
+  grouped <- names(model$links_fixed)
+  grouped[!vapply(grouped, function(par) {
+    identical(model$links[[par]], checked[[par]])
+  }, logical(1))]
 }
 
 # the derived member of each simplex group and the stick-breaking components
@@ -712,18 +794,11 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "Unknown link function(s): {collapse_comma(links)}. mpt() takes \\
     {collapse_comma(.mpt_link_functions)}"
   )
+  if (is.list(links)) .mpt_check_link_list(links)
   trees <- .mpt_as_tree_list(trees)
   covariates <- covariates %||% character(0)
   simplex <- .mpt_as_simplex_list(simplex)
   restrictions <- .mpt_parse_restrictions(restrictions)
-  # the link matcher would repair a removed name to a parameter one edit away
-  restricted_links <- intersect(names(links), names(restrictions))
-  stopif(
-    length(restricted_links) > 0,
-    "The link target(s) {collapse_comma(restricted_links)} are removed by the \\
-    restrictions and take no link. Set the link of the parameter a \\
-    restriction equates them to instead."
-  )
 
   stopif(
     length(trees) == 0L || !all(vapply(trees, inherits, logical(1), "mpt_tree")),
@@ -859,6 +934,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     appending 'raw' to the parameter name, but these names are already in \\
     use: {collapse_comma(raw_collisions)}"
   )
+
+  if (is.list(links)) .mpt_check_link_targets(links, parameters, restrictions, simplex)
 
   # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
   # so check_data() decides for trees that use covariates, with the observed
@@ -1143,6 +1220,7 @@ print_model_details.mpt <- function(model, ...) {
 
 #' @export
 check_model.mpt <- function(model, data = NULL, formula = NULL) {
+  .mpt_check_simplex_links(.mpt_changed_simplex_links(model), model$other_vars$simplex)
   model <- .mpt_undo_formula_state(model)
   model <- .mpt_match_link_priors(model)
   if (!is.null(formula)) {

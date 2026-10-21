@@ -329,7 +329,7 @@ test_that("the links of simplex parameters cannot be changed", {
   model$links$gA <- "logit"
   expect_error(
     suppressMessages(check_model(model, dat, bmf(gA ~ 1))),
-    "cannot be changed"
+    "belong to the simplex group"
   )
 })
 
@@ -416,11 +416,11 @@ test_that("the links argument of mpt() refuses what set_links() refuses", {
   tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
   expect_error(
     mpt(tree, simplex = c("gA", "gB", "gC"), links = list(gA = "probit")),
-    "The link of 'gA' cannot be changed in mpt\\(\\)"
+    "link target\\(s\\) 'gA' belong to the simplex group"
   )
   expect_error(
     mpt(tree, simplex = c("gA", "gB", "gC"), links = list(gAraw = "probit")),
-    "The link of 'gAraw' cannot be changed in mpt\\(\\)"
+    "link target\\(s\\) 'gAraw' belong to the simplex group"
   )
 })
 
@@ -441,6 +441,119 @@ test_that("mpt() refuses a link for a parameter the restrictions removed", {
   )
   model <- mpt(trees, tree_id = "item_type", restrictions = "Dn = Do", links = list(Do = "probit"))
   expect_equal(model$links, list(Do = "probit", g = "logit"))
+})
+
+test_that("a malformed links list is described for mpt(), not with another model's example", {
+  trees <- mpt_2htm_trees()
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = list(D = 1)),
+    "link of 'D' must be a single link function name.*takes 'logit', 'probit'"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = list(D = c("probit", "logit"))),
+    "link of 'D' must be a single link function name"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = list("probit")),
+    "without a parameter name: position\\(s\\) 1"
+  )
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = list(D = "probit", "logit")),
+    "without a parameter name: position\\(s\\) 2"
+  )
+  message <- tryCatch(
+    mpt(trees, tree_id = "item_type", links = list(D = 1)),
+    error = conditionMessage
+  )
+  expect_no_match(message, "kappa")
+})
+
+test_that("a simplex group takes no link of its own, whichever way the link arrives", {
+  tree <- mpt_tree("t", list(
+    A = "D + (1 - D) * gA", B = "(1 - D) * gB", C = "(1 - D) * gC"
+  ))
+  simplex <- c("gA", "gB", "gC")
+  dat <- data.frame(A = 10, B = 5, C = 5)
+
+  # the member, its stick-breaking component and the derived last member
+  for (target in c("gA", "gAraw", "gC")) {
+    expect_error(
+      mpt(tree, simplex = simplex, links = setNames(list("probit"), target)),
+      paste0(
+        "link target\\(s\\) '", target, "' belong to the simplex group\\(s\\) ",
+        "'gA', 'gB', 'gC': .*links = \"probit\" for the whole model and ",
+        "takes no link of its own"
+      )
+    )
+  }
+
+  # a link set on the model object after construction
+  for (target in c("gA", "gAraw", "gC")) {
+    model <- mpt(tree, simplex = simplex)
+    model$links[[target]] <- "probit"
+    expect_error(
+      suppressMessages(check_model(model, dat, bmf(D ~ 1))),
+      paste0("link target\\(s\\) '", target, "' belong to the simplex group")
+    )
+  }
+  model <- mpt(tree, simplex = simplex)
+  model$links$gA <- "probit"
+  expect_error(
+    suppressMessages(bmm(
+      bmf(D ~ 1, gAraw ~ 1, gBraw ~ 1), dat, model,
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )),
+    "belong to the simplex group"
+  )
+
+  # the link of a parameter outside the group is still settable afterwards, and
+  # the whole model can follow one link
+  model <- mpt(tree, simplex = simplex)
+  model$links$D <- "probit"
+  expect_no_error(suppressWarnings(suppressMessages(check_model(model, dat, bmf(D ~ 1)))))
+  expect_equal(
+    mpt(tree, simplex = simplex, links = "probit")$other_vars$link, "probit"
+  )
+})
+
+test_that("a restriction does not change how a misspelled link target is read", {
+  trees <- list(
+    mpt_tree("old", list(old = "Do + (1 - Do) * g", new = "(1 - Do) * (1 - g)")),
+    mpt_tree("new", list(old = "(1 - Dn) * g", new = "Dn + (1 - Dn) * (1 - g)"))
+  )
+  restricted <- function(links) {
+    mpt(trees, tree_id = "item_type", restrictions = "Dn = Do", links = links)
+  }
+
+  # 'Dm', 'Dx' and 'D' are one edit from both Do and Dn: no unique parameter
+  for (target in c("Dm", "Dx", "D")) {
+    expect_error(
+      expect_no_warning(restricted(setNames(list("probit"), target))),
+      paste0(
+        "Unrecognized link target\\(s\\): '", target,
+        "'\\. mpt\\(\\) takes links for 'Do', 'g'$"
+      )
+    )
+  }
+  # without the restriction the model has always refused them
+  expect_error(
+    mpt(trees, tree_id = "item_type", links = list(Dm = "probit")),
+    "Unrecognized link target\\(s\\): 'Dm'"
+  )
+
+  # a name that is only one edit from the remaining parameter is still repaired
+  expect_warning(
+    model <- restricted(list(Doo = "probit")),
+    "'Doo' read as 'Do'"
+  )
+  expect_equal(model$links, list(Do = "probit", g = "logit"))
+
+  # a misspelling of the restricted parameter itself takes the removal message
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", restrictions = "g = 0.5",
+        links = list(gg = "probit")),
+    "'gg' \\(read as 'g'\\) are removed by the restrictions"
+  )
 })
 
 test_that("formulas for response categories are rejected", {
