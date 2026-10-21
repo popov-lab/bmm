@@ -282,6 +282,36 @@ test_that("update() builds the initial values for the data and formula it fits",
   expect_equal(update_mock(fit1, newdata = new_data, init = 0, recompile = TRUE)$stan_args$init, 0)
 })
 
+test_that("update() without recompiling stores the init it sampled with (#520)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  withr::local_seed(520)
+  dat <- data.frame(y = rsdm(120, c = 4, kappa = 5), set_size = factor(rep(1:3, each = 40)))
+  fit <- suppressMessages(bmm(bmf(c ~ 0 + set_size, kappa ~ 1), dat, sdm("y"),
+                              backend = "mock", mock_fit = stub, rename = FALSE))
+  new_data <- droplevels(dat[dat$set_size %in% 1:2, ])
+  # rstan and cmdstanr fits reuse their compiled model, and brms then keeps the
+  # old fit's stan_args; a mock fit has no model to reuse until compiled_model()
+  # returns one, and a recompile, which rebuilds stan_args, fails the test
+  local_mocked_bindings(
+    compiled_model = function(x) NULL,
+    compile_model = function(...) stop("update() recompiled the model"),
+    .package = "brms"
+  )
+  update_reuse <- function(...) suppressWarnings(suppressMessages(
+    update(fit, newdata = new_data, ..., mock_fit = stub, rename = FALSE)
+  ))
+
+  expect_length(fit$stan_args$init()$b_c, 3)
+  expect_length(update_reuse()$stan_args$init()$b_c, 2)
+  expect_identical(update_reuse(init = 0)$stan_args$init, 0)
+  expect_identical(update_reuse(inits = 0)$stan_args$init, 0)
+})
+
 test_that("update() configures the prior and the inits with the fit's data2", {
   skip_on_cran()
   fit1 <- sdm_fixture()
@@ -343,6 +373,113 @@ test_that("update() keeps the fit's control on the same backend and algorithm on
   no_algorithm <- object
   no_algorithm$algorithm <- NULL
   expect_null(carried_control(no_algorithm, list()))
+})
+
+# brms reuses the compiled model, and with it the old fit's stan_args, only on a
+# real backend, so the mocks stand in for one: compile_model() fails the test if
+# update() recompiles, and fit_model() records the control the sampler gets
+local_reused_model_fit <- function(..., env = parent.frame()) {
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  dat <- withr::with_seed(520, data.frame(y = rsdm(60, c = 4, kappa = 5)))
+  fit <- suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"),
+    backend = "mock", mock_fit = stub, rename = FALSE, ...))
+  sampled <- new.env()
+  local_mocked_bindings(
+    compiled_model = function(x) NULL,
+    compile_model = function(...) stop("update() recompiled the model"),
+    fit_model = function(...) {
+      sampled$control <- list(...)$control
+      stub
+    },
+    .package = "brms", .env = env
+  )
+  list(fit = fit, sampled = sampled)
+}
+
+update_reused <- function(object, ...) {
+  suppressMessages(update(object, ..., rename = FALSE))
+}
+
+test_that("a chained update() without recompiling keeps the previous update's adapt_delta", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  run <- local_reused_model_fit(control = list(adapt_delta = 0.9))
+  up1 <- update_reused(run$fit, control = list(adapt_delta = 0.95))
+  expect_equal(run$sampled$control$adapt_delta, 0.95)
+  expect_equal(up1$stan_args$control$adapt_delta, 0.95)
+
+  up2 <- update_reused(up1)
+  expect_equal(run$sampled$control$adapt_delta, 0.95)
+  expect_equal(up2$stan_args$control, list(adapt_delta = 0.95, step_size = 0.01))
+})
+
+test_that("a chained update() without recompiling keeps the previous update's step size", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  run <- local_reused_model_fit()
+  up1 <- update_reused(run$fit, control = list(step_size = 0.05))
+  expect_equal(up1$stan_args$control, list(step_size = 0.05))
+
+  up2 <- update_reused(up1)
+  expect_equal(run$sampled$control, list(step_size = 0.05))
+  expect_equal(up2$stan_args$control, list(step_size = 0.05))
+})
+
+test_that("a chained update() after a switch of algorithm hands the sampler no stale control", {
+  # cmdstanr passes every control key to the method it runs, and $variational()
+  # rejects the sampler's step size
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  run <- local_reused_model_fit(control = list(adapt_delta = 0.9))
+  up1 <- update_reused(run$fit, algorithm = "meanfield")
+  expect_true("control" %in% names(up1$stan_args))
+  expect_null(up1$stan_args$control)
+
+  update_reused(up1)
+  expect_equal(run$sampled$control, list())
+})
+
+test_that("an abbreviated algorithm or backend is the fit's own run, as brms reads it", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  run <- local_reused_model_fit(control = list(step_size = 0.05))
+  up1 <- update_reused(run$fit, algorithm = "samp")
+  expect_equal(run$sampled$control, list(step_size = 0.05))
+  expect_equal(up1$stan_args$control, list(step_size = 0.05))
+
+  update_reused(up1)
+  expect_equal(run$sampled$control, list(step_size = 0.05))
+
+  up2 <- update_reused(run$fit, backend = "mo")
+  expect_equal(up2$stan_args$control, list(step_size = 0.05))
+})
+
+test_that("update() fills the control from the old rstan sampler as brms does", {
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(samples = list(structure(list(), args = list(
+    control = list(adapt_delta = 0.8, max_treedepth = 10, stepsize = 1)
+  )))))
+  object <- list(backend = "rstan", algorithm = "sampling", fit = stub)
+  expect_equal(
+    sampler_control(object, list(), list(adapt_delta = 0.95, stepsize = 0.01)),
+    list(adapt_delta = 0.95, stepsize = 0.01, max_treedepth = 10)
+  )
+  expect_equal(
+    sampler_control(object, list(algorithm = "meanfield"), list(adapt_delta = 0.95)),
+    list(adapt_delta = 0.95)
+  )
+})
+
+test_that("update(init = NULL) without recompiling keeps the init slot in stan_args", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  run <- local_reused_model_fit()
+  up <- update_reused(run$fit, init = NULL)
+  expect_true("init" %in% names(up$stan_args))
+  expect_null(up$stan_args$init)
 })
 
 test_that("update() carries the stored prior rows that are not brms defaults", {

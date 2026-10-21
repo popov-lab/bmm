@@ -1,6 +1,7 @@
 # bmm (development version)
 
 ### Bug fixes
+* A fit updated without recompiling the Stan model (`rstan`, or `cmdstanr` while its compiled model file exists) now stores the initial values and sampler settings it ran with. It kept those of the fit you started from: after `update(newdata = )` the initial values described the old data, and a chained `update()` sampled with the `adapt_delta` and step size from before the previous `update()`. A fit saved before the oversized-file fix (#518) now shrinks through such an `update()` (#520).
 * `cswald()` fits with very fast responses no longer fail to start (cmdstanr: "Unable to retrieve the metadata"; rstan: "sampling not done"). The initial value of `ndt` now stays below your fastest response time (#548).
 * A prior you set on a coefficient the model constrains, such as the intercept of a parameter fixed in an `mpt()` formula (`bmf(g = 0.5)`), was replaced by the constraint without notice. The fit still uses the constraint, but bmm now prints a message naming each such coefficient, your prior and the constant used instead. `update(fit, prior = )` now behaves the same; before, a prior given there replaced the constraint, so the refit sampled a coefficient the model fixes. Your prior on that coefficient has no effect, so you can remove it from `prior` (#549).
 
