@@ -273,27 +273,29 @@ test_that("fit_info() of a combined fit gives a unit_e chain a NULL metric eleme
 })
 
 test_that("parse_adaptation_info() rejects a malformed number without a warning", {
-  info <- paste(
-    "# Step size = 0.5",
-    "# Diagonal elements of inverse mass matrix:",
-    "# 1..2, 3",
-    sep = "\n"
-  )
+  for (row in c("# 1..2, 3", "# 1e, 3", "# 1e+, 3")) {
+    info <- paste(
+      "# Step size = 0.5",
+      "# Diagonal elements of inverse mass matrix:",
+      row,
+      sep = "\n"
+    )
 
-  expect_no_warning(parsed <- bmm:::parse_adaptation_info(info))
-  expect_null(parsed$inv_metric)
+    expect_no_warning(parsed <- bmm:::parse_adaptation_info(info))
+    expect_null(parsed$inv_metric)
+  }
 })
 
 test_that("parse_adaptation_info() reads the MSVC spellings of NaN and Inf", {
   info <- paste(
     "# Step size = 0.5",
     "# Diagonal elements of inverse mass matrix:",
-    "# -nan(ind), infinity, -Infinity, 0.3",
+    "# -nan(ind), infinity, -Infinity, 0.3, .5",
     sep = "\n"
   )
 
   expect_no_warning(inv_metric <- bmm:::parse_adaptation_info(info)$inv_metric)
   # expect_equal() does not tell NaN from NA
-  expect_identical(is.nan(inv_metric), c(TRUE, FALSE, FALSE, FALSE))
-  expect_equal(inv_metric[-1], c(Inf, -Inf, 0.3))
+  expect_identical(is.nan(inv_metric), c(TRUE, FALSE, FALSE, FALSE, FALSE))
+  expect_equal(inv_metric[-1], c(Inf, -Inf, 0.3, 0.5))
 })

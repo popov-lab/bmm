@@ -37,10 +37,10 @@ did not record: anything for a fit without a stanfit or without chains,
 "step_size" for any algorithm other than NUTS, and "inv_metric" for
 \code{metric = "unit_e"}. In a fit combined from several fits, a unit_e chain
 next to chains with a metric has a \code{NULL} element in the "inv_metric"
-list. The inverse metric and step size of a fit combined
-from several fits are read from Stan's printed adaptation output, which
-gives six significant digits by default; the step size of a unit_e chain
-is that of its last draw.
+list. Values read from Stan's printed adaptation output (rstan fits, and
+fits combined from several fits) have six significant digits by default.
+A cmdstanr unit_e chain carries no printed step size, so in a fit combined
+from several fits its step size is that of its last draw.
 }
 \description{
 Extract information from a brmsfit object
