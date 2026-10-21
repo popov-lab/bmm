@@ -42,6 +42,34 @@
   this fix restores the constant too. To estimate the parameter, give it
   a formula (`kappa ~ 1`); otherwise remove that prior from `prior`
   ([\#549](https://github.com/popov-lab/bmm/issues/549)).
+- `update(formula. = )` with a formula that uses a column the fit did
+  not keep now stops with a message that names the column and says to
+  pass your data as `newdata`. It failed with brms’s “can neither be
+  found in ‘data’ nor in ‘data2’”, which does not say so
+  ([\#552](https://github.com/popov-lab/bmm/issues/552)).
+- A custom [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) fit
+  can now be updated to a formula with other activation parameters, for
+  example `dist ~ b + e` after `dist ~ b + d`, also when `d` was fixed
+  to a constant. It stopped with “The parameter ‘d’ is not a valid
+  distributional or non-linear parameter”
+  ([\#552](https://github.com/popov-lab/bmm/issues/552)).
+- Clearer errors from
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) and its
+  helpers ([\#559](https://github.com/popov-lab/bmm/issues/559)). A
+  malformed `links` list, a link on a simplex parameter, and a
+  misspelled link name in a model with `restrictions` (which could
+  silently set another parameter’s link) now say what is wrong.
+  [`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md)
+  refuses a formula inside a branch.
+  [`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md)
+  and [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) report
+  counts above 2,147,483,647, and an `id` that is a count column,
+  instead of producing `NA`.
+  [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) checks `by`
+  before computing anything.
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+  no longer returns the stick-breaking components (`gAraw`) of a simplex
+  group unless `pars` names them.
 - `pp_check(group = )` on a multinomial fit and
   [`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md)
   no longer ignore your predictors whose names start with `Idx_`, `n_`,

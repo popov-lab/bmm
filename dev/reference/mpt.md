@@ -208,7 +208,9 @@ An object of class `bmmodel`
   the members listed before it. A predictor on the first member
   therefore scales all later members by the same factor, leaving their
   ratios unchanged. Read such effects on the probability scale with
-  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md).
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md),
+  which returns the group members and leaves out the stick-breaking
+  components (`gAraw`) unless `pars` names them.
 
   **Identifiability.** Printing the model ends with an identifiability
   check for intercept-only formulas. It compares the number of free

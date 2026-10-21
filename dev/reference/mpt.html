@@ -240,7 +240,8 @@ A predictor on member <code>p</code> acts on the logit (or probit) of <code>p</c
 the probability left over by the members listed before it. A predictor
 on the first member therefore scales all later members by the same
 factor, leaving their ratios unchanged. Read such effects on the probability scale with
-<code><a href="native_parameters.html">native_parameters()</a></code>.</p>
+<code><a href="native_parameters.html">native_parameters()</a></code>, which returns the group members and leaves out the
+stick-breaking components (<code>gAraw</code>) unless <code>pars</code> names them.</p>
 <p><strong>Identifiability.</strong> Printing the model ends with an identifiability
 check for intercept-only formulas. It compares the number of free
 parameters with the degrees of freedom (response categories minus 1,
