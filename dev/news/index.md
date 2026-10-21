@@ -42,6 +42,16 @@
   this fix restores the constant too. To estimate the parameter, give it
   a formula (`kappa ~ 1`); otherwise remove that prior from `prior`
   ([\#549](https://github.com/popov-lab/bmm/issues/549)).
+- `pp_check(group = )` on a multinomial fit and
+  [`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md)
+  no longer ignore your predictors whose names start with `Idx_`, `n_`,
+  `LureIdx` or `Item<number>_`, or are named `inv_ss` or `expS`.
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  warned that the column was not a predictor and pooled the plot;
+  [`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md)
+  dropped the panel, and those of its interactions, without a message.
+  bmm now hides only the columns it creates itself
+  ([\#550](https://github.com/popov-lab/bmm/issues/550)).
 
 #### Other changes
 
