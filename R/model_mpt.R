@@ -427,10 +427,12 @@ settable_link_functions.mpt <- function(model) {
 
 # validate_links() reads a name against the parameters left after the
 # restrictions, so a restriction would change what a misspelling resolves to
-# (Dm is one edit from both Dn and Do, but from Do alone once Dn is removed).
-# The names are resolved against the parameters as written instead, and one that
-# resolves to a removed or a simplex parameter, or to no unique one, stops here
-# before validate_links() can repair it onto another parameter.
+# (Dm is one edit from both Dn and Do, but from Do alone once Dn is removed;
+# 'ga' is a prefix of gaold alone once ganew is removed). The names are resolved
+# here, once, against the parameters as written: one that resolves to no unique
+# parameter, to the same parameter as another entry, or to a removed or a
+# simplex parameter stops, and the rest are returned under their resolved names,
+# so that validate_links() finds every name exact and repairs nothing again.
 .mpt_check_link_targets <- function(links, parameters, restrictions, simplex) {
   targets <- names(links)
   restricted <- names(restrictions)
@@ -441,6 +443,11 @@ settable_link_functions.mpt <- function(model) {
     anyNA(resolved),
     "Unrecognized link target(s): {collapse_comma(targets[is.na(resolved)])}. \\
     mpt() takes links for {collapse_comma(setdiff(parameters, unlist(simplex)))}"
+  )
+  stopif(
+    anyDuplicated(resolved) > 0,
+    "Several entries of `links` name the same parameter: \\
+    {collapse_comma(targets[resolved %in% resolved[duplicated(resolved)]])}"
   )
   removed <- resolved %in% restricted
   labels <- paste0("'", targets, "'", ifelse(
@@ -453,6 +460,14 @@ settable_link_functions.mpt <- function(model) {
     restriction equates them to instead."
   )
   .mpt_check_simplex_links(resolved, simplex)
+  repaired <- targets != resolved
+  warnif(
+    any(repaired),
+    "Link target(s) {collapse_comma(targets[repaired])} read as \\
+    {collapse_comma(resolved[repaired])}. Check the spelling of your \\
+    `links` argument"
+  )
+  setNames(links, resolved)
 }
 
 .mpt_stick_names <- function(simplex) {
@@ -947,7 +962,9 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     use: {collapse_comma(raw_collisions)}"
   )
 
-  if (is.list(links)) .mpt_check_link_targets(links, parameters, restrictions, simplex)
+  if (is.list(links)) {
+    links <- .mpt_check_link_targets(links, parameters, restrictions, simplex)
+  }
 
   # synthetic covariate values need not form a valid tree (Gcorr + Gother = 1),
   # so check_data() decides for trees that use covariates, with the observed

@@ -340,7 +340,7 @@ mpt_data_reshape <- function(data, model, id = NULL,
   )
   values <- as.matrix(counts)
   affected <- function(problem) {
-    collapse_comma(colnames(values)[colSums(problem, na.rm = TRUE) > 0])
+    collapse_comma(colnames(values)[colSums(problem) > 0])
   }
   stopif(
     anyNA(values),

@@ -555,11 +555,35 @@ test_that("a restriction does not change how a misspelled link target is read", 
   )
 
   # a name that is only one edit from the remaining parameter is still repaired
-  expect_warning(
-    model <- restricted(list(Doo = "probit")),
-    "'Doo' read as 'Do'"
-  )
+  warnings <- testthat::capture_warnings(model <- restricted(list(Doo = "probit")))
+  expect_length(warnings, 1)
+  expect_match(warnings, "'Doo' read as 'Do'")
   expect_equal(model$links, list(Do = "probit", g = "logit"))
+
+  # two names that resolve to one parameter are refused under the names given
+  expect_error(
+    restricted(list(Doo = "probit", Do = "logit")),
+    "Several entries of `links` name the same parameter: 'Doo', 'Do'$"
+  )
+
+  # 'ga' is a prefix of gaold and ganew and one edit from gb; with ganew
+  # restricted away it would be a unique prefix of gaold
+  prefix_trees <- list(
+    mpt_tree("a", list(x = "gaold * gb", y = "1 - gaold * gb")),
+    mpt_tree("b", list(x = "ganew * gb", y = "1 - ganew * gb"))
+  )
+  warnings <- testthat::capture_warnings(
+    model <- mpt(prefix_trees, tree_id = "tr", restrictions = "ganew = gaold",
+                 links = list(ga = "probit"))
+  )
+  expect_length(warnings, 1)
+  expect_match(warnings, "'ga' read as 'gb'")
+  expect_equal(model$links, list(gaold = "logit", gb = "probit"))
+  expect_warning(
+    unrestricted <- mpt(prefix_trees, tree_id = "tr", links = list(ga = "probit")),
+    "'ga' read as 'gb'"
+  )
+  expect_equal(unrestricted$links[c("gaold", "gb")], model$links)
 
   # a misspelling of the restricted parameter itself takes the removal message
   expect_error(
