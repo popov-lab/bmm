@@ -108,6 +108,19 @@ test_that("mpt_tree validates formula input", {
   expect_error(mpt_tree("t", a ~ 1e-5 * D, b ~ 1 - D), "scientific notation")
 })
 
+test_that("mpt_tree refuses a formula inside a branch expression, in every spelling", {
+  nested <- "category 'b' in tree 't' contains a formula"
+  expect_error(mpt_tree("t", a ~ D, b ~ (c ~ x)), nested)
+  expect_error(mpt_tree("t", a ~ D, b ~ (1 - D) * (y ~ z)), nested)
+  expect_error(mpt_tree("t", a ~ D, b ~ (~ 1 - D)), nested)
+  expect_error(mpt_tree("t", list(a = "D", b = "1 - D ~ x")), nested)
+  expect_error(mpt_tree("t", list(a = "D", b = "(c ~ x)")), nested)
+  expect_error(mpt_tree("t", list(a = "D", b = "`~`(c, x)")), nested)
+  # a top-level second tilde is a left-hand side problem and stays one
+  expect_error(mpt_tree("t", a ~ D, b ~ 1 - D ~ x), "single response category name")
+  expect_s3_class(mpt_tree("t", a ~ D, b ~ 1 - D), "mpt_tree")
+})
+
 test_that("mpt_tree gives the same tree for a formula as for the same string", {
   expressions <- c(
     "D", "-D", "-(1 - D)", "(D)", "((D))", "D^2", "D * 2^-1", "2 * (1 - D) * g",

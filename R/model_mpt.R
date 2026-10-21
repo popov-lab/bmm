@@ -192,6 +192,12 @@ mpt_tree <- function(name, branches, ..., impossible = NULL) {
       "The branch of category '{resp_cat}' in tree '{name}' must be an \\
       expression in parameters and numbers, such as D + (1 - D) * g, not {expr}."
     )
+    stopif(
+      "~" %in% all.names(parsed),
+      "The branch of category '{resp_cat}' in tree '{name}' contains a formula \\
+      (~): {expr}. A branch is an expression in parameters and numbers, such \\
+      as D + (1 - D) * g."
+    )
     parsed <- .mpt_fold_numeric_division(parsed)
     scientific <- .mpt_scientific_constants(parsed)
     if (length(scientific) > 0) {
