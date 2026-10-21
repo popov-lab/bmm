@@ -119,6 +119,11 @@ check_data.non_targets <- function(model, data, formula) {
   ss_numeric <- ss$ss_numeric
 
   stopif(
+    ss$max_set_size > max_set_size,
+    "The data hold a set size of {ss$max_set_size}, above the {max_set_size} \\
+    the model was fitted with."
+  )
+  stopif(
     !isTRUE(all.equal(length(nt_features), max_set_size - 1)),
     "The number of columns for non-target values in the argument \\
     'nt_features' should equal max(set_size)-1"
@@ -313,8 +318,9 @@ standata.bmmformula <- function(object, data, model, ...) {
 #' @param object A `bmmfit` object
 #' @param newdata An optional data frame, in the layout of the data given to
 #'   [bmm()] or a subset of the rows of `object$data`. Its rows keep their
-#'   order. It must not carry the columns `bmm` builds itself; `bmm()` warns
-#'   about or refuses those column names when fitting.
+#'   order. When `newdata` is in the layout given to [bmm()], the columns
+#'   `bmm` builds itself are built again, and a column of `newdata` with one
+#'   of those names is replaced.
 #' @param ... Further arguments passed to [brms::standata()]
 #' @return A named list of objects containing the data to evaluate the model
 #'   with Stan.

@@ -91,12 +91,35 @@ test_that("newdata at one set size matches the same rows of the model frame", {
   for (case_name in names(cases)) {
     fit <- newdata_fit(case_name)
     user <- as.data.frame(cases[[case_name]]$data)
-    set_size <- as.numeric(as.character(user[[fit$bmm$model$other_vars$set_size]]))
-    rows <- set_size == min(set_size)
-    expect_no_warning(from_user <- brms::standata(fit, newdata = user[rows, , drop = FALSE]))
+    set_size <- fit$bmm$model$other_vars$set_size
+    rows <- user[[set_size]] == min(as.numeric(as.character(user[[set_size]])))
+    expect_no_warning(
+      from_user <- brms::standata(fit, newdata = user[rows, , drop = FALSE])
+    )
     expect_equal(
       from_user, brms::standata(fit, newdata = fit$data[rows, , drop = FALSE]),
       info = case_name
+    )
+  }
+})
+
+test_that("newdata with a set size above the fit's maximum is refused", {
+  skip_on_cran()
+  cases <- Filter(
+    function(case) is_data_var(case$model$other_vars$set_size, case$data),
+    newdata_cases()
+  )
+  expect_gt(length(cases), 0)
+  for (case_name in names(cases)) {
+    fit <- newdata_fit(case_name)
+    user <- as.data.frame(cases[[case_name]]$data)
+    set_size <- fit$bmm$model$other_vars$set_size
+    user[[set_size]] <- as.numeric(as.character(user[[set_size]]))
+    above <- length(fit$bmm$model$other_vars$nt_features) + 2
+    user[[set_size]][1] <- above
+    expect_error(
+      brms::standata(fit, newdata = user),
+      paste0("set size of ", above, ", above the ", above - 1), fixed = TRUE
     )
   }
 })
