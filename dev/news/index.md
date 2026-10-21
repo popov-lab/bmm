@@ -4,6 +4,18 @@
 
 #### Bug fixes
 
+- A fit updated without recompiling the Stan model (`rstan`, or
+  `cmdstanr` while its compiled model file exists) now stores the
+  initial values and sampler settings it ran with. It kept those of the
+  fit you started from: after `update(newdata = )` the initial values
+  described the old data, and a chained
+  [`update()`](https://rdrr.io/r/stats/update.html) sampled with the
+  `adapt_delta` and step size from before the previous
+  [`update()`](https://rdrr.io/r/stats/update.html). A fit saved before
+  the oversized-file fix
+  ([\#518](https://github.com/popov-lab/bmm/issues/518)) now shrinks
+  through such an [`update()`](https://rdrr.io/r/stats/update.html)
+  ([\#520](https://github.com/popov-lab/bmm/issues/520)).
 - [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) fits
   with very fast responses no longer fail to start (cmdstanr: “Unable to
   retrieve the metadata”; rstan: “sampling not done”). The initial value
