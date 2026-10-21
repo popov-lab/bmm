@@ -32,6 +32,16 @@
   model fixes. Your prior on that coefficient has no effect, so you can
   remove it from `prior`
   ([\#549](https://github.com/popov-lab/bmm/issues/549)).
+- A prior set on the intercept of a fixed parameter, one fixed in the
+  formula (`bmf(kappa = 3)`) or by the model (such as `mu` in
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)), freed that
+  parameter without notice: the fit sampled it under your prior instead
+  of keeping the constant. The parameter now keeps its constant and bmm
+  prints a message naming your prior;
+  [`update()`](https://rdrr.io/r/stats/update.html) of a fit made before
+  this fix restores the constant too. To estimate the parameter, give it
+  a formula (`kappa ~ 1`); otherwise remove that prior from `prior`
+  ([\#549](https://github.com/popov-lab/bmm/issues/549)).
 
 #### Other changes
 
