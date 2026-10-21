@@ -266,11 +266,23 @@ read_lines2 <- function(con) {
 #' @param what String. What to return:
 #'  - "time" for the sampling time per chain
 #'  - "time_mean" for the mean sampling time
+#'  - "inv_metric" for the adapted inverse metric per chain
+#'  - "step_size" for the adapted step size per chain
 #' @return Depends on `what` and the class of `fit`. For `brmsfit` objects,
 #'   information about the single fit is returned. For `brmsfit_list` objects, a
 #'   list or data.frame with the information for each fit is returned.
 #'  - "time": A data.frame with the sampling time per chain
 #'  - "time_mean": A named numeric vector with the mean sampling time
+#'  - "inv_metric": A list with one numeric vector per chain (the diagonal), or
+#'    one matrix per chain for `metric = "dense_e"`
+#'  - "step_size": A list with one number per chain
+#'
+#'   Every chain of the fit is reported, also in a fit combined from several
+#'   fits with [brms::combine_models()]. `NULL` is returned for what the sampler
+#'   did not record: a fit without a stanfit, an algorithm other than NUTS, or,
+#'   for "inv_metric", `metric = "unit_e"`. The values of a fit combined from
+#'   several fits are read from Stan's printed output, which gives six significant
+#'   digits by default.
 #' @keywords extract_info
 #' @export
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
@@ -287,12 +299,87 @@ fit_info <- function(fit, what) {
 
 #' @export
 fit_info.brmsfit <- function(fit, what) {
-  fit_attr <- attributes(fit$fit)
-  metadata <- fit_attr$metadata
+  what <- match.arg(what, c("time", "time_mean", "inv_metric", "step_size"))
+  stanfit <- fit$fit
+  if (!inherits(stanfit, "stanfit")) {
+    return(NULL)
+  }
   switch(what,
-    time = metadata$time$chains,
-    time_mean = colMeans(metadata$time$chains),
-    inv_metric = metadata$inv_metric,
+    time = chain_times(stanfit),
+    time_mean = if (!is.null(times <- chain_times(stanfit))) colMeans(times),
+    inv_metric = chain_adaptation(stanfit, "inv_metric"),
+    step_size = chain_adaptation(stanfit, "step_size")
+  )
+}
+
+# The cmdstanr metadata is read from the first fit only when brms::combine_models()
+# merges fits, so it is used only while it covers every chain of the stanfit.
+# Each chain of the stanfit carries its own timing and adaptation output
+# whatever the backend, and combine_models() concatenates the chains.
+stored_metadata <- function(stanfit) {
+  metadata <- attr(stanfit, "metadata")
+  if (NROW(metadata$time$chains) >= length(stanfit@sim$samples)) metadata
+}
+
+chain_times <- function(stanfit) {
+  stored <- stored_metadata(stanfit)$time$chains
+  if (!is.null(stored)) {
+    return(stored)
+  }
+  elapsed <- lapply(stanfit@sim$samples, attr, "elapsed_time")
+  if (length(elapsed) == 0 || any(lengths(elapsed) == 0)) {
+    return(NULL)
+  }
+  elapsed <- do.call(rbind, elapsed)
+  data.frame(
+    chain_id = seq_len(nrow(elapsed)),
+    warmup = unname(elapsed[, "warmup"]),
+    sampling = unname(elapsed[, "sample"]),
+    total = unname(rowSums(elapsed))
+  )
+}
+
+chain_adaptation <- function(stanfit, what) {
+  stored <- stored_metadata(stanfit)
+  if (!is.null(stored)) {
+    return(stored[[what]])
+  }
+  chains <- stanfit@sim$samples
+  parsed <- lapply(chains, function(chain) {
+    info <- parse_adaptation_info(attr(chain, "adaptation_info"))
+    info$step_size <- info$step_size %||% last_step_size(chain)
+    info[[what]]
+  })
+  if (all(lengths(parsed) == 0)) {
+    return(NULL)
+  }
+  stats::setNames(parsed, seq_along(parsed))
+}
+
+# the step size of the last draw: adaptation_info holds none for metric = "unit_e"
+last_step_size <- function(chain) {
+  utils::tail(attr(chain, "sampler_params")$stepsize__, 1)
+}
+
+# the "# "-prefixed text Stan writes after warmup:
+#   # Step size = 0.0981616
+#   # Diagonal elements of inverse mass matrix:
+#   # 0.0298361, 0.0410393
+# and, for metric = "dense_e", "Elements of inverse mass matrix:" and a row per line
+parse_adaptation_info <- function(info) {
+  lines <- trimws(sub("^#", "", unlist(strsplit(paste(info, collapse = "\n"), "\n"))))
+  step_size <- grep("^Step size = ", lines, value = TRUE)
+  header <- grep("^(Diagonal elements|Elements) of inverse mass matrix:$", lines)
+  inv_metric <- NULL
+  if (length(header) == 1) {
+    rows <- utils::tail(lines, -header)
+    rows <- rows[grepl("^[-+0-9.eE, ]+$", rows)]
+    rows <- lapply(strsplit(rows, ",", fixed = TRUE), as.numeric)
+    inv_metric <- if (grepl("^Diagonal", lines[header])) rows[[1]] else do.call(rbind, rows)
+  }
+  list(
+    step_size = if (length(step_size) == 1) as.numeric(sub("^Step size = ", "", step_size)),
+    inv_metric = inv_metric
   )
 }
 
