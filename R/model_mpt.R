@@ -552,9 +552,17 @@ generated_parameters.mpt <- function(model) {
 #'   column in the data, also one that no branch uses. The range is checked
 #'   at the vertices of each branch's parameter box, which is exact when no
 #'   term of the branch contains the same parameter twice
-#'   (`a * (1 - b) * G + (1 - a) * c`). A parameter that does is also checked
-#'   at 0.5, which is exact for a factor `u * (1 - u)` and approximate
-#'   otherwise, e.g. for `u * (1 - u)^2`.
+#'   (`a * (1 - b) * G + (1 - a) * c`). It is also exact for a tree written
+#'   with parameters, their complements `1 - p`, non-negative constants, sums,
+#'   products and whole-number powers alone, as in pair clustering
+#'   (`(1 - c) * 2 * u * (1 - u)`, `(1 - c) * (1 - u)^2`); a covariate counts
+#'   as a probability there when its values in the tree's rows lie between 0
+#'   and 1, and as an exponent (`(1 - D)^n`) when they are whole numbers. For
+#'   any other branch in which a parameter appears twice, such as
+#'   `0.5 + 0.5 * (a - 0.3)^2`, a local search looks for values outside
+#'   (0, 1] between the vertices, and a message says that the check is
+#'   approximate. Trees without covariates are checked in the same way when
+#'   the model is built.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -683,6 +691,11 @@ generated_parameters.mpt <- function(model) {
 #'   `bmm()` warns when the rank is deficient and every formula is
 #'   intercept-only. When a formula has a predictor or is non-linear, it only
 #'   says that these may identify the parameters and that it did not check.
+#'   With covariates, `bmm()` and [bmm_data_check()] compute the rank again at
+#'   the covariate values that each tree has in the data, and report it in the
+#'   same way when it falls below the rank at the test values: a covariate
+#'   with a single value per tree can leave a parameter unidentified, as in
+#'   `(1 - D) * g * x` with `x = 0.5` throughout.
 #'
 #'   Example: separate detection parameters `Do` and `Dn` in a single old/new
 #'   test give three free parameters and rank 2 of 3, so one combination of
@@ -978,6 +991,7 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   vertex_errors <- .mpt_tree_vertex_errors(trees[!uses_covariates], parameters, simplex)
   stopif(!all(is.na(vertex_errors)), "{vertex_errors[!is.na(vertex_errors)][1]}")
   .mpt_message_sampled(attr(vertex_errors, "sampled"))
+  .mpt_message_sampled(attr(vertex_errors, "searched"), "search")
 
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
@@ -1100,6 +1114,12 @@ print_model_details.mpt <- function(model, ...) {
     strwrap(.mpt_rank_text(identifiability, tied), indent = 2, exdent = 4),
     sep = "\n"
   )
+  if (.mpt_uses_covariates(model)) {
+    cat(strwrap(
+      "bmm() takes the rank again at the covariate values each tree has in the data.",
+      indent = 2, exdent = 4
+    ), sep = "\n")
+  }
   invisible(NULL)
 }
 
@@ -1126,8 +1146,9 @@ print_model_details.mpt <- function(model, ...) {
 # fixed in the formula enters at its value. A simplex group is free through its
 # stick-breaking components, which users never write, so the text names the
 # group's members instead. Covariates are data, never free parameters; the rank
-# is taken at five test values of each
-.mpt_identifiability <- function(model) {
+# is taken at five test values of each, or, from check_data(), at the covariate
+# settings of each tree in the data (.mpt_observed_settings())
+.mpt_identifiability <- function(model, settings = NULL) {
   trees <- model$other_vars$trees
   simplex <- model$other_vars$simplex
   sticks <- model$other_vars$simplex_raw
@@ -1146,9 +1167,10 @@ print_model_details.mpt <- function(model, ...) {
       "the simplex group {collapse_comma(grp)}"
     )
   }
-  settings <- NULL
   where <- "at interior test values"
-  if (.mpt_uses_covariates(model)) {
+  if (!is.null(settings)) {
+    where <- "at interior test values and the covariate values in the data"
+  } else if (.mpt_uses_covariates(model)) {
     test_values <- as.data.frame(do.call(rbind, .mpt_test_points(covariates, list())))
     settings <- lapply(trees, function(tree) {
       used <- intersect(covariates, .mpt_expr_vars(tree))
@@ -1571,8 +1593,96 @@ check_data.mpt <- function(model, data, formula) {
   )
 
   .mpt_validate_covariate_sums(model, data)
+  .mpt_check_observed_rank(model, data, formula)
 
   NextMethod("check_data")
+}
+
+# print() and check_model() take the rank at five synthetic values of each
+# covariate, which can identify a parameter that the data cannot: a covariate
+# with a single value in each tree, as in g * x with x = 0.5 throughout. With
+# the data at hand the rank is taken again at the covariate settings each tree
+# has in its rows, and a fall below the synthetic rank is reported like the
+# deficit of check_model(). A constant covariate that leaves the rank as it is
+# (D + (1 - D) * x) stays silent.
+.mpt_check_observed_rank <- function(model, data, formula) {
+  if (!.mpt_uses_covariates(model)) {
+    return(invisible(NULL))
+  }
+  synthetic <- .mpt_identifiability(model)
+  observed <- .mpt_identifiability(model, .mpt_observed_settings(model, data))
+  if (!is.null(synthetic$error) || !is.null(observed$error) ||
+        observed$rank >= synthetic$rank) {
+    return(invisible(NULL))
+  }
+  constant <- .mpt_constant_covariates(model, data)
+  constant_text <- if (length(constant) > 0L) {
+    paste0(paste(
+      glue("'{names(constant)}' takes a single value within tree(s) {constant}"),
+      collapse = "; "
+    ), ". ")
+  } else {
+    ""
+  }
+  synthetic_text <- glue(
+    "With 5 test values of the covariates the rank is {synthetic$rank}, as \\
+    print() reports, so rows with more covariate values per tree would \\
+    identify more."
+  )
+  if (.mpt_no_predictors(formula, names(model$parameters))) {
+    warning2(
+      "The model is not identified with the covariate values in the data. \\
+      {.mpt_rank_text(observed)} {constant_text}{synthetic_text} Along the \\
+      non-identified direction(s), the posterior follows the prior."
+    )
+  } else {
+    message2(
+      "With the covariate values in the data, the branch expressions alone do \\
+      not identify {.mpt_deficit_params(observed)}. {constant_text}Predictors \\
+      or non-linear formulas may identify them; this was not checked."
+    )
+  }
+}
+
+# the distinct covariate settings in each tree's rows; a tree without rows,
+# which check_data() reports on its own, keeps the five test values
+.mpt_observed_settings <- function(model, data) {
+  covariates <- model$other_vars$covariates
+  test_values <- as.data.frame(do.call(rbind, .mpt_test_points(covariates, list())))
+  lapply(model$other_vars$trees, function(tree) {
+    used <- intersect(covariates, .mpt_expr_vars(tree))
+    rows <- .mpt_tree_rows(model, data, tree$name)
+    if (length(used) == 0L) {
+      data.frame(row.names = 1L)
+    } else if (length(rows) == 0L) {
+      test_values[used]
+    } else {
+      unique(data[rows, used, drop = FALSE])
+    }
+  })
+}
+
+# per used covariate with a single value within some tree's rows, those trees
+.mpt_constant_covariates <- function(model, data) {
+  covariates <- model$other_vars$covariates
+  per_tree <- lapply(model$other_vars$trees, function(tree) {
+    used <- intersect(covariates, .mpt_expr_vars(tree))
+    rows <- .mpt_tree_rows(model, data, tree$name)
+    if (length(rows) == 0L) {
+      return(character(0))
+    }
+    used[vapply(used, function(v) length(unique(data[[v]][rows])) == 1L, logical(1))]
+  })
+  trees <- names(model$other_vars$trees)
+  constant <- lapply(setNames(nm = unique(unlist(per_tree))), function(v) {
+    collapse_comma(trees[vapply(per_tree, function(used) v %in% used, logical(1))])
+  })
+  unlist(constant)
+}
+
+.mpt_tree_rows <- function(model, data, tree_name) {
+  idx_vars <- model$other_vars$indicators$tree
+  if (is.null(idx_vars)) seq_len(nrow(data)) else which(data[[idx_vars[[tree_name]]]] == 1L)
 }
 
 # a missing count in a category that the row's tree cannot produce is a known
@@ -1651,7 +1761,7 @@ check_data.mpt <- function(model, data, formula) {
   used_covariates <- intersect(
     covariates, unlist(lapply(model$other_vars$trees, .mpt_expr_vars))
   )
-  approximate <- character(0)
+  approximate <- list(vertices = character(0), search = character(0))
   for (tree in model$other_vars$trees) {
     rows <- if (is.null(idx_vars)) {
       seq_len(nrow(data))
@@ -1744,11 +1854,12 @@ check_data.mpt <- function(model, data, formula) {
         )
       }
     }
-    approximate <- c(approximate, .mpt_check_branch_vertices(
+    approximate <- Map(c, approximate, .mpt_check_branch_vertices(
       tree, data, rows, covariates, symbols, simplex, tolerance, check_what
     ))
   }
-  .mpt_message_sampled(approximate)
+  .mpt_message_sampled(approximate$vertices)
+  .mpt_message_sampled(approximate$search, "search")
   invisible(NULL)
 }
 
@@ -1756,41 +1867,37 @@ check_data.mpt <- function(model, data, formula) {
 # the points above visit only two corners and five interior points, so a branch
 # that mixes a parameter with another one's complement (a * (1 - b) * G) can
 # leave (0, 1] at a vertex that none of them reaches. The vertices are exact for
-# branches multilinear in their parameters (see .mpt_branch_vertices()). The
-# rule at the corners applies: a branch may underflow to 0 there, so only a
-# value below -tolerance counts. The result names the branches whose vertices
-# were only sampled.
+# branches multilinear in their parameters; the certificate or a local search
+# covers the others (.mpt_tree_range()), and a covariate counts as a
+# probability for the certificate when its values in the tree's rows lie in
+# [0, 1], as an exponent when they are whole numbers. The rule at the corners
+# applies: a branch may underflow to 0 there, so only a value below -tolerance
+# counts. The result names the branches whose range check is approximate, by
+# reason.
 .mpt_check_branch_vertices <- function(tree, data, rows, covariates, parameters,
                                        simplex, tolerance, check_what) {
-  sampled <- character(0)
   if (length(rows) == 0L) {
-    return(sampled)
+    return(list(vertices = character(0), search = character(0)))
   }
-  for (resp_cat in names(tree$branches)) {
-    branch <- tree$branches[[resp_cat]]
-    vertices <- .mpt_branch_vertices(branch, parameters, simplex)
-    if (!attr(vertices, "exact")) {
-      sampled <- c(sampled, glue("category '{resp_cat}' in tree '{tree$name}'"))
-    }
-    # rows with the same covariate values give the same branch value
-    branch_covariates <- intersect(covariates, all.vars(branch))
-    distinct <- if (length(branch_covariates) == 0L) {
-      rows[1]
-    } else {
-      rows[!duplicated(data[rows, branch_covariates, drop = FALSE])]
-    }
-    covariate_values <- as.list(data[distinct, branch_covariates, drop = FALSE])
-    violation <- .mpt_first_range_violation(
-      branch, vertices, covariate_values, tolerance
+  # rows with the same covariate values give the same branch values
+  tree_covariates <- intersect(covariates, .mpt_expr_vars(tree))
+  distinct <- rows[!duplicated(data[rows, tree_covariates, drop = FALSE])]
+  covariate_values <- as.list(data[distinct, tree_covariates, drop = FALSE])
+  in_unit <- vapply(covariate_values, function(v) all(v >= 0 & v <= 1), logical(1))
+  whole <- vapply(covariate_values, function(v) all(v >= 0 & v == round(v)), logical(1))
+  range <- .mpt_tree_range(
+    tree, parameters, simplex, covariate_values,
+    probabilities = c(parameters, tree_covariates[in_unit]),
+    exponents = vapply(covariate_values[whole], max, numeric(1)), tolerance = tolerance
+  )
+  violation <- range$violation
+  if (!is.null(violation)) {
+    .mpt_stop_branch_range(
+      tree$name, range$category, violation$value, distinct[violation$row],
+      check_what, at = violation$at
     )
-    if (!is.null(violation)) {
-      .mpt_stop_branch_range(
-        tree$name, resp_cat, violation$value, distinct[violation$row],
-        check_what, at = violation$at
-      )
-    }
   }
-  sampled
+  range$approximate
 }
 
 .mpt_stop_branch_range <- function(tree_name, resp_cat, value, row, check_what,

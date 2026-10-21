@@ -321,22 +321,29 @@
 # Those come from a Weyl sequence (steps sqrt(prime)) instead of a random
 # number generator, so they are the same on every call and leave the global
 # random number state alone; the attribute "exact" says whether the grid is
-# complete.
+# complete. The attributes "higher_free" and "higher_groups" name the
+# parameters and simplex groups of higher degree, which .mpt_tree_range()
+# searches between the vertices.
 .mpt_branch_vertices <- function(branch, parameters, simplex, eps = 1e-9,
                                  max_points = 1024L, n_fallback = 64L) {
   used <- intersect(all.vars(branch), parameters)
   if (length(used) == 0L) {
-    return(structure(matrix(numeric(0), 1L, 0L), exact = TRUE))
+    return(structure(matrix(numeric(0), 1L, 0L), exact = TRUE,
+                     higher_free = character(0), higher_groups = list()))
   }
   groups <- Filter(function(grp) any(grp %in% used), simplex)
+  free <- setdiff(used, unlist(groups))
+  higher_free <- free[vapply(free, function(par) .mpt_higher_degree(branch, par), logical(1))]
+  higher_groups <- Filter(function(grp) .mpt_higher_degree(branch, intersect(grp, used)), groups)
   candidates <- c(
-    lapply(setdiff(used, unlist(groups)), function(par) {
-      values <- if (.mpt_higher_degree(branch, par)) c(eps, 0.5, 1 - eps) else c(eps, 1 - eps)
+    lapply(free, function(par) {
+      values <- if (par %in% higher_free) c(eps, 0.5, 1 - eps) else c(eps, 1 - eps)
       matrix(values, ncol = 1L, dimnames = list(NULL, par))
     }),
     lapply(groups, function(grp) {
       members <- intersect(grp, used)
-      points <- .mpt_simplex_points(grp, eps, .mpt_higher_degree(branch, members))
+      higher <- any(vapply(higher_groups, identical, logical(1), grp))
+      points <- .mpt_simplex_points(grp, eps, higher)
       unique(points[, members, drop = FALSE])
     })
   )
@@ -346,7 +353,7 @@
     index <- expand.grid(lapply(candidates, function(points) seq_len(nrow(points))))
     return(structure(
       do.call(cbind, Map(function(points, i) points[i, , drop = FALSE], candidates, index)),
-      exact = TRUE
+      exact = TRUE, higher_free = higher_free, higher_groups = higher_groups
     ))
   }
 
@@ -357,7 +364,7 @@
   corners <- do.call(rbind, .mpt_boundary_points(parameters, simplex, eps))
   structure(
     rbind(corners[, colnames(sampled), drop = FALSE], sampled),
-    exact = FALSE
+    exact = FALSE, higher_free = higher_free, higher_groups = higher_groups
   )
 }
 
@@ -388,15 +395,280 @@
   NULL
 }
 
-.mpt_message_sampled <- function(labels) {
-  if (length(labels) > 0L) {
+.mpt_message_sampled <- function(labels, reason = c("vertices", "search")) {
+  if (length(labels) == 0L) {
+    return(invisible(NULL))
+  }
+  labels <- paste(labels, collapse = ", ")
+  if (match.arg(reason) == "vertices") {
     message2(
-      "The range check of the branches of {paste(labels, collapse = ', ')} \\
-      uses selected points of the parameter box only, not every vertex, because \\
-      they have too many vertices to evaluate. A covariate value or parameter \\
-      combination that takes one of them outside (0, 1] elsewhere is not detected."
+      "The range check of the branches of {labels} uses selected points of \\
+      the parameter box only, not every vertex, because they have too many \\
+      vertices to evaluate. A covariate value or parameter combination that \\
+      takes one of them outside (0, 1] elsewhere is not detected."
+    )
+  } else {
+    message2(
+      "The range check of the branches of {labels} is approximate: a \\
+      parameter enters them more than once in a product (or several members \\
+      of a simplex group do), and their tree is not written with parameters, \\
+      complements (1 - p), non-negative constants, sums, products and \\
+      whole-number powers alone, the form for which the check is exact. A \\
+      local search between the vertices found no value outside (0, 1]; a \\
+      parameter combination that it misses is not detected."
     )
   }
+}
+
+# The range check of one tree at the rows of covariate_values (a named list of
+# equal-length vectors, empty without covariates; `probabilities` and
+# `exponents` say which covariates the certificate may read as such): every
+# branch at its vertices (.mpt_branch_vertices()), which settle a branch
+# multilinear in its parameters. Only a tree with a branch they do not settle
+# (a higher-degree parameter or group, or a sampled grid) goes on: to the
+# certificate (.mpt_certified_tree()), which settles the whole tree, and
+# failing that to a local search between the vertices of each higher-degree
+# branch. The result holds the category and violation of the first branch
+# found outside (0, 1], or `approximate`, the labels of the branches whose
+# check is not exact by reason: "vertices" when the grid was only sampled,
+# "search" when the search stood in.
+.mpt_tree_range <- function(tree, parameters, simplex, covariate_values = list(),
+                            probabilities = parameters, exponents = numeric(0),
+                            tolerance = 1e-6) {
+  unsettled <- list()
+  for (resp_cat in names(tree$branches)) {
+    branch <- tree$branches[[resp_cat]]
+    vertices <- .mpt_branch_vertices(branch, parameters, simplex)
+    violation <- .mpt_first_range_violation(branch, vertices, covariate_values, tolerance)
+    if (!is.null(violation)) {
+      return(list(category = resp_cat, violation = violation))
+    }
+    higher <- length(attr(vertices, "higher_free")) + length(attr(vertices, "higher_groups"))
+    if (!attr(vertices, "exact") || higher > 0L) {
+      unsettled[[resp_cat]] <- vertices
+    }
+  }
+  approximate <- list(vertices = character(0), search = character(0))
+  if (length(unsettled) == 0L ||
+        .mpt_certified_tree(tree, parameters, simplex, probabilities, covariate_values,
+                            exponents)) {
+    return(list(approximate = approximate))
+  }
+  for (resp_cat in names(unsettled)) {
+    vertices <- unsettled[[resp_cat]]
+    label <- glue("category '{resp_cat}' in tree '{tree$name}'")
+    if (!attr(vertices, "exact")) {
+      approximate$vertices <- c(approximate$vertices, label)
+    }
+    if (length(attr(vertices, "higher_free")) + length(attr(vertices, "higher_groups")) == 0L) {
+      next
+    }
+    violation <- .mpt_search_range_violation(
+      tree$branches[[resp_cat]], vertices, attr(vertices, "higher_free"),
+      attr(vertices, "higher_groups"), covariate_values, tolerance
+    )
+    if (!is.null(violation)) {
+      return(list(category = resp_cat, violation = violation))
+    }
+    approximate$search <- c(approximate$search, label)
+  }
+  list(approximate = approximate)
+}
+
+# BFGS over the higher-degree coordinates only, from the max_starts grid points
+# (and covariate rows) where the branch is largest, then from those where it is
+# smallest. The other parameters stay at the start's vertex: for fixed values of
+# the higher-degree coordinates the branch is affine in each of them, so its
+# extremes lie at their vertices. A free parameter moves through plogis(), a
+# simplex group through softmax() over all its members, so every point visited
+# lies in the box and on the simplex, and any value visited outside
+# [-tolerance, 1 + tolerance] is a true witness; the most extreme one is
+# reported. Fixed starts and no random numbers make the search deterministic.
+.mpt_search_range_violation <- function(branch, vertices, free, groups,
+                                        covariate_values, tolerance,
+                                        max_starts = 16L, eps = 1e-9) {
+  n_rows <- if (length(covariate_values) > 0L) length(covariate_values[[1]]) else 1L
+  grid_values <- matrix(vapply(seq_len(nrow(vertices)), function(vertex) {
+    values <- setNames(vertices[vertex, ], colnames(vertices))
+    rep(eval(branch, c(as.list(values), covariate_values)), length.out = n_rows)
+  }, numeric(n_rows)), nrow = n_rows)
+  # z holds the free coordinates first, then every member of each group
+  to_values <- function(z) {
+    values <- plogis(z[seq_along(free)])
+    offset <- length(free)
+    for (grp in groups) {
+      share <- exp(z[offset + seq_along(grp)] - max(z[offset + seq_along(grp)]))
+      values <- c(values, setNames(share / sum(share), grp))
+      offset <- offset + length(grp)
+    }
+    pmin(pmax(setNames(values, c(free, unlist(groups))), eps), 1 - eps)
+  }
+  to_z <- function(start) {
+    z <- stats::qlogis(pmin(pmax(start[free], 1e-3), 1 - 1e-3))
+    for (grp in groups) {
+      members <- intersect(grp, names(start))
+      shares <- setNames(numeric(length(grp)), grp)
+      shares[members] <- start[members]
+      rest <- setdiff(grp, members)
+      shares[rest] <- (1 - sum(start[members])) / length(rest)
+      z <- c(z, log(pmax(shares, 1e-3)))
+    }
+    z
+  }
+  for (direction in c(1, -1)) {
+    starts <- order(-direction * grid_values)[seq_len(min(max_starts, length(grid_values)))]
+    for (start in starts) {
+      row <- (start - 1L) %% n_rows + 1L
+      vertex <- vertices[(start - 1L) %/% n_rows + 1L, ]
+      vertex <- setNames(vertex, colnames(vertices))
+      row_values <- lapply(covariate_values, `[`, row)
+      extreme <- list(value = direction * -Inf)
+      objective <- function(z) {
+        values <- vertex
+        moved <- to_values(z)
+        values[intersect(names(moved), names(values))] <- moved[intersect(names(moved), names(values))]
+        value <- eval(branch, c(as.list(values), row_values))
+        if (is.na(value) || direction * value > direction * extreme$value) {
+          extreme <<- list(value = value, values = values)
+        }
+        if (is.na(value)) stop2("undefined")
+        -direction * value
+      }
+      try(stats::optim(to_z(vertex), objective, method = "BFGS",
+                       control = list(maxit = 100L)), silent = TRUE)
+      if (is.na(extreme$value) || extreme$value > 1 + tolerance ||
+          extreme$value < -tolerance) {
+        return(list(
+          row = row, value = extreme$value,
+          at = paste(colnames(vertices), "=", round(extreme$values, 4), collapse = ", ")
+        ))
+      }
+    }
+  }
+  NULL
+}
+
+# A tree is certified when every branch is non-negative by its form alone
+# (.mpt_form()) and the branches sum to 1 as polynomials: each branch is then
+# also at most 1, as the others are non-negative, on the whole parameter box
+# and simplex, so no vertex or search is needed. Covariates count as
+# probabilities only where named in `probabilities`, which check_data() does
+# when their values in the tree's rows lie in [0, 1], and as exponents (named
+# by their largest value in `exponents`) when those values are whole numbers.
+.mpt_certified_tree <- function(tree, parameters, simplex, probabilities = parameters,
+                                covariate_values = list(), exponents = numeric(0)) {
+  used <- intersect(.mpt_expr_vars(tree), parameters)
+  forms <- lapply(tree$branches, .mpt_form, probabilities, used, exponents)
+  if (any(vapply(forms, `[[`, integer(1), "bound") < 1L)) {
+    return(FALSE)
+  }
+  degree <- setNames(do.call(pmax, lapply(forms, `[[`, "degree")), used)
+  .mpt_branches_sum_to_one(tree, degree, simplex, covariate_values)
+}
+
+# The bound an expression keeps by its form alone, for all values in [0, 1] of
+# `probabilities`: 2 for [0, 1] (a probability, a constant in [0, 1], a
+# product or whole-number power of such terms, 1 minus one of them), 1 for
+# non-negative (a non-negative constant, a sum, product or whole-number power
+# of non-negative terms), 0 otherwise. A part without symbols is evaluated, so
+# 1/5 is a constant, while a division or function of a parameter is outside
+# the form. A covariate named in `exponents` is a whole-number exponent of at
+# most that value, as in (1 - D)^n. Where the bound is 1 or 2 the expression
+# is a polynomial, and `degree` bounds the degree of each of `symbols` in it.
+# One pass over the expression.
+.mpt_form <- function(expr, probabilities, symbols, exponents = numeric(0)) {
+  zero <- numeric(length(symbols))
+  constant <- function(value) {
+    if (!is.numeric(value) || length(value) != 1L || !is.finite(value)) {
+      return(list(bound = 0L, degree = zero))
+    }
+    list(bound = if (value < 0) 0L else if (value <= 1) 2L else 1L, degree = zero,
+         value = value)
+  }
+  if (is.numeric(expr)) {
+    return(constant(expr))
+  }
+  if (is.symbol(expr)) {
+    name <- as.character(expr)
+    return(list(bound = if (name %in% probabilities) 2L else 0L,
+                degree = as.numeric(symbols == name)))
+  }
+  if (!is.call(expr)) {
+    return(list(bound = 0L, degree = zero))
+  }
+  args <- lapply(as.list(expr)[-1L], .mpt_form, probabilities, symbols, exponents)
+  if (all(vapply(args, function(arg) !is.null(arg$value), logical(1)))) {
+    value <- try(eval(expr, envir = baseenv()), silent = TRUE)
+    return(if (is_try_error(value)) list(bound = 0L, degree = zero) else constant(value))
+  }
+  bounds <- vapply(args, `[[`, integer(1), "bound")
+  degrees <- lapply(args, `[[`, "degree")
+  op <- as.character(expr[[1L]])
+  exponent <- if (op == "^") args[[2L]]$value
+  if (op == "^" && is.symbol(expr[[3L]]) && as.character(expr[[3L]]) %in% names(exponents)) {
+    exponent <- exponents[[as.character(expr[[3L]])]]
+  }
+  whole <- !is.null(exponent) && exponent >= 0 && exponent == round(exponent)
+  bound <- switch(op,
+    "(" = bounds[1L],
+    "*" = if (length(args) == 2L) min(bounds),
+    "+" = if (length(args) == 2L) min(bounds, 1L),
+    "-" = if (length(args) == 2L && isTRUE(args[[1L]]$value == 1) && bounds[2L] == 2L) 2L,
+    "^" = if (whole) bounds[1L]
+  )
+  degree <- switch(op,
+    "*" = Reduce(`+`, degrees),
+    "^" = if (whole) degrees[[1L]] * exponent else zero,
+    do.call(pmax, degrees)
+  )
+  list(bound = bound %||% 0L, degree = degree)
+}
+
+# The branches of a certified form are polynomials, and their sum is checked to
+# be 1 identically, not only at the test points of .mpt_tree_branch_errors(): a
+# polynomial of degree at most d_j in variable j that vanishes on a grid of
+# d_j + 1 distinct values per variable is 0. `degree` holds d_j per parameter.
+# A simplex group loses its last member to 1 minus the others, which adds that
+# member's degree to theirs, and its grid values stay below 1 / (group size)
+# so the last member stays positive. With covariates, the sum must be 1 at
+# each row of covariate_values. A grid of more than max_points points (16
+# parameters of degree 1) leaves the tree uncertified.
+.mpt_branches_sum_to_one <- function(tree, degree, simplex, covariate_values = list(),
+                                     max_points = 2^16, tolerance = 1e-8) {
+  used <- names(degree)
+  scale <- setNames(rep(1, length(used)), used)
+  last <- character(0)
+  for (grp in Filter(function(grp) any(grp %in% used), simplex)) {
+    final <- grp[length(grp)]
+    members <- intersect(grp[-length(grp)], used)
+    if (final %in% used) {
+      degree[members] <- degree[members] + degree[[final]]
+      last <- c(last, final)
+    }
+    scale[members] <- 1 / length(grp)
+  }
+  variables <- setdiff(used, last)
+  n_rows <- if (length(covariate_values) > 0L) length(covariate_values[[1]]) else 1L
+  n_points <- prod(degree[variables] + 1)
+  if (n_points * n_rows > max_points) {
+    return(FALSE)
+  }
+  grid <- expand.grid(lapply(setNames(nm = variables), function(par) {
+    scale[[par]] * seq_len(degree[[par]] + 1) / (degree[[par]] + 2)
+  }))
+  for (grp in simplex) {
+    if (grp[length(grp)] %in% last) {
+      grid[[grp[length(grp)]]] <- 1 - rowSums(grid[intersect(grp[-length(grp)], variables)])
+    }
+  }
+  env <- c(
+    lapply(grid, rep, times = n_rows),
+    lapply(covariate_values, rep, each = n_points)
+  )
+  total <- Reduce(`+`, lapply(tree$branches, function(branch) {
+    rep_len(eval(branch, envir = env), n_points * n_rows)
+  }))
+  all(abs(total - 1) <= tolerance)
 }
 
 .mpt_higher_degree <- function(branch, members) {
@@ -614,42 +886,41 @@
 }
 
 # the first branch that is not a number or leaves (0, 1] at a vertex of its own
-# parameter box, per tree (NA where none does); the attribute "sampled" names
-# the branches whose vertices were only sampled. The points of
+# parameter box or at a point the local search finds, per tree (NA where none
+# does); the attributes "sampled" and "searched" name the branches whose range
+# check is approximate, by reason (.mpt_tree_range()). The points of
 # .mpt_tree_branch_errors() visit two corners and five interior points, which
 # miss a branch that mixes a parameter with another one's complement
 # (2 * a * (1 - b) reaches 2 as a -> 1 and b -> 0).
 .mpt_tree_vertex_errors <- function(trees, parameters, simplex, tolerance = 1e-6) {
   results <- lapply(trees, function(tree) {
-    sampled <- character(0)
-    for (resp_cat in names(tree$branches)) {
-      branch <- tree$branches[[resp_cat]]
-      vertices <- .mpt_branch_vertices(branch, parameters, simplex)
-      if (!attr(vertices, "exact")) {
-        sampled <- c(sampled, glue("category '{resp_cat}' in tree '{tree$name}'"))
-      }
-      violation <- .mpt_first_range_violation(branch, vertices, tolerance = tolerance)
-      if (is.null(violation)) next
-      error <- if (is.na(violation$value)) {
-        glue(
-          "The branch probability of category '{resp_cat}' in tree \\
-          '{tree$name}' is not a number at the test values {violation$at}, so \\
-          the likelihood is undefined there. Please check the branch expressions."
-        )
-      } else {
-        glue(
-          "The branch probability of category '{resp_cat}' in tree \\
-          '{tree$name}' is {signif(violation$value, 6)} at the test values \\
-          {violation$at}, outside (0, 1]. Please check the branch expressions."
-        )
-      }
-      return(list(error = error, sampled = sampled))
+    range <- .mpt_tree_range(tree, parameters, simplex, tolerance = tolerance)
+    violation <- range$violation
+    if (is.null(violation)) {
+      return(list(error = NA_character_, approximate = range$approximate))
     }
-    list(error = NA_character_, sampled = sampled)
+    resp_cat <- range$category
+    error <- if (is.na(violation$value)) {
+      glue(
+        "The branch probability of category '{resp_cat}' in tree \\
+        '{tree$name}' is not a number at the test values {violation$at}, so \\
+        the likelihood is undefined there. Please check the branch expressions."
+      )
+    } else {
+      glue(
+        "The branch probability of category '{resp_cat}' in tree \\
+        '{tree$name}' is {signif(violation$value, 6)} at the test values \\
+        {violation$at}, outside (0, 1]. Please check the branch expressions."
+      )
+    }
+    list(error = error, approximate = list())
   })
+  approximate <- function(reason) {
+    as.character(unlist(lapply(results, function(result) result$approximate[[reason]])))
+  }
   structure(
     vapply(results, `[[`, character(1), "error"),
-    sampled = as.character(unlist(lapply(results, `[[`, "sampled")))
+    sampled = approximate("vertices"), searched = approximate("search")
   )
 }
 

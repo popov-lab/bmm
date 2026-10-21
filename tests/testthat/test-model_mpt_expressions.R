@@ -344,6 +344,79 @@ test_that(".mpt_branch_vertices adds 0.5 for a parameter of higher degree", {
   expect_equal(sort(unique(unknown[, "a"])), c(1e-9, 0.5, 1 - 1e-9))
 })
 
+test_that(".mpt_form bounds an expression by its form alone (#560)", {
+  bound <- function(expr) bmm:::.mpt_form(expr, c("a", "b"), c("a", "b"))$bound
+  # 2: in [0, 1]; 1: non-negative; 0: neither by form
+  expect_equal(bound(quote(a * (1 - b)^2)), 2L)
+  expect_equal(bound(quote(1 - a * (1 - b))), 2L)
+  expect_equal(bound(quote(a * (1/5))), 2L)
+  expect_equal(bound(quote(2 * a * (1 - a) + b)), 1L)
+  expect_equal(bound(quote(1 - 2 * a)), 0L)
+  expect_equal(bound(quote(a - b)), 0L)
+  expect_equal(bound(quote(a / 2)), 0L)
+  expect_equal(bound(quote(a^0.5)), 0L)
+  expect_equal(bound(quote(exp(a))), 0L)
+  expect_equal(bound(quote(G * a)), 0L)
+  expect_equal(bmm:::.mpt_form(quote(G * a), c("a", "G"), "a")$bound, 2L)
+  expect_equal(bmm:::.mpt_form(quote((1 - a)^n), "a", "a", c(n = 3))$bound, 2L)
+
+  degree <- function(expr) bmm:::.mpt_form(expr, c("a", "b"), c("a", "b"))$degree
+  expect_equal(degree(quote(2 * a * (1 - a)^2 + b)), c(3, 1))
+  expect_equal(bmm:::.mpt_form(quote((1 - a)^n), "a", "a", c(n = 3))$degree, 3)
+})
+
+test_that(".mpt_certified_tree needs the branches to sum to 1 everywhere, not at the test points (#560)", {
+  tree <- function(...) list(name = "t", branches = lapply(list(...), str2lang))
+  expect_true(bmm:::.mpt_certified_tree(tree("a * b", "a * (1 - b)", "1 - a"), c("a", "b"), list()))
+  expect_false(bmm:::.mpt_certified_tree(tree("a * b", "1 - a"), c("a", "b"), list()))
+
+  # a^2 + 1 - a is 1 at a = 0 and a = 1 only; the grid of degree + 1 values
+  # per parameter lies between them
+  expect_false(bmm:::.mpt_certified_tree(tree("a^2", "1 - a"), "a", list()))
+
+  # a simplex group sums to 1 only on the simplex
+  group <- list(c("gA", "gB", "gC"))
+  expect_true(bmm:::.mpt_certified_tree(tree("gA", "gB", "gC"), c("gA", "gB", "gC"), group))
+  expect_false(bmm:::.mpt_certified_tree(tree("gA", "gB", "gC"), c("gA", "gB", "gC"), list()))
+  # (gA + gB + gC)^2, expanded: 1 on the simplex, where the last member is
+  # replaced by 1 minus the others and its degree adds to theirs
+  squared <- tree("gA^2 + gB^2 + gC^2", "2 * gA * gB + 2 * gA * gC", "2 * gB * gC")
+  expect_true(bmm:::.mpt_certified_tree(squared, c("gA", "gB", "gC"), group))
+  expect_false(bmm:::.mpt_certified_tree(squared, c("gA", "gB", "gC"), list()))
+  # with gB = 1 - gA these sum to 1 + 0.9 (gA - 1/6) (gA - 1/3): degree 2 in
+  # gA, not the degree 1 that gA has in the branches, and exactly 1 at the two
+  # grid values that degree 1 would take
+  quadratic <- tree("0.5", "0.45 * gB", "0.9 * gA * gB")
+  expect_false(bmm:::.mpt_certified_tree(quadratic, c("gA", "gB"), list(c("gA", "gB"))))
+  expect_true(bmm:::.mpt_certified_tree(
+    tree("(gA + gB + gC)^2 * D", "1 - D"), c("D", "gA", "gB", "gC"), group
+  ))
+
+  # with covariates, the sum must be 1 at each covariate row
+  expect_true(bmm:::.mpt_certified_tree(
+    tree("D + (1 - D) * G", "(1 - D) * H"), "D", list(), c("D", "G", "H"),
+    list(G = c(0.2, 0.7), H = c(0.8, 0.3))
+  ))
+  expect_false(bmm:::.mpt_certified_tree(
+    tree("D + (1 - D) * G", "(1 - D) * H"), "D", list(), c("D", "G", "H"),
+    list(G = c(0.2, 0.7), H = c(0.8, 0.4))
+  ))
+})
+
+test_that("the range search visits only points in the box and on the simplex (#560)", {
+  # a branch undefined outside [0, 1] stays defined during the search
+  vertices <- bmm:::.mpt_branch_vertices(quote(sqrt(u * (1 - u))), "u", list())
+  expect_null(bmm:::.mpt_search_range_violation(
+    quote(sqrt(u * (1 - u))), vertices, "u", list(), list(), 1e-6
+  ))
+  # the reported witness is the extreme found, not the first value past 1
+  found <- bmm:::.mpt_search_range_violation(
+    quote(7 * u * (1 - u)^2), bmm:::.mpt_branch_vertices(quote(7 * u * (1 - u)^2), "u", list()),
+    "u", list(), list(), 1e-6
+  )
+  expect_equal(found$value, 28 / 27, tolerance = 1e-6)
+})
+
 test_that(".mpt_branch_vertices takes a simplex group as one dimension", {
   group <- list(c("gA", "gB", "gC"))
   vertices <- bmm:::.mpt_branch_vertices(quote(D * gA + (1 - D) * gB), c("D", "gA", "gB", "gC"), group)
