@@ -766,6 +766,44 @@ test_that("links set after construction are checked like any other model's", {
   expect_error(check_model(model, dat, formula), "Unknown link function")
 })
 
+test_that("internal_parameters() lists the stick-breaking components of an mpt simplex only", {
+  tree <- mpt_tree("t", list(
+    A = "D + (1 - D) * gA", B = "(1 - D) * gB", C = "(1 - D) * gC"
+  ))
+  expect_identical(
+    internal_parameters(mpt(tree, simplex = c("gA", "gB", "gC"))),
+    c("gAraw", "gBraw")
+  )
+  expect_identical(internal_parameters(mpt(mpt_2htm_trees(), tree_id = "item_type")), character(0))
+  expect_identical(internal_parameters(sdm(resp_error = "dev_rad")), character(0))
+})
+
+test_that("native_parameters() leaves the stick-breaking components out unless they are named", {
+  tree <- mpt_tree("t", list(
+    A = "D + (1 - D) * gA", B = "(1 - D) * gB", C = "(1 - D) * gC"
+  ))
+  model <- mpt(tree, simplex = c("gA", "gB", "gC"))
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(D ~ 1, gAraw ~ 1, gBraw ~ 1), data.frame(A = 10, B = 5, C = 5), model,
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  # a mock fit has no draws: the linear predictors are two draws of 0.3
+  local_mocked_bindings(
+    .np_linpred = function(x, pars, requested, newdata, re_formula, draw_ids, dots) {
+      setNames(lapply(pars, function(par) matrix(0.3, 2, nrow(newdata))), pars)
+    }
+  )
+  estimates <- function(...) {
+    native_parameters(fit, re_formula = NA, summary = TRUE, draw_ids = 1:2, ...)
+  }
+  expect_setequal(unique(estimates()$parameter), c("D", "gA", "gB", "gC"))
+  expect_equal(unique(estimates(pars = "gAraw")$parameter), "gAraw")
+  expect_setequal(
+    unique(estimates(pars = c("gA", "gBraw"))$parameter), c("gA", "gBraw")
+  )
+  expect_error(estimates(pars = "nosuch"), "Unknown parameter\\(s\\) 'nosuch'")
+})
+
 test_that("model_docs() names no scale that contradicts a switched link", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
   model$links$D <- "probit"

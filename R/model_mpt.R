@@ -486,6 +486,11 @@ settable_link_functions.mpt <- function(model) {
   }, logical(1))]
 }
 
+#' @exportS3Method
+internal_parameters.mpt <- function(model) {
+  as.character(unname(model$other_vars$simplex_raw))
+}
+
 # the derived member of each simplex group and the stick-breaking components
 # get their formulas from check_formula.mpt(), so none is expected from the user
 #' @exportS3Method
@@ -640,7 +645,8 @@ generated_parameters.mpt <- function(model) {
 #'   the probability left over by the members listed before it. A predictor
 #'   on the first member therefore scales all later members by the same
 #'   factor, leaving their ratios unchanged. Read such effects on the probability scale with
-#'   [native_parameters()].
+#'   [native_parameters()], which returns the group members and leaves out the
+#'   stick-breaking components (`gAraw`) unless `pars` names them.
 #'
 #'   **Identifiability.** Printing the model ends with an identifiability
 #'   check for intercept-only formulas. It compares the number of free
