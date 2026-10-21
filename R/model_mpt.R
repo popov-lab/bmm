@@ -1464,6 +1464,7 @@ check_data.mpt <- function(model, data, formula) {
   )
   missing_counts <- is.na(resp_matrix)
   resp_matrix[missing_counts] <- 0
+  .mpt_stop_if_beyond_integer(rowSums(resp_matrix), "Row totals of the response counts")
   data <- data[!col_names %in% resp_cats]
   # an integer column keeps conditional_effects() grids at a valid trial count
   data$nTrials <- as.integer(rowSums(resp_matrix))

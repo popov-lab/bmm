@@ -163,6 +163,12 @@ mpt_data_reshape <- function(data, model, id = NULL,
     {collapse_comma(names(data))}"
   )
 
+  layout <- .mpt_long_layout(model, columns)
+  stopif(
+    columns == "names" && !is.null(id) && id %in% .mpt_named_columns(layout),
+    "The id column '{id}' is also a count column of the model. Name the column \\
+    that identifies participants, or leave id = NULL to number the rows."
+  )
   participants <- if (is.null(id)) seq_len(nrow(data)) else data[[id]]
   stopif(
     anyNA(participants) || anyDuplicated(participants) > 0,
@@ -171,7 +177,6 @@ mpt_data_reshape <- function(data, model, id = NULL,
   )
   id_name <- id %||% "id"
 
-  layout <- .mpt_long_layout(model, columns)
   non_id <- setdiff(names(data), id)
   count_cols <- if (columns == "names") {
     .mpt_named_count_columns(layout, non_id)
@@ -202,6 +207,9 @@ mpt_data_reshape <- function(data, model, id = NULL,
       t(as.matrix(counts[in_tree])), layout$category[in_tree], reorder = FALSE
     ))
     tree_counts[, colnames(summed)] <- summed
+    .mpt_stop_if_beyond_integer(
+      tree_counts, glue("The counts of tree '{tree}' in the wide data")
+    )
     storage.mode(tree_counts) <- "integer"
     data.frame(
       c(
@@ -264,12 +272,26 @@ mpt_data_reshape <- function(data, model, id = NULL,
   )
 }
 
-.mpt_named_count_columns <- function(layout, available) {
-  qualified <- paste(layout$tree, ifelse(
+.mpt_qualified_names <- function(layout) {
+  paste(layout$tree, ifelse(
     is.na(layout$label), layout$category, layout$label
   ), sep = ".")
-  shared_label <- !is.na(layout$label) & !duplicated(layout$label) &
+}
+
+# a label that belongs to one tree only can stand for its qualified name
+.mpt_shared_label <- function(layout) {
+  !is.na(layout$label) & !duplicated(layout$label) &
     !duplicated(layout$label, fromLast = TRUE)
+}
+
+# every column name that columns = "names" can read as a count
+.mpt_named_columns <- function(layout) {
+  c(.mpt_qualified_names(layout), layout$label[.mpt_shared_label(layout)])
+}
+
+.mpt_named_count_columns <- function(layout, available) {
+  qualified <- .mpt_qualified_names(layout)
+  shared_label <- .mpt_shared_label(layout)
   count_cols <- ifelse(
     qualified %in% available, qualified,
     ifelse(shared_label & layout$label %in% available, layout$label, NA)
@@ -317,7 +339,9 @@ mpt_data_reshape <- function(data, model, id = NULL,
     {collapse_comma(non_numeric)}"
   )
   values <- as.matrix(counts)
-  affected <- function(problem) collapse_comma(colnames(values)[colSums(problem) > 0])
+  affected <- function(problem) {
+    collapse_comma(colnames(values)[colSums(problem, na.rm = TRUE) > 0])
+  }
   stopif(
     anyNA(values),
     "The count columns must not contain missing values. Missing values in: \\
@@ -329,5 +353,15 @@ mpt_data_reshape <- function(data, model, id = NULL,
     "The count columns must hold non-negative whole numbers. Other values in: \\
     {affected(not_counts)}"
   )
-  invisible(NULL)
+  .mpt_stop_if_beyond_integer(
+    values, glue("The count column(s) {affected(values > .Machine$integer.max)}")
+  )
+}
+
+# counts are stored as integers, and R holds none above 2147483647
+.mpt_stop_if_beyond_integer <- function(counts, what) {
+  stopif(
+    any(counts > .Machine$integer.max, na.rm = TRUE),
+    "{what} exceed {.Machine$integer.max}, the largest count bmm can store."
+  )
 }
