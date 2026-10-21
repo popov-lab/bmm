@@ -52,6 +52,17 @@ built_data_columns.default <- function(model) {
   character(0)
 }
 
+# inv_ss and ss_numeric are built whatever the set sizes; the LureIdx step
+# functions are one per non-target feature
+#' @exportS3Method
+built_data_columns.non_targets <- function(model) {
+  c(
+    paste0("LureIdx", seq_along(model$other_vars$nt_features)),
+    "inv_ss", "ss_numeric",
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")

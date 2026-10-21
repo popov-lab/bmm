@@ -1,5 +1,5 @@
-# A bmmfit stand-in for ppp() with fixed draws: .ppp_counts() is mocked, so
-# only the model class, the formula and the data are read from the fit
+# A bmmfit stand-in for ppp() with fixed draws: .ppp_counts() and .ppp_data()
+# are mocked, so only the model class and the formula are read from the fit
 ppp_toy_fit <- function(data, formula = bmf(D ~ 1, g ~ 1)) {
   structure(
     list(bmm = list(model = mpt(mpt_2htm_trees(), "item_type"), user_formula = formula),
@@ -15,10 +15,9 @@ ppp_toy_draws <- function(...) {
 
 local_ppp_counts <- function(observed, expected, replicated, data,
                              env = parent.frame()) {
-  counts <- list(observed = observed, expected = expected,
-                 replicated = replicated, data = data)
+  counts <- list(observed = observed, expected = expected, replicated = replicated)
   local_mocked_bindings(.ppp_counts = function(model, fit, draw_ids) counts,
-                        .env = env)
+                        .ppp_data = function(model, fit) data, .env = env)
 }
 
 # Klauer (2010), Eq. 18, written out: cells is a list of participants x
@@ -290,23 +289,29 @@ test_that("ppp() counts the second category of a yes/no model as trials minus re
 
 test_that("ppp() rebuilds the tree column of an mpt fit that no formula kept", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
-  local_ppd <- function(fit) {
-    draws <- array(1, c(2, nrow(fit$data), 2))
-    local_mocked_bindings(posterior_predict = function(...) draws,
-                          posterior_epred = function(...) draws, .package = "brms",
-                          .env = parent.frame())
-  }
   cases <- model_test_cases("stored_frame")
   fit <- stored_frame_fit(cases$mpt)
   expect_false("item_type" %in% names(fit$data))
-  local_ppd(fit)
-  data <- .ppp_counts(fit$bmm$model, fit, draw_ids = 1:2)$data
+  data <- .ppp_data(fit$bmm$model, fit)
   expect_identical(levels(data$item_type), c("old", "new"))
   expect_identical(as.character(data$item_type), ifelse(fit$data$Idx_old == 1, "old", "new"))
 
   # a formula that names the tree column keeps it, and it is left as it is
   fit <- stored_frame_fit(cases$mpt_tree_predictor)
-  local_ppd(fit)
-  expect_identical(.ppp_counts(fit$bmm$model, fit, draw_ids = 1:2)$data$item_type,
-                   fit$data$item_type)
+  expect_identical(.ppp_data(fit$bmm$model, fit)$item_type, fit$data$item_type)
+})
+
+test_that("ppp() checks 'by' before it computes any counts", {
+  fit <- ppp_toy_fit(data.frame(item_type = c("old", "new")))
+  local_mocked_bindings(
+    .ppp_counts = function(model, fit, draw_ids) stop("the counts were computed")
+  )
+  expect_error(
+    ppp(fit, by = "nosuchcol"),
+    "'by' must name columns of the model data. Available: 'item_type'"
+  )
+  expect_error(ppp(fit, by = 1L), "'by' must name columns of the model data")
+  # the mock is reached by a valid call, so it is the check that stopped the others
+  expect_error(ppp(fit, by = "item_type"), "the counts were computed")
+  expect_error(suppressMessages(ppp(fit)), "the counts were computed")
 })
