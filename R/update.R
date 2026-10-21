@@ -136,6 +136,9 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 
   if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
     data <- check_stored_data(model, newdata %||% olddata, user_formula)
+    if (!missing(formula.)) {
+      stop_unstored_variables(model, data, user_formula, fit_frame_args(object, dots)$data2)
+    }
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
@@ -262,8 +265,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 # the configure_prior methods of the non-target models, which read it to decide
 # whether set size 1 needs a constant prior. That is inert only because a column
 # gets rebuilt exactly when the fitted formula does not name it, and the
-# constraint helpers then return NULL; a new formula. that names it fails in
-# brms, because the column is no longer in the data
+# constraint helpers then return NULL; a new formula. that names it is refused
+# by stop_unstored_variables(), because the column is no longer in the data
 check_stored_data <- function(model, data, formula) {
   stored <- revert_check_data(model, data)
   rebuilt <- attr(stored, "rebuilt")
@@ -273,6 +276,25 @@ check_stored_data <- function(model, data, formula) {
     data[[var]] <- NULL
   }
   data
+}
+
+# A new formula can only use the columns the fit's model frame kept, which are
+# those its own formula used, and none of the ones check_stored_data() rebuilt
+# and dropped again. brms refuses the others only after bmm has configured the
+# prior, with a message that does not say where the data come from
+stop_unstored_variables <- function(model, data, formula, data2) {
+  known <- c(
+    colnames(data), names(data2), names(formula),
+    names(model$parameters), names(model$fixed_parameters)
+  )
+  unstored <- setdiff(rhs_vars(formula), known)
+  stopif(
+    length(unstored) > 0,
+    "The model frame of this fit does not hold {collapse_comma(unstored)}. It keeps \\
+    only the columns the fitted formula used, and none that bmm rebuilds for its \\
+    checks, such as the tree column of `mpt()`. Pass the data you gave `bmm()` as \\
+    `newdata` to use {if (length(unstored) > 1) 'them' else 'it'} in the new formula."
+  )
 }
 
 # brms::kfold() and reloo() hand update() slices of the fit's own model frame,

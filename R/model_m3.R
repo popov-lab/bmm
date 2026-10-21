@@ -285,6 +285,8 @@ m3 <- function(resp_cats, num_options, choice_rule = "softmax",
 #' @export
 check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
   if (!is.null(formula)) {
+    added_pars <- setdiff(names(model$parameters), m3_constructor_parameters(model))
+    model$parameters <- model$parameters[m3_constructor_parameters(model)]
     user_pars <- setdiff(
       m3_activation_symbols(model, formula),
       c(colnames(data), built_data_columns(model))
@@ -300,6 +302,9 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
       reserved and cannot be a data column)."
     )
     model$parameters <- c(model$parameters, setNames(user_pars, user_pars))
+    model$default_priors <- model$default_priors[
+      not_in(names(model$default_priors), m3_stale_default_priors(model, setdiff(added_pars, user_pars)))
+    ]
   }
 
   missing_links <- setdiff(names(model$parameters), names(model$links))
@@ -319,32 +324,56 @@ check_model.m3_custom <- function(model, data = NULL, formula = NULL) {
     "Default priors for each parameter will be specified internally based on the provided link function.
     Please check if the used priors are reasonable for your application"
   )
-  additional_priors <- lapply(missing_priors, function(m) {
-    if (model$other_vars$choice_rule == "simple") {
-      switch(model$links[[m]],
-             log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             softplus = list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             identity = list(main = "normal(10, 4)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
-      )
-    } else {
-      switch(model$links[[m]],
-             log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             softplus = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             identity = if (model$other_vars$choice_rule == "gaussian") {
-               list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
-             } else {
-               list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
-             },
-             logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
-             stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
-      )
-    }
-  })
+  additional_priors <- lapply(missing_priors, m3_default_prior, model = model)
   model$default_priors <- c(model$default_priors, setNames(additional_priors, missing_priors))
 
   NextMethod("check_model")
+}
+
+# The parameters the constructor defines. A checked model also holds the ones its
+# formula added, which a check with another formula must not keep; derived from
+# the version table, so that models stored before this was needed are covered
+m3_constructor_parameters <- function(model) {
+  c("b", names(.m3_version_table[[model$version]][["parameters"]]))
+}
+
+# Default priors that check_model() generated for parameters of a formula that
+# is no longer the model's, told apart from the ones the user passed to m3() by
+# being what check_model() would generate again
+m3_stale_default_priors <- function(model, pars) {
+  generated <- vapply(
+    pars,
+    function(par) {
+      !is.null(model$links[[par]]) &&
+        identical(model$default_priors[[par]], m3_default_prior(model, par))
+    },
+    logical(1)
+  )
+  pars[generated]
+}
+
+m3_default_prior <- function(model, par) {
+  if (model$other_vars$choice_rule == "simple") {
+    switch(model$links[[par]],
+           log = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+           softplus = list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+           identity = list(main = "normal(10, 4)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+           logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+           stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
+    )
+  } else {
+    switch(model$links[[par]],
+           log = list(main = "normal(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+           softplus = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+           identity = if (model$other_vars$choice_rule == "gaussian") {
+             list(main = "normal(2, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+           } else {
+             list(main = "normal(3, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+           },
+           logit = list(main = "logistic(0, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)"),
+           stop2("Invalid link function provided! Please use one of the following link functions: identity, log, softplus, logit")
+    )
+  }
 }
 
 # Candidates for the parameters a custom m3 adds: symbols in the activation
