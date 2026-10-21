@@ -11,7 +11,8 @@
 
 \item{newdata}{An optional data frame, in the layout of the data given to
 \code{\link[=bmm]{bmm()}} or a subset of the rows of \code{object$data}. Its rows keep their
-order.}
+order. It must not carry the columns \code{bmm} builds itself; \code{bmm()} warns
+about or refuses those column names when fitting.}
 
 \item{...}{Further arguments passed to \code{\link[brms:standata]{brms::standata()}}}
 }

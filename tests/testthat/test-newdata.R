@@ -12,11 +12,23 @@ newdata_cases <- local({
   }
 })
 
+# one mock fit per case for the whole file; the tests read the fits, so none
+# sees another's state
+newdata_fit <- local({
+  fits <- list()
+  function(case_name) {
+    if (is.null(fits[[case_name]])) {
+      fits[[case_name]] <<- stored_frame_fit(newdata_cases()[[case_name]])
+    }
+    fits[[case_name]]
+  }
+})
+
 for (case_name in names(newdata_cases())) {
   test_that(paste("newdata in the layout given to bmm() reaches the Stan data of", case_name), {
     skip_on_cran()
     case <- newdata_cases()[[case_name]]
-    fit <- stored_frame_fit(case)
+    fit <- newdata_fit(case_name)
     user <- as.data.frame(case$data)
     rows <- rev(seq_len(nrow(user)))
 
@@ -36,7 +48,7 @@ for (case_name in names(newdata_cases())) {
   test_that(paste("slices of the model frame of", case_name, "skip check_data()"), {
     skip_on_cran()
     case <- newdata_cases()[[case_name]]
-    fit <- stored_frame_fit(case)
+    fit <- newdata_fit(case_name)
     local_mocked_bindings(check_data = function(model, data, formula) {
       stop("check_data() was called on a slice of the model frame")
     })
@@ -50,7 +62,7 @@ for (case_name in names(newdata_cases())) {
 test_that("newdata for a model that builds no columns skips check_data()", {
   skip_on_cran()
   case_names <- c("sdm", "mixture2p", "ddm", "cswald", "ezdm")
-  fits <- lapply(newdata_cases()[case_names], stored_frame_fit)
+  fits <- lapply(setNames(nm = case_names), newdata_fit)
   local_mocked_bindings(check_data = function(model, data, formula) {
     stop("check_data() was called for a model that builds no columns")
   })
@@ -67,10 +79,32 @@ test_that("newdata for a model that builds no columns skips check_data()", {
   }
 })
 
+# newdata for a prediction can stop below the fit's largest set size, which
+# check_data() would otherwise take from the data
+test_that("newdata at one set size matches the same rows of the model frame", {
+  skip_on_cran()
+  cases <- Filter(
+    function(case) is_data_var(case$model$other_vars$set_size, case$data),
+    newdata_cases()
+  )
+  expect_gt(length(cases), 0)
+  for (case_name in names(cases)) {
+    fit <- newdata_fit(case_name)
+    user <- as.data.frame(cases[[case_name]]$data)
+    set_size <- as.numeric(as.character(user[[fit$bmm$model$other_vars$set_size]]))
+    rows <- set_size == min(set_size)
+    expect_no_warning(from_user <- brms::standata(fit, newdata = user[rows, , drop = FALSE]))
+    expect_equal(
+      from_user, brms::standata(fit, newdata = fit$data[rows, , drop = FALSE]),
+      info = case_name
+    )
+  }
+})
+
 test_that("newdata without a column check_data() needs stops with its message", {
   skip_on_cran()
   case <- newdata_cases()$sdt_yn
-  fit <- stored_frame_fit(case)
+  fit <- newdata_fit("sdt_yn")
   resp <- case$model$resp_vars$response
   expected <- tryCatch(
     check_data(case$model, case$data[setdiff(names(case$data), resp)], fit$bmm$user_formula),
