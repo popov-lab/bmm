@@ -248,3 +248,52 @@ test_that("parse_adaptation_info() returns no metric for a header without rows",
     list(step_size = 0.5, inv_metric = NULL)
   )
 })
+
+test_that("fit_info() of a combined fit returns no time when one chain has none", {
+  fit <- load_info_fit("bmmfit_m3_ppcheck.rds")
+  untimed <- fit
+  attr(untimed$fit@sim$samples[[1]], "elapsed_time") <- NULL
+
+  cmb <- brms::combine_models(untimed, fit)
+
+  expect_null(fit_info(cmb, "time"))
+  expect_null(fit_info(cmb, "time_mean"))
+})
+
+test_that("fit_info() of a combined fit gives a unit_e chain a NULL metric element", {
+  fit <- load_info_fit("bmmfit_m3_ppcheck.rds")
+  unit_e <- fit
+  attr(unit_e$fit@sim$samples[[1]], "adaptation_info") <- " "
+
+  inv_metric <- fit_info(brms::combine_models(unit_e, fit), "inv_metric")
+
+  expect_named(inv_metric, c("1", "2"))
+  expect_null(inv_metric[[1]])
+  expect_length(inv_metric[[2]], 84)
+})
+
+test_that("parse_adaptation_info() rejects a malformed number without a warning", {
+  info <- paste(
+    "# Step size = 0.5",
+    "# Diagonal elements of inverse mass matrix:",
+    "# 1..2, 3",
+    sep = "\n"
+  )
+
+  expect_no_warning(parsed <- bmm:::parse_adaptation_info(info))
+  expect_null(parsed$inv_metric)
+})
+
+test_that("parse_adaptation_info() reads the MSVC spellings of NaN and Inf", {
+  info <- paste(
+    "# Step size = 0.5",
+    "# Diagonal elements of inverse mass matrix:",
+    "# -nan(ind), infinity, -Infinity, 0.3",
+    sep = "\n"
+  )
+
+  expect_no_warning(inv_metric <- bmm:::parse_adaptation_info(info)$inv_metric)
+  # expect_equal() does not tell NaN from NA
+  expect_identical(is.nan(inv_metric), c(TRUE, FALSE, FALSE, FALSE))
+  expect_equal(inv_metric[-1], c(Inf, -Inf, 0.3))
+})

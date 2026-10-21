@@ -271,7 +271,7 @@ read_lines2 <- function(con) {
 #' @return Depends on `what` and the class of `fit`. For `brmsfit` objects,
 #'   information about the single fit is returned. For `brmsfit_list` objects, a
 #'   list or data.frame with the information for each fit is returned.
-#'  - "time": A data.frame with the sampling time per chain
+#'  - "time": A data.frame with the warmup, sampling and total time per chain
 #'  - "time_mean": A named numeric vector with the mean warmup, sampling and
 #'    total time across chains
 #'  - "inv_metric": A list with one numeric vector per chain (the diagonal), or
@@ -283,9 +283,12 @@ read_lines2 <- function(con) {
 #'   did not record: anything for a fit without a stanfit or without chains,
 #'   "time" and "time_mean" for variational and Laplace runs, "inv_metric" and
 #'   "step_size" for any algorithm other than NUTS, and "inv_metric" for
-#'   `metric = "unit_e"`. The values of a fit combined from several fits are
-#'   read from Stan's printed output, which gives six significant digits by
-#'   default.
+#'   `metric = "unit_e"`. In a fit combined from several fits, a unit_e chain
+#'   next to chains with a metric has a `NULL` element in the "inv_metric"
+#'   list. The inverse metric and step size of a fit combined
+#'   from several fits are read from Stan's printed adaptation output, which
+#'   gives six significant digits by default; the step size of a unit_e chain
+#'   is that of its last draw.
 #' @keywords extract_info
 #' @export
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
@@ -363,8 +366,8 @@ chain_adaptation <- function(stanfit, what) {
   stats::setNames(parsed, seq_along(parsed))
 }
 
-# the step size of the last draw: adaptation_info holds none for
-# metric = "unit_e"
+# the step size of the last draw, as adaptation_info holds none for a
+# unit_e metric
 last_step_size <- function(chain) {
   utils::tail(attr(chain, "sampler_params")$stepsize__, 1)
 }
@@ -374,8 +377,9 @@ last_step_size <- function(chain) {
 #   # Diagonal elements of inverse mass matrix:
 #   # 0.0298361, 0.0410393
 # and, for metric = "dense_e", "Elements of inverse mass matrix:" and a row per
-# line. A non-finite element is printed as C++ writes it (nan, -nan, inf), and
-# lines after the metric, such as "Elapsed Time", are not numbers.
+# line. A non-finite element is printed as C++ writes it (nan, -nan, inf, and
+# -nan(ind) with MSVC), and lines after the metric, such as "Elapsed Time", are
+# not numbers.
 parse_adaptation_info <- function(info) {
   lines <- unlist(strsplit(paste(info, collapse = "\n"), "\n"))
   lines <- trimws(sub("^#", "", lines))
@@ -385,11 +389,16 @@ parse_adaptation_info <- function(info) {
   )
   inv_metric <- NULL
   if (length(header) == 1) {
-    num <- "[-+]?([0-9.]+([eE][-+]?[0-9]+)?|nan|inf)"
+    num <- paste0(
+      "[-+]?(([0-9]+\\.?[0-9]*|\\.[0-9]+)([eE][-+]?[0-9]+)?",
+      "|nan(\\(ind\\))?|inf(inity)?)"
+    )
     rows <- utils::tail(lines, -header)
     rows <- rows[grepl(paste0("^", num, "(, *", num, ")*$"), rows,
       ignore.case = TRUE
     )]
+    # MSVC prints NaN as -nan(ind), which as.numeric() does not read
+    rows <- gsub("\\(ind\\)", "", rows, ignore.case = TRUE)
     rows <- lapply(strsplit(rows, ",", fixed = TRUE), as.numeric)
     if (length(rows)) {
       inv_metric <- if (grepl("^Diagonal", lines[header])) {
