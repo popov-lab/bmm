@@ -565,6 +565,124 @@ stored_frame_cases <- local({
   }
 })
 
+test_that("update(formula. = ) refuses only a column the fit did not keep, and says to pass newdata (#552)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  withr::local_seed(552)
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  stub_fit <- function(formula, data, model) suppressWarnings(suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = stub, rename = FALSE)
+  ))
+  stub_update <- function(fit, ...) suppressWarnings(suppressMessages(
+    update(fit, ..., backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE)
+  ))
+
+  dat <- data.frame(y = rsdm(60), x = rep(c("a", "b"), 30), id = rep(1:6, each = 10))
+  fit <- stub_fit(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"))
+  expect_error(
+    stub_update(fit, formula. = bmf(c ~ 1 + x, kappa ~ 1)),
+    "'x'.*`newdata`"
+  )
+  up <- stub_update(fit, formula. = bmf(c ~ 1 + x, kappa ~ 1), newdata = dat)
+  expect_equal(brms::stancode(up),
+               brms::stancode(stub_fit(bmf(c ~ 1 + x, kappa ~ 1), dat, sdm("y"))))
+
+  # the correlation ID p and the Intercept of brms are no columns to keep
+  f_cor <- bmf(c ~ 1 + x + (1 | p | id), kappa ~ 1 + (1 | p | id))
+  cor_fit <- stub_fit(f_cor, dat, sdm("y"))
+  expect_no_error(stub_update(cor_fit, formula. = f_cor))
+  expect_no_error(stub_update(cor_fit, formula. = bmf(c ~ 0 + Intercept + x + (1 | id), kappa ~ 1)))
+
+  # the tree column is rebuilt for check_data() and dropped again afterwards
+  case <- stored_frame_cases()$mpt
+  mpt_fit <- stub_fit(case$formula, case$data, case$model)
+  expect_error(
+    stub_update(mpt_fit, formula. = bmf(D ~ 1 + item_type + (1 | id), g ~ 1)),
+    "'item_type'.*`newdata`"
+  )
+  up <- stub_update(mpt_fit, formula. = bmf(D ~ 1 + item_type + (1 | id), g ~ 1),
+                    newdata = case$data)
+  expect_true("item_type" %in% colnames(up$data))
+})
+
+test_that("a formula whose variables the stored frame or data2 hold is not refused (#552)", {
+  configured <- function(formula) list(formula = formula, data = data.frame(y = 1, x = 1, id = "a"))
+  # neither the correlation ID p, nor Intercept, nor the cov matrix M, nor the
+  # non-linear parameters a and b are data columns
+  expect_silent(stop_unstored_variables(configured(brms::bf(
+    y ~ 0 + Intercept + x + (1 | p | gr(id, cov = M)), sigma ~ 1 + I(x^2) + (1 | p | id)
+  )), data2 = NULL))
+  expect_silent(stop_unstored_variables(configured(brms::bf(
+    y ~ a + b * x, a ~ 1 + (1 | id), b ~ 1, nl = TRUE
+  )), data2 = NULL))
+  expect_silent(stop_unstored_variables(configured(brms::bf(y ~ 1 + z)), data2 = list(z = 1)))
+  expect_error(
+    stop_unstored_variables(configured(brms::bf(y ~ 1 + z + w)), data2 = NULL),
+    "'z', 'w'.*`newdata`"
+  )
+})
+
+for (case_name in names(stored_frame_cases())) {
+  test_that(paste0("update() with a fit's own formula and no newdata is not refused (", case_name, ")"), {
+    skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+    skip_if_not_installed("rstan")
+    stub <- methods::new("stanfit", sim = list(
+      iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+      samples = list(structure(list(), args = list(control = list())))
+    ))
+    case <- stored_frame_cases()[[case_name]]
+    fit <- suppressWarnings(suppressMessages(
+      bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = stub, rename = FALSE)
+    ))
+    expect_no_error(suppressWarnings(suppressMessages(
+      update(fit, formula. = case$formula, backend = "mock", mock_fit = stub,
+             rename = FALSE, recompile = TRUE)
+    )))
+  })
+}
+
+test_that("a custom m3 fit updates to a formula with other activation parameters (#552)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  stub_fit <- function(formula) suppressWarnings(suppressMessages(
+    bmm(formula, oberauer_lewandowsky_2019_e1, model, backend = "mock",
+        mock_fit = stub, rename = FALSE)
+  ))
+  model <- m3(
+    resp_cats = c("corr", "other", "dist", "npl"),
+    num_options = paste0("n_", c("corr", "other", "dist", "npl")),
+    choice_rule = "simple",
+    links = list(c = "log", a = "log", d = "log", e = "log")
+  )
+  f_d <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d ~ 1)
+  f_e <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + e, npl ~ b, c ~ 1, a ~ 1, e ~ 1)
+
+  up <- suppressWarnings(suppressMessages(update(
+    stub_fit(f_d), formula. = f_e, backend = "mock", mock_fit = stub,
+    rename = FALSE, recompile = TRUE
+  )))
+  fresh <- stub_fit(f_e)
+  expect_equal(brms::stancode(up), brms::stancode(fresh))
+  expect_equal(up$bmm$model$parameters, fresh$bmm$model$parameters)
+  expect_false("d" %in% names(up$bmm$model$parameters))
+
+  # a constant of the old formula goes with it
+  f_dfix <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d = 0.5)
+  up <- suppressWarnings(suppressMessages(update(
+    stub_fit(f_dfix), formula. = f_e, backend = "mock", mock_fit = stub,
+    rename = FALSE, recompile = TRUE
+  )))
+  expect_equal(brms::stancode(up), brms::stancode(fresh))
+  expect_false("d" %in% names(up$bmm$model$fixed_parameters))
+})
+
 test_that("update.bmmfit needs no newdata for a model that packs its response", {
   skip_on_cran()
   fit <- m3_fixture()
