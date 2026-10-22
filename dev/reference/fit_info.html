@@ -62,6 +62,8 @@
 <dt id="arg-what">what<a class="anchor" aria-label="anchor" href="#arg-what"></a></dt>
 <dd><p>String. What to return:</p><ul><li><p>"time" for the sampling time per chain</p></li>
 <li><p>"time_mean" for the mean sampling time</p></li>
+<li><p>"inv_metric" for the adapted inverse metric per chain</p></li>
+<li><p>"step_size" for the adapted step size per chain</p></li>
 </ul></dd>
 
 </dl></div>
@@ -69,9 +71,24 @@
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Depends on <code>what</code> and the class of <code>fit</code>. For <code>brmsfit</code> objects,
 information about the single fit is returned. For <code>brmsfit_list</code> objects, a
-list or data.frame with the information for each fit is returned.</p><ul><li><p>"time": A data.frame with the sampling time per chain</p></li>
-<li><p>"time_mean": A named numeric vector with the mean sampling time</p></li>
-</ul></div>
+list or data.frame with the information for each fit is returned.</p><ul><li><p>"time": A data.frame with the warmup, sampling and total time per chain</p></li>
+<li><p>"time_mean": A named numeric vector with the mean warmup, sampling and
+total time across chains</p></li>
+<li><p>"inv_metric": A list with one numeric vector per chain (the diagonal), or
+one matrix per chain for <code>metric = "dense_e"</code></p></li>
+<li><p>"step_size": A list with one number per chain</p></li>
+</ul><p>Every chain of the fit is reported, also in a fit combined from several
+fits with <code><a href="https://paulbuerkner.com/brms/reference/combine_models.html" class="external-link">brms::combine_models()</a></code>. <code>NULL</code> is returned for what the sampler
+did not record: anything for a fit without a stanfit or without chains,
+"time" and "time_mean" for variational and Laplace runs, "inv_metric" and
+"step_size" for any algorithm other than NUTS, and "inv_metric" for
+<code>metric = "unit_e"</code>. In a fit combined from several fits, a unit_e chain
+next to chains with a metric has a <code>NULL</code> element in the "inv_metric"
+list. Values read from Stan's printed adaptation output (rstan fits, and
+fits combined from several fits) have six significant digits by default.
+A cmdstanr unit_e chain carries no printed step size, so in a fit combined
+from several fits its step size is that of its last draw.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>

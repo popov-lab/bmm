@@ -80,6 +80,15 @@
   dropped the panel, and those of its interactions, without a message.
   bmm now hides only the columns it creates itself
   ([\#550](https://github.com/popov-lab/bmm/issues/550)).
+- [`fit_info()`](https://venpopov.com/bmm/dev/reference/fit_info.md)
+  reports every chain of a fit combined with
+  [`brms::combine_models()`](https://paulbuerkner.com/brms/reference/combine_models.html).
+  It listed the first fit’s chains only: for
+  `combine_models(fit, update(fit, seed = 2))`, `fit_info("time")` had
+  one row for two chains. It also works for `rstan` fits now, where it
+  returned `NULL`, and `what = "step_size"` returns the adapted step
+  size per chain. `fit_info("time_mean")` no longer returns a mean
+  `chain_id` ([\#555](https://github.com/popov-lab/bmm/issues/555)).
 - [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) now
   accepts a vector `n_trials`, one value per draw, as
   [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) does.
