@@ -1027,7 +1027,7 @@ test_that("log_lik() of a cswald fit is the density of each observation under ea
   for (i in 1:2) {
     density <- function(...) {
       dcswald(data$Y[i], data$dec[i], dpars$drift[, i], dpars$bound[, i], dpars$ndt[, i],
-              s = dpars$s[, i], ...)
+              s = dpars$s[, i], ..., log = TRUE)
     }
     expect_equal(log_lik_cswald_simple(i, prep), density(version = "simple"))
     expect_equal(log_lik_cswald_crisk(i, prep), density(zr = dpars$zr[, i], version = "crisk"))

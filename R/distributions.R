@@ -637,7 +637,10 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   will be extracted. The default will attempt to construct the standard
 #'   activation functions for the "ss" and "cs" model version. For a custom m3
 #'   model you need to specify the act_funs argument manually.
-#' @param log Logical; if `TRUE` (default), values are returned on the log scale.
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), values are returned on
+#'   the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead of
 #'   a matrix. This allows automatic unpacking of response categories into separate
 #'   columns when used with `dplyr::reframe()`. Default is `FALSE` for backward
@@ -664,7 +667,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' )
 #'
 #' # No need to provide b parameter
-#' dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+#' dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model, log = TRUE)
 #' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
 #'
 #' # Can also use full formula (activation formulas are extracted automatically)
@@ -868,8 +871,10 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @param covariates A named vector or list with the values of all covariates
 #'   declared in the model that appear in the branch expressions of the
 #'   selected tree.
-#' @param log Logical; if `TRUE` (default), densities are returned on the log
-#'   scale.
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), densities are returned
+#'   on the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead
 #'   of a matrix. This allows automatic unpacking of response categories into
 #'   separate columns when used with `dplyr::reframe()`. Default is `FALSE`.
@@ -878,7 +883,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'
 #' @note Unlike the densities of the circular models in this package (`dsdm()`,
 #'   `dmixture2p()`, `dmixture3p()`, `dimm()`) and unlike [stats::dmultinom()],
-#'   `dmpt()` returns the log density by default, matching [dm3()].
+#'   `dmpt()` returns the log density by default, as [dm3()] does. The default
+#'   becomes `FALSE` in bmm 1.6.0, which matches them.
 #'
 #' @keywords distribution
 #'
@@ -902,7 +908,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'
 #' dmpt(
 #'   x = c(35, 15), pars = c(D = 0.7, g = 0.5),
-#'   mpt_model = model, tree = "target"
+#'   mpt_model = model, tree = "target", log = TRUE
 #' )
 #' rmpt(
 #'   n = 10, size = 50, pars = c(D = 0.7, g = 0.5),
@@ -1013,7 +1019,10 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
 #' @param bound Boundary separation of the ddm
 #' @param ndt Non-decision time of the ddm
 #' @param zr relative starting point of the ddm
-#' @param log Logical, indicating if log-densities should be returned (default = TRUE)
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), log-densities are
+#'   returned. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #'
 #' @keywords distribution
 #'
@@ -1112,7 +1121,9 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #'   which the likelihood should be returned. Available versions are "simple"
 #'   and "crisk", the default is "simple."
 #' @param log A single logical value indicating if log-likelihoods should be
-#'   returned, the default is `TRUE`
+#'   returned. The default is `TRUE` until bmm 1.6.0 and `FALSE` from then on,
+#'   as in base R and the other density functions of bmm. Pass `log` to get the
+#'   same result in every version.
 #'
 #' @return
 #'   - `dcswald()` returns a numeric vector of (log-)likelihoods.
@@ -1482,7 +1493,10 @@ times_nonzero <- function(count, log_prob) {
 #' @param s Diffusion constant (standard deviation of noise), default = 1.
 #' @param version Character; either "3par" (default) or "4par"
 #' @param n Number of samples to generate
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), values are returned on
+#'   the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #'
 #' @keywords distribution
 #'
@@ -1556,21 +1570,21 @@ times_nonzero <- function(count, log_prob) {
 #' # 3-parameter version (single observation)
 #' dezdm(
 #'   mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-#'   drift = 2, bound = 1.5, ndt = 0.3
+#'   drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 #' )
 #'
 #' # 3-parameter version (vectorized)
 #' dezdm(
 #'   mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025),
 #'   n_upper = c(80, 75), n_trials = c(100, 100),
-#'   drift = 2, bound = 1.5, ndt = 0.3
+#'   drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 #' )
 #'
 #' # 4-parameter version (single observation)
 #' dezdm(
 #'   mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
 #'   n_upper = 80, n_trials = 100,
-#'   drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+#'   drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
 #' )
 #'
 #' # generate random summary statistics
