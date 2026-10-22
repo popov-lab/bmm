@@ -10,6 +10,9 @@
 #   shared by the other models cannot serve the model
 #   (a name that is no model's, such as ezdm_4par, is read only by the check
 #   that built_data_columns() declares what check_data() adds)
+# - rt_data: list(model, formula), for the RT and response checks of
+#   test-helpers-data.R, for the models whose trial data are a response time
+#   and a binary decision; the data are built in the test
 # - observables: list(model, data, formula), for test-pp_observables.R: the
 #   model's pp_observables() must name standata slots and be elementwise
 # - sd_default: list(model, formula, data, sd), for test-default-priors.R: sd
