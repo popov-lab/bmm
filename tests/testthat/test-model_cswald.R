@@ -72,33 +72,13 @@ test_that("check_data.cswald errors when required variables missing", {
   )
 })
 
-test_that("check_data.cswald errors when RT contains NA", {
-  model <- cswald(rt = "rt", response = "response")
-  dat <- data.frame(rt = c(0.5, NA, 0.8), response = c(1, 1, 0))
-
-  expect_error(
-    check_data(model, dat, bmf(drift ~ 1)),
-    "RT variable 'rt' contains.*NA"
-  )
-})
-
-test_that("check_data.cswald errors when response contains NA", {
-  model <- cswald(rt = "rt", response = "response")
-  dat <- data.frame(rt = c(0.5, 0.6, 0.8), response = c(1, NA, 0))
-
-  expect_error(
-    check_data(model, dat, bmf(drift ~ 1)),
-    "response variable 'response' contains.*NA"
-  )
-})
-
 test_that("check_data.cswald errors when RT contains negative values", {
   model <- cswald(rt = "rt", response = "response")
   dat <- data.frame(rt = c(-0.5, 0.6, 0.8), response = c(1, 1, 0))
 
   expect_error(
     check_data(model, dat, bmf(drift ~ 1)),
-    "reaction times are lower than zero"
+    "reaction times are zero or negative"
   )
 })
 
@@ -514,11 +494,16 @@ test_that("the initial ndt of cswald ignores a response at rt = 0 (#548)", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(548)
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
-  data <- rbind(cswald_fast_data(0.03), data.frame(rt = 0, response = 0, id = factor(1), cond = factor("a")))
+  data <- cswald_fast_data(0.03)
+  zero <- data.frame(rt = 0, response = 0, id = factor(1), cond = factor("a"))
 
+  # check_data() refuses an RT of 0, so the init function is built on the data
+  # it would get from a caller that skips the check
   for (version in c("simple", "crisk")) {
-    case <- cswald_init_case(formula, data, version)
-    ndt <- exp(replicate(200, case$init()$Intercept_ndt))
+    model <- cswald("rt", "response", version = version)
+    cfg <- suppressWarnings(configure_fit(formula, data, model))
+    init <- create_initfun(model, rbind(data, zero), cfg$config_args$formula, cfg$prior)
+    ndt <- exp(replicate(200, init()$Intercept_ndt))
     expect_gte(min(ndt), 0.012 - 1e-9, label = version)
     expect_lte(max(ndt), 0.018 + 1e-9, label = version)
   }

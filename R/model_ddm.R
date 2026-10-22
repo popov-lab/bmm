@@ -152,92 +152,16 @@ check_data.ddm <- function(model, data, formula) {
   rt_var <- model$resp_vars$rt
   response_var <- model$resp_vars$response
 
-  stopif(
-    not_in(rt_var, colnames(data)),
-    "The RT variable '{rt_var}' is not present in the data."
+  data <- check_rt_data(
+    data, rt_var, response_var,
+    fast_rt_hint = paste(
+      "It is likely that the model will not be able to sample with the",
+      "current settings of the initial values.\n",
+      "Either pass your own initial value function or consider filtering",
+      "reaction times below 0.100 seconds."
+    )
   )
-
-  stopif(
-    not_in(response_var, colnames(data)),
-    "The response variable '{response_var}' is not present in the data."
-  )
-
-  if (any(is.na(data[, rt_var]))) {
-    data <- data[!is.na(data[, rt_var]), ]
-    warning2("Some values in {rt_var} were NA. These were removed from the analysis.")
-  }
-
-  if (any(is.na(data[, response_var]))) {
-    data <- data[!is.na(data[, response_var]), ]
-    warning2("Some values in {response_var} were NA. These were removed from the analysis.")
-  }
-
-  if (typeof(data[, rt_var]) %in% c("double", "integer")) {
-    stopif(
-      any(data[, rt_var] < 0, na.rm = TRUE),
-      "Some reaction times are lower than zero, please check your data."
-    )
-
-    warnif(
-      any(data[, rt_var] > 10, na.rm = TRUE),
-      "Your data contains reaction times larger than 10 seconds.\n
-      Either you have passed reaction times in milliseconds, then please \\
-      recode them to seconds and rerun the model.\n
-      Or you have very long RTs in your data in which case you might want \\
-      to consider outlier filtering."
-    )
-
-    warnif(
-      any(data[, rt_var] < 0.100, na.rm = TRUE),
-      "Your data contains reaction times smaller than 0.100 seconds.\n
-      It is likely that the model will not be able to sample with the \\
-      current settings of the initial values.\n
-      Either pass your own initial value function or consider filtering \\
-      reaction times below 0.100 seconds."
-    )
-  } else {
-    stop2("The RT variable '{rt_var}' needs to be of type double or integer.")
-  }
-
-  resp_type <- typeof(data[, response_var])
-
-  if (resp_type %in% c("integer", "double", "numerical")) {
-    stopif(
-      any(!data[, response_var] %in% c(0, 1), na.rm = TRUE),
-      "The response variable '{response_var}' should only contain values of 0 and 1."
-    )
-  } else if (resp_type == "logical") {
-    warning2(
-      "The response variable is boolean and will be internally transformed ",
-      "to an integer variable with values 0 for FALSE and 1 for TRUE."
-    )
-    data[, response_var] <- ifelse(data[, response_var], 1, 0)
-  } else if (resp_type == "character") {
-    data[, response_var] <- tolower(data[, response_var])
-    stopif(
-      any(!data[, response_var] %in% c("upper", "lower")),
-      "The response variable '{response_var}' contains invalid character values.\n
-      Please pass only 'upper' or 'lower' as response values, or use \\
-      numeric coding (0 = lower, 1 = upper)."
-    )
-    warning2(
-      "The response variable is a character variable and will be internally ",
-      "transformed to an integer variable with 0 for 'lower' and 1 for 'upper'."
-    )
-    data[, response_var] <- ifelse(data[, response_var] == "upper", 1, 0)
-  } else {
-    stop2(
-      "The response variable '{response_var}' is of type '{resp_type}'.\n
-      Please provide responses as integer (0/1), logical, or character \\
-      ('upper'/'lower')."
-    )
-  }
-
-  stopif(
-    any(!data[, response_var] %in% c(0, 1)),
-    "Invalid values in the response variable '{response_var}'.\n
-    After processing, responses must be coded as 0 (lower) or 1 (upper)."
-  )
+  data[[response_var]] <- code_dec_response(data[[response_var]], response_var)
 
   NextMethod("check_data")
 }
