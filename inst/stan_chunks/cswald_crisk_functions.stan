@@ -1,19 +1,24 @@
-// log-PDF of the competing risks shifted Wald model
-real cswald_crisk_lpdf(real rt, real mu, real drift, real bound, real ndt, real zr, real s, int response) {
+// log-PDF of the competing risks shifted Wald model; with sndt > 0 each accumulator draws its own ndt
+real cswald_crisk_lpdf(real rt, real mu, real drift, real bound, real ndt,
+                       real zr, real s, real sndt, int response) {
   // bounds for the upper and lower response
   real bound_upper = bound - zr*bound;
   real bound_lower = zr*bound;
 
   if (response == 1) {
-    return swald_lpdf(rt | drift, bound_upper, ndt, s) + swald_lccdf(rt | -drift, bound_lower, ndt, s);
+    return swald_sndt_lpdf(rt | drift, bound_upper, ndt, sndt, s)
+           + swald_sndt_lccdf(rt | -drift, bound_lower, ndt, sndt, s);
   } else {
-    return swald_lpdf(rt | -drift, bound_lower, ndt, s) + swald_lccdf(rt | drift, bound_upper, ndt, s);
+    return swald_sndt_lpdf(rt | -drift, bound_lower, ndt, sndt, s)
+           + swald_sndt_lccdf(rt | drift, bound_upper, ndt, sndt, s);
   }
 }
 
 // vectorized overload for the loop = FALSE family: winner's density plus loser's survivor
+// sndt is unused: configure_model() selects this overload only while sndt is fixed at 0
 real cswald_crisk_lpdf(vector rt, vector mu, vector drift, vector bound,
-                       vector ndt, vector zr, vector s, array[] int dec) {
+                       vector ndt, vector zr, vector s, vector sndt,
+                       array[] int dec) {
   int N = rows(rt);
   // both accumulators share rt - ndt, so a single rt <= ndt makes the target -inf
   vector[N] t = rt - ndt;
