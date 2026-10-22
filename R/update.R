@@ -402,11 +402,8 @@ revert_check_data.non_targets <- function(model, data) {
     )
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
-  # nt_features passed the check when the fit was made, so the fit's largest set
-  # size is one more than their number, even when brms dropped the rows of that
-  # set size from the frame (#459). Derived rather than stored on the fit, so fits
-  # saved before this fix are covered too
-  attr(data, "fit_max_set_size") <- length(model$other_vars$nt_features) + 1
+  # brms may have dropped the rows of the largest set size from the frame (#459)
+  data <- carry_fit_bounds(model, data)
   NextMethod("revert_check_data")
 }
 

@@ -95,7 +95,8 @@
 #'
 #' @return An object of class brmsfit which contains the posterior draws along
 #'   with many other useful information about the model. Use methods(class =
-#'   "brmsfit") for an overview on available methods.
+#'   "brmsfit") for an overview on available methods. Their `newdata` argument
+#'   takes data in the layout you gave to `bmm()` (see [standata.bmmfit()]).
 #'
 #' @references Frischkorn, G. T., & Popov, V. (2023). A tutorial for estimating
 #'   mixture models for visual working memory tasks in brms: Introducing the
