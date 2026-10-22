@@ -42,6 +42,18 @@
   this fix restores the constant too. To estimate the parameter, give it
   a formula (`kappa ~ 1`); otherwise remove that prior from `prior`
   ([\#549](https://github.com/popov-lab/bmm/issues/549)).
+- After [`update()`](https://rdrr.io/r/stats/update.html) with a new
+  formula, a parameter that gains or loses its intercept, such as
+  `kappa ~ 0 + cond` updated to `kappa ~ 1 + cond`, now gets the priors
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) gives that
+  formula. It kept bmm’s default priors for the old formula, so the
+  effect of `cond` got the prior meant for its levels. Your own priors
+  from [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and from
+  earlier [`update()`](https://rdrr.io/r/stats/update.html) calls are
+  kept. Fits saved with earlier versions keep the previous behaviour;
+  refit them with
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) for the new
+  one ([\#538](https://github.com/popov-lab/bmm/issues/538)).
 - `update(formula. = )` with a formula that uses a column the fit did
   not keep now stops with a message that names the column and says to
   pass your data as `newdata`. It failed with brms’s “can neither be
@@ -52,6 +64,25 @@
   example `dist ~ b + e` after `dist ~ b + d`, also when `d` was fixed
   to a constant. It stopped with “The parameter ‘d’ is not a valid
   distributional or non-linear parameter”
+  ([\#552](https://github.com/popov-lab/bmm/issues/552)).
+- [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html),
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html),
+  [`predict()`](https://rdrr.io/r/stats/predict.html),
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) and
+  [`loo()`](https://mc-stan.org/loo/reference/loo.html) now take
+  `newdata` in the layout you gave to
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) for every
+  model. Before, models such as
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md),
+  [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md), the SDT
+  models,
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
+  and [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md) stopped
+  with “Missing variables” or “can neither be found in ‘data’ nor in
+  ‘data2’”. For these models, `newdata` needs the columns
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) needs,
+  including the response for
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
   ([\#552](https://github.com/popov-lab/bmm/issues/552)).
 - Clearer errors from
   [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) and its

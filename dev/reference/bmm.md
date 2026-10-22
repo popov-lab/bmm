@@ -158,7 +158,9 @@ fit_model(
 
 An object of class brmsfit which contains the posterior draws along with
 many other useful information about the model. Use methods(class =
-"brmsfit") for an overview on available methods.
+"brmsfit") for an overview on available methods. Their `newdata`
+argument takes data in the layout you gave to `bmm()` (see
+[`standata.bmmfit()`](https://venpopov.com/bmm/dev/reference/standata.bmmfit.md)).
 
 ## Supported Models
 
