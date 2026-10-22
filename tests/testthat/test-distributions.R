@@ -27,6 +27,9 @@ test_that("dsdm, psdm and rsdm stop with the same message for each invalid param
     expect_error(member(kappa = -1), "kappa must be non-negative", fixed = TRUE)
     expect_error(member(kappa = c(1, -1), c = c(1, 2)), "kappa must be non-negative", fixed = TRUE)
     expect_error(member(c = -1), "c must be non-negative", fixed = TRUE)
+    for (par in list(1, NA, c("bessel", "sqrtexp"), "gauss")) {
+      expect_error(member(parametrization = par), "Parametrization must be one of 'bessel' or 'sqrtexp'", fixed = TRUE)
+    }
   }
 })
 
@@ -75,6 +78,102 @@ test_that("psdm is 0.5 at mu when lower.bound is mu - pi, whatever mu", {
   expect_equal(psdm(mu + 1, mu, c = 3, kappa = 5, lower.bound = mu - pi) + psdm(mu - 1, mu, c = 3, kappa = 5, lower.bound = mu - pi), rep(1, 5))
 })
 
+test_that("psdm is 1 at the upper end and 0 at lower.bound, also where the sum rounds", {
+  # for these mu, mu + pi is an ulp above (mu - pi) + 2 * pi
+  for (mu in c(-1.9, -2.9, -0.9)) {
+    expect_identical(psdm(mu + pi, mu, c = 3, kappa = 5, lower.bound = mu - pi), 1)
+    expect_identical(psdm(mu - pi, mu, c = 3, kappa = 5, lower.bound = mu - pi), 0)
+  }
+  # here (mu + pi) - (mu - pi) and (lb + 2 * pi) - lb are not exactly 2 * pi
+  expect_identical(psdm(5.3 + pi, mu = 5.3, c = 3, kappa = 5, lower.bound = 5.3 - pi), 1)
+  expect_identical(psdm(1.8 + 2 * pi, lower.bound = 1.8), 1)
+  expect_identical(psdm(4.411322201024876 + 2 * pi, lower.bound = 4.411322201024876), 1)
+})
+
+test_that("psdm matches independently computed values of narrow distributions", {
+  # the expected values come from a Fourier series of the density, not from psdm
+  expect_equal(
+    psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100),
+    c(0.038448322764, 0.961551677236, 1, 1),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100, parametrization = "bessel"),
+    c(0.038542019868, 0.961457980132, 1, 1),
+    tolerance = 1e-8
+  )
+  expect_equal(psdm(2.5886723465579902, mu = 1.2, c = 8, kappa = 2), 0.989500751919, tolerance = 1e-8)
+  # these from a Gauss-Legendre rule and a split integrate(), both outside bmm
+  expect_equal(psdm(-2.8642135609090413, mu = -2.972, c = 3.794, kappa = 12.628), 0.625201913281481, tolerance = 1e-10)
+  expect_equal(psdm(-2.5, mu = -1.142, c = 8.298, kappa = 23.977), 4.48759884265636e-07, tolerance = 1e-8)
+  expect_equal(psdm(1.9, mu = -1.142, c = 8.298, kappa = 23.977), 0.99999913157208, tolerance = 1e-10)
+  expect_equal(qsdm(c(1e-6, 1 - 1e-6), mu = -1.142, c = 8.298, kappa = 23.977), c(-1.7325488416531, 1.71189120227268), tolerance = 1e-8)
+})
+
+test_that("psdm matches independently computed values of very narrow distributions", {
+  # from a Gauss-Legendre rule on 2^18 panels, the same on 2^20
+  expect_equal(
+    psdm(c(-3.1101767270538954, -3e-4, 3e-4), mu = 0, c = 930.8, kappa = 5100.2),
+    c(0, 0.000242686377686503, 0.999757313622313),
+    tolerance = 1e-9
+  )
+  expect_equal(psdm(c(-3e-4, 1e-4), mu = 0, c = 0.02, kappa = 1e7), c(1.40656029687921e-05, 0.938679424969398), tolerance = 1e-9)
+})
+
+test_that("psdm works where |q - mu| is a few ulps inside the cut-off of the kernel", {
+  # a Gauss-Legendre rule gives 1.7e-23 and 1 to double precision
+  q <- c(-0.14049057246282708, 0.14049057246282708)
+  expect_equal(psdm(q, mu = 0, c = 20, kappa = 100), c(0, 1), tolerance = 1e-15)
+})
+
+test_that("psdm and qsdm return NaN for the bessel parametrization above kappa = 1e5", {
+  expect_identical(
+    psdm(c(-pi, -0.01, 0.001, 0.5, pi), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"),
+    rep(NaN, 5)
+  )
+  expect_no_warning(res <- qsdm(c(0, 0.3, 1), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"))
+  expect_identical(res, rep(NaN, 3))
+})
+
+test_that("psdm does not decrease along the circle for a narrow distribution", {
+  q <- seq(-pi, pi, length.out = 201)
+  expect_gte(min(diff(psdm(q, mu = 0, c = 20, kappa = 100))), -1e-12)
+  expect_gte(min(diff(psdm(q, mu = 0.7, c = 20, kappa = 200))), -1e-12)
+})
+
+test_that("psdm pairs q, the parameters and lower.bound element-wise", {
+  expect_no_warning(
+    res <- psdm(c(0.4, -0.3), mu = c(0, 1, -1, 2, 0.5, -0.5), c = 3, kappa = 5, lower.bound = c(-pi, -2, -1))
+  )
+  expect_equal(res, c(
+    psdm(0.4, mu = 0, c = 3, kappa = 5, lower.bound = -pi),
+    psdm(-0.3, mu = 1, c = 3, kappa = 5, lower.bound = -2),
+    psdm(0.4, mu = -1, c = 3, kappa = 5, lower.bound = -1),
+    psdm(-0.3, mu = 2, c = 3, kappa = 5, lower.bound = -pi),
+    psdm(0.4, mu = 0.5, c = 3, kappa = 5, lower.bound = -2),
+    psdm(-0.3, mu = -0.5, c = 3, kappa = 5, lower.bound = -1)
+  ))
+})
+
+test_that("psdm and qsdm return NA for a missing value and nothing for no q", {
+  expect_identical(psdm(NA), NA_real_)
+  expect_identical(psdm(c(0.4, NA), mu = 0)[2], NA_real_)
+  expect_identical(psdm(0.4, mu = c(0, NA))[2], NA_real_)
+  expect_identical(psdm(numeric(0)), numeric(0))
+  expect_identical(qsdm(0.5, mu = NA), NA_real_)
+  expect_identical(qsdm(0.5, kappa = c(5, NA))[2], NA_real_)
+})
+
+test_that("psdm and qsdm return NaN for NaN, infinite and huge positions", {
+  expect_identical(psdm(c(Inf, -Inf, NaN, 1e300, 2e8)), rep(NaN, 5))
+  expect_identical(psdm(0.3, mu = -2e8), NaN)
+  expect_equal(psdm(0.3 + 2 * pi * 1e7, mu = 0, c = 3, kappa = 5), psdm(0.3, mu = 0, c = 3, kappa = 5), tolerance = 1e-8)
+  expect_identical(psdm(0.3, lower.bound = c(Inf, -Inf)), c(NaN, NaN))
+  expect_identical(psdm(0.3, mu = Inf), NaN)
+  expect_identical(qsdm(0.5, lower.bound = c(Inf, -Inf)), c(NaN, NaN))
+  expect_identical(qsdm(NaN), NaN)
+})
+
 test_that("qsdm matches independently computed quantiles", {
   p <- c(0.025, 0.25, 0.5, 0.75, 0.975)
   expect_equal(
@@ -102,6 +201,29 @@ test_that("qsdm matches independently computed quantiles", {
     c(-1.6664740454, 0.8663819230, 1.1779562294, 1.4706224867, 2.3265643834),
     tolerance = 1e-8
   )
+})
+
+test_that("qsdm matches independently computed quantiles of a narrow distribution", {
+  p <- c(0.001, 0.25, 0.75, 0.999)
+  expect_equal(
+    qsdm(p, mu = 0, c = 20, kappa = 50),
+    c(-0.059930398206, -0.012799725231, 0.012799725231, 0.059930398206),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 0, c = 20, kappa = 50, parametrization = "bessel"),
+    c(-0.060010882249, -0.012816159925, 0.012816159925, 0.060010882249),
+    tolerance = 1e-8
+  )
+})
+
+test_that("qsdm returns a quantile for p near 1 where lower.bound + 2 * pi rounds", {
+  # the 16 digits matter: (lb + 2 * pi) - lb is not exactly 2 * pi here
+  lb <- 4.411322201024876
+  for (par in c("sqrtexp", "bessel")) {
+    q <- qsdm(1 - 1e-13, mu = 0, c = 3, kappa = 5, lower.bound = lb, parametrization = par)
+    expect_true(q >= lb && q <= lb + 2 * pi)
+  }
 })
 
 test_that("qsdm is the median at mu for a distribution symmetric around mu", {

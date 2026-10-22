@@ -110,9 +110,8 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'   memory - A factorial model comparison. Psychological Review, 130(3), 841–852
 #'
 #' @return `dsdm` gives the density, `psdm` gives the distribution
-#'   function, `qsdm` gives the quantile function, `rsdm` generates
-#'   random deviates, and `.dsdm_integrate` is a helper function for
-#'   calculating the density of the SDM distribution.
+#'   function, `qsdm` gives the quantile function, and `rsdm` generates
+#'   random deviates.
 #'
 #' @details **Parametrization**
 #'
@@ -136,7 +135,10 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' `psdm` is 0 at `lower.bound` and 1 at `lower.bound + 2 * pi`; a `q` outside
 #' this range is wrapped around the circle. `qsdm` inverts `psdm` by root
 #' finding and returns values between `lower.bound` and `lower.bound + 2 * pi`.
-#' Values of `p` outside \[0, 1\] give `NaN` with a warning.
+#' Values of `p` outside \[0, 1\] give `NaN` with a warning. Missing values
+#' give `NA`; `NaN`, infinite values and positions (`q`, `mu`, `lower.bound`)
+#' beyond 1e8 in absolute value give `NaN`, as does the bessel
+#' parametrization for `kappa` above 1e5.
 #'
 #' @export
 #'
@@ -170,13 +172,8 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' lines(x, d, type = "l", col = "red")
 dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
                  parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa)
-
-  .dsdm_numer <- switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp,
-    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
-  )
+  .check_sdm_args(c, kappa, parametrization)
+  .dsdm_numer <- .sdm_numer(parametrization)
 
   lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
 
@@ -198,34 +195,15 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
 #' @export
 psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
                  lower.bound = -pi, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa)
-
-  circle <- 2 * base::pi
-  inside <- q >= lower.bound & q <= lower.bound + circle
-  offset <- ifelse(inside, q - lower.bound, (q - lower.bound) %% circle)
-
-  .dsdm_integrate <- function(mu, c, kappa, lower, upper, parametrization) {
-    stats::integrate(dsdm,
-      lower = lower, upper = upper, mu, c, kappa,
-      parametrization = parametrization
-    )$value
-  }
-
-  .dsdm_integrate_v <- Vectorize(.dsdm_integrate)
-
-  if (any(length(offset) > 1, length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
-    out <- .dsdm_integrate_v(mu, c, kappa,
-      lower = lower.bound, upper = lower.bound + offset,
-      parametrization = parametrization
-    )
+  .check_sdm_args(c, kappa, parametrization)
+  # mapply() refuses a zero-length q next to scalar parameters
+  out <- if (length(q) == 0) {
+    numeric(0)
   } else {
-    out <- .dsdm_integrate(mu, c, kappa,
-      lower = lower.bound, upper = lower.bound + offset,
-      parametrization = parametrization
-    )
+    as.numeric(mapply(.psdm_one, q, mu, c, kappa, lower.bound,
+      MoreArgs = list(numer = .sdm_numer(parametrization))
+    ))
   }
-
-  out[offset == circle] <- 1
 
   if (!lower.tail) {
     out <- 1 - out
@@ -240,11 +218,7 @@ psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @export
 qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
                  lower.bound = -pi, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa)
-  stopif(
-    !parametrization %in% c("bessel", "sqrtexp"),
-    "Parametrization must be one of 'bessel' or 'sqrtexp'"
-  )
+  .check_sdm_args(c, kappa, parametrization)
   if (length(p) == 0) {
     numeric(0)
   } else {
@@ -252,7 +226,7 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
     p <- if (lower.tail) p else 1 - p
     warnif(any(p < 0 | p > 1, na.rm = TRUE), "NaNs produced")
     as.numeric(mapply(.qsdm_root, p, mu, c, kappa, lower.bound,
-      MoreArgs = list(parametrization = parametrization)
+      MoreArgs = list(numer = .sdm_numer(parametrization))
     ))
   }
 }
@@ -260,14 +234,9 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @rdname SDMdist
 #' @export
 rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa)
+  .check_sdm_args(c, kappa, parametrization)
   stopif(length(n) > 1, "n must be a single integer")
-
-  .dsdm_numer <- switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp,
-    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
-  )
+  .dsdm_numer <- .sdm_numer(parametrization)
 
   # compare to the peak on the log scale: the unnormalized density itself
   # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
@@ -282,27 +251,150 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   )
 }
 
-.qsdm_root <- function(p, mu, c, kappa, lower.bound, parametrization) {
-  upper <- lower.bound + 2 * pi
-  if (is.na(p)) {
-    NA_real_
+.psdm_one <- function(q, mu, c, kappa, lower.bound, numer) {
+  undefined <- .sdm_undefined(
+    c(q, mu, c, kappa, lower.bound),
+    positions = c(q, mu, lower.bound),
+    amplitude = numer(0, 0, c, kappa, log = TRUE)
+  )
+  if (!is.null(undefined)) {
+    undefined
+  } else {
+    .sdm_cdf(q, mu, lower.bound, .sdm_kernel(numer, c, kappa))
+  }
+}
+
+.qsdm_root <- function(p, mu, c, kappa, lower.bound, numer) {
+  undefined <- .sdm_undefined(
+    c(p, mu, c, kappa, lower.bound),
+    positions = c(mu, lower.bound),
+    amplitude = numer(0, 0, c, kappa, log = TRUE)
+  )
+  if (!is.null(undefined)) {
+    undefined
   } else if (p < 0 || p > 1) {
     NaN
   } else if (p == 0) {
     lower.bound
   } else if (p == 1) {
-    upper
+    lower.bound + 2 * pi
   } else {
+    kernel <- .sdm_kernel(numer, c, kappa)
+    base <- .sdm_mass_below(lower.bound, mu, kernel)
+    # f.lower and f.upper are the CDF at the ends by definition, so the
+    # bracket holds however the CDF rounds next to them
     stats::uniroot(
-      function(x) psdm(x, mu, c, kappa, lower.bound = lower.bound, parametrization = parametrization) - p,
-      interval = c(lower.bound, upper), tol = 1e-12
+      function(x) .sdm_cdf(x, mu, lower.bound, kernel, base) - p,
+      interval = c(lower.bound, lower.bound + 2 * pi),
+      f.lower = -p, f.upper = 1 - p, tol = 1e-12
     )$root
   }
 }
 
-.check_sdm_args <- function(c, kappa) {
+# NULL for usable arguments. Otherwise NA for a missing value, and NaN for NaN,
+# an infinite value, a position beyond 1e8 (where an ulp is about 1.5e-8
+# radians) or an amplitude that is not finite: R's besselI() returns 0 for
+# kappa above 1e5. `amplitude` is evaluated only for finite arguments
+.sdm_undefined <- function(values, positions, amplitude) {
+  if (anyNA(values) && !any(is.nan(values))) {
+    NA_real_
+  } else if (!all(is.finite(values)) || any(abs(positions) > 1e8) ||
+               !is.finite(amplitude)) {
+    NaN
+  }
+}
+
+# The numerator over its peak in u = x - mu, in the sin()/expm1() form that
+# keeps its digits near the peak at large c and kappa. It is below exp(-50)
+# past `end`; the breaks keep integrate() from missing a peak that is far
+# narrower than the range it integrates over
+.sdm_kernel <- function(numer, c, kappa) {
+  amp <- numer(0, 0, c, kappa, log = TRUE)
+  depth <- if (amp > 50) -log1p(-50 / amp) / (2 * kappa) else Inf
+  end <- if (depth < 1) 2 * asin(sqrt(depth)) else pi
+  breaks <- 64^seq_len(8) / sqrt(kappa * max(amp, 1))
+  kernel <- list(
+    f = function(u) exp(amp * expm1(-2 * kappa * sin(u / 2)^2)),
+    ends = c(breaks[breaks < end], end)
+  )
+  kernel$norm <- 2 * .sdm_beyond(kernel, 0)
+  kernel
+}
+
+.sdm_beyond <- function(kernel, from) {
+  upper <- kernel$ends[kernel$ends > from]
+  lower <- c(from, upper[-length(upper)])
+  sum(vapply(seq_along(upper), function(i) {
+    # integrate() stops with "roundoff error" on an interval a few ulps wide
+    # (|q - mu| next to `end`); there the midpoint rule is exact enough
+    if (upper[i] - lower[i] < 1e-12) {
+      (upper[i] - lower[i]) * kernel$f((lower[i] + upper[i]) / 2)
+    } else {
+      stats::integrate(kernel$f, lower[i], upper[i],
+        rel.tol = 1e-10, abs.tol = .Machine$double.xmin
+      )$value
+    }
+  }, numeric(1)))
+}
+
+# Mass from the antimode mu - pi up to x, from the mass between x reflected
+# onto [mu, mu + pi] and the antimode: the peak is only ever at the end of an
+# interval, and flat parts of the CDF come from small tail integrals
+.sdm_mass_below <- function(x, mu, kernel) {
+  turns <- floor((x - mu + pi) / (2 * pi))
+  r <- x - mu - 2 * pi * turns
+  beyond <- .sdm_beyond(kernel, abs(r))
+  turns * kernel$norm + if (r < 0) beyond else kernel$norm - beyond
+}
+
+.sdm_cdf <- function(q, mu, lower.bound, kernel,
+                     base = .sdm_mass_below(lower.bound, mu, kernel)) {
+  offset <- .sdm_circle_offset(q, lower.bound)
+  if (offset == 2 * pi) {
+    1
+  } else if (offset == 0) {
+    0
+  } else {
+    # rounding can put the difference just outside [0, 1] where the CDF is flat
+    min(max(
+      (.sdm_mass_below(lower.bound + offset, mu, kernel) - base) / kernel$norm,
+      0
+    ), 1)
+  }
+}
+
+# at the upper end q - lower.bound can miss 2 * pi by a few ulps (q = 1.8 +
+# 2 * pi with lower.bound = 1.8), and wrapping would turn it into the lower end
+.sdm_circle_offset <- function(q, lower.bound) {
+  circle <- 2 * pi
+  offset <- q - lower.bound
+  tol <- 8 * .Machine$double.eps * max(1, abs(q), abs(lower.bound))
+  if (abs(offset - circle) <= tol) {
+    circle
+  } else if (abs(offset) <= tol) {
+    0
+  } else if (offset > 0 && offset < circle) {
+    offset
+  } else {
+    offset %% circle
+  }
+}
+
+.check_sdm_args <- function(c, kappa, parametrization) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  stopif(
+    !is.character(parametrization) || length(parametrization) != 1 ||
+      !parametrization %in% c("bessel", "sqrtexp"),
+    "Parametrization must be one of 'bessel' or 'sqrtexp'"
+  )
+}
+
+.sdm_numer <- function(parametrization) {
+  switch(parametrization,
+    bessel = .dsdm_numer_bessel,
+    sqrtexp = .dsdm_numer_sqrtexp
+  )
 }
 
 # helper functions for calculating the density of the SDM distribution

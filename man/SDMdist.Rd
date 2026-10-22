@@ -66,9 +66,8 @@ distribution}
 }
 \value{
 \code{dsdm} gives the density, \code{psdm} gives the distribution
-function, \code{qsdm} gives the quantile function, \code{rsdm} generates
-random deviates, and \code{.dsdm_integrate} is a helper function for
-calculating the density of the SDM distribution.
+function, \code{qsdm} gives the quantile function, and \code{rsdm} generates
+random deviates.
 }
 \description{
 Density, distribution function, and random generation for the
@@ -99,7 +98,10 @@ probability mass is below the mean of the response distribution.
 \code{psdm} is 0 at \code{lower.bound} and 1 at \code{lower.bound + 2 * pi}; a \code{q} outside
 this range is wrapped around the circle. \code{qsdm} inverts \code{psdm} by root
 finding and returns values between \code{lower.bound} and \code{lower.bound + 2 * pi}.
-Values of \code{p} outside [0, 1] give \code{NaN} with a warning.
+Values of \code{p} outside [0, 1] give \code{NaN} with a warning. Missing values
+give \code{NA}; \code{NaN}, infinite values and positions (\code{q}, \code{mu}, \code{lower.bound})
+beyond 1e8 in absolute value give \code{NaN}, as does the bessel
+parametrization for \code{kappa} above 1e5.
 }
 \examples{
 # plot the density of the SDM distribution
