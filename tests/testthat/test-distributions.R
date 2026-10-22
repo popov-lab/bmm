@@ -5,6 +5,8 @@ test_that("sdm distribution functions run without errors", {
   expect_true(length(res) == n)
   res <- psdm(runif(n, -pi, pi), mu = rnorm(n), c = 0:(n - 1), kappa = 0:(n - 1))
   expect_true(length(res) == n)
+  res <- qsdm(runif(n), mu = rnorm(n), c = 0:(n - 1), kappa = 0:(n - 1))
+  expect_true(length(res) == n)
   res <- rsdm(n, mu = rnorm(n), c = 0:(n - 1), kappa = 0:(n - 1))
   expect_true(length(res) == n)
 
@@ -18,6 +20,7 @@ test_that("dsdm, psdm and rsdm stop with the same message for each invalid param
   members <- list(
     dsdm = function(...) dsdm(0.5, ...),
     psdm = function(...) psdm(0.5, ...),
+    qsdm = function(...) qsdm(0.5, ...),
     rsdm = function(...) rsdm(2, ...)
   )
   for (member in members) {
@@ -42,6 +45,125 @@ test_that("psdm returns 0 for q == -pi, 0.5 for q = mu, and 1 for q almost pi, w
   expect_equal(psdm(-pi, mu = 0, c = 3, kappa = 3), 0)
   expect_equal(psdm(0, mu = 0, c = 3, kappa = 3), 0.5)
   expect_equal(psdm(pi - 0.00000000001, mu = 0, c = 3, kappa = 3), 1)
+})
+
+test_that("psdm returns 1 at the upper end of the circle and 0 at lower.bound", {
+  expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5), 1)
+  expect_equal(psdm(-pi, mu = 0, c = 3, kappa = 5), 0)
+  expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5, lower.tail = FALSE), 0)
+  expect_equal(psdm(1 + pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 1)
+  expect_equal(psdm(1 - pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 0)
+  expect_equal(psdm(2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0, parametrization = "bessel"), 1)
+  expect_equal(psdm(c(-pi, 0, pi), mu = 0, c = 3, kappa = 5), c(0, 0.5, 1))
+})
+
+test_that("psdm counts probability from lower.bound around the circle", {
+  expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5, lower.bound = 0), 0.5)
+  expect_equal(
+    psdm(-2, mu = 0, c = 3, kappa = 5, lower.bound = 0),
+    0.5 + psdm(-2, mu = 0, c = 3, kappa = 5)
+  )
+  expect_equal(
+    psdm(-2, mu = 0, c = 3, kappa = 5, lower.bound = 0),
+    psdm(-2 + 2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0)
+  )
+})
+
+test_that("psdm is 0.5 at mu when lower.bound is mu - pi, whatever mu", {
+  mu <- c(-2.5, -1, 0.3, 1.2, 3)
+  expect_equal(psdm(mu, mu, c = 3, kappa = 5, lower.bound = mu - pi), rep(0.5, 5))
+  expect_equal(psdm(mu + 1, mu, c = 3, kappa = 5, lower.bound = mu - pi) + psdm(mu - 1, mu, c = 3, kappa = 5, lower.bound = mu - pi), rep(1, 5))
+})
+
+test_that("qsdm matches independently computed quantiles", {
+  p <- c(0.025, 0.25, 0.5, 0.75, 0.975)
+  expect_equal(
+    qsdm(p, mu = 0, c = 3, kappa = 5),
+    c(-2.7299962425, -0.3587943398, 0, 0.3587943398, 2.7299962425),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 1.2, c = 8, kappa = 2),
+    c(-1.1371375470, 0.9004783701, 1.1848417892, 1.4571759540, 2.2262380039),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = -2.5, c = 0.5, kappa = 20),
+    c(-2.9749628367, -2.0835147654, -0.3529887814, 1.3949450289, 2.9679771890),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 0, c = 3, kappa = 5, parametrization = "bessel"),
+    c(-2.7469702720, -0.3748796718, 0, 0.3748796718, 2.7469702720),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 1.2, c = 8, kappa = 2, parametrization = "bessel"),
+    c(-1.6664740454, 0.8663819230, 1.1779562294, 1.4706224867, 2.3265643834),
+    tolerance = 1e-8
+  )
+})
+
+test_that("qsdm is the median at mu for a distribution symmetric around mu", {
+  expect_equal(qsdm(0.5, mu = 0), 0, tolerance = 1e-8)
+  expect_equal(qsdm(0.5, mu = 0, parametrization = "bessel"), 0, tolerance = 1e-8)
+  expect_equal(qsdm(0.5, mu = 1, c = 8, kappa = 2, lower.bound = 1 - pi), 1, tolerance = 1e-8)
+  expect_equal(qsdm(0.5, mu = -2.5, c = 8, kappa = 2, lower.bound = -2.5 - pi), -2.5, tolerance = 1e-8)
+})
+
+test_that("psdm(qsdm(p)) returns p to 1e-8 on both parametrizations", {
+  p <- seq(0.01, 0.99, length.out = 25)
+  sets <- list(
+    list(mu = 0, c = 3, kappa = 5),
+    list(mu = 1.2, c = 8, kappa = 2),
+    list(mu = -2.5, c = 0.5, kappa = 20)
+  )
+  for (par in c("sqrtexp", "bessel")) {
+    for (s in sets) {
+      q <- qsdm(p, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
+      back <- psdm(q, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
+      expect_lt(max(abs(back - p)), 1e-8)
+    }
+  }
+})
+
+test_that("qsdm handles lower.tail, log.p and lower.bound like psdm", {
+  expect_equal(qsdm(0.3, lower.tail = FALSE), qsdm(0.7))
+  expect_equal(qsdm(log(0.3), log.p = TRUE), qsdm(0.3))
+  expect_equal(qsdm(log(0.3), lower.tail = FALSE, log.p = TRUE), qsdm(0.7))
+
+  q <- qsdm(c(0.1, 0.5, 0.9), mu = 0, c = 3, kappa = 5, lower.bound = 0)
+  expect_true(all(q >= 0 & q <= 2 * pi))
+  expect_equal(q[2], pi, tolerance = 1e-8)
+  expect_equal(psdm(q, mu = 0, c = 3, kappa = 5, lower.bound = 0), c(0.1, 0.5, 0.9), tolerance = 1e-8)
+})
+
+test_that("qsdm returns the ends of the circle for p = 0 and p = 1", {
+  expect_equal(qsdm(c(0, 1), mu = 0, c = 3, kappa = 5), c(-pi, pi))
+  expect_equal(qsdm(c(0, 1), mu = 0, c = 3, kappa = 5, lower.bound = 1), c(1, 1 + 2 * pi))
+  expect_equal(qsdm(c(0, 1), mu = 0, c = 3, kappa = 5, lower.tail = FALSE), c(pi, -pi))
+})
+
+test_that("qsdm pairs p and the parameters element-wise", {
+  expect_equal(
+    qsdm(c(0.2, 0.8, 0.5), mu = c(0, 2, -1), c = c(3, 5, 1), kappa = c(5, 3, 8)),
+    c(
+      qsdm(0.2, mu = 0, c = 3, kappa = 5),
+      qsdm(0.8, mu = 2, c = 5, kappa = 3),
+      qsdm(0.5, mu = -1, c = 1, kappa = 8)
+    )
+  )
+  expect_length(qsdm(numeric(0)), 0)
+  expect_equal(qsdm(c(0.5, NA), mu = 0), c(0, NA), tolerance = 1e-8)
+})
+
+test_that("qsdm returns NaN with a warning for p outside [0, 1]", {
+  expect_warning(res <- qsdm(c(-0.1, 0.5, 1.1), mu = 0), "NaN")
+  expect_equal(res, c(NaN, 0, NaN), tolerance = 1e-8)
+})
+
+test_that("qsdm stops on an unknown parametrization", {
+  expect_error(qsdm(0.5, parametrization = "gauss"), "Parametrization must be one of")
 })
 
 

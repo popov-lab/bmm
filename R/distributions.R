@@ -127,11 +127,16 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' Since responses are on the circle, the cumulative distribution function
 #' requires you to choose a lower bound of integration. The default is
 #' \eqn{-\pi}, as for the brms::pvon_mises() function but you can choose any
-#' value in the argument `lower_bound` of `psdm`. Another useful
+#' value in the argument `lower.bound` of `psdm` and `qsdm`. Another useful
 #' choice is the mean of the response distribution minus \eqn{\pi}, e.g.
-#' `lower_bound = mu-pi`. This is the default in
+#' `lower.bound = mu-pi`. This is the default in
 #' `circular::pvonmises()`, and it ensures that 50% of the cumulative
 #' probability mass is below the mean of the response distribution.
+#'
+#' `psdm` is 0 at `lower.bound` and 1 at `lower.bound + 2 * pi`; a `q` outside
+#' this range is wrapped around the circle. `qsdm` inverts `psdm` by root
+#' finding and returns values between `lower.bound` and `lower.bound + 2 * pi`.
+#' Values of `p` outside \[0, 1\] give `NaN` with a warning.
 #'
 #' @export
 #'
@@ -193,14 +198,11 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
 #' @export
 psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
                  lower.bound = -pi, parametrization = "sqrtexp") {
-  # parts adapted from brms::pvon_mises
   .check_sdm_args(c, kappa)
 
-  pi <- base::pi
-  pi2 <- 2 * pi
-  q <- (q + pi) %% pi2
-  mu <- (mu + pi) %% pi2
-  lower.bound <- (lower.bound + pi) %% pi2
+  circle <- 2 * base::pi
+  inside <- q >= lower.bound & q <= lower.bound + circle
+  offset <- ifelse(inside, q - lower.bound, (q - lower.bound) %% circle)
 
   .dsdm_integrate <- function(mu, c, kappa, lower, upper, parametrization) {
     stats::integrate(dsdm,
@@ -211,17 +213,19 @@ psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 
   .dsdm_integrate_v <- Vectorize(.dsdm_integrate)
 
-  if (any(length(q) > 1, length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
+  if (any(length(offset) > 1, length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
     out <- .dsdm_integrate_v(mu, c, kappa,
-      lower = lower.bound, upper = q,
+      lower = lower.bound, upper = lower.bound + offset,
       parametrization = parametrization
     )
   } else {
     out <- .dsdm_integrate(mu, c, kappa,
-      lower = lower.bound, upper = q,
+      lower = lower.bound, upper = lower.bound + offset,
       parametrization = parametrization
     )
   }
+
+  out[offset == circle] <- 1
 
   if (!lower.tail) {
     out <- 1 - out
@@ -234,8 +238,23 @@ psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 
 #' @rdname SDMdist
 #' @export
-qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
-  .NotYetImplemented()
+qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
+                 lower.bound = -pi, parametrization = "sqrtexp") {
+  .check_sdm_args(c, kappa)
+  stopif(
+    !parametrization %in% c("bessel", "sqrtexp"),
+    "Parametrization must be one of 'bessel' or 'sqrtexp'"
+  )
+  if (length(p) == 0) {
+    numeric(0)
+  } else {
+    p <- if (log.p) exp(p) else p
+    p <- if (lower.tail) p else 1 - p
+    warnif(any(p < 0 | p > 1, na.rm = TRUE), "NaNs produced")
+    as.numeric(mapply(.qsdm_root, p, mu, c, kappa, lower.bound,
+      MoreArgs = list(parametrization = parametrization)
+    ))
+  }
 }
 
 #' @rdname SDMdist
@@ -261,6 +280,24 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
     proposal_fun = function(n) stats::runif(n, -pi, pi),
     mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
   )
+}
+
+.qsdm_root <- function(p, mu, c, kappa, lower.bound, parametrization) {
+  upper <- lower.bound + 2 * pi
+  if (is.na(p)) {
+    NA_real_
+  } else if (p < 0 || p > 1) {
+    NaN
+  } else if (p == 0) {
+    lower.bound
+  } else if (p == 1) {
+    upper
+  } else {
+    stats::uniroot(
+      function(x) psdm(x, mu, c, kappa, lower.bound = lower.bound, parametrization = parametrization) - p,
+      interval = c(lower.bound, upper), tol = 1e-12
+    )$root
+  }
 }
 
 .check_sdm_args <- function(c, kappa) {
