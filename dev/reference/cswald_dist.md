@@ -99,7 +99,9 @@ qcswald(
 - log:
 
   A single logical value indicating if log-likelihoods should be
-  returned, the default is `TRUE`
+  returned. The default is `TRUE` until bmm 1.6.0 and `FALSE` from then
+  on, as in base R and the other density functions of bmm. Pass `log` to
+  get the same result in every version.
 
 - n:
 

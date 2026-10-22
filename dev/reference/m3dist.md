@@ -44,7 +44,10 @@ rm3(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE, ...)
 
 - log:
 
-  Logical; if `TRUE` (default), values are returned on the log scale.
+  Logical; if `TRUE` (default until bmm 1.6.0), values are returned on
+  the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+  and the other density functions of bmm. Pass `log` to get the same
+  result in every version.
 
 - ...:
 
@@ -90,7 +93,7 @@ model <- m3(
 )
 
 # No need to provide b parameter
-dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model, log = TRUE)
 #> [1] -14.88885
 rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
 #>       corr other npl

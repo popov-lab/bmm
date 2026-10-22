@@ -60,7 +60,10 @@ rmpt(
 
 - log:
 
-  Logical; if `TRUE` (default), densities are returned on the log scale.
+  Logical; if `TRUE` (default until bmm 1.6.0), densities are returned
+  on the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base
+  R and the other density functions of bmm. Pass `log` to get the same
+  result in every version.
 
 - covariates:
 
@@ -101,8 +104,9 @@ Unlike the densities of the circular models in this package
 [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
 [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)) and
 unlike [`stats::dmultinom()`](https://rdrr.io/r/stats/Multinom.html),
-`dmpt()` returns the log density by default, matching
-[`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md).
+`dmpt()` returns the log density by default, as
+[`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md) does. The
+default becomes `FALSE` in bmm 1.6.0, which matches them.
 
 ## References
 
@@ -125,7 +129,7 @@ model <- mpt(list(tree_target, tree_lure), tree_id = "item_type")
 
 dmpt(
   x = c(35, 15), pars = c(D = 0.7, g = 0.5),
-  mpt_model = model, tree = "target"
+  mpt_model = model, tree = "target", log = TRUE
 )
 #> [1] -5.702642
 rmpt(

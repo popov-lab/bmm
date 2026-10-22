@@ -140,6 +140,17 @@
 
 #### Other changes
 
+- In bmm 1.6.0 the default of `log` in
+  [`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md),
+  [`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md),
+  [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md),
+  [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
+  and [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
+  changes from `TRUE` to `FALSE`, as in base R and the other density
+  functions of bmm. A call without `log` then returns the density, not
+  the log density. Nothing changes in 1.5.0. Pass `log = TRUE` to keep
+  the log density
+  ([\#553](https://github.com/popov-lab/bmm/issues/553)).
 - bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or
   older, [`update()`](https://rdrr.io/r/stats/update.html) can fail on a
   fit saved with an older CmdStanR, with

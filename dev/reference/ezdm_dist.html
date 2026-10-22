@@ -135,7 +135,10 @@ for below-chance performance).</p></dd>
 
 
 <dt id="arg-log">log<a class="anchor" aria-label="anchor" href="#arg-log"></a></dt>
-<dd><p>Logical; if <code>TRUE</code>, values are returned on the log scale.</p></dd>
+<dd><p>Logical; if <code>TRUE</code> (default until bmm 1.6.0), values are returned on
+the log scale. From bmm 1.6.0 on the default is <code>FALSE</code>, as in base R
+and the other density functions of bmm. Pass <code>log</code> to get the same
+result in every version.</p></dd>
 
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
@@ -213,7 +216,7 @@ Psychonomic Bulletin &amp; Review.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># 3-parameter version (single observation)</span></span></span>
 <span class="r-in"><span><span class="fu">dezdm</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  mean_rt <span class="op">=</span> <span class="fl">0.5</span>, var_rt <span class="op">=</span> <span class="fl">0.02</span>, n_upper <span class="op">=</span> <span class="fl">80</span>, n_trials <span class="op">=</span> <span class="fl">100</span>,</span></span>
-<span class="r-in"><span>  drift <span class="op">=</span> <span class="fl">2</span>, bound <span class="op">=</span> <span class="fl">1.5</span>, ndt <span class="op">=</span> <span class="fl">0.3</span></span></span>
+<span class="r-in"><span>  drift <span class="op">=</span> <span class="fl">2</span>, bound <span class="op">=</span> <span class="fl">1.5</span>, ndt <span class="op">=</span> <span class="fl">0.3</span>, log <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] -30.99022</span>
 <span class="r-in"><span></span></span>
@@ -221,7 +224,7 @@ Psychonomic Bulletin &amp; Review.</p>
 <span class="r-in"><span><span class="fu">dezdm</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  mean_rt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">0.55</span><span class="op">)</span>, var_rt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.02</span>, <span class="fl">0.025</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  n_upper <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">80</span>, <span class="fl">75</span><span class="op">)</span>, n_trials <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">100</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  drift <span class="op">=</span> <span class="fl">2</span>, bound <span class="op">=</span> <span class="fl">1.5</span>, ndt <span class="op">=</span> <span class="fl">0.3</span></span></span>
+<span class="r-in"><span>  drift <span class="op">=</span> <span class="fl">2</span>, bound <span class="op">=</span> <span class="fl">1.5</span>, ndt <span class="op">=</span> <span class="fl">0.3</span>, log <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] -30.99022 -27.30733</span>
 <span class="r-in"><span></span></span>
@@ -229,7 +232,7 @@ Psychonomic Bulletin &amp; Review.</p>
 <span class="r-in"><span><span class="fu">dezdm</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  mean_rt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.45</span>, <span class="fl">0.55</span><span class="op">)</span>, var_rt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.018</span>, <span class="fl">0.025</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  n_upper <span class="op">=</span> <span class="fl">80</span>, n_trials <span class="op">=</span> <span class="fl">100</span>,</span></span>
-<span class="r-in"><span>  drift <span class="op">=</span> <span class="fl">2</span>, bound <span class="op">=</span> <span class="fl">1.5</span>, ndt <span class="op">=</span> <span class="fl">0.3</span>, zr <span class="op">=</span> <span class="fl">0.55</span>, version <span class="op">=</span> <span class="st">"4par"</span></span></span>
+<span class="r-in"><span>  drift <span class="op">=</span> <span class="fl">2</span>, bound <span class="op">=</span> <span class="fl">1.5</span>, ndt <span class="op">=</span> <span class="fl">0.3</span>, zr <span class="op">=</span> <span class="fl">0.55</span>, version <span class="op">=</span> <span class="st">"4par"</span>, log <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] -37.10626</span>
 <span class="r-in"><span></span></span>

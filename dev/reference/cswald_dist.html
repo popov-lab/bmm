@@ -154,7 +154,9 @@ and "crisk", the default is "simple."</p></dd>
 
 <dt id="arg-log">log<a class="anchor" aria-label="anchor" href="#arg-log"></a></dt>
 <dd><p>A single logical value indicating if log-likelihoods should be
-returned, the default is <code>TRUE</code></p></dd>
+returned. The default is <code>TRUE</code> until bmm 1.6.0 and <code>FALSE</code> from then on,
+as in base R and the other density functions of bmm. Pass <code>log</code> to get the
+same result in every version.</p></dd>
 
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
