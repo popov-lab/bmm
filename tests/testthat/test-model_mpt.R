@@ -1315,10 +1315,13 @@ test_that("the rank check takes the maximum over the parameter test points", {
   k <- bmm:::.mpt_test_points("a", list())[[1]][["a"]]
   spelling <- sprintf("%a", k)
   expect_identical(str2lang(spelling), k)
-  model <- mpt(mpt_tree("t", list(
-    yes = glue("0.5 + 0.5 * (a - {spelling})^2"),
-    no = glue("0.5 - 0.5 * (a - {spelling})^2")
-  )))
+  expect_message(
+    model <- mpt(mpt_tree("t", list(
+      yes = glue("0.5 + 0.5 * (a - {spelling})^2"),
+      no = glue("0.5 - 0.5 * (a - {spelling})^2")
+    ))),
+    "local search"
+  )
   expect_match(
     mpt_printed(model),
     "Jacobian rank 1 of 1 at interior test values: locally identified"
@@ -1384,8 +1387,8 @@ test_that("the rank check stacks rows over covariate values and never frees a co
   expect_match(printed, "Jacobian rank 2 of 2")
   both <- data.frame(x = c(0, 1, 1), yes = 5, no = 5)
   expect_no_warning(expect_no_message(check_model(switch_tree, both, bmf(a ~ 1, b ~ 1))))
-  # bmm() does not look at the data: a covariate with one distinct value
-  # leaves b open without a warning
+  # check_model() does not look at the data: a covariate with one distinct
+  # value leaves b open, which check_data() reports (#560)
   only_a <- data.frame(x = c(1, 1), yes = 5, no = 5)
   expect_no_warning(expect_no_message(check_model(switch_tree, only_a, bmf(a ~ 1, b ~ 1))))
 
@@ -1498,8 +1501,115 @@ test_that("bmm() does not look at the data for identifiability", {
   expect_no_warning(expect_no_message(check_model(two_htm, only_old, bmf(D ~ 1, g ~ 1))))
 })
 
+# scaled guessing: g * x with x a design value; the old tree identifies Do, the
+# new tree Dn, and g only through rows with different x
+mpt_scaled_guessing <- function() {
+  mpt(list(
+    mpt_tree("old", list(old = "Do + (1 - Do) * g * x", new = "1 - Do - (1 - Do) * g * x")),
+    mpt_tree("new", list(old = "(1 - Dn) * g * x", new = "1 - (1 - Dn) * g * x"))
+  ), tree_id = "item_type", covariates = "x")
+}
+
+test_that("check_data() warns when the covariate values in the data leave the model unidentified (#560)", {
+  model <- mpt_scaled_guessing()
+  printed <- mpt_printed(model)
+  expect_match(printed, "Jacobian rank 3 of 3 at interior test values and 5 test values of the covariates: locally identified")
+  expect_match(printed, "bmm() takes the rank again at the covariate values each tree has in the data.", fixed = TRUE)
+  formula <- bmf(Do ~ 1, Dn ~ 1, g ~ 1)
+  layout <- function(x) data.frame(item_type = rep(c("old", "new"), each = 2), x = x, old = 6, new = 4)
+
+  # one value in every row, and one value per tree: the rank is 2 of 3 either way
+  expect_warning(
+    check_data(model, layout(0.5), formula),
+    paste0(
+      "The model is not identified with the covariate values in the data\\. ",
+      "Jacobian rank 2 of 3 at interior test values and the covariate values in the data: ",
+      "the combination of all free parameters is not identified by the branch expressions\\. ",
+      "'x' takes a single value within tree\\(s\\) 'old', 'new'\\. ",
+      "With 5 test values of the covariates the rank is 3"
+    )
+  )
+  expect_warning(
+    check_data(model, layout(c(0.3, 0.3, 0.7, 0.7)), formula),
+    "Jacobian rank 2 of 3 .*'x' takes a single value within tree\\(s\\) 'old', 'new'"
+  )
+  expect_silent(check_data(model, layout(c(0.3, 0.7, 0.3, 0.7)), formula))
+
+  # with a predictor the formula may identify what the branches leave open
+  with_predictor <- transform(layout(0.5), cond = c("a", "b", "a", "b"))
+  expect_message(
+    expect_no_warning(check_data(model, with_predictor, bmf(Do ~ cond, Dn ~ 1, g ~ 1))),
+    "With the covariate values in the data, the branch expressions alone do not identify all free parameters\\. 'x' takes a single value"
+  )
+
+  # bmm_data_check() reports the warning among its hard checks
+  report <- bmm_data_check(formula, layout(0.5), model)
+  expect_match(report$pipeline$warnings, "not identified with the covariate values in the data", all = FALSE)
+})
+
+test_that("check_data() stays silent when a constant covariate does not matter (#560)", {
+  # one parameter per tree: D is identified at any single value of x
+  one_par <- mpt(list(
+    mpt_tree("old", list(old = "D + (1 - D) * x", new = "(1 - D) * (1 - x)")),
+    mpt_tree("new", list(old = "(1 - D) * x", new = "D + (1 - D) * (1 - x)"))
+  ), tree_id = "item_type", covariates = "x")
+  dat <- data.frame(item_type = c("old", "new"), x = 0.5, old = 6, new = 4)
+  expect_silent(check_data(one_par, dat, bmf(D ~ 1)))
+
+  # a switch covariate with one value leaves b out of every row
+  switch_tree <- mpt(
+    mpt_tree("t", list(yes = "x * a + (1 - x) * b", no = "1 - x * a - (1 - x) * b")),
+    covariates = "x"
+  )
+  expect_silent(check_data(switch_tree, data.frame(x = c(0, 1), yes = 5, no = 5), bmf(a ~ 1, b ~ 1)))
+  expect_warning(
+    check_data(switch_tree, data.frame(x = c(1, 1), yes = 5, no = 5), bmf(a ~ 1, b ~ 1)),
+    "Jacobian rank 1 of 2 .*'b' is not identified.*'x' takes a single value within tree\\(s\\) 't'"
+  )
+
+  # a parameter fixed in the formula is known, here as in print(); bmm()
+  # runs check_model() before check_data()
+  fixed_g <- bmf(Do ~ 1, Dn ~ 1, g = 0.5)
+  dat <- data.frame(item_type = c("old", "new"), x = 0.5, old = 6, new = 4)
+  checked <- check_model(mpt_scaled_guessing(), dat, fixed_g)
+  expect_silent(check_data(checked, dat, fixed_g))
+})
+
+test_that("check_data() takes the covariate values only from rows with trials (#560)", {
+  model <- mpt_scaled_guessing()
+  formula <- bmf(Do ~ 1, Dn ~ 1, g ~ 1)
+  dat <- data.frame(
+    item_type = rep(c("old", "new"), each = 2), x = c(0.3, 0.7, 0.3, 0.7), old = 6, new = 4
+  )
+  dat[dat$x == 0.7, c("old", "new")] <- 0
+  expect_warning(
+    check_data(model, dat, formula),
+    paste0(
+      "not identified with the covariate values in the data.*",
+      "'x' takes a single value within tree\\(s\\) 'old', 'new'\\."
+    )
+  )
+
+  # a tree whose rows all have zero trials keeps the test values, like a tree
+  # without rows, so only the old tree has a constant x
+  empty_new <- data.frame(
+    item_type = rep(c("old", "new"), each = 2), x = 0.5,
+    old = c(6, 6, 0, 0), new = c(4, 4, 0, 0)
+  )
+  expect_warning(
+    check_data(model, empty_new, formula),
+    paste0(
+      "not identified with the covariate values in the data.*",
+      "'x' takes a single value within tree\\(s\\) 'old'\\."
+    )
+  )
+})
+
 test_that("the Jacobian rank is reported as not computed when D() cannot differentiate", {
-  model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
+  expect_message(
+    model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)"))),
+    "local search"
+  )
   printed <- mpt_printed(model)
   expect_match(printed, "Jacobian rank not computed: .*'plogis'")
   expect_silent(check_model(model, data.frame(x = 1, y = 1), bmf(a ~ 1)))
@@ -1507,7 +1617,10 @@ test_that("the Jacobian rank is reported as not computed when D() cannot differe
 
 test_that("without a rank, check_model() uses the count of free parameters", {
   scaled <- "a * b * (0.5 + 0.2 * abs(c - 0.5))"
-  model <- mpt(mpt_tree("t", list(y = scaled, n = glue("1 - {scaled}"))))
+  expect_message(
+    model <- mpt(mpt_tree("t", list(y = scaled, n = glue("1 - {scaled}")))),
+    "local search"
+  )
   expect_warning(
     check_model(model, data.frame(y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
     paste0(
@@ -1542,9 +1655,12 @@ test_that("a test value with a non-finite derivative is left out of the rank", {
     ))
   }
   left_out <- "At 1 of the 5 interior test values a derivative .*not finite, so the rank is taken at the other 4"
-  product <- mpt(list(
-    mpt_tree("t1", list(y = "a * b", n = "1 - a * b")), cusp_tree(glue("c - {sprintf('%a', k)}"))
-  ), tree_id = "tr")
+  expect_message(
+    product <- mpt(list(
+      mpt_tree("t1", list(y = "a * b", n = "1 - a * b")), cusp_tree(glue("c - {sprintf('%a', k)}"))
+    ), tree_id = "tr"),
+    "local search"
+  )
   expect_match(mpt_printed(product), glue("Jacobian rank 2 of 3 at interior test values: .*{left_out}"))
   expect_warning(
     check_model(product, data.frame(tr = c("t1", "t2"), y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
@@ -1552,9 +1668,12 @@ test_that("a test value with a non-finite derivative is left out of the rank", {
   )
   # the test points depend on the symbols, so c takes other values here
   k_ac <- vapply(bmm:::.mpt_test_points(c("a", "c"), list()), `[[`, numeric(1), "c")[1]
-  identified <- mpt(list(
-    mpt_tree("t1", list(y = "a", n = "1 - a")), cusp_tree(glue("c - {sprintf('%a', k_ac)}"))
-  ), tree_id = "tr")
+  expect_message(
+    identified <- mpt(list(
+      mpt_tree("t1", list(y = "a", n = "1 - a")), cusp_tree(glue("c - {sprintf('%a', k_ac)}"))
+    ), tree_id = "tr"),
+    "local search"
+  )
   expect_match(mpt_printed(identified), glue("Jacobian rank 2 of 2 at interior test values: locally identified\\. {left_out}"))
 })
 
@@ -1577,10 +1696,13 @@ test_that("a rank that only one finite test value would give is not computed", {
   k <- vapply(bmm:::.mpt_test_points(c("a", "c"), list()), `[[`, numeric(1), "c")
   cusps <- paste(glue("((c - {sprintf('%a', k[1:4])})^2)^0.25"), collapse = " + ")
   shape <- glue("(c - {sprintf('%a', k[5])})^2 * (1 + 0.05 * ({cusps}))")
-  model <- mpt(list(
-    mpt_tree("t1", list(y = "a", n = "1 - a")),
-    mpt_tree("t2", list(y = glue("0.3 + 0.2 * {shape}"), n = glue("0.7 - 0.2 * {shape}")))
-  ), tree_id = "tr")
+  expect_message(
+    model <- mpt(list(
+      mpt_tree("t1", list(y = "a", n = "1 - a")),
+      mpt_tree("t2", list(y = glue("0.3 + 0.2 * {shape}"), n = glue("0.7 - 0.2 * {shape}")))
+    ), tree_id = "tr"),
+    "local search"
+  )
   expect_match(
     mpt_printed(model),
     "Jacobian rank not computed: at 4 of the 5 interior test values some derivative"
@@ -2281,7 +2403,12 @@ test_that("check_data checks a parameter that enters a branch twice on a grid", 
     check_data(model, data.frame(G = 1.01, yes = 6, no = 4), formula),
     "category 'yes' in tree 't' is 1.01 in row 1, outside \\(0, 1\\] at the test parameter values u = 0.5"
   )
-  expect_silent(check_data(model, data.frame(G = 0.9, yes = 6, no = 4), formula))
+  # valid, but 4 u (1 - u) G is not in the certified form, so the range
+  # between the vertices is searched (#560)
+  expect_message(
+    check_data(model, data.frame(G = 0.9, yes = 6, no = 4), formula),
+    "category 'yes' in tree 't', category 'no' in tree 't'.*local search"
+  )
 })
 
 test_that("check_data accepts the design-fixed guessing tree of the article over its covariate range", {
@@ -2310,10 +2437,11 @@ test_that("check_data accepts the design-fixed guessing tree of the article over
 
 test_that("check_data names a branch whose range is only checked approximately", {
   parameters <- paste0("p", 1:11)
-  build <- function(n_parameters) {
+  # the division keeps the tree outside the certified form (#560)
+  build <- function(n_parameters, scale = " / 2") {
     product <- paste(parameters[seq_len(n_parameters)], collapse = " * ")
     mpt(mpt_tree("t", list(
-      yes = glue("{product} * G"), no = glue("1 - {product} * G")
+      yes = glue("{product} * G{scale}"), no = glue("1 - {product} * G{scale}")
     )), covariates = "G")
   }
   dat <- data.frame(G = 0.5, yes = 6, no = 4)
@@ -2326,9 +2454,11 @@ test_that("check_data names a branch whose range is only checked approximately",
   expect_match(msgs, "category 'yes' in tree 't', category 'no' in tree 't'.*not every vertex")
   # the fallback still runs the range check at the corners
   expect_error(
-    suppressMessages(check_data(build(11), transform(dat, G = 1.5), formula)),
+    suppressMessages(check_data(build(11), transform(dat, G = 3), formula)),
     "outside \\(0, 1\\]"
   )
+  # in the certified form the sampled vertices do not matter
+  expect_silent(check_data(build(11, scale = ""), dat, formula))
 })
 
 test_that("check_data checks the vertices of a simplex group as one dimension", {
@@ -2500,23 +2630,103 @@ test_that("mpt() refuses a tree without covariates that leaves (0, 1] at a mixed
       yes = glue("{scale} * u * (1 - u)"), no = glue("1 - {scale} * u * (1 - u)")
     ))
   }
-  expect_silent(mpt(pair(4)))
+  expect_message(mpt(pair(4)), "local search")
   expect_error(mpt(pair(4.04)), "category 'yes' in tree 't' is 1.01 at the test values u = 0.5")
 
   # a tree that uses a covariate is decided by check_data(), not here
   expect_silent(mpt(mixed("2 * G"), covariates = "G"))
 })
 
-test_that("mpt() names the branches of a tree without covariates whose vertices it only samples", {
-  parameters <- paste0("p", 1:11)
-  product <- paste(parameters, collapse = " * ")
-  tree <- mpt_tree("t", list(yes = product, no = glue("1 - {product}")))
+test_that("mpt() refuses branches that leave (0, 1] between the old test points (#560)", {
+  # 7 u (1 - u)^2 peaks at 28/27 at u = 1/3, between 0, 0.5 and 1
+  cubic <- mpt_tree("t", list(y = "7 * u * (1 - u)^2", n = "1 - 7 * u * (1 - u)^2"))
+  expect_error(mpt(cubic), "category 'y' in tree 't' is 1\\.037[0-9]* at the test values u = 0\\.333[0-9]*, outside \\(0, 1\\]")
+
+  # 30 gA gB gC peaks at 30/27 on the face gD = 0 of a four-member simplex,
+  # away from its vertices, pair midpoints and centroid
+  face <- mpt_tree("t", list(
+    A = "30 * gA * gB * gC",
+    B = "gD * (1 - 30 * gA * gB * gC)",
+    C = "(1 - gD) * (1 - 30 * gA * gB * gC)"
+  ))
+  expect_error(
+    mpt(face, simplex = c("gA", "gB", "gC", "gD")),
+    "category 'A' in tree 't' is 1\\.111[0-9]* at the test values gA = 0\\.333[0-9]*, gB = 0\\.333[0-9]*, gC = 0\\.333[0-9]*"
+  )
+})
+
+test_that("mpt() accepts higher-degree trees built from parameters and complements without a message (#560)", {
+  pair_clustering <- mpt_tree("pairs", list(
+    E1 = "c * r", E2 = "(1 - c) * u^2",
+    E3 = "(1 - c) * 2 * u * (1 - u)", E4 = "c * (1 - r) + (1 - c) * (1 - u)^2"
+  ))
+  expect_silent(mpt(pair_clustering))
+
+  # the same holds for a simplex group whose members multiply
+  expect_silent(mpt(mpt_tree("t", list(
+    A = "gA * gB * gC", B = "1 - gA * gB * gC"
+  )), simplex = c("gA", "gB", "gC")))
+  # and for a covariate exponent with whole values in the data
+  repeated <- mpt(mpt_tree("t", list(hit = "1 - (1 - D)^n", miss = "(1 - D)^n")), covariates = "n")
+  expect_silent(check_data(repeated, data.frame(n = c(2, 200), hit = 5, miss = 5), bmf(D ~ 1)))
+})
+
+test_that("mpt() names a higher-degree branch whose range it can only search (#560)", {
+  # valid, (a - 0.3)^2 is at most 0.49, but not a sum of products of
+  # parameters and complements, so the range is searched rather than proven
+  tree <- mpt_tree("t", list(y = "0.5 + 0.5 * (a - 0.3)^2", n = "0.5 - 0.5 * (a - 0.3)^2"))
   msgs <- testthat::capture_messages(mpt(tree))
   expect_length(msgs, 1L)
-  expect_match(msgs, "category 'yes' in tree 't', category 'no' in tree 't'.*not every vertex")
+  expect_match(msgs, "category 'y' in tree 't', category 'n' in tree 't'.*local search")
+})
 
-  ten <- paste(parameters[1:10], collapse = " * ")
-  expect_silent(mpt(mpt_tree("t", list(yes = ten, no = glue("1 - {ten}")))))
+test_that("check_data() refuses a higher-degree branch that leaves (0, 1] with the observed covariates (#560)", {
+  model <- mpt(mpt_tree("t", list(
+    y = "7 * u * (1 - u)^2 * G", n = "1 - 7 * u * (1 - u)^2 * G"
+  )), covariates = "G")
+  expect_error(
+    check_data(model, data.frame(G = c(0.5, 1), y = 6, n = 4), bmf(u ~ 1)),
+    "category 'y' in tree 't' is 1\\.037[0-9]* in row 2, outside \\(0, 1\\] at the test parameter values u = 0\\.333"
+  )
+  expect_message(
+    check_data(model, data.frame(G = c(0.5, 0.9), y = 6, n = 4), bmf(u ~ 1)),
+    "category 'y' in tree 't', category 'n' in tree 't'.*local search"
+  )
+
+  # a covariate counts as a probability only with its values in [0, 1]: at
+  # G = 1 the tree is certified, at G = 7 the cubic peaks at 28/27
+  scaled <- mpt(mpt_tree("t", list(
+    y = "G * u * (1 - u)^2", n = "1 - G * u * (1 - u)^2"
+  )), covariates = "G")
+  expect_silent(check_data(scaled, data.frame(G = 1, y = 6, n = 4), bmf(u ~ 1)))
+  expect_error(
+    check_data(scaled, data.frame(G = c(1, 7), y = 6, n = 4), bmf(u ~ 1)),
+    "category 'y' in tree 't' is 1\\.037[0-9]* in row 2"
+  )
+
+  # a covariate in [0, 1] counts as a probability: the tree is exact
+  pairs <- mpt(mpt_tree("pairs", list(
+    E1 = "c * r * G", E2 = "(1 - c * G) * u^2",
+    E3 = "(1 - c * G) * 2 * u * (1 - u)", E4 = "c * G * (1 - r) + (1 - c * G) * (1 - u)^2"
+  )), covariates = "G")
+  expect_silent(check_data(pairs, data.frame(G = c(0.4, 1), E1 = 1, E2 = 2, E3 = 3, E4 = 4), bmf(c ~ 1, r ~ 1, u ~ 1)))
+})
+
+test_that("mpt() names the branches of a tree without covariates whose vertices it only samples", {
+  parameters <- paste0("p", 1:11)
+  # the division keeps the tree outside the certified form (#560)
+  halved <- function(n_parameters) {
+    product <- paste(parameters[seq_len(n_parameters)], collapse = " * ")
+    mpt_tree("t", list(yes = glue("{product} / 2"), no = glue("1 - {product} / 2")))
+  }
+  msgs <- testthat::capture_messages(mpt(halved(11)))
+  expect_length(msgs, 1L)
+  expect_match(msgs, "category 'yes' in tree 't', category 'no' in tree 't'.*not every vertex")
+  expect_silent(mpt(halved(10)))
+
+  # in the certified form the sampled vertices do not matter
+  product <- paste(parameters, collapse = " * ")
+  expect_silent(mpt(mpt_tree("t", list(yes = product, no = glue("1 - {product}")))))
 })
 
 test_that("a branch that cancels to just below 0 at a corner is accepted", {
@@ -2532,15 +2742,17 @@ test_that("a branch that cancels to just below 0 at a corner is accepted", {
   ))
   expect_silent(mpt(mpt_tree("t", chain)))
 
+  # the expanded (1 - a)^7 is not in the certified form, so its range is
+  # also searched (#560), which finds nothing below -tolerance either
   expanded <- "1 - 7*a + 21*a^2 - 35*a^3 + 35*a^4 - 21*a^5 + 7*a^6 - a^7"
-  expect_silent(mpt(mpt_tree("t", list(y = glue("1 - ({expanded})"), n = expanded))))
+  expect_message(mpt(mpt_tree("t", list(y = glue("1 - ({expanded})"), n = expanded))), "local search")
 
   # the same rule holds where the covariate values of the data are checked
   scaled <- mpt(
     mpt_tree("t", list(y = glue("1 - x * ({expanded})"), n = glue("x * ({expanded})"))),
     covariates = "x"
   )
-  expect_silent(check_data(scaled, data.frame(x = 1, y = 5, n = 5), bmf(a ~ 1)))
+  expect_message(check_data(scaled, data.frame(x = 1, y = 5, n = 5), bmf(a ~ 1)), "local search")
   shifted <- mpt(
     mpt_tree("t", list(yes = "x * (1.2 * a - 0.2)", no = "1 - x * (1.2 * a - 0.2)")),
     covariates = "x"
@@ -2587,7 +2799,10 @@ test_that("mpt() alone decides a tree without covariates in a model with covaria
     0.001, 0.999
   )
   bump <- paste0("(D - ", sprintf("%.10f", checked_d), ")", collapse = " * ")
-  model <- build(mpt_tree("t2", list(A = "D", B = glue("1 - D + {bump}")), impossible = "C"))
+  expect_message(
+    model <- build(mpt_tree("t2", list(A = "D", B = glue("1 - D + {bump}")), impossible = "C")),
+    "local search"
+  )
   dat <- data.frame(tree = c("t1", "t2"), x = 0.5, A = 3, B = 3, C = c(3, 0))
   expect_silent(check_data(model, dat, bmf(D ~ 1)))
 })
