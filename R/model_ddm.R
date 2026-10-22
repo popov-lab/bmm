@@ -154,10 +154,10 @@ check_data.ddm <- function(model, data, formula) {
 
   data <- check_rt_data(
     data, rt_var, response_var,
-    fast_rt_hint = paste(
-      "It is likely that the model will not be able to sample with the",
-      "current settings of the initial values.\n",
-      "Either pass your own initial value function or consider filtering",
+    fast_rt_hint = paste0(
+      "It is likely that the model will not be able to sample with the ",
+      "current settings of the initial values.\n\n",
+      "Either pass your own initial value function or consider filtering ",
       "reaction times below 0.100 seconds."
     )
   )

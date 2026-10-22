@@ -204,6 +204,11 @@ check_rt_data <- function(data, rt, response, fast_rt_hint) {
       warning2("Some values in {var} were NA. These were removed from the analysis.")
     }
   }
+  stopif(
+    nrow(data) == 0L,
+    "Every row has a missing value in '{rt}' or '{response}', so no \\
+    observations are left."
+  )
 
   stopif(
     !is.numeric(data[[rt]]),

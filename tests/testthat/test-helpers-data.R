@@ -1514,11 +1514,12 @@ rt_check_rows <- function() {
   not_positive <- "Some reaction times are zero or negative, please check your data. The likelihood is zero for a response time that is not strictly greater than the non-decision time."
   not_numeric <- "The RT variable 'rt' needs to be of type double or integer."
   not_binary <- "The response variable 'response' contains values other than 0 and 1."
+  no_rows <- "Every row has a missing value in 'rt' or 'response', so no observations are left."
   resp <- rt_check_response
   rt <- rt_check_rt
 
   list(
-    valid = list(data = rt_check_data(), all = rt_check_ok()),
+    valid = list(data = rt_check_data(), all = rt_check_ok(integer = TRUE)),
     no_rt_column = list(
       data = rt_check_data()["response"],
       all = rt_check_error("The RT variable 'rt' is not present in the data.")
@@ -1539,6 +1540,12 @@ rt_check_rows <- function() {
       data = rt_check_data(rt = replace(rt, 1, NA), response = replace(resp, 3, NA)),
       all = rt_check_ok(resp[-c(1, 3)], c(na_rt, na_response))
     ),
+    all_rt_na = list(data = rt_check_data(rt = NA_real_), all = rt_check_error(no_rows)),
+    all_rt_na_logical = list(data = rt_check_data(rt = NA), all = rt_check_error(no_rows)),
+    all_response_na = list(
+      data = rt_check_data(response = NA_character_),
+      all = rt_check_error(no_rows)
+    ),
     logical_response_na = list(
       data = rt_check_data(response = replace(resp == 1, 3, NA)),
       all = rt_check_ok(resp[-3], c(na_response, boolean), integer = TRUE)
@@ -1549,6 +1556,10 @@ rt_check_rows <- function() {
     ),
     rt_factor = list(
       data = rt_check_data(rt = factor(rt)),
+      all = rt_check_error(not_numeric)
+    ),
+    rt_difftime = list(
+      data = rt_check_data(rt = as.difftime(rt, units = "secs")),
       all = rt_check_error(not_numeric)
     ),
     rt_negative = list(
@@ -1674,4 +1685,21 @@ test_that("the RT models accept and refuse RTs and responses alike", {
       }
     }
   }
+})
+
+# The table squishes whitespace, so the paragraph break in ddm's two-part
+# advice is pinned here.
+test_that("ddm() keeps the blank line in its 0.100 s warning", {
+  case <- model_test_cases("rt_data")$ddm
+  expect_warning(
+    check_data(case$model, rt_check_data(rt = replace(rt_check_rt, 1, 0.05)), case$formula),
+    paste0(
+      "Your data contains reaction times smaller than 0.100 seconds.\n\n",
+      "It is likely that the model will not be able to sample with the current ",
+      "settings of the initial values.\n\n",
+      "Either pass your own initial value function or consider filtering ",
+      "reaction times below 0.100 seconds."
+    ),
+    fixed = TRUE
+  )
 })
