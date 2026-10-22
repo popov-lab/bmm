@@ -137,9 +137,32 @@
   [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md) does.
   It stopped with “the condition has length \> 1”
   ([\#564](https://github.com/popov-lab/bmm/issues/564)).
+- [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) and
+  [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
+  check response times and responses alike
+  ([\#557](https://github.com/popov-lab/bmm/issues/557)). A factor or
+  date-time response time now stops with a message asking for a number.
+  Before, a factor stopped
+  [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) with
+  “missing value where TRUE/FALSE needed”; a date-time, and a factor in
+  [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md), failed later
+  in brms. A response time of 0 now stops too. In
+  [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md),
+  `cswald(version = "crisk")` and for correct responses in
+  [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md), such a
+  fit failed as sampling started; an error response at 0 in
+  [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) was
+  ignored. Remove these rows.
+  [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) accepts a
+  factor response labelled “upper” and “lower”.
 
 #### Other changes
 
+- [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
+  drops rows with a missing response time or response and warns, as
+  [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) does. It
+  stopped and asked you to remove them
+  ([\#557](https://github.com/popov-lab/bmm/issues/557)).
 - In bmm 1.6.0 the default of `log` in
   [`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md),
   [`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md),
