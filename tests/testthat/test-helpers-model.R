@@ -38,7 +38,7 @@ test_that("model_group() keeps an unknown domain as its own group", {
 test_that("format_model_list() appends unknown groups after the known ones and strips the period", {
   extra <- data.frame(
     model = "foo", name = "Foo model", domain = "Foo tasks",
-    group = model_group("Foo tasks")
+    package = "bmm", url = NA_character_, group = model_group("Foo tasks")
   )
   registry <- rbind(model_registry(), extra)
   txt <- format_model_list(registry, "text")
@@ -53,8 +53,9 @@ test_that("bmm_models() prints every model exactly once, without arguments", {
   expect_output(printed <- print(bmm_models()), "Continuous reproduction")
   expect_s3_class(printed, "bmm_models")
   out <- paste(capture.output(print(bmm_models())), collapse = "\n")
+  # a model from another package prints its package after the constructor
   for (m in model_names()) {
-    hits <- gregexpr(glue::glue("- {m}\\(\\): "), out)[[1]]
+    hits <- gregexpr(glue::glue("- {m}\\(\\)( \\([^)]+\\))?: "), out)[[1]]
     expect_length(hits[hits > 0], 1)
   }
   expect_match(out, "Continuous reproduction")
@@ -107,7 +108,7 @@ test_that("print_pretty_models_md(group = ) lists one group without headers", {
 })
 
 test_that("every data argument of every model version has a column role", {
-  for (model in model_names()) {
+  for (model in bmm_builtin_models()) {
     args <- formals(get_model2(model))
     no_default <- vapply(args, function(arg) is.symbol(arg) && as.character(arg) == "", TRUE)
     required <- setdiff(names(args)[no_default], "...")
@@ -128,7 +129,7 @@ test_that("every data argument of every model version has a column role", {
 })
 
 test_that("data_column_roles keys name a model or one of its versions", {
-  valid <- unlist(lapply(model_names(), function(model) {
+  valid <- unlist(lapply(bmm_builtin_models(), function(model) {
     versions <- model_versions(model)
     c(model, if (!anyNA(versions)) paste0(model, "_", versions))
   }))
@@ -161,7 +162,7 @@ test_that("parameter_label() keeps the name before the first separator", {
 })
 
 test_that("estimated parameter labels have balanced parentheses", {
-  for (model in model_names()) {
+  for (model in bmm_builtin_models()) {
     for (version in model_versions(model)) {
       spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
       estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
@@ -211,6 +212,7 @@ test_that("model_overview() has one row per version with its own columns and par
   mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
   expect_false(grepl("version", mixture2p$Model))
 
+  # a registered model with a response-time domain joins this group too
   rt_models <- model_overview(group = "Choices and response times")
   registry <- model_registry()
   in_group <- registry$model[registry$group == "Choices and response times"]

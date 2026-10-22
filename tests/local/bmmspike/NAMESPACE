@@ -1,0 +1,8 @@
+# hand-written; S3 registrations against generics bmm exports.
+# check_formula is NOT exported by bmm: the line below is a probe (see .onLoad)
+export(slnorm)
+export(dslnorm)
+export(rslnorm)
+S3method(bmm::check_data, slnorm)
+S3method(bmm::configure_model, slnorm)
+S3method(bmm::postprocess_brm, slnorm)

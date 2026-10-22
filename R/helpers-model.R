@@ -114,8 +114,16 @@ check_model.default <- function(model, data = NULL, formula = NULL) {
   }
 
   stopif(
+    is_bmmodel(model) && !is_supported_bmmodel(model),
+    "The model of class {collapse_comma(class(model))} is not known to bmm. \\
+    Load the package that defines it, e.g. with library(). A package that \\
+    defines a model must register it with `register_bmm_model()` when it loads.
+
+    {models_text()}"
+  )
+  stopif(
     !is_supported_bmmodel(model),
-    "You provided an object of class `{class(model)}` to the model argument.
+    "You provided an object of class {collapse_comma(class(model))} to the model argument.
     The model argument should be a `bmmodel` function.
     You can see the list of supported models by running `bmm_models()`
 
@@ -532,7 +540,9 @@ model_registry <- function(models = model_names()) {
   registry <- data.frame(
     model = models,
     name = sub("\\.$", "", vapply(specs, `[[`, "", "name")),
-    domain = vapply(specs, `[[`, "", "domain")
+    domain = vapply(specs, `[[`, "", "domain"),
+    package = vapply(models, model_package, "", USE.NAMES = FALSE),
+    url = vapply(models, model_url, "", USE.NAMES = FALSE)
   )
   registry$group <- model_group(registry$domain)
   known <- unique(unname(model_groups))
@@ -542,14 +552,25 @@ model_registry <- function(models = model_names()) {
 
 reference_url <- "https://venpopov.com/bmm/reference/"
 
+# NA for a registered model without a url, which is then listed without a link
+model_url <- function(name) {
+  entry <- registry_entry(name)
+  if (is.null(entry)) paste0(reference_url, name, ".html") else entry$url %||% NA_character_
+}
+
+model_link <- function(model, url) {
+  ifelse(is.na(url), glue("`{model}()`"), glue("[`{model}()`]({url})"))
+}
+
 format_model_list <- function(registry, style = "text", headers = TRUE) {
   blocks <- lapply(unique(registry$group), function(group) {
     rows <- registry[registry$group == group, ]
     header <- if (!headers) NULL else if (style == "md") glue("**{group}**") else group
+    pkg <- ifelse(rows$package == "bmm", "", paste0(" (", rows$package, ")"))
     items <- if (style == "md") {
-      glue("- [`{rows$model}()`]({reference_url}{rows$model}.html): {rows$name}")
+      glue("- {model_link(rows$model, rows$url)}{pkg}: {rows$name}")
     } else {
-      glue("- {rows$model}(): {rows$name}")
+      glue("- {rows$model}(){pkg}: {rows$name}")
     }
     c(header, if (headers) "", items, "")
   })
@@ -717,7 +738,7 @@ model_overview <- function(group = NULL) {
     specs <- lapply(versions, function(version) {
       if (is.na(version)) get_model(model)() else get_model(model)(version = version)
     })
-    label <- glue("[`{model}()`]({reference_url}{model}.html)")
+    label <- model_link(model, registry$url[i])
     if (length(versions) > 1) {
       label <- glue("{label}, version `{versions}`")
     }
@@ -809,9 +830,112 @@ models_text <- function(models = model_names()) {
   gsub("`", " ", out)
 }
 
-# the registry behind bmm_models(), as plain names for internal lookups
+# the registry behind bmm_models(), as plain names for internal lookups: the
+# models bmm defines, then those other packages registered
 model_names <- function() {
+  c(bmm_builtin_models(), ls(.bmm_registry))
+}
+
+# bmm's own models are the `.model_*` constructors in its namespace. Code that
+# reads a list kept in bmm's source per model (data_column_roles, the test
+# providers) enumerates these, because a registered model has no entry there
+bmm_builtin_models <- function() {
   sub("^\\.model_", "", lsp("bmm", pattern = "^\\.model_"))
+}
+
+# one entry per model another package registered, filled by
+# register_bmm_model() when that package loads
+.bmm_registry <- new.env(parent = emptyenv())
+
+# NULL for bmm's own models, and for a name model_name() could not find, which
+# update() can pass after sampling, when an error would lose the fit
+registry_entry <- function(name) {
+  if (!is.na(name)) get0(name, envir = .bmm_registry, inherits = FALSE)
+}
+
+# the package that defines a model: "bmm" for bmm's own models
+model_package <- function(name) {
+  registry_entry(name)$package %||% "bmm"
+}
+
+# the name under which a model object is listed in bmm_models(); the most
+# specific class wins, so a versioned class such as "imm_full" never shadows it
+model_name <- function(model) {
+  intersect(rev(class(model)), model_names())[1]
+}
+
+#' Register a model defined in another package
+#'
+#' @description A package that defines a measurement model for `bmm` calls
+#'   `register_bmm_model()` in its `.onLoad()` function. Once registered, the
+#'   model appears in [bmm_models()], and [bmm()], [default_prior()],
+#'   [stancode()], [standata()] and [bmm_data_check()] accept it. Every fit of
+#'   the model records the package and its version.
+#'
+#'   The model's S3 methods (at least `configure_model()`) are registered in
+#'   the package's own NAMESPACE file, e.g. `S3method(bmm::configure_model,
+#'   mymodel)`.
+#'
+#' @param name The model name as [bmm_models()] lists it. The class vector of
+#'   the model object must end in `name`, or in `name` followed by `_` and the
+#'   model's version.
+#' @param constructor The internal constructor, by convention `.model_<name>()`.
+#'   It must run without arguments and return a `bmmodel` object; `bmm` calls
+#'   it that way to list the model.
+#' @param alias The user-facing constructor, e.g. `mymodel()`.
+#' @param package The name of the package that defines the model.
+#' @param version The version recorded on every fit of the model. Defaults to
+#'   the installed version of `package`.
+#' @param url Optional URL of the model's documentation, used for links in
+#'   model listings.
+#' @param overwrite Logical. A name that another package already registered is
+#'   an error unless `overwrite = TRUE`. The names of the models bmm defines
+#'   itself cannot be registered.
+#'
+#' @return The model name, invisibly.
+#' @export
+#' @keywords developer
+#'
+#' @examples
+#' \dontrun{
+#' # in R/zzz.R of the package that defines the model
+#' .onLoad <- function(libname, pkgname) {
+#'   bmm::register_bmm_model("mymodel", .model_mymodel, mymodel, package = pkgname)
+#' }
+#' }
+register_bmm_model <- function(name, constructor, alias, package,
+                               version = utils::packageVersion(package), url = NULL,
+                               overwrite = FALSE) {
+  stopif(
+    name %in% bmm_builtin_models(),
+    "'{name}' is a model bmm defines itself; choose another name."
+  )
+  stopif(
+    identical(package, "bmm"),
+    "`package` must be the name of the package that defines '{name}'."
+  )
+  stopif(!is.function(alias), "`alias` must be the user-facing constructor function.")
+  version <- as.package_version(version)
+  spec <- tryCatch(
+    constructor(),
+    error = function(e) {
+      stop2("`constructor()` must run without arguments; it failed with: {conditionMessage(e)}")
+    }
+  )
+  last_class <- utils::tail(class(spec), 1)
+  stopif(
+    !is_bmmodel(spec) || !last_class %in% c(name, paste0(name, "_", spec$version)),
+    "`constructor()` must return a `bmmodel` whose class vector ends in '{name}' \\
+    (or '{name}_<version>'); it ends in '{last_class}'."
+  )
+  registered_by <- registry_entry(name)$package
+  stopif(
+    isTRUE(registered_by != package) && !isTRUE(overwrite),
+    "The model name '{name}' is already registered by package '{registered_by}'. \\
+    Use `overwrite = TRUE` to replace it."
+  )
+  assign(name, nlist(constructor, alias, package, version, url), envir = .bmm_registry)
+  invisible(name)
 }
 
 #' Deprecated: use `bmm_models()`
@@ -940,12 +1064,12 @@ model_docs.bmmodel <- function(model, components = "all") {
 #'   returned function, e.g. `get_model("mixture2p")()`
 #' @noRd
 get_model <- function(model) {
-  get(paste0(".model_", model), mode = "function")
+  registry_entry(model)$constructor %||% get(paste0(".model_", model), mode = "function")
 }
 
 # same as get_model2, but with the new model structure for the user facing alias
 get_model2 <- function(model) {
-  get(model, mode = "function")
+  registry_entry(model)$alias %||% get(model, mode = "function")
 }
 
 #' Create a file with a template for adding a new model (for developers)
@@ -1459,11 +1583,11 @@ stancode.bmmformula <- function(object, data, model, prior = NULL, ...) {
   withr::local_options(bmm.sort_data = FALSE)
   dots <- list(...)
   local_brms_threads(dots)
-  add_bmm_version_to_stancode(call_brms_extractor(
-    brms::stancode,
-    configure_fit(object, data, model, prior, until = "prior", frame_args = brms_frame_args(dots)),
-    dots
-  ))
+  cfg <- configure_fit(object, data, model, prior, until = "prior", frame_args = brms_frame_args(dots))
+  add_bmm_version_to_stancode(
+    call_brms_extractor(brms::stancode, cfg, dots),
+    model_name(cfg$model)
+  )
 }
 
 # Everything brm() needs to fit a specification: the checked model, the brms
@@ -1527,11 +1651,17 @@ call_brms_extractor <- function(fun, cfg, dots) {
 }
 
 # update() runs postprocess_brm() again on code that may already carry a bmm
-# version, so any existing ones are replaced by the version doing the update
-add_bmm_version_to_stancode <- function(stancode) {
+# version, so any existing ones are replaced by the version doing the update.
+# A model from another package adds that package and its registered version
+add_bmm_version_to_stancode <- function(stancode, model_name = NA_character_) {
+  stamp <- paste0("\\1 and bmm ", utils::packageVersion("bmm"))
+  entry <- registry_entry(model_name)
+  if (!is.null(entry)) {
+    stamp <- paste0(stamp, " and ", entry$package, " ", entry$version)
+  }
   new_stancode <- sub(
-    "^([^\\r\\n]*?brms[^\\r\\n]*?)(?: and bmm [^ \\r\\n]+)*(?=\\r?\\n)",
-    paste0("\\1 and bmm ", utils::packageVersion("bmm")),
+    "^([^\\r\\n]*?brms[^\\r\\n]*?)(?: and bmm [^ \\r\\n]+(?: and [[:alnum:].]+ [^ \\r\\n]+)?)*(?=\\r?\\n)",
+    stamp,
     stancode,
     perl = TRUE
   )

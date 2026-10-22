@@ -39,13 +39,20 @@ postprocess_brm.bmmodel <- function(model, fit, ...) {
 }
 
 # the bookkeeping every bmm fit carries: the package version, the information
-# the bmmfit methods dispatch on, the name of the user's data, and the bmm
-# version stamp in the Stan code
+# the bmmfit methods dispatch on, the package that defines the model (and its
+# version, for a model from another package), the name of the user's data, and
+# the version stamp in the Stan code
 add_bmm_fit_info <- function(fit, info, fit_args) {
+  name <- model_name(info$model)
+  entry <- registry_entry(name)
   fit$version$bmm <- utils::packageVersion("bmm")
+  if (!is.null(entry)) {
+    fit$version[[entry$package]] <- entry$version
+  }
   fit$bmm <- info
+  fit$bmm$package <- model_package(name)
   attr(fit$data, "data_name") <- attr(fit_args$data, "data_name")
-  fit$model <- add_bmm_version_to_stancode(fit$model)
+  fit$model <- add_bmm_version_to_stancode(fit$model, name)
   fit
 }
 

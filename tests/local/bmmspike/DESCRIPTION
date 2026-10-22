@@ -1,0 +1,15 @@
+Package: bmmspike
+Title: Throwaway Extension Spike for bmm (Issue 442)
+Version: 0.0.1
+Authors@R: person("Spike", "Author", role = c("aut", "cre"), email = "spike@example.org")
+Description: Defines one shifted log-normal response-time model that bmm::bmm()
+    fits, to find out what an extension package needs from bmm. Not for use.
+License: GPL-2
+Encoding: UTF-8
+Imports:
+    bmm,
+    brms,
+    stats
+Suggests:
+    cmdstanr
+Additional_repositories: https://stan-dev.r-universe.dev

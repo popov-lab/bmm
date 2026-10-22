@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New features
+* Models defined in other packages can now be fitted with `bmm()`. A package registers its model with `register_bmm_model()` when it loads; the model then appears in `bmm_models()` next to the package's name and works with `default_prior()`, `stancode()`, `standata()` and `bmm_data_check()`. Every fit records the package that defines its model and that package's version (#442).
+
 ### Other changes
 * bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
 
