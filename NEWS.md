@@ -18,6 +18,7 @@
 
 ### Other changes
 * `cswald()` now drops rows with a missing response time or response and warns, as `ddm()` does. It stopped and asked you to remove them (#557).
+* In bmm 1.6.0 the default of `log` in `dm3()`, `dmpt()`, `dddm()`, `dcswald()` and `dezdm()` changes from `TRUE` to `FALSE`, as in base R and the other density functions of bmm. A call without `log` then returns the density, not the log density. Nothing changes in 1.5.0. Pass `log = TRUE` to keep the log density (#553).
 * bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
 
 ### Documentation

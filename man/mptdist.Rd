@@ -43,8 +43,10 @@ model that densities or random samples should be generated for.}
 \item{tree}{Character. For models with multiple trees, the name of the tree
 to compute probabilities for. Can be omitted for single-tree models.}
 
-\item{log}{Logical; if \code{TRUE} (default), densities are returned on the log
-scale.}
+\item{log}{Logical; if \code{TRUE} (default until bmm 1.6.0), densities are returned
+on the log scale. From bmm 1.6.0 on the default is \code{FALSE}, as in base R
+and the other density functions of bmm. Pass \code{log} to get the same
+result in every version.}
 
 \item{covariates}{A named vector or list with the values of all covariates
 declared in the model that appear in the branch expressions of the
@@ -73,7 +75,8 @@ functions are currently not vectorized.
 \note{
 Unlike the densities of the circular models in this package (\code{dsdm()},
 \code{dmixture2p()}, \code{dmixture3p()}, \code{dimm()}) and unlike \code{\link[stats:dmultinom]{stats::dmultinom()}},
-\code{dmpt()} returns the log density by default, matching \code{\link[=dm3]{dm3()}}.
+\code{dmpt()} returns the log density by default, as \code{\link[=dm3]{dm3()}} does. The default
+becomes \code{FALSE} in bmm 1.6.0, which matches them.
 }
 \examples{
 tree_target <- mpt_tree("target", list(
@@ -88,7 +91,7 @@ model <- mpt(list(tree_target, tree_lure), tree_id = "item_type")
 
 dmpt(
   x = c(35, 15), pars = c(D = 0.7, g = 0.5),
-  mpt_model = model, tree = "target"
+  mpt_model = model, tree = "target", log = TRUE
 )
 rmpt(
   n = 10, size = 50, pars = c(D = 0.7, g = 0.5),
