@@ -342,6 +342,8 @@ test_that(".mpt_branch_vertices adds 0.5 for a parameter of higher degree", {
   # a derivative that stats::D() cannot form counts as higher degree
   unknown <- bmm:::.mpt_branch_vertices(quote(besselJ(a, 1)), "a", list())
   expect_equal(sort(unique(unknown[, "a"])), c(1e-9, 0.5, 1 - 1e-9))
+  expect_false(attr(unknown, "differentiable"))
+  expect_true(attr(vertices, "differentiable"))
 })
 
 test_that(".mpt_form bounds an expression by its form alone (#560)", {
@@ -408,13 +410,124 @@ test_that("the range search visits only points in the box and on the simplex (#5
   vertices <- bmm:::.mpt_branch_vertices(quote(sqrt(u * (1 - u))), "u", list())
   expect_null(bmm:::.mpt_search_range_violation(
     quote(sqrt(u * (1 - u))), vertices, "u", list(), list(), 1e-6
-  ))
+  )$violation)
   # the reported witness is the extreme found, not the first value past 1
   found <- bmm:::.mpt_search_range_violation(
-    quote(7 * u * (1 - u)^2), bmm:::.mpt_branch_vertices(quote(7 * u * (1 - u)^2), "u", list()),
+    quote(7 * u * (1 - u)^2),
+    bmm:::.mpt_branch_vertices(quote(7 * u * (1 - u)^2), "u", list()),
     "u", list(), list(), 1e-6
   )
-  expect_equal(found$value, 28 / 27, tolerance = 1e-6)
+  expect_equal(found$violation$value, 28 / 27, tolerance = 1e-6)
+})
+
+test_that("the range search finds a narrow dip below a constant baseline (#560)", {
+  # the minimum -0.00999 at u = 0.05 lies between the grid values 1e-9 and 0.5,
+  # where the branch is 0.06 to within 4e-6
+  dip <- "0.06 - 3.7095 * u * (1 - u)^19"
+  expect_error(
+    mpt(mpt_tree("t", list(y = dip, n = glue("1 - ({dip})")))),
+    "category 'y' in tree 't' is -0\\.00998966 at the test values u = 0\\.05, outside"
+  )
+})
+
+test_that("the range search reaches the later starts of every cell (#560)", {
+  # 32 vertices of a1, ..., a5; only at all ai = 1 does the peak 1.0937 near
+  # u = 0.049 appear, and the search finds it only from that cell's third grid
+  # point u = 1 - 1e-9, which ranks below the third points of the 31 other
+  # cells, all at 0.9
+  product <- "a1 * a2 * a3 * a4 * a5"
+  y <- glue(
+    "{product} * (8 * u^2 * (1 - u)^2 + 60 * u * (1 - u)^20) + (1 - {product}) * 0.9"
+  )
+  expect_error(
+    mpt(mpt_tree("t", list(y = y, n = glue("1 - ({y})")))),
+    paste0(
+      "category 'y' in tree 't' is 1\\.09373 at the test values ",
+      "a1 = 1, a2 = 1, a3 = 1, a4 = 1, a5 = 1, u = 0\\.049"
+    )
+  )
+})
+
+test_that("the range search says which cells its budget left out (#560)", {
+  branch <- quote((1 - G) * H + G * 0.9 * 27 / 4 * u * (1 - u)^2)
+  vertices <- bmm:::.mpt_branch_vertices(branch, "u", list())
+  rows <- list(G = c(rep(0, 9), 1), H = c(seq(0.80, 0.85, length.out = 9), 0.5))
+  with_budget <- function(max_starts) {
+    bmm:::.mpt_search_range_violation(
+      branch, vertices, "u", list(), rows, 1e-6, max_starts = max_starts
+    )
+  }
+  # each direction starts in 4 rows, the two together in 8
+  four <- with_budget(4L)
+  expect_null(four$violation)
+  expect_equal(
+    as.character(four$skipped),
+    "left unsearched 2 of the 10 distinct covariate settings and capped its further starts"
+  )
+  expect_equal(
+    as.character(with_budget(10L)$skipped),
+    "searched all 10 distinct covariate settings and capped its further starts"
+  )
+  expect_null(with_budget(20L)$skipped)
+
+  msgs <- testthat::capture_messages(bmm:::.mpt_message_sampled(c(
+    "form|left unsearched 2 of the 10 distinct covariate settings" = "category 'y' in tree 't'",
+    "form|left unsearched 2 of the 10 distinct covariate settings" = "category 'n' in tree 't'",
+    "form|capped its further starts" = "category 'y' in tree 'u'",
+    "grid" = "category 'a' in tree 's'",
+    "grid" = "category 'b' in tree 'v'"
+  ), "search"))
+  expect_length(msgs, 2L)
+  expect_match(
+    msgs[1],
+    paste0(
+      "category 'y' in tree 't', category 'n' in tree 't', category 'y' in tree 'u' ",
+      "is approximate: .*their trees are not written.*local search.*",
+      "The search left unsearched 2 of the 10 distinct covariate settings for ",
+      "category 'y' in tree 't', category 'n' in tree 't'; it capped its further ",
+      "starts for category 'y' in tree 'u'\\."
+    )
+  )
+  expect_match(msgs[2], "is approximate: their trees have the form")
+  expect_no_match(msgs[2], "The search (left|searched|capped)")
+})
+
+test_that("the range search counts a cell searched in either direction (#560)", {
+  # each direction has 256 first starts, towards the largest G and the
+  # smallest; together they reach all 300 settings
+  branch <- quote(0.4 * u * (1 - u) + 0.2 * G)
+  search <- bmm:::.mpt_search_range_violation(
+    branch, bmm:::.mpt_branch_vertices(branch, "u", list()), "u", list(),
+    list(G = seq(0, 1, length.out = 300)), 1e-6
+  )
+  expect_null(search$violation)
+  expect_equal(
+    as.character(search$skipped),
+    "searched all 300 distinct covariate settings and capped its further starts"
+  )
+})
+
+test_that(".mpt_search_starts puts each row's best first and caps the later ranks apart (#560)", {
+  # six cells of one grid point, three per covariate row, for 3 starts: the
+  # second row's best comes before the first row's second best
+  expect_equal(
+    bmm:::.mpt_search_starts(
+      rbind(c(9, 8, 7), c(1, 2, 3)), list(1L, 2L, 3L), max_starts = 3L, max_further = 0L
+    ),
+    list(row = c(1L, 2L, 1L), vertex = c(1L, 3L, 2L))
+  )
+  # four cells of three grid points: the first and second points take 8 of the
+  # 10 starts, the third points only max_further = 1 of the 2 left
+  expect_equal(
+    bmm:::.mpt_search_starts(
+      rbind(c(6, 5, 4, 3, 2, 1), c(1, 2, 3, 4, 5, 6)), list(1:3, 4:6),
+      max_starts = 10L, max_further = 1L
+    ),
+    list(
+      row = c(1L, 2L, 2L, 1L, 1L, 2L, 2L, 1L, 1L),
+      vertex = c(1L, 6L, 3L, 4L, 2L, 5L, 2L, 5L, 3L)
+    )
+  )
 })
 
 test_that(".mpt_branch_vertices takes a simplex group as one dimension", {
@@ -454,4 +567,189 @@ test_that(".mpt_branch_vertices falls back to a fixed sample above max_points", 
   ten <- bmm:::.mpt_branch_vertices(str2lang(paste(parameters[1:10], collapse = " * ")), parameters, list())
   expect_true(attr(ten, "exact"))
   expect_equal(nrow(ten), 1024L)
+})
+
+test_that(".mpt_certified_tree checks the whole simplex when a group member is unused (#560)", {
+  tree <- function(...) list(name = "t", branches = lapply(list(...), str2lang))
+  group <- list(c("a", "b", "c"))
+  # a + c is 1 - b, which is 1 only on the face b = 0
+  unused <- bmm:::.mpt_certified_tree(tree("a", "c"), c("a", "b", "c"), group)
+  expect_false(unused)
+  expect_equal(attr(unused, "reason"), "identity")
+  expect_true(bmm:::.mpt_certified_tree(tree("a", "b", "c"), c("a", "b", "c"), group))
+  expect_false(bmm:::.mpt_certified_tree(tree("a^2", "c * (1 + a)"), c("a", "b", "c"), group))
+  # the last member alone is computed from the members the tree does not use
+  expect_true(bmm:::.mpt_certified_tree(
+    tree("c^2", "c * (1 - c)", "1 - c"), c("a", "b", "c"), group
+  ))
+})
+
+test_that(".mpt_certified_tree checks the sum at the ends of the parameter range (#560)", {
+  tree <- function(...) list(name = "t", branches = lapply(list(...), str2lang))
+  # off by 1e-8 only near D = 1, beyond the last of the equally spaced
+  # interior grid values the check used before
+  expect_false(bmm:::.mpt_certified_tree(
+    tree("1 - (1 - D)^200", "(1 - D)^200 + 1e-8 * D^200"), "D", list()
+  ))
+  expect_true(bmm:::.mpt_certified_tree(tree("1 - (1 - D)^200", "(1 - D)^200"), "D", list()))
+  expect_true(bmm:::.mpt_certified_tree(
+    tree("1 - (1 - D)^n", "(1 - D)^n"), "D", list(), "D", list(n = c(2, 200)),
+    c(n = 200)
+  ))
+})
+
+test_that(".mpt_certified_tree says why a tree is not certified (#560)", {
+  tree <- function(...) list(name = "t", branches = lapply(list(...), str2lang))
+  outside <- bmm:::.mpt_certified_tree(tree("a / 2", "1 - a / 2"), "a", list())
+  expect_equal(attr(outside, "reason"), "form")
+  too_many <- bmm:::.mpt_certified_tree(
+    tree("1 - (1 - D)^n", "(1 - D)^n"), "D", list(), "D", list(n = 1:300), c(n = 300)
+  )
+  expect_false(too_many)
+  expect_equal(attr(too_many, "reason"), "grid_covariates")
+  without_covariates <- bmm:::.mpt_certified_tree(
+    tree("1 - (1 - D)^70000", "(1 - D)^70000"), "D", list()
+  )
+  expect_equal(attr(without_covariates, "reason"), "grid")
+})
+
+test_that("mpt() builds a model whose tree uses only the last member of a simplex group (#560)", {
+  expect_silent(mpt(list(
+    mpt_tree("t1", list(x = "gA", y = "gB")),
+    mpt_tree("t2", list(x = "gB^2", y = "1 - gB^2"))
+  ), tree_id = "tree", simplex = c("gA", "gB")))
+  expect_silent(mpt(list(
+    mpt_tree("t1", list(x = "gA", y = "gB", z = "gC")),
+    mpt_tree("t2", list(x = "gC^2", y = "gC * (1 - gC)", z = "1 - gC"))
+  ), tree_id = "tree", simplex = c("gA", "gB", "gC")))
+})
+
+test_that("the range search starts in every covariate row (#560)", {
+  # the rows with G = 0 are flat at H; the row with G = 1 peaks at 1.0768 near
+  # u = 0.048, while its grid values are all below 3e-5, below every flat row's
+  model <- mpt(mpt_tree("t", list(
+    y = "(1 - G) * H + G * 60 * u * (1 - u)^20",
+    n = "1 - (1 - G) * H - G * 60 * u * (1 - u)^20"
+  )), covariates = c("G", "H"))
+  data <- data.frame(
+    G = c(rep(0, 6), 1), H = c(0.80, 0.81, 0.82, 0.83, 0.84, 0.85, 0.5), y = 5, n = 5
+  )
+  expect_error(
+    check_data(model, data, bmf(u ~ 1)),
+    paste0(
+      "category 'y' in tree 't' is 1\\.07683 in row 7, outside \\(0, 1\\] ",
+      "at the test parameter values u = 0\\.0476"
+    )
+  )
+  # beyond the 64 starts of an earlier budget
+  many_flat <- data.frame(
+    G = c(rep(0, 100), 1), H = c(seq(0.80, 0.85, length.out = 100), 0.5), y = 5, n = 5
+  )
+  expect_error(
+    check_data(model, many_flat, bmf(u ~ 1)),
+    "category 'y' in tree 't' is 1\\.07683 in row 101"
+  )
+})
+
+test_that("the range search starts at every vertex of the multilinear parameters (#560)", {
+  # the peak 1.0768 sits at the one vertex P = 1, whose grid values rank
+  # below those of the 31 vertices at 0.9
+  product <- "a1 * a2 * a3 * a4 * a5"
+  y <- glue("{product} * 60 * u * (1 - u)^20 + (1 - {product}) * 0.9")
+  expect_error(
+    mpt(mpt_tree("t", list(y = y, n = glue("1 - ({y})")))),
+    paste0(
+      "category 'y' in tree 't' is 1\\.07683 at the test values ",
+      "a1 = 1, a2 = 1, a3 = 1, a4 = 1, a5 = 1, u = 0\\.0476"
+    )
+  )
+})
+
+test_that("the range search stays on the simplex at its corners (#560)", {
+  # off the simplex by 2e-9, (gA + gB + gC)^2000 would be 1 + 4e-6
+  power <- "(gA + gB + gC)^2000 * gA * D"
+  expect_message(
+    mpt(mpt_tree("t", list(A = power, B = glue("1 - {power}"))), simplex = c("gA", "gB", "gC")),
+    "category 'A' in tree 't', category 'B' in tree 't' is approximate.*local search"
+  )
+})
+
+test_that("the search message states why the branches are searched (#560)", {
+  expect_message(
+    mpt(mpt_tree("t", list(y = "plogis(a)", n = "1 - plogis(a)"))),
+    paste0(
+      "category 'y' in tree 't', category 'n' in tree 't' is approximate: ",
+      "stats::D\\(\\) cannot differentiate them.*local search"
+    )
+  )
+  repeated <- mpt(mpt_tree("t", list(hit = "1 - (1 - D)^n", miss = "(1 - D)^n")), covariates = "n")
+  expect_message(
+    check_data(repeated, data.frame(n = 1:300, hit = 5, miss = 5), bmf(D ~ 1)),
+    paste0(
+      "category 'hit' in tree 't', category 'miss' in tree 't' is approximate: ",
+      "their tree has the form for which the check is exact, but the exact ",
+      "check would need more than 65,536 points \\(a grid over the parameters ",
+      "for each distinct covariate setting in the tree's rows\\).*local search"
+    )
+  )
+  expect_message(
+    mpt(mpt_tree("t", list(y = "0.5 + 0.5 * (a - 0.3)^2", n = "0.5 - 0.5 * (a - 0.3)^2"))),
+    paste0(
+      "is approximate: a parameter enters them more than once.*",
+      "not written with parameters.*local search"
+    )
+  )
+  # one message per reason
+  msgs <- testthat::capture_messages(bmm:::.mpt_message_sampled(
+    c(grid = "category 'a' in tree 's'", derivative = "category 'b' in tree 't'"), "search"
+  ))
+  expect_length(msgs, 2L)
+  expect_match(msgs[1], "category 'a' in tree 's' is approximate: their tree has the form")
+  expect_match(msgs[2], "category 'b' in tree 't' is approximate: stats::D\\(\\)")
+})
+
+test_that("the identity and grid reasons read as limits of the check (#560)", {
+  # a valid tree whose high power leaves the sum of its branches 1 only to
+  # within the rounding of the check off the simplex
+  expect_message(
+    mpt(list(
+      mpt_tree("t", list(x = "(1 - gC)^60", y = "1 - (1 - gC)^60"), impossible = "z"),
+      mpt_tree("g", list(x = "gA", y = "gB", z = "gC"))
+    ), tree_id = "tr", simplex = c("gA", "gB", "gC")),
+    paste0(
+      "category 'x' in tree 't', category 'y' in tree 't' is approximate: their ",
+      "tree has the form for which the check is exact, but the sum of its ",
+      "branches could not be confirmed as 1 within the numerical precision of ",
+      "the check, as happens with high powers such as \\(1 - g\\)\\^60 of a ",
+      "member of a simplex group\\. A local search"
+    )
+  )
+  # without covariates the grid is over the parameters alone, here 41^3 points
+  expect_message(
+    mpt(mpt_tree("t", list(y = "(u * v * w)^40", n = "1 - (u * v * w)^40"))),
+    "more than 65,536 points \\(a grid over the parameters\\)\\. A local search"
+  )
+})
+
+test_that("the search message names the reason for pair clustering over the grid limit (#560)", {
+  skip_on_cran()
+  # in the certified form, but 12 grid points for each of 6000 covariate rows
+  pairs <- mpt(mpt_tree("pairs", list(
+    E1 = "c * r * G", E2 = "(1 - c * G) * u^2",
+    E3 = "(1 - c * G) * 2 * u * (1 - u)", E4 = "c * G * (1 - r) + (1 - c * G) * (1 - u)^2"
+  )), covariates = "G")
+  data <- data.frame(G = seq(0.2, 0.9, length.out = 6000), E1 = 1, E2 = 2, E3 = 3, E4 = 4)
+  expect_message(
+    check_data(pairs, data, bmf(c ~ 1, r ~ 1, u ~ 1)),
+    paste0(
+      "category 'E2' in tree 'pairs', category 'E3' in tree 'pairs', category ",
+      "'E4' in tree 'pairs' is approximate: their tree has the form for which ",
+      "the check is exact.*more than 65,536 points.*local search.*",
+      "The search left unsearched 11,488 of the 12,000 combinations of a ",
+      "distinct covariate setting with a vertex of the parameters it holds ",
+      "fixed and capped its further starts for category 'E2' in tree 'pairs', ",
+      "category 'E3' in tree 'pairs'; it left unsearched 23,488 of the 24,000 .*",
+      "for category 'E4' in tree 'pairs'\\."
+    )
+  )
 })

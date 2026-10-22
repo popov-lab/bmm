@@ -557,12 +557,23 @@ generated_parameters.mpt <- function(model) {
 #'   products and whole-number powers alone, as in pair clustering
 #'   (`(1 - c) * 2 * u * (1 - u)`, `(1 - c) * (1 - u)^2`); a covariate counts
 #'   as a probability there when its values in the tree's rows lie between 0
-#'   and 1, and as an exponent (`(1 - D)^n`) when they are whole numbers. For
-#'   any other branch in which a parameter appears twice, such as
-#'   `0.5 + 0.5 * (a - 0.3)^2`, a local search looks for values outside
-#'   (0, 1] between the vertices, and a message says that the check is
-#'   approximate. Trees without covariates are checked in the same way when
-#'   the model is built.
+#'   and 1, and as an exponent (`(1 - D)^n`) when they are whole numbers. That
+#'   exact check is skipped when it needs more than 65,536 points: the product
+#'   over the tree's parameters of their highest power plus 1, times the
+#'   number of distinct covariate settings in the tree's rows. In a simplex
+#'   group the tree touches, every member but the last counts, used or not,
+#'   with the last member's highest power added to its own. The check also
+#'   gives way when the sum of the branches cannot be confirmed as 1 within its
+#'   numerical precision, as with a high power of the last member, such as
+#'   `(1 - gC)^54` in a group of three. In a tree where it gives way or that
+#'   is written otherwise, a local search looks for values outside (0, 1]
+#'   between the vertices of each branch in which a parameter appears twice,
+#'   such as `0.5 + 0.5 * (a - 0.3)^2`, and a message says that the check is
+#'   approximate. The search has at most 320 starts towards each end of
+#'   (0, 1]; when they leave distinct covariate settings or vertices of the
+#'   other parameters unsearched, or cap the further starts within them, the
+#'   message says so. Trees without covariates are checked in the same way
+#'   when the model is built.
 #' @param simplex A character vector, or a list of character vectors, naming
 #'   groups of parameters that are jointly constrained to sum to 1. Each group
 #'   is reparameterized via stick-breaking: the last parameter of each group
@@ -1645,13 +1656,14 @@ check_data.mpt <- function(model, data, formula) {
 }
 
 # the distinct covariate settings in each tree's rows; a tree without rows,
-# which check_data() reports on its own, keeps the five test values
+# which check_data() reports on its own, or whose rows all have zero trials
+# keeps the five test values
 .mpt_observed_settings <- function(model, data) {
   covariates <- model$other_vars$covariates
   test_values <- as.data.frame(do.call(rbind, .mpt_test_points(covariates, list())))
   lapply(model$other_vars$trees, function(tree) {
     used <- intersect(covariates, .mpt_expr_vars(tree))
-    rows <- .mpt_tree_rows(model, data, tree$name)
+    rows <- .mpt_tree_rows_with_trials(model, data, tree$name)
     if (length(used) == 0L) {
       data.frame(row.names = 1L)
     } else if (length(rows) == 0L) {
@@ -1667,7 +1679,7 @@ check_data.mpt <- function(model, data, formula) {
   covariates <- model$other_vars$covariates
   per_tree <- lapply(model$other_vars$trees, function(tree) {
     used <- intersect(covariates, .mpt_expr_vars(tree))
-    rows <- .mpt_tree_rows(model, data, tree$name)
+    rows <- .mpt_tree_rows_with_trials(model, data, tree$name)
     if (length(rows) == 0L) {
       return(character(0))
     }
@@ -1680,9 +1692,12 @@ check_data.mpt <- function(model, data, formula) {
   unlist(constant)
 }
 
-.mpt_tree_rows <- function(model, data, tree_name) {
+# a row with zero trials says nothing about the parameters, so its covariate
+# values must not count as a setting that identifies them
+.mpt_tree_rows_with_trials <- function(model, data, tree_name) {
   idx_vars <- model$other_vars$indicators$tree
-  if (is.null(idx_vars)) seq_len(nrow(data)) else which(data[[idx_vars[[tree_name]]]] == 1L)
+  in_tree <- if (is.null(idx_vars)) TRUE else data[[idx_vars[[tree_name]]]] == 1L
+  which(in_tree & data$nTrials > 0L)
 }
 
 # a missing count in a category that the row's tree cannot produce is a known

@@ -39,12 +39,23 @@ with parameters, their complements \code{1 - p}, non-negative constants, sums,
 products and whole-number powers alone, as in pair clustering
 (\code{(1 - c) * 2 * u * (1 - u)}, \code{(1 - c) * (1 - u)^2}); a covariate counts
 as a probability there when its values in the tree's rows lie between 0
-and 1, and as an exponent (\code{(1 - D)^n}) when they are whole numbers. For
-any other branch in which a parameter appears twice, such as
-\code{0.5 + 0.5 * (a - 0.3)^2}, a local search looks for values outside
-(0, 1] between the vertices, and a message says that the check is
-approximate. Trees without covariates are checked in the same way when
-the model is built.}
+and 1, and as an exponent (\code{(1 - D)^n}) when they are whole numbers. That
+exact check is skipped when it needs more than 65,536 points: the product
+over the tree's parameters of their highest power plus 1, times the
+number of distinct covariate settings in the tree's rows. In a simplex
+group the tree touches, every member but the last counts, used or not,
+with the last member's highest power added to its own. The check also
+gives way when the sum of the branches cannot be confirmed as 1 within its
+numerical precision, as with a high power of the last member, such as
+\code{(1 - gC)^54} in a group of three. In a tree where it gives way or that
+is written otherwise, a local search looks for values outside (0, 1]
+between the vertices of each branch in which a parameter appears twice,
+such as \code{0.5 + 0.5 * (a - 0.3)^2}, and a message says that the check is
+approximate. The search has at most 320 starts towards each end of
+(0, 1]; when they leave distinct covariate settings or vertices of the
+other parameters unsearched, or cap the further starts within them, the
+message says so. Trees without covariates are checked in the same way
+when the model is built.}
 
 \item{simplex}{A character vector, or a list of character vectors, naming
 groups of parameters that are jointly constrained to sum to 1. Each group

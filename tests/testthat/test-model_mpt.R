@@ -1315,10 +1315,13 @@ test_that("the rank check takes the maximum over the parameter test points", {
   k <- bmm:::.mpt_test_points("a", list())[[1]][["a"]]
   spelling <- sprintf("%a", k)
   expect_identical(str2lang(spelling), k)
-  model <- mpt(mpt_tree("t", list(
-    yes = glue("0.5 + 0.5 * (a - {spelling})^2"),
-    no = glue("0.5 - 0.5 * (a - {spelling})^2")
-  )))
+  expect_message(
+    model <- mpt(mpt_tree("t", list(
+      yes = glue("0.5 + 0.5 * (a - {spelling})^2"),
+      no = glue("0.5 - 0.5 * (a - {spelling})^2")
+    ))),
+    "local search"
+  )
   expect_match(
     mpt_printed(model),
     "Jacobian rank 1 of 1 at interior test values: locally identified"
@@ -1572,8 +1575,41 @@ test_that("check_data() stays silent when a constant covariate does not matter (
   expect_silent(check_data(checked, dat, fixed_g))
 })
 
+test_that("check_data() takes the covariate values only from rows with trials (#560)", {
+  model <- mpt_scaled_guessing()
+  formula <- bmf(Do ~ 1, Dn ~ 1, g ~ 1)
+  dat <- data.frame(
+    item_type = rep(c("old", "new"), each = 2), x = c(0.3, 0.7, 0.3, 0.7), old = 6, new = 4
+  )
+  dat[dat$x == 0.7, c("old", "new")] <- 0
+  expect_warning(
+    check_data(model, dat, formula),
+    paste0(
+      "not identified with the covariate values in the data.*",
+      "'x' takes a single value within tree\\(s\\) 'old', 'new'\\."
+    )
+  )
+
+  # a tree whose rows all have zero trials keeps the test values, like a tree
+  # without rows, so only the old tree has a constant x
+  empty_new <- data.frame(
+    item_type = rep(c("old", "new"), each = 2), x = 0.5,
+    old = c(6, 6, 0, 0), new = c(4, 4, 0, 0)
+  )
+  expect_warning(
+    check_data(model, empty_new, formula),
+    paste0(
+      "not identified with the covariate values in the data.*",
+      "'x' takes a single value within tree\\(s\\) 'old'\\."
+    )
+  )
+})
+
 test_that("the Jacobian rank is reported as not computed when D() cannot differentiate", {
-  model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)")))
+  expect_message(
+    model <- mpt(mpt_tree("t", list(x = "plogis(a)", y = "1 - plogis(a)"))),
+    "local search"
+  )
   printed <- mpt_printed(model)
   expect_match(printed, "Jacobian rank not computed: .*'plogis'")
   expect_silent(check_model(model, data.frame(x = 1, y = 1), bmf(a ~ 1)))
@@ -1581,7 +1617,10 @@ test_that("the Jacobian rank is reported as not computed when D() cannot differe
 
 test_that("without a rank, check_model() uses the count of free parameters", {
   scaled <- "a * b * (0.5 + 0.2 * abs(c - 0.5))"
-  model <- mpt(mpt_tree("t", list(y = scaled, n = glue("1 - {scaled}"))))
+  expect_message(
+    model <- mpt(mpt_tree("t", list(y = scaled, n = glue("1 - {scaled}")))),
+    "local search"
+  )
   expect_warning(
     check_model(model, data.frame(y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
     paste0(
@@ -1616,9 +1655,12 @@ test_that("a test value with a non-finite derivative is left out of the rank", {
     ))
   }
   left_out <- "At 1 of the 5 interior test values a derivative .*not finite, so the rank is taken at the other 4"
-  product <- mpt(list(
-    mpt_tree("t1", list(y = "a * b", n = "1 - a * b")), cusp_tree(glue("c - {sprintf('%a', k)}"))
-  ), tree_id = "tr")
+  expect_message(
+    product <- mpt(list(
+      mpt_tree("t1", list(y = "a * b", n = "1 - a * b")), cusp_tree(glue("c - {sprintf('%a', k)}"))
+    ), tree_id = "tr"),
+    "local search"
+  )
   expect_match(mpt_printed(product), glue("Jacobian rank 2 of 3 at interior test values: .*{left_out}"))
   expect_warning(
     check_model(product, data.frame(tr = c("t1", "t2"), y = 3, n = 3), bmf(a ~ 1, b ~ 1, c ~ 1)),
@@ -1626,9 +1668,12 @@ test_that("a test value with a non-finite derivative is left out of the rank", {
   )
   # the test points depend on the symbols, so c takes other values here
   k_ac <- vapply(bmm:::.mpt_test_points(c("a", "c"), list()), `[[`, numeric(1), "c")[1]
-  identified <- mpt(list(
-    mpt_tree("t1", list(y = "a", n = "1 - a")), cusp_tree(glue("c - {sprintf('%a', k_ac)}"))
-  ), tree_id = "tr")
+  expect_message(
+    identified <- mpt(list(
+      mpt_tree("t1", list(y = "a", n = "1 - a")), cusp_tree(glue("c - {sprintf('%a', k_ac)}"))
+    ), tree_id = "tr"),
+    "local search"
+  )
   expect_match(mpt_printed(identified), glue("Jacobian rank 2 of 2 at interior test values: locally identified\\. {left_out}"))
 })
 
@@ -1651,10 +1696,13 @@ test_that("a rank that only one finite test value would give is not computed", {
   k <- vapply(bmm:::.mpt_test_points(c("a", "c"), list()), `[[`, numeric(1), "c")
   cusps <- paste(glue("((c - {sprintf('%a', k[1:4])})^2)^0.25"), collapse = " + ")
   shape <- glue("(c - {sprintf('%a', k[5])})^2 * (1 + 0.05 * ({cusps}))")
-  model <- mpt(list(
-    mpt_tree("t1", list(y = "a", n = "1 - a")),
-    mpt_tree("t2", list(y = glue("0.3 + 0.2 * {shape}"), n = glue("0.7 - 0.2 * {shape}")))
-  ), tree_id = "tr")
+  expect_message(
+    model <- mpt(list(
+      mpt_tree("t1", list(y = "a", n = "1 - a")),
+      mpt_tree("t2", list(y = glue("0.3 + 0.2 * {shape}"), n = glue("0.7 - 0.2 * {shape}")))
+    ), tree_id = "tr"),
+    "local search"
+  )
   expect_match(
     mpt_printed(model),
     "Jacobian rank not computed: at 4 of the 5 interior test values some derivative"
@@ -2751,7 +2799,10 @@ test_that("mpt() alone decides a tree without covariates in a model with covaria
     0.001, 0.999
   )
   bump <- paste0("(D - ", sprintf("%.10f", checked_d), ")", collapse = " * ")
-  model <- build(mpt_tree("t2", list(A = "D", B = glue("1 - D + {bump}")), impossible = "C"))
+  expect_message(
+    model <- build(mpt_tree("t2", list(A = "D", B = glue("1 - D + {bump}")), impossible = "C")),
+    "local search"
+  )
   dat <- data.frame(tree = c("t1", "t2"), x = 0.5, A = 3, B = 3, C = c(3, 0))
   expect_silent(check_data(model, dat, bmf(D ~ 1)))
 })
