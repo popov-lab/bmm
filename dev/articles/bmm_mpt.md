@@ -154,7 +154,10 @@ why the printed line says so.
 rules: it warns when the rank is deficient and every formula is
 intercept-only, and it only says that predictors or non-linear formulas
 may identify the parameters, without checking, when any formula has a
-predictor or is non-linear. It does not look at the data.
+predictor or is non-linear. It looks at the data only for covariates: it
+takes the rank again at the covariate values each tree has in the data
+and reports a rank below the printed one in the same way, which catches
+a covariate with a single value per tree.
 [`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md)
 lists the parameters with their links and any fixed values.
 
@@ -824,6 +827,8 @@ model_ss
 #> Identifiability (intercept-only formulas): 2 free parameter(s), 2 degrees of freedom (response categories minus 1, summed over trees) 
 #>   Jacobian rank 2 of 2 at interior test values and 5 test values of the
 #>     covariates: locally identified.
+#>   bmm() takes the rank again at the covariate values each tree has in
+#>     the data.
 #> Use parameter_info() for parameter descriptions, links and fixed values.
 ```
 
@@ -1429,9 +1434,13 @@ or TreeBUGS](#migrating-from-mptinr-or-treebugs). With
 `links = "probit"` and correlated random effects across all parameters,
 the posterior means of the 18-parameter model lay inside the paper’s 95%
 credible intervals for all 18 group-level estimates of Experiment 1
-(Table 5). The paper reports none for the 12-parameter model, whose
-posterior means lay inside the 95% intervals of a TreeBUGS fit of the
-same data.
+(Table 5). A re-run with the same settings (4 chains of 4000 iterations,
+1000 of them warmup) had 50 divergent transitions among its 12000
+post-warmup transitions (0.4%). Raising `adapt_delta` from 0.8 to 0.95
+with the same seed did not remove them (56 divergent), and the posterior
+means of these two runs differed by at most 0.0022. The paper reports
+none for the 12-parameter model, whose posterior means lay inside the
+95% intervals of a TreeBUGS fit of the same data.
 
 ## 11 Migrating from MPTinR or TreeBUGS
 

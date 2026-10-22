@@ -55,9 +55,28 @@ mpt(
   needs a numeric column in the data, also one that no branch uses. The
   range is checked at the vertices of each branch's parameter box, which
   is exact when no term of the branch contains the same parameter twice
-  (`a * (1 - b) * G + (1 - a) * c`). A parameter that does is also
-  checked at 0.5, which is exact for a factor `u * (1 - u)` and
-  approximate otherwise, e.g. for `u * (1 - u)^2`.
+  (`a * (1 - b) * G + (1 - a) * c`). It is also exact for a tree written
+  with parameters, their complements `1 - p`, non-negative constants,
+  sums, products and whole-number powers alone, as in pair clustering
+  (`(1 - c) * 2 * u * (1 - u)`, `(1 - c) * (1 - u)^2`); a covariate
+  counts as a probability there when its values in the tree's rows lie
+  between 0 and 1, and as an exponent (`(1 - D)^n`) when they are whole
+  numbers. That exact check is skipped when it needs more than 65,536
+  points: the product over the tree's parameters of their highest power
+  plus 1, times the number of distinct covariate settings in the tree's
+  rows. In a simplex group the tree touches, every member but the last
+  counts, used or not, with the last member's highest power added to its
+  own. The check also gives way when the sum of the branches cannot be
+  confirmed as 1 within its numerical precision, as with a high power of
+  the last member, such as `(1 - gC)^54` in a group of three. In a tree
+  where it gives way or that is written otherwise, a local search looks
+  for values outside (0, 1\] between the vertices of each branch in
+  which a parameter appears twice, such as `0.5 + 0.5 * (a - 0.3)^2`,
+  and a message says that the check is approximate. The search has at
+  most 320 starts towards each end of (0, 1\]; when they leave distinct
+  covariate settings or vertices of the other parameters unsearched, or
+  cap the further starts within them, the message says so. Trees without
+  covariates are checked in the same way when the model is built.
 
 - simplex:
 
@@ -233,7 +252,14 @@ An object of class `bmmodel`
   [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) warns when
   the rank is deficient and every formula is intercept-only. When a
   formula has a predictor or is non-linear, it only says that these may
-  identify the parameters and that it did not check.
+  identify the parameters and that it did not check. With covariates,
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and
+  [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  compute the rank again at the covariate values that each tree has in
+  the data, and report it in the same way when it falls below the rank
+  at the test values: a covariate with a single value per tree can leave
+  a parameter unidentified, as in `(1 - D) * g * x` with `x = 0.5`
+  throughout.
 
   Example: separate detection parameters `Do` and `Dn` in a single
   old/new test give three free parameters and rank 2 of 3, so one

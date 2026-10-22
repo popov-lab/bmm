@@ -101,6 +101,18 @@
   [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
   no longer returns the stick-breaking components (`gAraw`) of a simplex
   group unless `pars` names them.
+- [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) and
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now refuse a
+  tree whose branches leave (0, 1\] between the old test points, such as
+  `7 * u * (1 - u)^2` or a product of three members of a four-member
+  simplex group, and a message names any branch whose range they can
+  only search. When your covariate values leave the model unidentified,
+  for example with one value per tree,
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and
+  [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  now warn and name the covariate; give such trees rows with different
+  covariate values
+  ([\#560](https://github.com/popov-lab/bmm/issues/560)).
 - `pp_check(group = )` on a multinomial fit and
   [`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md)
   no longer ignore your predictors whose names start with `Idx_`, `n_`,
