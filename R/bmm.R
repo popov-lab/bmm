@@ -95,7 +95,8 @@
 #'
 #' @return An object of class brmsfit which contains the posterior draws along
 #'   with many other useful information about the model. Use methods(class =
-#'   "brmsfit") for an overview on available methods.
+#'   "brmsfit") for an overview on available methods. Their `newdata` argument
+#'   takes data in the layout you gave to `bmm()` (see [standata.bmmfit()]).
 #'
 #' @references Frischkorn, G. T., & Popov, V. (2023). A tutorial for estimating
 #'   mixture models for visual working memory tasks in brms: Introducing the
@@ -184,6 +185,10 @@ bmm <- function(formula, data, model,
     cfg$model, fit,
     fit_args = fit_args,
     user_formula = cfg$user_formula,
+    # empty rather than NULL: update() reads a fit without a stored user prior as
+    # one saved before bmm stored it, whose prior mixes the user's rows with
+    # bmm's defaults (#538)
+    user_prior = prior %||% brms::empty_prior(),
     configure_opts = configure_opts
   )
 

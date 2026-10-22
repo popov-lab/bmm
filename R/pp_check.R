@@ -412,17 +412,10 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   model <- fit$bmm$model
   resp_cols <- unlist(model$resp_vars)
   re_vars <- .group_vars(fit)
-  exclude <- unique(c(resp_cols, "nTrials", re_vars))
+  exclude <- unique(c(resp_cols, built_data_columns(model), re_vars))
 
   pred_cols <- setdiff(names(data), exclude)
 
   is_matrix <- vapply(pred_cols, function(col) is.matrix(data[[col]]), logical(1))
-  pred_cols <- pred_cols[!is_matrix]
-
-  pred_cols <- pred_cols[
-    !grepl("^(Idx_|n_)", pred_cols) &
-      !pred_cols %in% unlist(model$other_vars$indicators$possible, use.names = FALSE)
-  ]
-
-  pred_cols
+  pred_cols[!is_matrix]
 }

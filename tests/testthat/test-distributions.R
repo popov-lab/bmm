@@ -14,6 +14,19 @@ test_that("sdm distribution functions run without errors", {
   expect_true(all.equal(res, exp(res_log)))
 })
 
+test_that("dsdm, psdm and rsdm stop with the same message for each invalid parameter", {
+  members <- list(
+    dsdm = function(...) dsdm(0.5, ...),
+    psdm = function(...) psdm(0.5, ...),
+    rsdm = function(...) rsdm(2, ...)
+  )
+  for (member in members) {
+    expect_error(member(kappa = -1), "kappa must be non-negative", fixed = TRUE)
+    expect_error(member(kappa = c(1, -1), c = c(1, 2)), "kappa must be non-negative", fixed = TRUE)
+    expect_error(member(c = -1), "c must be non-negative", fixed = TRUE)
+  }
+})
+
 test_that("dsdm integrates to 1", {
   expect_equal(integrate(dsdm, -pi, pi, mu = 0, c = 3, kappa = 3)$value, 1, tolerance = 1e-6)
 })
@@ -1260,6 +1273,42 @@ test_that("rezdm validates parameters correctly", {
     rezdm(n = 10, n_trials = 2, drift = 2, bound = 1.5, ndt = 0.3),
     "n_trials must be larger than 2"
   )
+})
+
+test_that("dezdm and rezdm stop with the same message for each invalid parameter", {
+  d_ok <- list(
+    mean_rt = c(0.5, 0.6), var_rt = c(0.02, 0.03), n_upper = 80, n_trials = 100,
+    drift = 2, bound = 1.5, ndt = 0.3
+  )
+  r_ok <- list(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
+  bad <- list(
+    list(bound = 0, msg = "bound must be positive"),
+    list(ndt = 0, msg = "ndt must be positive"),
+    list(s = 0, msg = "s must be positive"),
+    list(s = -1, msg = "s must be positive"),
+    list(n_trials = 2, msg = "n_trials must be larger than 2"),
+    list(zr = 1, version = "4par", msg = "zr must be between 0 and 1"),
+    list(zr = 0, version = "4par", msg = "zr must be between 0 and 1")
+  )
+  for (b in bad) {
+    pars <- b[setdiff(names(b), "msg")]
+    expect_error(do.call(dezdm, modifyList(d_ok, pars)), b$msg, fixed = TRUE)
+    expect_error(do.call(rezdm, modifyList(r_ok, pars)), b$msg, fixed = TRUE)
+  }
+})
+
+test_that("rezdm pairs a vector n_trials with the draws", {
+  withr::local_seed(564)
+  n_trials <- c(10, 1000)
+  for (version in c("3par", "4par")) {
+    res <- rezdm(
+      n = 2000, n_trials = n_trials, drift = 1, bound = 1, ndt = 0.2,
+      version = version
+    )
+    expect_equal(res$n_trials, rep(n_trials, 1000))
+    expect_true(all(res$n_upper <= res$n_trials))
+    expect_true(max(res$n_upper[res$n_trials == 10]) <= 10)
+  }
 })
 
 test_that("dezdm handles edge case with near-zero drift", {

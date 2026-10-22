@@ -165,8 +165,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' lines(x, d, type = "l", col = "red")
 dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
                  parametrization = "sqrtexp") {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  .check_sdm_args(c, kappa)
 
   .dsdm_numer <- switch(parametrization,
     bessel = .dsdm_numer_bessel,
@@ -195,8 +194,7 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
 psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
                  lower.bound = -pi, parametrization = "sqrtexp") {
   # parts adapted from brms::pvon_mises
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  .check_sdm_args(c, kappa)
 
   pi <- base::pi
   pi2 <- 2 * pi
@@ -243,8 +241,7 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @rdname SDMdist
 #' @export
 rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  .check_sdm_args(c, kappa)
   stopif(length(n) > 1, "n must be a single integer")
 
   .dsdm_numer <- switch(parametrization,
@@ -264,6 +261,11 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
     proposal_fun = function(n) stats::runif(n, -pi, pi),
     mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
   )
+}
+
+.check_sdm_args <- function(c, kappa) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
 }
 
 # helper functions for calculating the density of the SDM distribution
@@ -1150,6 +1152,10 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   # return NaN there, so they are evaluated at a placeholder and overwritten
   started <- rt_shifted > 0
   rt_shifted[!started] <- 1
+  # a bound at or below 0 has neither density nor survival; the Wald terms would
+  # warn about log(bound) there, so they get a placeholder like rt does
+  has_bound <- bound > 0
+  bound[!has_bound] <- 1
 
   if (version == "simple") {
     log_ll <- .pwald(rt_shifted, drift = drift, bound = bound, s = s, lower.tail = FALSE, log.p = TRUE)
@@ -1167,6 +1173,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   # simple-version error there is certain, since no response can have arrived
   log_ll[!started] <- -Inf
   if (version == "simple") log_ll[!started & response == 0] <- 0
+  log_ll[started & !has_bound] <- -Inf
 
   if (log) log_ll else exp(log_ll)
 }
@@ -1578,10 +1585,8 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
                   version = c("3par", "4par"), log = TRUE) {
   version <- match.arg(version)
 
-  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
-  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
-  stopif(isTRUE(any(s <= 0)), "s must be positive")
-  stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
+  .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
+
   stopif(isTRUE(any(n_upper < 0)), "n_upper cannot be negative")
   stopif(isTRUE(any(n_upper > n_trials)), "n_upper cannot exceed n_trials")
   stopif(
@@ -1590,7 +1595,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   )
 
   if (version == "4par") {
-    stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")
     if (!is.matrix(mean_rt)) {
       stopif(
         length(mean_rt) != 2 || length(var_rt) != 2,
@@ -1623,18 +1627,25 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
                   version = c("3par", "4par")) {
   version <- match.arg(version)
 
-  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
-  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
-  stopif(isTRUE(any(s <= 0)), "s must be positive")
+  .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
   stopif(length(n) > 1, "n must be a single integer")
-  stopif(n_trials <= 2, "n_trials must be larger than 2")
 
   if (version == "4par") {
-    stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")
     .rezdm_4par(n, n_trials, drift, bound, ndt, zr, s)
   } else {
     .rezdm_3par(n, n_trials, drift, bound, ndt, s)
   }
+}
+
+.check_ezdm_args <- function(bound, ndt, s, zr, n_trials, version) {
+  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
+  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
+  stopif(isTRUE(any(s <= 0)), "s must be positive")
+  stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
+  stopif(
+    version == "4par" && isTRUE(any(zr <= 0 | zr >= 1)),
+    "zr must be between 0 and 1"
+  )
 }
 
 # Internal: 3par density - vectorized

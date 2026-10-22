@@ -189,6 +189,68 @@ test_that("check_data() returns a data.frame()", {
   }
 })
 
+# A model's check_data() adds columns that pp_check(group = ) and
+# conditional_effects() must not offer as the user's predictors, and that
+# formula checks must not call unknown. built_data_columns() is the one
+# declaration, so a column added without it fails here (#550). The reverse
+# fails too: a declared name check_data() does not build hides a user column
+# of that name and lets a formula naming a missing column pass the data
+# check. It is compared with all returned columns, since a declared column may
+# overwrite one the user supplied. Cases of the check_data kind are read too,
+# for models whose stored-frame case cannot show a column (the ezdm 4par
+# indicators).
+test_that("built_data_columns() declares exactly the columns check_data() adds", {
+  cases <- c(model_test_cases("stored_frame"), model_test_cases("check_data"))
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    checked <- suppressWarnings(suppressMessages(
+      check_data(case$model, case$data, case$formula %||% bmf(kappa ~ 1))
+    ))
+    # Y is a matrix column that is no predictor, left out of the declaration
+    added <- setdiff(names(checked), c(names(case$data), "Y"))
+    declared <- built_data_columns(case$model)
+    expect_identical(
+      setdiff(added, declared), character(0),
+      info = paste0(name, ": check_data() adds a column built_data_columns() does not declare")
+    )
+    expect_identical(
+      setdiff(declared, names(checked)), character(0),
+      info = paste0(name, ": built_data_columns() declares a column check_data() does not build")
+    )
+  }
+})
+
+test_that("built_data_columns() names what each model's check_data() builds", {
+  cases <- model_test_cases("stored_frame")
+  declared <- function(name) built_data_columns(cases[[name]]$model)
+
+  expect_setequal(declared("mixture2p"), character(0))
+  expect_setequal(declared("sdm"), character(0))
+  expect_setequal(
+    declared("mixture3p"),
+    c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric")
+  )
+  expect_setequal(declared("imm"), c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric"))
+  expect_setequal(declared("sdt_yn"), "dist_type")
+  expect_setequal(declared("sdt_mafc"), c("m_afc", "dist_type"))
+  expect_setequal(declared("sdt_ranking"), c("nTrials", "max_rank"))
+  expect_setequal(declared("sdt_rating"), "nTrials")
+  expect_setequal(declared("sdt_cdp"), "nTrials")
+  expect_setequal(
+    declared("mpt_impossible"),
+    c("nTrials", "Idx_withdist", "Idx_nodist", "Poss_dist")
+  )
+  expect_setequal(declared("mpt_single_tree"), "nTrials")
+  expect_setequal(
+    declared("m3_num_options_by_category"),
+    c("nTrials", paste0("Idx_", c("corr", "other", "dist", "npl")),
+      paste0("n_opt_", c("corr", "other", "dist", "npl")))
+  )
+
+  ezdm_4par <- model_test_cases("check_data")$ezdm_4par$model
+  expect_setequal(built_data_columns(ezdm_4par), c("rt_used_upper", "rt_used_lower"))
+})
+
 test_that("wrap(x) returns the same for values between -pi and pi", {
   withr::local_seed(445)
   x <- runif(100, -pi, pi)

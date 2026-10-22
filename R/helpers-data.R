@@ -52,6 +52,17 @@ built_data_columns.default <- function(model) {
   character(0)
 }
 
+# inv_ss and ss_numeric are built whatever the set sizes; the LureIdx step
+# functions are one per non-target feature
+#' @exportS3Method
+built_data_columns.non_targets <- function(model) {
+  c(
+    paste0("LureIdx", seq_along(model$other_vars$nt_features)),
+    "inv_ss", "ss_numeric",
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.bmmodel <- function(model, data, formula) {
   stopif(missing(data), "Data must be specified using the 'data' argument.")
@@ -89,8 +100,9 @@ check_data.circular <- function(model, data, formula) {
 #' @export
 check_data.non_targets <- function(model, data, formula) {
   nt_features <- model$other_vars$nt_features
+  # rows at set size 1 hold NA in every non-target column
   warnif(
-    max(abs(data[, nt_features]), na.rm = TRUE) > 2 * pi,
+    any(abs(data[, nt_features]) > 2 * pi, na.rm = TRUE),
     "It appears at least one of your non_target variables are in degrees.
     The model requires these variable to be in radians.
     The model will continue to run, but the results may be compromised."
@@ -98,13 +110,19 @@ check_data.non_targets <- function(model, data, formula) {
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
   # brms drops NA-response rows from a fit's stored frame, so the frame's maximum
-  # set size can be below the fit's (#459); revert_check_data() hands over the
-  # fit's bound. Only that function sets it, so data from bmm() and
+  # set size can be below the fit's (#459), and newdata for a prediction can
+  # stop at any set size; carry_fit_bounds() hands over the fit's bound. Only
+  # revert_check_data() and check_newdata() set it, so data from bmm() and
   # update(newdata = ) is still checked against its own maximum
   max_set_size <- attr(data, "fit_max_set_size") %||% ss$max_set_size
   attr(data, "fit_max_set_size") <- NULL
   ss_numeric <- ss$ss_numeric
 
+  stopif(
+    ss$max_set_size > max_set_size,
+    "The data hold a set size of {ss$max_set_size}, above the {max_set_size} \\
+    the model was fitted with."
+  )
   stopif(
     !isTRUE(all.equal(length(nt_features), max_set_size - 1)),
     "The number of columns for non-target values in the argument \\
@@ -322,6 +340,82 @@ standata.bmmformula <- function(object, data, model, ...) {
     configure_fit(object, data, model, until = "model"),
     dots
   )
+}
+
+#' @title Stan data of a fitted `bmm` model
+#' @description The prediction methods of `brms`, such as [brms::log_lik()],
+#'   [brms::posterior_predict()], [brms::posterior_epred()],
+#'   [brms::predict.brmsfit()], [brms::fitted.brmsfit()] and [brms::loo()],
+#'   turn `newdata` into Stan data through `standata()`. For a `bmmfit`,
+#'   `newdata` can be in the layout of the data you gave to [bmm()]: the
+#'   columns `bmm` built from those data when it fitted the model are built
+#'   again. Rows of the fit's model frame,
+#'   `fit$data`, are used as they are.
+#' @param object A `bmmfit` object
+#' @param newdata An optional data frame, in the layout of the data given to
+#'   [bmm()] or a subset of the rows of `object$data`. Its rows keep their
+#'   order. When `newdata` is in the layout given to [bmm()], the columns
+#'   `bmm` builds itself are built again, and a column of `newdata` with one
+#'   of those names is replaced.
+#' @param ... Further arguments passed to [brms::standata()]
+#' @return A named list of objects containing the data to evaluate the model
+#'   with Stan.
+#' @seealso [brms::standata()], [bmm()]
+#' @keywords extract_info
+#' @export
+standata.bmmfit <- function(object, newdata = NULL, ...) {
+  if (lacks_built_columns(object, newdata)) {
+    newdata <- check_newdata(object, newdata)
+  }
+  NextMethod()
+}
+
+# The model frame holds the columns check_data() built, and data in the layout
+# given to bmm() lack some of them. Slices of the frame carry them all: those
+# of kfold() and reloo(), and the grids that conditional_effects() and
+# native_parameters() cut from it. So does any newdata for a model that
+# builds no columns, which brms then checks as it always did
+lacks_built_columns <- function(object, newdata) {
+  !is.null(newdata) && any(not_in(
+    intersect(built_data_columns(object$bmm$model), names(object$data)),
+    names(newdata)
+  ))
+}
+
+# brms returns predictions in the rows of newdata, so the data are not sorted,
+# and a check_data() method that dropped or reordered rows would misalign them
+# without an error
+check_newdata <- function(object, newdata) {
+  withr::local_options(bmm.sort_data = FALSE)
+  newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata))
+  checked <- check_data(object$bmm$model, newdata, object$bmm$user_formula)
+  stopif(
+    !identical(row.names(checked), row.names(newdata)),
+    "Preparing 'newdata' for this model changed its rows. Please report this \\
+    as a bug of bmm."
+  )
+  checked
+}
+
+# Data checked against a fit rather than on its own: the fit's stored frame in
+# update() and newdata for a prediction. Both can lack the largest set size
+# the fit was made with, which check_data() would then take from the data
+carry_fit_bounds <- function(model, data) {
+  UseMethod("carry_fit_bounds")
+}
+
+#' @exportS3Method
+carry_fit_bounds.default <- function(model, data) {
+  data
+}
+
+# nt_features passed the check when the fit was made, so the fit's largest set
+# size is one more than their number. Derived rather than stored on the fit, so
+# fits saved before #459 was fixed are covered too
+#' @exportS3Method
+carry_fit_bounds.non_targets <- function(model, data) {
+  attr(data, "fit_max_set_size") <- length(model$other_vars$nt_features) + 1
+  data
 }
 
 # check if the data is sorted by the predictors
