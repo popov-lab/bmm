@@ -2,6 +2,7 @@
 
 ### New features
 * `qsdm()`, the quantile function of the SDM distribution, now works; it stopped with "'qsdm' is not implemented yet". It takes `lower.tail`, `log.p` and `lower.bound` as `psdm()` does and returns values between `lower.bound` and `lower.bound + 2 * pi` (#556).
+* mixture2p, mixture3p and imm: a fit with `variable_precision = TRUE` that has divergent transitions now warns when its posterior presses against the smallest gamma shape the quadrature accepts, 60 / `vp_nodes`, and names the `vp_nodes` to refit with. Before, such a fit showed only the divergences. The refit takes about 1.5 times as long (#398).
 
 ### Bug fixes
 * `psdm()` returned 0 instead of 1 at the upper end of the circle (`psdm(pi, 0, 3, 5)`). With a `lower.bound` other than `-pi`, such as `mu - pi`, it also returned negative or wrong values for many `q` (`psdm(-2, lower.bound = 0)` gave -0.42). It now returns 1 at `lower.bound + 2 * pi` and counts probability from `lower.bound` around the circle (#556).

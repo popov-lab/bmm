@@ -419,3 +419,53 @@ test_that("apply_links refuses links that are not a named list of strings", {
 })
 
 
+
+test_that("check_formula() renames a deprecated parameter in both the name and the formula", {
+  withr::local_seed(445)
+  model <- mixture2p(resp_error = "dev_rad")
+  model$deprecated_parameters <- list(precision = "kappa")
+  data <- data.frame(dev_rad = rnorm(10), cond = factor(rep(1:2, 5)))
+
+  expect_warning(
+    formula <- check_formula(model, data, bmf(precision ~ cond, thetat ~ 1)),
+    "precision.*renamed to.*kappa"
+  )
+  expect_true("kappa" %in% names(formula))
+  expect_false("precision" %in% names(formula))
+  expect_equal(lhs_vars(formula$kappa), "kappa")
+  expect_equal(rhs_vars(formula$kappa), "cond")
+})
+
+test_that("check_formula() renames a deprecated parameter fixed to a constant", {
+  withr::local_seed(445)
+  model <- mixture2p(resp_error = "dev_rad")
+  model$deprecated_parameters <- list(precision = "kappa")
+  data <- data.frame(dev_rad = rnorm(10))
+
+  expect_warning(
+    formula <- check_formula(model, data, bmf(precision = 2, thetat ~ 1)),
+    "renamed to"
+  )
+  expect_equal(formula$kappa, 2, ignore_attr = TRUE)
+})
+
+test_that("check_formula() leaves a formula without deprecated parameters untouched", {
+  withr::local_seed(445)
+  model <- mixture2p(resp_error = "dev_rad")
+  model$deprecated_parameters <- list(precision = "kappa")
+  data <- data.frame(dev_rad = rnorm(10))
+
+  expect_silent(check_formula(model, data, bmf(kappa ~ 1, thetat ~ 1)))
+})
+
+test_that("check_formula() refuses a parameter given under both its old and its new name", {
+  withr::local_seed(445)
+  model <- mixture2p(resp_error = "dev_rad")
+  model$deprecated_parameters <- list(precision = "kappa")
+  data <- data.frame(dev_rad = rnorm(10), cond = factor(rep(1:2, 5)))
+
+  expect_error(
+    check_formula(model, data, bmf(precision ~ cond, kappa ~ 1, thetat ~ 1)),
+    "both.*'precision'.*'kappa'"
+  )
+})
