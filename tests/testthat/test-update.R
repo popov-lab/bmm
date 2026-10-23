@@ -1308,6 +1308,32 @@ test_that("a fit saved before bmm() stored the user's prior keeps the previous u
   expect_null(up$bmm$user_prior)
 })
 
+# a prior written for bmm 1.4 is translated once, where it enters: translated
+# after joining the stored prior, the old row and the stored new-form row on the
+# same coefficient both reached brms, which refused them, and the untranslated
+# combination was stored and warned again at every update()
+test_that("a 1.4-form prior in update() replaces a stored prior on the same coefficient", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  stored <- brms::set_prior("normal(1, 0.5)", class = "b", dpar = "kappa")
+  call <- brms::set_prior("normal(0, 0.1)", class = "b", nlpar = "kappa")
+  fit <- stub_bmm(bmf(kappa ~ 1 + cond, thetat ~ 1), mixture2p("y"), stored)
+  refit <- function(fit, ...) suppressMessages(update(
+    fit, ..., newdata = user_prior_data(), backend = "mock", mock_fit = stub_stanfit(),
+    rename = FALSE, recompile = TRUE
+  ))
+  expect_warning(up <- refit(fit, prior = call), "nlpar = \"kappa\"", fixed = TRUE)
+  rows <- as.data.frame(up$prior)
+  expect_identical(rows$prior[rows$class == "b" & rows$dpar == "kappa" & rows$coef == ""], "normal(0, 0.1)")
+  expect_identical(up$bmm$user_prior$nlpar, c("", ""))
+  expect_no_warning(refit(up))
+
+  # bmm() stores the translation too
+  fit <- stub_bmm(bmf(kappa ~ 1 + cond, thetat ~ 1), mixture2p("y"), call)
+  expect_identical(fit$bmm$user_prior$nlpar, c("", ""))
+  expect_no_warning(refit(fit))
+})
+
 test_that("a new fit without a stored user prior updates as a fit saved before (#538)", {
   skip_on_cran()
   skip_if_not_installed("rstan")
