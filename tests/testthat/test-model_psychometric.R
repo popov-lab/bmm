@@ -102,6 +102,16 @@ test_that("rows without a response do not widen the prior range", {
   expect_equal(prior_of(pr, "midpoint"), "normal(0, 1)")
 })
 
+test_that("rows with a missing predictor do not widen the prior range", {
+  dat <- transform(psy_trial_data(), cond = factor(rep(c("a", "b"), 20)))
+  dat$cond[dat$x == 2] <- NA
+  # brms fits x from -1 to 1: centre 0, R = 2
+  pr <- suppressWarnings(default_prior(
+    bmf(midpoint ~ 1 + cond, width ~ 1, guess ~ 1, lapse ~ 1), dat, psychometric("y", "x")
+  ))
+  expect_equal(prior_of(pr, "midpoint"), "normal(0, 1)")
+})
+
 test_that("log-scale sigmoids scale their priors to the log range", {
   dat <- psy_count_data()
   model <- psychometric("n_correct", "contrast", n_trials = "n_trials",
@@ -673,6 +683,21 @@ test_that("a grouping column is refused as a condition", {
   )
   expect_error(psychometric_threshold(fit, conditions = data.frame(id = factor(1:2))),
                "not population-level predictors or rate columns: 'id'")
+})
+
+test_that("a guess predicted by the intensity is refused", {
+  fit <- fake_psychometric_fit(
+    psychometric("y", "x", lapse = 0), psy_trial_data(),
+    bmf(midpoint ~ 1, width ~ 1, guess ~ 1 + x)
+  )
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(midpoint = 0.05, width = log(0.05),
+                                                  guess = -2)),
+    .package = "brms"
+  )
+  expect_error(psychometric_threshold(fit), "constant along the intensity axis")
+  expect_error(psychometric_threshold(fit, conditions = data.frame(x = c(0, 1))),
+               "constant along the intensity axis")
 })
 
 test_that("psychometric_threshold() validates its arguments", {

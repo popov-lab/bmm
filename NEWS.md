@@ -1,7 +1,7 @@
 # bmm (development version)
 
 ### New models
-* Add the **psychometric function** (`psychometric()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric()` and `rpsychometric()`. See `?psychometric`. Thanks to @GidonFrischkorn
+* Add the **psychometric function** (`psychometric()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric()` and `rpsychometric()`. See `?psychometric` (#507). Thanks to @GidonFrischkorn
 
 ### New features
 * `qsdm()`, the quantile function of the SDM distribution, now works; it stopped with "'qsdm' is not implemented yet". It takes `lower.tail`, `log.p` and `lower.bound` as `psdm()` does and returns values between `lower.bound` and `lower.bound + 2 * pi` (#556).

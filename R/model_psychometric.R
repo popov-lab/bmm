@@ -303,17 +303,19 @@ psychometric <- function(response, intensity, n_trials = NULL,
 # give one, which check_data() then reports. A single level has no range, so
 # the priors are centred on it with a span of its own magnitude (or 1 at 0),
 # rather than left at the 0-to-1 placeholders whatever the units
-.psychometric_axis_range <- function(model, data) {
+.psychometric_axis_range <- function(model, data, formula = NULL) {
   x <- data[[model$other_vars$intensity]]
   if (!is.numeric(x)) {
     return(NULL)
   }
-  # brms drops rows without a response or a trial count, so they must not set
-  # the scale of the priors
-  count_cols <- intersect(c(model$resp_vars$response, model$other_vars$n_trials),
-                          names(data))
-  dropped <- Reduce(`|`, lapply(count_cols, function(col) is.na(data[[col]])), FALSE)
-  x <- x[!dropped]
+  # brms drops rows with NA in any column it reads, so they must not set the
+  # scale of the priors
+  read_cols <- intersect(
+    c(model$resp_vars$response, model$other_vars$n_trials,
+      if (is_bmmformula(formula)) rhs_vars(formula)),
+    names(data)
+  )
+  x <- x[rowSums(is.na(data[read_cols])) == 0]
   if (.psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x) {
     x <- log(x[x > 0])
   }
@@ -329,7 +331,7 @@ psychometric <- function(response, intensity, n_trials = NULL,
 
 #' @export
 check_model.psychometric <- function(model, data = NULL, formula = NULL) {
-  x_range <- .psychometric_axis_range(model, data)
+  x_range <- .psychometric_axis_range(model, data, formula)
   if (!is.null(x_range)) {
     log_x <- .psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x
     model$default_priors[c("midpoint", "width")] <- .psychometric_shape_priors(x_range)
@@ -625,7 +627,9 @@ posterior_epred_psychometric <- function(prep) {
 #'
 #' Thresholds, slopes and rates come from the population-level effects only
 #' (`re_formula = NA` in [brms::posterior_linpred()]): group-level effects are
-#' left out, and `re_formula` cannot be passed through `...`.
+#' left out, and `re_formula` cannot be passed through `...`. The closed form
+#' needs `guess` and `lapse` constant along the intensity axis, so a fit whose
+#' formula predicts either by the intensity is refused.
 #'
 #' @param fit A `bmmfit` object returned by [bmm()] with a [psychometric()]
 #'   model.
@@ -794,8 +798,13 @@ print.bmm_psychometric_threshold <- function(x, ...) {
   model <- fit$bmm$model
   rate_cols <- Filter(is.character, model$other_vars[c("guess", "lapse")])
   cols <- union(unlist(.population_vars(fit$bmm$user_formula)), unlist(rate_cols))
-  cols <- setdiff(intersect(cols, names(fit$data)),
-                  c(model$other_vars$intensity, "Intercept"))
+  # the closed-form threshold takes the asymptotes as constant along the
+  # intensity, which a guess or lapse predicted by it breaks
+  intensity <- model$other_vars$intensity
+  stopif(intensity %in% cols,
+         "psychometric_threshold() needs guess and lapse constant along the \\
+         intensity axis, but the formula predicts them by '{intensity}'")
+  cols <- setdiff(intersect(cols, names(fit$data)), "Intercept")
   if (is.null(conditions)) {
     return(.sdt_unique_subset(fit$data, cols))
   }
@@ -809,8 +818,8 @@ print.bmm_psychometric_threshold <- function(x, ...) {
   extra_cols <- setdiff(names(conditions), cols)
   stopif(length(extra_cols) > 0,
          "conditions has columns that are not population-level predictors or \\
-         rate columns: {collapse_comma(extra_cols)}. Thresholds leave out \\
-         group-level effects, so a grouping column cannot be a condition.")
+         rate columns: {collapse_comma(extra_cols)}. Thresholds are \\
+         population-level, so only those columns can be conditions.")
   as.data.frame(conditions)
 }
 

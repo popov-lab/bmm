@@ -63,7 +63,9 @@ per unit of intensity.
 
 Thresholds, slopes and rates come from the population-level effects only
 (\code{re_formula = NA} in \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}): group-level effects are
-left out, and \code{re_formula} cannot be passed through \code{...}.
+left out, and \code{re_formula} cannot be passed through \code{...}. The closed form
+needs \code{guess} and \code{lapse} constant along the intensity axis, so a fit whose
+formula predicts either by the intensity is refused.
 }
 \examples{
 \dontrun{
