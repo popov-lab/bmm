@@ -6,11 +6,16 @@ real psychometric_log_lik(int y, int trials, real x, real midpoint, real width,
   real dx = log_x == 1 ? log(x) - log(midpoint) : x - midpoint;
   real z = zmid + zspan * dx / width;
   // in the extreme-value CDFs (dist_type 2 and 3) the gradient turns non-finite
-  // from about |z| = 699.6 when the rate that would absorb the tail is zero,
-  // where the adjoint count * exp(|z|) * |z| / width overflows, and past
-  // |z| = 709.78 for any rate, where exp(z) overflows and 0 * inf gives NaN.
-  // Beyond |z| = 600 the clamped terms are flat or below exp(-600), so only
-  // rows that are already nearly impossible change value
+  // when the rate that would absorb a tail is zero and the adjoint overflows:
+  // in the tail whose term is -count * exp(|z|), the adjoint carries
+  // |z| / width and overflows from |z| = 699.7 at 10 trials and width 0.3 down
+  // to 680.6 at the int maximum; in the other tail it overflows from
+  // 709.78 - log(count); the log-x sigmoids also carry 1 / (width * midpoint).
+  // Past 709.78 it turns NaN for any rate, where exp(z) overflows and 0 * inf
+  // gives NaN. At 600 the adjoint stays finite for any int count unless width
+  // (times midpoint on the log-x sigmoids) is below about count * 1e-45, and
+  // beyond 600 the clamped terms are flat or below exp(-600), so only rows that
+  // are already nearly impossible change value
   if (dist_type == 2 || dist_type == 3) z = fmin(fmax(z, -600), 600);
   real log1m_guess = log1m(guess);
   real out = lchoose(trials, y);

@@ -515,13 +515,15 @@ test_that("the four Stan families match dpsychometric() and keep finite gradient
       expect_lt(max(rel_error[finite]), 1e-12, label = label)
     }
 
-    # just inside the clamp, with the rate that would absorb the tail at zero:
-    # the adjoint count * exp(|z|) * |z| / width must not overflow there
-    shell <- rows_at_z(c(699.9, -699.9, 650, -650), c(0L, 10L, 0L, 10L),
+    # with the rate that would absorb the tail at zero: at 599.9, just inside
+    # the clamp, the adjoint count * exp(|z|) * |z| / width is about 2e264 and
+    # must stay finite; at 699.9 it overflows unless the clamp sits below it
+    shell <- rows_at_z(c(699.9, -699.9, 599.9, -599.9), c(0L, 10L, 0L, 10L),
                        guess = 0, lapse = 0, sigmoid)
     # CmdStan refuses a point with a non-finite gradient, which makes cmdstanr
-    # error; `error = 1e300` because the clamped constant (about -4e261 on the
-    # shell rows) swamps the finite-difference side of the comparison
+    # error. `error = 1e300` because the 599.9 rows carry gradients near 1e267
+    # that no finite-difference check matches (the 699.9 rows are clamped and
+    # flat), so only a non-finite gradient fails the check
     grad <- stan_model$diagnose(
       data = stan_data(rbind(far, shell), spec, k, gradient_check = 1L),
       init = list(list(log_width_scale = 0)),
