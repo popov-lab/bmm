@@ -53,6 +53,11 @@ built_data_columns.default <- function(model) {
 }
 
 #' @exportS3Method
+built_data_columns.change_detection <- function(model) {
+  c("probe_centered", NextMethod("built_data_columns"))
+}
+
+#' @exportS3Method
 built_data_columns.non_targets <- function(model) {
   c("ss_numeric", NextMethod("built_data_columns"))
 }
@@ -105,6 +110,11 @@ check_data.change_detection <- function(model, data, formula) {
   )
   data <- .cd_check_binary_response(data, vars$response)
   for (angle in c(vars$probe, vars$target)) {
+    stopif(
+      anyNA(data[[angle]]),
+      "The variable '{angle}' contains missing values. Remove the trials \\
+      without a probe or a target before fitting."
+    )
     warnif(
       max(abs(data[[angle]]), na.rm = TRUE) > 2 * pi,
       "It appears the variable '{angle}' is in degrees. The model requires \\

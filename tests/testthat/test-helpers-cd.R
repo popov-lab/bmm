@@ -326,6 +326,29 @@ test_that("check_data.change_detection() centres the probe on the target", {
   )
 })
 
+test_that("check_data.change_detection() refuses a missing probe or target", {
+  dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
+  for (column in c("p", "t")) {
+    holed <- dat
+    holed[[column]][2] <- NA
+    expect_error(
+      check_data(cd_stub_model(), holed, bmf(kappa ~ 1)),
+      glue::glue("'{column}' contains missing values")
+    )
+  }
+  expect_error(
+    check_data(cd_stub_model(), transform(dat, r = c(0, NA, 1)), bmf(kappa ~ 1)),
+    "missing"
+  )
+})
+
+test_that("check_data.change_detection() declares the column it builds", {
+  model <- cd_stub_model()
+  dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
+  built <- setdiff(names(check_data(model, dat, bmf(kappa ~ 1))), names(dat))
+  expect_identical(built_data_columns(model), built)
+})
+
 test_that("revert_check_data.change_detection() rebuilds what check_data() needs", {
   model <- cd_stub_model()
   dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
