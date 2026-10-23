@@ -22,7 +22,9 @@ between 0 and 1. The default 0.75 is the conventional 2AFC threshold.}
 \item{conditions}{A data frame of predictor values at which to evaluate the
 parameters. The default uses every unique combination of the
 population-level predictors in the data, and of the guess or lapse column
-when a rate is fixed per row. Group-level effects are left out.}
+when a rate is fixed per row. A user-supplied data frame must have a column
+for each of these and no other: the thresholds are population-level, so a
+grouping column such as a participant id is refused.}
 
 \item{probs}{Numeric vector of length 2. Lower and upper quantiles for the
 credible interval in the summary. Default \code{c(0.025, 0.975)}.}
@@ -58,6 +60,10 @@ task with \code{guess = 0.5} is the usual case; asking for 0.5 is not, because n
 
 The slope is \eqn{d\psi / dx}{dpsi / dx} at the threshold, in probability
 per unit of intensity.
+
+Thresholds, slopes and rates come from the population-level effects only
+(\code{re_formula = NA} in \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}}): group-level effects are
+left out, and \code{re_formula} cannot be passed through \code{...}.
 }
 \examples{
 \dontrun{

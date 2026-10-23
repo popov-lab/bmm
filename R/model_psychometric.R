@@ -13,7 +13,8 @@
       if (log_x) "; log link, so effects are multiplicative" else ""
     ),
     width = paste0(
-      "Distance on the intensity axis from F = 0.05 to F = 0.95",
+      "Width of the sigmoid: the distance on the intensity axis from ",
+      "F = 0.05 to F = 0.95",
       if (log_x) ", in log units of the intensity" else "",
       "; log link"
     ),
@@ -112,6 +113,9 @@ settable_links.psychometric <- function(model) {
 #'   from response counts per stimulus level.
 #' @details `r model_docs(.model_psychometric())`
 #'
+#' The default links listed above are those of the default sigmoid; `midpoint`
+#' takes a log link for `"weibull"`, `"lognormal"` and `"loglogistic"`.
+#'
 #' The probability of a positive response ("yes", "correct", "longer") at
 #' intensity \eqn{x} is
 #' \deqn{\psi(x) = \gamma + (1 - \gamma)(1 - \lambda) F(x),}{psi(x) = guess + (1 - guess) * (1 - lapse) * F(x),}
@@ -170,6 +174,8 @@ settable_links.psychometric <- function(model) {
 #' `normal(0, R / 4)` and its random-effect SDs `exponential(4 / R)`; the log of
 #' `width` gets `normal(log(R / 2), 1)`. The priors listed above are these for a
 #' range of 0 to 1; [default_prior()] shows the ones for your data.
+#' `update()` with `newdata` alone keeps the priors of the original fit, so for
+#' intensities on another scale pass a `prior` that fits them.
 #'
 #' @param response The name of the variable in the data with the responses:
 #'   0/1 (or logical) per trial when `n_trials` is `NULL`, and otherwise the
@@ -302,6 +308,12 @@ psychometric <- function(response, intensity, n_trials = NULL,
   if (!is.numeric(x)) {
     return(NULL)
   }
+  # brms drops rows without a response or a trial count, so they must not set
+  # the scale of the priors
+  count_cols <- intersect(c(model$resp_vars$response, model$other_vars$n_trials),
+                          names(data))
+  dropped <- Reduce(`|`, lapply(count_cols, function(col) is.na(data[[col]])), FALSE)
+  x <- x[!dropped]
   if (.psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x) {
     x <- log(x[x > 0])
   }
@@ -611,6 +623,10 @@ posterior_epred_psychometric <- function(prep) {
 #' The slope is \eqn{d\psi / dx}{dpsi / dx} at the threshold, in probability
 #' per unit of intensity.
 #'
+#' Thresholds, slopes and rates come from the population-level effects only
+#' (`re_formula = NA` in [brms::posterior_linpred()]): group-level effects are
+#' left out, and `re_formula` cannot be passed through `...`.
+#'
 #' @param fit A `bmmfit` object returned by [bmm()] with a [psychometric()]
 #'   model.
 #' @param p Numeric vector of target response probabilities, each strictly
@@ -618,7 +634,9 @@ posterior_epred_psychometric <- function(prep) {
 #' @param conditions A data frame of predictor values at which to evaluate the
 #'   parameters. The default uses every unique combination of the
 #'   population-level predictors in the data, and of the guess or lapse column
-#'   when a rate is fixed per row. Group-level effects are left out.
+#'   when a rate is fixed per row. A user-supplied data frame must have a column
+#'   for each of these and no other: the thresholds are population-level, so a
+#'   grouping column such as a participant id is refused.
 #' @param probs Numeric vector of length 2. Lower and upper quantiles for the
 #'   credible interval in the summary. Default `c(0.025, 0.975)`.
 #' @param ... Further arguments passed to [brms::posterior_linpred()], such as
@@ -786,6 +804,13 @@ print.bmm_psychometric_threshold <- function(x, ...) {
   stopif(length(missing_cols) > 0,
          "conditions must give a value for every column the model reads; \\
          missing: {collapse_comma(missing_cols)}")
+  # any other column would only label one population value, e.g. an id column
+  # would look like per-participant thresholds
+  extra_cols <- setdiff(names(conditions), cols)
+  stopif(length(extra_cols) > 0,
+         "conditions has columns that are not population-level predictors or \\
+         rate columns: {collapse_comma(extra_cols)}. Thresholds leave out \\
+         group-level effects, so a grouping column cannot be a condition.")
   as.data.frame(conditions)
 }
 

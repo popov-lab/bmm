@@ -4600,7 +4600,9 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 ############################################################################# !
 
 # Each sigmoid is a standard CDF from .sdt_dists read on the linear or on the
-# log stimulus axis; weibull is gumbel_min on log intensity, as in psignifit 4.
+# log stimulus axis; weibull is gumbel_min on log intensity, as in MATLAB
+# psignifit 4 (Python psignifit's weibull is its gumbel on the linear axis and
+# leaves the log transform of the intensities to the user).
 # The order is the order of the `sigmoid` argument, normal first as its default.
 .psychometric_sigmoids <- list(
   normal      = list(dist = "normal",     log_x = FALSE),
@@ -4766,6 +4768,7 @@ rpsychometric <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
                                       "loglogistic")) {
   sigmoid <- match.arg(sigmoid)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(n_trials < 1), "n_trials must be positive")
   .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
 

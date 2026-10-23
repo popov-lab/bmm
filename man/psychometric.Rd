@@ -71,7 +71,7 @@ Provide data with one row per trial or per stimulus level:
 \item \strong{Parameters:}
 \itemize{
 \item \code{midpoint}: Stimulus intensity at which the sigmoid F is 0.5, halfway between the asymptotes, in the units of the intensity
-\item \code{width}: Distance on the intensity axis from F = 0.05 to F = 0.95; log link
+\item \code{width}: Width of the sigmoid: the distance on the intensity axis from F = 0.05 to F = 0.95; log link
 \item \code{guess}: Guess rate: the lower asymptote, the response probability far below the midpoint; logit link
 \item \code{lapse}: Lapse rate: the proportion of trials on which the observer does not attend and responds at the guess rate; the upper asymptote is 1 - lapse * (1 - guess); logit link
 }
@@ -108,6 +108,9 @@ Provide data with one row per trial or per stimulus level:
 }
 }
 }
+
+The default links listed above are those of the default sigmoid; \code{midpoint}
+takes a log link for \code{"weibull"}, \code{"lognormal"} and \code{"loglogistic"}.
 
 The probability of a positive response ("yes", "correct", "longer") at
 intensity \eqn{x} is
@@ -174,6 +177,8 @@ the range, the \code{midpoint} intercept gets \code{normal(c, R / 2)}, its effec
 \code{normal(0, R / 4)} and its random-effect SDs \code{exponential(4 / R)}; the log of
 \code{width} gets \code{normal(log(R / 2), 1)}. The priors listed above are these for a
 range of 0 to 1; \code{\link[=default_prior]{default_prior()}} shows the ones for your data.
+\code{update()} with \code{newdata} alone keeps the priors of the original fit, so for
+intensities on another scale pass a \code{prior} that fits them.
 }
 
 \examples{

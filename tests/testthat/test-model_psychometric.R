@@ -92,6 +92,16 @@ test_that("midpoint and width priors are scaled to the intensity range", {
   expect_equal(prior_of(pr, "midpoint", "b"), "normal(0.5, 1.5)")
 })
 
+test_that("rows without a response do not widen the prior range", {
+  dat <- psy_trial_data()
+  dat$y[dat$x == 2] <- NA
+  # brms fits x from -1 to 1: centre 0, R = 2
+  pr <- suppressWarnings(default_prior(
+    bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1), dat, psychometric("y", "x")
+  ))
+  expect_equal(prior_of(pr, "midpoint"), "normal(0, 1)")
+})
+
 test_that("log-scale sigmoids scale their priors to the log range", {
   dat <- psy_count_data()
   model <- psychometric("n_correct", "contrast", n_trials = "n_trials",
@@ -385,6 +395,7 @@ test_that("the distribution functions validate their arguments", {
   expect_error(dpsychometric(1, 1, 1, 1, guess = 1), "guess must be")
   expect_error(dpsychometric(1, 0, 1, 1, sigmoid = "weibull"), "intensity must be positive")
   expect_error(rpsychometric(1, 1, -1, 1, sigmoid = "lognormal"), "midpoint must be positive")
+  expect_error(rpsychometric(1, 1, 1, 1, n_trials = NA), "n_trials must not contain NA")
 })
 
 
@@ -392,54 +403,115 @@ test_that("the distribution functions validate their arguments", {
 # R AND STAN PARITY                                                      ####
 ############################################################################# !
 
-test_that("psychometric_log_lik in Stan matches dpsychometric()", {
+test_that("the four Stan families match dpsychometric() and keep finite gradients", {
+  skip_unless_stan_tests()
   skip_on_cran()
-  skip_if_not(requireNamespace("cmdstanr", quietly = TRUE), "cmdstanr not available")
-  skip_if_not(!is.null(tryCatch(cmdstanr::cmdstan_path(), error = function(e) NULL)),
-              "CmdStan not installed")
 
   sc_path <- system.file("stan_chunks", package = "bmm")
+  family_args <- paste("trials[n], x[n], guess_fixed[n], lapse_fixed[n],",
+                       "dist_type, log_x, zmid, zspan")
   code <- glue(
     "functions {{\n{read_lines2(file.path(sc_path, 'sdt_dist_funs.stan'))}\n",
     "{read_lines2(file.path(sc_path, 'psychometric_funs.stan'))}\n}}\n",
     "data {{\n  int N;\n  array[N] int y;\n  array[N] int trials;\n",
     "  vector[N] x;\n  vector[N] midpoint;\n  vector[N] width;\n",
-    "  vector[N] guess;\n  vector[N] lapse;\n  int dist_type;\n  int log_x;\n",
-    "  real zmid;\n  real zspan;\n}}\n",
-    "generated quantities {{\n  vector[N] lp;\n  for (n in 1:N) lp[n] = ",
-    "psychometric_log_lik(y[n], trials[n], x[n], midpoint[n], width[n], ",
-    "guess[n], lapse[n], dist_type, log_x, zmid, zspan);\n}}\n"
+    "  vector[N] guess;\n  vector[N] lapse;\n  vector[N] guess_fixed;\n",
+    "  vector[N] lapse_fixed;\n  int dist_type;\n  int log_x;\n",
+    "  real zmid;\n  real zspan;\n  int gradient_check;\n}}\n",
+    "parameters {{\n  real log_width_scale;\n}}\n",
+    "model {{\n  if (gradient_check == 1) for (n in 1:N) target += ",
+    "psychometric_log_lik(y[n], trials[n], x[n], ",
+    "midpoint[n], width[n] * exp(log_width_scale), guess[n], lapse[n], ",
+    "dist_type, log_x, zmid, zspan);\n}}\n",
+    "generated quantities {{\n  matrix[N, 4] lp;\n  for (n in 1:N) {{\n",
+    "    lp[n, 1] = psychometric_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "guess[n], lapse[n], {family_args});\n",
+    "    lp[n, 2] = psychometric_fixguess_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "lapse[n], {family_args});\n",
+    "    lp[n, 3] = psychometric_fixlapse_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "guess[n], {family_args});\n",
+    "    lp[n, 4] = psychometric_fixboth_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "{family_args});\n  }}\n}}\n"
   )
   file <- file.path(tempdir(), "bmm_psychometric_parity.stan")
   writeLines(code, file)
   stan_model <- cmdstanr::cmdstan_model(file, quiet = TRUE)
 
+  # the rates each family reads: estimated (guess, lapse) or fixed in the data,
+  # which differ from the estimated ones so a swapped slot changes the value
+  rates <- list(
+    full = c("guess", "lapse"), fixguess = c("guess_fixed", "lapse"),
+    fixlapse = c("guess", "lapse_fixed"), fixboth = c("guess_fixed", "lapse_fixed")
+  )
   # a grid crossing tails, the midpoint, and rates fixed at exactly zero
   grid <- expand.grid(
     x = c(0.01, 0.3, 1, 3, 40), y = c(0L, 4L, 10L), midpoint = c(0.5, 2),
-    width = c(0.3, 3), guess = c(0, 0.5), lapse = c(0, 0.03)
+    width = c(0.3, 3), guess = c(0, 0.5), lapse = c(0, 0.03),
+    guess_fixed = 0.25, lapse_fixed = 0
   )
+  rows_at_z <- function(z, y, guess, lapse, sigmoid) {
+    k <- .psychometric_z_constants(sigmoid)
+    dx <- (z - k[["zmid"]]) * 0.3 / k[["zspan"]]
+    x <- if (.psychometric_sigmoids[[sigmoid]]$log_x) exp(dx) else 1 + dx
+    # fixed rates above zero: with a zero rate the R twin gives -Inf past the
+    # clamp the Stan code applies to the extreme-value CDFs
+    data.frame(x = x, y = y, midpoint = 1, width = 0.3, guess = guess,
+               lapse = lapse, guess_fixed = 0.25, lapse_fixed = 0.01)
+  }
+  # the model block runs only for $diagnose(): fixed_param sampling still
+  # evaluates it at the initial values, where grid rows can be -Inf or NaN
+  stan_data <- function(rows, spec, k, gradient_check = 0L) {
+    c(as.list(rows), N = nrow(rows), list(trials = rep(10L, nrow(rows))),
+      dist_type = .sdt_dist_id(spec$dist), log_x = as.integer(spec$log_x),
+      zmid = k[["zmid"]], zspan = k[["zspan"]], gradient_check = gradient_check)
+  }
   for (sigmoid in psy_sigmoids) {
     spec <- .psychometric_sigmoids[[sigmoid]]
     k <- .psychometric_z_constants(sigmoid)
-    sdata <- c(
-      as.list(grid), N = nrow(grid), list(trials = rep(10L, nrow(grid))),
-      dist_type = .sdt_dist_id(spec$dist), log_x = as.integer(spec$log_x),
-      zmid = k[["zmid"]], zspan = k[["zspan"]]
+    # past |z| = 709.78 exp(z) overflows in the extreme-value CDFs; every row
+    # has a finite log density, flat in z or absorbed by a rate above zero
+    far <- rows_at_z(
+      z = c(813, -813, rep(c(813, -813), each = 3)),
+      y = c(10L, 0L, rep(c(0L, 4L, 10L), 2)),
+      guess = c(0, 0, rep(0.5, 6)), lapse = c(0, 0, rep(0.03, 6)), sigmoid
     )
+    # zero counts against a log probability of -Inf (Phi underflows), which
+    # the y > 0 and trials > y guards skip
+    guards <- if (!spec$log_x) {
+      rows_at_z(c(-1e200, 1e200), c(0L, 10L), 0, 0, sigmoid)
+    }
+    rows <- rbind(grid, far, guards)
     fit <- stan_model$sample(
-      data = sdata, chains = 1, iter_sampling = 1, fixed_param = TRUE,
-      refresh = 0, show_messages = FALSE, sig_figs = 18, seed = 1
+      data = stan_data(rows, spec, k), chains = 1, iter_sampling = 1,
+      fixed_param = TRUE, refresh = 0, show_messages = FALSE, sig_figs = 18,
+      seed = 1
     )
-    lp_stan <- as.numeric(fit$draws("lp", format = "draws_matrix")[1, ])
-    lp_r <- with(grid, dpsychometric(y, x, midpoint, width, guess, lapse,
-                                     n_trials = 10, sigmoid = sigmoid, log = TRUE))
-    expect_identical(is.finite(lp_stan), is.finite(lp_r), info = sigmoid)
-    # relative, because the extreme-value sigmoids reach log densities near
-    # -1e224 on this grid, where an absolute gap of 1e211 is rounding
-    finite <- is.finite(lp_r)
-    rel_error <- abs(lp_stan - lp_r) / pmax(1, abs(lp_r))
-    expect_lt(max(rel_error[finite]), 1e-12)
+    # read.csv, because $draws() turns a whole-number value such as
+    # -3640649218810179 (gumbel_min, x = 3) into NaN
+    draws <- utils::read.csv(fit$output_files()[1], comment.char = "#")
+    lp_stan <- matrix(unlist(draws[1, grep("^lp\\.", names(draws))]),
+                      ncol = length(rates))
+    for (j in seq_along(rates)) {
+      label <- paste(sigmoid, names(rates)[j])
+      lp_r <- dpsychometric(rows$y, rows$x, rows$midpoint, rows$width,
+                            rows[[rates[[j]][1]]], rows[[rates[[j]][2]]],
+                            n_trials = 10, sigmoid = sigmoid, log = TRUE)
+      expect_identical(is.finite(lp_stan[, j]), is.finite(lp_r), info = label)
+      # relative, because the extreme-value sigmoids reach log densities near
+      # -1e224 on this grid, where an absolute gap of 1e211 is rounding
+      finite <- is.finite(lp_r)
+      rel_error <- abs(lp_stan[, j] - lp_r) / pmax(1, abs(lp_r))
+      expect_lt(max(rel_error[finite]), 1e-12, label = label)
+    }
+
+    # CmdStan refuses a point with a non-finite gradient, which makes cmdstanr
+    # error; the large `error` keeps finite-difference noise from failing it
+    grad <- stan_model$diagnose(
+      data = stan_data(far, spec, k, gradient_check = 1L),
+      init = list(list(log_width_scale = 0)),
+      error = 1e6, seed = 1
+    )$gradients()
+    expect_true(all(is.finite(grad$model)), info = sigmoid)
   }
 })
 
@@ -582,6 +654,19 @@ test_that("user conditions must name every column the model reads", {
                "missing: 'chance'")
   thr <- psychometric_threshold(fit, conditions = data.frame(chance = 0.5))
   expect_equal(summary_value(thr, "guess"), 0.5)
+})
+
+test_that("a grouping column is refused as a condition", {
+  fit <- fake_psychometric_fit(
+    psychometric("y", "x", guess = 0.5, lapse = 0), psy_trial_data(),
+    bmf(midpoint ~ 1 + (1 | id), width ~ 1)
+  )
+  local_mocked_bindings(
+    posterior_linpred = mock_linpred_factory(list(midpoint = 0.05, width = log(0.05))),
+    .package = "brms"
+  )
+  expect_error(psychometric_threshold(fit, conditions = data.frame(id = factor(1:2))),
+               "not population-level predictors or rate columns: 'id'")
 })
 
 test_that("psychometric_threshold() validates its arguments", {
