@@ -222,6 +222,7 @@ test_that("built_data_columns() names what each model's check_data() builds", {
   declared <- function(name) built_data_columns(cases[[name]]$model)
 
   expect_setequal(declared("mixture2p"), character(0))
+  expect_setequal(declared("mixture2p_slot"), "ss_numeric")
   expect_setequal(declared("sdm"), character(0))
   expect_setequal(
     declared("mixture3p"),

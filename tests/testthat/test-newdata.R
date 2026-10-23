@@ -103,10 +103,13 @@ test_that("newdata at one set size matches the same rows of the model frame", {
   }
 })
 
+# only the non-target models have a largest set size: one non-target column
+# per item beyond the first. mixture2p's capacity rule takes any set size
 test_that("newdata with a set size above the fit's maximum is refused", {
   skip_on_cran()
   cases <- Filter(
-    function(case) is_data_var(case$model$other_vars$set_size, case$data),
+    function(case) inherits(case$model, "non_targets") &&
+      is_data_var(case$model$other_vars$set_size, case$data),
     newdata_cases()
   )
   expect_gt(length(cases), 0)
@@ -122,6 +125,16 @@ test_that("newdata with a set size above the fit's maximum is refused", {
       paste0("set size of ", above, ", above the ", above - 1), fixed = TRUE
     )
   }
+})
+
+test_that("newdata for mixture2p's capacity versions may hold a larger set size", {
+  skip_on_cran()
+  fit <- newdata_fit("mixture2p_slot")
+  user <- as.data.frame(newdata_cases()$mixture2p_slot$data)
+  user$set_size <- as.numeric(as.character(user$set_size))
+  user$set_size[1] <- max(user$set_size) + 3
+  sdata <- suppressWarnings(brms::standata(fit, newdata = user))
+  expect_equal(sdata$vint1[1], user$set_size[1])
 })
 
 test_that("newdata without a column check_data() needs stops with its message", {
