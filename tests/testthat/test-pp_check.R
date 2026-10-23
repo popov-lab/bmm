@@ -483,11 +483,13 @@ test_that("pp_check() without arguments plots the stored fit of every model", {
 })
 
 # the ezdm 4par default leaves brms, and brms has no pp_check() for the m3
-# family; every other model with a stored fit must plot exactly what brms plots
+# and mpt families; every other model with a stored fit must plot exactly what
+# brms plots
 test_that("pp_check() without resp_var delegates to brms for every other model", {
   brms_method <- getS3method("pp_check", "brmsfit", envir = asNamespace("brms"))
   files <- vapply(model_test_cases("fixture"), `[[`, character(1), "file")
-  for (name in setdiff(files, c("bmmfit_ezdm4_ppcheck.rds", "bmmfit_m3_ppcheck.rds"))) {
+  no_brms_method <- c("bmmfit_ezdm4_ppcheck.rds", "bmmfit_m3_ppcheck.rds", "bmmfit_mpt_ppcheck.rds")
+  for (name in setdiff(files, no_brms_method)) {
     fit <- load_fixture_fit(name)
     withr::with_seed(1, mine <- pp_check(fit, ndraws = 5))
     withr::with_seed(1, theirs <- brms_method(fit, type = "dens_overlay", ndraws = 5))
