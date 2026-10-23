@@ -2395,6 +2395,29 @@ test_that("a logical in tau's position is read as log, with a deprecation warnin
   expect_equal(dens, exp(-0.7343545), tolerance = 1e-6)
 })
 
+test_that("the positional log warning is the lifecycle policy's deprecation warning", {
+  policy <- function(fun, before) {
+    tryCatch(warn_deprecated(
+      what = glue("{fun}({before}, TRUE)"),
+      with = glue("{fun}({before}, log = TRUE)"),
+      since = "1.5.0",
+      details = "That position now holds `tau`, so pass `log` by name."
+    ), warning = conditionMessage)
+  }
+  expect_warning(
+    dmixture2p(0.3, 0, 5, 0.6, TRUE),
+    policy("dmixture2p", "x, mu, kappa, p_mem"), fixed = TRUE
+  )
+  expect_warning(
+    dmixture3p(0.3, c(0, 2, -1.5), 5, 0.6, 0.2, TRUE),
+    policy("dmixture3p", "x, mu, kappa, p_mem, p_nt"), fixed = TRUE
+  )
+  expect_warning(
+    dimm(0.3, c(0, 2, -1.5), c(0, 0.5, 2), 5, 2, 1, 2, 5, TRUE),
+    policy("dimm", "x, mu, dist, c, a, b, s, kappa"), fixed = TRUE
+  )
+})
+
 test_that("the capacity versions of dmixture2p() and rmixture2p() need set_size", {
   withr::local_seed(445)
   expect_error(

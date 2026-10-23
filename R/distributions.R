@@ -554,10 +554,11 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 # 1.4 took log where tau now is, so a logical there is a 1.4 call; the form
 # stays readable until 1.6.0
 .warn_positional_log <- function(fun, before, log) {
-  warning2(
-    "`{fun}({before}, {log})` is deprecated since bmm 1.5.0 and will be \\
-    removed in bmm 1.6.0 at the earliest. Use `{fun}({before}, log = {log})` \\
-    instead. That position now holds `tau`, so pass `log` by name."
+  warn_deprecated(
+    what = glue("{fun}({before}, {log})"),
+    with = glue("{fun}({before}, log = {log})"),
+    since = "1.5.0",
+    details = "That position now holds `tau`, so pass `log` by name."
   )
 }
 
