@@ -356,6 +356,20 @@ check_formula.psychometric <- function(model, data, formula) {
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+# Counts in n_trials and a rate fixed by a column are read from the user's own
+# columns, so check_data() builds no column for them
+#' @exportS3Method
+built_data_columns.psychometric <- function(model) {
+  ov <- model$other_vars
+  c(
+    if (is.null(ov$n_trials)) "psy_trials",
+    if (!is.character(ov$guess)) "psy_guess",
+    if (!is.character(ov$lapse)) "psy_lapse",
+    "psy_dist", "psy_logx",
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.psychometric <- function(model, data, formula) {
   ov <- model$other_vars
