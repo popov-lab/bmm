@@ -29,6 +29,7 @@
 
 ### Deprecated functions and arguments
 * mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
+* `dmixture3p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))` (#585). It stopped with "number of items to replace is not a multiple of replacement length".
 
 ### Other changes
 * `cswald()` now drops rows with a missing response time or response and warns, as `ddm()` does. It stopped and asked you to remove them (#557).
