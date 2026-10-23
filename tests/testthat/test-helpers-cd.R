@@ -662,3 +662,11 @@ test_that("an estimated criterion is announced as bounded", {
   model$fixed_parameters$criterion <- NULL
   expect_message(check_formula(model, NULL, bmf(kappa ~ 1, criterion ~ 1)), "bounds it")
 })
+
+test_that(".cd_check_variable_precision() refuses variable precision, naming 1.6.0", {
+  expect_silent(.cd_check_variable_precision(FALSE))
+  expect_error(.cd_check_variable_precision(TRUE), "planned for bmm 1.6.0")
+  for (bad in list(NA, c(TRUE, FALSE), "yes", 1, NULL)) {
+    expect_error(.cd_check_variable_precision(bad), "either TRUE or FALSE")
+  }
+})

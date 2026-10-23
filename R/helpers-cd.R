@@ -331,6 +331,23 @@
   spec
 }
 
+# Variable precision for change detection waits for an accuracy measurement of
+# the arc mass over precision states (#136, decided for 1.5.0). The *_cd
+# constructors and their d*/r* functions keep the argument for parity with the
+# reproduction models and refuse TRUE through this one check.
+.cd_check_variable_precision <- function(variable_precision) {
+  stopif(
+    !isTRUE(variable_precision) && !isFALSE(variable_precision),
+    "The variable_precision argument must be either TRUE or FALSE."
+  )
+  stopif(
+    variable_precision,
+    "Variable precision is not available for change-detection models yet; it \\
+    is planned for bmm 1.6.0. Use variable_precision = FALSE, or fit the \\
+    continuous-reproduction model if your task has one."
+  )
+}
+
 # An estimated criterion is the bounded one of .circmix_cd_bounded_criterion(),
 # which is not Lin and Oberauer's once it is large against a trial's range of
 # evidence; a fixed one is bounded too, but was chosen by the user
