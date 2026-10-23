@@ -303,7 +303,7 @@ psychometric <- function(response, intensity, n_trials = NULL,
 # give one, which check_data() then reports. A single level has no range, so
 # the priors are centred on it with a span of its own magnitude (or 1 at 0),
 # rather than left at the 0-to-1 placeholders whatever the units
-.psychometric_axis_range <- function(model, data, formula = NULL) {
+.psychometric_axis_range <- function(model, data, formula) {
   x <- data[[model$other_vars$intensity]]
   if (!is.numeric(x)) {
     return(NULL)
@@ -311,11 +311,10 @@ psychometric <- function(response, intensity, n_trials = NULL,
   # brms drops rows with NA in any column it reads, so they must not set the
   # scale of the priors
   read_cols <- intersect(
-    c(model$resp_vars$response, model$other_vars$n_trials,
-      if (is_bmmformula(formula)) rhs_vars(formula)),
+    c(model$resp_vars$response, model$other_vars$n_trials, rhs_vars(formula)),
     names(data)
   )
-  x <- x[rowSums(is.na(data[read_cols])) == 0]
+  x <- x[!Reduce(`|`, lapply(data[read_cols], is.na), FALSE)]
   if (.psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x) {
     x <- log(x[x > 0])
   }
@@ -797,13 +796,15 @@ print.bmm_psychometric_threshold <- function(x, ...) {
 .psychometric_resolve_conditions <- function(fit, conditions) {
   model <- fit$bmm$model
   rate_cols <- Filter(is.character, model$other_vars[c("guess", "lapse")])
-  cols <- union(unlist(.population_vars(fit$bmm$user_formula)), unlist(rate_cols))
+  population_vars <- .population_vars(fit$bmm$user_formula)
   # the closed-form threshold takes the asymptotes as constant along the
-  # intensity, which a guess or lapse predicted by it breaks
+  # intensity, which a guess or lapse predicted by it breaks; check_formula()
+  # already refuses the intensity in midpoint and width
   intensity <- model$other_vars$intensity
-  stopif(intensity %in% cols,
+  stopif(intensity %in% unlist(population_vars[c("guess", "lapse")]),
          "psychometric_threshold() needs guess and lapse constant along the \\
          intensity axis, but the formula predicts them by '{intensity}'")
+  cols <- union(unlist(population_vars), unlist(rate_cols))
   cols <- setdiff(intersect(cols, names(fit$data)), "Intercept")
   if (is.null(conditions)) {
     return(.sdt_unique_subset(fit$data, cols))

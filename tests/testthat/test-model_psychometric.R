@@ -112,6 +112,13 @@ test_that("rows with a missing predictor do not widen the prior range", {
   expect_equal(prior_of(pr, "midpoint"), "normal(0, 1)")
 })
 
+test_that("data given as a list get the priors of the data frame", {
+  formula <- bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1)
+  model <- psychometric("y", "x")
+  expect_equal(prior_of(default_prior(formula, as.list(psy_trial_data()), model), "midpoint"),
+               prior_of(default_prior(formula, psy_trial_data(), model), "midpoint"))
+})
+
 test_that("log-scale sigmoids scale their priors to the log range", {
   dat <- psy_count_data()
   model <- psychometric("n_correct", "contrast", n_trials = "n_trials",
