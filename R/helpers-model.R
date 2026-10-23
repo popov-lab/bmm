@@ -428,6 +428,12 @@ response_annotations <- function(model) {
   if (inherits(model, "circular")) {
     return(list(resp_error = "radians in [-pi, pi]"))
   }
+  if (inherits(model, "change_detection")) {
+    return(list(
+      response = "0/1 or logical; 1 = 'change'",
+      probe = "radians", target = "radians"
+    ))
+  }
   if (inherits(model, "ddm") || inherits(model, "cswald")) {
     return(list(
       rt = "seconds",
@@ -516,6 +522,7 @@ model_groups <- c(
   "Categorical decision making, memory, and reasoning" = "Processing-tree models",
   "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
   "Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Visual working memory (change detection)" = "Detection, recognition and confidence judgments",
   "Decision Making / Response times" = "Choices and response times"
 )
 

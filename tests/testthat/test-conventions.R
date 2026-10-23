@@ -42,6 +42,7 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
   expect_pattern_counts(
     "cmdstan_model\\(",
     c(
+      "test-helpers-cd.R" = 2L,
       "test-helpers-circmix.R" = 3L,
       "test-model_cswald.R" = 3L,
       "test-model_ezdm.R" = 3L,
@@ -85,6 +86,7 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
   expect_pattern_counts(
     "\\$sample\\(",
     c(
+      "test-helpers-cd.R" = 1L,
       "test-helpers-circmix.R" = 1L,
       "test-model_cswald.R" = 5L,
       "test-model_ezdm.R" = 1L,
