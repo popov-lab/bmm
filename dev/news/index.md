@@ -2,8 +2,35 @@
 
 ## bmm (development version)
 
+#### New features
+
+- [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), the
+  quantile function of the SDM distribution, now works; it stopped with
+  “‘qsdm’ is not implemented yet”. It takes `lower.tail`, `log.p` and
+  `lower.bound` as
+  [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) does and
+  returns values between `lower.bound` and `lower.bound + 2 * pi`
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+
 #### Bug fixes
 
+- [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) returned
+  0 instead of 1 at the upper end of the circle (`psdm(pi, 0, 3, 5)`).
+  With a `lower.bound` other than `-pi`, such as `mu - pi`, it also
+  returned negative or wrong values for many `q`
+  (`psdm(-2, lower.bound = 0)` gave -0.42). It now returns 1 at
+  `lower.bound + 2 * pi` and counts probability from `lower.bound`
+  around the circle
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+- [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) could be
+  wrong with the default `lower.bound` as well. Narrow distributions,
+  with large `c` and `kappa`, were hit hardest:
+  `psdm(0.6, mu = 0, c = 20, kappa = 100)` gave 0.000009 instead of 1.
+  With ordinary values (`c` up to 10, `kappa` up to 30) it could be off
+  by up to 1 at some `q`, though rarely by more than 0.001. Recompute
+  any values you got from
+  [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md)
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
 - A fit updated without recompiling the Stan model (`rstan`, or
   `cmdstanr` while its compiled model file exists) now stores the
   initial values and sampler settings it ran with. It kept those of the

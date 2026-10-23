@@ -70,7 +70,16 @@ single activation source is supported.</p>
 <span>  parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">qsdm</span><span class="op">(</span><span class="va">p</span>, mu <span class="op">=</span> <span class="fl">0</span>, c <span class="op">=</span> <span class="fl">3</span>, kappa <span class="op">=</span> <span class="fl">3.5</span>, parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span><span class="op">)</span></span>
+<span><span class="fu">qsdm</span><span class="op">(</span></span>
+<span>  <span class="va">p</span>,</span>
+<span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  c <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  kappa <span class="op">=</span> <span class="fl">3.5</span>,</span>
+<span>  lower.tail <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  log.p <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  lower.bound <span class="op">=</span> <span class="op">-</span><span class="va">pi</span>,</span>
+<span>  parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">rsdm</span><span class="op">(</span><span class="va">n</span>, mu <span class="op">=</span> <span class="fl">0</span>, c <span class="op">=</span> <span class="fl">3</span>, kappa <span class="op">=</span> <span class="fl">3.5</span>, parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -135,9 +144,8 @@ distribution</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>dsdm</code> gives the density, <code>psdm</code> gives the distribution
-function, <code>qsdm</code> gives the quantile function, <code>rsdm</code> generates
-random deviates, and <code>.dsdm_integrate</code> is a helper function for
-calculating the density of the SDM distribution.</p>
+function, <code>qsdm</code> gives the quantile function, and <code>rsdm</code> generates
+random deviates.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -151,11 +159,18 @@ the functions <code><a href="c_parametrizations.html">c_bessel2sqrtexp()</a></co
 <p>Since responses are on the circle, the cumulative distribution function
 requires you to choose a lower bound of integration. The default is
 \(-\pi\), as for the brms::pvon_mises() function but you can choose any
-value in the argument <code>lower_bound</code> of <code>psdm</code>. Another useful
+value in the argument <code>lower.bound</code> of <code>psdm</code> and <code>qsdm</code>. Another useful
 choice is the mean of the response distribution minus \(\pi\), e.g.
-<code>lower_bound = mu-pi</code>. This is the default in
+<code>lower.bound = mu-pi</code>. This is the default in
 <code>circular::pvonmises()</code>, and it ensures that 50% of the cumulative
 probability mass is below the mean of the response distribution.</p>
+<p><code>psdm</code> is 0 at <code>lower.bound</code> and 1 at <code>lower.bound + 2 * pi</code>; a <code>q</code> outside
+this range is wrapped around the circle. <code>qsdm</code> inverts <code>psdm</code> by root
+finding and returns values between <code>lower.bound</code> and <code>lower.bound + 2 * pi</code>.
+Values of <code>p</code> outside [0, 1] give <code>NaN</code> with a warning. Missing values
+give <code>NA</code>; <code>NaN</code>, infinite values and positions (<code>q</code>, <code>mu</code>, <code>lower.bound</code>)
+beyond 1e8 in absolute value give <code>NaN</code>, as does the bessel
+parametrization for <code>kappa</code> above 1e5.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
