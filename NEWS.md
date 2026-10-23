@@ -30,7 +30,6 @@
 ### Deprecated functions and arguments
 * mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn until bmm 1.6.0 at the earliest; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
 * `dmixture2p()`, `dmixture3p()` and `dimm()`: passing `log` by position is deprecated, because `tau` now takes that position. Until bmm 1.6.0 a logical value there is still read as `log`, with a warning; write `log = TRUE` instead (#398).
-* mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
 * `dmixture3p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))` (#585). It stopped with "number of items to replace is not a multiple of replacement length".
 * `dimm()` now returns one density per value when a parameter is a vector longer than `x`, as in `dimm(0.3, c = c(1, 5, 20))` (#586). It returned a single density, for the first value.
 
