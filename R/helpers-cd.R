@@ -68,6 +68,52 @@
   out
 }
 
+# The criterion is kept inside the trial's range (LLR_min, LLR_max) of the
+# log-likelihood ratio by a scaled tanh on each side of 0 (CD-S2 for #136).
+# Unbounded, a criterion past LLR_max makes "change" impossible on the trial
+# and past -log(1 - p_s) the arc is clamped, so the likelihood falls off a
+# cliff (a log barrier, then the probability floor) that the sampler cannot
+# cross. Bounded, it has slope 1 at 0, leaves 0 unchanged, and keeps both
+# responses possible. The range is that of the marginal decision density over
+# the precision states, or for the rich observer the narrowest range of a
+# single state, since each state has its own arc. tanh rounds to 1 in double
+# precision past about 18 times the range, where the cliff would return; the
+# likelihood there is already about -18 per trial. kappa and lw are n x S;
+# lw = -Inf marks padding.
+.circmix_cd_bounded_criterion <- function(criterion, p_s, kappa, lw, rich) {
+  kappa <- as.matrix(kappa)
+  n <- max(nrow(kappa), length(criterion), length(p_s))
+  kappa <- kappa[rep_len(seq_len(nrow(kappa)), n), , drop = FALSE]
+  lw <- if (length(lw) == 1) matrix(lw, n, ncol(kappa)) else as.matrix(lw)
+  lw <- lw[rep_len(seq_len(nrow(lw)), n), , drop = FALSE]
+  criterion <- rep_len(criterion, n)
+  p_s <- rep_len(p_s, n)
+  log_i0 <- .circmix_log_besselI0(kappa)
+  if (rich && ncol(kappa) > 1) {
+    padding <- is.infinite(lw)
+    log_min <- ifelse(padding, -Inf, -kappa - log_i0)
+    log_max <- ifelse(padding, Inf, kappa - log_i0)
+    log_min <- matrixStats::rowMaxs(matrix(log_min, nrow = n))
+    log_max <- matrixStats::rowMins(matrix(log_max, nrow = n))
+  } else {
+    log_min <- matrixStats::rowLogSumExps(lw - log_i0 - kappa)
+    log_max <- matrixStats::rowLogSumExps(lw - log_i0 + kappa)
+  }
+  # on the log scale: exp(log_min) underflows for sharp memories when p_s = 1
+  hi <- -matrixStats::rowLogSumExps(cbind(log1p(-p_s), log(p_s) + log_min))
+  lo <- log1p(p_s * expm1(log_max))
+  out <- criterion
+  up <- which(criterion > 0 & p_s > 0)
+  out[up] <- hi[up] * tanh(criterion[up] / hi[up])
+  down <- which(criterion < 0 & p_s > 0)
+  out[down] <- lo[down] * tanh(criterion[down] / lo[down])
+  out
+}
+
+.circmix_cd_level <- function(criterion, p_s, kappa, lw, rich) {
+  .circmix_cd_offset(.circmix_cd_bounded_criterion(criterion, p_s, kappa, lw, rich), p_s)
+}
+
 .circmix_cd_crit_angle <- function(kappa, offset) {
   acos(pmin(pmax((.circmix_log_besselI0(kappa) + offset) / kappa, -1), 1))
 }
@@ -125,7 +171,10 @@
 }
 
 .circmix_cd_psame <- function(d, logw, logw_guess, kappa, criterion, p_s) {
-  hw <- .circmix_cd_crit_angle(kappa, .circmix_cd_offset(criterion, p_s))
+  n <- nrow(d)
+  kappa <- rep_len(kappa, n)
+  level <- .circmix_cd_level(rep_len(criterion, n), rep_len(p_s, n), kappa, 0, FALSE)
+  hw <- .circmix_cd_crit_angle(kappa, level)
   .circmix_cd_psame_at(d, logw, logw_guess, kappa, hw)
 }
 
@@ -184,7 +233,7 @@
 .circmix_cd_mix_psame <- function(d, logw, logw_guess, kappa, lw, criterion,
                                   p_s, rich) {
   n <- nrow(kappa)
-  offset <- .circmix_cd_offset(rep_len(criterion, n), rep_len(p_s, n))
+  offset <- .circmix_cd_level(rep_len(criterion, n), rep_len(p_s, n), kappa, lw, rich)
   hw <- .circmix_cd_crit_angle(kappa, offset)
   shared <- which(!rich & rowSums(is.finite(lw)) > 1)
   if (length(shared)) {
@@ -266,10 +315,12 @@
 # because it is the last distributional parameter of the family.
 .cd_add_criterion <- function(spec) {
   spec$parameters$criterion <- glue(
-    "Decision criterion. A 'change' response is given when the log-likelihood \\
-    ratio of a change against no change exceeds the criterion, so larger \\
-    values make 'change' responses less likely. Fixed to 0 (an unbiased \\
-    observer) by default; include a formula for criterion to estimate it."
+    "Decision criterion on the log-likelihood ratio of 'change' against \\
+    'same'; larger values make 'change' responses less likely. Fixed to 0, the \\
+    unbiased observer, by default. When estimated, it is kept inside the range \\
+    of evidence each trial can produce (it equals Lin and Oberauer's \\
+    criterion near 0 and is compressed toward that range's ends), so both \\
+    responses stay possible on every trial."
   )
   spec$links$criterion <- "identity"
   spec$fixed_parameters$criterion <- 0
@@ -278,6 +329,22 @@
   )
   spec$init_ranges$criterion <- c(-0.2, 0.2)
   spec
+}
+
+# An estimated criterion is the bounded one of .circmix_cd_bounded_criterion(),
+# which is not Lin and Oberauer's once it is large against a trial's range of
+# evidence; a fixed one is bounded too, but was chosen by the user
+#' @export
+check_formula.change_detection <- function(model, data, formula) {
+  if (!"criterion" %in% names(model$fixed_parameters)) {
+    message2(
+      "criterion is estimated. bmm bounds it to the evidence each trial can \\
+      produce (see the section 'Decision criterion' of the model's help page), \\
+      so large values are compressed and are not directly comparable with Lin \\
+      and Oberauer's (2022) unbounded criterion."
+    )
+  }
+  NextMethod("check_formula")
 }
 
 # Stan types of the data the likelihood receives: the kappa(J) table of

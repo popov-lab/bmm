@@ -57,8 +57,68 @@ test_that(".circmix_cd_offset() resolves the degenerate decisions", {
   # a criterion this liberal accepts every retrieved value as "same"
   expect_equal(.circmix_cd_offset(-log(0.5), 0.4), -Inf)
   expect_equal(.circmix_cd_crit_angle(8, c(Inf, -Inf)), c(0, pi))
-  expect_equal(psame_simple(0.3, 8, 0.7, criterion = 2, p_s = 0.1), 1)
   expect_equal(psame_simple(0.3, 8, 0.7, criterion = -0.5, p_s = 0), 0)
+  expect_equal(psame_simple(0.3, 8, 0.7, criterion = 0.5, p_s = 0), 1)
+})
+
+# range of the log-likelihood ratio over a fine grid of retrieved values, from
+# the decision density itself
+llr_range <- function(kappa, w, p_s) {
+  x <- seq(-pi, pi, length.out = 20001)
+  density <- rowSums(vapply(seq_along(kappa), function(s) {
+    w[s] * vm_density(x, kappa[s])
+  }, numeric(length(x))))
+  range(-log(1 - p_s + 2 * pi * p_s * density))
+}
+
+test_that(".circmix_cd_bounded_criterion() keeps 0 and stays inside the evidence range", {
+  one <- function(criterion, p_s = 0.6, kappa = 8) {
+    .circmix_cd_bounded_criterion(criterion, p_s, kappa, 0, FALSE)
+  }
+  expect_identical(one(0), 0)
+  expect_equal(one(1e-7) / 1e-7, 1, tolerance = 1e-6)
+  expect_equal(one(-1e-7) / -1e-7, 1, tolerance = 1e-6)
+  expect_true(all(diff(one(seq(-5, 5, by = 0.1))) > 0))
+  # nothing stored: the ratio is 1 everywhere, and the criterion decides alone
+  expect_identical(one(c(-0.4, 0.4), p_s = 0), c(-0.4, 0.4))
+
+  for (case in list(
+    list(kappa = 8, w = 1, p_s = 0.6), list(kappa = 1, w = 1, p_s = 0.2),
+    list(kappa = 40, w = 1, p_s = 1), list(kappa = c(6, 14), w = c(0.65, 0.35), p_s = 1)
+  )) {
+    marginal <- llr_range(case$kappa, case$w, case$p_s)
+    # up to three times each end of the range; tanh rounds to 1 past about 18
+    criteria <- c(c(3, 1, 0.2) * marginal[1], c(0.2, 1, 3) * marginal[2])
+    n <- length(criteria)
+    kappa <- matrix(case$kappa, n, length(case$kappa), byrow = TRUE)
+    lw <- matrix(log(case$w), n, length(case$w), byrow = TRUE)
+    bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, kappa, lw, FALSE)
+    expect_true(all(bounded > marginal[1] & bounded < marginal[2]))
+    expect_equal(bounded[6], marginal[2] * tanh(3), tolerance = 1e-6)
+    # the rich observer has an arc per state, so the narrowest single-state range binds
+    narrowest <- c(
+      max(vapply(case$kappa, function(k) llr_range(k, 1, case$p_s)[1], numeric(1))),
+      min(vapply(case$kappa, function(k) llr_range(k, 1, case$p_s)[2], numeric(1)))
+    )
+    bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, kappa, lw, TRUE)
+    expect_true(all(bounded > narrowest[1] & bounded < narrowest[2]))
+  }
+})
+
+test_that("a criterion beyond a trial's evidence leaves both responses possible", {
+  # unbounded, criterion 0.5 lies past -log(1 - p_s) and the arc covers the circle
+  p <- psame_simple(c(0.3, pi), 8, 0.7, criterion = 0.5, p_s = 0.1)
+  expect_true(all(p > 1e-3 & p < 1 - 1e-3))
+  p <- psame_simple(c(0.3, pi), 8, 0.7, criterion = -3, p_s = 0.6)
+  expect_true(all(p > 1e-3 & p < 1 - 1e-3))
+  # a held slot: p_s = 1, where -log(1 - p_s) is infinite but the range is not
+  branch <- .circmix_slot_averaging_branches(c(4, 3.3), 2, c(6, 6))
+  for (rich in c(TRUE, FALSE)) {
+    p <- .circmix_cd_slot_averaging_psame(
+      matrix(c(pi, 0), 2), matrix(0, 2), branch, c(10, -10), rich
+    )
+    expect_true(all(p > .Machine$double.eps & p < 1 - .Machine$double.eps))
+  }
 })
 
 test_that(".circmix_cd_psame() matches a fine trapezoid rule over the arc", {
@@ -66,7 +126,7 @@ test_that(".circmix_cd_psame() matches a fine trapezoid rule over the arc", {
     probe <- case[1]
     kappa <- case[2]
     p_mem <- case[3]
-    hw <- .circmix_cd_crit_angle(kappa, .circmix_cd_offset(case[4], p_mem))
+    hw <- .circmix_cd_crit_angle(kappa, .circmix_cd_level(case[4], p_mem, kappa, 0, FALSE))
     x <- seq(probe - hw, probe + hw, length.out = 2e5 + 1)
     f <- p_mem * vm_density(x, kappa) + (1 - p_mem) / (2 * pi)
     trapezoid <- sum((f[-1] + f[-length(f)]) / 2) * (x[2] - x[1])
@@ -111,10 +171,11 @@ test_that(".circmix_cd_mix_psame() matches adaptive integration over the arc", {
     0.1 * hw / pi + sum(c(0.6, 0.3) * vapply(-d, x_mass, numeric(1)))
   }
   for (criterion in c(0, 0.4, -0.3)) {
-    offset <- .circmix_cd_offset(criterion, 0.6)
+    offset <- .circmix_cd_level(criterion, 0.6, states$kappa, states$lw, TRUE)
     rich <- sum(w * vapply(1:2, function(s) {
       arc(states$kappa[s], .circmix_cd_crit_angle(states$kappa[s], offset))
     }, numeric(1)))
+    offset <- .circmix_cd_level(criterion, 0.6, states$kappa, states$lw, FALSE)
     marginal <- function(h) {
       sum(w * exp(states$kappa * cos(h) - .circmix_log_besselI0(states$kappa)))
     }
@@ -416,7 +477,7 @@ cd_stan_values <- function(data) {
     generated quantities {
       vector[NC] out_offset; vector[NC] out_crit; vector[ND] out_mass;
       vector[NC] out_psame; vector[NC] out_limited; array[2] vector[NC] out_mix;
-      array[2, NB] vector[NC] out_sa;
+      array[2, NB] vector[NC] out_sa; array[2] vector[NC] out_bound;
       array[2] real out_bern;
       for (c in 1:NC) {
         out_offset[c] = circmix_cd_offset(crit[c], ps[c]);
@@ -424,6 +485,7 @@ cd_stan_values <- function(data) {
         out_psame[c] = circmix_cd_psame(d, logw, logw_guess, 7, crit[c], ps[c], gl_x, gl_w);
         out_limited[c] = circmix_cd_limited_hw(kappa_s, lw_s, out_offset[c], 1.0);
         for (r in 1:2) {
+          out_bound[r, c] = circmix_cd_bounded_criterion(crit[c], ps[c], kappa_s, lw_s, r - 1);
           out_mix[r, c] = circmix_cd_mix_psame(d, logw, logw_guess, kappa_s, lw_s,
                                                crit[c], ps[c], r - 1, gl_x, gl_w);
           for (b in 1:NB) {
@@ -452,8 +514,9 @@ test_that("the Stan and R change-detection functions agree", {
   skip_on_cran()
   tab <- .circmix_kappa_table()
   gl <- .cd_gl_rule()
-  crit <- c(0, 0.4, -0.3, -0.5, 1.5)
-  ps <- c(0.6, 0.6, 0.6, 0, 0.3)
+  # past -log(1 - p_s), nothing stored, a held slot, the liberal side
+  crit <- c(0, 0.4, -0.3, -0.5, 1.5, 3, -2)
+  ps <- c(0.6, 0.6, 0.6, 0, 0.3, 1, 0.9)
   d <- c(0.4, 0.4 - 1.2, 0.4 + 2)
   logw <- log(c(0.5, 0.2, 0.15))
   logw_guess <- log(0.15)
@@ -475,6 +538,10 @@ test_that("the Stan and R change-detection functions agree", {
   rows <- function(x) matrix(x, nrow = n, ncol = length(x), byrow = TRUE)
   offset <- .circmix_cd_offset(crit, ps)
   expect_equal(stan("out_offset"), offset, tolerance = 1e-12)
+  bound <- vapply(c(FALSE, TRUE), function(rich) {
+    .circmix_cd_bounded_criterion(crit, ps, rows(kappa_s), rows(lw_s), rich)
+  }, numeric(n))
+  expect_equal(stan("out_bound"), as.vector(t(bound)), tolerance = 1e-12)
   expect_equal(stan("out_crit"), .circmix_cd_crit_angle(7, offset), tolerance = 1e-12)
   expect_equal(
     stan("out_mass"),
@@ -533,4 +600,42 @@ test_that("an infinite level gives kappa a finite gradient in circmix_cd_crit_an
     )
     expect_identical(gradient, 0, label = paste("gradient at level", level))
   }
+})
+
+test_that("a criterion past the cliff keeps a finite gradient that points back", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # unbounded, criterion 2 at p_s 0.3 lies past -log(1 - p_s) = 0.36: the arc
+  # covers the circle, a "change" response sits on the probability floor
+  # (log 2.2e-16 = -36) and the criterion has no gradient to leave it
+  code <- paste0(
+    "functions {\n", cd_chunks(), "\n}\n",
+    "data { int y; real probe; real p_s; vector[32] gl_x; vector[32] gl_w; }
+    parameters { real log_kappa; real criterion; }
+    model {
+      target += cd_bernoulli_lpmf(y | circmix_cd_psame([probe]', [log(p_s)]', log1m(p_s),
+                                  exp(log_kappa), criterion, p_s, gl_x, gl_w));
+    }"
+  )
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+  gl <- .cd_gl_rule()
+  diagnosed <- model$diagnose(
+    data = list(y = 1L, probe = pi, p_s = 0.3, gl_x = gl$x, gl_w = gl$w),
+    init = list(list(log_kappa = log(8), criterion = 2)), error = 1e300
+  )
+  expect_gt(diagnosed$lp(), log(1e-4))
+  gradient <- diagnosed$gradients()
+  expect_true(all(is.finite(gradient$model)))
+  # parameters in declaration order: log_kappa, criterion
+  expect_lt(gradient$model[2], 0)
+})
+
+test_that("an estimated criterion is announced as bounded", {
+  model <- structure(
+    list(fixed_parameters = list(mu = 0, criterion = 0)),
+    class = c("change_detection", "cd_stub")
+  )
+  expect_silent(check_formula(model, NULL, bmf(kappa ~ 1)))
+  model$fixed_parameters$criterion <- NULL
+  expect_message(check_formula(model, NULL, bmf(kappa ~ 1, criterion ~ 1)), "bounds it")
 })
