@@ -220,6 +220,101 @@ check_var_set_size <- function(set_size, data) {
   list(max_set_size = max_set_size, ss_numeric = ss_numeric)
 }
 
+# The checks on trial-level response times that models with a decision share.
+# Rows with a missing RT or response are dropped; fast_rt_hint is the model's
+# advice after the 0.100 s warning.
+check_rt_data <- function(data, rt, response, fast_rt_hint) {
+  stopif(
+    not_in(rt, colnames(data)),
+    "The RT variable '{rt}' is not present in the data."
+  )
+  stopif(
+    not_in(response, colnames(data)),
+    "The response variable '{response}' is not present in the data."
+  )
+
+  for (var in c(rt, response)) {
+    is_missing <- is.na(data[[var]])
+    if (any(is_missing)) {
+      data <- data[!is_missing, , drop = FALSE]
+      warning2("Some values in {var} were NA. These were removed from the analysis.")
+    }
+  }
+  stopif(
+    nrow(data) == 0L,
+    "Every row has a missing value in '{rt}' or '{response}', so no \\
+    observations are left."
+  )
+
+  stopif(
+    !is.numeric(data[[rt]]),
+    "The RT variable '{rt}' needs to be of type double or integer."
+  )
+  stopif(
+    any(data[[rt]] <= 0),
+    "Some reaction times are zero or negative, please check your data. \\
+    The likelihood is zero for a response time that is not strictly \\
+    greater than the non-decision time."
+  )
+  warnif(
+    any(data[[rt]] > 10),
+    "Your data contains reaction times larger than 10 seconds.\n
+    Either you have passed reaction times in milliseconds, then please \\
+    recode them to seconds and rerun the model.\n
+    Or you have very long RTs in your data in which case you might want \\
+    to consider outlier filtering."
+  )
+  warnif(
+    any(data[[rt]] < 0.100),
+    "Your data contains reaction times smaller than 0.100 seconds.\n
+    {fast_rt_hint}"
+  )
+
+  data
+}
+
+# The decision as integer 0 (lower boundary) and 1 (upper boundary); a factor
+# is read by its labels
+code_dec_response <- function(x, response) {
+  if (is.factor(x)) {
+    x <- as.character(x)
+  }
+
+  if (is.numeric(x)) {
+    stopif(
+      any(!x %in% c(0, 1)),
+      "The response variable '{response}' contains values other than 0 and 1.\n
+      Please pass responses coded as 0 (lower boundary) and 1 (upper boundary)."
+    )
+    as.integer(x)
+  } else if (is.logical(x)) {
+    warning2(
+      "The response variable is boolean and will be internally transformed ",
+      "to an integer variable with values 0 for FALSE and 1 for TRUE."
+    )
+    as.integer(x)
+  } else if (is.character(x)) {
+    x <- tolower(x)
+    stopif(
+      any(!x %in% c("upper", "lower")),
+      "The response variable '{response}' contains invalid character values.\n
+      Please pass only 'upper' or 'lower' as response values, or use \\
+      numeric coding (0 = lower, 1 = upper)."
+    )
+    warning2(
+      "The response variable is a character variable and will be internally ",
+      "transformed to an integer variable with 0 for 'lower' and 1 for 'upper'."
+    )
+    as.integer(x == "upper")
+  } else {
+    stop2(
+      "The response variable '{response}' is of type '{typeof(x)}'.\n
+      Please provide responses as integer (0/1), logical, character \\
+      ('upper'/'lower'), or factor."
+    )
+  }
+}
+
 ############################################################################# !
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
