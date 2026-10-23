@@ -8,9 +8,6 @@
 * mixture2p, mixture3p and imm: the new argument `variable_precision = TRUE` lets memory precision vary from trial to trial (van den Berg et al., 2012) and adds the parameter `tau`; `tau` near 0 is the constant-precision model. It works with every version. Fits take longer (about ten times for mixture2p), and `tau` needs a lot of data. `vp_nodes` sets the accuracy of the numerical integral; when it is too low the model stops and asks for more nodes. `dmixture2p()`, `rmixture2p()`, `dmixture3p()`, `rmixture3p()`, `dimm()` and `rimm()` gain `tau` (#398).
 * mixture2p, mixture3p and imm: the `links` argument is now applied, e.g. `imm(..., links = list(c = "softplus"))`. Before, these models refused any link change. mixture3p still refuses links on its mixture weights `thetat` and `thetant`. The imm background activation `b` now appears in the parameter list, fixed to 1 (#398).
 
-### Deprecated functions and arguments
-* mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
-
 ### Bug fixes
 * `psdm()` returned 0 instead of 1 at the upper end of the circle (`psdm(pi, 0, 3, 5)`). With a `lower.bound` other than `-pi`, such as `mu - pi`, it also returned negative or wrong values for many `q` (`psdm(-2, lower.bound = 0)` gave -0.42). It now returns 1 at `lower.bound + 2 * pi` and counts probability from `lower.bound` around the circle (#556).
 * `psdm()` could be wrong with the default `lower.bound` as well. Narrow distributions, with large `c` and `kappa`, were hit hardest: `psdm(0.6, mu = 0, c = 20, kappa = 100)` gave 0.000009 instead of 1. With ordinary values (`c` up to 10, `kappa` up to 30) it could be off by up to 1 at some `q`, though rarely by more than 0.001. Recompute any values you got from `psdm()` (#556).
@@ -29,20 +26,21 @@
 * `rezdm()` now accepts a vector `n_trials`, one value per draw, as `dezdm()` does. It stopped with "the condition has length > 1" (#564).
 * `ddm()` and `cswald()` now check response times and responses alike (#557). A factor or date-time response time now stops with a message asking for a number. Before, a factor stopped `cswald()` with "missing value where TRUE/FALSE needed"; a date-time, and a factor in `ddm()`, failed later in brms. A response time of 0 now stops too. In `ddm()`, `cswald(version = "crisk")` and for correct responses in `cswald()`, such a fit failed as sampling started; an error response at 0 in `cswald()` was ignored. Remove these rows. `ddm()` accepts a factor response labelled "upper" and "lower".
 
+### Deprecated functions and arguments
+* mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
+
 ### Other changes
 * `cswald()` now drops rows with a missing response time or response and warns, as `ddm()` does. It stopped and asked you to remove them (#557).
 * In bmm 1.6.0 the default of `log` in `dm3()`, `dmpt()`, `dddm()`, `dcswald()` and `dezdm()` changes from `TRUE` to `FALSE`, as in base R and the other density functions of bmm. A call without `log` then returns the density, not the log density. Nothing changes in 1.5.0. Pass `log = TRUE` to keep the log density (#553).
 * bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
-
-### Documentation
-* bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
-* For developers: the header of the file `use_model_template()` writes named an outdated place for a new model's test cases. It now points to `model_cases_<name>()` in `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`, `sd_default`, `init` and `links` case, and it lists `tests/testthat/test-model_<name>.R` for the model's own tests (#580).
-
-### Other changes
 * **mixture3p** no longer fixes the non-target weight `thetant` to zero at set size 1 when a formula estimates one value per set size. With one item there is nothing to swap to, so that value is not informed by the data and only reflects its prior. `bmm()` now warns and names every coefficient the other trials leave undetermined, including those of a formula with an intercept or a predictor that varies only at set size 1. Read the set-size-1 coefficient as prior-only (#398).
 * **imm** no longer fixes the set-size-1 levels of `a` and `s` when a formula estimates one value per set size. With one item there is no non-target, so set size 1 says nothing about `s`, and about `a` only through its sum with `c`; `bmm()` now warns and names the coefficients that depend on their priors. Give set size 1 a level of its own in a factor, so that only its coefficients depend on their priors, or let `c` take one value across set sizes (#398).
 * **mixture3p** and **imm** now accept an intercept together with `set_size` as a predictor, e.g. `kappa ~ 1 + set_size`; they used to require `0 + set_size` (#398).
 * For developers: `check_data()` no longer adds the `LureIdx*` and `inv_ss` columns for **mixture3p** and **imm**, whose likelihoods read the set size directly (#398).
+
+### Documentation
+* bmm now follows a written lifecycle policy. A deprecated function or argument keeps working, with a warning that names its replacement and the earliest release that may remove it, for at least one minor release: something deprecated in 1.5.0 works in every 1.5.x release and is removed in 1.6.0 at the earliest. Every deprecation and removal is listed under "Deprecated functions and arguments" in this file, and breaking changes are announced in a GitHub issue before the release that contains them. See the contributing guide (#441).
+* For developers: the header of the file `use_model_template()` writes named an outdated place for a new model's test cases. It now points to `model_cases_<name>()` in `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`, `sd_default`, `init` and `links` case, and it lists `tests/testthat/test-model_<name>.R` for the model's own tests (#580).
 
 # bmm 1.4.1
 
