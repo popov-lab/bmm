@@ -25,10 +25,14 @@
 * `fit_info()` reports every chain of a fit combined with `brms::combine_models()`. It listed the first fit's chains only: for `combine_models(fit, update(fit, seed = 2))`, `fit_info("time")` had one row for two chains. It also works for `rstan` fits now, where it returned `NULL`, and `what = "step_size"` returns the adapted step size per chain. `fit_info("time_mean")` no longer returns a mean `chain_id` (#555).
 * `rezdm()` now accepts a vector `n_trials`, one value per draw, as `dezdm()` does. It stopped with "the condition has length > 1" (#564).
 * `ddm()` and `cswald()` now check response times and responses alike (#557). A factor or date-time response time now stops with a message asking for a number. Before, a factor stopped `cswald()` with "missing value where TRUE/FALSE needed"; a date-time, and a factor in `ddm()`, failed later in brms. A response time of 0 now stops too. In `ddm()`, `cswald(version = "crisk")` and for correct responses in `cswald()`, such a fit failed as sampling started; an error response at 0 in `cswald()` was ignored. Remove these rows. `ddm()` accepts a factor response labelled "upper" and "lower".
+* `dmixture2p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture2p(0.3, kappa = c(1, 5, 20))` (#584). It stopped with "number of items to replace is not a multiple of replacement length".
 
 ### Deprecated functions and arguments
 * mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn until bmm 1.6.0 at the earliest; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
 * `dmixture2p()`, `dmixture3p()` and `dimm()`: passing `log` by position is deprecated, because `tau` now takes that position. Until bmm 1.6.0 a logical value there is still read as `log`, with a warning; write `log = TRUE` instead (#398).
+* mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
+* `dmixture3p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))` (#585). It stopped with "number of items to replace is not a multiple of replacement length".
+* `dimm()` now returns one density per value when a parameter is a vector longer than `x`, as in `dimm(0.3, c = c(1, 5, 20))` (#586). It returned a single density, for the first value.
 
 ### Other changes
 * `cswald()` now drops rows with a missing response time or response and warns, as `ddm()` does. It stopped and asked you to remove them (#557).
