@@ -108,13 +108,8 @@ check_data.non_targets <- function(model, data, formula) {
   # stop at any set size; carry_fit_bounds() hands over the fit's bound. Only
   # revert_check_data() and check_newdata() set it, so data from bmm() and
   # update(newdata = ) is still checked against its own maximum
-  fit_max_set_size <- attr(data, "fit_max_set_size")
-  max_set_size <- fit_max_set_size %||% ss$max_set_size
+  max_set_size <- attr(data, "fit_max_set_size") %||% ss$max_set_size
   attr(data, "fit_max_set_size") <- NULL
-  # the models' own checks, which run after this one, learn it too
-  if (!is.null(fit_max_set_size)) {
-    attr(data, "checked_against_fit") <- TRUE
-  }
   ss_numeric <- ss$ss_numeric
 
   stopif(
@@ -437,11 +432,15 @@ lacks_built_columns <- function(object, newdata) {
 
 # brms returns predictions in the rows of newdata, so the data are not sorted,
 # and a check_data() method that dropped or reordered rows would misalign them
-# without an error
+# without an error. The `prediction_newdata` mark tells the checks that warn
+# about what the data can estimate (one set size for a capacity rule) that
+# nothing is estimated from these data; it lives only for this check_data() call
 check_newdata <- function(object, newdata) {
   withr::local_options(bmm.sort_data = FALSE)
   newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata))
+  attr(newdata, "prediction_newdata") <- TRUE
   checked <- check_data(object$bmm$model, newdata, object$bmm$user_formula)
+  attr(checked, "prediction_newdata") <- NULL
   stopif(
     !identical(row.names(checked), row.names(newdata)),
     "Preparing 'newdata' for this model changed its rows. Please report this \\

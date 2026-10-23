@@ -127,6 +127,23 @@ test_that("newdata with a set size above the fit's maximum is refused", {
   }
 })
 
+test_that("check_newdata() leaves no mark on the data it hands to brms", {
+  skip_on_cran()
+  # any attribute beyond those of the same rows checked on their own is a mark
+  # that outlived the check
+  for (case_name in names(newdata_cases())) {
+    case <- newdata_cases()[[case_name]]
+    fit <- newdata_fit(case_name)
+    user <- as.data.frame(case$data)
+    own <- suppressWarnings(suppressMessages(check_data(fit$bmm$model, user, fit$bmm$user_formula)))
+    checked <- suppressWarnings(check_newdata(fit, user))
+    expect_identical(
+      setdiff(names(attributes(checked)), names(attributes(own))), character(0),
+      label = case_name
+    )
+  }
+})
+
 test_that("newdata for mixture2p's capacity versions may hold a larger set size", {
   skip_on_cran()
   fit <- newdata_fit("mixture2p_slot")
