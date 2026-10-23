@@ -477,16 +477,17 @@ test_that("model constructors and the template list their fields in the canonica
   skip_on_cran()
   canonical <- c(
     "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
-    "requirements", "parameters", "links", "fixed_parameters",
+    "requirements", "parameters", "links", "links_fixed", "fixed_parameters",
     "alternative_parameters", "default_priors", "init_ranges",
     "deprecated_parameters", "variable_precision", "vp_nodes"
   )
   # m3 builds its inits in create_initfun.m3() and drops an empty
   # default_priors; only models with interchangeable parameters declare
-  # alternative_parameters; the last three belong to the circular mixture
-  # models only
+  # alternative_parameters; links_fixed lists the parameters whose links the
+  # model sets itself, which check_links() leaves alone (mpt simplex groups);
+  # the last three belong to the circular mixture models only
   optional <- c(
-    "alternative_parameters", "default_priors", "init_ranges",
+    "links_fixed", "alternative_parameters", "default_priors", "init_ranges",
     "deprecated_parameters", "variable_precision", "vp_nodes"
   )
   expect_canonical <- function(model, label) {
