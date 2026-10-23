@@ -242,17 +242,17 @@ mixture2p <- function(resp_error, set_size = NULL,
 
 #' @export
 check_data.mixture2p <- function(model, data, formula) {
-  # newdata for a prediction may hold one set size; the warning below is about
-  # the data K is estimated from
-  for_prediction <- isTRUE(attr(data, "for_prediction"))
-  attr(data, "for_prediction") <- NULL
+  # data checked against a fit, such as newdata for a prediction, may hold one
+  # set size; the warning below is about the data K is estimated from
+  against_fit <- isTRUE(attr(data, "checked_against_fit"))
+  attr(data, "checked_against_fit") <- NULL
   if (!.mixture2p_version_table[[model$version]]$needs_set_size) {
     return(NextMethod("check_data"))
   }
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
   warnif(
-    !for_prediction && length(unique(ss$ss_numeric)) == 1,
+    !against_fit && length(unique(ss$ss_numeric)) == 1,
     "The set size does not vary, so the data cannot test the capacity rule of \\
     the '{model$version}' version. K is estimated from the responses at set \\
     size {ss$max_set_size}, and reflects only its prior where it reaches \\
@@ -268,7 +268,7 @@ check_data.mixture2p <- function(model, data, formula) {
 # that the data are not the fit's own
 #' @exportS3Method
 carry_fit_bounds.mixture2p <- function(model, data) {
-  attr(data, "for_prediction") <- TRUE
+  attr(data, "checked_against_fit") <- TRUE
   data
 }
 
