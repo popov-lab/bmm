@@ -881,14 +881,11 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   .check_imm_args(kappa, s, dist, tau, length(mu))
   .circmix_check_variable_precision(FALSE, vp_nodes)
 
-  n <- length(x)
-  weights <- .imm_item_weights(
-    rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
-  )
+  args <- .circmix_recycle(x = x, c = c, a = a, s = s, b = b, kappa = kappa, tau = tau)
+  weights <- .imm_item_weights(args$c, args$a, args$s, args$b, dist)
   density <- .circmix_vp_ld(
-    .circmix_cos(x, mu[1], mu[-1], length(mu)),
-    weights$logw, weights$logw_guess,
-    rep_len(kappa, n), rep_len(tau, n), vp_nodes
+    .circmix_cos(args$x, mu[1], mu[-1], length(mu)),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
   )
 
   if (!log) {
