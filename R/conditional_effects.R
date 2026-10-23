@@ -302,9 +302,10 @@ conditional_effects.bmmfit <- function(x,
 #' Filter internal variables from conditional_effects results
 #'
 #' @description
-#' Removes conditional effects plots for internal model variables
-#' (like Idx_*, Item*_, etc.) that are created during data
-#' preprocessing but are not part of the user's formula.
+#' Removes conditional effects plots for the columns bmm builds during data
+#' preprocessing (see `built_data_columns()`) and for a model's non-target
+#' features and distances, together with every interaction that involves one of
+#' them. A user predictor that merely resembles those names is kept.
 #'
 #' @param ce_result A brms_conditional_effects object
 #' @param bmmfit A bmmfit object
@@ -314,34 +315,15 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .filter_internal_effects <- function(ce_result, bmmfit) {
-  internal_patterns <- c(
-    "^Idx_",
-    "^Item[0-9]+_"
-  )
-  
   model <- bmmfit$bmm$model
-  if (!is.null(model$other_vars$nt_features)) {
-    nt_features <- model$other_vars$nt_features
-    escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_features)
-    internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
-  }
-  if (!is.null(model$other_vars$nt_distances)) {
-    nt_distances <- model$other_vars$nt_distances
-    escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_distances)
-    internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
-  }
-  if (length(model$other_vars$indicators$possible) > 0) {
-    internal_patterns <- c(
-      internal_patterns,
-      paste0("^", unlist(model$other_vars$indicators$possible, use.names = FALSE), "$")
-    )
-  }
-  
-  effect_names <- names(ce_result)
-  combined_pattern <- paste(internal_patterns, collapse = "|")
-  keep_effects <- !vapply(effect_names, function(name) {
-    vars <- strsplit(name, ":")[[1]]
-    any(grepl(combined_pattern, vars))
+  internal_vars <- c(
+    built_data_columns(model),
+    model$other_vars$nt_features,
+    model$other_vars$nt_distances
+  )
+
+  keep_effects <- !vapply(strsplit(names(ce_result), ":"), function(vars) {
+    any(vars %in% internal_vars)
   }, logical(1))
 
   if (any(keep_effects)) {

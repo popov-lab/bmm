@@ -544,6 +544,11 @@ check_formula.sdt_yn <- function(model, data, formula) {
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+built_data_columns.sdt_yn <- function(model) {
+  c("dist_type", NextMethod("built_data_columns"))
+}
+
 #' @export
 check_data.sdt_yn <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
