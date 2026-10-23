@@ -565,12 +565,12 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
   .circmix_check_variable_precision(FALSE, vp_nodes)
 
+  args <- .circmix_recycle(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau)
   set_size <- length(mu)
-  weights <- .mixture3p_marginal_weights(p_mem, p_nt, set_size, length(x))
+  weights <- .mixture3p_marginal_weights(args$p_mem, args$p_nt, set_size, length(args$x))
   density <- .circmix_vp_ld(
-    .circmix_cos(x, mu[1], mu[-1], set_size),
-    weights$logw, weights$logw_guess,
-    rep_len(kappa, length(x)), rep_len(tau, length(x)), vp_nodes
+    .circmix_cos(args$x, mu[1], mu[-1], set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
   )
 
   if (!log) {
