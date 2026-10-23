@@ -463,29 +463,74 @@ test_that(".has_category_dpars agrees with brms's conv_cats_dpars for the famili
 # Tier 1: Unit tests — .filter_internal_effects()
 # ===========================================================================
 
-test_that(".filter_internal_effects removes internal variables", {
-  # Build a mock bmmfit with minimal structure
-  mock_bmmfit <- list(
-    bmm = list(
-      model = structure(
-        list(other_vars = list()),
-        class = c("sdm", "bmmodel")
-      )
-    )
+test_that(".filter_internal_effects removes the columns a model builds", {
+  model <- mixture3p(
+    "dev_rad", nt_features = c("nt1", "nt2"), set_size = "set_size"
   )
+  mock_bmmfit <- list(bmm = list(model = model))
 
   ce <- mock_ce(
     set_size = mock_ce_df(1:3, 0:2, 2:4),
     LureIdx1 = mock_ce_df(1:3, 0:2, 2:4),
-    Idx_corr = mock_ce_df(1:3, 0:2, 2:4),
+    LureIdx2 = mock_ce_df(1:3, 0:2, 2:4),
     inv_ss = mock_ce_df(1:3, 0:2, 2:4),
-    Item1_Col_rad = mock_ce_df(1:3, 0:2, 2:4),
-    expS = mock_ce_df(1:3, 0:2, 2:4)
+    ss_numeric = mock_ce_df(1:3, 0:2, 2:4),
+    nt1 = mock_ce_df(1:3, 0:2, 2:4),
+    `set_size:LureIdx1` = mock_ce_df(1:3, 0:2, 2:4)
   )
 
   result <- .filter_internal_effects(ce, mock_bmmfit)
   expect_named(result, "set_size")
   expect_s3_class(result, "brms_conditional_effects")
+})
+
+test_that(".filter_internal_effects keeps user predictors that share a prefix with a built column", {
+  mixture2p_fit <- list(bmm = list(model = mixture2p("dev_rad")))
+  ce <- mock_ce(
+    n_items = mock_ce_df(1:3, 0:2, 2:4),
+    Idx_user = mock_ce_df(1:3, 0:2, 2:4),
+    cond = mock_ce_df(1:3, 0:2, 2:4),
+    `n_items:Idx_user` = mock_ce_df(1:3, 0:2, 2:4),
+    `Idx_user:cond` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+  expect_named(
+    .filter_internal_effects(ce, mixture2p_fit),
+    c("n_items", "Idx_user", "cond", "n_items:Idx_user", "Idx_user:cond")
+  )
+
+  # nothing creates Item<k>_* or expS columns, so a user column with those
+  # names is a predictor like any other
+  sdm_fit <- list(bmm = list(model = sdm("dev_rad")))
+  ce <- mock_ce(
+    Item1_Col_rad = mock_ce_df(1:3, 0:2, 2:4),
+    expS = mock_ce_df(1:3, 0:2, 2:4)
+  )
+  expect_named(.filter_internal_effects(ce, sdm_fit), c("Item1_Col_rad", "expS"))
+})
+
+test_that(".filter_internal_effects keeps user columns named like the ones a non-targets model builds", {
+  dat <- small_data()
+  dat$LureIdx_user <- rep_len(c(0, 1), nrow(dat))
+  dat$inv_ss2 <- rep_len(c(1, 2, 3), nrow(dat))
+  fit <- suppressMessages(mock_bmm(
+    bmf(kappa ~ 1, thetat ~ 1 + LureIdx_user, thetant ~ 1 + inv_ss2),
+    dat,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  ))
+  expect_true(all(c("LureIdx_user", "inv_ss2") %in% names(fit$data)))
+
+  ce <- mock_ce(
+    LureIdx_user = mock_ce_df(1:3, 0:2, 2:4),
+    inv_ss2 = mock_ce_df(1:3, 0:2, 2:4),
+    `LureIdx_user:inv_ss2` = mock_ce_df(1:3, 0:2, 2:4),
+    LureIdx1 = mock_ce_df(1:3, 0:2, 2:4),
+    inv_ss = mock_ce_df(1:3, 0:2, 2:4),
+    `LureIdx1:inv_ss2` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+  expect_named(
+    .filter_internal_effects(ce, fit),
+    c("LureIdx_user", "inv_ss2", "LureIdx_user:inv_ss2")
+  )
 })
 
 test_that(".filter_internal_effects keeps all user vars", {

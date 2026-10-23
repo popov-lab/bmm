@@ -204,11 +204,11 @@ test_that("a link the model does not pass on to the fit is refused", {
   simplex_tree <- mpt_tree("t", list(A = "gA", B = "gB", C = "gC"))
   expect_error(
     mpt(simplex_tree, simplex = c("gA", "gB", "gC"), links = list(gA = "probit")),
-    "cannot be changed in mpt\\(\\)"
+    "belong to the simplex group"
   )
   expect_error(
     mpt(simplex_tree, simplex = c("gA", "gB", "gC"), links = list(gAraw = "probit")),
-    "cannot be changed in mpt\\(\\)"
+    "belong to the simplex group"
   )
   # naming the link the model already uses asks for no change
   expect_silent(sdm(resp_error = "y", links = list(kappa = "log")))

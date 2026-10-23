@@ -182,6 +182,18 @@ test_that("bmm() stores the name of the data the user passed", {
   expect_equal(attr(fit$data, "data_name"), "counts")
 })
 
+test_that("bmm() stores the prior the user passed, and an empty one for none (#538)", {
+  skip_on_cran()
+  dat <- data.frame(y = c(-0.5, 0.1, 0.4, 1.2))
+  user <- brms::set_prior("normal(1, 0.5)", class = "Intercept", dpar = "kappa")
+  fit_with <- function(prior) suppressMessages(bmm(
+    bmf(c ~ 1, kappa ~ 1), dat, sdm("y"), prior = prior, backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_identical(fit_with(user)$bmm$user_prior, user)
+  # NULL on a fit means it was saved before bmm() stored the prior
+  expect_identical(fit_with(NULL)$bmm$user_prior, brms::empty_prior())
+})
+
 test_that("check_data() methods see the name of the user's data", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(445)
