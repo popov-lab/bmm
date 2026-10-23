@@ -1,5 +1,5 @@
-# A bmmfit stand-in for ppp() with fixed draws: .ppp_counts() is mocked, so
-# only the model class, the formula and the data are read from the fit
+# A bmmfit stand-in for ppp() with fixed draws: .ppp_counts() and .ppp_data()
+# are mocked, so only the model class and the formula are read from the fit
 ppp_toy_fit <- function(data, formula = bmf(D ~ 1, g ~ 1)) {
   structure(
     list(bmm = list(model = mpt(mpt_2htm_trees(), "item_type"), user_formula = formula),
@@ -15,10 +15,9 @@ ppp_toy_draws <- function(...) {
 
 local_ppp_counts <- function(observed, expected, replicated, data,
                              env = parent.frame()) {
-  counts <- list(observed = observed, expected = expected,
-                 replicated = replicated, data = data)
+  counts <- list(observed = observed, expected = expected, replicated = replicated)
   local_mocked_bindings(.ppp_counts = function(model, fit, draw_ids) counts,
-                        .env = env)
+                        .ppp_data = function(model, fit) data, .env = env)
 }
 
 # Klauer (2010), Eq. 18, written out: cells is a list of participants x
@@ -90,6 +89,35 @@ test_that("ppp() computes T2 as in Klauer (2010), across cells", {
   n <- matrix(10, 3, 2)
   expect_equal(unname(attr(res, "draws")$T2[, "observed"]), klauer_t2(wide(observed), cells, n))
   expect_equal(unname(attr(res, "draws")$T2[, "replicated"]), klauer_t2(wide(replicated), cells, n))
+})
+
+test_that("ppp() T2 of a stored mpt fit equals Klauer's T2 on its own draws (#560)", {
+  # the mocks above skip what a fit adds: brms's draw arrays, the tree of each
+  # row read from the tree indicators, the participant read from (1 | id)
+  fit <- load_fixture_fit("bmmfit_mpt_ppcheck.rds")
+  res <- withr::with_seed(560, ppp(fit, statistic = "T2"))
+  replicated <- withr::with_seed(560, brms::posterior_predict(fit))
+  expected <- brms::posterior_epred(fit)
+  data <- fit$data
+  indicators <- fit$bmm$model$other_vars$indicators$tree
+  # the rows of each tree in participant order, so that a row of the wide
+  # matrices is one participant across both trees
+  rows_of <- lapply(indicators, function(column) {
+    rows <- which(data[[column]] == 1L)
+    rows[order(data$id[rows])]
+  })
+  expect_equal(lengths(rows_of), c(old = 10L, new = 10L))
+  n <- vapply(rows_of, function(rows) rowSums(data$Y[rows, , drop = FALSE]), numeric(10))
+  klauer_draws <- function(counts) {
+    vapply(seq_len(dim(expected)[1]), function(d) {
+      wide <- do.call(cbind, lapply(rows_of, function(rows) counts(d)[rows, , drop = FALSE]))
+      klauer_t2(wide, lapply(rows_of, function(rows) expected[d, rows, ]), n)
+    }, numeric(1))
+  }
+  draws <- attr(res, "draws")$T2
+  expect_equal(nrow(draws), 150L)
+  expect_equal(unname(draws[, "observed"]), klauer_draws(function(d) unclass(data$Y)))
+  expect_equal(unname(draws[, "replicated"]), klauer_draws(function(d) replicated[d, , ]))
 })
 
 test_that("T2 is 0 when the observed covariance is the one the model implies", {
@@ -290,23 +318,29 @@ test_that("ppp() counts the second category of a yes/no model as trials minus re
 
 test_that("ppp() rebuilds the tree column of an mpt fit that no formula kept", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
-  local_ppd <- function(fit) {
-    draws <- array(1, c(2, nrow(fit$data), 2))
-    local_mocked_bindings(posterior_predict = function(...) draws,
-                          posterior_epred = function(...) draws, .package = "brms",
-                          .env = parent.frame())
-  }
   cases <- model_test_cases("stored_frame")
   fit <- stored_frame_fit(cases$mpt)
   expect_false("item_type" %in% names(fit$data))
-  local_ppd(fit)
-  data <- .ppp_counts(fit$bmm$model, fit, draw_ids = 1:2)$data
+  data <- .ppp_data(fit$bmm$model, fit)
   expect_identical(levels(data$item_type), c("old", "new"))
   expect_identical(as.character(data$item_type), ifelse(fit$data$Idx_old == 1, "old", "new"))
 
   # a formula that names the tree column keeps it, and it is left as it is
   fit <- stored_frame_fit(cases$mpt_tree_predictor)
-  local_ppd(fit)
-  expect_identical(.ppp_counts(fit$bmm$model, fit, draw_ids = 1:2)$data$item_type,
-                   fit$data$item_type)
+  expect_identical(.ppp_data(fit$bmm$model, fit)$item_type, fit$data$item_type)
+})
+
+test_that("ppp() checks 'by' before it computes any counts", {
+  fit <- ppp_toy_fit(data.frame(item_type = c("old", "new")))
+  local_mocked_bindings(
+    .ppp_counts = function(model, fit, draw_ids) stop("the counts were computed")
+  )
+  expect_error(
+    ppp(fit, by = "nosuchcol"),
+    "'by' must name columns of the model data. Available: 'item_type'"
+  )
+  expect_error(ppp(fit, by = 1L), "'by' must name columns of the model data")
+  # the mock is reached by a valid call, so it is the check that stopped the others
+  expect_error(ppp(fit, by = "item_type"), "the counts were computed")
+  expect_error(suppressMessages(ppp(fit)), "the counts were computed")
 })

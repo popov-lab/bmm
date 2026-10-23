@@ -13,6 +13,7 @@ model_cases_ddm <- function() {
       )
     ),
     init = list(ddm = list(model = model, formula = re_formula, data = toy_rt_data())),
+    rt_data = list(ddm = list(model = model, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1))),
     links = list(ddm = list(model = model, settable = c("drift", "bound", "ndt", "zr"))),
     fixture = list(ddm = list(file = "bmmfit_ddm_ppcheck.rds")),
     observables = list(
