@@ -282,6 +282,18 @@ generated_parameters.default <- function(model) {
   character(0)
 }
 
+# Parameters a model carries only to parameterise others, such as the
+# stick-breaking components of an mpt simplex. They are not probabilities, so
+# native_parameters() leaves them out by default and returns them when named.
+internal_parameters <- function(model) {
+  UseMethod("internal_parameters")
+}
+
+#' @exportS3Method
+internal_parameters.default <- function(model) {
+  character(0)
+}
+
 add_missing_parameters <- function(model, formula = bmmformula()) {
   formula_pars <- names(formula)
   model_pars <- setdiff(names(model$parameters),
