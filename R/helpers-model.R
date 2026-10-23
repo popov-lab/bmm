@@ -1025,6 +1025,10 @@ use_model_template <- function(model_name,
      #   requires them; the case kinds are listed in helper-model-cases.R)
      # - a `revert_check_data()` method in R/update.R if `check_data()`
      #   consumes or creates columns
+     # - a `built_data_columns()` method next to `check_data()` naming every
+     #   column it creates except the `Y` response matrix, so pp_check(),
+     #   conditional_effects() and the formula checks treat them as bmm's own
+     #   (a test requires it)
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
      #
@@ -1485,8 +1489,11 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
   if (until == "model") {
     return(nlist(config_args, model, user_formula))
   }
+  # a prior written for the parameters of bmm 1.4 is translated once, here, and
+  # bmm() stores the translation, so update() neither translates nor warns again
+  user_prior <- translate_deprecated_priors(model, config_args$formula, prior)
   prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, prior), frame_args)
+    configure_prior, c(list(model, data, config_args$formula, user_prior), frame_args)
   )
   # the prior decides which parameters exist, so the inits are built from it
   if (until == "init") {
@@ -1494,7 +1501,7 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
       create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
     )
   }
-  nlist(config_args, prior, model, user_formula)
+  nlist(config_args, prior, model, user_formula, user_prior)
 }
 
 #' @export

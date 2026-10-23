@@ -110,9 +110,8 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'   memory - A factorial model comparison. Psychological Review, 130(3), 841–852
 #'
 #' @return `dsdm` gives the density, `psdm` gives the distribution
-#'   function, `qsdm` gives the quantile function, `rsdm` generates
-#'   random deviates, and `.dsdm_integrate` is a helper function for
-#'   calculating the density of the SDM distribution.
+#'   function, `qsdm` gives the quantile function, and `rsdm` generates
+#'   random deviates.
 #'
 #' @details **Parametrization**
 #'
@@ -127,11 +126,19 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' Since responses are on the circle, the cumulative distribution function
 #' requires you to choose a lower bound of integration. The default is
 #' \eqn{-\pi}, as for the brms::pvon_mises() function but you can choose any
-#' value in the argument `lower_bound` of `psdm`. Another useful
+#' value in the argument `lower.bound` of `psdm` and `qsdm`. Another useful
 #' choice is the mean of the response distribution minus \eqn{\pi}, e.g.
-#' `lower_bound = mu-pi`. This is the default in
+#' `lower.bound = mu-pi`. This is the default in
 #' `circular::pvonmises()`, and it ensures that 50% of the cumulative
 #' probability mass is below the mean of the response distribution.
+#'
+#' `psdm` is 0 at `lower.bound` and 1 at `lower.bound + 2 * pi`; a `q` outside
+#' this range is wrapped around the circle. `qsdm` inverts `psdm` by root
+#' finding and returns values between `lower.bound` and `lower.bound + 2 * pi`.
+#' Values of `p` outside \[0, 1\] give `NaN` with a warning. Missing values
+#' give `NA`; `NaN`, infinite values and positions (`q`, `mu`, `lower.bound`)
+#' beyond 1e8 in absolute value give `NaN`, as does the bessel
+#' parametrization for `kappa` above 1e5.
 #'
 #' @export
 #'
@@ -165,14 +172,8 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' lines(x, d, type = "l", col = "red")
 dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
                  parametrization = "sqrtexp") {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(c < 0)), "c must be non-negative")
-
-  .dsdm_numer <- switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp,
-    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
-  )
+  .check_sdm_args(c, kappa, parametrization)
+  .dsdm_numer <- .sdm_numer(parametrization)
 
   lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
 
@@ -194,35 +195,14 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
 #' @export
 psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
                  lower.bound = -pi, parametrization = "sqrtexp") {
-  # parts adapted from brms::pvon_mises
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(c < 0)), "c must be non-negative")
-
-  pi <- base::pi
-  pi2 <- 2 * pi
-  q <- (q + pi) %% pi2
-  mu <- (mu + pi) %% pi2
-  lower.bound <- (lower.bound + pi) %% pi2
-
-  .dsdm_integrate <- function(mu, c, kappa, lower, upper, parametrization) {
-    stats::integrate(dsdm,
-      lower = lower, upper = upper, mu, c, kappa,
-      parametrization = parametrization
-    )$value
-  }
-
-  .dsdm_integrate_v <- Vectorize(.dsdm_integrate)
-
-  if (any(length(q) > 1, length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
-    out <- .dsdm_integrate_v(mu, c, kappa,
-      lower = lower.bound, upper = q,
-      parametrization = parametrization
-    )
+  .check_sdm_args(c, kappa, parametrization)
+  # mapply() refuses a zero-length q next to scalar parameters
+  out <- if (length(q) == 0) {
+    numeric(0)
   } else {
-    out <- .dsdm_integrate(mu, c, kappa,
-      lower = lower.bound, upper = q,
-      parametrization = parametrization
-    )
+    as.numeric(mapply(.psdm_one, q, mu, c, kappa, lower.bound,
+      MoreArgs = list(numer = .sdm_numer(parametrization))
+    ))
   }
 
   if (!lower.tail) {
@@ -236,22 +216,27 @@ psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 
 #' @rdname SDMdist
 #' @export
-qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
-  .NotYetImplemented()
+qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
+                 lower.bound = -pi, parametrization = "sqrtexp") {
+  .check_sdm_args(c, kappa, parametrization)
+  if (length(p) == 0) {
+    numeric(0)
+  } else {
+    p <- if (log.p) exp(p) else p
+    p <- if (lower.tail) p else 1 - p
+    warnif(any(p < 0 | p > 1, na.rm = TRUE), "NaNs produced")
+    as.numeric(mapply(.qsdm_root, p, mu, c, kappa, lower.bound,
+      MoreArgs = list(numer = .sdm_numer(parametrization))
+    ))
+  }
 }
 
 #' @rdname SDMdist
 #' @export
 rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  .check_sdm_args(c, kappa, parametrization)
   stopif(length(n) > 1, "n must be a single integer")
-
-  .dsdm_numer <- switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp,
-    stop2("Parametrization must be one of 'bessel' or 'sqrtexp'")
-  )
+  .dsdm_numer <- .sdm_numer(parametrization)
 
   # compare to the peak on the log scale: the unnormalized density itself
   # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
@@ -263,6 +248,152 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
     max_f = 1,
     proposal_fun = function(n) stats::runif(n, -pi, pi),
     mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
+  )
+}
+
+.psdm_one <- function(q, mu, c, kappa, lower.bound, numer) {
+  undefined <- .sdm_undefined(
+    c(q, mu, c, kappa, lower.bound),
+    positions = c(q, mu, lower.bound),
+    amplitude = numer(0, 0, c, kappa, log = TRUE)
+  )
+  if (!is.null(undefined)) {
+    undefined
+  } else {
+    .sdm_cdf(q, mu, lower.bound, .sdm_kernel(numer, c, kappa))
+  }
+}
+
+.qsdm_root <- function(p, mu, c, kappa, lower.bound, numer) {
+  undefined <- .sdm_undefined(
+    c(p, mu, c, kappa, lower.bound),
+    positions = c(mu, lower.bound),
+    amplitude = numer(0, 0, c, kappa, log = TRUE)
+  )
+  if (!is.null(undefined)) {
+    undefined
+  } else if (p < 0 || p > 1) {
+    NaN
+  } else if (p == 0) {
+    lower.bound
+  } else if (p == 1) {
+    lower.bound + 2 * pi
+  } else {
+    kernel <- .sdm_kernel(numer, c, kappa)
+    base <- .sdm_mass_below(lower.bound, mu, kernel)
+    # f.lower and f.upper are the CDF at the ends by definition, so the
+    # bracket holds however the CDF rounds next to them
+    stats::uniroot(
+      function(x) .sdm_cdf(x, mu, lower.bound, kernel, base) - p,
+      interval = c(lower.bound, lower.bound + 2 * pi),
+      f.lower = -p, f.upper = 1 - p, tol = 1e-12
+    )$root
+  }
+}
+
+# NULL for usable arguments. Otherwise NA for a missing value, and NaN for NaN,
+# an infinite value, a position beyond 1e8 (where an ulp is about 1.5e-8
+# radians) or an amplitude that is not finite: R's besselI() returns 0 for
+# kappa above 1e5. `amplitude` is evaluated only for finite arguments
+.sdm_undefined <- function(values, positions, amplitude) {
+  if (anyNA(values) && !any(is.nan(values))) {
+    NA_real_
+  } else if (!all(is.finite(values)) || any(abs(positions) > 1e8) ||
+               !is.finite(amplitude)) {
+    NaN
+  }
+}
+
+# The numerator over its peak in u = x - mu, in the sin()/expm1() form that
+# keeps its digits near the peak at large c and kappa. It is below exp(-50)
+# past `end`; the breaks keep integrate() from missing a peak that is far
+# narrower than the range it integrates over
+.sdm_kernel <- function(numer, c, kappa) {
+  amp <- numer(0, 0, c, kappa, log = TRUE)
+  depth <- if (amp > 50) -log1p(-50 / amp) / (2 * kappa) else Inf
+  end <- if (depth < 1) 2 * asin(sqrt(depth)) else pi
+  breaks <- 64^seq_len(8) / sqrt(kappa * max(amp, 1))
+  kernel <- list(
+    f = function(u) exp(amp * expm1(-2 * kappa * sin(u / 2)^2)),
+    ends = c(breaks[breaks < end], end)
+  )
+  kernel$norm <- 2 * .sdm_beyond(kernel, 0)
+  kernel
+}
+
+.sdm_beyond <- function(kernel, from) {
+  upper <- kernel$ends[kernel$ends > from]
+  lower <- c(from, upper[-length(upper)])
+  sum(vapply(seq_along(upper), function(i) {
+    # integrate() stops with "roundoff error" on an interval a few ulps wide
+    # (|q - mu| next to `end`); there the midpoint rule is exact enough
+    if (upper[i] - lower[i] < 1e-12) {
+      (upper[i] - lower[i]) * kernel$f((lower[i] + upper[i]) / 2)
+    } else {
+      stats::integrate(kernel$f, lower[i], upper[i],
+        rel.tol = 1e-10, abs.tol = .Machine$double.xmin
+      )$value
+    }
+  }, numeric(1)))
+}
+
+# Mass from the antimode mu - pi up to x, from the mass between x reflected
+# onto [mu, mu + pi] and the antimode: the peak is only ever at the end of an
+# interval, and flat parts of the CDF come from small tail integrals
+.sdm_mass_below <- function(x, mu, kernel) {
+  turns <- floor((x - mu + pi) / (2 * pi))
+  r <- x - mu - 2 * pi * turns
+  beyond <- .sdm_beyond(kernel, abs(r))
+  turns * kernel$norm + if (r < 0) beyond else kernel$norm - beyond
+}
+
+.sdm_cdf <- function(q, mu, lower.bound, kernel,
+                     base = .sdm_mass_below(lower.bound, mu, kernel)) {
+  offset <- .sdm_circle_offset(q, lower.bound)
+  if (offset == 2 * pi) {
+    1
+  } else if (offset == 0) {
+    0
+  } else {
+    # rounding can put the difference just outside [0, 1] where the CDF is flat
+    min(max(
+      (.sdm_mass_below(lower.bound + offset, mu, kernel) - base) / kernel$norm,
+      0
+    ), 1)
+  }
+}
+
+# at the upper end q - lower.bound can miss 2 * pi by a few ulps (q = 1.8 +
+# 2 * pi with lower.bound = 1.8), and wrapping would turn it into the lower end
+.sdm_circle_offset <- function(q, lower.bound) {
+  circle <- 2 * pi
+  offset <- q - lower.bound
+  tol <- 8 * .Machine$double.eps * max(1, abs(q), abs(lower.bound))
+  if (abs(offset - circle) <= tol) {
+    circle
+  } else if (abs(offset) <= tol) {
+    0
+  } else if (offset > 0 && offset < circle) {
+    offset
+  } else {
+    offset %% circle
+  }
+}
+
+.check_sdm_args <- function(c, kappa, parametrization) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  stopif(
+    !is.character(parametrization) || length(parametrization) != 1 ||
+      !parametrization %in% c("bessel", "sqrtexp"),
+    "Parametrization must be one of 'bessel' or 'sqrtexp'"
+  )
+}
+
+.sdm_numer <- function(parametrization) {
+  switch(parametrization,
+    bessel = .dsdm_numer_bessel,
+    sqrtexp = .dsdm_numer_sqrtexp
   )
 }
 
@@ -423,10 +554,11 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 # 1.4 took log where tau now is, so a logical there is a 1.4 call; the form
 # stays readable until 1.6.0
 .warn_positional_log <- function(fun, before, log) {
-  warning2(
-    "`{fun}({before}, {log})` is deprecated since bmm 1.5.0 and will be \\
-    removed in bmm 1.6.0 at the earliest. Use `{fun}({before}, log = {log})` \\
-    instead. That position now holds `tau`, so pass `log` by name."
+  warn_deprecated(
+    what = glue("{fun}({before}, {log})"),
+    with = glue("{fun}({before}, log = {log})"),
+    since = "1.5.0",
+    details = "That position now holds `tau`, so pass `log` by name."
   )
 }
 
@@ -597,12 +729,12 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
   .circmix_check_variable_precision(FALSE, vp_nodes)
 
+  args <- .circmix_recycle(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau)
   set_size <- length(mu)
-  weights <- .mixture3p_marginal_weights(p_mem, p_nt, set_size, length(x))
+  weights <- .mixture3p_marginal_weights(args$p_mem, args$p_nt, set_size, length(args$x))
   density <- .circmix_vp_ld(
-    .circmix_cos(x, mu[1], mu[-1], set_size),
-    weights$logw, weights$logw_guess,
-    rep_len(kappa, length(x)), rep_len(tau, length(x)), vp_nodes
+    .circmix_cos(args$x, mu[1], mu[-1], set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
   )
 
   if (!log) {
@@ -829,14 +961,11 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   .check_imm_args(kappa, s, dist, tau, length(mu))
   .circmix_check_variable_precision(FALSE, vp_nodes)
 
-  n <- length(x)
-  weights <- .imm_item_weights(
-    rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
-  )
+  args <- .circmix_recycle(x = x, c = c, a = a, s = s, b = b, kappa = kappa, tau = tau)
+  weights <- .imm_item_weights(args$c, args$a, args$s, args$b, dist)
   density <- .circmix_vp_ld(
-    .circmix_cos(x, mu[1], mu[-1], length(mu)),
-    weights$logw, weights$logw_guess,
-    rep_len(kappa, n), rep_len(tau, n), vp_nodes
+    .circmix_cos(args$x, mu[1], mu[-1], length(mu)),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
   )
 
   if (!log) {
@@ -985,7 +1114,10 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   will be extracted. The default will attempt to construct the standard
 #'   activation functions for the "ss" and "cs" model version. For a custom m3
 #'   model you need to specify the act_funs argument manually.
-#' @param log Logical; if `TRUE` (default), values are returned on the log scale.
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), values are returned on
+#'   the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead of
 #'   a matrix. This allows automatic unpacking of response categories into separate
 #'   columns when used with `dplyr::reframe()`. Default is `FALSE` for backward
@@ -1012,7 +1144,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' )
 #'
 #' # No need to provide b parameter
-#' dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+#' dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model, log = TRUE)
 #' rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
 #'
 #' # Can also use full formula (activation formulas are extracted automatically)
@@ -1216,8 +1348,10 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #' @param covariates A named vector or list with the values of all covariates
 #'   declared in the model that appear in the branch expressions of the
 #'   selected tree.
-#' @param log Logical; if `TRUE` (default), densities are returned on the log
-#'   scale.
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), densities are returned
+#'   on the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #' @param unpack Logical; if `TRUE` and `n = 1`, returns a named vector instead
 #'   of a matrix. This allows automatic unpacking of response categories into
 #'   separate columns when used with `dplyr::reframe()`. Default is `FALSE`.
@@ -1226,7 +1360,8 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'
 #' @note Unlike the densities of the circular models in this package (`dsdm()`,
 #'   `dmixture2p()`, `dmixture3p()`, `dimm()`) and unlike [stats::dmultinom()],
-#'   `dmpt()` returns the log density by default, matching [dm3()].
+#'   `dmpt()` returns the log density by default, as [dm3()] does. The default
+#'   becomes `FALSE` in bmm 1.6.0, which matches them.
 #'
 #' @keywords distribution
 #'
@@ -1250,7 +1385,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 #'
 #' dmpt(
 #'   x = c(35, 15), pars = c(D = 0.7, g = 0.5),
-#'   mpt_model = model, tree = "target"
+#'   mpt_model = model, tree = "target", log = TRUE
 #' )
 #' rmpt(
 #'   n = 10, size = 50, pars = c(D = 0.7, g = 0.5),
@@ -1361,7 +1496,10 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
 #' @param bound Boundary separation of the ddm
 #' @param ndt Non-decision time of the ddm
 #' @param zr relative starting point of the ddm
-#' @param log Logical, indicating if log-densities should be returned (default = TRUE)
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), log-densities are
+#'   returned. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #'
 #' @keywords distribution
 #'
@@ -1460,7 +1598,9 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #'   which the likelihood should be returned. Available versions are "simple"
 #'   and "crisk", the default is "simple."
 #' @param log A single logical value indicating if log-likelihoods should be
-#'   returned, the default is `TRUE`
+#'   returned. The default is `TRUE` until bmm 1.6.0 and `FALSE` from then on,
+#'   as in base R and the other density functions of bmm. Pass `log` to get the
+#'   same result in every version.
 #'
 #' @return
 #'   - `dcswald()` returns a numeric vector of (log-)likelihoods.
@@ -1500,6 +1640,10 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   # return NaN there, so they are evaluated at a placeholder and overwritten
   started <- rt_shifted > 0
   rt_shifted[!started] <- 1
+  # a bound at or below 0 has neither density nor survival; the Wald terms would
+  # warn about log(bound) there, so they get a placeholder like rt does
+  has_bound <- bound > 0
+  bound[!has_bound] <- 1
 
   if (version == "simple") {
     log_ll <- .pwald(rt_shifted, drift = drift, bound = bound, s = s, lower.tail = FALSE, log.p = TRUE)
@@ -1517,6 +1661,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
   # simple-version error there is certain, since no response can have arrived
   log_ll[!started] <- -Inf
   if (version == "simple") log_ll[!started & response == 0] <- 0
+  log_ll[started & !has_bound] <- -Inf
 
   if (log) log_ll else exp(log_ll)
 }
@@ -1825,7 +1970,10 @@ times_nonzero <- function(count, log_prob) {
 #' @param s Diffusion constant (standard deviation of noise), default = 1.
 #' @param version Character; either "3par" (default) or "4par"
 #' @param n Number of samples to generate
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param log Logical; if `TRUE` (default until bmm 1.6.0), values are returned on
+#'   the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+#'   and the other density functions of bmm. Pass `log` to get the same
+#'   result in every version.
 #'
 #' @keywords distribution
 #'
@@ -1899,21 +2047,21 @@ times_nonzero <- function(count, log_prob) {
 #' # 3-parameter version (single observation)
 #' dezdm(
 #'   mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-#'   drift = 2, bound = 1.5, ndt = 0.3
+#'   drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 #' )
 #'
 #' # 3-parameter version (vectorized)
 #' dezdm(
 #'   mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025),
 #'   n_upper = c(80, 75), n_trials = c(100, 100),
-#'   drift = 2, bound = 1.5, ndt = 0.3
+#'   drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 #' )
 #'
 #' # 4-parameter version (single observation)
 #' dezdm(
 #'   mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
 #'   n_upper = 80, n_trials = 100,
-#'   drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+#'   drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
 #' )
 #'
 #' # generate random summary statistics
@@ -1928,10 +2076,8 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
                   version = c("3par", "4par"), log = TRUE) {
   version <- match.arg(version)
 
-  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
-  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
-  stopif(isTRUE(any(s <= 0)), "s must be positive")
-  stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
+  .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
+
   stopif(isTRUE(any(n_upper < 0)), "n_upper cannot be negative")
   stopif(isTRUE(any(n_upper > n_trials)), "n_upper cannot exceed n_trials")
   stopif(
@@ -1940,7 +2086,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   )
 
   if (version == "4par") {
-    stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")
     if (!is.matrix(mean_rt)) {
       stopif(
         length(mean_rt) != 2 || length(var_rt) != 2,
@@ -1973,18 +2118,25 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
                   version = c("3par", "4par")) {
   version <- match.arg(version)
 
-  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
-  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
-  stopif(isTRUE(any(s <= 0)), "s must be positive")
+  .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
   stopif(length(n) > 1, "n must be a single integer")
-  stopif(n_trials <= 2, "n_trials must be larger than 2")
 
   if (version == "4par") {
-    stopif(isTRUE(any(zr <= 0 | zr >= 1)), "zr must be between 0 and 1")
     .rezdm_4par(n, n_trials, drift, bound, ndt, zr, s)
   } else {
     .rezdm_3par(n, n_trials, drift, bound, ndt, s)
   }
+}
+
+.check_ezdm_args <- function(bound, ndt, s, zr, n_trials, version) {
+  stopif(isTRUE(any(bound <= 0)), "bound must be positive")
+  stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
+  stopif(isTRUE(any(s <= 0)), "s must be positive")
+  stopif(isTRUE(any(n_trials <= 2)), "n_trials must be larger than 2")
+  stopif(
+    version == "4par" && isTRUE(any(zr <= 0 | zr >= 1)),
+    "zr must be between 0 and 1"
+  )
 }
 
 # Internal: 3par density - vectorized

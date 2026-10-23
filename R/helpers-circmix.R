@@ -517,8 +517,9 @@
 #' @export
 postprocess_brm.circular <- function(model, fit, ...) {
   fit <- NextMethod("postprocess_brm")
+  # a stanfit can hold no draws, as with iter = warmup
   if (isTRUE(model$variable_precision) && has_draws(fit) &&
-    identical(fit$algorithm, "sampling")) {
+    brms::ndraws(fit) > 0 && identical(fit$algorithm, "sampling")) {
     .circmix_warn_vp_bound(
       .circmix_vp_shape_min(fit),
       divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),

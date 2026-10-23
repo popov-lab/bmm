@@ -574,7 +574,7 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
   )
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
-  pars <- pars %||% model_pars
+  pars <- pars %||% setdiff(model_pars, internal_parameters(x$bmm$model))
   unknown <- pars[not_in(pars, model_pars)]
   stopif(
     length(unknown) > 0,

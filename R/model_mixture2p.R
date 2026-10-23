@@ -261,6 +261,10 @@ mixture2p <- function(resp_error, set_size = NULL,
 
 #' @export
 check_data.mixture2p <- function(model, data, formula) {
+  # newdata for a prediction may hold one set size; the warning below is about
+  # the data K is estimated from
+  for_prediction <- isTRUE(attr(data, "for_prediction"))
+  attr(data, "for_prediction") <- NULL
   # a model saved by bmm 1.4 has no version, and its single version needs no set
   # size; prior_info() checks the data of such fits again
   if (!isTRUE(.mixture2p_version_table[[model$version]]$needs_set_size)) {
@@ -269,7 +273,7 @@ check_data.mixture2p <- function(model, data, formula) {
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
   warnif(
-    length(unique(ss$ss_numeric)) == 1,
+    !for_prediction && length(unique(ss$ss_numeric)) == 1,
     "The set size does not vary, so the data cannot test the capacity rule of \\
     the '{model$version}' version. K is estimated from the responses at set \\
     size {ss$max_set_size}, and reflects only its prior where it reaches \\
@@ -279,6 +283,22 @@ check_data.mixture2p <- function(model, data, formula) {
   attr(data, "max_set_size") <- ss$max_set_size
 
   NextMethod("check_data")
+}
+
+# the capacity rule takes any set size, so the fit hands over no bound, only
+# that the data are not the fit's own
+#' @exportS3Method
+carry_fit_bounds.mixture2p <- function(model, data) {
+  attr(data, "for_prediction") <- TRUE
+  data
+}
+
+#' @exportS3Method
+built_data_columns.mixture2p <- function(model) {
+  c(
+    if (isTRUE(.mixture2p_version_table[[model$version]]$needs_set_size)) "ss_numeric",
+    NextMethod("built_data_columns")
+  )
 }
 
 ############################################################################# !

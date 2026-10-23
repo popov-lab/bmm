@@ -477,12 +477,11 @@ test_that("a non-linear parameter of the formula keeps its nlpar prior", {
 
 test_that("an nlpar prior on no parameter of the model is an error that names the parameters", {
   case <- migration_case("mixture2p")
+  # the prior is translated where bmm() and the extractors take it, configure_fit()
   expect_error(
-    configure_prior(
-      case$model, small_data(),
-      configure_model(case$model, check_data(case$model, small_data(), bmf(kappa ~ 1, thetat ~ 1)),
-                      check_formula(case$model, small_data(), bmf(kappa ~ 1, thetat ~ 1)))$formula,
-      user_prior = brms::set_prior("normal(0, 1)", class = "b", nlpar = "kappa1")
+    configure_fit(
+      bmf(kappa ~ 1, thetat ~ 1), small_data(), case$model,
+      prior = brms::set_prior("normal(0, 1)", class = "b", nlpar = "kappa1"), until = "prior"
     ),
     paste0(
       '`set_prior\\("normal\\(0, 1\\)", class = "b", nlpar = "kappa1"\\)` names no parameter of ',
