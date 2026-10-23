@@ -5,6 +5,11 @@ real psychometric_log_lik(int y, int trials, real x, real midpoint, real width,
                           real zmid, real zspan) {
   real dx = log_x == 1 ? log(x) - log(midpoint) : x - midpoint;
   real z = zmid + zspan * dx / width;
+  // exp(z) overflows past |z| = 709.78 in the extreme-value CDFs (dist_type 2
+  // and 3), where 0 * inf turns the gradient into NaN; beyond |z| = 700 the
+  // clamped terms are flat or below exp(-700), so only rows that are already
+  // nearly impossible change value
+  if (dist_type == 2 || dist_type == 3) z = fmin(fmax(z, -700), 700);
   real log1m_guess = log1m(guess);
   real out = lchoose(trials, y);
 
