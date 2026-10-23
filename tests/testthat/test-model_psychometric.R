@@ -453,8 +453,9 @@ test_that("the four Stan families match dpsychometric() and keep finite gradient
     k <- .psychometric_z_constants(sigmoid)
     dx <- (z - k[["zmid"]]) * 0.3 / k[["zspan"]]
     x <- if (.psychometric_sigmoids[[sigmoid]]$log_x) exp(dx) else 1 + dx
-    # fixed rates above zero: with a zero rate the R twin gives -Inf past the
-    # clamp the Stan code applies to the extreme-value CDFs
+    # fixed rates above zero: with a zero rate, a row past the clamp the Stan
+    # code applies to the extreme-value CDFs (|z| = 600) has a log density
+    # below -600 that Stan replaces by a clamped constant and R does not
     data.frame(x = x, y = y, midpoint = 1, width = 0.3, guess = guess,
                lapse = lapse, guess_fixed = 0.25, lapse_fixed = 0.01)
   }
@@ -504,12 +505,17 @@ test_that("the four Stan families match dpsychometric() and keep finite gradient
       expect_lt(max(rel_error[finite]), 1e-12, label = label)
     }
 
+    # just inside the clamp, with the rate that would absorb the tail at zero:
+    # the adjoint count * exp(|z|) * |z| / width must not overflow there
+    shell <- rows_at_z(c(699.9, -699.9, 650, -650), c(0L, 10L, 0L, 10L),
+                       guess = 0, lapse = 0, sigmoid)
     # CmdStan refuses a point with a non-finite gradient, which makes cmdstanr
-    # error; the large `error` keeps finite-difference noise from failing it
+    # error; `error = 1e300` because the clamped constant (about -4e261 on the
+    # shell rows) swamps the finite-difference side of the comparison
     grad <- stan_model$diagnose(
-      data = stan_data(far, spec, k, gradient_check = 1L),
+      data = stan_data(rbind(far, shell), spec, k, gradient_check = 1L),
       init = list(list(log_width_scale = 0)),
-      error = 1e6, seed = 1
+      error = 1e300, seed = 1
     )$gradients()
     expect_true(all(is.finite(grad$model)), info = sigmoid)
   }
