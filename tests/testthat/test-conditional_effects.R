@@ -519,13 +519,13 @@ test_that(".filter_internal_effects keeps user columns named like the ones a non
   ))
   expect_true(all(c("LureIdx_user", "inv_ss2") %in% names(fit$data)))
 
+  # ss_numeric is the one column mixture3p builds
   ce <- mock_ce(
     LureIdx_user = mock_ce_df(1:3, 0:2, 2:4),
     inv_ss2 = mock_ce_df(1:3, 0:2, 2:4),
     `LureIdx_user:inv_ss2` = mock_ce_df(1:3, 0:2, 2:4),
-    LureIdx1 = mock_ce_df(1:3, 0:2, 2:4),
-    inv_ss = mock_ce_df(1:3, 0:2, 2:4),
-    `LureIdx1:inv_ss2` = mock_ce_df(1:3, 0:2, 2:4)
+    ss_numeric = mock_ce_df(1:3, 0:2, 2:4),
+    `ss_numeric:inv_ss2` = mock_ce_df(1:3, 0:2, 2:4)
   )
   expect_named(
     .filter_internal_effects(ce, fit),

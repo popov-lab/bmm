@@ -224,11 +224,8 @@ test_that("built_data_columns() names what each model's check_data() builds", {
   expect_setequal(declared("mixture2p"), character(0))
   expect_setequal(declared("mixture2p_slot"), "ss_numeric")
   expect_setequal(declared("sdm"), character(0))
-  expect_setequal(
-    declared("mixture3p"),
-    c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric")
-  )
-  expect_setequal(declared("imm"), c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric"))
+  expect_setequal(declared("mixture3p"), "ss_numeric")
+  expect_setequal(declared("imm"), "ss_numeric")
   expect_setequal(declared("sdt_yn"), "dist_type")
   expect_setequal(declared("sdt_mafc"), c("m_afc", "dist_type"))
   expect_setequal(declared("sdt_ranking"), c("nTrials", "max_rank"))
