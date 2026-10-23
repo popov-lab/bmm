@@ -130,8 +130,8 @@ supply \code{newdata} for such models.
 }
 
 \section{Circular location parameters}{
-The circular models sample their location parameter (\code{mu} for \code{sdm}, \code{mu1} for
-\code{mixture2p}, \code{mixture3p} and \code{imm}) through a \code{tan_half} link, and it is
+The circular models sample their location parameter (\code{mu} for \code{sdm} and
+\code{mixture2p}, \code{mu1} for \code{mixture3p} and \code{imm}) through a \code{tan_half} link, and it is
 returned in radians in \verb{(-pi, pi)} — a response bias relative to the target,
 since the response variable is the angular error. It is fixed to \code{0} unless
 the \code{bmmformula} predicts it explicitly, so an all-zero \code{mu1} means the model

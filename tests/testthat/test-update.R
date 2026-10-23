@@ -1179,20 +1179,22 @@ expect_bmm_prior <- function(up, fresh, label) {
 }
 
 # the main parameter switches between levels and intercept + effects, which
-# changes the default prior of its class; mixture2p's kappa is an nlpar, sdm's
+# changes the default prior of its class; sdt_rating's d is an nlpar, sdm's
 # c a dpar, and brms stores their intercept priors in different classes
 user_prior_cases <- list(
   nlpar = list(
-    model = mixture2p("y"),
-    levels = bmf(kappa ~ 0 + cond, thetat ~ 1),
-    effects = bmf(kappa ~ 1 + cond, thetat ~ 1),
-    both_predicted = bmf(kappa ~ 1 + cond, thetat ~ 1 + cond),
-    user = brms::set_prior("normal(1, 0.5)", class = "b", nlpar = "kappa"),
-    other = brms::set_prior("normal(0, 0.5)", class = "b", nlpar = "thetat"),
-    intercept = brms::set_prior("normal(0, 0.3)", class = "b", coef = "Intercept", nlpar = "kappa")
+    model = sdt_rating(paste0("r", 1:5), "stimulus"),
+    data = transform(toy_rating_data(), cond = rep(c("a", "b"), each = 4)),
+    levels = bmf(d ~ 0 + cond, criterion ~ 1, spacing ~ 1),
+    effects = bmf(d ~ 1 + cond, criterion ~ 1, spacing ~ 1),
+    both_predicted = bmf(d ~ 1 + cond, criterion ~ 1 + cond, spacing ~ 1),
+    user = brms::set_prior("normal(1, 0.5)", class = "b", nlpar = "d"),
+    other = brms::set_prior("normal(0, 0.5)", class = "b", nlpar = "criterion"),
+    intercept = brms::set_prior("normal(0, 0.3)", class = "b", coef = "Intercept", nlpar = "d")
   ),
   dpar = list(
     model = sdm("y"),
+    data = user_prior_data(),
     levels = bmf(c ~ 0 + cond, kappa ~ 1),
     effects = bmf(c ~ 1 + cond, kappa ~ 1),
     both_predicted = bmf(c ~ 1 + cond, kappa ~ 1 + cond),
@@ -1211,8 +1213,9 @@ for (case_name in names(user_prior_cases)) {
     for (dir in list(c("levels", "effects"), c("effects", "levels"))) {
       for (prior in list(NULL, case$user)) {
         label <- paste(case_name, dir[1], "->", dir[2], if (is.null(prior)) "no prior" else "user prior")
-        up <- stub_update(stub_bmm(case[[dir[1]]], case$model, prior), formula. = case[[dir[2]]])
-        expect_bmm_prior(up, stub_bmm(case[[dir[2]]], case$model, prior), label)
+        up <- stub_update(stub_bmm(case[[dir[1]]], case$model, prior, case$data),
+                          formula. = case[[dir[2]]], data = case$data)
+        expect_bmm_prior(up, stub_bmm(case[[dir[2]]], case$model, prior, case$data), label)
       }
     }
   })
@@ -1222,12 +1225,12 @@ for (case_name in names(user_prior_cases)) {
     skip_if_not_installed("rstan")
     case <- user_prior_cases[[case_name]]
     both <- combine_prior(case$other, case$intercept)
-    up <- stub_update(stub_bmm(case$levels, case$model, case$other),
-                      formula. = case$effects, prior = case$intercept)
-    expect_bmm_prior(up, stub_bmm(case$effects, case$model, both), "first update")
+    up <- stub_update(stub_bmm(case$levels, case$model, case$other, case$data),
+                      formula. = case$effects, prior = case$intercept, data = case$data)
+    expect_bmm_prior(up, stub_bmm(case$effects, case$model, both, case$data), "first update")
     expect_identical(up$bmm$user_prior, both)
-    up <- stub_update(up, formula. = case$both_predicted)
-    expect_bmm_prior(up, stub_bmm(case$both_predicted, case$model, both), "second update")
+    up <- stub_update(up, formula. = case$both_predicted, data = case$data)
+    expect_bmm_prior(up, stub_bmm(case$both_predicted, case$model, both, case$data), "second update")
   })
 }
 
@@ -1315,13 +1318,12 @@ test_that("a new fit without a stored user prior updates as a fit saved before (
   fit$bmm$user_prior <- NULL
   up <- stub_update(fit, formula. = bmf(kappa ~ 1 + cond, thetat ~ 1))
   expect_identical(rows(up), data.frame(
-    prior = c("", "", "", "constant(-100)", "constant(0)", "constant(0)", "logistic(0, 1)",
-              "logistic(0, 1)", "normal(2, 1)"),
-    class = c("b", "b", "b", "Intercept", "Intercept", "Intercept", "b", "theta2", "b"),
-    coef = c("", "Intercept", "condb", "", "", "", "Intercept", "", ""),
-    dpar = c("", "", "", "kappa2", "mu1", "mu2", "", "", ""),
-    nlpar = c("thetat", "kappa", "kappa", "", "", "", "thetat", "", "kappa"),
-    source = c("default", "default", "default", "user", "user", "user", "user", "default", "user")
+    prior = c("", "constant(0)", "logistic(0, 1)", "normal(2, 1)", "normal(2, 1)"),
+    class = c("b", "Intercept", "Intercept", "Intercept", "b"),
+    coef = c("condb", "", "", "", ""),
+    dpar = c("kappa", "", "thetat", "kappa", "kappa"),
+    nlpar = c("", "", "", "", ""),
+    source = c("default", "user", "user", "user", "user")
   ))
   expect_null(up$bmm$user_prior)
 
