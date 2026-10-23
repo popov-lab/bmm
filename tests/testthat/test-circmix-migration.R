@@ -162,6 +162,25 @@ test_that("emmeans() routes a parameter of a 1.4 fit to its nlpar, without a war
   }
 })
 
+# a 1.4 fit keeps the brms mixture and its frame the LureIdx step functions and
+# inv_ss that the mixture's formula reads; check_data() no longer builds them
+test_that("conditional_effects() and pp_check() leave out the columns a 1.4 fit built", {
+  panels <- function(...) {
+    names <- c(...)
+    structure(stats::setNames(rep(list(data.frame(estimate__ = 1)), length(names)), names),
+              class = "brms_conditional_effects")
+  }
+  old <- load_fixture_fit("mock_v141_mixture3p.rds")
+  ce <- panels("set_size", "session", "LureIdx1", "inv_ss", "LureIdx1:inv_ss", "set_size:LureIdx2")
+  expect_named(.filter_internal_effects(ce, old), c("set_size", "session"))
+  expect_setequal(.resolve_pp_conditions(old), c(paste0("col_nt", 1:3), "session", "set_size"))
+
+  old <- load_fixture_fit("mock_v141_imm.rds")
+  ce <- panels("set_size", "LureIdx1", "LureIdx3:dist_nt3")
+  expect_named(.filter_internal_effects(ce, old), "set_size")
+  expect_setequal(.resolve_pp_conditions(old), c(paste0("col_nt", 1:3), paste0("dist_nt", 1:3), "set_size"))
+})
+
 test_that("emmeans() on a 1.4 mixture2p fit gives the same means by dpar and by nlpar", {
   skip_on_cran() # 0.40 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("emmeans")

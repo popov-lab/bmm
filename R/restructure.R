@@ -140,6 +140,18 @@ is_mixture_family_fit <- function(x) {
     inherits(x$formula$family, "mixfamily")
 }
 
+# Such a fit also keeps the columns check_data() built for the brms mixture,
+# the LureIdx step functions and, for mixture3p, inv_ss, which its formula
+# reads. check_data() no longer builds them, so built_data_columns() does not
+# name them, and conditional_effects() and pp_check(group = ) ask the fit
+fit_built_columns <- function(fit) {
+  model <- fit$bmm$model
+  old <- if (is_mixture_family_fit(fit) && inherits(model, "non_targets")) {
+    c(paste0("LureIdx", seq_along(model$other_vars$nt_features)), "inv_ss")
+  }
+  c(built_data_columns(model), old)
+}
+
 upgrade_mixture_family_model <- function(x) {
   model <- x$bmm$model
   name <- intersect(c("mixture2p", "mixture3p", "imm"), class(model))
