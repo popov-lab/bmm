@@ -165,22 +165,16 @@ if (make("bmmfit_example1.rds")) {
   save_fixture(sdm_fit, "bmmfit_example1.rds", seed = 6)
 }
 
-# The two mock fixtures keep what the parameter routing reads (the formula,
-# the data and the bmm slot of a mock fit), so they carry no draws
+# The mock fixture keeps what the parameter routing reads (the formula, the
+# data and the bmm slot of a mock fit), so it carries no draws
 mock_fixture <- function(...) {
   fit <- bmm(..., backend = "mock", mock_fit = 1, rename = FALSE)
   structure(unclass(fit)[c("formula", "data", "bmm")], class = class(fit))
 }
 
-if (make("mock_bmmfit_mixture2p.rds")) {
-  set.seed(7)
-  mix_data <- data.frame(y = rmixture2p(20, kappa = 5, p_mem = 0.7),
-                         x = rep(c("a", "b"), 10))
-  save_fixture(
-    mock_fixture(bmf(kappa ~ 1 + x, thetat ~ 1), mix_data, mixture2p("y")),
-    "mock_bmmfit_mixture2p.rds", seed = 7
-  )
-}
+# Fits saved by bmm 1.4.1 (mock_bmmfit_mixture2p.rds, bmmfit_v141_mixture2p.rds,
+# mock_v141_mixture3p.rds, mock_v141_imm.rds) are built by
+# tests/local/make-old-circmix-fixtures.R.
 
 if (make("mock_bmmfit_m3.rds")) {
   save_fixture(

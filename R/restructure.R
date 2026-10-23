@@ -128,6 +128,106 @@ add_posterior_epred <- function(x) {
   x
 }
 
+# Before bmm 1.5.0, mixture2p, mixture3p and imm were brms mixture families
+# with non-linear parameters, and their location was mu1. restructure() leaves
+# such a fit as it was fitted, because the extractors read the fitted
+# parameters (mu1, mu2, kappa2) from its model object. update() refits it under
+# the custom family instead, from a model object rebuilt by the current
+# constructor. Told apart by the family rather than by the version, because
+# development builds before the custom families carry the same version number
+is_mixture_family_fit <- function(x) {
+  any(c("mixture2p", "mixture3p", "imm") %in% class(x$bmm$model)) &&
+    inherits(x$formula$family, "mixfamily")
+}
+
+# Such a fit also keeps the columns check_data() built for the brms mixture,
+# the LureIdx step functions and, for mixture3p, inv_ss, which its formula
+# reads. check_data() no longer builds them, so built_data_columns() does not
+# name them, and conditional_effects() and pp_check(group = ) ask the fit
+fit_built_columns <- function(fit) {
+  model <- fit$bmm$model
+  old <- if (is_mixture_family_fit(fit) && inherits(model, "non_targets")) {
+    c(paste0("LureIdx", seq_along(model$other_vars$nt_features)), "inv_ss")
+  }
+  c(built_data_columns(model), old)
+}
+
+upgrade_mixture_family_model <- function(x) {
+  model <- x$bmm$model
+  name <- intersect(c("mixture2p", "mixture3p", "imm"), class(model))
+  # fits from 0.4.5 to 0.4.7 have non_targets after the version class
+  version <- if (name == "imm") {
+    sub("^imm_", "", grep("^imm_(full|bsc|abc)$", class(model), value = TRUE)[1])
+  } else {
+    "simple"
+  }
+  new <- brms::do_call(get_model(name), c(
+    model$resp_vars, model$other_vars,
+    list(version = version, regex = isTRUE(attr(model, "regex")), call = attr(model, "call"))
+  ))
+  # the links stay the constructor's: bmm 1.4 refused other links for these
+  # models, and a stored link means what it meant in the release that wrote it
+  # (0.5.3 stored thetat as identity, with the logit inside the formula)
+  for (a in c("regex_vars", "regex_applied", "user_vars")) {
+    attr(new, a) <- attr(model, a)
+  }
+  x$bmm$model <- update_model_fixed_parameters(new, x$bmm$user_formula)
+  x
+}
+
+# The prior stored on such a fit holds what bmm passed to brms: the user's
+# priors and bmm's own defaults, written for non-linear parameters, plus rows
+# for the second mixture component (mu2, kappa2) and the constants that pinned
+# the set-size-1 level of mixture3p's thetant and imm's a and s. The custom
+# families have no second component, and since 1.5.0 the set-size-1 level
+# samples its prior with a warning instead of being pinned (D6), so those rows
+# are dropped. A constant the user wrote in exactly the form bmm generated
+# cannot be told apart from it and is dropped too
+translate_stored_prior <- function(old_model, model, formula, prior, fitted_with) {
+  bterms <- brms::brmsterms(formula)
+  component <- nzchar(prior$dpar) &
+    not_in(prior$dpar, c(names(bterms$dpars), names(model$deprecated_parameters)))
+  pinned <- set_size_one_constants(model, prior)
+  translated <- translate_nlpar_priors(model, formula, prior[!component & !pinned, ])
+  name <- intersect(c("mixture2p", "mixture3p", "imm"), class(model))
+  pinned_pars <- unique(prior$nlpar[pinned])
+  sentences <- c(
+    glue(
+      "This fit was made with bmm {fitted_with}, when {name}() was built on a brms \\
+      mixture family. update() samples it again under the custom family of bmm \\
+      {utils::packageVersion('bmm')} and translates its priors from `nlpar =` to \\
+      `dpar =`, so your call needs no change."
+    ),
+    translated$details,
+    if (length(pinned_pars) > 0) {
+      glue(
+        "The constant priors that bmm {fitted_with} set on the set-size-1 level of \\
+        {collapse_comma(pinned_pars)} are dropped, so bmm no longer fixes that level."
+      )
+    },
+    if ("mu1" %in% names(old_model$parameters) && not_in("mu1", names(old_model$fixed_parameters))) {
+      glue(
+        "In the refitted fit, the draws of mu1 are named after mu, e.g. b_Intercept \\
+        instead of b_mu1_Intercept."
+      )
+    }
+  )
+  list(prior = translated$prior, message = paste(sentences, collapse = " "))
+}
+
+# the rows bmm 1.4 generated to pin the set-size-1 level (constrain_set_size1_*)
+set_size_one_constants <- function(model, prior) {
+  pars <- if (inherits(model, "mixture3p")) "thetant" else if (inherits(model, "imm")) c("a", "s")
+  value <- if (inherits(model, "mixture3p")) "constant(-100)" else "constant(0)"
+  set_size <- model$other_vars$set_size
+  if (length(pars) == 0 || !is.character(set_size)) {
+    return(rep(FALSE, nrow(prior)))
+  }
+  prior$nlpar %in% pars & prior$coef == paste0(set_size, 1) &
+    ((prior$class == "b" & prior$prior == value) |
+      (prior$class == "sd" & prior$prior == "constant(1e-8)"))
+}
+
 add_links <- function(x) {
   UseMethod("add_links")
 }
