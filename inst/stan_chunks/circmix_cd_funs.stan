@@ -17,6 +17,10 @@
 
   // half-width of the "same" arc around the probe for a von Mises decision density at kappa
   real circmix_cd_crit_angle(real kappa, real level) {
+    // before any arithmetic on kappa: an unused node with an infinite partial gives kappa a NaN adjoint (0 * Inf)
+    if (is_inf(level)) {
+      return level > 0 ? 0 : pi();
+    }
     real cos_d = (log_modified_bessel_first_kind(0, kappa) + level) / kappa;
     if (cos_d >= 1) {
       return 0;

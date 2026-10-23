@@ -509,3 +509,28 @@ test_that("the Stan and R change-detection functions agree", {
   expect_equal(stan("out_sa"), as.vector(sa), tolerance = 1e-12)
   expect_equal(stan("out_bern"), log(c(0.7, 0.3)), tolerance = 1e-12)
 })
+
+test_that("an infinite level gives kappa a finite gradient in circmix_cd_crit_angle()", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # the division by kappa must not run for an infinite level: its partial in
+  # kappa is infinite, and reverse mode multiplies it by the unused node's zero
+  # adjoint, which is NaN although the function returns 0 or pi
+  code <- paste0(
+    "functions {\n", cd_chunks(), "\n}\n",
+    "data { real level; }
+    parameters { real log_kappa; }
+    model { target += circmix_cd_crit_angle(exp(log_kappa), level); }"
+  )
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+  for (level in c(-Inf, Inf)) {
+    gradient <- tryCatch(
+      model$diagnose(
+        data = list(level = level), init = list(list(log_kappa = log(8))),
+        error = 1e300
+      )$gradients()$model,
+      error = function(e) NA_real_
+    )
+    expect_identical(gradient, 0, label = paste("gradient at level", level))
+  }
+})
