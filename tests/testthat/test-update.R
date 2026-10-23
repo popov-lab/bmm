@@ -565,6 +565,124 @@ stored_frame_cases <- local({
   }
 })
 
+test_that("update(formula. = ) refuses only a column the fit did not keep, and says to pass newdata (#552)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  withr::local_seed(552)
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  stub_fit <- function(formula, data, model) suppressWarnings(suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = stub, rename = FALSE)
+  ))
+  stub_update <- function(fit, ...) suppressWarnings(suppressMessages(
+    update(fit, ..., backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE)
+  ))
+
+  dat <- data.frame(y = rsdm(60), x = rep(c("a", "b"), 30), id = rep(1:6, each = 10))
+  fit <- stub_fit(bmf(c ~ 1, kappa ~ 1), dat, sdm("y"))
+  expect_error(
+    stub_update(fit, formula. = bmf(c ~ 1 + x, kappa ~ 1)),
+    "'x'.*`newdata`"
+  )
+  up <- stub_update(fit, formula. = bmf(c ~ 1 + x, kappa ~ 1), newdata = dat)
+  expect_equal(brms::stancode(up),
+               brms::stancode(stub_fit(bmf(c ~ 1 + x, kappa ~ 1), dat, sdm("y"))))
+
+  # the correlation ID p and the Intercept of brms are no columns to keep
+  f_cor <- bmf(c ~ 1 + x + (1 | p | id), kappa ~ 1 + (1 | p | id))
+  cor_fit <- stub_fit(f_cor, dat, sdm("y"))
+  expect_no_error(stub_update(cor_fit, formula. = f_cor))
+  expect_no_error(stub_update(cor_fit, formula. = bmf(c ~ 0 + Intercept + x + (1 | id), kappa ~ 1)))
+
+  # the tree column is rebuilt for check_data() and dropped again afterwards
+  case <- stored_frame_cases()$mpt
+  mpt_fit <- stub_fit(case$formula, case$data, case$model)
+  expect_error(
+    stub_update(mpt_fit, formula. = bmf(D ~ 1 + item_type + (1 | id), g ~ 1)),
+    "'item_type'.*`newdata`"
+  )
+  up <- stub_update(mpt_fit, formula. = bmf(D ~ 1 + item_type + (1 | id), g ~ 1),
+                    newdata = case$data)
+  expect_true("item_type" %in% colnames(up$data))
+})
+
+test_that("a formula whose variables the stored frame or data2 hold is not refused (#552)", {
+  configured <- function(formula) list(formula = formula, data = data.frame(y = 1, x = 1, id = "a"))
+  # neither the correlation ID p, nor Intercept, nor the cov matrix M, nor the
+  # non-linear parameters a and b are data columns
+  expect_silent(stop_unstored_variables(configured(brms::bf(
+    y ~ 0 + Intercept + x + (1 | p | gr(id, cov = M)), sigma ~ 1 + I(x^2) + (1 | p | id)
+  )), data2 = NULL))
+  expect_silent(stop_unstored_variables(configured(brms::bf(
+    y ~ a + b * x, a ~ 1 + (1 | id), b ~ 1, nl = TRUE
+  )), data2 = NULL))
+  expect_silent(stop_unstored_variables(configured(brms::bf(y ~ 1 + z)), data2 = list(z = 1)))
+  expect_error(
+    stop_unstored_variables(configured(brms::bf(y ~ 1 + z + w)), data2 = NULL),
+    "'z', 'w'.*`newdata`"
+  )
+})
+
+for (case_name in names(stored_frame_cases())) {
+  test_that(paste0("update() with a fit's own formula and no newdata is not refused (", case_name, ")"), {
+    skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+    skip_if_not_installed("rstan")
+    stub <- methods::new("stanfit", sim = list(
+      iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+      samples = list(structure(list(), args = list(control = list())))
+    ))
+    case <- stored_frame_cases()[[case_name]]
+    fit <- suppressWarnings(suppressMessages(
+      bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = stub, rename = FALSE)
+    ))
+    expect_no_error(suppressWarnings(suppressMessages(
+      update(fit, formula. = case$formula, backend = "mock", mock_fit = stub,
+             rename = FALSE, recompile = TRUE)
+    )))
+  })
+}
+
+test_that("a custom m3 fit updates to a formula with other activation parameters (#552)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  stub_fit <- function(formula) suppressWarnings(suppressMessages(
+    bmm(formula, oberauer_lewandowsky_2019_e1, model, backend = "mock",
+        mock_fit = stub, rename = FALSE)
+  ))
+  model <- m3(
+    resp_cats = c("corr", "other", "dist", "npl"),
+    num_options = paste0("n_", c("corr", "other", "dist", "npl")),
+    choice_rule = "simple",
+    links = list(c = "log", a = "log", d = "log", e = "log")
+  )
+  f_d <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d ~ 1)
+  f_e <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + e, npl ~ b, c ~ 1, a ~ 1, e ~ 1)
+
+  up <- suppressWarnings(suppressMessages(update(
+    stub_fit(f_d), formula. = f_e, backend = "mock", mock_fit = stub,
+    rename = FALSE, recompile = TRUE
+  )))
+  fresh <- stub_fit(f_e)
+  expect_equal(brms::stancode(up), brms::stancode(fresh))
+  expect_equal(up$bmm$model$parameters, fresh$bmm$model$parameters)
+  expect_false("d" %in% names(up$bmm$model$parameters))
+
+  # a constant of the old formula goes with it
+  f_dfix <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d = 0.5)
+  up <- suppressWarnings(suppressMessages(update(
+    stub_fit(f_dfix), formula. = f_e, backend = "mock", mock_fit = stub,
+    rename = FALSE, recompile = TRUE
+  )))
+  expect_equal(brms::stancode(up), brms::stancode(fresh))
+  expect_false("d" %in% names(up$bmm$model$fixed_parameters))
+})
+
 test_that("update.bmmfit needs no newdata for a model that packs its response", {
   skip_on_cran()
   fit <- m3_fixture()
@@ -1019,4 +1137,205 @@ test_that("a prior of the update() call on a parameter the new formula frees sti
     "normal(0, 0.3)"
   )
   expect_equal(constant_priors(up), 0)
+})
+
+# update() of a mock fit reads the sampler's arguments from a stanfit, and a
+# fresh mock fit cannot be reused, so these updates recompile
+stub_stanfit <- function() {
+  methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+}
+
+user_prior_data <- function() {
+  withr::local_seed(445)
+  data.frame(y = rmixture2p(n = 60), cond = rep(c("a", "b"), 30))
+}
+
+stub_bmm <- function(formula, model, prior = NULL, data = user_prior_data()) {
+  suppressWarnings(suppressMessages(bmm(
+    formula, data, model, prior = prior, backend = "mock", mock_fit = stub_stanfit(), rename = FALSE
+  )))
+}
+
+stub_update <- function(fit, ..., data = user_prior_data()) {
+  suppressWarnings(suppressMessages(update(
+    fit, ..., newdata = data, backend = "mock", mock_fit = stub_stanfit(),
+    rename = FALSE, recompile = TRUE
+  )))
+}
+
+prior_rows <- function(fit) {
+  rows <- as.data.frame(fit$prior)[c("prior", "class", "coef", "group", "dpar", "nlpar", "lb", "ub", "source")]
+  rows <- rows[do.call(order, c(unname(rows), method = "radix")), ]
+  rownames(rows) <- NULL
+  rows
+}
+
+expect_bmm_prior <- function(up, fresh, label) {
+  expect_identical(prior_rows(up), prior_rows(fresh), label = label)
+  expect_identical(brms::stancode(up), brms::stancode(fresh), label = label)
+}
+
+# the main parameter switches between levels and intercept + effects, which
+# changes the default prior of its class; mixture2p's kappa is an nlpar, sdm's
+# c a dpar, and brms stores their intercept priors in different classes
+user_prior_cases <- list(
+  nlpar = list(
+    model = mixture2p("y"),
+    levels = bmf(kappa ~ 0 + cond, thetat ~ 1),
+    effects = bmf(kappa ~ 1 + cond, thetat ~ 1),
+    both_predicted = bmf(kappa ~ 1 + cond, thetat ~ 1 + cond),
+    user = brms::set_prior("normal(1, 0.5)", class = "b", nlpar = "kappa"),
+    other = brms::set_prior("normal(0, 0.5)", class = "b", nlpar = "thetat"),
+    intercept = brms::set_prior("normal(0, 0.3)", class = "b", coef = "Intercept", nlpar = "kappa")
+  ),
+  dpar = list(
+    model = sdm("y"),
+    levels = bmf(c ~ 0 + cond, kappa ~ 1),
+    effects = bmf(c ~ 1 + cond, kappa ~ 1),
+    both_predicted = bmf(c ~ 1 + cond, kappa ~ 1 + cond),
+    user = brms::set_prior("normal(1, 0.5)", class = "b", dpar = "c"),
+    other = brms::set_prior("normal(1, 0.5)", class = "Intercept", dpar = "kappa"),
+    intercept = brms::set_prior("normal(0, 0.3)", class = "Intercept", dpar = "c")
+  )
+)
+
+for (case_name in names(user_prior_cases)) {
+  test_that(paste0("update() to a formula gives the priors bmm() gives it (#538, ", case_name, ")"), {
+    # eight mock fits, about 8 s: both directions, with and without a user prior
+    skip_on_cran()
+    skip_if_not_installed("rstan")
+    case <- user_prior_cases[[case_name]]
+    for (dir in list(c("levels", "effects"), c("effects", "levels"))) {
+      for (prior in list(NULL, case$user)) {
+        label <- paste(case_name, dir[1], "->", dir[2], if (is.null(prior)) "no prior" else "user prior")
+        up <- stub_update(stub_bmm(case[[dir[1]]], case$model, prior), formula. = case[[dir[2]]])
+        expect_bmm_prior(up, stub_bmm(case[[dir[2]]], case$model, prior), label)
+      }
+    }
+  })
+
+  test_that(paste0("a chained update() keeps the priors of bmm() and of each call (#538, ", case_name, ")"), {
+    skip_on_cran()
+    skip_if_not_installed("rstan")
+    case <- user_prior_cases[[case_name]]
+    both <- combine_prior(case$other, case$intercept)
+    up <- stub_update(stub_bmm(case$levels, case$model, case$other),
+                      formula. = case$effects, prior = case$intercept)
+    expect_bmm_prior(up, stub_bmm(case$effects, case$model, both), "first update")
+    expect_identical(up$bmm$user_prior, both)
+    up <- stub_update(up, formula. = case$both_predicted)
+    expect_bmm_prior(up, stub_bmm(case$both_predicted, case$model, both), "second update")
+  })
+}
+
+test_that("update() keeps brms from adding back the defaults of the old fit (#538)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  withr::local_seed(445)
+  dat <- data.frame(y = rmixture2p(n = 60), cond = factor(rep(c("a", "b"), 30)), x = rnorm(60),
+                    id = rep(1:6, each = 10))
+  # brms marks bmm's defaults as user rows and brms::update.brmsfit() adds back
+  # the ones the new prior does not restate: the level default of condb, set per
+  # coefficient when several predictors have no intercept, and the L row of the
+  # correlation next to the new cor row
+  cases <- list(
+    coefficient = list(model = mixture2p("y"), old = bmf(kappa ~ 0 + cond + x, thetat ~ 1),
+                       new = bmf(kappa ~ 1 + cond + x, thetat ~ 1)),
+    correlation = list(model = sdm("y"), old = bmf(c ~ 1 + cond + (1 | p | id), kappa ~ 1 + (1 | p | id)),
+                       new = bmf(c ~ 0 + cond + (1 | p | id), kappa ~ 1 + (1 | p | id)))
+  )
+  for (case_name in names(cases)) {
+    case <- cases[[case_name]]
+    up <- stub_update(stub_bmm(case$old, case$model, data = dat), formula. = case$new, data = dat)
+    expect_bmm_prior(up, stub_bmm(case$new, case$model, data = dat), case_name)
+  }
+})
+
+test_that("a user prior on a parameter the new formula fixes comes back when it is freed (#538)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  user <- brms::set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")
+  free <- bmf(c ~ 1, kappa ~ 1)
+  fixed <- bmf(c ~ 1, kappa = 3)
+  fit <- stub_bmm(free, sdm("y"), user)
+
+  # the constant wins and the stored row is named, as bmm() names it for the
+  # same formula and prior (#598)
+  msgs <- displacement_messages(up <- suppressWarnings(update(
+    fit, formula. = fixed, newdata = user_prior_data(), silent = 1,
+    backend = "mock", mock_fit = stub_stanfit(), rename = FALSE, recompile = TRUE
+  )))
+  expect_length(msgs, 1)
+  expect_match(msgs, 'dpar = "kappa", class = "Intercept": normal(2, 1) replaced by constant(3) (kappa fixed at 3)',
+               fixed = TRUE)
+  expect_match(brms::stancode(up), "Intercept_kappa = 3;", fixed = TRUE)
+  expect_bmm_prior(up, stub_bmm(fixed, sdm("y"), user), "fixed")
+
+  up <- stub_update(up, formula. = free)
+  expect_equal(kappa_intercept_prior(up), "normal(2, 1)")
+  expect_bmm_prior(up, stub_bmm(free, sdm("y"), user), "freed")
+})
+
+test_that("a user prior on a coefficient an update() drops comes back with it (#538)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  user <- brms::set_prior("normal(1, 0.5)", class = "b", dpar = "c")
+  levels <- bmf(c ~ 0 + cond, kappa ~ 1)
+  # bmm() refuses a prior on a coefficient its formula does not have, update()
+  # drops it as brms::update.brmsfit() does
+  up <- stub_update(stub_bmm(levels, sdm("y"), user), formula. = bmf(c ~ 1, kappa ~ 1))
+  expect_false(any(up$prior$class == "b" & up$prior$dpar == "c"))
+  up <- stub_update(up, formula. = levels)
+  expect_bmm_prior(up, stub_bmm(levels, sdm("y"), user), "restored")
+})
+
+test_that("a fit saved before bmm() stored the user's prior keeps the previous update() priors (#538)", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  expect_null(fit1$bmm$user_prior)
+  # the bmm default for the levels of c in the old formula is carried as a user
+  # prior, because nothing on the fit tells it apart from one
+  up <- update_mock(fit1, formula. = bmf(c ~ 1 + set_size, kappa ~ 1))
+  expect_equal(up$prior$prior[up$prior$class == "b" & up$prior$dpar == "c" & up$prior$coef == ""],
+               "student_t(5, 2, 0.75)")
+  # and the updated fit stays on that route when it is updated again
+  expect_null(up$bmm$user_prior)
+})
+
+test_that("a new fit without a stored user prior updates as a fit saved before (#538)", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  rows <- function(fit) prior_rows(fit)[c("prior", "class", "coef", "dpar", "nlpar", "source")]
+  # the expected rows are what update() gave before bmm() stored the user's prior
+
+  fit <- stub_bmm(bmf(kappa ~ 0 + cond, thetat ~ 1), mixture2p("y"))
+  fit$bmm$user_prior <- NULL
+  up <- stub_update(fit, formula. = bmf(kappa ~ 1 + cond, thetat ~ 1))
+  expect_identical(rows(up), data.frame(
+    prior = c("", "", "", "constant(-100)", "constant(0)", "constant(0)", "logistic(0, 1)",
+              "logistic(0, 1)", "normal(2, 1)"),
+    class = c("b", "b", "b", "Intercept", "Intercept", "Intercept", "b", "theta2", "b"),
+    coef = c("", "Intercept", "condb", "", "", "", "Intercept", "", ""),
+    dpar = c("", "", "", "kappa2", "mu1", "mu2", "", "", ""),
+    nlpar = c("thetat", "kappa", "kappa", "", "", "", "thetat", "", "kappa"),
+    source = c("default", "default", "default", "user", "user", "user", "user", "default", "user")
+  ))
+  expect_null(up$bmm$user_prior)
+
+  # a parameter the new formula fixes takes the old route's stale-row filter
+  fit <- stub_bmm(bmf(c ~ 1, kappa ~ 1), sdm("y"),
+                  brms::set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa"))
+  fit$bmm$user_prior <- NULL
+  up <- stub_update(fit, formula. = bmf(c ~ 1, kappa = 3))
+  expect_identical(rows(up), data.frame(
+    prior = c("constant(0)", "constant(3)", "student_t(5, 2, 0.75)"),
+    class = c("Intercept", "Intercept", "Intercept"),
+    coef = c("", "", ""),
+    dpar = c("", "kappa", "c"),
+    nlpar = c("", "", ""),
+    source = c("user", "user", "user")
+  ))
 })

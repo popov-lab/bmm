@@ -136,24 +136,35 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 
   if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
     data <- check_stored_data(model, newdata %||% olddata, user_formula)
+    from_stored_frame <- !missing(formula.)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
+    from_stored_frame <- FALSE
     attr(data, "data_name") <- substitute_name(newdata)
   }
 
   # standard bmm checks and transformations
   formula <- check_formula(model, data, user_formula)
   config_args <- configure_model(model, data, formula)
+  # checked on the configured formula, because only there does brms say which
+  # of its symbols are variables
+  if (from_stored_frame) {
+    stop_unstored_variables(config_args, fit_frame_args(object, dots)$data2)
+  }
 
-  # configure_prior() treats every row of the old fit's prior as a user prior, so
-  # for a parameter whose constant changed each of those rows would override the
-  # freshly configured one -- the stale constant() of a freed or re-valued
-  # parameter and the stale free prior of a newly fixed one alike. brms stores
-  # the main dpar without a `dpar` label, so its rows are the ones carrying
-  # neither label
-  old_prior <- carried_prior(object$prior)
-  if (length(changed_pars) > 0) {
+  # bmm() stores the prior the user gave it, and configure_prior() rebuilds the
+  # defaults around it for the new formula and data as bmm() would (#538). A fit
+  # saved before that has only its whole prior, in which brms marks bmm's
+  # defaults for the old formula as user rows; configure_prior() treats each of
+  # those rows as a user prior, so for a parameter whose constant changed each
+  # would override the freshly configured one -- the stale constant() of a freed
+  # or re-valued parameter and the stale free prior of a newly fixed one alike.
+  # brms stores the main dpar without a `dpar` label, so its rows are the ones
+  # carrying neither label
+  stored_prior <- object$bmm$user_prior
+  old_prior <- stored_prior %||% carried_prior(object$prior)
+  if (is.null(stored_prior) && length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
     stale <- old_prior$dpar %in% changed_pars |
@@ -167,10 +178,10 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # must win over it, and the message naming the displaced rows is printed
   # there, exactly as for the prior of bmm() (#549). Combined afterwards, a
   # prior on a constrained coefficient would replace the constraint in silence
+  user_prior <- combine_prior(old_prior, dots$prior)
   prior <- brms::do_call(
     configure_prior,
-    c(list(model, data, config_args$formula, combine_prior(old_prior, dots$prior)),
-      fit_frame_args(object, dots))
+    c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
   )
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
@@ -217,6 +228,15 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     carried_control(object, dots), dots$backend, dots$algorithm
   ))
 
+  # brms::update.brmsfit() adds back every row of the old prior marked "user"
+  # that the new prior does not restate, and brms marks bmm's defaults so: the
+  # old default of a coefficient the new formula keeps would replace the new
+  # one, and the stored L row of a correlation would duplicate the new cor row.
+  # The user's own rows are in the stored prior already (#538)
+  if (!is.null(stored_prior)) {
+    object$prior$source[] <- "default"
+  }
+
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
   # sdm run metadata) were computed for the original data and formula. The
@@ -232,9 +252,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # this one. Single brackets, because `init = NULL` must keep its slot
   object$stan_args[c("init", "control")] <- list(init, control)
 
-  # bmm postprocessing
+  # bmm postprocessing. A fit saved before bmm stored the user's prior stays
+  # without one: its user rows cannot be told from the defaults, and storing the
+  # prior of this call alone would drop them at the next update()
   object <- postprocess_brm(model, object,
     fit_args = new_fit_args, user_formula = user_formula,
+    user_prior = if (!is.null(stored_prior)) user_prior,
     configure_opts = configure_opts
   )
 
@@ -262,8 +285,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 # the configure_prior methods of the non-target models, which read it to decide
 # whether set size 1 needs a constant prior. That is inert only because a column
 # gets rebuilt exactly when the fitted formula does not name it, and the
-# constraint helpers then return NULL; a new formula. that names it fails in
-# brms, because the column is no longer in the data
+# constraint helpers then return NULL; a new formula. that names it is refused
+# by stop_unstored_variables(), because the column is no longer in the data
 check_stored_data <- function(model, data, formula) {
   stored <- revert_check_data(model, data)
   rebuilt <- attr(stored, "rebuilt")
@@ -273,6 +296,27 @@ check_stored_data <- function(model, data, formula) {
     data[[var]] <- NULL
   }
   data
+}
+
+# A new formula can only use the columns the fit's model frame kept, which are
+# those its own formula used, and none of the ones check_stored_data() rebuilt
+# and dropped again. brms refuses the others only after bmm has configured the
+# prior, with a message that does not say where the data come from
+stop_unstored_variables <- function(config_args, data2) {
+  # the variables brms::validate_data() looks up, by its own rule: allvars
+  # leaves out the correlation ID p of (1 | p | id), cov matrices and non-linear
+  # parameters, and Intercept is a column brms adds itself
+  unstored <- setdiff(
+    all.vars(brms::brmsterms(config_args$formula)$allvars),
+    c(colnames(config_args$data), names(data2), "Intercept")
+  )
+  stopif(
+    length(unstored) > 0,
+    "The model frame of this fit does not hold {collapse_comma(unstored)}. It keeps \\
+    only the columns the fitted formula used, and none that bmm rebuilds for its \\
+    checks, such as the tree column of `mpt()`. Pass the data you gave `bmm()` as \\
+    `newdata` to use {if (length(unstored) > 1) 'them' else 'it'} in the new formula."
+  )
 }
 
 # brms::kfold() and reloo() hand update() slices of the fit's own model frame,
@@ -374,11 +418,8 @@ revert_check_data.non_targets <- function(model, data) {
     )
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
-  # nt_features passed the check when the fit was made, so the fit's largest set
-  # size is one more than their number, even when brms dropped the rows of that
-  # set size from the frame (#459). Derived rather than stored on the fit, so fits
-  # saved before this fix are covered too
-  attr(data, "fit_max_set_size") <- length(model$other_vars$nt_features) + 1
+  # brms may have dropped the rows of the largest set size from the frame (#459)
+  data <- carry_fit_bounds(model, data)
   NextMethod("revert_check_data")
 }
 

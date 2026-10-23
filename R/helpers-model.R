@@ -1027,6 +1027,10 @@ use_model_template <- function(model_name,
      #   requires them; the case kinds are listed in helper-model-cases.R)
      # - a `revert_check_data()` method in R/update.R if `check_data()`
      #   consumes or creates columns
+     # - a `built_data_columns()` method next to `check_data()` naming every
+     #   column it creates except the `Y` response matrix, so pp_check(),
+     #   conditional_effects() and the formula checks treat them as bmm's own
+     #   (a test requires it)
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
      #
