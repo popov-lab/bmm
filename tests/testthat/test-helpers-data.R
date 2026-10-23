@@ -186,6 +186,68 @@ test_that("check_data() returns a data.frame()", {
   }
 })
 
+# A model's check_data() adds columns that pp_check(group = ) and
+# conditional_effects() must not offer as the user's predictors, and that
+# formula checks must not call unknown. built_data_columns() is the one
+# declaration, so a column added without it fails here (#550). The reverse
+# fails too: a declared name check_data() does not build hides a user column
+# of that name and lets a formula naming a missing column pass the data
+# check. It is compared with all returned columns, since a declared column may
+# overwrite one the user supplied. Cases of the check_data kind are read too,
+# for models whose stored-frame case cannot show a column (the ezdm 4par
+# indicators).
+test_that("built_data_columns() declares exactly the columns check_data() adds", {
+  cases <- c(model_test_cases("stored_frame"), model_test_cases("check_data"))
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    checked <- suppressWarnings(suppressMessages(
+      check_data(case$model, case$data, case$formula %||% bmf(kappa ~ 1))
+    ))
+    # Y is a matrix column that is no predictor, left out of the declaration
+    added <- setdiff(names(checked), c(names(case$data), "Y"))
+    declared <- built_data_columns(case$model)
+    expect_identical(
+      setdiff(added, declared), character(0),
+      info = paste0(name, ": check_data() adds a column built_data_columns() does not declare")
+    )
+    expect_identical(
+      setdiff(declared, names(checked)), character(0),
+      info = paste0(name, ": built_data_columns() declares a column check_data() does not build")
+    )
+  }
+})
+
+test_that("built_data_columns() names what each model's check_data() builds", {
+  cases <- model_test_cases("stored_frame")
+  declared <- function(name) built_data_columns(cases[[name]]$model)
+
+  expect_setequal(declared("mixture2p"), character(0))
+  expect_setequal(declared("sdm"), character(0))
+  expect_setequal(
+    declared("mixture3p"),
+    c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric")
+  )
+  expect_setequal(declared("imm"), c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric"))
+  expect_setequal(declared("sdt_yn"), "dist_type")
+  expect_setequal(declared("sdt_mafc"), c("m_afc", "dist_type"))
+  expect_setequal(declared("sdt_ranking"), c("nTrials", "max_rank"))
+  expect_setequal(declared("sdt_rating"), "nTrials")
+  expect_setequal(declared("sdt_cdp"), "nTrials")
+  expect_setequal(
+    declared("mpt_impossible"),
+    c("nTrials", "Idx_withdist", "Idx_nodist", "Poss_dist")
+  )
+  expect_setequal(declared("mpt_single_tree"), "nTrials")
+  expect_setequal(
+    declared("m3_num_options_by_category"),
+    c("nTrials", paste0("Idx_", c("corr", "other", "dist", "npl")),
+      paste0("n_opt_", c("corr", "other", "dist", "npl")))
+  )
+
+  ezdm_4par <- model_test_cases("check_data")$ezdm_4par$model
+  expect_setequal(built_data_columns(ezdm_4par), c("rt_used_upper", "rt_used_lower"))
+})
+
 test_that("wrap(x) returns the same for values between -pi and pi", {
   withr::local_seed(445)
   x <- runif(100, -pi, pi)
@@ -1417,4 +1479,227 @@ test_that("calc_error_relative_to_nontargets() gives one row per non-target with
   expect_equal(out$id, c(1, 2, 1, 2))
   # -3 - 3 = -6 lies outside [-pi, pi] and wraps to -6 + 2 * pi
   expect_equal(out$y_nt, c(0.3, -6 + 2 * pi, 0.9, -3))
+})
+
+# The RT models (ddm, cswald) take the same trial data, so they have to accept
+# and refuse it alike (#557). One row per input; a row gives one expectation
+# for all cases, or one per case where the models differ on purpose (the 0.100 s
+# advice, cswald's error-rate warning). The messages are written out. The
+# trial data have a 10% error rate, which cswald "simple" does not warn about.
+rt_check_rt <- c(0.5, 0.6, 0.7, 0.8, 0.9, 0.55, 0.65, 0.75, 0.85, 0.95)
+rt_check_response <- c(1, 0, 1, 1, 1, 1, 1, 1, 1, 1)
+rt_check_chars <- c("upper", "LOWER", "Upper", rep("upper", 7))
+
+rt_check_data <- function(rt = rt_check_rt, response = rt_check_response) {
+  data.frame(rt = rt, response = response)
+}
+
+rt_check_error <- function(message) list(error = message)
+
+# the warnings are given in the order they are raised
+rt_check_ok <- function(response = rt_check_response, warnings = character(0),
+                        integer = NULL) {
+  list(response = response, warnings = warnings, integer = integer)
+}
+
+rt_check_rows <- function() {
+  na_rt <- "Some values in rt were NA. These were removed from the analysis."
+  na_response <- "Some values in response were NA. These were removed from the analysis."
+  fast <- "Your data contains reaction times smaller than 0.100 seconds."
+  fast_ddm <- paste(fast, "It is likely that the model will not be able to sample with the current settings of the initial values.")
+  fast_cswald <- paste(fast, "Such fast responses are often anticipations and pull the estimate of `ndt` down; consider filtering them.")
+  slow <- "Your data contains reaction times larger than 10 seconds."
+  boolean <- "The response variable is boolean and will be internally transformed to an integer variable with values 0 for FALSE and 1 for TRUE."
+  character <- "The response variable is a character variable and will be internally transformed to an integer variable with 0 for 'lower' and 1 for 'upper'."
+  not_positive <- "Some reaction times are zero or negative, please check your data. The likelihood is zero for a response time that is not strictly greater than the non-decision time."
+  not_numeric <- "The RT variable 'rt' needs to be of type double or integer."
+  not_binary <- "The response variable 'response' contains values other than 0 and 1."
+  no_rows <- "Every row has a missing value in 'rt' or 'response', so no observations are left."
+  resp <- rt_check_response
+  rt <- rt_check_rt
+
+  list(
+    valid = list(data = rt_check_data(), all = rt_check_ok(integer = TRUE)),
+    no_rt_column = list(
+      data = rt_check_data()["response"],
+      all = rt_check_error("The RT variable 'rt' is not present in the data.")
+    ),
+    no_response_column = list(
+      data = rt_check_data()["rt"],
+      all = rt_check_error("The response variable 'response' is not present in the data.")
+    ),
+    rt_na = list(
+      data = rt_check_data(rt = replace(rt, 1, NA)),
+      all = rt_check_ok(resp[-1], na_rt)
+    ),
+    response_na = list(
+      data = rt_check_data(response = replace(resp, 3, NA)),
+      all = rt_check_ok(resp[-3], na_response)
+    ),
+    both_na = list(
+      data = rt_check_data(rt = replace(rt, 1, NA), response = replace(resp, 3, NA)),
+      all = rt_check_ok(resp[-c(1, 3)], c(na_rt, na_response))
+    ),
+    all_rt_na = list(data = rt_check_data(rt = NA_real_), all = rt_check_error(no_rows)),
+    all_rt_na_logical = list(data = rt_check_data(rt = NA), all = rt_check_error(no_rows)),
+    all_response_na = list(
+      data = rt_check_data(response = NA_character_),
+      all = rt_check_error(no_rows)
+    ),
+    logical_response_na = list(
+      data = rt_check_data(response = replace(resp == 1, 3, NA)),
+      all = rt_check_ok(resp[-3], c(na_response, boolean), integer = TRUE)
+    ),
+    rt_character = list(
+      data = rt_check_data(rt = as.character(rt)),
+      all = rt_check_error(not_numeric)
+    ),
+    rt_factor = list(
+      data = rt_check_data(rt = factor(rt)),
+      all = rt_check_error(not_numeric)
+    ),
+    rt_difftime = list(
+      data = rt_check_data(rt = as.difftime(rt, units = "secs")),
+      all = rt_check_error(not_numeric)
+    ),
+    rt_negative = list(
+      data = rt_check_data(rt = replace(rt, 1, -0.1)),
+      all = rt_check_error(not_positive)
+    ),
+    rt_zero = list(
+      data = rt_check_data(rt = replace(rt, 1, 0)),
+      all = rt_check_error(not_positive)
+    ),
+    rt_fast = list(
+      data = rt_check_data(rt = replace(rt, 1, 0.05)),
+      ddm = rt_check_ok(resp, fast_ddm),
+      cswald = rt_check_ok(resp, fast_cswald), cswald_crisk = rt_check_ok(resp, fast_cswald)
+    ),
+    rt_infinite = list(
+      data = rt_check_data(rt = replace(rt, 1, Inf)),
+      all = rt_check_ok(resp, slow)
+    ),
+    rt_milliseconds = list(
+      data = rt_check_data(rt = rt * 1000),
+      all = rt_check_ok(resp, slow)
+    ),
+    response_2_3 = list(
+      data = rt_check_data(response = replace(resp, 1:2, c(2, 3))),
+      all = rt_check_error(not_binary)
+    ),
+    response_integer = list(
+      data = rt_check_data(response = as.integer(resp)),
+      all = rt_check_ok(resp, integer = TRUE)
+    ),
+    response_logical = list(
+      data = rt_check_data(response = resp == 1),
+      all = rt_check_ok(resp, boolean, integer = TRUE)
+    ),
+    response_character = list(
+      data = rt_check_data(response = rt_check_chars),
+      all = rt_check_ok(resp, character, integer = TRUE)
+    ),
+    response_character_invalid = list(
+      data = rt_check_data(response = replace(rt_check_chars, 2, "up")),
+      all = rt_check_error("The response variable 'response' contains invalid character values.")
+    ),
+    response_character_01 = list(
+      data = rt_check_data(response = as.character(resp)),
+      all = rt_check_error("The response variable 'response' contains invalid character values.")
+    ),
+    response_factor_labels = list(
+      data = rt_check_data(response = factor(tolower(rt_check_chars))),
+      all = rt_check_ok(resp, character, integer = TRUE)
+    ),
+    response_factor_01 = list(
+      data = rt_check_data(response = factor(resp)),
+      all = rt_check_error("The response variable 'response' contains invalid character values.")
+    ),
+    response_complex = list(
+      data = rt_check_data(response = as.complex(resp)),
+      all = rt_check_error("The response variable 'response' is of type 'complex'.")
+    ),
+    many_errors = list(
+      data = rt_check_data(response = c(0, 0, 0, 0, rep(1, 6))),
+      ddm = rt_check_ok(c(0, 0, 0, 0, rep(1, 6))),
+      cswald = rt_check_ok(c(0, 0, 0, 0, rep(1, 6)), "Your data has an error rate of 40%."),
+      cswald_crisk = rt_check_ok(c(0, 0, 0, 0, rep(1, 6)))
+    )
+  )
+}
+
+squish_text <- function(x) gsub("\\s+", " ", trimws(x))
+
+# what check_data() returned, raised and signalled on one input
+run_rt_check <- function(case, data) {
+  warnings <- character(0)
+  messages <- character(0)
+  value <- tryCatch(
+    withCallingHandlers(
+      check_data(case$model, data, case$formula),
+      warning = function(w) {
+        warnings <<- c(warnings, squish_text(conditionMessage(w)))
+        invokeRestart("muffleWarning")
+      },
+      message = function(m) {
+        messages <<- c(messages, squish_text(conditionMessage(m)))
+        invokeRestart("muffleMessage")
+      }
+    ),
+    error = function(e) e
+  )
+  list(value = value, warnings = warnings, messages = messages)
+}
+
+test_that("the RT models accept and refuse RTs and responses alike", {
+  cases <- model_test_cases("rt_data")
+  rows <- rt_check_rows()
+  expect_setequal(names(cases), c("ddm", "cswald", "cswald_crisk"))
+  for (case_name in names(cases)) {
+    for (row_name in names(rows)) {
+      row <- rows[[row_name]]
+      want <- row[[case_name]] %||% row[["all"]]
+      label <- paste(case_name, row_name)
+      expect_false(is.null(want), label = paste(label, "has an expectation"))
+      got <- run_rt_check(cases[[case_name]], row$data)
+      expect_length(got$messages, 0)
+      if (!is.null(want$error)) {
+        expect_true(inherits(got$value, "error"), label = paste(label, "stops"))
+        if (inherits(got$value, "error")) {
+          expect_match(squish_text(conditionMessage(got$value)), want$error, fixed = TRUE,
+                       info = label)
+        }
+        next
+      }
+      expect_false(inherits(got$value, "error"), label = paste(label, "passes"),
+                   info = if (inherits(got$value, "error")) conditionMessage(got$value))
+      if (inherits(got$value, "error")) next
+      expect_length(got$warnings, length(want$warnings))
+      for (i in seq_along(want$warnings)) {
+        expect_match(got$warnings[i], want$warnings[i], fixed = TRUE, info = label)
+      }
+      expect_equal(got$value$response, want$response, info = label)
+      expect_equal(nrow(got$value), length(want$response), info = label)
+      if (!is.null(want$integer)) {
+        expect_identical(is.integer(got$value$response), want$integer, info = label)
+      }
+    }
+  }
+})
+
+# The table squishes whitespace, so the paragraph break in ddm's two-part
+# advice is pinned here.
+test_that("ddm() keeps the blank line in its 0.100 s warning", {
+  case <- model_test_cases("rt_data")$ddm
+  expect_warning(
+    check_data(case$model, rt_check_data(rt = replace(rt_check_rt, 1, 0.05)), case$formula),
+    paste0(
+      "Your data contains reaction times smaller than 0.100 seconds.\n\n",
+      "It is likely that the model will not be able to sample with the current ",
+      "settings of the initial values.\n\n",
+      "Either pass your own initial value function or consider filtering ",
+      "reaction times below 0.100 seconds."
+    ),
+    fixed = TRUE
+  )
 })
