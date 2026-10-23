@@ -108,8 +108,13 @@ check_data.non_targets <- function(model, data, formula) {
   # stop at any set size; carry_fit_bounds() hands over the fit's bound. Only
   # revert_check_data() and check_newdata() set it, so data from bmm() and
   # update(newdata = ) is still checked against its own maximum
-  max_set_size <- attr(data, "fit_max_set_size") %||% ss$max_set_size
+  fit_max_set_size <- attr(data, "fit_max_set_size")
+  max_set_size <- fit_max_set_size %||% ss$max_set_size
   attr(data, "fit_max_set_size") <- NULL
+  # the models' own checks, which run after this one, learn it too
+  if (!is.null(fit_max_set_size)) {
+    attr(data, "checked_against_fit") <- TRUE
+  }
   ss_numeric <- ss$ss_numeric
 
   stopif(

@@ -333,9 +333,13 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
 # one check_data.mixture2p() uses for the same limit.
 #' @export
 check_data.mixture3p <- function(model, data, formula) {
+  # data checked against a fit, such as newdata for a prediction, may hold one
+  # set size; the warning below is about the data K is estimated from
+  against_fit <- isTRUE(attr(data, "checked_against_fit"))
+  attr(data, "checked_against_fit") <- NULL
   set_sizes <- unique(data$ss_numeric)
   warnif(
-    model$version != "simple" && length(set_sizes) == 1,
+    !against_fit && model$version != "simple" && length(set_sizes) == 1,
     "The set size does not vary, so the data cannot test the capacity rule of \\
     the '{model$version}' version. K is estimated from the responses at set \\
     size {set_sizes}, and reflects only its prior where it reaches {set_sizes}."
