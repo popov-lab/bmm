@@ -434,11 +434,23 @@ test_that("a variable-precision fit reaches the shape-bound warning after sampli
   )
   local_mocked_bindings(
     nuts_params = function(...) data.frame(Value = c(rep(1, 153), rep(0, 47))),
+    ndraws = function(...) 200L,
     .package = "brms"
   )
   expect_warning(postprocess_brm(model, fit), "153 transitions.*vp_nodes = 121")
   model$variable_precision <- FALSE
   expect_no_warning(postprocess_brm(model, fit))
+})
+
+# a stanfit can hold no draws (iter = warmup), and prepare_predictions() then fails
+test_that("the shape-bound check after sampling skips a fit without draws", {
+  model <- structure(list(variable_precision = TRUE, vp_nodes = 81L), class = "circular")
+  local_mocked_bindings(
+    has_draws = function(fit) TRUE,
+    .circmix_vp_shape_min = function(fit) stop("the draws were read")
+  )
+  local_mocked_bindings(ndraws = function(...) 0L, .package = "brms")
+  expect_no_error(postprocess_brm(model, list(algorithm = "sampling")))
 })
 
 test_that(".circmix_vp_shape_min() takes the minimum over every block of observations", {
