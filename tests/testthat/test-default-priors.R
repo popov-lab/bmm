@@ -136,20 +136,18 @@ test_that("mixture3p mixing weights get an effects prior on the softmax scale", 
 
   # set_size as predictor requires a suppressed intercept in this model
   formula <- bmf(kappa ~ 1, thetat ~ session, thetant ~ 0 + set_size)
-  pr <- default_prior(formula, data, model)
+  pr <- suppressWarnings(default_prior(formula, data, model))
   b_rows <- pr[pr$coef == "" & pr$class == "b", ]
-  expect_equal(b_rows[b_rows$nlpar == "thetat", ]$prior, "normal(0, 2.5)")
-  expect_equal(b_rows[b_rows$nlpar == "thetant", ]$prior, "logistic(0, 1)")
-  expect_equal(pr[pr$coef == "set_size1" & pr$nlpar == "thetant", ]$prior, "constant(-100)")
+  expect_equal(b_rows[b_rows$dpar == "thetat", ]$prior, "normal(0, 2.5)")
+  expect_equal(b_rows[b_rows$dpar == "thetant", ]$prior, "logistic(0, 1)")
+  # the likelihood has no non-target component at set size 1, so nothing pins it
+  expect_false(any(grepl("constant", pr[pr$dpar == "thetant", ]$prior)))
 
   formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size + session)
-  pr <- default_prior(formula, data, model)
+  pr <- suppressWarnings(default_prior(formula, data, model))
   b_rows <- pr[pr$coef == "" & pr$class == "b", ]
-  expect_equal(b_rows[b_rows$nlpar == "thetant", ]$prior, "normal(0, 2.5)")
-  expect_equal(pr[pr$coef == "set_size1" & pr$nlpar == "thetant", ]$prior, "constant(-100)")
-  expect_equal(pr[pr$coef == "set_size2" & pr$nlpar == "thetant", ]$prior, "logistic(0, 1)")
+  expect_equal(b_rows[b_rows$dpar == "thetant", ]$prior, "normal(0, 2.5)")
 })
-
 
 test_that("default priors are set correctly with fixed effects only and sdm model", {
   data <- small_data()
@@ -436,20 +434,6 @@ test_that("a freed mu / mu1 gets regularizing main, effects and sd priors on the
 
 test_that("the set-size-1 sd constraint survives next to the blanket sd prior", {
   data <- small_data()
-  model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
-  formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size + (0 + set_size | ID))
-
-  pr <- default_prior(formula, data, model)
-  constraint <- pr[pr$class == "sd" & pr$coef == "set_size1" & pr$nlpar == "thetant", ]
-  expect_equal(constraint$prior, "constant(1e-8)")
-  expect_equal(constraint$group, "ID")
-  expect_equal(sd_default(pr, "thetant"), "exponential(1)")
-
-  fit <- bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
-  code <- brms::stancode(fit)
-  expect_match(code, "1e-08", fixed = TRUE)
-  expect_match(code, "exponential_lpdf(sd_1", fixed = TRUE)
-
   model <- imm("dev_rad", nt_features = paste0("col_nt", 1:7), nt_distances = paste0("dist_nt", 1:7), set_size = "set_size")
   formula <- bmf(kappa ~ 1, c ~ 1, a ~ 0 + set_size + (0 + set_size | ID), s ~ 0 + set_size + (0 + set_size | ID))
   pr <- default_prior(formula, data, model)

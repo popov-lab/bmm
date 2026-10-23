@@ -198,9 +198,10 @@ test_that("a link the model does not pass on to the fit is refused", {
     mixture2p(resp_error = "y", links = list(kappa = "softplus")),
     "cannot be changed in mixture2p\\(\\)"
   )
+  # the softmax over mixture3p's weights is computed inside its likelihood
   expect_error(
     mixture3p(resp_error = "y", nt_features = "nt", set_size = "ss",
-              links = list(kappa = "softplus")),
+              links = list(thetat = "logit")),
     "cannot be changed in mixture3p\\(\\)"
   )
   # a simplex member and its stick-breaking component take the link of the
@@ -247,10 +248,6 @@ test_that("a refused model builds the same fit whatever its links say", {
     list(sdm("dev_rad"), bmf(c ~ 1, kappa ~ 1), "kappa"),
     list(mixture2p("dev_rad"), bmf(thetat ~ 1, kappa ~ 1), "kappa"),
     list(
-      mixture3p("dev_rad", nt_features = nt, set_size = "set_size"),
-      bmf(thetat ~ 1, thetant ~ 1, kappa ~ 1), "kappa"
-    ),
-    list(
       imm("dev_rad", nt_features = nt, nt_distances = paste0("dist_nt", 1:7),
           set_size = "set_size"),
       bmf(c ~ 1, a ~ 1, s ~ 1, kappa ~ 1), "c"
@@ -273,6 +270,21 @@ test_that("a custom link set on a model reaches the brms family", {
   )
   family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
   expect_equal(family$link_bound, "softplus")
+
+  dat <- oberauer_lin_2017
+  ff <- bmmformula(kappa ~ 1, K ~ 1, pnt ~ 1)
+  model <- mixture3p("dev_rad",
+    nt_features = paste0("col_nt", 1:7), set_size = "set_size", version = "slot",
+    links = list(kappa = "softplus", pnt = "probit")
+  )
+  family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
+  expect_equal(family$link_kappa, "softplus")
+  expect_equal(family$link_pnt, "probit")
+  # the softmax weights of the simple version reach brms untransformed
+  model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
+  family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
+  expect_equal(c(family$link_thetat, family$link_thetant), c("identity", "identity"))
 })
 
 test_that("links set after construction are checked by the pipeline", {
