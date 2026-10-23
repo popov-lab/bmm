@@ -249,3 +249,13 @@ if (make("bmmfit_legacy_sdm_v0.2.1.rds")) {
   attr(attr(legacy$data, "terms"), ".Environment") <- globalenv()
   save_fixture(legacy, "bmmfit_legacy_sdm_v0.2.1.rds", seed = 365)
 }
+
+# circmix_reference_loglik.rds (#434) is frozen, not generated: it holds the
+# log-likelihood of the brms::mixture() implementation of mixture2p, mixture3p
+# and imm at bmm 53fd780d (181 stratified rows of oberauer_lin_2017, five
+# posterior draws per default model version), which this tree no longer
+# contains, so that test-circmix-equivalence.R can hold the custom families to
+# it. Rebuilding it needs fits made with bmm at that commit.
+if (length(wanted) && make("circmix_reference_loglik.rds")) {
+  stop("circmix_reference_loglik.rds is frozen from bmm at 53fd780d and cannot be rebuilt from this tree")
+}

@@ -730,6 +730,42 @@ test_that("the Stan and R implementations of the shared core agree", {
   )
 })
 
+test_that("variable precision says what kappa means, in every model and version", {
+  models <- list(
+    mixture2p("y", variable_precision = TRUE),
+    mixture3p("y", "nt", "ss", version = "slot", variable_precision = TRUE),
+    imm("y", "nt", "d", "ss", variable_precision = TRUE)
+  )
+  for (model in models) {
+    expect_match(model$parameters$kappa, "Fisher information J(kappa) is the mean of J", fixed = TRUE)
+    expect_no_match(model$parameters$kappa, "..", fixed = TRUE)
+  }
+  # under slot averaging an item held in j slots has mean J j * J(kappa), so
+  # J(kappa) is the mean for one slot, not for a trial
+  slot_averaging <- list(
+    mixture2p("y", set_size = "ss", version = "slot_averaging", variable_precision = TRUE),
+    mixture3p("y", "nt", "ss", version = "slot_averaging", variable_precision = TRUE)
+  )
+  for (model in slot_averaging) {
+    expect_match(model$parameters$kappa, "mean Fisher information of one slot", fixed = TRUE)
+    expect_no_match(model$parameters$kappa, "mean of J across trials", fixed = TRUE)
+    expect_match(model$parameters$tau, "sum of j such draws", fixed = TRUE)
+    expect_no_match(model$parameters$kappa, "..", fixed = TRUE)
+  }
+  expect_no_match(mixture2p("y")$parameters$kappa, "variable precision")
+})
+
+test_that("the variable-precision quadrature names the node count it needs", {
+  # J(1) / 20 = 0.0223, and 2689 is the smallest odd count with 60 / nodes below it
+  expect_error(
+    dmixture2p(0.3, kappa = 1, tau = 20),
+    "smallest value here is 0.0223. Raise vp_nodes to at least 2689",
+    fixed = TRUE
+  )
+  expect_no_error(dmixture2p(0.3, kappa = 1, tau = 20, vp_nodes = 2689))
+  expect_error(dmixture2p(0.3, kappa = 1, tau = 20, vp_nodes = 2687), "at least 2689")
+})
+
 test_that("Stan rejects the same shapes as R, below 60 / nodes", {
   skip_unless_stan_tests()
   skip_on_cran()

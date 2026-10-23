@@ -90,7 +90,7 @@
                              vp_nodes = 81L, call = NULL, ...) {
   spec <- .mixture2p_version_table[[version]]
   if (variable_precision) {
-    spec <- .circmix_add_variable_precision(spec)
+    spec <- .circmix_add_variable_precision(spec, per_slot = version == "slot_averaging")
   }
 
   out <- structure(
@@ -109,11 +109,13 @@
         if (variable_precision) .circmix_vp_citation
       ),
       version = version,
-      requirements = glue(
-        "- The response variable should be in radians and represent the \\
-        angular error relative to the target", "\n",
-        "- The 'slot' and 'slot_averaging' versions additionally require a \\
-        set_size variable, which should vary for the capacity rule to be testable"
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the second requirement in the same list
+      requirements = paste0(
+        "- The response variable should be in radians and represent the ",
+        "angular error relative to the target\n",
+        "  - The 'slot' and 'slot_averaging' versions additionally require a ",
+        "set_size variable, which should vary for the capacity rule to be testable"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -134,7 +136,17 @@
 # user facing alias
 
 #' @title `r .model_mixture2p()$name`
-#' @details `r model_docs(.model_mixture2p())`
+#' @details `r model_docs(.model_mixture2p(variable_precision = TRUE), components = c('domain', 'task', 'name', 'citation', 'requirements'))`
+#' #### Version: `simple`
+#' `r model_docs(.model_mixture2p(version = "simple"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot`
+#' `r model_docs(.model_mixture2p(version = "slot"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot_averaging`
+#' `r model_docs(.model_mixture2p(version = "slot_averaging"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Variable precision
+#' With `variable_precision = TRUE` every version gains `tau`, and `kappa`
+#' becomes the precision of the average trial. Shown for `"simple"`:
+#' `r model_docs(.model_mixture2p(variable_precision = TRUE), components = c('parameters', 'links', 'prior'))`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -166,8 +178,9 @@
 #'   from trial to trial rather than being constant (van den Berg et al., 2012;
 #'   Fougnie et al., 2012). This adds the parameter `tau`, and the likelihood
 #'   integrates the Fisher information `J` of a memory representation over
-#'   `gamma(mean = J(kappa), scale = tau)`. `kappa` keeps its meaning as the
-#'   mean precision, so `tau -> 0` recovers the constant-precision model.
+#'   `gamma(mean = J(kappa), scale = tau)`. `kappa` then describes the average
+#'   trial: it is the concentration whose Fisher information `J(kappa)` is the
+#'   mean of `J`, and `tau -> 0` recovers the constant-precision model.
 #'   Under `version = "slot_averaging"`, the precision of an item held in `j`
 #'   slots is the sum of `j` independent slot draws,
 #'   `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance grows
@@ -195,6 +208,9 @@
 #'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 #'   Variability in encoding precision accounts for visual short-term memory
 #'   limitations. PNAS, 109(22), 8780-8785.
+#'
+#'   Fougnie, D., Suchow, J. W., & Alvarez, G. A. (2012). Variability in the
+#'   quality of visual working memory. Nature Communications, 3(1), 1229.
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data
 #' dat <- data.frame(y = rmixture2p(n = 2000))

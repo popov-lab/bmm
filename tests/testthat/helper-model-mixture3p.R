@@ -6,7 +6,7 @@ model_cases_mixture3p <- function() {
   capacity_vp <- mixture3p("dev_rad", nt_features = nt, set_size = "set_size",
                            version = "slot_averaging", variable_precision = TRUE)
   re_formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID), thetant ~ 1 + (1 | ID))
-  capacity_vp_formula <- bmf(kappa ~ 1 + (1 | ID), K ~ 1 + (1 | ID), pnt ~ 1 + (1 | ID),
+  capacity_vp_formula <- bmf(kappa ~ 1 + (1 | ID), K ~ 1 + (1 | ID), ptarget ~ 1 + (1 | ID),
                              tau ~ 1 + (1 | ID))
   list(
     # brms has no reason to keep set_size in the first case's frame; the second
@@ -19,7 +19,7 @@ model_cases_mixture3p <- function() {
                                 data = small_data()),
       mixture3p_slot = list(
         model = mixture3p("dev_rad", nt_features = nt, set_size = "set_size", version = "slot"),
-        formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1), data = small_data()
+        formula = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), data = small_data()
       )
     ),
     sd_default = list(
@@ -29,7 +29,7 @@ model_cases_mixture3p <- function() {
       ),
       mixture3p_slot_averaging_vp = list(
         model = capacity_vp, formula = capacity_vp_formula, data = small_data(),
-        sd = c(kappa = "exponential(1)", K = "exponential(2)", pnt = "exponential(1)",
+        sd = c(kappa = "exponential(1)", K = "exponential(2)", ptarget = "exponential(1)",
                tau = "exponential(2)")
       )
     ),
@@ -42,7 +42,7 @@ model_cases_mixture3p <- function() {
     links = list(
       mixture3p = list(model = model, settable = c("mu", "kappa")),
       mixture3p_slot_averaging_vp = list(
-        model = capacity_vp, settable = c("mu", "kappa", "tau", "K", "pnt")
+        model = capacity_vp, settable = c("mu", "kappa", "tau", "K", "ptarget")
       )
     )
   )

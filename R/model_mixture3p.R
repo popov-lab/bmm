@@ -31,12 +31,12 @@
   mu = .mixture3p_location_prior,
   kappa = .mixture3p_kappa_prior,
   K = list(main = "normal(1, 0.5)", effects = "normal(0, 0.3)", sd = "exponential(2)"),
-  pnt = list(main = "logistic(-1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+  ptarget = list(main = "logistic(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
 )
 
 # central 50% of the main default prior on the native scale
 .mixture3p_capacity_inits <- list(
-  mu = c(-0.65, 0.65), kappa = c(3.8, 15), K = c(1.9, 3.8), pnt = c(0.11, 0.52)
+  mu = c(-0.65, 0.65), kappa = c(3.8, 15), K = c(1.9, 3.8), ptarget = c(0.48, 0.89)
 )
 
 .mixture3p_version_table <- list(
@@ -52,7 +52,10 @@
         on a trial, with guessing as the reference, so thetat maps to the \\
         probability of a target response only jointly with thetant."
       ),
-      thetant = "Mixture weight for non-target responses"
+      thetant = glue(
+        "Mixture weight for non-target responses, summed over the non-targets, \\
+        which share it equally. Like thetat, it is weighed against guessing."
+      )
     ),
     links = list(
       mu = "tan_half", kappa = "log", thetat = "softmax", thetant = "softmax"
@@ -74,8 +77,8 @@
     )
   ),
   slot = list(
-    weight_parameters = c("K", "pnt"),
-    swap_parameter = "pnt",
+    weight_parameters = c("K", "ptarget"),
+    swap_parameter = "ptarget",
     parameters = list(
       mu = .mixture3p_location,
       kappa = "Concentration of the von Mises distribution of memory responses",
@@ -84,18 +87,18 @@
         either held at full precision or not held at all, so the probability \\
         that a response comes from memory is min(1, K / set_size)."
       ),
-      pnt = glue(
-        "Probability that a response reports a non-target rather than the \\
-        target, given that it comes from memory."
+      ptarget = glue(
+        "Probability that a response reports the target rather than a \\
+        non-target, given that it comes from memory."
       )
     ),
-    links = list(mu = "tan_half", kappa = "log", K = "log", pnt = "logit"),
+    links = list(mu = "tan_half", kappa = "log", K = "log", ptarget = "logit"),
     priors = .mixture3p_capacity_priors,
     init_ranges = .mixture3p_capacity_inits
   ),
   slot_averaging = list(
-    weight_parameters = c("K", "pnt"),
-    swap_parameter = "pnt",
+    weight_parameters = c("K", "ptarget"),
+    swap_parameter = "ptarget",
     parameters = list(
       mu = .mixture3p_location,
       kappa = glue(
@@ -108,12 +111,12 @@
         the array. An item receives floor(K / set_size) or one more slot, and \\
         an item that receives none is guessed."
       ),
-      pnt = glue(
-        "Probability that a response reports a non-target rather than the \\
-        target, given that it comes from memory."
+      ptarget = glue(
+        "Probability that a response reports the target rather than a \\
+        non-target, given that it comes from memory."
       )
     ),
-    links = list(mu = "tan_half", kappa = "log", K = "log", pnt = "logit"),
+    links = list(mu = "tan_half", kappa = "log", K = "log", ptarget = "logit"),
     priors = .mixture3p_capacity_priors,
     init_ranges = .mixture3p_capacity_inits
   )
@@ -125,7 +128,7 @@
                              call = NULL, ...) {
   spec <- .mixture3p_version_table[[version]]
   if (variable_precision) {
-    spec <- .circmix_add_variable_precision(spec)
+    spec <- .circmix_add_variable_precision(spec, per_slot = version == "slot_averaging")
   }
 
   out <- structure(
@@ -141,11 +144,15 @@
         if (variable_precision) .circmix_vp_citation
       ),
       version = version,
-      requirements = glue(
-        "- The response vairable should be in radians and \\
-        represent the angular error relative to the target
-        - The non-target features should be in radians and be \\
-        centered relative to the target"
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the requirements in one list
+      requirements = paste0(
+        "- The response variable should be in radians and represent the ",
+        "angular error relative to the target\n",
+        "  - The non-target features should be in radians and be centered ",
+        "relative to the target\n",
+        "  - In the 'slot' and 'slot_averaging' versions, the set size should ",
+        "vary for the capacity rule to be testable"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -179,7 +186,17 @@ settable_links.mixture3p <- function(model) {
 
 # user facing alias
 #' @title `r .model_mixture3p()$name`
-#' @details `r model_docs(.model_mixture3p())`
+#' @details `r model_docs(.model_mixture3p(version = "slot", variable_precision = TRUE), components = c('domain', 'task', 'name', 'citation', 'requirements'))`
+#' #### Version: `simple`
+#' `r model_docs(.model_mixture3p(version = "simple"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot`
+#' `r model_docs(.model_mixture3p(version = "slot"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Version: `slot_averaging`
+#' `r model_docs(.model_mixture3p(version = "slot_averaging"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
+#' #### Variable precision
+#' With `variable_precision = TRUE` every version gains `tau`, and `kappa`
+#' becomes the precision of the average trial. Shown for `"simple"`:
+#' `r model_docs(.model_mixture3p(variable_precision = TRUE), components = c('parameters', 'links', 'prior'))`
 #' @param resp_error The name of the variable in the dataset containing
 #'   the response error. The response error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -191,7 +208,9 @@ settable_links.mixture3p <- function(model) {
 #'   dataset.
 #' @param set_size Name of the column containing the set size variable (if
 #'   set_size varies) or a numeric value for the set_size, if the set_size is
-#'   fixed.
+#'   fixed. In the `"slot"` and `"slot_averaging"` versions a single set size
+#'   cannot test the capacity rule: `K` is then estimated from the responses at
+#'   that set size, and only below it.
 #' @param regex Logical. If TRUE, the `nt_features` argument is interpreted as
 #'  a regular expression to match the non-target feature columns in the dataset.
 #' @param version A character string specifying which version of the model to
@@ -203,21 +222,26 @@ settable_links.mixture3p <- function(model) {
 #'       with guessing as the reference.
 #'     \item `"slot"`: the probability that a response comes from memory follows
 #'       the fixed-resolution slot model of Zhang and Luck (2008),
-#'       `min(1, K / set_size)`, and `pnt` is the probability that a remembered
-#'       response reports a non-target.
+#'       `min(1, K / set_size)`, and `ptarget` is the probability that a
+#'       remembered response reports the target rather than a non-target.
 #'     \item `"slot_averaging"`: as `"slot"`, but `K` slots are distributed over
 #'       the items and precision grows with the number of slots an item holds.
 #'   }
 #'   Storage and swapping are separate in the capacity versions: the capacity
-#'   rule says how often a response comes from memory and `pnt` says which
-#'   stored item is reported. In `"simple"` the two are jointly constrained by
-#'   the shared normalisation, so neither weight is separately interpretable.
+#'   rule says how often a response comes from memory and `ptarget` says which
+#'   stored item is reported. In `"simple"` both weights are log odds against
+#'   guessing, `thetat` for the target and `thetant` for all non-targets
+#'   together, so neither is a probability on its own; [native_parameters()]
+#'   returns the probabilities.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
-#'   from trial to trial (van den Berg et al., 2012). See [mixture2p()] for
-#'   details of the parameterisation. Under `version = "slot_averaging"`, the
-#'   precision of an item held in `j` slots is the sum of `j` independent slot
-#'   draws, `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance
-#'   grows with `j`.
+#'   from trial to trial (van den Berg et al., 2012). This adds the parameter
+#'   `tau`, and `kappa` then describes the average trial: it is the
+#'   concentration whose Fisher information `J(kappa)` is the mean of `J`. See
+#'   [mixture2p()] for details of the parameterisation. Under
+#'   `version = "slot_averaging"`, the precision of an item held in `j` slots
+#'   is the sum of `j` independent slot draws,
+#'   `gamma(shape = j * J(kappa) / tau, scale = tau)`, so its variance grows
+#'   with `j`.
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41, and
 #'   defaults to 81. See [mixture2p()] for the accuracy this gives.
@@ -229,10 +253,14 @@ settable_links.mixture3p <- function(model) {
 #' @keywords bmmodel
 #' @references Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
 #'   precision of visual working memory is set by allocation of a shared
-#'   resource. Journal of Vision, 9(10), 1-11.
+#'   resource. Journal of Vision, 9(10), Article 7.
 #'
 #'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
 #'   in visual working memory. Nature, 453(7192), 233-235.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #' @export
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # generate artificial data from the Bays et al (2009) 3-parameter mixture model
@@ -295,6 +323,27 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
     regex = regex, version = version, variable_precision = variable_precision,
     vp_nodes = vp_nodes, links = links, call = call, ...
   )
+}
+
+############################################################################# !
+# CHECK_DATA METHODS                                                     ####
+############################################################################# !
+
+# check_data.non_targets() runs first and adds ss_numeric. The wording is the
+# one check_data.mixture2p() uses for the same limit.
+#' @export
+check_data.mixture3p <- function(model, data, formula) {
+  # newdata for a prediction may hold one set size; the warning below is about
+  # the data K is estimated from, which a refit from the fit's frame still is
+  for_prediction <- isTRUE(attr(data, "prediction_newdata"))
+  set_sizes <- unique(data$ss_numeric)
+  warnif(
+    !for_prediction && model$version != "simple" && length(set_sizes) == 1,
+    "The set size does not vary, so the data cannot test the capacity rule of \\
+    the '{model$version}' version. K is estimated from the responses at set \\
+    size {set_sizes}, and reflects only its prior where it reaches {set_sizes}."
+  )
+  NextMethod("check_data")
 }
 
 ############################################################################# !
@@ -416,7 +465,7 @@ log_lik_mixture3p_slot <- function(i, prep) {
     mu = brms::get_dpar(prep, "mu", i = i),
     kappa = brms::get_dpar(prep, "kappa", i = i),
     K = brms::get_dpar(prep, "K", i = i),
-    p_nt = brms::get_dpar(prep, "pnt", i = i),
+    p_target = brms::get_dpar(prep, "ptarget", i = i),
     set_size = prep$data$vint1[i], nt = .circmix_prep_nt(prep, i),
     tau = .circmix_prep_tau(prep, i), nodes = .circmix_prep_nodes(prep)
   )
@@ -428,7 +477,7 @@ log_lik_mixture3p_slot_averaging <- function(i, prep) {
     mu = brms::get_dpar(prep, "mu", i = i),
     kappa = brms::get_dpar(prep, "kappa", i = i),
     K = brms::get_dpar(prep, "K", i = i),
-    p_nt = brms::get_dpar(prep, "pnt", i = i),
+    p_target = brms::get_dpar(prep, "ptarget", i = i),
     set_size = prep$data$vint1[i], nt = .circmix_prep_nt(prep, i),
     tau = .circmix_prep_tau(prep, i), nodes = .circmix_prep_nodes(prep)
   )
@@ -450,7 +499,7 @@ posterior_predict_mixture3p_slot <- function(i, prep, ...) {
   set_size <- prep$data$vint1[i]
   weights <- .mixture3p_nested_weights(
     pmin(1, brms::get_dpar(prep, "K", i = i) / set_size),
-    brms::get_dpar(prep, "pnt", i = i), set_size
+    brms::get_dpar(prep, "ptarget", i = i), set_size
   )
   .rmixture3p(
     brms::get_dpar(prep, "mu", i = i), .circmix_prep_nt(prep, i), set_size,
@@ -464,7 +513,7 @@ posterior_predict_mixture3p_slot_averaging <- function(i, prep, ...) {
     nt = .circmix_prep_nt(prep, i), set_size = prep$data$vint1[i],
     kappa = brms::get_dpar(prep, "kappa", i = i),
     K = brms::get_dpar(prep, "K", i = i),
-    p_nt = brms::get_dpar(prep, "pnt", i = i),
+    p_target = brms::get_dpar(prep, "ptarget", i = i),
     tau = .circmix_prep_tau(prep, i)
   )
 }

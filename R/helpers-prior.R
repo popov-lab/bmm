@@ -96,12 +96,13 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'
 #'   Parameters that exist only because the family machinery requires them are
 #'   omitted: a fixed parameter the model does not declare (the `mu` brms
-#'   forces on the custom families of the response-time models, or the `mu2`
-#'   and `kappa2` of a two-component `brms::mixture()` family), and the
-#'   mixture-weight reference component `theta2`, which brms lists with a
-#'   default prior although the sampler holds it at zero. Fixed parameters the
-#'   model does declare are reported, since the user can estimate them: `mu`
-#'   for `sdm()` and the circular mixture models, `zr` for `ddm()`.
+#'   forces on the custom families of the response-time models, or, in fits
+#'   saved before bmm 1.5.0, the `mu2` and `kappa2` of a two-component
+#'   `brms::mixture()` family), and the mixture-weight reference component
+#'   `theta2` of those fits, which brms lists with a default prior although the
+#'   sampler holds it at zero. Fixed parameters the model does declare are
+#'   reported, since the user can estimate them: `mu` for `sdm()` and the
+#'   circular mixture models, `zr` for `ddm()`.
 #' @return A `data.frame` of class `bmm_prior_info` with columns
 #'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
 #'   Subsetting the report with `[` returns a plain `data.frame`, as the
