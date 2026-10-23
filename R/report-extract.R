@@ -218,9 +218,16 @@ current_constructor <- function(model) {
   if (is.na(name)) {
     return(NULL)
   }
+  constructor <- get_model(name)
+  # the circular mixture models cite the variable-precision source only when
+  # the model uses it
+  args <- list()
+  if ("variable_precision" %in% names(formals(constructor))) {
+    args$variable_precision <- isTRUE(model$variable_precision)
+  }
   versions <- model_versions(name)
   if (all(model$version %in% c(NA, "NA", "")) || all(is.na(versions))) {
-    return(get_model(name)())
+    return(do.call(constructor, args))
   }
-  if (model$version %in% versions) get_model(name)(version = model$version)
+  if (model$version %in% versions) do.call(constructor, c(list(version = model$version), args))
 }

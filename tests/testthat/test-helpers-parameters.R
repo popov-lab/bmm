@@ -201,6 +201,15 @@ test_that(".is_softmax_param detects mixture3p softmax params", {
   expect_false(.is_softmax_param("kappa", model))
 })
 
+test_that(".is_softmax_param returns FALSE for the capacity-limited versions", {
+  # these parameterise the weights directly rather than through a softmax
+  for (version in c("slot", "slot_averaging")) {
+    model <- .model_mixture3p(version = version)
+    expect_false(.is_softmax_param("K", model))
+    expect_false(.is_softmax_param("pnt", model))
+  }
+})
+
 test_that(".is_softmax_param returns FALSE for non-mixture3p models", {
   expect_false(.is_softmax_param("thetat", .model_mixture2p()))
   expect_false(.is_softmax_param("kappa", .model_sdm()))
@@ -416,11 +425,11 @@ test_that("every link declared by a supported model can be transformed", {
 test_that("native_transform inverts the tan_half link at non-zero values", {
   model <- .model_mixture2p()
   eta <- matrix(c(-3, -1, 0, 0.5, 2, 7), nrow = 2)
-  out <- native_transform(model, list(mu1 = eta), data.frame())
+  out <- native_transform(model, list(mu = eta), data.frame())
 
-  expect_equal(out$mu1, 2 * atan(eta))
-  expect_false(isTRUE(all.equal(out$mu1, eta)))
-  expect_true(all(abs(out$mu1) < pi))
+  expect_equal(out$mu, 2 * atan(eta))
+  expect_false(isTRUE(all.equal(out$mu, eta)))
+  expect_true(all(abs(out$mu) < pi))
 })
 
 test_that("native_transform errors when a softmax group is incomplete", {
@@ -461,7 +470,7 @@ test_that("native_transform.non_targets preserves names and dimensions", {
   model <- .model_mixture3p()
   data <- data.frame(LureIdx1 = c(0, 1))
   linpred <- list(
-    mu1 = matrix(0.3, 4, 2),
+    mu = matrix(0.3, 4, 2),
     kappa = matrix(1.1, 4, 2),
     thetat = matrix(0.8, 4, 2),
     thetant = matrix(-0.4, 4, 2)
@@ -470,7 +479,7 @@ test_that("native_transform.non_targets preserves names and dimensions", {
 
   expect_setequal(names(out), names(linpred))
   expect_equal(lapply(out[names(linpred)], dim), lapply(linpred, dim))
-  expect_equal(out$mu1, 2 * atan(linpred$mu1))
+  expect_equal(out$mu, 2 * atan(linpred$mu))
   expect_equal(out$kappa, exp(linpred$kappa))
 })
 

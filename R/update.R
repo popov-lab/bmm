@@ -407,19 +407,33 @@ revert_check_data.mpt <- function(model, data) {
 revert_check_data.non_targets <- function(model, data) {
   set_size <- model$other_vars$set_size
   # brms keeps the set_size column only when a formula predicts something with
-  # it; LureIdx1..n is the step function check_data() built from it, so its row
-  # sums give the set size of each row back, as .np_lure_free_rows() also does.
-  # The names come from nt_features rather than from a pattern match, because a
-  # user column called LureIdx9 that a formula kept would be summed in too and
-  # the set sizes it shifts are legal integers that nothing downstream rejects
+  # it. A circmix family reads the set size from vint(ss_numeric), so the frame
+  # holds it. Fits made on brms mixtures hold only LureIdx1..n, the step function
+  # check_data() built from it, whose row sums give the set size back. Those
+  # names come from nt_features rather than from a pattern match, because a user
+  # column called LureIdx9 that a formula kept would be summed in too and the set
+  # sizes it shifts are legal integers that nothing downstream rejects
   if (is.character(set_size) && not_in(set_size, colnames(data))) {
-    data[[set_size]] <- 1 + rowSums(
+    data[[set_size]] <- data[["ss_numeric"]] %||% (1 + rowSums(
       data[paste0("LureIdx", seq_along(model$other_vars$nt_features))]
-    )
+    ))
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
   # brms may have dropped the rows of the largest set size from the frame (#459)
   data <- carry_fit_bounds(model, data)
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.mixture2p <- function(model, data) {
+  set_size <- model$other_vars$set_size
+  # brms keeps the set_size column only when a formula predicts something with
+  # it; ss_numeric is check_data()'s numeric copy, kept for the vint() term
+  if (is.character(set_size) && not_in(set_size, colnames(data)) &&
+    "ss_numeric" %in% colnames(data)) {
+    data[[set_size]] <- data$ss_numeric
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
+  }
   NextMethod("revert_check_data")
 }
 

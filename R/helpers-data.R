@@ -52,15 +52,9 @@ built_data_columns.default <- function(model) {
   character(0)
 }
 
-# inv_ss and ss_numeric are built whatever the set sizes; the LureIdx step
-# functions are one per non-target feature
 #' @exportS3Method
 built_data_columns.non_targets <- function(model) {
-  c(
-    paste0("LureIdx", seq_along(model$other_vars$nt_features)),
-    "inv_ss", "ss_numeric",
-    NextMethod("built_data_columns")
-  )
+  c("ss_numeric", NextMethod("built_data_columns"))
 }
 
 #' @export
@@ -129,19 +123,12 @@ check_data.non_targets <- function(model, data, formula) {
     'nt_features' should equal max(set_size)-1"
   )
 
-  # create index variables for nt_features and correction variable for theta due to set_size
-  lure_idx_vars <- paste0("LureIdx", 1:(max_set_size - 1))
-  for (i in 1:(max_set_size - 1)) {
-    data[[lure_idx_vars[i]]] <- ifelse(ss_numeric >= (i + 1), 1, 0)
-  }
   data$ss_numeric <- ss_numeric
-  data$inv_ss <- 1 / (ss_numeric - 1)
-  data$inv_ss <- ifelse(is.infinite(data$inv_ss), 1, data$inv_ss)
+  # the likelihood reads only as many non-target columns as a trial's set size
+  # has, so the padding value never enters it; it only has to not be missing
   data[, nt_features][is.na(data[, nt_features])] <- 0
 
-  # save some variables for later use
   attr(data, "max_set_size") <- max_set_size
-  attr(data, "lure_idx_vars") <- lure_idx_vars
 
   NextMethod("check_data")
 }
@@ -443,11 +430,15 @@ lacks_built_columns <- function(object, newdata) {
 
 # brms returns predictions in the rows of newdata, so the data are not sorted,
 # and a check_data() method that dropped or reordered rows would misalign them
-# without an error
+# without an error. The `prediction_newdata` mark tells the checks that warn
+# about what the data can estimate (one set size for a capacity rule) that
+# nothing is estimated from these data; it lives only for this check_data() call
 check_newdata <- function(object, newdata) {
   withr::local_options(bmm.sort_data = FALSE)
   newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata))
+  attr(newdata, "prediction_newdata") <- TRUE
   checked <- check_data(object$bmm$model, newdata, object$bmm$user_formula)
+  attr(checked, "prediction_newdata") <- NULL
   stopif(
     !identical(row.names(checked), row.names(newdata)),
     "Preparing 'newdata' for this model changed its rows. Please report this \\

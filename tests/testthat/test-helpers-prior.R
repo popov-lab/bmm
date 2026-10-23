@@ -64,17 +64,18 @@ test_that("combine_prior() lets a prior on a whole nlpar replace its intercept p
   expect_equal(nrow(combine_prior(dpar_default, dpar_user)), 2)
 })
 
-test_that("a user prior on a non-linear parameter reaches its intercept (#526)", {
+test_that("a user intercept prior on a distributional parameter replaces the default (#526)", {
   skip_on_cran()
+  # mixture2p's parameters are dpars, whose intercept is its own class; the
+  # nlpar case of #526 is the mpt test below
   withr::local_seed(445)
   dat <- data.frame(y = rmixture2p(n = 100), cond = rep(c("a", "b"), 50))
-  user <- brms::set_prior("normal(0, 2)", class = "b", nlpar = "kappa")
+  user <- brms::set_prior("normal(0, 2)", class = "Intercept", dpar = "kappa")
 
   for (formula in list(bmf(kappa ~ 1, thetat ~ 1), bmf(kappa ~ 1 + cond, thetat ~ 1))) {
     code <- suppressMessages(stancode(formula, dat, mixture2p(resp_error = "y"), prior = user))
-    # one prior for every coefficient of kappa, so brms vectorizes it
-    expect_match(code, "normal_lpdf(b_kappa | 0, 2)", fixed = TRUE)
-    expect_no_match(code, "normal_lpdf(b_kappa[1] | 2, 1)", fixed = TRUE)
+    expect_match(code, "normal_lpdf(Intercept_kappa | 0, 2)", fixed = TRUE)
+    expect_no_match(code, "normal_lpdf(Intercept_kappa | 2, 1)", fixed = TRUE)
   }
 
   expect_no_warning(suppressMessages(
@@ -435,7 +436,7 @@ test_that("prior_info() omits the technical parameters of mixture families", {
   # reference the sampler holds at zero; none of them is a model parameter
   expect_false(any(c("mu2", "kappa2") %in% out$parameter))
   expect_false(any(grepl("^theta[0-9]+$", out$class)))
-  expect_setequal(out$parameter, c("kappa", "thetat", "mu1"))
+  expect_setequal(out$parameter, c("kappa", "thetat", "mu"))
 
   text <- paste(capture.output(print(prior_info(fit, format = "text"))), collapse = " ")
   expect_false(grepl("kappa2|mu2|theta2", text))

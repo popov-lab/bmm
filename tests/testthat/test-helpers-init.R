@@ -67,6 +67,26 @@ test_that("create_initfun returns a function with random-effects inits for mixtu
     thetat ~ 0 + set_size + (0 + set_size | ID)
   )
   expect_re_inits(configured_initfun(model, formula, dat)())
+
+  # the init ranges are on the native scale and reach Stan on the link scale
+  inits <- init_fun()
+  expect_true(exp(inits$Intercept_kappa) >= 3.8 && exp(inits$Intercept_kappa) <= 15)
+  expect_true(
+    stats::plogis(inits$Intercept_thetat) >= 0.25 &&
+      stats::plogis(inits$Intercept_thetat) <= 0.75
+  )
+})
+
+test_that("create_initfun keeps the variable-precision gamma shape integrable", {
+  dat <- oberauer_lin_2017
+  model <- mixture2p(resp_error = "dev_rad", variable_precision = TRUE)
+  init_fun <- configured_initfun(model, bmf(thetat ~ 1, kappa ~ 1, tau ~ 1), dat)
+
+  shapes <- replicate(50, {
+    inits <- init_fun()
+    .circmix_J(exp(inits$Intercept_kappa)) / exp(inits$Intercept_tau)
+  })
+  expect_true(all(shapes > 60 / model$vp_nodes))
 })
 
 test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {
@@ -549,7 +569,8 @@ test_that("imm and mixture3p get random-effects inits", {
     kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 1,
     thetant ~ 0 + set_size + (0 + set_size | ID)
   )
-  expect_re_inits(configured_initfun(mix3p_model, slopes, dat)())
+  # set size 1 has no non-target, which mixture3p warns about for thetant
+  expect_re_inits(suppressWarnings(configured_initfun(mix3p_model, slopes, dat))())
 })
 
 test_that("the init list names every parameter of the Stan model and nothing else", {
@@ -562,8 +583,17 @@ test_that("the init list names every parameter of the Stan model and nothing els
         thetat ~ 0 + set_size + (0 + set_size | ID)
       )
     ),
-    # set size 1 pins thetant and its sd to constants, which brms implements by
-    # replacing the vectors b_thetant and sd_3 with per-coefficient scalars
+    list(
+      model = mixture3p("dev_rad",
+        nt_features = paste0("col_nt", 1:7), set_size = "set_size",
+        version = "slot_averaging", variable_precision = TRUE
+      ),
+      formula = bmf(
+        kappa ~ 1 + (1 | ID), tau ~ 1, K ~ 1 + (1 | ID), pnt ~ 1 + (1 | ID)
+      )
+    ),
+    # nothing pins the set-size-1 level of thetant any more, so b_thetant and its
+    # sd stay vectors rather than per-coefficient scalars
     list(
       model = mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
       formula = bmf(
@@ -573,18 +603,17 @@ test_that("the init list names every parameter of the Stan model and nothing els
       )
     )
   )
-  for (case in cases) {
+  # set size 1 has no non-target, which mixture3p warns about for thetant
+  for (case in cases) suppressWarnings({
     spars <- stan_parameter_names(case$model, case$formula, dat)
     inits <- configured_initfun(case$model, case$formula, dat)()
     expect_setequal(names(inits), spars)
-  }
-  expect_true(any(grepl("^par_b_thetant_", spars)))
-  par_sd <- unlist(inits[grep("^par_sd_", names(inits))])
-  expect_gt(length(par_sd), 0)
-  expect_true(all(par_sd >= 0.05 & par_sd <= 0.1))
-  par_b <- unlist(inits[grep("^par_b_thetant_", names(inits))])
-  expect_true(all(abs(par_b) <= 1.1))
-  sdata <- standata(cases[[2]]$formula, dat, cases[[2]]$model)
+  })
+  expect_false(any(grepl("^par_b_thetant_", spars)))
+  expect_length(inits$b_thetant, 8)
+  # the softmax weights take their init range on the sampling scale
+  expect_true(all(abs(inits$b_thetant) <= 1.1))
+  sdata <- suppressWarnings(standata(cases[[3]]$formula, dat, cases[[3]]$model))
   expect_length(inits$b_kappa, sdata$K_kappa)
   expect_equal(dim(inits$z_1), c(sdata$M_1, sdata$N_1))
 })
@@ -623,19 +652,21 @@ test_that("mixture2p starts inside the central 50% of its default priors", {
   model <- mixture2p("dev_rad")
   ranges <- model$init_ranges
   expect_equal(ranges$kappa, central_range(2, 1, exp))
-  expect_equal(ranges$mu1, central_range(0, 0.5, function(x) 2 * atan(x)))
+  expect_equal(ranges$mu, central_range(0, 0.5, function(x) 2 * atan(x)))
   expect_equal(ranges$thetat, signif(stats::plogis(c(-1, 1) * stats::qlogis(0.75)), 2))
 
-  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + set_size, mu1 ~ 1)
+  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + set_size, mu ~ 1)
   init_fun <- configured_initfun(model, formula, dat)
   for (i in 1:20) {
     inits <- init_fun()
-    # nlpars carry their intercept in the first coefficient
-    expect_true(inits$b_kappa[1] >= log(ranges$kappa[1]) && inits$b_kappa[1] <= log(ranges$kappa[2]))
-    expect_true(inits$b_thetat[1] >= stats::qlogis(ranges$thetat[1]) &&
-      inits$b_thetat[1] <= stats::qlogis(ranges$thetat[2]))
-    expect_true(all(abs(inits$b_thetat[-1]) <= 0.1))
-    expect_true(abs(inits$Intercept_mu1) <= tan(ranges$mu1[2] / 2))
+    # dpars carry their intercept separately from the coefficients
+    expect_true(inits$Intercept_kappa >= log(ranges$kappa[1]) &&
+      inits$Intercept_kappa <= log(ranges$kappa[2]))
+    expect_true(inits$Intercept_thetat >= stats::qlogis(ranges$thetat[1]) &&
+      inits$Intercept_thetat <= stats::qlogis(ranges$thetat[2]))
+    expect_true(all(abs(inits$b_thetat) <= 0.1))
+    # brms names the intercept of the custom family's first parameter, mu, plainly
+    expect_true(abs(inits$Intercept) <= tan(ranges$mu[2] / 2))
   }
 })
 
@@ -647,8 +678,8 @@ test_that("mixture3p softmax weights start inside their range on the sampling sc
   init_fun <- configured_initfun(model, formula, small_data())
   for (i in 1:20) {
     inits <- init_fun()
-    expect_true(abs(inits$b_thetat[1]) <= 1.1)
-    expect_true(abs(inits$b_thetant[1]) <= 1.1)
+    expect_true(abs(inits$Intercept_thetat) <= 1.1)
+    expect_true(abs(inits$Intercept_thetant) <= 1.1)
   }
 })
 
@@ -657,7 +688,7 @@ test_that("imm versions carry ranges for exactly their parameters", {
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
   )$init_ranges
-  expect_setequal(names(ranges), c("mu1", "kappa", "a", "c", "s"))
+  expect_setequal(names(ranges), c("mu", "kappa", "a", "c", "s", "b"))
   expect_equal(ranges$a, central_range(0, 1, exp))
   expect_equal(ranges$c, ranges$a)
   expect_equal(ranges$s, ranges$a)
@@ -665,12 +696,12 @@ test_that("imm versions carry ranges for exactly their parameters", {
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     set_size = "set_size", version = "abc"
   )$init_ranges
-  expect_setequal(names(abc), c("mu1", "kappa", "a", "c"))
+  expect_setequal(names(abc), c("mu", "kappa", "a", "c", "b"))
   bsc <- imm(
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     nt_distances = paste0("dist_nt", 1:7), set_size = "set_size", version = "bsc"
   )$init_ranges
-  expect_setequal(names(bsc), c("mu1", "kappa", "c", "s"))
+  expect_setequal(names(bsc), c("mu", "kappa", "c", "s", "b"))
 })
 
 # =============================================================================
@@ -856,10 +887,11 @@ test_that("every init has the shape its Stan declaration asks for", {
   mix3p <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
   # size-1 coefficient vectors, which rstan cannot read from a bare number
   expect_stan_shapes(mixture2p("dev_rad"), bmf(kappa ~ 1, thetat ~ 1 + set_size), dat)
-  # per-coefficient scalars and uncorrelated random effects
-  expect_stan_shapes(mix3p, bmf(
+  # uncorrelated random effects; set size 1 has no non-target, which
+  # mixture3p warns about for thetant
+  suppressWarnings(expect_stan_shapes(mix3p, bmf(
     kappa ~ 1, thetat ~ 0 + set_size + (0 + set_size || ID), thetant ~ 0 + set_size
-  ), dat)
+  ), dat))
   # the main dpar's coefficients and a Stan intercept
   expect_stan_shapes(sdm("dev_rad"), bmf(mu ~ 0 + set_size, c ~ 1 + set_size, kappa ~ 1), dat)
   # one correlation matrix per level of a gr(by = ) variable

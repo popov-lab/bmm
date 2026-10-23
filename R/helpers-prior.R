@@ -20,7 +20,7 @@
 #'   slopes alike) and replaces the `student_t(3, 0, 2.5)` default of `brms`. To
 #'   override it, address the parameter with `dpar` or `nlpar` in
 #'   [brms::set_prior()], e.g. `set_prior("exponential(2)", class = "sd",
-#'   nlpar = "kappa")`.
+#'   dpar = "kappa")`.
 #'
 #'   Correlations among random effects belong to a grouping factor rather than to
 #'   one parameter, so they get a single default for the whole model: `lkj(2)`
@@ -101,7 +101,7 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'   mixture-weight reference component `theta2`, which brms lists with a
 #'   default prior although the sampler holds it at zero. Fixed parameters the
 #'   model does declare are reported, since the user can estimate them: `mu`
-#'   for `sdm()`, `mu1` for the circular mixture models, `zr` for `ddm()`.
+#'   for `sdm()` and the circular mixture models, `zr` for `ddm()`.
 #' @return A `data.frame` of class `bmm_prior_info` with columns
 #'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
 #'   Subsetting the report with `[` returns a plain `data.frame`, as the
@@ -227,7 +227,7 @@ prior_provenance <- function(fit) {
 #   - fixed parameters the model never declares: the mu that brms forces on
 #     every custom family (the response-time models), and the second-component
 #     mu2/kappa2 of a brms::mixture() family. Fixed parameters the model does
-#     declare (sdm's mu, mixture2p's mu1) are real and stay.
+#     declare (sdm's and mixture2p's mu) are real and stay.
 #   - the mixture-weight reference component: brms reports a default prior for
 #     the theta<k> it did not linearly predict, but the generated Stan code
 #     sets it to rep_vector(0.0, N) as the softmax reference, so the prior is
@@ -481,8 +481,8 @@ upfirst <- function(x) {
 #' parameters should be fixed to a constant and put the appropriate constant
 #' priors. Any additional priors that a developer wants to specify, which are
 #' not based on information in the model object, can be defined in the
-#' configure_prior.* method for the model. See configure_prior.imm_full for an
-#' example.
+#' configure_prior.* method for the model, as `mpt` does; the example shows
+#' the form such a method takes.
 #' @param model A `bmmodel` object
 #' @param data A data.frame containing the data used in the model
 #' @param formula A `brmsformula` object returned from configure_model()
@@ -495,41 +495,12 @@ upfirst <- function(x) {
 #' @export
 #'
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
-#' configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
-#'   # if there is set_size 1 in the data, set constant prior over thetant for set_size1
-#'   prior <- brms::empty_prior()
-#'   set_size_var <- model$other_vars$set_size
-#'   prior_cond <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
-#'
-#'   thetant_preds <- rhs_vars(formula$pforms$thetant)
-#'   if (prior_cond && set_size_var %in% thetant_preds) {
-#'     prior <- prior + brms::prior_("constant(-100)",
-#'       class = "b",
-#'       coef = paste0(set_size_var, 1),
-#'       nlpar = "thetant"
-#'     )
+#' configure_prior.mymodel <- function(model, data, formula, user_prior, ...) {
+#'   # a prior that depends on the data, which the model object cannot declare
+#'   if (!"condition" %in% names(data)) {
+#'     return(NULL)
 #'   }
-#'   # check if there is a random effect on theetant that include set_size as predictor
-#'   bterms <- brms::brmsterms(formula$pforms$thetant)
-#'   re_terms <- bterms$dpars$mu$re
-#'   if (!is.null(re_terms)) {
-#'     for (i in 1:nrow(re_terms)) {
-#'       group <- re_terms$group[[i]]
-#'       form <- re_terms$form[[i]]
-#'       thetant_preds <- rhs_vars(form)
-#'
-#'       if (prior_cond && set_size_var %in% thetant_preds) {
-#'         prior <- prior + brms::prior_("constant(1e-8)",
-#'           class = "sd",
-#'           coef = paste0(set_size_var, 1),
-#'           group = group,
-#'           nlpar = "thetant"
-#'         )
-#'       }
-#'     }
-#'   }
-#'
-#'   prior
+#'   brms::prior_("normal(0, 0.5)", class = "b", dpar = "kappa")
 #' }
 #'
 #' @keywords internal developer
@@ -838,47 +809,4 @@ summarise_default_prior <- function(prior_list) {
     }
   }
   out
-}
-
-constrain_set_size1_fixef <- function(formula, nlpars, set_size_var, prior_value) {
-  nl_pforms <- formula$pforms[nlpars]
-  has_setsize <- vapply(nl_pforms, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
-  if (!any(has_setsize)) {
-    return(NULL)
-  }
-    
-  brms::prior_(prior_value,
-    class = "b",
-    coef = paste0(set_size_var, 1),
-    nlpar = nlpars[has_setsize]
-  )
-}
-
-constrain_set_size1_ranef <- function(formula, nlpars, set_size_var, prior_value) {
-  re_terms_list <- lapply(nlpars, function(nlp) {
-    bterms <- brms::brmsterms(formula$pforms[[nlp]])
-    re <- bterms$dpars$mu$re
-    if (NROW(re) > 0) {
-      data.frame(nlpar = nlp, group = re$group, form = I(re$form), stringsAsFactors = FALSE)
-    }
-  })
-  
-  re_terms_df <- do.call(rbind, re_terms_list)
-  if (is.null(re_terms_df)) {
-    return(NULL)
-  }
-  
-  has_setsize <- vapply(re_terms_df$form, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
-  if (!any(has_setsize)) {
-    return(NULL)
-  }
-
-  brms::prior_(prior_value,
-    class = "sd",
-    coef = paste0(set_size_var, 1),
-    group = re_terms_df$group[has_setsize],
-    nlpar = re_terms_df$nlpar[has_setsize]
-  )
 }
