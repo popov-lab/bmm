@@ -480,6 +480,9 @@ test_that("the shape-bound check after sampling skips a fit without draws", {
   )
   local_mocked_bindings(ndraws = function(...) 0L, .package = "brms")
   expect_no_error(postprocess_brm(model, list(algorithm = "sampling")))
+  # what brms 2.23.0 returns for a cmdstanr fit with iter = warmup
+  local_mocked_bindings(ndraws = function(...) NA_integer_, .package = "brms")
+  expect_no_error(postprocess_brm(model, list(algorithm = "sampling")))
 })
 
 test_that(".circmix_vp_shape_min() takes the minimum over every block of observations", {
