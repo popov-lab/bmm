@@ -389,7 +389,7 @@ test_that("log_lik_ezcdm() maps the standata slots onto dezcdm()", {
         sim_data$mean_angle[i], sim_data$var_angle[i], sim_data$mean_rt[i],
         sim_data$var_rt[i], sim_data$n_trials[i],
         drift = draws$drift[, i], driftangle = draws$driftangle[, i],
-        bound = draws$bound[, i], ndt = draws$ndt[, i]
+        bound = draws$bound[, i], ndt = draws$ndt[, i], log = TRUE
       )
     )
   }
@@ -498,7 +498,7 @@ test_that("ezcdm_lpdf in Stan matches dezcdm() in R", {
   stan_lpdf <- ezcdm_parity_stan_lpdf(grid)
   r_lpdf <- with(grid, dezcdm(
     mean_angle, var_angle, mean_rt, var_rt, n_trials,
-    drift = drift, driftangle = driftangle, bound = bound, ndt = ndt
+    drift = drift, driftangle = driftangle, bound = bound, ndt = ndt, log = TRUE
   ))
 
   expect_true(all(is.finite(r_lpdf)))

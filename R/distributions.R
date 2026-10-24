@@ -2313,10 +2313,10 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #' @param driftangle Drift angle, the direction of the drift vector in radians
 #'   (default 0).
 #' @param n Number of sets of summary statistics to generate.
-#' @param log Logical; if `TRUE` (default), values are returned on the log
-#'   scale. The angle term is a likelihood, not a normalised density (see
-#'   Details), so `log = FALSE` overflows to `Inf` for cells with many trials
-#'   or concentrated angles.
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'   `log = FALSE` can overflow to `Inf` for cells with many trials or
+#'   concentrated angles, because the angle term is an unnormalised likelihood
+#'   (see Details); use `log = TRUE` for those.
 #'
 #' @details The model is the circular diffusion model of Smith (2016) without
 #'   across-trial variability, with the within-trial noise fixed at
@@ -2396,7 +2396,8 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #'   report. Psychological Review, 123(4), 425-451.
 #'   https://doi.org/10.1037/rev0000023
 #'
-#' @return `dezcdm` gives the log-likelihood (or likelihood) of the observed
+#' @return `dezcdm` gives the likelihood (or, with `log = TRUE`, the
+#'   log-likelihood) of the observed
 #'   summary statistics, and `rezcdm` returns a `data.frame` with `n` rows and
 #'   columns `mean_angle`, `var_angle`, `mean_rt`, `var_rt` and `n_trials`.
 #'
@@ -2405,21 +2406,21 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #' @examples
 #' dezcdm(
 #'   mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
-#'   n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
+#'   n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 #' )
 #'
 #' # vectorised over observations
 #' dezcdm(
 #'   mean_angle = c(0.1, -0.2), var_angle = c(0.2, 0.3),
 #'   mean_rt = c(0.9, 1), var_rt = c(0.1, 0.12), n_trials = 100,
-#'   drift = 2, bound = 1.5, ndt = 0.3, driftangle = 0.1
+#'   drift = 2, bound = 1.5, ndt = 0.3, driftangle = 0.1, log = TRUE
 #' )
 #'
 #' # generate random summary statistics
 #' rezcdm(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 #'
 dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
-                   drift, bound, ndt, driftangle = 0, log = TRUE) {
+                   drift, bound, ndt, driftangle = 0, log = FALSE) {
   .check_ezcdm_pars(drift, bound, ndt, n_trials)
   stopif(isTRUE(any(var_angle < 0 | var_angle > 1)), "var_angle must be between 0 and 1")
   stopif(isTRUE(any(var_rt <= 0)), "var_rt must be positive")

@@ -16,7 +16,7 @@ dezcdm(
   bound,
   ndt,
   driftangle = 0,
-  log = TRUE
+  log = FALSE
 )
 
 rezcdm(n, n_trials, drift, bound, ndt, driftangle = 0)
@@ -45,15 +45,16 @@ a whole number larger than 2.}
 \item{driftangle}{Drift angle, the direction of the drift vector in radians
 (default 0).}
 
-\item{log}{Logical; if \code{TRUE} (default), values are returned on the log
-scale. The angle term is a likelihood, not a normalised density (see
-Details), so \code{log = FALSE} overflows to \code{Inf} for cells with many trials
-or concentrated angles.}
+\item{log}{Logical; if \code{TRUE}, values are returned on the log scale.
+\code{log = FALSE} can overflow to \code{Inf} for cells with many trials or
+concentrated angles, because the angle term is an unnormalised likelihood
+(see Details); use \code{log = TRUE} for those.}
 
 \item{n}{Number of sets of summary statistics to generate.}
 }
 \value{
-\code{dezcdm} gives the log-likelihood (or likelihood) of the observed
+\code{dezcdm} gives the likelihood (or, with \code{log = TRUE}, the
+log-likelihood) of the observed
 summary statistics, and \code{rezcdm} returns a \code{data.frame} with \code{n} rows and
 columns \code{mean_angle}, \code{var_angle}, \code{mean_rt}, \code{var_rt} and \code{n_trials}.
 }
@@ -130,14 +131,14 @@ share is largest at small \eqn{\kappa} and falls to zero by
 \examples{
 dezcdm(
   mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
-  n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
+  n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 )
 
 # vectorised over observations
 dezcdm(
   mean_angle = c(0.1, -0.2), var_angle = c(0.2, 0.3),
   mean_rt = c(0.9, 1), var_rt = c(0.1, 0.12), n_trials = 100,
-  drift = 2, bound = 1.5, ndt = 0.3, driftangle = 0.1
+  drift = 2, bound = 1.5, ndt = 0.3, driftangle = 0.1, log = TRUE
 )
 
 # generate random summary statistics

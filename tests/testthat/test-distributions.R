@@ -2029,7 +2029,7 @@ test_that("dmpt and rmpt refuse a value given more than once", {
 test_that("dezcdm runs without errors and returns a finite log-likelihood", {
   ll <- dezcdm(
     mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
-    n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
+    n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
   expect_type(ll, "double")
   expect_length(ll, 1)
@@ -2054,20 +2054,20 @@ test_that("dezcdm is vectorized over observations and over parameter draws", {
   )
   ll_vec <- dezcdm(
     obs$mean_angle, obs$var_angle, obs$mean_rt, obs$var_rt, obs$n_trials,
-    drift = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3
+    drift = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3, log = TRUE
   )
   ll_loop <- vapply(seq_len(nrow(obs)), function(i) {
     dezcdm(
       obs$mean_angle[i], obs$var_angle[i], obs$mean_rt[i], obs$var_rt[i], obs$n_trials[i],
-      drift = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3
+      drift = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3, log = TRUE
     )
   }, numeric(1))
   expect_equal(ll_vec, ll_loop)
 
   draws <- c(1, 2, 3)
-  ll_draws <- dezcdm(0.1, 0.2, 0.8, 0.1, 50, drift = draws, bound = 1.5, ndt = 0.3)
+  ll_draws <- dezcdm(0.1, 0.2, 0.8, 0.1, 50, drift = draws, bound = 1.5, ndt = 0.3, log = TRUE)
   ll_draws_loop <- vapply(draws, function(v) {
-    dezcdm(0.1, 0.2, 0.8, 0.1, 50, drift = v, bound = 1.5, ndt = 0.3)
+    dezcdm(0.1, 0.2, 0.8, 0.1, 50, drift = v, bound = 1.5, ndt = 0.3, log = TRUE)
   }, numeric(1))
   expect_equal(ll_draws, ll_draws_loop)
 })
@@ -2089,7 +2089,7 @@ test_that("dezcdm angle term is the exact von Mises log-likelihood of the trials
   angle_term <- dezcdm(
     summary$mean_angle, summary$var_angle, mean_rt, var_rt, n,
     drift = pars$drift, driftangle = pars$driftangle,
-    bound = pars$bound, ndt = pars$ndt
+    bound = pars$bound, ndt = pars$ndt, log = TRUE
   ) - rt_terms
 
   expect_equal(
@@ -2222,8 +2222,8 @@ test_that(".ezcdm_moments stays finite at extreme drift rates", {
 
   huge <- .ezcdm_moments(drift = c(1e6, 1e8), bound = 1, ndt = 0.3)
   expect_true(all(vapply(huge, function(x) all(is.finite(x)), logical(1))))
-  expect_true(is.finite(dezcdm(0.1, 0.2, 0.9, 0.1, 100, drift = 1e-300, bound = 1, ndt = 0.3)))
-  expect_true(is.finite(dezcdm(0.1, 0.2, 0.3, 1e-12, 100, drift = 1e3, bound = 1e3, ndt = 0.3)))
+  expect_true(is.finite(dezcdm(0.1, 0.2, 0.9, 0.1, 100, drift = 1e-300, bound = 1, ndt = 0.3, log = TRUE)))
+  expect_true(is.finite(dezcdm(0.1, 0.2, 0.3, 1e-12, 100, drift = 1e3, bound = 1e3, ndt = 0.3, log = TRUE)))
 })
 
 test_that("the skew bounds quoted in ?ezcdm_dist hold over the kappa range", {
@@ -2265,7 +2265,7 @@ test_that("dezcdm with k3 = 0 is the product of independent mean_rt and var_rt t
   pars <- list(drift = c(2, 0.7), driftangle = 0.1, bound = c(1.5, 2.2), ndt = 0.3)
   ll <- dezcdm(obs$mean_angle, obs$var_angle, obs$mean_rt, obs$var_rt, obs$n_trials,
                drift = pars$drift, driftangle = pars$driftangle,
-               bound = pars$bound, ndt = pars$ndt)
+               bound = pars$bound, ndt = pars$ndt, log = TRUE)
 
   moments <- moments_full(pars$drift, pars$bound, pars$ndt)
   W <- moments$k4 / obs$n_trials + 2 * moments$VRT^2 / (obs$n_trials - 1)
@@ -2278,7 +2278,7 @@ test_that("dezcdm with k3 = 0 is the product of independent mean_rt and var_rt t
 
 test_that("dezcdm is continuous across the small-kappa branch", {
   ll <- function(drift) {
-    dezcdm(0.1, 0.9, 0.8, 0.125, 100, drift = drift, bound = 1, ndt = 0.3)
+    dezcdm(0.1, 0.9, 0.8, 0.125, 100, drift = drift, bound = 1, ndt = 0.3, log = TRUE)
   }
   below <- ll(0.01 * (1 - 1e-9))
   above <- ll(0.01 * (1 + 1e-9))
@@ -2303,7 +2303,7 @@ test_that("dezcdm validates parameters", {
 })
 
 test_that("dezcdm propagates NA parameters row by row", {
-  ll <- function(...) dezcdm(0.1, 0.2, 0.9, 0.1, 100, ...)
+  ll <- function(...) dezcdm(0.1, 0.2, 0.9, 0.1, 100, ..., log = TRUE)
   reference <- ll(drift = 2, bound = 1.5, ndt = 0.3)
   expect_equal(ll(drift = c(NA, 2), bound = 1.5, ndt = 0.3), c(NA, reference))
   expect_equal(ll(drift = 2, bound = c(1.5, NA), ndt = 0.3), c(reference, NA))
@@ -2771,6 +2771,10 @@ log_default_calls <- function() {
     dezdm = quote(dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
       drift = 2, bound = 1.5, ndt = 0.3
+    )),
+    dezcdm = quote(dezcdm(
+      mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
+      n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
     )),
     dsdm = quote(dsdm(0.3, mu = 0, c = 3, kappa = 3.5)),
     dmixture2p = quote(dmixture2p(0.3)),
