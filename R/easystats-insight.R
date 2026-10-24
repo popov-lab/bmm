@@ -229,14 +229,13 @@ link_inverse.bmmfit <- function(x, ...) {
 }
 
 # The user's formula as bmm completed it before fitting, restricted to the
-# model's declared parameters and the helper parameters their non-linear
-# formulas use: m3's activation formulas and the technical parameters a
+# model's declared parameters and the helper parameters of non-linear
+# formulas, including helpers of helpers: m3's activation formulas and the technical parameters a
 # family requires are not parameters of the model
 .insight_parameter_formulas <- function(x) {
   model <- x$bmm$model
   formula <- suppressMessages(add_missing_parameters(model, x$bmm$user_formula))
-  non_linear <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
-  helpers <- unlist(lapply(non_linear, function(par) all.vars(formula[[par]][[3]])))
+  helpers <- unlist(lapply(formula[is_nl(formula)], function(f) all.vars(f[[3]])))
   formula[intersect(names(formula), c(names(model$parameters), helpers))]
 }
 

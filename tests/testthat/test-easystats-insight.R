@@ -105,11 +105,15 @@ test_that("find_formula() keeps the group-level terms of a parameter apart", {
 formula_cases <- function() {
   data <- small_data()
   data$ssn <- as.numeric(data$set_size)
+  data$x <- as.numeric(data$session)
   list(
     nested_groups = list(formula = bmf(c ~ 1 + (1 | ID/session), kappa ~ 1)),
     interaction_group = list(formula = bmf(c ~ 1 + (1 | ID:session), kappa ~ 1)),
     helper_parameters = list(formula = bmf(c ~ c0 + c1 * ssn, c0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)),
     helper_difference = list(formula = bmf(c ~ c0 - c1 * ssn, c0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)),
+    helper_of_helper = list(
+      formula = bmf(c ~ c0 + c1 * ssn, c0 ~ a0 * x, a0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)
+    ),
     helper_function = list(
       formula = bmf(c ~ en + (st - en) * exp(-R * ssn), st ~ 1 + (1 | ID), en ~ 1, R ~ 1, kappa ~ 1)
     )
@@ -186,6 +190,11 @@ test_that("the helper parameters of a non-linear formula are parameters, not pre
   difference <- fits$helper_difference
   expect_identical(deparse1(insight::find_formula(difference)$c), "~c0 - c1 * ssn")
   expect_identical(insight::find_predictors(difference, effects = "all", flatten = TRUE), c("ssn", "ID"))
+
+  nested_helpers <- fits$helper_of_helper
+  expect_identical(insight::find_predictors(nested_helpers, flatten = TRUE), c("ssn", "x"))
+  expect_identical(insight::find_random(nested_helpers), list(a0_random = "ID"))
+  expect_true(insight::is_mixed_model(nested_helpers))
 
   function_of_helpers <- fits$helper_function
   expect_identical(insight::find_predictors(function_of_helpers, effects = "all", flatten = TRUE),
