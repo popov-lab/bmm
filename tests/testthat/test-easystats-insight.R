@@ -399,21 +399,20 @@ test_that("get_data() returns the data the user passed, response categories as c
 
 test_that("link_function() and link_inverse() use the first parameter's link of every model", {
   skip_if_not_installed("insight")
-  # the inverse link at 0.3 of each model's first parameter: exp(0.3) for log,
-  # 2 * atan(0.3) for tan_half, plogis(0.3) for logit
+  # the inverse at 0.3 of every link bmm supports, written out: a model with
+  # a new link adds it here, a new model with a known link adds nothing
   expected <- c(
-    cswald = 1.349858807576003, cswald_crisk = 0.3, ddm = 0.3, ezdm = 0.3, ezdm_4par = 0.3,
-    imm = 0.582913588955734, m3 = 1.349858807576003, m3_custom = 1.349858807576003,
-    mixture2p = 0.582913588955734, mixture3p = 0.582913588955734, mpt = 0.574442516811659,
-    sdm = 0.582913588955734, sdt_cdp = 0.3, sdt_mafc = 0.3, sdt_ranking = 0.3, sdt_rating = 0.3,
-    sdt_yn = 0.3
+    identity = 0.3, log = 1.349858807576003, softplus = 0.854355244468527,
+    log1p = 0.349858807576003, logm1 = 2.349858807576003, inverse = 3.333333333333333,
+    sqrt = 0.09, logit = 0.574442516811659, probit = 0.617911422188953,
+    tan_half = 0.582913588955734, loglog = 0.259276865990828, cloglog = 0.740723134009172
   )
-  cases <- model_test_cases("links")
-  expect_setequal(names(cases), names(expected))
-  for (label in names(cases)) {
-    fit <- structure(list(bmm = list(model = cases[[label]]$model)), class = c("bmmfit", "brmsfit"))
-    expect_equal(insight::link_inverse(fit)(0.3), expected[[label]], tolerance = 1e-12, info = label)
-    expect_equal(insight::link_function(fit)(expected[[label]]), 0.3, tolerance = 1e-12, info = label)
+  for (case in model_test_cases("links")) {
+    fit <- structure(list(bmm = list(model = case$model)), class = c("bmmfit", "brmsfit"))
+    link <- case$model$links[[1]]
+    label <- paste(class(case$model)[length(class(case$model))], link)
+    expect_equal(insight::link_inverse(fit)(0.3), unname(expected[link]), tolerance = 1e-12, info = label)
+    expect_equal(insight::link_function(fit)(unname(expected[link])), 0.3, tolerance = 1e-12, info = label)
   }
   fit <- structure(list(bmm = list(model = sdm("dev_rad"))), class = c("bmmfit", "brmsfit"))
   expect_identical(insight::link_inverse(fit)(0.3), 2 * atan(0.3))
