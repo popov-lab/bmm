@@ -159,6 +159,31 @@ test_that("get_priors() gives the prior of every coefficient, constants with the
   expect_identical(prior_of("sd_ID__d_Intercept")$Distribution, "exponential")
 })
 
+test_that("get_priors() reads a brms mixture, whose first component's coefficients carry a prefix", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  case <- model_test_cases("stored_frame")$mixture2p
+  fit <- suppressWarnings(suppressMessages(
+    bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
+  ))
+  skip_if_not(identical(fit$family$family, "mixture"), "mixture2p is not a brms mixture here")
+  # the draws a sampled mixture2p fit of this formula has
+  local_mocked_bindings(
+    variables = function(x, ...) {
+      c("b_mu1_Intercept", "b_mu2_Intercept", "b_kappa2_Intercept", "b_kappa_Intercept",
+        "b_thetat_Intercept", "Intercept_mu1", "lprior", "lp__")
+    },
+    .package = "brms"
+  )
+  expect_identical(insight::get_priors(fit), data.frame(
+    Parameter = c("b_mu1_Intercept", "b_kappa_Intercept", "b_thetat_Intercept"),
+    Distribution = c("constant", "normal", "logistic"),
+    Location = c(0, 2, 0),
+    Scale = c(NA, 1, 1),
+    df = NA_real_
+  ))
+})
+
 test_that("get_data() returns the data the user passed, response categories as columns", {
   skip_if_not_installed("insight")
   for (fit in fixture_fits()) {

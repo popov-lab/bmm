@@ -248,14 +248,16 @@ link_inverse.bmmfit <- function(x, ...) {
   rest[grouped] <- sub("^.*?__", "", rest[grouped], perl = TRUE)
   terms <- brms::brmsterms(x$formula)
   main <- names(terms$dpars)[1]
+  # a mixture names the coefficients of its first dpar, mu1, with the prefix
   candidates <- names(c(terms$dpars, terms$nlpars))
   candidates <- candidates[order(-nchar(candidates))]
-  parameter <- vapply(rest, function(r) {
-    c(candidates[startsWith(r, paste0(candidates, "_")) | startsWith(r, paste0(candidates, "["))], main)[1]
+  prefix <- vapply(rest, function(r) {
+    c(candidates[startsWith(r, paste0(candidates, "_")) | startsWith(r, paste0(candidates, "["))], NA)[1]
   }, character(1), USE.NAMES = FALSE)
   draws <- data.frame(
-    variable, parameter, class,
-    coef = ifelse(parameter == main, rest, substring(rest, nchar(parameter) + 2)),
+    variable, class,
+    parameter = ifelse(is.na(prefix), main, prefix),
+    coef = ifelse(is.na(prefix), rest, substring(rest, nchar(prefix) + 2)),
     group = ifelse(grouped, sub("^[a-z]+_(.*?)__.*", "\\1", variable, perl = TRUE), ""),
     stringsAsFactors = FALSE
   )
