@@ -16,11 +16,19 @@ dlba(
   sp,
   ndt,
   s = 1,
-  distribution = "normal",
+  distribution = c("normal", "gamma", "frechet", "lognormal"),
   log = FALSE
 )
 
-rlba(n, drift, gap, sp, ndt, s = 1, distribution = "normal")
+rlba(
+  n,
+  drift,
+  gap,
+  sp,
+  ndt,
+  s = 1,
+  distribution = c("normal", "gamma", "frechet", "lognormal")
+)
 
 plba(
   q,
@@ -29,7 +37,7 @@ plba(
   sp,
   ndt,
   s = 1,
-  distribution = "normal",
+  distribution = c("normal", "gamma", "frechet", "lognormal"),
   lower.tail = TRUE,
   log.p = FALSE
 )
@@ -41,7 +49,7 @@ qlba(
   sp,
   ndt,
   s = 1,
-  distribution = "normal",
+  distribution = c("normal", "gamma", "frechet", "lognormal"),
   lower.tail = TRUE,
   log.p = FALSE
 )
@@ -54,8 +62,11 @@ qlba(
 (1, 2, ..., K). May be recycled to the length of \code{rt}, and may contain
 \code{NA}; the corresponding density is \code{NA}.}
 
-\item{drift}{Numeric vector of mean drift rates (one per accumulator). The
-mean may take any real value; the drawn drift rates are truncated at zero.}
+\item{drift}{Numeric vector of drift rate parameters (one per accumulator).
+Interpretation depends on \code{distribution}: mean drift for \code{"normal"}, shape
+for \code{"gamma"} and \code{"frechet"}, meanlog for \code{"lognormal"}. The lognormal
+meanlog may take any real value, unlike the gamma and Frechet shapes,
+which must be positive.}
 
 \item{gap}{Numeric. Threshold gap (> 0). The distance between the maximum
 starting point and the decision threshold. The total threshold is computed
@@ -70,11 +81,13 @@ a common length.}
 \code{rt}, \code{gap} and \code{sp} to a common length. \code{qlba()} requires a single value
 for \code{ndt}, \code{gap}, \code{sp} and \code{s}.}
 
-\item{s}{Numeric. Drift rate SD (> 0, default = 1). Typically fixed to 1
-for identifiability.}
+\item{s}{Numeric. Scale parameter (> 0, default = 1). Interpretation depends
+on \code{distribution}: drift SD for \code{"normal"}, rate for \code{"gamma"}, scale for
+\code{"frechet"}, sdlog for \code{"lognormal"}. Typically fixed to 1 for
+identifiability.}
 
-\item{distribution}{Character. The drift rate distribution. Currently
-\code{"normal"}.}
+\item{distribution}{Character. The drift rate distribution. One of
+\code{"normal"} (default), \code{"gamma"}, \code{"frechet"}, or \code{"lognormal"}.}
 
 \item{log}{Logical. If \code{TRUE}, return log-densities. Default \code{FALSE}.}
 
@@ -99,8 +112,8 @@ for identifiability.}
 }
 \description{
 Density, distribution function, quantile function, and random
-generation for the Linear Ballistic Accumulator (LBA) model with normally
-distributed drift rates. \code{dlba()} is the joint density of the response
+generation for the Linear Ballistic Accumulator (LBA) model with multiple
+drift rate distributions. \code{dlba()} is the joint density of the response
 time and the winning accumulator. \code{plba()} and \code{qlba()} describe the
 distribution of the race's first finishing time, regardless of which
 accumulator wins.

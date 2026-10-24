@@ -1,5 +1,5 @@
 # =============================================================================
-# Stage 2 Stan/R kernel parity: the normal LBA single-accumulator kernel
+# Stage 2 Stan/R kernel parity: the four LBA single-accumulator kernels
 # (inst/stan_chunks/lba_*_functions.stan) compiled through a fixed_param
 # generated-quantities block and checked against the R twins
 # (.lba_lpdf_single()/.lba_lsurv_single()), plus an independent log-space
@@ -8,13 +8,19 @@
 #
 # Tolerances below are measured on THIS grid (see the worktree's
 # local/report/lba_349_fixes_2026-09-25.md audit table) rather than assumed:
-# the normal rows agree with the R kernel to <1e-6 nats; a branch-boundary
-# corner of the normal kernel (t = 5, A = gap = 1e-3, where delta = A/(t s)
-# sits just above the 1e-4 midpoint-rule cutoff) is documented as genuinely
-# less accurate, so every comparison is restricted to rows where the R
-# reference is above -40 nats (below that a density is representationally
-# zero and comparing two independent floating-point paths to high precision
-# is meaningless for either implementation).
+# normal/gamma/lognormal and the low-ratio Frechet rows agree with the R
+# kernels to <1e-6 nats; a branch-boundary corner of the normal kernel
+# (t = 5, A = gap = 1e-3, where delta = A/(t s) sits just above the 1e-4
+# midpoint-rule cutoff) and the Frechet 16-point rule at A/gap > 6 are both
+# documented as genuinely less accurate, so:
+#  * every comparison is restricted to rows where the R reference is above
+#    -40 nats (below that a density is representationally zero and comparing
+#    two independent floating-point paths to high precision is meaningless
+#    for either implementation);
+#  * the Frechet kernel is compared at 1e-6 nats for A/gap <= 6 (matching the
+#    chunk's own docstring) and at 5 nats for A/gap > 6 (the chunk documents
+#    up to ~0.84-3 nats of drift there; 5 nats keeps slack while still
+#    catching a regression an order of magnitude worse than what is shipped).
 # =============================================================================
 
 .lba_kernel_stan_model <- local({
@@ -25,19 +31,31 @@
       rl <- function(f) paste(readLines(file.path(sc_dir, paste0(f, ".stan"))), collapse = "\n")
       funs <- paste(
         .lba_stan_code("lba_normal_simple", c("driftc", "drifte"), "normal"),
+        rl("lba_lognormal_functions"), rl("lba_gamma_functions"), rl("lba_frechet_functions"),
         sep = "\n"
       )
       prog <- paste0(
         "functions {\n", funs, "\n}\n",
         "data {\n",
         "  int N;\n  vector[N] t;\n  vector[N] v;\n  vector[N] b;\n  vector[N] A;\n",
-        "  vector[N] s;\n",
+        "  vector[N] s;\n  array[N] int dist;\n",
         "}\n",
         "generated quantities {\n",
         "  vector[N] bmm_lpdf;\n  vector[N] bmm_lsurv;\n",
         "  for (i in 1:N) {\n",
-        "    bmm_lpdf[i] = lba_normal_single_lpdf(t[i] | v[i], b[i], A[i], s[i]);\n",
-        "    bmm_lsurv[i] = lba_normal_single_lccdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "    if (dist[i] == 1) {\n",
+        "      bmm_lpdf[i] = lba_normal_single_lpdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "      bmm_lsurv[i] = lba_normal_single_lccdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "    } else if (dist[i] == 2) {\n",
+        "      bmm_lpdf[i] = lba_gamma_single_lpdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "      bmm_lsurv[i] = lba_gamma_single_lccdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "    } else if (dist[i] == 3) {\n",
+        "      bmm_lpdf[i] = lba_lognormal_single_lpdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "      bmm_lsurv[i] = lba_lognormal_single_lccdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "    } else {\n",
+        "      bmm_lpdf[i] = lba_frechet_single_lpdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "      bmm_lsurv[i] = lba_frechet_single_lccdf(t[i] | v[i], b[i], A[i], s[i]);\n",
+        "    }\n",
         "  }\n",
         "}\n"
       )
@@ -54,7 +72,10 @@
   ts <- c(0.001, 0.02, 0.5, 5)
   As <- c(1e-3, 0.5, 2)
   gaps <- c(1e-3, 0.5)
-  vs <- list(normal = c(-3, -0.3, 1, 3))
+  vs <- list(
+    normal = c(-3, -0.3, 1, 3), gamma = c(0.5, 2, 4),
+    lognormal = c(-1, 0.5), frechet = c(0.8, 3)
+  )
   do.call(rbind, lapply(names(vs), function(dist) {
     g <- expand.grid(t = ts, v = vs[[dist]], A = As, gap = gaps,
                      KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
@@ -72,8 +93,10 @@
   function() {
     if (is.null(res)) {
       G <- .lba_kernel_grid()
+      dist_code <- c(normal = 1L, gamma = 2L, lognormal = 3L, frechet = 4L)
       mod <- .lba_kernel_stan_model()
-      dat <- list(N = nrow(G), t = G$t, v = G$v, b = G$b, A = G$A, s = G$s)
+      dat <- list(N = nrow(G), t = G$t, v = G$v, b = G$b, A = G$A, s = G$s,
+                 dist = unname(dist_code[G$dist]))
       fit <- mod$sample(data = dat, fixed_param = TRUE, iter_sampling = 1,
                         chains = 1, refresh = 0, sig_figs = 18,
                         show_messages = FALSE, show_exceptions = FALSE)
@@ -112,6 +135,62 @@ test_that("Stan normal LBA kernel matches the R kernel on the grid", {
   expect_gt(sum(ok_lpdf), 0)
   expect_lt(max(abs(d$stan_lpdf[ok_lpdf] - d$r_lpdf[ok_lpdf])), 1e-6)
   expect_lt(max(abs(d$stan_lsurv[ok_lsurv] - d$r_lsurv[ok_lsurv])), 1e-6)
+})
+
+test_that("Stan gamma LBA kernel matches the R kernel on the grid", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  G <- .lba_kernel_results()
+  d <- G[G$dist == "gamma", ]
+  ok_lpdf <- .lba_kernel_meaningful(d$r_lpdf)
+  ok_lsurv <- .lba_kernel_meaningful(d$r_lsurv)
+
+  expect_gt(sum(ok_lpdf), 0)
+  expect_lt(max(abs(d$stan_lpdf[ok_lpdf] - d$r_lpdf[ok_lpdf])), 1e-6)
+  expect_lt(max(abs(d$stan_lsurv[ok_lsurv] - d$r_lsurv[ok_lsurv])), 1e-6)
+})
+
+test_that("Stan lognormal LBA kernel matches the R kernel on the grid", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  G <- .lba_kernel_results()
+  d <- G[G$dist == "lognormal", ]
+  ok_lpdf <- .lba_kernel_meaningful(d$r_lpdf)
+  ok_lsurv <- .lba_kernel_meaningful(d$r_lsurv)
+
+  expect_gt(sum(ok_lpdf), 0)
+  expect_lt(max(abs(d$stan_lpdf[ok_lpdf] - d$r_lpdf[ok_lpdf])), 1e-6)
+  expect_lt(max(abs(d$stan_lsurv[ok_lsurv] - d$r_lsurv[ok_lsurv])), 1e-6)
+})
+
+test_that("Stan frechet LBA kernel matches the R kernel where A/gap <= 6", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  G <- .lba_kernel_results()
+  d <- G[G$dist == "frechet" & (G$A / G$gap) <= 6, ]
+  ok_lpdf <- .lba_kernel_meaningful(d$r_lpdf)
+  ok_lsurv <- .lba_kernel_meaningful(d$r_lsurv)
+
+  expect_gt(sum(ok_lpdf), 0)
+  expect_lt(max(abs(d$stan_lpdf[ok_lpdf] - d$r_lpdf[ok_lpdf])), 1e-6)
+  expect_lt(max(abs(d$stan_lsurv[ok_lsurv] - d$r_lsurv[ok_lsurv])), 1e-6)
+})
+
+test_that("Stan frechet LBA kernel stays within its documented envelope where A/gap > 6", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  G <- .lba_kernel_results()
+  d <- G[G$dist == "frechet" & (G$A / G$gap) > 6, ]
+  ok_lpdf <- .lba_kernel_meaningful(d$r_lpdf)
+  ok_lsurv <- .lba_kernel_meaningful(d$r_lsurv)
+
+  expect_gt(sum(ok_lpdf), 0)
+  expect_lt(max(abs(d$stan_lpdf[ok_lpdf] - d$r_lpdf[ok_lpdf])), 5)
+  expect_lt(max(abs(d$stan_lsurv[ok_lsurv] - d$r_lsurv[ok_lsurv])), 5)
 })
 
 # Independent of both the closed-form M assembly (R) and its Stan twin: the
