@@ -153,16 +153,19 @@ configure_model.sdm <- function(model, data, formula) {
     "sdm_simple_likelihood.stan"
   }
   stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
-  stan_tdata_pll_args <- if (brms_slices_likelihood()) {
-    "data matrix COSN"
-  }
   run_metadata <- attr(data, "sdm_run_metadata")
   if (is.null(run_metadata)) {
     # Guard direct configure_model.sdm() calls that bypass check_data.sdm().
     run_metadata <- sdm_run_metadata(data, formula, model)
   }
+  # 16 nodes per panel of sdm_simple_ldenom() keep log Z within 3e-9 up to
+  # log c = 5 and kappa = 300, and within 2e-8 up to log c = 12 and kappa =
+  # 3000 (#615); test-model_sdm-stan.R holds the bar
+  gl <- .gl_rule(16L)
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
-    brms::stanvar(scode = stan_tdata, block = "tdata", pll_args = stan_tdata_pll_args) +
+    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(x = gl$nodes, name = "sdm_gl_x") +
+    brms::stanvar(x = gl$weights, name = "sdm_gl_w") +
     brms::stanvar(x = run_metadata$G_sdm_runs, name = "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
