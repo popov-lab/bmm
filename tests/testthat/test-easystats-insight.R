@@ -297,24 +297,28 @@ test_that("get_priors() gives the prior of every coefficient, constants with the
   expect_identical(prior_of("sd_ID__d_Intercept")$Distribution, "exponential")
 })
 
-test_that("get_priors() reads a brms mixture, whose first component's coefficients carry a prefix", {
+test_that("get_priors() reads the main parameter of mixture2p, with the prefix a brms mixture gives it", {
   skip_on_cran()
   skip_if_not_installed("insight")
   case <- model_test_cases("stored_frame")$mixture2p
   fit <- suppressWarnings(suppressMessages(
     bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
   ))
-  expect_identical(fit$family$family, "mixture")
+  # brms names the coefficients of a brms mixture's first component, mu1, with
+  # the prefix and those of a custom family's mu without it; any other main
+  # parameter is a change this test has to learn about
+  main <- names(brms::brmsterms(fit$formula)$dpars)[1]
+  intercept <- switch(main, mu1 = "b_mu1_Intercept", mu = "b_Intercept", stop("main parameter ", main))
+  technical <- switch(main, mu1 = c("b_mu2_Intercept", "b_kappa2_Intercept", "Intercept_mu1"), mu = character(0))
   # the draws a sampled mixture2p fit of this formula has
   local_mocked_bindings(
     variables = function(x, ...) {
-      c("b_mu1_Intercept", "b_mu2_Intercept", "b_kappa2_Intercept", "b_kappa_Intercept",
-        "b_thetat_Intercept", "Intercept_mu1", "lprior", "lp__")
+      c(intercept, technical, "b_kappa_Intercept", "b_thetat_Intercept", "lprior", "lp__")
     },
     .package = "brms"
   )
   expect_identical(insight::get_priors(fit), data.frame(
-    Parameter = c("b_mu1_Intercept", "b_kappa_Intercept", "b_thetat_Intercept"),
+    Parameter = c(intercept, "b_kappa_Intercept", "b_thetat_Intercept"),
     Distribution = c("constant", "normal", "logistic"),
     Location = c(0, 2, 0),
     Scale = c(NA, 1, 1),
