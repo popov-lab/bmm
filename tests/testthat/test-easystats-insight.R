@@ -342,7 +342,8 @@ test_that("parameters and bayestestR summarise every model parameter on its own"
   for (fit in fixture_fits()) {
     label <- fit_label(fit)
     mp <- suppressWarnings(suppressMessages(parameters::model_parameters(fit)))
-    expect_identical(unique(mp$Component), names(insight::find_parameters(fit, effects = "fixed")),
+    expect_identical(unique(mp$Component),
+                     intersect(names(fit$bmm$model$parameters), names(fit$formula$pforms)),
                      info = label)
     dp <- suppressWarnings(suppressMessages(bayestestR::describe_posterior(fit)))
     draws <- insight::get_parameters(fit)
