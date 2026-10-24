@@ -57,9 +57,12 @@
 
 \item{...}{Ignored, for consistency with the generics.}
 
-\item{effects}{Which coefficients to return: \code{"fixed"}, \code{"random"}, \code{"all"}
-and for \code{find_parameters()} also \code{"full"}, \code{"random_variance"} and
-\code{"grouplevel"}, as for the methods of \pkg{insight} for \pkg{brms} fits.}
+\item{effects}{\code{"fixed"} for the population-level part of the model,
+\code{"random"} for the group-level part or \code{"all"} for both: coefficients for
+\code{find_parameters()}, predictors for \code{find_predictors()}, columns for
+\code{get_data()}. \code{find_parameters()} also takes \code{"full"},
+\code{"random_variance"} and \code{"grouplevel"}, as the methods of \pkg{insight}
+for \pkg{brms} fits do.}
 
 \item{component}{\code{"all"}, \code{"conditional"}, \code{"location"},
 \code{"distributional"} or \code{"auxiliary"}, which all select every model
@@ -81,10 +84,10 @@ See the \pkg{insight} generics, e.g. \code{\link[insight:find_formula]{insight::
 }
 \description{
 These S3 methods let the \pkg{insight} package, and through it the easystats
-packages (\pkg{parameters}, \pkg{bayestestR}, \pkg{modelbased},
-\pkg{performance}, \pkg{report}), read a bmm fit as the model you specified
-with \code{\link[=bmm]{bmm()}}: its parameters, their formulas, the response variables and the
-data, rather than the \pkg{brms} model that bmm builds from them. With them,
+packages \pkg{parameters}, \pkg{bayestestR} and \pkg{modelbased}, read a
+bmm fit as the model you specified with \code{\link[=bmm]{bmm()}}: its parameters, their
+formulas, the response variables and the data, rather than the \pkg{brms}
+model that bmm builds from them. With them,
 for example, \code{\link[parameters:model_parameters]{parameters::model_parameters()}} and
 \code{\link[bayestestR:describe_posterior]{bayestestR::describe_posterior()}} summarise each model parameter in its own
 component, and \code{modelbased::estimate_means(fit, by = "set_size", predict = "c")} returns the estimates of a model parameter on its native scale.

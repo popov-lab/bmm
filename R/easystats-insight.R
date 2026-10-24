@@ -2,10 +2,10 @@
 #'
 #' @description
 #' These S3 methods let the \pkg{insight} package, and through it the easystats
-#' packages (\pkg{parameters}, \pkg{bayestestR}, \pkg{modelbased},
-#' \pkg{performance}, \pkg{report}), read a bmm fit as the model you specified
-#' with [bmm()]: its parameters, their formulas, the response variables and the
-#' data, rather than the \pkg{brms} model that bmm builds from them. With them,
+#' packages \pkg{parameters}, \pkg{bayestestR} and \pkg{modelbased}, read a
+#' bmm fit as the model you specified with [bmm()]: its parameters, their
+#' formulas, the response variables and the data, rather than the \pkg{brms}
+#' model that bmm builds from them. With them,
 #' for example, [parameters::model_parameters()] and
 #' [bayestestR::describe_posterior()] summarise each model parameter in its own
 #' component, and `modelbased::estimate_means(fit, by = "set_size", predict =
@@ -52,9 +52,12 @@
 #' }
 #'
 #' @param x A `bmmfit` object (created by [bmm()]).
-#' @param effects Which coefficients to return: `"fixed"`, `"random"`, `"all"`
-#'   and for `find_parameters()` also `"full"`, `"random_variance"` and
-#'   `"grouplevel"`, as for the methods of \pkg{insight} for \pkg{brms} fits.
+#' @param effects `"fixed"` for the population-level part of the model,
+#'   `"random"` for the group-level part or `"all"` for both: coefficients for
+#'   `find_parameters()`, predictors for `find_predictors()`, columns for
+#'   `get_data()`. `find_parameters()` also takes `"full"`,
+#'   `"random_variance"` and `"grouplevel"`, as the methods of \pkg{insight}
+#'   for \pkg{brms} fits do.
 #' @param component `"all"`, `"conditional"`, `"location"`,
 #'   `"distributional"` or `"auxiliary"`, which all select every model
 #'   parameter, or for `find_parameters()` the name of a model parameter;
