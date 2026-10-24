@@ -109,6 +109,7 @@ formula_cases <- function() {
     nested_groups = list(formula = bmf(c ~ 1 + (1 | ID/session), kappa ~ 1)),
     interaction_group = list(formula = bmf(c ~ 1 + (1 | ID:session), kappa ~ 1)),
     helper_parameters = list(formula = bmf(c ~ c0 + c1 * ssn, c0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)),
+    helper_difference = list(formula = bmf(c ~ c0 - c1 * ssn, c0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)),
     helper_function = list(
       formula = bmf(c ~ en + (st - en) * exp(-R * ssn), st ~ 1 + (1 | ID), en ~ 1, R ~ 1, kappa ~ 1)
     )
@@ -179,6 +180,12 @@ test_that("the helper parameters of a non-linear formula are parameters, not pre
   expect_identical(insight::find_random(helpers), list(c0_random = "ID"))
   expect_true(insight::is_mixed_model(helpers))
   expect_identical(names(insight::get_data(helpers)), c("dev_rad", "ssn", "ID"))
+  expect_identical(deparse1(insight::find_formula(helpers)$c), "~c0 + c1 * ssn")
+  expect_identical(deparse1(insight::find_formula(helpers)$conditional), "dev_rad ~ ssn")
+
+  difference <- fits$helper_difference
+  expect_identical(deparse1(insight::find_formula(difference)$c), "~c0 - c1 * ssn")
+  expect_identical(insight::find_predictors(difference, effects = "all", flatten = TRUE), c("ssn", "ID"))
 
   function_of_helpers <- fits$helper_function
   expect_identical(insight::find_predictors(function_of_helpers, effects = "all", flatten = TRUE),
