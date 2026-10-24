@@ -36,9 +36,10 @@
 #'     coefficients, `<parameter>_random` for the group-level ones), without
 #'     the parameters that the \pkg{brms} family needs but the model does not
 #'     have, such as the fixed `mu` of the response-time models. `component`
-#'     selects a model parameter by name; `"all"`, `"conditional"` and
-#'     `"location"` select all of them. [insight::get_parameters()] and
-#'     [insight::clean_parameters()] build on it.
+#'     selects a model parameter by name; `"all"`, `"conditional"`,
+#'     `"location"`, `"distributional"` and `"auxiliary"` select all of them.
+#'     [insight::get_parameters()] and [insight::clean_parameters()] build on
+#'     it.
 #'   \item `get_priors()` returns one row per population-level coefficient,
 #'     group-level standard deviation and correlation, with the prior that
 #'     applies to it. A parameter fixed to a constant has the distribution
@@ -54,9 +55,10 @@
 #' @param effects Which coefficients to return: `"fixed"`, `"random"`, `"all"`
 #'   and for `find_parameters()` also `"full"`, `"random_variance"` and
 #'   `"grouplevel"`, as for the methods of \pkg{insight} for \pkg{brms} fits.
-#' @param component For `find_parameters()`, `"all"`, `"conditional"`,
-#'   `"location"` or the name of a model parameter; for `find_predictors()`
-#'   as in \pkg{insight}; ignored by `get_data()`.
+#' @param component `"all"`, `"conditional"`, `"location"`,
+#'   `"distributional"` or `"auxiliary"`, which all select every model
+#'   parameter, or for `find_parameters()` the name of a model parameter;
+#'   ignored by `get_data()`.
 #' @param flatten Should a character vector be returned instead of a list?
 #' @param parameters A regular expression the names of the returned
 #'   parameters must match.
@@ -116,11 +118,7 @@ find_predictors.bmmfit <- function(x, effects = "fixed", component = "all",
     character(0)
   )]
   random <- if (length(fixed)) insight::find_random(x, split_nested = TRUE)
-  out <- Filter(length, switch(effects, fixed = fixed, random = random, c(fixed, random)))
-  if (!length(out)) {
-    return(NULL)
-  }
-  if (flatten) unique(unlist(out, use.names = FALSE)) else out
+  .insight_elements(switch(effects, fixed = fixed, random = random, c(fixed, random)), flatten)
 }
 
 
@@ -161,15 +159,17 @@ find_parameters.bmmfit <- function(x, effects = "all", component = "all",
     grouplevel = "r", full = c("b", "sd", "cor", "r"), c("b", "sd", "cor")
   )
   pars <- union(intersect(names(x$bmm$model$parameters), draws$parameter), draws$parameter)
-  pars <- switch(component, all = , conditional = , location = pars, intersect(component, pars))
+  pars <- switch(component,
+    all = , conditional = , location = , distributional = , auxiliary = pars,
+    intersect(component, pars)
+  )
   draws <- draws[draws$class %in% classes & draws$parameter %in% pars, , drop = FALSE]
   if (!is.null(parameters)) {
     draws <- draws[grepl(parameters, draws$variable, perl = TRUE), , drop = FALSE]
   }
   draws$element <- ifelse(draws$class == "b", draws$parameter, paste0(draws$parameter, "_random"))
-  out <- split(draws$variable, factor(draws$element, unique(c(pars, paste0(pars, "_random")))))
-  out <- Filter(length, out)
-  if (flatten) unique(unlist(out, use.names = FALSE)) else out
+  elements <- factor(draws$element, unique(c(pars, paste0(pars, "_random"))))
+  .insight_elements(split(draws$variable, elements), flatten)
 }
 
 
@@ -218,6 +218,12 @@ link_inverse.bmmfit <- function(x, ...) {
   function(eta) link_transform(eta, link, inverse = TRUE)
 }
 
+
+# insight's methods return NULL for an empty selection, flattened or not
+.insight_elements <- function(elements, flatten) {
+  elements <- Filter(length, elements)
+  if (!length(elements)) NULL else if (flatten) unique(unlist(elements, use.names = FALSE)) else elements
+}
 
 # The user's formula as bmm completed it before fitting, restricted to the
 # model's declared parameters and the helper parameters their non-linear

@@ -61,9 +61,10 @@
 and for \code{find_parameters()} also \code{"full"}, \code{"random_variance"} and
 \code{"grouplevel"}, as for the methods of \pkg{insight} for \pkg{brms} fits.}
 
-\item{component}{For \code{find_parameters()}, \code{"all"}, \code{"conditional"},
-\code{"location"} or the name of a model parameter; for \code{find_predictors()}
-as in \pkg{insight}; ignored by \code{get_data()}.}
+\item{component}{\code{"all"}, \code{"conditional"}, \code{"location"},
+\code{"distributional"} or \code{"auxiliary"}, which all select every model
+parameter, or for \code{find_parameters()} the name of a model parameter;
+ignored by \code{get_data()}.}
 
 \item{flatten}{Should a character vector be returned instead of a list?}
 
@@ -113,9 +114,10 @@ element per model parameter (\verb{<parameter>} for the population-level
 coefficients, \verb{<parameter>_random} for the group-level ones), without
 the parameters that the \pkg{brms} family needs but the model does not
 have, such as the fixed \code{mu} of the response-time models. \code{component}
-selects a model parameter by name; \code{"all"}, \code{"conditional"} and
-\code{"location"} select all of them. \code{\link[insight:get_parameters]{insight::get_parameters()}} and
-\code{\link[insight:clean_parameters]{insight::clean_parameters()}} build on it.
+selects a model parameter by name; \code{"all"}, \code{"conditional"},
+\code{"location"}, \code{"distributional"} and \code{"auxiliary"} select all of them.
+\code{\link[insight:get_parameters]{insight::get_parameters()}} and \code{\link[insight:clean_parameters]{insight::clean_parameters()}} build on
+it.
 \item \code{get_priors()} returns one row per population-level coefficient,
 group-level standard deviation and correlation, with the prior that
 applies to it. A parameter fixed to a constant has the distribution

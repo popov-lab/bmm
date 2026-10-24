@@ -416,6 +416,25 @@ test_that("parameters and bayestestR summarise every model parameter on its own"
   }
 })
 
+test_that("every model parameter is a distributional parameter, an empty selection is NULL", {
+  skip_if_not_installed("insight")
+  skip_if_not_installed("parameters")
+  skip_if_not_installed("bayestestR")
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  expected <- c("b_Intercept", paste0("b_c_set_size", 1:4), "b_kappa_Intercept")
+  for (component in c("distributional", "auxiliary")) {
+    expect_identical(insight::find_parameters(fit, component = component, flatten = TRUE), expected,
+                     info = component)
+  }
+  mp <- suppressWarnings(suppressMessages(parameters::model_parameters(fit, component = "distributional")))
+  expect_identical(mp$Parameter, expected)
+  dp <- suppressWarnings(suppressMessages(bayestestR::describe_posterior(fit, component = "distributional")))
+  expect_identical(dp$Parameter, expected)
+  expect_null(insight::find_parameters(fit, component = "zi"))
+  expect_null(insight::find_parameters(fit, effects = "random"))
+  expect_null(insight::find_predictors(fit, effects = "random"))
+})
+
 test_that("estimate_means() returns a model parameter on its native scale", {
   skip_if_not_installed("insight")
   skip_if_not_installed("modelbased")
