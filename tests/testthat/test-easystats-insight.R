@@ -100,27 +100,38 @@ test_that("find_formula() keeps the group-level terms of a parameter apart", {
   expect_identical(insight::find_random(fit, flatten = TRUE), "ID")
 })
 
-test_that("the methods that need no draws read every registered model", {
-  # 48 mock fits, about 30 s: the response layouts differ across models and
-  # within a model across its cases (sdt_cdp's column prefix)
-  skip_on_cran()
-  skip_if_not_installed("insight")
-  cases <- c(model_test_cases("stored_frame"), model_test_cases("sd_default"))
-  for (i in seq_along(cases)) {
-    case <- cases[[i]]
-    label <- names(cases)[i]
+# the stored-frame case of every model, and the default-prior case of the
+# model versions that have no stored-frame case
+draw_free_cases <- local({
+  cases <- NULL
+  function() {
+    if (is.null(cases)) {
+      stored <- model_test_cases("stored_frame")
+      defaults <- model_test_cases("sd_default")
+      version <- function(case) class(case$model)[length(class(case$model))]
+      cases <<- c(stored, defaults[!vapply(defaults, version, "") %in% vapply(stored, version, "")])
+    }
+    cases
+  }
+})
+
+for (case_name in names(draw_free_cases())) {
+  test_that(paste0("the methods that need no draws read the model (", case_name, ")"), {
+    skip_on_cran()
+    skip_if_not_installed("insight")
+    case <- draw_free_cases()[[case_name]]
     fit <- suppressWarnings(suppressMessages(
       bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
     ))
     response <- insight::find_response(fit)
     columns <- names(insight::get_data(fit))
-    expect_true(length(response) > 0 && all(response %in% columns), info = label)
-    expect_true(all(insight::find_predictors(fit, effects = "all", flatten = TRUE) %in% columns), info = label)
-    expect_identical(length(insight::find_formula(fit)$conditional), 3L, info = label)
-    expect_no_error(insight::model_info(fit), message = label)
-    expect_no_error(insight::get_response(fit), message = label)
-  }
-})
+    expect_true(length(response) > 0 && all(response %in% columns))
+    expect_true(all(insight::find_predictors(fit, effects = "all", flatten = TRUE) %in% columns))
+    expect_identical(length(insight::find_formula(fit)$conditional), 3L)
+    expect_no_error(insight::model_info(fit))
+    expect_no_error(insight::get_response(fit))
+  })
+}
 
 test_that("find_response() names the count columns of sdt_cdp(), whatever their prefix", {
   skip_on_cran()
