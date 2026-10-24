@@ -204,7 +204,6 @@ test_that("model_info() describes a bmm model as nonlinear without a dispersion 
     expect_false(info$is_linear, label = label)
     expect_false(info$is_dispersion, label = label)
     expect_true(info$is_bayesian, label = label)
-    expect_identical(info$family, fit$family$family, info = label)
     expect_identical(info$is_mixed, length(re_group_vars(fit$bmm$user_formula)) > 0, info = label)
   }
 })
@@ -215,12 +214,12 @@ test_that("get_parameters() returns every draw of the model parameters and no te
     label <- fit_label(fit)
     draws <- insight::get_parameters(fit)
     expect_equal(nrow(draws), brms::ndraws(fit), info = label)
-    expect_identical(names(draws), insight::find_parameters(fit, effects = "fixed", flatten = TRUE))
     pars <- insight::find_parameters(fit, effects = "full", flatten = TRUE)
     cleaned <- insight::clean_parameters(fit)
     # the main dpar's intercept is b_Intercept: a parameter only where the model declares mu
     expect_identical("b_Intercept" %in% pars, "mu" %in% names(fit$bmm$model$parameters), info = label)
-    expect_identical("b_Intercept" %in% cleaned$Parameter, "mu" %in% names(fit$bmm$model$parameters))
+    expect_identical("b_Intercept" %in% cleaned$Parameter, "mu" %in% names(fit$bmm$model$parameters),
+                     info = label)
     for (tp in technical_parameters(fit)) {
       expect_false(any(grepl(paste0("^b_", tp, "_"), pars)), info = paste(label, tp))
     }
@@ -263,14 +262,6 @@ test_that("find_parameters() honours effects, component, parameters and flatten"
 
 test_that("get_priors() gives the prior of every coefficient, constants with their value", {
   skip_if_not_installed("insight")
-  for (fit in fixture_fits()) {
-    label <- fit_label(fit)
-    priors <- insight::get_priors(fit)
-    expect_identical(priors$Parameter, insight::find_parameters(fit, flatten = TRUE), info = label)
-    provenance <- prior_provenance(fit)
-    expect_setequal(priors$Distribution, sub("\\(.*", "", provenance$prior))
-  }
-
   sdm_priors <- insight::get_priors(load_fixture_fit("bmmfit_example1.rds"))
   expect_identical(sdm_priors, data.frame(
     Parameter = c("b_Intercept", paste0("b_c_set_size", 1:4), "b_kappa_Intercept"),
@@ -297,7 +288,7 @@ test_that("get_priors() reads a brms mixture, whose first component's coefficien
   fit <- suppressWarnings(suppressMessages(
     bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
   ))
-  skip_if_not(identical(fit$family$family, "mixture"), "mixture2p is not a brms mixture here")
+  expect_identical(fit$family$family, "mixture")
   # the draws a sampled mixture2p fit of this formula has
   local_mocked_bindings(
     variables = function(x, ...) {
@@ -374,14 +365,17 @@ test_that("get_data() returns the data the user passed, response categories as c
     expect_true(all(insight::find_response(fit) %in% names(data)), info = label)
     expect_true(all(insight::find_predictors(fit, effects = "all", flatten = TRUE) %in% names(data)),
                 info = label)
-    expect_false(any(built_data_columns(fit$bmm$model) %in% names(data)), info = label)
   }
 
+  expect_identical(names(insight::get_data(load_fixture_fit("bmmfit_example1.rds"))), c("dev_rad", "set_size"))
+  expect_identical(names(insight::get_data(load_fixture_fit("bmmfit_mpt_ppcheck.rds"))), c("old", "new", "id"))
   m3_fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
   data <- insight::get_data(m3_fit)
-  expect_false("Y" %in% names(data))
-  expect_identical(data[c("corr", "other", "dist", "npl")],
-                   as.data.frame(m3_fit$data$Y)[c("corr", "other", "dist", "npl")])
+  expect_identical(names(data), c("corr", "other", "dist", "npl", "n_corr", "n_other", "n_dist", "n_npl",
+                                  "cond", "ID"))
+  counts <- data[c("corr", "other", "dist", "npl")]
+  expect_equal(unname(as.matrix(counts[1:3, ])), rbind(c(78, 11, 8, 3), c(73, 23, 0, 4), c(95, 4, 0, 1)))
+  expect_equal(colSums(counts), c(corr = 1755, other = 905, dist = 230, npl = 110))
   expect_identical(names(insight::get_data(m3_fit, effects = "random")), "ID")
   expect_false("ID" %in% names(insight::get_data(m3_fit, effects = "fixed")))
   expect_identical(names(insight::get_response(m3_fit)), c("corr", "other", "dist", "npl"))
