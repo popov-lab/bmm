@@ -239,8 +239,10 @@ link_inverse.bmmfit <- function(x, ...) {
 # belongs to and its class. brms names the draws b_<par>_<coef>,
 # sd_<group>__<par>_<coef>, cor_<group>__<par>_<coef>__<par>_<coef> and
 # r_<group>__<par>[<level>,<coef>], leaving out <par>_ for the main dpar. The
-# parameter is the longest dpar or nlpar name the remainder starts with, so
-# that kappa2_Intercept belongs to kappa2, not to kappa.
+# parameter is the dpar or nlpar name the remainder starts with; brms forbids
+# `_` in these names, so at most one matches. A population-level predictor of
+# the main dpar may itself start with <par>_, so the main dpar's coefficients,
+# as the fit's prior lists them, are matched first.
 .insight_draws <- function(x) {
   variable <- brms::variables(x)
   class <- sub("^(b|bs|bsp|bcs)_.*", "b", sub("^(sd|cor|r)_.*", "\\1", variable))
@@ -254,10 +256,11 @@ link_inverse.bmmfit <- function(x, ...) {
   main <- names(terms$dpars)[1]
   # a mixture names the coefficients of its first dpar, mu1, with the prefix
   candidates <- names(c(terms$dpars, terms$nlpars))
-  candidates <- candidates[order(-nchar(candidates))]
   prefix <- vapply(rest, function(r) {
     c(candidates[startsWith(r, paste0(candidates, "_")) | startsWith(r, paste0(candidates, "["))], NA)[1]
   }, character(1), USE.NAMES = FALSE)
+  prior <- x$prior
+  prefix[class == "b" & rest %in% prior$coef[prior$class == "b" & !nzchar(prior$dpar) & !nzchar(prior$nlpar)]] <- NA
   draws <- data.frame(
     variable, class,
     parameter = ifelse(is.na(prefix), main, prefix),

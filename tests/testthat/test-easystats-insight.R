@@ -229,6 +229,34 @@ test_that("get_priors() reads a brms mixture, whose first component's coefficien
   ))
 })
 
+test_that("a coefficient of mu whose predictor starts with another parameter's name belongs to mu", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  data <- small_data()[1:200, ]
+  data$c_load <- as.numeric(data$set_size)
+  prior <- brms::set_prior("normal(0, 0.3)", class = "b") +
+    brms::set_prior("normal(0, 2)", class = "b", dpar = "c")
+  fit <- suppressWarnings(suppressMessages(
+    bmm(bmf(mu ~ 1 + c_load, c ~ 1 + c_load, kappa ~ 1), data, sdm("dev_rad"),
+        prior = prior, backend = "mock", mock_fit = 1, rename = FALSE)
+  ))
+  # brms names mu's slope b_c_load and c's slope b_c_c_load
+  local_mocked_bindings(
+    variables = function(x, ...) {
+      c("b_Intercept", "b_c_load", "b_c_Intercept", "b_c_c_load", "b_kappa_Intercept", "lprior", "lp__")
+    },
+    .package = "brms"
+  )
+  expect_identical(insight::find_parameters(fit), list(
+    mu = c("b_Intercept", "b_c_load"),
+    c = c("b_c_Intercept", "b_c_c_load"),
+    kappa = "b_kappa_Intercept"
+  ))
+  priors <- insight::get_priors(fit)
+  slopes <- priors[match(c("b_c_load", "b_c_c_load"), priors$Parameter), ]
+  expect_identical(slopes$Scale, c(0.3, 2))
+})
+
 test_that("get_data() returns the data the user passed, response categories as columns", {
   skip_if_not_installed("insight")
   for (fit in fixture_fits()) {
