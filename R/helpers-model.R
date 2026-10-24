@@ -1035,12 +1035,17 @@ use_model_template <- function(model_name,
      # - tests/testthat/test-model_{model_name}.R with the model's own contract
      #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
      #   their sites are registered in test-conventions.R (a test requires it)
-     # - a provider model_cases_<model>() in tests/testthat/helper-model-<model>.R
-     #   with stored_frame, sd_default, init and links cases (a test requires
-     #   them); see tests/testthat/helper-model-cases.R. If `check_data()`
-     #   consumes or creates columns, also a `revert_check_data.<model>()` method
-     # - a `response_annotations.<model>()` method, if the response columns need
-     #   a unit or a coding note in the console output
+     # - `model_cases_{model_name}()` in tests/testthat/helper-model-{model_name}.R
+     #   with a `stored_frame`, `sd_default`, `init` and `links` case (a test
+     #   requires them; the case kinds are listed in helper-model-cases.R)
+     # - a `revert_check_data.<model>()` method in R/update.R if `check_data()`
+     #   consumes or creates columns
+     # - a `built_data_columns()` method next to `check_data()` naming every
+     #   column it creates except the `Y` response matrix, so pp_check(),
+     #   conditional_effects() and the formula checks treat them as bmm's own
+     #   (a test requires it)
+     # - a `response_annotations.<model>()` method, if the response columns
+     #   need a unit or a coding note in the console output
      #
      # In this file, `citation` needs at least one reference, one per element, each
      # on a single line without a \"- \" bullet and ending in \".\" or a

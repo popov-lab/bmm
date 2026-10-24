@@ -215,6 +215,14 @@ ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL,
 # CHECK_DATA S3 methods                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+built_data_columns.ezdm <- function(model) {
+  c(
+    if (model$version == "4par") .EZDM_RT_USED,
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.ezdm <- function(model, data, formula) {
   # retrieve required variable names
