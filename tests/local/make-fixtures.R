@@ -94,6 +94,19 @@ if (make("bmmfit_ezdm4_ppcheck.rds")) {
   save_fixture(ezdm4_fit, "bmmfit_ezdm4_ppcheck.rds", seed = 4)
 }
 
+if (make("bmmfit_ezcdm_ppcheck.rds")) {
+  set.seed(5)
+  ezcdm_data <- rezcdm(10, n_trials = 40, drift = 2, bound = 1.5, ndt = 0.3)
+  ezcdm_fit <- do.call(bmm, c(list(
+    formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+    data = ezcdm_data,
+    model = ezcdm(mean_angle = "mean_angle", var_angle = "var_angle",
+                  mean_rt = "mean_rt", var_rt = "var_rt", n_trials = "n_trials",
+                  version = "3par")
+  ), fit_args))
+  save_fixture(ezcdm_fit, "bmmfit_ezcdm_ppcheck.rds", seed = 5)
+}
+
 # m3 custom with random effects, for the m3 pp_check() and the
 # post-processing tests; ten participants keep the random-effect draws small
 if (make("bmmfit_m3_ppcheck.rds")) {

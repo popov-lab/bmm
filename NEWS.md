@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New models
+* Add the **EZ Circular Diffusion Model** (`ezcdm`) for continuous-report tasks with response times (Qarehdaghi & Amani Rad, 2024). It estimates drift rate, boundary and non-decision time, and in `version = "4par"` the drift angle, from the circular mean and variance of the response angles and the mean and variance of the response times per participant and condition. `ezcdm_summary_stats()` computes these statistics from trial data and by default corrects them for contaminant trials. Also adds `dezcdm()` and `rezcdm()`. See `?ezcdm` and the EZ circular diffusion article (#150). Thanks to @GidonFrischkorn
+
 ### New features
 * `qsdm()`, the quantile function of the SDM distribution, now works; it stopped with "'qsdm' is not implemented yet". It takes `lower.tail`, `log.p` and `lower.bound` as `psdm()` does and returns values between `lower.bound` and `lower.bound + 2 * pi` (#556).
 
@@ -19,6 +22,7 @@
 * `pp_check(group = )` on a multinomial fit and `conditional_effects()` no longer ignore your predictors whose names start with `Idx_`, `n_`, `LureIdx` or `Item<number>_`, or are named `inv_ss` or `expS`. `pp_check()` warned that the column was not a predictor and pooled the plot; `conditional_effects()` dropped the panel, and those of its interactions, without a message. bmm now hides only the columns it creates itself (#550).
 * `fit_info()` reports every chain of a fit combined with `brms::combine_models()`. It listed the first fit's chains only: for `combine_models(fit, update(fit, seed = 2))`, `fit_info("time")` had one row for two chains. It also works for `rstan` fits now, where it returned `NULL`, and `what = "step_size"` returns the adapted step size per chain. `fit_info("time_mean")` no longer returns a mean `chain_id` (#555).
 * `rezdm()` now accepts a vector `n_trials`, one value per draw, as `dezdm()` does. It stopped with "the condition has length > 1" (#564).
+* `ezdm` now stops with an error naming the column when `n_trials` holds non-integer values. It used to warn that the counts "should be whole numbers" and continue, after which brms stopped with "Number of trials must be non-negative integers".
 * `ddm()` and `cswald()` now check response times and responses alike (#557). A factor or date-time response time now stops with a message asking for a number. Before, a factor stopped `cswald()` with "missing value where TRUE/FALSE needed"; a date-time, and a factor in `ddm()`, failed later in brms. A response time of 0 now stops too. In `ddm()`, `cswald(version = "crisk")` and for correct responses in `cswald()`, such a fit failed as sampling started; an error response at 0 in `cswald()` was ignored. Remove these rows. `ddm()` accepts a factor response labelled "upper" and "lower".
 
 ### Other changes

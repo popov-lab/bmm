@@ -41,7 +41,9 @@ the models of the version this page was built from.
 **Continuous reproduction.** Participants reproduce a color, an
 orientation or another continuous feature, and the response error is the
 dependent variable. See the [continuous reproduction
-article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html).
+article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html). If you
+also recorded response times, see the [EZ circular diffusion
+article](https://venpopov.com/bmm/articles/bmm_ezcdm.html).
 
 - [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference
   measurement model by Oberauer and Lin (2017)
@@ -87,13 +89,14 @@ each model offers.
 - [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Signal
   Detection Theory (Yes/No)
 
-**Choices and response times.** Participants choose between two options
-and the response time is recorded, either on every trial or as means and
-variances per condition. See the
+**Choices and response times.** Participants choose between two options,
+or report a feature on a circle, such as an orientation or a color, and
+the response time is recorded, either on every trial or as means and variances per condition. See the
 [DDM](https://venpopov.com/bmm/articles/bmm_ddm.html), [censored shifted
 Wald](https://venpopov.com/bmm/articles/bmm_cswald.html),
-[EZ-diffusion](https://venpopov.com/bmm/articles/bmm_ezdm.html) and
-[response time
+[EZ-diffusion](https://venpopov.com/bmm/articles/bmm_ezdm.html), [EZ
+circular diffusion](https://venpopov.com/bmm/articles/bmm_ezcdm.html)
+and [response time
 contamination](https://venpopov.com/bmm/articles/bmm_rt_contamination.html)
 articles.
 
@@ -101,6 +104,8 @@ articles.
   Censored-Shifted Wald Model
 - [`ddm()`](https://venpopov.com/bmm/reference/ddm.html): Diffusion
   Decision Model
+- [`ezcdm()`](https://venpopov.com/bmm/reference/ezcdm.html): EZ
+  Circular Diffusion Model
 - [`ezdm()`](https://venpopov.com/bmm/reference/ezdm.html): EZ-Diffusion
   Model
 

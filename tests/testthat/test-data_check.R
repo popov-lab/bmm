@@ -214,6 +214,20 @@ test_that("bmm_data_check skips the min_trials note for aggregate-data models", 
   expect_equal(min(res$cells$counts$n), 3)
 })
 
+test_that("bmm_data_check treats ezcdm rows as aggregates", {
+  dat <- data.frame(
+    mean_angle = c(0.1, -0.1, 0.05, 0), var_angle = c(0.3, 0.35, 0.4, 0.3),
+    mean_rt = c(0.8, 0.9, 0.85, 0.95), var_rt = c(0.05, 0.06, 0.05, 0.07),
+    n_trials = 100, cond = c("a", "b", "a", "b")
+  )
+  res <- bmm_data_check(
+    bmf(drift ~ cond, bound ~ 1, ndt ~ 1), dat,
+    ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials")
+  )
+  expect_null(res$pipeline$error)
+  expect_false(any(grepl("fewer than", finding_messages(res))))
+})
+
 test_that("bmm_data_check does not count mpt rows as trials", {
   withr::local_seed(445)
   res <- bmm_data_check(

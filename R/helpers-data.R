@@ -146,6 +146,42 @@ check_data.non_targets <- function(model, data, formula) {
   NextMethod("check_data")
 }
 
+# Shared by the EZ models, whose aggregated RT summaries obey the same rules.
+# `used` marks the summaries the likelihood reads (ezdm 4par leaves a boundary
+# without responses unused), so placeholders there are not rejected.
+check_rt_summary_vars <- function(data, mean_rt, var_rt, used = TRUE) {
+  mean_rt_values <- as.matrix(data[mean_rt])[used %in% TRUE]
+  # typical RTs in seconds are 0.2-3s; values > 10 suggest milliseconds
+  warnif(
+    any(mean_rt_values > 10, na.rm = TRUE),
+    "Some mean RT values are greater than 10. If your reaction times are in
+    milliseconds, please convert them to seconds before fitting the model.
+    The model assumes reaction times are measured in seconds."
+  )
+  stopif(
+    any(mean_rt_values <= 0, na.rm = TRUE),
+    "Mean RT values must be positive. Found non-positive values in the data."
+  )
+  stopif(
+    any(as.matrix(data[var_rt])[used %in% TRUE] <= 0, na.rm = TRUE),
+    "Variance of RT must be positive. Found non-positive values in the data."
+  )
+}
+
+# Non-integer n_trials is an error rather than a warning because brms's
+# trials() term rejects it one step later with a message that names no column.
+check_n_trials_var <- function(data, n_trials) {
+  n_trials_values <- data[[n_trials]]
+  stopif(
+    any(n_trials_values <= 2, na.rm = TRUE),
+    "Number of trials ('{n_trials}') must be larger than two."
+  )
+  stopif(
+    any(n_trials_values %% 1 != 0, na.rm = TRUE),
+    "Number of trials ('{n_trials}') must be whole numbers. Found non-integer values."
+  )
+}
+
 check_var_set_size <- function(set_size, data) {
   stopif(
     length(set_size) > 1,
@@ -586,7 +622,9 @@ has_nonconsecutive_duplicates <- function(vec) {
 #'   `version = "4par"`, so the two versions can disagree about whether the
 #'   same cell is corrected. For `version = "4par"`, [bmm()] still fits a cell
 #'   whose summaries at one or both boundaries are NA, through its response
-#'   counts. Default is 10
+#'   counts. Default is 10. In [ezcdm_summary_stats()], `min_trials` only
+#'   decides whether the mixture is fitted, and smaller cells get the simple
+#'   statistics instead of `NA`
 #' @param init_contaminant Numeric. Initial proportion of contaminants for EM
 #'   algorithm. Default is 0.05
 #' @param max_contaminant Numeric. Maximum allowed contaminant proportion
@@ -1011,6 +1049,332 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
          "guess_rate must be between 0 and 1")
   as.data.frame(.adjust_accuracy_counts(n_upper, n_trials, contaminant_prop,
                                         guess_rate))
+}
+
+############################################################################# !
+# EZCDM SUMMARY STATISTICS                                               ####
+############################################################################# !
+
+# Shared by ezcdm_summary_stats() and rezcdm() so that the summary users compute
+# and the summary the generator simulates cannot drift apart. rowsum() keeps it
+# vectorised over replicates, which posterior predictions with many draws need.
+# weights are the mixture responsibilities; all-one weights give the plain
+# circular mean and variance, which is what keeps method = "mixture" equal to
+# method = "simple" on data without contaminants.
+.circular_summary <- function(angles, group = rep_len(1L, length(angles)),
+                              weights = rep_len(1, length(angles))) {
+  sums <- rowsum(weights * cbind(1, cos(angles), sin(angles)), group)
+  mean_cos <- as.vector(sums[, 2] / sums[, 1])
+  mean_sin <- as.vector(sums[, 3] / sums[, 1])
+  data.frame(
+    mean_angle = atan2(mean_sin, mean_cos),
+    # rounding can push the resultant length of identical angles above 1
+    var_angle = 1 - pmin(1, sqrt(mean_cos^2 + mean_sin^2))
+  )
+}
+
+#' Compute Summary Statistics for the EZ Circular Diffusion Model
+#'
+#' @description Computes the four summary statistics required by [ezcdm()]
+#'   from trial-level continuous-report data: the circular mean and circular
+#'   variance of the response angles, and the mean and variance of the
+#'   reaction times.
+#'
+#' @param angle Numeric vector of response angles, in radians (default) or
+#'   degrees (see `radians`).
+#' @param rt Numeric vector of reaction times in seconds, of the same length as
+#'   `angle`.
+#' @param target Optional numeric vector of target angles, either of length one
+#'   or of the same length as `angle`, in the same unit as `angle`. If
+#'   provided, the statistics are computed on the response deviation
+#'   `angle - target`, so that a drift angle of 0 means responses centred on
+#'   the target. If `NULL` (default), `angle` is used as is.
+#' @param radians Logical. Are `angle` and `target` in radians (`TRUE`,
+#'   default) or degrees (`FALSE`)?
+#' @param distribution Character. The parametric distribution for the reaction
+#'   times of the cognitive component. One of "exgaussian" (default),
+#'   "lognormal", or "invgaussian". Only used when `method = "mixture"`.
+#' @param method Character. How contaminant trials are handled. One of
+#'   "mixture" (default), "robust", or "simple". See Details.
+#' @param robust_scale Character. Scale estimator for the robust method. Either
+#'   "iqr" (default), giving `(IQR/1.349)^2`, or "mad", giving `mad()^2`. Only
+#'   used when `method = "robust"`.
+#' @param contaminant_bound Vector of length 2 specifying the bounds (in
+#'   seconds) of the uniform contaminant distribution over reaction times. Can
+#'   be numeric values or the strings "min" and "max" for data-driven bounds
+#'   (default), which are extended by half the data range on each side (at
+#'   least 0.1 s), as in [ezdm_summary_stats()]. Only used when
+#'   `method = "mixture"`. See Details for what the buffer costs.
+#' @param min_trials Integer. Minimum number of complete trials required to fit
+#'   the mixture. Cells with fewer trials fall back to `method = "simple"` with
+#'   a warning, rather than returning `NA`, so that small cells still yield
+#'   usable statistics. Default is 10. This differs from
+#'   [ezdm_summary_stats()], where a cell below `min_trials` gets `NA`
+#'   reaction-time statistics under every method.
+#' @param init_contaminant Numeric. Initial contaminant proportion for the EM
+#'   algorithm. Default is 0.05.
+#' @param max_contaminant Numeric. Maximum allowed contaminant proportion
+#'   (0 < max <= 1). Estimates are clipped to this value. Default is 0.5.
+#' @param maxit Integer. Maximum number of EM iterations. Default is 500.
+#' @param tol Numeric. Convergence tolerance for the EM algorithm.
+#'   Default is 1e-6.
+#'
+#' @return A 1-row `data.frame` with columns
+#'   \itemize{
+#'     \item `mean_angle`: circular mean of the (deviation) angles in radians,
+#'       in \eqn{(-\pi, \pi]}
+#'     \item `var_angle`: circular variance, one minus the mean resultant
+#'       length, in \eqn{[0, 1]}
+#'     \item `mean_rt`: mean reaction time
+#'     \item `var_rt`: variance of the reaction times (denominator `n - 1`)
+#'     \item `n_trials`: integer, the number of complete trials used. For
+#'       `method = "mixture"` this is the *effective* number of non-contaminant
+#'       trials, `round(sum(w))` over the mixture responsibilities `w`, because
+#'       that is the count the corrected statistics actually rest on; it is the
+#'       number of complete trials when the mixture fails the BIC gate
+#'     \item `contaminant_prop`: for `method = "mixture"`, the share of trials
+#'       the mixture assigns to the contaminant component, `1 - sum(w) / n`. It
+#'       is 0 when the mixture fails the BIC gate, and it can lie slightly above
+#'       `max_contaminant` when the proportion is clipped, because the clip
+#'       bounds the mixing proportion, not the responsibilities. `NA` for the
+#'       "simple" and "robust" methods
+#'   }
+#'   If no trial is complete, including for empty input, all statistics are
+#'   `NA` and `n_trials` is 0.
+#'
+#' @details With \eqn{\bar{C}} and \eqn{\bar{S}} the means of the cosines and
+#'   sines of the angles, the circular mean is
+#'   \eqn{\mathrm{atan2}(\bar{S}, \bar{C})} and the circular variance is
+#'   \eqn{1 - \sqrt{\bar{C}^2 + \bar{S}^2}}. Trials with a missing angle, reaction
+#'   time or target are dropped before the statistics are computed.
+#'
+#'   The function is designed for grouped operations with [dplyr::reframe()],
+#'   e.g. `reframe(ezcdm_summary_stats(angle, rt, target), .by = c(id, cond))`.
+#'
+#' ## Contaminant trials
+#'
+#'   Fast guesses and lapses of attention distort all four statistics, and they
+#'   do so in both channels: a lapse produces a reaction time from some other
+#'   process *and* a response angle that is unrelated to the target. The
+#'   unrelated angles deflate the mean resultant length, which biases
+#'   \eqn{\kappa = a v} downward, while the stray reaction times inflate
+#'   `var_rt`. Because the non-decision time is a residual
+#'   (\eqn{MRT - (a/v) R}), it absorbs most of the resulting distortion and is
+#'   driven toward zero.
+#'
+#'   \describe{
+#'     \item{`"simple"`}{The plain moments. Appropriate when the data are
+#'       already cleaned.}
+#'     \item{`"robust"`}{Median and an IQR- or MAD-based variance for the
+#'       reaction times; with `robust_scale = "iqr"` this is the robust EZ-CDM
+#'       of Qarehdaghi and Amani Rad (2024, Eq. 5). The angle statistics are
+#'       left untouched: `var_angle` is a sufficient statistic for
+#'       \eqn{\kappa}, so down-weighting angles far from the mean direction
+#'       would not remove contaminants but bias \eqn{\kappa} upward. The
+#'       likelihood reads the robust statistics as the mean and the variance,
+#'       and for right-skewed reaction times both lie lower even without
+#'       contaminants. In simulations from the model (three parameter sets,
+#'       100 trials per cell) the median was 9-12\% below the mean and
+#'       \eqn{(IQR/1.349)^2} 27-32\% below the variance; with 200,000 trials
+#'       this raised drift rate by 8-10\% and lowered boundary by 7-9\%.
+#'       Qarehdaghi and Amani Rad (2024, p. 2074) report the same direction of
+#'       bias for the robust EZ-CDM.}
+#'     \item{`"mixture"`}{A joint EM over reaction times and angles. Contaminant
+#'       trials are uniform on `contaminant_bound` *and* uniform on the circle;
+#'       cognitive trials follow `distribution` in time and a von Mises in
+#'       angle. All four statistics are then computed as
+#'       responsibility-weighted moments, and `n_trials` is the effective number
+#'       of clean trials. Qarehdaghi and Amani Rad (2024, pp. 2081-2086)
+#'       estimate the proportion of guesses from a uniform and von Mises
+#'       mixture over the angles and then recover the decision-time moments
+#'       from a split of the trials by accuracy; the mixture here puts both
+#'       channels into one likelihood instead. The angle channel identifies
+#'       the contaminant proportion far more sharply than the reaction times
+#'       alone.}
+#'   }
+#'
+#'   Weighted moments, rather than the moments of the fitted parametric
+#'   component, are used deliberately: they are distribution-free, they make
+#'   both channels use the same weights, and they reduce exactly to the
+#'   `"simple"` statistics when every weight is one. The cost is that a
+#'   contaminant hidden under the cognitive reaction-time distribution keeps
+#'   part of its weight, so `var_rt` is corrected conservatively.
+#'
+#'   The mixture is applied only if it improves BIC over the one-component
+#'   model. Decision times are right-skewed, so a handful of genuinely slow
+#'   trials look like contaminants to any parametric reaction-time component,
+#'   and because `var_rt` is dominated by its tail, down-weighting even one of
+#'   them can cut the variance substantially. Gating on BIC makes
+#'   `method = "mixture"` return the plain statistics, with
+#'   `contaminant_prop = 0`, when there is no evidence of contamination: in 200
+#'   simulated contaminant-free cells of 150 trials, every row equalled the
+#'   `"simple"` one. If the EM stops at `maxit` without converging, the gate
+#'   judges its last iterate, which is returned if it passes; otherwise the
+#'   plain statistics are returned. Both cases warn.
+#'
+#'   The data-driven bounds are widened by half the data range on each side, as
+#'   in [ezdm_summary_stats()]. The wider uniform has a lower density, so the
+#'   mixture detects less contamination than there is. In simulations with
+#'   contaminants uniform on 0.1-4 s and 150 trials per cell, the estimated
+#'   proportion averaged 0.034 at a true 0.050 and 0.147 at 0.200, and the
+#'   non-decision time implied by the statistics stayed 5\% and 13\% too low
+#'   (median over cells; 52\% and 104\% too low with `"simple"`). With the true
+#'   range as `contaminant_bound = c(0.1, 4)` the proportions were 0.042 and
+#'   0.192 and the non-decision time 2.5\% and 7\% too low. If you know the
+#'   range contaminant reaction times can take, for example the response
+#'   window, pass it as numeric bounds.
+#'
+#' @references Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple,
+#'   robust, and accurate estimation of circular diffusion model parameters.
+#'   *Psychonomic Bulletin & Review*, 31(5), 2058-2091.
+#'   https://doi.org/10.3758/s13423-024-02483-7
+#'
+#'   Ratcliff, R., & Tuerlinckx, F. (2002). Estimating parameters of the
+#'   diffusion model: Approaches to dealing with contaminant reaction times and
+#'   parameter variability. *Psychonomic Bulletin & Review*, 9(3), 438-481.
+#'   https://doi.org/10.3758/BF03196302
+#'
+#' @seealso [ezcdm()] for fitting the EZ circular diffusion model,
+#'   [ezdm_summary_stats()] for the two-choice counterpart,
+#'   [flag_contaminant_rts()] for trial-level contamination probabilities
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' set.seed(123)
+#' angle <- brms::rvon_mises(100, mu = 0.2, kappa = 5)
+#' rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+#' ezcdm_summary_stats(angle, rt)
+#'
+#' # without contaminant handling
+#' ezcdm_summary_stats(angle, rt, method = "simple")
+#'
+#' # median and IQR for the reaction times only
+#' ezcdm_summary_stats(angle, rt, method = "robust")
+#'
+#' # responses and targets in degrees
+#' target <- runif(100, -180, 180)
+#' response <- target + rad2deg(angle)
+#' ezcdm_summary_stats(response, rt, target = target, radians = FALSE)
+#'
+#' # With dplyr for grouped operations
+#' # library(dplyr)
+#' # mydata |>
+#' #   reframe(ezcdm_summary_stats(angle, rt, target), .by = c(id, cond))
+#'
+ezcdm_summary_stats <- function(
+    angle,
+    rt,
+    target = NULL,
+    radians = TRUE,
+    distribution = c("exgaussian", "lognormal", "invgaussian"),
+    method = c("mixture", "simple", "robust"),
+    robust_scale = c("iqr", "mad"),
+    contaminant_bound = c("min", "max"),
+    min_trials = 10,
+    init_contaminant = 0.05,
+    max_contaminant = 0.5,
+    maxit = 500,
+    tol = 1e-6) {
+  stop_missing_args()
+  distribution <- match.arg(distribution)
+  method <- match.arg(method)
+  robust_scale <- match.arg(robust_scale)
+
+  stopif(!is.numeric(angle), "Argument 'angle' must be a numeric vector")
+  stopif(!is.numeric(rt), "Argument 'rt' must be a numeric vector")
+  stopif(length(rt) != length(angle), "Arguments 'angle' and 'rt' must have the same length")
+  stopif(
+    !is.null(target) && (!is.numeric(target) || !length(target) %in% c(1L, length(angle))),
+    "Argument 'target' must be NULL or a numeric vector of length 1 or of the same length as 'angle'"
+  )
+  stopif(any(is.infinite(angle)), "Argument 'angle' contains infinite values")
+  stopif(any(is.infinite(rt)), "Argument 'rt' contains infinite values")
+  stopif(any(is.infinite(target)), "Argument 'target' contains infinite values")
+  stopif(
+    !is.logical(radians) || length(radians) != 1L || is.na(radians),
+    "Argument 'radians' must be TRUE or FALSE"
+  )
+  .validate_contaminant_bounds(contaminant_bound)
+  stopif(!is.numeric(min_trials) || min_trials < 1, "min_trials must be a positive integer")
+  .validate_contaminant_params(init_contaminant, max_contaminant)
+
+  deviation <- angle - rep_len(target %||% 0, length(angle))
+  complete <- !is.na(deviation) & !is.na(rt)
+  # an empty cell must still yield a row, or one empty or all-missing group
+  # aborts a grouped reframe(); check_data() then rejects it through n_trials
+  if (!any(complete)) {
+    return(.ezcdm_empty_summary(0L))
+  }
+  deviation <- deviation[complete]
+  rt <- rt[complete]
+
+  warnif(any(rt > 10), "Some RT values > 10. Ensure RTs are in seconds, not milliseconds.")
+  stopif(any(rt <= 0), "Non-positive RT values found.")
+  warnif(
+    radians && any(abs(deviation) > 2 * pi),
+    "Some angles are larger than 2*pi in absolute value. If they are in degrees, set radians = FALSE."
+  )
+  # a few precise responses can lie within 2*pi degrees of the target by chance
+  warnif(
+    !radians && length(deviation) >= 10 && all(abs(deviation) <= 2 * pi),
+    "All angles are within 2*pi of zero (degrees). If they are in radians, set radians = TRUE."
+  )
+
+  if (!radians) deviation <- deg2rad(deviation)
+  if (method == "mixture" && length(rt) < min_trials) {
+    warning2("Fewer than min_trials ({min_trials}) complete trials. Using \\
+             simple moments without contaminant handling.")
+    method <- "simple"
+  }
+
+  if (method == "mixture") {
+    fit <- .fit_ezcdm_mixture(
+      deviation, rt, distribution,
+      .resolve_contaminant_bounds(contaminant_bound, rt),
+      init_contaminant, max_contaminant, maxit, tol
+    )
+    warnif(
+      !fit$converged && fit$applied,
+      "EM did not converge{.em_maxit_hint(fit, maxit)}. The last iterate \\
+      improves BIC over the one-component model and is returned."
+    )
+    warnif(
+      !fit$converged && !fit$applied,
+      "EM did not converge{.em_maxit_hint(fit, maxit)}. The last iterate does \\
+      not improve BIC over the one-component model, so the simple moments are \\
+      returned."
+    )
+    return(data.frame(
+      mean_angle = fit$mean_angle,
+      var_angle = fit$var_angle,
+      mean_rt = fit$mean_rt,
+      var_rt = fit$var_rt,
+      n_trials = as.integer(round(fit$n_eff)),
+      contaminant_prop = fit$contaminant_prop
+    ))
+  }
+
+  moments <- switch(method,
+    simple = .simple_aggregation(rt),
+    robust = .robust_aggregation(rt, scale_method = robust_scale)
+  )
+  data.frame(
+    .circular_summary(deviation),
+    mean_rt = moments$mean,
+    var_rt = moments$var,
+    n_trials = length(rt),
+    contaminant_prop = NA_real_
+  )
+}
+
+.ezcdm_empty_summary <- function(n_trials) {
+  data.frame(
+    mean_angle = NA_real_, var_angle = NA_real_,
+    mean_rt = NA_real_, var_rt = NA_real_,
+    n_trials = n_trials, contaminant_prop = NA_real_
+  )
 }
 
 ############################################################################# !

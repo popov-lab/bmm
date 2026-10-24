@@ -336,6 +336,20 @@ test_that("pp_check(resp_var) drops undefined 4par ezdm cells with a warning", {
                   "bayesplot_grid")
 })
 
+test_that("pp_check(resp_var) checks all four ezcdm summary statistics", {
+  withr::local_seed(445)
+  fit <- load_fixture_fit("bmmfit_ezcdm_ppcheck.rds")
+  expect_identical(pp_check_vars(fit)$resp_var,
+                   c("mean_angle", "var_angle", "mean_rt", "var_rt"))
+  p <- pp_check(fit, resp_var = "var_rt", ndraws = 5)
+  expect_s3_class(p, "ggplot")
+  expect_setequal(p$data$value[p$data$is_y_label == "italic(y)"],
+                  fit$data$var_rt)
+  p_all <- pp_check(fit, resp_var = "all", ndraws = 5)
+  expect_s3_class(p_all, "bayesplot_grid")
+  expect_length(p_all$bayesplots, 4L)
+})
+
 # reducing the observation dimension would make the retained count decay as
 # (1 - p)^ndraws, so a user asking for more draws would silently check less data
 test_that("pp_check(resp_var) retains every defined observation at any ndraws", {
