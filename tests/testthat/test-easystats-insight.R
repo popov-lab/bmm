@@ -279,6 +279,28 @@ test_that("a coefficient of mu whose predictor starts with another parameter's n
   expect_identical(slopes$Scale, c(0.3, 2))
 })
 
+test_that("get_priors() gives the eta of an lkj prior as its location", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  fit <- suppressWarnings(suppressMessages(
+    bmm(bmf(kappa ~ 1 + (1 | p | ID), c ~ 1 + (1 | p | ID)), small_data(), sdm("dev_rad"),
+        prior = brms::set_prior("lkj(4)", class = "cor", group = "ID"),
+        backend = "mock", mock_fit = 1, rename = FALSE)
+  ))
+  local_mocked_bindings(
+    variables = function(x, ...) {
+      c("b_c_Intercept", "b_kappa_Intercept", "sd_ID__c_Intercept", "sd_ID__kappa_Intercept",
+        "cor_ID__c_Intercept__kappa_Intercept", "lprior", "lp__")
+    },
+    .package = "brms"
+  )
+  priors <- insight::get_priors(fit)
+  expect_identical(
+    as.list(priors[priors$Parameter == "cor_ID__c_Intercept__kappa_Intercept", c("Distribution", "Location", "Scale")]),
+    list(Distribution = "lkj", Location = 4, Scale = NA_real_)
+  )
+})
+
 test_that("get_data() returns the data the user passed, response categories as columns", {
   skip_if_not_installed("insight")
   for (fit in fixture_fits()) {

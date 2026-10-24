@@ -313,7 +313,7 @@ link_inverse.bmmfit <- function(x, ...) {
   switch(sub("\\(.*", "", prior),
     normal = , cauchy = , logistic = c(args[1:2], NA),
     student_t = c(args[2:3], args[1]),
-    constant = c(args[1], NA, NA),
+    constant = , lkj = c(args[1], NA, NA),
     c(NA, NA, NA)
   )
 }
