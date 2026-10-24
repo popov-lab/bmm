@@ -108,8 +108,9 @@ counts as both a location and a distributional parameter, so each
 \item \code{find_response()} returns the names of the response columns, as
 \code{get_data()} returns them.
 \item \code{get_data()} returns the data the model was fitted to as you passed
-them: without the columns bmm adds for its own use, and with the
-response categories of a model fitted to counts (e.g. \code{\link[=m3]{m3()}}) as
+them: without the columns bmm adds for its own use or \pkg{brms}
+computes from the formula (such as \code{ID:session} or \code{log(x)}), and with
+the response categories of a model fitted to counts (e.g. \code{\link[=m3]{m3()}}) as
 columns of their own. The model frame stored in the fit is always the
 source; \code{source} is ignored.
 \item \code{find_parameters()} returns the names of the posterior draws in one

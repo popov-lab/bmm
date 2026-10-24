@@ -109,6 +109,7 @@ formula_cases <- function() {
   list(
     nested_groups = list(formula = bmf(c ~ 1 + (1 | ID/session), kappa ~ 1)),
     interaction_group = list(formula = bmf(c ~ 1 + (1 | ID:session), kappa ~ 1)),
+    transformed_predictor = list(formula = bmf(c ~ 1 + log(ssn), kappa ~ 1)),
     helper_parameters = list(formula = bmf(c ~ c0 + c1 * ssn, c0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)),
     helper_difference = list(formula = bmf(c ~ c0 - c1 * ssn, c0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)),
     helper_of_helper = list(
@@ -170,6 +171,16 @@ test_that("find_random() reads nested and interaction grouping terms as brms doe
                    c("ID", "session"))
   expect_identical(insight::find_random(fits$interaction_group), list(c_random = "ID:session"))
   expect_identical(names(insight::get_data(fits$nested_groups, effects = "random")), c("ID", "session"))
+})
+
+test_that("get_data() leaves out the columns brms computes from the formula", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  fits <- mock_formula_cases()
+  expect_identical(names(insight::get_data(fits$nested_groups)), c("dev_rad", "ID", "session"))
+  expect_identical(names(insight::get_data(fits$nested_groups, effects = "fixed")), "dev_rad")
+  expect_identical(names(insight::get_data(fits$interaction_group)), c("dev_rad", "ID", "session"))
+  expect_identical(names(insight::get_data(fits$transformed_predictor)), c("dev_rad", "ssn"))
 })
 
 test_that("the helper parameters of a non-linear formula are parameters, not predictors", {

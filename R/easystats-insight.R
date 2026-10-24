@@ -27,8 +27,9 @@
 #'   \item `find_response()` returns the names of the response columns, as
 #'     `get_data()` returns them.
 #'   \item `get_data()` returns the data the model was fitted to as you passed
-#'     them: without the columns bmm adds for its own use, and with the
-#'     response categories of a model fitted to counts (e.g. [m3()]) as
+#'     them: without the columns bmm adds for its own use or \pkg{brms}
+#'     computes from the formula (such as `ID:session` or `log(x)`), and with
+#'     the response categories of a model fitted to counts (e.g. [m3()]) as
 #'     columns of their own. The model frame stored in the fit is always the
 #'     source; `source` is ignored.
 #'   \item `find_parameters()` returns the names of the posterior draws in one
@@ -143,6 +144,12 @@ get_data.bmmfit <- function(x, effects = "all", component = "all",
   data <- do.call(cbind, lapply(names(data), function(col) {
     if (is.matrix(data[[col]])) as.data.frame(data[[col]]) else data[col]
   }))
+  # brms adds the columns it computes from the formula, such as ID:session
+  # or log(x), to the model frame
+  model <- x$bmm$model
+  variables <- c(find_response.bmmfit(x), unlist(c(model$resp_vars, model$other_vars)),
+                 unlist(lapply(x$bmm$user_formula, all.vars)))
+  data <- data[names(data) %in% variables]
   groups <- insight::find_random(x, split_nested = TRUE, flatten = TRUE)
   switch(effects,
     random = data[intersect(groups, names(data))],
