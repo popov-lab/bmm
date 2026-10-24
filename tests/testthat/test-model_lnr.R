@@ -268,6 +268,23 @@ test_that("check_data.lnr_simple handles factor responses", {
   expect_true(is.integer(result$response))
 })
 
+# the declaration lets standata() route user-layout newdata through check_data()
+# and keeps the coding columns out of pp_check(group = ) (#550, #552)
+test_that("built_data_columns() declares the coding columns of both lnr versions", {
+  expect_setequal(
+    built_data_columns(lnr(rt = "rt", response = "response", n_choices = 4)),
+    c(".lnr_cat", ".lnr_n1", ".lnr_n2")
+  )
+  custom <- check_model(
+    lnr(rt = "rt", response = "label", version = "custom"),
+    formula = bmf(correct ~ 1, similar ~ 1, other ~ 1)
+  )
+  expect_setequal(
+    built_data_columns(custom),
+    c(".lnr_cat", ".lnr_n1", ".lnr_n2", ".lnr_n3")
+  )
+})
+
 test_that("check_data.lnr returns a data.frame", {
   withr::local_seed(445)
   model <- lnr(rt = "rt", response = "response", n_choices = 2)

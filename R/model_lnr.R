@@ -322,6 +322,22 @@ check_model.lnr_custom <- function(model, data = NULL, formula = NULL) {
 # CHECK_DATA S3 methods                                                  ####
 ############################################################################# !
 
+# the same columns race_bf() hands to vint(): the category code and one
+# accumulator count per racing category
+#' @exportS3Method
+built_data_columns.lnr_simple <- function(model) {
+  c(race_cat_column("lnr"), race_count_columns("lnr", 2), NextMethod("built_data_columns"))
+}
+
+#' @exportS3Method
+built_data_columns.lnr_custom <- function(model) {
+  c(
+    race_cat_column("lnr"),
+    race_count_columns("lnr", length(model$other_vars$resp_cats)),
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.lnr <- function(model, data, formula) {
   race_check_data(model, data)
