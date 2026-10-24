@@ -231,13 +231,13 @@ link_inverse.bmmfit <- function(x, ...) {
 # population-level terms, as brms formulas are split by insight's brmsfit
 # method; stats::terms() keeps each `(... | group)` term whole. insight reads
 # only the grouping factors and slopes from these terms and cannot parse `||`,
-# which says nothing about either.
+# which says nothing about either, nor `/`, which brms expands.
 .split_bar_terms <- function(formula) {
   terms <- stats::terms(formula)
   labels <- attr(terms, "term.labels")
   is_bar <- grepl("|", labels, fixed = TRUE)
   env <- environment(formula)
-  random <- lapply(sub("||", "|", labels[is_bar], fixed = TRUE), function(label) {
+  random <- lapply(.expand_nested_groups(sub("||", "|", labels[is_bar], fixed = TRUE)), function(label) {
     stats::as.formula(paste("~", label), env = env)
   })
   list(
@@ -247,6 +247,17 @@ link_inverse.bmmfit <- function(x, ...) {
     ),
     random = if (length(random) == 1) random[[1]] else random
   )
+}
+
+# brms reads `(1 | a/b)` as `(1 | a) + (1 | a:b)`
+.expand_nested_groups <- function(labels) {
+  unlist(lapply(labels, function(label) {
+    effects <- sub("\\|[^|]*$", "| ", label)
+    groups <- trimws(strsplit(sub("^.*\\|", "", label), "/", fixed = TRUE)[[1]])
+    paste0(effects, vapply(seq_along(groups), function(i) {
+      paste(groups[seq_len(i)], collapse = ":")
+    }, character(1)))
+  }))
 }
 
 # One row per posterior draw of a coefficient, with the brms parameter it

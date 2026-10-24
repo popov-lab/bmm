@@ -100,8 +100,17 @@ test_that("find_formula() keeps the group-level terms of a parameter apart", {
   expect_identical(insight::find_random(fit, flatten = TRUE), "ID")
 })
 
-# the stored-frame case of every model, and the default-prior case of the
-# model versions that have no stored-frame case
+# group-level terms that brms expands before insight reads them
+grouping_cases <- function() {
+  list(
+    nested_groups = list(formula = bmf(c ~ 1 + (1 | ID/session), kappa ~ 1)),
+    interaction_group = list(formula = bmf(c ~ 1 + (1 | ID:session), kappa ~ 1))
+  ) |>
+    lapply(function(case) c(case, list(data = small_data(), model = sdm("dev_rad"))))
+}
+
+# the stored-frame case of every model, the default-prior case of the model
+# versions that have no stored-frame case, and the grouping cases
 draw_free_cases <- local({
   cases <- NULL
   function() {
@@ -109,7 +118,8 @@ draw_free_cases <- local({
       stored <- model_test_cases("stored_frame")
       defaults <- model_test_cases("sd_default")
       version <- function(case) class(case$model)[length(class(case$model))]
-      cases <<- c(stored, defaults[!vapply(defaults, version, "") %in% vapply(stored, version, "")])
+      cases <<- c(stored, defaults[!vapply(defaults, version, "") %in% vapply(stored, version, "")],
+                  grouping_cases())
     }
     cases
   }
@@ -132,6 +142,20 @@ for (case_name in names(draw_free_cases())) {
     expect_no_error(insight::get_response(fit))
   })
 }
+
+test_that("find_random() reads nested and interaction grouping terms as brms does", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  cases <- grouping_cases()
+  fits <- lapply(cases, function(case) suppressWarnings(suppressMessages(
+    bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )))
+  expect_identical(insight::find_random(fits$nested_groups), list(c_random = c("ID", "ID:session")))
+  expect_identical(insight::find_random(fits$nested_groups, split_nested = TRUE, flatten = TRUE),
+                   c("ID", "session"))
+  expect_identical(insight::find_random(fits$interaction_group), list(c_random = "ID:session"))
+  expect_identical(names(insight::get_data(fits$nested_groups, effects = "random")), c("ID", "session"))
+})
 
 test_that("find_response() names the count columns of sdt_cdp(), whatever their prefix", {
   skip_on_cran()
