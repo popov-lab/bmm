@@ -100,17 +100,30 @@ test_that("find_formula() keeps the group-level terms of a parameter apart", {
   expect_identical(insight::find_random(fit, flatten = TRUE), "ID")
 })
 
-# group-level terms that brms expands before insight reads them
-grouping_cases <- function() {
+# formulas the registry does not cover: group-level terms that brms expands
+# before insight reads them, and non-linear formulas with helper parameters
+formula_cases <- function() {
+  data <- small_data()
+  data$ssn <- as.numeric(data$set_size)
   list(
     nested_groups = list(formula = bmf(c ~ 1 + (1 | ID/session), kappa ~ 1)),
-    interaction_group = list(formula = bmf(c ~ 1 + (1 | ID:session), kappa ~ 1))
+    interaction_group = list(formula = bmf(c ~ 1 + (1 | ID:session), kappa ~ 1)),
+    helper_parameters = list(formula = bmf(c ~ c0 + c1 * ssn, c0 ~ 1 + (1 | ID), c1 ~ 1, kappa ~ 1)),
+    helper_function = list(
+      formula = bmf(c ~ en + (st - en) * exp(-R * ssn), st ~ 1 + (1 | ID), en ~ 1, R ~ 1, kappa ~ 1)
+    )
   ) |>
-    lapply(function(case) c(case, list(data = small_data(), model = sdm("dev_rad"))))
+    lapply(function(case) c(case, list(data = data, model = sdm("dev_rad"))))
+}
+
+mock_formula_cases <- function() {
+  lapply(formula_cases(), function(case) suppressWarnings(suppressMessages(
+    bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )))
 }
 
 # the stored-frame case of every model, the default-prior case of the model
-# versions that have no stored-frame case, and the grouping cases
+# versions that have no stored-frame case, and the formula cases
 draw_free_cases <- local({
   cases <- NULL
   function() {
@@ -119,7 +132,7 @@ draw_free_cases <- local({
       defaults <- model_test_cases("sd_default")
       version <- function(case) class(case$model)[length(class(case$model))]
       cases <<- c(stored, defaults[!vapply(defaults, version, "") %in% vapply(stored, version, "")],
-                  grouping_cases())
+                  formula_cases())
     }
     cases
   }
@@ -146,15 +159,31 @@ for (case_name in names(draw_free_cases())) {
 test_that("find_random() reads nested and interaction grouping terms as brms does", {
   skip_on_cran()
   skip_if_not_installed("insight")
-  cases <- grouping_cases()
-  fits <- lapply(cases, function(case) suppressWarnings(suppressMessages(
-    bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
-  )))
+  fits <- mock_formula_cases()
   expect_identical(insight::find_random(fits$nested_groups), list(c_random = c("ID", "ID:session")))
   expect_identical(insight::find_random(fits$nested_groups, split_nested = TRUE, flatten = TRUE),
                    c("ID", "session"))
   expect_identical(insight::find_random(fits$interaction_group), list(c_random = "ID:session"))
   expect_identical(names(insight::get_data(fits$nested_groups, effects = "random")), c("ID", "session"))
+})
+
+test_that("the helper parameters of a non-linear formula are parameters, not predictors", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  fits <- mock_formula_cases()
+  helpers <- fits$helper_parameters
+  expect_identical(names(insight::find_formula(helpers)),
+                   c("conditional", "mu", "c", "kappa", "c0", "c1", "c0_random"))
+  expect_identical(insight::find_predictors(helpers, flatten = TRUE), "ssn")
+  expect_identical(insight::find_predictors(helpers, effects = "all", flatten = TRUE), c("ssn", "ID"))
+  expect_identical(insight::find_random(helpers), list(c0_random = "ID"))
+  expect_true(insight::is_mixed_model(helpers))
+  expect_identical(names(insight::get_data(helpers)), c("dev_rad", "ssn", "ID"))
+
+  function_of_helpers <- fits$helper_function
+  expect_identical(insight::find_predictors(function_of_helpers, effects = "all", flatten = TRUE),
+                   c("ssn", "ID"))
+  expect_identical(insight::find_random(function_of_helpers), list(st_random = "ID"))
 })
 
 test_that("find_response() names the count columns of sdt_cdp(), whatever their prefix", {

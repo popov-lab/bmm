@@ -91,10 +91,11 @@ component, and \code{modelbased::estimate_means(fit, by = "set_size", predict = 
 \details{
 Each method reshapes what the fit already stores:
 \itemize{
-\item \code{find_formula()} returns one formula per model parameter, with the
-population-level and group-level parts as separate elements
-(\verb{<parameter>} and \verb{<parameter>_random}), plus a \code{conditional} formula
-of the response variables on all population-level predictors.
+\item \code{find_formula()} returns one formula per model parameter, and per
+helper parameter of a non-linear formula, with the population-level
+and group-level parts as separate elements (\verb{<parameter>} and
+\verb{<parameter>_random}), plus a \code{conditional} formula of the response
+variables on all population-level predictors.
 \item \code{find_predictors()} returns the predictors of these formulas:
 the population-level predictors for \code{effects = "fixed"}, the grouping
 factors for \code{"random"} and both for \code{"all"}. Every model parameter

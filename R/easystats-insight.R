@@ -14,10 +14,11 @@
 #' @details
 #' Each method reshapes what the fit already stores:
 #' \itemize{
-#'   \item `find_formula()` returns one formula per model parameter, with the
-#'     population-level and group-level parts as separate elements
-#'     (`<parameter>` and `<parameter>_random`), plus a `conditional` formula
-#'     of the response variables on all population-level predictors.
+#'   \item `find_formula()` returns one formula per model parameter, and per
+#'     helper parameter of a non-linear formula, with the population-level
+#'     and group-level parts as separate elements (`<parameter>` and
+#'     `<parameter>_random`), plus a `conditional` formula of the response
+#'     variables on all population-level predictors.
 #'   \item `find_predictors()` returns the predictors of these formulas:
 #'     the population-level predictors for `effects = "fixed"`, the grouping
 #'     factors for `"random"` and both for `"all"`. Every model parameter
@@ -219,20 +220,27 @@ link_inverse.bmmfit <- function(x, ...) {
 
 
 # The user's formula as bmm completed it before fitting, restricted to the
-# model's declared parameters: m3's activation formulas and the technical
-# parameters a family requires are not parameters of the model
+# model's declared parameters and the helper parameters their non-linear
+# formulas use: m3's activation formulas and the technical parameters a
+# family requires are not parameters of the model
 .insight_parameter_formulas <- function(x) {
   model <- x$bmm$model
   formula <- suppressMessages(add_missing_parameters(model, x$bmm$user_formula))
-  formula[intersect(names(formula), names(model$parameters))]
+  non_linear <- intersect(names(formula)[is_nl(formula)], names(model$parameters))
+  helpers <- unlist(lapply(non_linear, function(par) all.vars(formula[[par]][[3]])))
+  formula[intersect(names(formula), c(names(model$parameters), helpers))]
 }
 
 # insight expects the group-level terms of a formula apart from its
 # population-level terms, as brms formulas are split by insight's brmsfit
 # method; stats::terms() keeps each `(... | group)` term whole. insight reads
 # only the grouping factors and slopes from these terms and cannot parse `||`,
-# which says nothing about either, nor `/`, which brms expands.
+# which says nothing about either, nor `/`, which brms expands. A non-linear
+# formula has no group-level terms; brms puts them on its helper parameters.
 .split_bar_terms <- function(formula) {
+  if (is_nl(formula)) {
+    return(list(fixed = formula[-2], random = NULL))
+  }
   terms <- stats::terms(formula)
   labels <- attr(terms, "term.labels")
   is_bar <- grepl("|", labels, fixed = TRUE)
