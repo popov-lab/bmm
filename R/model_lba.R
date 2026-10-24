@@ -328,6 +328,18 @@ check_model.lba_custom <- function(model, data = NULL, formula = NULL) {
   NextMethod("check_model")
 }
 
+# The simple version pools the errors into one accumulator column next to the
+# correct one; the custom version has one per formula category, which
+# check_model() reads from the formula
+#' @exportS3Method
+built_data_columns.lba <- function(model) {
+  n_cats <- if (model$version == "simple") 2 else length(model$other_vars$resp_cats)
+  c(
+    race_cat_column("lba"), race_count_columns("lba", n_cats),
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.lba <- function(model, data, formula) {
   race_check_data(model, data)
