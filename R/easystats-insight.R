@@ -18,7 +18,11 @@
 #'     population-level and group-level parts as separate elements
 #'     (`<parameter>` and `<parameter>_random`), plus a `conditional` formula
 #'     of the response variables on all population-level predictors.
-#'   \item `find_predictors()` returns the predictors of these formulas.
+#'   \item `find_predictors()` returns the predictors of these formulas:
+#'     the population-level predictors for `effects = "fixed"`, the grouping
+#'     factors for `"random"` and both for `"all"`. Every model parameter
+#'     counts as both a location and a distributional parameter, so each
+#'     `component` returns the same variables.
 #'   \item `find_response()` returns the names of the response columns, as
 #'     `get_data()` returns them.
 #'   \item `get_data()` returns the data the model was fitted to as you passed
@@ -98,10 +102,20 @@ find_formula.bmmfit <- function(x, verbose = TRUE, ...) {
 #' @exportS3Method insight::find_predictors
 find_predictors.bmmfit <- function(x, effects = "fixed", component = "all",
                                    flatten = FALSE, verbose = TRUE, ...) {
-  # insight adds every variable of the brms formulas of a non-linear model as
-  # a `nonlinear` element, the columns bmm builds among them
-  out <- NextMethod(flatten = FALSE)
-  out$nonlinear <- NULL
+  formulas <- find_formula.bmmfit(x)
+  fixed <- lapply(formulas[!endsWith(names(formulas), "_random")], function(f) {
+    setdiff(all.vars(f[[length(f)]]), names(formulas))
+  })
+  # every model parameter is a location parameter as well as a distributional
+  # one; a component bmm models do not have, such as zi, has no predictors
+  fixed <- fixed[switch(component,
+    all = names(fixed),
+    conditional = , location = "conditional",
+    distributional = , auxiliary = setdiff(names(fixed), "conditional"),
+    character(0)
+  )]
+  random <- if (length(fixed)) insight::find_random(x, split_nested = TRUE)
+  out <- Filter(length, switch(effects, fixed = fixed, random = random, c(fixed, random)))
   if (!length(out)) {
     return(NULL)
   }

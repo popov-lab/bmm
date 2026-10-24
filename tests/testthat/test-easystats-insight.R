@@ -66,6 +66,26 @@ test_that("find_formula() names the predictors on the sdm and m3 fixtures", {
   expect_identical(names(insight::find_random(m3_fit)), c("a_random", "c_random", "d_random"))
 })
 
+test_that("find_predictors() returns the user's variables for every effects and component", {
+  skip_if_not_installed("insight")
+  expected <- list(
+    "bmmfit_m3_ppcheck.rds" = list(fixed = "cond", random = "ID", all = c("cond", "ID")),
+    "bmmfit_mpt_ppcheck.rds" = list(fixed = NULL, random = "id", all = "id")
+  )
+  for (file in names(expected)) {
+    fit <- load_fixture_fit(file)
+    for (component in c("all", "conditional", "location", "distributional", "auxiliary")) {
+      for (effects in names(expected[[file]])) {
+        expect_identical(
+          insight::find_predictors(fit, effects = effects, component = component, flatten = TRUE),
+          expected[[file]][[effects]],
+          info = paste(file, component, effects)
+        )
+      }
+    }
+  }
+})
+
 test_that("find_formula() keeps the group-level terms of a parameter apart", {
   skip_on_cran()
   skip_if_not_installed("insight")
@@ -93,7 +113,9 @@ test_that("the methods that need no draws read every registered model", {
       bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
     ))
     response <- insight::find_response(fit)
-    expect_true(length(response) > 0 && all(response %in% names(insight::get_data(fit))), info = label)
+    columns <- names(insight::get_data(fit))
+    expect_true(length(response) > 0 && all(response %in% columns), info = label)
+    expect_true(all(insight::find_predictors(fit, effects = "all", flatten = TRUE) %in% columns), info = label)
     expect_identical(length(insight::find_formula(fit)$conditional), 3L, info = label)
     expect_no_error(insight::model_info(fit), message = label)
     expect_no_error(insight::get_response(fit), message = label)

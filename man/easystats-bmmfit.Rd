@@ -95,7 +95,11 @@ Each method reshapes what the fit already stores:
 population-level and group-level parts as separate elements
 (\verb{<parameter>} and \verb{<parameter>_random}), plus a \code{conditional} formula
 of the response variables on all population-level predictors.
-\item \code{find_predictors()} returns the predictors of these formulas.
+\item \code{find_predictors()} returns the predictors of these formulas:
+the population-level predictors for \code{effects = "fixed"}, the grouping
+factors for \code{"random"} and both for \code{"all"}. Every model parameter
+counts as both a location and a distributional parameter, so each
+\code{component} returns the same variables.
 \item \code{find_response()} returns the names of the response columns, as
 \code{get_data()} returns them.
 \item \code{get_data()} returns the data the model was fitted to as you passed
