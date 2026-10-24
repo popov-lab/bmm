@@ -64,3 +64,28 @@ test_that("find_formula() keeps the group-level terms of a parameter apart", {
   expect_true(insight::is_mixed_model(fit))
   expect_identical(insight::find_random(fit, flatten = TRUE), "ID")
 })
+
+test_that("model_info() describes a bmm model as nonlinear without a dispersion parameter", {
+  skip_if_not_installed("insight")
+  for (fit in fixture_fits()) {
+    info <- insight::model_info(fit)
+    label <- fit_label(fit)
+    expect_false(info$is_linear, label = label)
+    expect_false(info$is_dispersion, label = label)
+    expect_true(info$is_bayesian, label = label)
+    expect_identical(info$family, fit$family$family, info = label)
+    expect_identical(info$is_mixed, length(re_group_vars(fit$bmm$user_formula)) > 0, info = label)
+  }
+})
+
+test_that("link_function() and link_inverse() use the first parameter's link of every model", {
+  skip_if_not_installed("insight")
+  for (case in model_test_cases("links")) {
+    fit <- structure(list(bmm = list(model = case$model)), class = c("bmmfit", "brmsfit"))
+    label <- class(case$model)[length(class(case$model))]
+    eta <- insight::link_function(fit)(insight::link_inverse(fit)(0.3))
+    expect_equal(eta, 0.3, info = label)
+  }
+  fit <- structure(list(bmm = list(model = sdm("dev_rad"))), class = c("bmmfit", "brmsfit"))
+  expect_identical(insight::link_inverse(fit)(0.3), 2 * atan(0.3))
+})

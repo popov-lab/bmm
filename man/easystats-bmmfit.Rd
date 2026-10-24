@@ -5,6 +5,9 @@
 \alias{find_formula.bmmfit}
 \alias{find_predictors.bmmfit}
 \alias{find_response.bmmfit}
+\alias{model_info.bmmfit}
+\alias{link_function.bmmfit}
+\alias{link_inverse.bmmfit}
 \title{easystats support for bmmfit objects}
 \usage{
 \method{find_formula}{bmmfit}(x, verbose = TRUE, ...)
@@ -19,6 +22,12 @@
 )
 
 \method{find_response}{bmmfit}(x, combine = TRUE, ...)
+
+\method{model_info}{bmmfit}(x, response = NULL, ...)
+
+\method{link_function}{bmmfit}(x, ...)
+
+\method{link_inverse}{bmmfit}(x, ...)
 }
 \arguments{
 \item{x}{A \code{bmmfit} object (created by \code{\link[=bmm]{bmm()}}).}
@@ -36,6 +45,8 @@ as in \pkg{insight}; ignored by \code{get_data()}.}
 \item{flatten}{Should a character vector be returned instead of a list?}
 
 \item{combine, verbose}{Ignored, for consistency with the generics.}
+
+\item{response}{Ignored, for consistency with the generic.}
 }
 \value{
 See the \pkg{insight} generics, e.g. \code{\link[insight:find_formula]{insight::find_formula()}} and
@@ -57,6 +68,11 @@ population-level and group-level parts as separate elements
 of the response variables on all population-level predictors.
 \item \code{find_predictors()} returns the predictors of these formulas.
 \item \code{find_response()} returns the response variables of the model.
+\item \code{model_info()} describes the model as not linear and as having no
+dispersion parameter; the family is the one of the \pkg{brms} model.
+\item \code{link_function()} and \code{link_inverse()} return the link function of
+the first parameter that has one and its inverse. bmm models have one
+link per parameter, so for anything else use \code{model$links}.
 }
 }
 \examples{

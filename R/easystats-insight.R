@@ -16,6 +16,11 @@
 #'     of the response variables on all population-level predictors.
 #'   \item `find_predictors()` returns the predictors of these formulas.
 #'   \item `find_response()` returns the response variables of the model.
+#'   \item `model_info()` describes the model as not linear and as having no
+#'     dispersion parameter; the family is the one of the \pkg{brms} model.
+#'   \item `link_function()` and `link_inverse()` return the link function of
+#'     the first parameter that has one and its inverse. bmm models have one
+#'     link per parameter, so for anything else use `model$links`.
 #' }
 #'
 #' @param x A `bmmfit` object (created by [bmm()]).
@@ -84,6 +89,33 @@ find_predictors.bmmfit <- function(x, effects = "fixed", component = "all",
 #' @exportS3Method insight::find_response
 find_response.bmmfit <- function(x, combine = TRUE, ...) {
   unlist(x$bmm$model$resp_vars, use.names = FALSE)
+}
+
+
+#' @rdname easystats-bmmfit
+#' @param response Ignored, for consistency with the generic.
+#' @exportS3Method insight::model_info
+model_info.bmmfit <- function(x, response = NULL, ...) {
+  out <- NextMethod()
+  out$is_linear <- FALSE
+  out$is_dispersion <- FALSE
+  out
+}
+
+
+#' @rdname easystats-bmmfit
+#' @exportS3Method insight::link_function
+link_function.bmmfit <- function(x, ...) {
+  link <- x$bmm$model$links[[1]]
+  function(mu) link_transform(mu, link)
+}
+
+
+#' @rdname easystats-bmmfit
+#' @exportS3Method insight::link_inverse
+link_inverse.bmmfit <- function(x, ...) {
+  link <- x$bmm$model$links[[1]]
+  function(eta) link_transform(eta, link, inverse = TRUE)
 }
 
 
