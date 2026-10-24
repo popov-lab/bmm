@@ -6,6 +6,8 @@
 \alias{find_predictors.bmmfit}
 \alias{find_response.bmmfit}
 \alias{get_data.bmmfit}
+\alias{find_parameters.bmmfit}
+\alias{get_priors.bmmfit}
 \alias{model_info.bmmfit}
 \alias{link_function.bmmfit}
 \alias{link_inverse.bmmfit}
@@ -33,6 +35,17 @@
   ...
 )
 
+\method{find_parameters}{bmmfit}(
+  x,
+  effects = "all",
+  component = "all",
+  flatten = FALSE,
+  parameters = NULL,
+  ...
+)
+
+\method{get_priors}{bmmfit}(x, verbose = TRUE, ...)
+
 \method{model_info}{bmmfit}(x, response = NULL, ...)
 
 \method{link_function}{bmmfit}(x, ...)
@@ -56,6 +69,9 @@ as in \pkg{insight}; ignored by \code{get_data()}.}
 
 \item{combine, source, verbose}{Ignored, for consistency with the generics.}
 
+\item{parameters}{A regular expression the names of the returned
+parameters must match.}
+
 \item{response}{Ignored, for consistency with the generic.}
 }
 \value{
@@ -67,7 +83,10 @@ These S3 methods let the \pkg{insight} package, and through it the easystats
 packages (\pkg{parameters}, \pkg{bayestestR}, \pkg{modelbased},
 \pkg{performance}, \pkg{report}), read a bmm fit as the model you specified
 with \code{\link[=bmm]{bmm()}}: its parameters, their formulas, the response variables and the
-data, rather than the \pkg{brms} model that bmm builds from them.
+data, rather than the \pkg{brms} model that bmm builds from them. With them,
+for example, \code{\link[parameters:model_parameters]{parameters::model_parameters()}} and
+\code{\link[bayestestR:describe_posterior]{bayestestR::describe_posterior()}} summarise each model parameter in its own
+component, and \code{modelbased::estimate_means(fit, by = "set_size", predict = "c")} returns the estimates of a model parameter on its native scale.
 }
 \details{
 Each method reshapes what the fit already stores:
@@ -83,6 +102,18 @@ them: without the columns bmm adds for its own use, and with the
 response categories of a model fitted to counts (e.g. \code{\link[=m3]{m3()}}) as
 columns of their own. The model frame stored in the fit is always the
 source; \code{source} is ignored.
+\item \code{find_parameters()} returns the names of the posterior draws in one
+element per model parameter (\verb{<parameter>} for the population-level
+coefficients, \verb{<parameter>_random} for the group-level ones), without
+the parameters that the \pkg{brms} family needs but the model does not
+have, such as the fixed \code{mu} of the response-time models. \code{component}
+selects a model parameter by name; \code{"all"}, \code{"conditional"} and
+\code{"location"} select all of them. \code{\link[insight:get_parameters]{insight::get_parameters()}} and
+\code{\link[insight:clean_parameters]{insight::clean_parameters()}} build on it.
+\item \code{get_priors()} returns one row per population-level coefficient,
+group-level standard deviation and correlation, with the prior that
+applies to it. A parameter fixed to a constant has the distribution
+\code{"constant"} and the constant as its location.
 \item \code{model_info()} describes the model as not linear and as having no
 dispersion parameter; the family is the one of the \pkg{brms} model.
 \item \code{link_function()} and \code{link_inverse()} return the link function of

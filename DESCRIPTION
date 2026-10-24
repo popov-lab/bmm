@@ -40,6 +40,7 @@ Imports:
     stats,
     withr
 Suggests:
+    bayestestR,
     bookdown,
     cmdstanr (>= 0.7.0),
     cowplot,
@@ -52,7 +53,9 @@ Suggests:
     knitr,
     loo (>= 2.10.0),
     mixtur,
+    modelbased,
     MPTinR,
+    parameters,
     pkgbuild,
     remotes,
     rmarkdown,
