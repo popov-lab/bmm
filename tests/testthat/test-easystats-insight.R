@@ -78,6 +78,28 @@ test_that("model_info() describes a bmm model as nonlinear without a dispersion 
   }
 })
 
+test_that("get_data() returns the data the user passed, response categories as columns", {
+  skip_if_not_installed("insight")
+  for (fit in fixture_fits()) {
+    label <- fit_label(fit)
+    data <- insight::get_data(fit)
+    expect_identical(nrow(data), nrow(fit$data), info = label)
+    expect_true(all(insight::find_response(fit) %in% names(data)), info = label)
+    expect_true(all(insight::find_predictors(fit, effects = "all", flatten = TRUE) %in% names(data)),
+                info = label)
+    expect_false(any(built_data_columns(fit$bmm$model) %in% names(data)), info = label)
+  }
+
+  m3_fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
+  data <- insight::get_data(m3_fit)
+  expect_false("Y" %in% names(data))
+  expect_identical(data[c("corr", "other", "dist", "npl")],
+                   as.data.frame(m3_fit$data$Y)[c("corr", "other", "dist", "npl")])
+  expect_identical(names(insight::get_data(m3_fit, effects = "random")), "ID")
+  expect_false("ID" %in% names(insight::get_data(m3_fit, effects = "fixed")))
+  expect_identical(names(insight::get_response(m3_fit)), c("corr", "other", "dist", "npl"))
+})
+
 test_that("link_function() and link_inverse() use the first parameter's link of every model", {
   skip_if_not_installed("insight")
   for (case in model_test_cases("links")) {

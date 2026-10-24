@@ -16,6 +16,11 @@
 #'     of the response variables on all population-level predictors.
 #'   \item `find_predictors()` returns the predictors of these formulas.
 #'   \item `find_response()` returns the response variables of the model.
+#'   \item `get_data()` returns the data the model was fitted to as you passed
+#'     them: without the columns bmm adds for its own use, and with the
+#'     response categories of a model fitted to counts (e.g. [m3()]) as
+#'     columns of their own. The model frame stored in the fit is always the
+#'     source; `source` is ignored.
 #'   \item `model_info()` describes the model as not linear and as having no
 #'     dispersion parameter; the family is the one of the \pkg{brms} model.
 #'   \item `link_function()` and `link_inverse()` return the link function of
@@ -31,7 +36,7 @@
 #'   `"location"` or the name of a model parameter; for `find_predictors()`
 #'   as in \pkg{insight}; ignored by `get_data()`.
 #' @param flatten Should a character vector be returned instead of a list?
-#' @param combine,verbose Ignored, for consistency with the generics.
+#' @param combine,source,verbose Ignored, for consistency with the generics.
 #' @param ... Ignored, for consistency with the generics.
 #'
 #' @return See the \pkg{insight} generics, e.g. [insight::find_formula()] and
@@ -89,6 +94,23 @@ find_predictors.bmmfit <- function(x, effects = "fixed", component = "all",
 #' @exportS3Method insight::find_response
 find_response.bmmfit <- function(x, combine = TRUE, ...) {
   unlist(x$bmm$model$resp_vars, use.names = FALSE)
+}
+
+
+#' @rdname easystats-bmmfit
+#' @exportS3Method insight::get_data
+get_data.bmmfit <- function(x, effects = "all", component = "all",
+                            source = "frame", verbose = FALSE, ...) {
+  data <- x$data[setdiff(names(x$data), built_data_columns(x$bmm$model))]
+  data <- do.call(cbind, lapply(names(data), function(col) {
+    if (is.matrix(data[[col]])) as.data.frame(data[[col]]) else data[col]
+  }))
+  groups <- insight::find_random(x, split_nested = TRUE, flatten = TRUE)
+  switch(effects,
+    random = data[intersect(groups, names(data))],
+    fixed = data[setdiff(names(data), setdiff(groups, insight::find_predictors(x, flatten = TRUE)))],
+    data
+  )
 }
 
 

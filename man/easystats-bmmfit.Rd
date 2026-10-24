@@ -5,6 +5,7 @@
 \alias{find_formula.bmmfit}
 \alias{find_predictors.bmmfit}
 \alias{find_response.bmmfit}
+\alias{get_data.bmmfit}
 \alias{model_info.bmmfit}
 \alias{link_function.bmmfit}
 \alias{link_inverse.bmmfit}
@@ -22,6 +23,15 @@
 )
 
 \method{find_response}{bmmfit}(x, combine = TRUE, ...)
+
+\method{get_data}{bmmfit}(
+  x,
+  effects = "all",
+  component = "all",
+  source = "frame",
+  verbose = FALSE,
+  ...
+)
 
 \method{model_info}{bmmfit}(x, response = NULL, ...)
 
@@ -44,7 +54,7 @@ as in \pkg{insight}; ignored by \code{get_data()}.}
 
 \item{flatten}{Should a character vector be returned instead of a list?}
 
-\item{combine, verbose}{Ignored, for consistency with the generics.}
+\item{combine, source, verbose}{Ignored, for consistency with the generics.}
 
 \item{response}{Ignored, for consistency with the generic.}
 }
@@ -68,6 +78,11 @@ population-level and group-level parts as separate elements
 of the response variables on all population-level predictors.
 \item \code{find_predictors()} returns the predictors of these formulas.
 \item \code{find_response()} returns the response variables of the model.
+\item \code{get_data()} returns the data the model was fitted to as you passed
+them: without the columns bmm adds for its own use, and with the
+response categories of a model fitted to counts (e.g. \code{\link[=m3]{m3()}}) as
+columns of their own. The model frame stored in the fit is always the
+source; \code{source} is ignored.
 \item \code{model_info()} describes the model as not linear and as having no
 dispersion parameter; the family is the one of the \pkg{brms} model.
 \item \code{link_function()} and \code{link_inverse()} return the link function of
