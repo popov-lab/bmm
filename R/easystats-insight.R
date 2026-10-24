@@ -343,11 +343,20 @@ link_inverse.bmmfit <- function(x, ...) {
 # Location, scale and degrees of freedom of a prior, as insight's get_priors()
 # reports them; NA for distributions without a location-scale form
 .prior_moments <- function(prior) {
-  args <- suppressWarnings(as.numeric(strsplit(sub("^[^(]*\\((.*)\\)$", "\\1", prior), ",")[[1]]))
+  args <- vapply(strsplit(sub("^[^(]*\\((.*)\\)$", "\\1", prior), ",")[[1]], .prior_argument, numeric(1))
   switch(sub("\\(.*", "", prior),
     normal = , cauchy = , logistic = c(args[1:2], NA),
     student_t = c(args[2:3], args[1]),
     constant = , lkj = c(args[1], NA, NA),
     c(NA, NA, NA)
   )
+}
+
+# Stan accepts arithmetic in prior arguments, such as normal(0, 1/2); only
+# numbers and arithmetic operators are evaluated
+.prior_argument <- function(argument) {
+  if (!grepl("^[-+*/^().0-9eE ]+$", argument)) {
+    return(NA_real_)
+  }
+  tryCatch(as.numeric(eval(str2lang(argument), baseenv())), error = function(e) NA_real_)
 }
