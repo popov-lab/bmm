@@ -1,3 +1,8 @@
+# bmm 1.6.0 (development)
+
+### New models
+* Add the **Log-Normal Race Model** (`lnr`) for multi-alternative choice reaction time tasks (Rouder et al., 2015), a race model in which each response alternative has a lognormal accumulator. Two versions: `simple` (one meanlog for correct, one shared by the errors, integer-coded responses) and `custom` (one meanlog per named response category, with optional per-category `accumulators`). The sdlog `s` is estimated by default; write `s = 0` in `bmf()` to hold it at 1 instead. See `?lnr` and the [article](https://popov-lab.github.io/bmm/dev/articles/bmm_lnr.html) on the `bmm` website. Thanks to @GidonFrischkorn (#352)
+
 # bmm (development version)
 
 ### New features
