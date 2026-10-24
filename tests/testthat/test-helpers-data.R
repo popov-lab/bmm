@@ -238,6 +238,7 @@ test_that("built_data_columns() names what each model's check_data() builds", {
     c("nTrials", "Idx_withdist", "Idx_nodist", "Poss_dist")
   )
   expect_setequal(declared("mpt_single_tree"), "nTrials")
+  expect_setequal(declared("rdm"), c(".rdm_cat", ".rdm_n1", ".rdm_n2"))
   expect_setequal(
     declared("m3_num_options_by_category"),
     c("nTrials", paste0("Idx_", c("corr", "other", "dist", "npl")),

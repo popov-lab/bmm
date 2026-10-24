@@ -339,6 +339,17 @@ check_model.rdm_custom <- function(model, data = NULL, formula = NULL) {
 # CHECK_DATA S3 methods                                                  ####
 ############################################################################# !
 
+# the simple version lumps every error into the second category, whatever
+# n_choices; the custom version has one per named category, as bmf2bf() reads
+#' @exportS3Method
+built_data_columns.rdm <- function(model) {
+  c(
+    race_cat_column("rdm"),
+    race_count_columns("rdm", length(model$other_vars$resp_cats %||% c("correct", "error"))),
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.rdm <- function(model, data, formula) {
   race_check_data(model, data)
