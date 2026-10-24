@@ -135,6 +135,31 @@ if (make("bmmfit_lnr_ppcheck.rds")) {
   save_fixture(lnr_fit, "bmmfit_lnr_ppcheck.rds", seed = 8)
 }
 
+# mpt: the two-high-threshold model with person effects on D and g, for the
+# ppp() T2 test, which needs brms's own draw arrays, the tree column rebuilt
+# from the tree indicators and participants read from (1 | id)
+if (make("bmmfit_mpt_ppcheck.rds")) {
+  set.seed(8)
+  n_id <- 10
+  D <- stats::plogis(stats::rnorm(n_id, 0.5, 0.7))
+  g <- stats::plogis(stats::rnorm(n_id, 0, 0.5))
+  mpt_data <- data.frame(
+    id = factor(rep(seq_len(n_id), 2)), item_type = rep(c("old", "new"), each = n_id)
+  )
+  p_old <- ifelse(mpt_data$item_type == "old", D + (1 - D) * g, (1 - D) * g)
+  mpt_data$old <- stats::rbinom(2 * n_id, 40, p_old)
+  mpt_data$new <- 40L - mpt_data$old
+  mpt_fit <- do.call(bmm, c(list(
+    formula = bmf(D ~ 1 + (1 | id), g ~ 1 + (1 | id)),
+    data = mpt_data,
+    model = mpt(list(
+      mpt_tree("old", old ~ D + (1 - D) * g, new ~ (1 - D) * (1 - g)),
+      mpt_tree("new", old ~ (1 - D) * g, new ~ D + (1 - D) * (1 - g))
+    ), tree_id = "item_type")
+  ), fit_args))
+  save_fixture(mpt_fit, "bmmfit_mpt_ppcheck.rds", seed = 8)
+}
+
 # sdm on rstan, so the tests can read what an rstan fit stores: no warmup
 # saved, draws from the prior; two participants at set sizes 1 to 4
 if (make("bmmfit_example1.rds")) {

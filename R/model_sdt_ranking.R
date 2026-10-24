@@ -243,6 +243,11 @@ sdt_ranking <- function(response, m,
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+built_data_columns.sdt_ranking <- function(model) {
+  c("nTrials", "max_rank", NextMethod("built_data_columns"))
+}
+
 #' @export
 check_data.sdt_ranking <- function(model, data, formula) {
   resp_cols <- model$resp_vars$response
