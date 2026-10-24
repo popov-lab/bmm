@@ -19,7 +19,8 @@
 #'     (`<parameter>` and `<parameter>_random`), plus a `conditional` formula
 #'     of the response variables on all population-level predictors.
 #'   \item `find_predictors()` returns the predictors of these formulas.
-#'   \item `find_response()` returns the response variables of the model.
+#'   \item `find_response()` returns the names of the response columns, as
+#'     `get_data()` returns them.
 #'   \item `get_data()` returns the data the model was fitted to as you passed
 #'     them: without the columns bmm adds for its own use, and with the
 #'     response categories of a model fitted to counts (e.g. [m3()]) as
@@ -111,7 +112,10 @@ find_predictors.bmmfit <- function(x, effects = "fixed", component = "all",
 #' @rdname easystats-bmmfit
 #' @exportS3Method insight::find_response
 find_response.bmmfit <- function(x, combine = TRUE, ...) {
-  unlist(x$bmm$model$resp_vars, use.names = FALSE)
+  # a model fitted to counts names the columns of its response matrix, which
+  # need not be its resp_vars (sdt_cdp() stores a column prefix there)
+  response <- x$data[[all.vars(brms::brmsterms(x$formula)$respform)[1]]]
+  colnames(response) %||% unlist(x$bmm$model$resp_vars, use.names = FALSE)
 }
 
 

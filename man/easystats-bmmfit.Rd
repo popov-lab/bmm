@@ -96,7 +96,8 @@ population-level and group-level parts as separate elements
 (\verb{<parameter>} and \verb{<parameter>_random}), plus a \code{conditional} formula
 of the response variables on all population-level predictors.
 \item \code{find_predictors()} returns the predictors of these formulas.
-\item \code{find_response()} returns the response variables of the model.
+\item \code{find_response()} returns the names of the response columns, as
+\code{get_data()} returns them.
 \item \code{get_data()} returns the data the model was fitted to as you passed
 them: without the columns bmm adds for its own use, and with the
 response categories of a model fitted to counts (e.g. \code{\link[=m3]{m3()}}) as

@@ -35,7 +35,22 @@ test_that("find_formula() gives one formula per model parameter and the user's p
                     re_group_vars(fit$bmm$user_formula))
     expect_identical(insight::is_mixed_model(fit), length(re_group_vars(fit$bmm$user_formula)) > 0,
                      info = label)
-    expect_identical(insight::find_response(fit), unlist(fit$bmm$model$resp_vars, use.names = FALSE))
+  }
+})
+
+test_that("find_response() names the response columns of the data", {
+  skip_if_not_installed("insight")
+  expected <- list(
+    "bmmfit_example1.rds" = "dev_rad",
+    "bmmfit_ddm_ppcheck.rds" = c("rt", "response"),
+    "bmmfit_cswald_ppcheck.rds" = c("rt", "response"),
+    "bmmfit_ezdm3_ppcheck.rds" = c("mean_rt", "var_rt", "n_upper"),
+    "bmmfit_ezdm4_ppcheck.rds" = c("mean_rt_upper", "mean_rt_lower", "var_rt_upper", "var_rt_lower", "n_upper"),
+    "bmmfit_m3_ppcheck.rds" = c("corr", "other", "dist", "npl"),
+    "bmmfit_mpt_ppcheck.rds" = c("old", "new")
+  )
+  for (file in names(expected)) {
+    expect_identical(insight::find_response(load_fixture_fit(file)), expected[[file]], info = file)
   }
 })
 
@@ -63,6 +78,36 @@ test_that("find_formula() keeps the group-level terms of a parameter apart", {
   expect_identical(all.vars(f$kappa_random), "ID")
   expect_true(insight::is_mixed_model(fit))
   expect_identical(insight::find_random(fit, flatten = TRUE), "ID")
+})
+
+test_that("the methods that need no draws read every registered model", {
+  # 48 mock fits, about 30 s: the response layouts differ across models and
+  # within a model across its cases (sdt_cdp's column prefix)
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  cases <- c(model_test_cases("stored_frame"), model_test_cases("sd_default"))
+  for (i in seq_along(cases)) {
+    case <- cases[[i]]
+    label <- names(cases)[i]
+    fit <- suppressWarnings(suppressMessages(
+      bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
+    ))
+    response <- insight::find_response(fit)
+    expect_true(length(response) > 0 && all(response %in% names(insight::get_data(fit))), info = label)
+    expect_identical(length(insight::find_formula(fit)$conditional), 3L, info = label)
+    expect_no_error(insight::model_info(fit), message = label)
+    expect_no_error(insight::get_response(fit), message = label)
+  }
+})
+
+test_that("find_response() names the count columns of sdt_cdp(), whatever their prefix", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  case <- model_test_cases("sd_default")$sdt_cdp
+  fit <- suppressWarnings(suppressMessages(
+    bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
+  ))
+  expect_identical(insight::find_response(fit), paste0("cdp", 1:6))
 })
 
 test_that("model_info() describes a bmm model as nonlinear without a dispersion parameter", {
