@@ -48,6 +48,7 @@ Suggests:
     fansi,
     ggplot2,
     ggthemes,
+    insight (>= 1.6.0),
     knitr,
     loo (>= 2.10.0),
     mixtur,
