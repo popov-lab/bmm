@@ -1,3 +1,8 @@
+# bmm 1.6.0 (development)
+
+### New models
+* Add the **Racing Diffusion Model** (`rdm`) (Tillman, Van Zandt, & Logan, 2020) for multi-alternative choice reaction time tasks, a race model in which each response alternative has a Wald accumulator. Two versions: `simple` (one drift for correct, one shared by the errors, integer-coded responses) and `custom` (one drift per named response category, with optional per-category `accumulators`). Starting-point variability (`sp`) is fixed to 0 by default; write `sp ~ 1` in `bmf()` to estimate it. Density and RNG helpers `drdm()`/`rrdm()`/`prdm()`/`qrdm()` are exported. See `?rdm`. Thanks to @GidonFrischkorn (#353)
+
 # bmm (development version)
 
 ### New features
