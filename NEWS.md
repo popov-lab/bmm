@@ -2,6 +2,7 @@
 
 ### New features
 * bmm fits now work with the easystats packages (#477). `parameters::model_parameters()` and `bayestestR::describe_posterior()` summarise each model parameter on its own, without the fixed `mu` of the response-time models, and `modelbased::estimate_means(fit, by = "set_size", predict = "c")` returns a parameter on its native scale. insight now finds the predictors, response variables, data and priors you gave to `bmm()`; these functions failed on `m3()` and `mpt()` fits.
+* `report::report(fit)` now describes a bmm fit by the model's name, its formula and the priors in bmm's parameter names, with all response variables in one sentence (#478). It failed on `m3()` and `mpt()` fits. `performance::model_performance()` returns LOOIC and WAIC only; R2 and RMSE are not defined for bmm models.
 * `qsdm()`, the quantile function of the SDM distribution, now works; it stopped with "'qsdm' is not implemented yet". It takes `lower.tail`, `log.p` and `lower.bound` as `psdm()` does and returns values between `lower.bound` and `lower.bound + 2 * pi` (#556).
 
 ### Bug fixes
