@@ -137,6 +137,7 @@ test_that("report_methods() refuses a mock fit and unknown sections or formats",
   expect_error(report_methods(fit, sections = "results"), "should be one of")
   expect_error(report_methods(fit, sections = NULL), "at least one of 'model', 'priors' or 'convergence'")
   expect_error(report_methods(fit, sections = character(0)), "at least one of 'model', 'priors' or 'convergence'")
+  expect_error(report_methods(fit, sections = NA), "at least one")
   expect_error(report_convergence(fit, format = "html"), "should be one of")
 })
 
@@ -445,7 +446,11 @@ test_that("several chains are counted, and a single chain gets a note on R-hat",
     sub(" Priors were specified.*$", "", report$paragraph),
     expected_model_text(combined)
   )
-  expect_match(report$paragraph, "We ran 2 Markov chains of the No-U-Turn sampler with 400 iterations each", fixed = TRUE)
+  expect_match(
+    report$paragraph,
+    "We ran 2 Markov chains of the No-U-Turn sampler with 400 iterations each",
+    fixed = TRUE
+  )
   expect_false(any(grepl("single chain", report$notes)))
 })
 
@@ -458,7 +463,10 @@ test_that("a backend that is not installed gets a placeholder reference and a no
   expect_identical(report$references[i_backend], "[CITATION NEEDED]")
   expect_match(report$paragraph, paste0("notinstalledbackend ", marker(i_backend)), fixed = TRUE)
   expect_true(any(grepl(
-    paste0("notinstalledbackend could not be read because it is not installed: replace [CITATION NEEDED] ", marker(i_backend)),
+    paste0(
+      "notinstalledbackend could not be read because it is not installed: replace [CITATION NEEDED] ",
+      marker(i_backend)
+    ),
     report$notes, fixed = TRUE
   )))
 })

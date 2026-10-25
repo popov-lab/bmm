@@ -174,11 +174,11 @@ convergence_summary <- function(fit) {
       in_summary = grepl(summary_variables_regex(fit), conv$variable)
     ),
     algorithm = algorithm,
-    divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
+    divergent = sum(brms::nuts_params(fit, pars = "divergent__", inc_warmup = FALSE)$Value),
     max_treedepth_hits = if (is.null(max_treedepth)) {
       NA_real_
     } else {
-      sum(brms::nuts_params(fit, pars = "treedepth__")$Value >= max_treedepth)
+      sum(brms::nuts_params(fit, pars = "treedepth__", inc_warmup = FALSE)$Value >= max_treedepth)
     }
   )
 }

@@ -68,7 +68,7 @@ report_methods <- function(fit, sections = c("model", "priors", "convergence")) 
   )
   stopif(!has_draws(fit), no_draws_message())
   stopif(
-    !length(sections),
+    !length(sections) || anyNA(sections),
     "sections must name at least one of 'model', 'priors' or 'convergence'."
   )
   sections <- unique(match.arg(sections, several.ok = TRUE))
