@@ -354,6 +354,12 @@ stan data, etc.
 - [`prior_info()`](https://venpopov.com/bmm/dev/reference/prior_info.md)
   : Priors of a fitted bmm model and where they came from
 
+- [`report_convergence()`](https://venpopov.com/bmm/dev/reference/report_convergence.md)
+  : Convergence diagnostics of a fitted model
+
+- [`report_methods()`](https://venpopov.com/bmm/dev/reference/report_methods.md)
+  : Draft a methods paragraph for a fitted model
+
 - [`stancode(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
   : Generate Stan code for bmm models
 

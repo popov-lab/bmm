@@ -23,6 +23,15 @@
   [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) does and
   returns values between `lower.bound` and `lower.bound + 2 * pi`
   ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+- `report_methods(fit)` drafts the methods paragraph for a fitted model:
+  the model, the versions of bmm, brms, Stan and R, the sampler
+  settings, the formula, the priors and the convergence diagnostics,
+  followed by a reference list from the model and the installed
+  packages. Edit the draft before you use it; `sections` selects and
+  orders its parts. `report_convergence(fit)` gives the R-hat, effective
+  sample sizes and divergent transitions as a table or a sentence. Fits
+  now store the R version they ran in
+  ([\#432](https://github.com/popov-lab/bmm/issues/432)).
 
 #### Bug fixes
 
@@ -224,6 +233,12 @@
 
 #### Documentation
 
+- `citation("bmm")` and
+  [`?bmm`](https://venpopov.com/bmm/dev/reference/bmm.md) now cite the
+  bmm tutorial as published in Behavior Research Methods, with its
+  volume, issue and article number;
+  [`?bmm`](https://venpopov.com/bmm/dev/reference/bmm.md) cited the 2023
+  preprint ([\#432](https://github.com/popov-lab/bmm/issues/432)).
 - bmm now follows a written lifecycle policy. A deprecated function or
   argument keeps working, with a warning that names its replacement and
   the earliest release that may remove it, for at least one minor
