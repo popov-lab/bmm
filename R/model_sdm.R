@@ -158,14 +158,18 @@ configure_model.sdm <- function(model, data, formula) {
     # Guard direct configure_model.sdm() calls that bypass check_data.sdm().
     run_metadata <- sdm_run_metadata(data, formula, model)
   }
-  # 16 nodes per panel of sdm_simple_ldenom() keep log Z within 3e-9 up to
-  # log c = 5 and kappa = 300, and within 2e-8 up to log c = 12 and kappa =
-  # 3000 (#615); test-model_sdm-stan.R holds the bar
+  # 16 nodes per panel and the 32-node wide rule keep log Z within 4e-12
+  # where it is below 1e4 and within 5e-10 above, to log c = 12 and kappa =
+  # 3000 and beyond; where sdm_simple_ldenom() switches between them they
+  # differ by 4e-14 (#615). test-model_sdm-stan.R holds the bar
   gl <- .gl_rule(16L)
+  wide <- .sdm_wide_rule()
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
     brms::stanvar(scode = stan_tdata, block = "tdata") +
     brms::stanvar(x = gl$nodes, name = "sdm_gl_x") +
     brms::stanvar(x = gl$weights, name = "sdm_gl_w") +
+    brms::stanvar(x = wide$cosm1, name = "sdm_wide_cosm1") +
+    brms::stanvar(x = wide$weights, name = "sdm_wide_w") +
     brms::stanvar(x = run_metadata$G_sdm_runs, name = "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
@@ -239,6 +243,22 @@ sdm_run_metadata <- function(data, formula, model) {
     sdm_run_start = as.integer(run_start),
     sdm_run_count = as.integer(run_count)
   )
+}
+
+# The midpoint rule on [0, pi] after mapping t to t - 0.55 sin(t) three times.
+# The map fixes 0 and pi and keeps the integrand smooth and periodic, so the
+# rule keeps converging geometrically, and it crowds the nodes toward the
+# spike at u = 0, where they are 11 times denser than without it. cos(u) - 1
+# is formed as -2 sin(u / 2)^2, which does not cancel near the spike.
+.sdm_wide_rule <- function() {
+  n <- 32L
+  u <- (seq_len(n) - 0.5) * pi / n
+  weights <- rep(pi / n, n)
+  for (i in 1:3) {
+    weights <- weights * (1 - 0.55 * cos(u))
+    u <- u - 0.55 * sin(u)
+  }
+  list(cosm1 = -2 * sin(u / 2)^2, weights = weights)
 }
 
 sdm_stanvar_int_array <- function(x, name, size) {

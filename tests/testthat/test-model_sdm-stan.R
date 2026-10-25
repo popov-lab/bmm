@@ -38,13 +38,22 @@ sdm_corner_cells <- data.frame(
 
 # beyond the grid: where a refit's warm-up went along the ridge of constant
 # c kappa^1.5, and cutting only at multiples of the eta width was off by 8e-5
-# to 1.4e-2; and small c with large kappa, where cutting only at multiples of
-# the SD near the peak was off by 7e-6
+# to 1.4e-2; small c with large kappa, where cutting only at multiples of
+# the SD near the peak was off by 7e-6; and large c with large kappa, where
+# eta - peak formed as peak (exp(kappa (cos(u) - 1)) - 1) was off by 3e-7
 sdm_extended_cells <- data.frame(
-  lc = c(6, 7, 8, 10, 10, 12, -1),
-  kappa = c(300, 30, 5, 1, 10, 0.5, 3000)
+  lc = c(6, 7, 8, 10, 10, 12, -1, 12),
+  kappa = c(300, 30, 5, 1, 10, 0.5, 3000, 3000)
 )
-sdm_stan_cells <- rbind(sdm_issue_grid, sdm_extended_cells)
+
+# a pair on either side of the switch between the two rules at kappa (peak +
+# 1) = 4000, at a large and at a small peak; and log peak 1.3 with kappa 2000,
+# where the last cut at 3 instead of 5 eta widths was off by 3e-8
+sdm_tight_cells <- data.frame(
+  lc = c(2.25, 2.3, -1.5, -1.4, -1.6),
+  kappa = c(100, 100, 1000, 1000, 2000)
+)
+sdm_stan_cells <- rbind(sdm_issue_grid, sdm_extended_cells, sdm_tight_cells)
 
 # dsdm() integrates without scaling by the peak and stops with a non-finite
 # value once log Z passes about 709 (log c 5 with kappa 200), so the
@@ -161,8 +170,9 @@ test_that("the Stan normalising constant of sdm() matches integrate() across the
   error <- abs(stan$log_z - reference)
   on_grid <- seq_len(nrow(sdm_issue_grid))
 
-  # the rule's measured worst: 2e-9 on the grid, 3e-14 for kappa <= 30, 3e-9
-  # at the cells beyond it, so a rule with half the nodes fails here
+  # the rule's measured worst: 1.3e-13 on the grid, 7.3e-12 at the cells
+  # beyond it and 7.1e-15 at the tight cells, so a rule with fewer nodes in
+  # either regime fails here
   expect_lt(max(error[on_grid]), 1e-7)
   expect_lt(max(error[on_grid][sdm_issue_grid$kappa <= 30]), 1e-10)
   for (i in seq_len(nrow(sdm_corner_cells))) {
@@ -175,6 +185,14 @@ test_that("the Stan normalising constant of sdm() matches integrate() across the
   for (i in seq_len(nrow(sdm_extended_cells))) {
     cell <- sdm_extended_cells[i, ]
     expect_lt(error[nrow(sdm_issue_grid) + i], 1e-7,
+      label = glue("|error in log Z| at log c {cell$lc}, kappa {cell$kappa}")
+    )
+  }
+  # within 1e-10 on both sides, so the value jumps by less than 2e-10 per run
+  # where a sampler crosses the switch
+  for (i in seq_len(nrow(sdm_tight_cells))) {
+    cell <- sdm_tight_cells[i, ]
+    expect_lt(error[nrow(sdm_issue_grid) + nrow(sdm_extended_cells) + i], 1e-10,
       label = glue("|error in log Z| at log c {cell$lc}, kappa {cell$kappa}")
     )
   }
