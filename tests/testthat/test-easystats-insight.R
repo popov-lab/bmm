@@ -122,11 +122,18 @@ formula_cases <- function() {
     lapply(function(case) c(case, list(data = data, model = sdm("dev_rad"))))
 }
 
-mock_formula_cases <- function() {
-  lapply(formula_cases(), function(case) suppressWarnings(suppressMessages(
-    bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
-  )))
-}
+# fitted once and shared by the tests that read them
+mock_formula_cases <- local({
+  fits <- NULL
+  function() {
+    if (is.null(fits)) {
+      fits <<- lapply(formula_cases(), function(case) suppressWarnings(suppressMessages(
+        bmm(case$formula, case$data, case$model, backend = "mock", mock_fit = 1, rename = FALSE)
+      )))
+    }
+    fits
+  }
+})
 
 # the stored-frame case of every model, the default-prior case of the model
 # versions that have no stored-frame case, and the formula cases
@@ -441,7 +448,9 @@ test_that("link_function() and link_inverse() use the first parameter's link of 
     sqrt = 0.09, logit = 0.574442516811659, probit = 0.617911422188953,
     tan_half = 0.582913588955734, loglog = 0.259276865990828, cloglog = 0.740723134009172
   )
-  for (case in model_test_cases("links")) {
+  cases <- model_test_cases("links")
+  expect_gt(length(cases), 0)
+  for (case in cases) {
     fit <- structure(list(bmm = list(model = case$model)), class = c("bmmfit", "brmsfit"))
     link <- case$model$links[[1]]
     label <- paste(class(case$model)[length(class(case$model))], link)
