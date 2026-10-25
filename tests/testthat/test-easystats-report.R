@@ -25,7 +25,11 @@ test_that("report() describes each fit once, in bmm's terms", {
     label <- report_fit_label(case$fit)
     text <- as.character(case$report)
     expect_s3_class(case$report, "report")
-    expect_length(gregexpr("We fitted a", text, fixed = TRUE)[[1]], 1)
+    expect_length(text, 1)
+    expect_identical(
+      lengths(regmatches(text, gregexpr("We fitted a", text, fixed = TRUE))), 1L,
+      info = label
+    )
     expect_false(grepl("intercept-only", text, fixed = TRUE), info = label)
     expect_false(grepl("general linear", text, fixed = TRUE), info = label)
     expect_false(grepl("custom family", text, fixed = TRUE), info = label)
@@ -47,6 +51,11 @@ test_that("format_model() names the bmm model and its version", {
   expect_identical(
     report::format_model(m3_fit),
     "Bayesian Multinomial / Memory Measurement Model (custom)"
+  )
+  mixture2p_fit <- readRDS(test_path("assets", "mock_bmmfit_mixture2p.rds"))
+  expect_identical(
+    report::format_model(mixture2p_fit),
+    "Bayesian Two-parameter mixture model by Zhang and Luck (2008)"
   )
 })
 
@@ -94,6 +103,7 @@ test_that("report_priors() gives the sentences of prior_info()", {
 })
 
 test_that("model_performance() returns only the indices defined for bmm models", {
+  skip_if_not_installed("report")
   skip_if_not_installed("performance")
   for (case in report_fixtures()) {
     perf <- attr(attr(case$report, "table"), "performance")
@@ -107,4 +117,10 @@ test_that("model_performance() returns only the indices defined for bmm models",
     "R2 and RMSE"
   )
   expect_identical(names(perf), "WAIC")
+  expect_message(
+    performance::model_performance(fit, metrics = c("ELPD", "R2_adjusted")),
+    "^R2_adjusted is not defined"
+  )
+  expect_no_message(perf <- performance::model_performance(fit, metrics = "all"))
+  expect_identical(names(perf), c("ELPD", "ELPD_SE", "LOOIC", "LOOIC_SE", "WAIC"))
 })

@@ -16,15 +16,20 @@
 #'     grouping factors of the random effects.
 #'   \item `report_priors()` gives the text of `prior_info(fit, format =
 #'     "text")`: the priors in the names of the model parameters, with a note
-#'     that they apply on the sampling (link) scale.
+#'     that they apply on the sampling (link) scale. The short version of the
+#'     report, `summary(report(fit))`, leaves the priors out.
 #'   \item `model_performance()` returns LOOIC and WAIC (with ELPD and the
 #'     standard errors). R2, RMSE and the other indices of
 #'     \pkg{performance} need the expected response or residuals, which bmm
-#'     models do not define; requested ones are left out with a message.
+#'     models do not define; requested ones are left out with a message, and
+#'     when none of the requested indices is defined, LOOIC and WAIC are
+#'     returned.
 #' }
 #'
 #' The parameter summaries and the paragraph on convergence come from
-#' \pkg{report} unchanged.
+#' \pkg{report} unchanged. \pkg{report} lists no parameter estimates for a
+#' model without predictors, such as an [mpt()] or [ezdm()] fit with
+#' intercepts only; use [summary()] for those.
 #'
 #' @param x,model A `bmmfit` object (created by [bmm()]).
 #' @param table Ignored, for consistency with the generic.
@@ -54,9 +59,14 @@ NULL
 #' @exportS3Method report::format_model
 format_model.bmmfit <- function(x) {
   model <- x$bmm$model
-  version <- if (is.null(model$version) || model$version %in% c(NA, "NA", "")) "" else glue(" ({model$version})")
-  # model names such as "The Multinomial / Memory Measurement Model" follow "a"
-  paste0("Bayesian ", sub("^The ", "", model$name), version)
+  version <- if (is.null(model$version) || model$version %in% c(NA, "NA", "")) {
+    ""
+  } else {
+    glue(" ({model$version})")
+  }
+  # names such as "The Multinomial / Memory Measurement Model" follow "a", and
+  # some end with the period of their reference ("Zhang and Luck (2008).")
+  paste0("Bayesian ", sub("\\.$", "", sub("^The ", "", model$name)), version)
 }
 
 
@@ -70,15 +80,22 @@ format_model.bmmfit <- function(x) {
 report_model.bmmfit <- function(x, table = NULL, ...) {
   model_text <- report::format_model(x)
   algorithm <- report::format_algorithm(x)
-  text_full <- if (nzchar(algorithm)) paste0(model_text, " (estimated using ", algorithm, ")") else model_text
+  text_full <- if (nzchar(algorithm)) {
+    paste0(model_text, " (estimated using ", algorithm, ")")
+  } else {
+    model_text
+  }
   predict_text <- paste0(" to predict ", collapse_and(insight::find_response(x)))
   if (!suppressWarnings(insight::is_nullmodel(x))) {
     predict_text <- paste0(
-      predict_text, " with ", collapse_and(insight::find_predictors(x, effects = "fixed", flatten = TRUE))
+      predict_text, " with ",
+      collapse_and(insight::find_predictors(x, effects = "fixed", flatten = TRUE))
     )
   }
-  formula <- paste(summarise_formula(x$bmm$user_formula, x$bmm$model), collapse = "; ")
-  text_full <- paste0(text_full, predict_text, " (formula: ", formula, ")")
+  text_full <- paste0(
+    text_full, predict_text, " (formula: ",
+    paste(summarise_formula(x$bmm$user_formula, x$bmm$model), collapse = "; "), ")"
+  )
   model_text <- paste0(model_text, predict_text)
   if (insight::model_info(x)$is_mixed) {
     random <- report::report_random(x)
@@ -86,9 +103,7 @@ report_model.bmmfit <- function(x, table = NULL, ...) {
     model_text <- paste0(model_text, ". ", summary(random))
   }
   # report_text() appends the period after the model sentence
-  priors <- report::report_priors(x)
-  text_full <- paste0(text_full, ". ", sub("\\.$", "", priors))
-  model_text <- paste0(model_text, ". ", sub("\\.$", "", summary(priors)))
+  text_full <- paste0(text_full, ". ", sub("\\.$", "", report::report_priors(x)))
   report::as.report_model(text_full, summary = model_text, ...)
 }
 
@@ -114,16 +129,17 @@ report_priors.bmmfit <- function(x, ...) {
 }
 
 
+# ELPD comes with LOOIC; "all" and "common" ask for no index by name
 #' @rdname easystats-report-bmmfit
 #' @exportS3Method performance::model_performance
 model_performance.bmmfit <- function(model, metrics = c("LOOIC", "WAIC"), verbose = TRUE, ...) {
   defined <- c("LOOIC", "WAIC")
-  requested <- if (all(metrics %in% c("all", "common"))) defined else toupper(metrics)
-  undefined <- setdiff(requested, defined)
+  requested <- sub("^ELPD$", "LOOIC", toupper(metrics))
+  undefined <- unique(metrics[!requested %in% c(defined, "ALL", "COMMON")])
   if (length(undefined) && verbose) {
     message2(
-      "{collapse_and(undefined)} {if (length(undefined) > 1) 'are' else 'is'} not defined \\
-      for bmm models and left out."
+      "{collapse_and(undefined)} {if (length(undefined) > 1) 'are' else 'is'} \\
+      not defined for bmm models and left out."
     )
   }
   kept <- intersect(requested, defined)

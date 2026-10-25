@@ -52,15 +52,20 @@ response variables of models such as \code{\link[=ezdm]{ezdm()}} or \code{\link[
 the formula of each model parameter as \code{summary()} prints it, and the
 grouping factors of the random effects.
 \item \code{report_priors()} gives the text of \code{prior_info(fit, format = "text")}: the priors in the names of the model parameters, with a note
-that they apply on the sampling (link) scale.
+that they apply on the sampling (link) scale. The short version of the
+report, \code{summary(report(fit))}, leaves the priors out.
 \item \code{model_performance()} returns LOOIC and WAIC (with ELPD and the
 standard errors). R2, RMSE and the other indices of
 \pkg{performance} need the expected response or residuals, which bmm
-models do not define; requested ones are left out with a message.
+models do not define; requested ones are left out with a message, and
+when none of the requested indices is defined, LOOIC and WAIC are
+returned.
 }
 
 The parameter summaries and the paragraph on convergence come from
-\pkg{report} unchanged.
+\pkg{report} unchanged. \pkg{report} lists no parameter estimates for a
+model without predictors, such as an \code{\link[=mpt]{mpt()}} or \code{\link[=ezdm]{ezdm()}} fit with
+intercepts only; use \code{\link[=summary]{summary()}} for those.
 }
 \examples{
 \dontrun{
