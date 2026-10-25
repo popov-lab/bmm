@@ -16,6 +16,18 @@
   functions failed on
   [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) and
   [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits.
+- `report::report(fit)` now describes a bmm fit by the model’s name, its
+  formula and the priors in bmm’s parameter names, with all response
+  variables in one sentence
+  ([\#478](https://github.com/popov-lab/bmm/issues/478)). It failed on
+  [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) and
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits. Its
+  closing paragraph now gives the fit’s largest R-hat, smallest ESS and
+  divergent transitions, as
+  [`report_convergence()`](https://venpopov.com/bmm/dev/reference/report_convergence.md)
+  does, instead of thresholds. `performance::model_performance()`
+  returns LOOIC and WAIC only; R2 and RMSE are not defined for bmm
+  models.
 - [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), the
   quantile function of the SDM distribution, now works; it stopped with
   “‘qsdm’ is not implemented yet”. It takes `lower.tail`, `log.p` and

@@ -283,6 +283,14 @@ Main functions for model fitting
   [`link_inverse(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
   : easystats support for bmmfit objects
 
+- [`format_model(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)
+  [`report_model(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)
+  [`report_random(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)
+  [`report_priors(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)
+  [`report_info(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)
+  [`model_performance(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)
+  : report and performance support for bmmfit objects
+
 - [`pp_check(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
   : Posterior predictive check for bmmfit objects
 
