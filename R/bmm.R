@@ -98,10 +98,11 @@
 #'   "brmsfit") for an overview on available methods. Their `newdata` argument
 #'   takes data in the layout you gave to `bmm()` (see [standata.bmmfit()]).
 #'
-#' @references Frischkorn, G. T., & Popov, V. (2023). A tutorial for estimating
-#'   mixture models for visual working memory tasks in brms: Introducing the
-#'   Bayesian Measurement Modeling  (bmm) package for R.
-#'   https://doi.org/10.31234/osf.io/umt57
+#' @references Frischkorn, G. T., & Popov, V. (2025). A tutorial for estimating
+#'   Bayesian hierarchical mixture models for visual working memory tasks:
+#'   Introducing the Bayesian Measurement Modeling (bmm) package for R.
+#'   *Behavior Research Methods*, *57*(5), Article 144.
+#'   https://doi.org/10.3758/s13428-025-02643-0
 #'
 #' @seealso [bmm_models()], [brms::brm()], [default_prior()][default_prior.bmmformula()], [bmmformula()], [stancode()][stancode.bmmformula()], [standata()][standata.bmmformula()]
 #'
