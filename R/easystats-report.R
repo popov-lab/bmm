@@ -133,6 +133,7 @@ report_priors.bmmfit <- function(x, ...) {
 #' @rdname easystats-report-bmmfit
 #' @exportS3Method performance::model_performance
 model_performance.bmmfit <- function(model, metrics = c("LOOIC", "WAIC"), verbose = TRUE, ...) {
+  metrics_given <- !missing(metrics)
   defined <- c("LOOIC", "WAIC")
   requested <- sub("^ELPD$", "LOOIC", toupper(metrics))
   undefined <- unique(metrics[!requested %in% c(defined, "ALL", "COMMON")])
@@ -143,5 +144,11 @@ model_performance.bmmfit <- function(model, metrics = c("LOOIC", "WAIC"), verbos
     )
   }
   kept <- intersect(requested, defined)
-  NextMethod(metrics = if (length(kept)) kept else defined)
+  # NextMethod() forwards the arguments of the call with the current values of
+  # the formals: a metrics that was given keeps its position, while adding it by
+  # name would shift a positional metrics into verbose; a metrics that was not
+  # given is not forwarded at all, and the method for brms fits would use its
+  # own default ("all"), so it is added by name
+  metrics <- if (length(kept)) kept else defined
+  if (metrics_given) NextMethod() else NextMethod(metrics = metrics)
 }
