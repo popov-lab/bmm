@@ -8,8 +8,9 @@
 #' model that bmm builds from them. With them,
 #' for example, [parameters::model_parameters()] and
 #' [bayestestR::describe_posterior()] summarise each model parameter in its own
-#' component, and `modelbased::estimate_means(fit, by = "set_size", predict =
-#' "c")` returns the estimates of a model parameter on its native scale.
+#' component, and for models such as [sdm()],
+#' `modelbased::estimate_means(fit, by = "set_size", predict = "c")` returns
+#' the estimates of a model parameter on its native scale.
 #'
 #' @details
 #' Each method reshapes what the fit already stores:

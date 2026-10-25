@@ -90,7 +90,9 @@ formulas, the response variables and the data, rather than the \pkg{brms}
 model that bmm builds from them. With them,
 for example, \code{\link[parameters:model_parameters]{parameters::model_parameters()}} and
 \code{\link[bayestestR:describe_posterior]{bayestestR::describe_posterior()}} summarise each model parameter in its own
-component, and \code{modelbased::estimate_means(fit, by = "set_size", predict = "c")} returns the estimates of a model parameter on its native scale.
+component, and for models such as \code{\link[=sdm]{sdm()}},
+\code{modelbased::estimate_means(fit, by = "set_size", predict = "c")} returns
+the estimates of a model parameter on its native scale.
 }
 \details{
 Each method reshapes what the fit already stores:

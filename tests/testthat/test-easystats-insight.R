@@ -451,6 +451,8 @@ test_that("link_function() and link_inverse() use the first parameter's link of 
 })
 
 test_that("parameters and bayestestR summarise every model parameter on its own", {
+  # about 5 s: model_parameters() and describe_posterior() summarise every
+  # draw of each of the seven fixtures, the end-user path this file is for
   skip_if_not_installed("insight")
   skip_if_not_installed("parameters")
   skip_if_not_installed("bayestestR")
