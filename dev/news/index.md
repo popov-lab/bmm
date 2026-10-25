@@ -4,6 +4,18 @@
 
 #### New features
 
+- bmm fits now work with the easystats packages
+  ([\#477](https://github.com/popov-lab/bmm/issues/477)).
+  `parameters::model_parameters()` and
+  `bayestestR::describe_posterior()` summarise each model parameter on
+  its own, without the fixed `mu` of the response-time models, and
+  `modelbased::estimate_means(fit, by = "set_size", predict = "c")`
+  returns a parameter on its native scale. insight now finds the
+  predictors, response variables, data and priors you gave to
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md); these
+  functions failed on
+  [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) and
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits.
 - [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), the
   quantile function of the SDM distribution, now works; it stopped with
   “‘qsdm’ is not implemented yet”. It takes `lower.tail`, `log.p` and

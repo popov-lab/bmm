@@ -272,6 +272,17 @@ Main functions for model fitting
   [`emm_basis(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/emmeans-bmmfit.md)
   : emmeans support for bmmfit objects
 
+- [`find_formula(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`find_predictors(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`find_response(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`get_data(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`find_parameters(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`get_priors(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`model_info(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`link_function(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  [`link_inverse(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
+  : easystats support for bmmfit objects
+
 - [`pp_check(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
   : Posterior predictive check for bmmfit objects
 

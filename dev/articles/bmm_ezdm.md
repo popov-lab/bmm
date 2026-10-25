@@ -336,7 +336,7 @@ print(comparison)
 #>    Method   Mean_RT     Var_RT Contaminant
 #> 1  Simple 0.5409176 0.10605857          NA
 #> 2  Robust 0.4568634 0.02440439          NA
-#> 3 Mixture 0.4962307 0.03633472  0.03539257
+#> 3 Mixture 0.4964177 0.03642890  0.03532347
 #> 4    TRUE 0.4755037 0.02050638  0.05000000
 ```
 
@@ -403,9 +403,9 @@ summary_4par <- ezdm_summary_stats(
 
 summary_4par
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.3941652            NA   0.01606298           NA     193      198
+#> mu     0.3950143            NA   0.01629836           NA     193      198
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu             0.01236314                     NA
+#> mu             0.01143807                     NA
 ```
 
 Notice the output now includes: - `mean_rt_upper`, `var_rt_upper`:
