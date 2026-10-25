@@ -35,7 +35,7 @@ expected_convergence_text <- function(fit) {
     paste0("There were ", conv$divergent, " divergent transitions after warmup.")
   )
   paste0(
-    "Across all estimated parameters, the largest rank-normalized R-hat was ",
+    "Across all estimated parameters, the largest rank-normalized split R-hat was ",
     fmt_rhat(conv$rhat), ", the smallest bulk effective sample size (ESS) was ",
     fmt_ess(conv$bulk), ", and the smallest tail ESS was ", fmt_ess(conv$tail),
     ". ", divergent
@@ -59,7 +59,7 @@ expected_model_text <- function(fit) {
   i_brms <- i_bmm + seq_len(n_brms)
   i_backend <- max(i_brms) + 1
   name <- sub("^The ", "", model$name)
-  version <- if (model$version %in% c(NA, "NA", "")) "" else paste0(", version \"", model$version, "\",")
+  version <- if (all(model$version %in% c(NA, "NA", ""))) "" else paste0(", version \"", model$version, "\",")
   r_version <- if (is.null(fit$version$R)) "" else paste0(" (version ", fit$version$R, ")")
   chains <- sim$chains
   draws <- posterior::ndraws(brms::as_draws_array(fit))
@@ -75,7 +75,7 @@ expected_model_text <- function(fit) {
     " of the No-U-Turn sampler with ", fmt_ess(sim$iter), " iterations", if (chains > 1) " each",
     ", of which the first ", fmt_ess(sim$warmup), " were warmup, ", thinning, ", which left ",
     fmt_ess(draws), " post-warmup draws. ",
-    "The bmm formula, including the parameters fixed to constants, is given below."
+    "The bmm formula of the model follows this paragraph; a parameter written with = is fixed to that constant."
   )
 }
 
@@ -166,8 +166,8 @@ test_that("the template itself is written out for the sdm fixture", {
     "through the R package rstan (version 2.32.7) ", marker(3 + n_brms), ", in R ",
     marker(4 + n_brms), ". We ran 1 Markov chain of the No-U-Turn sampler with 400 ",
     "iterations, of which the first 200 were warmup, without thinning, which left 200 ",
-    "post-warmup draws. The bmm formula, including the parameters fixed to constants, ",
-    "is given below."
+    "post-warmup draws. The bmm formula of the model follows this paragraph; a parameter ",
+    "written with = is fixed to that constant."
   ))
   expect_identical(report$formula, c("mu = 0", "c ~ 0 + set_size", "kappa ~ 1"))
 })
@@ -277,7 +277,7 @@ test_that("a non-sampling algorithm gets no convergence sentence, and one note",
   expect_no_match(report$paragraph, "R-hat|Markov chain|divergent")
   expect_match(
     report$paragraph,
-    "The posterior was approximated with Stan's meanfield algorithm, which returned 200 draws.",
+    "The model was run with Stan's meanfield algorithm, which returned 200 draws.",
     fixed = TRUE
   )
   expect_identical(sum(grepl("meanfield", report$notes)), 1L)
@@ -287,6 +287,9 @@ test_that("a non-sampling algorithm gets no convergence sentence, and one note",
   )
   expect_identical(nrow(report_convergence(fit)), 0L)
   expect_identical(sum(grepl("meanfield", quiet_report(fit, sections = "model")$notes)), 0L)
+  convergence_only <- quiet_report(fit, sections = "convergence")
+  expect_identical(convergence_only$paragraph, "")
+  expect_true(startsWith(format(convergence_only), "[1] "))
 })
 
 test_that("thinning and the sampler are reported as the fit stores them", {
@@ -307,6 +310,7 @@ test_that("the R version is reported when the fit stores it, and a note asks for
   report <- quiet_report(fit)
   expect_match(report$paragraph, "in R (version 4.5.2) [", fixed = TRUE)
   expect_false(any(grepl("does not store the R version", report$notes)))
+  expect_true(any(grepl(paste0("R ", getRversion(), " (fit: R 4.5.2)"), report$notes, fixed = TRUE)))
 })
 
 test_that("a note says when an installed package differs from the one the fit used", {
@@ -328,7 +332,7 @@ test_that("print() wraps the draft and format() returns the text to paste", {
   withr::local_options(bmm.color_summary = FALSE)
   printed <- utils::capture.output(print(report))
   expect_true(all(nchar(printed) <= 80))
-  expect_true(all(c("Formula:", "References:", "Notes:") %in% printed))
+  expect_true(all(c("Formula:", "References:", "Notes (for you, not for the paper):") %in% printed))
   utils::capture.output(shown <- withVisible(print(report)))
   expect_false(shown$visible)
   expect_identical(shown$value, report)
@@ -369,7 +373,50 @@ test_that("report_convergence() prints the table with its footer", {
   expect_true(any(grepl("^Algorithm: sampling$", printed)))
   expect_true(any(grepl("^Divergent transitions after warmup: 0$", printed)))
   expect_true(any(grepl("b_kappa_Intercept", printed)))
-  expect_false(inherits(conv[1:2, ], "bmm_report_convergence"))
+  expect_identical(class(conv[1:2, ]), "data.frame")
+  expect_identical(conv[, "rhat"], conv$rhat)
+  expect_identical(report_convergence(fit, format = "text")[1], expected_convergence_text(fit))
   text <- utils::capture.output(print(report_convergence(fit, format = "text")))
   expect_identical(paste(text, collapse = " "), expected_convergence_text(fit))
+})
+
+test_that("several chains are counted, and a single chain gets a note on R-hat", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  expect_true(any(grepl("single chain", quiet_report(fit)$notes)))
+  combined <- brms::combine_models(fit, fit)
+  report <- quiet_report(combined)
+  expect_identical(
+    sub(" Priors were specified.*$", "", report$paragraph),
+    expected_model_text(combined)
+  )
+  expect_match(report$paragraph, "We ran 2 Markov chains of the No-U-Turn sampler with 400 iterations each", fixed = TRUE)
+  expect_false(any(grepl("single chain", report$notes)))
+})
+
+test_that("a backend that is not installed gets a placeholder reference and a note", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_ezdm3_ppcheck.rds")
+  fit$backend <- "notinstalledbackend"
+  report <- quiet_report(fit, sections = "model")
+  i_backend <- length(model_citation(fit)) + 1 + length(citation("brms")) + 1
+  expect_identical(report$references[i_backend], "[CITATION NEEDED]")
+  expect_match(report$paragraph, paste0("notinstalledbackend ", marker(i_backend)), fixed = TRUE)
+  expect_true(any(grepl(
+    paste0("notinstalledbackend could not be read because it is not installed: replace [CITATION NEEDED] ", marker(i_backend)),
+    report$notes, fixed = TRUE
+  )))
+})
+
+test_that("fits without a model version, and fits from old versions of bmm, are reported", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  fit$bmm$model$version <- NULL
+  expect_no_match(quiet_report(fit, sections = "model")$paragraph, "version \"", fixed = FALSE)
+  legacy <- load_fixture_fit("bmmfit_legacy_sdm_v0.2.1.rds")
+  class(legacy) <- c("bmmfit", "brmsfit")
+  expect_match(
+    quiet_report(legacy, sections = c("model", "convergence"))$paragraph,
+    "^We fitted the Signal Discrimination Model"
+  )
 })

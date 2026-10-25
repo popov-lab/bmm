@@ -65,6 +65,7 @@ report_methods <- function(fit, sections = c("model", "priors", "convergence")) 
   )
   stopif(!has_draws(fit), no_draws_message())
   sections <- unique(match.arg(sections, several.ok = TRUE))
+  fit <- restructure(fit)
   references <- report_references(fit)
   markers <- reference_markers(references)
   conv <- if ("convergence" %in% sections) convergence_summary(fit)
@@ -136,7 +137,7 @@ report_convergence <- function(fit, format = c("table", "text")) {
   )
   stopif(!has_draws(fit), no_draws_message())
   format <- match.arg(format)
-  conv <- convergence_summary(fit)
+  conv <- convergence_summary(restructure(fit))
   if (format == "text") {
     return(structure(convergence_report_text(conv), class = c("bmm_report_convergence", "character")))
   }
@@ -150,7 +151,7 @@ no_draws_message <- function() {
 #' @export
 print.bmm_report_methods <- function(x, ...) {
   label <- style("purple1")
-  cat(label("Methods (draft):"), "\n", sep = "")
+  cat(label("Methods paragraph (draft):"), "\n", sep = "")
   cat(strwrap(x$paragraph, width = 80), sep = "\n")
   if (length(x$formula)) {
     cat("\n", label("Formula:"), "\n", sep = "")
@@ -160,7 +161,7 @@ print.bmm_report_methods <- function(x, ...) {
   for (reference in numbered_references(x$references)) {
     cat(strwrap(reference, width = 80, exdent = 4), sep = "\n")
   }
-  cat("\n", label("Notes:"), "\n", sep = "")
+  cat("\n", label("Notes (for you, not for the paper):"), "\n", sep = "")
   for (note in x$notes) {
     cat(strwrap(paste("-", note), width = 80, exdent = 2), sep = "\n")
   }
@@ -171,7 +172,7 @@ print.bmm_report_methods <- function(x, ...) {
 format.bmm_report_methods <- function(x, ...) {
   paste(
     c(
-      x$paragraph,
+      if (nzchar(x$paragraph)) x$paragraph,
       if (length(x$formula)) paste(x$formula, collapse = "\n"),
       paste(numbered_references(x$references), collapse = "\n")
     ),
@@ -192,7 +193,6 @@ print.bmm_report_convergence <- function(x, ...) {
     return(invisible(x))
   }
   label <- style("purple1")
-  algorithm <- attr(x, "algorithm")
   if (nrow(x) == 0) {
     cat(strwrap(convergence_report_text(x), width = 80), sep = "\n")
     return(invisible(x))
@@ -206,7 +206,7 @@ print.bmm_report_convergence <- function(x, ...) {
     right = FALSE, row.names = FALSE
   )
   footer <- c(
-    "Algorithm: " = algorithm,
+    "Algorithm: " = attr(x, "algorithm"),
     "Divergent transitions after warmup: " = attr(x, "divergent"),
     "Transitions at the maximum tree depth: " = attr(x, "max_treedepth_hits")
   )
@@ -219,7 +219,9 @@ print.bmm_report_convergence <- function(x, ...) {
 
 #' @export
 "[.bmm_report_convergence" <- function(x, ...) {
-  as.data.frame(NextMethod())
+  out <- NextMethod()
+  if (is.data.frame(out)) class(out) <- "data.frame"
+  out
 }
 
 # the references in citation order: the model's, then bmm, brms, the backend
@@ -256,7 +258,7 @@ model_report_text <- function(fit, markers) {
   settings <- fit_settings(fit)
   versions <- settings$versions
   model <- fit$bmm$model
-  model_version <- if (model$version %in% c(NA, "NA", "")) "" else glue(", version \"{model$version}\",")
+  model_version <- if (all(model$version %in% c(NA, "NA", ""))) "" else glue(", version \"{model$version}\",")
   paste(
     glue(
       "We fitted the {sub('^The ', '', model$name)} {markers$model}{model_version} ",
@@ -269,7 +271,7 @@ model_report_text <- function(fit, markers) {
       "in R{version_phrase(versions[['R']])} {markers$R}."
     ),
     sampler_report_text(fit, settings),
-    "The bmm formula, including the parameters fixed to constants, is given below."
+    "The bmm formula of the model follows this paragraph; a parameter written with = is fixed to that constant."
   )
 }
 
@@ -280,7 +282,7 @@ version_phrase <- function(version, label = "version") {
 sampler_report_text <- function(fit, settings) {
   if (!identical(settings$algorithm, "sampling")) {
     return(glue(
-      "The posterior was approximated with Stan's {settings$algorithm} algorithm, ",
+      "The model was run with Stan's {settings$algorithm} algorithm, ",
       "which returned {format_count(settings$ndraws_stored)} draws."
     ))
   }
@@ -311,7 +313,7 @@ convergence_report_text <- function(conv) {
   }
   paste(
     glue(
-      "Across all estimated parameters, the largest rank-normalized R-hat was {format_rhat(max(conv$rhat))}, ",
+      "Across all estimated parameters, the largest rank-normalized split R-hat was {format_rhat(max(conv$rhat))}, ",
       "the smallest bulk effective sample size (ESS) was {format_count(min(conv$ess_bulk))}, ",
       "and the smallest tail ESS was {format_count(min(conv$ess_tail))}."
     ),
@@ -339,26 +341,38 @@ format_count <- function(x) {
 
 report_notes <- function(fit, sections, references, markers, conv) {
   uncited <- uncited_part(fit$bmm$model)
-  unread <- setdiff(names(references)[vapply(references, identical, logical(1), "[CITATION NEEDED]")], "model")
+  placeholders <- vapply(references, identical, logical(1), "[CITATION NEEDED]")
   c(
-    "This text is a draft built from the fit: check it against your analysis and edit it before use.",
+    paste(
+      "This text is a draft built from the fit. It does not describe the data, the task or what the",
+      "model parameters mean; add them, check the text against your analysis and edit it before use."
+    ),
     "Numbers in square brackets refer to the references; replace them with citations in the style of your journal.",
     glue("Please cite bmm {markers$bmm} when you use it."),
-    if (identical(references$model, "[CITATION NEEDED]")) {
+    "No installed package provides a reference for Stan itself; add one if your journal asks for it.",
+    if (placeholders[["model"]]) {
       glue("bmm has no reference for this model: replace [CITATION NEEDED] {markers$model} with its source.")
     },
-    if (!is.null(uncited)) glue("bmm cannot know the source of {uncited}: add its reference yourself."),
-    vapply(unread, function(group) {
+    if (!is.null(uncited)) {
+      glue(
+        "Reference {markers$model} is the source bmm gives for this model, but bmm cannot know the source ",
+        "of {uncited}: add its reference yourself."
+      )
+    },
+    vapply(setdiff(names(references)[placeholders], "model"), function(group) {
       glue(
         "The reference of {reference_package(fit, group)} could not be read because it is not ",
         "installed: replace [CITATION NEEDED] {markers[[group]]}."
       )
     }, character(1), USE.NAMES = FALSE),
     if ("model" %in% sections && is.null(fit$version$R)) {
-      "The fit does not store the R version it ran in, as it was made with an older version of bmm: add the R version to the text."
+      paste(
+        "The fit does not store the R version it ran in, as it was made with an older version of bmm:",
+        "add the version you fitted the model with after \"in R\"."
+      )
     },
     version_mismatch_note(fit),
-    if ("convergence" %in% sections) convergence_notes(conv)
+    if ("convergence" %in% sections) convergence_notes(conv, fit$fit@sim$chains)
   )
 }
 
@@ -388,18 +402,27 @@ version_mismatch_note <- function(fit) {
   }
   pkgs <- names(installed)[differ]
   glue(
-    "The references are those of the versions installed now, which differ from the versions the fit ",
-    "was made with: {paste0(pkgs, ' ', installed[differ], ' (fit: ', pkgs, ' ', used[differ], ')', collapse = ', ')}."
+    "The versions in the text are those the fit stores, but the references are those of the packages ",
+    "installed now, which differ: ",
+    "{paste0(pkgs, ' ', installed[differ], ' (fit: ', pkgs, ' ', used[differ], ')', collapse = ', ')}."
   )
 }
 
-convergence_notes <- function(conv) {
+convergence_notes <- function(conv, chains) {
   if (!identical(attr(conv, "algorithm"), "sampling")) {
     return(convergence_report_text(conv))
   }
   above <- conv$parameter[conv$in_summary & conv$rhat > 1.05]
   divergent <- attr(conv, "divergent")
   c(
+    paste(
+      "R-hat and ESS were computed with posterior::summarise_draws() over all estimated parameters,",
+      "including group-level effects and the centred intercepts brms samples; report_convergence()",
+      "lists them per parameter."
+    ),
+    if (chains == 1) {
+      "With a single chain, R-hat compares the two halves of that chain only; with several chains it also compares the chains."
+    },
     if (length(above)) {
       glue("brms's summary() warns about this fit: R-hat above 1.05 for {collapse_comma(above)}.")
     },
