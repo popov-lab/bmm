@@ -46,6 +46,7 @@ reference:
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "easystats-bmmfit"
+    - "easystats-report-bmmfit"
     - "pp_check.bmmfit"
     - "ppp"
     - "posterior_epred.bmmfit"
