@@ -159,9 +159,10 @@ configure_model.sdm <- function(model, data, formula) {
     run_metadata <- sdm_run_metadata(data, formula, model)
   }
   # 16 nodes per panel and the 32-node wide rule keep log Z within 4e-12
-  # where it is below 1e4 and within 5e-10 above, to log c = 12 and kappa =
-  # 3000 and beyond; where sdm_simple_ldenom() switches between them they
-  # differ by 4e-14 (#615). test-model_sdm-stan.R holds the bar
+  # where it is below 1e4 and, above it, within 5e-10 to log c = 12 and
+  # kappa = 3000 and within 3 ulps beyond; where sdm_simple_ldenom()
+  # switches between them they differ by 4e-14 (#615).
+  # test-model_sdm-stan.R holds the bar
   gl <- .gl_rule(16L)
   wide <- .sdm_wide_rule()
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +

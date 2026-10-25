@@ -13,16 +13,18 @@
   // eta(u) = exp(c) sqrt(kappa / (2 pi)) exp(kappa (cos(u) - 1)) and c is on the
   // log scale. eta is even, so [0, pi] carries the whole integral. The spike at
   // u = 0 narrows with kappa and its peak grows with c (#615). Its squared
-  // inverse width is about peak * kappa at the top and kappa where it meets the
-  // floor, so kappa (peak + 1) measures how sharp it is. Up to 4000, which takes
-  // in c <= 50 with kappa <= 30, a fixed rule with nodes crowded toward u = 0
-  // resolves it; wide_cosm1 holds cos(u) - 1 at its nodes. Sharper spikes get
-  // Gauss-Legendre on panels cut at multiples of two widths: w, where eta falls
-  // to about 1, and s, the SD of exp(eta) near the peak, which is far narrower
-  // than w once the peak is large. The last w cut is at 5 w because past 3 w
-  // the floor of a small peak still carries 1e-8 of the integral. eta - peak is
-  // formed as peak expm1(kappa (cos(u) - 1)), with cos(u) - 1 free of
-  // cancellation, because cos(u) - 1 and eta - peak both cancel near the peak.
+  // inverse width is about peak * kappa at the top, at most 2 kappa log(peak)
+  // where it meets the floor, and kappa for a small peak, so kappa (peak + 1)
+  // measures how sharp it is. Up to 4000, which takes in exp(c) <= 50 with
+  // kappa <= 30, a fixed rule with nodes crowded toward u = 0 resolves it;
+  // wide_cosm1 holds cos(u) - 1 at its nodes. Sharper spikes get Gauss-Legendre
+  // on panels cut at multiples of two widths: w, where eta falls to about 1,
+  // and s, the SD of exp(eta) near the peak, which is far narrower than w once
+  // the peak is large. The last w cut is at 5 w because past 3 w the spike of a
+  // small peak still carries up to 1.2e-6 of the integral above its floor,
+  // and 1.2e-13 past 5 w. eta - peak is formed as
+  // peak expm1(kappa (cos(u) - 1)), with cos(u) - 1 free of cancellation,
+  // because cos(u) - 1 and eta - peak both cancel near the peak.
   real sdm_simple_ldenom(real c, real kappa, data vector gl_x, data vector gl_w,
                          data vector wide_cosm1, data vector wide_w) {
     int n_nodes = num_elements(gl_x);

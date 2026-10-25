@@ -170,9 +170,9 @@ test_that("the Stan normalising constant of sdm() matches integrate() across the
   error <- abs(stan$log_z - reference)
   on_grid <- seq_len(nrow(sdm_issue_grid))
 
-  # the rule's measured worst: 1.3e-13 on the grid, 7.3e-12 at the cells
-  # beyond it and 7.1e-15 at the tight cells, so a rule with fewer nodes in
-  # either regime fails here
+  # the rule's measured worst: 1.3e-13 on the grid, one ulp of log Z (4.7e-10
+  # at log c 12, kappa 3000) at the cells beyond it and 7.1e-15 at the tight
+  # cells, so a rule with fewer nodes in either regime fails here
   expect_lt(max(error[on_grid]), 1e-7)
   expect_lt(max(error[on_grid][sdm_issue_grid$kappa <= 30]), 1e-10)
   for (i in seq_len(nrow(sdm_corner_cells))) {
