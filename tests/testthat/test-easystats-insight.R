@@ -365,12 +365,14 @@ test_that("a coefficient of mu whose predictor starts with another parameter's n
   expect_identical(slopes$Scale, c(0.3, 2))
 })
 
-test_that("get_priors() reads prior arguments written as arithmetic", {
+test_that("get_priors() leaves a prior argument written as arithmetic unread", {
   skip_on_cran()
   skip_if_not_installed("insight")
+  # Stan divides integers as integers, so 1/2 is 0 there: a value read in R
+  # would differ from the one the model used
   fit <- suppressWarnings(suppressMessages(
     bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
-        prior = brms::set_prior("normal(1/2, 3 * 0.5)", class = "Intercept", dpar = "c"),
+        prior = brms::set_prior("normal(1/2, 2)", class = "Intercept", dpar = "c"),
         backend = "mock", mock_fit = 1, rename = FALSE)
   ))
   local_mocked_bindings(
@@ -378,8 +380,8 @@ test_that("get_priors() reads prior arguments written as arithmetic", {
     .package = "brms"
   )
   priors <- insight::get_priors(fit)
-  expect_identical(as.list(priors[priors$Parameter == "b_c_Intercept", c("Location", "Scale")]),
-                   list(Location = 0.5, Scale = 1.5))
+  expect_identical(as.list(priors[priors$Parameter == "b_c_Intercept", c("Distribution", "Location", "Scale")]),
+                   list(Distribution = "normal", Location = NA_real_, Scale = 2))
 })
 
 test_that("get_priors() gives the eta of an lkj prior as its location", {
