@@ -135,6 +135,8 @@ test_that("report_methods() refuses a mock fit and unknown sections or formats",
   expect_error(report_convergence(mock), "no posterior draws")
   fit <- load_fixture_fit("bmmfit_example1.rds")
   expect_error(report_methods(fit, sections = "results"), "should be one of")
+  expect_error(report_methods(fit, sections = NULL), "at least one of 'model', 'priors' or 'convergence'")
+  expect_error(report_methods(fit, sections = character(0)), "at least one of 'model', 'priors' or 'convergence'")
   expect_error(report_convergence(fit, format = "html"), "should be one of")
 })
 
@@ -170,6 +172,26 @@ test_that("the template itself is written out for the sdm fixture", {
     "written with = is fixed to that constant."
   ))
   expect_identical(report$formula, c("mu = 0", "c ~ 0 + set_size", "kappa ~ 1"))
+  expect_identical(quiet_report(fit, sections = "priors")$paragraph, paste(
+    "Priors were specified on the sampling (link) scale of each parameter.",
+    "For parameters with a non-identity link, priors therefore apply to the transformed parameter.",
+    "For the memory strength parameter c (log link), all population-level coefficients received a",
+    "student_t(5, 2, 0.75) prior (bmm default). The location parameter mu was fixed to 0.",
+    "For the precision parameter kappa (log link), the intercept received a student_t(5, 1.75, 0.75)",
+    "prior (bmm default)."
+  ))
+})
+
+test_that("a model name that ends in the period of its reference does not end the sentence", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  fit$bmm$model$name <- "Two-parameter mixture model by Zhang and Luck (2008)."
+  paragraph <- quiet_report(fit, sections = "model")$paragraph
+  expect_true(startsWith(
+    paragraph,
+    "We fitted the Two-parameter mixture model by Zhang and Luck (2008) [1], version"
+  ))
+  expect_no_match(paragraph, "(2008). [", fixed = TRUE)
 })
 
 test_that("the formula lists the user's formula with its constants", {
@@ -269,6 +291,24 @@ test_that("divergent transitions are counted and named where brms's summary() wa
   expect_match(quiet_report(fit)$paragraph, "There was 1 divergent transition after warmup.", fixed = TRUE)
 })
 
+test_that("divergent transitions are counted after warmup only", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  # the fixtures store no warmup draws, so only the call's argument can pin this
+  local_mocked_bindings(
+    nuts_params = function(x, pars, inc_warmup = FALSE, ...) {
+      stopifnot(isFALSE(inc_warmup))
+      data.frame(Value = c(0, 0, 1))
+    },
+    .package = "brms"
+  )
+  expect_match(
+    quiet_report(fit, sections = "convergence")$paragraph,
+    "There was 1 divergent transition after warmup.",
+    fixed = TRUE
+  )
+})
+
 test_that("a non-sampling algorithm gets no convergence sentence, and one note", {
   skip_on_cran()
   fit <- load_fixture_fit("bmmfit_example1.rds")
@@ -290,6 +330,10 @@ test_that("a non-sampling algorithm gets no convergence sentence, and one note",
   convergence_only <- quiet_report(fit, sections = "convergence")
   expect_identical(convergence_only$paragraph, "")
   expect_true(startsWith(format(convergence_only), "[1] "))
+  withr::local_options(bmm.color_summary = FALSE)
+  printed <- utils::capture.output(print(convergence_only))
+  expect_false("Methods paragraph (draft):" %in% printed)
+  expect_true("References:" %in% printed)
 })
 
 test_that("thinning and the sampler are reported as the fit stores them", {
@@ -343,6 +387,17 @@ test_that("print() wraps the draft and format() returns the text to paste", {
   expect_match(pasted, paste0("[1] ", report$references[1]), fixed = TRUE)
   expect_match(pasted, "corr ~ b + a + c", fixed = TRUE)
   expect_no_match(pasted, report$notes[1], fixed = TRUE)
+
+  long <- load_fixture_fit("bmmfit_example1.rds")
+  long$bmm$user_formula <- bmf(
+    c ~ 0 + set_size + some_extremely_long_predictor_name_1 + another_very_long_predictor_name_2 +
+      (1 + set_size | ID),
+    kappa ~ 1
+  )
+  printed <- utils::capture.output(print(quiet_report(long, sections = "model")))
+  expect_true(all(nchar(printed) <= 80))
+  expect_true(any(grepl("  c ~ 0 + set_size + some_extremely_long_predictor_name_1 +", printed, fixed = TRUE)))
+  expect_true(any(grepl("      another_very_long_predictor_name_2 + (1 + set_size | ID)", printed, fixed = TRUE)))
 })
 
 test_that("report_convergence() returns the numbers of every fixture", {

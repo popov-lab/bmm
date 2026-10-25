@@ -29,7 +29,10 @@ An object of class \code{bmm_report_methods}, a list with
 }
 
 \code{print()} shows all of it; \code{format()} returns the paragraph, the formula
-and the numbered references as one string to paste into a document.
+and the numbered references as one string to paste into a document. The
+references keep the Markdown emphasis marks that \code{\link[=citation]{citation()}} writes
+(\verb{_journal_}, \verb{*volume*}): Quarto renders them as italics; in Word, remove
+them.
 }
 \description{
 Drafts the text that describes a model fitted with \code{\link[=bmm]{bmm()}} in the methods

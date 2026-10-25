@@ -45,7 +45,10 @@
 #'   - `sections`: the sections drafted, in order.
 #'
 #'   `print()` shows all of it; `format()` returns the paragraph, the formula
-#'   and the numbered references as one string to paste into a document.
+#'   and the numbered references as one string to paste into a document. The
+#'   references keep the Markdown emphasis marks that [citation()] writes
+#'   (`_journal_`, `*volume*`): Quarto renders them as italics; in Word, remove
+#'   them.
 #' @seealso [report_convergence()], [prior_info()], [model_citation()]
 #' @keywords extract_info
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
@@ -64,6 +67,10 @@ report_methods <- function(fit, sections = c("model", "priors", "convergence")) 
     "report_methods() needs a bmmfit object returned by bmm(), not an object of class '{class(fit)[1]}'."
   )
   stopif(!has_draws(fit), no_draws_message())
+  stopif(
+    !length(sections),
+    "sections must name at least one of 'model', 'priors' or 'convergence'."
+  )
   sections <- unique(match.arg(sections, several.ok = TRUE))
   fit <- restructure(fit)
   references <- report_references(fit)
@@ -151,11 +158,13 @@ no_draws_message <- function() {
 #' @export
 print.bmm_report_methods <- function(x, ...) {
   label <- style("purple1")
-  cat(label("Methods paragraph (draft):"), "\n", sep = "")
-  cat(strwrap(x$paragraph, width = 80), sep = "\n")
+  if (nzchar(x$paragraph)) {
+    cat(label("Methods paragraph (draft):"), "\n", sep = "")
+    cat(strwrap(x$paragraph, width = 80), sep = "\n")
+  }
   if (length(x$formula)) {
     cat("\n", label("Formula:"), "\n", sep = "")
-    cat(paste0("  ", x$formula), sep = "\n")
+    cat(paste0("  ", strwrap(x$formula, width = 78, exdent = 4)), sep = "\n")
   }
   cat("\n", label("References:"), "\n", sep = "")
   for (reference in numbered_references(x$references)) {
@@ -254,6 +263,13 @@ reference_markers <- function(references) {
   )
 }
 
+# some constructors store the name with the period of its reference ("... by
+# Zhang and Luck (2008)."), which would end the sentence before the marker;
+# the report methods of PR 478 apply the same rule
+model_display_name <- function(model) {
+  sub("\\.$", "", sub("^The ", "", model$name))
+}
+
 model_report_text <- function(fit, markers) {
   settings <- fit_settings(fit)
   versions <- settings$versions
@@ -261,7 +277,7 @@ model_report_text <- function(fit, markers) {
   model_version <- if (all(model$version %in% c(NA, "NA", ""))) "" else glue(", version \"{model$version}\",")
   paste(
     glue(
-      "We fitted the {sub('^The ', '', model$name)} {markers$model}{model_version} ",
+      "We fitted the {model_display_name(model)} {markers$model}{model_version} ",
       "with the R package bmm{version_phrase(versions[['bmm']])} {markers$bmm}."
     ),
     glue(
@@ -421,7 +437,10 @@ convergence_notes <- function(conv, chains) {
       "lists them per parameter."
     ),
     if (chains == 1) {
-      "With a single chain, R-hat compares the two halves of that chain only; with several chains it also compares the chains."
+      paste(
+        "With a single chain, R-hat compares the two halves of that chain only;",
+        "with several chains it also compares the chains."
+      )
     },
     if (length(above)) {
       glue("brms's summary() warns about this fit: R-hat above 1.05 for {collapse_comma(above)}.")
