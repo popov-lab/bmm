@@ -6,6 +6,7 @@
 \alias{report_model.bmmfit}
 \alias{report_random.bmmfit}
 \alias{report_priors.bmmfit}
+\alias{report_info.bmmfit}
 \alias{model_performance.bmmfit}
 \title{report and performance support for bmmfit objects}
 \usage{
@@ -17,6 +18,8 @@
 
 \method{report_priors}{bmmfit}(x, ...)
 
+\method{report_info}{bmmfit}(x, parameters = NULL, ...)
+
 \method{model_performance}{bmmfit}(model, metrics = c("LOOIC", "WAIC"), verbose = TRUE, ...)
 }
 \arguments{
@@ -26,6 +29,9 @@
 
 \item{...}{Passed on to the methods of \pkg{report} and \pkg{performance}
 for \pkg{brms} fits.}
+
+\item{parameters}{The result of \code{\link[report:report_parameters]{report::report_parameters()}} for \code{x}, or
+\code{NULL} to compute it.}
 
 \item{metrics}{The indices to return: \code{"LOOIC"}, \code{"WAIC"}, or \code{"all"} and
 \code{"common"} for both.}
@@ -54,6 +60,12 @@ grouping factors of the random effects.
 \item \code{report_priors()} gives the text of \code{prior_info(fit, format = "text")}: the priors in the names of the model parameters, with a note
 that they apply on the sampling (link) scale. The short version of the
 report, \code{summary(report(fit))}, leaves the priors out.
+\item \code{report_info()} keeps the paragraph of \pkg{report} that explains
+the parameter summaries, and replaces its sentence on convergence (the
+thresholds for R-hat and ESS) with the sentence of
+\code{report_convergence(fit, format = "text")}: the largest R-hat, the
+smallest bulk and tail ESS and the number of divergent transitions,
+without verdicts.
 \item \code{model_performance()} returns LOOIC and WAIC (with ELPD and the
 standard errors). R2, RMSE and the other indices of
 \pkg{performance} need the expected response or residuals, which bmm
@@ -62,10 +74,11 @@ when none of the requested indices is defined, LOOIC and WAIC are
 returned.
 }
 
-The parameter summaries and the paragraph on convergence come from
-\pkg{report} unchanged. \pkg{report} lists no parameter estimates for a
-model without predictors, such as an \code{\link[=mpt]{mpt()}} or \code{\link[=ezdm]{ezdm()}} fit with
-intercepts only; use \code{\link[=summary]{summary()}} for those.
+The parameter summaries, with their R-hat and ESS, come from \pkg{report}
+unchanged. \pkg{report} lists no parameter estimates for a model without
+predictors, such as an \code{\link[=mpt]{mpt()}} or \code{\link[=ezdm]{ezdm()}} fit with intercepts only; use
+\code{summary()} for those. \code{\link[=report_methods]{report_methods()}} drafts a methods paragraph from
+the same facts in bmm's own words.
 }
 \examples{
 \dontrun{
@@ -75,5 +88,6 @@ performance::model_performance(fit)
 
 }
 \seealso{
-\code{\link[=prior_info]{prior_info()}}, \link{easystats-bmmfit}
+\code{\link[=prior_info]{prior_info()}}, \code{\link[=report_methods]{report_methods()}}, \code{\link[=report_convergence]{report_convergence()}},
+\link{easystats-bmmfit}
 }

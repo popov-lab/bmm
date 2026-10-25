@@ -114,6 +114,36 @@ test_that("report_priors() gives the sentences of prior_info()", {
 })
 
 # reads the reports cached by the per-fixture blocks above
+test_that("report_info() replaces report's threshold sentence with the fit's convergence numbers", {
+  skip_if_not_installed("report")
+  skip_if_not_installed("performance")
+  for (case in model_test_cases("fixture")) {
+    cached <- fixture_report(case$file)
+    fit <- cached$fit
+    label <- report_fit_label(fit)
+    text <- as.character(cached$report)
+    convergence <- as.character(suppressWarnings(report_convergence(fit, format = "text")))
+    expect_true(endsWith(text, convergence), info = label)
+    expect_false(grepl("should be below", text, fixed = TRUE), info = label)
+    expect_false(grepl("Vehtari", text, fixed = TRUE), info = label)
+    expect_true(grepl("SEXIT", text, fixed = TRUE), info = label)
+    conv <- posterior::summarise_draws(brms::as_draws_array(restructure(fit)), "rhat")
+    conv <- conv[!conv$variable %in% c("lp__", "lprior") & !grepl("^prior_", conv$variable), ]
+    expect_true(
+      grepl(
+        paste0("largest rank-normalized split R-hat was ", formatC(max(conv$rhat, na.rm = TRUE), format = "f", digits = 3)),
+        text, fixed = TRUE
+      ),
+      info = label
+    )
+  }
+  info <- suppressWarnings(report::report_info(load_fixture_fit("bmmfit_example1.rds")))
+  expect_s3_class(info, "report_info")
+  expect_match(as.character(info), "^.*SEXIT.* Across all estimated parameters, .*divergent transitions? after warmup\\.$")
+  expect_false(grepl("Convergence and stability", info, fixed = TRUE))
+})
+
+# reads the reports cached by the per-fixture blocks above
 test_that("model_performance() returns only the indices defined for bmm models", {
   skip_if_not_installed("report")
   skip_if_not_installed("performance")
