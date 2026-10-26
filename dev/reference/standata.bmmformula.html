@@ -102,34 +102,38 @@ model with Stan.</p>
 <span class="r-in"><span>  model <span class="op">=</span> <span class="fu"><a href="sdm.html">sdm</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">"dev_rad"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">sdata1</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ N            : int 15200</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Y            : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ K            : int 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Kc           : num 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X            : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> List of 19</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ N             : int 15200</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Y             : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ K             : int 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Kc            : num 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X             : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr "Intercept"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "assign")= int 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ K_c          : int 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Kc_c         : num 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X_c          : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ K_c           : int 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Kc_c          : num 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X_c           : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr "Intercept"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "assign")= int 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ K_kappa      : int 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Kc_kappa     : num 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X_kappa      : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ K_kappa       : int 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ Kc_kappa      : num 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X_kappa       : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr "Intercept"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "assign")= int 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ prior_only   : int 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ G_sdm_runs   : int 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_run_start: int [1(1d)] 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_run_count: int [1(1d)] 15200</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ prior_only    : int 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_gl_x      : num [1:16] -0.989 -0.945 -0.866 -0.755 -0.618 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_gl_w      : num [1:16] 0.0272 0.0623 0.0952 0.1246 0.1496 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_wide_cosm1: num [1:32] -0.00001 -0.000091 -0.000258 -0.00052 -0.000894 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_wide_w    : num [1:32] 0.00896 0.00909 0.00936 0.00976 0.01031 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ G_sdm_runs    : int 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_run_start : int [1(1d)] 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sdm_run_count : int [1(1d)] 15200</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr [1:2] "standata" "list"</span>
 </code></pre></div>
     </div>

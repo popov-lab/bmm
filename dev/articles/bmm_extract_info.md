@@ -287,31 +287,6 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
 
 
 
-      // utility function trick for converting real to integer type
-      int bin_search(real x, int min_val, int max_val) {
-          int mid_p;
-          int L = min_val;
-          int R = max_val;
-          while(L < R) {
-            mid_p = (R-L) %/% 2;
-            if (L + mid_p < x) {
-              L += mid_p + 1;
-            } else if (L + mid_p > x) {
-              R = L + mid_p - 1;
-            } else {
-              return(L + mid_p);
-            }
-          }
-          return(L);
-        }
-
-      // utility function for determining optimal number of chebyshev points for the denominator approximation
-      int get_m(real c, real kappa) {
-        real m = floor(2 * exp(0.4*c) * kappa^(fma(c,0.0145,0.7)) + 0.5)+2;
-        int M = bin_search(m, 2, 200);
-        return(M);
-      }
-
       // log of the numerator of the sdm likelihood
       real sdm_simple_lpdf(vector y, vector mu, vector c, vector kappa) {
         int N = size(y);
@@ -321,37 +296,72 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
         return(out);
       }
 
-      // log of the normalization constant, approximated by chebyshev quadrature
-      real sdm_simple_ldenom_chquad_adaptive(real c, real kappa, matrix CN) {
-        int m = get_m(c,kappa);
-        vector[m] cosn = CN[1:m,m];
-        vector[m] fn = exp(fma(kappa,cosn,c)) * sqrt(kappa) * inv(sqrt2()) * inv_sqrt(pi());
-        real out = -log_sum_exp(fn)+log(m);
-        return(out);
+      // Minus the log of the mean of exp(eta(u)) over the circle, where
+      // eta(u) = exp(c) sqrt(kappa / (2 pi)) exp(kappa (cos(u) - 1)) and c is on the
+      // log scale. eta is even, so [0, pi] carries the whole integral. The spike at
+      // u = 0 narrows with kappa and its peak grows with c (#615). Its squared
+      // inverse width is about peak * kappa at the top, at most 2 kappa log(peak)
+      // where it meets the floor, and kappa for a small peak, so kappa (peak + 1)
+      // measures how sharp it is. Up to 4000, which takes in exp(c) <= 50 with
+      // kappa <= 30, a fixed rule with nodes crowded toward u = 0 resolves it;
+      // wide_cosm1 holds cos(u) - 1 at its nodes. Sharper spikes get Gauss-Legendre
+      // on panels cut at multiples of two widths: w, where eta falls to about 1,
+      // and s, the SD of exp(eta) near the peak, which is far narrower than w once
+      // the peak is large. The last w cut is at 5 w because past 3 w the spike of a
+      // small peak still carries up to 1.2e-6 of the integral above its floor,
+      // and 1.2e-13 past 5 w. eta - peak is formed as
+      // peak expm1(kappa (cos(u) - 1)), with cos(u) - 1 free of cancellation,
+      // because cos(u) - 1 and eta - peak both cancel near the peak.
+      real sdm_simple_ldenom(real c, real kappa, data vector gl_x, data vector gl_w,
+                             data vector wide_cosm1, data vector wide_w) {
+        int n_nodes = num_elements(gl_x);
+        real log_peak = c + 0.5 * log(kappa / (2 * pi()));
+        real peak = exp(log_peak);
+        if (kappa * (peak + 1) <= 4000) {
+          return log(pi()) - peak - log(dot_product(wide_w, exp(peak * expm1(kappa * wide_cosm1))));
+        }
+        real w = fmin(pi(), sqrt(2 * fmax(log_peak, 1) / kappa));
+        real s = exp(-0.5 * (log_peak + log(kappa)));
+        vector[9] cuts = [0, pi(), 0.5 * w, w, 2 * w, 5 * w, s, 3 * s, 9 * s]';
+        real log_int = negative_infinity();
+        for (i in 1:9) {
+          cuts[i] = fmin(fmax(cuts[i], 0), pi());
+        }
+        cuts = sort_asc(cuts);
+        for (i in 1:8) {
+          if (cuts[i + 1] > cuts[i]) {
+            real half = (cuts[i + 1] - cuts[i]) / 2;
+            vector[n_nodes] u = (cuts[i] + cuts[i + 1]) / 2 + half * gl_x;
+            vector[n_nodes] d = peak * expm1(-2 * kappa * square(sin(u / 2)));
+            real d_max = max(d);
+            log_int = log_sum_exp(log_int, log(half) + d_max + log(dot_product(gl_w, exp(d - d_max))));
+          }
+        }
+        return log(pi()) - peak - log_int;
       }
 
-      real sdm_simple_run_ldenom(vector c, vector kappa, matrix CN,
-                                 int G_runs, array[] int run_start,
-                                 array[] int run_count) {
+      real sdm_simple_run_ldenom(vector c, vector kappa, data vector gl_x,
+                                 data vector gl_w, data vector wide_cosm1,
+                                 data vector wide_w, int G_runs,
+                                 array[] int run_start, array[] int run_count) {
         real out = 0;
         for (g in 1:G_runs) {
           int n = run_start[g];
-          real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
-          out += run_count[g] * z;
+          out += run_count[g] * sdm_simple_ldenom(c[n], kappa[n], gl_x, gl_w, wide_cosm1, wide_w);
         }
         return(out);
       }
 
-      real sdm_simple_run_ldenom_slice(vector c, vector kappa, matrix CN,
-                                       int start, int end, int G_runs,
-                                       array[] int run_start,
+      real sdm_simple_run_ldenom_slice(vector c, vector kappa, data vector gl_x,
+                                       data vector gl_w, data vector wide_cosm1,
+                                       data vector wide_w, int start, int end,
+                                       int G_runs, array[] int run_start,
                                        array[] int run_count) {
         real out = 0;
         for (g in 1:G_runs) {
           if (run_start[g] >= start && run_start[g] <= end) {
             int n = run_start[g] - start + 1;
-            real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);
-            out += run_count[g] * z;
+            out += run_count[g] * sdm_simple_ldenom(c[n], kappa[n], gl_x, gl_w, wide_cosm1, wide_w);
           }
         }
         return(out);
@@ -365,19 +375,16 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
       int<lower=1> K_kappa;  // number of population-level effects
       matrix[N, K_kappa] X_kappa;  // population-level design matrix
       int prior_only;  // should the likelihood be ignored?
+      vector[16] sdm_gl_x;
+      vector[16] sdm_gl_w;
+      vector[32] sdm_wide_cosm1;
+      vector[32] sdm_wide_w;
       int G_sdm_runs;
       array[G_sdm_runs] int sdm_run_start;
       array[G_sdm_runs] int sdm_run_count;
     }
     transformed data {
-        // precompute chebyshev points
-      matrix[200,200] COSN;
-      for (m in 1:200) {
-        for (i in 1:m) {
-          COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;
-        }
-      }
-      // fail fast if the run metadata computed in R does not match the data Stan received
+        // fail fast if the run metadata computed in R does not match the data Stan received
       {
         int sdm_run_total = 0;
         for (g in 1:G_sdm_runs) {
@@ -428,8 +435,9 @@ stancode(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
         mu = inv_tan_half(mu);
         kappa = exp(kappa);
         target += sdm_simple_lpdf(Y | mu, c, kappa);
-          target += sdm_simple_run_ldenom(c, kappa, COSN, G_sdm_runs,
-                                        sdm_run_start, sdm_run_count);
+          target += sdm_simple_run_ldenom(c, kappa, sdm_gl_x, sdm_gl_w, sdm_wide_cosm1,
+                                        sdm_wide_w, G_sdm_runs, sdm_run_start,
+                                        sdm_run_count);
         target += -(log2()+log(pi()))*N;
       }
       // priors including constants
@@ -467,18 +475,18 @@ sd <- standata(bmf(c ~ 0 + set_size, kappa ~ 0 + set_size),
                data = oberauer_lin_2017,
                model = sdm(resp_error = 'dev_rad'))
 str(sd)
-#> List of 13
-#>  $ N            : int 15200
-#>  $ Y            : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...
-#>  $ K            : int 1
-#>  $ Kc           : num 0
-#>  $ X            : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
+#> List of 17
+#>  $ N             : int 15200
+#>  $ Y             : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...
+#>  $ K             : int 1
+#>  $ Kc            : num 0
+#>  $ X             : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr "Intercept"
 #>   ..- attr(*, "assign")= int 0
-#>  $ K_c          : int 8
-#>  $ X_c          : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
+#>  $ K_c           : int 8
+#>  $ X_c           : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr [1:8] "set_size1" "set_size2" "set_size3" "set_size4" ...
@@ -488,8 +496,8 @@ str(sd)
 #>   .. .. ..- attr(*, "dimnames")=List of 2
 #>   .. .. .. ..$ : chr [1:8] "1" "2" "3" "4" ...
 #>   .. .. .. ..$ : chr [1:7] "2" "3" "4" "5" ...
-#>  $ K_kappa      : int 8
-#>  $ X_kappa      : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
+#>  $ K_kappa       : int 8
+#>  $ X_kappa       : num [1:15200, 1:8] 0 0 0 0 1 1 0 0 0 0 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr [1:8] "set_size1" "set_size2" "set_size3" "set_size4" ...
@@ -499,9 +507,13 @@ str(sd)
 #>   .. .. ..- attr(*, "dimnames")=List of 2
 #>   .. .. .. ..$ : chr [1:8] "1" "2" "3" "4" ...
 #>   .. .. .. ..$ : chr [1:7] "2" "3" "4" "5" ...
-#>  $ prior_only   : int 0
-#>  $ G_sdm_runs   : int 13397
-#>  $ sdm_run_start: int [1:13397(1d)] 1 2 3 4 5 7 8 9 10 11 ...
-#>  $ sdm_run_count: int [1:13397(1d)] 1 1 1 1 2 1 1 1 1 1 ...
+#>  $ prior_only    : int 0
+#>  $ sdm_gl_x      : num [1:16] -0.989 -0.945 -0.866 -0.755 -0.618 ...
+#>  $ sdm_gl_w      : num [1:16] 0.0272 0.0623 0.0952 0.1246 0.1496 ...
+#>  $ sdm_wide_cosm1: num [1:32] -0.00001 -0.000091 -0.000258 -0.00052 -0.000894 ...
+#>  $ sdm_wide_w    : num [1:32] 0.00896 0.00909 0.00936 0.00976 0.01031 ...
+#>  $ G_sdm_runs    : int 13397
+#>  $ sdm_run_start : int [1:13397(1d)] 1 2 3 4 5 7 8 9 10 11 ...
+#>  $ sdm_run_count : int [1:13397(1d)] 1 1 1 1 2 1 1 1 1 1 ...
 #>  - attr(*, "class")= chr [1:2] "standata" "list"
 ```

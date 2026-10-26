@@ -150,31 +150,6 @@ bmm model.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // utility function trick for converting real to integer type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int bin_search(real x, int min_val, int max_val) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       int mid_p;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       int L = min_val;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       int R = max_val;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       while(L &lt; R) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         mid_p = (R-L) %/% 2;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         if (L + mid_p &lt; x) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           L += mid_p + 1;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         } else if (L + mid_p &gt; x) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           R = L + mid_p - 1;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         } else {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           return(L + mid_p);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       return(L);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // utility function for determining optimal number of chebyshev points for the denominator approximation</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int get_m(real c, real kappa) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     real m = floor(2 * exp(0.4*c) * kappa^(fma(c,0.0145,0.7)) + 0.5)+2;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     int M = bin_search(m, 2, 200);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     return(M);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // log of the numerator of the sdm likelihood</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_lpdf(vector y, vector mu, vector c, vector kappa) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     int N = size(y);</span>
@@ -184,37 +159,72 @@ bmm model.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     return(out);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // log of the normalization constant, approximated by chebyshev quadrature</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_ldenom_chquad_adaptive(real c, real kappa, matrix CN) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     int m = get_m(c,kappa);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     vector[m] cosn = CN[1:m,m];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     vector[m] fn = exp(fma(kappa,cosn,c)) * sqrt(kappa) * inv(sqrt2()) * inv_sqrt(pi());</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     real out = -log_sum_exp(fn)+log(m);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     return(out);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // Minus the log of the mean of exp(eta(u)) over the circle, where</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // eta(u) = exp(c) sqrt(kappa / (2 pi)) exp(kappa (cos(u) - 1)) and c is on the</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // log scale. eta is even, so [0, pi] carries the whole integral. The spike at</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // u = 0 narrows with kappa and its peak grows with c (#615). Its squared</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // inverse width is about peak * kappa at the top, at most 2 kappa log(peak)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // where it meets the floor, and kappa for a small peak, so kappa (peak + 1)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // measures how sharp it is. Up to 4000, which takes in exp(c) &lt;= 50 with</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // kappa &lt;= 30, a fixed rule with nodes crowded toward u = 0 resolves it;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // wide_cosm1 holds cos(u) - 1 at its nodes. Sharper spikes get Gauss-Legendre</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // on panels cut at multiples of two widths: w, where eta falls to about 1,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // and s, the SD of exp(eta) near the peak, which is far narrower than w once</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // the peak is large. The last w cut is at 5 w because past 3 w the spike of a</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // small peak still carries up to 1.2e-6 of the integral above its floor,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // and 1.2e-13 past 5 w. eta - peak is formed as</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // peak expm1(kappa (cos(u) - 1)), with cos(u) - 1 free of cancellation,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // because cos(u) - 1 and eta - peak both cancel near the peak.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_ldenom(real c, real kappa, data vector gl_x, data vector gl_w,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                          data vector wide_cosm1, data vector wide_w) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     int n_nodes = num_elements(gl_x);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     real log_peak = c + 0.5 * log(kappa / (2 * pi()));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     real peak = exp(log_peak);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     if (kappa * (peak + 1) &lt;= 4000) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       return log(pi()) - peak - log(dot_product(wide_w, exp(peak * expm1(kappa * wide_cosm1))));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     real w = fmin(pi(), sqrt(2 * fmax(log_peak, 1) / kappa));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     real s = exp(-0.5 * (log_peak + log(kappa)));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     vector[9] cuts = [0, pi(), 0.5 * w, w, 2 * w, 5 * w, s, 3 * s, 9 * s]';</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     real log_int = negative_infinity();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     for (i in 1:9) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       cuts[i] = fmin(fmax(cuts[i], 0), pi());</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     cuts = sort_asc(cuts);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     for (i in 1:8) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       if (cuts[i + 1] &gt; cuts[i]) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         real half = (cuts[i + 1] - cuts[i]) / 2;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         vector[n_nodes] u = (cuts[i] + cuts[i + 1]) / 2 + half * gl_x;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         vector[n_nodes] d = peak * expm1(-2 * kappa * square(sin(u / 2)));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         real d_max = max(d);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         log_int = log_sum_exp(log_int, log(half) + d_max + log(dot_product(gl_w, exp(d - d_max))));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     return log(pi()) - peak - log_int;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_run_ldenom(vector c, vector kappa, matrix CN,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                              int G_runs, array[] int run_start,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                              array[] int run_count) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_run_ldenom(vector c, vector kappa, data vector gl_x,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              data vector gl_w, data vector wide_cosm1,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              data vector wide_w, int G_runs,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              array[] int run_start, array[] int run_count) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     real out = 0;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     for (g in 1:G_runs) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       int n = run_start[g];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       out += run_count[g] * z;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       out += run_count[g] * sdm_simple_ldenom(c[n], kappa[n], gl_x, gl_w, wide_cosm1, wide_w);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     return(out);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_run_ldenom_slice(vector c, vector kappa, matrix CN,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                    int start, int end, int G_runs,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                    array[] int run_start,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   real sdm_simple_run_ldenom_slice(vector c, vector kappa, data vector gl_x,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    data vector gl_w, data vector wide_cosm1,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    data vector wide_w, int start, int end,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    int G_runs, array[] int run_start,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                    array[] int run_count) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     real out = 0;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     for (g in 1:G_runs) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       if (run_start[g] &gt;= start &amp;&amp; run_start[g] &lt;= end) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>         int n = run_start[g] - start + 1;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         real z = sdm_simple_ldenom_chquad_adaptive(c[n], kappa[n], CN);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         out += run_count[g] * z;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         out += run_count[g] * sdm_simple_ldenom(c[n], kappa[n], gl_x, gl_w, wide_cosm1, wide_w);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     return(out);</span>
@@ -224,19 +234,16 @@ bmm model.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=1&gt; N;  // total number of observations</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[N] Y;  // response variable</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int prior_only;  // should the likelihood be ignored?</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[16] sdm_gl_x;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[16] sdm_gl_w;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[32] sdm_wide_cosm1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[32] sdm_wide_w;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int G_sdm_runs;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   array[G_sdm_runs] int sdm_run_start;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   array[G_sdm_runs] int sdm_run_count;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> transformed data {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     // precompute chebyshev points</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[200,200] COSN;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   for (m in 1:200) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     for (i in 1:m) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // fail fast if the run metadata computed in R does not match the data Stan received</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     // fail fast if the run metadata computed in R does not match the data Stan received</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     int sdm_run_total = 0;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     for (g in 1:G_sdm_runs) {</span>
@@ -287,8 +294,9 @@ bmm model.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     mu = inv_tan_half(mu);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     kappa = exp(kappa);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     target += sdm_simple_lpdf(Y | mu, c, kappa);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>       target += sdm_simple_run_ldenom(c, kappa, COSN, G_sdm_runs,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     sdm_run_start, sdm_run_count);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       target += sdm_simple_run_ldenom(c, kappa, sdm_gl_x, sdm_gl_w, sdm_wide_cosm1,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                     sdm_wide_w, G_sdm_runs, sdm_run_start,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                     sdm_run_count);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     target += -(log2()+log(pi()))*N;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors including constants</span>

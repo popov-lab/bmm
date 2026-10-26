@@ -215,6 +215,16 @@
   ignored. Remove these rows.
   [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) accepts a
   factor response labelled “upper” and “lower”.
+- [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) fits
+  overestimated the likelihood when `c` and `kappa` were both large,
+  without a warning, and pulled the estimates there toward larger `c`
+  and `kappa`. On simulated data the estimates drifted far above the
+  true values. The likelihood is now accurate across the parameter
+  range, and fits take about as long as before. Refit
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) models whose
+  estimates reach large `c` and `kappa`. Fits such as the one in the SDM
+  article change no more than sampling noise
+  ([\#615](https://github.com/popov-lab/bmm/issues/615)).
 
 #### Other changes
 
