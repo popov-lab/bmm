@@ -119,6 +119,20 @@ Censored-Shifted Wald Model
 }
 }
 }
+\subsection{The prior for \code{ndt} and the fastest response}{
+
+\code{ndt} has to stay below every response the model fits: all responses in
+version \code{"crisk"}, the correct ones in \code{"simple"}, which censors errors.
+\code{bmm()} and \code{update()} warn when more than half of the prior for \code{ndt} lies
+at or above the fastest of these responses. Sampling can then fail to
+start, and the data pull \code{ndt} down against the prior. With the default
+prior, \code{normal(-2, 0.3)} on the log scale, this happens when the fastest
+response is faster than 0.135 s. Set a prior with a lower location, as the
+warning suggests, or filter out anticipations. The check reads \code{normal()}
+and \code{student_t()} priors on the intercept of \code{ndt}, or on each cell of a
+formula without an intercept such as \code{ndt ~ 0 + cond}; other priors and
+designs are not checked.
+}
 }
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}

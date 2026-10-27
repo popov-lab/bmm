@@ -502,7 +502,10 @@ test_that("the initial ndt of cswald ignores a response at rt = 0 (#548)", {
   for (version in c("simple", "crisk")) {
     model <- cswald("rt", "response", version = version)
     cfg <- suppressWarnings(configure_fit(formula, data, model))
-    init <- create_initfun(model, rbind(data, zero), cfg$config_args$formula, cfg$prior)
+    # the warning about the ndt prior is tested below
+    init <- suppressWarnings(
+      create_initfun(model, rbind(data, zero), cfg$config_args$formula, cfg$prior)
+    )
     ndt <- exp(replicate(200, init()$Intercept_ndt))
     expect_gte(min(ndt), 0.012 - 1e-9, label = version)
     expect_lte(max(ndt), 0.018 + 1e-9, label = version)
@@ -524,6 +527,138 @@ test_that("the init function of cswald carries neither the calling frame nor unu
   expect_equal(size(init_beside(1e6, data)), size(init_beside(1, data)))
   wide <- cbind(data, matrix(0, nrow(data), 500))
   expect_equal(size(init_beside(1, wide)), size(init_beside(1, data)))
+})
+
+# -----------------------------------------------------------------------------
+# The ndt prior against the fastest response (#548)
+# -----------------------------------------------------------------------------
+
+# The warnings about the ndt prior from the steps of bmm() up to the init
+# function; the others (0.100 s, error rate, identity link) are tested elsewhere
+ndt_prior_warnings <- function(data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+                               prior = NULL, version = "simple", links = NULL) {
+  model <- suppressWarnings(cswald("rt", "response", version = version, links = links))
+  warnings <- collect_warnings(suppressMessages(configure_fit(formula, data, model, prior)))$warnings
+  grep("prior for `ndt`", warnings, value = TRUE, fixed = TRUE)
+}
+
+# The warning of the default prior when the fastest response is 0.13 s; the
+# default normal(-2,0.3) has its median at exp(-2) = 0.135 s
+ndt_prior_warning_013 <- function(kind = "correct response") {
+  paste0(
+    "The prior for `ndt` puts most of its mass at or above the fastest ", kind,
+    " time, but `ndt` must stay below it:\n",
+    "  Intercept: normal(-2,0.3) puts 55% of its mass at or above 0.13 s\n",
+    "Sampling can fail to start, and the data pull `ndt` below that response ",
+    "against the prior. Give `ndt` a prior with a lower location, for example\n",
+    "  set_prior(\"normal(-2.65, 0.3)\", class = \"Intercept\", dpar = \"ndt\")\n",
+    "or filter out anticipations, responses faster than the task allows."
+  )
+}
+
+test_that("cswald warns when the default ndt prior lies above the fastest response (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  expect_identical(ndt_prior_warnings(cswald_fast_data(0.13)), ndt_prior_warning_013())
+  expect_identical(
+    ndt_prior_warnings(cswald_fast_data(0.13), version = "crisk"),
+    ndt_prior_warning_013("response")
+  )
+  # the default's median is 0.135 s and its upper 2.5% point 0.244 s
+  expect_identical(ndt_prior_warnings(cswald_fast_data(0.14)), character())
+  expect_identical(ndt_prior_warnings(cswald_fast_data(0.3)), character())
+})
+
+test_that("the ndt prior check reads the user's prior, not the default (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  user <- brms::set_prior("normal(-3,0.3)", class = "Intercept", dpar = "ndt")
+  expect_identical(ndt_prior_warnings(cswald_fast_data(0.13), prior = user), character())
+})
+
+test_that("the ndt prior check compares each cell with its own fastest response (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
+  data <- cswald_fast_data(0.13)
+  # cell a keeps the fastest response at 0.13 s, cell b starts at 0.305 s
+  data$rt[data$cond == "b"] <- data$rt[data$cond == "b"] + 0.17
+
+  warning <- ndt_prior_warnings(data, formula)
+  expect_length(warning, 1)
+  expect_match(warning, "conda: normal(-2,0.3) puts 55% of its mass at or above 0.13 s", fixed = TRUE)
+  expect_match(warning, "fastest correct response time in its cell", fixed = TRUE)
+  expect_match(
+    warning,
+    "set_prior(\"normal(-2.65, 0.3)\", class = \"b\", coef = \"conda\", dpar = \"ndt\")",
+    fixed = TRUE
+  )
+  expect_no_match(warning, "condb")
+
+  user <- brms::set_prior("normal(-3,0.3)", class = "b", coef = "conda", dpar = "ndt")
+  expect_identical(ndt_prior_warnings(data, formula, prior = user), character())
+})
+
+test_that("the ndt prior check ignores censored errors in cswald simple only (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  # the fastest response, 0.05 s, is an error; the fastest correct one 0.3 s
+  data <- cswald_fast_data(0.3)
+  data$rt[4] <- 0.05
+  expect_identical(ndt_prior_warnings(data), character())
+  expect_length(ndt_prior_warnings(data, version = "crisk"), 1)
+})
+
+test_that("the ndt prior check of update() reads the new data and prior (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  skip_if_not_installed("rstan")
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  mock <- function(fun, ...) {
+    out <- collect_warnings(suppressMessages(
+      fun(..., backend = "mock", mock_fit = stub, rename = FALSE)
+    ))
+    list(fit = out$value, warnings = grep("prior for `ndt`", out$warnings, value = TRUE, fixed = TRUE))
+  }
+  slow <- mock(bmm, bmf(drift ~ 1, bound ~ 1, ndt ~ 1), cswald_fast_data(0.3), cswald("rt", "response"))
+  expect_identical(slow$warnings, character())
+
+  # a mock fit cannot be reused, so update() takes the recompile path
+  fast <- mock(update, slow$fit, newdata = cswald_fast_data(0.13), recompile = TRUE)
+  expect_identical(fast$warnings, ndt_prior_warning_013())
+  user <- brms::set_prior("normal(-3,0.3)", class = "Intercept", dpar = "ndt")
+  fixed <- mock(update, slow$fit, newdata = cswald_fast_data(0.13), prior = user, recompile = TRUE)
+  expect_identical(fixed$warnings, character())
+})
+
+test_that("the ndt prior check reads normal() and student_t() on the scale of the link (#548)", {
+  data <- cswald_fast_data(0.13)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
+  # the brms formula and checked data of bmm(), without the cost of the prior
+  warnings_for <- function(prior, data, links = NULL) {
+    model <- suppressWarnings(cswald("rt", "response", links = links))
+    cfg <- suppressWarnings(configure_fit(formula, data, model, until = "model"))
+    collect_warnings(
+      .warn_ndt_prior_conflict(model, cfg$config_args$data, cfg$config_args$formula, prior)
+    )$warnings
+  }
+
+  t_warning <- warnings_for(brms::set_prior("student_t(3, -1.9, 0.3)", class = "Intercept", dpar = "ndt"), data)
+  expect_length(t_warning, 1)
+  expect_match(t_warning, "student_t(3, -1.9, 0.3) puts 66% of its mass", fixed = TRUE)
+  expect_match(t_warning, "set_prior(\"student_t(3, -2.65, 0.3)\"", fixed = TRUE)
+
+  # other distributions are not read
+  gamma <- brms::set_prior("gamma(2, 10)", class = "Intercept", dpar = "ndt")
+  expect_identical(warnings_for(gamma, data), character())
+
+  # on the identity link the default prior lies below zero, and a prior on the
+  # natural scale is compared with the fastest response itself
+  default <- brms::set_prior("normal(-2,0.3)", class = "Intercept", dpar = "ndt")
+  expect_identical(warnings_for(default, data, links = list(ndt = "identity")), character())
+  natural <- brms::set_prior("normal(0.2, 0.05)", class = "Intercept", dpar = "ndt")
+  identity_warning <- warnings_for(natural, cswald_fast_data(0.15), links = list(ndt = "identity"))
+  expect_length(identity_warning, 1)
+  expect_match(identity_warning, "normal(0.2, 0.05) puts 84% of its mass at or above 0.15 s", fixed = TRUE)
+  expect_match(identity_warning, "set_prior(\"normal(0.05, 0.05)\"", fixed = TRUE)
 })
 
 # -----------------------------------------------------------------------------
