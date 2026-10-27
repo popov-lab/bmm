@@ -7,9 +7,11 @@
 #'   the rstan or cmdstanr backend.
 #' @param chains The number of chains to add, a positive whole number.
 #' @param seed The seed of the new chains. If `NULL` (the default), a seed is
-#'   drawn from R's random number generator, so [set.seed()] before the call
-#'   makes it reproducible. A seed that a chain of `fit` was sampled with is
-#'   refused, because the new chains could repeat that chain's draws.
+#'   drawn from R's random number generator. bmm draws the default initial
+#'   values from R's random number generator too, so call [set.seed()] before
+#'   `add_chains()` to make the new chains reproducible, with or without
+#'   `seed`. A seed that a chain of `fit` was sampled with is refused, because
+#'   the new chains could repeat that chain's draws.
 #' @param ... Further arguments passed to [update.bmmfit()], such as `cores`,
 #'   `refresh` or `control`. `threads` works only for a fit that was sampled
 #'   with threading, because a threaded Stan program differs from an
@@ -23,8 +25,8 @@
 #'   combined with [brms::combine_models()]. Everything else is taken from
 #'   `fit`, except criteria added with [brms::add_criterion()]: they were
 #'   computed from the chains of `fit` alone and are removed, so add them again.
-#'   The result has no `file`, as with [update()], so [brms::add_criterion()]
-#'   does not write it over the file of `fit`. `version` and the other fields
+#'   The result has no `file`, so [brms::add_criterion()] does not write it
+#'   over the file of `fit`. `version` and the other fields
 #'   that describe the fit are those of `fit`; the new chains ran the same Stan
 #'   program. [fit_info()] reports the time, step size and inverse metric of
 #'   every chain.
@@ -77,12 +79,15 @@ add_chains <- function(fit, chains = 1, seed = NULL, ...) {
     "iter", "warmup", "thin", "algorithm", "backend", "normalize", "file",
     "file_compress"
   )
-  refused <- names(dots)[vapply(names(dots), function(name) any(startsWith(refused, name)), logical(1))]
+  refused <- names(dots)[vapply(
+    names(dots), function(name) any(startsWith(refused, name)), logical(1)
+  )]
   stopif(
     length(refused) > 0,
-    "add_chains() does not take {collapse_comma(refused)}: the new chains sample \\
-    the model, data and draws per chain of 'fit'. Use update() to change them and \\
-    sample all chains anew, and saveRDS() to save the result."
+    "add_chains() does not take {collapse_comma(refused)}: the new chains must \\
+    sample the same posterior as 'fit', with its model, data, prior, backend and \\
+    draws per chain. Use update() to change those and sample all chains anew, and \\
+    saveRDS() to save the result."
   )
 
   # a chain's random numbers follow from its seed and its chain id, and the
@@ -90,21 +95,32 @@ add_chains <- function(fit, chains = 1, seed = NULL, ...) {
   # chain repeats the draws of the old chain with its id whenever their initial
   # values agree as well, as they do for a fixed `init`. A fit without a stored
   # seed (NA) passes, because there is no seed to compare with
-  old_seeds <- vapply(fit$fit@stan_args, function(args) as.character(args$seed %||% NA), character(1))
+  old_seeds <- .chain_seeds(fit)
   # a script that calls set.seed() with the same value before bmm() and before
   # add_chains() draws the seed of `fit` again
   if (is.null(seed)) {
     seed <- sample.int(.Machine$integer.max, 1)
-    while (as.character(seed) %in% old_seeds) seed <- sample.int(.Machine$integer.max, 1)
+    while (seed %in% old_seeds) seed <- sample.int(.Machine$integer.max, 1)
   }
-  repeated <- match(as.character(seed), old_seeds)
+  repeated <- match(seed, old_seeds)
   stopif(
     !is.na(repeated),
-    "Chain {repeated} of 'fit' was sampled with seed {seed}. New chains with that \\
-    seed can repeat its draws; choose another seed or leave 'seed' as NULL."
+    "Chain {repeated} of 'fit' was sampled with seed \\
+    {format(seed, scientific = FALSE)}. New chains with that seed can repeat its \\
+    draws; choose another seed or leave 'seed' as NULL."
   )
 
   new <- stats::update(fit, chains = chains, seed = seed, ...)
+  # the seed a chain ran with is not always the one requested: cmdstanr runs
+  # some seeds, such as 100000, as seed 1
+  new_seeds <- .chain_seeds(new)
+  clash <- match(new_seeds, old_seeds, incomparables = NA)
+  first <- which(!is.na(clash))[1]
+  stopif(
+    !is.na(first),
+    "New chain {first} ran with seed {format(new_seeds[first], scientific = FALSE)}, \\
+    the seed of chain {clash[first]} of 'fit', and can repeat its draws. Choose another seed."
+  )
   # brms recompiles when it has to, and a program written by another version of
   # bmm or brms may then differ from the one `fit` ran. The first line of the
   # code names those versions and is all that may differ
@@ -119,4 +135,14 @@ add_chains <- function(fit, chains = 1, seed = NULL, ...) {
   out$criteria <- list()
   out$file <- NULL
   out
+}
+
+# NA for a chain without a stored seed; numeric, because as.character(100000)
+# is "1e+05" and would not match a stored 100000L
+.chain_seeds <- function(fit) {
+  vapply(
+    fit$fit@stan_args,
+    function(args) suppressWarnings(as.numeric(args$seed %||% NA)),
+    numeric(1)
+  )
 }

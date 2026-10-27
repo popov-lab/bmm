@@ -8,14 +8,15 @@ chain_seeds <- function(fit) {
   vapply(fit$fit@stan_args, function(args) as.character(args$seed), character(1))
 }
 
-# the arguments of the last update() call land in `calls`
-mock_update <- function(new_fit, env = parent.frame()) {
+# the arguments of the last update() call land in `calls`; the new chains store
+# the seed passed to update() unless `stored_seed` says otherwise
+mock_update <- function(new_fit, stored_seed = NULL, env = parent.frame()) {
   calls <- new.env()
   local_mocked_bindings(
     update = function(object, ...) {
       calls$args <- list(...)
       new_fit$fit@stan_args <- lapply(new_fit$fit@stan_args, function(args) {
-        args$seed <- calls$args$seed
+        args$seed <- stored_seed %||% calls$args$seed
         args
       })
       new_fit
@@ -83,6 +84,27 @@ test_that("add_chains() refuses the seed of a chain the fit already has", {
 
   combined <- add_chains(fit, seed = 99)
   expect_error(add_chains(combined, seed = 99), "Chain 2 of 'fit' was sampled with seed 99")
+})
+
+test_that("add_chains() compares seeds as numbers", {
+  fit <- load_chains_fit()
+  fit$fit@stan_args[[1]]$seed <- 100000L
+  calls <- mock_update(fit)
+
+  expect_error(add_chains(fit, seed = 1e5), "Chain 1 of 'fit' was sampled with seed 100000\\.")
+  expect_null(calls$args)
+})
+
+test_that("add_chains() refuses new chains that ran with a seed of the fit", {
+  fit <- load_chains_fit()
+  # as cmdstanr, which runs a requested seed of 100000 as seed 1
+  calls <- mock_update(fit, stored_seed = 5)
+
+  expect_error(
+    add_chains(fit, seed = 100000),
+    "New chain 1 ran with seed 5, the seed of chain 1 of 'fit'"
+  )
+  expect_equal(calls$args$seed, 100000)
 })
 
 test_that("add_chains() keeps what describes the model and drops criteria of the old draws", {

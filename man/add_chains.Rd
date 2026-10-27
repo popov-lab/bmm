@@ -13,9 +13,11 @@ the rstan or cmdstanr backend.}
 \item{chains}{The number of chains to add, a positive whole number.}
 
 \item{seed}{The seed of the new chains. If \code{NULL} (the default), a seed is
-drawn from R's random number generator, so \code{\link[=set.seed]{set.seed()}} before the call
-makes it reproducible. A seed that a chain of \code{fit} was sampled with is
-refused, because the new chains could repeat that chain's draws.}
+drawn from R's random number generator. bmm draws the default initial
+values from R's random number generator too, so call \code{\link[=set.seed]{set.seed()}} before
+\code{add_chains()} to make the new chains reproducible, with or without
+\code{seed}. A seed that a chain of \code{fit} was sampled with is refused, because
+the new chains could repeat that chain's draws.}
 
 \item{...}{Further arguments passed to \code{\link[=update.bmmfit]{update.bmmfit()}}, such as \code{cores},
 \code{refresh} or \code{control}. \code{threads} works only for a fit that was sampled
@@ -32,8 +34,8 @@ A \code{bmmfit} object with the chains of \code{fit} followed by the new ones,
 combined with \code{\link[brms:combine_models]{brms::combine_models()}}. Everything else is taken from
 \code{fit}, except criteria added with \code{\link[brms:add_criterion]{brms::add_criterion()}}: they were
 computed from the chains of \code{fit} alone and are removed, so add them again.
-The result has no \code{file}, as with \code{\link[=update]{update()}}, so \code{\link[brms:add_criterion]{brms::add_criterion()}}
-does not write it over the file of \code{fit}. \code{version} and the other fields
+The result has no \code{file}, so \code{\link[brms:add_criterion]{brms::add_criterion()}} does not write it
+over the file of \code{fit}. \code{version} and the other fields
 that describe the fit are those of \code{fit}; the new chains ran the same Stan
 program. \code{\link[=fit_info]{fit_info()}} reports the time, step size and inverse metric of
 every chain.
