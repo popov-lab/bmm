@@ -517,6 +517,7 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     dist$args[n - 1] <- floor((limit - 2 * dist$args[n]) * 100 + 1e-8) / 100
     list(
       limit = limit,
+      own_row = any(nzchar(rows$prior[rows$coef == cell])),
       location = dist$args[n - 1],
       line = glue("{cell}: {applied[length(applied)]} puts {share} of \\
                   its mass at or above {signif(fastest, 3)} s"),
@@ -539,11 +540,14 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     lines <- c(lines, glue("... and {length(conflicts) - listed} more"))
   }
   lines <- paste0("  ", lines, collapse = "\n")
-  # one row on the class serves every conflicting cell, so it is built from
-  # the lowest fastest response; a single cell gets a row of its own
-  several <- prior_class == "b" && length(conflicts) > 1
+  # one row on the class serves the conflicting cells only when none has a
+  # row of its own, which beats the class row; it is built from the lowest
+  # fastest response. Otherwise the suggestion names one cell, one with its
+  # own row first, so that applying it makes progress
+  own_rows <- vapply(conflicts, `[[`, logical(1), "own_row")
+  several <- prior_class == "b" && length(conflicts) > 1 && !any(own_rows)
   lowest <- which.min(vapply(conflicts, `[[`, numeric(1), "limit"))
-  first <- conflicts[[if (several) lowest else 1]]
+  first <- conflicts[[if (several) lowest else if (any(own_rows)) which(own_rows)[1] else 1]]
   coef <- if (prior_class == "b" && !several) glue(', coef = "{first$cell}"') else ""
   # a location that maps to a time at or below zero is no prior for a time
   advice <- if (link_transform(first$location, model$links$ndt, inverse = TRUE) <= 0) {
@@ -578,6 +582,9 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
   }
   args <- suppressWarnings(as.numeric(strsplit(parts[3], ",")[[1]]))
   if (anyNA(args) || length(args) != c(normal = 2, student_t = 3)[[parts[2]]]) {
+    return(NULL)
+  }
+  if (parts[2] == "student_t" && args[1] <= 0) {
     return(NULL)
   }
   list(family = parts[2], args = args)

@@ -573,6 +573,17 @@ ndt_prior_mock <- function(fun, ...) {
   list(fit = out$value, warnings = grep("prior for `ndt`", out$warnings, value = TRUE, fixed = TRUE))
 }
 
+# The prior after adding (or replacing) the row the warning suggests, applied verbatim
+ndt_apply_suggestion <- function(prior, warning) {
+  call <- regmatches(
+    warning,
+    regexpr("set_prior\\(\"[^\"]+\", class = \"b\"(, coef = \"[^\"]+\")?, dpar = \"ndt\"\\)", warning)
+  )
+  suggested <- eval(parse(text = paste0("brms::", call)))
+  keep <- !(prior$class == suggested$class & prior$coef == suggested$coef)
+  c(prior[keep, ], suggested)
+}
+
 # The warning of the default prior when the fastest response is 0.13 s; the
 # default normal(-2,0.3) has its median at exp(-2) = 0.135 s
 ndt_prior_warning_013 <- function(kind = "correct response") {
@@ -600,7 +611,6 @@ test_that("cswald warns when the default ndt prior lies above the fastest respon
 })
 
 test_that("the ndt prior check reads the user's prior, not the default (#548)", {
-  skip_on_cran() # 0.2 s in CRAN mode, kept with the other tests of the check
   user <- brms::set_prior("normal(-3,0.3)", class = "Intercept", dpar = "ndt")
   expect_identical(ndt_prior_warnings(cswald_fast_data(0.13), prior = user), character())
 })
@@ -804,7 +814,6 @@ test_that("a row without a prior string inherits the row of its class (#548)", {
 })
 
 test_that("the ndt prior check leaves a numeric predictor without an intercept alone (#548)", {
-  skip_on_cran() # 0.2 s in CRAN mode, kept with the other tests of the check
   data <- cswald_fast_data(0.13)
   data$trial <- seq_len(nrow(data))
   expect_identical(
@@ -858,7 +867,6 @@ test_that("the ndt prior check does not read a truncated prior as untruncated (#
 })
 
 test_that("the ndt prior check skips a cell without fitted responses silently (#548)", {
-  skip_on_cran() # 0.2 s in CRAN mode, kept with the other tests of the check
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
   data <- cswald_fast_data(0.13)
   data$rt[data$cond == "b"] <- data$rt[data$cond == "b"] + 0.17
@@ -935,8 +943,74 @@ test_that("the ndt prior check suggests one row on the class when several cells 
   )
 })
 
-test_that("the ndt prior check reads the intercept row, not the class row, of ndt ~ 1 + cond (#548)", {
+test_that("the ndt prior check names a cell with a row of its own, which beats the class row (#548)", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
+  data <- data.frame(
+    rt = rep(c(0.12, 0.11, 0.13), each = 4) + rep(c(0, 0.2, 0.4, 0.6), times = 3),
+    response = 1,
+    cond = factor(rep(c("a", "b", "c"), each = 4))
+  )
+  prior <- function(class_location, coefs) {
+    rows <- lapply(coefs, function(coef) {
+      brms::set_prior("normal(-1.9,0.3)", class = "b", coef = coef, dpar = "ndt")
+    })
+    do.call(c, c(list(brms::set_prior(class_location, class = "b", dpar = "ndt")), rows))
+  }
+  # a class row cannot clear a cell that has a row of its own, so applying the
+  # suggestion makes progress one cell at a time until the cells inherit
+  rounds_to_clear <- function(prior) {
+    rounds <- 0
+    while (length(warning <- ndt_prior_warnings(data, formula, prior = prior)) && rounds < 3) {
+      prior <- ndt_apply_suggestion(prior, warning)
+      rounds <- rounds + 1
+    }
+    rounds
+  }
+
+  # the class row is fine, the rows of conda and condb are not
+  both <- prior("normal(-3,0.3)", c("conda", "condb"))
+  expect_match(
+    ndt_prior_warnings(data, formula, prior = both),
+    "set_prior(\"normal(-2.73, 0.3)\", class = \"b\", coef = \"conda\", dpar = \"ndt\")",
+    fixed = TRUE
+  )
+  expect_identical(rounds_to_clear(both), 2)
+
+  # all three conflict, condb through a row of its own, conda and condc through the class row
+  mixed <- prior("normal(-2,0.3)", "condb")
+  expect_match(
+    ndt_prior_warnings(data, formula, prior = mixed),
+    "set_prior(\"normal(-2.81, 0.3)\", class = \"b\", coef = \"condb\", dpar = \"ndt\")",
+    fixed = TRUE
+  )
+  expect_identical(rounds_to_clear(mixed), 2)
+})
+
+test_that("the ndt prior check leaves a non-linear formula for ndt alone (#548)", {
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ a * cond, a ~ 1)
+  expect_no_error(warnings <- ndt_prior_warnings(cswald_fast_data(0.13), formula))
+  expect_identical(warnings, character())
+})
+
+test_that("the ndt prior check lists a cell whose name is longer than the whole budget (#548)", {
+  # the suggestion names the cell too, so a message for such a name passes the
+  # 1000 characters R prints; the cell is still the one it is about
+  name <- strrep("x", 450)
+  data <- cswald_fast_data(0.12)
+  data$cond <- factor(ifelse(data$cond == "a", name, "b"))
+  data$rt[data$cond == "b"] <- data$rt[data$cond == "b"] + 0.3
+  warning <- ndt_prior_warnings(data, bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond))
+  expect_match(warning, paste0("\n  cond", name, ": normal(-2,0.3) puts 66% of its mass"), fixed = TRUE)
+  expect_no_match(warning, "more", fixed = TRUE)
+})
+
+test_that("the ndt prior check skips a student_t prior with no degrees of freedom silently (#548)", {
+  prior <- brms::set_prior("student_t(0, -2, 0.3)", class = "Intercept", dpar = "ndt")
+  expect_identical(ndt_check_warnings(prior, cswald_fast_data(0.13)), character())
+})
+
+test_that("the ndt prior check reads the intercept row, not the class row, of ndt ~ 1 + cond (#548)", {
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + cond)
   data <- cswald_fast_data(0.13)
   user <- c(
