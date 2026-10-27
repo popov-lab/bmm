@@ -135,31 +135,47 @@ check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
 # The model constructors forward `...` to their .model_*() internal, whose own
 # `...` drops whatever matches none of its formals. `known` are the internal's
 # formals the constructor leaves to `...`; R matches them there by unique
-# prefix, so `link =` reaches `links` and is not reported. `deprecated` names
-# are read with %in%, so only exactly. Unnamed extras are reported because they
-# land in whichever internal formal is next by position.
+# prefix among those no exact name took, so `link =` reaches `links` and is not
+# reported. `deprecated` names are read with %in%, so only exactly. Unnamed
+# extras are reported because they land in whichever internal formal is next
+# by position.
 .check_constructor_dots <- function(dots, known = character(), deprecated = character()) {
   dot_names <- names(dots) %||% rep("", length(dots))
   named <- nzchar(dot_names)
-  unknown <- dot_names[named & !dot_names %in% deprecated &
-                         is.na(pmatch(dot_names, known, duplicates.ok = TRUE))]
+  free <- setdiff(known, dot_names)
+  prefix <- pmatch(dot_names, free, duplicates.ok = TRUE)
+  unknown <- dot_names[named & !dot_names %in% c(deprecated, known) & is.na(prefix)]
   if (length(unknown) == 0 && all(named)) {
     return(invisible())
   }
-  constructor <- deparse1(sys.call(-1)[[1]])
-  candidates <- setdiff(c(names(formals(sys.function(-1))), known), "...")
+  constructor_fn <- sys.function(-1)
+  head <- sys.call(-1)[[1]]
+  head_name <- if (is.call(head) && deparse1(head[[1]]) %in% c("::", ":::")) head[[3]] else head
+  is_named_head <- is.name(head_name) &&
+    identical(get0(as.character(head_name), environment(constructor_fn), inherits = FALSE), constructor_fn)
+  constructor <- if (is_named_head) glue("{deparse1(head)}()") else "this model constructor"
+  lead <- if (is_named_head) constructor else "This model constructor"
+  env <- parent.frame()
+  formal_names <- setdiff(names(formals(constructor_fn)), "...")
+  supplied <- formal_names[!vapply(formal_names, function(name) {
+    eval(call("missing", as.name(name)), env)
+  }, logical(1))]
+  candidates <- setdiff(c(formal_names, known), c(supplied, dot_names, free[prefix[!is.na(prefix)]]))
   suggestions <- vapply(unknown, function(name) {
-    close <- candidates[utils::adist(name, candidates)[1, ] <= 2]
+    close <- candidates[utils::adist(name, candidates)[1, ] <= min(2, nchar(name) %/% 3)]
     if (length(close) == 1) glue(" Did you mean `{close}`?", .trim = FALSE) else ""
   }, character(1))
   n_unnamed <- sum(!named)
   msg <- c(
-    glue("`{unknown}` is not an argument of {constructor}() and is ignored.{suggestions}"),
+    glue("`{unknown}` is not an argument of {constructor} and is ignored.{suggestions}"),
     if (n_unnamed > 0) glue(
-      "{constructor}() takes further arguments by name only; it was given ",
+      "{lead} takes further arguments by name only; it was given ",
       "{n_unnamed} unnamed argument{if (n_unnamed > 1) 's' else ''}."
     ),
-    glue("See ?{constructor} for its arguments. From bmm 1.6.0 on this is an error.")
+    paste0(
+      if (is_named_head) paste0("See ?", deparse1(head), " for its arguments. "),
+      "From bmm 1.6.0 on this is an error."
+    )
   )
   warning2("{paste(msg, collapse = '\n')}")
 }

@@ -30,7 +30,9 @@ constructor_calls <- function() {
 
 with_args <- function(call, ...) as.call(c(as.list(call), list(...)))
 
-warnings_of <- function(call) collect_warnings(eval(call))$warnings
+warnings_of <- function(call) collect_warnings(try(eval(call), silent = TRUE))$warnings
+
+two_close <- function(aaaaab, aaaaac, ...) .check_constructor_dots(list(...))
 
 test_that("every constructor names the argument it does not use and itself", {
   calls <- constructor_calls()
@@ -69,14 +71,36 @@ test_that("the names a constructor passes on to its model still work", {
   expect_silent(sdm("y", link = list(kappa = "log")))
 })
 
+test_that("a prefix is matched only to an argument no exact name already took", {
+  m3_call <- quote(m3(c("a", "b"), c(1, 2), "softmax", "ss", links = list(c = "log")))
+  expect_match(
+    warnings_of(with_args(m3_call, l = list(a = "log"))),
+    "`l` is not an argument of m3() and is ignored.", fixed = TRUE
+  )
+  expect_length(warnings_of(m3_call), 0)
+  expect_length(warnings_of(quote(m3(c("a", "b"), c(1, 2), "softmax", "ss", l = list(a = "log")))), 0)
+})
+
 test_that("setsize keeps its deprecation warning and nothing more", {
+  setsize_warning <- "The argument 'setsize' is deprecated. Please use 'set_size' instead."
+  deprecated_function <- function(name, version) {
+    paste0("The function `", name, "()` is deprecated. Please use `imm(version = '", version, "')` instead.")
+  }
   expect_identical(
-    warnings_of(quote(mixture3p("y", nt_features = "x", setsize = 2))),
-    "The argument 'setsize' is deprecated. Please use 'set_size' instead."
+    warnings_of(quote(mixture3p("y", nt_features = "x", setsize = 2))), setsize_warning
+  )
+  expect_identical(warnings_of(quote(imm("y", "nt", "d", setsize = 2))), setsize_warning)
+  expect_identical(
+    warnings_of(quote(IMMfull("y", "nt", "d", setsize = 2))),
+    c(deprecated_function("IMMfull", "full"), setsize_warning)
   )
   expect_identical(
-    warnings_of(quote(imm("y", "nt", "d", setsize = 2))),
-    "The argument 'setsize' is deprecated. Please use 'set_size' instead."
+    warnings_of(quote(IMMbsc("y", "nt", "d", setsize = 2))),
+    c(deprecated_function("IMMbsc", "bsc"), setsize_warning)
+  )
+  expect_identical(
+    warnings_of(quote(IMMabc("y", "nt", setsize = 2))),
+    c(deprecated_function("IMMabc", "abc"), setsize_warning)
   )
 })
 
@@ -84,6 +108,52 @@ test_that("a misspelt argument is pointed to the close one", {
   expect_match(
     warnings_of(quote(mixture2p("y", lnks = list(kappa = "log")))),
     "`lnks` is not an argument of mixture2p() and is ignored. Did you mean `links`?",
+    fixed = TRUE
+  )
+})
+
+test_that("a suggestion needs a close name and an argument not yet supplied", {
+  expect_match(
+    warnings_of(quote(mixture2p("y", Links = list(kappa = "log")))),
+    "`Links` is not an argument of mixture2p() and is ignored. Did you mean `links`?",
+    fixed = TRUE
+  )
+  expect_match(
+    warnings_of(quote(mixture3p("y", nt_features = "x", set_sze = 2))),
+    "`set_sze` is not an argument of mixture3p() and is ignored. Did you mean `set_size`?",
+    fixed = TRUE
+  )
+  expect_identical(
+    warnings_of(quote(sdt_mafc("k", "n", xy = 1))),
+    paste0("`xy` is not an argument of sdt_mafc() and is ignored.\n",
+           "See ?sdt_mafc for its arguments. From bmm 1.6.0 on this is an error.")
+  )
+  expect_identical(
+    warnings_of(quote(sdt_yn("r", "s", "n", dist = "normal", distt = "logistic"))),
+    paste0("`distt` is not an argument of sdt_yn() and is ignored.\n",
+           "See ?sdt_yn for its arguments. From bmm 1.6.0 on this is an error.")
+  )
+  expect_no_match(
+    warnings_of(quote(mixture3p("y", nt_features = "x", set_size = 2, set_sze = 2))),
+    "Did you mean", fixed = TRUE
+  )
+  # two formals within reach of the misspelling: no guess
+  expect_no_match(warnings_of(quote(two_close(aaaaad = 1))), "Did you mean", fixed = TRUE)
+})
+
+test_that("a call through a function object does not print the function", {
+  wording <- paste0("`foo` is not an argument of this model constructor and is ignored.\n",
+                    "From bmm 1.6.0 on this is an error.")
+  expect_identical(warnings_of(quote(do.call(sdm, list("y", foo = 1)))), wording)
+  expect_identical(warnings_of(quote(Map(sdm, "y", foo = 1))), wording)
+  expect_identical(warnings_of(quote(lapply("y", sdm, foo = 1))), wording)
+  expect_match(
+    warnings_of(quote(do.call(sdm, list("y", 1, 2)))),
+    "This model constructor takes further arguments by name only", fixed = TRUE
+  )
+  expect_match(
+    warnings_of(quote(bmm::sdm("y", foo = 1))),
+    "`foo` is not an argument of bmm::sdm() and is ignored.\nSee ?bmm::sdm for",
     fixed = TRUE
   )
 })
