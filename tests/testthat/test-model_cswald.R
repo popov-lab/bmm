@@ -723,7 +723,7 @@ test_that("the ndt prior check lists at most five cells (#548)", {
   expect_lt(nchar(many), 1000)
   expect_match(many, "  condc5: normal(-2,0.3) puts 66% of its mass at or above 0.12 s\n  ... and 35 more\n", fixed = TRUE)
   expect_no_match(many, "condc6: ", fixed = TRUE)
-  expect_match(many, "set_prior(\"normal(-2.73, 0.3)\", class = \"b\", coef = \"condc1\"", fixed = TRUE)
+  expect_match(many, "set_prior(\"normal(-2.73, 0.3)\", class = \"b\", dpar = \"ndt\")", fixed = TRUE)
 
   five <- ndt_prior_warnings(cells_data(5), formula)
   expect_match(five, "  condc5: normal(-2,0.3) puts 66% of its mass at or above 0.12 s\nSampling", fixed = TRUE)
@@ -733,7 +733,7 @@ test_that("the ndt prior check lists at most five cells (#548)", {
   long <- ndt_prior_warnings(cells_data(5, strrep("x", 99)), formula)
   expect_lt(nchar(long), 1000)
   expect_match(long, "\n  ... and 3 more\nSampling", fixed = TRUE)
-  expect_match(long, "set_prior(\"normal(-2.73, 0.3)\", class = \"b\", coef = \"cond", fixed = TRUE)
+  expect_match(long, "set_prior(\"normal(-2.73, 0.3)\", class = \"b\", dpar = \"ndt\")", fixed = TRUE)
 })
 
 test_that("the ndt prior check skips a decreasing link and reads the increasing ones (#548)", {
@@ -804,7 +804,7 @@ test_that("a row without a prior string inherits the row of its class (#548)", {
 })
 
 test_that("the ndt prior check leaves a numeric predictor without an intercept alone (#548)", {
-  skip_on_cran() # 0.3 s in CRAN mode, kept with the other tests of the check
+  skip_on_cran() # 0.2 s in CRAN mode, kept with the other tests of the check
   data <- cswald_fast_data(0.13)
   data$trial <- seq_len(nrow(data))
   expect_identical(
@@ -814,6 +814,7 @@ test_that("the ndt prior check leaves a numeric predictor without an intercept a
 })
 
 test_that("the ndt prior check does not stop a fit or warn on the logm1 link (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   data <- cswald_fast_data(0.13)
   data$response <- 1
   for (version in c("simple", "crisk")) {
@@ -857,7 +858,7 @@ test_that("the ndt prior check does not read a truncated prior as untruncated (#
 })
 
 test_that("the ndt prior check skips a cell without fitted responses silently (#548)", {
-  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  skip_on_cran() # 0.2 s in CRAN mode, kept with the other tests of the check
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
   data <- cswald_fast_data(0.13)
   data$rt[data$cond == "b"] <- data$rt[data$cond == "b"] + 0.17
@@ -871,14 +872,92 @@ test_that("the ndt prior check skips a cell without fitted responses silently (#
   expect_match(warnings, "  conda: normal(-2,0.3) puts 55% of its mass at or above 0.13 s\nSampling", fixed = TRUE)
 })
 
-test_that("the ndt prior check prints one decimal for a mass just above one half (#548)", {
+test_that("the ndt prior check does not round a mass just above one half down to 50% (#548)", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
-  # the default prior has its median at 0.1353 s
+  # the default prior has its median at 0.13534 s
   expect_match(
     ndt_prior_warnings(cswald_fast_data(0.135)),
     "Intercept: normal(-2,0.3) puts 50.3% of its mass at or above 0.135 s",
     fixed = TRUE
   )
+  expect_match(
+    ndt_prior_warnings(cswald_fast_data(0.1353)),
+    "Intercept: normal(-2,0.3) puts just over 50% of its mass at or above 0.135 s",
+    fixed = TRUE
+  )
+})
+
+test_that("the ndt prior check ignores a fastest response that brms drops for a missing value (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  data <- cswald_fast_data(0.3)
+  data$rt[1] <- 0.12
+  data$x <- seq_len(nrow(data))
+
+  # the control: the 0.12 s response is fitted
+  expect_length(ndt_prior_warnings(data, bmf(drift ~ x, bound ~ 1, ndt ~ 1)), 1)
+  # a missing value in another term of the model removes the row
+  data$x[1] <- NA
+  expect_identical(ndt_prior_warnings(data, bmf(drift ~ x, bound ~ 1, ndt ~ 1)), character())
+
+  data$x <- NULL
+  data$cond[1] <- NA
+  expect_identical(ndt_prior_warnings(data, bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + cond)), character())
+})
+
+test_that("the ndt prior check suggests one row on the class when several cells conflict (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
+  data <- data.frame(
+    rt = 0.12 + rep(c(0, 0.2, 0.4, 0.6), times = 3),
+    response = 1,
+    cond = factor(rep(c("a", "b", "c"), each = 4))
+  )
+  data$rt[data$cond == "b"] <- data$rt[data$cond == "b"] - 0.01
+
+  warning <- ndt_prior_warnings(data, formula)
+  expect_length(warning, 1)
+  expect_lt(nchar(warning), 1000)
+  expect_match(warning, "  condb: normal(-2,0.3) puts 76% of its mass at or above 0.11 s\n", fixed = TRUE)
+  # the lowest fastest response, 0.11 s, sets the location for all three cells
+  call <- "set_prior(\"normal(-2.81, 0.3)\", class = \"b\", dpar = \"ndt\")"
+  expect_match(warning, call, fixed = TRUE)
+  expect_no_match(warning, "coef", fixed = TRUE)
+
+  suggested <- eval(parse(text = paste0("brms::", call)))
+  expect_identical(ndt_prior_warnings(data, formula, prior = suggested), character())
+
+  # a single conflicting cell keeps a row of its own
+  data$rt[data$cond != "a"] <- data$rt[data$cond != "a"] + 0.3
+  expect_match(
+    ndt_prior_warnings(data, formula),
+    "set_prior(\"normal(-2.73, 0.3)\", class = \"b\", coef = \"conda\", dpar = \"ndt\")",
+    fixed = TRUE
+  )
+})
+
+test_that("the ndt prior check reads the intercept row, not the class row, of ndt ~ 1 + cond (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + cond)
+  data <- cswald_fast_data(0.13)
+  user <- c(
+    brms::set_prior("normal(-3,0.3)", class = "Intercept", dpar = "ndt"),
+    brms::set_prior("normal(0,0.3)", class = "b", dpar = "ndt")
+  )
+  expect_identical(ndt_prior_warnings(data, formula, prior = user), character())
+
+  effect <- brms::set_prior("normal(-5,0.3)", class = "b", dpar = "ndt")
+  warning <- ndt_prior_warnings(data, formula, prior = effect)
+  expect_length(warning, 1)
+  expect_match(warning, "Intercept: normal(-2,0.3) puts 55% of its mass at or above 0.13 s", fixed = TRUE)
+})
+
+test_that("the ndt prior check suggests no negative location on the log1p link either (#548)", {
+  prior <- brms::set_prior("normal(0.1, 0.05)", class = "Intercept", dpar = "ndt")
+  warning <- ndt_check_warnings(prior, cswald_fast_data(0.05), links = list(ndt = "log1p"))
+  expect_length(warning, 1)
+  expect_match(warning, "Intercept: normal(0.1, 0.05) puts 85% of its mass at or above 0.05 s", fixed = TRUE)
+  expect_match(warning, "The fastest response is less than two scales above zero", fixed = TRUE)
+  expect_no_match(warning, "set_prior(", fixed = TRUE)
 })
 
 # -----------------------------------------------------------------------------

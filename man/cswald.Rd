@@ -131,11 +131,12 @@ response is faster than 0.135 s. Set a prior with a lower location, as the
 warning suggests, or filter out anticipations. The check reads \code{normal()}
 and \code{student_t()} priors on the intercept of \code{ndt}, or on each cell of a
 formula without an intercept such as \code{ndt ~ 0 + cond}; other priors and
-designs are not checked, and neither are truncated priors or a decreasing
-link such as \code{"inverse"}. In a formula with other fixed effects, such as
+designs are not checked, and neither are truncated priors or the links
+\code{"inverse"} and \code{"logm1"}. In a formula with other fixed effects, such as
 \code{ndt ~ 1 + cond}, the prior on the intercept is the prior on the centred
 intercept (the grand mean), and the check compares it with the fastest
-response overall. \code{update()} with \code{init} or \code{inits} skips the check.
+response overall. \code{update()} with \code{init} or \code{inits} skips the check, while
+\code{bmm()} with \code{init} still runs it.
 }
 }
 \examples{

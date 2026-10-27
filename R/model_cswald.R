@@ -128,11 +128,12 @@
 #' warning suggests, or filter out anticipations. The check reads `normal()`
 #' and `student_t()` priors on the intercept of `ndt`, or on each cell of a
 #' formula without an intercept such as `ndt ~ 0 + cond`; other priors and
-#' designs are not checked, and neither are truncated priors or a decreasing
-#' link such as `"inverse"`. In a formula with other fixed effects, such as
+#' designs are not checked, and neither are truncated priors or the links
+#' `"inverse"` and `"logm1"`. In a formula with other fixed effects, such as
 #' `ndt ~ 1 + cond`, the prior on the intercept is the prior on the centred
 #' intercept (the grand mean), and the check compares it with the fastest
-#' response overall. `update()` with `init` or `inits` skips the check.
+#' response overall. `update()` with `init` or `inits` skips the check, while
+#' `bmm()` with `init` still runs it.
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -432,7 +433,8 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
 # each cell of a design without one (ndt ~ 0 + cond), has a prior that maps to
 # a set of responses, and only normal() and student_t() are read
 .warn_ndt_prior_conflict <- function(model, data, formula, prior) {
-  ndt_terms <- brms::brmsterms(formula)$dpars$ndt
+  bterms <- brms::brmsterms(formula)
+  ndt_terms <- bterms$dpars$ndt
   probe <- suppressWarnings(link_transform(c(0.1, 1), model$links$ndt))
   # on a decreasing link, such as inverse, the mass above the fastest response
   # is the mass below its transform; logm1 is undefined at the probe points
@@ -441,7 +443,9 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     return(invisible())
   }
   rt <- data[[model$resp_vars$rt]]
-  fits <- rt > 0
+  # brms drops every row with a missing value in any variable of the model
+  complete <- stats::complete.cases(data[intersect(all.vars(bterms$allvars), names(data))])
+  fits <- rt > 0 & complete
   if (model$version == "simple") {
     fits <- fits & data[[model$resp_vars$response]] == 1
   }
@@ -493,22 +497,28 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     limit <- link_transform(fastest, model$links$ndt)
     n <- length(dist$args)
     z <- (limit - dist$args[n - 1]) / dist$args[n]
-    mass <- if (dist$family == "normal") stats::pnorm(z, lower.tail = FALSE) else
+    mass <- if (dist$family == "normal") {
+      stats::pnorm(z, lower.tail = FALSE)
+    } else {
       stats::pt(z, dist$args[1], lower.tail = FALSE)
+    }
     if (!isTRUE(mass > 0.5)) {
       return(NULL)
     }
     # a mass just above one half would read as "50% ... most of its mass"
-    percent <- if (round(100 * mass) == 50) {
-      format(round(100 * mass, 1), nsmall = 1)
+    share <- if (round(100 * mass, 1) == 50) {
+      "just over 50%"
+    } else if (round(100 * mass) == 50) {
+      paste0(format(round(100 * mass, 1), nsmall = 1), "%")
     } else {
-      round(100 * mass)
+      paste0(round(100 * mass), "%")
     }
     # two scales below the fastest response leaves about 2.5% of the mass above
     dist$args[n - 1] <- floor((limit - 2 * dist$args[n]) * 100 + 1e-8) / 100
     list(
+      limit = limit,
       location = dist$args[n - 1],
-      line = glue("{cell}: {applied[length(applied)]} puts {percent}% of \\
+      line = glue("{cell}: {applied[length(applied)]} puts {share} of \\
                   its mass at or above {signif(fastest, 3)} s"),
       suggestion = paste0(dist$family, "(", paste(dist$args, collapse = ", "), ")"),
       cell = cell
@@ -529,10 +539,14 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     lines <- c(lines, glue("... and {length(conflicts) - listed} more"))
   }
   lines <- paste0("  ", lines, collapse = "\n")
-  first <- conflicts[[1]]
-  coef <- if (prior_class == "b") glue(', coef = "{first$cell}"') else ""
-  # a location at or below zero is no prior for a time on its natural scale
-  advice <- if (first$location <= 0 && identical(probe, c(0.1, 1))) {
+  # one row on the class serves every conflicting cell, so it is built from
+  # the lowest fastest response; a single cell gets a row of its own
+  several <- prior_class == "b" && length(conflicts) > 1
+  lowest <- which.min(vapply(conflicts, `[[`, numeric(1), "limit"))
+  first <- conflicts[[if (several) lowest else 1]]
+  coef <- if (prior_class == "b" && !several) glue(', coef = "{first$cell}"') else ""
+  # a location that maps to a time at or below zero is no prior for a time
+  advice <- if (link_transform(first$location, model$links$ndt, inverse = TRUE) <= 0) {
     paste(
       "The fastest response is less than two scales above zero, so the prior",
       "needs a smaller scale as well as a lower location. You can also filter",
