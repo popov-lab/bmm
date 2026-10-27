@@ -111,7 +111,7 @@ bind_rows(
 #>       method   mean_rt     var_rt  accuracy contaminant_prop
 #> ...1  simple 0.8231905 0.39684254 0.4752726               NA
 #> ...2  robust 0.6440000 0.05804206 0.4752726               NA
-#> mu   mixture 0.7500167 0.11366858 0.4745630       0.02797528
+#> mu   mixture 0.7500167 0.11366855 0.4745630       0.02797529
 ```
 
 The mixture method also returns a contamination proportion estimate. The
@@ -216,11 +216,11 @@ flagged <- rr98_subset |>
 
 head(flagged)
 #>      rt response strength correct contam_prob
-#> 1 0.801    upper        8    TRUE 0.002307907
-#> 2 0.680    upper        7    TRUE 0.001599956
-#> 3 0.694    lower       19    TRUE 0.001669001
+#> 1 0.801    upper        8    TRUE 0.002307908
+#> 2 0.680    upper        7    TRUE 0.001599957
+#> 3 0.694    lower       19    TRUE 0.001669002
 #> 4 0.582    lower       21   FALSE 0.001215208
-#> 5 0.925    upper       19   FALSE 0.003359717
+#> 5 0.925    upper       19   FALSE 0.003359718
 #> 6 0.605    upper       10    TRUE 0.001286845
 ```
 
@@ -232,7 +232,7 @@ Diagnostics (convergence, parameters, log-likelihood) are available via
 probs <- flag_contaminant_rts(rr98_subset$rt)
 attr(probs, "diagnostics")
 #>   mixture_params contaminant_prop converged iterations    loglik n_trials
-#> 1   0.420729....       0.02797528      TRUE         12 -926.5735     3943
+#> 1   0.420729....       0.02797529      TRUE         12 -926.5735     3943
 #>   distribution     method
 #> 1   exgaussian mixture_em
 ```
@@ -471,7 +471,7 @@ case_study_data |>
 #>   instruction original_n filtered_n removed_pct
 #>   <fct>            <int>      <int>       <dbl>
 #> 1 speed            12153      12130         0.2
-#> 2 accuracy         12205      11876         2.7
+#> 2 accuracy         12205      11877         2.7
 ```
 
 Both workflows pick up on contamination differences between instruction
