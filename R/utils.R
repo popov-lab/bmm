@@ -279,7 +279,8 @@ read_lines2 <- function(con) {
 #'  - "step_size": A list with one number per chain
 #'
 #'   Every chain of the fit is reported, also in a fit combined from several
-#'   fits with [brms::combine_models()]. `NULL` is returned for what the sampler
+#'   fits with [brms::combine_models()] or extended with [add_chains()]. `NULL`
+#'   is returned for what the sampler
 #'   did not record: anything for a fit without a stanfit or without chains,
 #'   "time" and "time_mean" for variational and Laplace runs, "inv_metric" and
 #'   "step_size" for any algorithm other than NUTS, and "inv_metric" for
