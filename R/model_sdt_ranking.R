@@ -218,6 +218,7 @@ sdt_ranking <- function(response, m,
                         dist = c("gumbel_min", "normal"),
                         links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
 

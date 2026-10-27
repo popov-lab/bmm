@@ -167,3 +167,19 @@ test_that("every model has a model-case provider with the cases every model need
                      info = paste0("R4: no '", kind, "' case for these models"))
   }
 })
+
+test_that("every model constructor with ... reports arguments it does not use (#552)", {
+  # a constructor is an export that builds its model with a .model_*()
+  # internal; read from the namespace, so a new model is caught without a list
+  ns <- asNamespace("bmm")
+  exports <- Filter(function(f) is.function(f) && "..." %in% names(formals(f)),
+                    mget(getNamespaceExports("bmm"), envir = ns, inherits = TRUE))
+  calls <- lapply(exports, function(f) all.names(body(f)))
+  constructors <- names(calls)[vapply(calls, function(x) any(grepl("^\\.model_", x)), logical(1))]
+  unchecked <- constructors[!vapply(calls[constructors], function(x) {
+    ".check_constructor_dots" %in% x
+  }, logical(1))]
+  expect_gt(length(constructors), 10)
+  expect_identical(sort(unchecked), character(0),
+                   info = "call .check_constructor_dots() after call <- match.call()")
+})

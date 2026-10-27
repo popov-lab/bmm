@@ -132,6 +132,38 @@ check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
   NextMethod("check_model")
 }
 
+# The model constructors forward `...` to their .model_*() internal, whose own
+# `...` drops whatever matches none of its formals. `known` are the internal's
+# formals the constructor leaves to `...`; R matches them there by unique
+# prefix, so `link =` reaches `links` and is not reported. `deprecated` names
+# are read with %in%, so only exactly. Unnamed extras are reported because they
+# land in whichever internal formal is next by position.
+.check_constructor_dots <- function(dots, known = character(), deprecated = character()) {
+  dot_names <- names(dots) %||% rep("", length(dots))
+  named <- nzchar(dot_names)
+  unknown <- dot_names[named & !dot_names %in% deprecated &
+                         is.na(pmatch(dot_names, known, duplicates.ok = TRUE))]
+  if (length(unknown) == 0 && all(named)) {
+    return(invisible())
+  }
+  constructor <- deparse1(sys.call(-1)[[1]])
+  candidates <- setdiff(c(names(formals(sys.function(-1))), known), "...")
+  suggestions <- vapply(unknown, function(name) {
+    close <- candidates[utils::adist(name, candidates)[1, ] <= 2]
+    if (length(close) == 1) glue(" Did you mean `{close}`?", .trim = FALSE) else ""
+  }, character(1))
+  n_unnamed <- sum(!named)
+  msg <- c(
+    glue("`{unknown}` is not an argument of {constructor}() and is ignored.{suggestions}"),
+    if (n_unnamed > 0) glue(
+      "{constructor}() takes further arguments by name only; it was given ",
+      "{n_unnamed} unnamed argument{if (n_unnamed > 1) 's' else ''}."
+    ),
+    glue("See ?{constructor} for its arguments. From bmm 1.6.0 on this is an error.")
+  )
+  warning2("{paste(msg, collapse = '\n')}")
+}
+
 # check if the user has provided a regular expression for any model variables and
 # replace the regular expression with the actual variables
 replace_regex_variables <- function(model, data) {

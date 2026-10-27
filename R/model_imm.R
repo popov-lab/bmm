@@ -205,6 +205,7 @@ settable_links.imm <- function(model) {
 imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
                 version = c("full", "bsc", "abc"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
   version <- match.arg(version)
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
@@ -394,6 +395,7 @@ configure_prior.imm_full <- function(model, data, formula, user_prior, ...) {
 #' @export
 IMMfull <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMfull()` is deprecated. Please use `imm(version = 'full')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -413,6 +415,7 @@ IMMfull <- function(resp_error, nt_features, nt_distances, set_size, regex = FAL
 #' @export
 IMMbsc <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMbsc()` is deprecated. Please use `imm(version = 'bsc')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -432,6 +435,7 @@ IMMbsc <- function(resp_error, nt_features, nt_distances, set_size, regex = FALS
 #' @export
 IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = c("nt_distances", "links"), deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMabc()` is deprecated. Please use `imm(version = 'abc')` instead.")
   if ("setsize" %in% names(dots)) {
