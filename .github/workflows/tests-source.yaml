@@ -85,8 +85,11 @@ jobs:
       - name: Locate CmdStan install path
         id: cmdstan-path
         run: |
+          # the OS release keys the cache: a CmdStan built on another runner
+          # image fails to sample on this one
           cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
-              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+              sprintf("release=%s\n", gsub("[^A-Za-z0-9.]+", "-", utils::sessionInfo()$running)),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE, sep = "")
         shell: Rscript {0}
 
       - name: Cache CmdStan
@@ -94,7 +97,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.cmdstan-path.outputs.path }}
-          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
+          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-path.outputs.release }}-${{ steps.cmdstan-version.outputs.version }}
 
       - name: Set up CmdStan toolchain
         run: cmdstanr::check_cmdstan_toolchain(fix = TRUE)
