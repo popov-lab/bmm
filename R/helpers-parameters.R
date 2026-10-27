@@ -552,8 +552,63 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     "native_parameters() requires a bmmfit object, not an object of class \\
     {collapse_comma(class(x))}."
   )
-  x <- restructure(x)
   scale <- match.arg(scale)
+  stopif(
+    !is.numeric(prob) || length(prob) != 1L || is.na(prob) || prob <= 0 || prob >= 1,
+    "'prob' must be a single number between 0 and 1, not {prob}."
+  )
+
+  native <- .native_draw_matrices(x, newdata, pars, re_formula, scale, ndraws, draw_ids, list(...))
+  linpred <- native$draws
+  grid <- native$newdata[, native$grid_vars, drop = FALSE]
+  row.names(grid) <- NULL
+
+  clash <- intersect(names(grid), .np_reserved_names(summary, prob))
+  stopif(
+    length(clash) > 0,
+    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
+    output. Rename them in the data, or pass 'newdata' with different names."
+  )
+
+  if (summary) {
+    .np_summary(linpred, grid, prob, robust)
+  } else {
+    warnif(
+      length(linpred) * nrow(grid) * length(native$draw_ids) > 1e6,
+      "This will return \\
+      {length(linpred) * nrow(grid) * length(native$draw_ids)} rows. Supply 'newdata' \\
+      with the grid cells you need, or set 'ndraws', to return fewer."
+    )
+    .np_long(linpred, grid, .np_draw_index(x, native$draw_ids))
+  }
+}
+
+
+#' Native-scale draws of model parameters as matrices
+#'
+#' @description
+#' The computation behind [native_parameters()], without its reshaping, so that
+#' callers that need one matrix per parameter, such as the \pkg{insight} and
+#' \pkg{marginaleffects} methods, take the same draws.
+#'
+#' @param x A bmmfit object
+#' @param newdata User supplied prediction data, or `NULL` for the default grid
+#' @param pars Character vector of the requested parameters, or `NULL` for all
+#'   that are not internal
+#' @param re_formula Passed to [brms::posterior_linpred()]
+#' @param scale `"native"` or `"sampling"`
+#' @param ndraws,draw_ids The draws to use, as in [native_parameters()]
+#' @param dots Further arguments for [brms::posterior_linpred()]
+#' @return A list with `draws`, a named list of draws x grid cell matrices of
+#'   the requested parameters, `newdata`, the completed prediction data,
+#'   `grid_vars`, the variables spanning the grid, and `draw_ids`, sorted
+#'
+#' @keywords internal
+#' @noRd
+.native_draw_matrices <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
+                                  scale = "native", ndraws = NULL, draw_ids = NULL,
+                                  dots = list()) {
+  x <- restructure(x)
 
   model_pars <- setdiff(
     names(x$bmm$model$parameters),
@@ -568,10 +623,6 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     The parameters of this model are {collapse_comma(model_pars)}."
   )
 
-  stopif(
-    !is.numeric(prob) || length(prob) != 1L || is.na(prob) || prob <= 0 || prob >= 1,
-    "'prob' must be a single number between 0 and 1, not {prob}."
-  )
   stopif(
     !is.null(ndraws) &&
       (!is.numeric(ndraws) || length(ndraws) != 1L || is.na(ndraws) ||
@@ -594,7 +645,7 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   grid_vars <- .np_grid_vars(x, model_pars, re_formula)
   newdata <- .np_newdata(x, grid_vars, newdata)
 
-  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, list(...))
+  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, dots)
   if (scale == "native") {
     transformed <- native_transform(x$bmm$model, linpred, newdata)
     stopif(
@@ -610,29 +661,10 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     )
     linpred <- transformed
   }
-  linpred <- linpred[names(linpred) %in% pars]
-
-  grid <- newdata[, grid_vars, drop = FALSE]
-  row.names(grid) <- NULL
-
-  clash <- intersect(names(grid), .np_reserved_names(summary, prob))
-  stopif(
-    length(clash) > 0,
-    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
-    output. Rename them in the data, or pass 'newdata' with different names."
+  list(
+    draws = linpred[names(linpred) %in% pars], newdata = newdata,
+    grid_vars = grid_vars, draw_ids = draw_ids
   )
-
-  if (summary) {
-    .np_summary(linpred, grid, prob, robust)
-  } else {
-    warnif(
-      length(linpred) * nrow(grid) * length(draw_ids) > 1e6,
-      "This will return \\
-      {length(linpred) * nrow(grid) * length(draw_ids)} rows. Supply 'newdata' \\
-      with the grid cells you need, or set 'ndraws', to return fewer."
-    )
-    .np_long(linpred, grid, .np_draw_index(x, draw_ids))
-  }
 }
 
 
