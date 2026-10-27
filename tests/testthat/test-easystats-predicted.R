@@ -39,7 +39,7 @@ test_that("get_predicted() leaves insight's own prediction types to brms and ref
   grid <- data.frame(set_size = factor(1:4))
   link <- insight::get_predicted(fit, data = grid, predict = "link")
   expect_equal(unname(unlist(attr(link, "iterations")[1, ])),
-               unname(rstantools::posterior_linpred(fit, newdata = grid)[, 1]))
+               unname(brms::posterior_linpred(fit, newdata = grid)[, 1]))
   expect_error(insight::get_predicted(fit, data = grid, predict = "thetat"), "'mu', 'c', 'kappa'")
 })
 
