@@ -8,7 +8,7 @@ development:
 
 navbar:
   structure:
-     left: [intro, reference, articles, changelog, develop, parameter_recovery]
+     left: [intro, reference, articles, changelog, develop, parameter_recovery, explorer]
   components:
      reference:
         text: Functions
@@ -25,6 +25,9 @@ navbar:
      parameter_recovery:
         text: Parameter recovery
         href: https://venpopov.com/bmm/parameter-recovery/index.html
+     explorer:
+        text: Model explorer
+        href: https://www.gfrischkorn.org/bmm-explorer/
 
 
 
