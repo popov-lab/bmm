@@ -22,11 +22,12 @@
 \arguments{
 \item{x, model}{A \code{bmmfit} object (created by \code{\link[=bmm]{bmm()}}).}
 
-\item{data, newdata}{The data to predict for. \code{get_predicted()} predicts for
-the data of the fit if \code{data} is \code{NULL}.}
+\item{data, newdata}{The data to predict for. \code{get_predicted()} also takes
+\code{newdata} in \code{...}, and predicts for the data of the fit if both are
+\code{NULL}.}
 
 \item{predict}{The name of a model parameter, or one of the prediction
-types of \code{\link[insight:get_predicted]{insight::get_predicted()}}.}
+types of \code{\link[insight:get_predicted]{insight::get_predicted()}}. A \code{type} in \code{...} replaces it.}
 
 \item{iterations}{The number of posterior draws to predict from, all of
 them if \code{NULL}.}
@@ -40,8 +41,9 @@ formula for the random effects to include, or \code{"default"} or \code{TRUE} fo
 all of them if the data contain the grouping factors.}
 
 \item{...}{For a model parameter: \code{draw_ids}, \code{allow_new_levels} and
-\code{sample_new_levels}, passed to \code{\link[=native_parameters]{native_parameters()}}, and for
-\code{get_predict()} \code{dpar}, \code{ndraws} and \code{re_formula} (or \code{re.form}). For
+\code{sample_new_levels}, passed to \code{\link[=native_parameters]{native_parameters()}}; for
+\code{get_predicted()} also \code{newdata}, \code{type} and \code{centrality_function}, and
+for \code{get_predict()} \code{dpar}, \code{ndraws} and \code{re_formula} (or \code{re.form}). For
 any other prediction, passed to the methods for \pkg{brms} fits.}
 
 \item{type}{The prediction type of \pkg{marginaleffects}, used only when
@@ -60,7 +62,7 @@ them \code{modelbased::estimate_means()}, \code{modelbased::estimate_contrasts()
 predict a model parameter on its native scale, as \code{\link[=native_parameters]{native_parameters()}}
 computes it: with the inverse link applied draw by draw and the mixture
 weights softmaxed jointly, so that \code{predict = "thetat"} returns the
-probability of a memory response.
+probability of a target response.
 }
 \details{
 \code{predict} (or \code{dpar} for \code{get_predict()}, which is how \pkg{modelbased}
@@ -72,11 +74,17 @@ for \pkg{brms} fits; the expected response is not defined for most bmm
 models.
 
 Random effects enter the predictions only if every grouping factor is a
-column of the data to predict for and holds only levels of the fit (or
-\code{allow_new_levels = TRUE}); otherwise the predictions are for the
-population level, as \pkg{insight} does for \pkg{brms} fits.
+column of the data to predict for and holds only levels of the fit, as
+\pkg{insight} does for \pkg{brms} fits, or new levels with
+\code{allow_new_levels = TRUE}. Otherwise the predictions are for the population
+level, with a warning if you asked for \code{include_random = TRUE}. A grouping
+factor that is \code{NA}, as in the grids of \pkg{modelbased}, always means the
+population level. For a mixed model, \code{modelbased::estimate_means()}
+averages the predictions over the participants in its grid, so its means
+differ from those of \code{native_parameters(re_formula = NA)}.
 
-The point prediction is the median of the draws.
+The point prediction of \code{get_predicted()} is the \code{centrality_function} of
+the draws, \code{base::mean} by default, as for \pkg{brms} fits.
 }
 \examples{
 \dontrun{
