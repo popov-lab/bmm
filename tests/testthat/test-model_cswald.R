@@ -542,6 +542,13 @@ ndt_prior_warnings <- function(data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1
   grep("prior for `ndt`", warnings, value = TRUE, fixed = TRUE)
 }
 
+# Every warning of the steps of bmm() up to the init function
+all_warnings <- function(data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1), prior = NULL,
+                         version = "simple", links = NULL) {
+  model <- suppressWarnings(cswald("rt", "response", version = version, links = links))
+  collect_warnings(suppressMessages(configure_fit(formula, data, model, prior)))$warnings
+}
+
 # The warnings of the check itself, called on the brms formula and checked data
 # of bmm() without the cost of the prior
 ndt_check_warnings <- function(prior, data, links = NULL,
@@ -593,7 +600,7 @@ test_that("cswald warns when the default ndt prior lies above the fastest respon
 })
 
 test_that("the ndt prior check reads the user's prior, not the default (#548)", {
-  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  skip_on_cran() # 0.2 s in CRAN mode, kept with the other tests of the check
   user <- brms::set_prior("normal(-3,0.3)", class = "Intercept", dpar = "ndt")
   expect_identical(ndt_prior_warnings(cswald_fast_data(0.13), prior = user), character())
 })
@@ -702,11 +709,12 @@ test_that("the ndt prior check returns silently when it cannot build the design 
 test_that("the ndt prior check lists at most five cells (#548)", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
-  cells_data <- function(n) {
+  cells_data <- function(n, name = "c") {
+    levels <- paste0(name, seq_len(n))
     data.frame(
       rt = 0.12 + rep(c(0, 0.2, 0.4, 0.6), times = n),
       response = 1,
-      cond = factor(rep(paste0("c", seq_len(n)), each = 4), levels = paste0("c", seq_len(n)))
+      cond = factor(rep(levels, each = 4), levels = levels)
     )
   }
 
@@ -720,6 +728,12 @@ test_that("the ndt prior check lists at most five cells (#548)", {
   five <- ndt_prior_warnings(cells_data(5), formula)
   expect_match(five, "  condc5: normal(-2,0.3) puts 66% of its mass at or above 0.12 s\nSampling", fixed = TRUE)
   expect_no_match(five, "more", fixed = TRUE)
+
+  # cells with long names stop the list early, so that the suggestion survives
+  long <- ndt_prior_warnings(cells_data(5, strrep("x", 99)), formula)
+  expect_lt(nchar(long), 1000)
+  expect_match(long, "\n  ... and 3 more\nSampling", fixed = TRUE)
+  expect_match(long, "set_prior(\"normal(-2.73, 0.3)\", class = \"b\", coef = \"cond", fixed = TRUE)
 })
 
 test_that("the ndt prior check skips a decreasing link and reads the increasing ones (#548)", {
@@ -790,12 +804,80 @@ test_that("a row without a prior string inherits the row of its class (#548)", {
 })
 
 test_that("the ndt prior check leaves a numeric predictor without an intercept alone (#548)", {
-  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  skip_on_cran() # 0.3 s in CRAN mode, kept with the other tests of the check
   data <- cswald_fast_data(0.13)
   data$trial <- seq_len(nrow(data))
   expect_identical(
     ndt_prior_warnings(data, bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + trial)),
     character()
+  )
+})
+
+test_that("the ndt prior check does not stop a fit or warn on the logm1 link (#548)", {
+  data <- cswald_fast_data(0.13)
+  data$response <- 1
+  for (version in c("simple", "crisk")) {
+    expect_no_error(warnings <- all_warnings(data, version = version, links = list(ndt = "logm1")))
+    expect_identical(warnings, character(), label = version)
+  }
+})
+
+test_that("the ndt prior check ignores rows with a missing predictor and checks the other cells (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
+  # cell a starts at 0.3 s except for a 0.1 s row whose cell is missing, as are two more rows
+  data <- data.frame(rt = rep(c(0.3, 0.5), 20), response = 1, cond = factor(rep(c("a", "b"), 20)))
+  data$rt[1] <- 0.1
+  data$cond[1:3] <- NA
+  brms_na <- "Rows containing NAs were excluded from the model."
+
+  expect_identical(setdiff(all_warnings(data, formula, version = "crisk"), brms_na), character())
+
+  data$rt[data$cond == "b" & !is.na(data$cond)][1] <- 0.13
+  warnings <- setdiff(all_warnings(data, formula, version = "crisk"), brms_na)
+  expect_length(warnings, 1)
+  expect_match(warnings, "  condb: normal(-2,0.3) puts 55% of its mass at or above 0.13 s\nSampling", fixed = TRUE)
+})
+
+test_that("the ndt prior check does not read a truncated prior as untruncated (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  prior <- function(...) brms::set_prior("normal(-2,0.3)", dpar = "ndt", ...)
+  expect_length(ndt_prior_warnings(cswald_fast_data(0.13), prior = prior(class = "Intercept")), 1)
+  expect_identical(
+    ndt_prior_warnings(cswald_fast_data(0.13), prior = prior(class = "Intercept", ub = -2.1)),
+    character()
+  )
+
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
+  data <- cswald_fast_data(0.13)
+  data$rt[data$cond == "b"] <- data$rt[data$cond == "b"] + 0.17
+  expect_length(ndt_prior_warnings(data, formula, prior = prior(class = "b")), 1)
+  expect_identical(ndt_prior_warnings(data, formula, prior = prior(class = "b", ub = -2.1)), character())
+  expect_identical(ndt_prior_warnings(data, formula, prior = prior(class = "b", lb = -3)), character())
+})
+
+test_that("the ndt prior check skips a cell without fitted responses silently (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 0 + cond)
+  data <- cswald_fast_data(0.13)
+  data$rt[data$cond == "b"] <- data$rt[data$cond == "b"] + 0.17
+  data$response <- 1
+  # cell c has errors only, which cswald simple censors
+  errors <- data.frame(rt = c(0.5, 0.6), response = 0, id = factor(1), cond = factor("c"))
+  data <- rbind(data, errors)
+
+  warnings <- all_warnings(data, formula)
+  expect_length(warnings, 1)
+  expect_match(warnings, "  conda: normal(-2,0.3) puts 55% of its mass at or above 0.13 s\nSampling", fixed = TRUE)
+})
+
+test_that("the ndt prior check prints one decimal for a mass just above one half (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  # the default prior has its median at 0.1353 s
+  expect_match(
+    ndt_prior_warnings(cswald_fast_data(0.135)),
+    "Intercept: normal(-2,0.3) puts 50.3% of its mass at or above 0.135 s",
+    fixed = TRUE
   )
 })
 

@@ -128,8 +128,8 @@
 #' warning suggests, or filter out anticipations. The check reads `normal()`
 #' and `student_t()` priors on the intercept of `ndt`, or on each cell of a
 #' formula without an intercept such as `ndt ~ 0 + cond`; other priors and
-#' designs are not checked, and neither is a decreasing link such as
-#' `"inverse"`. In a formula with other fixed effects, such as
+#' designs are not checked, and neither are truncated priors or a decreasing
+#' link such as `"inverse"`. In a formula with other fixed effects, such as
 #' `ndt ~ 1 + cond`, the prior on the intercept is the prior on the centred
 #' intercept (the grand mean), and the check compares it with the fastest
 #' response overall. `update()` with `init` or `inits` skips the check.
@@ -433,10 +433,11 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
 # a set of responses, and only normal() and student_t() are read
 .warn_ndt_prior_conflict <- function(model, data, formula, prior) {
   ndt_terms <- brms::brmsterms(formula)$dpars$ndt
-  probe <- link_transform(c(0.1, 1), model$links$ndt)
+  probe <- suppressWarnings(link_transform(c(0.1, 1), model$links$ndt))
   # on a decreasing link, such as inverse, the mass above the fastest response
-  # is the mass below its transform
-  if (NROW(prior) == 0 || is.null(ndt_terms$fe) || probe[2] < probe[1]) {
+  # is the mass below its transform; logm1 is undefined at the probe points
+  increasing <- all(is.finite(probe)) && probe[2] > probe[1]
+  if (NROW(prior) == 0 || is.null(ndt_terms$fe) || !increasing) {
     return(invisible())
   }
   rt <- data[[model$resp_vars$rt]]
@@ -459,11 +460,22 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     if (is.null(X) || !all(X %in% c(0, 1)) || any(rowSums(X) != 1)) {
       return(invisible())
     }
-    cells <- lapply(seq_cols(X), function(j) fits & X[, j] == 1)
+    # model.matrix() drops the rows with a missing predictor, as brms does
+    # later, so the cells are placed on the rows it kept
+    kept <- match(rownames(X), rownames(data))
+    cells <- lapply(seq_cols(X), function(j) {
+      in_cell <- logical(nrow(data))
+      in_cell[kept] <- X[, j] == 1
+      fits & in_cell
+    })
     names(cells) <- colnames(X)
   }
   rows <- prior[prior$dpar == "ndt" & prior$class == prior_class & !nzchar(prior$nlpar) &
                   !nzchar(prior$group) & !nzchar(prior$resp), ]
+  # a truncated prior has less mass above the fastest response than it shows
+  if (any(nzchar(c(rows$lb, rows$ub), keepNA = TRUE), na.rm = TRUE)) {
+    return(invisible())
+  }
 
   conflicts <- lapply(names(cells), function(cell) {
     if (!any(cells[[cell]])) {
@@ -486,11 +498,17 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     if (!isTRUE(mass > 0.5)) {
       return(NULL)
     }
+    # a mass just above one half would read as "50% ... most of its mass"
+    percent <- if (round(100 * mass) == 50) {
+      format(round(100 * mass, 1), nsmall = 1)
+    } else {
+      round(100 * mass)
+    }
     # two scales below the fastest response leaves about 2.5% of the mass above
     dist$args[n - 1] <- floor((limit - 2 * dist$args[n]) * 100 + 1e-8) / 100
     list(
       location = dist$args[n - 1],
-      line = glue("{cell}: {applied[length(applied)]} puts {round(100 * mass)}% of \\
+      line = glue("{cell}: {applied[length(applied)]} puts {percent}% of \\
                   its mass at or above {signif(fastest, 3)} s"),
       suggestion = paste0(dist$family, "(", paste(dist$args, collapse = ", "), ")"),
       cell = cell
@@ -504,9 +522,11 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
   kind <- if (model$version == "simple") "correct response" else "response"
   where <- if (prior_class == "b") " in its cell" else ""
   # a long list would push the suggestion past the 1000 characters R prints
-  lines <- vapply(conflicts[seq_len(min(5, length(conflicts)))], `[[`, character(1), "line")
-  if (length(conflicts) > 5) {
-    lines <- c(lines, glue("... and {length(conflicts) - 5} more"))
+  lines <- vapply(conflicts, `[[`, character(1), "line")
+  listed <- max(1, min(5, sum(cumsum(nchar(lines)) <= 400)))
+  lines <- lines[seq_len(listed)]
+  if (length(conflicts) > listed) {
+    lines <- c(lines, glue("... and {length(conflicts) - listed} more"))
   }
   lines <- paste0("  ", lines, collapse = "\n")
   first <- conflicts[[1]]
