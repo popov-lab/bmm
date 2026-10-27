@@ -128,7 +128,11 @@
 #' warning suggests, or filter out anticipations. The check reads `normal()`
 #' and `student_t()` priors on the intercept of `ndt`, or on each cell of a
 #' formula without an intercept such as `ndt ~ 0 + cond`; other priors and
-#' designs are not checked.
+#' designs are not checked, and neither is a decreasing link such as
+#' `"inverse"`. In a formula with other fixed effects, such as
+#' `ndt ~ 1 + cond`, the prior on the intercept is the prior on the centred
+#' intercept (the grand mean), and the check compares it with the fastest
+#' response overall. `update()` with `init` or `inits` skips the check.
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -429,7 +433,10 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
 # a set of responses, and only normal() and student_t() are read
 .warn_ndt_prior_conflict <- function(model, data, formula, prior) {
   ndt_terms <- brms::brmsterms(formula)$dpars$ndt
-  if (NROW(prior) == 0 || is.null(ndt_terms$fe)) {
+  probe <- link_transform(c(0.1, 1), model$links$ndt)
+  # on a decreasing link, such as inverse, the mass above the fastest response
+  # is the mass below its transform
+  if (NROW(prior) == 0 || is.null(ndt_terms$fe) || probe[2] < probe[1]) {
     return(invisible())
   }
   rt <- data[[model$resp_vars$rt]]
@@ -439,18 +446,23 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
   }
 
   if (has_intercept(ndt_terms$fe)) {
-    class <- "Intercept"
+    prior_class <- "Intercept"
     cells <- list(Intercept = fits)
   } else {
-    class <- "b"
-    X <- get_model_matrix(ndt_terms$fe, data)
-    if (!all(X %in% c(0, 1)) || any(rowSums(X) != 1)) {
+    prior_class <- "b"
+    # brms adds the Intercept pseudo-column of ndt ~ 0 + Intercept to its own
+    # frame only; a diagnostic must not stop a fit it cannot read the design of
+    X <- tryCatch(
+      get_model_matrix(ndt_terms$fe, transform(data, Intercept = 1)),
+      error = function(e) NULL
+    )
+    if (is.null(X) || !all(X %in% c(0, 1)) || any(rowSums(X) != 1)) {
       return(invisible())
     }
     cells <- lapply(seq_cols(X), function(j) fits & X[, j] == 1)
     names(cells) <- colnames(X)
   }
-  rows <- prior[prior$dpar == "ndt" & prior$class == class & !nzchar(prior$nlpar) &
+  rows <- prior[prior$dpar == "ndt" & prior$class == prior_class & !nzchar(prior$nlpar) &
                   !nzchar(prior$group) & !nzchar(prior$resp), ]
 
   conflicts <- lapply(names(cells), function(cell) {
@@ -477,6 +489,7 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
     # two scales below the fastest response leaves about 2.5% of the mass above
     dist$args[n - 1] <- floor((limit - 2 * dist$args[n]) * 100 + 1e-8) / 100
     list(
+      location = dist$args[n - 1],
       line = glue("{cell}: {applied[length(applied)]} puts {round(100 * mass)}% of \\
                   its mass at or above {signif(fastest, 3)} s"),
       suggestion = paste0(dist$family, "(", paste(dist$args, collapse = ", "), ")"),
@@ -489,18 +502,36 @@ create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
   }
 
   kind <- if (model$version == "simple") "correct response" else "response"
-  where <- if (class == "b") " in its cell" else ""
-  lines <- paste0("  ", vapply(conflicts, `[[`, character(1), "line"), collapse = "\n")
+  where <- if (prior_class == "b") " in its cell" else ""
+  # a long list would push the suggestion past the 1000 characters R prints
+  lines <- vapply(conflicts[seq_len(min(5, length(conflicts)))], `[[`, character(1), "line")
+  if (length(conflicts) > 5) {
+    lines <- c(lines, glue("... and {length(conflicts) - 5} more"))
+  }
+  lines <- paste0("  ", lines, collapse = "\n")
   first <- conflicts[[1]]
-  coef <- if (class == "b") glue(', coef = "{first$cell}"') else ""
+  coef <- if (prior_class == "b") glue(', coef = "{first$cell}"') else ""
+  # a location at or below zero is no prior for a time on its natural scale
+  advice <- if (first$location <= 0 && identical(probe, c(0.1, 1))) {
+    paste(
+      "The fastest response is less than two scales above zero, so the prior",
+      "needs a smaller scale as well as a lower location. You can also filter",
+      "out anticipations, responses faster than the task allows."
+    )
+  } else {
+    glue(
+      "Give `ndt` a prior with a lower location, for example\n",
+      "  set_prior(\"{first$suggestion}\", class = \"{prior_class}\"{coef}, dpar = \"ndt\")\n",
+      "or filter out anticipations, responses faster than the task allows.",
+      .trim = FALSE
+    )
+  }
   warning2(
     "The prior for `ndt` puts most of its mass at or above the fastest {kind} \\
     time{where}, but `ndt` must stay below it:
     {lines}
     Sampling can fail to start, and the data pull `ndt` below that response \\
-    against the prior. Give `ndt` a prior with a lower location, for example
-      set_prior(\"{first$suggestion}\", class = \"{class}\"{coef}, dpar = \"ndt\")
-    or filter out anticipations, responses faster than the task allows."
+    against the prior. {advice}"
   )
 }
 
