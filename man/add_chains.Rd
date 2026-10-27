@@ -18,18 +18,25 @@ makes it reproducible. A seed that a chain of \code{fit} was sampled with is
 refused, because the new chains could repeat that chain's draws.}
 
 \item{...}{Further arguments passed to \code{\link[=update.bmmfit]{update.bmmfit()}}, such as \code{cores},
-\code{threads}, \code{refresh} or \code{control}. Arguments that would change the model,
-the data or the draws per chain (\code{formula.}, \code{newdata}, \code{data}, \code{data2},
-\code{model}, \code{prior}, \code{iter}, \code{warmup}, \code{thin} and \code{algorithm}) are refused:
-use \code{\link[=update]{update()}} for those and sample all chains anew. \code{file} and
-\code{file_compress} are refused too; save the result with \code{\link[=saveRDS]{saveRDS()}}.}
+\code{refresh} or \code{control}. \code{threads} works only for a fit that was sampled
+with threading, because a threaded Stan program differs from an
+unthreaded one. Arguments that would change the model, the data, the
+draws per chain or what is sampled (\code{formula.}, \code{newdata}, \code{data},
+\code{data2}, \code{model}, \code{prior}, \code{sample_prior}, \code{iter}, \code{warmup}, \code{thin},
+\code{algorithm}, \code{backend} and \code{normalize}) are refused: use \code{\link[=update]{update()}} for
+those and sample all chains anew. \code{file} and \code{file_compress} are refused
+too; save the result with \code{\link[=saveRDS]{saveRDS()}}.}
 }
 \value{
 A \code{bmmfit} object with the chains of \code{fit} followed by the new ones,
 combined with \code{\link[brms:combine_models]{brms::combine_models()}}. Everything else is taken from
 \code{fit}, except criteria added with \code{\link[brms:add_criterion]{brms::add_criterion()}}: they were
 computed from the chains of \code{fit} alone and are removed, so add them again.
-\code{\link[=fit_info]{fit_info()}} reports the time, step size and inverse metric of every chain.
+The result has no \code{file}, as with \code{\link[=update]{update()}}, so \code{\link[brms:add_criterion]{brms::add_criterion()}}
+does not write it over the file of \code{fit}. \code{version} and the other fields
+that describe the fit are those of \code{fit}; the new chains ran the same Stan
+program. \code{\link[=fit_info]{fit_info()}} reports the time, step size and inverse metric of
+every chain.
 }
 \description{
 \code{add_chains()} samples more chains of a model fitted with

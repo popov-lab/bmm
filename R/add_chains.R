@@ -11,16 +11,23 @@
 #'   makes it reproducible. A seed that a chain of `fit` was sampled with is
 #'   refused, because the new chains could repeat that chain's draws.
 #' @param ... Further arguments passed to [update.bmmfit()], such as `cores`,
-#'   `threads`, `refresh` or `control`. Arguments that would change the model,
-#'   the data or the draws per chain (`formula.`, `newdata`, `data`, `data2`,
-#'   `model`, `prior`, `iter`, `warmup`, `thin` and `algorithm`) are refused:
-#'   use [update()] for those and sample all chains anew. `file` and
-#'   `file_compress` are refused too; save the result with [saveRDS()].
+#'   `refresh` or `control`. `threads` works only for a fit that was sampled
+#'   with threading, because a threaded Stan program differs from an
+#'   unthreaded one. Arguments that would change the model, the data, the
+#'   draws per chain or what is sampled (`formula.`, `newdata`, `data`,
+#'   `data2`, `model`, `prior`, `sample_prior`, `iter`, `warmup`, `thin`,
+#'   `algorithm`, `backend` and `normalize`) are refused: use [update()] for
+#'   those and sample all chains anew. `file` and `file_compress` are refused
+#'   too; save the result with [saveRDS()].
 #' @return A `bmmfit` object with the chains of `fit` followed by the new ones,
 #'   combined with [brms::combine_models()]. Everything else is taken from
 #'   `fit`, except criteria added with [brms::add_criterion()]: they were
 #'   computed from the chains of `fit` alone and are removed, so add them again.
-#'   [fit_info()] reports the time, step size and inverse metric of every chain.
+#'   The result has no `file`, as with [update()], so [brms::add_criterion()]
+#'   does not write it over the file of `fit`. `version` and the other fields
+#'   that describe the fit are those of `fit`; the new chains ran the same Stan
+#'   program. [fit_info()] reports the time, step size and inverse metric of
+#'   every chain.
 #' @details The new chains are sampled with [update()], which recompiles the
 #'   Stan model only when it needs to, for example for a cmdstanr fit loaded in
 #'   a new R session. If the Stan program that bmm now writes for the model
@@ -66,8 +73,9 @@ add_chains <- function(fit, chains = 1, seed = NULL, ...) {
   )
   # update() and brms::brm() match partial names, so `new` is `newdata` there
   refused <- c(
-    "formula.", "newdata", "data", "data2", "model", "prior", "iter", "warmup",
-    "thin", "algorithm", "file", "file_compress"
+    "formula.", "newdata", "data", "data2", "model", "prior", "sample_prior",
+    "iter", "warmup", "thin", "algorithm", "backend", "normalize", "file",
+    "file_compress"
   )
   refused <- names(dots)[vapply(names(dots), function(name) any(startsWith(refused, name)), logical(1))]
   stopif(
@@ -80,9 +88,15 @@ add_chains <- function(fit, chains = 1, seed = NULL, ...) {
   # a chain's random numbers follow from its seed and its chain id, and the
   # chains of update() count their ids from 1 again: with a seed of `fit`, a new
   # chain repeats the draws of the old chain with its id whenever their initial
-  # values agree as well, as they do for a fixed `init`
-  seed <- seed %||% sample.int(.Machine$integer.max, 1)
+  # values agree as well, as they do for a fixed `init`. A fit without a stored
+  # seed (NA) passes, because there is no seed to compare with
   old_seeds <- vapply(fit$fit@stan_args, function(args) as.character(args$seed %||% NA), character(1))
+  # a script that calls set.seed() with the same value before bmm() and before
+  # add_chains() draws the seed of `fit` again
+  if (is.null(seed)) {
+    seed <- sample.int(.Machine$integer.max, 1)
+    while (as.character(seed) %in% old_seeds) seed <- sample.int(.Machine$integer.max, 1)
+  }
   repeated <- match(as.character(seed), old_seeds)
   stopif(
     !is.na(repeated),
@@ -103,5 +117,6 @@ add_chains <- function(fit, chains = 1, seed = NULL, ...) {
   )
   out <- brms::combine_models(fit, new)
   out$criteria <- list()
+  out$file <- NULL
   out
 }

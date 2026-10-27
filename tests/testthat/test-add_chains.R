@@ -59,6 +59,18 @@ test_that("add_chains() without a seed draws one from R's random number generato
   expect_equal(chain_seeds(out), c("5", "1592386033"))
 })
 
+test_that("add_chains() without a seed draws again when the draw is a seed of the fit", {
+  fit <- load_chains_fit()
+  fit$fit@stan_args[[1]]$seed <- 1592386033L
+  calls <- mock_update(fit)
+  withr::local_seed(555)
+
+  out <- add_chains(fit)
+
+  expect_false(identical(as.character(calls$args$seed), "1592386033"))
+  expect_equal(brms::nchains(out), 2)
+})
+
 test_that("add_chains() refuses the seed of a chain the fit already has", {
   fit <- load_chains_fit()
   calls <- mock_update(fit)
@@ -84,6 +96,14 @@ test_that("add_chains() keeps what describes the model and drops criteria of the
   expect_identical(out$bmm, fit$bmm)
   expect_identical(out$formula, fit$formula)
   expect_identical(out$prior, fit$prior)
+})
+
+test_that("add_chains() returns a fit without the file of the fit", {
+  fit <- load_chains_fit()
+  fit$file <- "fit.rds"
+  mock_update(fit)
+
+  expect_null(add_chains(fit, seed = 99)$file)
 })
 
 test_that("add_chains() refuses new chains from another Stan program", {
@@ -174,9 +194,9 @@ test_that("add_chains() refuses arguments that would change the model, data or d
   # list fails here
   refused <- list(
     formula. = bmf(c ~ 1), newdata = data.frame(), data = data.frame(), data2 = list(),
-    model = sdm("y"),
-    prior = brms::prior(normal(0, 1)), iter = 400, warmup = 100, thin = 2,
-    algorithm = "meanfield", file = "fit.rds", file_compress = FALSE
+    model = sdm("y"), prior = brms::prior(normal(0, 1)), sample_prior = "only",
+    iter = 400, warmup = 100, thin = 2, algorithm = "meanfield", backend = "rstan",
+    normalize = FALSE, file = "fit.rds", file_compress = FALSE
   )
   for (name in names(refused)) {
     expect_error(
@@ -197,4 +217,17 @@ test_that("add_chains() refuses arguments that would change the model, data or d
   expect_error(add_chains(fit, 1, 99, bmf(c ~ 1)), "must be named")
 
   expect_null(calls$args)
+})
+
+test_that("add_chains() passes on arguments whose names start like no refused name", {
+  fit <- load_chains_fit()
+  calls <- mock_update(fit)
+  passed <- list(
+    cores = 1, refresh = 0, control = list(adapt_delta = 0.9), init = 0, inits = 0,
+    threads = NULL, silent = 2, save_pars = NULL, stan_model_args = list()
+  )
+
+  do.call(add_chains, c(list(fit, seed = 99), passed))
+
+  expect_identical(names(calls$args), c("chains", "seed", names(passed)))
 })
