@@ -144,17 +144,17 @@ check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
   named <- nzchar(dot_names)
   free <- setdiff(known, dot_names)
   prefix <- pmatch(dot_names, free, duplicates.ok = TRUE)
-  unknown <- dot_names[named & !dot_names %in% c(deprecated, known) & is.na(prefix)]
+  unknown <- unique(dot_names[named & !dot_names %in% c(deprecated, known) & is.na(prefix)])
   if (length(unknown) == 0 && all(named)) {
     return(invisible())
   }
   constructor_fn <- sys.function(-1)
-  head <- sys.call(-1)[[1]]
-  head_name <- if (is.call(head) && deparse1(head[[1]]) %in% c("::", ":::")) head[[3]] else head
+  call_head <- sys.call(-1)[[1]]
+  head_name <- if (is.call(call_head) && deparse1(call_head[[1]]) %in% c("::", ":::")) call_head[[3]] else call_head
   is_named_head <- is.name(head_name) &&
     identical(get0(as.character(head_name), environment(constructor_fn), inherits = FALSE), constructor_fn)
-  constructor <- if (is_named_head) glue("{deparse1(head)}()") else "this model constructor"
-  lead <- if (is_named_head) constructor else "This model constructor"
+  help_topic <- deparse1(call_head)
+  constructor <- if (is_named_head) glue("{help_topic}()") else "this model constructor"
   env <- parent.frame()
   formal_names <- setdiff(names(formals(constructor_fn)), "...")
   supplied <- formal_names[!vapply(formal_names, function(name) {
@@ -162,18 +162,19 @@ check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
   }, logical(1))]
   candidates <- setdiff(c(formal_names, known), c(supplied, dot_names, free[prefix[!is.na(prefix)]]))
   suggestions <- vapply(unknown, function(name) {
-    close <- candidates[utils::adist(name, candidates)[1, ] <= min(2, nchar(name) %/% 3)]
+    close <- candidates[utils::adist(name, candidates)[1, ] <= min(2, nchar(name) %/% 2)]
     if (length(close) == 1) glue(" Did you mean `{close}`?", .trim = FALSE) else ""
   }, character(1))
   n_unnamed <- sum(!named)
   msg <- c(
     glue("`{unknown}` is not an argument of {constructor} and is ignored.{suggestions}"),
     if (n_unnamed > 0) glue(
-      "{lead} takes further arguments by name only; it was given ",
+      "{if (is_named_head) constructor else 'This model constructor'} takes further ",
+      "arguments by name only; it was given ",
       "{n_unnamed} unnamed argument{if (n_unnamed > 1) 's' else ''}."
     ),
     paste0(
-      if (is_named_head) paste0("See ?", deparse1(head), " for its arguments. "),
+      if (is_named_head) paste0("See ?", help_topic, " for its arguments. "),
       "From bmm 1.6.0 on this is an error."
     )
   )

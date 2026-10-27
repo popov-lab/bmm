@@ -30,7 +30,16 @@ constructor_calls <- function() {
 
 with_args <- function(call, ...) as.call(c(as.list(call), list(...)))
 
-warnings_of <- function(call) collect_warnings(try(eval(call), silent = TRUE))$warnings
+warnings_of <- function(call) collect_warnings(eval(call))$warnings
+
+# only for calls that stop after the warning: a required argument is missing,
+# or the call head is a function object, where stop_missing_args() fails
+warnings_before_error <- function(call) collect_warnings(try(eval(call), silent = TRUE))$warnings
+
+unused_message <- function(constructor, name, hint = "") {
+  paste0("`", name, "` is not an argument of ", constructor, "() and is ignored.", hint, "\n",
+         "See ?", constructor, " for its arguments. From bmm 1.6.0 on this is an error.")
+}
 
 two_close <- function(aaaaab, aaaaac, ...) .check_constructor_dots(list(...))
 
@@ -73,9 +82,8 @@ test_that("the names a constructor passes on to its model still work", {
 
 test_that("a prefix is matched only to an argument no exact name already took", {
   m3_call <- quote(m3(c("a", "b"), c(1, 2), "softmax", "ss", links = list(c = "log")))
-  expect_match(
-    warnings_of(with_args(m3_call, l = list(a = "log"))),
-    "`l` is not an argument of m3() and is ignored.", fixed = TRUE
+  expect_identical(
+    warnings_of(with_args(m3_call, l = list(a = "log"))), unused_message("m3", "l")
   )
   expect_length(warnings_of(m3_call), 0)
   expect_length(warnings_of(quote(m3(c("a", "b"), c(1, 2), "softmax", "ss", l = list(a = "log")))), 0)
@@ -105,50 +113,81 @@ test_that("setsize keeps its deprecation warning and nothing more", {
 })
 
 test_that("a misspelt argument is pointed to the close one", {
-  expect_match(
+  expect_identical(
     warnings_of(quote(mixture2p("y", lnks = list(kappa = "log")))),
-    "`lnks` is not an argument of mixture2p() and is ignored. Did you mean `links`?",
-    fixed = TRUE
+    unused_message("mixture2p", "lnks", " Did you mean `links`?")
+  )
+  expect_identical(
+    warnings_of(quote(mixture2p("y", Links = list(kappa = "log")))),
+    unused_message("mixture2p", "Links", " Did you mean `links`?")
+  )
+  expect_identical(
+    warnings_before_error(quote(mixture3p("y", nt_features = "x", set_sze = 2))),
+    unused_message("mixture3p", "set_sze", " Did you mean `set_size`?")
   )
 })
 
-test_that("a suggestion needs a close name and an argument not yet supplied", {
-  expect_match(
-    warnings_of(quote(mixture2p("y", Links = list(kappa = "log")))),
-    "`Links` is not an argument of mixture2p() and is ignored. Did you mean `links`?",
-    fixed = TRUE
-  )
-  expect_match(
-    warnings_of(quote(mixture3p("y", nt_features = "x", set_sze = 2))),
-    "`set_sze` is not an argument of mixture3p() and is ignored. Did you mean `set_size`?",
-    fixed = TRUE
+test_that("a suggestion reaches as far as the length of the name allows", {
+  # a transposition costs two edits
+  expect_identical(
+    warnings_of(quote(sdm("y", ilnks = 1))), unused_message("sdm", "ilnks", " Did you mean `links`?")
   )
   expect_identical(
-    warnings_of(quote(sdt_mafc("k", "n", xy = 1))),
-    paste0("`xy` is not an argument of sdt_mafc() and is ignored.\n",
-           "See ?sdt_mafc for its arguments. From bmm 1.6.0 on this is an error.")
+    warnings_of(quote(sdt_yn("r", "s", "n", idst = 1))),
+    unused_message("sdt_yn", "idst", " Did you mean `dist`?")
   )
+  expect_identical(
+    warnings_of(quote(sdt_yn("r", "s", "n", dst = 1))),
+    unused_message("sdt_yn", "dst", " Did you mean `dist`?")
+  )
+  expect_identical(
+    warnings_of(quote(sdm("y", linkzzs = 1))), unused_message("sdm", "linkzzs", " Did you mean `links`?")
+  )
+  # three letters at two edits, and eight letters at three edits
+  expect_identical(warnings_of(quote(sdm("y", lik = 1))), unused_message("sdm", "lik"))
+  expect_identical(warnings_of(quote(sdm("y", linkzzzs = 1))), unused_message("sdm", "linkzzzs"))
+  # a two-letter name is two edits from the one-letter `m`
+  expect_identical(
+    warnings_before_error(quote(sdt_mafc("k", "n", xy = 1))), unused_message("sdt_mafc", "xy")
+  )
+})
+
+test_that("a suggestion never offers an argument the call already gave", {
   expect_identical(
     warnings_of(quote(sdt_yn("r", "s", "n", dist = "normal", distt = "logistic"))),
-    paste0("`distt` is not an argument of sdt_yn() and is ignored.\n",
-           "See ?sdt_yn for its arguments. From bmm 1.6.0 on this is an error.")
+    unused_message("sdt_yn", "distt")
   )
-  expect_no_match(
+  expect_identical(
     warnings_of(quote(mixture3p("y", nt_features = "x", set_size = 2, set_sze = 2))),
-    "Did you mean", fixed = TRUE
+    unused_message("mixture3p", "set_sze")
   )
-  # two formals within reach of the misspelling: no guess
-  expect_no_match(warnings_of(quote(two_close(aaaaad = 1))), "Did you mean", fixed = TRUE)
+  expect_identical(
+    warnings_of(quote(sdm("y", links = list(kappa = "log"), lnks = 1))), unused_message("sdm", "lnks")
+  )
+  # `link` is `links` by prefix
+  expect_identical(
+    warnings_of(quote(sdm("y", link = list(kappa = "log"), lnks = 1))), unused_message("sdm", "lnks")
+  )
+})
+
+test_that("two formals within reach of the misspelling give no guess", {
+  expect_identical(
+    warnings_of(quote(two_close(aaaaad = 1))), unused_message("two_close", "aaaaad")
+  )
+})
+
+test_that("an argument given twice is reported once", {
+  expect_identical(warnings_of(quote(sdm("y", foo = 1, foo = 2))), unused_message("sdm", "foo"))
 })
 
 test_that("a call through a function object does not print the function", {
   wording <- paste0("`foo` is not an argument of this model constructor and is ignored.\n",
                     "From bmm 1.6.0 on this is an error.")
-  expect_identical(warnings_of(quote(do.call(sdm, list("y", foo = 1)))), wording)
-  expect_identical(warnings_of(quote(Map(sdm, "y", foo = 1))), wording)
-  expect_identical(warnings_of(quote(lapply("y", sdm, foo = 1))), wording)
+  expect_identical(warnings_before_error(quote(do.call(sdm, list("y", foo = 1)))), wording)
+  expect_identical(warnings_before_error(quote(Map(sdm, "y", foo = 1))), wording)
+  expect_identical(warnings_before_error(quote(lapply("y", sdm, foo = 1))), wording)
   expect_match(
-    warnings_of(quote(do.call(sdm, list("y", 1, 2)))),
+    warnings_before_error(quote(do.call(sdm, list("y", 1, 2)))),
     "This model constructor takes further arguments by name only", fixed = TRUE
   )
   expect_match(
@@ -159,9 +198,14 @@ test_that("a call through a function object does not print the function", {
 })
 
 test_that("unnamed extra arguments are reported", {
-  expect_match(
-    warnings_of(quote(sdt_yn("r", "s", "n", "normal", NULL, 5))),
-    "sdt_yn() takes further arguments by name only; it was given 1 unnamed argument.",
-    fixed = TRUE
+  unnamed_message <- function(n) paste0(
+    "sdt_yn() takes further arguments by name only; it was given ", n, ".\n",
+    "See ?sdt_yn for its arguments. From bmm 1.6.0 on this is an error."
+  )
+  expect_identical(
+    warnings_of(quote(sdt_yn("r", "s", "n", "normal", NULL, 5))), unnamed_message("1 unnamed argument")
+  )
+  expect_identical(
+    warnings_of(quote(sdt_yn("r", "s", "n", "normal", NULL, 5, 6))), unnamed_message("2 unnamed arguments")
   )
 })
