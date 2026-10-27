@@ -83,25 +83,28 @@ get_predicted.bmmfit <- function(x, data = NULL, predict = NULL, iterations = NU
     par <- .estimated_parameters(x)[1]
     message2("Predicting the model parameter '{par}'; choose another with `predict`.")
   }
-  if (!par[1] %in% names(model$parameters)) {
+  pars <- .np_model_pars(x)
+  if (!par[1] %in% pars) {
     if (par[1] %in% c("expectation", "expected", "response", "link",
                       "prediction", "predicted", "classification")) {
       return(NextMethod())
     }
-    stop2("'{par[1]}' is not a parameter of the {model$name} model. \\
-          Its parameters are {collapse_comma(names(model$parameters))}.")
+    stop2("'{par[1]}' is not a parameter of this {model$name} fit. \\
+          Its parameters are {collapse_comma(pars)}.")
   }
   if (length(par) > 1) {
     par <- par[1]
-    warning2("`predict` takes one value; predicting '{par}'.")
+    warning2("`{if (is.null(dots$type)) 'predict' else 'type'}` takes one value; predicting '{par}'.")
   }
+  stopif(
+    !is.null(iterations) && !.is_draw_count(iterations, brms::ndraws(x)),
+    "`iterations` must be a whole number between 1 and {brms::ndraws(x)}."
+  )
   data <- data %||% dots$newdata %||% get_data.bmmfit(x)
   draws <- .native_draws(
     x, newdata = data, par = par,
     re_formula = .easystats_re_formula(x, data, include_random, dots$allow_new_levels),
-    ndraws = iterations, draw_ids = dots$draw_ids,
-    allow_new_levels = isTRUE(dots$allow_new_levels),
-    sample_new_levels = dots$sample_new_levels %||% "uncertainty"
+    ndraws = iterations, dots = dots
   )
   predictions <- apply(draws, 1, dots$centrality_function %||% base::mean)
   attr(predictions, "iterations") <- as.data.frame(draws)
@@ -121,6 +124,16 @@ get_predict.bmmfit <- function(model, newdata, type = "response", ...) {
   if (!isTRUE(dots$dpar %in% names(model$bmm$model$parameters))) {
     return(NextMethod())
   }
+  pars <- .np_model_pars(model)
+  stopif(
+    !dots$dpar %in% pars,
+    "'{dots$dpar}' is not a parameter of this {model$bmm$model$name} fit. \\
+    Its parameters are {collapse_comma(pars)}."
+  )
+  stopif(
+    !is.null(dots$ndraws) && !.is_draw_count(dots$ndraws, brms::ndraws(model)),
+    "`ndraws` must be a whole number between 1 and {brms::ndraws(model)}."
+  )
   # NA asks for the population level and NULL for all random effects, so the
   # argument's presence decides, not its value
   re_formula <- if ("re_formula" %in% names(dots)) {
@@ -130,12 +143,7 @@ get_predict.bmmfit <- function(model, newdata, type = "response", ...) {
   } else {
     .easystats_re_formula(model, newdata, allow_new_levels = dots$allow_new_levels)
   }
-  draws <- .native_draws(
-    model, newdata, dots$dpar, re_formula,
-    ndraws = dots$ndraws, draw_ids = dots$draw_ids,
-    allow_new_levels = isTRUE(dots$allow_new_levels),
-    sample_new_levels = dots$sample_new_levels %||% "uncertainty"
-  )
+  draws <- .native_draws(model, newdata, dots$dpar, re_formula, ndraws = dots$ndraws, dots = dots)
   # marginaleffects' comparisons split the predictions by group with data.table
   out <- data.table::data.table(
     group = "main_marginaleffect", rowid = newdata$rowid %||% seq_len(nrow(newdata)),
@@ -147,12 +155,16 @@ get_predict.bmmfit <- function(model, newdata, type = "response", ...) {
 
 
 # The draws of one parameter on its native scale, one row per row of newdata
-# and one column per draw, as insight and marginaleffects hold them
-.native_draws <- function(x, newdata, par, re_formula, ndraws = NULL, draw_ids = NULL,
-                          allow_new_levels = FALSE, sample_new_levels = "uncertainty") {
+# and one column per draw, as insight and marginaleffects hold them. Of the
+# user's arguments only these reach brms, so that insight's and
+# marginaleffects' own arguments are not mistaken for posterior_linpred()'s
+.native_draws <- function(x, newdata, par, re_formula, ndraws, dots) {
   draws <- t(.native_draw_matrices(
-    x, newdata, par, re_formula, ndraws = ndraws, draw_ids = draw_ids,
-    dots = nlist(allow_new_levels, sample_new_levels)
+    restructure(x), newdata, par, re_formula, ndraws = ndraws, draw_ids = dots$draw_ids,
+    dots = list(
+      allow_new_levels = isTRUE(dots$allow_new_levels),
+      sample_new_levels = dots$sample_new_levels %||% "uncertainty"
+    )
   )$draws[[par]])
   dimnames(draws) <- list(NULL, paste0("iter_", seq_len(ncol(draws))))
   draws
@@ -181,19 +193,28 @@ get_predict.bmmfit <- function(model, newdata, type = "response", ...) {
     )
     return(NA)
   }
-  unknown <- groups[vapply(groups, function(g) {
-    anyNA(data[[g]]) || !isTRUE(allow_new_levels) && !all(data[[g]] %in% x$data[[g]])
+  # as.character() also finds the NA level of a factor made with addNA()
+  values <- lapply(stats::setNames(groups, groups), function(g) as.character(data[[g]]))
+  incomplete <- groups[vapply(values, anyNA, logical(1))]
+  warnif(
+    isTRUE(include_random) && length(incomplete) > 0,
+    "`include_random = TRUE`, but {collapse_comma(incomplete)} in the data hold \\
+    missing values; predicting the population level."
+  )
+  new <- if (isTRUE(allow_new_levels)) NULL else groups[vapply(groups, function(g) {
+    any(not_in(stats::na.omit(values[[g]]), as.character(x$data[[g]])))
   }, logical(1))]
-  if (length(unknown) > 0) {
-    warnif(
-      isTRUE(include_random),
-      "`include_random = TRUE`, but {collapse_comma(unknown)} in the data hold \\
-      missing values, or levels the fit does not know without \\
-      `allow_new_levels = TRUE`; predicting the population level."
-    )
-    return(NA)
-  }
-  NULL
+  warnif(
+    isTRUE(include_random) && length(new) > 0,
+    "`include_random = TRUE`, but {collapse_comma(new)} in the data hold levels \\
+    the fit does not know; set `allow_new_levels = TRUE` to predict them. \\
+    Predicting the population level."
+  )
+  if (length(c(incomplete, new)) > 0) NA else NULL
+}
+
+.is_draw_count <- function(n, max) {
+  is.numeric(n) && length(n) == 1L && !is.na(n) && n == round(n) && n >= 1 && n <= max
 }
 
 # The parameters the fit estimates: those not fixed to a constant, or fixed by

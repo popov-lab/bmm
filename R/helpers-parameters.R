@@ -552,10 +552,28 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     "native_parameters() requires a bmmfit object, not an object of class \\
     {collapse_comma(class(x))}."
   )
+  x <- restructure(x)
   scale <- match.arg(scale)
+
+  model_pars <- .np_model_pars(x)
+  stopif(length(model_pars) == 0, "This model has no parameters defined.")
+  pars <- pars %||% setdiff(model_pars, internal_parameters(x$bmm$model))
+  unknown <- pars[not_in(pars, model_pars)]
+  stopif(
+    length(unknown) > 0,
+    "Unknown parameter(s) {collapse_comma(unknown)}. \\
+    The parameters of this model are {collapse_comma(model_pars)}."
+  )
+
   stopif(
     !is.numeric(prob) || length(prob) != 1L || is.na(prob) || prob <= 0 || prob >= 1,
     "'prob' must be a single number between 0 and 1, not {prob}."
+  )
+  stopif(
+    !is.null(ndraws) &&
+      (!is.numeric(ndraws) || length(ndraws) != 1L || is.na(ndraws) ||
+        ndraws < 1 || ndraws > brms::ndraws(x)),
+    "'ndraws' must be a single number between 1 and {brms::ndraws(x)}."
   )
 
   native <- .native_draw_matrices(x, newdata, pars, re_formula, scale, ndraws, draw_ids, list(...))
@@ -591,10 +609,10 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
 #' callers that need one matrix per parameter, such as the \pkg{insight} and
 #' \pkg{marginaleffects} methods, take the same draws.
 #'
-#' @param x A bmmfit object
+#' @param x A bmmfit object, restructured
 #' @param newdata User supplied prediction data, or `NULL` for the default grid
-#' @param pars Character vector of the requested parameters, or `NULL` for all
-#'   that are not internal
+#' @param pars Character vector of the requested parameters, all of them among
+#'   [.np_model_pars()]
 #' @param re_formula Passed to [brms::posterior_linpred()]
 #' @param scale `"native"` or `"sampling"`
 #' @param ndraws,draw_ids The draws to use, as in [native_parameters()]
@@ -605,31 +623,9 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
 #'
 #' @keywords internal
 #' @noRd
-.native_draw_matrices <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
-                                  scale = "native", ndraws = NULL, draw_ids = NULL,
-                                  dots = list()) {
-  x <- restructure(x)
-
-  model_pars <- setdiff(
-    names(x$bmm$model$parameters),
-    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
-  )
-  stopif(length(model_pars) == 0, "This model has no parameters defined.")
-  pars <- pars %||% setdiff(model_pars, internal_parameters(x$bmm$model))
-  unknown <- pars[not_in(pars, model_pars)]
-  stopif(
-    length(unknown) > 0,
-    "Unknown parameter(s) {collapse_comma(unknown)}. \\
-    The parameters of this model are {collapse_comma(model_pars)}."
-  )
-
-  stopif(
-    !is.null(ndraws) &&
-      (!is.numeric(ndraws) || length(ndraws) != 1L || is.na(ndraws) ||
-        ndraws < 1 || ndraws > brms::ndraws(x)),
-    "'ndraws' must be a single number between 1 and {brms::ndraws(x)}."
-  )
-
+.native_draw_matrices <- function(x, newdata, pars, re_formula, scale = "native",
+                                  ndraws = NULL, draw_ids = NULL, dots = list()) {
+  model_pars <- .np_model_pars(x)
   if (is.null(draw_ids)) {
     draw_ids <- if (is.null(ndraws)) {
       seq_len(brms::ndraws(x))
@@ -664,6 +660,25 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   list(
     draws = linpred[names(linpred) %in% pars], newdata = newdata,
     grid_vars = grid_vars, draw_ids = draw_ids
+  )
+}
+
+
+#' The parameters a fit can predict
+#'
+#' @description
+#' The model's parameters without the alternatives its formula left out, such
+#' as `bias` in a fit that estimates `criterion`.
+#'
+#' @param x A bmmfit object
+#' @return Character vector of parameter names
+#'
+#' @keywords internal
+#' @noRd
+.np_model_pars <- function(x) {
+  setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
   )
 }
 

@@ -58,12 +58,16 @@ test_that("the mixture weights are predicted after the joint softmax", {
   skip_if_not_installed("modelbased")
   fit <- load_fixture_fit("bmmfit_mixture3p.rds")
   grid <- data.frame(set_size = factor(c(1, 2, 4)))
-  thetant <- insight::get_predicted(fit, data = grid, predict = "thetant")
+  draws <- as.data.frame(fit)
+  target <- exp(draws[paste0("b_thetat_set_size", c(1, 2, 4))])
+  lure <- exp(draws[paste0("b_thetant_set_size", c(1, 2, 4))])
   # set size 1 has no non-target, so the model switches the component off
+  lure[[1]] <- 0
+  thetant <- insight::get_predicted(fit, data = grid, predict = "thetant")
+  expect_equal(unname(as.matrix(attr(thetant, "iterations"))), unname(t(lure / (1 + target + lure))))
   expect_identical(unname(unlist(attr(thetant, "iterations")[1, ])), rep(0, brms::ndraws(fit)))
   relation <- suppressMessages(modelbased::estimate_relation(fit, by = "set_size", predict = "thetat"))
-  expect_equal(relation$Predicted, native_means(fit, grid, "thetat"))
-  expect_true(all(relation$Predicted > 0.5 & relation$Predicted < 1))
+  expect_equal(relation$Predicted, unname(colMeans(target / (1 + target + lure))))
 })
 
 test_that("estimate_means() and estimate_contrasts() summarise the native draws", {
@@ -152,8 +156,11 @@ test_that("get_predicted() predicts the first parameter of several and warns", {
   skip_if_not_installed("insight")
   fit <- load_fixture_fit("bmmfit_example1.rds")
   grid <- data.frame(set_size = factor(1:4))
-  expect_warning(pred <- insight::get_predicted(fit, data = grid, predict = c("c", "kappa")), "'c'")
+  expect_warning(pred <- insight::get_predicted(fit, data = grid, predict = c("c", "kappa")),
+                 "`predict` takes one value; predicting 'c'")
   expect_identical(attr(pred, "predict"), "c")
+  expect_warning(insight::get_predicted(fit, data = grid, predict = NULL, type = c("kappa", "c")),
+                 "`type` takes one value; predicting 'kappa'")
 })
 
 test_that("get_predicted() takes newdata, type and centrality_function as insight does", {
@@ -179,13 +186,40 @@ test_that("get_predicted() takes newdata, type and centrality_function as insigh
 test_that("get_predicted() predicts from the number of draws in iterations", {
   skip_if_not_installed("insight")
   fit <- load_fixture_fit("bmmfit_example1.rds")
-  draws <- exp(as.data.frame(fit, variable = "b_c_set_size2")$b_c_set_size2)
+  grid <- data.frame(set_size = factor(1:4))
+  draws <- t(exp(as.matrix(as.data.frame(fit, variable = paste0("b_c_set_size", 1:4)))))
   withr::local_seed(11)
-  pred <- insight::get_predicted(fit, data = data.frame(set_size = factor(2, levels = 1:4)),
-                                 predict = "c", iterations = 10)
-  withr::local_seed(11)
-  ids <- sort(sample.int(length(draws), 10))
-  expect_equal(unname(unlist(attr(pred, "iterations"))), draws[ids])
+  sampled <- as.matrix(attr(insight::get_predicted(fit, data = grid, predict = "c", iterations = 10),
+                            "iterations"))
+  expect_identical(ncol(sampled), 10L)
+  matched <- apply(sampled, 2, function(d) which(colSums(abs(draws - d)) == 0))
+  expect_type(matched, "integer")
+  expect_length(unique(matched), 10)
+})
+
+test_that("get_predicted() and get_predict() refuse a count of draws that is not one", {
+  skip_if_not_installed("insight")
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  grid <- data.frame(set_size = factor(1:4))
+  for (iterations in list(0, 2.5, "a", NA, 1e6)) {
+    expect_error(insight::get_predicted(fit, data = grid, predict = "c", iterations = iterations),
+                 paste("`iterations` must be a whole number between 1 and", brms::ndraws(fit)), info = format(iterations))
+  }
+  expect_error(get_predict.bmmfit(fit, newdata = grid, dpar = "c", ndraws = 2.5),
+               paste("`ndraws` must be a whole number between 1 and", brms::ndraws(fit)))
+})
+
+test_that("get_predicted() and get_predict() refuse the alternative parameter the fit left out", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  skip_if_not_installed("insight")
+  withr::local_options(bmm.silent = 2)
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  fit <- suppressWarnings(bmm(bmf(d ~ 1, criterion ~ 1), dat, sdt_yn("n_old", "stimulus", "n_trials"),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  expect_error(insight::get_predicted(fit, data = dat, predict = "bias"),
+               "'bias' is not a parameter of this .* fit")
+  expect_error(get_predict.bmmfit(fit, newdata = dat, dpar = "bias"),
+               "'bias' is not a parameter of this .* fit")
 })
 
 test_that("a grouping factor at NA predicts the population level even with new levels allowed", {
@@ -203,6 +237,12 @@ test_that("get_predicted() warns when it drops the random effects asked for", {
   expect_warning(insight::get_predicted(fit, data = data.frame(nTrials = 40), predict = "D",
                                         include_random = TRUE), "no column 'id'")
   expect_warning(insight::get_predicted(fit, data = data.frame(nTrials = 40, id = "new"), predict = "D",
-                                        include_random = TRUE), "levels the fit does not know")
+                                        include_random = TRUE),
+                 "levels the fit does not know; set `allow_new_levels = TRUE`")
+  # addNA() makes NA a level, which anyNA() does not see
+  na_level <- data.frame(nTrials = 40, id = addNA(factor(NA, levels = 1:2)))
+  expect_warning(pred <- insight::get_predicted(fit, data = na_level, predict = "D", include_random = TRUE),
+                 "'id' in the data hold missing values")
+  expect_equal(as.numeric(pred), mean(stats::plogis(as.data.frame(fit, variable = "b_D_Intercept")$b_D_Intercept)))
   expect_no_warning(insight::get_predicted(fit, data = data.frame(nTrials = 40), predict = "D"))
 })
