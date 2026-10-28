@@ -64,7 +64,13 @@ restructure.bmmfit <- function(x, ...) {
     x$bmm$fit_args <- NULL
   }
 
-  if (restr_version < "0.4.5") {
+  # before 0.4.5, mixture2p, mixture3p and IMM were the models on a brms
+  # mixture family, and sdm the only other one. Told apart by the family,
+  # because fits from 0.4.3 and 0.4.4 still carry the IMM classes of 0.4.1
+  # (IMMbsc), which is_mixture_family_fit() does not know
+  if (restr_version < "0.4.5" && inherits(x$formula$family, "mixfamily")) {
+    x$bmm$model <- pre_0_4_5_mixture_family_model(x)
+  } else if (restr_version < "0.4.5") {
     prev_model <- x$bmm$model
     prev_model_name <- class(prev_model)[length(class(prev_model))]
     new_model <- get_model(prev_model_name)
@@ -150,6 +156,46 @@ fit_built_columns <- function(fit) {
     c(paste0("LureIdx", seq_along(model$other_vars$nt_features)), "inv_ss")
   }
   c(built_data_columns(model), old)
+}
+
+# A model object from before 0.4.5 has no links and no default priors, names
+# the response resp_err and the set size setsize, and gives the IMM version
+# only in its class or its version field. Rebuilding it with the current
+# constructor would declare the parameters of the custom family, which the
+# fit does not have, so it is brought into the layout of 0.4.8 as fitted:
+# the layout the extractors read and update() upgrades from
+pre_0_4_5_mixture_family_model <- function(x) {
+  model <- x$bmm$model
+  names(model$resp_vars)[names(model$resp_vars) == "resp_err"] <- "resp_error"
+  names(model$other_vars)[names(model$other_vars) == "setsize"] <- "set_size"
+  pars <- names(model$parameters)
+  # the links of 0.4.8, whose formulas parameterise the models as these fits do
+  model$links <- list(
+    mu1 = "tan_half", kappa = "log", thetat = "identity", thetant = "identity",
+    a = "identity", c = "identity", s = "log"
+  )[pars]
+  # the defaults that bmm 0.3.4 to 0.4.4 passed to brms, spelled as they were,
+  # because prior_info() compares them with the stored prior as strings
+  defaults <- list(
+    kappa = list(main = "normal(2,1)", effects = "normal(0,1)"),
+    thetat = list(main = "logistic(0, 1)"),
+    thetant = list(main = "logistic(0, 1)"),
+    a = list(main = "normal(0,1)", effects = "normal(0,1)"),
+    c = list(main = "normal(0,1)", effects = "normal(0,1)"),
+    s = list(main = "normal(0,1)", effects = "normal(0,1)")
+  )
+  model$default_priors <- defaults[intersect(pars, names(defaults))]
+  # the last component of the mixture is the guessing one, a technical
+  # parameter that prior_info() leaves out
+  guessing <- paste0(c("mu", "kappa"), length(x$formula$family$mix))
+  model$fixed_parameters[guessing] <- list(0, -100)
+  model <- update_model_fixed_parameters(model, x$bmm$user_formula)
+  name <- intersect(c("mixture2p", "mixture3p"), class(model))
+  if (length(name) == 0) {
+    name <- c("imm", paste0("imm_", model$version))
+  }
+  class(model) <- c("bmmodel", "vwm", if (name[1] != "mixture2p") "non_targets", name)
+  model
 }
 
 upgrade_mixture_family_model <- function(x) {
