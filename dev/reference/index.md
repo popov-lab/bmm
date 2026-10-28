@@ -34,6 +34,9 @@ Main functions for model fitting
 - [`update(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/update.bmmfit.md)
   : Update a bmm model
 
+- [`add_chains()`](https://venpopov.com/bmm/dev/reference/add_chains.md)
+  : Sample more chains for a fitted model
+
 - [`summary(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/summary.bmmfit.md)
   :
 
@@ -56,6 +59,10 @@ Main functions for model fitting
   [`link_function(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
   [`link_inverse(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-bmmfit.md)
   : easystats support for bmmfit objects
+
+- [`get_predicted(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/predicted-bmmfit.md)
+  [`get_predict(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/predicted-bmmfit.md)
+  : Predictions of a model parameter for easystats and marginaleffects
 
 - [`format_model(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)
   [`report_model(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/dev/reference/easystats-report-bmmfit.md)

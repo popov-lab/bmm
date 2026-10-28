@@ -79,7 +79,8 @@ total time across chains</p></li>
 one matrix per chain for <code>metric = "dense_e"</code></p></li>
 <li><p>"step_size": A list with one number per chain</p></li>
 </ul><p>Every chain of the fit is reported, also in a fit combined from several
-fits with <code><a href="https://paulbuerkner.com/brms/reference/combine_models.html" class="external-link">brms::combine_models()</a></code>. <code>NULL</code> is returned for what the sampler
+fits with <code><a href="https://paulbuerkner.com/brms/reference/combine_models.html" class="external-link">brms::combine_models()</a></code> or extended with <code><a href="add_chains.html">add_chains()</a></code>. <code>NULL</code>
+is returned for what the sampler
 did not record: anything for a fit without a stanfit or without chains,
 "time" and "time_mean" for variational and Laplace runs, "inv_metric" and
 "step_size" for any algorithm other than NUTS, and "inv_metric" for

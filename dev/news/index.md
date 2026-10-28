@@ -16,6 +16,18 @@
   functions failed on
   [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) and
   [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits.
+- `modelbased::estimate_means()`, `estimate_contrasts()` and
+  `estimate_relation()` with `predict = "<parameter>"` now return that
+  model parameter on its native scale, as
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+  does ([\#479](https://github.com/popov-lab/bmm/issues/479)). The
+  mixture weights are probabilities: `predict = "thetat"` gives the
+  probability of a target response. These calls failed on
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md),
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) and
+  [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) fits.
+  `insight::get_predicted()` without `predict` now predicts the first
+  estimated parameter and says which.
 - `report::report(fit)` now describes a bmm fit by the model’s name, its
   formula and the priors in bmm’s parameter names, with all response
   variables in one sentence
@@ -44,6 +56,16 @@
   sample sizes and divergent transitions as a table or a sentence. Fits
   now store the R version they ran in
   ([\#432](https://github.com/popov-lab/bmm/issues/432)).
+- New
+  [`add_chains()`](https://venpopov.com/bmm/dev/reference/add_chains.md)
+  samples more chains for a fitted model and returns one fit with all
+  chains;
+  [`fit_info()`](https://venpopov.com/bmm/dev/reference/fit_info.md)
+  reports each of them. Criteria added with
+  [`brms::add_criterion()`](https://paulbuerkner.com/brms/reference/add_criterion.html),
+  such as `loo`, are removed from the result, because they describe the
+  old chains only; add them again
+  ([\#555](https://github.com/popov-lab/bmm/issues/555)).
 
 #### Bug fixes
 

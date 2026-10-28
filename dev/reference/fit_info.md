@@ -46,7 +46,9 @@ returned.
 
 Every chain of the fit is reported, also in a fit combined from several
 fits with
-[`brms::combine_models()`](https://paulbuerkner.com/brms/reference/combine_models.html).
+[`brms::combine_models()`](https://paulbuerkner.com/brms/reference/combine_models.html)
+or extended with
+[`add_chains()`](https://venpopov.com/bmm/dev/reference/add_chains.md).
 `NULL` is returned for what the sampler did not record: anything for a
 fit without a stanfit or without chains, "time" and "time_mean" for
 variational and Laplace runs, "inv_metric" and "step_size" for any
