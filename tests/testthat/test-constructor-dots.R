@@ -9,6 +9,7 @@ constructor_calls <- function() {
   list(
     cswald = quote(cswald("rt", "resp")),
     ddm = quote(ddm("rt", "resp")),
+    ezcdm = quote(ezcdm("ma", "va", "m", "v", "n")),
     ezdm = quote(ezdm("m", "v", "u", "n")),
     imm = quote(imm("y", "nt", "d", 2)),
     IMMfull = quote(IMMfull("y", "nt", "d", 2)),

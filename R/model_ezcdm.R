@@ -172,6 +172,7 @@
 ezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials, links = NULL,
                   version = c("3par", "4par"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
   .model_ezcdm(
