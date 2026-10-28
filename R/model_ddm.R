@@ -138,6 +138,7 @@
 #' summary(fit)
 ddm <- function(rt, response, links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   .model_ddm(rt = rt, response = response,
              links = links, call = call, ...)
