@@ -251,6 +251,16 @@ posterior_epred_ddm <- function(prep) {
 }
 
 #############################################################################!
+# CREATE_INITFUN S3 method                                               ####
+#############################################################################!
+
+#' @export
+create_initfun.ddm <- function(model, data, formula, prior = NULL, ...) {
+  model$init_ranges$ndt <- .ndt_init_range(data[[model$resp_vars$rt]])
+  NextMethod()
+}
+
+#############################################################################!
 # PP_CHECK OBSERVABLES                                                    ####
 #############################################################################!
 
