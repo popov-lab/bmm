@@ -490,6 +490,14 @@ response_annotations <- function(model) {
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
   }
+  if (inherits(model, "psychometric")) {
+    response <- if (is.null(model$other_vars$n_trials)) {
+      "0/1 or logical per trial"
+    } else {
+      "count of positive responses per row"
+    }
+    return(list(response = response))
+  }
   list()
 }
 
@@ -559,6 +567,7 @@ model_groups <- c(
   "Categorical decision making, memory, and reasoning" = "Processing-tree models",
   "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
   "Recognition Memory" = "Detection, recognition and confidence judgments",
+  "Psychophysics" = "Psychometric functions",
   "Decision Making / Response times" = "Choices and response times"
 )
 
@@ -664,6 +673,13 @@ data_column_roles <- list(
   ),
   sdm = c(
     resp_error = "response error relative to the target, in radians"
+  ),
+  psychometric = c(
+    response = "0/1 response per trial, or the number of positive responses out of `n_trials`",
+    intensity = "stimulus intensity",
+    n_trials = "number of trials (optional; omit for one binary response per row)",
+    guess = "guess rate per row, e.g. 1 / m in m-AFC (optional; or one number, or estimated)",
+    lapse = "lapse rate per row (optional; or one number, or estimated)"
   ),
   sdt_cdp = c(
     response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",

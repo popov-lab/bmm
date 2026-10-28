@@ -18,6 +18,7 @@ constructor_calls <- function() {
     mixture2p = quote(mixture2p("y")),
     mixture3p = quote(mixture3p("y", nt_features = "x", set_size = 2)),
     mpt = bquote(mpt(.(tree))),
+    psychometric = quote(psychometric("y", "x")),
     sdm = quote(sdm("y")),
     sdmSimple = quote(sdmSimple("y")),
     sdt_cdp = quote(sdt_cdp(stimulus = "s", n_new = 2, n_old = 2)),
