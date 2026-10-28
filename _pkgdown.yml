@@ -45,6 +45,7 @@ reference:
     - "bmm"
     - "bmmformula"
     - "update.bmmfit"
+    - "add_chains"
     - "summary.bmmfit"
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
