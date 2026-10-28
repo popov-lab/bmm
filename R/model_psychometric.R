@@ -239,6 +239,7 @@ psychometric <- function(response, intensity, n_trials = NULL,
                                      "loglogistic"),
                          guess = NULL, lapse = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   sigmoid <- match.arg(sigmoid)
   rates <- list(guess = guess, lapse = lapse)
