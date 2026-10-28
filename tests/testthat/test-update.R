@@ -907,6 +907,23 @@ test_that("an updated fit carries nothing from the frame that called update()", 
   expect_equal(serialized_size(1e6), serialized_size(1))
 })
 
+test_that("update() fits a 3par ezcdm fit given a driftangle formula as 4par", {
+  skip_on_cran()
+  fit <- load_fixture_fit("bmmfit_ezcdm_ppcheck.rds")
+  expect_s3_class(fit$bmm$model, "ezcdm_3par")
+  # the fixture was fitted with silent = 2, which update() would keep
+  expect_message(
+    up <- update(fit, formula. = bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1),
+                 silent = 1, backend = "mock", mock_fit = 1, rename = FALSE),
+    "fitted as version '4par'"
+  )
+  expect_s3_class(up$bmm$model, "ezcdm_4par")
+  expect_identical(up$bmm$model$version, "4par")
+  expect_identical(attr(up$bmm$model, "call")$version, "4par")
+  expect_equal(constant_priors(up), 1)
+  expect_match(brms::stancode(up), "real Intercept_driftangle;", fixed = TRUE)
+})
+
 test_that("update() switches an SDT fit between criterion and bias", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   skip_if_not_installed("rstan")
@@ -941,7 +958,9 @@ test_that("update() switches an SDT fit between criterion and bias", {
 
 # models whose stored frame check_data() accepts as it is, so that update() has
 # nothing to route
-frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
+frame_is_user_layout <- c(
+  "cswald", "ddm", "ezcdm", "ezcdm_4par", "ezdm", "mixture2p", "mixture3p_set_size", "sdm"
+)
 
 for (case_name in names(stored_frame_cases())) {
   test_that(paste0("only a slice of a fit's model frame counts as stored data (", case_name, ")"), {

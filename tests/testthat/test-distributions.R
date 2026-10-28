@@ -2024,6 +2024,380 @@ test_that("dmpt and rmpt refuse a value given more than once", {
   expect_no_error(dmpt(c(7, 3), c(D = 0.5), model, "t", TRUE, NULL, 0.5, 0.6, G = 0.5))
 })
 
+# Tests for EZCDM distribution functions ---------------------------------------
+
+test_that("dezcdm runs without errors and returns a finite log-likelihood", {
+  ll <- dezcdm(
+    mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
+    n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
+  )
+  expect_type(ll, "double")
+  expect_length(ll, 1)
+  expect_true(is.finite(ll))
+})
+
+test_that("dezcdm log = FALSE is exp of log = TRUE", {
+  args <- list(
+    mean_angle = 0.1, var_angle = 0.4, mean_rt = 0.6, var_rt = 0.05,
+    n_trials = 10, drift = 1, bound = 1, ndt = 0.3
+  )
+  expect_equal(
+    do.call(dezcdm, c(args, log = FALSE)),
+    exp(do.call(dezcdm, c(args, log = TRUE)))
+  )
+})
+
+test_that("dezcdm is vectorized over observations and over parameter draws", {
+  obs <- data.frame(
+    mean_angle = c(0.1, -0.3, 2), var_angle = c(0.2, 0.5, 0.9),
+    mean_rt = c(0.8, 1, 1.2), var_rt = c(0.1, 0.2, 0.3), n_trials = c(50, 100, 20)
+  )
+  ll_vec <- dezcdm(
+    obs$mean_angle, obs$var_angle, obs$mean_rt, obs$var_rt, obs$n_trials,
+    drift = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3, log = TRUE
+  )
+  ll_loop <- vapply(seq_len(nrow(obs)), function(i) {
+    dezcdm(
+      obs$mean_angle[i], obs$var_angle[i], obs$mean_rt[i], obs$var_rt[i], obs$n_trials[i],
+      drift = 2, driftangle = 0.2, bound = 1.5, ndt = 0.3, log = TRUE
+    )
+  }, numeric(1))
+  expect_equal(ll_vec, ll_loop)
+
+  draws <- c(1, 2, 3)
+  ll_draws <- dezcdm(0.1, 0.2, 0.8, 0.1, 50, drift = draws, bound = 1.5, ndt = 0.3, log = TRUE)
+  ll_draws_loop <- vapply(draws, function(v) {
+    dezcdm(0.1, 0.2, 0.8, 0.1, 50, drift = v, bound = 1.5, ndt = 0.3, log = TRUE)
+  }, numeric(1))
+  expect_equal(ll_draws, ll_draws_loop)
+})
+
+test_that("dezcdm angle term is the exact von Mises log-likelihood of the trials", {
+  withr::local_seed(2024)
+  pars <- list(drift = 1.7, driftangle = 0.4, bound = 1.2, ndt = 0.25)
+  kappa <- pars$bound * pars$drift
+  theta <- brms::rvon_mises(80, pars$driftangle, kappa)
+  summary <- .circular_summary(theta)
+  mean_rt <- 0.9
+  var_rt <- 0.2
+  n <- length(theta)
+
+  moments <- .ezcdm_moments(pars$drift, pars$bound, pars$ndt)
+  rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n)
+  rt_terms <- stats::dgamma(var_rt, rt$shape, rt$rate, log = TRUE) +
+    stats::dnorm(mean_rt, moments$MRT + rt$slope * (var_rt - moments$VRT), rt$sd, log = TRUE)
+  angle_term <- dezcdm(
+    summary$mean_angle, summary$var_angle, mean_rt, var_rt, n,
+    drift = pars$drift, driftangle = pars$driftangle,
+    bound = pars$bound, ndt = pars$ndt, log = TRUE
+  ) - rt_terms
+
+  expect_equal(
+    angle_term,
+    sum(brms::dvon_mises(theta, pars$driftangle, kappa, log = TRUE)) + n * log(2 * pi)
+  )
+})
+
+test_that(".ezcdm_moments matches the first-passage Laplace transform", {
+  # E[exp(-sT)] = I0(a v) / I0(a sqrt(2 s + v^2)); moments by central differences
+  laplace <- function(s, a, v) {
+    exp(a * v - a * sqrt(2 * s + v^2)) *
+      besselI(a * v, 0, TRUE) / besselI(a * sqrt(2 * s + v^2), 0, TRUE)
+  }
+  h <- 1e-4
+  for (p in list(c(a = 1, v = 2), c(a = 2, v = 1), c(a = 1.5, v = 0.5), c(a = 3, v = 3))) {
+    m1 <- -(laplace(h, p["a"], p["v"]) - laplace(-h, p["a"], p["v"])) / (2 * h)
+    m2 <- (laplace(h, p["a"], p["v"]) - 2 + laplace(-h, p["a"], p["v"])) / h^2
+    moments <- .ezcdm_moments(p["v"], p["a"], ndt = 0)
+    expect_equal(unname(moments$MRT), unname(m1), tolerance = 1e-6)
+    expect_equal(unname(moments$VRT), unname(m2 - m1^2), tolerance = 1e-5)
+  }
+})
+
+test_that(".ezcdm_moments reaches the zero-drift limits", {
+  moments <- .ezcdm_moments(drift = 1e-6, bound = 1.3, ndt = 0.2)
+  expect_equal(moments$MRT, 0.2 + 1.3^2 / 2)
+  expect_equal(moments$VRT, 1.3^4 / 8)
+})
+
+test_that(".ezcdm_moments small-kappa series matches high-precision references", {
+  # 60-digit mpmath values of R = I1/I0 and (R^2 - 1 + 2R/kappa) / kappa^2 at
+  # kappa = 0.0099, just inside the series branch; with bound = 1, VRT is the
+  # latter. Dropping the kappa^4 term of the variance series errs by 8e-10
+  moments <- .ezcdm_moments(drift = 0.0099, bound = 1, ndt = 0)
+  expect_equal(moments$R, 0.004949939357303097948227113, tolerance = 1e-14)
+  expect_equal(moments$VRT, 0.1249959163531866953783885, tolerance = 1e-13)
+})
+
+test_that(".ezcdm_moments k4 matches high-precision references in every branch", {
+  # 60-digit mpmath values of the fourth derivative at 0 of
+  # K(l) = log I0(a v) - log I0(a sqrt(v^2 + 2 l)); kappa = a v covers the
+  # small-kappa series, the closed form and the asymptotic series
+  ref <- data.frame(
+    a = c(0.5, 1, 1, 1.5, 1.8, 3, 2, 4, 2.5),
+    v = c(0.02, 0.05, 0.5, 2, 1.5, 3, 10, 50, 320),
+    k4 = c(
+      0.0003356701670180080061, 0.085789222748270863285, 0.072568765521756091338,
+      0.052584022947964774569, 0.36764406706077275354, 0.016629217455392289592,
+      2.7527454971494603793e-6, 7.618390443994564079e-11, 1.0892093592819363706e-16
+    )
+  )
+  moments <- .ezcdm_moments(ref$v, ref$a, ndt = 0)
+  # elementwise: expect_equal() scales by the mean reference, which the
+  # small-kappa values set, so the asymptotic ones would go unchecked
+  expect_lt(max(abs(moments$k4 / ref$k4 - 1)), 1e-10)
+})
+
+test_that(".ezcdm_moments k4 reaches the zero-drift limit", {
+  # log I0(z) = z^2/4 - z^4/64 + z^6/576 - 11 z^8/49152 + ...  gives k4 = 11 a^8 / 128
+  moments <- .ezcdm_moments(drift = 1e-6, bound = 1.3, ndt = 0.2)
+  expect_equal(moments$k4, 11 * 1.3^8 / 128)
+})
+
+test_that(".ezcdm_moments k4 is continuous across its series branches", {
+  for (kappa in c(0.25, 100)) {
+    below <- .ezcdm_moments(drift = kappa * (1 - 1e-12), bound = 1, ndt = 0)$k4
+    above <- .ezcdm_moments(drift = kappa * (1 + 1e-12), bound = 1, ndt = 0)$k4
+    expect_lt(abs(above / below - 1), 1e-9)
+  }
+})
+
+test_that(".ezcdm_moments k3 matches high-precision references in every branch", {
+  # 60-digit mpmath values of minus the third derivative at 0 of
+  # K(l) = log I0(a v) - log I0(a sqrt(v^2 + 2 l)); kappa = a v from 0.01 to 5000
+  # covers the small-kappa series, the closed form and the asymptotic series
+  ref <- data.frame(
+    a = c(0.5, 1, 0.4, 1, 1.8, 1.5, 3, 2, 1.2, 4, 2.5, 2),
+    v = c(0.02, 0.05, 0.5, 0.5, 1.5, 2, 3, 10, 50, 50, 320, 2500),
+    k3 = c(
+      0.001302016196980727444719, 0.08322600416498629405255, 0.0003343895036682916188472,
+      0.073456137602591188782, 0.2548940767246537981923, 0.05976258840288373705414,
+      0.03119349519173859704521, 0.00005589774778980381167081, 1.126194453909258777992e-8,
+      3.814339514451903375109e-8, 2.231446701613348675612e-12, 6.142361446350825587212e-17
+    )
+  )
+  moments <- .ezcdm_moments(ref$v, ref$a, ndt = 0)
+  expect_lt(max(abs(moments$k3 / ref$k3 - 1)), 1e-11)
+})
+
+test_that(".ezcdm_moments k3 reaches the zero-drift limit", {
+  # log I0(z) = z^2/4 - z^4/64 + z^6/576 - ...  gives k3 = a^6 / 12
+  moments <- .ezcdm_moments(drift = 1e-6, bound = 1.3, ndt = 0.2)
+  expect_equal(moments$k3, 1.3^6 / 12)
+})
+
+test_that(".ezcdm_moments k3 is continuous across its series branches", {
+  for (kappa in c(0.25, 100)) {
+    below <- .ezcdm_moments(drift = kappa * (1 - 1e-12), bound = 1, ndt = 0)$k3
+    above <- .ezcdm_moments(drift = kappa * (1 + 1e-12), bound = 1, ndt = 0)$k3
+    expect_lt(abs(above / below - 1), 1e-10)
+  }
+})
+
+test_that(".ezcdm_moments large-kappa expansion matches 50-digit Bessel references", {
+  # log I0(kappa) and I1/I0 from mpmath with 50 significant digits
+  ref <- data.frame(
+    kappa = c(1e3, 1e4, 2e5, 1e6),
+    log_I0 = c(995.627308889869464671467764481, 9994.47590378143230100450870026,
+               199992.97802576903180290160416, 999992.1733063128132527062308),
+    R = c(0.999499874874804280198918174348, 0.999949998749874980464686451826,
+          0.999997499996874984374877928418, 0.999999499999874999874999804687)
+  )
+  moments <- .ezcdm_moments(drift = ref$kappa, bound = 1, ndt = 0)
+  expect_lt(max(abs(moments$log_I0 / ref$log_I0 - 1)), 1e-14)
+  expect_lt(max(abs(moments$R / ref$R - 1)), 1e-14)
+
+  below <- .ezcdm_moments(drift = 1000 * (1 - 1e-12), bound = 1, ndt = 0)
+  above <- .ezcdm_moments(drift = 1000 * (1 + 1e-12), bound = 1, ndt = 0)
+  expect_lt(abs(above$R / below$R - 1), 1e-12)
+  expect_lt(abs(above$VRT / below$VRT - 1), 1e-9)
+})
+
+test_that(".ezcdm_moments stays finite at extreme drift rates", {
+  # drift = 0 stands in for exp() of a very negative linear predictor
+  tiny <- .ezcdm_moments(drift = c(0, 1e-300, 1e-200), bound = 1.5, ndt = 0.3)
+  expect_true(all(vapply(tiny, function(x) all(is.finite(x)), logical(1))))
+  expect_equal(tiny$VRT, rep(1.5^4 / 8, 3))
+  expect_equal(tiny$MRT, rep(0.3 + 1.5^2 / 2, 3))
+
+  huge <- .ezcdm_moments(drift = c(1e6, 1e8), bound = 1, ndt = 0.3)
+  expect_true(all(vapply(huge, function(x) all(is.finite(x)), logical(1))))
+  expect_true(is.finite(dezcdm(0.1, 0.2, 0.9, 0.1, 100, drift = 1e-300, bound = 1, ndt = 0.3, log = TRUE)))
+  expect_true(is.finite(dezcdm(0.1, 0.2, 0.3, 1e-12, 100, drift = 1e3, bound = 1e3, ndt = 0.3, log = TRUE)))
+})
+
+test_that("the skew bounds quoted in ?ezcdm_dist hold over the kappa range", {
+  kappa <- 10^seq(-4, 5, length.out = 400)
+  # drift = bound = sqrt(kappa) fixes tau = 1; the ratios do not depend on tau
+  moments <- .ezcdm_moments(drift = sqrt(kappa), bound = sqrt(kappa), ndt = 0)
+  excess <- moments$k4 / moments$VRT^2
+  # large-n limits: Var(var_rt) relative to the normal-RT value, and Cor(mean_rt, var_rt)
+  variance_ratio <- 1 + excess / 2
+  correlation <- moments$k3 / sqrt(moments$VRT * (moments$k4 + 2 * moments$VRT^2))
+
+  expect_true(all(excess >= 0))
+  expect_equal(max(3 + excess), 8.5, tolerance = 1e-3)
+  expect_lte(max(3 + excess), 8.5)
+  expect_equal(max(variance_ratio), 3.75, tolerance = 1e-3)
+  expect_lte(max(variance_ratio), 3.75)
+  expect_gt(max(correlation), 0.68)
+  expect_lt(max(correlation), 0.69)
+})
+
+test_that("the conditional sd of mean_rt is positive over the kappa range", {
+  kappa <- 10^seq(-8, 5, length.out = 300)
+  moments <- .ezcdm_moments(drift = kappa, bound = 1, ndt = 0)
+  for (n in c(3, 10, 1000)) {
+    rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, n)
+    expect_true(all(is.finite(rt$sd) & rt$sd^2 > 0.5 * moments$VRT / n))
+  }
+})
+
+test_that("dezcdm with k3 = 0 is the product of independent mean_rt and var_rt terms", {
+  moments_full <- .ezcdm_moments
+  local_mocked_bindings(.ezcdm_moments = function(...) {
+    moments <- moments_full(...)
+    moments$k3 <- 0 * moments$k3
+    moments
+  })
+  obs <- data.frame(mean_angle = c(0.1, -0.4), var_angle = c(0.2, 0.5), mean_rt = c(0.9, 1.4),
+                    var_rt = c(0.1, 0.35), n_trials = c(100, 20))
+  pars <- list(drift = c(2, 0.7), driftangle = 0.1, bound = c(1.5, 2.2), ndt = 0.3)
+  ll <- dezcdm(obs$mean_angle, obs$var_angle, obs$mean_rt, obs$var_rt, obs$n_trials,
+               drift = pars$drift, driftangle = pars$driftangle,
+               bound = pars$bound, ndt = pars$ndt, log = TRUE)
+
+  moments <- moments_full(pars$drift, pars$bound, pars$ndt)
+  W <- moments$k4 / obs$n_trials + 2 * moments$VRT^2 / (obs$n_trials - 1)
+  independent <- obs$n_trials * (moments$kappa * (1 - obs$var_angle) *
+    cos(obs$mean_angle - pars$driftangle) - moments$log_I0) +
+    stats::dnorm(obs$mean_rt, moments$MRT, sqrt(moments$VRT / obs$n_trials), log = TRUE) +
+    stats::dgamma(obs$var_rt, moments$VRT^2 / W, moments$VRT / W, log = TRUE)
+  expect_equal(ll, independent)
+})
+
+test_that("dezcdm is continuous across the small-kappa branch", {
+  ll <- function(drift) {
+    dezcdm(0.1, 0.9, 0.8, 0.125, 100, drift = drift, bound = 1, ndt = 0.3, log = TRUE)
+  }
+  below <- ll(0.01 * (1 - 1e-9))
+  above <- ll(0.01 * (1 + 1e-9))
+  expect_true(is.finite(below) && is.finite(above))
+  expect_lt(abs(below - above), 1e-6)
+})
+
+test_that("dezcdm validates parameters", {
+  args <- list(
+    mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
+    n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
+  )
+  bad <- function(...) do.call(dezcdm, utils::modifyList(args, list(...)))
+  expect_error(bad(drift = 0), "drift must be positive")
+  expect_error(bad(bound = -1), "bound must be positive")
+  expect_error(bad(ndt = 0), "ndt must be positive")
+  expect_error(bad(n_trials = 2), "n_trials must be larger than 2")
+  expect_error(bad(n_trials = 2.5), "n_trials must be whole numbers")
+  expect_error(bad(var_angle = 1.1), "var_angle must be between 0 and 1")
+  expect_error(bad(var_angle = -0.1), "var_angle must be between 0 and 1")
+  expect_error(bad(var_rt = 0), "var_rt must be positive")
+})
+
+test_that("dezcdm propagates NA parameters row by row", {
+  ll <- function(...) dezcdm(0.1, 0.2, 0.9, 0.1, 100, ..., log = TRUE)
+  reference <- ll(drift = 2, bound = 1.5, ndt = 0.3)
+  expect_equal(ll(drift = c(NA, 2), bound = 1.5, ndt = 0.3), c(NA, reference))
+  expect_equal(ll(drift = 2, bound = c(1.5, NA), ndt = 0.3), c(reference, NA))
+  expect_equal(ll(drift = 2, bound = 1.5, ndt = c(NA, 0.3)), c(NA, reference))
+  expect_equal(ll(drift = 2, bound = 1.5, ndt = 0.3, driftangle = c(0, NA)), c(reference, NA))
+  # next to a kappa in each of the series and asymptotic branches
+  drift <- c(0.001, 0.1, 200, 2000)
+  expect_equal(ll(drift = c(NA, drift), bound = 1, ndt = 0.3), c(NA, ll(drift = drift, bound = 1, ndt = 0.3)))
+})
+
+test_that("rezcdm returns plausible summary statistics", {
+  withr::local_seed(123)
+  sim <- rezcdm(n = 200, n_trials = 50, drift = 2, driftangle = 0.5, bound = 1.5, ndt = 0.3)
+
+  expect_s3_class(sim, "data.frame")
+  expect_equal(nrow(sim), 200)
+  expect_named(sim, c("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials"))
+  expect_true(all(sim$mean_rt > 0.3))
+  expect_true(all(sim$var_angle >= 0 & sim$var_angle <= 1))
+  expect_true(all(sim$var_rt > 0))
+  expect_true(all(abs(sim$mean_angle) <= pi))
+  expect_true(all(sim$n_trials == 50))
+})
+
+test_that("rezcdm reproduces the moments used by dezcdm", {
+  withr::local_seed(99)
+  pars <- list(drift = 1.5, driftangle = -0.6, bound = 2, ndt = 0.2)
+  n_trials <- 40
+  sim <- do.call(rezcdm, c(list(n = 4000, n_trials = n_trials), pars))
+  moments <- .ezcdm_moments(pars$drift, pars$bound, pars$ndt)
+
+  expect_equal(mean(sim$mean_rt), moments$MRT, tolerance = 0.01)
+  expect_equal(mean(sim$var_rt), moments$VRT, tolerance = 0.02)
+  # ratios: the second moments lie below their tolerance, where expect_equal()
+  # compares absolute differences and a flipped covariance would pass
+  expect_equal(var(sim$mean_rt) / (moments$VRT / n_trials), 1, tolerance = 0.05)
+  expect_equal(
+    var(sim$var_rt) / (moments$k4 / n_trials + 2 * moments$VRT^2 / (n_trials - 1)),
+    1,
+    tolerance = 0.1
+  )
+  expect_equal(cov(sim$mean_rt, sim$var_rt) / (moments$k3 / n_trials), 1, tolerance = 0.1)
+  resultant <- mean((1 - sim$var_angle) * cos(sim$mean_angle - pars$driftangle))
+  expect_equal(atan2(mean(sin(sim$mean_angle)), mean(cos(sim$mean_angle))), pars$driftangle, tolerance = 0.02)
+  expect_equal(resultant, moments$R, tolerance = 0.02)
+})
+
+test_that("rezcdm does not truncate mean_rt, and values below ndt stay rare", {
+  withr::local_seed(11)
+  sim <- rezcdm(n = 20000, n_trials = 3, drift = 0.03, bound = 0.03, ndt = 0.3)
+  below <- mean(sim$mean_rt < 0.3)
+  expect_gt(below, 0)
+  expect_lt(below, 0.005)
+})
+
+test_that("rezcdm recycles parameters and n_trials across replicates", {
+  withr::local_seed(1)
+  sim <- rezcdm(n = 4000, n_trials = c(10, 20), drift = c(1, 3), bound = 1, ndt = c(0.2, 0.6))
+  expect_equal(sim$n_trials[1:4], c(10, 20, 10, 20))
+  odd <- seq(1, 4000, by = 2)
+  moments <- .ezcdm_moments(drift = c(1, 3), bound = 1, ndt = c(0.2, 0.6))
+  # MRT 0.65 vs 0.87 (drift and ndt), VRT 0.092 vs 0.022 (drift alone)
+  expect_equal(mean(sim$mean_rt[odd]), moments$MRT[1], tolerance = 0.01)
+  expect_equal(mean(sim$mean_rt[-odd]), moments$MRT[2], tolerance = 0.01)
+  expect_equal(mean(sim$var_rt[odd]) / moments$VRT[1], 1, tolerance = 0.05)
+  expect_equal(mean(sim$var_rt[-odd]) / moments$VRT[2], 1, tolerance = 0.05)
+})
+
+test_that("rezcdm returns NA summaries for NA parameters", {
+  withr::local_seed(2)
+  sim <- suppressWarnings(rezcdm(n = 2, n_trials = 20, drift = c(NA, 2), bound = 1.5, ndt = 0.3))
+  expect_true(all(is.na(sim[1, c("mean_angle", "var_angle", "mean_rt", "var_rt")])))
+  expect_true(all(is.finite(unlist(sim[2, ]))))
+})
+
+test_that("rezcdm validates parameters", {
+  expect_error(rezcdm(n = c(1, 2), n_trials = 10, drift = 1, bound = 1, ndt = 0.3), "n must be")
+  expect_error(rezcdm(n = 5, n_trials = 2, drift = 1, bound = 1, ndt = 0.3), "n_trials must be larger than 2")
+  expect_error(rezcdm(n = 5, n_trials = 10.5, drift = 1, bound = 1, ndt = 0.3), "whole numbers")
+  expect_error(rezcdm(n = 2, n_trials = c(10, NA), drift = 1, bound = 1, ndt = 0.3), "missing values")
+  expect_error(rezcdm(n = 5, n_trials = 10, drift = -1, bound = 1, ndt = 0.3), "drift must be positive")
+  expect_error(rezcdm(n = 5, n_trials = 10, drift = 1, bound = 0, ndt = 0.3), "bound must be positive")
+  expect_error(rezcdm(n = 5, n_trials = 10, drift = 1, bound = 1, ndt = 0), "ndt must be positive")
+})
+
+test_that(".vm_kappa_from_R() inverts the mean resultant length", {
+  kappa <- c(0.05, 0.5, 2, 8, 50, 500)
+  R <- besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
+  expect_equal(vapply(R, .vm_kappa_from_R, numeric(1)), kappa, tolerance = 1e-6)
+  expect_equal(.vm_kappa_from_R(0), 0)
+  expect_equal(.vm_kappa_from_R(-1), 0)
+  expect_lte(.vm_kappa_from_R(1), 1e4)
+})
+
 # Tests for the ezdm decision-time cumulants (issue #407) ----------------------
 
 # Reference values from local/ezdm/k34_derivation.py: the cumulants of the
@@ -2397,6 +2771,10 @@ log_default_calls <- function() {
     dezdm = quote(dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
       drift = 2, bound = 1.5, ndt = 0.3
+    )),
+    dezcdm = quote(dezcdm(
+      mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1,
+      n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3
     )),
     dsdm = quote(dsdm(0.3, mu = 0, c = 3, kappa = 3.5)),
     dmixture2p = quote(dmixture2p(0.3)),

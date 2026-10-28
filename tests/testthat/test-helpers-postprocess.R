@@ -70,6 +70,15 @@ test_that("circular models saved under their pre-1.0.1 class refuse as well", {
   expect_false(expected_response_defined(fit$bmm$model))
 })
 
+test_that("posterior_epred() and fitted() refuse ezcdm and point to native_parameters()", {
+  fit <- load_fixture_fit("bmmfit_ezcdm_ppcheck.rds")
+  expect_error(brms::posterior_epred(fit, ndraws = 5),
+               "not defined for the ezcdm model; use native_parameters()")
+  expect_error(fitted(fit, ndraws = 5), "not defined for the ezcdm model")
+  expect_equal(dim(brms::posterior_epred(fit, dpar = "drift", ndraws = 5)),
+               c(5L, nrow(fit$data)))
+})
+
 test_that("fitted() refuses the circular models like posterior_epred()", {
   fit <- load_fixture_fit("mock_bmmfit_mixture2p.rds")
   # brms computes fitted() on a prep object, where posterior_epred.bmmfit()
