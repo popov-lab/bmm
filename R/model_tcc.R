@@ -207,6 +207,11 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+built_data_columns.tcc <- function(model) {
+  c("tcc_bin", NextMethod("built_data_columns"))
+}
+
 #' @export
 check_data.tcc <- function(model, data, formula) {
   resp <- model$resp_vars$resp_error
