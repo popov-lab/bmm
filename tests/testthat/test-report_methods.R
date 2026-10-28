@@ -58,7 +58,7 @@ expected_model_text <- function(fit) {
   i_bmm <- n_model + 1
   i_brms <- i_bmm + seq_len(n_brms)
   i_backend <- max(i_brms) + 1
-  name <- sub("^The ", "", model$name)
+  name <- sub("\\.$", "", sub("^The ", "", model$name))
   version <- if (all(model$version %in% c(NA, "NA", ""))) "" else paste0(", version \"", model$version, "\",")
   r_version <- if (is.null(fit$version$R)) "" else paste0(" (version ", fit$version$R, ")")
   chains <- sim$chains
