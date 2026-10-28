@@ -188,31 +188,33 @@ if (make("mock_bmmfit_m3.rds")) {
   )
 }
 
-# A fit saved by bmm 0.2.1 (February 2024), for restructure() of old fits.
-# It is cut from a reference fit that lived in tests/internal until #422,
-# read from the git history so that this block still runs after their
-# deletion: one chain of 200 draws, without the compiled model and the
-# sampler instance. Its custom family's environment held the whole frame of
-# the 0.2.1 fitting call; restructure() reads only the model and the
-# formula from it, so only those stay, with the formulas detached from the
-# frames they were written in
-if (make("bmmfit_legacy_sdm_v0.2.1.rds")) {
-  source_commit <- "6870f5d69ba94430192e6947cda6fb1b5d0fd744"
-  source_path <- "tests/internal/ref_fits/20240215_v0.2.1_sdmSimple_seed-365_d406b23125.rds"
+# The legacy fits below are cut from reference fits that lived in
+# tests/internal until #422, read from the git history so that their blocks
+# still run after the folder's deletion: one chain of 200 draws, without the
+# compiled model and the sampler instance, with the formulas detached from
+# the frames they were written in
+read_from_history <- function(commit, path) {
   blob <- tempfile(fileext = ".rds")
-  stopifnot(system2("git", c("show", paste0(source_commit, ":", source_path)), stdout = blob) == 0)
-  legacy <- readRDS(blob)
+  stopifnot(system2("git", c("show", paste0(commit, ":", path)), stdout = blob) == 0)
+  readRDS(blob)
+}
 
+# Subsetting the rows of a data frame drops its other attributes, which carry
+# the sampler parameters of a chain and the terms of a model frame, so they
+# are put back
+keep_rows <- function(x, rows) {
+  extra <- attributes(x)[setdiff(names(attributes(x)), c("names", "row.names", "class"))]
+  cut <- x[rows, , drop = FALSE]
+  attributes(cut)[names(extra)] <- extra
+  cut
+}
+
+cut_to_one_chain <- function(legacy) {
   sim <- legacy$fit@sim
   keep <- seq_len(200)
-  # rstan 2.21 stores a chain as a data frame whose attributes carry the
-  # sampler parameters; subsetting the rows drops them, so they are put back
-  chain <- sim$samples[[1]]
-  extra <- attributes(chain)[setdiff(names(attributes(chain)), c("names", "row.names", "class"))]
-  extra$sampler_params <- lapply(extra$sampler_params, `[`, keep)
-  cut <- chain[keep, , drop = FALSE]
-  attributes(cut)[names(extra)] <- extra
-  sim$samples <- list(cut)
+  chain <- keep_rows(sim$samples[[1]], keep)
+  attr(chain, "sampler_params") <- lapply(attr(chain, "sampler_params"), `[`, keep)
+  sim$samples <- list(chain)
   sim$chains <- 1L
   sim$n_save <- length(keep)
   sim$warmup2 <- 0L
@@ -222,14 +224,28 @@ if (make("bmmfit_legacy_sdm_v0.2.1.rds")) {
   legacy$fit@stan_args <- legacy$fit@stan_args[1]
   legacy$fit@inits <- legacy$fit@inits[1]
   legacy$fit@stanmodel <- methods::new("stanmodel")
-  legacy$fit@.MISC <- new.env()
+  # a new environment would otherwise enclose this frame, and with it the
+  # whole source fit
+  legacy$fit@.MISC <- new.env(parent = globalenv())
+  legacy
+}
 
-  detach_formulas <- function(x) {
-    rapply(x, function(f) {
-      environment(f) <- globalenv()
-      f
-    }, classes = "formula", how = "replace")
-  }
+detach_formulas <- function(x) {
+  rapply(x, function(f) {
+    environment(f) <- globalenv()
+    f
+  }, classes = "formula", how = "replace")
+}
+
+# A fit saved by bmm 0.2.1 (February 2024), for restructure() of old fits.
+# Its custom family's environment held the whole frame of the 0.2.1 fitting
+# call; restructure() reads only the model and the formula from it, so only
+# those stay
+if (make("bmmfit_legacy_sdm_v0.2.1.rds")) {
+  legacy <- cut_to_one_chain(read_from_history(
+    "6870f5d69ba94430192e6947cda6fb1b5d0fd744",
+    "tests/internal/ref_fits/20240215_v0.2.1_sdmSimple_seed-365_d406b23125.rds"
+  ))
   old_env <- legacy$family$env
   env <- new.env(parent = globalenv())
   env$model <- old_env$model
@@ -242,6 +258,47 @@ if (make("bmmfit_legacy_sdm_v0.2.1.rds")) {
   legacy$formula$family$env <- env
   attr(attr(legacy$data, "terms"), ".Environment") <- globalenv()
   save_fixture(legacy, "bmmfit_legacy_sdm_v0.2.1.rds", seed = 365)
+}
+
+# A fit saved by bmm 0.4.1.9000 (March 2024), for restructure() of fits made
+# before 0.4.5 on a brms mixture family: its model object names the set size
+# `setsize` and the IMM version in its class only. Fitted to 4000 rows, of
+# which the first 50 per set size stay, in both copies of the data
+if (make("bmmfit_legacy_imm_bsc_v0.4.1.rds")) {
+  legacy <- cut_to_one_chain(read_from_history(
+    "4e498c413041b39f1f9fe87be99d398a416c46cd",
+    "tests/internal/ref_fits0301/fit_objects_0.4.1.9000_seed-365_20240215.rds"
+  )$IMMbsc)
+  rows <- unlist(lapply(split(seq_len(nrow(legacy$data)), legacy$data$SetSize), utils::head, 50))
+  legacy$data <- keep_rows(legacy$data, rows)
+  legacy$bmm$fit_args$data <- keep_rows(legacy$bmm$fit_args$data, rows)
+  # the link functions of each mixture component carry the source references
+  # of brms 2.20 and enclose the frame of its family constructor, 2 MB per
+  # copy of the family; they keep only the link they apply
+  slim_link_functions <- function(family) {
+    family$mix <- lapply(family$mix, function(component) {
+      frame <- list2env(
+        list(slink = environment(component$linkfun)$slink), parent = asNamespace("brms")
+      )
+      for (fun in c("linkfun", "linkinv")) {
+        component[[fun]] <- utils::removeSource(component[[fun]])
+        environment(component[[fun]]) <- frame
+      }
+      component
+    })
+    family
+  }
+  legacy$family <- slim_link_functions(legacy$family)
+  legacy$formula$family <- slim_link_functions(legacy$formula$family)
+  legacy$bmm$fit_args$family <- slim_link_functions(legacy$bmm$fit_args$family)
+  for (formula in list(c("formula"), c("bmm", "fit_args", "formula"))) {
+    legacy[[formula]] <- structure(
+      detach_formulas(unclass(legacy[[formula]])), class = class(legacy[[formula]])
+    )
+  }
+  attr(attr(legacy$data, "terms"), ".Environment") <- globalenv()
+  attr(attr(legacy$bmm$fit_args$data, "terms"), ".Environment") <- globalenv()
+  save_fixture(legacy, "bmmfit_legacy_imm_bsc_v0.4.1.rds", seed = 365)
 }
 
 # circmix_reference_loglik.rds (#434) is frozen, not generated: it holds the
