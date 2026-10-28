@@ -116,6 +116,24 @@
 #' @title `r .model_cswald()$name`
 #' @name cswald
 #' @details `r model_docs(.model_cswald())`
+#'
+#' #### The prior for `ndt` and the fastest response
+#' `ndt` has to stay below every response the model fits: all responses in
+#' version `"crisk"`, the correct ones in `"simple"`, which censors errors.
+#' `bmm()` and `update()` warn when more than half of the prior for `ndt` lies
+#' at or above the fastest of these responses. Sampling can then fail to
+#' start, and the data pull `ndt` down against the prior. With the default
+#' prior, `normal(-2, 0.3)` on the log scale, this happens when the fastest
+#' response is faster than 0.135 s. Set a prior with a lower location, as the
+#' warning suggests, or filter out anticipations. The check reads `normal()`
+#' and `student_t()` priors on the intercept of `ndt`, or on each cell of a
+#' formula without an intercept such as `ndt ~ 0 + cond`; other priors and
+#' designs are not checked, and neither are truncated priors or the links
+#' `"inverse"` and `"logm1"`. In a formula with other fixed effects, such as
+#' `ndt ~ 1 + cond`, the prior on the intercept is the prior on the centred
+#' intercept (the grand mean), and the check compares it with the fastest
+#' response overall. `update()` with `init` or `inits` skips the check, while
+#' `bmm()` with `init` still runs it.
 #' @param rt The name of the variable in the dataset containing the response
 #'   times. Response times should be coded in seconds (not milliseconds).
 #' @param response The name of the variable in the dataset containing the
@@ -404,7 +422,173 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
 create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
   rt <- data[[model$resp_vars$rt]]
   model$init_ranges$ndt <- c(0.4, 0.6) * min(rt[rt > 0])
+  # the first step of bmm() and update() that sees both the data and the prior
+  # brms will use
+  .warn_ndt_prior_conflict(model, data, formula, prior)
   NextMethod()
+}
+
+# A prior with most of its mass where the likelihood is -Inf fights the data
+# (#548). ndt has to stay below every response it fits: all of them in crisk,
+# the correct ones in simple, whose errors are censored. Only the intercept, or
+# each cell of a design without one (ndt ~ 0 + cond), has a prior that maps to
+# a set of responses, and only normal() and student_t() are read
+.warn_ndt_prior_conflict <- function(model, data, formula, prior) {
+  bterms <- brms::brmsterms(formula)
+  ndt_terms <- bterms$dpars$ndt
+  probe <- suppressWarnings(link_transform(c(0.1, 1), model$links$ndt))
+  # on a decreasing link, such as inverse, the mass above the fastest response
+  # is the mass below its transform; logm1 is undefined at the probe points
+  increasing <- all(is.finite(probe)) && probe[2] > probe[1]
+  if (NROW(prior) == 0 || is.null(ndt_terms$fe) || !increasing) {
+    return(invisible())
+  }
+  rt <- data[[model$resp_vars$rt]]
+  # brms drops every row with a missing value in any variable of the model
+  complete <- stats::complete.cases(data[intersect(all.vars(bterms$allvars), names(data))])
+  fits <- rt > 0 & complete
+  if (model$version == "simple") {
+    fits <- fits & data[[model$resp_vars$response]] == 1
+  }
+
+  if (has_intercept(ndt_terms$fe)) {
+    prior_class <- "Intercept"
+    cells <- list(Intercept = fits)
+  } else {
+    prior_class <- "b"
+    # brms adds the Intercept pseudo-column of ndt ~ 0 + Intercept to its own
+    # frame only; a diagnostic must not stop a fit it cannot read the design of
+    X <- tryCatch(
+      get_model_matrix(ndt_terms$fe, transform(data, Intercept = 1)),
+      error = function(e) NULL
+    )
+    if (is.null(X) || !all(X %in% c(0, 1)) || any(rowSums(X) != 1)) {
+      return(invisible())
+    }
+    # model.matrix() drops the rows with a missing predictor, as brms does
+    # later, so the cells are placed on the rows it kept
+    kept <- match(rownames(X), rownames(data))
+    cells <- lapply(seq_cols(X), function(j) {
+      in_cell <- logical(nrow(data))
+      in_cell[kept] <- X[, j] == 1
+      fits & in_cell
+    })
+    names(cells) <- colnames(X)
+  }
+  rows <- prior[prior$dpar == "ndt" & prior$class == prior_class & !nzchar(prior$nlpar) &
+                  !nzchar(prior$group) & !nzchar(prior$resp), ]
+  # a truncated prior has less mass above the fastest response than it shows
+  if (any(nzchar(c(rows$lb, rows$ub), keepNA = TRUE), na.rm = TRUE)) {
+    return(invisible())
+  }
+
+  conflicts <- lapply(names(cells), function(cell) {
+    if (!any(cells[[cell]])) {
+      return(NULL)
+    }
+    # as in brms, a row on the coefficient beats the row on its class, and a
+    # row without a prior string inherits
+    applied <- c(rows$prior[!nzchar(rows$coef)], rows$prior[rows$coef == cell])
+    applied <- applied[nzchar(applied)]
+    dist <- if (length(applied)) .parse_location_scale_prior(applied[length(applied)])
+    if (is.null(dist)) {
+      return(NULL)
+    }
+    fastest <- min(rt[cells[[cell]]])
+    limit <- link_transform(fastest, model$links$ndt)
+    n <- length(dist$args)
+    z <- (limit - dist$args[n - 1]) / dist$args[n]
+    mass <- if (dist$family == "normal") {
+      stats::pnorm(z, lower.tail = FALSE)
+    } else {
+      stats::pt(z, dist$args[1], lower.tail = FALSE)
+    }
+    if (!isTRUE(mass > 0.5)) {
+      return(NULL)
+    }
+    # a mass just above one half would read as "50% ... most of its mass"
+    share <- if (round(100 * mass, 1) == 50) {
+      "just over 50%"
+    } else if (round(100 * mass) == 50) {
+      paste0(format(round(100 * mass, 1), nsmall = 1), "%")
+    } else {
+      paste0(round(100 * mass), "%")
+    }
+    # two scales below the fastest response leaves about 2.5% of the mass above
+    dist$args[n - 1] <- floor((limit - 2 * dist$args[n]) * 100 + 1e-8) / 100
+    list(
+      limit = limit,
+      own_row = any(nzchar(rows$prior[rows$coef == cell])),
+      location = dist$args[n - 1],
+      line = glue("{cell}: {applied[length(applied)]} puts {share} of \\
+                  its mass at or above {signif(fastest, 3)} s"),
+      suggestion = paste0(dist$family, "(", paste(dist$args, collapse = ", "), ")"),
+      cell = cell
+    )
+  })
+  conflicts <- Filter(Negate(is.null), conflicts)
+  if (length(conflicts) == 0) {
+    return(invisible())
+  }
+
+  kind <- if (model$version == "simple") "correct response" else "response"
+  where <- if (prior_class == "b") " in its cell" else ""
+  # a long list would push the suggestion past the 1000 characters R prints
+  lines <- vapply(conflicts, `[[`, character(1), "line")
+  listed <- max(1, min(5, sum(cumsum(nchar(lines)) <= 400)))
+  lines <- lines[seq_len(listed)]
+  if (length(conflicts) > listed) {
+    lines <- c(lines, glue("... and {length(conflicts) - listed} more"))
+  }
+  lines <- paste0("  ", lines, collapse = "\n")
+  # one row on the class serves the conflicting cells only when none has a
+  # row of its own, which beats the class row; it is built from the lowest
+  # fastest response. Otherwise the suggestion names one cell, one with its
+  # own row first, so that applying it makes progress
+  own_rows <- vapply(conflicts, `[[`, logical(1), "own_row")
+  several <- prior_class == "b" && length(conflicts) > 1 && !any(own_rows)
+  lowest <- which.min(vapply(conflicts, `[[`, numeric(1), "limit"))
+  first <- conflicts[[if (several) lowest else if (any(own_rows)) which(own_rows)[1] else 1]]
+  coef <- if (prior_class == "b" && !several) glue(', coef = "{first$cell}"') else ""
+  # a location that maps to a time at or below zero is no prior for a time
+  advice <- if (link_transform(first$location, model$links$ndt, inverse = TRUE) <= 0) {
+    paste(
+      "The fastest response is less than two scales above zero, so the prior",
+      "needs a smaller scale as well as a lower location. You can also filter",
+      "out anticipations, responses faster than the task allows."
+    )
+  } else {
+    glue(
+      "Give `ndt` a prior with a lower location, for example\n",
+      "  set_prior(\"{first$suggestion}\", class = \"{prior_class}\"{coef}, dpar = \"ndt\")\n",
+      "or filter out anticipations, responses faster than the task allows.",
+      .trim = FALSE
+    )
+  }
+  warning2(
+    "The prior for `ndt` puts most of its mass at or above the fastest {kind} \\
+    time{where}, but `ndt` must stay below it:
+    {lines}
+    Sampling can fail to start, and the data pull `ndt` below that response \\
+    against the prior. {advice}"
+  )
+}
+
+# The family and numeric arguments of a normal() or student_t() prior string,
+# NULL for anything else, including arguments that are not plain numbers
+.parse_location_scale_prior <- function(prior) {
+  parts <- regmatches(prior, regexec("^\\s*(normal|student_t)\\s*\\(([^()]*)\\)\\s*$", prior))[[1]]
+  if (length(parts) == 0) {
+    return(NULL)
+  }
+  args <- suppressWarnings(as.numeric(strsplit(parts[3], ",")[[1]]))
+  if (anyNA(args) || length(args) != c(normal = 2, student_t = 3)[[parts[2]]]) {
+    return(NULL)
+  }
+  if (parts[2] == "student_t" && args[1] <= 0) {
+    return(NULL)
+  }
+  list(family = parts[2], args = args)
 }
 
 ############################################################################# !
