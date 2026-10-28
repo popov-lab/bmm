@@ -815,3 +815,57 @@ postprocess_brm.circular <- function(model, fit, ...) {
   d <- c(s$d, rep(0, ncol(M) - length(s$d)))
   s$v[, d <= 1e-8 * max(d), drop = FALSE]
 }
+
+# The "Priors from bmm 1.4" section of ?mixture2p, ?mixture3p and ?imm, which
+# roxygen reads as markdown
+.circmix_prior_migration_doc <- function() {
+  paste(
+    "Since bmm 1.5.0, the parameters of this model are distributional parameters",
+    "(`dpar`) of a custom family, and the location `mu1` is called `mu`. Calls",
+    "written for bmm 1.4 keep working until bmm 1.6.0 at the earliest: bmm translates their priors,",
+    "formulas, `links` and `emmeans(nlpar = )`, and warns with the code to use",
+    "instead.",
+    "",
+    "```",
+    "# an intercept prior",
+    'set_prior("normal(2, 1)", class = "b", coef = "Intercept", nlpar = "kappa") # 1.4',
+    'set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")              # 1.5',
+    "",
+    "# a prior on all coefficients",
+    'set_prior("normal(0, 0.5)", class = "b", nlpar = "kappa")                   # 1.4',
+    'set_prior("normal(0, 0.5)", class = "Intercept", dpar = "kappa") +          # 1.5',
+    '  set_prior("normal(0, 0.5)", class = "b", dpar = "kappa")',
+    "",
+    "# a prior on the random-effect standard deviations",
+    'set_prior("exponential(2)", class = "sd", nlpar = "kappa")                  # 1.4',
+    'set_prior("exponential(2)", class = "sd", dpar = "kappa")                   # 1.5',
+    "",
+    "# the location, and emmeans()",
+    "bmf(mu1 ~ 1 + cond, kappa ~ 1 + cond)                                      # 1.4",
+    "bmf(mu ~ 1 + cond, kappa ~ 1 + cond)                                       # 1.5",
+    'emmeans(fit, ~ cond, nlpar = "kappa")                                      # 1.4',
+    'emmeans(fit, ~ cond, dpar = "kappa")                                       # 1.5',
+    "```",
+    "",
+    "In bmm 1.4 a `class = \"b\"` prior also covered the intercept, so it now",
+    "becomes two priors with the same distribution, unless the intercept has a prior of",
+    "its own. One prior changes its meaning.",
+    "When a formula has an intercept and predictors, such as `kappa ~ 1 + cond`,",
+    "brms centres the predictors of a distributional parameter, so an intercept",
+    "prior applies at the average over the conditions, weighted by their number of",
+    "trials, not at the reference condition. The slopes keep their meaning, and so",
+    "do intercept-only formulas",
+    "and formulas with one coefficient per condition (`kappa ~ 0 + cond`). If your",
+    "intercept prior was meant for the reference condition, give it for the",
+    "average instead.",
+    "",
+    "Two things are not translated. The draws of the location are named after",
+    "`mu` (`b_Intercept` instead of `b_mu1_Intercept`), and calls that go straight",
+    "to brms need `dpar =`: `posterior_linpred(fit, dpar = \"kappa\")`, not",
+    "`nlpar = \"kappa\"`. Fits saved with bmm 1.4 work as before with `summary()`,",
+    "`prior_info()`, `emmeans()`, `native_parameters()` and `conditional_effects()`.",
+    "`update()` samples them again under the custom family, translates their",
+    "priors and says so in a message.",
+    sep = "\n"
+  )
+}

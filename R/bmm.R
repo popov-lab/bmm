@@ -188,7 +188,7 @@ bmm <- function(formula, data, model,
     # empty rather than NULL: update() reads a fit without a stored user prior as
     # one saved before bmm stored it, whose prior mixes the user's rows with
     # bmm's defaults (#538)
-    user_prior = prior %||% brms::empty_prior(),
+    user_prior = cfg$user_prior %||% brms::empty_prior(),
     configure_opts = configure_opts
   )
 

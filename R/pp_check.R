@@ -412,7 +412,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   model <- fit$bmm$model
   resp_cols <- unlist(model$resp_vars)
   re_vars <- .group_vars(fit)
-  exclude <- unique(c(resp_cols, built_data_columns(model), re_vars))
+  exclude <- unique(c(resp_cols, fit_built_columns(fit), re_vars))
 
   pred_cols <- setdiff(names(data), exclude)
 

@@ -255,7 +255,7 @@ test_that("mu1 keeps working as a deprecated name for mu", {
     check_formula(
       mixture2p("dev_rad"), oberauer_lin_2017, bmf(mu1 = 0, kappa ~ 1, thetat ~ 1)
     ),
-    "mu1.*renamed to.*mu"
+    "`bmf\\(mu1 = 0\\)` is deprecated since bmm 1.5.0.*Use `bmf\\(mu = 0\\)` instead"
   )
 })
 
@@ -264,7 +264,7 @@ test_that("a formula for mu1 still reaches mu, with a warning", {
     fit <- bmm(bmf(kappa ~ 1, thetat ~ 1, mu1 ~ 1), oberauer_lin_2017,
       mixture2p("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
     ),
-    "renamed to 'mu'"
+    "Use `bmf\\(mu ~ 1\\)` instead"
   )
   # mu is fixed to 0 unless a formula frees it, so a default intercept prior
   # on the location shows that the mu1 formula reached it

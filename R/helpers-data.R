@@ -381,11 +381,13 @@ standata.bmmformula <- function(object, data, model, ...) {
   dots <- list(...)
   local_brms_threads(dots)
   configure_options(dots)
-  call_brms_extractor(
-    brms::standata,
-    configure_fit(object, data, model, until = "model"),
-    dots
-  )
+  cfg <- configure_fit(object, data, model, until = "model")
+  # the prior skips configure_prior() here, so priors written for an older
+  # parameterisation are translated before brms checks them
+  if (!is.null(dots$prior)) {
+    dots$prior <- translate_deprecated_priors(cfg$model, cfg$config_args$formula, dots$prior)
+  }
+  call_brms_extractor(brms::standata, cfg, dots)
 }
 
 #' @title Stan data of a fitted `bmm` model

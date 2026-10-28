@@ -160,6 +160,7 @@
       default_priors = spec$priors,
       init_ranges = spec$init_ranges,
       deprecated_parameters = list(mu1 = "mu"),
+      dpar_since = "1.5.0",
       variable_precision = variable_precision,
       vp_nodes = as.integer(vp_nodes)
     ),
@@ -197,6 +198,8 @@ settable_links.mixture3p <- function(model) {
 #' With `variable_precision = TRUE` every version gains `tau`, and `kappa`
 #' becomes the precision of the average trial. Shown for `"simple"`:
 #' `r model_docs(.model_mixture3p(variable_precision = TRUE), components = c('parameters', 'links', 'prior'))`
+#' @section Priors from bmm 1.4:
+#' `r .circmix_prior_migration_doc()`
 #' @param resp_error The name of the variable in the dataset containing
 #'   the response error. The response error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error

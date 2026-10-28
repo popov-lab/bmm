@@ -300,6 +300,20 @@ validate_links <- function(links, model) {
     class(model)[2]
   )[1]
   given <- names(links)
+  # a link named after a parameter's old name goes to the new one
+  renames <- model$deprecated_parameters
+  old <- given %in% names(renames)
+  if (any(old)) {
+    new_names <- unlist(renames[given[old]], use.names = FALSE)
+    link_values <- unlist(links[old], use.names = FALSE)
+    warn_deprecated(
+      what = glue('links = list({given[old]} = "{link_values}")'),
+      with = glue('links = list({new_names} = "{link_values}")'),
+      since = model$dpar_since
+    )
+    given[old] <- new_names
+    names(links) <- given
+  }
 
   if (!is.null(settable)) {
     known <- unique(c(names(model$parameters), names(defaults)))
@@ -1475,8 +1489,11 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
   if (until == "model") {
     return(nlist(config_args, model, user_formula))
   }
+  # a prior written for the parameters of bmm 1.4 is translated once, here, and
+  # bmm() stores the translation, so update() neither translates nor warns again
+  user_prior <- translate_deprecated_priors(model, config_args$formula, prior)
   prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, prior), frame_args)
+    configure_prior, c(list(model, data, config_args$formula, user_prior), frame_args)
   )
   # the prior decides which parameters exist, so the inits are built from it
   if (until == "init") {
@@ -1484,7 +1501,7 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
       create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
     )
   }
-  nlist(config_args, prior, model, user_formula)
+  nlist(config_args, prior, model, user_formula, user_prior)
 }
 
 #' @export

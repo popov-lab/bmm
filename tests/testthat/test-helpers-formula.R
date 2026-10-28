@@ -428,7 +428,7 @@ test_that("check_formula() renames a deprecated parameter in both the name and t
 
   expect_warning(
     formula <- check_formula(model, data, bmf(precision ~ cond, thetat ~ 1)),
-    "precision.*renamed to.*kappa"
+    "`bmf\\(precision ~ cond\\)` is deprecated.*Use `bmf\\(kappa ~ cond\\)` instead"
   )
   expect_true("kappa" %in% names(formula))
   expect_false("precision" %in% names(formula))
@@ -444,7 +444,7 @@ test_that("check_formula() renames a deprecated parameter fixed to a constant", 
 
   expect_warning(
     formula <- check_formula(model, data, bmf(precision = 2, thetat ~ 1)),
-    "renamed to"
+    "`bmf\\(precision = 2\\)` is deprecated"
   )
   expect_equal(formula$kappa, 2, ignore_attr = TRUE)
 })

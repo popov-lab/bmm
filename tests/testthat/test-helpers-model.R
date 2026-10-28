@@ -482,19 +482,21 @@ test_that("model constructors and the template list their fields in the canonica
     "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
     "requirements", "parameters", "links", "links_fixed", "fixed_parameters",
     "alternative_parameters", "default_priors", "init_ranges",
-    "deprecated_parameters", "variable_precision", "vp_nodes"
+    "deprecated_parameters", "dpar_since", "variable_precision", "vp_nodes"
   )
   # m3 builds its inits in create_initfun.m3() and drops an empty
   # default_priors; only models with interchangeable parameters declare
   # alternative_parameters; links_fixed lists the parameters whose links the
   # model sets itself, which check_links() leaves alone (mpt simplex groups);
-  # the last three belong to the circular mixture models only
+  # the last four belong to the circular mixture models only
   optional <- c(
     "links_fixed", "alternative_parameters", "default_priors", "init_ranges",
-    "deprecated_parameters", "variable_precision", "vp_nodes"
+    "deprecated_parameters", "dpar_since", "variable_precision", "vp_nodes"
   )
   expect_canonical <- function(model, label) {
     fields <- names(model)
+    # the deprecation warnings of renamed parameters take their release from it
+    if ("deprecated_parameters" %in% fields) expect_true("dpar_since" %in% fields, label = label)
     expect_identical(fields, intersect(canonical, fields), label = label)
     expect_in(setdiff(canonical, fields), optional)
   }
