@@ -228,6 +228,16 @@
 
 #### Other changes
 
+- Model constructors such as
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) and
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) now warn
+  about an argument they do not use, such as `mpt(trees, foo = 1)` or a
+  misspelt `lnks =`, which they ignored without a message. They also
+  warn about an extra argument given by position; give it by name. The
+  warning names the argument and, for a misspelling, the one you
+  probably meant. In bmm 1.6.0 this becomes an error; remove such
+  arguments from your calls
+  ([\#552](https://github.com/popov-lab/bmm/issues/552)).
 - [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
   drops rows with a missing response time or response and warns, as
   [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) does. It
