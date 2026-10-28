@@ -142,6 +142,7 @@ settable_links.mixture3p <- function(model) {
 #' )
 mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize

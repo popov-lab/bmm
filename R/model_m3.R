@@ -241,6 +241,7 @@ settable_link_functions.m3 <- function(model) {
 m3 <- function(resp_cats, num_options, choice_rule = "softmax",
                version = c("custom", "ss", "cs"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = c("links", "default_priors"))
   stop_missing_args()
   version <- match.arg(version)
   stopif(
