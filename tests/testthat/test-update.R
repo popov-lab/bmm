@@ -1003,7 +1003,7 @@ stub_update <- function(fit, ...) {
 
 slice_cases <- c("m3", "m3_char_num_options_by_category", "sdt_rating", "sdt_ranking_m_column",
                  "sdt_cdp", "sdt_mafc_m_column", "mixture3p", "imm",
-                 "mpt", "mpt_tree_predictor", "mpt_single_tree")
+                 "mpt", "mpt_tree_predictor", "mpt_single_tree", "tcc", "tcc_bins")
 
 # one stub fit per case, shared by the two tests below
 stub_frame_fits <- local({

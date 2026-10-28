@@ -142,9 +142,16 @@ find_response.bmmfit <- function(x, combine = TRUE, ...) {
 get_data.bmmfit <- function(x, effects = "all", component = "all",
                             source = "frame", verbose = FALSE, ...) {
   data <- x$data[setdiff(names(x$data), built_data_columns(x$bmm$model))]
-  data <- do.call(cbind, lapply(names(data), function(col) {
+  # the zero-column frame keeps the rows when every column of the frame was built
+  data <- do.call(cbind, c(list(x$data[0]), lapply(names(data), function(col) {
     if (is.matrix(data[[col]])) as.data.frame(data[[col]]) else data[col]
-  }))
+  })))
+  # a model whose brms response is a column check_data() built (tcc's binned
+  # error) keeps no user response in the frame; revert_check_data() rebuilds it
+  missing_response <- setdiff(find_response.bmmfit(x), names(data))
+  if (length(missing_response)) {
+    data[missing_response] <- revert_check_data(x$bmm$model, x$data)[missing_response]
+  }
   # brms adds the columns it computes from the formula, such as ID:session
   # or log(x), to the model frame
   model <- x$bmm$model

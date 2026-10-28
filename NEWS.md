@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New models
+* Add the **Target Confusability Competition model** (`tcc`) for continuous reproduction (Schurgin, Wixted & Brady, 2020). It estimates memory strength `d` from response errors in radians or option steps, given the similarity of each option to the target as a vector by distance. Also adds `dtcc()` and `rtcc()`. Its log-likelihood is a probability over options: `?tcc` shows how to compare it with `sdm()` or `mixture2p()` by LOO, and what to do when `d` reaches the grid limit `d_max` (#566). Thanks to @GidonFrischkorn
+
 ### New features
 * bmm fits now work with the easystats packages (#477). `parameters::model_parameters()` and `bayestestR::describe_posterior()` summarise each model parameter on its own, without the fixed `mu` of the response-time models, and `modelbased::estimate_means(fit, by = "set_size", predict = "c")` returns a parameter on its native scale. insight now finds the predictors, response variables, data and priors you gave to `bmm()`; these functions failed on `m3()` and `mpt()` fits.
 * `modelbased::estimate_means()`, `estimate_contrasts()` and `estimate_relation()` with `predict = "<parameter>"` now return that model parameter on its native scale, as `native_parameters()` does (#479). The mixture weights are probabilities: `predict = "thetat"` gives the probability of a target response. These calls failed on `mixture3p()`, `mpt()` and `m3()` fits. `insight::get_predicted()` without `predict` now predicts the first estimated parameter and says which.
