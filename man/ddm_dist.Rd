@@ -23,7 +23,10 @@ rddm(n, drift, bound, ndt, zr = 0.5)
 
 \item{zr}{relative starting point of the ddm}
 
-\item{log}{Logical, indicating if log-densities should be returned (default = TRUE)}
+\item{log}{Logical; if \code{TRUE} (default until bmm 1.6.0), log-densities are
+returned. From bmm 1.6.0 on the default is \code{FALSE}, as in base R
+and the other density functions of bmm. Pass \code{log} to get the same
+result in every version.}
 
 \item{n}{Number of random samples to generate}
 }

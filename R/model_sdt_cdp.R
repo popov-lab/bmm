@@ -315,6 +315,7 @@ sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
                                        "log_distance"),
                     links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   threshold_type <- match.arg(threshold_type)
   stopif(!identical(dist, "normal"),
@@ -463,6 +464,11 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @exportS3Method
+built_data_columns.sdt_cdp <- function(model) {
+  c("nTrials", NextMethod("built_data_columns"))
+}
 
 #' @export
 check_data.sdt_cdp <- function(model, data, formula) {

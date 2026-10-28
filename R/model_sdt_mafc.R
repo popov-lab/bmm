@@ -149,6 +149,7 @@ sdt_mafc <- function(response, n_trials, m,
                      dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                      links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
 
@@ -169,6 +170,11 @@ sdt_mafc <- function(response, n_trials, m,
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @exportS3Method
+built_data_columns.sdt_mafc <- function(model) {
+  c("m_afc", "dist_type", NextMethod("built_data_columns"))
+}
 
 #' @export
 check_data.sdt_mafc <- function(model, data, formula) {

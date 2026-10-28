@@ -183,6 +183,7 @@
 #' )
 cswald <- function(rt, response, links = NULL, version = c("simple", "crisk"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
   .model_cswald(
@@ -204,100 +205,17 @@ check_data.cswald <- function(model, data, formula) {
   rt_var <- model$resp_vars$rt
   response_var <- model$resp_vars$response
 
-  stopif(
-    not_in(rt_var, colnames(data)),
-    "The RT variable '{rt_var}' is not present in the data."
+  data <- check_rt_data(
+    data, rt_var, response_var,
+    fast_rt_hint = paste(
+      "Such fast responses are often anticipations and pull the estimate of",
+      "`ndt` down; consider filtering them."
+    )
   )
-
-  stopif(
-    not_in(response_var, colnames(data)),
-    "The response variable '{response_var}' is not present in the data."
-  )
-
-  n_na_rt <- sum(is.na(data[, rt_var]))
-  n_na_resp <- sum(is.na(data[, response_var]))
-
-  stopif(
-    n_na_rt > 0,
-    "The RT variable '{rt_var}' contains {n_na_rt} NA values. \\
-    Please remove or impute missing values before fitting the model."
-  )
-
-  stopif(
-    n_na_resp > 0,
-    "The response variable '{response_var}' contains {n_na_resp} NA values. \\
-    Please remove or impute missing values before fitting the model."
-  )
-
-  if (typeof(data[, rt_var]) %in% c("double", "integer")) {
-    stopif(
-      any(data[, rt_var] < 0),
-      "Some reaction times are lower than zero, please check your data."
-    )
-
-    warnif(
-      any(data[, rt_var] > 10),
-      "Your data contains reaction times larger than 10 seconds.\n
-      Either you have passed reaction times in milliseconds, then please \\
-      recode them to seconds and rerun the model.\n
-      Or you have very long RTs in your data in which case you might want \\
-      to consider outlier filtering."
-    )
-
-    warnif(
-      any(data[, rt_var] < 0.100),
-      "Your data contains reaction times smaller than 0.100 seconds.\n
-      It is likely that the model will not be able to sample with the \\
-      current settings of the initial values.\n
-      Either pass your own initial value function or consider filtering \\
-      reaction times below 0.100 seconds."
-    )
-  } else {
-    stop2("The RT variable '{rt_var}' needs to be of type double or integer.")
-  }
-
-  resp_type <- typeof(data[, response_var])
-
-  if (is.factor(data[, response_var])) {
-    data[, response_var] <- as.character(data[, response_var])
-    resp_type <- "character"
-  }
-
-  if (resp_type %in% c("integer", "double")) {
-    stopif(
-      any(!data[, response_var] %in% c(0, 1)),
-      "The response variable '{response_var}' contains values other than 0 and 1.\n
-      Please pass responses coded as 0 (lower boundary) and 1 (upper boundary)."
-    )
-  } else if (resp_type == "logical") {
-    warning2(
-      "The response variable is boolean and will be internally transformed ",
-      "to an integer variable with values 0 for FALSE and 1 for TRUE."
-    )
-    data[, response_var] <- as.integer(data[, response_var])
-  } else if (resp_type == "character") {
-    data[, response_var] <- tolower(data[, response_var])
-    stopif(
-      any(!data[, response_var] %in% c("upper", "lower")),
-      "The response variable '{response_var}' contains invalid character values.\n
-      Please pass only 'upper' or 'lower' as response values, or use \\
-      numeric coding (0 = lower, 1 = upper)."
-    )
-    warning2(
-      "The response variable is a character variable and will be internally ",
-      "transformed to an integer variable with 0 for 'lower' and 1 for 'upper'."
-    )
-    data[, response_var] <- ifelse(data[, response_var] == "upper", 1L, 0L)
-  } else {
-    stop2(
-      "The response variable '{response_var}' is of type '{resp_type}'.\n
-      Please provide responses as integer (0/1), logical, character \\
-      ('upper'/'lower'), or factor."
-    )
-  }
+  data[[response_var]] <- code_dec_response(data[[response_var]], response_var)
 
   if (model$version == "simple") {
-    error_rate <- mean(data[, response_var] == 0)
+    error_rate <- mean(data[[response_var]] == 0)
     warnif(
       error_rate > 0.20,
       "Your data has an error rate of {round(error_rate * 100, 1)}%.\n
@@ -472,6 +390,21 @@ posterior_predict_cswald_crisk <- function(i, prep, ...) {
   } else {
     out$rt
   }
+}
+
+############################################################################# !
+# CREATE_INITFUN S3 method                                               ####
+############################################################################# !
+
+# The likelihood is -Inf wherever ndt >= min(rt), so the start for ndt has to
+# come from the data; the other ranges do not depend on it. rt = 0 is left out:
+# a censored response there never binds, and a response of 1 there cannot be
+# fitted with any positive ndt
+#' @export
+create_initfun.cswald <- function(model, data, formula, prior = NULL, ...) {
+  rt <- data[[model$resp_vars$rt]]
+  model$init_ranges$ndt <- c(0.4, 0.6) * min(rt[rt > 0])
+  NextMethod()
 }
 
 ############################################################################# !

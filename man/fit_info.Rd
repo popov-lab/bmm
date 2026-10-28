@@ -13,6 +13,8 @@ fit_info(fit, what)
 \itemize{
 \item "time" for the sampling time per chain
 \item "time_mean" for the mean sampling time
+\item "inv_metric" for the adapted inverse metric per chain
+\item "step_size" for the adapted step size per chain
 }}
 }
 \value{
@@ -20,9 +22,26 @@ Depends on \code{what} and the class of \code{fit}. For \code{brmsfit} objects,
 information about the single fit is returned. For \code{brmsfit_list} objects, a
 list or data.frame with the information for each fit is returned.
 \itemize{
-\item "time": A data.frame with the sampling time per chain
-\item "time_mean": A named numeric vector with the mean sampling time
+\item "time": A data.frame with the warmup, sampling and total time per chain
+\item "time_mean": A named numeric vector with the mean warmup, sampling and
+total time across chains
+\item "inv_metric": A list with one numeric vector per chain (the diagonal), or
+one matrix per chain for \code{metric = "dense_e"}
+\item "step_size": A list with one number per chain
 }
+
+Every chain of the fit is reported, also in a fit combined from several
+fits with \code{\link[brms:combine_models]{brms::combine_models()}} or extended with \code{\link[=add_chains]{add_chains()}}. \code{NULL}
+is returned for what the sampler
+did not record: anything for a fit without a stanfit or without chains,
+"time" and "time_mean" for variational and Laplace runs, "inv_metric" and
+"step_size" for any algorithm other than NUTS, and "inv_metric" for
+\code{metric = "unit_e"}. In a fit combined from several fits, a unit_e chain
+next to chains with a metric has a \code{NULL} element in the "inv_metric"
+list. Values read from Stan's printed adaptation output (rstan fits, and
+fits combined from several fits) have six significant digits by default.
+A cmdstanr unit_e chain carries no printed step size, so in a fit combined
+from several fits its step size is that of its last draw.
 }
 \description{
 Extract information from a brmsfit object

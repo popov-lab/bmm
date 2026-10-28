@@ -218,6 +218,7 @@ sdt_ranking <- function(response, m,
                         dist = c("gumbel_min", "normal"),
                         links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
 
@@ -242,6 +243,11 @@ sdt_ranking <- function(response, m,
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @exportS3Method
+built_data_columns.sdt_ranking <- function(model) {
+  c("nTrials", "max_rank", NextMethod("built_data_columns"))
+}
 
 #' @export
 check_data.sdt_ranking <- function(model, data, formula) {

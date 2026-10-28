@@ -95,6 +95,7 @@ settable_links.mixture2p <- function(model) {
 #' @export
 mixture2p <- function(resp_error, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   .model_mixture2p(resp_error = resp_error, call = call, ...)
 }
