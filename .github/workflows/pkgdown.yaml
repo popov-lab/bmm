@@ -89,10 +89,12 @@ jobs:
       - name: Locate CmdStan install path
         id: cmdstan-path
         run: |
-          # the OS release keys the cache: a CmdStan built on another runner
-          # image fails to sample on this one
+          # the OS release and runner image key the cache: CmdStan's
+          # precompiled header is stamped with the image's SDK headers, so one
+          # built on another image fails to compile models on this one, even
+          # at the same OS release (macOS, 2026-10-28)
           cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
-              sprintf("release=%s\n", gsub("[^A-Za-z0-9.]+", "-", utils::sessionInfo()$running)),
+              sprintf("release=%s\n", gsub("[^A-Za-z0-9.]+", "-", paste(utils::sessionInfo()$running, Sys.getenv("ImageVersion")))),
               file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE, sep = "")
         shell: Rscript {0}
 
