@@ -315,6 +315,7 @@ sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
                                        "log_distance"),
                     links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   threshold_type <- match.arg(threshold_type)
   stopif(!identical(dist, "normal"),

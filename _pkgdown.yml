@@ -50,6 +50,7 @@ reference:
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
     - "easystats-bmmfit"
+    - "predicted-bmmfit"
     - "easystats-report-bmmfit"
     - "pp_check.bmmfit"
     - "ppp"

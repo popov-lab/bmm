@@ -555,10 +555,7 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   x <- restructure(x)
   scale <- match.arg(scale)
 
-  model_pars <- setdiff(
-    names(x$bmm$model$parameters),
-    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
-  )
+  model_pars <- .np_model_pars(x)
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
   pars <- pars %||% setdiff(model_pars, internal_parameters(x$bmm$model))
   unknown <- pars[not_in(pars, model_pars)]
@@ -579,6 +576,56 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     "'ndraws' must be a single number between 1 and {brms::ndraws(x)}."
   )
 
+  native <- .native_draw_matrices(x, newdata, pars, re_formula, scale, ndraws, draw_ids, list(...))
+  linpred <- native$draws
+  grid <- native$newdata[, native$grid_vars, drop = FALSE]
+  row.names(grid) <- NULL
+
+  clash <- intersect(names(grid), .np_reserved_names(summary, prob))
+  stopif(
+    length(clash) > 0,
+    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
+    output. Rename them in the data, or pass 'newdata' with different names."
+  )
+
+  if (summary) {
+    .np_summary(linpred, grid, prob, robust)
+  } else {
+    warnif(
+      length(linpred) * nrow(grid) * length(native$draw_ids) > 1e6,
+      "This will return \\
+      {length(linpred) * nrow(grid) * length(native$draw_ids)} rows. Supply 'newdata' \\
+      with the grid cells you need, or set 'ndraws', to return fewer."
+    )
+    .np_long(linpred, grid, .np_draw_index(x, native$draw_ids))
+  }
+}
+
+
+#' Native-scale draws of model parameters as matrices
+#'
+#' @description
+#' The computation behind [native_parameters()], without its reshaping, so that
+#' callers that need one matrix per parameter, such as the \pkg{insight} and
+#' \pkg{marginaleffects} methods, take the same draws.
+#'
+#' @param x A bmmfit object, restructured
+#' @param newdata User supplied prediction data, or `NULL` for the default grid
+#' @param pars Character vector of the requested parameters, all of them among
+#'   [.np_model_pars()]
+#' @param re_formula Passed to [brms::posterior_linpred()]
+#' @param scale `"native"` or `"sampling"`
+#' @param ndraws,draw_ids The draws to use, as in [native_parameters()]
+#' @param dots Further arguments for [brms::posterior_linpred()]
+#' @return A list with `draws`, a named list of draws x grid cell matrices of
+#'   the requested parameters, `newdata`, the completed prediction data,
+#'   `grid_vars`, the variables spanning the grid, and `draw_ids`, sorted
+#'
+#' @keywords internal
+#' @noRd
+.native_draw_matrices <- function(x, newdata, pars, re_formula, scale = "native",
+                                  ndraws = NULL, draw_ids = NULL, dots = list()) {
+  model_pars <- .np_model_pars(x)
   if (is.null(draw_ids)) {
     draw_ids <- if (is.null(ndraws)) {
       seq_len(brms::ndraws(x))
@@ -594,7 +641,7 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   grid_vars <- .np_grid_vars(x, model_pars, re_formula)
   newdata <- .np_newdata(x, grid_vars, newdata)
 
-  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, list(...))
+  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, dots)
   if (scale == "native") {
     transformed <- native_transform(x$bmm$model, linpred, newdata)
     stopif(
@@ -610,29 +657,29 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     )
     linpred <- transformed
   }
-  linpred <- linpred[names(linpred) %in% pars]
-
-  grid <- newdata[, grid_vars, drop = FALSE]
-  row.names(grid) <- NULL
-
-  clash <- intersect(names(grid), .np_reserved_names(summary, prob))
-  stopif(
-    length(clash) > 0,
-    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
-    output. Rename them in the data, or pass 'newdata' with different names."
+  list(
+    draws = linpred[names(linpred) %in% pars], newdata = newdata,
+    grid_vars = grid_vars, draw_ids = draw_ids
   )
+}
 
-  if (summary) {
-    .np_summary(linpred, grid, prob, robust)
-  } else {
-    warnif(
-      length(linpred) * nrow(grid) * length(draw_ids) > 1e6,
-      "This will return \\
-      {length(linpred) * nrow(grid) * length(draw_ids)} rows. Supply 'newdata' \\
-      with the grid cells you need, or set 'ndraws', to return fewer."
-    )
-    .np_long(linpred, grid, .np_draw_index(x, draw_ids))
-  }
+
+#' The parameters a fit can predict
+#'
+#' @description
+#' The model's parameters without the alternatives its formula left out, such
+#' as `bias` in a fit that estimates `criterion`.
+#'
+#' @param x A bmmfit object
+#' @return Character vector of parameter names
+#'
+#' @keywords internal
+#' @noRd
+.np_model_pars <- function(x) {
+  setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  )
 }
 
 
