@@ -250,6 +250,12 @@
 
 #### Other changes
 
+- [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
+  warns when the prior for `ndt` puts most of its mass at or above your
+  fastest response time, which `ndt` must stay below. Such a fit can
+  fail to start. The warning suggests a prior with a lower location;
+  filtering out anticipations helps too
+  ([\#548](https://github.com/popov-lab/bmm/issues/548)).
 - Model constructors such as
   [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) and
   [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) now warn

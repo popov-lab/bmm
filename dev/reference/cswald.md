@@ -157,6 +157,29 @@ An object of class `bmmodel`
 
     - `sd`: exponential(2)
 
+### The prior for `ndt` and the fastest response
+
+`ndt` has to stay below every response the model fits: all responses in
+version `"crisk"`, the correct ones in `"simple"`, which censors errors.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and
+[`update()`](https://rdrr.io/r/stats/update.html) warn when more than
+half of the prior for `ndt` lies at or above the fastest of these
+responses. Sampling can then fail to start, and the data pull `ndt` down
+against the prior. With the default prior, `normal(-2, 0.3)` on the log
+scale, this happens when the fastest response is faster than 0.135 s.
+Set a prior with a lower location, as the warning suggests, or filter
+out anticipations. The check reads `normal()` and `student_t()` priors
+on the intercept of `ndt`, or on each cell of a formula without an
+intercept such as `ndt ~ 0 + cond`; other priors and designs are not
+checked, and neither are truncated priors or the links `"inverse"` and
+`"logm1"`. In a formula with other fixed effects, such as
+`ndt ~ 1 + cond`, the prior on the intercept is the prior on the centred
+intercept (the grand mean), and the check compares it with the fastest
+response overall. [`update()`](https://rdrr.io/r/stats/update.html) with
+`init` or `inits` skips the check, while
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) with `init`
+still runs it.
+
 ## See also
 
 [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) and

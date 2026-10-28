@@ -149,7 +149,29 @@ logit scale (an unbiased <code>zr = 0.5</code>) unless you give it a formula.</p
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 </ul></li>
-</ul></div>
+</ul><div class="section">
+<h3 id="the-prior-for-ndt-and-the-fastest-response">The prior for <code>ndt</code> and the fastest response<a class="anchor" aria-label="anchor" href="#the-prior-for-ndt-and-the-fastest-response"></a></h3>
+
+
+<p><code>ndt</code> has to stay below every response the model fits: all responses in
+version <code>"crisk"</code>, the correct ones in <code>"simple"</code>, which censors errors.
+<code><a href="bmm.html">bmm()</a></code> and <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> warn when more than half of the prior for <code>ndt</code> lies
+at or above the fastest of these responses. Sampling can then fail to
+start, and the data pull <code>ndt</code> down against the prior. With the default
+prior, <code>normal(-2, 0.3)</code> on the log scale, this happens when the fastest
+response is faster than 0.135 s. Set a prior with a lower location, as the
+warning suggests, or filter out anticipations. The check reads <code>normal()</code>
+and <code>student_t()</code> priors on the intercept of <code>ndt</code>, or on each cell of a
+formula without an intercept such as <code>ndt ~ 0 + cond</code>; other priors and
+designs are not checked, and neither are truncated priors or the links
+<code>"inverse"</code> and <code>"logm1"</code>. In a formula with other fixed effects, such as
+<code>ndt ~ 1 + cond</code>, the prior on the intercept is the prior on the centred
+intercept (the grand mean), and the check compares it with the fastest
+response overall. <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> with <code>init</code> or <code>inits</code> skips the check, while
+<code><a href="bmm.html">bmm()</a></code> with <code>init</code> still runs it.</p>
+</div>
+
+    </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="cswald_dist.html">dcswald()</a></code> and <code><a href="cswald_dist.html">rcswald()</a></code> for the density and random generation
