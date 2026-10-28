@@ -203,6 +203,7 @@
 ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL,
                  version = c("3par", "4par"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
   .model_ezdm(

@@ -8,7 +8,7 @@ development:
 
 navbar:
   structure:
-     left: [intro, reference, articles, changelog, develop, parameter_recovery]
+     left: [intro, reference, articles, changelog, develop, parameter_recovery, explorer]
   components:
      reference:
         text: Functions
@@ -25,6 +25,9 @@ navbar:
      parameter_recovery:
         text: Parameter recovery
         href: https://venpopov.com/bmm/parameter-recovery/index.html
+     explorer:
+        text: Model explorer
+        href: https://www.gfrischkorn.org/bmm-explorer/
 
 
 
@@ -42,9 +45,13 @@ reference:
     - "bmm"
     - "bmmformula"
     - "update.bmmfit"
+    - "add_chains"
     - "summary.bmmfit"
     - "conditional_effects.bmmfit"
     - "emmeans-bmmfit"
+    - "easystats-bmmfit"
+    - "predicted-bmmfit"
+    - "easystats-report-bmmfit"
     - "pp_check.bmmfit"
     - "ppp"
     - "posterior_epred.bmmfit"
