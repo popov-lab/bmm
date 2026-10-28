@@ -473,6 +473,7 @@ sdt_yn <- function(response, stimulus, n_trials,
                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                    links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
 
@@ -543,6 +544,11 @@ check_formula.sdt_yn <- function(model, data, formula) {
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @exportS3Method
+built_data_columns.sdt_yn <- function(model) {
+  c("dist_type", NextMethod("built_data_columns"))
+}
 
 #' @export
 check_data.sdt_yn <- function(model, data, formula) {

@@ -665,12 +665,9 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     "'ndraws_population' must be a single number of at least 2."
   )
 
-  model_pars <- setdiff(
-    names(x$bmm$model$parameters),
-    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
-  )
+  model_pars <- .np_model_pars(x)
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
-  pars <- pars %||% model_pars
+  pars <- pars %||% setdiff(model_pars, internal_parameters(x$bmm$model))
   unknown <- pars[not_in(pars, model_pars)]
   stopif(
     length(unknown) > 0,
@@ -689,6 +686,69 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     "'ndraws' must be a single number between 1 and {brms::ndraws(x)}."
   )
 
+  native <- .native_draw_matrices(
+    x, newdata, pars, re_formula, scale, ndraws, draw_ids, list(...),
+    population_summary, ndraws_population
+  )
+  values <- native$draws
+  grid <- native$newdata[, native$grid_vars, drop = FALSE]
+  row.names(grid) <- NULL
+
+  clash <- intersect(names(grid), .np_reserved_names(summary, prob, population))
+  stopif(
+    length(clash) > 0,
+    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
+    output. Rename them in the data, or pass 'newdata' with different names."
+  )
+
+  out <- if (summary) {
+    .np_summary(values, grid, prob, robust, native$statistic)
+  } else {
+    warnif(
+      length(values) * nrow(grid) * length(native$draw_ids) > 1e6,
+      "This will return \\
+      {length(values) * nrow(grid) * length(native$draw_ids)} rows. Supply 'newdata' \\
+      with the grid cells you need, or set 'ndraws', to return fewer."
+    )
+    .np_long(values, grid, .np_draw_index(x, native$draw_ids), native$statistic)
+  }
+  if (population) {
+    attr(out, "population_method") <- native$method
+  }
+  out
+}
+
+
+#' Native-scale draws of model parameters as matrices
+#'
+#' @description
+#' The computation behind [native_parameters()], without its reshaping, so that
+#' callers that need one matrix per parameter, such as the \pkg{insight} and
+#' \pkg{marginaleffects} methods, take the same draws.
+#'
+#' @param x A bmmfit object, restructured
+#' @param newdata User supplied prediction data, or `NULL` for the default grid
+#' @param pars Character vector of the requested parameters, all of them among
+#'   [.np_model_pars()]
+#' @param re_formula Passed to [brms::posterior_linpred()]
+#' @param scale `"native"` or `"sampling"`
+#' @param ndraws,draw_ids The draws to use, as in [native_parameters()]
+#' @param dots Further arguments for [brms::posterior_linpred()]
+#' @param population_summary,ndraws_population As in [native_parameters()]
+#' @return A list with `draws`, a named list of draws x grid cell matrices of
+#'   the requested parameters, `newdata`, the completed prediction data,
+#'   `grid_vars`, the variables spanning the grid, and `draw_ids`, sorted. With
+#'   a population summary, `draws` has one matrix per parameter and statistic,
+#'   named by parameter, and the list also holds `statistic`, one element per
+#'   matrix, and `method`, the data frame described in `.np_population()`.
+#'
+#' @keywords internal
+#' @noRd
+.native_draw_matrices <- function(x, newdata, pars, re_formula, scale = "native",
+                                  ndraws = NULL, draw_ids = NULL, dots = list(),
+                                  population_summary = "none",
+                                  ndraws_population = 1000) {
+  model_pars <- .np_model_pars(x)
   if (is.null(draw_ids)) {
     draw_ids <- if (is.null(ndraws)) {
       seq_len(brms::ndraws(x))
@@ -701,52 +761,29 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   # be built from the same ordering or every row is labelled with another draw
   draw_ids <- sort(draw_ids)
 
+  population <- population_summary != "none"
   # a population summary integrates the grouping factors out, so they never
   # span the grid
   grid_vars <- .np_grid_vars(x, model_pars, if (population) NA else re_formula)
   newdata <- .np_newdata(x, grid_vars, newdata)
-
-  grid <- newdata[, grid_vars, drop = FALSE]
-  row.names(grid) <- NULL
-
-  clash <- intersect(names(grid), .np_reserved_names(summary, prob, population))
-  stopif(
-    length(clash) > 0,
-    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
-    output. Rename them in the data, or pass 'newdata' with different names."
-  )
+  out <- list(newdata = newdata, grid_vars = grid_vars, draw_ids = draw_ids)
 
   if (population) {
     result <- .np_population(
       x, model_pars, pars, newdata, grid_vars, re_formula, draw_ids,
-      population_summary, scale, ndraws_population, list(...)
+      population_summary, scale, ndraws_population, dots
     )
-    values <- stats::setNames(result$values, result$parameter)
-    statistic <- result$statistic
-  } else {
-    values <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, list(...))
-    if (scale == "native") {
-      values <- .np_transform_checked(x, values, newdata)
-    }
-    values <- values[names(values) %in% pars]
-    statistic <- NULL
+    return(c(out, list(
+      draws = stats::setNames(result$values, result$parameter),
+      statistic = result$statistic, method = result$method
+    )))
   }
 
-  out <- if (summary) {
-    .np_summary(values, grid, prob, robust, statistic)
-  } else {
-    warnif(
-      length(values) * nrow(grid) * length(draw_ids) > 1e6,
-      "This will return \\
-      {length(values) * nrow(grid) * length(draw_ids)} rows. Supply 'newdata' \\
-      with the grid cells you need, or set 'ndraws', to return fewer."
-    )
-    .np_long(values, grid, .np_draw_index(x, draw_ids), statistic)
+  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, dots)
+  if (scale == "native") {
+    linpred <- .np_transform_checked(x, linpred, newdata)
   }
-  if (population) {
-    attr(out, "population_method") <- result$method
-  }
-  out
+  c(out, list(draws = linpred[names(linpred) %in% pars]))
 }
 
 
@@ -773,6 +810,25 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     the dimensions of the draws it was given."
   )
   transformed
+}
+
+
+#' The parameters a fit can predict
+#'
+#' @description
+#' The model's parameters without the alternatives its formula left out, such
+#' as `bias` in a fit that estimates `criterion`.
+#'
+#' @param x A bmmfit object
+#' @return Character vector of parameter names
+#'
+#' @keywords internal
+#' @noRd
+.np_model_pars <- function(x) {
+  setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  )
 }
 
 

@@ -117,6 +117,31 @@ if (make("bmmfit_m3_ppcheck.rds")) {
   save_fixture(m3_fit, "bmmfit_m3_ppcheck.rds", seed = 5)
 }
 
+# mpt: the two-high-threshold model with person effects on D and g, for the
+# ppp() T2 test, which needs brms's own draw arrays, the tree column rebuilt
+# from the tree indicators and participants read from (1 | id)
+if (make("bmmfit_mpt_ppcheck.rds")) {
+  set.seed(8)
+  n_id <- 10
+  D <- stats::plogis(stats::rnorm(n_id, 0.5, 0.7))
+  g <- stats::plogis(stats::rnorm(n_id, 0, 0.5))
+  mpt_data <- data.frame(
+    id = factor(rep(seq_len(n_id), 2)), item_type = rep(c("old", "new"), each = n_id)
+  )
+  p_old <- ifelse(mpt_data$item_type == "old", D + (1 - D) * g, (1 - D) * g)
+  mpt_data$old <- stats::rbinom(2 * n_id, 40, p_old)
+  mpt_data$new <- 40L - mpt_data$old
+  mpt_fit <- do.call(bmm, c(list(
+    formula = bmf(D ~ 1 + (1 | id), g ~ 1 + (1 | id)),
+    data = mpt_data,
+    model = mpt(list(
+      mpt_tree("old", old ~ D + (1 - D) * g, new ~ (1 - D) * (1 - g)),
+      mpt_tree("new", old ~ (1 - D) * g, new ~ D + (1 - D) * (1 - g))
+    ), tree_id = "item_type")
+  ), fit_args))
+  save_fixture(mpt_fit, "bmmfit_mpt_ppcheck.rds", seed = 8)
+}
+
 # sdm on rstan, so the tests can read what an rstan fit stores: no warmup
 # saved, draws from the prior; two participants at set sizes 1 to 4
 if (make("bmmfit_example1.rds")) {
@@ -138,6 +163,21 @@ if (make("bmmfit_example1.rds")) {
   )
   sdm_fit$fit@.MISC <- new.env()
   save_fixture(sdm_fit, "bmmfit_example1.rds", seed = 6)
+}
+
+# mixture3p: the weights are softmaxed jointly, and set size 1 has no
+# non-target, so its thetant is switched off; two participants at set sizes
+# 1, 2 and 4
+if (make("bmmfit_mixture3p.rds")) {
+  m3p_data <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2 &
+                                  oberauer_lin_2017$set_size %in% c(1, 2, 4), ]
+  m3p_data$set_size <- factor(m3p_data$set_size)
+  m3p_fit <- do.call(bmm, c(list(
+    formula = bmf(kappa ~ 1, thetat ~ 0 + set_size, thetant ~ 0 + set_size),
+    data = m3p_data,
+    model = mixture3p("dev_rad", nt_features = paste0("col_nt", 1:3), set_size = "set_size")
+  ), fit_args))
+  save_fixture(m3p_fit, "bmmfit_mixture3p.rds", seed = 123)
 }
 
 # The two mock fixtures keep what the parameter routing reads (the formula,

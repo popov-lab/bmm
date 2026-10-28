@@ -583,6 +583,7 @@ sdt_rating <- function(response, stimulus,
                        version = c("standard", "dpsdt", "metad"),
                        links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
   threshold_type <- match.arg(threshold_type)
@@ -613,6 +614,11 @@ sdt_rating <- function(response, stimulus,
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @exportS3Method
+built_data_columns.sdt_rating <- function(model) {
+  c("nTrials", NextMethod("built_data_columns"))
+}
 
 #' @export
 check_data.sdt_rating <- function(model, data, formula) {
