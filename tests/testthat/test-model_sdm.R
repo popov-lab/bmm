@@ -37,11 +37,32 @@ test_that("printing a model says what c is unless the scaling is density", {
   expect_false(any(grepl("Scaling:", out, fixed = TRUE)))
 })
 
-test_that("the default prior on c depends on the scaling", {
+test_that("every scaling keeps the default prior on c", {
   for (scaling in c("density", "peak", "range")) {
-    expect_identical(sdm("y", scaling = scaling)$default_priors$c$main, .sdm_c_prior[[scaling]])
+    expect_identical(sdm("y", scaling = scaling)$default_priors$c$main, "student_t(5, 2, 0.75)")
   }
-  expect_identical(sdm("y")$default_priors$c$main, "student_t(5, 2, 0.75)")
+  expect_identical(
+    suppressMessages(sdm("y", activation = "laplace"))$default_priors$c$main,
+    "student_t(5, 2, 0.75)"
+  )
+})
+
+test_that("log_lik() and posterior_predict() read the cell from the Stan data", {
+  withr::local_seed(558)
+  draws <- matrix(c(5, 6, 7, 5, 6, 7), 3)
+  prep <- structure(list(
+    dpars = list(mu = matrix(0, 3, 2), c = draws, kappa = matrix(2, 3, 2)),
+    data = list(Y = c(0.1, -0.4), sdm_activation = 2L, sdm_scaling = 3L),
+    ndraws = 3, nobs = 2
+  ), class = "brmsprep")
+  expect_equal(
+    log_lik_sdm_simple(2, prep),
+    dsdm(-0.4, 0, c(5, 6, 7), 2, log = TRUE, activation = "laplace", scaling = "range")
+  )
+  expect_length(posterior_predict_sdm_simple(1, prep), 3)
+  # an sdm_simple fit has no codes in its data
+  prep$data[c("sdm_activation", "sdm_scaling")] <- NULL
+  expect_equal(log_lik_sdm_simple(2, prep), dsdm(-0.4, 0, c(5, 6, 7), 2, log = TRUE))
 })
 
 test_that("estimating mu with the Laplace activation warns", {
@@ -96,4 +117,17 @@ test_that("an sdm() fit from before activation and scaling is the default cell",
   expect_s3_class(up, "bmmfit")
   expect_identical(up$bmm$model$other_vars$scaling, "density")
   expect_identical(up$formula$family$name, "sdm_simple")
+})
+
+test_that("a fit from 0.4.5 to 0.4.7, whose model class is still sdmSimple, gets the default cell", {
+  skip_on_cran() # loads a stored fit
+  fit <- load_fixture_fit("bmmfit_example1.rds")
+  class(fit$bmm$model) <- c("bmmodel", "circular", "sdmSimple")
+  fit$bmm$model$other_vars <- list()
+  fit$version$bmm <- package_version("0.4.6")
+  fit$version$bmm_restructure <- NULL
+  fit <- restructure(fit)
+  expect_identical(class(fit$bmm$model), c("bmmodel", "circular", "sdm", "sdm_simple"))
+  expect_identical(fit$bmm$model$other_vars, list(activation = "vonmises", scaling = "density"))
+  expect_output(print(fit$bmm$model), "Parameters:")
 })

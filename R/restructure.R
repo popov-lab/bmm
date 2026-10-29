@@ -96,6 +96,8 @@ restructure.bmmfit <- function(x, ...) {
     class(x$bmm$model) <- cl
   }
 
+  # again after the renames: a fit from 0.4.5 to 0.4.7 still has class sdmSimple above
+  x <- add_sdm_cell(x)
   x$version$bmm_restructure <- current_version
   NextMethod("restructure")
 }

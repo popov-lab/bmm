@@ -44,7 +44,11 @@
       default_priors = list(
         mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
         kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        c = list(main = .sdm_c_prior[[scaling]], effects = "normal(0, 1)", sd = "exponential(1)")
+        # the same for every scaling: with kappa's default prior, a prior
+        # predictive check of the circular SD of the response error matched the
+        # default cell best at this location for the von Mises peak and range
+        # scalings too (#558, see ?sdm)
+        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
       init_ranges = list(
         mu = c(-0.5,0.5),
@@ -63,17 +67,6 @@
   density = "Memory strength parameter of the SDM distribution",
   peak = "Memory strength: the activation of the target (scaling = \"peak\")",
   range = "Memory strength: the activation of the target minus that of the location opposite it (scaling = \"range\")"
-)
-
-# c's prior per scaling (#558). With kappa's default prior, a prior
-# predictive check of the circular SD of the response error matched the
-# default cell best at a location of 2 for the peak and range scalings of the
-# von Mises activation too (Kolmogorov distance 0.06); for the Laplace
-# activation no location of c's prior alone matches (0.17 at best)
-.sdm_c_prior <- c(
-  density = "student_t(5, 2, 0.75)",
-  peak = "student_t(5, 2, 0.75)",
-  range = "student_t(5, 2, 0.75)"
 )
 
 #' @export
@@ -150,9 +143,10 @@ settable_links.sdm <- function(model) {
 #'   Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
 #'   \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
 #'   divides by the integral over the real line, \eqn{2 / \kappa}. The two
-#'   differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}). `"peak"` takes `c` as the
-#'   activation of the target, and `"range"` as the difference between the
-#'   activation of the target and that of the location opposite it.
+#'   differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at
+#'   \eqn{\kappa = 2}). `"peak"` takes `c` as the activation of the target, and
+#'   `"range"` as the difference between the activation of the target and that
+#'   of the location opposite it.
 #'
 #'   The default prior on `c` is `student_t(5, 2, 0.75)` on the log scale for
 #'   every scaling. A prior predictive check of the circular SD of the

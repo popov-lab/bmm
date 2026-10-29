@@ -23,6 +23,9 @@ test_that(".sdm_log_z() matches integrate() over the #615 cells for both activat
 
 test_that(".sdm_log_z() keeps NA cells and the constant activation of c = 0", {
   expect_identical(.sdm_log_z(c(NA, 1), 2, "laplace")[1], NA_real_)
+  expect_identical(.sdm_log_z(NA_real_, 2, "laplace"), NA_real_)
+  expect_identical(dsdm(numeric(0), 0, 3, 2), numeric(0))
+  expect_identical(dsdm(0.3, 0, NA, 2), NA_real_)
   expect_equal(.sdm_log_z(-Inf, c(0.5, 30), "vonmises"), rep(log(2 * pi), 2))
   expect_equal(.sdm_log_z(-Inf, c(0.5, 30), "laplace"), rep(log(2 * pi), 2))
 })
@@ -136,4 +139,14 @@ test_that("parametrization is deprecated and keeps the values it gave", {
     "c_bessel2sqrtexp(c, kappa)", fixed = TRUE
   )
   expect_equal(bessel, dsdm(0.3, 0, c_bessel2sqrtexp(4, 3), 3))
+})
+
+test_that("kappa = 0 gives the uniform density where the cell has a limit there", {
+  expect_equal(dsdm(c(-2, 0.5), 0, 2, 0, activation = "laplace", scaling = "density"), rep(1 / (2 * pi), 2))
+  expect_equal(dsdm(c(-2, 0.5), 0, 2, 0, activation = "laplace"), rep(1 / (2 * pi), 2))
+  expect_equal(dsdm(c(-2, 0.5), 0, 2, 0), rep(1 / (2 * pi), 2))
+  expect_equal(
+    suppressWarnings(dsdm(c(-2, 0.5), 0, 3, 0, parametrization = "bessel")),
+    rep(1 / (2 * pi), 2)
+  )
 })

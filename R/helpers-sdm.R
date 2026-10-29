@@ -30,7 +30,8 @@
     density = if (activation == "vonmises") {
       log_c + 0.5 * log(kappa / (2 * pi))
     } else {
-      log_c + log(kappa) - log(2) - .log1mexp_neg(kappa * pi)
+      # kappa / (1 - exp(-kappa pi)) tends to 1 / pi as kappa goes to 0
+      ifelse(kappa == 0, log_c - log(2 * pi), log_c + log(kappa) - log(2) - .log1mexp_neg(kappa * pi))
     },
     peak = log_c,
     range = log_c - .log1mexp_neg(if (activation == "vonmises") 2 * kappa else kappa * pi)
@@ -60,6 +61,9 @@
   kappa <- rep_len(kappa, n)
   out <- rep(NA_real_, n)
   ok <- !is.na(log_cstar) & !is.na(kappa)
+  if (!any(ok)) {
+    return(out)
+  }
   out[ok] <- log(2) + exp(log_cstar[ok]) + .sdm_log_int(log_cstar[ok], kappa[ok], activation)
   out
 }

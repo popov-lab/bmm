@@ -261,8 +261,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
 }
 
 # log c* of a d/p/q/r call. The deprecated parametrization = "bessel" takes c
-# of the exact von Mises density, which converts to the sqrtexp c of
-# scaling = "density"
+# of the exact von Mises density, whose peak is c / (2 pi I0(kappa) e^-kappa)
 .sdm_dist_log_cstar <- function(c, kappa, activation, scaling, parametrization) {
   if (identical(parametrization, "sqrtexp")) {
     warn_deprecated('parametrization = "sqrtexp"', with = 'scaling = "density"', since = "1.5.0")
@@ -270,7 +269,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
     warn_deprecated('parametrization = "bessel"', with = NULL, since = "1.5.0",
       details = 'Convert c with `c_bessel2sqrtexp(c, kappa)` and use `scaling = "density"`.'
     )
-    c <- c / (besselI(kappa, 0, expon.scaled = TRUE) * sqrt(2 * pi * kappa))
+    return(log(c) - log(2 * pi * besselI(kappa, 0, expon.scaled = TRUE)))
   }
   if (is.null(scaling)) {
     scaling <- .sdm_default_scaling(activation)

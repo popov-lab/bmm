@@ -131,9 +131,10 @@ Bessel form), and fits from before \code{scaling} existed are this cell. For the
 Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
   \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
 divides by the integral over the real line, \eqn{2 / \kappa}. The two
-differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}). \code{"peak"} takes \code{c} as the
-activation of the target, and \code{"range"} as the difference between the
-activation of the target and that of the location opposite it.
+differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at
+\eqn{\kappa = 2}). \code{"peak"} takes \code{c} as the activation of the target, and
+\code{"range"} as the difference between the activation of the target and that
+of the location opposite it.
 
 The default prior on \code{c} is \code{student_t(5, 2, 0.75)} on the log scale for
 every scaling. A prior predictive check of the circular SD of the
