@@ -247,6 +247,16 @@
   estimates reach large `c` and `kappa`. Fits such as the one in the SDM
   article change no more than sampling noise
   ([\#615](https://github.com/popov-lab/bmm/issues/615)).
+- Fits with a random slope on a predictor such as a trial number, an
+  identity link with random effects, or
+  [`mo()`](https://paulbuerkner.com/brms/reference/mo.html) or
+  [`s()`](https://paulbuerkner.com/brms/reference/s.html) terms no
+  longer stop with “Rejecting initial value” when your data bound a
+  parameter, such as `ndt`, which must stay below your fastest response
+  time. [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md) now
+  starts `ndt` below your fastest response time, as
+  [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) does
+  ([\#621](https://github.com/popov-lab/bmm/issues/621)).
 
 #### Other changes
 
