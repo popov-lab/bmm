@@ -65,7 +65,8 @@ init_stan_param <- function(spar, spec, model, standata_list) {
   if (anyNA(dim)) {
     return(NULL)
   }
-  init_ranef_param(spar, spec$types, dim) %||%
+  init_ranef_param(spar, spec$types, dim, model, standata_list) %||%
+    init_special_coef_param(spar, spec$types, dim, model, standata_list) %||%
     init_fixef_param(spar, spec$types, dim, model, standata_list) %||%
     init_default_param(spec, dim, standata_list)
 }
@@ -93,18 +94,122 @@ match_stan_to_model_par <- function(spar, model_pars) {
 
 # brms names the random-effects parameters by their role, not by the model
 # parameter; a constant on one coefficient makes brms replace a vector by
-# per-coefficient scalars named par_<vector>_<index>
-init_ranef_param <- function(spar, types, dim) {
+# per-coefficient scalars named par_<vector>_<index>. The penalized part of an
+# s() term is a random effect too (sds_*, zs_*)
+init_ranef_param <- function(spar, types, dim, model, standata_list) {
   if (any(types %in% c("cholesky_factor_corr", "cholesky_factor_cov", "cov_matrix", "corr_matrix"))) {
     return(init_identity(types, dim))
   }
-  if (grepl("^(par_)?sd_", spar)) {
-    return(init_array(runif(prod(dim), min = 0.05, max = 0.1), types, dim))
+  if (grepl("^(par_)?sds?_", spar)) {
+    shrink <- sd_entry_shrink(spar, model, standata_list)
+    if (length(shrink) != dim[1]) {
+      shrink <- 1
+    }
+    return(init_array(runif(prod(dim), min = 0.05, max = 0.1) * rep_len(shrink, prod(dim)), types, dim))
   }
-  if (grepl("^z_", spar)) {
+  if (grepl("^zs?_", spar)) {
     return(init_array(runif(prod(dim), min = -0.5, max = 0.5), types, dim))
   }
   NULL
+}
+
+# A coefficient moves its parameter by its value times the column it
+# multiplies, on the link scale. Drawn without regard to either, a random slope
+# on a trial number (1 to 40) moves it by up to 2, and an SD of 0.05 on the
+# identity link is several times the whole start range of a parameter the data
+# bound (cswald's ndt below a 0.03 s response is 0.012-0.018). Either puts some
+# rows past the bound, where the likelihood is -Inf. The draw is shrunk by the
+# largest absolute value of the column and by the width of the parameter's init
+# range on the link scale, each only where it exceeds 1 or falls short of it,
+# so a unit column on a range wider than 1 starts as before
+coef_shrink <- function(parameter, columns, model) {
+  if (is.null(parameter)) {
+    return(1)
+  }
+  link <- init_link(model$links[[parameter]])
+  range <- representable_range(model$init_ranges[[parameter]], link)
+  width <- if (is.null(range)) 1 else abs(diff(link_transform(range, link)))
+  reach <- abs(as.numeric(unlist(columns)))
+  min(1, width, na.rm = TRUE) / max(1, reach[is.finite(reach)])
+}
+
+# One factor per entry of an SD vector, in entry order: sd_<id> (whose by
+# matrix has one row per entry), its per-entry scalars par_sd_<id>_<k>, and
+# sds_<par>_<i> of an s() term, whose entry j scales the columns
+# Zs_<par>_<i>_<j> (Zs_<i>_<j> on the main dpar)
+sd_entry_shrink <- function(spar, model, standata_list) {
+  if (startsWith(spar, "sds_")) {
+    term <- sub("^sds_", "", spar)
+    parameter <- sub("_?[0-9]+$", "", term)
+    columns <- paste0("Zs_", term, "_", seq_len(standata_list[[paste0("nb_", term)]] %||% 0))
+    return(vapply(columns, function(column) {
+      coef_shrink(if (nzchar(parameter)) parameter else "mu", standata_list[[column]], model)
+    }, numeric(1), USE.NAMES = FALSE))
+  }
+  id <- sub("^(par_)?sd_([0-9]+).*$", "\\2", spar)
+  entries <- if (startsWith(spar, "par_")) {
+    as.integer(sub(".*_", "", spar))
+  } else {
+    seq_len(standata_list[[paste0("M_", id)]] %||% 0)
+  }
+  owners <- ranef_column_owners(id, model, standata_list)
+  vapply(entries, function(k) {
+    own <- owners[owners$entry %in% k, , drop = FALSE]
+    if (nrow(own) == 0) {
+      return(1)
+    }
+    coef_shrink(own$parameter[1], standata_list[own$column], model)
+  }, numeric(1))
+}
+
+# brms names the column of entry k of group term <id> Z_<id>_<par>_<k>, or
+# Z_<id>_<k> on the main dpar, and an mm() term appends _<member>; k counts
+# across every parameter the term holds. Parameter names may end in digits
+# (mu1), so the owner is found by matching the names the model and the Stan
+# data know, not by splitting at underscores. A column whose name does not
+# parse has entry NA and is not read
+ranef_column_owners <- function(id, model, standata_list) {
+  prefix <- paste0("Z_", id, "_")
+  columns <- names(standata_list)[startsWith(names(standata_list), prefix)]
+  rest <- substring(columns, nchar(prefix) + 1)
+  known <- union(names(model$parameters), sub("^K_", "", grep("^K_", names(standata_list), value = TRUE)))
+  parameter <- vapply(rest, function(r) {
+    owner <- known[startsWith(r, paste0(known, "_"))]
+    if (length(owner)) owner[which.max(nchar(owner))] else "mu"
+  }, character(1), USE.NAMES = FALSE)
+  index <- ifelse(parameter == "mu", rest, substring(rest, nchar(parameter) + 2))
+  parsed <- grepl("^[0-9]+(_[0-9]+)?$", index)
+  entry <- rep(NA_integer_, length(index))
+  entry[parsed] <- as.integer(sub("_.*$", "", index[parsed]))
+  data.frame(column = columns, parameter = parameter, entry = entry)
+}
+
+# The linear part of an s() term (bs_<par>) and the coefficients of special
+# terms such as mo() (bsp_<par>; bs and bsp on the main dpar) have no range of
+# their own and start near zero, shrunk as random-effects SDs are. mo()
+# multiplies its coefficient by up to the number of categories minus one (Jmo)
+# of each of its variables, and by any covariate it interacts with (Csp); the
+# Stan data do not say which variables belong to which coefficient, so every
+# coefficient is shrunk by all of them together, which can only shrink it more
+init_special_coef_param <- function(spar, types, dim, model, standata_list) {
+  if (!grepl("^bsp?(_|$)", spar)) {
+    return(NULL)
+  }
+  suffix <- sub("^bsp?_?", "", spar)
+  parameter <- if (nzchar(suffix)) suffix else "mu"
+  data_name <- function(prefix) paste0(prefix, if (nzchar(suffix)) "_", suffix)
+  shrink <- if (startsWith(spar, "bsp")) {
+    covariates <- standata_list[grep(paste0("^", data_name("Csp"), "_[0-9]+$"), names(standata_list))]
+    coef_shrink(parameter, prod(standata_list[[data_name("Jmo")]]) * max(1, abs(as.numeric(unlist(covariates)))), model)
+  } else {
+    columns <- standata_list[[data_name("Xs")]]
+    if (is.null(columns)) {
+      coef_shrink(parameter, NULL, model)
+    } else {
+      apply(as.matrix(columns), 2, function(column) coef_shrink(parameter, column, model))
+    }
+  }
+  init_array(runif(prod(dim), min = -0.1, max = 0.1) * rep_len(shrink, prod(dim)), types, dim)
 }
 
 # A matrix declaration names its size once; gr(by = ) declares an array of
@@ -166,6 +271,14 @@ range_coefficients <- function(X, target, centered) {
   values <- if (all(is.finite(X))) qr.coef(qr(X), rep(target, nrow(X))) else rep(NA_real_, ncol(X))
   values[is.na(values)] <- 0
   unname(if (centered) values[-1] else values)
+}
+
+# The likelihood of a response time model is -Inf wherever ndt >= rt, so the
+# start of ndt comes from the fastest response; a fixed range lies above it for
+# fast data. rt = 0 is left out: a censored response there never binds, and a
+# response of 1 there cannot be fitted with any positive ndt
+.ndt_init_range <- function(rt) {
+  c(0.4, 0.6) * min(rt[rt > 0])
 }
 
 # init_ranges of softmax parameters are declared on the sampling scale, as
