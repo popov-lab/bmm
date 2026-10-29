@@ -2,14 +2,19 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_sdm <- function(resp_error = NULL, links = NULL, version = "simple", call = NULL, ...) {
+.model_sdm <- function(resp_error = NULL, links = NULL, version = "simple",
+                       activation = "vonmises", scaling = "density", call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
-      other_vars = nlist(),
+      other_vars = nlist(activation, scaling),
       domain = "Visual working memory",
       task = "Continuous reproduction",
-      name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
+      name = if (activation == "laplace") {
+        "SDM with a Laplace activation function (Oberauer, 2023, Table 2); not the SDM proper"
+      } else {
+        "Signal Discrimination Model (SDM) by Oberauer (2023)"
+      },
       citation = glue(
         "Oberauer, K. (2023). Measurement models for visual working \\
         memory\u2014A factorial model comparison. Psychological Review, \\
@@ -23,8 +28,12 @@
       parameters = list(
         mu = glue("Location parameter of the SDM distribution (in radians; \\
                   by default fixed internally to 0)"),
-        c = "Memory strength parameter of the SDM distribution",
-        kappa = "Precision parameter of the SDM distribution"
+        c = .sdm_c_description[[scaling]],
+        kappa = if (activation == "laplace") {
+          "Precision parameter: the rate at which the Laplace activation falls with distance from the target"
+        } else {
+          "Precision parameter of the SDM distribution"
+        }
       ),
       links = list(
         mu = "tan_half",
@@ -35,7 +44,7 @@
       default_priors = list(
         mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
         kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)")
+        c = list(main = .sdm_c_prior[[scaling]], effects = "normal(0, 1)", sd = "exponential(1)")
       ),
       init_ranges = list(
         mu = c(-0.5,0.5),
@@ -48,6 +57,33 @@
   )
   out <- set_links(out, links)
   out
+}
+
+.sdm_c_description <- c(
+  density = "Memory strength parameter of the SDM distribution",
+  peak = "Memory strength: the activation of the target (scaling = \"peak\")",
+  range = "Memory strength: the activation of the target minus that of the location opposite it (scaling = \"range\")"
+)
+
+# the mean of c's prior on the log scale is set per scaling from prior
+# predictive checks of the error distribution (local recovery and prior
+# scripts of #558); "density" keeps the prior of the fits before #558
+.sdm_c_prior <- c(
+  density = "student_t(5, 2, 0.75)",
+  peak = "student_t(5, 2, 0.75)",
+  range = "student_t(5, 2, 0.75)"
+)
+
+#' @export
+print_model_details.sdm <- function(model, ...) {
+  meaning <- switch(model$other_vars$scaling,
+    peak = "the activation of the target",
+    range = "the target-opposite contrast in activation"
+  )
+  if (!is.null(meaning)) {
+    cat(glue("Scaling:    memory strength `c` is {meaning}."), "\n")
+  }
+  invisible(NULL)
 }
 
 # configure_model.sdm declares the family links itself, and the log link of `c`
@@ -93,12 +129,26 @@ settable_links.sdm <- function(model) {
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
-sdm <- function(resp_error, version = "simple", ...) {
+sdm <- function(resp_error, version = "simple", activation = c("vonmises", "laplace"),
+                scaling = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   version <- match.arg(version)
-  .model_sdm(resp_error = resp_error, version = version, call = call, ...)
+  activation <- match.arg(activation)
+  scaling <- if (is.null(scaling)) .sdm_default_scaling(activation) else match.arg(scaling, .sdm_scalings)
+  if (activation == "laplace") {
+    message2(
+      'sdm(activation = "laplace") is not the signal discrimination model of \\
+      Oberauer (2023), which uses a von Mises activation function; it is the \\
+      Laplace x Gumbel cell of his model space (Table 2). The fit is labelled \\
+      accordingly.'
+    )
+  }
+  .model_sdm(
+    resp_error = resp_error, version = version, activation = activation,
+    scaling = scaling, call = call, ...
+  )
 }
 
 #' @rdname sdm
@@ -109,12 +159,26 @@ sdmSimple <- function(resp_error, version = "simple", ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
-  .model_sdm(resp_error = resp_error, version = version, call = call, ...)
+  .model_sdm(
+    resp_error = resp_error, version = version, activation = "vonmises",
+    scaling = "density", call = call, ...
+  )
 }
 
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @export
+check_formula.sdm <- function(model, data, formula) {
+  warnif(
+    model$other_vars$activation == "laplace" && !is_constant(formula$mu),
+    "The formula estimates mu with the Laplace activation, whose density has a \\
+    kink at mu: the likelihood has a kink at every response, which gradient-based \\
+    sampling handles poorly. Consider keeping mu fixed at 0."
+  )
+  NextMethod("check_formula")
+}
 
 #' @export
 check_data.sdm <- function(model, data, formula) {
@@ -132,14 +196,21 @@ check_data.sdm <- function(model, data, formula) {
 
 #' @export
 configure_model.sdm <- function(model, data, formula) {
+  activation <- model$other_vars$activation
+  scaling <- model$other_vars$scaling
+  # the default cell keeps the family, chunks and stanvars of the fits before
+  # #558, so their Stan code stays byte-identical (test-model_sdm-stancode.R);
+  # the other cells pass the cell to Stan as two integer codes
+  family_name <- if (.sdm_is_default_cell(activation, scaling)) "sdm_simple" else "sdm_cont"
   # note - c has a log link, but I've coded it manually for computational efficiency
-  sdm_simple <- brms::custom_family(
-    name = "sdm_simple",
+  sdm_family <- brms::custom_family(
+    name = family_name,
     dpars = c("mu", "c", "kappa"),
     links = c("tan_half", "identity", "log"),
     lb = c(NA, NA, NA),
     ub = c(NA, NA, NA),
     type = "real", loop = FALSE,
+    vars = if (family_name == "sdm_cont") c("sdm_activation", "sdm_scaling"),
     log_lik = log_lik_sdm_simple,
     posterior_predict = posterior_predict_sdm_simple,
     posterior_epred = posterior_epred_sdm_simple
@@ -148,11 +219,18 @@ configure_model.sdm <- function(model, data, formula) {
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
+  if (family_name == "sdm_cont") {
+    stan_funs <- paste(
+      read_lines2(paste0(sc_path, "/sdm_kernel_funs.stan")),
+      read_lines2(paste0(sc_path, "/sdm_cont_funs.stan")),
+      sep = "\n"
+    )
+  }
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
   likelihood_file <- if (brms_slices_likelihood()) {
-    "sdm_simple_likelihood_threaded.stan"
+    paste0(family_name, "_likelihood_threaded.stan")
   } else {
-    "sdm_simple_likelihood.stan"
+    paste0(family_name, "_likelihood.stan")
   }
   stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
   run_metadata <- attr(data, "sdm_run_metadata")
@@ -163,8 +241,8 @@ configure_model.sdm <- function(model, data, formula) {
   # 16 nodes per panel and the 32-node wide rule keep log Z within 4e-12
   # where it is below 1e4 and, above it, within 5e-10 to log c = 12 and
   # kappa = 3000 and within 3 ulps beyond; where sdm_simple_ldenom()
-  # switches between them they differ by 4e-14 (#615).
-  # test-model_sdm-stan.R holds the bar
+  # switches between them they differ by 4e-14 (#615). The Laplace rule
+  # reuses the 16 nodes (#558). test-model_sdm-stan.R holds the bars
   gl <- .gl_rule(16L)
   wide <- .sdm_wide_rule()
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
@@ -177,10 +255,15 @@ configure_model.sdm <- function(model, data, formula) {
     sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
     brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
+  if (family_name == "sdm_cont") {
+    stanvars <- stanvars +
+      sdm_stanvar_int(match(activation, .sdm_activations), "sdm_activation") +
+      sdm_stanvar_int(match(scaling, .sdm_scalings), "sdm_scaling")
+  }
 
   # construct main brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
-  formula$family <- sdm_simple
+  formula$family <- sdm_family
 
   nlist(formula, data, stanvars)
 }
@@ -204,12 +287,25 @@ revert_postprocess_brm.sdm <- function(model, fit, ...) {
   fit
 }
 
+# serve both families: the codes of the cell are in the Stan data of an
+# sdm_cont fit, and an sdm_simple fit is the von Mises density cell
 log_lik_sdm_simple <- function(i, prep) {
   mu <- brms::get_dpar(prep, "mu", i = i)
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   y <- prep$data$Y[i]
-  dsdm(y, mu, c, kappa, log = T)
+  cell <- .sdm_prep_cell(prep)
+  dsdm(y, mu, c, kappa, log = TRUE, activation = cell$activation, scaling = cell$scaling)
+}
+
+.sdm_prep_cell <- function(prep) {
+  if (is.null(prep$data$sdm_activation)) {
+    return(list(activation = "vonmises", scaling = "density"))
+  }
+  list(
+    activation = .sdm_activations[prep$data$sdm_activation],
+    scaling = .sdm_scalings[prep$data$sdm_scaling]
+  )
 }
 
 posterior_epred_sdm_simple <- posterior_epred_undefined("sdm")
@@ -218,7 +314,8 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
   mu <- brms::get_dpar(prep, "mu", i = i)
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
-  rsdm(length(mu), mu, c, kappa)
+  cell <- .sdm_prep_cell(prep)
+  rsdm(length(mu), mu, c, kappa, activation = cell$activation, scaling = cell$scaling)
 }
 
 sdm_run_metadata <- function(data, formula, model) {
@@ -262,6 +359,12 @@ sdm_run_metadata <- function(data, formula, model) {
     u <- u - 0.55 * sin(u)
   }
   list(cosm1 = -2 * sin(u / 2)^2, weights = weights)
+}
+
+sdm_stanvar_int <- function(x, name) {
+  out <- brms::stanvar(x = as.integer(x), name = name, scode = paste0("int ", name, ";"))
+  out[[name]]$pll_args <- paste("data int", name)
+  out
 }
 
 sdm_stanvar_int_array <- function(x, name, size) {

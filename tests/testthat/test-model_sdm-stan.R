@@ -218,3 +218,164 @@ test_that("the Stan log-likelihood of sdm() runs matches dsdm()", {
     label = "|Stan - dsdm()| log-likelihood of the three cells as runs of one design"
   )
 })
+
+# The cells other than the default (#558) -------------------------------------
+
+# the #615 cells taken as log c of the density scaling and translated to the
+# log peak, and very small kappa with log c taken as the log peak. Stan gets
+# lc and kappa and translates: cmdstanr writes data with 15 significant
+# digits, which moves log Z by 1e-7 at log peak 15
+sdm_laplace_cells <- rbind(
+  data.frame(
+    lc = sdm_stan_cells$lc, kappa = sdm_stan_cells$kappa, translate = 1,
+    on_grid = seq_len(nrow(sdm_stan_cells)) <= nrow(sdm_issue_grid)
+  ),
+  data.frame(expand.grid(lc = c(-1, 0, 2, 5), kappa = c(0.05, 0.1)), translate = 0, on_grid = TRUE)
+)
+sdm_laplace_cells$log_peak <- with(sdm_laplace_cells, lc + translate * 0.5 * log(kappa / (2 * pi)))
+
+# Like sdm_stan_program(), for the sdm_cont chunks: the Laplace normaliser on
+# its cells, sdm_vm_ldenom_peak() against sdm_simple_ldenom() on the #615
+# cells, and the likelihood of every cell at the parity cells, one run each
+# and all as runs of one design
+sdm_cont_stan_program <- function(data_scode) {
+  chunk <- function(file) read_lines2(system.file("stan_chunks", file, package = "bmm"))
+  funs <- gsub("#include[^\n]*", "", paste(
+    chunk("sdm_simple_funs.stan"), chunk("sdm_kernel_funs.stan"), chunk("sdm_cont_funs.stan"),
+    sep = "\n"
+  ))
+  tdata <- chunk("sdm_simple_tdata.stan")
+  likelihood <- gsub("target +=", "lp +=", chunk("sdm_cont_likelihood.stan"), fixed = TRUE)
+  paste0(
+    "functions {\n", funs, "\n}\n",
+    "data {\n",
+    "  int<lower=1> K; vector[K] grid_lc; vector[K] grid_kappa;\n",
+    "  int<lower=1> L; vector[L] lap_lc; vector[L] lap_kappa; vector[L] lap_translate;\n",
+    "  int<lower=1> P; int<lower=1> n_y; vector[n_y] y_obs;\n",
+    "  vector[P] par_lc; vector[P] par_kappa;\n",
+    data_scode, "\n}\n",
+    "generated quantities {\n",
+    "  vector[L] laplace_log_z;\n",
+    "  vector[K] vm_peak_minus_simple;\n",
+    "  array[2, 3] vector[P + 1] log_lik;\n",
+    "  for (l in 1:L) {\n",
+    "    real log_peak = lap_lc[l] + lap_translate[l] * 0.5 * log(lap_kappa[l] / (2 * pi()));\n",
+    "    laplace_log_z[l] = log(2 * pi()) - sdm_laplace_ldenom(log_peak, lap_kappa[l], sdm_gl_x, sdm_gl_w);\n",
+    "  }\n",
+    "  for (k in 1:K) {\n",
+    "    vm_peak_minus_simple[k] =\n",
+    "      sdm_vm_ldenom_peak(grid_lc[k] + 0.5 * log(grid_kappa[k] / (2 * pi())), grid_kappa[k],\n",
+    "                         sdm_gl_x, sdm_gl_w, sdm_wide_cosm1, sdm_wide_w)\n",
+    "      - sdm_simple_ldenom(grid_lc[k], grid_kappa[k], sdm_gl_x, sdm_gl_w, sdm_wide_cosm1, sdm_wide_w);\n",
+    "  }\n",
+    "  for (sdm_activation in 1:2) for (sdm_scaling in 1:3) for (p in 1:(P + 1)) {\n",
+    "    int G_sdm_runs = p <= P ? 1 : P;\n",
+    "    int N = G_sdm_runs * n_y;\n",
+    "    vector[N] Y;\n",
+    "    vector[N] mu = rep_vector(0, N);\n",
+    "    vector[N] c;\n",
+    "    vector[N] kappa;\n",
+    "    array[G_sdm_runs] int sdm_run_start;\n",
+    "    array[G_sdm_runs] int sdm_run_count;\n",
+    "    real lp = 0;\n",
+    "    for (g in 1:G_sdm_runs) {\n",
+    "      int cell = p <= P ? p : g;\n",
+    "      int first = (g - 1) * n_y + 1;\n",
+    "      sdm_run_start[g] = first;\n",
+    "      sdm_run_count[g] = n_y;\n",
+    "      Y[first:(first + n_y - 1)] = y_obs;\n",
+    "      c[first:(first + n_y - 1)] = rep_vector(par_lc[cell], n_y);\n",
+    "      kappa[first:(first + n_y - 1)] = rep_vector(par_kappa[cell], n_y);\n",
+    "    }\n",
+    tdata, "\n", likelihood, "\n",
+    "    lp += sdm_cont_lpdf(Y | mu, c, kappa, sdm_activation, sdm_scaling);\n",
+    "    log_lik[sdm_activation, sdm_scaling, p] = lp;\n",
+    "  }\n",
+    "}\n"
+  )
+}
+
+sdm_cont_stan_values <- function() {
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  model <- suppressMessages(sdm(resp_error = "y", activation = "laplace"))
+  dat <- data.frame(y = sdm_parity_y)
+  stanvars <- configure_model(model, check_data(model, dat, formula), formula)$stanvars
+  not_needed <- c("G_sdm_runs", "sdm_run_start", "sdm_run_count", "sdm_activation", "sdm_scaling")
+  model_data <- Filter(function(sv) sv$block == "data" && !sv$name %in% not_needed, stanvars)
+  data <- c(
+    list(
+      K = nrow(sdm_stan_cells), grid_lc = sdm_stan_cells$lc, grid_kappa = sdm_stan_cells$kappa,
+      L = nrow(sdm_laplace_cells), lap_lc = sdm_laplace_cells$lc,
+      lap_kappa = sdm_laplace_cells$kappa, lap_translate = sdm_laplace_cells$translate,
+      P = nrow(sdm_parity_cells), n_y = length(sdm_parity_y), y_obs = sdm_parity_y,
+      par_lc = sdm_parity_cells$lc, par_kappa = sdm_parity_cells$kappa
+    ),
+    stats::setNames(lapply(model_data, `[[`, "sdata"), vapply(model_data, `[[`, "", "name"))
+  )
+  program <- sdm_cont_stan_program(paste(vapply(model_data, `[[`, "", "scode"), collapse = "\n"))
+
+  dir <- withr::local_tempdir()
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program, dir = dir), quiet = TRUE)$sample(
+    data = data, fixed_param = TRUE, chains = 1, iter_sampling = 1, iter_warmup = 0,
+    refresh = 0, show_messages = FALSE, sig_figs = 17, output_dir = dir
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#", check.names = FALSE)
+  read <- function(names) as.numeric(csv[1, names])
+  list(
+    laplace_log_z = read(paste0("laplace_log_z.", seq_len(data$L))),
+    vm_peak_minus_simple = read(paste0("vm_peak_minus_simple.", seq_len(data$K))),
+    log_lik = function(a, s) read(paste0("log_lik.", a, ".", s, ".", seq_len(data$P + 1)))
+  )
+}
+
+sdm_cont_stan_cached <- local({
+  values <- NULL
+  function() {
+    if (is.null(values)) values <<- sdm_cont_stan_values()
+    values
+  }
+})
+
+test_that("the Stan normaliser of the Laplace activation matches integrate()", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  # about 15 s: the first call compiles the program the three tests read
+  stan <- sdm_cont_stan_cached()
+  reference <- mapply(sdm_log_z_integrate, sdm_laplace_cells$log_peak, sdm_laplace_cells$kappa,
+    MoreArgs = list(activation = "laplace")
+  )
+  error <- abs(stan$laplace_log_z - reference)
+  # the rule's measured worst is 1.7e-12 against the exponential-integral
+  # series; beyond the grid an ulp of the log peak is up to 1e-8 of log Z
+  expect_lt(max(error), 1e-7)
+  expect_lt(max(error[sdm_laplace_cells$on_grid & sdm_laplace_cells$kappa <= 30]), 1e-10)
+})
+
+test_that("sdm_vm_ldenom_peak() is sdm_simple_ldenom() taking the log peak", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  stan <- sdm_cont_stan_cached()
+  expect_lt(max(abs(stan$vm_peak_minus_simple)), 1e-14)
+})
+
+test_that("the Stan log-likelihood of every sdm() cell matches dsdm()", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  stan <- sdm_cont_stan_cached()
+  for (a in 1:2) for (s in 1:3) {
+    activation <- c("vonmises", "laplace")[a]
+    scaling <- c("density", "peak", "range")[s]
+    r_log_lik <- vapply(seq_len(nrow(sdm_parity_cells)), function(i) {
+      cell <- sdm_parity_cells[i, ]
+      sum(dsdm(sdm_parity_y, 0, exp(cell$lc), cell$kappa,
+        log = TRUE, activation = activation, scaling = scaling
+      ))
+    }, numeric(1))
+    expect_lt(max(abs(stan$log_lik(a, s) - c(r_log_lik, sum(r_log_lik)))), 1e-6,
+      label = glue("|Stan - dsdm()| log-likelihood of {activation}, {scaling}")
+    )
+  }
+})

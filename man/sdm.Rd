@@ -5,7 +5,13 @@
 \alias{sdmSimple}
 \title{Signal Discrimination Model (SDM) by Oberauer (2023)}
 \usage{
-sdm(resp_error, version = "simple", ...)
+sdm(
+  resp_error,
+  version = "simple",
+  activation = c("vonmises", "laplace"),
+  scaling = NULL,
+  ...
+)
 
 sdmSimple(resp_error, version = "simple", ...)
 }
