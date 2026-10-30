@@ -70,8 +70,8 @@ rsdm(
 instead. \code{"sqrtexp"} is \code{scaling = "density"}; for \code{"bessel"}, convert \code{c}
 with \code{\link[=c_bessel2sqrtexp]{c_bessel2sqrtexp()}} and use \code{scaling = "density"}.}
 
-\item{activation}{Character; the activation function, \code{"vonmises"}
-(default) or \code{"laplace"}. See \code{\link[=sdm]{sdm()}}.}
+\item{activation}{Character; the activation kernel of the SDM,
+\code{"vonmises"} (default) or \code{"laplace"}. See \code{\link[=sdm]{sdm()}}.}
 
 \item{scaling}{Character; what \code{c} measures: \code{"density"}, \code{"peak"} or
 \code{"range"}. \code{NULL} (default) means \code{"density"} for the von Mises and
@@ -116,7 +116,9 @@ these functions computed before \code{activation} and \code{scaling} existed (th
 sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
 exact density of the von Mises distribution instead (the bessel
 parametrization); \code{c_bessel2sqrtexp()} and \code{c_sqrtexp2bessel()} convert
-between the two. See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article}.
+between the two. For the Laplace activation with \code{scaling = "density"},
+\code{c_laplace_circle2line()} and \code{c_laplace_line2circle()} convert between
+\code{bmm}'s \code{c} and that of Oberauer (2023, eq. 2). See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article}.
 
 \strong{The cumulative distribution function}
 

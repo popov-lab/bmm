@@ -130,7 +130,9 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
 #' exact density of the von Mises distribution instead (the bessel
 #' parametrization); `c_bessel2sqrtexp()` and `c_sqrtexp2bessel()` convert
-#' between the two. See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#' between the two. For the Laplace activation with `scaling = "density"`,
+#' `c_laplace_circle2line()` and `c_laplace_line2circle()` convert between
+#' `bmm`'s `c` and that of Oberauer (2023, eq. 2). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
 #'
 #' **The cumulative distribution function**
 #'

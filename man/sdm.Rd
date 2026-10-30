@@ -24,9 +24,9 @@ degrees to radians using the \code{deg2rad} function.}
 \item{version}{Character. The version of the model to use. Currently only
 "simple" is supported.}
 
-\item{activation}{Character. The activation function, \code{"vonmises"} (the
-default, the SDM of Oberauer, 2023) or \code{"laplace"}. See the section
-"Activation functions".}
+\item{activation}{Character. The activation kernel of the SDM,
+\code{"vonmises"} (the default, as in Oberauer, 2023) or \code{"laplace"}. See the
+section "Activation functions".}
 
 \item{scaling}{Character. What the memory strength \code{c} measures:
 \code{"density"}, \code{"peak"} or \code{"range"}. \code{NULL} (the default) means \code{"density"}
@@ -101,15 +101,16 @@ is \eqn{\exp(c^* s(x - \mu)) / Z}, with \eqn{Z} its integral over the
 circle.
 \itemize{
 \item \code{activation = "vonmises"}: \eqn{s(x) = \exp(\kappa (\cos x - 1))}, the
-signal discrimination model of Oberauer (2023).
+von Mises activation kernel of the signal discrimination model of Oberauer
+(2023).
 \item \code{activation = "laplace"}: \eqn{s(x) = \exp(-\kappa |x|)}, with
 \eqn{|x|} the angular distance and \eqn{\kappa} the rate of the Laplace
-activation in Oberauer (2023, eq. 2). With the Gumbel noise of the SDM this
-is the Laplace x Gumbel cell of Oberauer's model space (Table 2), not the
-SDM proper; \code{sdm()} says so when the model is built, and the fit is
-labelled accordingly. The density has a kink at \eqn{\mu}, so estimating
-\code{mu} puts a kink at every response, which gradient-based sampling handles
-poorly; \code{bmm()} warns when the formula estimates \code{mu}.
+activation in Oberauer (2023, eq. 2). This is the SDM with the Laplace
+activation kernel of Oberauer's model space (Table 2): the same Gumbel
+noise and decision rule, with \eqn{\kappa} estimated freely. The density
+has a kink at \eqn{\mu}, so estimating \code{mu} puts a kink at every
+response, which gradient-based sampling handles poorly; \code{bmm()} warns
+when the formula estimates \code{mu}.
 }
 
 With the Laplace activation \eqn{\kappa} is a rate per radian, and the
@@ -130,11 +131,13 @@ parametrization; \code{\link[=c_sqrtexp2bessel]{c_sqrtexp2bessel()}} converts to
 Bessel form), and fits from before \code{scaling} existed are this cell. For the
 Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
   \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
-divides by the integral over the real line, \eqn{2 / \kappa}. The two
-differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at
-\eqn{\kappa = 2}). \code{"peak"} takes \code{c} as the activation of the target, and
-\code{"range"} as the difference between the activation of the target and that
-of the location opposite it.
+divides by the integral over the real line, \eqn{2 / \kappa}. \code{bmm}
+keeps the exact integral over the circle, so its \code{c} is that of eq. 2
+times \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}, 0.79 at
+\eqn{\kappa = 0.5}); \code{\link[=c_laplace_circle2line]{c_laplace_circle2line()}} converts it to the \code{c}
+of eq. 2 and \code{\link[=c_laplace_line2circle]{c_laplace_line2circle()}} back. \code{"peak"} takes \code{c} as the
+activation of the target, and \code{"range"} as the difference between the
+activation of the target and that of the location opposite it.
 
 The default prior on \code{c} is \code{student_t(5, 2, 0.75)} on the log scale for
 every scaling. A prior predictive check of the circular SD of the

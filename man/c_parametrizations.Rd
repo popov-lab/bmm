@@ -4,11 +4,17 @@
 \alias{c_parametrizations}
 \alias{c_sqrtexp2bessel}
 \alias{c_bessel2sqrtexp}
+\alias{c_laplace_circle2line}
+\alias{c_laplace_line2circle}
 \title{Convert between parametrizations of the c parameter of the SDM distribution}
 \usage{
 c_sqrtexp2bessel(c, kappa)
 
 c_bessel2sqrtexp(c, kappa)
+
+c_laplace_circle2line(c, kappa)
+
+c_laplace_line2circle(c, kappa)
 }
 \arguments{
 \item{c}{Vector of memory strength values}
@@ -22,18 +28,37 @@ A numeric vector of the same length as \code{c} and \code{kappa}.
 Convert between parametrizations of the c parameter of the SDM distribution
 }
 \details{
-\code{c_bessel2sqrtexp} converts the memory strength parameter (c)
-from the bessel parametrization to the sqrtexp parametrization,
-\code{c_sqrtexp2bessel} converts from the sqrtexp parametrization to the
-bessel parametrization.
+With \code{scaling = "density"}, \code{\link[=sdm]{sdm()}} divides the memory strength \code{c}
+by the integral of the activation function. Two pairs of functions
+convert \code{c} to and from the forms used elsewhere.
 
-See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for details on the
-parameterization. The sqrtexp parametrization is the default in the
-\code{bmm} package.
+\strong{Von Mises activation.} \code{bmm} approximates the integral by
+\eqn{\sqrt{2\pi/\kappa}} (the sqrtexp parametrization, the default in
+\code{bmm}); Oberauer (2023) uses the exact von Mises density (the bessel
+parametrization). \code{c_sqrtexp2bessel} converts from the sqrtexp to the
+bessel parametrization, \code{c_bessel2sqrtexp} back. See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article}.
+
+\strong{Laplace activation.} \code{bmm} divides by the exact integral over the
+circle, \eqn{2(1 - e^{-\kappa \pi}) / \kappa}; Oberauer (2023, eq. 2)
+multiplies the activation by \eqn{\kappa / 2}, that is, divides by the
+integral over the real line, \eqn{2 / \kappa}. \code{c_laplace_circle2line}
+converts the \code{c} of \code{bmm} to that of eq. 2, \eqn{c_{line} = c_{circle} /
+  (1 - e^{-\kappa \pi})}, and \code{c_laplace_line2circle} back. The two differ
+by less than 1\% once \eqn{\kappa} exceeds 1.5. At \eqn{\kappa = 0} the
+real-line form has no finite \code{c}.
 }
 \examples{
 c_bessel <- c_sqrtexp2bessel(c = 4, kappa = 3)
 c_sqrtexp <- c_bessel2sqrtexp(c = c_bessel, kappa = 3)
 
+# c of a Laplace fit with scaling = "density", on the scale of eq. 2
+c_line <- c_laplace_circle2line(c = 4, kappa = 1)
+c_laplace_line2circle(c = c_line, kappa = 1)
+
+}
+\references{
+Oberauer, K. (2023). Measurement models for visual working
+memory - A factorial model comparison. Psychological Review, 130(3),
+841–852
 }
 \keyword{transform}

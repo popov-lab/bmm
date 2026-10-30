@@ -139,11 +139,13 @@ settable_links.sdm <- function(model) {
 #'   Bessel form), and fits from before `scaling` existed are this cell. For the
 #'   Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
 #'   \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
-#'   divides by the integral over the real line, \eqn{2 / \kappa}. The two
-#'   differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at
-#'   \eqn{\kappa = 2}). `"peak"` takes `c` as the activation of the target, and
-#'   `"range"` as the difference between the activation of the target and that
-#'   of the location opposite it.
+#'   divides by the integral over the real line, \eqn{2 / \kappa}. `bmm`
+#'   keeps the exact integral over the circle, so its `c` is that of eq. 2
+#'   times \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}, 0.79 at
+#'   \eqn{\kappa = 0.5}); [c_laplace_circle2line()] converts it to the `c`
+#'   of eq. 2 and [c_laplace_line2circle()] back. `"peak"` takes `c` as the
+#'   activation of the target, and `"range"` as the difference between the
+#'   activation of the target and that of the location opposite it.
 #'
 #'   The default prior on `c` is `student_t(5, 2, 0.75)` on the log scale for
 #'   every scaling. A prior predictive check of the circular SD of the
