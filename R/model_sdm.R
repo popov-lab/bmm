@@ -98,9 +98,9 @@ settable_links.sdm <- function(model) {
 #'   degrees to radians using the `deg2rad` function.
 #' @param version Character. The version of the model to use. Currently only
 #'   "simple" is supported.
-#' @param activation Character. The activation function, `"vonmises"` (the
-#'   default, the SDM of Oberauer, 2023) or `"laplace"`. See the section
-#'   "Activation functions".
+#' @param activation Character. The activation kernel of the SDM,
+#'   `"vonmises"` (the default, as in Oberauer, 2023) or `"laplace"`. See the
+#'   section "Activation functions".
 #' @param scaling Character. What the memory strength `c` measures:
 #'   `"density"`, `"peak"` or `"range"`. `NULL` (the default) means `"density"`
 #'   for the von Mises and `"peak"` for the Laplace activation. See the
@@ -113,15 +113,16 @@ settable_links.sdm <- function(model) {
 #'   circle.
 #'
 #'   - `activation = "vonmises"`: \eqn{s(x) = \exp(\kappa (\cos x - 1))}, the
-#'   signal discrimination model of Oberauer (2023).
+#'   von Mises activation kernel of the signal discrimination model of Oberauer
+#'   (2023).
 #'   - `activation = "laplace"`: \eqn{s(x) = \exp(-\kappa |x|)}, with
 #'   \eqn{|x|} the angular distance and \eqn{\kappa} the rate of the Laplace
-#'   activation in Oberauer (2023, eq. 2). With the Gumbel noise of the SDM this
-#'   is the Laplace x Gumbel cell of Oberauer's model space (Table 2), not the
-#'   SDM proper; `sdm()` says so when the model is built, and the fit is
-#'   labelled accordingly. The density has a kink at \eqn{\mu}, so estimating
-#'   `mu` puts a kink at every response, which gradient-based sampling handles
-#'   poorly; `bmm()` warns when the formula estimates `mu`.
+#'   activation in Oberauer (2023, eq. 2). This is the SDM with the Laplace
+#'   activation kernel of Oberauer's model space (Table 2): the same Gumbel
+#'   noise and decision rule, with \eqn{\kappa} estimated freely. The density
+#'   has a kink at \eqn{\mu}, so estimating `mu` puts a kink at every
+#'   response, which gradient-based sampling handles poorly; `bmm()` warns
+#'   when the formula estimates `mu`.
 #'
 #'   With the Laplace activation \eqn{\kappa} is a rate per radian, and the
 #'   default priors, set for the von Mises activation, put 21% of the prior
@@ -189,14 +190,6 @@ sdm <- function(resp_error, version = "simple", activation = c("vonmises", "lapl
   version <- match.arg(version)
   activation <- match.arg(activation)
   scaling <- if (is.null(scaling)) .sdm_default_scaling(activation) else match.arg(scaling, .sdm_scalings)
-  if (activation == "laplace") {
-    message2(
-      'sdm(activation = "laplace") is not the signal discrimination model of \\
-      Oberauer (2023), which uses a von Mises activation function; it is the \\
-      Laplace x Gumbel cell of his model space (Table 2). The fit is labelled \\
-      accordingly.'
-    )
-  }
   .model_sdm(
     resp_error = resp_error, version = version, activation = activation,
     scaling = scaling, call = call, ...

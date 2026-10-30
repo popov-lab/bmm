@@ -98,8 +98,8 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param parametrization Deprecated since bmm 1.5.0; use `scaling`
 #'   instead. `"sqrtexp"` is `scaling = "density"`; for `"bessel"`, convert `c`
 #'   with [c_bessel2sqrtexp()] and use `scaling = "density"`.
-#' @param activation Character; the activation function, `"vonmises"`
-#'   (default) or `"laplace"`. See [sdm()].
+#' @param activation Character; the activation kernel of the SDM,
+#'   `"vonmises"` (default) or `"laplace"`. See [sdm()].
 #' @param scaling Character; what `c` measures: `"density"`, `"peak"` or
 #'   `"range"`. `NULL` (default) means `"density"` for the von Mises and
 #'   `"peak"` for the Laplace activation. See [sdm()].

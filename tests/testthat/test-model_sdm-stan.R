@@ -297,7 +297,7 @@ sdm_cont_stan_program <- function(data_scode) {
 
 sdm_cont_stan_values <- function() {
   formula <- bmf(c ~ 1, kappa ~ 1)
-  model <- suppressMessages(sdm(resp_error = "y", activation = "laplace"))
+  model <- sdm(resp_error = "y", activation = "laplace")
   dat <- data.frame(y = sdm_parity_y)
   stanvars <- configure_model(model, check_data(model, dat, formula), formula)$stanvars
   not_needed <- c("G_sdm_runs", "sdm_run_start", "sdm_run_count", "sdm_activation", "sdm_scaling")
