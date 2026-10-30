@@ -30,7 +30,11 @@
     density = if (activation == "vonmises") {
       log_c + 0.5 * log(kappa / (2 * pi))
     } else {
-      # kappa / (1 - exp(-kappa pi)) tends to 1 / pi as kappa goes to 0
+      # kappa / (1 - exp(-kappa pi)) tends to 1 / pi as kappa goes to 0;
+      # ifelse() takes the length of its condition, so both are recycled first
+      n <- max(length(log_c), length(kappa))
+      log_c <- rep_len(log_c, n)
+      kappa <- rep_len(kappa, n)
       ifelse(kappa == 0, log_c - log(2 * pi), log_c + log(kappa) - log(2) - .log1mexp_neg(kappa * pi))
     },
     peak = log_c,

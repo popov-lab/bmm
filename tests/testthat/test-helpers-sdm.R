@@ -150,3 +150,15 @@ test_that("kappa = 0 gives the uniform density where the cell has a limit there"
     rep(1 / (2 * pi), 2)
   )
 })
+
+# K1's Laplace density scaling took its length from kappa alone
+test_that("dsdm() gives one value per c with a single kappa in every cell", {
+  for (i in seq_len(nrow(sdm_cells))) {
+    cell <- sdm_cells[i, ]
+    one_by_one <- vapply(c(5, 6, 7), function(c) {
+      dsdm(0.3, 0, c, 2, activation = cell$activation, scaling = cell$scaling)
+    }, numeric(1))
+    expect_equal(dsdm(0.3, 0, c(5, 6, 7), 2, activation = cell$activation, scaling = cell$scaling),
+                 one_by_one, label = glue("{cell$activation}, {cell$scaling}"))
+  }
+})
