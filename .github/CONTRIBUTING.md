@@ -143,7 +143,10 @@ three rules apply:
 
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data layout a
-model expects. Internal functions are not covered. Fits saved by an earlier
+model expects. The model specification accessor, the simulation generic and
+the exported density and generator functions are covered as contract items too
+([ADR 0005](../.dev/decisions/0005-model-contract-for-companions-and-extensions.md)).
+Internal functions are not covered. Fits saved by an earlier
 release are covered: they keep working with `update()` and the extraction
 functions, through `restructure()` where they need converting, or the NEWS
 bullet says they must be refitted.
@@ -183,6 +186,72 @@ it, list the removal under the same heading in the release that removes it, and
 announce it in an issue before that release (rule 3). Forms deprecated before
 1.5.0 may be removed in any later release once the removal is announced the
 same way.
+
+## Companion packages and extensions
+
+Other packages build on bmm's models. [bmmtools](https://github.com/GidonFrischkorn/bmmtools)
+simulates from them and checks parameter recovery, and the
+[model explorer](https://github.com/GidonFrischkorn/bmm-explorer) draws them.
+Packages that define their own bmm models (#442) will join them. All of them
+rely on one contract, described in
+[ADR 0005](../.dev/decisions/0005-model-contract-for-companions-and-extensions.md):
+
+- what `model_spec()` returns for a model: its name, package, version, domain
+  and task, its parameters with their links, fixed values and alternative
+  groups, its default priors and init ranges, its response and other
+  variables, the role of each data column, the names of its density and
+  generator functions, and the contract version;
+- the simulation generic `simulate_data()` and every model's method for it;
+- the exported density and generator functions, and `link_transform()`.
+
+Reading a model object with `$`, its attributes, and internal functions are
+not part of the contract. Code in other packages should not rely on them.
+`model_spec()`, `simulate_data()` and the export of `link_transform()` are
+being added for 1.5.0 (the generic possibly for 1.6.0); each item is covered
+from the release that contains it.
+
+### When your PR changes the contract
+
+A change to any item above is announced, whether or not it breaks a script.
+This extends rule 3 of "Deprecating and removing features" to the contract:
+
+1. Add a NEWS bullet under the heading `### Companion packages` in the section
+   of your release. Name the item and give the old and the new form.
+2. Before the release, a maintainer files one issue in
+   [bmmtools](https://github.com/GidonFrischkorn/bmmtools/issues) and one in
+   [bmm-explorer](https://github.com/GidonFrischkorn/bmm-explorer/issues) from
+   the "Companion package change" template, and links them in the PR.
+3. If the change also breaks user scripts, the deprecation rules above apply
+   as well.
+
+A new model is a change to the contract too: once the accessor and the
+generic are in bmm, it needs a complete `model_spec()` and a `simulate_data()`
+method. `use_model_template()` will scaffold both, and the convention tests
+will fail until they are there.
+
+### The companion packages job
+
+The workflow "Companion packages" (`.github/workflows/companions.yaml`) runs
+the tests of bmmtools and the model explorer's fixture checks against bmm as
+pushed. It runs on every push to `develop` and the `dev-*` branches, once a
+week and on demand, not on pull requests. It never blocks a merge.
+
+When it fails:
+
+- Read the failing step's summary and decide where the cause is.
+- If the failure follows from a contract change that was announced, the
+  companion issue already covers it. Nothing to do in bmm.
+- If it follows from a contract change that was not announced, announce it
+  now (steps 1 and 2 above), or revert the change if it was not intended.
+- If bmm broke something it should not have, open a bug in bmm and fix it
+  there.
+- If the companion itself is at fault, open an issue in its repository.
+
+To run the job by hand:
+
+```sh
+gh workflow run companions.yaml --repo popov-lab/bmm --ref develop
+```
 
 ## Review and merging
 
