@@ -58,7 +58,7 @@ Your PR also needs:
 - **For a new model:** read the
   [developer notes](https://venpopov.com/bmm/dev-notes/) and follow the
   one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Add a
-  recovery plan (see below).
+  recovery plan, `tests/recovery/<model>.R` (see below).
 
 ### Recovery evidence for new models
 
@@ -73,13 +73,14 @@ cover:
 - data simulated with an independent generator, not the model's own `r*`
   function, so that a bug in the density cannot cancel out.
 
-Until a card site exists, run the plan locally (see `tests/recovery/README.md`)
-and attach the rendered `card.html` to the PR, or paste a collapsed summary of
-its stage table. The run takes hours of sampling.
+You run the plan locally (see `tests/recovery/README.md`); it takes hours of
+sampling. Until a card site exists, attach
+the rendered card.html to the PR.
 
 bmmtools 0.3.0 ships defaults for `mixture2p` and `ezdm` only, and those simulate
-with bmm's own `r*` function, so pass `generator =`. For any other model, pass
-the model object and `pars`, not its name:
+with bmm's own `r*` function; other models with a bmmtools adapter (for example
+`mixture3p`) fall back to it too, so always pass `generator =`. For any other
+model, pass the model object and `pars`, not its name:
 `bmmtools::validation_plan(bmm::<model>(...), pars = c(...), generator = ..., seed = 2026)`.
 The plan is not run by `R CMD check` or CI.
 
@@ -207,7 +208,7 @@ How many reviews a PR needs depends on what it touches.
 
 A **new model** is a standard PR with one addition: the reviewer works through
 the reviewer block in the PR template. They read the likelihood against the
-cited source, run or inspect the recovery, and check the default priors on the
+cited source, read the recovery plan and inspect its card, and check the default priors on the
 natural scale.
 
 Three rules apply to all tiers:
