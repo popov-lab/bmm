@@ -336,3 +336,7 @@ last.
   change seeds every test that draws random numbers
   (`withr::local_seed()`, R8) and sets `rel.tol` in the circular
   integrate-to-1 tests, whose default tolerance failed a check of 1e-6.
+- 2026-10-30. R9 gains one item, no other rule changed: a model pull request
+  also adds a recovery plan `tests/recovery/<model>.R` (a bmmtools
+  `validation_plan()`; `.github/CONTRIBUTING.md`). `AGENTS.md` lists it in
+  R9. Review checks it; no test reads it.

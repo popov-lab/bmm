@@ -13,7 +13,7 @@
 - [ ] Targets the right branch: `develop` for fixes and the next release, `dev-x.y.0` for later features
 
 ## New model only
-- [ ] Recovery plan in `tests/recovery/<model>.R` (true vs recovered, hierarchical, independent generator); card link below when available
+- [ ] Recovery plan in `tests/recovery/<model>.R` (true vs recovered, hierarchical, independent generator so that a bug in the density cannot cancel out); card attached or linked in Review notes
 - [ ] One constructor per response type
 
 <details><summary>Reviewer (new models)</summary>

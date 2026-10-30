@@ -65,17 +65,23 @@ Your PR also needs:
 Recovery evidence is a validation plan for the
 [bmmtools](https://github.com/GidonFrischkorn/bmmtools) package. Commit the plan
 as `tests/recovery/<model>.R`, a script that builds it with
-`bmmtools::validation_plan()` (see `tests/recovery/README.md`), and link the
-validation card that `bmmtools::run_validation()` renders from it in the PR
-body once the card site is up. The plan must cover:
+`bmmtools::validation_plan()` (see `tests/recovery/README.md`). The plan must
+cover:
 
 - true against recovered values;
 - a hierarchical recovery with several subjects whose parameters vary;
 - data simulated with an independent generator, not the model's own `r*`
   function, so that a bug in the density cannot cancel out.
 
-bmmtools 0.3.0 ships defaults for `mixture2p` and `ezdm` only; for any other
-model pass `pars` yourself. The plan is not run by `R CMD check` or CI.
+Until a card site exists, run the plan locally (see `tests/recovery/README.md`)
+and attach the rendered `card.html` to the PR, or paste a collapsed summary of
+its stage table. The run takes hours of sampling.
+
+bmmtools 0.3.0 ships defaults for `mixture2p` and `ezdm` only, and those simulate
+with bmm's own `r*` function, so pass `generator =`. For any other model, pass
+the model object and `pars`, not its name:
+`bmmtools::validation_plan(bmm::<model>(...), pars = c(...), generator = ..., seed = 2026)`.
+The plan is not run by `R CMD check` or CI.
 
 ### Model fits for the website articles
 
