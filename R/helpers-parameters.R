@@ -34,20 +34,39 @@ k2sd <- function(K) {
 #' @name c_parametrizations
 #' @inheritParams SDMdist
 #' @return A numeric vector of the same length as `c` and `kappa`.
-#' @details
-#' `c_bessel2sqrtexp` converts the memory strength parameter (c)
-#'   from the bessel parametrization to the sqrtexp parametrization,
-#'   `c_sqrtexp2bessel` converts from the sqrtexp parametrization to the
-#'   bessel parametrization.
+#' @details With `scaling = "density"`, [sdm()] divides the memory strength `c`
+#'   by the integral of the activation function. Two pairs of functions
+#'   convert `c` to and from the forms used elsewhere.
+#'
+#'   **Von Mises activation.** `bmm` approximates the integral by
+#'   \eqn{\sqrt{2\pi/\kappa}} (the sqrtexp parametrization, the default in
+#'   `bmm`); Oberauer (2023) uses the exact von Mises density (the bessel
+#'   parametrization). `c_sqrtexp2bessel` converts from the sqrtexp to the
+#'   bessel parametrization, `c_bessel2sqrtexp` back. See [the online
+#'   article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#'
+#'   **Laplace activation.** `bmm` divides by the exact integral over the
+#'   circle, \eqn{2(1 - e^{-\kappa \pi}) / \kappa}; Oberauer (2023, eq. 2)
+#'   multiplies the activation by \eqn{\kappa / 2}, that is, divides by the
+#'   integral over the real line, \eqn{2 / \kappa}. `c_laplace_circle2line`
+#'   converts the `c` of `bmm` to that of eq. 2, \eqn{c_{line} = c_{circle} /
+#'   (1 - e^{-\kappa \pi})}, and `c_laplace_line2circle` back. The two differ
+#'   by less than 1% once \eqn{\kappa} exceeds 1.5. At \eqn{\kappa = 0} the
+#'   real-line form has no finite `c`; `c_laplace_circle2line()` returns `Inf`
+#'   there, and `NaN` when `c` is 0 as well.
+#' @references Oberauer, K. (2023). Measurement models for visual working
+#'   memory - A factorial model comparison. Psychological Review, 130(3),
+#'   841–852
 #' @keywords transform
-#' @details See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
-#'   parameterization. The sqrtexp parametrization is the default in the
-#'   `bmm` package.
 #' @export
 #'
 #' @examples
 #' c_bessel <- c_sqrtexp2bessel(c = 4, kappa = 3)
 #' c_sqrtexp <- c_bessel2sqrtexp(c = c_bessel, kappa = 3)
+#'
+#' # c of a Laplace fit with scaling = "density", on the scale of eq. 2
+#' c_line <- c_laplace_circle2line(c = 4, kappa = 1)
+#' c_laplace_line2circle(c = c_line, kappa = 1)
 #'
 c_sqrtexp2bessel <- function(c, kappa) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
@@ -62,6 +81,24 @@ c_bessel2sqrtexp <- function(c, kappa) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
   c / (besselI(kappa, 0, expon.scaled = TRUE) * sqrt(2 * pi * kappa))
+}
+
+#' @rdname c_parametrizations
+#' @keywords transform
+#' @export
+c_laplace_circle2line <- function(c, kappa) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  c / abs(expm1(-kappa * pi))
+}
+
+#' @rdname c_parametrizations
+#' @keywords transform
+#' @export
+c_laplace_line2circle <- function(c, kappa) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  c * abs(expm1(-kappa * pi))
 }
 
 #' Transform values between the native and the parameter scale of a link

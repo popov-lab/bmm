@@ -5,7 +5,13 @@
 \alias{sdmSimple}
 \title{Signal Discrimination Model (SDM)}
 \usage{
-sdm(resp_error, version = "simple", ...)
+sdm(
+  resp_error,
+  version = "simple",
+  activation = c("vonmises", "laplace"),
+  scaling = NULL,
+  ...
+)
 
 sdmSimple(resp_error, version = "simple", ...)
 }
@@ -17,6 +23,15 @@ degrees to radians using the \code{deg2rad} function.}
 
 \item{version}{Character. The version of the model to use. Currently only
 "simple" is supported.}
+
+\item{activation}{Character. The activation kernel of the SDM,
+\code{"vonmises"} (the default, as in Oberauer, 2023) or \code{"laplace"}. See the
+section "Activation functions".}
+
+\item{scaling}{Character. What the memory strength \code{c} measures:
+\code{"density"}, \code{"peak"} or \code{"range"}. \code{NULL} (the default) means \code{"density"}
+for the von Mises and \code{"peak"} for the Laplace activation. See the
+sections "Scaling of the activation" and "What \code{c} means".}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -78,6 +93,83 @@ and how to use it. * \strong{Domain:} Working memory
 }
 }
 }
+\section{Activation functions}{
+ Each response \eqn{x} is activated by
+\eqn{c^* s(x - \mu)}, where the activation function \eqn{s} is 1 at the
+target and \eqn{c^*} is the activation of the target; the response density
+is \eqn{\exp(c^* s(x - \mu)) / Z}, with \eqn{Z} its integral over the
+circle.
+\itemize{
+\item \code{activation = "vonmises"}: \eqn{s(x) = \exp(\kappa (\cos x - 1))}, the
+von Mises activation kernel of the signal discrimination model of Oberauer
+(2023).
+\item \code{activation = "laplace"}: \eqn{s(x) = \exp(-\kappa |x|)}, with
+\eqn{|x|} the angular distance and \eqn{\kappa} the rate of the Laplace
+activation in Oberauer (2023, eq. 2). This is the SDM with the Laplace
+activation kernel of Oberauer's model space (Table 2): the same Gumbel
+noise and decision rule, with \eqn{\kappa} estimated freely. The density
+has a kink at \eqn{\mu}, so estimating \code{mu} puts a kink at every
+response, which gradient-based sampling handles poorly; \code{bmm()} warns
+when the formula estimates \code{mu}.
+}
+}
+
+\section{Scaling of the activation}{
+ \code{scaling} decides how \code{c} translates
+into the activation of the target \eqn{c^*}; the table in "What \code{c}
+means" gives the formulas. \code{"density"} divides \code{c} by the integral of
+\eqn{s} over the circle, so \code{c} weighs an activation of unit area. For the
+von Mises activation that integral is approximated by
+\eqn{\sqrt{2\pi/\kappa}}, the form \code{bmm} has always used (the "sqrtexp"
+parametrization; \code{\link[=c_sqrtexp2bessel]{c_sqrtexp2bessel()}} converts to Oberauer's exact
+Bessel form), and fits from before \code{scaling} existed are this cell. For the
+Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
+  \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
+divides by the integral over the real line, \eqn{2 / \kappa}. \code{bmm}
+keeps the exact integral over the circle, so its \code{c} is that of eq. 2
+times \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}, 0.79 at
+\eqn{\kappa = 0.5}); \code{\link[=c_laplace_circle2line]{c_laplace_circle2line()}} converts it to the \code{c}
+of eq. 2 and \code{\link[=c_laplace_line2circle]{c_laplace_line2circle()}} back. \code{"peak"} takes \code{c} as the
+activation of the target, and \code{"range"} as the difference between the
+activation of the target and that of the location opposite it.
+}
+
+\section{Default priors}{
+ \code{kappa} and \code{c} mean different things in each
+cell, so each cell has its own \code{main} priors (log scale; the \code{effects} and
+\code{sd} priors are the same everywhere). They were chosen in a prior
+predictive check so that the implied distributions of the circular SD of
+the response error are comparable across cells, not exactly matched. The
+last column is the share of prior predictive distributions with a circular
+SD below 0.05 radians; the Laplace cells still produce more of these
+spikes. The von Mises peak and range cells keep the priors of the
+default cell, which already give them comparable error distributions
+(Kolmogorov-Smirnov distance 0.06 to the default cell); the Laplace cells
+needed their own. Set your own priors where that matters.\tabular{lllll}{
+   \code{activation} \tab \code{scaling} \tab \code{c} \tab \code{kappa} \tab circular SD < 0.05 \cr
+   \code{"vonmises"} \tab \code{"density"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.07 \cr
+   \code{"vonmises"} \tab \code{"peak"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.03 \cr
+   \code{"vonmises"} \tab \code{"range"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.03 \cr
+   \code{"laplace"} \tab \code{"density"} \tab \code{student_t(5, 3.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.16 \cr
+   \code{"laplace"} \tab \code{"peak"} \tab \code{student_t(5, 2.5, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.11 \cr
+   \code{"laplace"} \tab \code{"range"} \tab \code{student_t(5, 2.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.09 \cr
+}
+}
+
+\section{What \code{c} means}{
+\tabular{llll}{
+   \code{scaling} \tab \eqn{c^*}, von Mises \tab \eqn{c^*}, Laplace \tab \code{c} is \cr
+   \code{"density"} \tab \eqn{c \sqrt{\kappa / 2\pi}} \tab \eqn{c \kappa / (2 (1 - e^{-\kappa \pi}))} \tab the weight of an activation of unit area \cr
+   \code{"peak"} \tab \eqn{c} \tab \eqn{c} \tab the activation of the target \cr
+   \code{"range"} \tab \eqn{c / (1 - e^{-2\kappa})} \tab \eqn{c / (1 - e^{-\kappa \pi})} \tab the target-opposite contrast in activation \cr
+}
+
+
+For a given data set the three scalings give the same likelihood at
+values of \code{c} related by these formulas; what differs is which quantity
+the regression formula for \code{c} and its prior act on.
+}
+
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # simulate data from the model

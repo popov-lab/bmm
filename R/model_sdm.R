@@ -2,11 +2,12 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_sdm <- function(resp_error = NULL, links = NULL, version = "simple", call = NULL, ...) {
+.model_sdm <- function(resp_error = NULL, links = NULL, version = "simple",
+                       activation = "vonmises", scaling = "density", call = NULL, ...) {
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
-      other_vars = nlist(),
+      other_vars = nlist(activation, scaling),
       domain = "Working memory",
       task = "Continuous reproduction",
       name = "Signal Discrimination Model (SDM)",
@@ -23,8 +24,12 @@
       parameters = list(
         mu = glue("Location parameter of the SDM distribution (in radians; \\
                   by default fixed internally to 0)"),
-        c = "Memory strength parameter of the SDM distribution",
-        kappa = "Precision parameter of the SDM distribution"
+        c = .sdm_c_description[[scaling]],
+        kappa = if (activation == "laplace") {
+          "Precision parameter: the rate at which the Laplace activation falls with distance from the target"
+        } else {
+          "Precision parameter of the SDM distribution"
+        }
       ),
       links = list(
         mu = "tan_half",
@@ -34,8 +39,8 @@
       fixed_parameters = list(mu = 0),
       default_priors = list(
         mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
-        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)")
+        kappa = list(main = .sdm_main_priors[[activation]]$kappa, effects = "normal(0, 1)", sd = "exponential(1)"),
+        c = list(main = .sdm_main_priors[[activation]]$c[[scaling]], effects = "normal(0, 1)", sd = "exponential(1)")
       ),
       init_ranges = list(
         mu = c(-0.5,0.5),
@@ -48,6 +53,38 @@
   )
   out <- set_links(out, links)
   out
+}
+
+# kappa and c mean different things per cell, so the same prior would imply very
+# different response errors; these make the implied circular SD of the response
+# error comparable across cells, not equal (#558, see ?sdm)
+.sdm_main_priors <- list(
+  vonmises = list(
+    kappa = "student_t(5, 1.75, 0.75)",
+    c = c(density = "student_t(5, 2, 0.75)", peak = "student_t(5, 2, 0.75)", range = "student_t(5, 2, 0.75)")
+  ),
+  laplace = list(
+    kappa = "student_t(5, -0.5, 0.75)",
+    c = c(density = "student_t(5, 3.25, 0.75)", peak = "student_t(5, 2.5, 0.75)", range = "student_t(5, 2.25, 0.75)")
+  )
+)
+
+.sdm_c_description <- c(
+  density = "Memory strength parameter of the SDM distribution",
+  peak = "Memory strength: the activation of the target (scaling = \"peak\")",
+  range = "Memory strength: the activation of the target minus that of the location opposite it (scaling = \"range\")"
+)
+
+#' @export
+print_model_details.sdm <- function(model, ...) {
+  meaning <- switch(model$other_vars$scaling,
+    peak = "the activation of the target",
+    range = "the target-opposite contrast in activation"
+  )
+  if (!is.null(meaning)) {
+    cat(glue("Scaling:    memory strength `c` is {meaning}."), "\n")
+  }
+  invisible(NULL)
 }
 
 # configure_model.sdm declares the family links itself, and the log link of `c`
@@ -71,7 +108,79 @@ settable_links.sdm <- function(model) {
 #'   degrees to radians using the `deg2rad` function.
 #' @param version Character. The version of the model to use. Currently only
 #'   "simple" is supported.
+#' @param activation Character. The activation kernel of the SDM,
+#'   `"vonmises"` (the default, as in Oberauer, 2023) or `"laplace"`. See the
+#'   section "Activation functions".
+#' @param scaling Character. What the memory strength `c` measures:
+#'   `"density"`, `"peak"` or `"range"`. `NULL` (the default) means `"density"`
+#'   for the von Mises and `"peak"` for the Laplace activation. See the
+#'   sections "Scaling of the activation" and "What `c` means".
 #' @param ... used internally for testing, ignore it
+#' @section Activation functions: Each response \eqn{x} is activated by
+#'   \eqn{c^* s(x - \mu)}, where the activation function \eqn{s} is 1 at the
+#'   target and \eqn{c^*} is the activation of the target; the response density
+#'   is \eqn{\exp(c^* s(x - \mu)) / Z}, with \eqn{Z} its integral over the
+#'   circle.
+#'
+#'   - `activation = "vonmises"`: \eqn{s(x) = \exp(\kappa (\cos x - 1))}, the
+#'   von Mises activation kernel of the signal discrimination model of Oberauer
+#'   (2023).
+#'   - `activation = "laplace"`: \eqn{s(x) = \exp(-\kappa |x|)}, with
+#'   \eqn{|x|} the angular distance and \eqn{\kappa} the rate of the Laplace
+#'   activation in Oberauer (2023, eq. 2). This is the SDM with the Laplace
+#'   activation kernel of Oberauer's model space (Table 2): the same Gumbel
+#'   noise and decision rule, with \eqn{\kappa} estimated freely. The density
+#'   has a kink at \eqn{\mu}, so estimating `mu` puts a kink at every
+#'   response, which gradient-based sampling handles poorly; `bmm()` warns
+#'   when the formula estimates `mu`.
+#' @section Scaling of the activation: `scaling` decides how `c` translates
+#'   into the activation of the target \eqn{c^*}; the table in "What `c`
+#'   means" gives the formulas. `"density"` divides `c` by the integral of
+#'   \eqn{s} over the circle, so `c` weighs an activation of unit area. For the
+#'   von Mises activation that integral is approximated by
+#'   \eqn{\sqrt{2\pi/\kappa}}, the form `bmm` has always used (the "sqrtexp"
+#'   parametrization; [c_sqrtexp2bessel()] converts to Oberauer's exact
+#'   Bessel form), and fits from before `scaling` existed are this cell. For the
+#'   Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
+#'   \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
+#'   divides by the integral over the real line, \eqn{2 / \kappa}. `bmm`
+#'   keeps the exact integral over the circle, so its `c` is that of eq. 2
+#'   times \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}, 0.79 at
+#'   \eqn{\kappa = 0.5}); [c_laplace_circle2line()] converts it to the `c`
+#'   of eq. 2 and [c_laplace_line2circle()] back. `"peak"` takes `c` as the
+#'   activation of the target, and `"range"` as the difference between the
+#'   activation of the target and that of the location opposite it.
+#' @section Default priors: `kappa` and `c` mean different things in each
+#'   cell, so each cell has its own `main` priors (log scale; the `effects` and
+#'   `sd` priors are the same everywhere). They were chosen in a prior
+#'   predictive check so that the implied distributions of the circular SD of
+#'   the response error are comparable across cells, not exactly matched. The
+#'   last column is the share of prior predictive distributions with a circular
+#'   SD below 0.05 radians; the Laplace cells still produce more of these
+#'   spikes. The von Mises peak and range cells keep the priors of the
+#'   default cell, which already give them comparable error distributions
+#'   (Kolmogorov-Smirnov distance 0.06 to the default cell); the Laplace cells
+#'   needed their own. Set your own priors where that matters.
+#'
+#'   | `activation` | `scaling` | `c` | `kappa` | circular SD < 0.05 |
+#'   |---|---|---|---|---|
+#'   | `"vonmises"` | `"density"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.07 |
+#'   | `"vonmises"` | `"peak"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.03 |
+#'   | `"vonmises"` | `"range"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.03 |
+#'   | `"laplace"` | `"density"` | `student_t(5, 3.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.16 |
+#'   | `"laplace"` | `"peak"` | `student_t(5, 2.5, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.11 |
+#'   | `"laplace"` | `"range"` | `student_t(5, 2.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.09 |
+#' @section What `c` means:
+#'
+#'   | `scaling` | \eqn{c^*}, von Mises | \eqn{c^*}, Laplace | `c` is |
+#'   |---|---|---|---|
+#'   | `"density"` | \eqn{c \sqrt{\kappa / 2\pi}} | \eqn{c \kappa / (2 (1 - e^{-\kappa \pi}))} | the weight of an activation of unit area |
+#'   | `"peak"` | \eqn{c} | \eqn{c} | the activation of the target |
+#'   | `"range"` | \eqn{c / (1 - e^{-2\kappa})} | \eqn{c / (1 - e^{-\kappa \pi})} | the target-opposite contrast in activation |
+#'
+#'   For a given data set the three scalings give the same likelihood at
+#'   values of `c` related by these formulas; what differs is which quantity
+#'   the regression formula for `c` and its prior act on.
 #' @return An object of class `bmmodel`
 #' @export
 #' @keywords bmmodel
@@ -93,12 +202,18 @@ settable_links.sdm <- function(model) {
 #'   cores = 4,
 #'   backend = "cmdstanr"
 #' )
-sdm <- function(resp_error, version = "simple", ...) {
+sdm <- function(resp_error, version = "simple", activation = c("vonmises", "laplace"),
+                scaling = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   version <- match.arg(version)
-  .model_sdm(resp_error = resp_error, version = version, call = call, ...)
+  activation <- match.arg(activation)
+  scaling <- if (is.null(scaling)) .sdm_default_scaling(activation) else match.arg(scaling, .sdm_scalings)
+  .model_sdm(
+    resp_error = resp_error, version = version, activation = activation,
+    scaling = scaling, call = call, ...
+  )
 }
 
 #' @rdname sdm
@@ -109,12 +224,26 @@ sdmSimple <- function(resp_error, version = "simple", ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
-  .model_sdm(resp_error = resp_error, version = version, call = call, ...)
+  .model_sdm(
+    resp_error = resp_error, version = version, activation = "vonmises",
+    scaling = "density", call = call, ...
+  )
 }
 
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @export
+check_formula.sdm <- function(model, data, formula) {
+  warnif(
+    model$other_vars$activation == "laplace" && !is_constant(formula$mu),
+    "The formula estimates mu with the Laplace activation, whose density has a \\
+    kink at mu: the likelihood has a kink at every response, which gradient-based \\
+    sampling handles poorly. Consider keeping mu fixed at 0."
+  )
+  NextMethod("check_formula")
+}
 
 #' @export
 check_data.sdm <- function(model, data, formula) {
@@ -132,14 +261,21 @@ check_data.sdm <- function(model, data, formula) {
 
 #' @export
 configure_model.sdm <- function(model, data, formula) {
+  activation <- model$other_vars$activation
+  scaling <- model$other_vars$scaling
+  # the default cell keeps the family, chunks and stanvars of the fits before
+  # #558, so their Stan code stays byte-identical (test-model_sdm-stancode.R);
+  # the other cells pass the cell to Stan as two integer codes
+  family_name <- if (.sdm_is_default_cell(activation, scaling)) "sdm_simple" else "sdm_cont"
   # note - c has a log link, but I've coded it manually for computational efficiency
-  sdm_simple <- brms::custom_family(
-    name = "sdm_simple",
+  sdm_family <- brms::custom_family(
+    name = family_name,
     dpars = c("mu", "c", "kappa"),
     links = c("tan_half", "identity", "log"),
     lb = c(NA, NA, NA),
     ub = c(NA, NA, NA),
     type = "real", loop = FALSE,
+    vars = if (family_name == "sdm_cont") c("sdm_activation", "sdm_scaling"),
     log_lik = log_lik_sdm_simple,
     posterior_predict = posterior_predict_sdm_simple,
     posterior_epred = posterior_epred_sdm_simple
@@ -148,11 +284,18 @@ configure_model.sdm <- function(model, data, formula) {
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_functions.stan"))
+  if (family_name == "sdm_cont") {
+    stan_funs <- paste(
+      read_lines2(paste0(sc_path, "/sdm_kernel_functions.stan")),
+      read_lines2(paste0(sc_path, "/sdm_cont_functions.stan")),
+      sep = "\n"
+    )
+  }
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
   likelihood_file <- if (brms_slices_likelihood()) {
-    "sdm_simple_likelihood_threaded.stan"
+    paste0(family_name, "_likelihood_threaded.stan")
   } else {
-    "sdm_simple_likelihood.stan"
+    paste0(family_name, "_likelihood.stan")
   }
   stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
   run_metadata <- attr(data, "sdm_run_metadata")
@@ -163,8 +306,8 @@ configure_model.sdm <- function(model, data, formula) {
   # 16 nodes per panel and the 32-node wide rule keep log Z within 4e-12
   # where it is below 1e4 and, above it, within 5e-10 to log c = 12 and
   # kappa = 3000 and within 3 ulps beyond; where sdm_simple_ldenom()
-  # switches between them they differ by 4e-14 (#615).
-  # test-model_sdm-stan.R holds the bar
+  # switches between them they differ by 4e-14 (#615). The Laplace rule
+  # reuses the 16 nodes (#558). test-model_sdm-stan.R holds the bars
   gl <- .gl_rule(16L)
   wide <- .sdm_wide_rule()
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
@@ -177,10 +320,15 @@ configure_model.sdm <- function(model, data, formula) {
     sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
     brms::stanvar(scode = stan_likelihood, block = "likelihood", position = "end")
+  if (family_name == "sdm_cont") {
+    stanvars <- stanvars +
+      sdm_stanvar_int(match(activation, .sdm_activations), "sdm_activation") +
+      sdm_stanvar_int(match(scaling, .sdm_scalings), "sdm_scaling")
+  }
 
   # construct main brms formula from the bmm formula
   formula <- bmf2bf(model, formula)
-  formula$family <- sdm_simple
+  formula$family <- sdm_family
 
   nlist(formula, data, stanvars)
 }
@@ -204,12 +352,25 @@ revert_postprocess_brm.sdm <- function(model, fit, ...) {
   fit
 }
 
+# serve both families: the codes of the cell are in the Stan data of an
+# sdm_cont fit, and an sdm_simple fit is the von Mises density cell
 log_lik_sdm_simple <- function(i, prep) {
   mu <- brms::get_dpar(prep, "mu", i = i)
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   y <- prep$data$Y[i]
-  dsdm(y, mu, c, kappa, log = T)
+  cell <- .sdm_prep_cell(prep)
+  dsdm(y, mu, c, kappa, log = TRUE, activation = cell$activation, scaling = cell$scaling)
+}
+
+.sdm_prep_cell <- function(prep) {
+  if (is.null(prep$data$sdm_activation)) {
+    return(list(activation = "vonmises", scaling = "density"))
+  }
+  list(
+    activation = .sdm_activations[prep$data$sdm_activation],
+    scaling = .sdm_scalings[prep$data$sdm_scaling]
+  )
 }
 
 posterior_epred_sdm_simple <- posterior_epred_undefined("sdm")
@@ -218,7 +379,8 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
   mu <- brms::get_dpar(prep, "mu", i = i)
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
-  rsdm(length(mu), mu, c, kappa)
+  cell <- .sdm_prep_cell(prep)
+  rsdm(length(mu), mu, c, kappa, activation = cell$activation, scaling = cell$scaling)
 }
 
 sdm_run_metadata <- function(data, formula, model) {
@@ -262,6 +424,12 @@ sdm_run_metadata <- function(data, formula, model) {
     u <- u - 0.55 * sin(u)
   }
   list(cosm1 = -2 * sin(u / 2)^2, weights = weights)
+}
+
+sdm_stanvar_int <- function(x, name) {
+  out <- brms::stanvar(x = as.integer(x), name = name, scode = paste0("int ", name, ";"))
+  out[[name]]$pll_args <- paste("data int", name)
+  out
 }
 
 sdm_stanvar_int_array <- function(x, name, size) {

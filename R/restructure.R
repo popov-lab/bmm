@@ -32,6 +32,7 @@ restructure.bmmfit <- function(x, ...) {
   # not gated by version: development fits carry the current version number
   # and can still predate the function
   x <- add_posterior_epred(x)
+  x <- add_sdm_cell(x)
 
   if (restr_version >= current_version) {
     x <- NextMethod("restructure")
@@ -95,6 +96,8 @@ restructure.bmmfit <- function(x, ...) {
     class(x$bmm$model) <- cl
   }
 
+  # again after the renames: a fit from 0.4.5 to 0.4.7 still has class sdmSimple above
+  x <- add_sdm_cell(x)
   x$version$bmm_restructure <- current_version
   NextMethod("restructure")
 }
@@ -125,6 +128,19 @@ add_posterior_epred <- function(x) {
   if (inherits(x$family, "customfamily")) {
     x$family$posterior_epred <- fun
   }
+  x
+}
+
+# sdm() fits from before #558 carry no activation or scaling; they are the
+# von Mises activation with the density scaling. Like add_posterior_epred(),
+# not gated by version
+add_sdm_cell <- function(x) {
+  model <- x$bmm$model
+  if (!inherits(model, "sdm") || !is.null(model$other_vars$activation)) {
+    return(x)
+  }
+  x$bmm$model$other_vars$activation <- "vonmises"
+  x$bmm$model$other_vars$scaling <- "density"
   x
 }
 
