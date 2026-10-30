@@ -21,7 +21,8 @@ the parameter scale; \code{TRUE} transforms from the parameter scale to the
 native scale.}
 }
 \value{
-A numeric vector of the same length as \code{values}.
+The transformed values, with the length and dimensions of \code{values}
+(a matrix stays a matrix).
 }
 \description{
 \code{link_transform()} applies one of the links bmm uses for model parameters to
@@ -50,11 +51,15 @@ scale, \code{eta} one on the parameter scale.\tabular{llll}{
 }
 
 
-Values outside these ranges are not checked; most give \code{NaN} (\code{NA} for
-\code{"softplus"}) with a warning. \code{"tan_half"} reads \code{x} as an angle: a value
+Values outside these ranges are not checked. For the links other than
+\code{"tan_half"}, a value at an edge the range excludes, such as \code{0} for \code{"log"}
+and \code{"inverse"} or \code{1} for \code{"logit"}, gives \code{-Inf} or \code{Inf} without a
+warning, and a value beyond it gives \code{NaN} (\code{NA} for \code{"softplus"}) with a
+warning. \code{"tan_half"} reads \code{x} as an angle: a value
 outside \code{-pi} to \code{pi} gives the \code{eta} of the same angle inside that range,
 and returns that angle on the way back. \code{"sqrt"} squares on the way back, so
-a negative \code{eta} does not return the \code{x} it came from.
+a negative \code{eta} comes back as its absolute value: \code{-3} gives \code{9}, and \code{9}
+gives \code{3}.
 
 The table holds the links that transform one value at a time. It does not
 include \code{"softmax"}, the link of the mixture weights of models such as
@@ -63,7 +68,10 @@ reference position, so \code{link_transform()} stops for it, as for any other
 name that is not in the table. \code{\link[=parameter_info]{parameter_info()}} shows the link of each
 parameter of a model in its \code{link} column; a parameter with \code{"softmax"}
 there is not covered by \code{link_transform()}. For the weights on the native
-scale, use \code{\link[=native_parameters]{native_parameters()}} or \code{\link[=softmax]{softmax()}}.
+scale, use \code{\link[=native_parameters]{native_parameters()}}, or \code{\link[=softmax]{softmax()}} on the weights of a group
+with a \code{0} for the reference weight appended: for \code{\link[=mixture3p]{mixture3p()}},
+\code{softmax(c(thetat, thetant, 0))} gives the probabilities of a target, a
+non-target and a guessing response.
 }
 \examples{
 # a probability on the parameter scale of a logit link, and back

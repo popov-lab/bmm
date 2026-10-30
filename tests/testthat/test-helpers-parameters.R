@@ -1102,6 +1102,22 @@ test_that("link_transform() passes NA through at its position", {
   expect_link_keeps_na("cloglog", x = c(0.2, 0.9), eta = c(-3, 1.5))
 })
 
+test_that("link_transform() gives an infinite eta without a warning at an edge its native range excludes", {
+  expect_identical(expect_silent(link_transform(0, "log")), -Inf)
+  expect_identical(expect_silent(link_transform(0, "softplus")), -Inf)
+  expect_identical(expect_silent(link_transform(-1, "log1p")), -Inf)
+  expect_identical(expect_silent(link_transform(1, "logm1")), -Inf)
+  expect_identical(expect_silent(link_transform(0, "inverse")), Inf)
+  expect_identical(expect_silent(link_transform(c(0, 1), "logit")), c(-Inf, Inf))
+  expect_identical(expect_silent(link_transform(c(0, 1), "probit")), c(-Inf, Inf))
+  expect_identical(expect_silent(link_transform(c(0, 1), "loglog")), c(Inf, -Inf))
+  expect_identical(expect_silent(link_transform(c(0, 1), "cloglog")), c(-Inf, Inf))
+  expect_warning(beyond_logit <- link_transform(1.5, "logit"))
+  expect_identical(beyond_logit, NaN)
+  expect_warning(beyond_softplus <- link_transform(-0.5, "softplus"))
+  expect_true(is.na(beyond_softplus) && !is.nan(beyond_softplus))
+})
+
 test_that("link_transform() implements the twelve links in the same order in both directions", {
   switch_names <- function(e) {
     if (!is.call(e)) return(list())
@@ -1135,6 +1151,19 @@ test_that("the help page of link_transform() names the twelve links in code orde
   link_text <- paste(unlist(link_item[[1]][[2]]), collapse = "")
   quoted <- regmatches(link_text, gregexpr("\"[a-z0-9_]+\"", link_text))[[1]]
   expect_identical(quoted, paste0("\"", link_names_in_code_order, "\""))
+
+  details <- rd[[which(vapply(rd, tag, "") == "\\details")]]
+  tabular <- Filter(function(x) identical(tag(x), "\\tabular"), details)
+  expect_length(tabular, 1)
+  cell_text <- vapply(tabular[[1]][[2]], function(x) {
+    switch(tag(x), "\\tab" = "\001", "\\cr" = "\002", paste(unlist(x), collapse = ""))
+  }, "")
+  rows <- strsplit(paste(cell_text, collapse = ""), "\002", fixed = TRUE)[[1]]
+  link_column <- trimws(vapply(strsplit(rows, "\001", fixed = TRUE), `[`, "", 1))
+  expect_identical(
+    link_column[link_column != ""],
+    c("link", paste0("\"", link_names_in_code_order, "\""))
+  )
 
   expect_match(section_text("\\details"), "softmax", fixed = TRUE)
   expect_match(section_text("\\details"), "parameter_info", fixed = TRUE)

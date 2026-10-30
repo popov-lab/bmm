@@ -104,11 +104,15 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #' | `"loglog"` | `log(-log(x))` | `exp(-exp(eta))` | `0 < x < 1` |
 #' | `"cloglog"` | `log(-log(1 - x))` | `1 - exp(-exp(eta))` | `0 < x < 1` |
 #'
-#' Values outside these ranges are not checked; most give `NaN` (`NA` for
-#' `"softplus"`) with a warning. `"tan_half"` reads `x` as an angle: a value
+#' Values outside these ranges are not checked. For the links other than
+#' `"tan_half"`, a value at an edge the range excludes, such as `0` for `"log"`
+#' and `"inverse"` or `1` for `"logit"`, gives `-Inf` or `Inf` without a
+#' warning, and a value beyond it gives `NaN` (`NA` for `"softplus"`) with a
+#' warning. `"tan_half"` reads `x` as an angle: a value
 #' outside `-pi` to `pi` gives the `eta` of the same angle inside that range,
 #' and returns that angle on the way back. `"sqrt"` squares on the way back, so
-#' a negative `eta` does not return the `x` it came from.
+#' a negative `eta` comes back as its absolute value: `-3` gives `9`, and `9`
+#' gives `3`.
 #'
 #' The table holds the links that transform one value at a time. It does not
 #' include `"softmax"`, the link of the mixture weights of models such as
@@ -117,9 +121,13 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #' name that is not in the table. [parameter_info()] shows the link of each
 #' parameter of a model in its `link` column; a parameter with `"softmax"`
 #' there is not covered by `link_transform()`. For the weights on the native
-#' scale, use [native_parameters()] or [softmax()].
+#' scale, use [native_parameters()], or [softmax()] on the weights of a group
+#' with a `0` for the reference weight appended: for [mixture3p()],
+#' `softmax(c(thetat, thetant, 0))` gives the probabilities of a target, a
+#' non-target and a guessing response.
 #'
-#' @return A numeric vector of the same length as `values`.
+#' @return The transformed values, with the length and dimensions of `values`
+#'   (a matrix stays a matrix).
 #'
 #' @seealso [parameter_info()] for the link of each parameter of a model,
 #'   [native_parameters()] for the parameters of a fitted model on their native
