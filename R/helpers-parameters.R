@@ -52,7 +52,8 @@ k2sd <- function(K) {
 #'   converts the `c` of `bmm` to that of eq. 2, \eqn{c_{line} = c_{circle} /
 #'   (1 - e^{-\kappa \pi})}, and `c_laplace_line2circle` back. The two differ
 #'   by less than 1% once \eqn{\kappa} exceeds 1.5. At \eqn{\kappa = 0} the
-#'   real-line form has no finite `c`.
+#'   real-line form has no finite `c`; `c_laplace_circle2line()` returns `Inf`
+#'   there, and `NaN` when `c` is 0 as well.
 #' @references Oberauer, K. (2023). Measurement models for visual working
 #'   memory - A factorial model comparison. Psychological Review, 130(3),
 #'   841–852
@@ -88,7 +89,7 @@ c_bessel2sqrtexp <- function(c, kappa) {
 c_laplace_circle2line <- function(c, kappa) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
-  c / -expm1(-kappa * pi)
+  c / abs(expm1(-kappa * pi))
 }
 
 #' @rdname c_parametrizations
@@ -97,7 +98,7 @@ c_laplace_circle2line <- function(c, kappa) {
 c_laplace_line2circle <- function(c, kappa) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
-  c * -expm1(-kappa * pi)
+  c * abs(expm1(-kappa * pi))
 }
 
 #' @title Transform values from the native to parameter scale or vice versa according to a link function

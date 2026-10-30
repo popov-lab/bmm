@@ -45,7 +45,8 @@ integral over the real line, \eqn{2 / \kappa}. \code{c_laplace_circle2line}
 converts the \code{c} of \code{bmm} to that of eq. 2, \eqn{c_{line} = c_{circle} /
   (1 - e^{-\kappa \pi})}, and \code{c_laplace_line2circle} back. The two differ
 by less than 1\% once \eqn{\kappa} exceeds 1.5. At \eqn{\kappa = 0} the
-real-line form has no finite \code{c}.
+real-line form has no finite \code{c}; \code{c_laplace_circle2line()} returns \code{Inf}
+there, and \code{NaN} when \code{c} is 0 as well.
 }
 \examples{
 c_bessel <- c_sqrtexp2bessel(c = 4, kappa = 3)
