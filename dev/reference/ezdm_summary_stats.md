@@ -196,7 +196,7 @@ ezdm_summary_stats(rt, response)
 # 4par version with separate upper/lower moments
 ezdm_summary_stats(rt, response, version = "4par")
 #>    mean_rt_upper mean_rt_lower var_rt_upper var_rt_lower n_upper n_trials
-#> mu     0.7751185     0.7755717   0.04176804    0.0161435      82      100
+#> mu     0.7751185     0.7755742   0.04176804   0.01614321      82      100
 #>    contaminant_prop_upper contaminant_prop_lower
-#> mu           5.349368e-08           5.214748e-08
+#> mu           5.349368e-08           4.963068e-08
 ```

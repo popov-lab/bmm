@@ -66,6 +66,15 @@
   such as `loo`, are removed from the result, because they describe the
   old chains only; add them again
   ([\#555](https://github.com/popov-lab/bmm/issues/555)).
+- [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
+  is now exported. It converts values between the native scale of a
+  model parameter and the scale of its link (`log`, `logit`, `tan_half`
+  and nine others), so packages that transform bmm parameters can use
+  bmm’s table and need no copy. The `softmax` link of mixture weights is
+  not part of it;
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+  returns the weights
+  ([\#635](https://github.com/popov-lab/bmm/issues/635)).
 
 #### Bug fixes
 

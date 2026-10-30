@@ -335,6 +335,10 @@ Utility functions for transforming data and parameters
 - [`k2sd()`](https://venpopov.com/bmm/dev/reference/k2sd.md) : Transform
   kappa of the von Mises distribution to the circular standard deviation
 
+- [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
+  : Transform values between the native and the parameter scale of a
+  link
+
 - [`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md)
   :
 

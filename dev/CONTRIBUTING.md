@@ -177,8 +177,9 @@ on, three rules apply:
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data
 layout a model expects. From the release that adds or exports them,
-`model_spec()`, `simulate_data()` and `link_transform()` are covered too
-([ADR
+`model_spec()`, `simulate_data()` and
+[`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
+are covered too ([ADR
 0005](https://venpopov.com/bmm/.dev/decisions/0005-model-contract-for-companions-and-extensions.md)).
 Internal functions are not covered. Fits saved by an earlier release are
 covered: they keep working with
@@ -244,15 +245,17 @@ them rely on one contract, described in [ADR
   density and generator functions, and the contract version;
 - the simulation generic `simulate_data()` and every model’s method for
   it;
-- the exported density and generator functions, and `link_transform()`.
+- the exported density and generator functions, and
+  [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md).
 
 Reading a model object with `$`, its attributes, and internal functions
 are not part of the contract. Code in other packages should not rely on
 them. `model_spec()`, `simulate_data()` and the export of
-`link_transform()` are being added for 1.5.0 (the generic possibly for
-1.6.0); each item is covered from the release that contains it. Until
-the 1.6.0 release pins contract version 1.0, the contract may still
-change, and the announcement rule below applies to every such change.
+[`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
+are being added for 1.5.0 (the generic possibly for 1.6.0); each item is
+covered from the release that contains it. Until the 1.6.0 release pins
+contract version 1.0, the contract may still change, and the
+announcement rule below applies to every such change.
 
 ### When your PR changes the contract
 
