@@ -131,3 +131,146 @@ test_that("a fit from 0.4.5 to 0.4.7, whose model class is still sdmSimple, gets
   expect_identical(fit$bmm$model$other_vars, list(activation = "vonmises", scaling = "density"))
   expect_output(print(fit$bmm$model), "Parameters:")
 })
+
+# Discrete response options and option sets (#558, K2) -------------------------
+
+grid_prep <- function(Y, dpars, extra = list(), K = 360L, activation = 1L, scaling = 1L) {
+  structure(list(
+    dpars = dpars,
+    data = c(list(Y = Y, sdm_K = K, sdm_activation = activation, sdm_scaling = scaling), extra),
+    ndraws = nrow(dpars$c), nobs = length(Y)
+  ), class = "brmsprep")
+}
+
+test_that("a model with n_options gets the sdm_grid family and the density-scale constant", {
+  dat <- data.frame(y = deg2rad(c(0, 10, -20, 5)), cond = c("a", "a", "b", "b"))
+  formula <- bmf(c ~ cond, kappa ~ 1)
+  for (i in seq_len(nrow(sdm_cells))) {
+    cell <- sdm_cells[i, ]
+    model <- suppressMessages(sdm("y", activation = cell$activation, scaling = cell$scaling, n_options = 360))
+    code <- stancode(formula, dat, model)
+    expect_match(code, "target += sdm_grid_lpmf(Y | mu, c, kappa, sdm_K, sdm_activation, sdm_scaling);",
+                 fixed = TRUE)
+    expect_match(code, "target += -sdm_grid_cells_lse(", fixed = TRUE)
+    expect_match(code, "target += -N * log(2 * pi() / sdm_K);", fixed = TRUE)
+    expect_match(code, "array[N] int Y;", fixed = TRUE)
+    expect_false(grepl("sdm_simple_lpdf|sdm_cont_lpdf", code))
+    sdata <- standata(formula, dat, model)
+    expect_identical(as.integer(sdata$Y), c(0L, 10L, -20L, 5L))
+    expect_identical(as.integer(sdata$sdm_activation), match(cell$activation, c("vonmises", "laplace")))
+    expect_identical(as.integer(sdata$sdm_scaling), match(cell$scaling, c("density", "peak", "range")))
+  }
+  threaded <- stancode(formula, dat, sdm("y", n_options = 360), threads = brms::threading(2))
+  expect_match(threaded, "ptarget += sdm_grid_lpmf(Y[start:end] | mu, c, kappa, sdm_K, sdm_activation, sdm_scaling);",
+               fixed = TRUE)
+  expect_match(threaded, "sdm_grid_cells_lse_slice(", fixed = TRUE)
+})
+
+# brms 2.23 passes vint columns to the threaded partial_log_lik() although the
+# family does not read them; the probe that the per-trial option columns reach
+# the data in both programs
+test_that("the option columns reach brms as vint terms in the serial and threaded programs", {
+  dat <- data.frame(y = deg2rad(c(0, 90, -90)), o1 = 0, o2 = deg2rad(c(90, 90, -90)))
+  model <- sdm("y", n_options = 360, options = c("o1", "o2"))
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  # two cells in three rows, which messages
+  serial <- suppressMessages(stancode(formula, dat, model))
+  expect_match(serial, "array[N] int vint1;", fixed = TRUE)
+  expect_match(serial, "array[N] int vint2;", fixed = TRUE)
+  threaded <- suppressMessages(stancode(formula, dat, model, threads = brms::threading(2)))
+  expect_match(threaded, "data array[] int vint1, data array[] int vint2", fixed = TRUE)
+  sdata <- suppressMessages(standata(formula, dat, model))
+  expect_identical(as.integer(sdata$vint1), c(0L, 0L, 0L))
+  expect_identical(as.integer(sdata$vint2), c(90L, 90L, -90L))
+})
+
+test_that("log_lik() of the full wheel is dsdm() with n_options, for every cell", {
+  draws <- matrix(c(5, 6, 7, 5, 6, 7), 3)
+  dpars <- list(mu = matrix(c(0, 0, 0, 0.1, 0.1, 0.1), 3), c = draws, kappa = matrix(2, 3, 2))
+  for (a in 1:2) for (s in 1:3) {
+    prep <- grid_prep(c(3L, -40L), dpars, activation = a, scaling = s)
+    activation <- c("vonmises", "laplace")[a]
+    scaling <- c("density", "peak", "range")[s]
+    expect_equal(
+      log_lik_sdm_grid(2, prep),
+      dsdm(deg2rad(-40), 0.1, c(5, 6, 7), 2, n_options = 360, log = TRUE, activation = activation,
+           scaling = scaling),
+      tolerance = 1e-12
+    )
+  }
+})
+
+test_that("log_lik() of an option set is dsdm() with the trial's options", {
+  draws <- matrix(c(5, 6, 7, 5, 6, 7), 3)
+  dpars <- list(mu = matrix(0, 3, 2), c = draws, kappa = matrix(2, 3, 2))
+  absent <- .option_absent(360L)
+  extra <- list(vint1 = c(0L, 0L), vint2 = c(90L, -45L), vint3 = c(absent, 45L))
+  prep <- grid_prep(c(90L, 45L), dpars, extra)
+  expect_equal(
+    log_lik_sdm_grid(1, prep),
+    dsdm(deg2rad(90), 0, c(5, 6, 7), 2, n_options = 360, options = deg2rad(c(0, 90)), log = TRUE),
+    tolerance = 1e-12
+  )
+  expect_equal(
+    log_lik_sdm_grid(2, prep),
+    dsdm(deg2rad(45), 0, c(5, 6, 7), 2, n_options = 360, options = deg2rad(c(0, -45, 45)), log = TRUE),
+    tolerance = 1e-12
+  )
+})
+
+test_that("posterior_predict() draws offered option offsets in steps", {
+  withr::local_seed(558)
+  n <- 2000
+  dpars <- list(mu = matrix(0, n, 2), c = matrix(3, n, 2), kappa = matrix(2, n, 2))
+  absent <- .option_absent(360L)
+  prep <- grid_prep(c(0L, 120L), dpars, list(vint1 = c(0L, 0L), vint2 = c(120L, 120L),
+                                             vint3 = c(-120L, absent)))
+  pred <- posterior_predict_sdm_grid(1, prep)
+  expect_setequal(unique(pred), c(0L, 120L, -120L))
+  expected <- dsdm(0, 0, 3, 2, n_options = 360, options = deg2rad(c(0, 120, -120))) * 2 * pi / 360
+  expect_lt(abs(mean(pred == 0) - expected), 0.03)
+  expect_setequal(unique(posterior_predict_sdm_grid(2, prep)), c(0L, 120L))
+  full <- posterior_predict_sdm_grid(1, grid_prep(c(0L, 1L), dpars, K = 8L))
+  expect_true(all(full %in% -3:4))
+})
+
+test_that("a draw whose activation is narrower than a step gives a post-fit warning", {
+  dat <- data.frame(y = deg2rad(c(0, 1, -2)))
+  model <- sdm("y", n_options = 90)
+  # w = 1 / sqrt(max(c*, 1) kappa) against the step 2 pi / 90 = 0.07: c* = 50
+  # with kappa = 300 gives 0.008, c* = 2 with kappa = 3 gives 0.41
+  narrow <- list(mu = matrix(0, 2, 3), c = matrix(c(50, 2), 2, 3), kappa = matrix(c(300, 3), 2, 3))
+  prep <- structure(list(dpars = narrow, data = list(sdm_K = 90L, sdm_activation = 1L, sdm_scaling = 2L),
+                         ndraws = 2, nobs = 3), class = "brmsprep")
+  expect_warning(.sdm_check_grid(model, prep), "In 1 of 2 posterior draws")
+  prep$dpars$kappa[] <- 3
+  expect_no_warning(.sdm_check_grid(model, prep))
+  expect_no_warning(.sdm_check_grid(sdm("y"), prep))
+})
+
+test_that("each grid cell runs the bmm() pipeline on the mock backend", {
+  dat <- small_data()
+  dat$opt1 <- 0
+  # the response on the 1-degree grid, and the opposite option where it is the target
+  dat$opt2 <- deg2rad(round(rad2deg(dat$dev_rad)))
+  dat$opt2[dat$opt2 == 0] <- pi
+  dat$cont <- seq(0, 1, length.out = nrow(dat))
+  formula <- bmf(c ~ set_size, kappa ~ 1)
+  models <- list(
+    full = sdm("dev_rad", n_options = 360),
+    laplace = suppressMessages(sdm("dev_rad", n_options = 360, activation = "laplace")),
+    sets = sdm("dev_rad", n_options = 360, options = c("opt1", "opt2")),
+    shorthand = sdm("dev_rad", n_options = 360, n_alternatives = 4)
+  )
+  dat_short <- dat
+  dat_short$dev_rad <- round(dat$dev_rad / (pi / 2)) * pi / 2
+  for (name in names(models)) {
+    data <- if (name == "shorthand") dat_short else dat
+    fit <- suppressMessages(bmm(formula, data, models[[name]], backend = "mock", mock_fit = 1, rename = FALSE))
+    expect_s3_class(fit, "bmmfit")
+    expect_identical(fit$family$name, "sdm_grid", label = name)
+  }
+  per_trial <- suppressMessages(bmm(bmf(c ~ cont, kappa ~ 1), dat, models$full,
+                                    backend = "mock", mock_fit = 1, rename = FALSE))
+  expect_identical(per_trial$family$name, "sdm_grid")
+})

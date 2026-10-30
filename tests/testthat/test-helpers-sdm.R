@@ -151,6 +151,119 @@ test_that("kappa = 0 gives the uniform density where the cell has a limit there"
   )
 })
 
+# Discrete response options (#558, K2) -----------------------------------------
+
+test_that("dsdm() with n_options times the step sums to 1 over the grid for every cell", {
+  for (K in c(4L, 90L, 360L)) {
+    x <- 2 * pi * (seq_len(K) - K / 2) / K
+    for (i in seq_len(nrow(sdm_cells))) {
+      cell <- sdm_cells[i, ]
+      for (par in list(c(0, 2, 3), c(0.3, 40, 0.5), c(-1.7, 0.2, 80))) {
+        total <- sum(dsdm(x, par[1], par[2], par[3],
+          n_options = K, activation = cell$activation, scaling = cell$scaling
+        )) * 2 * pi / K
+        expect_lt(abs(total - 1), 1e-12,
+          label = glue("|sum - 1| at K {K}, {cell$activation}, {cell$scaling}, mu {par[1]}")
+        )
+      }
+    }
+  }
+})
+
+test_that("dsdm() with n_options is the softmax over the options on the density scale", {
+  K <- 12
+  x <- 2 * pi * (-5:6) / K
+  a <- 7 * exp(-3 * (1 - cos(x - 0.2)))
+  by_hand <- a - log(sum(exp(a))) - log(2 * pi / K)
+  expect_equal(dsdm(x, 0.2, 7, 3, n_options = K, scaling = "peak", log = TRUE), by_hand, tolerance = 1e-13)
+  # a response is taken at its nearest option
+  expect_equal(dsdm(x + 0.2, 0.2, 7, 3, n_options = K, scaling = "peak"), exp(by_hand), tolerance = 1e-13)
+})
+
+test_that("dsdm() with options is the softmax over the offered options", {
+  options <- deg2rad(c(0, 45, 180, -90))
+  values <- dsdm(options, 0, 4, 2, n_options = 360, options = options, log = TRUE)
+  expect_lt(abs(sum(exp(values)) * 2 * pi / 360 - 1), 1e-13)
+  a <- .sdm_log_cstar(log(4), 2, "vonmises", "density")
+  a <- exp(a - 2 * 2 * sin(options / 2)^2)
+  expect_equal(values, a - log(sum(exp(a))) - log(2 * pi / 360), tolerance = 1e-13)
+  # a response the trial did not offer has no probability
+  expect_identical(dsdm(deg2rad(90), 0, 4, 2, n_options = 360, options = options), 0)
+  expect_identical(dsdm(deg2rad(90), 0, 4, 2, n_options = 360, options = options, log = TRUE), -Inf)
+})
+
+test_that("dsdm() refuses options without n_options and a bad n_options", {
+  expect_error(dsdm(0, options = c(0, 1)), "need `n_options`")
+  expect_error(dsdm(0, n_options = 7), "even whole number of at least 4")
+  expect_error(rsdm(3, n_options = 5.5), "even whole number of at least 4")
+})
+
+# The discrete von Mises SDM is the continuous one where the activation is
+# wider than a few steps (k2_logs/discrete_vs_continuous.md): the error in log
+# Z falls as exp(-2.2 r^2) in r = w / h, w = 1 / sqrt(max(c*, 1) kappa), and
+# is below 1e-10 from r = 2.25 on. Laplace never converges: its kink at the
+# target makes the step error of the grid sum O(h^2 c* kappa)
+test_that("the discrete density approaches the continuous one with the measured curve", {
+  # on both grids
+  x <- 2 * pi * c(-44, -10, 0, 1, 7, 45) / 90
+  cells <- expand.grid(lc = c(-1, 0, 1, 2, 3, 5), kappa = c(0.5, 2, 10, 50, 300), K = c(90, 360))
+  for (i in seq_len(nrow(cells))) {
+    cell <- cells[i, ]
+    log_cstar <- .sdm_log_cstar(cell$lc, cell$kappa, "vonmises", "density")
+    r <- 1 / sqrt(max(exp(log_cstar), 1) * cell$kappa) / (2 * pi / cell$K)
+    discrete <- dsdm(x, 0, exp(cell$lc), cell$kappa, n_options = cell$K, log = TRUE)
+    continuous <- dsdm(x, 0, exp(cell$lc), cell$kappa, log = TRUE)
+    if (r < 0.75) next
+    bound <- if (r >= 2.25) 1e-10 else max(1e-10, exp(-4 * r^2))
+    expect_lt(max(abs(discrete - continuous)), bound,
+      label = glue("|discrete - continuous| at log c {cell$lc}, kappa {cell$kappa}, K {cell$K}, r {signif(r, 3)}")
+    )
+  }
+  laplace <- abs(dsdm(0, 0, 50, 20, n_options = 360, activation = "laplace", log = TRUE) -
+    dsdm(0, 0, 50, 20, activation = "laplace", log = TRUE))
+  expect_gt(laplace, 1e-3)
+})
+
+test_that("rsdm() with n_options or options draws option centres with their probabilities", {
+  withr::local_seed(558)
+  draws <- rsdm(40000, 0, 3, 2, n_options = 8)
+  steps <- draws / (2 * pi / 8)
+  expect_lt(max(abs(steps - round(steps))), 1e-12)
+  expect_true(all(draws > -pi & draws <= pi))
+  x <- 2 * pi * (-3:4) / 8
+  expected <- dsdm(x, 0, 3, 2, n_options = 8) * 2 * pi / 8
+  observed <- tabulate(round(steps) + 4, 8) / 40000
+  expect_lt(max(abs(observed - expected)), 0.01)
+
+  options <- deg2rad(c(0, 120, -120))
+  draws <- rsdm(30000, 0, 3, 2, n_options = 360, options = options)
+  expect_setequal(round(rad2deg(unique(draws))), c(0, 120, -120))
+  expected <- dsdm(options, 0, 3, 2, n_options = 360, options = options) * 2 * pi / 360
+  observed <- vapply(options, function(o) mean(abs(draws - o) < 1e-9), numeric(1))
+  expect_lt(max(abs(observed - expected)), 0.01)
+})
+
+# The softmax of d f under Gumbel noise, with the von Mises similarity scaled
+# to 1 at the target and 0 opposite it, f = (s - s(pi)) / (1 - s(pi)), is
+# sdm(scaling = "range") with c = d: the constant cancels in the softmax.
+# dtcc() is on the TCC branch until TCC-K3 brings both together
+test_that("dsdm() with n_options is tcc(noise = 'gumbel') with a von Mises similarity", {
+  skip_if_not(exists("dtcc", envir = asNamespace("bmm"), inherits = FALSE), "dtcc() not on this branch")
+  dtcc <- get("dtcc", envir = asNamespace("bmm"))
+  x <- 2 * pi * (-179:180) / 360
+  for (kappa in c(0.5, 3, 30)) {
+    s <- exp(-2 * kappa * sin(2 * pi * (0:180) / 360 / 2)^2)
+    f <- (s - exp(-2 * kappa)) / -expm1(-2 * kappa)
+    for (d in c(0.5, 4, 20)) {
+      expect_equal(
+        dtcc(x, d, similarity = f, noise = "gumbel", log = TRUE) - log(2 * pi / 360),
+        dsdm(x, 0, d, kappa, n_options = 360, scaling = "range", log = TRUE),
+        tolerance = 1e-10
+      )
+    }
+  }
+})
+
 # K1's Laplace density scaling took its length from kappa alone
 test_that("dsdm() gives one value per c with a single kappa in every cell", {
   for (i in seq_len(nrow(sdm_cells))) {

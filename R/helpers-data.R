@@ -87,8 +87,9 @@ check_data.circular <- function(model, data, formula) {
     not_in(resp_name, colnames(data)),
     "The response variable '{resp_name}' is not present in the data."
   )
+  # with units = "bins" the response counts option steps
   warnif(
-    max(abs(data[[resp_name]]), na.rm = TRUE) > 2 * pi,
+    !identical(model$other_vars$units, "bins") && max(abs(data[[resp_name]]), na.rm = TRUE) > 2 * pi,
     "It appears your response variable is in degrees.
     The model requires the response variable to be in radians.
     The model will continue to run, but the results may be compromised."

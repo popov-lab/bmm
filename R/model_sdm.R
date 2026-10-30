@@ -3,11 +3,17 @@
 ############################################################################# !
 
 .model_sdm <- function(resp_error = NULL, links = NULL, version = "simple",
-                       activation = "vonmises", scaling = "density", call = NULL, ...) {
+                       activation = "vonmises", scaling = "density", n_options = NULL,
+                       units = "radians", options = NULL, n_alternatives = NULL, call = NULL, ...) {
+  # the option arguments enter other_vars only when given, so the continuous
+  # model keeps the other_vars of fits from before them
+  option_vars <- if (!is.null(n_options)) {
+    Filter(Negate(is.null), nlist(n_options, units, options, n_alternatives))
+  }
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
-      other_vars = nlist(activation, scaling),
+      other_vars = c(nlist(activation, scaling), option_vars),
       domain = "Visual working memory",
       task = "Continuous reproduction",
       name = if (activation == "laplace") {
@@ -56,7 +62,8 @@
         c = c(4,6)
       )
     ),
-    class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
+    class = c("bmmodel", "circular", if (!is.null(n_options)) "option_set", "sdm",
+              paste0("sdm_", version)),
     call = call
   )
   out <- set_links(out, links)
@@ -77,6 +84,18 @@ print_model_details.sdm <- function(model, ...) {
   )
   if (!is.null(meaning)) {
     cat(glue("Scaling:    memory strength `c` is {meaning}."), "\n")
+  }
+  n_options <- model$other_vars$n_options
+  if (!is.null(n_options)) {
+    n_alternatives <- model$other_vars$n_alternatives
+    offered <- if (!is.null(model$other_vars$options)) {
+      "the options each trial offers"
+    } else if (is.numeric(n_alternatives)) {
+      glue("{n_alternatives} equally spaced options")
+    } else {
+      "all of them"
+    }
+    cat(glue("Options:    {n_options} positions on the wheel; each response is a choice among {offered}."), "\n")
   }
   invisible(NULL)
 }
@@ -109,7 +128,89 @@ settable_links.sdm <- function(model) {
 #'   `"density"`, `"peak"` or `"range"`. `NULL` (the default) means `"density"`
 #'   for the von Mises and `"peak"` for the Laplace activation. See the
 #'   sections "Scaling of the activation" and "What `c` means".
+#' @param n_options `NULL` (the default) for a continuous response, or the
+#'   number of equally spaced response options on the wheel, an even number of
+#'   at least 4: 360 for a colour wheel in 1-degree steps. Each response is
+#'   then a choice among these options. See the section "Discrete response
+#'   options".
+#' @param options The names of the columns holding the options offered on
+#'   each trial, one column per option, in the units of `resp_error` and
+#'   relative to the target; rows that offer fewer options hold `NA` in the
+#'   remaining columns. Needs `n_options`, the grid the options sit on. See the
+#'   section "Forced-choice option sets".
+#' @param n_alternatives With `options`, optionally the name of a column
+#'   holding the number of options offered on each trial, which is checked
+#'   against the option columns. Without `options`, a single number `m`: each
+#'   trial offers `m` equally spaced options, the target among them, as in the
+#'   m-alternative tasks of Robinson et al. (2023).
+#' @param units With `n_options`, the units of `resp_error` and of the option
+#'   columns: `"radians"` (the default), binned to the nearest option, or
+#'   `"bins"`, whole option steps from the target (any integer, taken modulo
+#'   `n_options`).
 #' @param ... used internally for testing, ignore it
+#' @section Discrete response options: With `n_options = K`, the response is a
+#'   choice among \eqn{K} equally spaced options, and the probability of the
+#'   option at offset \eqn{x} from the target is the softmax of the activation
+#'   over the options, \eqn{\exp(c^* s(x - \mu)) / \sum_k \exp(c^* s(x_k -
+#'   \mu))}: the SDM with Gumbel noise on a wheel of \eqn{K} options. Use it
+#'   when participants chose among discrete options, as on a colour wheel of
+#'   360 colours, and especially when the options are coarse.
+#'
+#'   The log-likelihood is reported on the density scale, \eqn{\log P -
+#'   \log(2\pi / K)}, so `loo()` of a discrete fit can be compared with that
+#'   of a continuous `sdm()` fit of the same responses. For the von Mises
+#'   activation the two models agree wherever the activation spans a few
+#'   steps: with \eqn{w = 1 / \sqrt{\max(c^*, 1) \kappa}}, the log-likelihood
+#'   of a trial differs by less than 1e-10 once \eqn{w} is at least 2.25
+#'   steps of \eqn{2\pi / K}, by about 1e-5 at one step, and by more below.
+#'   `bmm()` warns after the fit when a posterior draw has \eqn{w} below one
+#'   step; the discrete likelihood is then still exact, but a comparison with
+#'   a continuous fit is not. For the Laplace activation the two never agree
+#'   to that precision, because its kink at the target makes the sum over the
+#'   options differ from the integral by a term of the order of the step.
+#'
+#'   The likelihood needs one sum over the options per combination of
+#'   parameter values and option set. As in the continuous model, rows share
+#'   parameter values when they share the values of all predictors, which
+#'   is fastest when they are adjacent, so bmm offers to sort the data by the
+#'   predictors. With a
+#'   continuous predictor every trial has its own sum; for the von Mises
+#'   activation the sum over the full wheel is then replaced by the continuous
+#'   normaliser wherever \eqn{w} is at least 2.25 steps, which changes the
+#'   log-likelihood by less than 1e-10 and costs about as much as the
+#'   continuous model. `posterior_predict()` returns option offsets from the
+#'   target in steps; multiply by `2 * pi / n_options` for radians.
+#'
+#'   Fits from before `n_options` existed are continuous, and `n_options =
+#'   NULL` keeps that model unchanged.
+#' @section Forced-choice option sets: With `options`, each trial offers the
+#'   options in its row of the option columns, which must include the target
+#'   (an offset of 0) and the response, and must sit on the grid of
+#'   `n_options` positions (values within a tenth of a step are rounded onto
+#'   it, with a message). The probability of the response is the softmax over
+#'   the offered options only. Sets may differ in size and spacing from trial
+#'   to trial, and trials that offer the same options, in any order, share one
+#'   normalising sum within each combination of parameter values. A data set
+#'   could look like this, for trials with two and four options in radians:
+#'
+#'   | `error` | `opt1` | `opt2` | `opt3` | `opt4` |
+#'   |---|---|---|---|---|
+#'   | 0 | 0 | 3.142 | NA | NA |
+#'   | 1.571 | 0 | 1.571 | 3.142 | -1.571 |
+#'
+#'   fitted with `sdm("error", n_options = 360, options = paste0("opt", 1:4))`.
+#'   Robinson et al. (2023) compared such m-alternative tasks with 2, 4, 8 and
+#'   16 equally spaced colours; for that design `n_alternatives = m` builds the
+#'   option columns. They found that the softmax parameter varied with the
+#'   number of alternatives while the d' of a signal detection model with
+#'   normal noise did not; with `options`, the SDM, whose Gumbel noise makes it
+#'   a softmax model, can be fitted across set sizes to test that for its
+#'   memory strength `c`.
+#'
+#'   Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F. (2023). How do
+#'   people build up visual memory representations from sensory evidence?
+#'   Revisiting two classic models of choice. Journal of Mathematical
+#'   Psychology, 117, 102805. https://doi.org/10.1016/j.jmp.2023.102805
 #' @section Activation functions: Each response \eqn{x} is activated by
 #'   \eqn{c^* s(x - \mu)}, where the activation function \eqn{s} is 1 at the
 #'   target and \eqn{c^*} is the activation of the target; the response density
@@ -186,13 +287,16 @@ settable_links.sdm <- function(model) {
 #'   backend = "cmdstanr"
 #' )
 sdm <- function(resp_error, version = "simple", activation = c("vonmises", "laplace"),
-                scaling = NULL, ...) {
+                scaling = NULL, n_options = NULL, options = NULL, n_alternatives = NULL,
+                units = c("radians", "bins"), ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   version <- match.arg(version)
   activation <- match.arg(activation)
   scaling <- if (is.null(scaling)) .sdm_default_scaling(activation) else match.arg(scaling, .sdm_scalings)
+  units <- match.arg(units)
+  option_args <- .check_option_args(n_options, options, n_alternatives, units)
   if (activation == "laplace") {
     message2(
       'sdm(activation = "laplace") is not the signal discrimination model of \\
@@ -203,7 +307,8 @@ sdm <- function(resp_error, version = "simple", activation = c("vonmises", "lapl
   }
   .model_sdm(
     resp_error = resp_error, version = version, activation = activation,
-    scaling = scaling, call = call, ...
+    scaling = scaling, n_options = option_args$n_options, units = units, options = options,
+    n_alternatives = option_args$n_alternatives, call = call, ...
   )
 }
 
@@ -215,9 +320,11 @@ sdmSimple <- function(resp_error, version = "simple", ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
+  # the deprecated alias builds the continuous model only
   .model_sdm(
     resp_error = resp_error, version = version, activation = "vonmises",
-    scaling = "density", call = call, ...
+    scaling = "density", n_options = NULL, units = "radians", options = NULL,
+    n_alternatives = NULL, call = call, ...
   )
 }
 
@@ -240,7 +347,11 @@ check_formula.sdm <- function(model, data, formula) {
 check_data.sdm <- function(model, data, formula) {
   # data sorted by predictors is necessary for speedy computation of normalizing constant
   data <- order_data_query(model, data, formula)
-  attr(data, "sdm_run_metadata") <- sdm_run_metadata(data, formula, model)
+  runs <- sdm_run_metadata(data, formula, model)
+  attr(data, "sdm_run_metadata") <- runs
+  if (inherits(model, "option_set")) {
+    attr(data, "sdm_grid_metadata") <- sdm_grid_metadata(data, formula, model, runs)
+  }
   NextMethod("check_data")
 }
 
@@ -252,6 +363,9 @@ check_data.sdm <- function(model, data, formula) {
 
 #' @export
 configure_model.sdm <- function(model, data, formula) {
+  if (inherits(model, "option_set")) {
+    return(.sdm_grid_configure(model, data, formula))
+  }
   activation <- model$other_vars$activation
   scaling <- model$other_vars$scaling
   # the default cell keeps the family, chunks and stanvars of the fits before
@@ -333,7 +447,40 @@ postprocess_brm.sdm <- function(model, fit, ...) {
   # manually set link_c to "log" since I coded it manually
   fit$family$link_c <- "log"
   fit$formula$family$link_c <- "log"
+  # a stanfit can carry sampler settings and no parameter draws (the stub
+  # fits of the update() tests)
+  if (inherits(model, "option_set") && has_draws(fit) && length(fit$fit@sim$samples) &&
+      length(fit$fit@sim$samples[[1]])) {
+    .sdm_check_grid(model, brms::prepare_predictions(fit))
+  }
   fit
+}
+
+# The discrete model is exact whatever the grid, but it equals the continuous
+# one only where the activation spans a few steps (?sdm, "Discrete response
+# options"); w = 1 / sqrt(max(c*, 1) kappa) is the width that decides it
+.sdm_check_grid <- function(model, prep) {
+  if (!inherits(model, "option_set")) {
+    return(invisible())
+  }
+  cell <- .sdm_prep_cell(prep)
+  step <- 2 * pi / prep$data$sdm_K
+  narrowest <- rep(Inf, prep$ndraws)
+  for (idx in split(seq_len(prep$nobs), ceiling(seq_len(prep$nobs) / 1000))) {
+    c <- matrix(brms::get_dpar(prep, "c", i = idx), nrow = prep$ndraws)
+    kappa <- matrix(brms::get_dpar(prep, "kappa", i = idx), nrow = prep$ndraws)
+    log_cstar <- .sdm_log_cstar(log(c), kappa, cell$activation, cell$scaling)
+    w <- 1 / sqrt(pmax(exp(log_cstar), 1) * kappa)
+    narrowest <- pmin(narrowest, matrixStats::rowMins(matrix(w, nrow = prep$ndraws)))
+  }
+  narrow <- narrowest < step
+  warnif(
+    any(narrow),
+    "In {sum(narrow)} of {length(narrow)} posterior draws, the activation is narrower \
+    than one step of the response grid (2 * pi / {prep$data$sdm_K}): the response \
+    grid is coarser than the fitted precision. The discrete likelihood is exact, but \
+    comparisons with continuous fits are not."
+  )
 }
 
 #' @export
@@ -428,5 +575,223 @@ sdm_stanvar_int_array <- function(x, name, size) {
   out <- brms::stanvar(x = x, name = name)
   out[[name]]$scode <- paste0("array[", size, "] int ", name, ";")
   out[[name]]$pll_args <- paste("data array[] int", name)
+  out
+}
+
+############################################################################# !
+# DISCRETE RESPONSE OPTIONS (#558, K2)                                   ####
+############################################################################# !
+
+# the rows brms keeps: it drops those with a missing value in any model
+# variable before fitting, so runs and cells are computed on the rest
+sdm_kept_rows <- function(data, formula, model) {
+  model_vars <- unique(c(unlist(model$resp_vars), data_predictor_vars(data, formula)))
+  model_vars <- model_vars[model_vars %in% colnames(data)]
+  if (length(model_vars) == 0L) {
+    return(rep(TRUE, nrow(data)))
+  }
+  stats::complete.cases(data[model_vars])
+}
+
+# The cells of a model with response options (see .option_cells()) and the
+# option sets they use. Set 0 is the full wheel
+sdm_grid_metadata <- function(data, formula, model, runs) {
+  kept <- data[sdm_kept_rows(data, formula, model), , drop = FALSE]
+  run_id <- rep(seq_along(runs$sdm_run_start), runs$sdm_run_count)
+  width <- .option_width(model)
+  sets <- if (width > 0) {
+    .option_set_table(as.matrix(kept[.option_columns(width)]), model$other_vars$n_options)
+  } else {
+    list(set_id = rep(0L, nrow(kept)), size = integer(0), off = matrix(0L, 0, 1))
+  }
+  cells <- .option_cells(run_id, sets$set_id)
+  list(
+    G_sdm_cells = length(cells$first),
+    sdm_cell_first = as.integer(cells$first),
+    sdm_cell_count = as.integer(cells$count),
+    sdm_cell_set = as.integer(cells$set),
+    S_sdm_sets = length(sets$size),
+    M_sdm_sets = ncol(sets$off),
+    sdm_set_size = as.integer(sets$size),
+    sdm_set_off = sets$off
+  )
+}
+
+.sdm_grid_configure <- function(model, data, formula) {
+  n_options <- model$other_vars$n_options
+  grid <- attr(data, "sdm_grid_metadata") %||%
+    sdm_grid_metadata(data, formula, model, sdm_run_metadata(data, formula, model))
+  n_rows <- sum(grid$sdm_cell_count)
+  if (grid$G_sdm_cells > n_rows / 2) {
+    message2(
+      "{grid$G_sdm_cells} of the {n_rows} rows have a normaliser of their own, because \
+      no other row shares both their parameter values and their option set. Each \
+      normaliser sums over the options of its row in every gradient, so the fit takes \
+      longer than when rows share them; see ?sdm, section \"Discrete response options\"."
+    )
+  }
+  sdm_family <- brms::custom_family(
+    name = "sdm_grid",
+    dpars = c("mu", "c", "kappa"),
+    links = c("tan_half", "identity", "log"),
+    lb = c(NA, NA, NA),
+    ub = c(NA, NA, NA),
+    type = "int", loop = FALSE,
+    vars = c("sdm_K", "sdm_activation", "sdm_scaling"),
+    log_lik = log_lik_sdm_grid,
+    posterior_predict = posterior_predict_sdm_grid,
+    posterior_epred = posterior_epred_sdm_grid
+  )
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  chunk <- function(file) read_lines2(file.path(sc_path, file))
+  likelihood_file <- if (brms_slices_likelihood()) "sdm_grid_likelihood_threaded.stan" else "sdm_grid_likelihood.stan"
+  step <- 2 * pi / n_options
+  half <- n_options / 2
+  gl <- .gl_rule(16L)
+  wide <- .sdm_wide_rule()
+  stanvars <- brms::stanvar(scode = paste(chunk("sdm_kernel_funs.stan"), chunk("sdm_grid_funs.stan"), sep = "\n"),
+                            block = "functions") +
+    brms::stanvar(scode = chunk("sdm_grid_tdata.stan"), block = "tdata") +
+    sdm_stanvar_int(n_options, "sdm_K") +
+    sdm_stanvar_int(match(model$other_vars$activation, .sdm_activations), "sdm_activation") +
+    sdm_stanvar_int(match(model$other_vars$scaling, .sdm_scalings), "sdm_scaling") +
+    brms::stanvar(x = (0:half) * step, name = "sdm_grid_half") +
+    brms::stanvar(x = log(c(1, rep(2, half - 1), 1)), name = "sdm_grid_logmult") +
+    brms::stanvar(x = ((1 - half):half) * step, name = "sdm_grid_full") +
+    brms::stanvar(x = gl$nodes, name = "sdm_gl_x") +
+    brms::stanvar(x = gl$weights, name = "sdm_gl_w") +
+    brms::stanvar(x = wide$cosm1, name = "sdm_wide_cosm1") +
+    brms::stanvar(x = wide$weights, name = "sdm_wide_w") +
+    brms::stanvar(x = grid$G_sdm_cells, name = "G_sdm_cells") +
+    sdm_stanvar_int_array(grid$sdm_cell_first, "sdm_cell_first", "G_sdm_cells") +
+    sdm_stanvar_int_array(grid$sdm_cell_count, "sdm_cell_count", "G_sdm_cells") +
+    sdm_stanvar_int_array(grid$sdm_cell_set, "sdm_cell_set", "G_sdm_cells") +
+    brms::stanvar(x = grid$S_sdm_sets, name = "S_sdm_sets") +
+    brms::stanvar(x = grid$M_sdm_sets, name = "M_sdm_sets") +
+    sdm_stanvar_int_array(grid$sdm_set_size, "sdm_set_size", "S_sdm_sets") +
+    sdm_stanvar_int_matrix(grid$sdm_set_off, "sdm_set_off", "S_sdm_sets", "M_sdm_sets") +
+    brms::stanvar(scode = chunk(likelihood_file), block = "likelihood", position = "end")
+  formula <- bmf2bf(model, formula)
+  formula$family <- sdm_family
+  nlist(formula, data, stanvars)
+}
+
+sdm_stanvar_int_matrix <- function(x, name, rows, cols) {
+  x <- array(as.integer(x), dim = dim(x))
+  out <- brms::stanvar(x = x, name = name)
+  out[[name]]$scode <- paste0("array[", rows, ", ", cols, "] int ", name, ";")
+  out[[name]]$pll_args <- paste("data array[,] int", name)
+  out
+}
+
+# The offered options of observation i as offsets in steps, NULL for the full
+# wheel: the vint columns of the brms data, without the padding
+.sdm_prep_options <- function(prep, i) {
+  columns <- grep("^vint[0-9]+$", names(prep$data), value = TRUE)
+  if (length(columns) == 0) {
+    return(NULL)
+  }
+  columns <- columns[order(as.integer(sub("vint", "", columns)))]
+  offsets <- vapply(columns, function(column) prep$data[[column]][i], integer(1), USE.NAMES = FALSE)
+  offsets[offsets != .option_absent(prep$data$sdm_K)]
+}
+
+# the log of the sum over a set of options of exp(c* s(x - mu)), one value per
+# element of the parameter vectors; NULL options is the full wheel. In the
+# form peak + log sum exp(peak expm1(log s)), which loses no digits at a
+# large peak; with mu = 0 the full wheel takes each distance once with its
+# multiplicity
+.sdm_grid_log_sum <- function(options, mu, log_cstar, kappa, activation, n_options) {
+  n <- max(length(mu), length(log_cstar), length(kappa))
+  mu <- rep_len(mu, n)
+  peak <- exp(rep_len(log_cstar, n))
+  kappa <- rep_len(kappa, n)
+  step <- 2 * pi / n_options
+  half <- n_options / 2
+  folded <- is.null(options) && all(mu == 0, na.rm = TRUE)
+  offsets <- if (folded) 0:half else if (is.null(options)) (1 - half):half else options
+  log_mult <- if (folded) log(c(1, rep(2, half - 1), 1)) else rep(0, length(offsets))
+  out <- rep(NA_real_, n)
+  for (rows in split(seq_len(n), ceiling(seq_len(n) / 2000))) {
+    delta <- outer(-mu[rows], offsets * step, `+`)
+    terms <- peak[rows] * expm1(.sdm_log_s(delta, kappa[rows], activation)) +
+      rep(log_mult, each = length(rows))
+    out[rows] <- peak[rows] + matrixStats::rowLogSumExps(terms)
+  }
+  out
+}
+
+# log P of the option x (radians) is taken at, among the offered options,
+# minus log(2 pi / n_options): the density scale of the continuous model
+.sdm_grid_log_density <- function(x, mu, log_cstar, kappa, activation, n_options, options = NULL) {
+  bins <- .bin_options(x, n_options, "radians")
+  numerator <- exp(log_cstar + .sdm_log_s(bins * 2 * pi / n_options - mu, kappa, activation))
+  out <- numerator - .sdm_grid_log_sum(options, mu, log_cstar, kappa, activation, n_options) -
+    log(2 * pi / n_options)
+  if (!is.null(options)) {
+    out[!bins %in% options] <- -Inf
+  }
+  out
+}
+
+# brms calls log_lik and posterior_predict once per observation, and the rows
+# of one cell share their draws and options, so the last sums are kept
+.sdm_grid_cache <- new.env(parent = emptyenv())
+
+.sdm_grid_prep_log_sum <- function(prep, i, cell, options, mu, log_cstar, kappa) {
+  key <- list(mu, log_cstar, kappa, options, cell, prep$data$sdm_K)
+  if (!identical(.sdm_grid_cache$key, key)) {
+    .sdm_grid_cache$value <- .sdm_grid_log_sum(options, mu, log_cstar, kappa, cell$activation,
+                                               prep$data$sdm_K)
+    .sdm_grid_cache$key <- key
+  }
+  .sdm_grid_cache$value
+}
+
+.sdm_grid_prep_draws <- function(i, prep) {
+  cell <- .sdm_prep_cell(prep)
+  mu <- brms::get_dpar(prep, "mu", i = i)
+  kappa <- brms::get_dpar(prep, "kappa", i = i)
+  log_cstar <- .sdm_log_cstar(log(brms::get_dpar(prep, "c", i = i)), kappa, cell$activation, cell$scaling)
+  options <- .sdm_prep_options(prep, i)
+  log_sum <- .sdm_grid_prep_log_sum(prep, i, cell, options, mu, log_cstar, kappa)
+  nlist(cell, mu, kappa, log_cstar, options, log_sum)
+}
+
+log_lik_sdm_grid <- function(i, prep) {
+  d <- .sdm_grid_prep_draws(i, prep)
+  n_options <- prep$data$sdm_K
+  y <- prep$data$Y[i]
+  exp(d$log_cstar + .sdm_log_s(y * 2 * pi / n_options - d$mu, d$kappa, d$cell$activation)) -
+    d$log_sum - log(2 * pi / n_options)
+}
+
+# offsets in steps, as the brms response; multiply by 2 * pi / n_options for
+# radians
+posterior_predict_sdm_grid <- function(i, prep, ...) {
+  d <- .sdm_grid_prep_draws(i, prep)
+  n_options <- prep$data$sdm_K
+  offsets <- d$options %||% seq(1 - n_options / 2, n_options / 2)
+  .sdm_draw_options(offsets, d$mu, d$log_cstar, d$kappa, d$cell$activation, n_options)
+}
+
+posterior_epred_sdm_grid <- posterior_epred_undefined("sdm")
+
+# one option per element of the parameter vectors, by inverse CDF over the
+# offsets; the parameters are recycled to n
+.sdm_draw_options <- function(offsets, mu, log_cstar, kappa, activation, n_options, n = NULL) {
+  n <- n %||% max(length(mu), length(log_cstar), length(kappa))
+  mu <- rep_len(mu, n)
+  log_cstar <- rep_len(log_cstar, n)
+  kappa <- rep_len(kappa, n)
+  out <- integer(n)
+  for (rows in split(seq_len(n), ceiling(seq_len(n) / 2000))) {
+    delta <- outer(-mu[rows], offsets * 2 * pi / n_options, `+`)
+    peak <- exp(log_cstar[rows])
+    weights <- exp(peak * expm1(.sdm_log_s(delta, kappa[rows], activation)))
+    cum <- matrixStats::rowCumsums(weights)
+    draw <- stats::runif(length(rows)) * cum[, ncol(cum)]
+    out[rows] <- as.integer(offsets[rowSums(cum < draw) + 1])
+  }
   out
 }

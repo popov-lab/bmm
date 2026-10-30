@@ -103,6 +103,17 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param scaling Character; what `c` measures: `"density"`, `"peak"` or
 #'   `"range"`. `NULL` (default) means `"density"` for the von Mises and
 #'   `"peak"` for the Laplace activation. See [sdm()].
+#' @param n_options For `dsdm()` and `rsdm()`: `NULL` (the default) for the
+#'   continuous model, or the number of equally spaced response options on the
+#'   wheel, an even number of at least 4. `x` is then taken at its nearest
+#'   option, `dsdm()` returns the probability of that option divided by the
+#'   step `2 * pi / n_options` (a density, comparable with the continuous
+#'   model), and `rsdm()` returns option centres in (-pi, pi]. See the section
+#'   "Discrete response options" in [sdm()].
+#' @param options For `dsdm()` and `rsdm()` with `n_options`: the offered
+#'   options as offsets from the target in radians, one set for all values;
+#'   the probability is the softmax over these options only, and is 0 for an
+#'   `x` that is not among them.
 #' @param log.p Logical; if `TRUE`, probabilities are returned on the log
 #'   scale.
 #' @param lower.bound Numeric; Lower bound of integration for the cumulative
@@ -185,12 +196,16 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' lines(x, d, type = "l", col = "red")
 dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
                  parametrization = NULL, activation = c("vonmises", "laplace"),
-                 scaling = NULL) {
+                 scaling = NULL, n_options = NULL, options = NULL) {
   activation <- match.arg(activation)
   .check_sdm_args(c, kappa, parametrization, activation, scaling)
   log_cstar <- .sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization)
-  out <- exp(log_cstar + .sdm_log_s(x - mu, kappa, activation)) -
-    .sdm_log_z(log_cstar, kappa, activation)
+  grid <- .sdm_dist_options(n_options, options)
+  out <- if (is.null(grid)) {
+    exp(log_cstar + .sdm_log_s(x - mu, kappa, activation)) - .sdm_log_z(log_cstar, kappa, activation)
+  } else {
+    .sdm_grid_log_density(x, mu, log_cstar, kappa, activation, grid$n_options, grid$options)
+  }
   if (log) out else exp(out)
 }
 
@@ -243,10 +258,19 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @rdname SDMdist
 #' @export
 rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
-                 activation = c("vonmises", "laplace"), scaling = NULL) {
+                 activation = c("vonmises", "laplace"), scaling = NULL, n_options = NULL,
+                 options = NULL) {
   activation <- match.arg(activation)
   .check_sdm_args(c, kappa, parametrization, activation, scaling)
   stopif(length(n) > 1, "n must be a single integer")
+  grid <- .sdm_dist_options(n_options, options)
+  if (!is.null(grid)) {
+    log_cstar <- .sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization)
+    offsets <- grid$options %||% seq(1 - grid$n_options / 2, grid$n_options / 2)
+    draws <- .sdm_draw_options(offsets, .recycle_draws(mu, n), .recycle_draws(log_cstar, n),
+                               .recycle_draws(kappa, n), activation, grid$n_options, n = n)
+    return(draws * 2 * pi / grid$n_options)
+  }
   amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
 
   # the density over its value at the peak, on the log scale: the
@@ -275,6 +299,23 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
     scaling <- .sdm_default_scaling(activation)
   }
   .sdm_log_cstar(log(c), kappa, activation, scaling)
+}
+
+# the response grid of a d or r call, with the options as offsets in steps;
+# NULL for the continuous model
+.sdm_dist_options <- function(n_options, options) {
+  stopif(
+    is.null(n_options) && !is.null(options),
+    "`options` need `n_options`, the number of equally spaced positions on the \\
+    response wheel that the options sit on."
+  )
+  if (is.null(n_options)) {
+    return(NULL)
+  }
+  n_options <- .check_n_options(n_options)
+  stopif(!is.null(options) && !is.numeric(options), "`options` must be numeric, in radians.")
+  options <- if (!is.null(options)) unique(.bin_options(options, n_options, "radians"))
+  nlist(n_options, options)
 }
 
 .psdm_one <- function(q, mu, amp, kappa, lower.bound, activation) {

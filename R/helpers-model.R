@@ -663,7 +663,9 @@ data_column_roles <- list(
     covariates = "numeric columns used in branch expressions, e.g. design-fixed guessing rates (optional)"
   ),
   sdm = c(
-    resp_error = "response error relative to the target, in radians"
+    resp_error = "response error relative to the target, in radians",
+    options = "options offered on each trial, relative to the target, one column per option (optional, with `n_options`)",
+    n_alternatives = "number of options offered on each trial (a column, or one number; optional)"
   ),
   sdt_cdp = c(
     response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",
