@@ -3,11 +3,13 @@
 # parity tests of bmm-explorer. Both packages detect a break only after it is
 # on develop (bmmtools' own weekly job, the explorer's oracle); this finds it
 # on the push that causes it. It never blocks a merge: both jobs continue on
-# error and write a one-table summary instead of failing the run.
+# error and write a one-table summary, plus a warning annotation when a step
+# failed, instead of failing the run.
 #
-# Both jobs are off until the co-maintainer has agreed to a workflow in
-# popov-lab/bmm that checks out repositories of another account. Remove the
-# two `if: false` lines then.
+# Both jobs are off until the other maintainer has agreed to a workflow in
+# popov-lab/bmm that checks out repositories of another account. Replace each
+# `if: false` with `if: github.repository == 'popov-lab/bmm'` then, so that
+# forks do not run it.
 on:
   push:
     branches: [develop, 'dev-*']
@@ -22,8 +24,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: companions-${{ github.ref }}
-  cancel-in-progress: true
+  # a push gets a group of its own commit, so a later push never cancels the
+  # run that is meant to find the break the earlier one caused; only a manual
+  # run on a ref replaces an earlier manual run on the same ref
+  group: companions-${{ github.event_name == 'workflow_dispatch' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   bmmtools:
@@ -35,29 +40,39 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       NOT_CRAN: true
-      TESTTHAT_CPUS: 4
 
     steps:
       - uses: actions/checkout@v4
+        id: checkout
+        with:
+          persist-credentials: false
 
       - uses: actions/checkout@v4
+        id: checkout-companion
         with:
           repository: GidonFrischkorn/bmmtools
           ref: main
           path: bmmtools
+          persist-credentials: false
 
       - uses: r-lib/actions/setup-r@v2
+        id: setup-r
         with:
           use-public-rspm: true
 
       # bmmtools' tests use mock fitters, so no CmdStan is installed. bmm is
       # not in this list: it comes from the checkout in the next step, never
       # from CRAN. SBC is not on CRAN and is installed unpinned, as in
-      # bmmtools' own workflow.
+      # bmmtools' own workflow. Quarto and pandoc are off because the action's
+      # auto detection would install them (bmmtools ships a .qmd and lists
+      # rmarkdown in Suggests), and no test run here renders anything.
       - uses: r-lib/actions/setup-r-dependencies@v2
+        id: deps
         with:
           working-directory: bmmtools
           dependencies: '"hard"'
+          install-quarto: false
+          install-pandoc: false
           extra-packages: |
             any::testthat
             any::knitr
@@ -68,15 +83,12 @@ jobs:
 
       - name: Install bmm from this checkout
         id: install
-        run: pak::local_install(".", dependencies = NA)
+        run: pak::local_install(".", upgrade = FALSE, dependencies = NA)
         shell: Rscript {0}
 
       - name: Run the bmmtools tests
         id: tests
         run: |
-          # setup-r writes options(Ncpus = 1) and testthat reads it before
-          # TESTTHAT_CPUS
-          options(Ncpus = NULL)
           res <- as.data.frame(testthat::test_local("bmmtools", reporter = "summary", stop_on_failure = FALSE))
           failed <- res$failed > 0 | res$error
           writeLines(sprintf("%d passed, %d failed, %d skipped",
@@ -94,11 +106,31 @@ jobs:
             echo
             echo "| | |"
             echo "|---|---|"
-            echo "| bmmtools commit | $(git -C bmmtools rev-parse --short=8 HEAD) |"
+            echo "| bmmtools commit | $(git -C bmmtools rev-parse --short=8 HEAD 2>/dev/null || echo "not checked out") |"
+            echo "| Check out bmm | ${{ steps.checkout.outcome }} |"
+            echo "| Check out bmmtools | ${{ steps.checkout-companion.outcome }} |"
+            echo "| Set up R | ${{ steps.setup-r.outcome }} |"
+            echo "| Install dependencies | ${{ steps.deps.outcome }} |"
             echo "| Install bmm from this checkout | ${{ steps.install.outcome }} |"
             echo "| Run the tests | ${{ steps.tests.outcome }} |"
             echo "| Results | ${counts} |"
           } >> "$GITHUB_STEP_SUMMARY"
+          failed=""
+          for pair in \
+            "Check out bmm|${{ steps.checkout.outcome }}" \
+            "Check out bmmtools|${{ steps.checkout-companion.outcome }}" \
+            "Set up R|${{ steps.setup-r.outcome }}" \
+            "Install dependencies|${{ steps.deps.outcome }}" \
+            "Install bmm from this checkout|${{ steps.install.outcome }}" \
+            "Run the tests|${{ steps.tests.outcome }}"; do
+            case "${pair##*|}" in
+              success|skipped) ;;
+              *) failed="${failed:+${failed}; }${pair%|*}" ;;
+            esac
+          done
+          if [ -n "$failed" ]; then
+            echo "::warning title=bmmtools against bmm::Step(s) not successful: ${failed}"
+          fi
         shell: bash
 
   explorer:
@@ -112,26 +144,41 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        id: checkout
+        with:
+          persist-credentials: false
 
       - uses: actions/checkout@v4
+        id: checkout-companion
         with:
           repository: GidonFrischkorn/bmm-explorer
           ref: main
           path: explorer
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 22
 
       - uses: r-lib/actions/setup-r@v2
+        id: setup-r
         with:
           use-public-rspm: true
 
       - uses: r-lib/actions/setup-r-dependencies@v2
+        id: deps
         with:
           packages: |
             local::.
             any::jsonlite
+          # the default "all" would also install every Suggests of bmm, among
+          # them cmdstanr, which is not on CRAN
+          dependencies: NA
+          # the auto detection finds the .qmd files of the explorer clone and
+          # rmarkdown in bmm's Suggests; the fixtures script renders nothing
+          install-quarto: false
+          install-pandoc: false
 
       # The three steps of the explorer's own oracle job, run from its checkout
       - name: Regenerate fixtures
@@ -159,9 +206,32 @@ jobs:
             echo
             echo "| | |"
             echo "|---|---|"
-            echo "| bmm-explorer commit | $(git -C explorer rev-parse --short=8 HEAD) |"
+            echo "| bmm-explorer commit | $(git -C explorer rev-parse --short=8 HEAD 2>/dev/null || echo "not checked out") |"
+            echo "| Check out bmm | ${{ steps.checkout.outcome }} |"
+            echo "| Check out bmm-explorer | ${{ steps.checkout-companion.outcome }} |"
+            echo "| Set up Node | ${{ steps.setup-node.outcome }} |"
+            echo "| Set up R | ${{ steps.setup-r.outcome }} |"
+            echo "| Install dependencies | ${{ steps.deps.outcome }} |"
             echo "| Regenerate fixtures | ${{ steps.fixtures.outcome }} |"
             echo "| Compare with the committed fixtures | ${{ steps.compare.outcome }} |"
             echo "| Parity tests | ${{ steps.parity.outcome }} |"
           } >> "$GITHUB_STEP_SUMMARY"
+          failed=""
+          for pair in \
+            "Check out bmm|${{ steps.checkout.outcome }}" \
+            "Check out bmm-explorer|${{ steps.checkout-companion.outcome }}" \
+            "Set up Node|${{ steps.setup-node.outcome }}" \
+            "Set up R|${{ steps.setup-r.outcome }}" \
+            "Install dependencies|${{ steps.deps.outcome }}" \
+            "Regenerate fixtures|${{ steps.fixtures.outcome }}" \
+            "Compare with the committed fixtures|${{ steps.compare.outcome }}" \
+            "Parity tests|${{ steps.parity.outcome }}"; do
+            case "${pair##*|}" in
+              success|skipped) ;;
+              *) failed="${failed:+${failed}; }${pair%|*}" ;;
+            esac
+          done
+          if [ -n "$failed" ]; then
+            echo "::warning title=bmm-explorer against bmm::Step(s) not successful: ${failed}"
+          fi
         shell: bash

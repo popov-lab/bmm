@@ -143,8 +143,8 @@ three rules apply:
 
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data layout a
-model expects. The model specification accessor, the simulation generic and
-the exported density and generator functions are covered as contract items too
+model expects. From the release that adds or exports them, `model_spec()`,
+`simulate_data()` and `link_transform()` are covered too
 ([ADR 0005](../.dev/decisions/0005-model-contract-for-companions-and-extensions.md)).
 Internal functions are not covered. Fits saved by an earlier
 release are covered: they keep working with `update()` and the extraction
@@ -208,7 +208,9 @@ Reading a model object with `$`, its attributes, and internal functions are
 not part of the contract. Code in other packages should not rely on them.
 `model_spec()`, `simulate_data()` and the export of `link_transform()` are
 being added for 1.5.0 (the generic possibly for 1.6.0); each item is covered
-from the release that contains it.
+from the release that contains it. Until the 1.6.0 release pins contract
+version 1.0, the contract may still change, and the announcement rule below
+applies to every such change.
 
 ### When your PR changes the contract
 
@@ -217,28 +219,40 @@ This extends rule 3 of "Deprecating and removing features" to the contract:
 
 1. Add a NEWS bullet under the heading `### Companion packages` in the section
    of your release. Name the item and give the old and the new form.
-2. Before the release, a maintainer files one issue in
-   [bmmtools](https://github.com/GidonFrischkorn/bmmtools/issues) and one in
-   [bmm-explorer](https://github.com/GidonFrischkorn/bmm-explorer/issues) from
-   the "Companion package change" template, and links them in the PR.
+2. Before the release, a maintainer copies the body of the "Companion package
+   change" template
+   ([`companion_change.md`](ISSUE_TEMPLATE/companion_change.md); open the raw
+   file, because the rendered view hides its instructions) into a new issue in
+   [bmmtools](https://github.com/GidonFrischkorn/bmmtools/issues) and into one
+   in [bmm-explorer](https://github.com/GidonFrischkorn/bmm-explorer/issues),
+   one issue per repository, and links both in the PR.
 3. If the change also breaks user scripts, the deprecation rules above apply
    as well.
 
-A new model is a change to the contract too: once the accessor and the
-generic are in bmm, it needs a complete `model_spec()` and a `simulate_data()`
-method. `use_model_template()` will scaffold both, and the convention tests
-will fail until they are there.
+A new model has to meet the contract too: once the accessor and the generic
+are in bmm, it needs a complete `model_spec()` and a `simulate_data()` method.
+`use_model_template()` will scaffold the `simulate_data()` method, and a
+convention test will fail until the model has both.
 
 ### The companion packages job
 
 The workflow "Companion packages" (`.github/workflows/companions.yaml`) runs
 the tests of bmmtools and the model explorer's fixture checks against bmm as
 pushed. It runs on every push to `develop` and the `dev-*` branches, once a
-week and on demand, not on pull requests. It never blocks a merge.
+week and on demand, not on pull requests. It never blocks a merge. Both jobs
+are switched off until the other maintainer has agreed to the workflow. The
+pull request that switches them on needs that maintainer's approval; the
+comment at the top of the file says how to switch them on.
 
-When it fails:
+A failure does not turn the run red, and nothing sends a notification. Look
+at the run page: a warning annotation names the step that failed, and
+the job's summary table lists the checkout, setup and test steps with their
+outcomes.
 
-- Read the failing step's summary and decide where the cause is.
+When a job has failed:
+
+- Read the warning and the summary table, which also shows the companion
+  commit that was tested, and decide where the cause is.
 - If the failure follows from a contract change that was announced, the
   companion issue already covers it. Nothing to do in bmm.
 - If it follows from a contract change that was not announced, announce it
@@ -247,7 +261,7 @@ When it fails:
   there.
 - If the companion itself is at fault, open an issue in its repository.
 
-To run the job by hand:
+Once the jobs are switched on, run them by hand with:
 
 ```sh
 gh workflow run companions.yaml --repo popov-lab/bmm --ref develop
