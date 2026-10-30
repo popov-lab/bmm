@@ -204,6 +204,12 @@ test_that("every model constructor with ... reports arguments it does not use (#
     internal_call <- calls_to(body(exports[[name]]), "^\\.model_")[[1]]
     internal <- get(as.character(internal_call[[1]]), envir = ns)
     passed <- names(internal_call)[nzchar(names(internal_call))]
+    # `name = list(...)$name` takes the argument from the dots: left to `...`
+    args <- as.list(internal_call)[-1]
+    from_dots <- vapply(args, function(a) {
+      is.call(a) && identical(a[[1]], as.name("$")) && identical(a[[2]], quote(list(...)))
+    }, logical(1))
+    passed <- setdiff(passed, names(args)[from_dots])
     expected <- setdiff(names(formals(internal)), c(passed, "call", "..."))
     expect_identical(sort(strings(check$known) %||% character()), sort(expected), label = name,
                      info = paste0("known = must list the ", as.character(internal_call[[1]]),
