@@ -566,7 +566,7 @@ test_that("every dist argument offers exactly the registry's distributions", {
 })
 
 test_that("the noise distribution reaches Stan as the id the Stan switch reads", {
-  # sdt_dist_funs.stan dispatches on 1 normal, 2 gumbel_min, 3 gumbel_max,
+  # sdt_dist_functions.stan dispatches on 1 normal, 2 gumbel_min, 3 gumbel_max,
   # 4 logistic; the code is the same for every distribution, so the id in the
   # data is the only thing that selects it
   ids <- c(normal = 1L, gumbel_min = 2L, gumbel_max = 3L, logistic = 4L)
