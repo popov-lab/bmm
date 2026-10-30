@@ -17,6 +17,7 @@
 ^index.md$
 ^tests/internal-.*$
 ^tests/internal$
+^tests/recovery$
 ^tests/local$
 ^tests/testthat/assets$
 ^.dev$

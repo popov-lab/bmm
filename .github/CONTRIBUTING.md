@@ -57,20 +57,30 @@ Your PR also needs:
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
   [developer notes](https://venpopov.com/bmm/dev-notes/) and follow the
-  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Show
-  parameter recovery in the PR description (see below).
+  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Add a
+  recovery plan, `tests/recovery/<model>.R` (see below).
 
 ### Recovery evidence for new models
 
-Until we have a `tests/recovery/` folder, the PR description shows the result
-of a parameter recovery for the new model:
+Recovery evidence is a validation plan for the
+[bmmtools](https://github.com/GidonFrischkorn/bmmtools) package. Commit the plan
+as `tests/recovery/<model>.R`, a script that builds it with
+`bmmtools::validation_plan()` (see `tests/recovery/README.md`). The plan must
+cover:
 
-- true against recovered values, as a table or a plot;
+- true against recovered values;
 - a hierarchical recovery with several subjects whose parameters vary;
 - data simulated with an independent generator, not the model's own `r*`
   function, so that a bug in the density cannot cancel out.
 
-Attach the script as a gist or in a collapsed block in the PR.
+You run the plan locally (see `tests/recovery/README.md`); it takes hours of
+sampling. Until a card site exists, attach the rendered card.html (zipped) to
+the PR.
+
+Always pass `generator =` and, for a model bmmtools has no defaults for, the
+model object and `pars` instead of its name; `tests/recovery/README.md` has the
+details and the install line for bmmtools. The plan is not run by `R CMD check`
+or CI.
 
 ### Model fits for the website articles
 
@@ -279,7 +289,7 @@ How many reviews a PR needs depends on what it touches.
 
 A **new model** is a standard PR with one addition: the reviewer works through
 the reviewer block in the PR template. They read the likelihood against the
-cited source, run or inspect the recovery, and check the default priors on the
+cited source, read the recovery plan and inspect its card, and check the default priors on the
 natural scale.
 
 Three rules apply to all tiers:
