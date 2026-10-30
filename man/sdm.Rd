@@ -174,8 +174,16 @@ options in its row of the option columns, which must include the target
 it, with a message). The probability of the response is the softmax over
 the offered options only. Sets may differ in size and spacing from trial
 to trial, and trials that offer the same options, in any order, share one
-normalising sum within each combination of parameter values. A data set
-could look like this, for trials with two and four options in radians:\tabular{lllll}{
+normalising sum within each combination of parameter values.
+\code{conditional_effects()} shows the parameters. A prediction of the
+response needs the options a trial offers, so predict with
+\code{posterior_predict()} or \code{predict()} on \code{newdata} that carries the option
+columns; \code{conditional_effects(method = "posterior_predict")} is not
+meaningful for option sets, because its grid of conditions holds no
+option set.
+
+A data set could look like this, for trials with two and four options in
+radians:\tabular{lllll}{
    \code{error} \tab \code{opt1} \tab \code{opt2} \tab \code{opt3} \tab \code{opt4} \cr
    0 \tab 0 \tab 3.142 \tab NA \tab NA \cr
    1.571 \tab 0 \tab 1.571 \tab 3.142 \tab -1.571 \cr

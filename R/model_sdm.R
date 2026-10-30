@@ -199,8 +199,16 @@ settable_links.sdm <- function(model) {
 #'   it, with a message). The probability of the response is the softmax over
 #'   the offered options only. Sets may differ in size and spacing from trial
 #'   to trial, and trials that offer the same options, in any order, share one
-#'   normalising sum within each combination of parameter values. A data set
-#'   could look like this, for trials with two and four options in radians:
+#'   normalising sum within each combination of parameter values.
+#'   `conditional_effects()` shows the parameters. A prediction of the
+#'   response needs the options a trial offers, so predict with
+#'   `posterior_predict()` or `predict()` on `newdata` that carries the option
+#'   columns; `conditional_effects(method = "posterior_predict")` is not
+#'   meaningful for option sets, because its grid of conditions holds no
+#'   option set.
+#'
+#'   A data set could look like this, for trials with two and four options in
+#'   radians:
 #'
 #'   | `error` | `opt1` | `opt2` | `opt3` | `opt4` |
 #'   |---|---|---|---|---|
