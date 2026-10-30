@@ -224,6 +224,8 @@ test_that("log_lik() of a response outside the trial's options is -Inf, as in ds
   prep <- grid_prep(c(90L, 10L), dpars, list(vint1 = c(0L, 0L), vint2 = c(90L, -45L), vint3 = c(absent, 45L)))
   expect_identical(log_lik_sdm_grid(2, prep), rep(-Inf, 3))
   expect_true(all(is.finite(log_lik_sdm_grid(1, prep))))
+  prep$data$Y[2] <- NA_integer_
+  expect_identical(log_lik_sdm_grid(2, prep), rep(NA_real_, 3))
 })
 
 test_that("posterior_predict() draws offered option offsets in steps", {

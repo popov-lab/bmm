@@ -781,7 +781,7 @@ log_lik_sdm_grid <- function(i, prep) {
   # newdata that carries the built columns is not checked again, so a
   # response the trial did not offer can reach here; it has no probability,
   # as in dsdm(options = )
-  if (!is.null(d$options) && !y %in% d$options) {
+  if (!is.null(d$options) && !is.na(y) && !y %in% d$options) {
     return(rep(-Inf, prep$ndraws))
   }
   exp(d$log_cstar + .sdm_log_s(y * 2 * pi / n_options - d$mu, d$kappa, d$cell$activation)) -
