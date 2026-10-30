@@ -122,7 +122,7 @@ check_data.option_set <- function(model, data, formula) {
     )
   } else {
     stopif(
-      isTRUE(max(abs(x), na.rm = TRUE) > 2 * pi),
+      any(abs(x) > 2 * pi, na.rm = TRUE),
       "{what} must be in radians, but values beyond 2*pi show they are not. \\
       Convert them with deg2rad(), or set units = 'bins' if they count option steps."
     )
@@ -301,7 +301,8 @@ revert_check_data.option_set <- function(model, data) {
   set_id <- match(keys, unique(keys))
   sets <- lapply(which(!duplicated(keys)), function(i) sort(offsets[i, offsets[i, ] != absent]))
   size <- lengths(sets)
-  off <- matrix(0L, length(sets), max(size))
+  # max() of no sets is -Inf and warns; newdata without a response has none
+  off <- matrix(0L, length(sets), max(size, 1L))
   for (s in seq_along(sets)) {
     off[s, seq_len(size[s])] <- sets[[s]]
   }

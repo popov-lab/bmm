@@ -256,15 +256,29 @@ test_that("the stored frame gives the response and the options back at the optio
   expect_identical(revert_check_data(bins, data.frame(sdm_bin = c(3L, -2L)))$y, c(3L, -2L))
 })
 
-test_that("a data set without a single response is refused before the cell tables are built", {
+# newdata for a prediction holds no response, so the cell tables are built from
+# no kept rows (#558)
+test_that("a data set without a single response passes check_data() with empty cell tables", {
   dat <- data.frame(y = c(NA_real_, NA_real_), cond = c("a", "b"), o1 = 0, o2 = pi / 2)
   formula <- bmf(c ~ cond, kappa ~ 1)
-  expect_error(
-    check_data(sdm("y", n_options = 360, options = c("o1", "o2")), dat, formula),
-    "missing in every row"
+  models <- list(
+    options = sdm("y", n_options = 360, options = c("o1", "o2")),
+    alternatives = sdm("y", n_options = 360, n_alternatives = 4),
+    wheel = sdm("y", n_options = 360),
+    continuous = sdm("y")
   )
-  expect_error(check_data(sdm("y", n_options = 360), dat, formula), "missing in every row")
-  expect_error(check_data(sdm("y"), dat, formula), "missing in every row")
+  for (name in names(models)) {
+    expect_no_warning(checked <- check_data(models[[name]], dat, formula))
+    expect_identical(nrow(checked), 2L, info = name)
+    expect_true(all(is.na(checked$y)), info = name)
+  }
+  checked <- check_data(models$options, dat, formula)
+  expect_identical(checked$OptIdx1, c(0L, 0L))
+  expect_identical(checked$OptIdx2, c(90L, 90L))
+  grid <- attr(checked, "sdm_grid_metadata")
+  expect_identical(grid$G_sdm_cells, 0L)
+  expect_identical(grid$S_sdm_sets, 0L)
+  expect_identical(dim(grid$sdm_set_off), c(0L, 1L))
 })
 
 test_that("an infinite n_options is refused like any other non-integer", {
