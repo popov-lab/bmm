@@ -15,13 +15,15 @@
   // peak + log sum exp(peak expm1(log s)), which loses no digits at a large
   // peak. Set 0 is the full wheel. There, for K >= 90, the von Mises sum is
   // the continuous normaliser over the step wherever the activation spans 2.25
-  // steps, w = 1 / sqrt(max(c*, 1) kappa) >= 2.25 * 2 pi / K: measured within
-  // 5e-12 in log over 2,745 cells with K from 90 to 720, where the grid sum
-  // would cost K terms per cell. The trapezoid error falls as exp(-2.2 (w /
-  // step)^2), not faster, because the powers of s in exp(c* s) are narrower
-  // than s; on coarser wheels it is larger at the same w (2.6e-6 with K = 4),
-  // and K terms are cheap. With mu = 0 the full wheel takes each distance
-  // once, with its multiplicity
+  // steps, w = 1 / sqrt(max(c*, 1) kappa) >= 2.25 * 2 pi / K, where the grid
+  // sum would cost K terms per cell. The difference between the two, in log,
+  // is below 2e-11 at the gate for K = 90 and falls with K (5e-12 at K = 360,
+  // 3e-12 at 720; two cell samples, K 90 to 720, mu on and off the grid); it is
+  // about 2e-5 at one step, 1e-7 at 1.5 and 4e-10 at 2 steps, falling slower
+  // than the exp(-2 pi^2 (w / step)^2) of s alone because the powers of s in
+  // exp(c* s) are narrower than s. On coarser wheels it is larger at the same
+  // w (2.6e-6 with K = 4), and K terms are cheap. With mu = 0 the full wheel
+  // takes each distance once, with its multiplicity
   real sdm_grid_log_sum(real mu, real c, real kappa, int activation, int scaling, int K, int set,
                         data array[] int set_size, data array[,] int set_off,
                         data vector grid_half, data vector grid_logmult, data vector grid_full,
