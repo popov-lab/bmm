@@ -247,3 +247,19 @@ test_that("the stored frame gives the response and the options back at the optio
   bins <- sdm("y", n_options = 360, units = "bins")
   expect_identical(revert_check_data(bins, data.frame(sdm_bin = c(3L, -2L)))$y, c(3L, -2L))
 })
+
+test_that("a data set without a single response is refused before the cell tables are built", {
+  dat <- data.frame(y = c(NA_real_, NA_real_), cond = c("a", "b"), o1 = 0, o2 = pi / 2)
+  formula <- bmf(c ~ cond, kappa ~ 1)
+  expect_error(
+    check_data(sdm("y", n_options = 360, options = c("o1", "o2")), dat, formula),
+    "missing in every row"
+  )
+  expect_error(check_data(sdm("y", n_options = 360), dat, formula), "missing in every row")
+  expect_error(check_data(sdm("y"), dat, formula), "missing in every row")
+})
+
+test_that("an infinite n_options is refused like any other non-integer", {
+  expect_error(sdm("y", n_options = Inf), "even whole number")
+  expect_error(dsdm(0, n_options = -Inf), "even whole number")
+})

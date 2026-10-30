@@ -329,11 +329,12 @@ sdmSimple <- function(resp_error, version = "simple", ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
-  # the deprecated alias builds the continuous model only
+  # the deprecated alias builds the continuous model only; the dots it warned
+  # about must not reach .model_sdm(), whose arguments they can name
   .model_sdm(
     resp_error = resp_error, version = version, activation = "vonmises",
     scaling = "density", n_options = NULL, units = "radians", options = NULL,
-    n_alternatives = NULL, call = call, ...
+    n_alternatives = NULL, call = call, links = list(...)$links
   )
 }
 

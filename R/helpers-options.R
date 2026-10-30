@@ -33,7 +33,7 @@
 # sdm() and the d/r functions
 .check_n_options <- function(n_options) {
   stopif(
-    !is.numeric(n_options) || length(n_options) != 1 || is.na(n_options) || n_options < 4 ||
+    !is.numeric(n_options) || length(n_options) != 1 || !is.finite(n_options) || n_options < 4 ||
       n_options %% 2 != 0,
     "n_options must be a single even whole number of at least 4, the number of \\
     equally spaced positions on the response wheel."

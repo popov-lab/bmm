@@ -296,3 +296,17 @@ test_that("a column named like one check_data() builds is reported before it is 
     "'OptIdx1', 'opt_set_id'"
   )
 })
+
+test_that("sdmSimple() ignores the option arguments with a warning and stays continuous", {
+  warnings <- character()
+  model <- withCallingHandlers(
+    sdmSimple("y", n_options = 360, options = "o1"),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_match(warnings, "n_options", all = FALSE)
+  expect_false(inherits(model, "option_set"))
+  expect_identical(names(model$other_vars), c("activation", "scaling"))
+})

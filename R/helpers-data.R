@@ -87,6 +87,9 @@ check_data.circular <- function(model, data, formula) {
     not_in(resp_name, colnames(data)),
     "The response variable '{resp_name}' is not present in the data."
   )
+  # brms drops the rows without a response; with none left the checks below
+  # warn on an empty column and the fit stops much later
+  stopif(all(is.na(data[[resp_name]])), "The response variable '{resp_name}' is missing in every row.")
   # with units = "bins" the response counts option steps
   warnif(
     !identical(model$other_vars$units, "bins") && max(abs(data[[resp_name]]), na.rm = TRUE) > 2 * pi,
