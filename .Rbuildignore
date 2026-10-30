@@ -28,3 +28,5 @@
 ^\.lintr$
 ^\.claude$
 ^\.git$
+^bmmtools$
+^explorer$
