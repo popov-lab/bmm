@@ -52,7 +52,7 @@
 # log Z = log 2 + c* + log of the integral of exp(c* expm1(log s(u))) over
 # [0, pi]: the integrand over its peak, so that exp() neither overflows at
 # large c* (dsdm() before #558 stopped once log Z passed 709) nor loses digits
-# near the peak. The rules are the Stan normalisers of sdm_simple_funs.stan
+# near the peak. The rules are the Stan normalisers of sdm_simple_functions.stan
 # and sdm_kernel_funs.stan, vectorised over cells; one integrate() call per
 # cell would make log_lik(), and so loo(), several times slower than before
 .sdm_log_z <- function(log_cstar, kappa, activation) {

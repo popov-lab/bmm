@@ -8,13 +8,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(activation, scaling),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = if (activation == "laplace") {
-        "SDM with a Laplace activation function (Oberauer, 2023, Table 2); not the SDM proper"
-      } else {
-        "Signal Discrimination Model (SDM) by Oberauer (2023)"
-      },
+      name = "Signal Discrimination Model (SDM)",
       citation = glue(
         "Oberauer, K. (2023). Measurement models for visual working \\
         memory\u2014A factorial model comparison. Psychological Review, \\
@@ -274,7 +270,7 @@ configure_model.sdm <- function(model, data, formula) {
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
+  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_functions.stan"))
   if (family_name == "sdm_cont") {
     stan_funs <- paste(
       read_lines2(paste0(sc_path, "/sdm_kernel_funs.stan")),

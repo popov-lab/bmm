@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_mixture3p.R
 \name{mixture3p}
 \alias{mixture3p}
-\title{Three-parameter mixture model by Bays et al (2009).}
+\title{Three-Parameter Mixture Model}
 \usage{
 mixture3p(resp_error, nt_features, set_size, regex = FALSE, ...)
 }
@@ -31,13 +31,13 @@ a regular expression to match the non-target feature columns in the dataset.}
 An object of class \code{bmmodel}
 }
 \description{
-Three-parameter mixture model by Bays et al (2009).
+Three-Parameter Mixture Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Visual working memory
+\item \strong{Domain:} Working memory
 \item \strong{Task:} Continuous reproduction
-\item \strong{Name:} Three-parameter mixture model by Bays et al (2009).
+\item \strong{Name:} Three-Parameter Mixture Model
 \item \strong{Citation:}
 \itemize{
 \item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7

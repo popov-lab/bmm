@@ -57,20 +57,30 @@ Your PR also needs:
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
   [developer notes](https://venpopov.com/bmm/dev-notes/) and follow the
-  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Show
-  parameter recovery in the PR description (see below).
+  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Add a
+  recovery plan, `tests/recovery/<model>.R` (see below).
 
 ### Recovery evidence for new models
 
-Until we have a `tests/recovery/` folder, the PR description shows the result
-of a parameter recovery for the new model:
+Recovery evidence is a validation plan for the
+[bmmtools](https://github.com/GidonFrischkorn/bmmtools) package. Commit the plan
+as `tests/recovery/<model>.R`, a script that builds it with
+`bmmtools::validation_plan()` (see `tests/recovery/README.md`). The plan must
+cover:
 
-- true against recovered values, as a table or a plot;
+- true against recovered values;
 - a hierarchical recovery with several subjects whose parameters vary;
 - data simulated with an independent generator, not the model's own `r*`
   function, so that a bug in the density cannot cancel out.
 
-Attach the script as a gist or in a collapsed block in the PR.
+You run the plan locally (see `tests/recovery/README.md`); it takes hours of
+sampling. Until a card site exists, attach the rendered card.html (zipped) to
+the PR.
+
+Always pass `generator =` and, for a model bmmtools has no defaults for, the
+model object and `pars` instead of its name; `tests/recovery/README.md` has the
+details and the install line for bmmtools. The plan is not run by `R CMD check`
+or CI.
 
 ### Model fits for the website articles
 
@@ -143,7 +153,10 @@ three rules apply:
 
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data layout a
-model expects. Internal functions are not covered. Fits saved by an earlier
+model expects. From the release that adds or exports them, `model_spec()`,
+`simulate_data()` and `link_transform()` are covered too
+([ADR 0005](../.dev/decisions/0005-model-contract-for-companions-and-extensions.md)).
+Internal functions are not covered. Fits saved by an earlier
 release are covered: they keep working with `update()` and the extraction
 functions, through `restructure()` where they need converting, or the NEWS
 bullet says they must be refitted.
@@ -184,6 +197,86 @@ announce it in an issue before that release (rule 3). Forms deprecated before
 1.5.0 may be removed in any later release once the removal is announced the
 same way.
 
+## Companion packages and extensions
+
+Other packages build on bmm's models. [bmmtools](https://github.com/GidonFrischkorn/bmmtools)
+simulates from them and checks parameter recovery, and the
+[model explorer](https://github.com/GidonFrischkorn/bmm-explorer) draws them.
+Packages that define their own bmm models (#442) will join them. All of them
+rely on one contract, described in
+[ADR 0005](../.dev/decisions/0005-model-contract-for-companions-and-extensions.md):
+
+- what `model_spec()` returns for a model: its name, package, version, domain
+  and task, its parameters with their links, fixed values and alternative
+  groups, its default priors and init ranges, its response and other
+  variables, the role of each data column, the names of its density and
+  generator functions, and the contract version;
+- the simulation generic `simulate_data()` and every model's method for it;
+- the exported density and generator functions, and `link_transform()`.
+
+Reading a model object with `$`, its attributes, and internal functions are
+not part of the contract. Code in other packages should not rely on them.
+`model_spec()`, `simulate_data()` and the export of `link_transform()` are
+being added for 1.5.0 (the generic possibly for 1.6.0); each item is covered
+from the release that contains it. Until the 1.6.0 release pins contract
+version 1.0, the contract may still change, and the announcement rule below
+applies to every such change.
+
+### When your PR changes the contract
+
+A change to any item above is announced, whether or not it breaks a script.
+This extends rule 3 of "Deprecating and removing features" to the contract:
+
+1. Add a NEWS bullet under the heading `### Companion packages` in the section
+   of your release. Name the item and give the old and the new form.
+2. Before the release, a maintainer copies the body of the "Companion package
+   change" template
+   ([`companion_change.md`](ISSUE_TEMPLATE/companion_change.md); open the raw
+   file, because the rendered view hides its instructions) into a new issue in
+   [bmmtools](https://github.com/GidonFrischkorn/bmmtools/issues) and into one
+   in [bmm-explorer](https://github.com/GidonFrischkorn/bmm-explorer/issues),
+   one issue per repository, and links both in the PR.
+3. If the change also breaks user scripts, the deprecation rules above apply
+   as well.
+
+A new model has to meet the contract too: once the accessor and the generic
+are in bmm, it needs a complete `model_spec()` and a `simulate_data()` method.
+`use_model_template()` will scaffold the `simulate_data()` method, and a
+convention test will fail until the model has both.
+
+### The companion packages job
+
+The workflow "Companion packages" (`.github/workflows/companions.yaml`) runs
+the tests of bmmtools and the model explorer's fixture checks against bmm as
+pushed. It runs on every push to `develop` and the `dev-*` branches, once a
+week and on demand, not on pull requests. It never blocks a merge. Both jobs
+are switched off until the other maintainer has agreed to the workflow. The
+pull request that switches them on needs that maintainer's approval; the
+comment at the top of the file says how to switch them on.
+
+A failure does not turn the run red, and nothing sends a notification. Look
+at the run page: a warning annotation names the step that failed, and
+the job's summary table lists the checkout, setup and test steps with their
+outcomes.
+
+When a job has failed:
+
+- Read the warning and the summary table, which also shows the companion
+  commit that was tested, and decide where the cause is.
+- If the failure follows from a contract change that was announced, the
+  companion issue already covers it. Nothing to do in bmm.
+- If it follows from a contract change that was not announced, announce it
+  now (steps 1 and 2 above), or revert the change if it was not intended.
+- If bmm broke something it should not have, open a bug in bmm and fix it
+  there.
+- If the companion itself is at fault, open an issue in its repository.
+
+Once the jobs are switched on, run them by hand with:
+
+```sh
+gh workflow run companions.yaml --repo popov-lab/bmm --ref develop
+```
+
 ## Review and merging
 
 How many reviews a PR needs depends on what it touches.
@@ -196,7 +289,7 @@ How many reviews a PR needs depends on what it touches.
 
 A **new model** is a standard PR with one addition: the reviewer works through
 the reviewer block in the PR template. They read the likelihood against the
-cited source, run or inspect the recovery, and check the default priors on the
+cited source, read the recovery plan and inspect its card, and check the default priors on the
 natural scale.
 
 Three rules apply to all tiers:

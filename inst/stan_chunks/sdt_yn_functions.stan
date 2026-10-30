@@ -1,4 +1,4 @@
-// yes/no SDT likelihood for aggregated counts; needs sdt_dist_funs.stan
+// yes/no SDT likelihood for aggregated counts; needs sdt_dist_functions.stan
 // d is d_a, sdratio the SD ratio on the natural scale, stimulus 0 = new and 1 = old
 // criterion is measured from the noise mean, in noise-SD units
 real sdt_yn_lpmf(int y, real mu, real d, real criterion, real sdratio,

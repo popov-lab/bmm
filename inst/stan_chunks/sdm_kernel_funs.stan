@@ -1,7 +1,7 @@
   #include 'fun_tan_half.stan'
 
   // The activation and normaliser of the sdm() cells other than the default
-  // (#558), which keeps sdm_simple_funs.stan. The density is
+  // (#558), which keeps sdm_simple_functions.stan. The density is
   // exp(c* s(y - mu)) / Z with s(0) = 1, so c* is the peak of the activation,
   // and c is on the log scale. activation: 1 von Mises, 2 Laplace; scaling:
   // 1 density, 2 peak, 3 range. "density" divides c by the integral of s over
@@ -41,7 +41,7 @@
     return -kappa .* fmin(d, 2 * pi() - d);
   }
 
-  // The body of sdm_simple_ldenom() (sdm_simple_funs.stan, where the reasons
+  // The body of sdm_simple_ldenom() (sdm_simple_functions.stan, where the reasons
   // for each branch are written out) taking the log peak instead of c;
   // test-model_sdm-stan.R pins the two to agree
   real sdm_vm_ldenom_peak(real log_peak, real kappa, data vector gl_x, data vector gl_w,
