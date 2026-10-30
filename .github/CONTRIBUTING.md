@@ -74,15 +74,13 @@ cover:
   function, so that a bug in the density cannot cancel out.
 
 You run the plan locally (see `tests/recovery/README.md`); it takes hours of
-sampling. Until a card site exists, attach
-the rendered card.html to the PR.
+sampling. Until a card site exists, attach the rendered card.html (zipped) to
+the PR.
 
-bmmtools 0.3.0 ships defaults for `mixture2p` and `ezdm` only, and those simulate
-with bmm's own `r*` function; other models with a bmmtools adapter (for example
-`mixture3p`) fall back to it too, so always pass `generator =`. For any other
-model, pass the model object and `pars`, not its name:
-`bmmtools::validation_plan(bmm::<model>(...), pars = c(...), generator = ..., seed = 2026)`.
-The plan is not run by `R CMD check` or CI.
+Always pass `generator =` and, for a model bmmtools has no defaults for, the
+model object and `pars` instead of its name; `tests/recovery/README.md` has the
+details and the install line for bmmtools. The plan is not run by `R CMD check`
+or CI.
 
 ### Model fits for the website articles
 
