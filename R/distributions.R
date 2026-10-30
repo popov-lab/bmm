@@ -133,6 +133,10 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' between the two. For the Laplace activation with `scaling = "density"`,
 #' `c_laplace_circle2line()` and `c_laplace_line2circle()` convert between
 #' `bmm`'s `c` and that of Oberauer (2023, eq. 2). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#' At exactly `kappa = 0` the range scaling is undefined, because target and
+#' opposite have the same activation: `dsdm`, `psdm` and `qsdm` return `NaN`
+#' and `rsdm` stops with an error. Fits
+#' never reach it, since `kappa` has a log link.
 #'
 #' **The cumulative distribution function**
 #'

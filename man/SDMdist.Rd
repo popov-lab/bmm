@@ -119,6 +119,10 @@ parametrization); \code{c_bessel2sqrtexp()} and \code{c_sqrtexp2bessel()} conver
 between the two. For the Laplace activation with \code{scaling = "density"},
 \code{c_laplace_circle2line()} and \code{c_laplace_line2circle()} convert between
 \code{bmm}'s \code{c} and that of Oberauer (2023, eq. 2). See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article}.
+At exactly \code{kappa = 0} the range scaling is undefined, because target and
+opposite have the same activation: \code{dsdm}, \code{psdm} and \code{qsdm} return \code{NaN}
+and \code{rsdm} stops with an error. Fits
+never reach it, since \code{kappa} has a log link.
 
 \strong{The cumulative distribution function}
 
