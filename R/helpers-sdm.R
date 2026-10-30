@@ -10,8 +10,9 @@
 .sdm_activations <- c("vonmises", "laplace")
 .sdm_scalings <- c("density", "peak", "range")
 
-# the scaling a cell gets when sdm() or the d/p/q/r functions are not given one;
-# Laplace has no density scaling in Oberauer (2023), so its natural unit is the peak
+# the scaling a cell gets when sdm() or the d/p/q/r functions are not given one.
+# Laplace defaults to the peak because bmm's density scaling divides by the
+# integral over the circle, unlike the real-line kappa / 2 of Oberauer (2023, eq. 2)
 .sdm_default_scaling <- function(activation) {
   if (activation == "laplace") "peak" else "density"
 }
