@@ -64,23 +64,84 @@ c_bessel2sqrtexp <- function(c, kappa) {
   c / (besselI(kappa, 0, expon.scaled = TRUE) * sqrt(2 * pi * kappa))
 }
 
-#' @title Transform values from the native to parameter scale or vice versa according to a link function
+#' Transform values between the native and the parameter scale of a link
 #'
 #' @description
-#' This function transforms a vector of values from the native scale to the parameter scale,
-#' according to the specified link function. The function is mainly used internally, to ensure proper
-#' initial values
+#' `link_transform()` applies one of the links bmm uses for model parameters to
+#' a numeric vector. With `inverse = FALSE` it maps values from the native
+#' scale of a parameter, the scale of the model equations, to the parameter
+#' scale, the scale on which `bmm()` samples the intercept and coefficients of
+#' the parameter's formula. With `inverse = TRUE` it maps values from the
+#' parameter scale back to the native scale.
 #'
-#' @param values A numerical vector of values the transformation should be applied to
-#' @param link A character specifying the link to be applied.
-#' Available options are: "identity", "log", "softplus", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
-#' @param inverse A Boolean value indicating if values should be transformed from the native to
-#' the parameter scale (FALSE), or from the parameter scale to the native scale (TRUE)
+#' @param values A numeric vector. With `inverse = FALSE` the values are on the
+#'   native scale, with `inverse = TRUE` on the parameter scale. `NA` stays `NA`
+#'   at its position.
+#' @param link A single string naming the link: `"identity"`, `"log"`,
+#'   `"softplus"`, `"log1p"`, `"logm1"`, `"inverse"`, `"sqrt"`, `"logit"`,
+#'   `"probit"`, `"tan_half"`, `"loglog"` or `"cloglog"`. A `NULL` link is read
+#'   as the identity link, as for a model parameter that declares no link.
+#' @param inverse Logical. `FALSE` (the default) transforms from the native to
+#'   the parameter scale; `TRUE` transforms from the parameter scale to the
+#'   native scale.
 #'
-#' @noRd
+#' @details
+#' The links, with the native values each accepts. `x` is a value on the native
+#' scale, `eta` one on the parameter scale.
+#'
+#' | `link` | `inverse = FALSE`: `eta` from `x` | `inverse = TRUE`: `x` from `eta` | Native values `x` |
+#' |:--|:--|:--|:--|
+#' | `"identity"` | `x` | `eta` | all real numbers |
+#' | `"log"` | `log(x)` | `exp(eta)` | `x > 0` |
+#' | `"softplus"` | `log(exp(x) - 1)` | `log(1 + exp(eta))` | `x > 0` |
+#' | `"log1p"` | `log(1 + x)` | `exp(eta) - 1` | `x > -1` |
+#' | `"logm1"` | `log(x - 1)` | `exp(eta) + 1` | `x > 1` |
+#' | `"inverse"` | `1 / x` | `1 / eta` | `x != 0` |
+#' | `"sqrt"` | `sqrt(x)` | `eta^2` | `x >= 0` |
+#' | `"logit"` | `log(x / (1 - x))` | `1 / (1 + exp(-eta))` | `0 < x < 1` |
+#' | `"probit"` | `qnorm(x)` | `pnorm(eta)` | `0 < x < 1` |
+#' | `"tan_half"` | `tan(x / 2)` | `2 * atan(eta)` | `-pi < x < pi` |
+#' | `"loglog"` | `log(-log(x))` | `exp(-exp(eta))` | `0 < x < 1` |
+#' | `"cloglog"` | `log(-log(1 - x))` | `1 - exp(-exp(eta))` | `0 < x < 1` |
+#'
+#' Values outside these ranges are not checked; they give `NaN`, usually with a
+#' warning. `"sqrt"` squares on the way back, so a negative `eta` does not
+#' return the `x` it came from.
+#'
+#' The table holds the links that transform one value at a time. It does not
+#' include `"softmax"`, the link of the mixture weights of models such as
+#' [mixture3p()]: a softmax needs all weights of a group at once and a
+#' reference position, so `link_transform()` stops for it, as for any other
+#' name that is not in the table. [parameter_info()] shows the link of each
+#' parameter of a model in its `link` column; a parameter with `"softmax"`
+#' there is not covered by `link_transform()`. For the weights on the native
+#' scale, use [native_parameters()] or [softmax()].
+#'
+#' @return A numeric vector of the same length as `values`.
+#'
+#' @seealso [parameter_info()] for the link of each parameter of a model,
+#'   [native_parameters()] for the parameters of a fitted model on their native
+#'   scale, and [softmax()] for the link of mixture weights.
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' # a probability on the parameter scale of a logit link, and back
+#' eta <- link_transform(c(0.2, 0.5, 0.8), "logit")
+#' eta
+#' link_transform(eta, "logit", inverse = TRUE)
+#'
+#' # the native value of a parameter with a log link, from its parameter scale
+#' link_transform(c(-1, 0, 1), "log", inverse = TRUE)
+#'
+#' # the link of each parameter of a model
+#' parameter_info(sdm(resp_error = "y"))$link
 link_transform <- function(values, link, inverse = FALSE) {
-  # Handle NULL or missing link as identity (no transformation)
+  # NULL is what model$links[[par]] returns for a parameter without a link
   if (is.null(link)) link <- "identity"
+  # switch() would pick the alternative at position `link` for a number
+  stopif(!is.character(link) || length(link) != 1, "`link` must be a single string, such as 'log'.")
 
   if(inverse) {
     switch(
