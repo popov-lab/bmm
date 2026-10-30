@@ -57,20 +57,25 @@ Your PR also needs:
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
   [developer notes](https://venpopov.com/bmm/dev-notes/) and follow the
-  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Show
-  parameter recovery in the PR description (see below).
+  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Add a
+  recovery plan (see below).
 
 ### Recovery evidence for new models
 
-Until we have a `tests/recovery/` folder, the PR description shows the result
-of a parameter recovery for the new model:
+Recovery evidence is a validation plan for the
+[bmmtools](https://github.com/GidonFrischkorn/bmmtools) package. Commit the plan
+as `tests/recovery/<model>.R`, a script that builds it with
+`bmmtools::validation_plan()` (see `tests/recovery/README.md`), and link the
+validation card that `bmmtools::run_validation()` renders from it in the PR
+body once the card site is up. The plan must cover:
 
-- true against recovered values, as a table or a plot;
+- true against recovered values;
 - a hierarchical recovery with several subjects whose parameters vary;
 - data simulated with an independent generator, not the model's own `r*`
   function, so that a bug in the density cannot cancel out.
 
-Attach the script as a gist or in a collapsed block in the PR.
+bmmtools 0.3.0 ships defaults for `mixture2p` and `ezdm` only; for any other
+model pass `pars` yourself. The plan is not run by `R CMD check` or CI.
 
 ### Model fits for the website articles
 

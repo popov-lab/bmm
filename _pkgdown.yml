@@ -22,6 +22,7 @@ navbar:
      develop:
         text: Develop
         href: https://venpopov.com/bmm/dev-notes/index.html
+     # TODO(T-3): point at the bmmtools validation-card site once it is published
      parameter_recovery:
         text: Parameter recovery
         href: https://venpopov.com/bmm/parameter-recovery/index.html

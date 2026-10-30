@@ -13,13 +13,13 @@
 - [ ] Targets the right branch: `develop` for fixes and the next release, `dev-x.y.0` for later features
 
 ## New model only
-- [ ] Recovery evidence below: true vs recovered, hierarchical, independent generator
+- [ ] Recovery plan in `tests/recovery/<model>.R` (true vs recovered, hierarchical, independent generator); card link below when available
 - [ ] One constructor per response type
 
 <details><summary>Reviewer (new models)</summary>
 
 - [ ] Likelihood checked against the cited source
-- [ ] Recovery run or inspected
+- [ ] Plan file runs (or card inspected)
 - [ ] Default priors checked on the natural scale
 </details>
 
