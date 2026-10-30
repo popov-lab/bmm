@@ -54,12 +54,12 @@
 <div class="section level3">
 <h3 id="development-cycle">Development Cycle<a class="anchor" aria-label="anchor" href="#development-cycle"></a></h3>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/load_all.html" class="external-link">load_all</a></span><span class="op">(</span><span class="op">)</span>      <span class="co"># Load package functions (NOT library())</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/document.html" class="external-link">document</a></span><span class="op">(</span><span class="op">)</span>      <span class="co"># Generate man/ files from roxygen</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/check.html" class="external-link">check</a></span><span class="op">(</span><span class="op">)</span>         <span class="co"># R CMD CHECK - must pass before PR</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/test.html" class="external-link">test</a></span><span class="op">(</span><span class="op">)</span>          <span class="co"># Run all tests</span></span>
-<span><span class="fu">testthat</span><span class="fu">::</span><span class="fu"><a href="https://testthat.r-lib.org/reference/test_file.html" class="external-link">test_file</a></span><span class="op">(</span><span class="op">)</span>     <span class="co"># Run single test file</span></span></code></pre></div>
-<p><strong>ALWAYS</strong> use <code><a href="https://devtools.r-lib.org/reference/load_all.html" class="external-link">devtools::load_all()</a></code> instead of <code><a href="https://github.com/popov-lab/bmm" class="external-link">library(bmm)</a></code> during development.</p>
+<code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">load_all</span><span class="op">(</span><span class="op">)</span>      <span class="co"># Load package functions (NOT library())</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">document</span><span class="op">(</span><span class="op">)</span>      <span class="co"># Generate man/ files from roxygen</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">check</span><span class="op">(</span><span class="op">)</span>         <span class="co"># R CMD CHECK - must pass before PR</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">test</span><span class="op">(</span><span class="op">)</span>          <span class="co"># Run all tests</span></span>
+<span><span class="fu">testthat</span><span class="fu">::</span><span class="fu">test_file</span><span class="op">(</span><span class="op">)</span>     <span class="co"># Run single test file</span></span></code></pre></div>
+<p><strong>ALWAYS</strong> use <code>devtools::load_all()</code> instead of <code><a href="https://github.com/popov-lab/bmm" class="external-link">library(bmm)</a></code> during development.</p>
 </div>
 <div class="section level3">
 <h3 id="package-requirements">Package Requirements<a class="anchor" aria-label="anchor" href="#package-requirements"></a></h3>

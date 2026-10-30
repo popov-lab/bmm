@@ -26,10 +26,8 @@ devtools::test()          # Run all tests
 testthat::test_file()     # Run single test file
 ```
 
-**ALWAYS** use
-[`devtools::load_all()`](https://devtools.r-lib.org/reference/load_all.html)
-instead of [`library(bmm)`](https://github.com/popov-lab/bmm) during
-development.
+**ALWAYS** use `devtools::load_all()` instead of
+[`library(bmm)`](https://github.com/popov-lab/bmm) during development.
 
 ### Package Requirements
 
