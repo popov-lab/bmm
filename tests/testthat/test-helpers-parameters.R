@@ -983,3 +983,217 @@ test_that("print() of parameter_info() of a custom m3 model says how to find its
   out <- capture.output(print(parameter_info(model, formula = bmf(a ~ b + c, b ~ b))))
   expect_false(any(grepl("Pass a formula", out, fixed = TRUE)))
 })
+
+# link_transform() ----------------------------------------------------------
+
+# Round trip at 1e-12, absolute below 1 and relative above. `x` lies in the
+# link's native domain, `eta` on its parameter scale; both are written out at
+# each call, so a link that changes its definition cannot move its own test.
+expect_link_round_trip <- function(link, x, eta) {
+  native_back <- link_transform(link_transform(x, link), link, inverse = TRUE)
+  expect_lt(max(abs(native_back - x) / pmax(1, abs(x))), 1e-12)
+  eta_back <- link_transform(link_transform(eta, link, inverse = TRUE), link)
+  expect_lt(max(abs(eta_back - eta) / pmax(1, abs(eta))), 1e-12)
+}
+
+link_names_in_code_order <- c(
+  "identity", "log", "softplus", "log1p", "logm1", "inverse",
+  "sqrt", "logit", "probit", "tan_half", "loglog", "cloglog"
+)
+
+expect_link_keeps_na <- function(link, x, eta) {
+  at_na <- function(v) c(v[1], NA, v[2])
+  forward <- link_transform(at_na(x), link)
+  inverse <- link_transform(at_na(eta), link, inverse = TRUE)
+  expect_identical(is.na(forward), c(FALSE, TRUE, FALSE))
+  expect_identical(is.na(inverse), c(FALSE, TRUE, FALSE))
+  expect_equal(forward[c(1, 3)], link_transform(x, link))
+  expect_equal(inverse[c(1, 3)], link_transform(eta, link, inverse = TRUE))
+}
+
+test_that("link_transform() is exported", {
+  namespace <- readLines(system.file("NAMESPACE", package = "bmm"))
+  expect_true("export(link_transform)" %in% namespace)
+})
+
+test_that("link_transform() round trip: identity", {
+  expect_link_round_trip("identity", x = c(-3, 0, 2.5), eta = c(-2, 0, 3))
+})
+
+test_that("link_transform() round trip: log", {
+  expect_link_round_trip("log", x = c(0.001, 0.5, 1, 20, 1e4), eta = c(-5, 0, 3, 10))
+})
+
+test_that("link_transform() round trip: softplus, also where exp() overflows", {
+  expect_link_round_trip("softplus", x = c(0.01, 0.5, 1, 10, 800), eta = c(-5, -1, 0, 3, 800))
+})
+
+test_that("link_transform() round trip: log1p", {
+  expect_link_round_trip("log1p", x = c(-0.9, -0.5, 0, 1, 1000), eta = c(-4, 0, 2))
+})
+
+test_that("link_transform() round trip: logm1", {
+  expect_link_round_trip("logm1", x = c(1.001, 1.5, 2, 10, 1000), eta = c(-4, 0, 3))
+})
+
+test_that("link_transform() round trip: inverse", {
+  expect_link_round_trip("inverse", x = c(-4, -0.5, 0.2, 1, 250), eta = c(-2, 0.5, 3))
+})
+
+test_that("link_transform() round trip: sqrt, on the non-negative parameter scale", {
+  expect_link_round_trip("sqrt", x = c(0, 0.04, 1, 9, 1e4), eta = c(0, 0.5, 3))
+})
+
+test_that("link_transform() round trip: logit", {
+  expect_link_round_trip("logit", x = c(0.001, 0.2, 0.5, 0.9, 0.999), eta = c(-6, 0, 2.5))
+})
+
+test_that("link_transform() round trip: probit", {
+  expect_link_round_trip("probit", x = c(0.001, 0.2, 0.5, 0.9, 0.999), eta = c(-3, 0, 2.5))
+})
+
+test_that("link_transform() round trip: tan_half", {
+  expect_link_round_trip("tan_half", x = c(-3, -1, 0, 1, 3), eta = c(-20, -1, 0, 1, 20))
+})
+
+test_that("link_transform() round trip: loglog", {
+  expect_link_round_trip("loglog", x = c(0.001, 0.2, 0.5, 0.9, 0.999), eta = c(-3, 0, 1.5))
+})
+
+test_that("link_transform() round trip: cloglog", {
+  expect_link_round_trip("cloglog", x = c(0.001, 0.2, 0.5, 0.9, 0.999), eta = c(-3, 0, 1.5))
+})
+
+# the round trip bar is absolute below 1, which a cancellation near 0 passes
+test_that("link_transform() keeps the relative precision of a small cloglog probability", {
+  x <- c(1e-6, 1e-10)
+  back <- link_transform(link_transform(x, "cloglog"), "cloglog", inverse = TRUE)
+  expect_lt(max(abs(back - x) / x), 1e-12)
+})
+
+test_that("link_transform() maps known values in the documented direction", {
+  tol <- 1e-12
+  expect_equal(link_transform(2.5, "identity"), 2.5)
+  expect_equal(link_transform(c(1, exp(1)), "log"), c(0, 1), tolerance = tol)
+  expect_equal(link_transform(log(2), "softplus"), 0, tolerance = tol)
+  expect_equal(link_transform(0, "softplus", inverse = TRUE), log(2), tolerance = tol)
+  expect_equal(link_transform(exp(1) - 1, "log1p"), 1, tolerance = tol)
+  expect_equal(link_transform(1, "log1p", inverse = TRUE), exp(1) - 1, tolerance = tol)
+  expect_equal(link_transform(exp(1) + 1, "logm1"), 1, tolerance = tol)
+  expect_equal(link_transform(0, "logm1", inverse = TRUE), 2, tolerance = tol)
+  expect_equal(link_transform(4, "inverse"), 0.25, tolerance = tol)
+  expect_equal(link_transform(0.25, "inverse", inverse = TRUE), 4, tolerance = tol)
+  expect_equal(link_transform(9, "sqrt"), 3, tolerance = tol)
+  expect_equal(link_transform(3, "sqrt", inverse = TRUE), 9, tolerance = tol)
+  expect_equal(link_transform(0.5, "logit"), 0, tolerance = tol)
+  expect_equal(link_transform(log(3), "logit", inverse = TRUE), 0.75, tolerance = tol)
+  expect_equal(link_transform(0.975, "probit"), 1.959963984540054, tolerance = tol)
+  expect_equal(link_transform(0, "probit", inverse = TRUE), 0.5, tolerance = tol)
+  expect_equal(link_transform(pi / 2, "tan_half"), 1, tolerance = tol)
+  expect_equal(link_transform(1, "tan_half", inverse = TRUE), pi / 2, tolerance = tol)
+  expect_equal(link_transform(exp(-1), "loglog"), 0, tolerance = tol)
+  expect_equal(link_transform(0, "loglog", inverse = TRUE), exp(-1), tolerance = tol)
+  expect_equal(link_transform(1 - exp(-1), "cloglog"), 0, tolerance = tol)
+  expect_equal(link_transform(0, "cloglog", inverse = TRUE), 1 - exp(-1), tolerance = tol)
+})
+
+test_that("link_transform() reads a NULL link as identity", {
+  expect_identical(link_transform(c(0.2, 3), NULL), c(0.2, 3))
+  expect_identical(link_transform(c(0.2, 3), NULL, inverse = TRUE), c(0.2, 3))
+})
+
+test_that("link_transform() refuses softmax and unknown links with the same message", {
+  expect_error(link_transform(c(0.2, 0.8), "softmax"), "Link 'softmax' not recognized.", fixed = TRUE)
+  expect_error(link_transform(c(0.2, 0.8), "softmax", inverse = TRUE), "Link 'softmax' not recognized.", fixed = TRUE)
+  expect_error(link_transform(1, "nope"), "Link 'nope' not recognized.", fixed = TRUE)
+  expect_error(link_transform(1, "nope", inverse = TRUE), "Link 'nope' not recognized.", fixed = TRUE)
+})
+
+test_that("link_transform() refuses a link that is not a single string instead of picking one by position", {
+  expect_error(link_transform(2, 2), "single string")
+  expect_error(link_transform(2, NA), "single string")
+  expect_error(link_transform(2, factor("log")), "single string")
+  expect_error(link_transform(2, c("log", "logit")), "single string")
+})
+
+test_that("link_transform() passes NA through at its position", {
+  expect_link_keeps_na("identity", x = c(-3, 2.5), eta = c(-2, 3))
+  expect_link_keeps_na("log", x = c(0.5, 20), eta = c(-5, 3))
+  expect_link_keeps_na("softplus", x = c(0.5, 10), eta = c(-1, 3))
+  expect_link_keeps_na("log1p", x = c(-0.5, 1), eta = c(-4, 2))
+  expect_link_keeps_na("logm1", x = c(1.5, 10), eta = c(-4, 3))
+  expect_link_keeps_na("inverse", x = c(-0.5, 4), eta = c(-2, 3))
+  expect_link_keeps_na("sqrt", x = c(0.04, 9), eta = c(0.5, 3))
+  expect_link_keeps_na("logit", x = c(0.2, 0.9), eta = c(-6, 2.5))
+  expect_link_keeps_na("probit", x = c(0.2, 0.9), eta = c(-3, 2.5))
+  expect_link_keeps_na("tan_half", x = c(-1, 3), eta = c(-1, 20))
+  expect_link_keeps_na("loglog", x = c(0.2, 0.9), eta = c(-3, 1.5))
+  expect_link_keeps_na("cloglog", x = c(0.2, 0.9), eta = c(-3, 1.5))
+})
+
+test_that("link_transform() gives an infinite eta without a warning at an edge its native range excludes", {
+  expect_identical(expect_silent(link_transform(0, "log")), -Inf)
+  expect_identical(expect_silent(link_transform(0, "softplus")), -Inf)
+  expect_identical(expect_silent(link_transform(-1, "log1p")), -Inf)
+  expect_identical(expect_silent(link_transform(1, "logm1")), -Inf)
+  expect_identical(expect_silent(link_transform(0, "inverse")), Inf)
+  expect_identical(expect_silent(link_transform(c(0, 1), "logit")), c(-Inf, Inf))
+  expect_identical(expect_silent(link_transform(c(0, 1), "probit")), c(-Inf, Inf))
+  expect_identical(expect_silent(link_transform(c(0, 1), "loglog")), c(Inf, -Inf))
+  expect_identical(expect_silent(link_transform(c(0, 1), "cloglog")), c(-Inf, Inf))
+  expect_warning(beyond_logit <- link_transform(1.5, "logit"))
+  expect_identical(beyond_logit, NaN)
+  expect_warning(beyond_softplus <- link_transform(-0.5, "softplus"))
+  expect_true(is.na(beyond_softplus) && !is.nan(beyond_softplus))
+})
+
+test_that("link_transform() implements the twelve links in the same order in both directions", {
+  switch_names <- function(e) {
+    if (!is.call(e)) return(list())
+    inner <- unlist(lapply(as.list(e)[-1], switch_names), recursive = FALSE)
+    if (identical(e[[1]], quote(switch))) c(list(names(e)[names(e) != ""]), inner) else inner
+  }
+  expect_identical(
+    switch_names(body(link_transform)),
+    list(link_names_in_code_order, link_names_in_code_order)
+  )
+})
+
+test_that("the help page of link_transform() names the twelve links in code order and the softmax exclusion", {
+  rd_file <- testthat::test_path("..", "..", "man", "link_transform.Rd")
+  rd <- if (file.exists(rd_file)) {
+    tools::parse_Rd(rd_file)
+  } else {
+    tryCatch(tools::Rd_db("bmm")[["link_transform.Rd"]], error = function(e) NULL)
+  }
+  skip_if(is.null(rd), "help page not available")
+  tag <- function(x) attr(x, "Rd_tag")
+  section_text <- function(name) {
+    section <- rd[[which(vapply(rd, tag, "") == name)]]
+    paste(unlist(section), collapse = "")
+  }
+
+  arguments <- rd[[which(vapply(rd, tag, "") == "\\arguments")]]
+  items <- Filter(function(x) identical(tag(x), "\\item"), arguments)
+  link_item <- Filter(function(x) identical(trimws(paste(unlist(x[[1]]), collapse = "")), "link"), items)
+  expect_length(link_item, 1)
+  link_text <- paste(unlist(link_item[[1]][[2]]), collapse = "")
+  quoted <- regmatches(link_text, gregexpr("\"[a-z0-9_]+\"", link_text))[[1]]
+  expect_identical(quoted, paste0("\"", link_names_in_code_order, "\""))
+
+  details <- rd[[which(vapply(rd, tag, "") == "\\details")]]
+  tabular <- Filter(function(x) identical(tag(x), "\\tabular"), details)
+  expect_length(tabular, 1)
+  cell_text <- vapply(tabular[[1]][[2]], function(x) {
+    switch(tag(x), "\\tab" = "\001", "\\cr" = "\002", paste(unlist(x), collapse = ""))
+  }, "")
+  rows <- strsplit(paste(cell_text, collapse = ""), "\002", fixed = TRUE)[[1]]
+  link_column <- trimws(vapply(strsplit(rows, "\001", fixed = TRUE), `[`, "", 1))
+  expect_identical(
+    link_column[link_column != ""],
+    c("link", paste0("\"", link_names_in_code_order, "\""))
+  )
+
+  expect_match(section_text("\\details"), "softmax", fixed = TRUE)
+  expect_match(section_text("\\details"), "parameter_info", fixed = TRUE)
+})
