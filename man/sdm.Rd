@@ -142,14 +142,17 @@ predictive check so that the implied distributions of the circular SD of
 the response error are comparable across cells, not exactly matched. The
 last column is the share of prior predictive distributions with a circular
 SD below 0.05 radians; the Laplace cells still produce more of these
-spikes. Set your own priors where that matters.\tabular{lllll}{
+spikes. The von Mises peak and range cells keep the priors of the
+default cell, which already give them comparable error distributions
+(Kolmogorov-Smirnov distance 0.06 to the default cell); the Laplace cells
+needed their own. Set your own priors where that matters.\tabular{lllll}{
    \code{activation} \tab \code{scaling} \tab \code{c} \tab \code{kappa} \tab circular SD < 0.05 \cr
-   \code{"vonmises"} \tab \code{"density"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.071 \cr
-   \code{"vonmises"} \tab \code{"peak"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.033 \cr
-   \code{"vonmises"} \tab \code{"range"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.033 \cr
-   \code{"laplace"} \tab \code{"density"} \tab \code{student_t(5, 3.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.161 \cr
-   \code{"laplace"} \tab \code{"peak"} \tab \code{student_t(5, 2.5, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.112 \cr
-   \code{"laplace"} \tab \code{"range"} \tab \code{student_t(5, 2.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.087 \cr
+   \code{"vonmises"} \tab \code{"density"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.07 \cr
+   \code{"vonmises"} \tab \code{"peak"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.03 \cr
+   \code{"vonmises"} \tab \code{"range"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.03 \cr
+   \code{"laplace"} \tab \code{"density"} \tab \code{student_t(5, 3.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.16 \cr
+   \code{"laplace"} \tab \code{"peak"} \tab \code{student_t(5, 2.5, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.11 \cr
+   \code{"laplace"} \tab \code{"range"} \tab \code{student_t(5, 2.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.09 \cr
 }
 }
 

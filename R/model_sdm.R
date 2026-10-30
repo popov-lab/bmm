@@ -157,16 +157,19 @@ settable_links.sdm <- function(model) {
 #'   the response error are comparable across cells, not exactly matched. The
 #'   last column is the share of prior predictive distributions with a circular
 #'   SD below 0.05 radians; the Laplace cells still produce more of these
-#'   spikes. Set your own priors where that matters.
+#'   spikes. The von Mises peak and range cells keep the priors of the
+#'   default cell, which already give them comparable error distributions
+#'   (Kolmogorov-Smirnov distance 0.06 to the default cell); the Laplace cells
+#'   needed their own. Set your own priors where that matters.
 #'
 #'   | `activation` | `scaling` | `c` | `kappa` | circular SD < 0.05 |
 #'   |---|---|---|---|---|
-#'   | `"vonmises"` | `"density"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.071 |
-#'   | `"vonmises"` | `"peak"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.033 |
-#'   | `"vonmises"` | `"range"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.033 |
-#'   | `"laplace"` | `"density"` | `student_t(5, 3.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.161 |
-#'   | `"laplace"` | `"peak"` | `student_t(5, 2.5, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.112 |
-#'   | `"laplace"` | `"range"` | `student_t(5, 2.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.087 |
+#'   | `"vonmises"` | `"density"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.07 |
+#'   | `"vonmises"` | `"peak"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.03 |
+#'   | `"vonmises"` | `"range"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.03 |
+#'   | `"laplace"` | `"density"` | `student_t(5, 3.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.16 |
+#'   | `"laplace"` | `"peak"` | `student_t(5, 2.5, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.11 |
+#'   | `"laplace"` | `"range"` | `student_t(5, 2.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.09 |
 #' @section What `c` means:
 #'
 #'   | `scaling` | \eqn{c^*}, von Mises | \eqn{c^*}, Laplace | `c` is |
