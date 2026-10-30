@@ -626,12 +626,15 @@ sdm_grid_metadata <- function(data, formula, model, runs) {
   grid <- attr(data, "sdm_grid_metadata") %||%
     sdm_grid_metadata(data, formula, model, sdm_run_metadata(data, formula, model))
   n_rows <- sum(grid$sdm_cell_count)
-  if (grid$G_sdm_cells > n_rows / 2) {
+  # a cell of an offered subset sums over its few options, so only cells of
+  # the full wheel (set 0) are worth reporting
+  n_full_cells <- sum(grid$sdm_cell_set == 0)
+  if (n_full_cells > n_rows / 2) {
     message2(
-      "{grid$G_sdm_cells} of the {n_rows} rows have a normaliser of their own, because \
-      no other row shares both their parameter values and their option set. Each \
-      normaliser sums over the options of its row in every gradient, so the fit takes \
-      longer than when rows share them; see ?sdm, section \"Discrete response options\"."
+      "{n_full_cells} of the {n_rows} rows have a normaliser of their own, because \\
+      no other row shares their parameter values. Each normaliser sums over the \\
+      options of its row in every gradient, so the fit takes longer than when rows \\
+      share them; see ?sdm, section \"Discrete response options\"."
     )
   }
   sdm_family <- brms::custom_family(
@@ -766,6 +769,12 @@ log_lik_sdm_grid <- function(i, prep) {
   d <- .sdm_grid_prep_draws(i, prep)
   n_options <- prep$data$sdm_K
   y <- prep$data$Y[i]
+  # newdata that carries the built columns is not checked again, so a
+  # response the trial did not offer can reach here; it has no probability,
+  # as in dsdm(options = )
+  if (!is.null(d$options) && !y %in% d$options) {
+    return(rep(-Inf, prep$ndraws))
+  }
   exp(d$log_cstar + .sdm_log_s(y * 2 * pi / n_options - d$mu, d$kappa, d$cell$activation)) -
     d$log_sum - log(2 * pi / n_options)
 }

@@ -218,6 +218,14 @@ test_that("log_lik() of an option set is dsdm() with the trial's options", {
   )
 })
 
+test_that("log_lik() of a response outside the trial's options is -Inf, as in dsdm()", {
+  dpars <- list(mu = matrix(0, 3, 2), c = matrix(5:7, 3, 2), kappa = matrix(2, 3, 2))
+  absent <- .option_absent(360L)
+  prep <- grid_prep(c(90L, 10L), dpars, list(vint1 = c(0L, 0L), vint2 = c(90L, -45L), vint3 = c(absent, 45L)))
+  expect_identical(log_lik_sdm_grid(2, prep), rep(-Inf, 3))
+  expect_true(all(is.finite(log_lik_sdm_grid(1, prep))))
+})
+
 test_that("posterior_predict() draws offered option offsets in steps", {
   withr::local_seed(558)
   n <- 2000

@@ -229,6 +229,14 @@ test_that("more normaliser cells than half the rows give a message", {
   expect_no_message(standata(bmf(c ~ 1, kappa ~ 1), dat, sdm("y", n_options = 360)))
 })
 
+test_that("option-set cells of their own are not reported, since each sums only a few options", {
+  dat <- options_data()
+  dat$x <- seq(0, 1, length.out = nrow(dat))
+  model <- sdm("y", n_options = 360, options = paste0("o", 1:4), n_alternatives = "m")
+  formula <- bmf(c ~ x, kappa ~ 1)
+  expect_no_message(configure_model(model, check_data(model, dat, formula), formula))
+})
+
 test_that("the stored frame gives the response and the options back at the option centres", {
   dat <- options_data()
   dat$y[1] <- deg2rad(0.3)
