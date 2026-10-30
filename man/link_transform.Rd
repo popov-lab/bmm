@@ -50,9 +50,11 @@ scale, \code{eta} one on the parameter scale.\tabular{llll}{
 }
 
 
-Values outside these ranges are not checked; they give \code{NaN}, usually with a
-warning. \code{"sqrt"} squares on the way back, so a negative \code{eta} does not
-return the \code{x} it came from.
+Values outside these ranges are not checked; most give \code{NaN} (\code{NA} for
+\code{"softplus"}) with a warning. \code{"tan_half"} reads \code{x} as an angle: a value
+outside \code{-pi} to \code{pi} gives the \code{eta} of the same angle inside that range,
+and returns that angle on the way back. \code{"sqrt"} squares on the way back, so
+a negative \code{eta} does not return the \code{x} it came from.
 
 The table holds the links that transform one value at a time. It does not
 include \code{"softmax"}, the link of the mixture weights of models such as

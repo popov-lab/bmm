@@ -104,9 +104,11 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #' | `"loglog"` | `log(-log(x))` | `exp(-exp(eta))` | `0 < x < 1` |
 #' | `"cloglog"` | `log(-log(1 - x))` | `1 - exp(-exp(eta))` | `0 < x < 1` |
 #'
-#' Values outside these ranges are not checked; they give `NaN`, usually with a
-#' warning. `"sqrt"` squares on the way back, so a negative `eta` does not
-#' return the `x` it came from.
+#' Values outside these ranges are not checked; most give `NaN` (`NA` for
+#' `"softplus"`) with a warning. `"tan_half"` reads `x` as an angle: a value
+#' outside `-pi` to `pi` gives the `eta` of the same angle inside that range,
+#' and returns that angle on the way back. `"sqrt"` squares on the way back, so
+#' a negative `eta` does not return the `x` it came from.
 #'
 #' The table holds the links that transform one value at a time. It does not
 #' include `"softmax"`, the link of the mixture weights of models such as
@@ -157,7 +159,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       probit = pnorm(values),
       tan_half = 2 * atan(values),
       loglog = exp(-exp(values)),
-      cloglog = 1 - exp(-exp(values)),
+      cloglog = -expm1(-exp(values)),
       stop2("Link '{link}' not recognized.")
     )
   } else {

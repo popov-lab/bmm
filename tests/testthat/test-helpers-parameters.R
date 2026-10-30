@@ -967,6 +967,11 @@ expect_link_round_trip <- function(link, x, eta) {
   expect_lt(max(abs(eta_back - eta) / pmax(1, abs(eta))), 1e-12)
 }
 
+link_names_in_code_order <- c(
+  "identity", "log", "softplus", "log1p", "logm1", "inverse",
+  "sqrt", "logit", "probit", "tan_half", "loglog", "cloglog"
+)
+
 expect_link_keeps_na <- function(link, x, eta) {
   at_na <- function(v) c(v[1], NA, v[2])
   forward <- link_transform(at_na(x), link)
@@ -1030,6 +1035,13 @@ test_that("link_transform() round trip: cloglog", {
   expect_link_round_trip("cloglog", x = c(0.001, 0.2, 0.5, 0.9, 0.999), eta = c(-3, 0, 1.5))
 })
 
+# the round trip bar is absolute below 1, which a cancellation near 0 passes
+test_that("link_transform() keeps the relative precision of a small cloglog probability", {
+  x <- c(1e-6, 1e-10)
+  back <- link_transform(link_transform(x, "cloglog"), "cloglog", inverse = TRUE)
+  expect_lt(max(abs(back - x) / x), 1e-12)
+})
+
 test_that("link_transform() maps known values in the documented direction", {
   tol <- 1e-12
   expect_equal(link_transform(2.5, "identity"), 2.5)
@@ -1090,6 +1102,18 @@ test_that("link_transform() passes NA through at its position", {
   expect_link_keeps_na("cloglog", x = c(0.2, 0.9), eta = c(-3, 1.5))
 })
 
+test_that("link_transform() implements the twelve links in the same order in both directions", {
+  switch_names <- function(e) {
+    if (!is.call(e)) return(list())
+    inner <- unlist(lapply(as.list(e)[-1], switch_names), recursive = FALSE)
+    if (identical(e[[1]], quote(switch))) c(list(names(e)[names(e) != ""]), inner) else inner
+  }
+  expect_identical(
+    switch_names(body(link_transform)),
+    list(link_names_in_code_order, link_names_in_code_order)
+  )
+})
+
 test_that("the help page of link_transform() names the twelve links in code order and the softmax exclusion", {
   rd_file <- testthat::test_path("..", "..", "man", "link_transform.Rd")
   rd <- if (file.exists(rd_file)) {
@@ -1110,13 +1134,7 @@ test_that("the help page of link_transform() names the twelve links in code orde
   expect_length(link_item, 1)
   link_text <- paste(unlist(link_item[[1]][[2]]), collapse = "")
   quoted <- regmatches(link_text, gregexpr("\"[a-z0-9_]+\"", link_text))[[1]]
-  expect_identical(
-    quoted,
-    c(
-      "\"identity\"", "\"log\"", "\"softplus\"", "\"log1p\"", "\"logm1\"", "\"inverse\"",
-      "\"sqrt\"", "\"logit\"", "\"probit\"", "\"tan_half\"", "\"loglog\"", "\"cloglog\""
-    )
-  )
+  expect_identical(quoted, paste0("\"", link_names_in_code_order, "\""))
 
   expect_match(section_text("\\details"), "softmax", fixed = TRUE)
   expect_match(section_text("\\details"), "parameter_info", fixed = TRUE)
