@@ -112,12 +112,6 @@ has a kink at \eqn{\mu}, so estimating \code{mu} puts a kink at every
 response, which gradient-based sampling handles poorly; \code{bmm()} warns
 when the formula estimates \code{mu}.
 }
-
-With the Laplace activation \eqn{\kappa} is a rate per radian, and the
-default priors, set for the von Mises activation, put 21\% of the prior
-predictive response distributions below a circular SD of 0.05 radians with
-\code{scaling = "peak"} and 63\% with \code{scaling = "density"}, against 7\% for the
-default cell. Set priors on \code{kappa} and \code{c} where that matters.
 }
 
 \section{Scaling of the activation}{
@@ -138,12 +132,25 @@ times \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}, 0.79 at
 of eq. 2 and \code{\link[=c_laplace_line2circle]{c_laplace_line2circle()}} back. \code{"peak"} takes \code{c} as the
 activation of the target, and \code{"range"} as the difference between the
 activation of the target and that of the location opposite it.
+}
 
-The default prior on \code{c} is \code{student_t(5, 2, 0.75)} on the log scale for
-every scaling. A prior predictive check of the circular SD of the
-response error, with \code{kappa}'s default prior, matched that of the default
-cell best at this location for the peak and range scalings of the von
-Mises activation too (Kolmogorov distance 0.06).
+\section{Default priors}{
+ \code{kappa} and \code{c} mean different things in each
+cell, so each cell has its own \code{main} priors (log scale; the \code{effects} and
+\code{sd} priors are the same everywhere). They were chosen in a prior
+predictive check so that the implied distributions of the circular SD of
+the response error are comparable across cells, not exactly matched. The
+last column is the share of prior predictive distributions with a circular
+SD below 0.05 radians; the Laplace cells still produce more of these
+spikes. Set your own priors where that matters.\tabular{lllll}{
+   \code{activation} \tab \code{scaling} \tab \code{c} \tab \code{kappa} \tab circular SD < 0.05 \cr
+   \code{"vonmises"} \tab \code{"density"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.071 \cr
+   \code{"vonmises"} \tab \code{"peak"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.033 \cr
+   \code{"vonmises"} \tab \code{"range"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.033 \cr
+   \code{"laplace"} \tab \code{"density"} \tab \code{student_t(5, 3.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.161 \cr
+   \code{"laplace"} \tab \code{"peak"} \tab \code{student_t(5, 2.5, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.112 \cr
+   \code{"laplace"} \tab \code{"range"} \tab \code{student_t(5, 2.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.087 \cr
+}
 }
 
 \section{What \code{c} means}{

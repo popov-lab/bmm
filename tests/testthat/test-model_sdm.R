@@ -37,14 +37,20 @@ test_that("printing a model says what c is unless the scaling is density", {
   expect_false(any(grepl("Scaling:", out, fixed = TRUE)))
 })
 
-test_that("every scaling keeps the default prior on c", {
-  for (scaling in c("density", "peak", "range")) {
-    expect_identical(sdm("y", scaling = scaling)$default_priors$c$main, "student_t(5, 2, 0.75)")
+test_that("each activation x scaling cell has its own main priors on c and kappa", {
+  main_priors <- function(activation, scaling) {
+    priors <- sdm("y", activation = activation, scaling = scaling)$default_priors
+    c(c = priors$c$main, kappa = priors$kappa$main)
   }
-  expect_identical(
-    suppressMessages(sdm("y", activation = "laplace"))$default_priors$c$main,
-    "student_t(5, 2, 0.75)"
-  )
+  expect_identical(main_priors("vonmises", "density"), c(c = "student_t(5, 2, 0.75)", kappa = "student_t(5, 1.75, 0.75)"))
+  expect_identical(main_priors("vonmises", "peak"), c(c = "student_t(5, 2, 0.75)", kappa = "student_t(5, 1.75, 0.75)"))
+  expect_identical(main_priors("vonmises", "range"), c(c = "student_t(5, 2, 0.75)", kappa = "student_t(5, 1.75, 0.75)"))
+  expect_identical(main_priors("laplace", "density"), c(c = "student_t(5, 3.25, 0.75)", kappa = "student_t(5, -0.5, 0.75)"))
+  expect_identical(main_priors("laplace", "peak"), c(c = "student_t(5, 2.5, 0.75)", kappa = "student_t(5, -0.5, 0.75)"))
+  expect_identical(main_priors("laplace", "range"), c(c = "student_t(5, 2.25, 0.75)", kappa = "student_t(5, -0.5, 0.75)"))
+  expect_identical(sdm("y", activation = "laplace")$default_priors$c$main, "student_t(5, 2.5, 0.75)")
+  expect_identical(sdm("y")$default_priors$c$effects, "normal(0, 1)")
+  expect_identical(sdm("y", activation = "laplace", scaling = "density")$default_priors$kappa$sd, "exponential(1)")
 })
 
 test_that("log_lik() and posterior_predict() read the cell from the Stan data", {
