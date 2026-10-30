@@ -74,9 +74,9 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #' the parameter's formula. With `inverse = TRUE` it maps values from the
 #' parameter scale back to the native scale.
 #'
-#' @param values A numeric vector. With `inverse = FALSE` the values are on the
-#'   native scale, with `inverse = TRUE` on the parameter scale. `NA` stays `NA`
-#'   at its position.
+#' @param values A numeric vector, matrix or array. With `inverse = FALSE` the
+#'   values are on the native scale, with `inverse = TRUE` on the parameter
+#'   scale. `NA` stays `NA` at its position.
 #' @param link A single string naming the link: `"identity"`, `"log"`,
 #'   `"softplus"`, `"log1p"`, `"logm1"`, `"inverse"`, `"sqrt"`, `"logit"`,
 #'   `"probit"`, `"tan_half"`, `"loglog"` or `"cloglog"`. A `NULL` link is read
@@ -121,17 +121,16 @@ c_bessel2sqrtexp <- function(c, kappa) {
 #' name that is not in the table. [parameter_info()] shows the link of each
 #' parameter of a model in its `link` column; a parameter with `"softmax"`
 #' there is not covered by `link_transform()`. For the weights on the native
-#' scale, use [native_parameters()], or [softmax()] on the weights of a group
-#' with a `0` for the reference weight appended: for [mixture3p()],
-#' `softmax(c(thetat, thetant, 0))` gives the probabilities of a target, a
-#' non-target and a guessing response.
+#' scale, use [native_parameters()]. How the weights of a softmax group combine
+#' depends on the model, for [mixture3p()] on the set size (at set size 1 the
+#' non-target weight is zero), and [native_parameters()] applies that.
 #'
 #' @return The transformed values, with the length and dimensions of `values`
 #'   (a matrix stays a matrix).
 #'
-#' @seealso [parameter_info()] for the link of each parameter of a model,
+#' @seealso [parameter_info()] for the link of each parameter of a model, and
 #'   [native_parameters()] for the parameters of a fitted model on their native
-#'   scale, and [softmax()] for the link of mixture weights.
+#'   scale.
 #'
 #' @keywords transform
 #' @export

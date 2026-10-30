@@ -7,9 +7,9 @@
 link_transform(values, link, inverse = FALSE)
 }
 \arguments{
-\item{values}{A numeric vector. With \code{inverse = FALSE} the values are on the
-native scale, with \code{inverse = TRUE} on the parameter scale. \code{NA} stays \code{NA}
-at its position.}
+\item{values}{A numeric vector, matrix or array. With \code{inverse = FALSE} the
+values are on the native scale, with \code{inverse = TRUE} on the parameter
+scale. \code{NA} stays \code{NA} at its position.}
 
 \item{link}{A single string naming the link: \code{"identity"}, \code{"log"},
 \code{"softplus"}, \code{"log1p"}, \code{"logm1"}, \code{"inverse"}, \code{"sqrt"}, \code{"logit"},
@@ -68,10 +68,9 @@ reference position, so \code{link_transform()} stops for it, as for any other
 name that is not in the table. \code{\link[=parameter_info]{parameter_info()}} shows the link of each
 parameter of a model in its \code{link} column; a parameter with \code{"softmax"}
 there is not covered by \code{link_transform()}. For the weights on the native
-scale, use \code{\link[=native_parameters]{native_parameters()}}, or \code{\link[=softmax]{softmax()}} on the weights of a group
-with a \code{0} for the reference weight appended: for \code{\link[=mixture3p]{mixture3p()}},
-\code{softmax(c(thetat, thetant, 0))} gives the probabilities of a target, a
-non-target and a guessing response.
+scale, use \code{\link[=native_parameters]{native_parameters()}}. How the weights of a softmax group combine
+depends on the model, for \code{\link[=mixture3p]{mixture3p()}} on the set size (at set size 1 the
+non-target weight is zero), and \code{\link[=native_parameters]{native_parameters()}} applies that.
 }
 \examples{
 # a probability on the parameter scale of a logit link, and back
@@ -86,8 +85,8 @@ link_transform(c(-1, 0, 1), "log", inverse = TRUE)
 parameter_info(sdm(resp_error = "y"))$link
 }
 \seealso{
-\code{\link[=parameter_info]{parameter_info()}} for the link of each parameter of a model,
+\code{\link[=parameter_info]{parameter_info()}} for the link of each parameter of a model, and
 \code{\link[=native_parameters]{native_parameters()}} for the parameters of a fitted model on their native
-scale, and \code{\link[=softmax]{softmax()}} for the link of mixture weights.
+scale.
 }
 \keyword{transform}
