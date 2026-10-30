@@ -85,9 +85,9 @@ Three versions share the confidence-rating response interface,
 selected with \code{version}:
 \subsection{Version: \code{standard} (default)}{
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Signal/Noise or Old/New Recognition
-\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Confidence Rating Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
@@ -180,9 +180,9 @@ its prior: on the probability scale the interval cannot include 0, so the
 test of "no recollection" is a comparison with the fit that leaves the
 parameter fixed off, not the interval.
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Signal/Noise or Old/New Recognition
-\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Confidence Rating Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341
@@ -295,9 +295,9 @@ Lau, 2014), so its estimates differ from bmm's when the criterion is far
 from the midpoint.
 Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Signal/Noise or Old/New Recognition
-\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Confidence Rating Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for estimating metacognitive sensitivity from confidence ratings. Consciousness and Cognition, 21(1), 422-430. https://doi.org/10.1016/j.concog.2011.09.021

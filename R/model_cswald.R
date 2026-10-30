@@ -84,8 +84,8 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = list(),
-      domain = "Decision Making / Response times",
-      task = "Choice Reaction Time tasks (with few errors)",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "Censored-Shifted Wald Model",
       citation = glue(
         "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2018). \\

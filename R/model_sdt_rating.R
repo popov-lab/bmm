@@ -296,9 +296,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, dist, n_ratings, threshold_type),
-      domain = "Perception & Recognition Memory",
-      task = "Signal/Noise or Old/New Recognition",
-      name = "Signal Detection Theory (Confidence Rating)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "Confidence Rating Signal Detection Theory Model",
       citation = variant$citation,
       version = version,
       requirements = requirements,

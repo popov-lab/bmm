@@ -61,9 +61,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(m, dist),
-      domain = "Perception & Recognition Memory",
-      task = "Ranking Task",
-      name = "Signal Detection Theory (Ranking)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "Ranking Signal Detection Theory Model",
       citation = glue(
         "Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. ",
         "(2026). Extreme-value signal detection theory for recognition memory: ",

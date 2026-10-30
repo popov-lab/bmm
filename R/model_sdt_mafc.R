@@ -29,9 +29,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(n_trials, dist, m),
-      domain = "Perception & Recognition Memory",
-      task = "m-Alternative Forced Choice",
-      name = "Signal Detection Theory (m-AFC)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "m-Alternative Forced Choice Signal Detection Theory Model",
       citation = c(
         glue(
           "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
