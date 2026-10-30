@@ -241,7 +241,7 @@ sdm_laplace_cells$log_peak <- with(sdm_laplace_cells, lc + translate * 0.5 * log
 sdm_cont_stan_program <- function(data_scode) {
   chunk <- function(file) read_lines2(system.file("stan_chunks", file, package = "bmm"))
   funs <- gsub("#include[^\n]*", "", paste(
-    chunk("sdm_simple_functions.stan"), chunk("sdm_kernel_funs.stan"), chunk("sdm_cont_funs.stan"),
+    chunk("sdm_simple_functions.stan"), chunk("sdm_kernel_functions.stan"), chunk("sdm_cont_functions.stan"),
     sep = "\n"
   ))
   tdata <- chunk("sdm_simple_tdata.stan")

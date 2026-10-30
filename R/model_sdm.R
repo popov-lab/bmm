@@ -266,8 +266,8 @@ configure_model.sdm <- function(model, data, formula) {
   stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_functions.stan"))
   if (family_name == "sdm_cont") {
     stan_funs <- paste(
-      read_lines2(paste0(sc_path, "/sdm_kernel_funs.stan")),
-      read_lines2(paste0(sc_path, "/sdm_cont_funs.stan")),
+      read_lines2(paste0(sc_path, "/sdm_kernel_functions.stan")),
+      read_lines2(paste0(sc_path, "/sdm_cont_functions.stan")),
       sep = "\n"
     )
   }

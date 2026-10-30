@@ -1,5 +1,5 @@
   // log of the numerator of the likelihood of the sdm() cells other than the
-  // default; sdm_kernel_funs.stan defines the cell
+  // default; sdm_kernel_functions.stan defines the cell
   real sdm_cont_lpdf(vector y, vector mu, vector c, vector kappa, data int sdm_activation,
                      data int sdm_scaling) {
     return sum(exp(sdm_log_cstar(c, kappa, sdm_activation, sdm_scaling)
