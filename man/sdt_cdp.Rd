@@ -58,9 +58,9 @@ Continuous Dual-Process Signal Detection Theory Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Recognition Memory
-\item \strong{Task:} Old/New Recognition with Remember/Know Judgments
-\item \strong{Name:} Continuous Dual-Process Signal Detection Theory (CDP)
+\item \strong{Domain:} Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Continuous Dual-Process Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of remember/know judgments. Psychological Review, 117(4), 1025-1054. https://doi.org/10.1037/a0020874

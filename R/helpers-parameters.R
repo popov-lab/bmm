@@ -34,20 +34,39 @@ k2sd <- function(K) {
 #' @name c_parametrizations
 #' @inheritParams SDMdist
 #' @return A numeric vector of the same length as `c` and `kappa`.
-#' @details
-#' `c_bessel2sqrtexp` converts the memory strength parameter (c)
-#'   from the bessel parametrization to the sqrtexp parametrization,
-#'   `c_sqrtexp2bessel` converts from the sqrtexp parametrization to the
-#'   bessel parametrization.
+#' @details With `scaling = "density"`, [sdm()] divides the memory strength `c`
+#'   by the integral of the activation function. Two pairs of functions
+#'   convert `c` to and from the forms used elsewhere.
+#'
+#'   **Von Mises activation.** `bmm` approximates the integral by
+#'   \eqn{\sqrt{2\pi/\kappa}} (the sqrtexp parametrization, the default in
+#'   `bmm`); Oberauer (2023) uses the exact von Mises density (the bessel
+#'   parametrization). `c_sqrtexp2bessel` converts from the sqrtexp to the
+#'   bessel parametrization, `c_bessel2sqrtexp` back. See [the online
+#'   article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#'
+#'   **Laplace activation.** `bmm` divides by the exact integral over the
+#'   circle, \eqn{2(1 - e^{-\kappa \pi}) / \kappa}; Oberauer (2023, eq. 2)
+#'   multiplies the activation by \eqn{\kappa / 2}, that is, divides by the
+#'   integral over the real line, \eqn{2 / \kappa}. `c_laplace_circle2line`
+#'   converts the `c` of `bmm` to that of eq. 2, \eqn{c_{line} = c_{circle} /
+#'   (1 - e^{-\kappa \pi})}, and `c_laplace_line2circle` back. The two differ
+#'   by less than 1% once \eqn{\kappa} exceeds 1.5. At \eqn{\kappa = 0} the
+#'   real-line form has no finite `c`; `c_laplace_circle2line()` returns `Inf`
+#'   there, and `NaN` when `c` is 0 as well.
+#' @references Oberauer, K. (2023). Measurement models for visual working
+#'   memory - A factorial model comparison. Psychological Review, 130(3),
+#'   841–852
 #' @keywords transform
-#' @details See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
-#'   parameterization. The sqrtexp parametrization is the default in the
-#'   `bmm` package.
 #' @export
 #'
 #' @examples
 #' c_bessel <- c_sqrtexp2bessel(c = 4, kappa = 3)
 #' c_sqrtexp <- c_bessel2sqrtexp(c = c_bessel, kappa = 3)
+#'
+#' # c of a Laplace fit with scaling = "density", on the scale of eq. 2
+#' c_line <- c_laplace_circle2line(c = 4, kappa = 1)
+#' c_laplace_line2circle(c = c_line, kappa = 1)
 #'
 c_sqrtexp2bessel <- function(c, kappa) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
@@ -64,23 +83,111 @@ c_bessel2sqrtexp <- function(c, kappa) {
   c / (besselI(kappa, 0, expon.scaled = TRUE) * sqrt(2 * pi * kappa))
 }
 
-#' @title Transform values from the native to parameter scale or vice versa according to a link function
+#' @rdname c_parametrizations
+#' @keywords transform
+#' @export
+c_laplace_circle2line <- function(c, kappa) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  c / abs(expm1(-kappa * pi))
+}
+
+#' @rdname c_parametrizations
+#' @keywords transform
+#' @export
+c_laplace_line2circle <- function(c, kappa) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(c < 0)), "c must be non-negative")
+  c * abs(expm1(-kappa * pi))
+}
+
+#' Transform values between the native and the parameter scale of a link
 #'
 #' @description
-#' This function transforms a vector of values from the native scale to the parameter scale,
-#' according to the specified link function. The function is mainly used internally, to ensure proper
-#' initial values
+#' `link_transform()` applies one of the links bmm uses for model parameters to
+#' a numeric vector. With `inverse = FALSE` it maps values from the native
+#' scale of a parameter, the scale of the model equations, to the parameter
+#' scale, the scale on which `bmm()` samples the intercept and coefficients of
+#' the parameter's formula. With `inverse = TRUE` it maps values from the
+#' parameter scale back to the native scale.
 #'
-#' @param values A numerical vector of values the transformation should be applied to
-#' @param link A character specifying the link to be applied.
-#' Available options are: "identity", "log", "softplus", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
-#' @param inverse A Boolean value indicating if values should be transformed from the native to
-#' the parameter scale (FALSE), or from the parameter scale to the native scale (TRUE)
+#' @param values A numeric vector, matrix or array. With `inverse = FALSE` the
+#'   values are on the native scale, with `inverse = TRUE` on the parameter
+#'   scale. `NA` stays `NA` at its position.
+#' @param link A single string naming the link: `"identity"`, `"log"`,
+#'   `"softplus"`, `"log1p"`, `"logm1"`, `"inverse"`, `"sqrt"`, `"logit"`,
+#'   `"probit"`, `"tan_half"`, `"loglog"` or `"cloglog"`. A `NULL` link is read
+#'   as the identity link, as for a model parameter that declares no link.
+#' @param inverse Logical. `FALSE` (the default) transforms from the native to
+#'   the parameter scale; `TRUE` transforms from the parameter scale to the
+#'   native scale.
 #'
-#' @noRd
+#' @details
+#' The links, with the native values each accepts. `x` is a value on the native
+#' scale, `eta` one on the parameter scale.
+#'
+#' | `link` | `inverse = FALSE`: `eta` from `x` | `inverse = TRUE`: `x` from `eta` | Native values `x` |
+#' |:--|:--|:--|:--|
+#' | `"identity"` | `x` | `eta` | all real numbers |
+#' | `"log"` | `log(x)` | `exp(eta)` | `x > 0` |
+#' | `"softplus"` | `log(exp(x) - 1)` | `log(1 + exp(eta))` | `x > 0` |
+#' | `"log1p"` | `log(1 + x)` | `exp(eta) - 1` | `x > -1` |
+#' | `"logm1"` | `log(x - 1)` | `exp(eta) + 1` | `x > 1` |
+#' | `"inverse"` | `1 / x` | `1 / eta` | `x != 0` |
+#' | `"sqrt"` | `sqrt(x)` | `eta^2` | `x >= 0` |
+#' | `"logit"` | `log(x / (1 - x))` | `1 / (1 + exp(-eta))` | `0 < x < 1` |
+#' | `"probit"` | `qnorm(x)` | `pnorm(eta)` | `0 < x < 1` |
+#' | `"tan_half"` | `tan(x / 2)` | `2 * atan(eta)` | `-pi < x < pi` |
+#' | `"loglog"` | `log(-log(x))` | `exp(-exp(eta))` | `0 < x < 1` |
+#' | `"cloglog"` | `log(-log(1 - x))` | `1 - exp(-exp(eta))` | `0 < x < 1` |
+#'
+#' Values outside these ranges are not checked. For the links other than
+#' `"tan_half"`, a value at an edge the range excludes, such as `0` for `"log"`
+#' and `"inverse"` or `1` for `"logit"`, gives `-Inf` or `Inf` without a
+#' warning, and a value beyond it gives `NaN` (`NA` for `"softplus"`) with a
+#' warning. `"tan_half"` reads `x` as an angle: a value
+#' outside `-pi` to `pi` gives the `eta` of the same angle inside that range,
+#' and returns that angle on the way back. `"sqrt"` squares on the way back, so
+#' a negative `eta` comes back as its absolute value: `-3` gives `9`, and `9`
+#' gives `3`.
+#'
+#' The table holds the links that transform one value at a time. It does not
+#' include `"softmax"`, the link of the mixture weights of models such as
+#' [mixture3p()]: a softmax needs all weights of a group at once and a
+#' reference position, so `link_transform()` stops for it, as for any other
+#' name that is not in the table. [parameter_info()] shows the link of each
+#' parameter of a model in its `link` column; a parameter with `"softmax"`
+#' there is not covered by `link_transform()`. For the weights on the native
+#' scale, use [native_parameters()]. How the weights of a softmax group combine
+#' depends on the model, for [mixture3p()] on the set size (at set size 1 the
+#' non-target weight is zero), and [native_parameters()] applies that.
+#'
+#' @return The transformed values, with the length and dimensions of `values`
+#'   (a matrix stays a matrix).
+#'
+#' @seealso [parameter_info()] for the link of each parameter of a model, and
+#'   [native_parameters()] for the parameters of a fitted model on their native
+#'   scale.
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' # a probability on the parameter scale of a logit link, and back
+#' eta <- link_transform(c(0.2, 0.5, 0.8), "logit")
+#' eta
+#' link_transform(eta, "logit", inverse = TRUE)
+#'
+#' # the native value of a parameter with a log link, from its parameter scale
+#' link_transform(c(-1, 0, 1), "log", inverse = TRUE)
+#'
+#' # the link of each parameter of a model
+#' parameter_info(sdm(resp_error = "y"))$link
 link_transform <- function(values, link, inverse = FALSE) {
-  # Handle NULL or missing link as identity (no transformation)
+  # NULL is what model$links[[par]] returns for a parameter without a link
   if (is.null(link)) link <- "identity"
+  # switch() would pick the alternative at position `link` for a number
+  stopif(!is.character(link) || length(link) != 1, "`link` must be a single string, such as 'log'.")
 
   if(inverse) {
     switch(
@@ -96,7 +203,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       probit = pnorm(values),
       tan_half = 2 * atan(values),
       loglog = exp(-exp(values)),
-      cloglog = 1 - exp(-exp(values)),
+      cloglog = -expm1(-exp(values)),
       stop2("Link '{link}' not recognized.")
     )
   } else {

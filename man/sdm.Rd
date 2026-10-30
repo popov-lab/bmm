@@ -3,7 +3,7 @@
 \name{sdm}
 \alias{sdm}
 \alias{sdmSimple}
-\title{Signal Discrimination Model (SDM) by Oberauer (2023)}
+\title{Signal Discrimination Model (SDM)}
 \usage{
 sdm(
   resp_error,
@@ -28,9 +28,9 @@ degrees to radians using the \code{deg2rad} function.}
 \item{version}{Character. The version of the model to use. Currently only
 "simple" is supported.}
 
-\item{activation}{Character. The activation function, \code{"vonmises"} (the
-default, the SDM of Oberauer, 2023) or \code{"laplace"}. See the section
-"Activation functions".}
+\item{activation}{Character. The activation kernel of the SDM,
+\code{"vonmises"} (the default, as in Oberauer, 2023) or \code{"laplace"}. See the
+section "Activation functions".}
 
 \item{scaling}{Character. What the memory strength \code{c} measures:
 \code{"density"}, \code{"peak"} or \code{"range"}. \code{NULL} (the default) means \code{"density"}
@@ -66,14 +66,14 @@ columns: \code{"radians"} (the default), binned to the nearest option, or
 An object of class \code{bmmodel}
 }
 \description{
-Signal Discrimination Model (SDM) by Oberauer (2023)
+Signal Discrimination Model (SDM)
 }
 \details{
 see \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for a detailed description of the model
-and how to use it. * \strong{Domain:} Visual working memory
+and how to use it. * \strong{Domain:} Working memory
 \itemize{
 \item \strong{Task:} Continuous reproduction
-\item \strong{Name:} Signal Discrimination Model (SDM) by Oberauer (2023)
+\item \strong{Name:} Signal Discrimination Model (SDM)
 \item \strong{Citation:}
 \itemize{
 \item Oberauer, K. (2023). Measurement models for visual working memory—A factorial model comparison. Psychological Review, 130(3), 841-852. https://doi.org/10.1037/rev0000328
@@ -213,22 +213,17 @@ is \eqn{\exp(c^* s(x - \mu)) / Z}, with \eqn{Z} its integral over the
 circle.
 \itemize{
 \item \code{activation = "vonmises"}: \eqn{s(x) = \exp(\kappa (\cos x - 1))}, the
-signal discrimination model of Oberauer (2023).
+von Mises activation kernel of the signal discrimination model of Oberauer
+(2023).
 \item \code{activation = "laplace"}: \eqn{s(x) = \exp(-\kappa |x|)}, with
 \eqn{|x|} the angular distance and \eqn{\kappa} the rate of the Laplace
-activation in Oberauer (2023, eq. 2). With the Gumbel noise of the SDM this
-is the Laplace x Gumbel cell of Oberauer's model space (Table 2), not the
-SDM proper; \code{sdm()} says so when the model is built, and the fit is
-labelled accordingly. The density has a kink at \eqn{\mu}, so estimating
-\code{mu} puts a kink at every response, which gradient-based sampling handles
-poorly; \code{bmm()} warns when the formula estimates \code{mu}.
+activation in Oberauer (2023, eq. 2). This is the SDM with the Laplace
+activation kernel of Oberauer's model space (Table 2): the same Gumbel
+noise and decision rule, with \eqn{\kappa} estimated freely. The density
+has a kink at \eqn{\mu}, so estimating \code{mu} puts a kink at every
+response, which gradient-based sampling handles poorly; \code{bmm()} warns
+when the formula estimates \code{mu}.
 }
-
-With the Laplace activation \eqn{\kappa} is a rate per radian, and the
-default priors, set for the von Mises activation, put 21\% of the prior
-predictive response distributions below a circular SD of 0.05 radians with
-\code{scaling = "peak"} and 63\% with \code{scaling = "density"}, against 7\% for the
-default cell. Set priors on \code{kappa} and \code{c} where that matters.
 }
 
 \section{Scaling of the activation}{
@@ -242,17 +237,35 @@ parametrization; \code{\link[=c_sqrtexp2bessel]{c_sqrtexp2bessel()}} converts to
 Bessel form), and fits from before \code{scaling} existed are this cell. For the
 Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
   \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
-divides by the integral over the real line, \eqn{2 / \kappa}. The two
-differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at
-\eqn{\kappa = 2}). \code{"peak"} takes \code{c} as the activation of the target, and
-\code{"range"} as the difference between the activation of the target and that
-of the location opposite it.
+divides by the integral over the real line, \eqn{2 / \kappa}. \code{bmm}
+keeps the exact integral over the circle, so its \code{c} is that of eq. 2
+times \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}, 0.79 at
+\eqn{\kappa = 0.5}); \code{\link[=c_laplace_circle2line]{c_laplace_circle2line()}} converts it to the \code{c}
+of eq. 2 and \code{\link[=c_laplace_line2circle]{c_laplace_line2circle()}} back. \code{"peak"} takes \code{c} as the
+activation of the target, and \code{"range"} as the difference between the
+activation of the target and that of the location opposite it.
+}
 
-The default prior on \code{c} is \code{student_t(5, 2, 0.75)} on the log scale for
-every scaling. A prior predictive check of the circular SD of the
-response error, with \code{kappa}'s default prior, matched that of the default
-cell best at this location for the peak and range scalings of the von
-Mises activation too (Kolmogorov distance 0.06).
+\section{Default priors}{
+ \code{kappa} and \code{c} mean different things in each
+cell, so each cell has its own \code{main} priors (log scale; the \code{effects} and
+\code{sd} priors are the same everywhere). They were chosen in a prior
+predictive check so that the implied distributions of the circular SD of
+the response error are comparable across cells, not exactly matched. The
+last column is the share of prior predictive distributions with a circular
+SD below 0.05 radians; the Laplace cells still produce more of these
+spikes. The von Mises peak and range cells keep the priors of the
+default cell, which already give them comparable error distributions
+(Kolmogorov-Smirnov distance 0.06 to the default cell); the Laplace cells
+needed their own. Set your own priors where that matters.\tabular{lllll}{
+   \code{activation} \tab \code{scaling} \tab \code{c} \tab \code{kappa} \tab circular SD < 0.05 \cr
+   \code{"vonmises"} \tab \code{"density"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.07 \cr
+   \code{"vonmises"} \tab \code{"peak"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.03 \cr
+   \code{"vonmises"} \tab \code{"range"} \tab \code{student_t(5, 2, 0.75)} \tab \code{student_t(5, 1.75, 0.75)} \tab 0.03 \cr
+   \code{"laplace"} \tab \code{"density"} \tab \code{student_t(5, 3.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.16 \cr
+   \code{"laplace"} \tab \code{"peak"} \tab \code{student_t(5, 2.5, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.11 \cr
+   \code{"laplace"} \tab \code{"range"} \tab \code{student_t(5, 2.25, 0.75)} \tab \code{student_t(5, -0.5, 0.75)} \tab 0.09 \cr
+}
 }
 
 \section{What \code{c} means}{

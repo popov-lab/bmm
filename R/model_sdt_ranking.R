@@ -61,9 +61,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(m, dist),
-      domain = "Perception & Recognition Memory",
-      task = "Ranking Task",
-      name = "Signal Detection Theory (Ranking)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "Ranking Signal Detection Theory Model",
       citation = glue(
         "Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. ",
         "(2026). Extreme-value signal detection theory for recognition memory: ",
@@ -354,13 +354,13 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   formula$family$cats <- resp_cats
   formula$family$dpars <- paste0("mu", resp_cats)
 
-  # sdt_dist_funs.stan supplies sdt_rms_scale(), which the Gaussian branch needs
+  # sdt_dist_functions.stan supplies sdt_rms_scale(), which the Gaussian branch needs
   # to turn d_a into the noise-standardized separation
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
-    read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_dist_functions.stan")),
     .ranking_fill_quadrature(
-      read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan")),
+      read_lines2(paste0(sc_path, "/sdt_ranking_functions.stan")),
       max_m = max(data$max_rank),
       free_sdratio = "sdratio" %in% names(model$parameters) &&
         !"sdratio" %in% names(model$fixed_parameters)
@@ -373,7 +373,7 @@ configure_model.sdt_ranking <- function(model, data, formula) {
 }
 
 
-# Substitute the quadrature tokens in sdt_ranking_funs.stan with the rules that
+# Substitute the quadrature tokens in sdt_ranking_functions.stan with the rules that
 # .ranking_gh_n() and .ranking_gl_rule() select for the data's largest set size;
 # .ranking_prob_r() selects per row, so rows with a smaller set size can use a
 # different rule (they agree to ~1e-8). 17 significant digits round-trips a

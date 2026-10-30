@@ -14,13 +14,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = c(nlist(activation, scaling), option_vars),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = if (activation == "laplace") {
-        "SDM with a Laplace activation function (Oberauer, 2023, Table 2); not the SDM proper"
-      } else {
-        "Signal Discrimination Model (SDM) by Oberauer (2023)"
-      },
+      name = "Signal Discrimination Model (SDM)",
       citation = glue(
         "Oberauer, K. (2023). Measurement models for visual working \\
         memory\u2014A factorial model comparison. Psychological Review, \\
@@ -49,12 +45,8 @@
       fixed_parameters = list(mu = 0),
       default_priors = list(
         mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
-        kappa = list(main = "student_t(5, 1.75, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        # the same for every scaling: with kappa's default prior, a prior
-        # predictive check of the circular SD of the response error matched the
-        # default cell best at this location for the von Mises peak and range
-        # scalings too (#558, see ?sdm)
-        c = list(main = "student_t(5, 2, 0.75)", effects = "normal(0, 1)", sd = "exponential(1)")
+        kappa = list(main = .sdm_main_priors[[activation]]$kappa, effects = "normal(0, 1)", sd = "exponential(1)"),
+        c = list(main = .sdm_main_priors[[activation]]$c[[scaling]], effects = "normal(0, 1)", sd = "exponential(1)")
       ),
       init_ranges = list(
         mu = c(-0.5,0.5),
@@ -69,6 +61,20 @@
   out <- set_links(out, links)
   out
 }
+
+# kappa and c mean different things per cell, so the same prior would imply very
+# different response errors; these make the implied circular SD of the response
+# error comparable across cells, not equal (#558, see ?sdm)
+.sdm_main_priors <- list(
+  vonmises = list(
+    kappa = "student_t(5, 1.75, 0.75)",
+    c = c(density = "student_t(5, 2, 0.75)", peak = "student_t(5, 2, 0.75)", range = "student_t(5, 2, 0.75)")
+  ),
+  laplace = list(
+    kappa = "student_t(5, -0.5, 0.75)",
+    c = c(density = "student_t(5, 3.25, 0.75)", peak = "student_t(5, 2.5, 0.75)", range = "student_t(5, 2.25, 0.75)")
+  )
+)
 
 .sdm_c_description <- c(
   density = "Memory strength parameter of the SDM distribution",
@@ -121,9 +127,9 @@ settable_links.sdm <- function(model) {
 #'   degrees to radians using the `deg2rad` function.
 #' @param version Character. The version of the model to use. Currently only
 #'   "simple" is supported.
-#' @param activation Character. The activation function, `"vonmises"` (the
-#'   default, the SDM of Oberauer, 2023) or `"laplace"`. See the section
-#'   "Activation functions".
+#' @param activation Character. The activation kernel of the SDM,
+#'   `"vonmises"` (the default, as in Oberauer, 2023) or `"laplace"`. See the
+#'   section "Activation functions".
 #' @param scaling Character. What the memory strength `c` measures:
 #'   `"density"`, `"peak"` or `"range"`. `NULL` (the default) means `"density"`
 #'   for the von Mises and `"peak"` for the Laplace activation. See the
@@ -235,21 +241,16 @@ settable_links.sdm <- function(model) {
 #'   circle.
 #'
 #'   - `activation = "vonmises"`: \eqn{s(x) = \exp(\kappa (\cos x - 1))}, the
-#'   signal discrimination model of Oberauer (2023).
+#'   von Mises activation kernel of the signal discrimination model of Oberauer
+#'   (2023).
 #'   - `activation = "laplace"`: \eqn{s(x) = \exp(-\kappa |x|)}, with
 #'   \eqn{|x|} the angular distance and \eqn{\kappa} the rate of the Laplace
-#'   activation in Oberauer (2023, eq. 2). With the Gumbel noise of the SDM this
-#'   is the Laplace x Gumbel cell of Oberauer's model space (Table 2), not the
-#'   SDM proper; `sdm()` says so when the model is built, and the fit is
-#'   labelled accordingly. The density has a kink at \eqn{\mu}, so estimating
-#'   `mu` puts a kink at every response, which gradient-based sampling handles
-#'   poorly; `bmm()` warns when the formula estimates `mu`.
-#'
-#'   With the Laplace activation \eqn{\kappa} is a rate per radian, and the
-#'   default priors, set for the von Mises activation, put 21% of the prior
-#'   predictive response distributions below a circular SD of 0.05 radians with
-#'   `scaling = "peak"` and 63% with `scaling = "density"`, against 7% for the
-#'   default cell. Set priors on `kappa` and `c` where that matters.
+#'   activation in Oberauer (2023, eq. 2). This is the SDM with the Laplace
+#'   activation kernel of Oberauer's model space (Table 2): the same Gumbel
+#'   noise and decision rule, with \eqn{\kappa} estimated freely. The density
+#'   has a kink at \eqn{\mu}, so estimating `mu` puts a kink at every
+#'   response, which gradient-based sampling handles poorly; `bmm()` warns
+#'   when the formula estimates `mu`.
 #' @section Scaling of the activation: `scaling` decides how `c` translates
 #'   into the activation of the target \eqn{c^*}; the table in "What `c`
 #'   means" gives the formulas. `"density"` divides `c` by the integral of
@@ -260,17 +261,33 @@ settable_links.sdm <- function(model) {
 #'   Bessel form), and fits from before `scaling` existed are this cell. For the
 #'   Laplace activation the integral is exact, \eqn{2(1 - e^{-\kappa \pi}) /
 #'   \kappa}; Oberauer (2023, eq. 2) multiplies by \eqn{\kappa / 2}, which
-#'   divides by the integral over the real line, \eqn{2 / \kappa}. The two
-#'   differ by the factor \eqn{1 - e^{-\kappa \pi}} (0.998 at
-#'   \eqn{\kappa = 2}). `"peak"` takes `c` as the activation of the target, and
-#'   `"range"` as the difference between the activation of the target and that
-#'   of the location opposite it.
+#'   divides by the integral over the real line, \eqn{2 / \kappa}. `bmm`
+#'   keeps the exact integral over the circle, so its `c` is that of eq. 2
+#'   times \eqn{1 - e^{-\kappa \pi}} (0.998 at \eqn{\kappa = 2}, 0.79 at
+#'   \eqn{\kappa = 0.5}); [c_laplace_circle2line()] converts it to the `c`
+#'   of eq. 2 and [c_laplace_line2circle()] back. `"peak"` takes `c` as the
+#'   activation of the target, and `"range"` as the difference between the
+#'   activation of the target and that of the location opposite it.
+#' @section Default priors: `kappa` and `c` mean different things in each
+#'   cell, so each cell has its own `main` priors (log scale; the `effects` and
+#'   `sd` priors are the same everywhere). They were chosen in a prior
+#'   predictive check so that the implied distributions of the circular SD of
+#'   the response error are comparable across cells, not exactly matched. The
+#'   last column is the share of prior predictive distributions with a circular
+#'   SD below 0.05 radians; the Laplace cells still produce more of these
+#'   spikes. The von Mises peak and range cells keep the priors of the
+#'   default cell, which already give them comparable error distributions
+#'   (Kolmogorov-Smirnov distance 0.06 to the default cell); the Laplace cells
+#'   needed their own. Set your own priors where that matters.
 #'
-#'   The default prior on `c` is `student_t(5, 2, 0.75)` on the log scale for
-#'   every scaling. A prior predictive check of the circular SD of the
-#'   response error, with `kappa`'s default prior, matched that of the default
-#'   cell best at this location for the peak and range scalings of the von
-#'   Mises activation too (Kolmogorov distance 0.06).
+#'   | `activation` | `scaling` | `c` | `kappa` | circular SD < 0.05 |
+#'   |---|---|---|---|---|
+#'   | `"vonmises"` | `"density"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.07 |
+#'   | `"vonmises"` | `"peak"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.03 |
+#'   | `"vonmises"` | `"range"` | `student_t(5, 2, 0.75)` | `student_t(5, 1.75, 0.75)` | 0.03 |
+#'   | `"laplace"` | `"density"` | `student_t(5, 3.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.16 |
+#'   | `"laplace"` | `"peak"` | `student_t(5, 2.5, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.11 |
+#'   | `"laplace"` | `"range"` | `student_t(5, 2.25, 0.75)` | `student_t(5, -0.5, 0.75)` | 0.09 |
 #' @section What `c` means:
 #'
 #'   | `scaling` | \eqn{c^*}, von Mises | \eqn{c^*}, Laplace | `c` is |
@@ -407,11 +424,11 @@ configure_model.sdm <- function(model, data, formula) {
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
+  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_functions.stan"))
   if (family_name == "sdm_cont") {
     stan_funs <- paste(
-      read_lines2(paste0(sc_path, "/sdm_kernel_funs.stan")),
-      read_lines2(paste0(sc_path, "/sdm_cont_funs.stan")),
+      read_lines2(paste0(sc_path, "/sdm_kernel_functions.stan")),
+      read_lines2(paste0(sc_path, "/sdm_cont_functions.stan")),
       sep = "\n"
     )
   }

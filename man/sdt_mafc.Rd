@@ -48,9 +48,9 @@ m-Alternative Forced Choice Signal Detection Theory Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} m-Alternative Forced Choice
-\item \strong{Name:} Signal Detection Theory (m-AFC)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} m-Alternative Forced Choice Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.

@@ -98,8 +98,8 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param parametrization Deprecated since bmm 1.5.0; use `scaling`
 #'   instead. `"sqrtexp"` is `scaling = "density"`; for `"bessel"`, convert `c`
 #'   with [c_bessel2sqrtexp()] and use `scaling = "density"`.
-#' @param activation Character; the activation function, `"vonmises"`
-#'   (default) or `"laplace"`. See [sdm()].
+#' @param activation Character; the activation kernel of the SDM,
+#'   `"vonmises"` (default) or `"laplace"`. See [sdm()].
 #' @param scaling Character; what `c` measures: `"density"`, `"peak"` or
 #'   `"range"`. `NULL` (default) means `"density"` for the von Mises and
 #'   `"peak"` for the Laplace activation. See [sdm()].
@@ -141,7 +141,13 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
 #' exact density of the von Mises distribution instead (the bessel
 #' parametrization); `c_bessel2sqrtexp()` and `c_sqrtexp2bessel()` convert
-#' between the two. See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#' between the two. For the Laplace activation with `scaling = "density"`,
+#' `c_laplace_circle2line()` and `c_laplace_line2circle()` convert between
+#' `bmm`'s `c` and that of Oberauer (2023, eq. 2). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#' At exactly `kappa = 0` the range scaling is undefined, because target and
+#' opposite have the same activation: `dsdm`, `psdm` and `qsdm` return `NaN`
+#' and `rsdm` stops with an error. Fits
+#' never reach it, since `kappa` has a log link.
 #'
 #' **The cumulative distribution function**
 #'
@@ -970,7 +976,7 @@ rm3 <- function(n, size, pars, m3_model, act_funs = NULL, unpack = FALSE,
 # evidence A_j + N(0, 1) and the largest wins, so with n_j options per category
 #   P(k) = n_k E_z[ Phi(z)^(n_k - 1) prod_{j != k} Phi(z + A_k - A_j)^n_j ],
 # z ~ N(0, 1), by Gauss-Hermite quadrature. Mirrors m3_gauss_logp_vec() in
-# inst/stan_chunks/m3_gaussian_funs.stan. 40 nodes: against an integrate()
+# inst/stan_chunks/m3_gaussian_functions.stan. 40 nodes: against an integrate()
 # reference |delta log P| is below 2e-5 where log P > -5 for categories with
 # fewer than 30 options and 1.5e-4 with 30 options, and below 2e-5 down to
 # log P = -20 (nothing measured below); maximum-likelihood estimates on pooled
@@ -2336,7 +2342,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # Each entry: cdf, qf (quantile function), pdf (density, the derivative of cdf),
 # lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label of
 # the ROC's quantile scale). The lcdf/lccdf entries mirror the Stan
-# dispatchers in inst/stan_chunks/sdt_dist_funs.stan branch for branch, so the
+# dispatchers in inst/stan_chunks/sdt_dist_functions.stan branch for branch, so the
 # two implementations can be read side by side.
 #
 # The list position defines the integer dist_type code passed to Stan --
@@ -2720,7 +2726,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
 ############################################################################# !
 
 # Quadrature tables for .mafc_pc_r, mirroring the Stan tables in
-# inst/stan_chunks/sdt_mafc_funs.stan: 40-point Gauss-Hermite (normal) and
+# inst/stan_chunks/sdt_mafc_functions.stan: 40-point Gauss-Hermite (normal) and
 # 64-point Gauss-Legendre on [0, 1] (logistic)
 .mafc_gh_nodes <- c(
   -1.14533778415487379e+01, -1.04815605346742640e+01, -9.67355636693402765e+00, -8.94950454385556249e+00,
@@ -3659,7 +3665,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # boundary -- the middle category straddles it -- so the criterion is the
 # centre of that category and the two thresholds around it sit half an
 # interval away. Returns an n-by-(K - 1) matrix. The Stan counterpart is
-# sdt_place_thresholds_rating() in sdt_rating_funs.stan.
+# sdt_place_thresholds_rating() in sdt_rating_functions.stan.
 .sdt_assemble_thresholds <- function(criterion, inc, n_ratings) {
   K1 <- n_ratings - 1L
   thr <- matrix(0, length(criterion), K1)

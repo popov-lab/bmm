@@ -234,11 +234,15 @@ test_that("the deprecated sdmSimple() warns and builds the model sdm() builds", 
 # brms and bmm versions, taken on develop 4ae8bfff with brms 2.23.0 before
 # sdm() gained `activation` and `scaling` (#558). A new brms can change the
 # code it writes around the chunks, so the hashes are pinned to that version.
+# The lines go through a binary connection: a path opens in text mode, which
+# on Windows writes CRLF and hashes the same code to another value.
 sdm_stancode_md5 <- function(formula, ...) {
   code <- stancode(formula, data = oberauer_lin_2017, model = sdm("dev_rad"), ...)
   lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
   file <- withr::local_tempfile()
-  writeLines(lines[!grepl("^// generated with brms", lines)], file)
+  con <- file(file, "wb")
+  writeLines(lines[!grepl("^// generated with brms", lines)], con, sep = "\n")
+  close(con)
   unname(tools::md5sum(file))
 }
 

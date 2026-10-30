@@ -1,30 +1,30 @@
-test_that("sdm() messages that the Laplace cell is not the SDM proper, and only then", {
-  expect_message(sdm("y", activation = "laplace"), "is not the signal discrimination model", fixed = TRUE)
-  expect_message(sdm("y", activation = "laplace", scaling = "range"), "Table 2", fixed = TRUE)
-  for (scaling in c("density", "peak", "range")) {
-    expect_no_message(sdm("y", scaling = scaling))
+test_that("no cell of sdm() messages when the model is built", {
+  for (activation in c("vonmises", "laplace")) {
+    for (scaling in c("density", "peak", "range")) {
+      expect_no_message(sdm("y", activation = activation, scaling = scaling))
+    }
   }
-  expect_no_message(sdm("y"))
+  expect_no_message(sdm("y", activation = "laplace"))
 })
 
 test_that("sdm() takes the scaling of the activation when none is given", {
   expect_identical(sdm("y")$other_vars, list(activation = "vonmises", scaling = "density"))
   expect_identical(
-    suppressMessages(sdm("y", activation = "laplace"))$other_vars,
+    sdm("y", activation = "laplace")$other_vars,
     list(activation = "laplace", scaling = "peak")
   )
   expect_identical(
-    suppressMessages(sdm("y", activation = "laplace", scaling = "density"))$other_vars$scaling,
+    sdm("y", activation = "laplace", scaling = "density")$other_vars$scaling,
     "density"
   )
   expect_error(sdm("y", activation = "gauss"), "should be one of")
   expect_error(sdm("y", scaling = "height"), "should be one of")
 })
 
-test_that("each cell names itself and keeps the class chain", {
-  laplace <- suppressMessages(sdm("y", activation = "laplace"))
-  expect_identical(laplace$name, "SDM with a Laplace activation function (Oberauer, 2023, Table 2); not the SDM proper")
-  expect_identical(sdm("y", scaling = "range")$name, "Signal Discrimination Model (SDM) by Oberauer (2023)")
+test_that("every cell is named the SDM and keeps the class chain", {
+  laplace <- sdm("y", activation = "laplace")
+  expect_identical(laplace$name, "Signal Discrimination Model (SDM)")
+  expect_identical(sdm("y", scaling = "range")$name, "Signal Discrimination Model (SDM)")
   for (model in list(sdm("y"), sdm("y", scaling = "peak"), laplace)) {
     expect_identical(class(model), c("bmmodel", "circular", "sdm", "sdm_simple"))
   }
@@ -37,14 +37,20 @@ test_that("printing a model says what c is unless the scaling is density", {
   expect_false(any(grepl("Scaling:", out, fixed = TRUE)))
 })
 
-test_that("every scaling keeps the default prior on c", {
-  for (scaling in c("density", "peak", "range")) {
-    expect_identical(sdm("y", scaling = scaling)$default_priors$c$main, "student_t(5, 2, 0.75)")
+test_that("each activation x scaling cell has its own main priors on c and kappa", {
+  main_priors <- function(activation, scaling) {
+    priors <- sdm("y", activation = activation, scaling = scaling)$default_priors
+    c(c = priors$c$main, kappa = priors$kappa$main)
   }
-  expect_identical(
-    suppressMessages(sdm("y", activation = "laplace"))$default_priors$c$main,
-    "student_t(5, 2, 0.75)"
-  )
+  expect_identical(main_priors("vonmises", "density"), c(c = "student_t(5, 2, 0.75)", kappa = "student_t(5, 1.75, 0.75)"))
+  expect_identical(main_priors("vonmises", "peak"), c(c = "student_t(5, 2, 0.75)", kappa = "student_t(5, 1.75, 0.75)"))
+  expect_identical(main_priors("vonmises", "range"), c(c = "student_t(5, 2, 0.75)", kappa = "student_t(5, 1.75, 0.75)"))
+  expect_identical(main_priors("laplace", "density"), c(c = "student_t(5, 3.25, 0.75)", kappa = "student_t(5, -0.5, 0.75)"))
+  expect_identical(main_priors("laplace", "peak"), c(c = "student_t(5, 2.5, 0.75)", kappa = "student_t(5, -0.5, 0.75)"))
+  expect_identical(main_priors("laplace", "range"), c(c = "student_t(5, 2.25, 0.75)", kappa = "student_t(5, -0.5, 0.75)"))
+  expect_identical(sdm("y", activation = "laplace")$default_priors$c$main, "student_t(5, 2.5, 0.75)")
+  expect_identical(sdm("y")$default_priors$c$effects, "normal(0, 1)")
+  expect_identical(sdm("y", activation = "laplace", scaling = "density")$default_priors$kappa$sd, "exponential(1)")
 })
 
 test_that("log_lik() and posterior_predict() read the cell from the Stan data", {
@@ -67,7 +73,7 @@ test_that("log_lik() and posterior_predict() read the cell from the Stan data", 
 
 test_that("estimating mu with the Laplace activation warns", {
   dat <- data.frame(y = c(-0.3, 0.1, 0.5, 0.02))
-  laplace <- suppressMessages(sdm("y", activation = "laplace"))
+  laplace <- sdm("y", activation = "laplace")
   expect_warning(
     standata(bmf(mu ~ 1, c ~ 1, kappa ~ 1), dat, laplace),
     "kink at every response", fixed = TRUE
@@ -81,7 +87,7 @@ test_that("the cells other than the default get the sdm_cont family and pass the
   formula <- bmf(c ~ cond, kappa ~ 1)
   for (i in seq_len(nrow(sdm_cells))) {
     cell <- sdm_cells[i, ]
-    model <- suppressMessages(sdm("y", activation = cell$activation, scaling = cell$scaling))
+    model <- sdm("y", activation = cell$activation, scaling = cell$scaling)
     sdata <- standata(formula, dat, model)
     code <- stancode(formula, dat, model)
     if (cell$activation == "vonmises" && cell$scaling == "density") {
@@ -95,7 +101,7 @@ test_that("the cells other than the default get the sdm_cont family and pass the
       expect_identical(as.integer(sdata$G_sdm_runs), 2L)
     }
   }
-  threaded <- stancode(formula, dat, suppressMessages(sdm("y", activation = "laplace")),
+  threaded <- stancode(formula, dat, sdm("y", activation = "laplace"),
     threads = brms::threading(2)
   )
   expect_match(threaded, "data int sdm_activation, data int sdm_scaling) {", fixed = TRUE)

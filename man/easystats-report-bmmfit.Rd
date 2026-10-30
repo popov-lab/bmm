@@ -52,7 +52,7 @@ only the indices that are defined for bmm models. They build on the
 \details{
 \itemize{
 \item \code{format_model()} names the model and its version, e.g. "Bayesian
-Signal Discrimination Model (SDM) by Oberauer (2023) (simple)".
+Signal Discrimination Model (SDM) (simple)".
 \item \code{report_model()} describes the model in one sentence, with all
 response variables of models such as \code{\link[=ezdm]{ezdm()}} or \code{\link[=m3]{m3()}} in one list,
 the formula of each model parameter as \code{summary()} prints it, and the

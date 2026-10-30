@@ -6,12 +6,13 @@
 # Laplace), "peak" takes it as the activation of the target, and "range" as
 # the contrast between target and opposite, c* (1 - s(pi)), whose additive
 # constant cancels against Z. Stan reads the cell as integer codes in this
-# order (inst/stan_chunks/sdm_kernel_funs.stan)
+# order (inst/stan_chunks/sdm_kernel_functions.stan)
 .sdm_activations <- c("vonmises", "laplace")
 .sdm_scalings <- c("density", "peak", "range")
 
-# the scaling a cell gets when sdm() or the d/p/q/r functions are not given one;
-# Laplace has no density scaling in Oberauer (2023), so its natural unit is the peak
+# the scaling a cell gets when sdm() or the d/p/q/r functions are not given one.
+# Laplace defaults to the peak because bmm's density scaling divides by the
+# integral over the circle, unlike the real-line kappa / 2 of Oberauer (2023, eq. 2)
 .sdm_default_scaling <- function(activation) {
   if (activation == "laplace") "peak" else "density"
 }
@@ -56,8 +57,8 @@
 # log Z = log 2 + c* + log of the integral of exp(c* expm1(log s(u))) over
 # [0, pi]: the integrand over its peak, so that exp() neither overflows at
 # large c* (dsdm() before #558 stopped once log Z passed 709) nor loses digits
-# near the peak. The rules are the Stan normalisers of sdm_simple_funs.stan
-# and sdm_kernel_funs.stan, vectorised over cells; one integrate() call per
+# near the peak. The rules are the Stan normalisers of sdm_simple_functions.stan
+# and sdm_kernel_functions.stan, vectorised over cells; one integrate() call per
 # cell would make log_lik(), and so loo(), several times slower than before
 .sdm_log_z <- function(log_cstar, kappa, activation) {
   n <- max(length(log_cstar), length(kappa))

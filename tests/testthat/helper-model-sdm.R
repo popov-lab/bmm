@@ -7,9 +7,8 @@ model_cases_sdm <- function() {
   for (activation in c("vonmises", "laplace")) {
     for (scaling in c("density", "peak", "range")) {
       if (activation == "vonmises" && scaling == "density") next
-      cells[[paste("sdm", activation, scaling, sep = "_")]] <- suppressMessages(
+      cells[[paste("sdm", activation, scaling, sep = "_")]] <-
         sdm("dev_rad", activation = activation, scaling = scaling)
-      )
     }
   }
   # the response options of K2: the full wheel in both activations, option
