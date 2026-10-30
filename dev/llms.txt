@@ -27,13 +27,13 @@ dependent variable. See the [continuous reproduction
 article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html).
 
 - [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference
-  measurement model by Oberauer and Lin (2017)
+  Measurement Model
 - [`mixture2p()`](https://venpopov.com/bmm/reference/mixture2p.html):
-  Two-parameter mixture model by Zhang and Luck (2008)
+  Two-Parameter Mixture Model
 - [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.html):
-  Three-parameter mixture model by Bays et al (2009)
+  Three-Parameter Mixture Model
 - [`sdm()`](https://venpopov.com/bmm/reference/sdm.html): Signal
-  Discrimination Model (SDM) by Oberauer (2023)
+  Discrimination Model (SDM)
 
 **Categorical recall and n-AFC decisions.** Participants choose one
 response from a set of categories (n-alternative forced choice), for
@@ -41,8 +41,10 @@ example the correct item, an item from another position, or an item that
 was not studied. See the [M3
 article](https://venpopov.com/bmm/articles/bmm_m3.html).
 
-- [`m3()`](https://venpopov.com/bmm/reference/m3.html): The Multinomial
-  / Memory Measurement Model
+- [`m3()`](https://venpopov.com/bmm/reference/m3.html): Memory
+  Measurement Model
+- [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
+  Processing Tree (MPT) Model
 
 **Detection, recognition and confidence judgments.** Participants decide
 whether a signal was present or an item was studied, rate their
@@ -62,16 +64,18 @@ started](https://venpopov.com/bmm/articles/bmm.html#detection-recognition-and-co
 page has a table of the response formats and the noise distributions
 each model offers.
 
+- [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
+  Processing Tree (MPT) Model
 - [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.html):
-  Continuous Dual-Process Signal Detection Theory (CDP)
+  Continuous Dual-Process Signal Detection Theory Model
 - [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.html):
-  Signal Detection Theory (m-AFC)
+  m-Alternative Forced Choice Signal Detection Theory Model
 - [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.html):
-  Signal Detection Theory (Ranking)
+  Ranking Signal Detection Theory Model
 - [`sdt_rating()`](https://venpopov.com/bmm/reference/sdt_rating.html):
-  Signal Detection Theory (Confidence Rating)
-- [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Signal
-  Detection Theory (Yes/No)
+  Confidence Rating Signal Detection Theory Model
+- [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Yes/No
+  Signal Detection Theory Model
 
 **Choices and response times.** Participants choose between two options
 and the response time is recorded, either on every trial or as means and
@@ -96,9 +100,9 @@ multinomial processing tree: the two-high-threshold model of
 recognition, the pair-clustering model of free recall, or a tree of your
 own. The model is fit to response counts per participant and condition.
 See the [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html).
-
-- [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
-  Processing Tree (MPT) models
+The model, [`mpt()`](https://venpopov.com/bmm/reference/mpt.html), is
+listed above under categorical recall and under detection and
+recognition.
 
 ![The tasks bmm covers and the models for
 each](reference/figures/README-task-map.png)
@@ -402,15 +406,15 @@ Functions for specifying which model to fit
   [`IMMfull()`](https://venpopov.com/bmm/dev/reference/imm.md)
   [`IMMbsc()`](https://venpopov.com/bmm/dev/reference/imm.md)
   [`IMMabc()`](https://venpopov.com/bmm/dev/reference/imm.md) :
-  Interference measurement model by Oberauer and Lin (2017).
-- [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) : The
-  Multinomial / Memory Measurement Model
+  Interference Measurement Model
+- [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) : Memory
+  Measurement Model
 - [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md) :
-  Two-parameter mixture model by Zhang and Luck (2008).
+  Two-Parameter Mixture Model
 - [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md) :
-  Three-parameter mixture model by Bays et al (2009).
+  Three-Parameter Mixture Model
 - [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) : Multinomial
-  Processing Tree (MPT) models
+  Processing Tree (MPT) Model
 - [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
   : Create an MPT model from an EQN model file
 - [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
@@ -422,7 +426,7 @@ Functions for specifying which model to fit
   : Plot the structure of MPT trees
 - [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://venpopov.com/bmm/dev/reference/sdm.md) :
-  Signal Discrimination Model (SDM) by Oberauer (2023)
+  Signal Discrimination Model (SDM)
 - [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) :
   Continuous Dual-Process Signal Detection Theory Model
 - [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) :

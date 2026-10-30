@@ -66,7 +66,7 @@ See the generics, e.g. `report::report_model()` and
 ## Details
 
 - `format_model()` names the model and its version, e.g. "Bayesian
-  Signal Discrimination Model (SDM) by Oberauer (2023) (simple)".
+  Signal Discrimination Model (SDM) (simple)".
 
 - `report_model()` describes the model in one sentence, with all
   response variables of models such as

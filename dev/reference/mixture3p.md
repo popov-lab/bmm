@@ -1,6 +1,6 @@
-# Three-parameter mixture model by Bays et al (2009).
+# Three-Parameter Mixture Model
 
-Three-parameter mixture model by Bays et al (2009).
+Three-Parameter Mixture Model
 
 ## Usage
 
@@ -46,11 +46,11 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Visual working memory
+- **Domain:** Working memory
 
 - **Task:** Continuous reproduction
 
-- **Name:** Three-parameter mixture model by Bays et al (2009).
+- **Name:** Three-Parameter Mixture Model
 
 - **Citation:**
 

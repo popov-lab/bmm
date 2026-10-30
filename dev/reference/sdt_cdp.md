@@ -79,11 +79,11 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Recognition Memory
+- **Domain:** Long-term memory
 
-- **Task:** Old/New Recognition with Remember/Know Judgments
+- **Task:** Detection, recognition and confidence judgments
 
-- **Name:** Continuous Dual-Process Signal Detection Theory (CDP)
+- **Name:** Continuous Dual-Process Signal Detection Theory Model
 
 - **Citation:**
 

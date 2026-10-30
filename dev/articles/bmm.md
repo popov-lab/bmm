@@ -190,8 +190,9 @@ response counts. The [MPT
 article](https://venpopov.com/bmm/articles/bmm_mpt.html) covers
 specifying trees, importing model files from MPTinR and TreeBUGS, and
 constraining parameters.
-
-[TABLE]
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) is in the
+tables of the categorical recall and the detection and recognition
+groups above.
 
 You can list the models in R at any time with
 [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md),

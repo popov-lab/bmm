@@ -62,11 +62,12 @@ where a function refuses the class.</p>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Printed, the result lists the models grouped by the task they are
-meant for, one line per model with its constructor and full name. The
+meant for, one line per model with its constructor and name. The
 groups are: continuous reproduction; categorical recall and n-AFC
 decisions; detection, recognition and confidence judgments; choices and
-response times; processing-tree models. Type <code>?modelname</code> (for example
-<code><a href="imm.html">?imm</a></code>) for the arguments of a model.</p>
+response times. A model that fits several tasks, such as <code><a href="mpt.html">mpt()</a></code>, is
+listed under each. Type <code>?modelname</code> (for example <code><a href="imm.html">?imm</a></code>) for the
+arguments of a model.</p>
     </div>
 
     <div class="section level2">
@@ -76,26 +77,24 @@ response times; processing-tree models. Type <code>?modelname</code> (for exampl
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Continuous reproduction</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - imm(): Interference measurement model by Oberauer and Lin (2017)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - mixture3p(): Three-parameter mixture model by Bays et al (2009)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - imm(): Interference Measurement Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - mixture2p(): Two-Parameter Mixture Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - mixture3p(): Three-Parameter Mixture Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdm(): Signal Discrimination Model (SDM)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Categorical recall and n-AFC decisions</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - m3(): The Multinomial / Memory Measurement Model</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Processing-tree models</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - mpt(): Multinomial Processing Tree (MPT) models</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - m3(): Memory Measurement Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - mpt(): Multinomial Processing Tree (MPT) Model</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Detection, recognition and confidence judgments</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_mafc(): Signal Detection Theory (m-AFC)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_ranking(): Signal Detection Theory (Ranking)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_rating(): Signal Detection Theory (Confidence Rating)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_yn(): Signal Detection Theory (Yes/No)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - mpt(): Multinomial Processing Tree (MPT) Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_ranking(): Ranking Signal Detection Theory Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_rating(): Confidence Rating Signal Detection Theory Model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - sdt_yn(): Yes/No Signal Detection Theory Model</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Choices and response times</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>

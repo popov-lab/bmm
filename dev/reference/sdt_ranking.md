@@ -53,11 +53,11 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Perception & Recognition Memory
+- **Domain:** Perception, Long-term memory
 
-- **Task:** Ranking Task
+- **Task:** Detection, recognition and confidence judgments
 
-- **Name:** Signal Detection Theory (Ranking)
+- **Name:** Ranking Signal Detection Theory Model
 
 - **Citation:**
 

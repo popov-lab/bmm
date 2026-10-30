@@ -168,33 +168,33 @@ The following models are supported:
 
 Continuous reproduction
 
-- imm(): Interference measurement model by Oberauer and Lin (2017)
+- imm(): Interference Measurement Model
 
-- mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
+- mixture2p(): Two-Parameter Mixture Model
 
-- mixture3p(): Three-parameter mixture model by Bays et al (2009)
+- mixture3p(): Three-Parameter Mixture Model
 
-- sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
+- sdm(): Signal Discrimination Model (SDM)
 
 Categorical recall and n-AFC decisions
 
-- m3(): The Multinomial / Memory Measurement Model
+- m3(): Memory Measurement Model
 
-Processing-tree models
-
-- mpt(): Multinomial Processing Tree (MPT) models
+- mpt(): Multinomial Processing Tree (MPT) Model
 
 Detection, recognition and confidence judgments
 
-- sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
+- mpt(): Multinomial Processing Tree (MPT) Model
 
-- sdt_mafc(): Signal Detection Theory (m-AFC)
+- sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model
 
-- sdt_ranking(): Signal Detection Theory (Ranking)
+- sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model
 
-- sdt_rating(): Signal Detection Theory (Confidence Rating)
+- sdt_ranking(): Ranking Signal Detection Theory Model
 
-- sdt_yn(): Signal Detection Theory (Yes/No)
+- sdt_rating(): Confidence Rating Signal Detection Theory Model
+
+- sdt_yn(): Yes/No Signal Detection Theory Model
 
 Choices and response times
 

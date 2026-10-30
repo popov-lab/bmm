@@ -176,15 +176,15 @@ Functions for specifying which model to fit
   [`IMMfull()`](https://venpopov.com/bmm/dev/reference/imm.md)
   [`IMMbsc()`](https://venpopov.com/bmm/dev/reference/imm.md)
   [`IMMabc()`](https://venpopov.com/bmm/dev/reference/imm.md) :
-  Interference measurement model by Oberauer and Lin (2017).
-- [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) : The
-  Multinomial / Memory Measurement Model
+  Interference Measurement Model
+- [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) : Memory
+  Measurement Model
 - [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md) :
-  Two-parameter mixture model by Zhang and Luck (2008).
+  Two-Parameter Mixture Model
 - [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md) :
-  Three-parameter mixture model by Bays et al (2009).
+  Three-Parameter Mixture Model
 - [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) : Multinomial
-  Processing Tree (MPT) models
+  Processing Tree (MPT) Model
 - [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
   : Create an MPT model from an EQN model file
 - [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
@@ -196,7 +196,7 @@ Functions for specifying which model to fit
   : Plot the structure of MPT trees
 - [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://venpopov.com/bmm/dev/reference/sdm.md) :
-  Signal Discrimination Model (SDM) by Oberauer (2023)
+  Signal Discrimination Model (SDM)
 - [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) :
   Continuous Dual-Process Signal Detection Theory Model
 - [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) :

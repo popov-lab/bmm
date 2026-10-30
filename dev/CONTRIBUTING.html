@@ -78,14 +78,15 @@
 <li>
 <strong>Documentation</strong> for new or changed exported functions (roxygen).</li>
 <li>
-<strong>For a new model:</strong> read the <a href="https://venpopov.com/bmm/dev-notes/">developer notes</a> and follow the one-constructor-per-response-type rule in <a href="../AGENTS.html">AGENTS.md</a>. Show parameter recovery in the PR description (see below).</li>
+<strong>For a new model:</strong> read the <a href="https://venpopov.com/bmm/dev-notes/">developer notes</a> and follow the one-constructor-per-response-type rule in <a href="../AGENTS.html">AGENTS.md</a>. Add a recovery plan, <code>tests/recovery/&lt;model&gt;.R</code> (see below).</li>
 </ul><div class="section level3">
 <h3 id="recovery-evidence-for-new-models">Recovery evidence for new models<a class="anchor" aria-label="anchor" href="#recovery-evidence-for-new-models"></a></h3>
-<p>Until we have a <code>tests/recovery/</code> folder, the PR description shows the result of a parameter recovery for the new model:</p>
-<ul><li>true against recovered values, as a table or a plot;</li>
+<p>Recovery evidence is a validation plan for the <a href="https://github.com/GidonFrischkorn/bmmtools" class="external-link">bmmtools</a> package. Commit the plan as <code>tests/recovery/&lt;model&gt;.R</code>, a script that builds it with <code>bmmtools::validation_plan()</code> (see <code>tests/recovery/README.md</code>). The plan must cover:</p>
+<ul><li>true against recovered values;</li>
 <li>a hierarchical recovery with several subjects whose parameters vary;</li>
 <li>data simulated with an independent generator, not the model’s own <code>r*</code> function, so that a bug in the density cannot cancel out.</li>
-</ul><p>Attach the script as a gist or in a collapsed block in the PR.</p>
+</ul><p>You run the plan locally (see <code>tests/recovery/README.md</code>); it takes hours of sampling. Until a card site exists, attach the rendered card.html (zipped) to the PR.</p>
+<p>Always pass <code>generator =</code> and, for a model bmmtools has no defaults for, the model object and <code>pars</code> instead of its name; <code>tests/recovery/README.md</code> has the details and the install line for bmmtools. The plan is not run by <code>R CMD check</code> or CI.</p>
 </div>
 <div class="section level3">
 <h3 id="model-fits-for-the-website-articles">Model fits for the website articles<a class="anchor" aria-label="anchor" href="#model-fits-for-the-website-articles"></a></h3>
@@ -111,7 +112,7 @@
 <strong>List it in NEWS.</strong> Every deprecation and every removal gets a bullet under the heading <code>### Deprecated functions and arguments</code>.</li>
 <li>
 <strong>Announce breaking changes.</strong> A change is breaking when a script that ran before now fails, has to be edited, or gives different results for the same data and model. Removing a deprecated form counts. A bug fix that corrects results is not; it goes in NEWS under the bug fixes. We announce a breaking change in a GitHub issue before the release that contains it, with the old and the new code side by side (use the “Breaking change” issue template).</li>
-</ol><p>The rules cover what users type or read: exported functions and their arguments, model parameter names, documented defaults, and the data layout a model expects. Internal functions are not covered. Fits saved by an earlier release are covered: they keep working with <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> and the extraction functions, through <code><a href="reference/restructure.bmmfit.html">restructure()</a></code> where they need converting, or the NEWS bullet says they must be refitted.</p>
+</ol><p>The rules cover what users type or read: exported functions and their arguments, model parameter names, documented defaults, and the data layout a model expects. From the release that adds or exports them, <code>model_spec()</code>, <code>simulate_data()</code> and <code>link_transform()</code> are covered too (<a href="../.dev/decisions/0005-model-contract-for-companions-and-extensions.html">ADR 0005</a>). Internal functions are not covered. Fits saved by an earlier release are covered: they keep working with <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> and the extraction functions, through <code><a href="reference/restructure.bmmfit.html">restructure()</a></code> where they need converting, or the NEWS bullet says they must be refitted.</p>
 <p>A changed default has no old form to warn about. Announce it as a breaking change (rule 3) and say in NEWS how to get the old default back. For a changed data layout, accept both layouts for the window and give the old and the new column names as <code>what</code> and <code>with</code>.</p>
 <p>If your PR deprecates something:</p>
 <ul><li>Deprecate in a minor release (1.5.0, 1.6.0), not in a patch release, so that users meet the warning before the release that may remove the form.</li>
@@ -121,6 +122,35 @@
 <li>Add the NEWS bullet under <code>### Deprecated functions and arguments</code> in the section of the release that deprecates the form. On a <code>dev-*</code> branch that is the branch’s own section (<a href="../.dev/decisions/0002-release-integration-branches.html">ADR 0002</a>).</li>
 <li>Test that the old form still works and warns.</li>
 </ul><p>When the window has passed, you may remove the old form. Remove its tests with it, list the removal under the same heading in the release that removes it, and announce it in an issue before that release (rule 3). Forms deprecated before 1.5.0 may be removed in any later release once the removal is announced the same way.</p>
+</div>
+<div class="section level2">
+<h2 id="companion-packages-and-extensions">Companion packages and extensions<a class="anchor" aria-label="anchor" href="#companion-packages-and-extensions"></a></h2>
+<p>Other packages build on bmm’s models. <a href="https://github.com/GidonFrischkorn/bmmtools" class="external-link">bmmtools</a> simulates from them and checks parameter recovery, and the <a href="https://github.com/GidonFrischkorn/bmm-explorer" class="external-link">model explorer</a> draws them. Packages that define their own bmm models (#442) will join them. All of them rely on one contract, described in <a href="../.dev/decisions/0005-model-contract-for-companions-and-extensions.html">ADR 0005</a>:</p>
+<ul><li>what <code>model_spec()</code> returns for a model: its name, package, version, domain and task, its parameters with their links, fixed values and alternative groups, its default priors and init ranges, its response and other variables, the role of each data column, the names of its density and generator functions, and the contract version;</li>
+<li>the simulation generic <code>simulate_data()</code> and every model’s method for it;</li>
+<li>the exported density and generator functions, and <code>link_transform()</code>.</li>
+</ul><p>Reading a model object with <code>$</code>, its attributes, and internal functions are not part of the contract. Code in other packages should not rely on them. <code>model_spec()</code>, <code>simulate_data()</code> and the export of <code>link_transform()</code> are being added for 1.5.0 (the generic possibly for 1.6.0); each item is covered from the release that contains it. Until the 1.6.0 release pins contract version 1.0, the contract may still change, and the announcement rule below applies to every such change.</p>
+<div class="section level3">
+<h3 id="when-your-pr-changes-the-contract">When your PR changes the contract<a class="anchor" aria-label="anchor" href="#when-your-pr-changes-the-contract"></a></h3>
+<p>A change to any item above is announced, whether or not it breaks a script. This extends rule 3 of “Deprecating and removing features” to the contract:</p>
+<ol style="list-style-type: decimal"><li>Add a NEWS bullet under the heading <code>### Companion packages</code> in the section of your release. Name the item and give the old and the new form.</li>
+<li>Before the release, a maintainer copies the body of the “Companion package change” template (<a href="ISSUE_TEMPLATE/companion_change.html"><code>companion_change.md</code></a>; open the raw file, because the rendered view hides its instructions) into a new issue in <a href="https://github.com/GidonFrischkorn/bmmtools/issues" class="external-link">bmmtools</a> and into one in <a href="https://github.com/GidonFrischkorn/bmm-explorer/issues" class="external-link">bmm-explorer</a>, one issue per repository, and links both in the PR.</li>
+<li>If the change also breaks user scripts, the deprecation rules above apply as well.</li>
+</ol><p>A new model has to meet the contract too: once the accessor and the generic are in bmm, it needs a complete <code>model_spec()</code> and a <code>simulate_data()</code> method. <code><a href="reference/use_model_template.html">use_model_template()</a></code> will scaffold the <code>simulate_data()</code> method, and a convention test will fail until the model has both.</p>
+</div>
+<div class="section level3">
+<h3 id="the-companion-packages-job">The companion packages job<a class="anchor" aria-label="anchor" href="#the-companion-packages-job"></a></h3>
+<p>The workflow “Companion packages” (<code>.github/workflows/companions.yaml</code>) runs the tests of bmmtools and the model explorer’s fixture checks against bmm as pushed. It runs on every push to <code>develop</code> and the <code>dev-*</code> branches, once a week and on demand, not on pull requests. It never blocks a merge. Both jobs are switched off until the other maintainer has agreed to the workflow. The pull request that switches them on needs that maintainer’s approval; the comment at the top of the file says how to switch them on.</p>
+<p>A failure does not turn the run red, and nothing sends a notification. Look at the run page: a warning annotation names the step that failed, and the job’s summary table lists the checkout, setup and test steps with their outcomes.</p>
+<p>When a job has failed:</p>
+<ul><li>Read the warning and the summary table, which also shows the companion commit that was tested, and decide where the cause is.</li>
+<li>If the failure follows from a contract change that was announced, the companion issue already covers it. Nothing to do in bmm.</li>
+<li>If it follows from a contract change that was not announced, announce it now (steps 1 and 2 above), or revert the change if it was not intended.</li>
+<li>If bmm broke something it should not have, open a bug in bmm and fix it there.</li>
+<li>If the companion itself is at fault, open an issue in its repository.</li>
+</ul><p>Once the jobs are switched on, run them by hand with:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="ex">gh</span> workflow run companions.yaml <span class="at">--repo</span> popov-lab/bmm <span class="at">--ref</span> develop</span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="review-and-merging">Review and merging<a class="anchor" aria-label="anchor" href="#review-and-merging"></a></h2>
@@ -137,7 +167,7 @@
 </tr><tr><td><strong>Pipeline or exported API</strong></td>
 <td>The shared pipeline files (<code>R/bmm.R</code>, <code>R/bmmformula.R</code>, <code>R/helpers-model.R</code>, <code>R/helpers-data.R</code>, <code>R/helpers-prior.R</code>, <code>R/helpers-postprocess.R</code>, <code>R/helpers-inits.R</code>, <code>R/update.R</code>), the signature or return value of an exported function, or deprecating or removing an exported function or argument</td>
 <td>Two approving reviews.</td>
-</tr></tbody></table><p>A <strong>new model</strong> is a standard PR with one addition: the reviewer works through the reviewer block in the PR template. They read the likelihood against the cited source, run or inspect the recovery, and check the default priors on the natural scale.</p>
+</tr></tbody></table><p>A <strong>new model</strong> is a standard PR with one addition: the reviewer works through the reviewer block in the PR template. They read the likelihood against the cited source, read the recovery plan and inspect its card, and check the default priors on the natural scale.</p>
 <p>Three rules apply to all tiers:</p>
 <ul><li>All three <code>R-CMD-check</code> jobs (<code>ubuntu-latest</code>, <code>macos-latest</code>, <code>windows-latest</code>, each on <code>release</code>) must pass. CI runs on pushes and PRs to <code>master</code>, <code>develop</code> and <code>dev-*</code>.</li>
 <li>Approvals stay valid after new pushes. If you review a PR and the author pushes afterwards, you can still re-request changes.</li>

@@ -41,9 +41,9 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Decision Making / Response times
+- **Domain:** Decision making
 
-- **Task:** Two-Alternative Force Choice RT
+- **Task:** Choices and response times
 
 - **Name:** Diffusion Decision Model
 

@@ -75,31 +75,35 @@
 <p><strong>Continuous reproduction.</strong> Participants reproduce a color, an orientation or another continuous feature, and the response error is the dependent variable. See the <a href="https://venpopov.com/bmm/articles/bmm_vwm_crt.html">continuous reproduction article</a>.</p>
 <ul>
 <li>
-<a href="https://venpopov.com/bmm/reference/imm.html"><code>imm()</code></a>: Interference measurement model by Oberauer and Lin (2017)</li>
+<a href="https://venpopov.com/bmm/reference/imm.html"><code>imm()</code></a>: Interference Measurement Model</li>
 <li>
-<a href="https://venpopov.com/bmm/reference/mixture2p.html"><code>mixture2p()</code></a>: Two-parameter mixture model by Zhang and Luck (2008)</li>
+<a href="https://venpopov.com/bmm/reference/mixture2p.html"><code>mixture2p()</code></a>: Two-Parameter Mixture Model</li>
 <li>
-<a href="https://venpopov.com/bmm/reference/mixture3p.html"><code>mixture3p()</code></a>: Three-parameter mixture model by Bays et al (2009)</li>
+<a href="https://venpopov.com/bmm/reference/mixture3p.html"><code>mixture3p()</code></a>: Three-Parameter Mixture Model</li>
 <li>
-<a href="https://venpopov.com/bmm/reference/sdm.html"><code>sdm()</code></a>: Signal Discrimination Model (SDM) by Oberauer (2023)</li>
+<a href="https://venpopov.com/bmm/reference/sdm.html"><code>sdm()</code></a>: Signal Discrimination Model (SDM)</li>
 </ul>
 <p><strong>Categorical recall and n-AFC decisions.</strong> Participants choose one response from a set of categories (n-alternative forced choice), for example the correct item, an item from another position, or an item that was not studied. See the <a href="https://venpopov.com/bmm/articles/bmm_m3.html">M3 article</a>.</p>
 <ul>
 <li>
-<a href="https://venpopov.com/bmm/reference/m3.html"><code>m3()</code></a>: The Multinomial / Memory Measurement Model</li>
+<a href="https://venpopov.com/bmm/reference/m3.html"><code>m3()</code></a>: Memory Measurement Model</li>
+<li>
+<a href="https://venpopov.com/bmm/reference/mpt.html"><code>mpt()</code></a>: Multinomial Processing Tree (MPT) Model</li>
 </ul>
 <p><strong>Detection, recognition and confidence judgments.</strong> Participants decide whether a signal was present or an item was studied, rate their confidence, give Remember/Know judgments, pick the target among several alternatives, or rank the alternatives. One signal detection model per response format, each fit to response counts per participant and condition. See the <a href="https://venpopov.com/bmm/articles/bmm_sdt.html">signal detection article</a> and, for the dual-process and meta-d′ versions of <code><a href="reference/sdt_rating.html">sdt_rating()</a></code> and the Remember/Know model <code><a href="reference/sdt_cdp.html">sdt_cdp()</a></code>, the <a href="https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html">dual-process and meta-d′ article</a>. The <a href="https://venpopov.com/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments">Get started</a> page has a table of the response formats and the noise distributions each model offers.</p>
 <ul>
 <li>
-<a href="https://venpopov.com/bmm/reference/sdt_cdp.html"><code>sdt_cdp()</code></a>: Continuous Dual-Process Signal Detection Theory (CDP)</li>
+<a href="https://venpopov.com/bmm/reference/mpt.html"><code>mpt()</code></a>: Multinomial Processing Tree (MPT) Model</li>
 <li>
-<a href="https://venpopov.com/bmm/reference/sdt_mafc.html"><code>sdt_mafc()</code></a>: Signal Detection Theory (m-AFC)</li>
+<a href="https://venpopov.com/bmm/reference/sdt_cdp.html"><code>sdt_cdp()</code></a>: Continuous Dual-Process Signal Detection Theory Model</li>
 <li>
-<a href="https://venpopov.com/bmm/reference/sdt_ranking.html"><code>sdt_ranking()</code></a>: Signal Detection Theory (Ranking)</li>
+<a href="https://venpopov.com/bmm/reference/sdt_mafc.html"><code>sdt_mafc()</code></a>: m-Alternative Forced Choice Signal Detection Theory Model</li>
 <li>
-<a href="https://venpopov.com/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>: Signal Detection Theory (Confidence Rating)</li>
+<a href="https://venpopov.com/bmm/reference/sdt_ranking.html"><code>sdt_ranking()</code></a>: Ranking Signal Detection Theory Model</li>
 <li>
-<a href="https://venpopov.com/bmm/reference/sdt_yn.html"><code>sdt_yn()</code></a>: Signal Detection Theory (Yes/No)</li>
+<a href="https://venpopov.com/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>: Confidence Rating Signal Detection Theory Model</li>
+<li>
+<a href="https://venpopov.com/bmm/reference/sdt_yn.html"><code>sdt_yn()</code></a>: Yes/No Signal Detection Theory Model</li>
 </ul>
 <p><strong>Choices and response times.</strong> Participants choose between two options and the response time is recorded, either on every trial or as means and variances per condition. See the <a href="https://venpopov.com/bmm/articles/bmm_ddm.html">DDM</a>, <a href="https://venpopov.com/bmm/articles/bmm_cswald.html">censored shifted Wald</a>, <a href="https://venpopov.com/bmm/articles/bmm_ezdm.html">EZ-diffusion</a> and <a href="https://venpopov.com/bmm/articles/bmm_rt_contamination.html">response time contamination</a> articles.</p>
 <ul>
@@ -110,11 +114,7 @@
 <li>
 <a href="https://venpopov.com/bmm/reference/ezdm.html"><code>ezdm()</code></a>: EZ-Diffusion Model</li>
 </ul>
-<p><strong>Processing-tree models.</strong> Participants give categorical responses, and you describe the discrete processes that lead to each response as a multinomial processing tree: the two-high-threshold model of recognition, the pair-clustering model of free recall, or a tree of your own. The model is fit to response counts per participant and condition. See the <a href="https://venpopov.com/bmm/articles/bmm_mpt.html">MPT article</a>.</p>
-<ul>
-<li>
-<a href="https://venpopov.com/bmm/reference/mpt.html"><code>mpt()</code></a>: Multinomial Processing Tree (MPT) models</li>
-</ul>
+<p><strong>Processing-tree models.</strong> Participants give categorical responses, and you describe the discrete processes that lead to each response as a multinomial processing tree: the two-high-threshold model of recognition, the pair-clustering model of free recall, or a tree of your own. The model is fit to response counts per participant and condition. See the <a href="https://venpopov.com/bmm/articles/bmm_mpt.html">MPT article</a>. The model, <a href="https://venpopov.com/bmm/reference/mpt.html"><code>mpt()</code></a>, is listed above under categorical recall and under detection and recognition.</p>
 <p><img src="reference/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%"></p>
 <p><code><a href="reference/bmm_models.html">bmm_models()</a></code> prints the same list in R, and <code>?modelname</code> (for example <code><a href="reference/imm.html">?imm</a></code>) documents what data a model expects and what its parameters mean.</p>
 </div>

@@ -31,26 +31,24 @@ Markdown code for printing the list of measurement models available in
 print_pretty_models_md()
 #> **Continuous reproduction**
 #> 
-#> - [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference measurement model by Oberauer and Lin (2017)
-#> - [`mixture2p()`](https://venpopov.com/bmm/reference/mixture2p.html): Two-parameter mixture model by Zhang and Luck (2008)
-#> - [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.html): Three-parameter mixture model by Bays et al (2009)
-#> - [`sdm()`](https://venpopov.com/bmm/reference/sdm.html): Signal Discrimination Model (SDM) by Oberauer (2023)
+#> - [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference Measurement Model
+#> - [`mixture2p()`](https://venpopov.com/bmm/reference/mixture2p.html): Two-Parameter Mixture Model
+#> - [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.html): Three-Parameter Mixture Model
+#> - [`sdm()`](https://venpopov.com/bmm/reference/sdm.html): Signal Discrimination Model (SDM)
 #> 
 #> **Categorical recall and n-AFC decisions**
 #> 
-#> - [`m3()`](https://venpopov.com/bmm/reference/m3.html): The Multinomial / Memory Measurement Model
-#> 
-#> **Processing-tree models**
-#> 
-#> - [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial Processing Tree (MPT) models
+#> - [`m3()`](https://venpopov.com/bmm/reference/m3.html): Memory Measurement Model
+#> - [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial Processing Tree (MPT) Model
 #> 
 #> **Detection, recognition and confidence judgments**
 #> 
-#> - [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.html): Continuous Dual-Process Signal Detection Theory (CDP)
-#> - [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.html): Signal Detection Theory (m-AFC)
-#> - [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.html): Signal Detection Theory (Ranking)
-#> - [`sdt_rating()`](https://venpopov.com/bmm/reference/sdt_rating.html): Signal Detection Theory (Confidence Rating)
-#> - [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Signal Detection Theory (Yes/No)
+#> - [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial Processing Tree (MPT) Model
+#> - [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.html): Continuous Dual-Process Signal Detection Theory Model
+#> - [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.html): m-Alternative Forced Choice Signal Detection Theory Model
+#> - [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.html): Ranking Signal Detection Theory Model
+#> - [`sdt_rating()`](https://venpopov.com/bmm/reference/sdt_rating.html): Confidence Rating Signal Detection Theory Model
+#> - [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Yes/No Signal Detection Theory Model
 #> 
 #> **Choices and response times**
 #> 
@@ -59,9 +57,9 @@ print_pretty_models_md()
 #> - [`ezdm()`](https://venpopov.com/bmm/reference/ezdm.html): EZ-Diffusion Model
 #> 
 print_pretty_models_md(group = "Continuous reproduction")
-#> - [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference measurement model by Oberauer and Lin (2017)
-#> - [`mixture2p()`](https://venpopov.com/bmm/reference/mixture2p.html): Two-parameter mixture model by Zhang and Luck (2008)
-#> - [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.html): Three-parameter mixture model by Bays et al (2009)
-#> - [`sdm()`](https://venpopov.com/bmm/reference/sdm.html): Signal Discrimination Model (SDM) by Oberauer (2023)
+#> - [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference Measurement Model
+#> - [`mixture2p()`](https://venpopov.com/bmm/reference/mixture2p.html): Two-Parameter Mixture Model
+#> - [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.html): Three-Parameter Mixture Model
+#> - [`sdm()`](https://venpopov.com/bmm/reference/sdm.html): Signal Discrimination Model (SDM)
 #> 
 ```

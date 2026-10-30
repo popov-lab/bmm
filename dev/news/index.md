@@ -300,6 +300,14 @@
   brms is on CRAN, or call `update(fit, recompile = TRUE)`.
   [`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
   now warns about this combination.
+- [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
+  and the help pages now show each model by its name only, such as
+  “Two-Parameter Mixture Model”, without the citation, which stays in
+  the `Citation` field of the help page. A model that fits several
+  tasks, such as
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), is listed
+  under each of them
+  ([\#554](https://github.com/popov-lab/bmm/issues/554)).
 
 #### Documentation
 

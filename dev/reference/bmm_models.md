@@ -19,10 +19,12 @@ one where a function refuses the class.
 ## Details
 
 Printed, the result lists the models grouped by the task they are meant
-for, one line per model with its constructor and full name. The groups
-are: continuous reproduction; categorical recall and n-AFC decisions;
+for, one line per model with its constructor and name. The groups are:
+continuous reproduction; categorical recall and n-AFC decisions;
 detection, recognition and confidence judgments; choices and response
-times; processing-tree models. Type `?modelname` (for example
+times. A model that fits several tasks, such as
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), is listed
+under each. Type `?modelname` (for example
 [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)) for the
 arguments of a model.
 
@@ -34,26 +36,24 @@ bmm_models()
 #> 
 #> Continuous reproduction
 #> 
-#> - imm(): Interference measurement model by Oberauer and Lin (2017)
-#> - mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
-#> - mixture3p(): Three-parameter mixture model by Bays et al (2009)
-#> - sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
+#> - imm(): Interference Measurement Model
+#> - mixture2p(): Two-Parameter Mixture Model
+#> - mixture3p(): Three-Parameter Mixture Model
+#> - sdm(): Signal Discrimination Model (SDM)
 #> 
 #> Categorical recall and n-AFC decisions
 #> 
-#> - m3(): The Multinomial / Memory Measurement Model
-#> 
-#> Processing-tree models
-#> 
-#> - mpt(): Multinomial Processing Tree (MPT) models
+#> - m3(): Memory Measurement Model
+#> - mpt(): Multinomial Processing Tree (MPT) Model
 #> 
 #> Detection, recognition and confidence judgments
 #> 
-#> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
-#> - sdt_mafc(): Signal Detection Theory (m-AFC)
-#> - sdt_ranking(): Signal Detection Theory (Ranking)
-#> - sdt_rating(): Signal Detection Theory (Confidence Rating)
-#> - sdt_yn(): Signal Detection Theory (Yes/No)
+#> - mpt(): Multinomial Processing Tree (MPT) Model
+#> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model
+#> - sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model
+#> - sdt_ranking(): Ranking Signal Detection Theory Model
+#> - sdt_rating(): Confidence Rating Signal Detection Theory Model
+#> - sdt_yn(): Yes/No Signal Detection Theory Model
 #> 
 #> Choices and response times
 #> 

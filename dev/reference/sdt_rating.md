@@ -110,11 +110,11 @@ with `version`:
 
 ### Version: `standard` (default)
 
-- **Domain:** Perception & Recognition Memory
+- **Domain:** Perception, Long-term memory
 
-- **Task:** Signal/Noise or Old/New Recognition
+- **Task:** Detection, recognition and confidence judgments
 
-- **Name:** Signal Detection Theory (Confidence Rating)
+- **Name:** Confidence Rating Signal Detection Theory Model
 
 - **Citation:**
 
@@ -236,11 +236,11 @@ prior: on the probability scale the interval cannot include 0, so the
 test of "no recollection" is a comparison with the fit that leaves the
 parameter fixed off, not the interval.
 
-- **Domain:** Perception & Recognition Memory
+- **Domain:** Perception, Long-term memory
 
-- **Task:** Signal/Noise or Old/New Recognition
+- **Task:** Detection, recognition and confidence judgments
 
-- **Name:** Signal Detection Theory (Confidence Rating)
+- **Name:** Confidence Rating Signal Detection Theory Model
 
 - **Citation:**
 
@@ -397,11 +397,11 @@ estimates differ from bmm's when the criterion is far from the midpoint.
 Extract the M-ratio posterior with
 [`mratio()`](https://venpopov.com/bmm/dev/reference/mratio.md).
 
-- **Domain:** Perception & Recognition Memory
+- **Domain:** Perception, Long-term memory
 
-- **Task:** Signal/Noise or Old/New Recognition
+- **Task:** Detection, recognition and confidence judgments
 
-- **Name:** Signal Detection Theory (Confidence Rating)
+- **Name:** Confidence Rating Signal Detection Theory Model
 
 - **Citation:**
 

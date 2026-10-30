@@ -1,6 +1,6 @@
-# Signal Discrimination Model (SDM) by Oberauer (2023)
+# Signal Discrimination Model (SDM)
 
-Signal Discrimination Model (SDM) by Oberauer (2023)
+Signal Discrimination Model (SDM)
 
 ## Usage
 
@@ -37,11 +37,11 @@ An object of class `bmmodel`
 see [the online
 article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for a
 detailed description of the model and how to use it. \* **Domain:**
-Visual working memory
+Working memory
 
 - **Task:** Continuous reproduction
 
-- **Name:** Signal Discrimination Model (SDM) by Oberauer (2023)
+- **Name:** Signal Discrimination Model (SDM)
 
 - **Citation:**
 

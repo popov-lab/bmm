@@ -1,6 +1,6 @@
-# Two-parameter mixture model by Zhang and Luck (2008).
+# Two-Parameter Mixture Model
 
-Two-parameter mixture model by Zhang and Luck (2008).
+Two-Parameter Mixture Model
 
 ## Usage
 
@@ -27,11 +27,11 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Visual working memory
+- **Domain:** Working memory
 
 - **Task:** Continuous reproduction
 
-- **Name:** Two-parameter mixture model by Zhang and Luck (2008).
+- **Name:** Two-Parameter Mixture Model
 
 - **Citation:**
 

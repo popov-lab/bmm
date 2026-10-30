@@ -48,7 +48,7 @@ columns: `parameter`, `description`, `fixed`, `value`, and `link`.
 ``` r
 # For an unfitted model
 parameter_info(sdm(resp_error = "y"))
-#> Model:  Signal Discrimination Model (SDM) by Oberauer (2023) 
+#> Model:  Signal Discrimination Model (SDM) 
 #> 
 #>  parameter description                                        fixed value
 #>  mu        Location parameter of the SDM distribution (in ... yes   0    
@@ -65,7 +65,7 @@ parameter_info(m3(
   num_options = c(1, 4, 5),
   version = "ss"
 ))
-#> Model:  The Multinomial / Memory Measurement Model 
+#> Model:  Memory Measurement Model 
 #> 
 #>  parameter description                                        fixed value
 #>  b         Background activation. Added to each response c... yes   0    

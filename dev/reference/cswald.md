@@ -74,9 +74,9 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Decision Making / Response times
+- **Domain:** Decision making
 
-- **Task:** Choice Reaction Time tasks (with few errors)
+- **Task:** Choices and response times
 
 - **Name:** Censored-Shifted Wald Model
 

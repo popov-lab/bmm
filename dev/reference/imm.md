@@ -1,10 +1,9 @@
-# Interference measurement model by Oberauer and Lin (2017).
+# Interference Measurement Model
 
-Three versions of the Interference measurement model by Oberauer and Lin
-(2017). - the full, bsc, and abc. `IMMfull()`, `IMMbsc()`, and
-`IMMabc()` are deprecated and will be removed in the future. Please use
-`imm(version = 'full')`, `imm(version = 'bsc')`, or
-`imm(version = 'abc')` instead.
+Three versions of the Interference Measurement Model - the full, bsc,
+and abc. `IMMfull()`, `IMMbsc()`, and `IMMabc()` are deprecated and will
+be removed in the future. Please use `imm(version = 'full')`,
+`imm(version = 'bsc')`, or `imm(version = 'abc')` instead.
 
 ## Usage
 
@@ -76,11 +75,11 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Visual working memory
+- **Domain:** Working memory
 
 - **Task:** Continuous reproduction
 
-- **Name:** Interference measurement model by Oberauer and Lin (2017).
+- **Name:** Interference Measurement Model
 
 - **Citation:**
 

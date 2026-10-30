@@ -84,11 +84,11 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Perception & Recognition Memory
+- **Domain:** Perception, Long-term memory
 
-- **Task:** Yes/No Detection or Old/New Recognition
+- **Task:** Detection, recognition and confidence judgments
 
-- **Name:** Signal Detection Theory (Yes/No)
+- **Name:** Yes/No Signal Detection Theory Model
 
 - **Citation:**
 

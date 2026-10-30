@@ -298,19 +298,20 @@ content (never `nchar(code) > 0`), its d/r functions, Stan parity. - R8:
 A test file seeds through
 [`withr::local_seed()`](https://withr.r-lib.org/reference/with_seed.html),
 never [`set.seed()`](https://rdrr.io/r/base/Random.html); a script such
-as `tests/local/make-fixtures.R` may. - R9: A new model adds
-`test-model_<name>.R`, a `helper-model-<name>.R` provider (R4), a
-fixture only when post-processing needs one (then also a `fixture` case
-and a block in `make-fixtures.R`), and stays inside the budget (R6). -
-R10: CRAN tier. The three cross-model contract files
-(`test-conditional_effects.R`, `test-default-priors.R`,
-`test-helpers-init.R`) open with a file-level `skip_on_cran()`, the only
-file-level ones (count pinned in `test-conventions.R`). A test that
-takes more than 0.4 s in CRAN mode on a developer machine (the installed
-tarball’s tests, `NOT_CRAN` unset, one worker) opens with
-`skip_on_cran()`. `cran-budget.R` runs the tests CRAN runs, fails on a
-failing test or when the wall time exceeds its cap, and writes
-`cran-test-timings.csv` to find slow tests.
+as `tests/local/make-fixtures.R` may. - R9: A new model adds a recovery
+plan `tests/recovery/<model>.R` (bmmtools `validation_plan()`;
+`.github/CONTRIBUTING.md`), `test-model_<name>.R`, a
+`helper-model-<name>.R` provider (R4), a fixture only when
+post-processing needs one (then also a `fixture` case and a block in
+`make-fixtures.R`), and stays inside the budget (R6). - R10: CRAN tier.
+The three cross-model contract files (`test-conditional_effects.R`,
+`test-default-priors.R`, `test-helpers-init.R`) open with a file-level
+`skip_on_cran()`, the only file-level ones (count pinned in
+`test-conventions.R`). A test that takes more than 0.4 s in CRAN mode on
+a developer machine (the installed tarball’s tests, `NOT_CRAN` unset,
+one worker) opens with `skip_on_cran()`. `cran-budget.R` runs the tests
+CRAN runs, fails on a failing test or when the wall time exceeds its
+cap, and writes `cran-test-timings.csv` to find slow tests.
 
 Test patterns from codebase:
 

@@ -67,9 +67,9 @@ An object of class `bmmodel`
 
 ## Details
 
-- **Domain:** Decision Making / Response times
+- **Domain:** Decision making
 
-- **Task:** Choice Reaction Time tasks
+- **Task:** Choices and response times
 
 - **Name:** EZ-Diffusion Model
 
