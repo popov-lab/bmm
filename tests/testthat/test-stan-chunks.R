@@ -10,8 +10,8 @@ chunk_files <- list.files(chunk_dir, pattern = "\\.stan$")
 read_chunk <- function(file) read_lines2(file.path(chunk_dir, file))
 
 # string literals go first so that the // of a URL inside reject() does not
-# start a comment; the comments go because m3_gaussian_funs.stan and
-# sdt_dist_funs.stan write braces in them (prod_{j != k}, F^{-1})
+# start a comment; the comments go because m3_gaussian_functions.stan and
+# sdt_dist_functions.stan write braces in them (prod_{j != k}, F^{-1})
 strip_stan_comments <- function(code) {
   gsub("(?s)\"[^\"\n]*\"|/\\*.*?\\*/|//[^\n]*", "", code, perl = TRUE)
 }
@@ -38,6 +38,13 @@ test_that("the braces of every Stan chunk balance", {
   unbalanced <- chunk_files[!balanced]
   expect_identical(unbalanced, character(0),
                    info = paste("unbalanced braces in", toString(unbalanced)))
+})
+
+test_that("the functions block of a model is <model>_functions.stan, never _funs.stan", {
+  # brms calls the block "functions" and use_model_template() writes
+  # <model>_<block>.stan, so a new model starts out with this spelling
+  abandoned <- grep("_funs\\.stan$", chunk_files, value = TRUE)
+  expect_identical(abandoned, character(0), info = paste("rename", toString(abandoned)))
 })
 
 test_that("every #include in a Stan chunk names a brms chunk", {

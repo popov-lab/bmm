@@ -66,9 +66,9 @@ noise and signal means; the formula names the one to estimate.
 }
 \details{
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Yes/No Detection or Old/New Recognition
-\item \strong{Name:} Signal Detection Theory (Yes/No)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Yes/No Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.

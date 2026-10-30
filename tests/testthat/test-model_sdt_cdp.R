@@ -594,7 +594,7 @@ cdp_kernel_stan <- function(cells) {
                     .sdt_cdp_logmu_stan(m_ld), fixed = TRUE)
   program <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "sdt_cdp_functions.stan", package = "bmm")),
     "\n", .sdt_cdp_logmu_stan(sdt_cdp(stimulus = "s", n_new = 3, n_old = 3)),
     wrapper_ld, "}\n",
     "data { int N; array[N] int cat; array[N] int n_new; array[N] int n_old;\n",
@@ -657,7 +657,7 @@ test_that("the Stan cdp likelihood has a finite gradient with an unbounded top b
 
   program <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "sdt_cdp_functions.stan", package = "bmm")),
     "\n}\n",
     "data { array[2, 11] int y; }\n",
     "parameters { real dfam; real drec; real criterion; real spacing;\n",
@@ -792,7 +792,7 @@ test_that("the Stan cdp gradient is right where a threshold meets the strength m
 
   program <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "sdt_cdp_functions.stan", package = "bmm")),
     "\n}\n",
     "data { array[2, 12] int y; }\n",
     "parameters { real dfam; real drec; real criterion; real spacing;\n",

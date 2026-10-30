@@ -1,4 +1,4 @@
-// confidence-rating SDT thresholds and per-row likelihood; needs sdt_dist_funs.stan
+// confidence-rating SDT thresholds and per-row likelihood; needs sdt_dist_functions.stan
 
 vector sdt_thresholds_parsimonious_rating(real criterion, real spacing,
                                           int K_full) {

@@ -550,35 +550,31 @@ print_model_details.default <- function(model, ...) {
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
 
-# maps the `domain` field of each `.model_*()` constructor to the task group
-# shown by bmm_models(); a domain not listed here prints as its own group,
-# so a new model never disappears from the list
-model_groups <- c(
-  "Visual working memory" = "Continuous reproduction",
-  "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
-  "Categorical decision making, memory, and reasoning" = "Processing-tree models",
-  "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
-  "Recognition Memory" = "Detection, recognition and confidence judgments",
-  "Decision Making / Response times" = "Choices and response times"
+# the vocabularies of the `task` and `domain` fields of the model constructors;
+# both fields take one or more of these values. A model is listed under each of
+# its tasks, in this order. A task outside the vocabulary (a model registered by
+# another package) prints as its own group after these, so a model never
+# disappears from the list
+model_tasks <- c(
+  "Continuous reproduction",
+  "Categorical recall and n-AFC decisions",
+  "Detection, recognition and confidence judgments",
+  "Choices and response times"
 )
 
-model_group <- function(domain) {
-  group <- unname(model_groups[domain])
-  group[is.na(group)] <- domain[is.na(group)]
-  group[group == ""] <- "Other models"
-  group
-}
+model_domains <- c(
+  "Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning"
+)
 
-model_registry <- function(models = model_names()) {
-  specs <- lapply(models, function(m) get_model(m)())
+model_registry <- function(models = model_names(),
+                           specs = lapply(models, function(m) get_model(m)())) {
+  tasks <- lapply(specs, function(spec) if (length(spec$task) == 0) "" else spec$task)
   registry <- data.frame(
-    model = models,
-    name = sub("\\.$", "", vapply(specs, `[[`, "", "name")),
-    domain = vapply(specs, `[[`, "", "domain")
+    model = rep(models, lengths(tasks)),
+    name = rep(vapply(specs, `[[`, "", "name"), lengths(tasks)),
+    group = sub("^$", "Other models", unlist(tasks))
   )
-  registry$group <- model_group(registry$domain)
-  known <- unique(unname(model_groups))
-  group_levels <- c(known, setdiff(registry$group, known))
+  group_levels <- c(model_tasks, setdiff(registry$group, model_tasks))
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
@@ -730,8 +726,10 @@ format_key_parameters <- function(spec) {
 # it estimates; used for the tables of the Get started article
 model_overview <- function(group = NULL) {
   registry <- model_registry()
-  if (!is.null(group)) {
-    registry <- registry[registry$group %in% group, ]
+  registry <- if (is.null(group)) {
+    registry[!duplicated(registry$model), ]
+  } else {
+    registry[registry$group %in% group, ]
   }
   rows <- lapply(seq_len(nrow(registry)), function(i) {
     model <- registry$model[i]
@@ -758,11 +756,12 @@ model_overview <- function(group = NULL) {
 #' Measurement models available in `bmm`
 #'
 #' @details Printed, the result lists the models grouped by the task they are
-#'   meant for, one line per model with its constructor and full name. The
+#'   meant for, one line per model with its constructor and name. The
 #'   groups are: continuous reproduction; categorical recall and n-AFC
 #'   decisions; detection, recognition and confidence judgments; choices and
-#'   response times; processing-tree models. Type `?modelname` (for example
-#'   `?imm`) for the arguments of a model.
+#'   response times. A model that fits several tasks, such as `mpt()`, is
+#'   listed under each. Type `?modelname` (for example `?imm`) for the
+#'   arguments of a model.
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
@@ -929,9 +928,10 @@ model_docs.bmmodel <- function(model, components = "all") {
   priors <- model$default_priors
   priors_info <- summarise_default_prior(priors)
 
+  # the tasks contain commas, so they are joined with a semicolon
   info_all <- list(
-    domain = paste0("* **Domain:** ", model$domain, "\n\n"),
-    task = paste0("* **Task:** ", model$task, "\n\n"),
+    domain = paste0("* **Domain:** ", paste(model$domain, collapse = ", "), "\n\n"),
+    task = paste0("* **Task:** ", paste(model$task, collapse = "; "), "\n\n"),
     name = paste0("* **Name:** ", model$name, "\n\n"),
     citation = paste0("* **Citation:** \n\n", collapse(paste0("   - ", model$citation, "\n")), "\n"),
     version = paste0("* **Version:** ", model$version, "\n\n"),
@@ -1067,7 +1067,13 @@ use_model_template <- function(model_name,
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
      #
-     # In this file, `citation` needs at least one reference, one per element, each
+     # In this file, `domain` and `task` take one or more values of `model_domains`
+     # and `model_tasks` in R/helpers-model.R, and `task` decides the group
+     # `bmm_models()` lists the model under. `name` holds the model's name only,
+     # in title case, and the reference goes in `citation`; a test checks the
+     # vocabularies and that `name` has no year, no \"by\" and no final period
+     #
+     # `citation` needs at least one reference, one per element, each
      # on a single line without a \"- \" bullet and ending in \".\" or a
      # https://doi.org/ URL (a test requires it)\n\n\n"
   )

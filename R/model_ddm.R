@@ -36,8 +36,8 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = nlist(),
-      domain = "Decision Making / Response times",
-      task = "Two-Alternative Force Choice RT",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "Diffusion Decision Model",
       citation = glue(
         "Ratcliff, R. (1978). A theory of memory retrieval. Psychological \\
