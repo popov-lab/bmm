@@ -263,7 +263,7 @@ test_that("the generated Gauss-Hermite rule integrates the normal exactly", {
 
 test_that("configure_model substitutes every quadrature token", {
   sc <- system.file("stan_chunks", package = "bmm")
-  tpl <- read_lines2(file.path(sc, "sdt_ranking_funs.stan"))
+  tpl <- read_lines2(file.path(sc, "sdt_ranking_functions.stan"))
   n_entries <- function(code, name) {
     vec <- sub(paste0(".*", name, " = to_vector\\(\\{([^}]*)\\}\\).*"), "\\1",
                gsub("\n", " ", code))
@@ -340,9 +340,9 @@ test_that("the telescoped gumbel_min form is the gamma ratio of Meyer-Grant et a
 ranking_stan_logmu <- function(grid, max_m) {
   sc <- system.file("stan_chunks", package = "bmm")
   funs <- paste(
-    read_lines2(file.path(sc, "sdt_dist_funs.stan")),
+    read_lines2(file.path(sc, "sdt_dist_functions.stan")),
     bmm:::.ranking_fill_quadrature(
-      read_lines2(file.path(sc, "sdt_ranking_funs.stan")),
+      read_lines2(file.path(sc, "sdt_ranking_functions.stan")),
       max_m = max_m, free_sdratio = TRUE
     ),
     sep = "\n"

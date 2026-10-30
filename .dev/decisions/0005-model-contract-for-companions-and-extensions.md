@@ -191,3 +191,10 @@ pull request template and `CLAUDE.md` say so.
   maintainer's confirmation of the downstream job; the `package` and `version`
   fields for registered models, which #442's registry fills when `develop` is
   forward-merged into `dev-1.6.0`.
+
+## Amendment 2026-10-30 (#409)
+
+The recovery evidence route in § Recovery evidence is now: a new-model pull
+request commits a `validation_plan()` script as `tests/recovery/<model>.R` and
+attaches the rendered card. `.github/CONTRIBUTING.md`, the pull request
+template and `tests/recovery/README.md` say so.

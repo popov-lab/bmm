@@ -623,7 +623,7 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   formula$family$dpars <- paste0("mu", resp_cats)
 
   stan_funs <- paste(
-    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "sdt_cdp_functions.stan", package = "bmm")),
     .sdt_cdp_logmu_stan(model), sep = "\n"
   )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
