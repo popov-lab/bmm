@@ -3,7 +3,7 @@
 \name{sdm}
 \alias{sdm}
 \alias{sdmSimple}
-\title{Signal Discrimination Model (SDM) by Oberauer (2023)}
+\title{Signal Discrimination Model (SDM)}
 \usage{
 sdm(
   resp_error,
@@ -39,14 +39,14 @@ sections "Scaling of the activation" and "What \code{c} means".}
 An object of class \code{bmmodel}
 }
 \description{
-Signal Discrimination Model (SDM) by Oberauer (2023)
+Signal Discrimination Model (SDM)
 }
 \details{
 see \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for a detailed description of the model
-and how to use it. * \strong{Domain:} Visual working memory
+and how to use it. * \strong{Domain:} Working memory
 \itemize{
 \item \strong{Task:} Continuous reproduction
-\item \strong{Name:} Signal Discrimination Model (SDM) by Oberauer (2023)
+\item \strong{Name:} Signal Discrimination Model (SDM)
 \item \strong{Citation:}
 \itemize{
 \item Oberauer, K. (2023). Measurement models for visual working memory—A factorial model comparison. Psychological Review, 130(3), 841-852. https://doi.org/10.1037/rev0000328

@@ -263,9 +263,9 @@ reference_markers <- function(references) {
   )
 }
 
-# some constructors store the name with the period of its reference ("... by
-# Zhang and Luck (2008)."), which would end the sentence before the marker;
-# the report methods of PR 478 apply the same rule
+# fits saved with older bmm versions store the name with the period of its
+# reference ("... by Zhang and Luck (2008)."), which would end the sentence
+# before the marker; the report methods of PR 478 apply the same rule
 model_display_name <- function(model) {
   sub("\\.$", "", sub("^The ", "", model$name))
 }

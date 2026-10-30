@@ -23,8 +23,8 @@ test_that("sdm() takes the scaling of the activation when none is given", {
 
 test_that("each cell names itself and keeps the class chain", {
   laplace <- suppressMessages(sdm("y", activation = "laplace"))
-  expect_identical(laplace$name, "SDM with a Laplace activation function (Oberauer, 2023, Table 2); not the SDM proper")
-  expect_identical(sdm("y", scaling = "range")$name, "Signal Discrimination Model (SDM) by Oberauer (2023)")
+  expect_identical(laplace$name, "Signal Discrimination Model (SDM) with a Laplace activation")
+  expect_identical(sdm("y", scaling = "range")$name, "Signal Discrimination Model (SDM)")
   for (model in list(sdm("y"), sdm("y", scaling = "peak"), laplace)) {
     expect_identical(class(model), c("bmmodel", "circular", "sdm", "sdm_simple"))
   }

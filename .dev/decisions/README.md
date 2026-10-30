@@ -29,3 +29,4 @@ record, and the old one is marked superseded with a link to the new one.
 | [0002](0002-release-integration-branches.md) | Integration branches for the next two releases | accepted 2026-10-04 |
 | [0003](0003-model-fit-files.md) | Large model-fit files: keep the history, stop the growth | accepted 2026-10-04 |
 | [0004](0004-test-tiers-and-budget.md) | Test tiers, a time budget, and rules for the test suite | accepted 2026-10-13 |
+| [0005](0005-model-contract-for-companions-and-extensions.md) | The model contract for companion and extension packages | proposed 2026-10-29 |

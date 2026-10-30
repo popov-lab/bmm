@@ -100,19 +100,12 @@ you describe the discrete processes that lead to each response as a
 multinomial processing tree: the two-high-threshold model of recognition,
 the pair-clustering model of free recall, or a tree of your own. The model is
 fit to response counts per participant and condition. See the
-[MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html).
-
-```{r, results = "asis", echo = FALSE}
-bmm::print_pretty_models_md(group = "Processing-tree models")
-```
+[MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html). The model,
+[`mpt()`](https://venpopov.com/bmm/reference/mpt.html), is listed above under
+categorical recall and under detection and recognition.
 
 ```{r other-groups, results = "asis", echo = FALSE}
-known <- c(
-  "Continuous reproduction", "Categorical recall and n-AFC decisions",
-  "Detection, recognition and confidence judgments", "Choices and response times",
-  "Processing-tree models"
-)
-other <- setdiff(unique(bmm:::model_registry()$group), known)
+other <- setdiff(unique(bmm:::model_registry()$group), bmm:::model_tasks)
 if (length(other) > 0) {
   cat("**Other models.**\n\n")
   bmm::print_pretty_models_md(group = other)

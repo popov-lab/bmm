@@ -29,9 +29,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(n_trials, dist, m),
-      domain = "Perception & Recognition Memory",
-      task = "m-Alternative Forced Choice",
-      name = "Signal Detection Theory (m-AFC)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "m-Alternative Forced Choice Signal Detection Theory Model",
       citation = c(
         glue(
           "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
@@ -233,8 +233,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
-    read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
-    read_lines2(paste0(sc_path, "/sdt_mafc_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_dist_functions.stan")),
+    read_lines2(paste0(sc_path, "/sdt_mafc_functions.stan")),
     sep = "\n"
   )
   # reduce_sum's partial log-likelihood gets its own scope, so the tables have
