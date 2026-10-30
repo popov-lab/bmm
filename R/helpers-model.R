@@ -1069,9 +1069,9 @@ use_model_template <- function(model_name,
      #
      # In this file, `domain` and `task` take one or more values of `model_domains`
      # and `model_tasks` in R/helpers-model.R, and `task` decides the group
-     # `bmm_models()` lists the model under. `name` holds the model's name only
-     # (title case, no year, no \"by\", no final period); the reference goes in
-     # `citation` (a test requires all of this)
+     # `bmm_models()` lists the model under. `name` holds the model's name only,
+     # in title case, and the reference goes in `citation`; a test checks the
+     # vocabularies and that `name` has no year, no \"by\" and no final period
      #
      # `citation` needs at least one reference, one per element, each
      # on a single line without a \"- \" bullet and ending in \".\" or a
