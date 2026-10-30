@@ -7,9 +7,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
+      name = "Signal Discrimination Model (SDM)",
       citation = glue(
         "Oberauer, K. (2023). Measurement models for visual working \\
         memory\u2014A factorial model comparison. Psychological Review, \\

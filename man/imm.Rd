@@ -5,7 +5,7 @@
 \alias{IMMfull}
 \alias{IMMbsc}
 \alias{IMMabc}
-\title{Interference measurement model by Oberauer and Lin (2017).}
+\title{Interference Measurement Model}
 \usage{
 imm(
   resp_error,
@@ -57,15 +57,15 @@ columns in the dataset.}
 An object of class \code{bmmodel}
 }
 \description{
-Three versions of the Interference measurement model by Oberauer and Lin (2017). - the full, bsc, and abc.
+Three versions of the Interference Measurement Model - the full, bsc, and abc.
 \code{IMMfull()}, \code{IMMbsc()}, and \code{IMMabc()} are deprecated and will be removed in the future.
 Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{imm(version = 'abc')} instead.
 }
 \details{
 \itemize{
-\item \strong{Domain:} Visual working memory
+\item \strong{Domain:} Working memory
 \item \strong{Task:} Continuous reproduction
-\item \strong{Name:} Interference measurement model by Oberauer and Lin (2017).
+\item \strong{Name:} Interference Measurement Model
 \item \strong{Citation:}
 \itemize{
 \item Oberauer, K., & Lin, H.-Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59. https://doi.org/10.1037/rev0000044

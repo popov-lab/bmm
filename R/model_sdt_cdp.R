@@ -113,9 +113,9 @@
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, dist, dist_int, threshold_type,
                          thresh_type_int, n_new, n_old),
-      domain = "Recognition Memory",
-      task = "Old/New Recognition with Remember/Know Judgments",
-      name = "Continuous Dual-Process Signal Detection Theory (CDP)",
+      domain = "Long-term memory",
+      task = "Detection, recognition and confidence judgments",
+      name = "Continuous Dual-Process Signal Detection Theory Model",
       citation = glue(
         "Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model ",
         "of remember/know judgments. Psychological Review, 117(4), 1025-1054. ",
