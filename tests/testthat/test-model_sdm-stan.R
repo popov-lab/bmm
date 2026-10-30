@@ -566,3 +566,30 @@ test_that("rows with a different number and spacing of options each match dsdm(o
   expect_lt(max(abs(stan$serial - r)), 1e-8)
   expect_lt(max(abs(stan$sliced - stan$serial)), 1e-10)
 })
+
+# On a coarse wheel the grid sum and the continuous normaliser differ by 2.6e-6
+# per row at w = 2.25 steps with K = 4 (measured from K = 90 up, the bound is
+# 5e-12), so the switch is limited to K >= 90; rows near w = 2.25 steps, kappa
+# about 0.08 with c* about 1 for K = 4
+test_that("a coarse wheel keeps the exact grid sum, serial and sliced", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  dat <- data.frame(
+    lc = c(0, 0, -0.5, 0.2, 1, 0, 0, -1),
+    kappa = c(0.08, 0.06, 0.1, 0.07, 0.03, 0.08, 0.5, 0.09),
+    mu = c(0, 0, 0, 0, 0, 0.3, 0, 0)
+  )
+  dat$run <- sprintf("r%02d", seq_len(nrow(dat)))
+  dat$y <- c(0, 1, 2, -1, 0, 2, 1, 0) * pi / 2
+  stan <- sdm_grid_stan_run(sdm("y", n_options = 4), dat, slice = 3L)
+  r <- matrix(NA_real_, 2, 3)
+  for (a in 1:2) for (s in 1:3) {
+    r[a, s] <- sum(vapply(seq_len(nrow(dat)), function(i) {
+      dsdm(dat$y[i], dat$mu[i], exp(dat$lc[i]), dat$kappa[i], n_options = 4, log = TRUE,
+           activation = c("vonmises", "laplace")[a], scaling = c("density", "peak", "range")[s])
+    }, numeric(1)))
+  }
+  expect_lt(max(abs(stan$serial - r)), 1e-10)
+  expect_lt(max(abs(stan$sliced - stan$serial)), 1e-10)
+})

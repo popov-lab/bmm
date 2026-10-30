@@ -274,3 +274,25 @@ test_that("each grid cell runs the bmm() pipeline on the mock backend", {
                                     backend = "mock", mock_fit = 1, rename = FALSE))
   expect_identical(per_trial$family$name, "sdm_grid")
 })
+
+test_that("insight::get_data() of a grid fit returns the response column given to bmm()", {
+  skip_if_not_installed("insight")
+  dat <- data.frame(y = deg2rad(c(0, 10, -20, 5, NA)), cond = c("a", "a", "b", "b", "b"),
+                    o1 = 0, o2 = deg2rad(c(90, 10, -20, 5, 90)))
+  fit <- suppressWarnings(suppressMessages(
+    bmm(bmf(c ~ cond, kappa ~ 1), dat, sdm("y", n_options = 360, options = c("o1", "o2")),
+        backend = "mock", mock_fit = 1, rename = FALSE)
+  ))
+  got <- insight::get_data(fit)
+  expect_setequal(names(got), c("y", "cond"))
+  expect_equal(got$y, deg2rad(c(0, 10, -20, 5)))
+  expect_identical(insight::find_response(fit), "y")
+})
+
+test_that("a column named like one check_data() builds is reported before it is overwritten", {
+  dat <- data.frame(y = deg2rad(c(0, 90)), o1 = 0, o2 = deg2rad(c(90, 90)), opt_set_id = 7, OptIdx1 = 3)
+  expect_warning(
+    check_data(sdm("y", n_options = 360, options = c("o1", "o2")), dat, bmf(c ~ 1, kappa ~ 1)),
+    "'OptIdx1', 'opt_set_id'"
+  )
+})

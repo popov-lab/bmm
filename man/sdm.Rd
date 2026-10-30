@@ -135,7 +135,9 @@ of a continuous \code{sdm()} fit of the same responses. For the von Mises
 activation the two models agree wherever the activation spans a few
 steps: with \eqn{w = 1 / \sqrt{\max(c^*, 1) \kappa}}, the log-likelihood
 of a trial differs by less than 1e-10 once \eqn{w} is at least 2.25
-steps of \eqn{2\pi / K}, by about 1e-5 at one step, and by more below.
+steps of \eqn{2\pi / K} (measured for \eqn{K} from 90 to 720; on coarser
+wheels the difference is larger at the same \eqn{w}), by about 1e-5 at
+one step, and by more below.
 \code{bmm()} warns after the fit when a posterior draw has \eqn{w} below one
 step; the discrete likelihood is then still exact, but a comparison with
 a continuous fit is not. For the Laplace activation the two never agree
@@ -148,14 +150,17 @@ parameter values when they share the values of all predictors, which
 is fastest when they are adjacent, so bmm offers to sort the data by the
 predictors. With a
 continuous predictor every trial has its own sum; for the von Mises
-activation the sum over the full wheel is then replaced by the continuous
-normaliser wherever \eqn{w} is at least 2.25 steps, which changes the
-log-likelihood by less than 1e-10 and costs about as much as the
+activation on a wheel of at least 90 options the sum over the full wheel
+is then replaced by the continuous normaliser wherever \eqn{w} is at least
+2.25 steps, which changes the log-likelihood by less than 1e-10 and costs
+about as much as the
 continuous model (1.1 times as much per gradient on the 15,200 trials of
 \link{oberauer_lin_2017}, against 7.6 times without the replacement). The
 Laplace activation has no such replacement, and there the full wheel of
 360 options cost 9.7 times as much as the continuous model per gradient.
-\code{posterior_predict()} returns option offsets from the
+\code{log_lik()}, and so \code{loo()}, sums over all options of a row for every
+posterior draw, which with a continuous predictor takes a while on large
+data sets. \code{posterior_predict()} returns option offsets from the
 target in steps; multiply by \code{2 * pi / n_options} for radians.
 
 Fits from before \code{n_options} existed are continuous, and \code{n_options = NULL} keeps that model unchanged.

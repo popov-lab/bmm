@@ -162,7 +162,9 @@ settable_links.sdm <- function(model) {
 #'   activation the two models agree wherever the activation spans a few
 #'   steps: with \eqn{w = 1 / \sqrt{\max(c^*, 1) \kappa}}, the log-likelihood
 #'   of a trial differs by less than 1e-10 once \eqn{w} is at least 2.25
-#'   steps of \eqn{2\pi / K}, by about 1e-5 at one step, and by more below.
+#'   steps of \eqn{2\pi / K} (measured for \eqn{K} from 90 to 720; on coarser
+#'   wheels the difference is larger at the same \eqn{w}), by about 1e-5 at
+#'   one step, and by more below.
 #'   `bmm()` warns after the fit when a posterior draw has \eqn{w} below one
 #'   step; the discrete likelihood is then still exact, but a comparison with
 #'   a continuous fit is not. For the Laplace activation the two never agree
@@ -175,14 +177,17 @@ settable_links.sdm <- function(model) {
 #'   is fastest when they are adjacent, so bmm offers to sort the data by the
 #'   predictors. With a
 #'   continuous predictor every trial has its own sum; for the von Mises
-#'   activation the sum over the full wheel is then replaced by the continuous
-#'   normaliser wherever \eqn{w} is at least 2.25 steps, which changes the
-#'   log-likelihood by less than 1e-10 and costs about as much as the
+#'   activation on a wheel of at least 90 options the sum over the full wheel
+#'   is then replaced by the continuous normaliser wherever \eqn{w} is at least
+#'   2.25 steps, which changes the log-likelihood by less than 1e-10 and costs
+#'   about as much as the
 #'   continuous model (1.1 times as much per gradient on the 15,200 trials of
 #'   [oberauer_lin_2017], against 7.6 times without the replacement). The
 #'   Laplace activation has no such replacement, and there the full wheel of
 #'   360 options cost 9.7 times as much as the continuous model per gradient.
-#'   `posterior_predict()` returns option offsets from the
+#'   `log_lik()`, and so `loo()`, sums over all options of a row for every
+#'   posterior draw, which with a continuous predictor takes a while on large
+#'   data sets. `posterior_predict()` returns option offsets from the
 #'   target in steps; multiply by `2 * pi / n_options` for radians.
 #'
 #'   Fits from before `n_options` existed are continuous, and `n_options =
@@ -527,13 +532,7 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
 
 sdm_run_metadata <- function(data, formula, model) {
   predictors <- data_predictor_vars(data, formula)
-  # brms excludes rows with missing values in any model variable before
-  # fitting, so run boundaries must be computed on the rows brms will keep
-  model_vars <- unique(c(unlist(model$resp_vars), predictors))
-  model_vars <- model_vars[model_vars %in% colnames(data)]
-  if (length(model_vars) > 0L) {
-    data <- data[stats::complete.cases(data[model_vars]), , drop = FALSE]
-  }
+  data <- data[sdm_kept_rows(data, formula, model), , drop = FALSE]
   if (length(predictors) == 0L) {
     return(list(
       G_sdm_runs = 1L,
@@ -733,7 +732,7 @@ sdm_stanvar_int_matrix <- function(x, name, rows, cols) {
   out <- numerator - .sdm_grid_log_sum(options, mu, log_cstar, kappa, activation, n_options) -
     log(2 * pi / n_options)
   if (!is.null(options)) {
-    out[!bins %in% options] <- -Inf
+    out[!is.na(bins) & !bins %in% options] <- -Inf
   }
   out
 }

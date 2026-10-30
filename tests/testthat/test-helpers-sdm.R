@@ -201,7 +201,7 @@ test_that("dsdm() refuses options without n_options and a bad n_options", {
 # The discrete von Mises SDM is the continuous one where the activation is
 # wider than a few steps (k2_logs/discrete_vs_continuous.md): the error in log
 # Z falls as exp(-2.2 r^2) in r = w / h, w = 1 / sqrt(max(c*, 1) kappa), and
-# is below 1e-10 from r = 2.25 on. Laplace never converges: its kink at the
+# is below 1e-10 from r = 2.25 on for K from 90 to 720. Laplace never converges: its kink at the
 # target makes the step error of the grid sum O(h^2 c* kappa)
 test_that("the discrete density approaches the continuous one with the measured curve", {
   # on both grids
@@ -274,4 +274,12 @@ test_that("dsdm() gives one value per c with a single kappa in every cell", {
     expect_equal(dsdm(0.3, 0, c(5, 6, 7), 2, activation = cell$activation, scaling = cell$scaling),
                  one_by_one, label = glue("{cell$activation}, {cell$scaling}"))
   }
+})
+
+test_that("dsdm() with options keeps a missing value missing", {
+  expect_identical(
+    is.na(dsdm(c(NA, 0, pi / 2), 0, 3, 3.5, n_options = 8, options = c(0, pi))),
+    c(TRUE, FALSE, FALSE)
+  )
+  expect_identical(dsdm(pi / 2, 0, 3, 3.5, n_options = 8, options = c(0, pi)), 0)
 })

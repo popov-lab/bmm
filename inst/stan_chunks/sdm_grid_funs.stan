@@ -13,13 +13,15 @@
 
   // The log of the sum over the options of a cell of exp(c* s(x - mu)), as
   // peak + log sum exp(peak expm1(log s)), which loses no digits at a large
-  // peak. Set 0 is the full wheel. There the von Mises sum is the continuous
-  // normaliser over the step wherever the activation spans 2.25 steps, w = 1 /
-  // sqrt(max(c*, 1) kappa) >= 2.25 * 2 pi / K: measured within 5e-12 in log
-  // over 2,745 cells, where the grid sum would cost K terms per cell. The
-  // trapezoid error falls as exp(-2.2 (w / step)^2), not faster, because the
-  // powers of s in exp(c* s) are narrower than s. With mu = 0 the full wheel
-  // takes each distance once, with its multiplicity
+  // peak. Set 0 is the full wheel. There, for K >= 90, the von Mises sum is
+  // the continuous normaliser over the step wherever the activation spans 2.25
+  // steps, w = 1 / sqrt(max(c*, 1) kappa) >= 2.25 * 2 pi / K: measured within
+  // 5e-12 in log over 2,745 cells with K from 90 to 720, where the grid sum
+  // would cost K terms per cell. The trapezoid error falls as exp(-2.2 (w /
+  // step)^2), not faster, because the powers of s in exp(c* s) are narrower
+  // than s; on coarser wheels it is larger at the same w (2.6e-6 with K = 4),
+  // and K terms are cheap. With mu = 0 the full wheel takes each distance
+  // once, with its multiplicity
   real sdm_grid_log_sum(real mu, real c, real kappa, int activation, int scaling, int K, int set,
                         data array[] int set_size, data array[,] int set_off,
                         data vector grid_half, data vector grid_logmult, data vector grid_full,
@@ -32,7 +34,8 @@
       vector[m] delta = to_vector(set_off[set, 1:m]) * (2 * pi() / K) - mu;
       return peak + log_sum_exp(peak * expm1(sdm_log_s(delta, rep_vector(kappa, m), activation)));
     }
-    if (activation == 1 && fmax(log_peak, 0) + log(kappa) + 2 * log(2.25 * 2 * pi() / K) <= 0) {
+    if (activation == 1 && K >= 90
+        && fmax(log_peak, 0) + log(kappa) + 2 * log(2.25 * 2 * pi() / K) <= 0) {
       return log(K) - sdm_vm_ldenom_peak(log_peak, kappa, gl_x, gl_w, wide_cosm1, wide_w);
     }
     if (mu == 0) {

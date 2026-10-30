@@ -92,9 +92,12 @@ check_data.option_set <- function(model, data, formula) {
   stopif(!is.numeric(data[[resp]]), "The response variable '{resp}' must be numeric.")
   .check_option_units(data[[resp]], units, glue("The response variable '{resp}'"))
   bin_col <- .option_bin_column(model)
+  width <- .option_width(model)
+  reserved <- intersect(c(bin_col, .option_columns(width), if (width > 0) "opt_set_id"), colnames(data))
   warnif(
-    bin_col %in% colnames(data),
-    "Column '{bin_col}' in your data is reserved by bmm and will be overwritten."
+    length(reserved) > 0,
+    "Column{if (length(reserved) > 1) 's' else ''} {collapse_comma(reserved)} in your \\
+    data {if (length(reserved) > 1) 'are' else 'is'} reserved by bmm and will be overwritten."
   )
   data[[bin_col]] <- .bin_options(data[[resp]], n_options, units)
   offsets <- .option_offsets(model, data)
