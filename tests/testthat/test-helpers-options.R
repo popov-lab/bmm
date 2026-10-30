@@ -268,7 +268,9 @@ test_that("a data set without a single response passes check_data() with empty c
     continuous = sdm("y")
   )
   for (name in names(models)) {
-    expect_no_warning(checked <- check_data(models[[name]], dat, formula))
+    checked <- collect_warnings(check_data(models[[name]], dat, formula))
+    expect_identical(checked$warnings, character(), info = name)
+    checked <- checked$value
     expect_identical(nrow(checked), 2L, info = name)
     expect_true(all(is.na(checked$y)), info = name)
   }

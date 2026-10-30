@@ -318,3 +318,8 @@ test_that("sdmSimple() ignores the option arguments with a warning and stays con
   expect_false(inherits(model, "option_set"))
   expect_identical(names(model$other_vars), c("activation", "scaling"))
 })
+
+test_that("sdmSimple() takes an abbreviated `link =` the way it takes `links =`", {
+  expect_error(suppressWarnings(sdmSimple("y", links = list(c = "identity"))), "cannot be changed")
+  expect_error(suppressWarnings(sdmSimple("y", link = list(c = "identity"))), "cannot be changed")
+})

@@ -204,10 +204,16 @@ test_that("every model constructor with ... reports arguments it does not use (#
     internal_call <- calls_to(body(exports[[name]]), "^\\.model_")[[1]]
     internal <- get(as.character(internal_call[[1]]), envir = ns)
     passed <- names(internal_call)[nzchar(names(internal_call))]
-    # `name = list(...)$name` takes the argument from the dots: left to `...`
+    # `name = list(...)$name` and `name = dots$name`, with `dots` the value of
+    # .check_constructor_dots(), take the argument from the dots: left to `...`
+    checked_dots <- Filter(function(a) {
+      is.call(a[[3]]) && identical(a[[3]][[1]], as.name(".check_constructor_dots"))
+    }, calls_to(body(exports[[name]]), "^<-$"))
+    dots_sources <- c(list(quote(list(...))), lapply(checked_dots, `[[`, 2))
     args <- as.list(internal_call)[-1]
     from_dots <- vapply(args, function(a) {
-      is.call(a) && identical(a[[1]], as.name("$")) && identical(a[[2]], quote(list(...)))
+      is.call(a) && identical(a[[1]], as.name("$")) &&
+        any(vapply(dots_sources, identical, logical(1), a[[2]]))
     }, logical(1))
     passed <- setdiff(passed, names(args)[from_dots])
     expected <- setdiff(names(formals(internal)), c(passed, "call", "..."))

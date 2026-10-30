@@ -138,15 +138,18 @@ check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
 # prefix among those no exact name took, so `link =` reaches `links` and is not
 # reported. `deprecated` names are read with %in%, so only exactly. Unnamed
 # extras are reported because they land in whichever internal formal is next
-# by position.
+# by position. The dots come back with every prefix expanded to its full name,
+# for a constructor that reads single dots itself instead of forwarding `...`
+# (sdmSimple()): `list(...)$links` would miss a `link =` R had matched.
 .check_constructor_dots <- function(dots, known = character(), deprecated = character()) {
   dot_names <- names(dots) %||% rep("", length(dots))
   named <- nzchar(dot_names)
   free <- setdiff(known, dot_names)
   prefix <- pmatch(dot_names, free, duplicates.ok = TRUE)
+  names(dots)[!is.na(prefix)] <- free[prefix[!is.na(prefix)]]
   unknown <- unique(dot_names[named & !dot_names %in% c(deprecated, known) & is.na(prefix)])
   if (length(unknown) == 0 && all(named)) {
-    return(invisible())
+    return(invisible(dots))
   }
   constructor_fn <- sys.function(-1)
   call_head <- sys.call(-1)[[1]]
@@ -179,6 +182,7 @@ check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
     )
   )
   warning2("{paste(msg, collapse = '\n')}")
+  invisible(dots)
 }
 
 # check if the user has provided a regular expression for any model variables and

@@ -335,14 +335,15 @@ sdm <- function(resp_error, version = "simple", activation = c("vonmises", "lapl
 sdmSimple <- function(resp_error, version = "simple", ...) {
   warning2("The function `sdmSimple()` is deprecated. Please use `sdm()` instead.")
   call <- match.call()
-  .check_constructor_dots(list(...), known = "links")
+  dots <- .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   # the deprecated alias builds the continuous model only; the dots it warned
-  # about must not reach .model_sdm(), whose arguments they can name
+  # about must not reach .model_sdm(), whose arguments they can name, so only
+  # `links` is read -- from the checked dots, where `link =` is already `links`
   .model_sdm(
     resp_error = resp_error, version = version, activation = "vonmises",
     scaling = "density", n_options = NULL, units = "radians", options = NULL,
-    n_alternatives = NULL, call = call, links = list(...)$links
+    n_alternatives = NULL, call = call, links = dots$links
   )
 }
 
