@@ -233,8 +233,8 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
-    read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
-    read_lines2(paste0(sc_path, "/sdt_mafc_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_dist_functions.stan")),
+    read_lines2(paste0(sc_path, "/sdt_mafc_functions.stan")),
     sep = "\n"
   )
   # reduce_sum's partial log-likelihood gets its own scope, so the tables have
