@@ -4,7 +4,7 @@
 
 # Threshold-parameterization registry: the position defines the integer
 # thresh_type code passed to Stan -- reordering entries changes the R <-> Stan
-# contract (see sdt_make_thresholds_rating in sdt_rating_funs.stan)
+# contract (see sdt_make_thresholds_rating in sdt_rating_functions.stan)
 .sdt_threshold_types <- c("parsimonious", "equidistant", "log_distance",
                           "log_ratio", "softmax")
 
@@ -130,7 +130,7 @@
     extra_params = character(0),
     logmu_fun = "sdt_rating_logmu",
     logmu_cat_call = "sdt_rating_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_rating_funs.stan",
+    stan_chunk = "sdt_rating_functions.stan",
     citation = glue(
       "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
       "and psychophysics. Wiley."
@@ -160,7 +160,7 @@
     extra_params = c("Ro", "Rn"),
     logmu_fun = "sdt_dpsdt_logmu",
     logmu_cat_call = "sdt_dpsdt_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type, Ro, Rn)",
-    stan_chunk = "sdt_dpsdt_funs.stan",
+    stan_chunk = "sdt_dpsdt_functions.stan",
     citation = c(
       glue(
         "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
@@ -201,7 +201,7 @@
     extra_params = "logmratio",
     logmu_fun = "sdt_metad_logmu",
     logmu_cat_call = "sdt_metad_logmu_cat(cat, thr, d, exp(logmratio) * d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_metad_funs.stan",
+    stan_chunk = "sdt_metad_functions.stan",
     citation = glue(
       "Maniscalco, B., & Lau, H. (2012). A signal detection theoretic ",
       "approach for estimating metacognitive sensitivity from confidence ",
@@ -762,7 +762,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
   formula$family$dpars <- paste0("mu", resp_cats)
 
   sc_path <- system.file("stan_chunks", package = "bmm")
-  chunks <- unique(c("sdt_dist_funs.stan", "sdt_rating_funs.stan",
+  chunks <- unique(c("sdt_dist_functions.stan", "sdt_rating_functions.stan",
                      .sdt_rating_variant(model)$stan_chunk))
   stan_funs <- paste(
     paste(vapply(chunks, function(f) read_lines2(paste0(sc_path, "/", f)),

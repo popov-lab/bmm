@@ -147,7 +147,7 @@ configure_model.sdm <- function(model, data, formula) {
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
+  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_functions.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
   likelihood_file <- if (brms_slices_likelihood()) {
     "sdm_simple_likelihood_threaded.stan"

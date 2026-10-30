@@ -636,7 +636,7 @@ m3_gaussian_stanvars <- function(model) {
   )
   sc_path <- system.file("stan_chunks", package = "bmm")
   brms::stanvar(
-    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_funs.stan")), wrapper, sep = "\n"),
+    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_functions.stan")), wrapper, sep = "\n"),
     block = "functions"
   )
 }
