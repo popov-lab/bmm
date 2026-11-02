@@ -128,8 +128,9 @@ estimates the width of the gradient from the responses is the \code{\link[=sdm]{
 \code{"gaussian"}, the default, is the model of Schurgin et al. (2020), with
 normal noise of unit variance. Its response probabilities have no closed
 form, so on the full wheel the likelihood reads them from a table (see
-the section Grid limit on d); with \code{options} it integrates them per cell. With \code{"gumbel"} the noise follows the standard Gumbel (type
-I extreme value) distribution. The largest of independent Gumbel
+the section Grid limit on d); with \code{options} it integrates them per
+cell. With \code{"gumbel"} the noise follows the standard Gumbel (type I
+extreme value) distribution. The largest of independent Gumbel
 variables is again Gumbel distributed, which turns the probability of
 choosing an option into the softmax of \code{d * f(x)} over all options,
 \verb{exp(d * f(x)) / sum(exp(d * f(x')))} (Oberauer, 2023, eq. 4). This needs
@@ -189,8 +190,9 @@ at that of guessing uniformly, so under a flat prior on \code{log(d)} the
 posterior cannot be normalised, and a cell with little information
 drifts towards \code{d = 0} without end. The default prior is proper. This
 holds for either noise; the rest of this section applies to normal noise
-on the full wheel only, not with \code{options}. The likelihood reads the response probabilities from a table on a grid
-of \code{d} values up to \code{d_max} in steps of 0.02, built once per chain
+on the full wheel only, not with \code{options}. The likelihood reads the
+response probabilities from a table on a grid of \code{d} values up to
+\code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
 log probability). Beyond \code{d_max} the table is extended
 linearly, with the log probability of each response allowed to fall but
@@ -301,21 +303,22 @@ so add \code{log(n_options / (2 * pi))} per observation before comparing a
 
 Under normal noise the likelihood integrates over the offered options
 once per cell, a combination of a value of \code{d} and an option set, and
-needs no table, so \code{d_max} is not used. A cell cost about 0.07 ms per
-gradient with 2 options and 0.18 ms with 16. The design of Robinson et
-al. with \code{d} per participant and m (30 participants, 15,000 trials, 120
-cells) took 14 ms per gradient, and 500 trials with random foils, each
-trial its own cell, took 41 ms with 4 options and 87 ms with 16. Gumbel
-noise needs no integral and took 1 ms and 0.2 to 0.3 ms for the same
-designs. \code{bmm()} says so when there are more cells than half the rows,
-as with a continuous predictor of \code{d} or foils drawn anew on each trial.
-\code{log_lik()},
-\code{posterior_predict()} and \code{pp_check()} read each row's options from the
-data; to predict, pass \code{newdata} that carries the option columns and a
-response that is one of the offered options (any one will do, as
-\code{posterior_predict()} ignores it). \code{log_lik()} and \code{loo()} evaluate each
-row on its own under normal noise, about 0.15 s per row for 4,000 draws
-and 4 options, unless consecutive rows share their draws and options.
+needs no table, so \code{d_max} is not used. Measured on one chain and one
+thread with fixed-step NUTS on an Apple M3 Max laptop, a cell cost about
+0.07 ms per gradient with 2 options and 0.18 ms with 16. The design of
+Robinson et al. with \code{d} per participant and m (30 participants, 15,000
+trials, 120 cells) took 14 ms per gradient, and 500 trials with random
+foils, each trial its own cell, took 41 ms with 4 options and 87 ms
+with 16. Gumbel noise needs no integral and took 1 ms and 0.2 to 0.3 ms
+for the same designs. \code{bmm()} says so when there are more cells than half
+the rows, as with a continuous predictor of \code{d} or foils drawn anew on
+each trial. \code{log_lik()}, \code{posterior_predict()} and \code{pp_check()} read each
+row's options from the data; to predict, pass \code{newdata} that carries the
+option columns and a response that is one of the offered options (any
+one will do, as \code{posterior_predict()} ignores it). \code{log_lik()} and \code{loo()} evaluate each
+row on its own under normal noise, unless consecutive rows share their
+draws and options; for 4,000 draws on the same laptop this took 0.13 s
+per row with 4 options and 0.38 s with 16.
 }
 }
 \examples{
