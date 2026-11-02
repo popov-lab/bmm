@@ -46,6 +46,8 @@
         "- The response is the error relative to the target, in radians (binned \\
         to the nearest of `n_options` options) or, with units = 'bins', in whole \\
         option steps\n",
+        "- With `options` or `n_alternatives`, each trial must offer the target, and \\
+        the response must be one of the options its trial offers\n",
         "- `similarity` gives the psychophysical similarity f of an option to the \\
         target at each distance 0, 1, ..., n_options / 2 options, scaled so that \\
         f = 1 at distance 0"
@@ -255,10 +257,10 @@
 #'   options of each row, relative to the target and in the units of
 #'   `resp_error`, with `NA` where a row offers fewer options than there are
 #'   columns. They must include the target (an offset of 0) and the response,
-#'   and must sit on the grid of `n_options` positions (values within a tenth
-#'   of a step are rounded onto it). Sets may differ in size and spacing from
-#'   trial to trial; rows that offer the same options, in any order, share
-#'   one set. A data set with two- and four-option trials on a 360-option
+#'   offer each option once, and sit on the grid of `n_options` positions
+#'   (values within a tenth of a step are rounded onto it). Sets may differ in
+#'   size and spacing from trial to trial; rows that offer the same options,
+#'   in any order, share one set. A data set with two- and four-option trials on a 360-option
 #'   wheel, in degrees for readability (convert them with [deg2rad()]):
 #'
 #'   ```
@@ -274,29 +276,32 @@
 #'   of each row, which is checked against the option columns. The data
 #'   contract is the one of `sdm(options = )`, so the same data fit both models.
 #'
-#'   The design is that of Robinson et al. (2023), who offered 2, 4, 8 or 16
-#'   equally spaced colours (16 options lie 22.5 degrees apart, so they need
-#'   `n_options = 720`). Their critical test fixes the parameter across m and
-#'   compares the two noises: with one value for all m, the normal-noise TCC
-#'   fitted better than the softmax (Gumbel) model, while both fitted alike
-#'   with the parameter free per m. In bmm the test compares `d ~ 1` under
-#'   `noise = "gaussian"` with `d ~ 1` under `noise = "gumbel"`, on the same
-#'   similarity and `options`. The Gumbel fit is their softmax model, and both
-#'   log-likelihoods are log probabilities over the offered options, so
-#'   `loo_compare()` reads them as they are (see the examples). Comparing
-#'   `d ~ 1` with `d ~ 0 + m_condition` within one noise checks whether that
-#'   model needs a parameter per m. [sdm()] with the same `options` gives this
-#'   check for `c` (`c ~ 1` against `c ~ 0 + m_condition`); with `kappa`
-#'   estimated it is not their softmax model, which keeps the measured
-#'   similarity. `d` under normal noise and the Gumbel parameters (`d` with
-#'   `noise = "gumbel"`, or `c` of [sdm()]) are not on one scale (see the
-#'   section Noise), so compare the fits, or how each parameter varies across
-#'   m, not their values.
+#'   The design is that of Experiment 1 of Robinson et al. (2023), who
+#'   offered 2, 4, 8 or 16 equally spaced colours (16 options lie 22.5 degrees
+#'   apart, so they need `n_options = 720`). Their critical test fixes the
+#'   parameter across m and compares the two noises: with one value for all
+#'   m, the normal-noise TCC fitted better than the softmax (Gumbel) model,
+#'   while both fitted alike with the parameter free per m. They fitted each
+#'   participant on their own. In bmm the test compares `d ~ 1` under `noise =
+#'   "gaussian"` with `d ~ 1` under `noise = "gumbel"`, on the same similarity
+#'   and `options`; with several participants, `d` stays free per participant
+#'   and fixed across m in both fits, as in `d ~ 1 + (1 | id)`. The Gumbel fit
+#'   is their softmax model, and both log-likelihoods are log probabilities
+#'   over the offered options, so `loo_compare()` reads them as they are (see
+#'   the examples). Comparing `d ~ 1` with `d ~ 0 + m_condition` within one
+#'   noise checks whether that model needs a parameter per m. [sdm()] with the
+#'   same `options` gives this check for `c` (`c ~ 1` against `c ~ 0 +
+#'   m_condition`); with `kappa` estimated it is not their softmax model,
+#'   which keeps the measured similarity. `d` under normal noise and the
+#'   Gumbel parameters (`d` with `noise = "gumbel"`, or `c` of [sdm()]) are
+#'   not on one scale (see the section Noise), so compare the fits, or how
+#'   each parameter varies across m, not their values.
 #'   For either noise, the log-likelihood is a log probability over the
 #'   offered options, as for the full wheel (see the section Comparing with
 #'   continuous models); `sdm(options = )` reports it on the density scale,
-#'   so add `log(n_options / (2 * pi))` per observation before comparing a
-#'   `tcc()` fit with an [sdm()] fit.
+#'   so before comparing a `tcc()` fit with an [sdm()] fit, add
+#'   `log(n_options / (2 * pi))` per observation to the `tcc()`
+#'   log-likelihood.
 #'
 #'   Under normal noise the likelihood integrates over the offered options
 #'   once per cell, a combination of a value of `d` and an option set, and
@@ -307,15 +312,16 @@
 #'   trials, 120 cells) took 14 ms per gradient, and 500 trials with random
 #'   foils, each trial its own cell, took 41 ms with 4 options and 87 ms
 #'   with 16. Gumbel noise needs no integral and took 1 ms and 0.2 to 0.3 ms
-#'   for the same designs. `bmm()` says so when there are more cells than half
-#'   the rows, as with a continuous predictor of `d` or foils drawn anew on
-#'   each trial. `log_lik()`, `posterior_predict()` and `pp_check()` read each
-#'   row's options from the data; to predict, pass `newdata` that carries the
-#'   option columns and a response that is one of the offered options (any
-#'   one will do, as `posterior_predict()` ignores it). `log_lik()` and `loo()` evaluate each
-#'   row on its own under normal noise, unless consecutive rows share their
-#'   draws and options; for 4,000 draws on the same laptop this took 0.13 s
-#'   per row with 4 options and 0.38 s with 16.
+#'   for the same designs. Under normal noise only, `bmm()` says when there
+#'   are more cells than half the rows, as with a continuous predictor of `d`
+#'   or foils drawn anew on each trial. `log_lik()`, `posterior_predict()` and
+#'   `pp_check()` read each row's options from the data; to predict, pass
+#'   `newdata` that carries the option columns and a response that is either
+#'   one of the offered options or a numeric `NA` (`NA_real_`); any of these
+#'   will do, as `posterior_predict()` ignores it. `log_lik()` and `loo()`
+#'   evaluate each row on its own under normal noise, unless consecutive rows
+#'   share their draws and options; for 4,000 draws on the same laptop this
+#'   took 0.13 s per row with 4 options and 0.38 s with 16.
 #' @param resp_error The name of the variable in the data holding the response
 #'   error. With `units = "radians"` (the default) it is the error relative to
 #'   the target in radians, as for the other circular models, and is binned to
@@ -342,7 +348,7 @@
 #'   holding the number of options offered on each trial, which is checked
 #'   against the option columns. Without `options`, a single number `m`: each
 #'   trial offers `m` options spaced equally around the wheel, the target
-#'   among them.
+#'   among them; `n_options` must be a multiple of `m`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F.
