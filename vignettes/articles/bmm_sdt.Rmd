@@ -66,9 +66,9 @@ requirements; they are not modes of a single function.
 
 | Constructor | Response format | Key parameters | ROC defined? |
 |-------------|-----------------|----------------|--------------|
-| `sdt_yn()` | counts of "signal"/"old" responses | `d`, `criterion`, `sdratio` | yes |
+| `sdt_yn()` | counts of "signal"/"old" responses, or one 0/1 row per trial | `d`, `criterion`, `sdratio` | yes |
 | `sdt_rating()` | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
-| `sdt_mafc()` | counts of correct m-AFC responses | `d` | no |
+| `sdt_mafc()` | counts of correct m-AFC responses, or one 0/1 row per trial | `d` | no |
 | `sdt_ranking()` | counts per rank position | `d`, `sdratio` (`dist = "normal"` only) | no |
 
 All four assume a latent evidence variable whose noise distribution is selected
