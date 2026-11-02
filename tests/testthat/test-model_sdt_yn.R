@@ -61,6 +61,20 @@ test_that("trial-level check_data() names the responses that are not 0 or 1", {
     check_data(model, dat, bmf(d ~ 1, criterion ~ 1)),
     "'resp' must hold one of '0', '1' in every row. Found: '2', '3'"
   )
+  expect_error(
+    check_data(model, data.frame(resp = c(35, 12), stimulus = 0:1), bmf(d ~ 1, criterion ~ 1)),
+    paste0("With one row per trial, the response column 'resp' must hold one of '0', '1' in ",
+           "every row. Found: '35', '12'. For counts aggregated over trials, name the column ",
+           "of trial numbers with n_trials."),
+    fixed = TRUE
+  )
+})
+
+test_that("trial-level check_data() keeps a missing response missing", {
+  checked <- check_data(sdt_yn("resp", "stimulus"),
+                        data.frame(resp = c(1, NA, 0), stimulus = c(1L, 1L, 0L)),
+                        bmf(d ~ 1, criterion ~ 1))
+  expect_identical(checked$resp, c(1L, NA, 0L))
 })
 
 test_that("trial-level check_data() adds one trial per row and keeps the 0/1 response", {

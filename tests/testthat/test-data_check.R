@@ -352,7 +352,7 @@ test_that("the trial-level report crosses only the participant variable and coun
     "1 design cell(s) have fewer than 10 observations: id=4 (n=5)"
   )
   printed <- capture.output(print(res, color = FALSE))
-  expect_true(any(grepl("only 'id' (the grouping", printed, fixed = TRUE)))
+  expect_true(any(grepl("only 'id' (the first grouping", printed, fixed = TRUE)))
   expect_true(any(grepl(
     "item: 10 levels, observations per level: min 3 / median 3.5 / max 4", printed, fixed = TRUE
   )))
@@ -382,16 +382,81 @@ test_that("the report on aggregated sdt_yn rows is unchanged", {
   )
 })
 
-test_that("a small grouping factor taken as participant does not hide a sparse subject", {
+test_that("a small grouping factor written first does not hide a sparse subject", {
   dat <- expand.grid(id = 1:4, item = 1:20)
   dat <- dat[!(dat$id == 4 & dat$item > 5), ]
   dat$list <- dat$id %% 2
   dat$stimulus <- (dat$item + dat$list) %% 2
   dat$resp <- (dat$id + dat$item) %% 3 == 0
   res <- bmm_data_check(
-    bmf(d ~ 1 + (1 | id) + (1 | item) + (1 | list), criterion ~ 1 + (1 | id)),
+    bmf(d ~ 1 + (1 | list) + (1 | id) + (1 | item), criterion ~ 1 + (1 | id)),
     dat, sdt_yn("resp", "stimulus")
   )
   expect_equal(res$cells$group_vars, "list")
   expect_equal(finding_messages(res), "1 level(s) of 'id' have fewer than 10 observations: id=4 (n=5)")
+})
+
+# fewer items than participants: a rule that counted levels would cross items
+# with the condition, report empty item x condition cells, and miss the
+# participant with 3 trials in condition b
+test_that("the trial-level report crosses the first grouping variable in the formula", {
+  dat <- expand.grid(id = 1:60, item = 1:40)
+  dat$cond <- factor(ifelse(dat$item <= 20, "a", "b"))
+  dat <- dat[!(dat$id == 1 & dat$item > 23), ]
+  dat$stimulus <- dat$item %% 2
+  dat$resp <- as.integer((dat$id + dat$item) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(d ~ cond + (cond | id) + (1 | item), criterion ~ cond + (cond | id) + (1 | item)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(res$cells$group_vars, "id")
+  expect_equal(res$cells$cell_vars, "cond")
+  expect_equal(
+    finding_messages(res),
+    "1 design cell(s) have fewer than 10 observations: id=1, cond=b (n=3)"
+  )
+  printed <- capture.output(print(res, color = FALSE))
+  expect_true(any(grepl("(the first grouping", printed, fixed = TRUE)))
+})
+
+# every subject sees a random half of the items: item counts scatter around
+# their median without any item being sparse
+test_that("items drawn at random for each subject are not flagged", {
+  withr::local_seed(4821)
+  dat <- do.call(rbind, lapply(1:20, function(i) data.frame(id = i, item = sample(100, 50))))
+  dat$stimulus <- dat$item %% 2
+  dat$resp <- as.integer((dat$id + dat$item) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id) + (1 | item)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(res$cells$other_groups$median, 10)
+  expect_lt(res$cells$other_groups$min, 10)
+  expect_identical(finding_messages(res), character(0))
+})
+
+test_that("unused factor levels are not counted per level", {
+  dat <- expand.grid(id = 1:2, item = factor(1:4, levels = 1:6))
+  dat$stimulus <- as.integer(dat$item) %% 2
+  dat$resp <- 1L
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(
+    res$cells$other_groups,
+    data.frame(variable = "item", n_levels = 4L, min = 2L, median = 2, max = 2L)
+  )
+})
+
+# aggregated rows with two grouping variables cross both, as before trial rows
+test_that("the report on aggregated rows crosses every grouping variable", {
+  dat <- data.frame(id = rep(1:2, each = 2), item = rep(1:2, 2), stimulus = rep(0:1, 2),
+                    n_old = c(10, 35, 12, 30), n_trials = 50)
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("n_old", "stimulus", "n_trials")
+  )
+  expect_equal(res$cells$group_vars, c("id", "item"))
+  expect_null(res$cells$other_groups)
 })

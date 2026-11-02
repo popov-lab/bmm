@@ -948,7 +948,9 @@ model_docs.bmmodel <- function(model, components = "all") {
     prior = paste0("* **Default priors:** \n\n", priors_info, "\n"),
     trial_level = paste0(
       "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
-      "* **Trial-level data:** ", trial_level_docs, "\n"
+      "* **Trial-level data:** ", trial_level_docs,
+      if ("stimulus" %in% names(model$other_vars)) trial_level_stimulus_docs,
+      trial_level_notes_docs, "\n"
     )
   )
 

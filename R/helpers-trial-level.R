@@ -22,7 +22,8 @@ is_trial_level <- function(model) {
     length(bad) > 0,
     "With one row per trial, {what} must hold one of {collapse_comma(categories)} \\
     in every row. Found: {collapse_comma(utils::head(bad, 5))}\\
-    {if (length(bad) > 5) ', ...' else ''}"
+    {if (length(bad) > 5) ', ...' else ''}. For counts aggregated over trials, \\
+    name the column of trial numbers with n_trials."
   )
   counts <- matrix(0L, nrow = length(values), ncol = length(categories),
                    dimnames = list(NULL, as.character(categories)))
@@ -59,18 +60,25 @@ is_trial_level <- function(model) {
 }
 
 # the "Trial-level data" part of the help page of every model that carries the
-# marker; model_docs() appends it under the trial-level requirements
+# marker; model_docs() appends it under the trial-level requirements, with the
+# stimulus bullet only for models with a stimulus column
 trial_level_docs <- paste0(
   "Without trial-level predictors or item terms, trial rows give the same ",
   "posterior as the counts aggregated from them, which are sufficient ",
   "statistics; the fit only takes longer, because its cost grows with the ",
   "number of rows. Trial rows are what crossed random effects such as ",
-  "`(1 | id) + (1 | item)` need.\n\n",
-  "   - With `criterion` (the default) in a model with a stimulus column, an ",
-  "item's effect on `d` is informed only by the trials on which the item is ",
-  "the signal: on noise trials `d` does not enter the likelihood, so the item ",
-  "effects on `d` of items shown only as noise stay at their prior. With ",
-  "`bias`, `d` also moves the criterion and enters every trial.\n",
+  "`(1 | id) + (1 | item)` need.\n\n"
+)
+
+trial_level_stimulus_docs <- paste0(
+  "   - With `criterion` (the default), an item's effect on `d` is informed ",
+  "only by the trials on which the item is the signal: on noise trials `d` ",
+  "does not enter the likelihood, so the item effects on `d` of items shown ",
+  "only as noise stay at their prior. With `bias`, `d` also moves the ",
+  "criterion and enters every trial.\n"
+)
+
+trial_level_notes_docs <- paste0(
   "   - `loo()` leaves out single trials on trial rows and whole cells on ",
   "aggregated rows. These are different predictions, and the log-likelihoods ",
   "of the trial rows sum to the cell's log-likelihood less the log binomial ",

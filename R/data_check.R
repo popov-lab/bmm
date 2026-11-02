@@ -259,10 +259,11 @@ re_group_vars <- function(formula) {
 }
 
 # With one row per trial and crossed grouping variables (subjects x items),
-# every crossing holds one trial, so only the participant-like variable is
-# crossed with the fixed predictors. The other grouping variables are counted
-# per level and only described: few trials per item are normal, and partial
-# pooling handles them
+# every crossing holds one trial, so only the participant variable is crossed
+# with the fixed predictors. It is the first grouping variable in the formula:
+# the data cannot tell participants from items, and a count of levels picks
+# items whenever there are fewer items than participants. The other grouping
+# variables are counted per level; group_level_findings() judges them
 summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   group_vars <- intersect(re_group_vars(formula), colnames(data))
   fixed_vars <- setdiff(
@@ -276,11 +277,10 @@ summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   other_groups <- NULL
   other_counts <- NULL
   if (trial_level && length(group_vars) > 1) {
-    n_levels <- vapply(group_vars, function(v) length(unique(data[[v]])), numeric(1))
-    other_counts <- lapply(group_vars[-which.min(n_levels)], function(v) table(data[[v]]))
-    names(other_counts) <- group_vars[-which.min(n_levels)]
+    other_counts <- lapply(group_vars[-1], function(v) table(droplevels(as.factor(data[[v]]))))
+    names(other_counts) <- group_vars[-1]
     other_groups <- summarise_group_levels(other_counts)
-    group_vars <- group_vars[which.min(n_levels)]
+    group_vars <- group_vars[1]
   }
 
   vars <- c(group_vars, cell_vars)
@@ -310,17 +310,19 @@ summarise_group_levels <- function(counts) {
   }))
 }
 
-# the fewest-levels rule can pick a small factor such as a list or a session
-# as the participant variable, so every other grouping variable whose typical
+# a formula that names a small factor such as a list or a session first makes
+# it the participant variable, so every other grouping variable whose typical
 # level holds min_trials observations is judged per level too; one whose
-# typical level holds fewer (items seen a few times each) is only described
+# typical level holds fewer (items seen a few times each) is only described.
+# A level is flagged only when it also holds less than half the typical level,
+# so items drawn at random for each subject are not flagged at the boundary
 group_level_findings <- function(counts, min_trials) {
   if (is.null(min_trials)) {
     return(list())
   }
   findings <- lapply(names(counts), function(v) {
     n <- counts[[v]]
-    low <- n[n > 0 & n < min_trials]
+    low <- n[n > 0 & n < min(min_trials, stats::median(n) / 2)]
     if (stats::median(n) < min_trials || length(low) == 0) {
       return(NULL)
     }
@@ -415,7 +417,8 @@ generic_data_findings <- function(predictors, cells, min_trials) {
 # is_trial_level() for that. The aggregated SDT models are rows of many trials
 # too, but are not listed: their report counts rows per cell, which flags a
 # cell of two 50-trial rows as sparse. That flaw is left to its own PR, so the
-# aggregated report stays as it is here
+# aggregated report stays as it is here. The trial-level clause is for mpt
+# trial rows, which a later step adds
 uses_aggregate_data <- function(model) {
   inherits(model, c("m3", "ezdm", "mpt")) && !is_trial_level(model)
 }
@@ -701,9 +704,9 @@ print_other_groups <- function(cells) {
     return(invisible())
   }
   cat_wrapped(glue(
-    "Rows are single trials, so only '{cells$group_vars}' (the grouping \
-    variable with the fewest levels, the first in the formula on a tie) is \
-    crossed into cells; the other grouping variables are counted per level:"
+    "Rows are single trials, so only '{cells$group_vars}' (the first grouping \
+    variable in the formula, taken as the participant) is crossed into cells; \
+    the other grouping variables are counted per level:"
   ), "  ")
   for (i in seq_len(nrow(others))) {
     cat("  ", others$variable[i], ": ", others$n_levels[i], " levels, observations per level: min ",
