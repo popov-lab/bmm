@@ -355,6 +355,34 @@ configure_model.imm_full <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rimm() takes one display per call and ignores per-row values, so rows are
+# drawn in groups of identical displays and values. The guessing activation b
+# is the reference, exp(0) = 1. bsc has no cue-independent activation (a = 0);
+# abc has no generalization gradient, which infinite distances with s = 1 give
+#' @export
+simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, c(.set_size_column(model), vars$nt_features, vars$nt_distances))
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  n_obs <- nrow(design)
+  a <- p$a %||% rep(0, n_obs)
+  s <- p$s %||% rep(1, n_obs)
+  set_size <- check_var_set_size(vars$set_size, design)$ss_numeric
+  nt <- unname(as.matrix(design[vars$nt_features]))
+  dist <- if (is.null(vars$nt_distances)) nt * 0 + Inf else unname(as.matrix(design[vars$nt_distances]))
+  y <- .simulate_by_group(data.frame(set_size, nt, dist, p), function(i, n) {
+    k <- seq_len(set_size[i] - 1)
+    rimm(n, mu = c(p$mu1[i], nt[i, k]), dist = c(0, dist[i, k]), c = p$c[i], a = a[i], b = 1,
+         s = s[i], kappa = p$kappa[i])
+  })
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
+}
+
+############################################################################# !
 # CONFIGURE_PRIOR METHODS                                                ####
 ############################################################################# !
 

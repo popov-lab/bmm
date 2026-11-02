@@ -499,6 +499,37 @@ configure_model.ezdm_4par <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# the summaries of few trials can have a mean RT that is not positive or is
+# below the non-decision time; bmm() rejects them, and redrawing would truncate
+# the sampling distribution dezdm() assumes, so those rows are dropped
+#' @export
+simulate_data.ezdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  n_trials <- model$other_vars$n_trials
+  design <- .design_or_n(model, design, n_trials)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  out <- rezdm(nrow(design), design[[n_trials]], p$drift, p$bound, p$ndt, zr = p$zr %||% 0.5,
+               s = p$s, version = model$version)
+  resp <- model$resp_vars
+  out <- stats::setNames(out[-ncol(out)], unlist(resp[c("mean_rt", "var_rt", "n_upper")], use.names = FALSE))
+  mean_rt <- as.matrix(out[resp$mean_rt])
+  dropped <- which(rowSums(mean_rt <= 0 | mean_rt < p$ndt, na.rm = TRUE) > 0)
+  if (length(dropped) == 0) {
+    return(.simulate_result(design, out, sim))
+  }
+  warning2("Dropped {length(dropped)} of {nrow(design)} rows whose simulated mean \\
+           response time is not positive or is below the non-decision time, which \\
+           bmm() rejects. Their row numbers are in attr(, \"dropped_rows\").")
+  sim$link <- sim$link[-dropped, , drop = FALSE]
+  data <- .simulate_result(design[-dropped, , drop = FALSE], out[-dropped, , drop = FALSE], sim)
+  attr(data, "dropped_rows") <- dropped
+  data
+}
+
 
 log_lik_ezdm_4par <- function(i, prep) {
   # based on bmf2bf.ezdm_4par formula:

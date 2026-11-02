@@ -1056,8 +1056,11 @@ use_model_template <- function(model_name,
      #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
      #   their sites are registered in test-conventions.R (a test requires it)
      # - `model_cases_{model_name}()` in tests/testthat/helper-model-{model_name}.R
-     #   with a `stored_frame`, `sd_default`, `init` and `links` case (a test
-     #   requires them; the case kinds are listed in helper-model-cases.R)
+     #   with a `stored_frame`, `sd_default`, `init`, `links` and `simulate` case
+     #   (a test requires them; the case kinds are listed in helper-model-cases.R)
+     # - the `simulate_data.{model_name}()` method below, after `configure_model()`,
+     #   drawing the responses with `r{model_name}()`; a test requires it and a
+     #   `simulate` case for every version
      # - a `revert_check_data()` method in R/update.R if `check_data()`
      #   consumes or creates columns
      # - a `built_data_columns()` method next to `check_data()` naming every
@@ -1425,6 +1428,28 @@ use_model_template <- function(model_name,
     .open = "<<", .close = ">>"
   )
 
+  simulate_data_header <- glue(
+    "#############################################################################!
+     # SIMULATE_DATA S3 METHODS                                               ####
+     #############################################################################!
+     # Draws data from the model given its parameters and a design. See
+     # ?simulate_data and simulate_data.ddm() in 'R/model_ddm.R'.\n\n\n"
+  )
+
+  simulate_data_method <- glue(
+    "#' @export
+    simulate_data.<<model_name>> <- function(model, pars, design = NULL, scale = c('link', 'native'), ...) {
+       # the design columns the model reads; add them to the Design section of ?simulate_data
+       design <- .design_or_n(model, design, character(0), ...)
+       sim <- .simulate_pars(model, pars, design, scale)
+       # draw one response per row of the design with r<<model_name>>() from the
+       # native values in sim$native and return them under the response names:
+       # .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_var1), sim)
+       stop2('simulate_data() is not yet implemented for <<model_name>>.')
+    }\n\n\n",
+    .open = "<<", .close = ">>"
+  )
+
   postprocess_brm_method <- glue(
     "#' @export
     postprocess_brm.<<model_name>> <- function(model, fit, ...) {
@@ -1446,6 +1471,8 @@ use_model_template <- function(model_name,
     bmf2bf_method,
     configure_model_header,
     configure_model_method,
+    simulate_data_header,
+    simulate_data_method,
     family_functions,
     postprocess_brm_header,
     postprocess_brm_method
