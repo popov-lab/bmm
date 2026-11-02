@@ -193,7 +193,7 @@ configure_model.sdm <- function(model, data, formula) {
 # left to the generator's default
 #' @export
 simulate_data.sdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
-  design <- .design_or_n(model, design, ...)
+  design <- .design_or_n(model, design, character(0), ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   y <- rsdm(nrow(design), mu = p$mu, c = p$c, kappa = p$kappa, parametrization = "sqrtexp")

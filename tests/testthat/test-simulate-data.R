@@ -77,14 +77,20 @@ test_that("simulate_data() refuses what it cannot simulate", {
   expect_error(simulate_data(model, list(kappa = 2), n_trials = 5), "No value.*'thetat'")
   expect_error(simulate_data(model, list(kappa = 1:2, thetat = 0), n_trials = 5),
                "'kappa'.*length 2")
+  expect_error(simulate_data(model, list(kappa = TRUE, thetat = 0), n_trials = 5),
+               "'kappa' must be numeric\\.$")
+  expect_error(simulate_data(model, list(kappa = 2, thetat = 0), NULL, "link", 100),
+               "must be named")
   expect_error(simulate_data(model, list(kappa = 2, thetat = 0)), "n_trials")
   expect_error(simulate_data(model, list(kappa = c(2, NA), thetat = NA), data.frame(x = 1:2)),
                "'kappa', 'thetat' contain NA")
   expect_error(simulate_data(model, list(kappa = 2, thetat = 0), data.frame(x = 1:4), n_trials = 10),
-               "one or the other")
+               "number of rows: drop `n_trials =`")
   expect_error(simulate_data(m3(resp_cats = c("corr", "npl"), num_options = c(1, 4), version = "ss"),
                              list(c = 1), data.frame(n_trials = 5), n_trials = 5),
-               "one or the other")
+               "read the trials of each row\\s+from a column")
+  expect_identical(nrow(simulate_data(model, list(kappa = 2, thetat = 0), data.frame(x = 1:4),
+                                      n_trials = NULL)), 4L)
   expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0)),
                "'stim', 'n'")
   expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0, bias = 0),

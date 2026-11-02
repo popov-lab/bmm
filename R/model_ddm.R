@@ -222,7 +222,7 @@ configure_model.ddm <- function(model, data, formula) {
 
 #' @export
 simulate_data.ddm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
-  design <- .design_or_n(model, design, ...)
+  design <- .design_or_n(model, design, character(0), ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   out <- rddm(nrow(design), drift = p$drift, bound = p$bound, ndt = p$ndt, zr = p$zr)

@@ -120,9 +120,13 @@
 #' )
 #' bmm::simulate_data(model, pars = list(c = 2, a = 0.5), design = data.frame(n_trials = c(100, 100)))
 simulate_data <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
-  stopif(!is.null(design) && "n_trials" %in% ...names(),
-         "`n_trials =` sets the number of observations only without a `design`; \\
-         with one, each row is an observation. Give one or the other.")
+  dots <- list(...)
+  stopif(length(dots) > 0 && (is.null(names(dots)) || !all(nzchar(names(dots)))),
+         "Arguments in `...` must be named, such as `n_trials = 100`.")
+  stopif(!is.null(design) && !is.null(dots[["n_trials"]]),
+         "With a `design`, the number of observations is its number of rows: drop \\
+         `n_trials =`. The models of response counts read the trials of each row \\
+         from a column of the design (see ?simulate_data, section Design).")
   UseMethod("simulate_data")
 }
 
@@ -184,10 +188,12 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
   stopif(length(missing) > 0, "No value for the parameter(s) {collapse_comma(missing)}.")
   na <- names(pars)[vapply(pars, anyNA, logical(1))]
   stopif(length(na) > 0, "The value(s) of {collapse_comma(na)} contain NA.")
-  wrong <- names(pars)[!vapply(pars, is.numeric, logical(1)) | !lengths(pars) %in% c(1L, n)]
+  not_numeric <- names(pars)[!vapply(pars, is.numeric, logical(1))]
+  stopif(length(not_numeric) > 0, "The value(s) of {collapse_comma(not_numeric)} must be numeric.")
+  wrong <- names(pars)[!lengths(pars) %in% c(1L, n)]
   stopif(length(wrong) > 0,
-         "The value(s) of {collapse_comma(wrong)} must be numeric, a single value or \\
-         one per row of the design ({n}); found length {paste(lengths(pars[wrong]), collapse = ', ')}.")
+         "The value(s) of {collapse_comma(wrong)} must be a single value or one per \\
+         row of the design ({n}); found length {paste(lengths(pars[wrong]), collapse = ', ')}.")
 
   given <- lapply(pars, function(x) rep_len(as.numeric(x), n))
   if (scale == "native") given <- .simulate_native_to_link(model, given)

@@ -377,7 +377,7 @@ configure_model.cswald_crisk <- function(model, data, formula) {
 # either boundary, as in pp_simulate.cswald_simple()
 #' @export
 simulate_data.cswald <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
-  design <- .design_or_n(model, design, ...)
+  design <- .design_or_n(model, design, character(0), ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   out <- if (model$version == "simple") {

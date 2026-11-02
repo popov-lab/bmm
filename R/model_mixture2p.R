@@ -126,7 +126,7 @@ configure_model.mixture2p <- function(model, data, formula) {
 
 #' @export
 simulate_data.mixture2p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
-  design <- .design_or_n(model, design, ...)
+  design <- .design_or_n(model, design, character(0), ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   y <- rmixture2p(nrow(design), mu = p$mu1, kappa = p$kappa, p_mem = p$thetat)
