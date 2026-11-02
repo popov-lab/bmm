@@ -331,6 +331,11 @@ test_that("adjacent rows with different predictor values never share a cell", {
   dat$b <- c("c", "b.c")
   sdata <- brms::standata(opt_mock_fit(formula = bmf(d ~ a + b), data = dat))
   expect_equal(as.integer(sdata$tcc_row_cell), 1:2)
+  # a grouping variable sets d as much as a predictor does
+  dat <- opt_data()[rep(1, 4), ]
+  dat$ID <- c(1, 2, 1, 2)
+  sdata <- brms::standata(opt_mock_fit(formula = bmf(d ~ 1 + (1 | ID)), data = dat))
+  expect_equal(as.integer(sdata$tcc_row_cell), 1:4)
 })
 
 test_that("one cell and one set keep their tables arrays, which brms would declare as scalars", {
