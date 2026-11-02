@@ -7,9 +7,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Two-parameter mixture model by Zhang and Luck (2008).",
+      name = "Two-Parameter Mixture Model",
       citation = glue(
         "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
         representations in visual working memory. Nature, 453(7192), 233-235. \\
@@ -95,6 +95,7 @@ settable_links.mixture2p <- function(model) {
 #' @export
 mixture2p <- function(resp_error, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   .model_mixture2p(resp_error = resp_error, call = call, ...)
 }

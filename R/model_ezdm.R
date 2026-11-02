@@ -64,8 +64,8 @@
     list(
       resp_vars = nlist(mean_rt, var_rt, n_upper),
       other_vars = nlist(n_trials),
-      domain = "Decision Making / Response times",
-      task = "Choice Reaction Time tasks",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "EZ-Diffusion Model",
       citation = c(
         glue(
@@ -203,6 +203,7 @@
 ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL,
                  version = c("3par", "4par"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
   .model_ezdm(

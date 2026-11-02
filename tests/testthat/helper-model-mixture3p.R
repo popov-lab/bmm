@@ -19,6 +19,7 @@ model_cases_mixture3p <- function() {
       )
     ),
     init = list(mixture3p = list(model = model, formula = re_formula, data = small_data())),
-    links = list(mixture3p = list(model = model, settable = character(0)))
+    links = list(mixture3p = list(model = model, settable = character(0))),
+    fixture = list(mixture3p = list(file = "bmmfit_mixture3p.rds"))
   )
 }

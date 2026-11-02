@@ -222,20 +222,11 @@ model of free recall. You write each tree's branch probabilities as
 expressions, and `mpt()` fits them to response counts. The
 [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html) covers
 specifying trees, importing model files from MPTinR and TreeBUGS, and
-constraining parameters.
-
-```{r, echo = FALSE}
-knitr::kable(bmm:::model_overview(group = "Processing-tree models"))
-```
+constraining parameters. `mpt()` is in the tables of the categorical recall
+and the detection and recognition groups above.
 
 ```{r other-groups, results = "asis", echo = FALSE}
-known <- c(
-  "Continuous reproduction", "Categorical recall and n-AFC decisions",
-  "Detection, recognition and confidence judgments", "Choices and response times",
-  "Processing-tree models"
-)
-registry <- bmm:::model_registry()
-other <- setdiff(unique(registry$group), known)
+other <- setdiff(unique(bmm:::model_registry()$group), bmm:::model_tasks)
 if (length(other) > 0) {
   cat("## Other models\n\n")
   cat("These models were added after this page was written:\n\n")

@@ -69,9 +69,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, n_trials, dist),
-      domain = "Perception & Recognition Memory",
-      task = "Yes/No Detection or Old/New Recognition",
-      name = "Signal Detection Theory (Yes/No)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "Yes/No Signal Detection Theory Model",
       citation = glue(
         "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
         "and psychophysics. Wiley."
@@ -473,6 +473,7 @@ sdt_yn <- function(response, stimulus, n_trials,
                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                    links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
 
@@ -609,8 +610,8 @@ configure_model.sdt_yn <- function(model, data, formula) {
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
-    read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
-    read_lines2(paste0(sc_path, "/sdt_yn_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_dist_functions.stan")),
+    read_lines2(paste0(sc_path, "/sdt_yn_functions.stan")),
     sep = "\n"
   )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")

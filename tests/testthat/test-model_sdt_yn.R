@@ -591,7 +591,7 @@ test_that("the Stan dist_type branches match the registry order", {
   # dist = "normal" fit into a Gumbel model. Text-level, as in
   # test-model_cswald.R, so it costs no compilation.
   sc <- read_lines2(file.path(system.file("stan_chunks", package = "bmm"),
-                              "sdt_dist_funs.stan"))
+                              "sdt_dist_functions.stan"))
   dispatcher <- function(fun) {
     sub("(?s)\n\\}.*", "",
         sub(paste0("(?s).*real ", fun, "\\("), "", sc, perl = TRUE), perl = TRUE)
@@ -663,8 +663,8 @@ test_that("both Stan yes/no likelihoods match dsdt_yn", {
 
   sc <- system.file("stan_chunks", package = "bmm")
   program <- paste0(
-    "functions {\n", read_lines2(file.path(sc, "sdt_dist_funs.stan")), "\n",
-    read_lines2(file.path(sc, "sdt_yn_funs.stan")), "\n}\n",
+    "functions {\n", read_lines2(file.path(sc, "sdt_dist_functions.stan")), "\n",
+    read_lines2(file.path(sc, "sdt_yn_functions.stan")), "\n}\n",
     "data {\n  int N; array[N] int y; array[N] int trials; array[N] int stimulus;\n",
     "  array[N] int dist; vector[N] d; vector[N] crit; vector[N] sdratio;\n}\n",
     "generated quantities {\n  vector[N] lp_crit; vector[N] lp_bias;\n",

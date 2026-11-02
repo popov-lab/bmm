@@ -8,9 +8,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Three-parameter mixture model by Bays et al (2009).",
+      name = "Three-Parameter Mixture Model",
       citation = glue(
         "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
         The precision of visual working memory is set by allocation \\
@@ -142,6 +142,7 @@ settable_links.mixture3p <- function(model) {
 #' )
 mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize

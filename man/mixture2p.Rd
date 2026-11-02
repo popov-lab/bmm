@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_mixture2p.R
 \name{mixture2p}
 \alias{mixture2p}
-\title{Two-parameter mixture model by Zhang and Luck (2008).}
+\title{Two-Parameter Mixture Model}
 \usage{
 mixture2p(resp_error, ...)
 }
@@ -18,13 +18,13 @@ in degrees to radian using the \code{deg2rad} function.}
 An object of class \code{bmmodel}
 }
 \description{
-Two-parameter mixture model by Zhang and Luck (2008).
+Two-Parameter Mixture Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Visual working memory
+\item \strong{Domain:} Working memory
 \item \strong{Task:} Continuous reproduction
-\item \strong{Name:} Two-parameter mixture model by Zhang and Luck (2008).
+\item \strong{Name:} Two-Parameter Mixture Model
 \item \strong{Citation:}
 \itemize{
 \item Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in visual working memory. Nature, 453(7192), 233-235. https://doi.org/10.1038/nature06860

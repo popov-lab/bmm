@@ -65,11 +65,14 @@ test_that("SDM generated Stan code includes run-level denominator chunks", {
 
   code <- stancode(formula, data = dat, model = sdm(resp_error = "y"))
 
-  expect_match(code, "sdm_simple_ldenom_chquad_adaptive", fixed = TRUE)
-  expect_match(code, "sdm_simple_run_ldenom", fixed = TRUE)
-  expect_match(code, "target += sdm_simple_run_ldenom", fixed = TRUE)
+  expect_match(code, "real sdm_simple_ldenom(real c, real kappa", fixed = TRUE)
+  expect_match(code, "target += sdm_simple_run_ldenom(c, kappa, sdm_gl_x, sdm_gl_w, sdm_wide_cosm1,", fixed = TRUE)
+  expect_match(code, "vector[16] sdm_gl_x;", fixed = TRUE)
+  expect_match(code, "vector[16] sdm_gl_w;", fixed = TRUE)
+  expect_match(code, "vector[32] sdm_wide_cosm1;", fixed = TRUE)
+  expect_match(code, "vector[32] sdm_wide_w;", fixed = TRUE)
   expect_false(grepl("c[n] != c[n-1]", code, fixed = TRUE))
-  expect_match(code, "COSN", fixed = TRUE)
+  expect_false(grepl("COSN", code, fixed = TRUE))
 })
 
 test_that("SDM threaded Stan code slices denominator runs correctly", {
@@ -88,6 +91,9 @@ test_that("SDM threaded Stan code slices denominator runs correctly", {
   expect_match(code, "run_start[g] >= start", fixed = TRUE)
   expect_match(code, "run_start[g] <= end", fixed = TRUE)
   expect_match(code, "run_start[g] - start + 1", fixed = TRUE)
+  expect_match(code, "data vector sdm_gl_x, data vector sdm_gl_w, data vector sdm_wide_cosm1, data vector sdm_wide_w", fixed = TRUE)
+  expect_match(code, "sdm_simple_run_ldenom_slice(c, kappa, sdm_gl_x, sdm_gl_w,", fixed = TRUE)
+  expect_match(code, "sdm_wide_cosm1, sdm_wide_w, start,", fixed = TRUE)
 })
 
 test_that("SDM accepts numeric threads shorthand", {
