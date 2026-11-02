@@ -349,6 +349,13 @@ test_that("one cell and one set keep their tables arrays, which brms would decla
   expect_match(code, "array[N] int tcc_row_cell;", fixed = TRUE)
 })
 
+test_that("the option-set family takes the link of d from the model", {
+  model <- tcc("err", opt_similarity(360), options = paste0("o", 1:4), links = list(d = "softplus"))
+  formula <- bmf(d ~ 1)
+  family <- configure_model(model, check_data(model, opt_data(), formula), formula)$formula$family
+  expect_identical(family$link_d, "softplus")
+})
+
 test_that("rows with a missing response or predictor are left out of the cells as brms drops them", {
   dat <- opt_data()
   dat$err[2] <- NA

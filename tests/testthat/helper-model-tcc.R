@@ -36,7 +36,8 @@ model_cases_tcc <- function() {
     ),
     links = list(
       tcc = list(model = model, settable = "d"),
-      tcc_gumbel = list(model = gumbel, settable = "d")
+      tcc_gumbel = list(model = gumbel, settable = "d"),
+      tcc_options = list(model = options, settable = "d")
     ),
     observables = list(
       tcc = list(model = model, data = data, formula = bmf(d ~ 1)),
