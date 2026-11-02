@@ -328,7 +328,7 @@ one of the offered options or a numeric \code{NA} (\code{NA_real_}); any of thes
 will do, as \code{posterior_predict()} ignores it. \code{log_lik()} and \code{loo()}
 evaluate each row on its own under normal noise, unless consecutive rows
 share their draws and options; for 4,000 draws on the same laptop this
-took 0.13 s per row with 4 options and 0.38 s with 16.
+took 0.13 s per row with 4 options and 0.39 s with 16.
 }
 }
 \examples{

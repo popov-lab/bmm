@@ -328,7 +328,7 @@
 #'   will do, as `posterior_predict()` ignores it. `log_lik()` and `loo()`
 #'   evaluate each row on its own under normal noise, unless consecutive rows
 #'   share their draws and options; for 4,000 draws on the same laptop this
-#'   took 0.13 s per row with 4 options and 0.38 s with 16.
+#'   took 0.13 s per row with 4 options and 0.39 s with 16.
 #' @param resp_error The name of the variable in the data holding the response
 #'   error. With `units = "radians"` (the default) it is the error relative to
 #'   the target in radians, as for the other circular models, and is binned to
