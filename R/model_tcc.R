@@ -352,7 +352,7 @@
 #'   https://doi.org/10.1016/j.jmp.2023.102805
 #' @keywords bmmodel
 #' @export
-#' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
+#' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
 #' dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 #' fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
