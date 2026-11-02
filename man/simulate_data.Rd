@@ -85,7 +85,7 @@ specified with:\tabular{ll}{
    \code{\link[=mixture2p]{mixture2p()}}, \code{\link[=sdm]{sdm()}}, \code{\link[=ddm]{ddm()}}, \code{\link[=cswald]{cswald()}} \tab none \cr
    \code{\link[=mixture3p]{mixture3p()}} \tab \code{set_size} (if it names a column), \code{nt_features}, of which a row's first \code{set_size - 1} are read \cr
    \code{\link[=imm]{imm()}} \tab as \code{\link[=mixture3p]{mixture3p()}}, plus \code{nt_distances} for the versions \code{"full"} and \code{"bsc"} \cr
-   \code{\link[=m3]{m3()}} \tab \code{n_trials}, the number of trials of each row; \code{num_options} when it names columns \cr
+   \code{\link[=m3]{m3()}} \tab \code{n_trials}, the number of trials of each row; \code{num_options} when it names columns; for the custom version, the columns its activation functions read besides the parameters \cr
    \code{\link[=mpt]{mpt()}} \tab \code{n_trials}; \code{tree_id} and \code{covariates} when the model has them \cr
    \code{\link[=ezdm]{ezdm()}} \tab \code{n_trials} \cr
    \code{\link[=sdt_yn]{sdt_yn()}} \tab \code{stimulus}, \code{n_trials} \cr

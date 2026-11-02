@@ -69,6 +69,14 @@ model_cases_m3 <- function() {
         pars = list(a = 1, c = 2), design = data.frame(n_trials = rep(50, 20)),
         formula = bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, a ~ 1, c ~ 1),
         simulate_pars = list(b = 0, a = 1, c = 2)
+      ),
+      # an activation function that reads a design column besides the parameters
+      m3_custom_design_var = list(
+        model = m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), choice_rule = "softmax",
+                   version = "custom", links = list(a = "identity", c = "identity")),
+        pars = list(a = 1, c = 0.5), design = data.frame(n_trials = 50, ss = rep(c(1, 4), 10)),
+        formula = bmf(corr ~ b + a + c * ss, other ~ b + a, npl ~ b, a ~ 1, c ~ 1),
+        simulate_pars = list(b = 0, a = 1, c = 0.5)
       )
     )
   )

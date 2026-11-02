@@ -696,28 +696,34 @@ configure_model.m3 <- function(model, data, formula) {
 
 # rm3() takes one number of options per category and one size per call, and
 # does not read option counts from columns, so rows are drawn in groups of
-# identical trials, options and values. The custom version's parameters exist
-# only in its activation functions, which `formula` carries
+# identical trials, options, values and design variables. The custom
+# version's parameters exist only in its activation functions, which `formula`
+# carries; the other variables those functions read are design columns, which
+# rm3() takes among the parameters
 #' @export
 simulate_data.m3 <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
-  formula <- if (inherits(model, "m3_custom")) list(...)$formula
+  formula <- if (inherits(model, "m3_custom")) list(...)[["formula"]]
   stopif(inherits(model, "m3_custom") && is.null(formula),
          "The custom version of m3 takes its parameters from the activation \\
          functions: pass the bmmformula you fit as `formula =`.")
   options <- m3_num_options(model)
-  design <- .design_or_n(model, design, c("n_trials", if (is.character(options)) options))
+  cats <- model$resp_vars$resp_cats
+  act_funs <- formula %||% construct_m3_act_funs(model, warnings = FALSE)
+  act_vars <- rhs_vars(act_funs[names(act_funs) %in% cats])
+  par_names <- if (is.null(formula)) names(model$parameters) else parameter_info(model, formula)$parameter
+  design_vars <- setdiff(act_vars, par_names)
+  design <- .design_or_n(model, design, c("n_trials", if (is.character(options)) options, design_vars))
   sim <- .simulate_pars(model, pars, design, scale, formula)
   options <- if (is.character(options)) as.matrix(design[options]) else
     matrix(options, nrow(design), length(options), byrow = TRUE)
-  cats <- model$resp_vars$resp_cats
-  act_funs <- formula %||% construct_m3_act_funs(model, warnings = FALSE)
-  used <- intersect(names(sim$native), rhs_vars(act_funs[names(act_funs) %in% cats]))
+  used <- intersect(names(sim$native), act_vars)
   counts <- matrix(0L, nrow(design), length(cats), dimnames = list(NULL, cats))
-  for (idx in .row_groups(data.frame(design$n_trials, options, sim$native))) {
+  for (idx in .row_groups(data.frame(design$n_trials, options, design[design_vars], sim$native))) {
     i <- idx[1]
     model$other_vars$num_options <- unname(options[i, ])
-    counts[idx, ] <- rm3(length(idx), design$n_trials[i], vapply(sim$native[used], `[`, numeric(1), i),
-                         model, act_funs = formula)
+    values <- c(vapply(sim$native[used], `[`, numeric(1), i),
+                vapply(design[design_vars], function(x) as.numeric(x[i]), numeric(1)))
+    counts[idx, ] <- rm3(length(idx), design$n_trials[i], values, model, act_funs = formula)
   }
   .simulate_result(design, as.data.frame(counts), sim)
 }

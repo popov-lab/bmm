@@ -262,6 +262,15 @@ test_that("simulated counts of the m3 and mpt models match their closed forms", 
   # activations b + a + c, b + a, b on the native scale, with the fixed b = 0.1
   expect_within_mc(k, 3.18616 / (3.18616 + 4 * 0.4678794 + 5 * 0.1), "m3 simple")
 
+  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5),
+              choice_rule = "softmax", version = "custom", links = list(a = "identity", c = "identity"))
+  formula <- bmf(corr ~ b + a + c * ss, other ~ b + a, npl ~ b, a ~ 1, c ~ 1)
+  data <- simulate_data(model, list(a = 1, c = 0.5), data.frame(n_trials = 1, ss = rep(c(1, 4), n_sim / 2)),
+                        formula = formula)
+  # corr activation b + a + c * ss with b = 0: 1.5 at ss = 1, 3 at ss = 4
+  expect_within_mc(data$corr[data$ss == 1], exp(1.5) / (exp(1.5) + 4 * exp(1) + 5), "m3 custom ss 1")
+  expect_within_mc(data$corr[data$ss == 4], exp(3) / (exp(3) + 4 * exp(1) + 5), "m3 custom ss 4")
+
   model <- mpt(mpt_2htm_trees(), tree_id = "item")
   k <- simulate_data(model, list(D = 0.5, g = -0.3),
                      data.frame(item = rep("old", n_sim), n_trials = 1))$old
