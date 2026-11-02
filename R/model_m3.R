@@ -714,6 +714,12 @@ simulate_data.m3 <- function(model, pars, design = NULL, scale = c("link", "nati
   design_vars <- setdiff(act_vars, par_names)
   design <- .design_or_n(model, design, design_vars, trials = "n_trials",
                          counts = if (is.character(options)) options)
+  not_numeric <- design_vars[!vapply(design[design_vars], function(x) is.numeric(x) || is.logical(x),
+                                     logical(1))]
+  stopif(length(not_numeric) > 0,
+         "The activation formula(s) multiply the design column(s) {collapse_comma(not_numeric)}, \\
+         so they must be numeric: code the covariate as numbers, e.g. as 0/1 indicators. \\
+         bmm() would fit a factor or character column there as a contrast.")
   sim <- .simulate_pars(model, pars, design, scale, formula)
   options <- if (is.character(options)) as.matrix(design[options]) else
     matrix(options, nrow(design), length(options), byrow = TRUE)

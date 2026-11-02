@@ -99,6 +99,16 @@ test_that("simulate_data() refuses what it cannot simulate", {
   custom <- m3(resp_cats = c("corr", "npl"), num_options = c(1, 4), version = "custom",
                links = list(a = "identity"))
   expect_error(simulate_data(custom, list(a = 1), data.frame(n_trials = 5)), "formula")
+  custom <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), version = "custom",
+               links = list(a = "identity", c = "identity", c0 = "identity", c1 = "identity"))
+  formula <- bmf(corr ~ b + a + c * cond, other ~ b + a, npl ~ b, a ~ 1, c ~ 1)
+  for (cond in list(factor(c("low", "high")), c("low", "high"))) {
+    expect_error(simulate_data(custom, list(a = 1, c = 1), data.frame(n_trials = 5, cond = cond),
+                               formula = formula),
+                 "design column\\(s\\) 'cond', so they must be numeric.*0/1 indicators")
+  }
+  expect_identical(nrow(simulate_data(custom, list(a = 1, c = 1), data.frame(n_trials = 5, cond = c(TRUE, FALSE)),
+                                      formula = formula)), 2L)
   expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0),
                              data.frame(stim = 0:1, n = c(10.7, 20))),
                "'n' hold numbers of trials: they must be whole numbers of 1 or more")
