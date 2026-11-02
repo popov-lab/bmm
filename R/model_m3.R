@@ -711,7 +711,17 @@ simulate_data.m3 <- function(model, pars, design = NULL, scale = c("link", "nati
   act_funs <- formula %||% construct_m3_act_funs(model, warnings = FALSE)
   act_vars <- rhs_vars(act_funs[names(act_funs) %in% cats])
   par_names <- if (is.null(formula)) names(model$parameters) else parameter_info(model, formula)$parameter
+  derived <- setdiff(intersect(act_vars, names(formula)), par_names)
+  stopif(length(derived) > 0,
+         "{collapse_comma(derived)} in the activation formula(s) is predicted by a \\
+         non-linear formula of its own, which simulate_data() does not evaluate. Write \\
+         that formula into the activation functions in place of '{derived[1]}'.")
   design_vars <- setdiff(act_vars, par_names)
+  undefined <- setdiff(design_vars, names(design))
+  stopif(length(undefined) > 0,
+         "{collapse_comma(undefined)} in your activation formula(s) is neither a \\
+         design column nor a model parameter. Give each new parameter its own \\
+         formula (e.g. {undefined[1]} ~ 1), or add the column to the design.")
   design <- .design_or_n(model, design, design_vars, trials = "n_trials",
                          counts = if (is.character(options)) options)
   not_numeric <- design_vars[!vapply(design[design_vars], function(x) is.numeric(x) || is.logical(x),

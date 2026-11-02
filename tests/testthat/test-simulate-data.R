@@ -109,6 +109,13 @@ test_that("simulate_data() refuses what it cannot simulate", {
   }
   expect_identical(nrow(simulate_data(custom, list(a = 1, c = 1), data.frame(n_trials = 5, cond = c(TRUE, FALSE)),
                                       formula = formula)), 2L)
+  expect_error(simulate_data(custom, list(a = 1), data.frame(n_trials = 5, cond = 1),
+                             formula = bmf(corr ~ b + a + c * cond, other ~ b + a, npl ~ b, a ~ 1)),
+               "'c' in your activation formula\\(s\\) is neither a design column nor a model parameter")
+  expect_error(simulate_data(custom, list(a = 1, c0 = 0, c1 = 0.5), data.frame(n_trials = 5, ss = 1, w = 9),
+                             formula = bmf(corr ~ b + a + w, other ~ b + a, npl ~ b, a ~ 1,
+                                           w ~ c0 + c1 * ss, c0 ~ 1, c1 ~ 1)),
+               "'w' in the activation formula\\(s\\) is predicted by a non-linear formula of its own")
   expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0),
                              data.frame(stim = 0:1, n = c(10.7, 20))),
                "'n' hold numbers of trials: they must be whole numbers of 1 or more")
