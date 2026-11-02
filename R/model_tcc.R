@@ -136,14 +136,17 @@
 #'   the option width `2 * pi / n_options`, with the same `kappa` and `c = d *
 #'   sqrt(2 * pi / kappa) / (1 - exp(-2 * kappa))` in the default
 #'   parametrization of [sdm()]. The sum over options stands in for the
-#'   integral of the [sdm()], so the two agree to 1e-8 in log probability
-#'   while the gradient's SD, `1 / sqrt(kappa)` radians, spans about 4 options
+#'   integral of the [sdm()], so the two agree to about 1e-8 in log
+#'   probability (1.4e-8 at `kappa = 200`) while the gradient's SD, `1 / sqrt(kappa)` radians, spans about 4 options
 #'   or more (`kappa` up to 200 on 360 options), and differ by 0.013 at `kappa
 #'   = 1000`.
 #'
-#'   Per gradient, Gumbel noise is not cheaper than normal noise: with `d` per
-#'   subject and set size on [oberauer_lin_2017] it cost 1.5 times as much.
-#'   It skips the table build before sampling and has no grid limit. Keep
+#'   Per gradient, Gumbel noise is not cheaper than normal noise. With `d` per
+#'   subject and set size on [oberauer_lin_2017] and the data sorted by the
+#'   predictors of `d`, it cost 1.5 times as much. On the same data unsorted
+#'   it cost about 8 times as much, because the Gumbel likelihood sums over
+#'   the options once for each run of rows that share `d` (see the section
+#'   Speed). It skips the table build before sampling and has no grid limit. Keep
 #'   normal noise to stay with the model of Schurgin et al. (2020) and to
 #'   compare `d` with their d'. The two `d` are not on one scale. The
 #'   standard Gumbel distribution has an SD of `pi / sqrt(6)` = 1.28, but
@@ -237,7 +240,11 @@
 #'
 #'   The fit is fastest when rows that share a value of `d` are adjacent, so
 #'   bmm offers to sort the data by the predictors of `d`, as for [sdm()].
-#'   Continuous predictors of `d` are supported at the per-trial cost.
+#'   Continuous predictors of `d` are supported at the per-trial cost. With
+#'   Gumbel noise that cost is much higher: on unsorted data, the fit
+#'   described under Noise cost about 8 times as much as with normal noise.
+#'   In a non-interactive session `bmm()` cannot ask whether to sort and fits
+#'   the data as they are; set `sort_data = TRUE` to sort them.
 #' @param resp_error The name of the variable in the data holding the response
 #'   error. With `units = "radians"` (the default) it is the error relative to
 #'   the target in radians, as for the other circular models, and is binned to
@@ -258,6 +265,9 @@
 #'   "gumbel"`, which needs no table.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
+#' @references Oberauer, K. (2023). Measurement models for visual working
+#'   memory - A factorial model comparison. *Psychological Review, 130*(3),
+#'   841-852. https://doi.org/10.1037/rev0000328
 #' @keywords bmmodel
 #' @export
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
