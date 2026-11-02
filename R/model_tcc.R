@@ -532,7 +532,7 @@ check_data.tcc <- function(model, data, formula) {
          "The response variable '{resp}' is not present in the data.")
   stopif(!is.numeric(data[[resp]]),
          "The response variable '{resp}' must be numeric.")
-  stopif(units == "radians" && isTRUE(max(abs(data[[resp]]), na.rm = TRUE) > 2 * pi),
+  stopif(units == "radians" && any(abs(data[[resp]]) > 2 * pi, na.rm = TRUE),
          "The response variable '{resp}' holds values beyond 2*pi, so it is not in \\
          radians. Convert it with deg2rad(), or set units = 'bins' if it counts options.")
   stopif(units == "bins" && any(data[[resp]] %% 1 != 0, na.rm = TRUE),

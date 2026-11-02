@@ -111,6 +111,14 @@ test_that("check_data() builds the option columns and keeps the tcc bin without 
   expect_error(check_data(model, dat, bmf(d ~ 1)), "not one of the options in row 4")
 })
 
+test_that("newdata whose response is all NA_real_, as ?tcc allows for prediction, checks without a warning", {
+  dat <- opt_data()
+  dat$err <- NA_real_
+  expect_no_warning(checked <- check_data(opt_model(), dat, bmf(d ~ 1)))
+  expect_identical(checked$OptIdx1, rep(0L, 8))
+  expect_no_warning(check_data(tcc("err", opt_similarity(360)), data.frame(err = NA_real_), bmf(d ~ 1)))
+})
+
 test_that("n_alternatives = m builds the same option columns as the equivalent option columns", {
   f <- opt_similarity(360)
   dat <- data.frame(err = c(0, 90, 180, -90) * pi / 180)
