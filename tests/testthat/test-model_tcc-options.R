@@ -338,6 +338,24 @@ test_that("log_lik_tcc_options() is dtcc() over each row's own options, for both
   expect_error(family$posterior_epred(NULL), "not defined for the tcc model")
 })
 
+test_that("log_lik_tcc_options() reads each row's own d, and gives a response off the set -Inf", {
+  # rows 1, 2 and 8 offer one set: consecutive rows with other d must not
+  # reuse the probabilities of the row before
+  fit <- opt_mock_fit()
+  sdata <- brms::standata(fit)
+  d <- matrix(rep(0.3 * seq_len(sdata$N), each = 2), 2, sdata$N) * c(1, 2)
+  prep <- epred_prep(list(d = d), sdata)
+  checked <- check_data(opt_model(), opt_data(), bmf(d ~ cond))
+  for (i in seq_len(prep$nobs)) {
+    x <- unlist(checked[i, paste0("o", 1:4)])
+    exact <- dtcc(checked$err[i], d[, i], opt_similarity(360), options = x[!is.na(x)], log = TRUE)
+    expect_lt(max(abs(log_lik_tcc_options(i, prep) - exact)), 1e-12)
+  }
+  # newdata whose response the trial did not offer
+  prep$data$Y[1] <- 90L
+  expect_identical(log_lik_tcc_options(1, prep), rep(-Inf, 2))
+})
+
 test_that("posterior_predict_tcc_options() and pp_simulate() draw from each row's options", {
   withr::local_seed(567)
   model <- opt_model()
