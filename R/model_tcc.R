@@ -10,9 +10,9 @@
       # table = "r" passes the d table from R instead of building it in Stan;
       # an internal switch for table transforms (correlated or motor noise)
       other_vars = nlist(similarity, n_options, units, d_max, table = "stan"),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)",
+      name = "Target Confusability Competition (TCC) model",
       citation = glue(
         "Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical \\
         scaling reveals a unified theory of visual memory strength. Nature Human \\
@@ -276,7 +276,7 @@ configure_model.tcc <- function(model, data, formula) {
   grid <- .tcc_grid(model)
   similarity <- .tcc_similarity(model)
   sc_path <- system.file("stan_chunks", package = "bmm")
-  out <- brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_funs.stan")),
+  out <- brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_functions.stan")),
                        block = "functions") +
     brms::stanvar(x = grid$lo, name = "tcc_grid_lo") +
     brms::stanvar(x = grid$step, name = "tcc_grid_step")
@@ -338,7 +338,7 @@ configure_model.tcc <- function(model, data, formula) {
 # peaks halfway between its own mean and m, so the window reaches down to
 # (min(d f) + m) / 2 - 6 as well (1.5e-4 off in log P at d = 12 with a 1-degree
 # Laplace similarity before, 1e-13 after; TCC 2-D table spike, 2026-10).
-# tcc_logp_by_distance() in tcc_funs.stan is the Stan twin
+# tcc_logp_by_distance() in tcc_functions.stan is the Stan twin
 .tcc_logp <- function(d, similarity) {
   n_dist <- length(similarity)
   mult <- c(1, rep(2, n_dist - 2), 1)

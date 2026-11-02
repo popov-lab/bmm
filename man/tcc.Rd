@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_tcc.R
 \name{tcc}
 \alias{tcc}
-\title{Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)}
+\title{Target Confusability Competition (TCC) model}
 \usage{
 tcc(
   resp_error,
@@ -51,9 +51,9 @@ d' to this \code{d} was 1.60.
 }
 \details{
 \itemize{
-\item \strong{Domain:} Visual working memory
+\item \strong{Domain:} Working memory
 \item \strong{Task:} Continuous reproduction
-\item \strong{Name:} Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)
+\item \strong{Name:} Target Confusability Competition (TCC) model
 \item \strong{Citation:}
 \itemize{
 \item Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical scaling reveals a unified theory of visual memory strength. Nature Human Behaviour, 4(11), 1156-1172. https://doi.org/10.1038/s41562-020-00938-0
