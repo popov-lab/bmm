@@ -1000,11 +1000,6 @@ revert_check_data.tcc <- function(model, data) {
   sc_path <- system.file("stan_chunks", package = "bmm")
   chunk <- function(file) read_lines2(file.path(sc_path, file))
   rule <- .gl_rule(.tcc_gl_nodes)
-  likelihood <- if (brms_slices_likelihood()) {
-    "tcc_options_likelihood_threaded.stan"
-  } else {
-    "tcc_options_likelihood.stan"
-  }
   stanvars <- brms::stanvar(scode = chunk("tcc_options_functions.stan"), block = "functions") +
     .tcc_data_stanvar(match(model$other_vars$noise, c("gaussian", "gumbel")), "tcc_noise", "int") +
     .tcc_data_stanvar(.tcc_similarity(model), "tcc_similarity", "vector") +
@@ -1019,7 +1014,11 @@ revert_check_data.tcc <- function(model, data) {
     .tcc_int_array_stanvar(cells$off, "tcc_set_off", c("S_tcc_sets", "M_tcc_sets"), "array[,] int") +
     brms::stanvar(scode = chunk("tcc_options_tdata.stan"), block = "tdata",
                   pll_args = "data array[] int tcc_cell_first, data array[,] int tcc_cell_n") +
-    brms::stanvar(scode = chunk(likelihood), block = "likelihood", position = "end")
+    brms::stanvar(
+      scode = chunk(if (brms_slices_likelihood()) "tcc_options_likelihood_threaded.stan"
+                    else "tcc_options_likelihood.stan"),
+      block = "likelihood", position = "end"
+    )
   nlist(formula, data, stanvars)
 }
 
