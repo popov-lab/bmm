@@ -22,15 +22,15 @@
   requirements <- if (trial_level) {
     glue(
       "Provide one row per trial with the following column:", "\n\n",
-      "  - Response (response): 1 = correct, 0 = incorrect", "\n",
-      "  No stimulus column needed (each trial has exactly one signal alternative)"
+      "  - Response (response): 1 = correct, 0 = incorrect",
+      "\n\n  No stimulus column is needed: each trial has exactly one signal alternative."
     )
   } else {
     glue(
       "Provide aggregated accuracy data, one row per cell, with the following columns:", "\n\n",
       "  - Response counts (response): number of correct responses", "\n",
-      "  - Number of trials (n_trials): total trials per cell", "\n",
-      "  No stimulus column needed (each trial has exactly one signal alternative)"
+      "  - Number of trials (n_trials): total trials per cell",
+      "\n\n  No stimulus column is needed: each trial has exactly one signal alternative."
     )
   }
 

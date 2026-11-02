@@ -65,8 +65,9 @@ Provide aggregated accuracy data, one row per cell, with the following columns:
 \itemize{
 \item Response counts (response): number of correct responses
 \item Number of trials (n_trials): total trials per cell
-No stimulus column needed (each trial has exactly one signal alternative)
 }
+
+No stimulus column is needed: each trial has exactly one signal alternative.
 \itemize{
 \item \strong{Parameters:}
 \itemize{
@@ -92,8 +93,9 @@ Provide one row per trial with the following column:
 }
 \itemize{
 \item Response (response): 1 = correct, 0 = incorrect
-No stimulus column needed (each trial has exactly one signal alternative)
 }
+
+No stimulus column is needed: each trial has exactly one signal alternative.
 \itemize{
 \item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Trial rows are what crossed random effects such as \code{(1 | id) + (1 | item)} need.
 \itemize{

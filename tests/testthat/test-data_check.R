@@ -352,7 +352,8 @@ test_that("the trial-level report crosses only the participant variable and coun
     "1 design cell(s) have fewer than 10 observations: id=4 (n=5)"
   )
   printed <- capture.output(print(res, color = FALSE))
-  expect_true(any(grepl("only 'id' (the first grouping", printed, fixed = TRUE)))
+  expect_match(paste(trimws(printed), collapse = " "),
+               "only 'id' (the first in the formula found in the data", fixed = TRUE)
   expect_true(any(grepl(
     "item: 10 levels, observations per level: min 3 / median 3.5 / max 4", printed, fixed = TRUE
   )))
@@ -416,7 +417,7 @@ test_that("the trial-level report crosses the first grouping variable in the for
     "1 design cell(s) have fewer than 10 observations: id=1, cond=b (n=3)"
   )
   printed <- capture.output(print(res, color = FALSE))
-  expect_true(any(grepl("(the first grouping", printed, fixed = TRUE)))
+  expect_match(paste(trimws(printed), collapse = " "), "(the first in the formula", fixed = TRUE)
 })
 
 # every subject sees a random half of the items: item counts scatter around
@@ -489,5 +490,46 @@ test_that("a grouping variable that is also a fixed predictor stays crossed with
   )
   expect_equal(res$cells$group_vars, "id")
   expect_equal(res$cells$cell_vars, "grp")
+  expect_equal(res$cells$other_groups$variable, "item")
+  expect_equal(finding_messages(res), "1 design cell(s) have fewer than 10 observations: id=1, grp=B (n=3)")
+})
+
+test_that("the per-level bound is printed in full", {
+  counts <- list(id = table(rep(1:6, c(2001, 2001, 2002, 2002, 1000, 3))))
+  expect_match(group_level_findings(counts, 1500)[[1]]$message,
+               "fewer than 1000.5 observations", fixed = TRUE)
+})
+
+# a grouping variable crossed as a predictor is not also judged per level, so
+# its sparse level C is reported once, as a design cell; only subject 1 saw C
+test_that("a grouping variable crossed as a predictor is not counted per level too", {
+  dat <- expand.grid(id = 1:4, item = 1:26)
+  dat$grp <- factor(ifelse(dat$item <= 13, "A", "B"), levels = c("A", "B", "C"))
+  dat <- rbind(dat, data.frame(id = 1, item = 27:28, grp = "C"))
+  dat$stimulus <- dat$item %% 2
+  dat$resp <- as.integer((dat$id + dat$item) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(d ~ grp + (1 | id) + (1 | grp) + (1 | item), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(res$cells$other_groups$variable, "item")
+  expect_equal(finding_messages(res), c(
+    "1 design cell(s) have fewer than 10 observations: id=1, grp=C (n=2)",
+    "3 design cell combination(s) contain no observations - fine if the design is intentionally incomplete."
+  ))
+})
+
+test_that("a grouping variable used as a random slope stays crossed with the participant", {
+  dat <- expand.grid(id = 1:4, item = 1:24)
+  dat$grp <- factor(ifelse(dat$item <= 12, "A", "B"))
+  dat <- dat[!(dat$id == 1 & dat$item > 15), ]
+  dat$stimulus <- dat$item %% 2
+  dat$resp <- as.integer((dat$id + dat$item) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (grp | id) + (1 | grp) + (1 | item), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(res$cells$cell_vars, "grp")
+  expect_equal(res$cells$other_groups$variable, "item")
   expect_equal(finding_messages(res), "1 design cell(s) have fewer than 10 observations: id=1, grp=B (n=3)")
 })

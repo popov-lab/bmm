@@ -264,7 +264,8 @@ re_group_vars <- function(formula) {
 # the data cannot tell participants from items, and a count of levels picks
 # items whenever there are fewer items than participants. The other grouping
 # variables are counted per level; group_level_findings() judges them. One
-# that is also a discrete fixed predictor stays crossed with the participant
+# that is also a discrete predictor, in the fixed part or as a random slope, is
+# crossed with the participant instead
 summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   group_vars <- intersect(re_group_vars(formula), colnames(data))
   fixed_vars <- setdiff(
@@ -278,13 +279,17 @@ summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   other_groups <- NULL
   other_counts <- NULL
   if (trial_level && length(group_vars) > 1) {
-    other_counts <- lapply(group_vars[-1], function(v) table(droplevels(as.factor(data[[v]]))))
-    names(other_counts) <- group_vars[-1]
-    other_groups <- summarise_group_levels(other_counts)
-    also_fixed <- intersect(group_vars[-1], fixed_part_vars(formula))
-    cell_vars <- c(cell_vars, also_fixed[vapply(also_fixed, function(v) {
+    also_fixed <- intersect(group_vars[-1], predictor_side_vars(formula))
+    also_fixed <- also_fixed[vapply(also_fixed, function(v) {
       is_discrete_var(data[[v]])
-    }, logical(1))])
+    }, logical(1))]
+    cell_vars <- c(cell_vars, also_fixed)
+    per_level <- setdiff(group_vars[-1], also_fixed)
+    if (length(per_level) > 0) {
+      other_counts <- lapply(per_level, function(v) table(droplevels(as.factor(data[[v]]))))
+      names(other_counts) <- per_level
+      other_groups <- summarise_group_levels(other_counts)
+    }
     group_vars <- group_vars[1]
   }
 
@@ -307,14 +312,15 @@ summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   nlist(group_vars, cell_vars, counts, n_combos, other_groups, other_counts)
 }
 
-# the variables of the population-level part: every `( ... | ... )` term dropped
-fixed_part_vars <- function(formula) {
+# the variables outside the grouping side of every `( ... | ... )` term: the
+# population-level part and the random slopes
+predictor_side_vars <- function(formula) {
   drop_bars <- function(expr) {
     if (!is.call(expr)) {
       return(expr)
     }
     if (identical(expr[[1]], as.name("(")) && .is_bar_call(expr[[2]])) {
-      return(1)
+      return(.drop_re_cor_ids(expr[[2]])[[2]])
     }
     as.call(lapply(as.list(expr), drop_bars))
   }
@@ -354,7 +360,7 @@ group_level_findings <- function(counts, min_trials) {
     }
     labels <- paste0(v, "=", names(low), " (n=", low, ")")
     data_check_finding("note", glue(
-      "{length(low)} level(s) of '{v}' have fewer than {signif(threshold, 3)} \\
+      "{length(low)} level(s) of '{v}' have fewer than {format(threshold)} \\
       observations: {paste(utils::head(labels, 3), collapse = '; ')}\\
       {if (length(low) > 3) ', ...' else ''}"
     ))
@@ -730,9 +736,10 @@ print_other_groups <- function(cells) {
     return(invisible())
   }
   cat_wrapped(glue(
-    "Rows are single trials, so only '{cells$group_vars}' (the first grouping \
-    variable in the formula, taken as the participant) is crossed into cells; \
-    the other grouping variables are counted per level:"
+    "Rows are single trials, so of the grouping variables only \
+    '{cells$group_vars}' (the first in the formula found in the data, taken as \
+    the participant) and any that is also a predictor are crossed into cells; \
+    the others are counted per level:"
   ), "  ")
   for (i in seq_len(nrow(others))) {
     cat("  ", others$variable[i], ": ", others$n_levels[i], " levels, observations per level: min ",

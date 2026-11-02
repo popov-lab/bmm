@@ -129,7 +129,8 @@ settable_links.sdt_yn <- function(model) {
 #' @name sdt_yn
 #' @description Estimates sensitivity (`d`, which is \eqn{d'} under equal
 #'   variance and \eqn{d_a} once `sdratio` is estimated) and the decision
-#'   criterion from yes/no detection or old/new recognition counts. The
+#'   criterion from yes/no detection or old/new recognition data, one row per
+#'   trial or counts per cell. The
 #'   criterion is estimated either as `criterion`, measured from the mean of the
 #'   noise distribution, or as `bias`, measured from the midpoint between the
 #'   noise and signal means; the formula names the one to estimate.

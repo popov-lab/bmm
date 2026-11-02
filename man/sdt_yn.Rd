@@ -60,7 +60,8 @@ An object of class \code{bmmodel}
 \description{
 Estimates sensitivity (\code{d}, which is \eqn{d'} under equal
 variance and \eqn{d_a} once \code{sdratio} is estimated) and the decision
-criterion from yes/no detection or old/new recognition counts. The
+criterion from yes/no detection or old/new recognition data, one row per
+trial or counts per cell. The
 criterion is estimated either as \code{criterion}, measured from the mean of the
 noise distribution, or as \code{bias}, measured from the midpoint between the
 noise and signal means; the formula names the one to estimate.
