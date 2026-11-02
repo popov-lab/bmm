@@ -115,9 +115,15 @@ whole interface would pass through `...`. dRiftDM and ggdag export a
 bmm it masks bmm's, so the documentation calls it as `bmm::simulate_data()`
 where that matters.
 
-Release: the generic lands in 1.5.0 if the circular mixture stack (#434) has
-merged into `develop` by 1 Dec 2026, otherwise in 1.6.0 on `dev-1.6.0`. This
-amends 0001 § 1.6.0, which placed it in 1.6.0 without condition.
+Release: the generic lands in 1.5.0, built on `develop` with a method for
+every model there, the circular mixture models in their current form
+included. The circular mixture stack (#434) rewrites those methods for its
+models at its next base merge, as every open model pull request adds its
+own. This amends 0001 § 1.6.0, which placed the generic in 1.6.0. (Changed
+2026-11-02: the release no longer waits on a 1 Dec check of whether #434 has
+merged. The three circular methods written twice cost less than moving the
+generic to `dev-1.6.0`, behind #571, and keeping the bmmtools adapters for
+another release.)
 
 ### `link_transform()`
 
@@ -187,7 +193,7 @@ pull request template and `CLAUDE.md` say so.
 - `model_spec()` and the generic join the exported API, so their pull
   requests take the pipeline-or-API review tier.
 - Open points: whether `model_spec()` also accepts a fitted model (decided
-  in the accessor's pull request); the 1 Dec gate for the generic; the other
+  in the accessor's pull request); the other
   maintainer's confirmation of the downstream job; the `package` and `version`
   fields for registered models, which #442's registry fills when `develop` is
   forward-merged into `dev-1.6.0`.

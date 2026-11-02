@@ -192,6 +192,14 @@ built_data_columns.sdt_mafc <- function(model) {
     NextMethod("built_data_columns"))
 }
 
+#' @exportS3Method
+data_trials.sdt_mafc <- function(model, data) {
+  if (is_trial_level(model)) {
+    return(NULL)
+  }
+  .row_trials(data, model$other_vars$n_trials)
+}
+
 #' @export
 check_data.sdt_mafc <- function(model, data, formula) {
   if (is_trial_level(model)) {

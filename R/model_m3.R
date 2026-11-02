@@ -425,6 +425,11 @@ built_data_columns.m3 <- function(model) {
   )
 }
 
+#' @exportS3Method
+data_trials.m3 <- function(model, data) {
+  .row_trials(data, model$resp_vars$resp_cats)
+}
+
 #' @export
 check_data.m3 <- function(model, data, formula) {
   resp_name <- model$resp_vars$resp_cats
