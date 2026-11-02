@@ -128,7 +128,10 @@ fixed. Estimating the width of the similarity gradient is the next step,
 and that model is the \code{\link[=sdm]{sdm()}}. The two meet at a von Mises similarity:
 with \code{similarity = tcc_similarity("vonmises", kappa)} and \code{noise = "gumbel"}, \code{\link[=dtcc]{dtcc()}} is the \code{\link[=sdm]{sdm()}} density at each option's centre times
 the option width \code{2 * pi / n_options}, with the same \code{kappa} and \code{c = d * sqrt(2 * pi / kappa) / (1 - exp(-2 * kappa))} in the default
-parametrization of \code{\link[=sdm]{sdm()}}.
+parametrization of \code{\link[=sdm]{sdm()}}. The sum over options stands in for the
+integral of the \code{\link[=sdm]{sdm()}}, so the two agree to 1e-8 in log probability
+while the gradient's SD, \code{1 / sqrt(kappa)} radians, spans about 4 options
+or more (\code{kappa} up to 200 on 360 options), and differ by 0.013 at \code{kappa = 1000}.
 
 Per gradient, Gumbel noise is not cheaper than normal noise: with \code{d} per
 subject and set size on \link{oberauer_lin_2017} it cost 1.5 times as much.

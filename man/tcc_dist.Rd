@@ -11,8 +11,8 @@ dtcc(
   d,
   similarity,
   n_options = 360,
-  noise = c("gaussian", "gumbel"),
-  log = FALSE
+  log = FALSE,
+  noise = c("gaussian", "gumbel")
 )
 
 rtcc(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbel"))
@@ -28,10 +28,10 @@ nearest option, as \code{\link[=tcc]{tcc()}} does with \code{units = "radians"}.
 
 \item{n_options}{Number of response options, an even number.}
 
+\item{log}{Logical; if \code{TRUE}, the log probability is returned.}
+
 \item{noise}{The noise on each option's signal, \code{"gaussian"} or \code{"gumbel"}
 (see the section Noise of \code{\link[=tcc]{tcc()}}).}
-
-\item{log}{Logical; if \code{TRUE}, the log probability is returned.}
 
 \item{n}{Number of observations to generate.}
 }

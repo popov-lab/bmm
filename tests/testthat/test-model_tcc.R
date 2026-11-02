@@ -515,6 +515,18 @@ test_that("each noise names its model and cites its authors", {
   expect_match(gumbel$citation[2], "^Oberauer, K. \\(2023\\).*130\\(3\\), 841-852.*rev0000328$")
 })
 
+test_that("model_citation() keeps the Oberauer reference of a Gumbel model and fit", {
+  expect_length(model_citation(tcc_test_model()), 1)
+  expect_length(model_citation(tcc_gumbel_model()), 2)
+  refs <- model_citation(tcc_mock_fit(tcc_gumbel_model()))
+  expect_length(refs, 2)
+  expect_match(refs[2], "^Oberauer, K. \\(2023\\)")
+  # a model stored before noise existed is the Gaussian one
+  old <- tcc_test_model()
+  old$other_vars$noise <- NULL
+  expect_length(model_citation(old), 1)
+})
+
 test_that("dtcc(noise = 'gumbel') matches the argmax integral of Gumbel signals", {
   for (f in list(tcc_test_similarity(360), tcc_similarity("laplace", kappa = 1.7),
                  tcc_similarity("vonmises", kappa = 4))) {

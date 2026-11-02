@@ -222,7 +222,20 @@ current_constructor <- function(model) {
   }
   versions <- model_versions(name)
   if (all(model$version %in% c(NA, "NA", "")) || all(is.na(versions))) {
-    return(get_model(name)())
+    return(do.call(get_model(name), cell_args(model)))
   }
-  if (model$version %in% versions) get_model(name)(version = model$version)
+  if (model$version %in% versions) {
+    do.call(get_model(name), c(list(version = model$version), cell_args(model)))
+  }
+}
+
+# Arguments other than the version that select a cell of a constructor with
+# its own name and citation, as tcc(noise = "gumbel") does; without them the
+# rebuilt model is the default cell and cites the wrong authors
+cell_args <- function(model) {
+  UseMethod("cell_args")
+}
+
+cell_args.default <- function(model) {
+  list()
 }

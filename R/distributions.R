@@ -4334,8 +4334,8 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' # Gumbel noise: the softmax of d * f(x)
 #' plot(x, dtcc(x, d = 5, similarity = f, noise = "gumbel"), type = "h")
 #' @export
-dtcc <- function(x, d, similarity, n_options = 360, noise = c("gaussian", "gumbel"),
-                 log = FALSE) {
+dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
+                 noise = c("gaussian", "gumbel")) {
   logp <- .tcc_noise_logp(match.arg(noise))
   .tcc_check_similarity(similarity, n_options)
   dist <- abs(.tcc_bin(x, n_options, "radians")) + 1

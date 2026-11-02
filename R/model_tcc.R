@@ -21,7 +21,11 @@
       task = "Continuous reproduction",
       # Gumbel noise is the first step from the TCC towards the SDM in Oberauer
       # (2023, eq. 4): the same model with another noise, so both are cited
-      name = if (gumbel) "TCC with Gumbel noise" else "Target Confusability Competition (TCC) model",
+      name = if (gumbel) {
+        "TCC with Gumbel noise"
+      } else {
+        "Target Confusability Competition (TCC) model"
+      },
       citation = if (gumbel) {
         c(
           schurgin,
@@ -53,7 +57,8 @@
         } else {
           glue(
             "Memory strength d (the d' of the uncorrelated-noise model): the mean \\
-            memory-match signal of the target in units of the noise SD; an option at distance x has mean d * f(x)"
+            memory-match signal of the target in units of the noise SD; an option \\
+            at distance x has mean d * f(x)"
           )
         }
       ),
@@ -130,7 +135,11 @@
 #'   "gumbel"`, [dtcc()] is the [sdm()] density at each option's centre times
 #'   the option width `2 * pi / n_options`, with the same `kappa` and `c = d *
 #'   sqrt(2 * pi / kappa) / (1 - exp(-2 * kappa))` in the default
-#'   parametrization of [sdm()].
+#'   parametrization of [sdm()]. The sum over options stands in for the
+#'   integral of the [sdm()], so the two agree to 1e-8 in log probability
+#'   while the gradient's SD, `1 / sqrt(kappa)` radians, spans about 4 options
+#'   or more (`kappa` up to 200 on 360 options), and differ by 0.013 at `kappa
+#'   = 1000`.
 #'
 #'   Per gradient, Gumbel noise is not cheaper than normal noise: with `d` per
 #'   subject and set size on [oberauer_lin_2017] it cost 1.5 times as much.
@@ -351,6 +360,11 @@ tcc_similarity <- function(shape = c("vonmises", "laplace"), kappa, n_options = 
   exp(-2 * kappa * s) * expm1(-2 * kappa * (1 - s)) / expm1(-2 * kappa)
 }
 
+# a model stored before `noise` existed is the Gaussian cell
+cell_args.tcc <- function(model) {
+  if (is.null(model$other_vars$noise)) list() else list(noise = model$other_vars$noise)
+}
+
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
@@ -499,8 +513,7 @@ configure_model.tcc <- function(model, data, formula) {
 # Laplace similarity before, 1e-13 after; TCC 2-D table spike, 2026-10).
 # tcc_logp_by_distance() in tcc_functions.stan is the Stan twin
 .tcc_logp <- function(d, similarity) {
-  n_dist <- length(similarity)
-  mult <- c(1, rep(2, n_dist - 2), 1)
+  mult <- .tcc_mult(length(similarity))
   means <- d * similarity
   top <- max(means)
   half <- (top + 8 - min(top - 8, (min(means) + top) / 2 - 6)) / 2
@@ -511,7 +524,7 @@ configure_model.tcc <- function(model, data, formula) {
   matrixStats::colLogSumExps(terms)
 }
 
-# how many options lie at each distance 0, 1, ..., n / 2 from the target
+# each distance but 0 and n / 2 has an option on either side of the target
 .tcc_mult <- function(n_dist) {
   c(1, rep(2, n_dist - 2), 1)
 }
