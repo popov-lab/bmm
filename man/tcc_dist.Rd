@@ -12,10 +12,18 @@ dtcc(
   similarity,
   n_options = 360,
   log = FALSE,
-  noise = c("gaussian", "gumbel")
+  noise = c("gaussian", "gumbel"),
+  options = NULL
 )
 
-rtcc(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbel"))
+rtcc(
+  n,
+  d,
+  similarity,
+  n_options = 360,
+  noise = c("gaussian", "gumbel"),
+  options = NULL
+)
 }
 \arguments{
 \item{x}{Vector of response errors in radians; each is binned to the
@@ -32,6 +40,12 @@ nearest option, as \code{\link[=tcc]{tcc()}} does with \code{units = "radians"}.
 
 \item{noise}{The noise on each option's signal, \code{"gaussian"} or \code{"gumbel"}
 (see the section Noise of \code{\link[=tcc]{tcc()}}).}
+
+\item{options}{\code{NULL} (the default) for a choice among all \code{n_options}
+options, or the offered options as offsets from the target in radians,
+one set for all values (see the section "Forced-choice option sets" of
+\code{\link[=tcc]{tcc()}}). The probability is then taken over these options only, and is 0
+for an \code{x} off the set.}
 
 \item{n}{Number of observations to generate.}
 }
@@ -56,6 +70,9 @@ plot(x, dtcc(x, d = 2, similarity = f), type = "h")
 hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
 # Gumbel noise: the softmax of d * f(x)
 plot(x, dtcc(x, d = 5, similarity = f, noise = "gumbel"), type = "h")
+# a 4-AFC trial with options 90 degrees apart
+four <- c(0, 90, 180, -90) * pi / 180
+dtcc(four, d = 2, similarity = f, options = four)
 }
 \references{
 Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical scaling reveals a unified theory of visual memory strength. Nature Human Behaviour, 4(11), 1156-1172. https://doi.org/10.1038/s41562-020-00938-0

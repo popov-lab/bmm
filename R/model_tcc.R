@@ -3,9 +3,12 @@
 ############################################################################# !
 
 .model_tcc <- function(resp_error = NULL, similarity = NULL, n_options = 360,
-                       units = "radians", noise = "gaussian", d_max = 30, links = NULL,
-                       call = NULL, ...) {
+                       units = "radians", noise = "gaussian", d_max = 30, options = NULL,
+                       n_alternatives = NULL, links = NULL, call = NULL, ...) {
   gumbel <- noise == "gumbel"
+  # the option arguments enter other_vars only when given, so that a model
+  # stored before they existed is the full-wheel model it was
+  option_vars <- Filter(Negate(is.null), nlist(options, n_alternatives))
   schurgin <- glue(
     "Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical \\
     scaling reveals a unified theory of visual memory strength. Nature Human \\
@@ -16,7 +19,7 @@
       resp_vars = nlist(resp_error),
       # table = "r" passes the d table from R instead of building it in Stan;
       # an internal switch for table transforms (correlated or motor noise)
-      other_vars = nlist(similarity, n_options, units, noise, d_max, table = "stan"),
+      other_vars = c(nlist(similarity, n_options, units, noise, d_max, table = "stan"), option_vars),
       domain = "Working memory",
       task = "Continuous reproduction",
       # Gumbel noise is the first step from the TCC towards the SDM in Oberauer
@@ -78,7 +81,9 @@
       ),
       init_ranges = list(d = c(1, 2))
     ),
-    class = c("bmmodel", "tcc"),
+    # option_set after tcc: check_data.tcc() runs first and leaves the binning
+    # to the shared contract, and bmf2bf.tcc() keeps mu out of the model
+    class = c("bmmodel", "tcc", if (length(option_vars)) "option_set"),
     call = call
   )
   set_links(out, links)
@@ -238,6 +243,65 @@
 #'   The fit is fastest when rows that share a value of `d` are adjacent, so
 #'   bmm offers to sort the data by the predictors of `d`, as for [sdm()].
 #'   Continuous predictors of `d` are supported at the per-trial cost.
+#'
+#' ## Forced-choice option sets
+#'
+#'   With `options`, each trial offers only some of the `n_options` positions,
+#'   as in an m-alternative forced choice, and the response is the offered
+#'   option with the strongest signal: the probabilities above are taken over
+#'   the offered options only. The columns named in `options` hold the offered
+#'   options of each row, relative to the target and in the units of
+#'   `resp_error`, with `NA` where a row offers fewer options than there are
+#'   columns. They must include the target (an offset of 0) and the response,
+#'   and must sit on the grid of `n_options` positions (values within a tenth
+#'   of a step are rounded onto it). Sets may differ in size and spacing from
+#'   trial to trial; rows that offer the same options, in any order, share
+#'   one set. A data set with two- and four-option trials on a 360-option
+#'   wheel, in degrees for readability (convert them with [deg2rad()]):
+#'
+#'   ```
+#'   err  opt1 opt2 opt3 opt4
+#'     0     0  180   NA   NA
+#'    90     0   90  180  -90
+#'   ```
+#'
+#'   fitted with `tcc("err", similarity, options = paste0("opt", 1:4))`.
+#'   When every trial offers `m` options spaced equally around the wheel from
+#'   the target, `n_alternatives = m` builds these columns; with `options`,
+#'   `n_alternatives` may instead name a column holding the number of options
+#'   of each row, which is checked against the option columns. The data
+#'   contract is the one of `sdm(options = )`, so the same data fit both models.
+#'
+#'   The design is that of Robinson et al. (2023), who offered 2, 4, 8 or 16
+#'   equally spaced colours (16 options lie 22.5 degrees apart, so they need
+#'   `n_options = 720`). Their critical test asks which model keeps one value
+#'   of its parameter across m: the normal-noise TCC with `d` fixed across m
+#'   fitted better than the softmax (Gumbel) model with its parameter fixed,
+#'   while both fitted alike with the parameter free per m. In bmm the test is
+#'   a comparison of `d ~ 1` with `d ~ 0 + m_condition` here and of `c ~ 1`
+#'   with `c ~ 0 + m_condition` in [sdm()] with the same `options`, as in the
+#'   examples. `d` under normal noise and the Gumbel parameters (`d` with
+#'   `noise = "gumbel"`, or `c` of [sdm()]) are not on one scale (see the
+#'   section Noise), so compare how each varies across m, not their values.
+#'   Within one noise, the log-likelihood is a log probability over the
+#'   offered options, as for the full wheel (see the section Comparing with
+#'   continuous models); `sdm(options = )` reports it on the density scale,
+#'   so add `log(n_options / (2 * pi))` per observation before comparing a
+#'   `tcc()` fit with an [sdm()] fit.
+#'
+#'   Under normal noise the likelihood integrates over the offered options
+#'   once per cell, a combination of a value of `d` and an option set, and
+#'   needs no table, so `d_max` is not used. A cell cost about 0.07 ms per
+#'   gradient with 2 options and 0.18 ms with 16. The design of Robinson et
+#'   al. with `d` per participant and m (30 participants, 15,000 trials, 120
+#'   cells) took 14 ms per gradient, and 500 trials with random foils, each
+#'   trial its own cell, took 41 ms with 4 options and 87 ms with 16. Gumbel
+#'   noise needs no integral and took 1 ms and 0.2 to 0.3 ms for the same
+#'   designs. `bmm()` says so when there are more cells than half the rows,
+#'   as with a continuous predictor of `d` or foils drawn anew on each trial.
+#'   `log_lik()`,
+#'   `posterior_predict()` and `pp_check()` read each row's options from the
+#'   data; to predict, pass `newdata` that carries the option columns.
 #' @param resp_error The name of the variable in the data holding the response
 #'   error. With `units = "radians"` (the default) it is the error relative to
 #'   the target in radians, as for the other circular models, and is binned to
@@ -255,9 +319,23 @@
 #'   response probabilities a softmax). See the section Noise.
 #' @param d_max The upper end of the `d` grid of the likelihood table; draws
 #'   of `d` beyond it are reported after the fit. Not used with `noise =
-#'   "gumbel"`, which needs no table.
+#'   "gumbel"` or with `options`, which need no table.
+#' @param options The names of the columns holding the options offered on
+#'   each trial, one column per option, in the units of `resp_error` and
+#'   relative to the target; rows that offer fewer options hold `NA` in the
+#'   remaining columns. See the section "Forced-choice option sets".
+#' @param n_alternatives With `options`, optionally the name of a column
+#'   holding the number of options offered on each trial, which is checked
+#'   against the option columns. Without `options`, a single number `m`: each
+#'   trial offers `m` options spaced equally around the wheel, the target
+#'   among them.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
+#' @references Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F.
+#'   (2023). How do people build up visual memory representations from sensory
+#'   evidence? Revisiting two classic models of choice. *Journal of
+#'   Mathematical Psychology, 117*, 102805.
+#'   https://doi.org/10.1016/j.jmp.2023.102805
 #' @keywords bmmodel
 #' @export
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
@@ -268,8 +346,32 @@
 #' # Gumbel noise with a fixed von Mises similarity
 #' f_vm <- tcc_similarity("vonmises", kappa = 4)
 #' fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f_vm, noise = "gumbel"), cores = 4)
+#'
+#' # Forced choice among 2, 4, 8 or 16 equally spaced options (Robinson et al.,
+#' # 2023), 125 trials each, on a wheel of 720 half-degree positions
+#' f720 <- tcc_similarity("vonmises", kappa = 4, n_options = 720)
+#' m <- c(2, 4, 8, 16)
+#' afc <- data.frame(m_condition = factor(rep(m, each = 125)))
+#' offered <- lapply(m, function(k) (seq_len(k) - 1) * 2 * pi / k)
+#' afc[paste0("opt", 1:16)] <- t(vapply(rep(offered, each = 125), function(x) {
+#'   c(x, rep(NA, 16 - length(x)))
+#' }, numeric(16)))
+#' afc$err <- unlist(lapply(offered, function(x) {
+#'   rtcc(125, d = 1.8, similarity = f720, n_options = 720, options = x)
+#' }))
+#' tcc_afc <- tcc("err", similarity = f720, n_options = 720, options = paste0("opt", 1:16))
+#' fit_d1 <- bmm(bmf(d ~ 1), afc, tcc_afc, cores = 4)
+#' fit_dm <- bmm(bmf(d ~ 0 + m_condition), afc, tcc_afc, cores = 4)
+#' sdm_afc <- sdm("err", n_options = 720, options = paste0("opt", 1:16))
+#' fit_c1 <- bmm(bmf(c ~ 1, kappa ~ 1), afc, sdm_afc, cores = 4)
+#' fit_cm <- bmm(bmf(c ~ 0 + m_condition, kappa ~ 1), afc, sdm_afc, cores = 4)
+#' # does one parameter hold across m? Here the data come from one d, so the
+#' # normal-noise model should need no d per m
+#' loo::loo_compare(brms::loo(fit_d1), brms::loo(fit_dm))
+#' loo::loo_compare(brms::loo(fit_c1), brms::loo(fit_cm))
 tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "bins"),
-                noise = c("gaussian", "gumbel"), d_max = 30, ...) {
+                noise = c("gaussian", "gumbel"), d_max = 30, options = NULL,
+                n_alternatives = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
@@ -278,8 +380,12 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
   .tcc_check_similarity(similarity, n_options)
   stopif(!is.numeric(d_max) || length(d_max) != 1 || !isTRUE(d_max > 0),
          "`d_max` must be a single positive number.")
+  option_args <- if (!is.null(options) || !is.null(n_alternatives)) {
+    .check_option_args(n_options, options, n_alternatives, units)
+  }
   .model_tcc(resp_error = resp_error, similarity = similarity, n_options = n_options,
-             units = units, noise = noise, d_max = d_max, call = call, ...)
+             units = units, noise = noise, d_max = d_max, options = options,
+             n_alternatives = option_args$n_alternatives, call = call, ...)
 }
 
 .tcc_check_n_options <- function(n_options) {
@@ -387,9 +493,12 @@ check_data.tcc <- function(model, data, formula) {
          radians. Convert it with deg2rad(), or set units = 'bins' if it counts options.")
   stopif(units == "bins" && any(data[[resp]] %% 1 != 0, na.rm = TRUE),
          "With units = 'bins', the response variable '{resp}' must hold whole numbers.")
-  warnif("tcc_bin" %in% colnames(data),
-         "Column 'tcc_bin' in your data is reserved by the TCC model and will be overwritten.")
-  data$tcc_bin <- .tcc_bin(data[[resp]], model$other_vars$n_options, units)
+  # with option sets, check_data.option_set() bins the response next
+  if (!inherits(model, "option_set")) {
+    warnif("tcc_bin" %in% colnames(data),
+           "Column 'tcc_bin' in your data is reserved by the TCC model and will be overwritten.")
+    data$tcc_bin <- .tcc_bin(data[[resp]], model$other_vars$n_options, units)
+  }
   data <- order_data_query(model, data, formula)
   NextMethod("check_data")
 }
@@ -407,7 +516,12 @@ check_data.tcc <- function(model, data, formula) {
 
 #' @export
 bmf2bf.tcc <- function(model, formula) {
-  brms::bf("tcc_bin ~ 0")
+  if (!inherits(model, "option_set")) {
+    return(brms::bf("tcc_bin ~ 0"))
+  }
+  # the option offsets ride along as vint terms, so that log_lik() and
+  # posterior_predict() read each trial's options from the data, newdata included
+  brms::bf(glue("tcc_bin | vint({paste(.option_columns(.option_width(model)), collapse = ', ')}) ~ 0"))
 }
 
 ############################################################################# !
@@ -416,6 +530,9 @@ bmf2bf.tcc <- function(model, formula) {
 
 #' @export
 configure_model.tcc <- function(model, data, formula) {
+  if (inherits(model, "option_set")) {
+    return(.tcc_options_configure(model, data, formula))
+  }
   formula <- bmf2bf(model, formula)
   gumbel <- .tcc_gumbel(model)
   formula$family <- brms::custom_family(
@@ -512,8 +629,7 @@ configure_model.tcc <- function(model, data, formula) {
 # (min(d f) + m) / 2 - 6 as well (1.5e-4 off in log P at d = 12 with a 1-degree
 # Laplace similarity before, 1e-13 after; TCC 2-D table spike, 2026-10).
 # tcc_logp_by_distance() in tcc_functions.stan is the Stan twin
-.tcc_logp <- function(d, similarity) {
-  mult <- .tcc_mult(length(similarity))
+.tcc_logp <- function(d, similarity, mult = .tcc_mult(length(similarity))) {
   means <- d * similarity
   top <- max(means)
   half <- (top + 8 - min(top - 8, (min(means) + top) / 2 - 6)) / 2
@@ -534,9 +650,9 @@ configure_model.tcc <- function(model, data, formula) {
 # argmax integral reduces to the softmax of the means (Yellott, 1977;
 # Oberauer, 2023, eq. 4; derivation in the TCC design note, #566).
 # tcc_gumbel_lpmf() in tcc_gumbel_functions.stan is the Stan twin
-.tcc_gumbel_logp <- function(d, similarity) {
+.tcc_gumbel_logp <- function(d, similarity, mult = .tcc_mult(length(similarity))) {
   a <- d * similarity
-  a - matrixStats::logSumExp(log(.tcc_mult(length(similarity))) + a)
+  a - matrixStats::logSumExp(log(mult) + a)
 }
 
 .tcc_table <- function(similarity, grid) {
@@ -566,7 +682,7 @@ postprocess_brm.tcc <- function(model, fit, ...) {
 }
 
 .tcc_check_grid <- function(model, prep) {
-  if (.tcc_gumbel(model)) {
+  if (.tcc_gumbel(model) || inherits(model, "option_set")) {
     return(invisible())
   }
   d_max <- model$other_vars$d_max
@@ -737,6 +853,10 @@ pp_observables.tcc <- function(model) {
 
 #' @export
 pp_simulate.tcc <- function(model, prep) {
+  if (inherits(model, "option_set")) {
+    draws <- vapply(seq_len(prep$nobs), posterior_predict_tcc_options, integer(prep$ndraws), prep = prep)
+    return(list(error = matrix(draws, nrow = prep$ndraws)))
+  }
   d <- .pp_dpar_vector(prep, "d")
   n_options <- model$other_vars$n_options
   bins <- if (.tcc_gumbel(model)) {
@@ -766,4 +886,165 @@ revert_check_data.tcc <- function(model, data) {
   }
   data$tcc_bin <- NULL
   NextMethod("revert_check_data")
+}
+
+############################################################################# !
+# FORCED-CHOICE OPTION SETS (#566, D4)                                   ####
+############################################################################# !
+
+# Each trial offers some of the n_options positions (the option-set contract,
+# R/helpers-options.R), and the response is the offered option with the
+# strongest signal. The probabilities depend on d and on the offered set, so
+# the rows that share both share them: a cell is a run of equal predictors
+# times an option set. Cells are numbered by first appearance, and each row
+# carries its cell, from which transformed data counts the choices per offered
+# option of each cell; the likelihood then evaluates each cell once
+.tcc_option_cells <- function(model, data, formula) {
+  predictors <- data_predictor_vars(data, formula)
+  # brms drops the rows with a missing value in a model variable before fitting
+  used <- intersect(c(model$resp_vars$resp_error, predictors), colnames(data))
+  kept <- data[stats::complete.cases(data[used]), , drop = FALSE]
+  run_id <- if (length(predictors)) {
+    id <- interaction(kept[predictors], drop = TRUE, lex.order = TRUE)
+    cumsum(c(TRUE, id[-1] != id[-length(id)]))
+  } else {
+    rep(1L, nrow(kept))
+  }
+  sets <- .option_set_table(as.matrix(kept[.option_columns(.option_width(model))]),
+                            model$other_vars$n_options)
+  key <- paste(run_id, sets$set_id)
+  list(row_cell = match(key, unique(key)), cell_set = sets$set_id[!duplicated(key)],
+       size = sets$size, off = sets$off)
+}
+
+# data for the sliced likelihood of a threaded fit needs its own argument
+.tcc_data_stanvar <- function(x, name, arg, scode = NULL) {
+  out <- brms::stanvar(x = x, name = name, scode = scode)
+  out[[name]]$pll_args <- paste("data", arg, name)
+  out
+}
+
+# brms declares an integer array of length 1 as a scalar and an integer matrix
+# as a one-dimensional array, so the cell tables get their declarations here
+.tcc_int_array_stanvar <- function(x, name, dims, arg = NULL) {
+  x <- array(as.integer(x), dim = if (is.matrix(x)) dim(x) else length(x))
+  scode <- paste0("array[", paste(dims, collapse = ", "), "] int ", name, ";")
+  if (is.null(arg)) {
+    return(brms::stanvar(x = x, name = name, scode = scode))
+  }
+  .tcc_data_stanvar(x, name, arg, scode = scode)
+}
+
+.tcc_options_configure <- function(model, data, formula) {
+  cells <- .tcc_option_cells(model, data, formula)
+  n_rows <- length(cells$row_cell)
+  n_cells <- length(cells$cell_set)
+  # one integral over its options per cell and gradient: 0.07 ms with 2
+  # options to 0.18 ms with 16 (#566, D4; ?tcc, "Forced-choice option sets")
+  if (!.tcc_gumbel(model) && n_cells > n_rows / 2) {
+    message2(
+      "The {n_rows} rows fall into {n_cells} cells of equal d and offered options. \\
+      Under normal noise each cell takes one integral over its options per gradient, \\
+      so the fit takes longer than when rows share cells; see ?tcc, section \\
+      \"Forced-choice option sets\"."
+    )
+  }
+  formula <- bmf2bf(model, formula)
+  formula$family <- brms::custom_family(
+    "tcc_options",
+    dpars = c("mu", "d"),
+    links = c("identity", model$links$d),
+    type = "int",
+    loop = FALSE,
+    log_lik = log_lik_tcc_options,
+    posterior_predict = posterior_predict_tcc_options,
+    posterior_epred = posterior_epred_tcc
+  )
+  sc_path <- system.file("stan_chunks", package = "bmm")
+  chunk <- function(file) read_lines2(file.path(sc_path, file))
+  rule <- .gl_rule(.tcc_gl_nodes)
+  likelihood <- if (brms_slices_likelihood()) {
+    "tcc_options_likelihood_threaded.stan"
+  } else {
+    "tcc_options_likelihood.stan"
+  }
+  stanvars <- brms::stanvar(scode = chunk("tcc_options_functions.stan"), block = "functions") +
+    .tcc_data_stanvar(match(model$other_vars$noise, c("gaussian", "gumbel")), "tcc_noise", "int") +
+    .tcc_data_stanvar(.tcc_similarity(model), "tcc_similarity", "vector") +
+    .tcc_data_stanvar(rule$nodes, "tcc_gl_nodes", "vector") +
+    .tcc_data_stanvar(log(rule$weights), "tcc_gl_logw", "vector") +
+    brms::stanvar(x = n_cells, name = "G_tcc_cells") +
+    .tcc_int_array_stanvar(cells$row_cell, "tcc_row_cell", "N") +
+    .tcc_int_array_stanvar(cells$cell_set, "tcc_cell_set", "G_tcc_cells", "array[] int") +
+    brms::stanvar(x = nrow(cells$off), name = "S_tcc_sets") +
+    brms::stanvar(x = ncol(cells$off), name = "M_tcc_sets") +
+    .tcc_int_array_stanvar(cells$size, "tcc_set_size", "S_tcc_sets", "array[] int") +
+    .tcc_int_array_stanvar(cells$off, "tcc_set_off", c("S_tcc_sets", "M_tcc_sets"), "array[,] int") +
+    brms::stanvar(scode = chunk("tcc_options_tdata.stan"), block = "tdata",
+                  pll_args = "data array[] int tcc_cell_first, data array[,] int tcc_cell_n") +
+    brms::stanvar(scode = chunk(likelihood), block = "likelihood", position = "end")
+  nlist(formula, data, stanvars)
+}
+
+# The offered options of observation i as offsets in steps: the vint columns
+# of the brms data, without the padding
+.tcc_prep_options <- function(prep, i) {
+  columns <- grep("^vint[0-9]+$", names(prep$data), value = TRUE)
+  columns <- columns[order(as.integer(sub("vint", "", columns)))]
+  offsets <- vapply(columns, function(column) prep$data[[column]][i], integer(1), USE.NAMES = FALSE)
+  offsets[offsets != .option_absent(2 * (length(prep$data$tcc_similarity) - 1))]
+}
+
+# log P of each offered option, whose similarities to the target are f, at one
+# value of d; the Stan twin is tcc_set_logp() in tcc_options_functions.stan
+.tcc_set_logp <- function(d, f, noise) {
+  if (noise == "gumbel") {
+    return(.tcc_gumbel_logp(d, f, mult = rep(1, length(f))))
+  }
+  .tcc_logp(d, f, mult = rep(1, length(f)))
+}
+
+# one row per value of d, one column per offered option
+.tcc_set_logp_rows <- function(d, f, noise) {
+  values <- unique(d)
+  rows <- matrix(vapply(values, .tcc_set_logp, numeric(length(f)), f = f, noise = noise),
+                 ncol = length(f), byrow = TRUE)
+  rows[match(d, values), , drop = FALSE]
+}
+
+# brms calls log_lik and posterior_predict once per observation, and the rows
+# of one cell share their draws and options, so the last rows are kept
+.tcc_options_logp_draws <- function(prep, i, offsets) {
+  d <- brms::get_dpar(prep, "d", i = i)
+  f <- as.numeric(prep$data$tcc_similarity)[abs(offsets) + 1]
+  noise <- c("gaussian", "gumbel")[prep$data$tcc_noise]
+  key <- list(d, f, noise)
+  if (!identical(.tcc_cache$options_key, key)) {
+    .tcc_cache$options_logp <- .tcc_set_logp_rows(d, f, noise)
+    .tcc_cache$options_key <- key
+  }
+  .tcc_cache$options_logp
+}
+
+log_lik_tcc_options <- function(i, prep) {
+  offsets <- .tcc_prep_options(prep, i)
+  y <- prep$data$Y[i]
+  # newdata that carries the built columns is not checked again, so a
+  # response the trial did not offer can reach here; it has no probability
+  if (!is.na(y) && !y %in% offsets) {
+    return(rep(-Inf, prep$ndraws))
+  }
+  .tcc_options_logp_draws(prep, i, offsets)[, match(y, offsets)]
+}
+
+posterior_predict_tcc_options <- function(i, prep, ...) {
+  offsets <- .tcc_prep_options(prep, i)
+  .tcc_draw_from_set(.tcc_options_logp_draws(prep, i, offsets), offsets)
+}
+
+# one offset per row of logp, which holds log P of each offered option
+.tcc_draw_from_set <- function(logp, offsets) {
+  cum <- matrixStats::rowCumsums(exp(logp))
+  draw <- stats::runif(nrow(logp)) * cum[, ncol(cum)]
+  as.integer(offsets[rowSums(cum < draw) + 1])
 }

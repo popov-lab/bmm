@@ -11,6 +11,8 @@ tcc(
   units = c("radians", "bins"),
   noise = c("gaussian", "gumbel"),
   d_max = 30,
+  options = NULL,
+  n_alternatives = NULL,
   ...
 )
 }
@@ -36,7 +38,18 @@ Schurgin et al., 2020) or \code{"gumbel"} (standard Gumbel, which makes the
 response probabilities a softmax). See the section Noise.}
 
 \item{d_max}{The upper end of the \code{d} grid of the likelihood table; draws
-of \code{d} beyond it are reported after the fit. Not used with \code{noise = "gumbel"}, which needs no table.}
+of \code{d} beyond it are reported after the fit. Not used with \code{noise = "gumbel"} or with \code{options}, which need no table.}
+
+\item{options}{The names of the columns holding the options offered on
+each trial, one column per option, in the units of \code{resp_error} and
+relative to the target; rows that offer fewer options hold \code{NA} in the
+remaining columns. See the section "Forced-choice option sets".}
+
+\item{n_alternatives}{With \code{options}, optionally the name of a column
+holding the number of options offered on each trial, which is checked
+against the option columns. Without \code{options}, a single number \code{m}: each
+trial offers \code{m} options spaced equally around the wheel, the target
+among them.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -234,6 +247,65 @@ The fit is fastest when rows that share a value of \code{d} are adjacent, so
 bmm offers to sort the data by the predictors of \code{d}, as for \code{\link[=sdm]{sdm()}}.
 Continuous predictors of \code{d} are supported at the per-trial cost.
 }
+
+\subsection{Forced-choice option sets}{
+
+With \code{options}, each trial offers only some of the \code{n_options} positions,
+as in an m-alternative forced choice, and the response is the offered
+option with the strongest signal: the probabilities above are taken over
+the offered options only. The columns named in \code{options} hold the offered
+options of each row, relative to the target and in the units of
+\code{resp_error}, with \code{NA} where a row offers fewer options than there are
+columns. They must include the target (an offset of 0) and the response,
+and must sit on the grid of \code{n_options} positions (values within a tenth
+of a step are rounded onto it). Sets may differ in size and spacing from
+trial to trial; rows that offer the same options, in any order, share
+one set. A data set with two- and four-option trials on a 360-option
+wheel, in degrees for readability (convert them with \code{\link[=deg2rad]{deg2rad()}}):
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{err  opt1 opt2 opt3 opt4
+  0     0  180   NA   NA
+ 90     0   90  180  -90
+}\if{html}{\out{</div>}}
+
+fitted with \code{tcc("err", similarity, options = paste0("opt", 1:4))}.
+When every trial offers \code{m} options spaced equally around the wheel from
+the target, \code{n_alternatives = m} builds these columns; with \code{options},
+\code{n_alternatives} may instead name a column holding the number of options
+of each row, which is checked against the option columns. The data
+contract is the one of \code{sdm(options = )}, so the same data fit both models.
+
+The design is that of Robinson et al. (2023), who offered 2, 4, 8 or 16
+equally spaced colours (16 options lie 22.5 degrees apart, so they need
+\code{n_options = 720}). Their critical test asks which model keeps one value
+of its parameter across m: the normal-noise TCC with \code{d} fixed across m
+fitted better than the softmax (Gumbel) model with its parameter fixed,
+while both fitted alike with the parameter free per m. In bmm the test is
+a comparison of \code{d ~ 1} with \code{d ~ 0 + m_condition} here and of \code{c ~ 1}
+with \code{c ~ 0 + m_condition} in \code{\link[=sdm]{sdm()}} with the same \code{options}, as in the
+examples. \code{d} under normal noise and the Gumbel parameters (\code{d} with
+\code{noise = "gumbel"}, or \code{c} of \code{\link[=sdm]{sdm()}}) are not on one scale (see the
+section Noise), so compare how each varies across m, not their values.
+Within one noise, the log-likelihood is a log probability over the
+offered options, as for the full wheel (see the section Comparing with
+continuous models); \code{sdm(options = )} reports it on the density scale,
+so add \code{log(n_options / (2 * pi))} per observation before comparing a
+\code{tcc()} fit with an \code{\link[=sdm]{sdm()}} fit.
+
+Under normal noise the likelihood integrates over the offered options
+once per cell, a combination of a value of \code{d} and an option set, and
+needs no table, so \code{d_max} is not used. A cell cost about 0.07 ms per
+gradient with 2 options and 0.18 ms with 16. The design of Robinson et
+al. with \code{d} per participant and m (30 participants, 15,000 trials, 120
+cells) took 14 ms per gradient, and 500 trials with random foils, each
+trial its own cell, took 41 ms with 4 options and 87 ms with 16. Gumbel
+noise needs no integral and took 1 ms and 0.2 to 0.3 ms for the same
+designs. \code{bmm()} says so when there are more cells than half the rows,
+as with a continuous predictor of \code{d} or foils drawn anew on each trial.
+\code{log_lik()},
+\code{posterior_predict()} and \code{pp_check()} read each row's options from the
+data; to predict, pass \code{newdata} that carries the option columns.
+}
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
@@ -244,6 +316,36 @@ fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
 # Gumbel noise with a fixed von Mises similarity
 f_vm <- tcc_similarity("vonmises", kappa = 4)
 fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f_vm, noise = "gumbel"), cores = 4)
+
+# Forced choice among 2, 4, 8 or 16 equally spaced options (Robinson et al.,
+# 2023), 125 trials each, on a wheel of 720 half-degree positions
+f720 <- tcc_similarity("vonmises", kappa = 4, n_options = 720)
+m <- c(2, 4, 8, 16)
+afc <- data.frame(m_condition = factor(rep(m, each = 125)))
+offered <- lapply(m, function(k) (seq_len(k) - 1) * 2 * pi / k)
+afc[paste0("opt", 1:16)] <- t(vapply(rep(offered, each = 125), function(x) {
+  c(x, rep(NA, 16 - length(x)))
+}, numeric(16)))
+afc$err <- unlist(lapply(offered, function(x) {
+  rtcc(125, d = 1.8, similarity = f720, n_options = 720, options = x)
+}))
+tcc_afc <- tcc("err", similarity = f720, n_options = 720, options = paste0("opt", 1:16))
+fit_d1 <- bmm(bmf(d ~ 1), afc, tcc_afc, cores = 4)
+fit_dm <- bmm(bmf(d ~ 0 + m_condition), afc, tcc_afc, cores = 4)
+sdm_afc <- sdm("err", n_options = 720, options = paste0("opt", 1:16))
+fit_c1 <- bmm(bmf(c ~ 1, kappa ~ 1), afc, sdm_afc, cores = 4)
+fit_cm <- bmm(bmf(c ~ 0 + m_condition, kappa ~ 1), afc, sdm_afc, cores = 4)
+# does one parameter hold across m? Here the data come from one d, so the
+# normal-noise model should need no d per m
+loo::loo_compare(brms::loo(fit_d1), brms::loo(fit_dm))
+loo::loo_compare(brms::loo(fit_c1), brms::loo(fit_cm))
 \dontshow{\}) # examplesIf}
+}
+\references{
+Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F.
+(2023). How do people build up visual memory representations from sensory
+evidence? Revisiting two classic models of choice. \emph{Journal of
+Mathematical Psychology, 117}, 102805.
+https://doi.org/10.1016/j.jmp.2023.102805
 }
 \keyword{bmmodel}

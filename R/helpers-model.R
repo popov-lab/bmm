@@ -691,7 +691,9 @@ data_column_roles <- list(
   ),
   tcc = c(
     resp_error = "response error relative to the target, in radians or, with `units = \"bins\"`, in option steps",
-    similarity = NA
+    similarity = NA,
+    options = "options offered on each trial, relative to the target, one column per option (optional)",
+    n_alternatives = "number of options offered on each trial (a column, or one number; optional)"
   )
 )
 

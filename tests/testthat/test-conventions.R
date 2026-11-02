@@ -58,6 +58,7 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
       "test-model_sdt_yn.R" = 1L,
+      "test-model_tcc-options.R" = 2L,
       "test-model_tcc.R" = 2L,
       "test-sdt-rating-versions.R" = 1L
     ),
@@ -103,6 +104,7 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
       "test-model_sdt_yn.R" = 1L,
+      "test-model_tcc-options.R" = 2L,
       "test-model_tcc.R" = 2L,
       "test-sdt-rating-versions.R" = 1L
     ),
