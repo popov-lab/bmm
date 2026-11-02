@@ -2,7 +2,7 @@
   // spaced options, y its offset from the target in steps, and its probability
   // the softmax of c* s(x - mu) over the options the trial offered. Every
   // log-likelihood is reported on the density scale, log P - log(2 pi / K),
-  // as in the continuous model; sdm_kernel_funs.stan defines the cell
+  // as in the continuous model; sdm_kernel_functions.stan defines the cell
 
   // the numerator: c* s(y - mu) per trial
   real sdm_grid_lpmf(array[] int y, vector mu, vector c, vector kappa, data int K,
