@@ -224,6 +224,11 @@ built_data_columns.ezdm <- function(model) {
   )
 }
 
+#' @exportS3Method
+data_trials.ezdm <- function(model, data) {
+  .row_trials(data, model$other_vars$n_trials)
+}
+
 #' @export
 check_data.ezdm <- function(model, data, formula) {
   # retrieve required variable names

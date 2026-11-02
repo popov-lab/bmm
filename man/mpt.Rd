@@ -222,6 +222,14 @@ test give three free parameters and rank 2 of 3, so one combination of
 \code{Do}, \code{Dn} and \code{g} cannot be estimated; a second condition that varies
 the response bias identifies them.
 
+\strong{Sparse cells.} \code{\link[=bmm_data_check]{bmm_data_check()}} flags design cells with fewer than
+\code{min_trials} trials, counting the trials of a row as the sum of all its
+response category columns. With several trees that sum runs over all of
+them, so a cell can pass while one tree holds only a few trials: 40
+trials in an old/new test and 2 in a source test add up to 42. The check
+does not count trials per tree; when the trees differ in size, sum each
+tree's columns per cell yourself.
+
 \strong{Reading the estimates.} \code{summary()} reports intercepts and regression
 coefficients on the latent (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}}
 returns the posterior draws of every parameter on the probability scale
