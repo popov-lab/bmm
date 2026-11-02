@@ -56,6 +56,9 @@ n_discrete_max <- 10
 #'   is a list containing the summarized `response`, `predictors` and `cells`
 #'   information (including the full cell count table in `$cells$counts`), all
 #'   `findings`, and the captured results of the validation `pipeline`.
+#'   `$cells$unit` says what a cell's `n` counts (`"trials"`, `"rows"` or
+#'   `"observations"`); when it counts trials, `$cells$counts` also holds each
+#'   cell's `n_rows` and the object its total `n_trials`.
 #' @seealso [bmm()], [check_data()], [data_check_findings()]
 #' @keywords extract_info
 #' @examples
@@ -424,10 +427,12 @@ cell_count_findings <- function(counts, min_trials, unit = "observations") {
     return(list())
   }
   findings <- list()
+  # a cell is empty when it has no rows; a cell whose rows hold no trials is sparse
+  rows <- counts$n_rows %||% counts$n
   low <- if (is.null(min_trials)) {
     counts[0, , drop = FALSE]
   } else {
-    counts[counts$n > 0 & counts$n < min_trials, , drop = FALSE]
+    counts[rows > 0 & counts$n < min_trials, , drop = FALSE]
   }
   if (nrow(low) > 0) {
     findings <- c(findings, list(data_check_finding("note", glue(
@@ -436,7 +441,7 @@ cell_count_findings <- function(counts, min_trials, unit = "observations") {
       {if (nrow(low) > 3) ', ...' else ''}"
     ))))
   }
-  empty <- counts[counts$n == 0, , drop = FALSE]
+  empty <- counts[rows == 0, , drop = FALSE]
   if (nrow(empty) > 0) {
     findings <- c(findings, list(data_check_finding("note", glue(
       "{nrow(empty)} design cell combination(s) contain no {unit} - \\
@@ -688,7 +693,7 @@ print_cells_section <- function(cells) {
     cat("\n")
     return(invisible())
   }
-  observed <- cells$counts$n[cells$counts$n > 0]
+  observed <- cells$counts$n[(cells$counts$n_rows %||% cells$counts$n) > 0]
   cat(heading)
   cat("  ", paste(c(cells$group_vars, cells$cell_vars), collapse = " x "),
     ": ", length(observed), " non-empty cell(s)\n",

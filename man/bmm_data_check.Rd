@@ -34,6 +34,9 @@ An object of class \code{bmm_data_check} with a print method. The object
 is a list containing the summarized \code{response}, \code{predictors} and \code{cells}
 information (including the full cell count table in \verb{$cells$counts}), all
 \code{findings}, and the captured results of the validation \code{pipeline}.
+\verb{$cells$unit} says what a cell's \code{n} counts (\code{"trials"}, \code{"rows"} or
+\code{"observations"}); when it counts trials, \verb{$cells$counts} also holds each
+cell's \code{n_rows} and the object its total \code{n_trials}.
 }
 \description{
 Inspect whether your data is coded the way a \code{bmmodel} expects

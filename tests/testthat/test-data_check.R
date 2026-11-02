@@ -243,6 +243,22 @@ test_that("bmm_data_check flags aggregated cells with fewer than 10 trials in to
   expect_false(any(grepl("fewer than", finding_messages(res5))))
 })
 
+test_that("bmm_data_check flags cells whose rows hold no trials, not as empty cells", {
+  dat <- sdt_yn_cells(50L)
+  dat[dat$id == 1, c("n_trials", "n_old")] <- NA
+  msgs <- finding_messages(sdt_yn_check(dat))
+  expect_true(any(grepl("2 design cell(s) have fewer than 10 trials: id=1, cond=a (n=0)",
+    msgs, fixed = TRUE)))
+  expect_false(any(grepl("contain no trials", msgs)))
+
+  dat[c("n_trials", "n_old")] <- NA_integer_
+  res <- sdt_yn_check(dat)
+  expect_identical(res$cells$unit, "trials")
+  expect_no_warning(out <- capture.output(print(res, color = FALSE)))
+  expect_true(any(grepl("id x cond: 20 non-empty cell(s)", out, fixed = TRUE)))
+  expect_true(any(grepl("trials per cell: min 0 / median 0 / max 0", out, fixed = TRUE)))
+})
+
 test_that("bmm_data_check counts rows and checks no cell when the trial counts are missing", {
   res <- sdt_yn_check(sdt_yn_cells(50L), n_trials = "trials")
   expect_identical(res$cells$unit, "rows")
