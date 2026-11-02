@@ -21,6 +21,12 @@ model_cases_sdt_mafc <- function() {
                       sd = c(d = "exponential(1)"))
     ),
     init = list(sdt_mafc = list(model = model, formula = bmf(d ~ 1 + (1 | id)), data = re_data)),
-    links = list(sdt_mafc = list(model = model, settable = "d"))
+    links = list(sdt_mafc = list(model = model, settable = "d")),
+    simulate = list(
+      sdt_mafc = list(
+        model = sdt_mafc("n_correct", "n_trials", m = "m"), pars = list(d = 1),
+        design = data.frame(m = 2:5, n_trials = 40), formula = bmf(d ~ 1), simulate_pars = list(d = 1)
+      )
+    )
   )
 }

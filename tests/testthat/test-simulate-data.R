@@ -1,0 +1,238 @@
+# simulate_data() for every model. The round trip runs each `simulate` case of
+# the model-case registry (helper-model-cases.R) through check_data() and a
+# mock fit. The statistic tests compare one statistic of n = 1e5 simulated
+# observations of one cell or display with a value computed here from literal
+# native values, within 5 Monte Carlo SE, so a wrong link conversion, a missing
+# `2 * bound` or a dropped softmax reference fails.
+#
+# simulate_data() calls the r*() functions, so a bug that r*() shares with
+# d*() cancels out wherever the reference is a d*() function. For m3 and mpt,
+# r*() and d*() even share the probability vector; their references are
+# therefore the closed forms of the model, written out here.
+
+expect_within_mc <- function(sim, expected, label) {
+  se <- sqrt(stats::var(sim) / length(sim))
+  expect_lt(abs(mean(sim) - expected) / se, 5, label = label)
+}
+
+circular_mean_cos <- function(density) {
+  stats::integrate(function(x) cos(x) * density(x), -pi, pi)$value
+}
+
+# P(upper boundary) of a Wiener process with drift v, boundary separation a,
+# relative start point z and diffusion constant 1
+p_upper <- function(v, a, z) (1 - exp(-2 * v * a * z)) / (1 - exp(-2 * v * a))
+
+n_sim <- 1e5
+
+test_that("simulate_data() output passes check_data() and a mock fit for every simulate case", {
+  skip_on_cran()
+  withr::local_seed(20261102)
+  for (name in names(cases <- model_test_cases("simulate"))) {
+    case <- cases[[name]]
+    data <- simulate_data(case$model, case$pars, case$design, formula = case$formula)
+    response <- case$response %||% unlist(case$model$resp_vars, use.names = FALSE)
+    expect_in(c(names(case$design), response), names(data))
+    expect_identical(nrow(data), nrow(case$design), label = name)
+    expect_no_warning(suppressMessages(check_data(case$model, data, case$formula)),
+                      message = name)
+    # the custom m3 version warns that its default priors follow its links
+    fit <- suppressWarnings(suppressMessages(bmm(case$formula, data, case$model,
+                                                 backend = "mock", mock_fit = 1, rename = FALSE)))
+    expect_identical(parameter_info(fit)$parameter,
+                     parameter_info(case$model, case$formula)$parameter, label = name)
+    expect_mapequal(lapply(attr(data, "simulate_pars"), unique), case$simulate_pars)
+  }
+})
+
+test_that("scale = 'native' gives the data of the link values and of the generator", {
+  model <- mixture2p("y")
+  link <- withr::with_seed(5, simulate_data(model, list(kappa = 2, thetat = 0), n_trials = 50))
+  native <- withr::with_seed(5, simulate_data(model, list(kappa = exp(2), thetat = 0.5),
+                                              scale = "native", n_trials = 50))
+  direct <- withr::with_seed(5, rmixture2p(50, mu = 0, kappa = exp(2), p_mem = 0.5))
+  expect_identical(link$y, direct)
+  expect_identical(native$y, direct)
+})
+
+test_that("the simulate_pars attribute holds the link values whatever the scale", {
+  model <- mixture3p("y", nt_features = c("nt1", "nt2"), set_size = 3)
+  design <- data.frame(nt1 = c(1, -1), nt2 = c(2, -2), cond = c("a", "b"))
+  data <- simulate_data(model, list(kappa = exp(1), thetat = c(0.6, 0.5), thetant = 0.2),
+                        design, scale = "native")
+  expect_identical(data$cond, design$cond)
+  expect_equal(attr(data, "simulate_pars"), data.frame(
+    mu1 = c(0, 0), kappa = c(1, 1), thetat = log(c(0.6, 0.5) / c(0.2, 0.3)),
+    thetant = log(0.2 / c(0.2, 0.3))
+  ))
+  expect_identical(attr(data, "simulate_call"), list(model = class(model), scale = "native"))
+})
+
+test_that("simulate_data() refuses what it cannot simulate", {
+  model <- mixture2p("y")
+  expect_error(simulate_data(list(name = "x"), list()), "has no simulate_data\\(\\) method")
+  expect_error(simulate_data(model, list(kappa = 2, thetat = 0, p = 1), n_trials = 5),
+               "Unknown parameter.*'p'")
+  expect_error(simulate_data(model, list(kappa = 2), n_trials = 5), "No value.*'thetat'")
+  expect_error(simulate_data(model, list(kappa = 1:2, thetat = 0), n_trials = 5),
+               "'kappa'.*length 2")
+  expect_error(simulate_data(model, list(kappa = 2, thetat = 0)), "n_trials")
+  expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0)),
+               "'stim', 'n'")
+  expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0, bias = 0),
+                             data.frame(stim = 0:1, n = 10)),
+               "one of 'criterion', 'bias'")
+  custom <- m3(resp_cats = c("corr", "npl"), num_options = c(1, 4), version = "custom",
+               links = list(a = "identity"))
+  expect_error(simulate_data(custom, list(a = 1), data.frame(n_trials = 5)), "formula")
+  simplex <- mpt(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")), simplex = c("gA", "gB", "gC"))
+  expect_error(simulate_data(simplex, list(gA = 0.2, gB = 0.3, gC = 0.4), data.frame(n_trials = 5)),
+               "sum to 1")
+})
+
+test_that("count models give each row its own number of trials and options", {
+  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"),
+              choice_rule = "softmax", version = "ss")
+  design <- data.frame(n_trials = c(1, 1000, 40, 7), n_corr = 1, n_other = c(0, 4, 0, 4), n_npl = 5)
+  data <- simulate_data(model, list(c = 3, a = 3), design)
+  expect_equal(unname(rowSums(data[c("corr", "other", "npl")])), c(1, 1000, 40, 7))
+  expect_identical(data$other[design$n_other == 0], c(0L, 0L))
+  mpt_model <- mpt(mpt_2htm_trees(), tree_id = "item")
+  mpt_data <- simulate_data(mpt_model, list(D = 0, g = 0),
+                            data.frame(item = c("old", "new"), n_trials = c(1, 1000)))
+  expect_equal(unname(rowSums(mpt_data[c("old", "new")])), c(1, 1000))
+})
+
+test_that("the one-display generators get each trial's own values", {
+  model <- mixture3p("y", nt_features = "nt1", set_size = 2)
+  withr::local_seed(11)
+  data <- simulate_data(model, list(kappa = 3, thetat = rep_len(c(5, -5), 2000), thetant = -5),
+                        data.frame(nt1 = rep(2, 2000)))
+  near_target <- abs(data$y) < 0.5
+  expect_gt(mean(near_target[c(TRUE, FALSE)]), 0.9)
+  expect_lt(mean(near_target[c(FALSE, TRUE)]), 0.2)
+})
+
+test_that("ezdm drops the summaries bmm() rejects and says so", {
+  model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials")
+  withr::local_seed(3)
+  expect_warning(
+    data <- simulate_data(model, list(drift = 0, bound = 1.5, ndt = -4.6),
+                          data.frame(n_trials = rep(3, 2000))),
+    "Dropped [0-9]+ of 2000 rows"
+  )
+  dropped <- attr(data, "dropped_rows")
+  expect_gt(length(dropped), 0)
+  expect_identical(nrow(data) + length(dropped), 2000L)
+  expect_identical(nrow(attr(data, "simulate_pars")), nrow(data))
+  expect_true(all(data$mean_rt > exp(-4.6)))
+})
+
+test_that("simulated statistics of the circular models match their densities", {
+  skip_on_cran()
+  withr::local_seed(1)
+  y <- simulate_data(mixture2p("y"), list(kappa = 2, thetat = 0.4), n_trials = n_sim)$y
+  expect_within_mc(cos(y), circular_mean_cos(function(x) dmixture2p(x, 0, 7.389056, 0.5986877)),
+                   "mixture2p")
+
+  y <- simulate_data(sdm("y"), list(c = 2, kappa = 1.75), n_trials = n_sim)$y
+  expect_within_mc(cos(y), circular_mean_cos(function(x) dsdm(x, 0, 7.389056, 5.754603)), "sdm")
+
+  display <- data.frame(set_size = rep(3, n_sim), nt1 = 1.5, nt2 = -2, d1 = 1, d2 = 2)
+  model <- mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size")
+  y <- simulate_data(model, list(kappa = 2, thetat = 0.5, thetant = -0.5), display)$y
+  # softmax(c(0.5, -0.5, 0)): the guessing weight is the reference
+  expect_within_mc(cos(y), circular_mean_cos(function(x) {
+    dmixture3p(x, c(0, 1.5, -2), 7.389056, p_mem = 0.5064804, p_nt = 0.1863237)
+  }), "mixture3p")
+
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "full")
+  y <- simulate_data(model, list(kappa = 2, a = 0, c = 0.5, s = 0), display)$y
+  expect_within_mc(cos(y), circular_mean_cos(function(x) {
+    dimm(x, c(0, 1.5, -2), c(0, 1, 2), c = 1.648721, a = 1, b = 1, s = 1, kappa = 7.389056)
+  }), "imm")
+})
+
+test_that("simulated decisions of the RT models match the closed forms", {
+  skip_on_cran()
+  withr::local_seed(2)
+  data <- simulate_data(ddm("rt", "response"), list(drift = 1, bound = 0, ndt = -1.2, zr = 0.4),
+                        n_trials = n_sim)
+  expect_within_mc(data$response, p_upper(v = 1, a = 1, z = 0.5986877), "ddm")
+
+  # the simple version's bound is half the boundary separation
+  data <- simulate_data(cswald("rt", "response", version = "simple"),
+                        list(drift = 0, bound = -0.2876821, ndt = -1.2), n_trials = n_sim)
+  expect_within_mc(data$response, p_upper(v = 1, a = 1.5, z = 0.5), "cswald simple")
+
+  data <- simulate_data(cswald("rt", "response", version = "crisk"),
+                        list(drift = 0.8, bound = 0, ndt = -1.2, zr = 0.3), n_trials = n_sim)
+  expect_within_mc(data$response, p_upper(v = 0.8, a = 1, z = 0.5744425), "cswald crisk")
+
+  design <- data.frame(n_trials = rep(100, n_sim))
+  data <- simulate_data(ezdm("mean_rt", "var_rt", "n_upper", "n_trials"),
+                        list(drift = 1, bound = 0.1823216, ndt = -1.2), design)
+  expect_within_mc(data$n_upper / 100, stats::plogis(1 * 1.2), "ezdm 3par")
+
+  data <- simulate_data(ezdm(c("m_up", "m_lo"), c("v_up", "v_lo"), "n_upper", "n_trials",
+                             version = "4par"),
+                        list(drift = 1, bound = 0.1823216, ndt = -1.2, zr = -0.3), design)
+  expect_within_mc(data$n_upper / 100, p_upper(v = 1, a = 1.2, z = 0.4255575), "ezdm 4par")
+})
+
+test_that("simulated responses of the signal detection models match their densities", {
+  skip_on_cran()
+  withr::local_seed(3)
+  signal <- data.frame(stimulus = rep(1, n_sim), n_trials = 1)
+
+  k <- simulate_data(sdt_yn("k", "stimulus", "n_trials"),
+                     list(d = 1, criterion = 0.5, sdratio = 0.2231436), signal)$k
+  expect_within_mc(k, dsdt_yn(1, 1, 1, d = 1, criterion = 0.5, sdratio = 1.25), "sdt_yn")
+
+  k <- simulate_data(sdt_mafc("k", "n_trials", m = 4), list(d = 1), signal)$k
+  expect_within_mc(k, dsdt_mafc(1, 1, 4, d = 1), "sdt_mafc")
+
+  # parsimonious thresholds: criterion + exp(spacing) * log(k / (K - k))
+  thresholds <- c(-0.8862944, 0.0945349, 0.9054651, 1.8862944)
+  rating <- function(version, ...) {
+    sdt_rating(paste0("r", 1:5), "stimulus", version = version, ...)
+  }
+  base <- list(d = 1, criterion = 0.5, spacing = 0, sdratio = 0.2)
+  k <- simulate_data(rating("standard"), base, signal)$r5
+  expect_within_mc(k, dsdt_rating(c(0, 0, 0, 0, 1), 1, d = 1, thresholds = thresholds,
+                                  sdratio = 1.221403), "sdt_rating standard")
+  k <- simulate_data(rating("dpsdt"), c(base, Ro = 0.3), signal)$r5
+  expect_within_mc(k, dsdt_dpsdt(c(0, 0, 0, 0, 1), 1, d = 1, thresholds = thresholds,
+                                 Ro = 0.5744425, Rn = 0, sdratio = 1.221403), "sdt_rating dpsdt")
+  metad <- sdt_rating(paste0("r", 1:4), "stimulus", version = "metad")
+  k <- simulate_data(metad, c(base, logmratio = -0.2231436), signal)$r4
+  expect_within_mc(k, dsdt_metad(c(0, 0, 0, 1), 1, d = 1, thresholds = c(-0.5986123, 0.5, 1.5986123),
+                                 metad = 0.8, sdratio = 1.221403), "sdt_rating metad")
+
+  k <- simulate_data(sdt_ranking(paste0("rank", 1:4), m = 4, dist = "normal"),
+                     list(d = 1, sdratio = 0.2), signal)$rank1
+  expect_within_mc(k, dsdt_ranking(c(1, 0, 0, 0), 4, d = 1, sdratio = 1.221403, dist = "normal"),
+                   "sdt_ranking")
+
+  k <- simulate_data(sdt_cdp("", "stimulus", n_new = 2, n_old = 2),
+                     list(dfam = 1, drec = 1, criterion = 0, spacing = 0, rcrit = 0), signal)
+  expect_within_mc(k$remember4, dsdt_cdp(c(0, 0, 0, 0, 0, 1), 1, dfam = 1, drec = 1,
+                                         thresholds = c(-1.0986123, 0, 1.0986123), rcrit = 0,
+                                         n_new = 2), "sdt_cdp")
+})
+
+test_that("simulated counts of the m3 and mpt models match their closed forms", {
+  skip_on_cran()
+  withr::local_seed(4)
+  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5),
+              choice_rule = "softmax", version = "ss")
+  k <- simulate_data(model, list(c = 2, a = 1), data.frame(n_trials = rep(1, n_sim)))$corr
+  # softmax activations b + a + c, b + a, b with b = 0, times the number of options
+  expect_within_mc(k, exp(3) / (exp(3) + 4 * exp(1) + 5), "m3")
+
+  model <- mpt(mpt_2htm_trees(), tree_id = "item")
+  k <- simulate_data(model, list(D = 0.5, g = -0.3),
+                     data.frame(item = rep("old", n_sim), n_trials = 1))$old
+  expect_within_mc(k, 0.6224593 + (1 - 0.6224593) * 0.4255575, "mpt")
+})
