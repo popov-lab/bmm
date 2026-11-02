@@ -286,18 +286,20 @@
 #'   while both fitted alike with the parameter free per m. They fitted each
 #'   participant on their own. In bmm the test compares `d ~ 1` under `noise =
 #'   "gaussian"` with `d ~ 1` under `noise = "gumbel"`, on the same similarity
-#'   and `options`; with several participants, `d` stays free per participant
-#'   and fixed across m in both fits, as in `d ~ 1 + (1 | id)`. The Gumbel fit
-#'   is their softmax model, and both log-likelihoods are log probabilities
-#'   over the offered options, so `loo_compare()` reads them as they are (see
-#'   the examples). Comparing `d ~ 1` with `d ~ 0 + m_condition` within one
-#'   noise checks whether that model needs a parameter per m. [sdm()] with the
-#'   same `options` gives this check for `c` (`c ~ 1` against `c ~ 0 +
-#'   m_condition`); with `kappa` estimated it is not their softmax model,
-#'   which keeps the measured similarity. `d` under normal noise and the
-#'   Gumbel parameters (`d` with `noise = "gumbel"`, or `c` of [sdm()]) are
-#'   not on one scale (see the section Noise), so compare the fits, or how
-#'   each parameter varies across m, not their values.
+#'   and `options`; with several participants, `d` varies by participant and
+#'   stays fixed across m in both fits, either unpooled as in `d ~ 0 + id`,
+#'   the analogue of their separate fits, or partially pooled as in `d ~ 1 +
+#'   (1 | id)`. The Gumbel fit is their softmax model, and both
+#'   log-likelihoods are log probabilities over the offered options, so
+#'   `loo_compare()` reads them as they are (see the examples). Comparing
+#'   `d ~ 1` with `d ~ 0 + m_condition` within one noise checks whether that
+#'   model needs a parameter per m. [sdm()] with the same `options` gives
+#'   this check for `c` (`c ~ 1` against `c ~ 0 + m_condition`); with
+#'   `kappa` estimated it is not their softmax model, which keeps the
+#'   measured similarity. `d` under normal noise and the Gumbel parameters
+#'   (`d` with `noise = "gumbel"`, or `c` of [sdm()]) are not on one scale
+#'   (see the section Noise), so compare the fits, or how each parameter
+#'   varies across m, not their values.
 #'   For either noise, the log-likelihood is a log probability over the
 #'   offered options, as for the full wheel (see the section Comparing with
 #'   continuous models); `sdm(options = )` reports it on the density scale,
@@ -306,15 +308,18 @@
 #'   log-likelihood.
 #'
 #'   Under normal noise the likelihood integrates over the offered options
-#'   once per cell, a combination of a value of `d` and an option set, and
-#'   needs no table, so `d_max` is not used. Measured on one chain and one
-#'   thread with fixed-step NUTS on an Apple M3 Max laptop, a cell cost about
-#'   0.07 ms per gradient with 2 options and 0.18 ms with 16. The design of
-#'   Robinson et al. with `d` per participant and m (30 participants, 15,000
-#'   trials, 120 cells) took 14 ms per gradient, and 500 trials with random
-#'   foils, each trial its own cell, took 41 ms with 4 options and 87 ms
-#'   with 16. Gumbel noise needs no integral and took 1 ms and 0.2 to 0.3 ms
-#'   for the same designs. Under normal noise only, `bmm()` says when there
+#'   once per cell: the rows that offer one option set within a run of
+#'   adjacent rows with equal values of the predictors of `d`, grouping
+#'   variables included. Sorting the data by the predictors of `d` keeps the
+#'   cells few. The likelihood needs no table, so `d_max` is not used.
+#'   Measured on one chain and one thread with fixed-step NUTS on an Apple M3
+#'   Max laptop, a cell cost about 0.07 ms per gradient with 2 options and
+#'   0.18 ms with 16. The design of Robinson et al. with `d` per participant
+#'   and m (30 participants, 15,000 trials, 120 cells) took 14 ms per
+#'   gradient, and 500 trials with random foils, each trial its own cell,
+#'   took 41 ms with 4 options and 87 ms with 16. Gumbel noise needs no
+#'   integral and took 1 ms and 0.2 to 0.3 ms for the same designs. Under
+#'   normal noise only, `bmm()` says when there
 #'   are more cells than half the rows, as with a continuous predictor of `d`
 #'   or foils drawn anew on each trial. `log_lik()`, `posterior_predict()` and
 #'   `pp_check()` read each row's options from the data; to predict, pass
