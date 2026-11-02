@@ -276,6 +276,8 @@ test_that("dtcc() and rtcc() refuse the options check_data() refuses", {
   expect_error(rtcc(5, 2, f, options = c(0, 90.4 * step)), "lies 0.4 of a step from the nearest")
   # within a tenth of a step an option is rounded onto the grid, as in check_data()
   expect_equal(dtcc(0, 2, f, options = c(0, 90.05 * step)), dtcc(0, 2, f, options = c(0, pi / 2)))
+  expect_equal(dtcc(0, 2, f, options = c(0, 90.09 * step)), dtcc(0, 2, f, options = c(0, pi / 2)))
+  expect_error(dtcc(0, 2, f, options = c(0, 90.11 * step)), "lies 0.11 of a step from the nearest")
 })
 
 ############################################################################# !
