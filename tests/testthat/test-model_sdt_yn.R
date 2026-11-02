@@ -64,8 +64,8 @@ test_that("trial-level check_data() names the responses that are not 0 or 1", {
   expect_error(
     check_data(model, data.frame(resp = c(35, 12), stimulus = 0:1), bmf(d ~ 1, criterion ~ 1)),
     paste0("With one row per trial, the response column 'resp' must hold one of '0', '1' in ",
-           "every row. Found: '35', '12'. For counts aggregated over trials, name the column ",
-           "of trial numbers with n_trials."),
+           "every row. Found: '35', '12'. For counts aggregated over trials, construct the ",
+           "model with n_trials."),
     fixed = TRUE
   )
 })

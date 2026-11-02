@@ -78,6 +78,13 @@ test_that("sdt_mafc check_data resolves per-row set size from a data column", {
   expect_equal(result$m_afc, c(2L, 4L, 6L))
 })
 
+test_that("sdt_mafc requirements list the set-size column only when m names one", {
+  line <- "Number of alternatives (m): one integer >= 2 per row"
+  expect_match(sdt_mafc("c", m = "k")$requirements, line, fixed = TRUE)
+  expect_match(sdt_mafc("c", "n", m = "k")$requirements, line, fixed = TRUE)
+  expect_no_match(sdt_mafc("c", m = 4)$requirements, line, fixed = TRUE)
+})
+
 test_that("sdt_mafc check_data errors when the set-size column is missing", {
   model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
   dat <- data.frame(n_correct = c(70, 65), n_trials = c(100, 100))

@@ -279,12 +279,12 @@ summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   other_groups <- NULL
   other_counts <- NULL
   if (trial_level && length(group_vars) > 1) {
-    also_fixed <- intersect(group_vars[-1], predictor_side_vars(formula))
-    also_fixed <- also_fixed[vapply(also_fixed, function(v) {
+    also_predictor <- intersect(group_vars[-1], predictor_side_vars(formula))
+    also_predictor <- also_predictor[vapply(also_predictor, function(v) {
       is_discrete_var(data[[v]])
     }, logical(1))]
-    cell_vars <- c(cell_vars, also_fixed)
-    per_level <- setdiff(group_vars[-1], also_fixed)
+    cell_vars <- c(cell_vars, also_predictor)
+    per_level <- setdiff(group_vars[-1], also_predictor)
     if (length(per_level) > 0) {
       other_counts <- lapply(per_level, function(v) table(droplevels(as.factor(data[[v]]))))
       names(other_counts) <- per_level
@@ -360,7 +360,7 @@ group_level_findings <- function(counts, min_trials) {
     }
     labels <- paste0(v, "=", names(low), " (n=", low, ")")
     data_check_finding("note", glue(
-      "{length(low)} level(s) of '{v}' have fewer than {format(threshold)} \\
+      "{length(low)} level(s) of '{v}' have fewer than {format(threshold, digits = 15)} \\
       observations: {paste(utils::head(labels, 3), collapse = '; ')}\\
       {if (length(low) > 3) ', ...' else ''}"
     ))
@@ -738,7 +738,8 @@ print_other_groups <- function(cells) {
   cat_wrapped(glue(
     "Rows are single trials, so of the grouping variables only \
     '{cells$group_vars}' (the first in the formula found in the data, taken as \
-    the participant) and any that is also a predictor are crossed into cells; \
+    the participant) and those that are also discrete predictors (non-numeric, \
+    or numeric with at most {n_discrete_max} values) are crossed into cells; \
     the others are counted per level:"
   ), "  ")
   for (i in seq_len(nrow(others))) {

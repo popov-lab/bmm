@@ -23,7 +23,7 @@ is_trial_level <- function(model) {
     "With one row per trial, {what} must hold one of {collapse_comma(categories)} \\
     in every row. Found: {collapse_comma(utils::head(bad, 5))}\\
     {if (length(bad) > 5) ', ...' else ''}. For counts aggregated over trials, \\
-    name the column of trial numbers with n_trials."
+    construct the model with n_trials."
   )
   counts <- matrix(0L, nrow = length(values), ncol = length(categories),
                    dimnames = list(NULL, as.character(categories)))
@@ -82,10 +82,12 @@ trial_level_notes_docs <- paste0(
   "   - `loo()` leaves out single trials on trial rows and whole cells on ",
   "aggregated rows. These are different predictions, and the log-likelihoods ",
   "of the trial rows sum to the cell's log-likelihood less the log binomial ",
-  "(multinomial) coefficient, so ELPD values compare only fits to the same ",
-  "layout. `kfold(fit, group = \"id\")` leaves ",
-  "out whole participants with either layout.\n",
+  "coefficient, so ELPD values compare only fits to the same layout. ",
+  "`kfold(fit, group = \"id\")` leaves out whole participants with either ",
+  "layout.\n",
   "   - `bmm(..., threads = n)` with `backend = \"cmdstanr\"` evaluates the ",
   "likelihood on `n` threads per chain, which shortens trial-level fits on a ",
-  "machine with cores to spare.\n"
+  "machine with cores to spare.\n",
+  "   - `ppp(fit, participant = \"id\")` names the participant when the formula ",
+  "has more than one grouping variable, such as item terms.\n"
 )

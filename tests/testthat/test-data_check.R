@@ -495,6 +495,7 @@ test_that("a grouping variable that is also a fixed predictor stays crossed with
 })
 
 test_that("the per-level bound is printed in full", {
+  withr::local_options(digits = 4)
   counts <- list(id = table(rep(1:6, c(2001, 2001, 2002, 2002, 1000, 3))))
   expect_match(group_level_findings(counts, 1500)[[1]]$message,
                "fewer than 1000.5 observations", fixed = TRUE)
@@ -532,4 +533,24 @@ test_that("a grouping variable used as a random slope stays crossed with the par
   expect_equal(res$cells$cell_vars, "grp")
   expect_equal(res$cells$other_groups$variable, "item")
   expect_equal(finding_messages(res), "1 design cell(s) have fewer than 10 observations: id=1, grp=B (n=3)")
+})
+
+# a numeric grouping variable with more distinct values than n_discrete_max is
+# not crossed even when it is also a predictor; it is counted per level
+test_that("a numeric grouping variable with many values stays per level", {
+  dat <- expand.grid(id = 1:4, item = 1:24)
+  dat <- dat[!(dat$id == 1 & dat$item > 15), ]
+  dat$blk <- (dat$item - 1) %/% 2 + 1
+  dat$stimulus <- (dat$item %/% 2) %% 2
+  dat$resp <- as.integer((dat$id + dat$item) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(d ~ blk + (1 | id) + (1 | blk) + (1 | item), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(res$cells$group_vars, "id")
+  expect_length(res$cells$cell_vars, 0)
+  expect_equal(res$cells$other_groups$variable, c("blk", "item"))
+  printed <- paste(trimws(capture.output(print(res, color = FALSE))), collapse = " ")
+  expect_match(printed, "discrete predictors (non-numeric, or numeric with at most 10 values)",
+               fixed = TRUE)
 })
