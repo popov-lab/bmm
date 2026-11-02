@@ -170,18 +170,21 @@
 #'   in radians, as for [sdm()] and [mixture2p()], and each value is assigned to
 #'   the nearest of the `n_options` options (+-pi fall into the same option).
 #'   With `units = "bins"`, it is the chosen option's offset from the target in
-#'   option steps. The model treats the response as a choice among
-#'   `n_options` discrete options, so `n_options` should be the number of
-#'   options the participant could choose from.
+#'   option steps. On the full wheel, the model treats the response as a
+#'   choice among `n_options` discrete options, so `n_options` should be the
+#'   number of options the participant could choose from.
 #'
-#'   `n_options` is part of the model, not a resolution setting. Each option
+#'   On the full wheel, `n_options` is part of the model, not a resolution
+#'   setting. Each option
 #'   draws its own noise, and the more options lie near the target, the more
 #'   often one of them wins: at `d = 2`, with the Laplace similarity of the
 #'   examples built for each wheel (`tcc_similarity(..., n_options = n)`), the
 #'   probability of choosing an option at most 10 degrees from the target is
 #'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
 #'   continuous limit, and values of `d` fitted with different `n_options` are
-#'   not on one scale.
+#'   not on one scale. With `options`, `n_options` only places the options:
+#'   the choice is among the offered options alone, and any multiple of `m`
+#'   spaces `m` options equally.
 #'
 #' ## Grid limit on d
 #'
@@ -280,9 +283,9 @@
 #'
 #'   The design is that of Experiment 1 of Robinson et al. (2023), who
 #'   offered 2, 4, 8 or 16 equally spaced colours (16 options lie 22.5 degrees
-#'   apart, so they need `n_options = 720`). Their critical test fixes the
-#'   parameter across m and compares the two noises: with one value for all
-#'   m, the normal-noise TCC fitted better than the softmax (Gumbel) model,
+#'   apart, so `n_options` must be a multiple of 16, such as 720). Their
+#'   critical test fixes the parameter across m and compares the two noises:
+#'   with one value for all m, the normal-noise TCC fitted better than the softmax (Gumbel) model,
 #'   while both fitted alike with the parameter free per m. They fitted each
 #'   participant on their own. In bmm the test compares `d ~ 1` under `noise =
 #'   "gaussian"` with `d ~ 1` under `noise = "gumbel"`, on the same similarity
