@@ -231,6 +231,17 @@ test_that("rtcc() draws only offered options, with the frequencies dtcc() gives"
   }
 })
 
+test_that("rtcc() with options draws each row at its own d", {
+  withr::local_seed(566)
+  f <- opt_similarity(360)
+  x <- c(0, 90, 180, -90) * pi / 180
+  d <- rep(c(0.01, 20), 2000)
+  hit <- rtcc(length(d), d = d, similarity = f, options = x) == 0
+  # at d = 20 the target all but always wins; at d = 0.01 each option about a quarter of the time
+  expect_gt(mean(hit[d == 20]), 0.99)
+  expect_lt(mean(hit[d == 0.01]), 0.4)
+})
+
 test_that("dtcc() and rtcc() check the options as dsdm() does", {
   f <- opt_similarity(360)
   expect_error(dtcc(0, 1, f, options = c(0, NA, pi)), "missing or empty")
