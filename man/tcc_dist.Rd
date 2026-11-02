@@ -46,9 +46,10 @@ options, or the offered options as offsets from the target in radians,
 one set for all values (see the section "Forced-choice option sets" of
 \code{\link[=tcc]{tcc()}}). The probability is then taken over these options only, and is 0
 for an \code{x} off the set. As in \code{\link[=tcc]{tcc()}}, the set must include the target
-(an offset of 0), and each option must sit within a tenth of a step of
-one of the \code{n_options} positions, onto which it is rounded; values beyond
-\code{2 * pi} are refused as not in radians.}
+(an offset of 0) and offer each option once (\code{pi} and \code{-pi}, or \code{0} and
+\code{2 * pi}, are one option), and each option must sit within a tenth of a
+step of one of the \code{n_options} positions, onto which it is rounded;
+values beyond \code{2 * pi} are refused as not in radians.}
 
 \item{n}{Number of observations to generate.}
 }

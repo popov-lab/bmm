@@ -4321,9 +4321,10 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   one set for all values (see the section "Forced-choice option sets" of
 #'   [tcc()]). The probability is then taken over these options only, and is 0
 #'   for an `x` off the set. As in [tcc()], the set must include the target
-#'   (an offset of 0), and each option must sit within a tenth of a step of
-#'   one of the `n_options` positions, onto which it is rounded; values beyond
-#'   `2 * pi` are refused as not in radians.
+#'   (an offset of 0) and offer each option once (`pi` and `-pi`, or `0` and
+#'   `2 * pi`, are one option), and each option must sit within a tenth of a
+#'   step of one of the `n_options` positions, onto which it is rounded;
+#'   values beyond `2 * pi` are refused as not in radians.
 #'
 #' @return `dtcc()` returns the probability of the option each `x` falls on (a
 #'   probability mass, not a density: divide by `2 * pi / n_options` for the
@@ -4417,7 +4418,12 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
     the {n_options} positions on the wheel. Options must sit on those positions: check \\
     n_options and that `options` is in radians."
   )
-  offsets <- unique(.bin_options(round(steps), n_options, "bins"))
+  offsets <- .bin_options(round(steps), n_options, "bins")
+  stopif(
+    anyDuplicated(offsets) > 0,
+    "`options` offers the same option twice (with n_options = {n_options}, offsets are \\
+    taken modulo the wheel)."
+  )
   stopif(
     !0L %in% offsets,
     "The target (an offset of 0) is not among `options`. Each trial must offer the target."

@@ -239,8 +239,11 @@ test_that("dtcc() and rtcc() check the options as dsdm() does", {
   expect_identical(dtcc(numeric(0), 1, f, options = x), numeric(0))
   expect_identical(dtcc(0, numeric(0), f, options = x), numeric(0))
   expect_equal(dtcc(c(NA, 0, 0), c(1, NA, 1), f, options = x), c(NA, NA, dtcc(0, 1, f, options = x)))
-  # a repeated option, or pi and -pi, is one option
-  expect_equal(dtcc(x, 1, f, options = c(x, 0, pi / 2 - 2 * pi)), dtcc(x, 1, f, options = x))
+  # a repeated option, pi and -pi, or 0 and 2*pi, is the same option twice, as check_data() says
+  for (twice in list(c(0, pi, pi), c(0, pi, -pi), c(0, 2 * pi), c(x, pi / 2 - 2 * pi))) {
+    expect_error(dtcc(0, 1, f, options = twice), "`options` offers the same option twice")
+    expect_error(rtcc(5, 1, f, options = twice), "`options` offers the same option twice")
+  }
   expect_error(dtcc(0, 1, f, options = "a"), "must be numeric, in radians")
   expect_error(rtcc(5, 1, f, options = "a"), "must be numeric, in radians")
 })
