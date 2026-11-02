@@ -96,7 +96,10 @@ option opposite the target. The model assumes the similarity depends only
 on the distance, the same for every target and on both sides of it. The
 values are fixed, not estimated; Schurgin et al. (2020) measured them in
 a separate perceptual matching task. With 360 options in 1-degree steps,
-\code{similarity[k + 1]} is the similarity at \code{k} degrees.
+\code{similarity[k + 1]} is the similarity at \code{k} degrees. Without a measured
+similarity, \code{\link[=tcc_similarity]{tcc_similarity()}} returns a von Mises or Laplace shape for a
+chosen \code{kappa}; the fit is then a TCC with that shape fixed. A model that
+estimates the width of the gradient from the responses is the \code{\link[=sdm]{sdm()}}.
 }
 
 \subsection{Response}{
@@ -108,6 +111,14 @@ With \code{units = "bins"}, it is the chosen option's offset from the target in
 option steps. The model treats the response as a choice among
 \code{n_options} discrete options, so \code{n_options} should be the number of
 options the participant could choose from.
+
+\code{n_options} is part of the model, not a resolution setting. Each option
+draws its own noise, and the more options lie near the target, the more
+often one of them wins: at \code{d = 2}, with the similarity of the examples,
+the probability of a response within 10 degrees of the target is 0.68 on
+360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
+continuous limit, and values of \code{d} fitted with different \code{n_options} are
+not on one scale.
 }
 
 \subsection{Grid limit on d}{
@@ -179,8 +190,7 @@ Continuous predictors of \code{d} are supported at the per-trial cost.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
-f <- exp(-(0:180) / 20)
-f <- (f - min(f)) / (1 - min(f))
+f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
 dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
 \dontshow{\}) # examplesIf}

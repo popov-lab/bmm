@@ -56,6 +56,40 @@ test_that("tcc() refuses a similarity vector the model cannot read", {
   expect_error(tcc("err"), "missing.*similarity")
 })
 
+test_that("tcc_similarity() scales the Laplace and von Mises shapes to 1 at the target and 0 opposite", {
+  delta <- (0:180) * pi / 180
+  laplace <- exp(-2.5 * delta)
+  vonmises <- exp(4 * (cos(delta) - 1))
+  expect_equal(tcc_similarity("laplace", kappa = 2.5),
+               (laplace - laplace[181]) / (1 - laplace[181]), tolerance = 1e-14)
+  expect_equal(tcc_similarity("vonmises", kappa = 4),
+               (vonmises - vonmises[181]) / (1 - vonmises[181]), tolerance = 1e-14)
+  expect_equal(tcc_similarity("laplace", kappa = 1 / deg2rad(20)), tcc_test_similarity(),
+               tolerance = 1e-14)
+  expect_length(tcc_similarity("vonmises", kappa = 4, n_options = 180), 91)
+})
+
+test_that("tcc_similarity() stays exact where the scaled shapes approach a line or a cosine", {
+  delta <- (0:180) * pi / 180
+  expect_equal(tcc_similarity("laplace", kappa = 1e-9), 1 - delta / pi, tolerance = 1e-8)
+  expect_equal(tcc_similarity("vonmises", kappa = 1e-9), (1 + cos(delta)) / 2, tolerance = 1e-8)
+  sharp <- tcc_similarity("vonmises", kappa = 1e4)
+  expect_equal(sharp[c(1, 181)], c(1, 0))
+  expect_true(all(is.finite(sharp)) && all(sharp >= 0))
+})
+
+test_that("a vector from tcc_similarity() is accepted by tcc()", {
+  expect_s3_class(tcc("err", similarity = tcc_similarity("vonmises", kappa = 8)), "tcc")
+})
+
+test_that("tcc_similarity() refuses an unknown shape, a non-positive kappa and an odd option count", {
+  expect_error(tcc_similarity("gaussian", kappa = 1), "should be one of")
+  expect_error(tcc_similarity("laplace", kappa = 0), "single positive number")
+  expect_error(tcc_similarity("laplace", kappa = c(1, 2)), "single positive number")
+  expect_error(tcc_similarity("laplace", kappa = 1, n_options = 361), "even number")
+  expect_error(tcc_similarity("laplace"), "missing.*kappa")
+})
+
 test_that("tcc() refuses odd or tiny option counts and a non-positive d_max", {
   f <- tcc_test_similarity(360)
   expect_error(tcc("err", similarity = f[1:3], n_options = 5), "even number")

@@ -4323,8 +4323,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @keywords distribution
 #'
 #' @examples
-#' f <- exp(-(0:180) / 20)
-#' f <- (f - min(f)) / (1 - min(f))
+#' f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
 #' x <- 2 * pi * (-179:180) / 360
 #' plot(x, dtcc(x, d = 2, similarity = f), type = "h")
 #' hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
