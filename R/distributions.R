@@ -4402,7 +4402,12 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
 .tcc_dist_options <- function(n_options, options) {
   stopif(!is.numeric(options), "`options` must be numeric, in radians.")
   stopif(length(options) == 0 || anyNA(options), "`options` must not be missing or empty.")
-  .check_option_units(options, "radians", "`options`")
+  # not .check_option_units(), whose message points to a units argument these lack
+  stopif(
+    any(abs(options) > 2 * pi),
+    "`options` must be in radians, but values beyond 2*pi show they are not. \\
+    Convert them with deg2rad()."
+  )
   steps <- options * n_options / (2 * pi)
   off_grid <- abs(steps - round(steps))
   at <- which.max(off_grid)

@@ -247,8 +247,14 @@ test_that("dtcc() and rtcc() check the options as dsdm() does", {
 
 test_that("dtcc() and rtcc() refuse the options check_data() refuses", {
   f <- opt_similarity(360)
-  expect_error(dtcc(0, 2, f, options = c(0, 90, 180)), "must be in radians")
-  expect_error(rtcc(5, 2, f, options = c(0, 90, 180)), "must be in radians")
+  # dtcc() and rtcc() have no units argument, so the message names deg2rad() only
+  for (err in list(expect_error(dtcc(0, 2, f, options = c(0, 90, 180))),
+                   expect_error(rtcc(5, 2, f, options = c(0, 90, 180))))) {
+    expect_identical(conditionMessage(err), paste(
+      "`options` must be in radians, but values beyond 2*pi show they are not.",
+      "Convert them with deg2rad()."
+    ))
+  }
   expect_error(dtcc(pi / 2, 2, f, options = c(pi / 2, pi)), "target \\(an offset of 0\\) is not among")
   expect_error(rtcc(5, 2, f, options = c(pi / 2, pi)), "target \\(an offset of 0\\) is not among")
   step <- 2 * pi / 360
