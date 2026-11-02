@@ -2,6 +2,7 @@
 
 ### New models
 * Add the **Target Confusability Competition model** (`tcc`) for continuous reproduction (Schurgin, Wixted & Brady, 2020). It estimates memory strength `d` from response errors in radians or option steps, given the similarity of each option to the target as a vector by distance. Also adds `dtcc()` and `rtcc()`. Its log-likelihood is a probability over options: `?tcc` shows how to compare it with `sdm()` or `mixture2p()` by LOO, and what to do when `d` reaches the grid limit `d_max` (#566). Thanks to @GidonFrischkorn
+* Add `tcc_cd()`, the TCC model for single-probe change detection: the probe's familiarity, `d` times its similarity to the target, is compared with a criterion, as in `sdt_yn()`. It takes the same similarity vector as `tcc()` and estimates `d` with `criterion` or `bias`, from responses coded 0 = "same" and 1 = "change". Also adds `dtcc_cd()` and `rtcc_cd()`. The new article *Two decision rules for change detection* sets it beside the decision rule of Lin & Oberauer (2022) (#566). Thanks to @GidonFrischkorn
 
 ### New features
 * bmm fits now work with the easystats packages (#477). `parameters::model_parameters()` and `bayestestR::describe_posterior()` summarise each model parameter on its own, without the fixed `mu` of the response-time models, and `modelbased::estimate_means(fit, by = "set_size", predict = "c")` returns a parameter on its native scale. insight now finds the predictors, response variables, data and priors you gave to `bmm()`; these functions failed on `m3()` and `mpt()` fits.
