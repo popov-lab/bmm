@@ -4320,7 +4320,10 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   options, or the offered options as offsets from the target in radians,
 #'   one set for all values (see the section "Forced-choice option sets" of
 #'   [tcc()]). The probability is then taken over these options only, and is 0
-#'   for an `x` off the set.
+#'   for an `x` off the set. As in [tcc()], the set must include the target
+#'   (an offset of 0), and each option must sit within a tenth of a step of
+#'   one of the `n_options` positions, onto which it is rounded; values beyond
+#'   `2 * pi` are refused as not in radians.
 #'
 #' @return `dtcc()` returns the probability of the option each `x` falls on (a
 #'   probability mass, not a density: divide by `2 * pi / n_options` for the
@@ -4393,11 +4396,28 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
   if (noise == "gumbel") .tcc_gumbel_logp else .tcc_logp
 }
 
-# the offered options of a d or r call as offsets in steps, checked as for dsdm()
+# the offered options of a d or r call as offsets in steps, refused where
+# check_data() would refuse them, so that dtcc() never returns a probability
+# for a set that tcc() cannot fit
 .tcc_dist_options <- function(n_options, options) {
   stopif(!is.numeric(options), "`options` must be numeric, in radians.")
   stopif(length(options) == 0 || anyNA(options), "`options` must not be missing or empty.")
-  unique(.bin_options(options, n_options, "radians"))
+  .check_option_units(options, "radians", "`options`")
+  steps <- options * n_options / (2 * pi)
+  off_grid <- abs(steps - round(steps))
+  at <- which.max(off_grid)
+  stopif(
+    off_grid[at] > 0.1,
+    "Option {at} of `options` lies {signif(off_grid[at], 2)} of a step from the nearest of \\
+    the {n_options} positions on the wheel. Options must sit on those positions: check \\
+    n_options and that `options` is in radians."
+  )
+  offsets <- unique(.bin_options(round(steps), n_options, "bins"))
+  stopif(
+    !0L %in% offsets,
+    "The target (an offset of 0) is not among `options`. Each trial must offer the target."
+  )
+  offsets
 }
 
 # log P of the option each x falls on among the offered options, -Inf off them

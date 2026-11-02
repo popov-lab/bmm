@@ -245,6 +245,19 @@ test_that("dtcc() and rtcc() check the options as dsdm() does", {
   expect_error(rtcc(5, 1, f, options = "a"), "must be numeric, in radians")
 })
 
+test_that("dtcc() and rtcc() refuse the options check_data() refuses", {
+  f <- opt_similarity(360)
+  expect_error(dtcc(0, 2, f, options = c(0, 90, 180)), "must be in radians")
+  expect_error(rtcc(5, 2, f, options = c(0, 90, 180)), "must be in radians")
+  expect_error(dtcc(pi / 2, 2, f, options = c(pi / 2, pi)), "target \\(an offset of 0\\) is not among")
+  expect_error(rtcc(5, 2, f, options = c(pi / 2, pi)), "target \\(an offset of 0\\) is not among")
+  step <- 2 * pi / 360
+  expect_error(dtcc(0, 2, f, options = c(0, 90.4 * step)), "lies 0.4 of a step from the nearest")
+  expect_error(rtcc(5, 2, f, options = c(0, 90.4 * step)), "lies 0.4 of a step from the nearest")
+  # within a tenth of a step an option is rounded onto the grid, as in check_data()
+  expect_equal(dtcc(0, 2, f, options = c(0, 90.05 * step)), dtcc(0, 2, f, options = c(0, pi / 2)))
+})
+
 ############################################################################# !
 # CELL TABLES AND THE GENERATED STAN CODE                                ####
 ############################################################################# !
