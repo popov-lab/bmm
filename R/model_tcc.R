@@ -301,7 +301,9 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 .tcc_check_similarity <- function(similarity, n_options) {
   .tcc_check_n_options(n_options)
   n_values <- n_options / 2 + 1
-  stopif(!is.numeric(similarity), "`similarity` must be a numeric vector.")
+  stopif(!is.numeric(similarity),
+         "`similarity` must be a numeric vector. For a von Mises or Laplace shape, use \\
+         tcc_similarity(); to estimate its width, use sdm().")
   stopif(length(similarity) != n_values,
          "`similarity` must hold {n_values} values, one for each distance from 0 to \\
          {n_options / 2} options, but it holds {length(similarity)}.")
