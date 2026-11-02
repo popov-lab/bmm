@@ -373,6 +373,7 @@ tcc_similarity <- function(shape = c("vonmises", "laplace"), kappa, n_options = 
 }
 
 # a model stored before `noise` existed is the Gaussian cell
+#' @exportS3Method
 cell_args.tcc <- function(model) {
   if (is.null(model$other_vars$noise)) list() else list(noise = model$other_vars$noise)
 }
