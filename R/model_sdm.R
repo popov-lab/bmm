@@ -331,14 +331,6 @@ sdm <- function(resp_error, version = "simple", activation = c("vonmises", "lapl
   scaling <- if (is.null(scaling)) .sdm_default_scaling(activation) else match.arg(scaling, .sdm_scalings)
   units <- match.arg(units)
   option_args <- .check_option_args(n_options, options, n_alternatives, units)
-  if (activation == "laplace") {
-    message2(
-      'sdm(activation = "laplace") is not the signal discrimination model of \\
-      Oberauer (2023), which uses a von Mises activation function; it is the \\
-      Laplace x Gumbel cell of his model space (Table 2). The fit is labelled \\
-      accordingly.'
-    )
-  }
   .model_sdm(
     resp_error = resp_error, version = version, activation = activation,
     scaling = scaling, n_options = option_args$n_options, units = units, options = options,

@@ -16,7 +16,7 @@ model_cases_sdm <- function() {
   # option where the response is the target), and four equally spaced options
   # with the response rounded onto them
   cells$sdm_grid <- sdm("dev_rad", n_options = 360)
-  cells$sdm_grid_laplace <- suppressMessages(sdm("dev_rad", n_options = 360, activation = "laplace"))
+  cells$sdm_grid_laplace <- sdm("dev_rad", n_options = 360, activation = "laplace")
   cells$sdm_options <- sdm("dev_rad", n_options = 360, options = c("opt1", "opt2"))
   cells$sdm_alternatives <- sdm("dev_rad", n_options = 360, n_alternatives = 4)
   data_of <- function(name) {

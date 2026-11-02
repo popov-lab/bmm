@@ -153,7 +153,7 @@ test_that("a model with n_options gets the sdm_grid family and the density-scale
   formula <- bmf(c ~ cond, kappa ~ 1)
   for (i in seq_len(nrow(sdm_cells))) {
     cell <- sdm_cells[i, ]
-    model <- suppressMessages(sdm("y", activation = cell$activation, scaling = cell$scaling, n_options = 360))
+    model <- sdm("y", activation = cell$activation, scaling = cell$scaling, n_options = 360)
     code <- stancode(formula, dat, model)
     expect_match(code, "target += sdm_grid_lpmf(Y | mu, c, kappa, sdm_K, sdm_activation, sdm_scaling);",
                  fixed = TRUE)
@@ -274,7 +274,7 @@ test_that("each grid cell runs the bmm() pipeline on the mock backend", {
   formula <- bmf(c ~ set_size, kappa ~ 1)
   models <- list(
     full = sdm("dev_rad", n_options = 360),
-    laplace = suppressMessages(sdm("dev_rad", n_options = 360, activation = "laplace")),
+    laplace = sdm("dev_rad", n_options = 360, activation = "laplace"),
     sets = sdm("dev_rad", n_options = 360, options = c("opt1", "opt2")),
     shorthand = sdm("dev_rad", n_options = 360, n_alternatives = 4)
   )
