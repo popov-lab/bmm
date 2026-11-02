@@ -257,7 +257,7 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_mafc <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, c(vars$n_trials, if (is.character(vars$m)) vars$m))
+  design <- .design_or_n(model, design, trials = vars$n_trials, counts = if (is.character(vars$m)) vars$m)
   sim <- .simulate_pars(model, pars, design, scale)
   response <- rsdt_mafc(nrow(design), design[[vars$n_trials]], .sdt_resolve_set_size(vars$m, design),
                         d = sim$native$d, dist = vars$dist)

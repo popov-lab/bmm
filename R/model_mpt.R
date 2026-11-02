@@ -2128,7 +2128,7 @@ configure_model.mpt <- function(model, data, formula) {
 #' @export
 simulate_data.mpt <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, c("n_trials", vars$tree_id, vars$covariates))
+  design <- .design_or_n(model, design, c(vars$tree_id, vars$covariates), trials = "n_trials")
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   for (group in vars$simplex) {

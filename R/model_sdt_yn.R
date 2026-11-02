@@ -626,7 +626,7 @@ configure_model.sdt_yn <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_yn <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, c(vars$stimulus, vars$n_trials))
+  design <- .design_or_n(model, design, vars$stimulus, trials = vars$n_trials)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   response <- rsdt_yn(nrow(design), design[[vars$n_trials]], .coerce_sdt_stimulus(design[[vars$stimulus]]),

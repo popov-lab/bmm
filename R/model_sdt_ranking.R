@@ -381,7 +381,7 @@ configure_model.sdt_ranking <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, c("n_trials", if (is.character(vars$m)) vars$m))
+  design <- .design_or_n(model, design, trials = "n_trials", counts = if (is.character(vars$m)) vars$m)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   counts <- rsdt_ranking(nrow(design), design$n_trials, .sdt_resolve_set_size(vars$m, design),

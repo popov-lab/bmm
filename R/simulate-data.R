@@ -140,8 +140,12 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
 
 # the design a method simulates on: the user's data frame, checked for the
 # columns the model reads, or n_trials rows without columns. `ragged` columns
-# may hold NA, where a display has fewer items than the design has columns
-.design_or_n <- function(model, design, columns = character(0), ..., ragged = character(0)) {
+# may hold NA, where a display has fewer items than the design has columns.
+# `trials` and `counts` are read columns that the generators take as whole
+# numbers, the numbers of trials of a row and other counts (options, set sizes)
+.design_or_n <- function(model, design, columns = character(0), ..., ragged = character(0),
+                         trials = character(0), counts = character(0)) {
+  columns <- c(columns, trials, counts)
   if (is.null(design)) {
     stopif(length(c(columns, ragged)) > 0,
            "{model$name} reads the column(s) {collapse_comma(c(columns, ragged))}: give them \\
@@ -160,7 +164,17 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
          reads. See ?simulate_data, section Design.")
   na <- columns[vapply(design[columns], anyNA, logical(1))]
   stopif(length(na) > 0, "The design's column(s) {collapse_comma(na)} contain NA.")
+  .check_whole_columns(design, trials, 1, "numbers of trials")
+  .check_whole_columns(design, counts, 0, "counts")
   design
+}
+
+.check_whole_columns <- function(design, columns, min, what) {
+  bad <- columns[!vapply(design[columns], function(x) is.numeric(x) && all(x >= min & x %% 1 == 0),
+                         logical(1))]
+  stopif(length(bad) > 0,
+         "The design's column(s) {collapse_comma(bad)} hold {what}: they must be \\
+         whole numbers of {min} or more.")
 }
 
 # a row's first set_size - 1 non-target columns describe the items shown; the

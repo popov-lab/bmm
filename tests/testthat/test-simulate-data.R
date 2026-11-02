@@ -99,6 +99,15 @@ test_that("simulate_data() refuses what it cannot simulate", {
   custom <- m3(resp_cats = c("corr", "npl"), num_options = c(1, 4), version = "custom",
                links = list(a = "identity"))
   expect_error(simulate_data(custom, list(a = 1), data.frame(n_trials = 5)), "formula")
+  expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0),
+                             data.frame(stim = 0:1, n = c(10.7, 20))),
+               "'n' hold numbers of trials: they must be whole numbers of 1 or more")
+  expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0),
+                             data.frame(stim = 0:1, n = c("10", "20"))),
+               "'n' hold numbers of trials")
+  expect_error(simulate_data(mpt(mpt_2htm_trees(), tree_id = "item"), list(D = 0, g = 0),
+                             data.frame(item = c("old", "new"), n_trials = 10.7)),
+               "'n_trials' hold numbers of trials")
   simplex <- mpt(mpt_tree("t", list(A = "gA", B = "gB", C = "gC")), simplex = c("gA", "gB", "gC"))
   expect_error(simulate_data(simplex, list(gA = 0.2, gB = 0.3, gC = 0.4), data.frame(n_trials = 5)),
                "sum to 1")

@@ -509,7 +509,7 @@ configure_model.ezdm_4par <- function(model, data, formula) {
 #' @export
 simulate_data.ezdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   n_trials <- model$other_vars$n_trials
-  design <- .design_or_n(model, design, n_trials)
+  design <- .design_or_n(model, design, trials = n_trials)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   out <- rezdm(nrow(design), design[[n_trials]], p$drift, p$bound, p$ndt, zr = p$zr %||% 0.5,

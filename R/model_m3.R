@@ -712,7 +712,8 @@ simulate_data.m3 <- function(model, pars, design = NULL, scale = c("link", "nati
   act_vars <- rhs_vars(act_funs[names(act_funs) %in% cats])
   par_names <- if (is.null(formula)) names(model$parameters) else parameter_info(model, formula)$parameter
   design_vars <- setdiff(act_vars, par_names)
-  design <- .design_or_n(model, design, c("n_trials", if (is.character(options)) options, design_vars))
+  design <- .design_or_n(model, design, design_vars, trials = "n_trials",
+                         counts = if (is.character(options)) options)
   sim <- .simulate_pars(model, pars, design, scale, formula)
   options <- if (is.character(options)) as.matrix(design[options]) else
     matrix(options, nrow(design), length(options), byrow = TRUE)
