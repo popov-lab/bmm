@@ -674,7 +674,8 @@ sdm_grid_metadata <- function(data, formula, model, runs) {
   half <- n_options / 2
   gl <- .gl_rule(16L)
   wide <- .sdm_wide_rule()
-  stanvars <- brms::stanvar(scode = paste(chunk("sdm_kernel_functions.stan"), chunk("sdm_grid_funs.stan"), sep = "\n"),
+  stanvars <- brms::stanvar(scode = paste(chunk("sdm_kernel_functions.stan"), chunk("sdm_grid_functions.stan"),
+                                          sep = "\n"),
                             block = "functions") +
     brms::stanvar(scode = chunk("sdm_grid_tdata.stan"), block = "tdata") +
     sdm_stanvar_int(n_options, "sdm_K") +

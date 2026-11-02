@@ -390,8 +390,8 @@ test_that("the Stan log-likelihood of every sdm() cell matches dsdm()", {
 # value per row, constant within each run of `run`
 sdm_grid_stan_program <- function(stanvars) {
   chunk <- function(file) read_lines2(system.file("stan_chunks", file, package = "bmm"))
-  funs <- gsub("#include[^\n]*", "", paste(chunk("sdm_kernel_functions.stan"), chunk("sdm_grid_funs.stan"),
-                                            sep = "\n"))
+  funs <- gsub("#include[^\n]*", "", paste(chunk("sdm_kernel_functions.stan"),
+                                            chunk("sdm_grid_functions.stan"), sep = "\n"))
   data_vars <- Filter(function(sv) sv$block == "data", stanvars)
   pll <- vapply(data_vars, `[[`, "", "pll_args")
   threaded <- gsub("target +=", "lp +=", chunk("sdm_grid_likelihood_threaded.stan"), fixed = TRUE)
