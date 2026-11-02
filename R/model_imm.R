@@ -365,13 +365,16 @@ configure_model.imm_full <- function(model, data, formula) {
 #' @export
 simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, c(.set_size_column(model), vars$nt_features, vars$nt_distances))
+  design <- .design_or_n(model, design, .set_size_column(model),
+                        ragged = c(vars$nt_features, vars$nt_distances))
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   n_obs <- nrow(design)
   a <- p$a %||% rep(0, n_obs)
   s <- p$s %||% rep(1, n_obs)
   set_size <- check_var_set_size(vars$set_size, design)$ss_numeric
+  .check_nt_na(design, vars$nt_features, set_size)
+  .check_nt_na(design, vars$nt_distances, set_size)
   nt <- unname(as.matrix(design[vars$nt_features]))
   dist <- if (is.null(vars$nt_distances)) nt * 0 + Inf else unname(as.matrix(design[vars$nt_distances]))
   y <- .simulate_by_group(data.frame(set_size, nt, dist, p), function(i, n) {

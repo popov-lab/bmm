@@ -211,10 +211,11 @@ configure_model.mixture3p <- function(model, data, formula) {
 #' @export
 simulate_data.mixture3p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   nt_features <- model$other_vars$nt_features
-  design <- .design_or_n(model, design, c(.set_size_column(model), nt_features))
+  design <- .design_or_n(model, design, .set_size_column(model), ragged = nt_features)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   set_size <- check_var_set_size(model$other_vars$set_size, design)$ss_numeric
+  .check_nt_na(design, nt_features, set_size)
   nt <- unname(as.matrix(design[nt_features]))
   y <- .simulate_by_group(data.frame(set_size, nt, p), function(i, n) {
     rmixture3p(n, mu = c(p$mu1[i], nt[i, seq_len(set_size[i] - 1)]), kappa = p$kappa[i],

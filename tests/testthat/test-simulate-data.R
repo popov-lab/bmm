@@ -104,6 +104,24 @@ test_that("simulate_data() refuses what it cannot simulate", {
                "sum to 1")
 })
 
+test_that("simulate_data() names the design column that holds NA", {
+  expect_error(simulate_data(sdt_yn("k", "stim", "n"), list(d = 1, criterion = 0),
+                             data.frame(stim = 0:1, n = c(10, NA))),
+               "column\\(s\\) 'n' contain NA")
+  model <- mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "ss")
+  pars <- list(kappa = 2, thetat = 0, thetant = 0)
+  expect_error(simulate_data(model, pars, data.frame(ss = c(2, NA), nt1 = 1, nt2 = NA)),
+               "column\\(s\\) 'ss' contain NA")
+  expect_error(simulate_data(model, pars, data.frame(ss = c(3, 3, 2), nt1 = c(1, 1, 1), nt2 = c(1, NA, NA))),
+               "'nt2' contain NA within the set size, in row\\(s\\) 2:")
+  # past a row's set size NA is the layout of displays of different sizes
+  data <- simulate_data(model, pars, data.frame(ss = c(1, 2, 3), nt1 = c(NA, 1, 1), nt2 = c(NA, NA, 1)))
+  expect_false(anyNA(data$y))
+  imm_model <- imm("y", nt_features = "nt1", nt_distances = "d1", set_size = 2, version = "full")
+  expect_error(simulate_data(imm_model, list(c = 1, a = 0, s = 0, kappa = 2), data.frame(nt1 = 1, d1 = NA)),
+               "'d1' contain NA within the set size")
+})
+
 test_that("count models give each row its own number of trials and options", {
   model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"),
               choice_rule = "softmax", version = "ss")

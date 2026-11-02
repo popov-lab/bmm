@@ -138,13 +138,14 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
 }
 
 # the design a method simulates on: the user's data frame, checked for the
-# columns the model reads, or n_trials rows without columns
-.design_or_n <- function(model, design, columns = character(0), ...) {
+# columns the model reads, or n_trials rows without columns. `ragged` columns
+# may hold NA, where a display has fewer items than the design has columns
+.design_or_n <- function(model, design, columns = character(0), ..., ragged = character(0)) {
   if (is.null(design)) {
-    stopif(length(columns) > 0,
-           "{model$name} reads the column(s) {collapse_comma(columns)}: give them \\
+    stopif(length(c(columns, ragged)) > 0,
+           "{model$name} reads the column(s) {collapse_comma(c(columns, ragged))}: give them \\
            in a `design` data frame. See ?simulate_data, section Design.")
-    n_trials <- list(...)$n_trials
+    n_trials <- list(...)[["n_trials"]]
     stopif(length(n_trials) != 1 || !is.numeric(n_trials) || n_trials < 1 || n_trials %% 1 != 0,
            "Without a `design`, give the number of observations as `n_trials`, \\
            a single positive whole number.")
@@ -152,11 +153,25 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
   }
   stopif(!is.data.frame(design) || nrow(design) == 0,
          "`design` must be a data frame with one row per observation.")
-  missing <- setdiff(columns, names(design))
+  missing <- setdiff(c(columns, ragged), names(design))
   stopif(length(missing) > 0,
          "The design lacks the column(s) {collapse_comma(missing)} that {model$name} \\
          reads. See ?simulate_data, section Design.")
+  na <- columns[vapply(design[columns], anyNA, logical(1))]
+  stopif(length(na) > 0, "The design's column(s) {collapse_comma(na)} contain NA.")
   design
+}
+
+# a row's first set_size - 1 non-target columns describe the items shown; the
+# columns past them may be NA
+.check_nt_na <- function(design, columns, set_size) {
+  nt <- as.matrix(design[columns])
+  shown_na <- is.na(nt) & col(nt) < set_size
+  bad <- columns[colSums(shown_na) > 0]
+  stopif(length(bad) > 0,
+         "The design's column(s) {collapse_comma(bad)} contain NA within the set size, \\
+         in row(s) {paste(utils::head(which(rowSums(shown_na) > 0), 5), collapse = ', ')}: \\
+         a row's first set_size - 1 non-target columns need values.")
 }
 
 #' The values of a model's parameters for every row of a design
