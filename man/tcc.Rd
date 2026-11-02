@@ -277,16 +277,23 @@ contract is the one of \code{sdm(options = )}, so the same data fit both models.
 
 The design is that of Robinson et al. (2023), who offered 2, 4, 8 or 16
 equally spaced colours (16 options lie 22.5 degrees apart, so they need
-\code{n_options = 720}). Their critical test asks which model keeps one value
-of its parameter across m: the normal-noise TCC with \code{d} fixed across m
-fitted better than the softmax (Gumbel) model with its parameter fixed,
-while both fitted alike with the parameter free per m. In bmm the test is
-a comparison of \code{d ~ 1} with \code{d ~ 0 + m_condition} here and of \code{c ~ 1}
-with \code{c ~ 0 + m_condition} in \code{\link[=sdm]{sdm()}} with the same \code{options}, as in the
-examples. \code{d} under normal noise and the Gumbel parameters (\code{d} with
+\code{n_options = 720}). Their critical test fixes the parameter across m and
+compares the two noises: with one value for all m, the normal-noise TCC
+fitted better than the softmax (Gumbel) model, while both fitted alike
+with the parameter free per m. In bmm the test compares \code{d ~ 1} under
+\code{noise = "gaussian"} with \code{d ~ 1} under \code{noise = "gumbel"}, on the same
+similarity and \code{options}. The Gumbel fit is their softmax model, and both
+log-likelihoods are log probabilities over the offered options, so
+\code{loo_compare()} reads them as they are (see the examples). Comparing
+\code{d ~ 1} with \code{d ~ 0 + m_condition} within one noise checks whether that
+model needs a parameter per m. \code{\link[=sdm]{sdm()}} with the same \code{options} gives this
+check for \code{c} (\code{c ~ 1} against \code{c ~ 0 + m_condition}); with \code{kappa}
+estimated it is not their softmax model, which keeps the measured
+similarity. \code{d} under normal noise and the Gumbel parameters (\code{d} with
 \code{noise = "gumbel"}, or \code{c} of \code{\link[=sdm]{sdm()}}) are not on one scale (see the
-section Noise), so compare how each varies across m, not their values.
-Within one noise, the log-likelihood is a log probability over the
+section Noise), so compare the fits, or how each parameter varies across
+m, not their values.
+For either noise, the log-likelihood is a log probability over the
 offered options, as for the full wheel (see the section Comparing with
 continuous models); \code{sdm(options = )} reports it on the density scale,
 so add \code{log(n_options / (2 * pi))} per observation before comparing a
@@ -336,11 +343,16 @@ afc$err <- unlist(lapply(offered, function(x) {
 tcc_afc <- tcc("err", similarity = f720, n_options = 720, options = paste0("opt", 1:16))
 fit_d1 <- bmm(bmf(d ~ 1), afc, tcc_afc, cores = 4)
 fit_dm <- bmm(bmf(d ~ 0 + m_condition), afc, tcc_afc, cores = 4)
+tcc_gumbel <- tcc("err", similarity = f720, n_options = 720, options = paste0("opt", 1:16),
+                  noise = "gumbel")
+fit_g1 <- bmm(bmf(d ~ 1), afc, tcc_gumbel, cores = 4)
+# Robinson et al.'s critical test: one d for all m, normal against Gumbel noise
+loo::loo_compare(brms::loo(fit_d1), brms::loo(fit_g1))
 sdm_afc <- sdm("err", n_options = 720, options = paste0("opt", 1:16))
 fit_c1 <- bmm(bmf(c ~ 1, kappa ~ 1), afc, sdm_afc, cores = 4)
 fit_cm <- bmm(bmf(c ~ 0 + m_condition, kappa ~ 1), afc, sdm_afc, cores = 4)
-# does one parameter hold across m? Here the data come from one d, so the
-# normal-noise model should need no d per m
+# within one model, does one parameter hold across m? Here the data come
+# from one d, so the normal-noise model should need no d per m
 loo::loo_compare(brms::loo(fit_d1), brms::loo(fit_dm))
 loo::loo_compare(brms::loo(fit_c1), brms::loo(fit_cm))
 \dontshow{\}) # examplesIf}
