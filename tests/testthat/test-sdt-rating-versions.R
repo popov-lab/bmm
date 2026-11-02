@@ -328,8 +328,8 @@ test_that("metad R companion with logmratio = 0 reduces to the standard model", 
 # round-trips a double.
 versions_stan_logmu <- function(grid, deltas) {
   sc <- system.file("stan_chunks", package = "bmm")
-  chunks <- c("sdt_dist_funs.stan", "sdt_rating_funs.stan",
-              "sdt_dpsdt_funs.stan", "sdt_metad_funs.stan")
+  chunks <- c("sdt_dist_functions.stan", "sdt_rating_functions.stan",
+              "sdt_dpsdt_functions.stan", "sdt_metad_functions.stan")
   funs <- paste(vapply(file.path(sc, chunks), read_lines2, character(1)),
                 collapse = "\n")
   program <- paste0(

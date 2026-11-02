@@ -7,9 +7,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
+      name = "Signal Discrimination Model (SDM)",
       citation = glue(
         "Oberauer, K. (2023). Measurement models for visual working \\
         memory\u2014A factorial model comparison. Psychological Review, \\
@@ -147,7 +147,7 @@ configure_model.sdm <- function(model, data, formula) {
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
+  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_functions.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
   likelihood_file <- if (brms_slices_likelihood()) {
     "sdm_simple_likelihood_threaded.stan"

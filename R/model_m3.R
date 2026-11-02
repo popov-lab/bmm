@@ -69,9 +69,9 @@
     list(
       resp_vars = nlist(resp_cats),
       other_vars = nlist(num_options, choice_rule),
-      domain = "Working Memory (categorical), Categorical Decision Making",
-      task = "n-AFC retrieval",
-      name = "The Multinomial / Memory Measurement Model",
+      domain = c("Working memory", "Decision making"),
+      task = "Categorical recall and n-AFC decisions",
+      name = "Memory Measurement Model",
       citation = glue(
         "Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models \\
         for complex working-memory tasks. Psychological Review, 126(6), \\
@@ -636,7 +636,7 @@ m3_gaussian_stanvars <- function(model) {
   )
   sc_path <- system.file("stan_chunks", package = "bmm")
   brms::stanvar(
-    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_funs.stan")), wrapper, sep = "\n"),
+    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_functions.stan")), wrapper, sep = "\n"),
     block = "functions"
   )
 }

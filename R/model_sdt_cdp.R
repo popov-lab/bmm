@@ -113,9 +113,9 @@
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, dist, dist_int, threshold_type,
                          thresh_type_int, n_new, n_old),
-      domain = "Recognition Memory",
-      task = "Old/New Recognition with Remember/Know Judgments",
-      name = "Continuous Dual-Process Signal Detection Theory (CDP)",
+      domain = "Long-term memory",
+      task = "Detection, recognition and confidence judgments",
+      name = "Continuous Dual-Process Signal Detection Theory Model",
       citation = glue(
         "Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model ",
         "of remember/know judgments. Psychological Review, 117(4), 1025-1054. ",
@@ -623,7 +623,7 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   formula$family$dpars <- paste0("mu", resp_cats)
 
   stan_funs <- paste(
-    read_lines2(system.file("stan_chunks", "sdt_cdp_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "sdt_cdp_functions.stan", package = "bmm")),
     .sdt_cdp_logmu_stan(model), sep = "\n"
   )
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")

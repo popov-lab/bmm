@@ -36,8 +36,8 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = nlist(),
-      domain = "Decision Making / Response times",
-      task = "Two-Alternative Force Choice RT",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "Diffusion Decision Model",
       citation = glue(
         "Ratcliff, R. (1978). A theory of memory retrieval. Psychological \\
@@ -248,6 +248,16 @@ posterior_predict_ddm <- function(i, prep, ...) {
 # the mean of what posterior_predict_ddm() returns: the RT of either response
 posterior_epred_ddm <- function(prep) {
   .epred_matrix(with(prep$dpars, .diffusion_mean_rt(drift, bound, ndt, zr, s = 1)), prep)
+}
+
+#############################################################################!
+# CREATE_INITFUN S3 method                                               ####
+#############################################################################!
+
+#' @export
+create_initfun.ddm <- function(model, data, formula, prior = NULL, ...) {
+  model$init_ranges$ndt <- .ndt_init_range(data[[model$resp_vars$rt]])
+  NextMethod()
 }
 
 #############################################################################!

@@ -9,9 +9,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, nt_distances, set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Interference measurement model by Oberauer and Lin (2017).",
+      name = "Interference Measurement Model",
       citation = glue(
         "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
           of visual working memory. Psychological Review, 124(1), 21-59. \\

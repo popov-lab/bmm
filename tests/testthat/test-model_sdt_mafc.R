@@ -232,7 +232,7 @@ test_that("the Stan quadrature tables are the R tables, digit for digit", {
 
   # The family is loop = TRUE, so a table declared in mafc_pc() is rebuilt per
   # row per gradient: ~22% more time per leapfrog step.
-  expect_false(grepl("to_vector({", read_lines2(file.path(sc_path, "sdt_mafc_funs.stan")),
+  expect_false(grepl("to_vector({", read_lines2(file.path(sc_path, "sdt_mafc_functions.stan")),
                      fixed = TRUE))
 })
 
@@ -241,7 +241,7 @@ test_that("the Stan mafc_logit_pc branches match the registry order", {
   # the integers. Swapping two branches in the chunk would leave every test
   # green while turning every dist = "gumbel_max" fit into a gumbel_min model.
   pc <- read_lines2(file.path(system.file("stan_chunks", package = "bmm"),
-                              "sdt_mafc_funs.stan"))
+                              "sdt_mafc_functions.stan"))
   pc <- sub("(?s)\n\\}.*", "",
             sub("(?s).*real mafc_logit_pc\\(", "", pc, perl = TRUE), perl = TRUE)
   pc <- gsub("[[:space:]]+", " ", gsub("//[^\n]*", "", pc))
@@ -297,7 +297,7 @@ test_that("the quadrature tables reach sdt_mafc_lpmf in its declared order", {
   # swapped `vars` in configure_model.sdt_mafc() would pass everything.
   tables <- function(x) regmatches(x, gregexpr("g[hl]_(nodes|weights)", x))[[1]]
   chunk <- read_lines2(file.path(system.file("stan_chunks", package = "bmm"),
-                                 "sdt_mafc_funs.stan"))
+                                 "sdt_mafc_functions.stan"))
   declared <- tables(sub("(?s)\\).*", "",
                          sub("(?s).*real sdt_mafc_lpmf\\(", "", chunk, perl = TRUE),
                          perl = TRUE))

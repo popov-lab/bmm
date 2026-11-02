@@ -8,9 +8,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Three-parameter mixture model by Bays et al (2009).",
+      name = "Three-Parameter Mixture Model",
       citation = glue(
         "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
         The precision of visual working memory is set by allocation \\

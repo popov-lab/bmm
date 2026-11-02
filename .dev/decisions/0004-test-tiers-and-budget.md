@@ -151,9 +151,11 @@ the rest of R5 are checked in review.
   or a call after other code on the line passes it. It scans
   `tests/testthat`; a script such as
   `tests/local/make-fixtures.R` may use `set.seed()`.
-- **R9 New model checklist.** A model pull request adds
-  `test-model_<name>.R`, a `helper-model-<name>.R` provider (R4), a
-  fixture only when post-processing needs one, and stays inside the budget.
+- **R9 New model checklist.** A model pull request adds a recovery plan
+  `tests/recovery/<model>.R` (a bmmtools `validation_plan()`;
+  `.github/CONTRIBUTING.md`), `test-model_<name>.R`, a
+  `helper-model-<name>.R` provider (R4), a fixture only when
+  post-processing needs one, and stays inside the budget.
 - **R10 CRAN tier.** CRAN returns a package whose check takes more than
   10 min, and its Windows machine runs the tests on one worker, several
   times slower than a developer machine. The three cross-model contract
@@ -336,3 +338,8 @@ last.
   change seeds every test that draws random numbers
   (`withr::local_seed()`, R8) and sets `rel.tol` in the circular
   integrate-to-1 tests, whose default tolerance failed a check of 1e-6.
+- 2026-10-30, #409. R9 gains one item, no other rule changed (the body of
+  R9 is updated to match): a model pull request also adds a recovery plan
+  `tests/recovery/<model>.R` (a bmmtools `validation_plan()`;
+  `.github/CONTRIBUTING.md`). `AGENTS.md` lists it in R9. Review checks it;
+  no test reads it.
