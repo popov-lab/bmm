@@ -218,6 +218,14 @@ test_that("rtcc() draws only offered options, with the frequencies dtcc() gives"
 
 test_that("dtcc() and rtcc() check the options as dsdm() does", {
   f <- opt_similarity(360)
+  expect_error(dtcc(0, 1, f, options = c(0, NA, pi)), "missing or empty")
+  expect_error(rtcc(5, 1, f, options = numeric(0)), "missing or empty")
+  x <- c(0, pi / 2)
+  expect_identical(dtcc(numeric(0), 1, f, options = x), numeric(0))
+  expect_identical(dtcc(0, numeric(0), f, options = x), numeric(0))
+  expect_equal(dtcc(c(NA, 0, 0), c(1, NA, 1), f, options = x), c(NA, NA, dtcc(0, 1, f, options = x)))
+  # a repeated option, or pi and -pi, is one option
+  expect_equal(dtcc(x, 1, f, options = c(x, 0, pi / 2 - 2 * pi)), dtcc(x, 1, f, options = x))
   expect_error(dtcc(0, 1, f, options = "a"), "must be numeric, in radians")
   expect_error(rtcc(5, 1, f, options = "a"), "must be numeric, in radians")
 })
@@ -270,8 +278,8 @@ test_that("rows with a missing response or predictor are left out of the cells a
   fit <- suppressWarnings(opt_mock_fit(data = dat))
   sdata <- brms::standata(fit)
   expect_equal(sdata$N, 6)
-  expect_length(sdata$tcc_row_cell, 6)
-  expect_equal(sum(table(sdata$tcc_row_cell)), 6)
+  # rows 2 and 6 dropped: cond a rows 1, 3; cond b rows 4-5, 7, 8
+  expect_equal(as.integer(sdata$tcc_row_cell), c(1L, 2L, 3L, 3L, 4L, 5L))
 })
 
 test_that("each row's own cell is reported, since a fit then sums once per row", {
@@ -389,13 +397,13 @@ test_that("the cells counted in transformed data give the summed log_lik, whole 
   skip_on_cran()
   skip_unless_stan_tests()
   withr::local_seed(568)
-  # random foils: 60 trials of 2 to 5 options in three conditions, unsorted
+  # 60 trials in three conditions, sorted, each offering one of four sets of 2
+  # to 5 options, so that cells hold many rows with different responses
   n <- 60
-  dat <- data.frame(cond = sample(c("a", "b", "c"), n, TRUE))
-  offs <- t(vapply(seq_len(n), function(i) {
-    m <- sample(2:5, 1)
-    c(0, sample(setdiff(-179:180, 0), m - 1), rep(NA, 5 - m))
-  }, numeric(5)))
+  dat <- data.frame(cond = sort(sample(c("a", "b", "c"), n, TRUE)))
+  pool <- list(c(0, 180, NA, NA, NA), c(0, 90, 180, -90, NA), c(0, 10, -10, NA, NA),
+               c(0, 45, -120, 150, 170))
+  offs <- do.call(rbind, pool[sample(4, n, TRUE)])
   dat[paste0("o", 1:5)] <- offs * pi / 180
   dat$err <- vapply(seq_len(n), function(i) sample(stats::na.omit(offs[i, ]), 1), numeric(1)) * pi / 180
   for (noise in c("gaussian", "gumbel")) {
@@ -403,27 +411,35 @@ test_that("the cells counted in transformed data give the summed log_lik, whole 
     fit <- suppressMessages(bmm(bmf(d ~ cond), dat, model, backend = "mock", mock_fit = 1,
                                 rename = FALSE))
     sdata <- brms::standata(fit)
+    expect_gt(max(table(sdata$tcc_row_cell)), 3)
+    # the split after K cuts the largest cell: its first row in one slice, the rest in the other
+    biggest <- which(sdata$tcc_row_cell == which.max(tabulate(sdata$tcc_row_cell)))
+    K <- biggest[1]
+    expect_gt(max(biggest), K)
     d <- c(a = 0.7, b = 2.1, c = 6)[fit$data$cond]
-    stanvars <- .tcc_options_configure(model, fit$data, bmf(d ~ cond))$stanvars
+    # every random-foil row is its own cell, which configure reports
+    stanvars <- suppressMessages(.tcc_options_configure(model, fit$data, bmf(d ~ cond)))$stanvars
     block <- function(b) paste(vapply(stanvars, function(s) if (s$block == b) s$scode else "", ""),
                                collapse = "\n")
     cells_args <- paste("tcc_noise, tcc_cell_first, tcc_cell_set, tcc_cell_n, tcc_set_size,",
                         "tcc_set_off, tcc_similarity, tcc_gl_nodes, tcc_gl_logw")
     program <- paste0(
       "functions {\n", block("functions"), "\n}\n",
-      "data {\n  int<lower=1> N;\n  array[N] int Y;\n  vector[N] d;\n  int K;\n", block("data"),
+      "data {\n  int<lower=1> N;\n  array[N] int Y;\n  vector[N] d;\n  int K;\n  int H;\n", block("data"),
       "\n}\n",
       "transformed data {\n", block("tdata"), "\n}\n",
       "generated quantities {\n",
       "  real lp = tcc_options_cells(d, 1, N, ", cells_args, ");\n",
       "  real lp_slices = tcc_options_cells(d[1:K], 1, K, ", cells_args, ")\n",
       "    + tcc_options_cells(d[(K + 1):N], K + 1, N, ", cells_args, ");\n",
+      "  real lp_halves = tcc_options_cells(d[1:H], 1, H, ", cells_args, ")\n",
+      "    + tcc_options_cells(d[(H + 1):N], H + 1, N, ", cells_args, ");\n",
       "}\n"
     )
     sv_data <- lapply(stanvars, function(s) s$sdata)
     sv_data <- sv_data[!vapply(sv_data, is.null, TRUE)]
     out <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
-      data = c(sv_data, list(N = sdata$N, Y = sdata$Y, d = unname(d), K = 23)),
+      data = c(sv_data, list(N = sdata$N, Y = sdata$Y, d = unname(d), K = K, H = sdata$N %/% 2)),
       fixed_param = TRUE, chains = 1, iter_sampling = 1, iter_warmup = 0, refresh = 0,
       show_messages = FALSE, sig_figs = 17
     )
@@ -432,5 +448,7 @@ test_that("the cells counted in transformed data give the summed log_lik, whole 
     total <- sum(vapply(seq_len(sdata$N), log_lik_tcc_options, numeric(1), prep = prep))
     expect_equal(csv$lp, total, tolerance = 1e-10, label = noise)
     expect_equal(csv$lp_slices, total, tolerance = 1e-10, label = noise)
+    # halves: the second slice's cells must read d from their own offset
+    expect_equal(csv$lp_halves, total, tolerance = 1e-10, label = noise)
   }
 })

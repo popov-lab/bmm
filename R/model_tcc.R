@@ -124,8 +124,8 @@
 #'   `noise` sets the distribution of the noise on each option's signal.
 #'   `"gaussian"`, the default, is the model of Schurgin et al. (2020), with
 #'   normal noise of unit variance. Its response probabilities have no closed
-#'   form, so the likelihood reads them from a table (see the section Grid
-#'   limit on d). With `"gumbel"` the noise follows the standard Gumbel (type
+#'   form, so on the full wheel the likelihood reads them from a table (see
+#'   the section Grid limit on d); with `options` it integrates them per cell. With `"gumbel"` the noise follows the standard Gumbel (type
 #'   I extreme value) distribution. The largest of independent Gumbel
 #'   variables is again Gumbel distributed, which turns the probability of
 #'   choosing an option into the softmax of `d * f(x)` over all options,
@@ -187,7 +187,7 @@
 #'   posterior cannot be normalised, and a cell with little information
 #'   drifts towards `d = 0` without end. The default prior is proper. This
 #'   holds for either noise; the rest of this section applies to normal noise
-#'   only. The likelihood reads the response probabilities from a table on a grid
+#'   on the full wheel only, not with `options`. The likelihood reads the response probabilities from a table on a grid
 #'   of `d` values up to `d_max` in steps of 0.02, built once per chain
 #'   by quadrature and interpolated with a cubic spline (error below 1e-6 in
 #'   log probability). Beyond `d_max` the table is extended
@@ -301,7 +301,11 @@
 #'   as with a continuous predictor of `d` or foils drawn anew on each trial.
 #'   `log_lik()`,
 #'   `posterior_predict()` and `pp_check()` read each row's options from the
-#'   data; to predict, pass `newdata` that carries the option columns.
+#'   data; to predict, pass `newdata` that carries the option columns and a
+#'   response that is one of the offered options (any one will do, as
+#'   `posterior_predict()` ignores it). `log_lik()` and `loo()` evaluate each
+#'   row on its own under normal noise, about 0.15 s per row for 4,000 draws
+#'   and 4 options, unless consecutive rows share their draws and options.
 #' @param resp_error The name of the variable in the data holding the response
 #'   error. With `units = "radians"` (the default) it is the error relative to
 #'   the target in radians, as for the other circular models, and is binned to

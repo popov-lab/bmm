@@ -4396,6 +4396,7 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
 # the offered options of a d or r call as offsets in steps, checked as for dsdm()
 .tcc_dist_options <- function(n_options, options) {
   stopif(!is.numeric(options), "`options` must be numeric, in radians.")
+  stopif(length(options) == 0 || anyNA(options), "`options` must not be missing or empty.")
   unique(.bin_options(options, n_options, "radians"))
 }
 

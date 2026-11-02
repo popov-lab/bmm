@@ -127,8 +127,8 @@ estimates the width of the gradient from the responses is the \code{\link[=sdm]{
 \code{noise} sets the distribution of the noise on each option's signal.
 \code{"gaussian"}, the default, is the model of Schurgin et al. (2020), with
 normal noise of unit variance. Its response probabilities have no closed
-form, so the likelihood reads them from a table (see the section Grid
-limit on d). With \code{"gumbel"} the noise follows the standard Gumbel (type
+form, so on the full wheel the likelihood reads them from a table (see
+the section Grid limit on d); with \code{options} it integrates them per cell. With \code{"gumbel"} the noise follows the standard Gumbel (type
 I extreme value) distribution. The largest of independent Gumbel
 variables is again Gumbel distributed, which turns the probability of
 choosing an option into the softmax of \code{d * f(x)} over all options,
@@ -189,7 +189,7 @@ at that of guessing uniformly, so under a flat prior on \code{log(d)} the
 posterior cannot be normalised, and a cell with little information
 drifts towards \code{d = 0} without end. The default prior is proper. This
 holds for either noise; the rest of this section applies to normal noise
-only. The likelihood reads the response probabilities from a table on a grid
+on the full wheel only, not with \code{options}. The likelihood reads the response probabilities from a table on a grid
 of \code{d} values up to \code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
 log probability). Beyond \code{d_max} the table is extended
@@ -304,7 +304,11 @@ designs. \code{bmm()} says so when there are more cells than half the rows,
 as with a continuous predictor of \code{d} or foils drawn anew on each trial.
 \code{log_lik()},
 \code{posterior_predict()} and \code{pp_check()} read each row's options from the
-data; to predict, pass \code{newdata} that carries the option columns.
+data; to predict, pass \code{newdata} that carries the option columns and a
+response that is one of the offered options (any one will do, as
+\code{posterior_predict()} ignores it). \code{log_lik()} and \code{loo()} evaluate each
+row on its own under normal noise, about 0.15 s per row for 4,000 draws
+and 4 options, unless consecutive rows share their draws and options.
 }
 }
 \examples{
