@@ -8,13 +8,14 @@
 #' a parameter recovery study needs.
 #'
 #' @param model A `bmmodel` object, such as `mixture2p(resp_error = "y")`.
-#' @param pars A named list, or a one-row data frame, of parameter values, named
-#'   as [parameter_info()] lists the model's parameters. Each value is a single
-#'   number or a vector with one element per row of `design`, element `i` going
-#'   to row `i`. Parameters the model fixes may be left out, and then take
-#'   their fixed value; a value given for one of them replaces it. Of
-#'   alternative parameters, such as `criterion` and `bias` of [sdt_yn()], give
-#'   one.
+#' @param pars A named list of parameter values, named as [parameter_info()]
+#'   lists the model's parameters, or a data frame of them with one row or one
+#'   row per row of `design`, such as the attribute `simulate_pars` of an
+#'   earlier result. Each value is a single number or a vector with one element
+#'   per row of `design`, element `i` going to row `i`. Parameters the model
+#'   fixes may be left out, and then take their fixed value; a value given for
+#'   one of them replaces it. Of alternative parameters, such as `criterion`
+#'   and `bias` of [sdt_yn()], give one.
 #' @param design A data frame with one row per observation of the model's data:
 #'   one trial for trial-level models, one cell for the models of response
 #'   counts. It holds the columns the model reads (see the section Design) and
@@ -189,8 +190,9 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
   scale <- match.arg(scale, c("link", "native"))
   n <- nrow(design)
   stopif(!is.list(pars) || is.null(names(pars)) || !all(nzchar(names(pars))) ||
-           is.data.frame(pars) && nrow(pars) != 1,
-         "`pars` must be a named list or a one-row data frame of parameter values.")
+           is.data.frame(pars) && !nrow(pars) %in% c(1, n),
+         "`pars` must be a named list of parameter values, or a data frame of them \\
+         with one row or one row per row of the design ({n}).")
   pars <- as.list(pars)
   model_pars <- .simulate_par_names(model, pars, formula)
 

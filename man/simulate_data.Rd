@@ -12,13 +12,14 @@ simulate_data(model, pars, design = NULL, scale = c("link", "native"), ...)
 \arguments{
 \item{model}{A \code{bmmodel} object, such as \code{mixture2p(resp_error = "y")}.}
 
-\item{pars}{A named list, or a one-row data frame, of parameter values, named
-as \code{\link[=parameter_info]{parameter_info()}} lists the model's parameters. Each value is a single
-number or a vector with one element per row of \code{design}, element \code{i} going
-to row \code{i}. Parameters the model fixes may be left out, and then take
-their fixed value; a value given for one of them replaces it. Of
-alternative parameters, such as \code{criterion} and \code{bias} of \code{\link[=sdt_yn]{sdt_yn()}}, give
-one.}
+\item{pars}{A named list of parameter values, named as \code{\link[=parameter_info]{parameter_info()}}
+lists the model's parameters, or a data frame of them with one row or one
+row per row of \code{design}, such as the attribute \code{simulate_pars} of an
+earlier result. Each value is a single number or a vector with one element
+per row of \code{design}, element \code{i} going to row \code{i}. Parameters the model
+fixes may be left out, and then take their fixed value; a value given for
+one of them replaces it. Of alternative parameters, such as \code{criterion}
+and \code{bias} of \code{\link[=sdt_yn]{sdt_yn()}}, give one.}
 
 \item{design}{A data frame with one row per observation of the model's data:
 one trial for trial-level models, one cell for the models of response

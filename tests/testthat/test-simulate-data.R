@@ -122,6 +122,16 @@ test_that("simulate_data() names the design column that holds NA", {
                "'d1' contain NA within the set size")
 })
 
+test_that("the simulate_pars of a result simulate the same values again", {
+  model <- sdt_yn("k", "stim", "n")
+  design <- data.frame(stim = rep(0:1, 3), n = 20)
+  data <- simulate_data(model, list(d = c(0.5, 1, 1.5, 0.5, 1, 1.5), criterion = 0.2), design)
+  again <- simulate_data(model, attr(data, "simulate_pars"), design)
+  expect_identical(attr(again, "simulate_pars"), attr(data, "simulate_pars"))
+  expect_error(simulate_data(model, attr(data, "simulate_pars")[1:2, ], design),
+               "one row or one row per row of the design \\(6\\)")
+})
+
 test_that("count models give each row its own number of trials and options", {
   model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"),
               choice_rule = "softmax", version = "ss")
