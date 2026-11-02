@@ -369,6 +369,13 @@ test_that("the cells are reported once they outnumber half the rows, not only wh
                         rename = FALSE))
 })
 
+test_that("Gumbel noise needs no integral per cell, so many cells bring no message", {
+  dat <- opt_data()
+  dat$x <- seq_len(nrow(dat))
+  expect_no_message(bmm(bmf(d ~ x), dat, opt_model("gumbel"), backend = "mock", mock_fit = 1,
+                        rename = FALSE))
+})
+
 test_that("an options fit reads no d table and is not checked against one", {
   prep <- epred_prep(list(d = cbind(c(1, 45, 300), 2)))
   expect_silent(.tcc_check_grid(opt_model(), prep))
