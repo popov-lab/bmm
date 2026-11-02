@@ -73,9 +73,10 @@
 #'   parameter (fixed ones included) for every row on the link scale, the
 #'   values a recovery study compares the estimates with, and `simulate_call`,
 #'   the model's class and the scale. For [ezdm()], rows whose simulated mean
-#'   response time is not positive or is below the non-decision time are
-#'   dropped with a warning, because [bmm()] rejects them; their row numbers
-#'   are in the attribute `dropped_rows`.
+#'   response time is not positive are dropped with a warning, because [bmm()]
+#'   rejects them; their row numbers are in the attribute `dropped_rows`. A
+#'   mean response time below the non-decision time is a valid draw and is
+#'   kept.
 #'
 #' @family model information
 #' @keywords distribution

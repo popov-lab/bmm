@@ -114,19 +114,22 @@ test_that("the one-display generators get each trial's own values", {
   expect_lt(mean(near_target[c(FALSE, TRUE)]), 0.2)
 })
 
-test_that("ezdm drops the summaries bmm() rejects and says so", {
+test_that("ezdm drops the summaries bmm() rejects and keeps those below ndt", {
   model <- ezdm("mean_rt", "var_rt", "n_upper", "n_trials")
   withr::local_seed(3)
+  # with three trials and ndt = exp(-1) = 0.37, this seed draws mean RTs at or
+  # below 0 and mean RTs between 0 and ndt
   expect_warning(
-    data <- simulate_data(model, list(drift = 0, bound = 1.5, ndt = -4.6),
+    data <- simulate_data(model, list(drift = 0, bound = 1.5, ndt = -1),
                           data.frame(n_trials = rep(3, 2000))),
-    "Dropped [0-9]+ of 2000 rows"
+    "Dropped [0-9]+ of 2000 rows.*not positive"
   )
   dropped <- attr(data, "dropped_rows")
   expect_gt(length(dropped), 0)
   expect_identical(nrow(data) + length(dropped), 2000L)
   expect_identical(nrow(attr(data, "simulate_pars")), nrow(data))
-  expect_true(all(data$mean_rt > exp(-4.6)))
+  expect_true(all(data$mean_rt > 0))
+  expect_true(any(data$mean_rt < exp(-1)))
 })
 
 test_that("simulated statistics of the circular models match their densities", {
