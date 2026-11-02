@@ -79,6 +79,21 @@ test_that("tcc() checks the option arguments as sdm() does", {
   expect_error(tcc("err", f, options = 1:2), "column names")
 })
 
+test_that("print() names the option sets as sdm() does, and the full wheel prints no options line", {
+  f <- opt_similarity(360)
+  expect_match(
+    paste(capture.output(print(tcc("err", f, options = c("o1", "o2")))), collapse = "\n"),
+    "Options:    360 positions on the wheel; each response is a choice among the options each trial offers.",
+    fixed = TRUE
+  )
+  expect_match(
+    paste(capture.output(print(tcc("err", f, n_alternatives = 4))), collapse = "\n"),
+    "Options:    360 positions on the wheel; each response is a choice among 4 equally spaced options.",
+    fixed = TRUE
+  )
+  expect_no_match(paste(capture.output(print(tcc("err", f))), collapse = "\n"), "Options:", fixed = TRUE)
+})
+
 test_that("check_data() builds the option columns and keeps the tcc bin without a reserved-column warning", {
   model <- opt_model()
   expect_no_warning(checked <- check_data(model, opt_data(), bmf(d ~ 1)))

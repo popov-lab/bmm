@@ -392,6 +392,25 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
              n_alternatives = option_args$n_alternatives, call = call, ...)
 }
 
+# the full wheel prints nothing here, so that print() of tcc() without option
+# sets is unchanged; the line is the one of sdm(options = )
+#' @export
+print_model_details.tcc <- function(model, ...) {
+  options <- model$other_vars$options
+  n_alternatives <- model$other_vars$n_alternatives
+  if (is.null(options) && is.null(n_alternatives)) {
+    return(invisible(NULL))
+  }
+  offered <- if (is.null(options)) {
+    glue("{n_alternatives} equally spaced options")
+  } else {
+    "the options each trial offers"
+  }
+  cat(glue("Options:    {model$other_vars$n_options} positions on the wheel; \\
+           each response is a choice among {offered}."), "\n")
+  invisible(NULL)
+}
+
 .tcc_check_n_options <- function(n_options) {
   stopif(!is.numeric(n_options) || length(n_options) != 1 || !isTRUE(is.finite(n_options)) ||
            !isTRUE(n_options >= 4) || n_options %% 2 != 0,
