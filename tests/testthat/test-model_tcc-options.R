@@ -293,6 +293,7 @@ test_that("dtcc() and rtcc() refuse the options check_data() refuses", {
 ############################################################################# !
 
 test_that("the cells are runs of equal predictors times option sets, with each row's cell", {
+  skip_on_cran()
   fit <- opt_mock_fit()
   sdata <- brms::standata(fit)
   # cond a: rows 1-2 set 1, row 3 set 2; cond b: rows 4-5 set 2, rows 6-7 set 3, row 8 set 1
@@ -318,6 +319,7 @@ test_that("the cells are runs of equal predictors times option sets, with each r
 })
 
 test_that("adjacent rows with different predictor values never share a cell", {
+  skip_on_cran()
   # interaction() pastes labels with ".", so (1, 5.2) and (1.5, 2) are both
   # "1.5.2", as are the levels ("a.b", "c") and ("a", "b.c"); one cell across
   # them would give every row the d of the first
@@ -387,6 +389,7 @@ test_that("each row's own cell is reported, since a fit then sums once per row",
 })
 
 test_that("the cells are reported once they outnumber half the rows, not only when each row is one", {
+  skip_on_cran()
   # the rows' sets are 1 1 2 2 2 3 3 1, so cond a-a-a-b-b-b-b-b gives 5 cells
   # of 8 rows and a single b at the end gives 4, exactly half
   dat <- opt_data()
@@ -417,6 +420,7 @@ test_that("an options fit reads no d table and is not checked against one", {
 ############################################################################# !
 
 test_that("log_lik_tcc_options() is dtcc() over each row's own options, for both noises", {
+  skip_on_cran()
   d <- c(0.4, 2.2, 9)
   for (noise in c("gaussian", "gumbel")) {
     fit <- opt_mock_fit(opt_model(noise), formula = bmf(d ~ 1))
