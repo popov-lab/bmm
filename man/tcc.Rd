@@ -114,9 +114,10 @@ options the participant could choose from.
 
 \code{n_options} is part of the model, not a resolution setting. Each option
 draws its own noise, and the more options lie near the target, the more
-often one of them wins: at \code{d = 2}, with the similarity of the examples,
-the probability of a response within 10 degrees of the target is 0.68 on
-360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
+often one of them wins: at \code{d = 2}, with the Laplace similarity of the
+examples built for each wheel (\code{tcc_similarity(..., n_options = n)}), the
+probability of choosing an option at most 10 degrees from the target is
+0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
 continuous limit, and values of \code{d} fitted with different \code{n_options} are
 not on one scale.
 }

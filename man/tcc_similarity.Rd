@@ -10,7 +10,8 @@ tcc_similarity(shape = c("vonmises", "laplace"), kappa, n_options = 360)
 \item{shape}{\code{"vonmises"} or \code{"laplace"}.}
 
 \item{kappa}{The concentration (von Mises) or rate (Laplace) of the shape, a
-single positive number, on radians of the response circle.}
+single positive finite number, for distances in radians: a Laplace
+similarity that falls by a factor e over 20 degrees has \code{kappa = 1 / deg2rad(20)}.}
 
 \item{n_options}{The number of response options on the wheel, an even
 number, as in \code{\link[=tcc]{tcc()}}.}
@@ -25,10 +26,10 @@ Mises or Laplace shape with a given \code{kappa}, for when no measured
 similarity is at hand.
 }
 \details{
-The shapes are those of the activation functions of \code{\link[=sdm]{sdm()}}:
-\code{exp(kappa * (cos(x) - 1))} for \code{"vonmises"} and \verb{exp(-kappa * |x|)} for
-\code{"laplace"}, with \code{x} the distance from the target in radians and \code{kappa}
-the concentration or the rate (Oberauer, 2023, eq. 2). Each is scaled to 1
+The shapes are \code{exp(kappa * (cos(x) - 1))} for \code{"vonmises"}, the
+activation function of \code{\link[=sdm]{sdm()}}, and \verb{exp(-kappa * |x|)} for \code{"laplace"},
+with \code{x} the distance from the target in radians and \code{kappa} the
+concentration or the rate (Oberauer, 2023). Each is scaled to 1
 at the target and 0 at the opposite option, as Schurgin et al. (2020)
 scaled their measured similarity.
 
@@ -36,7 +37,7 @@ scaled their measured similarity.
 similarity enters the model as known. Schurgin et al. (2020) measured
 theirs in a separate perceptual task, and a measured similarity is the
 model as its authors intended it. To estimate \code{kappa} from the responses,
-fit \code{\link[=sdm]{sdm()}} instead.
+fit \code{\link[=sdm]{sdm()}} instead, which estimates it for the von Mises shape.
 }
 \examples{
 f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
@@ -46,7 +47,7 @@ lines(0:180, tcc_similarity("vonmises", kappa = 8), lty = 2)
 }
 \references{
 Oberauer, K. (2023). Measurement models for visual working
-memory: A factorial model comparison. \emph{Psychological Review, 130}(3),
+memory - A factorial model comparison. \emph{Psychological Review, 130}(3),
 841-852. https://doi.org/10.1037/rev0000328
 
 Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical

@@ -93,9 +93,10 @@
 #'
 #'   `n_options` is part of the model, not a resolution setting. Each option
 #'   draws its own noise, and the more options lie near the target, the more
-#'   often one of them wins: at `d = 2`, with the similarity of the examples,
-#'   the probability of a response within 10 degrees of the target is 0.68 on
-#'   360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
+#'   often one of them wins: at `d = 2`, with the Laplace similarity of the
+#'   examples built for each wheel (`tcc_similarity(..., n_options = n)`), the
+#'   probability of choosing an option at most 10 degrees from the target is
+#'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
 #'   continuous limit, and values of `d` fitted with different `n_options` are
 #'   not on one scale.
 #'
@@ -199,8 +200,8 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 }
 
 .tcc_check_n_options <- function(n_options) {
-  stopif(!is.numeric(n_options) || length(n_options) != 1 || !isTRUE(n_options >= 4) ||
-           n_options %% 2 != 0,
+  stopif(!is.numeric(n_options) || length(n_options) != 1 || !isTRUE(is.finite(n_options)) ||
+           !isTRUE(n_options >= 4) || n_options %% 2 != 0,
          "`n_options` must be an even number of at least 4.")
 }
 
@@ -221,10 +222,10 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 #' @description Returns the similarity vector that [tcc()] takes, from a von
 #'   Mises or Laplace shape with a given `kappa`, for when no measured
 #'   similarity is at hand.
-#' @details The shapes are those of the activation functions of [sdm()]:
-#'   `exp(kappa * (cos(x) - 1))` for `"vonmises"` and `exp(-kappa * |x|)` for
-#'   `"laplace"`, with `x` the distance from the target in radians and `kappa`
-#'   the concentration or the rate (Oberauer, 2023, eq. 2). Each is scaled to 1
+#' @details The shapes are `exp(kappa * (cos(x) - 1))` for `"vonmises"`, the
+#'   activation function of [sdm()], and `exp(-kappa * |x|)` for `"laplace"`,
+#'   with `x` the distance from the target in radians and `kappa` the
+#'   concentration or the rate (Oberauer, 2023). Each is scaled to 1
 #'   at the target and 0 at the opposite option, as Schurgin et al. (2020)
 #'   scaled their measured similarity.
 #'
@@ -232,16 +233,18 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 #'   similarity enters the model as known. Schurgin et al. (2020) measured
 #'   theirs in a separate perceptual task, and a measured similarity is the
 #'   model as its authors intended it. To estimate `kappa` from the responses,
-#'   fit [sdm()] instead.
+#'   fit [sdm()] instead, which estimates it for the von Mises shape.
 #' @param shape `"vonmises"` or `"laplace"`.
 #' @param kappa The concentration (von Mises) or rate (Laplace) of the shape, a
-#'   single positive number, on radians of the response circle.
+#'   single positive finite number, for distances in radians: a Laplace
+#'   similarity that falls by a factor e over 20 degrees has `kappa = 1 /
+#'   deg2rad(20)`.
 #' @param n_options The number of response options on the wheel, an even
 #'   number, as in [tcc()].
 #' @return A numeric vector of `n_options / 2 + 1` similarities, at the
 #'   distances 0, 1, ..., `n_options / 2` options from the target.
 #' @references Oberauer, K. (2023). Measurement models for visual working
-#'   memory: A factorial model comparison. *Psychological Review, 130*(3),
+#'   memory - A factorial model comparison. *Psychological Review, 130*(3),
 #'   841-852. https://doi.org/10.1037/rev0000328
 #'
 #'   Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical
@@ -257,8 +260,8 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 tcc_similarity <- function(shape = c("vonmises", "laplace"), kappa, n_options = 360) {
   stop_missing_args()
   shape <- match.arg(shape)
-  stopif(!is.numeric(kappa) || length(kappa) != 1 || !isTRUE(kappa > 0),
-         "`kappa` must be a single positive number.")
+  stopif(!is.numeric(kappa) || length(kappa) != 1 || !isTRUE(is.finite(kappa) && kappa > 0),
+         "`kappa` must be a single positive finite number.")
   .tcc_check_n_options(n_options)
   .tcc_shape_similarity(shape, kappa, seq(0, pi, length.out = n_options / 2 + 1))
 }

@@ -67,6 +67,9 @@ test_that("tcc_similarity() scales the Laplace and von Mises shapes to 1 at the 
   expect_equal(tcc_similarity("laplace", kappa = 1 / deg2rad(20)), tcc_test_similarity(),
                tolerance = 1e-14)
   expect_length(tcc_similarity("vonmises", kappa = 4, n_options = 180), 91)
+  # four options lie at 0, pi / 2 and pi from the target
+  expect_equal(tcc_similarity("laplace", kappa = 1, n_options = 4),
+               c(1, (exp(-pi / 2) - exp(-pi)) / (1 - exp(-pi)), 0), tolerance = 1e-14)
 })
 
 test_that("tcc_similarity() stays exact where the scaled shapes approach a line or a cosine", {
@@ -84,9 +87,11 @@ test_that("a vector from tcc_similarity() is accepted by tcc()", {
 
 test_that("tcc_similarity() refuses an unknown shape, a non-positive kappa and an odd option count", {
   expect_error(tcc_similarity("gaussian", kappa = 1), "should be one of")
-  expect_error(tcc_similarity("laplace", kappa = 0), "single positive number")
-  expect_error(tcc_similarity("laplace", kappa = c(1, 2)), "single positive number")
+  expect_error(tcc_similarity("laplace", kappa = 0), "single positive finite number")
+  expect_error(tcc_similarity("laplace", kappa = c(1, 2)), "single positive finite number")
+  expect_error(tcc_similarity("laplace", kappa = Inf), "single positive finite number")
   expect_error(tcc_similarity("laplace", kappa = 1, n_options = 361), "even number")
+  expect_error(tcc_similarity("laplace", kappa = 1, n_options = Inf), "even number")
   expect_error(tcc_similarity("laplace"), "missing.*kappa")
 })
 
