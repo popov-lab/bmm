@@ -487,8 +487,14 @@ response_annotations <- function(model) {
   if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
+  if (inherits(model, "sdt_yn") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = 'old'/'signal'"))
+  }
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
+  }
+  if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = correct"))
   }
   list()
 }
@@ -668,8 +674,8 @@ data_column_roles <- list(
     n_old = NA
   ),
   sdt_mafc = c(
-    response = "number of correct responses",
-    n_trials = "number of trials",
+    response = "number of correct responses, or 1/0 for a correct/incorrect trial",
+    n_trials = "number of trials (left out for one row per trial)",
     m = "number of alternatives (a column, or one number)"
   ),
   sdt_ranking = c(
@@ -681,9 +687,9 @@ data_column_roles <- list(
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
   ),
   sdt_yn = c(
-    response = "number of 'old'/'signal' responses",
+    response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' trial",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
-    n_trials = "number of trials"
+    n_trials = "number of trials (left out for one row per trial)"
   )
 )
 
@@ -939,11 +945,17 @@ model_docs.bmmodel <- function(model, components = "all") {
     parameters = paste0("* **Parameters:** \n\n  ", par_info, "\n"),
     fixed_parameters = paste0("* **Fixed parameters:** \n\n  ", fixed_par_info, "\n"),
     links = paste0("* **Default parameter links:** \n\n     - ", links_info, "\n\n"),
-    prior = paste0("* **Default priors:** \n\n", priors_info, "\n")
+    prior = paste0("* **Default priors:** \n\n", priors_info, "\n"),
+    trial_level = paste0(
+      "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
+      "* **Trial-level data:** ", trial_level_docs, "\n"
+    )
   )
 
+  # the trial-level part needs an instance constructed for trial rows, whose
+  # requirements it shows; a help page asks for it in a second call
   if (length(components) == 1 && components == "all") {
-    components <- names(info_all)
+    components <- setdiff(names(info_all), "trial_level")
   }
 
   if (model$version == "NA" || model$version == "") {

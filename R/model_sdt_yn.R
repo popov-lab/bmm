@@ -58,17 +58,26 @@
     # moves the ratio -- that fit estimated sdratio ~ 1.
     sdratio = list(main = "normal(0, 0.3)", effects = "normal(0, 0.3)", sd = "exponential(2)")
   )
-  requirements <- glue(
-    "Provide pre-aggregated data with the following columns:", "\n\n",
-    "  - Response counts (response): number of 'old'/'signal' responses", "\n",
-    "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
-    "  - Number of trials (n_trials): total trials per cell"
-  )
+  trial_level <- is.null(n_trials)
+  requirements <- if (trial_level) {
+    glue(
+      "Provide one row per trial with the following columns:", "\n\n",
+      "  - Response (response): 1 = 'old'/'signal', 0 = 'new'/'noise'", "\n",
+      "  - Stimulus type (stimulus): 0 = noise, 1 = signal"
+    )
+  } else {
+    glue(
+      "Provide aggregated data, one row per cell, with the following columns:", "\n\n",
+      "  - Response counts (response): number of 'old'/'signal' responses", "\n",
+      "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
+      "  - Number of trials (n_trials): total trials per cell"
+    )
+  }
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(stimulus, n_trials, dist),
+      other_vars = nlist(stimulus, n_trials, dist, trial_level),
       domain = c("Perception", "Long-term memory"),
       task = "Detection, recognition and confidence judgments",
       name = "Yes/No Signal Detection Theory Model",
@@ -124,9 +133,13 @@ settable_links.sdt_yn <- function(model) {
 #'   criterion is estimated either as `criterion`, measured from the mean of the
 #'   noise distribution, or as `bias`, measured from the midpoint between the
 #'   noise and signal means; the formula names the one to estimate.
-#' @details `r model_docs(.model_sdt_yn())`
+#' @details `r model_docs(.model_sdt_yn(n_trials = "n_trials"))`
+#'
+#' `r model_docs(.model_sdt_yn(), components = "trial_level")`
 #' @param response The name of the variable in the dataset containing the
-#'   count of "old"/"signal" responses for each cell.
+#'   count of "old"/"signal" responses for each cell, or, with one row per
+#'   trial (`n_trials = NULL`), 1 for an "old"/"signal" response and 0 for a
+#'   "new"/"noise" response.
 #' @param stimulus The name of the variable in the dataset coding the stimulus
 #'   type: 0 (noise/new) and 1 (signal/old). Logical, and factor or character
 #'   columns holding "0"/"1", are coerced automatically; anything else (e.g.
@@ -135,9 +148,8 @@ settable_links.sdt_yn <- function(model) {
 #'   column but are stricter, accepting only numeric or logical input.
 #' @param n_trials The name of the variable in the dataset containing the
 #'   total number of trials for each cell. It may differ from cell to cell.
-#'   Trial-level data also works: keep one row per trial, with the column
-#'   named by `response` holding 0 or 1 and the column named by `n_trials`
-#'   holding `1`s.
+#'   `NULL` (the default) declares one row per trial: the column named by
+#'   `response` then holds 0 or 1 in every row.
 #' @param dist The noise distribution assumed for the latent evidence variable,
 #'   given here by its cumulative distribution function. One of:
 #'   \itemize{
@@ -469,7 +481,7 @@ settable_links.sdt_yn <- function(model) {
 #' rsdt_yn(2, 100L, c(0L, 1L),
 #'         d = 1.3, criterion = 0.75, sdratio = exp(sdratio_posterior))
 #' }
-sdt_yn <- function(response, stimulus, n_trials,
+sdt_yn <- function(response, stimulus, n_trials = NULL,
                    dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                    links = NULL, ...) {
   call <- match.call()
@@ -547,7 +559,7 @@ check_formula.sdt_yn <- function(model, data, formula) {
 
 #' @exportS3Method
 built_data_columns.sdt_yn <- function(model) {
-  c("dist_type", NextMethod("built_data_columns"))
+  c("dist_type", if (is_trial_level(model)) "nTrials", NextMethod("built_data_columns"))
 }
 
 #' @export
@@ -555,8 +567,12 @@ check_data.sdt_yn <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
   data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
-  .validate_sdt_counts(data, model$resp_vars$response,
-                       model$other_vars$n_trials)
+  if (is_trial_level(model)) {
+    data <- .add_binomial_trials(data, model)
+  } else {
+    .validate_sdt_counts(data, model$resp_vars$response,
+                         model$other_vars$n_trials)
+  }
 
   warnif("dist_type" %in% colnames(data),
          "Column 'dist_type' in your data is reserved by {model$name} and \\
@@ -575,11 +591,10 @@ check_data.sdt_yn <- function(model, data, formula) {
 bmf2bf.sdt_yn <- function(model, formula) {
   resp_var <- model$resp_vars$response
   stim_var <- model$other_vars$stimulus
-  n_trials_var <- model$other_vars$n_trials
 
   brms::bf(paste0(
     resp_var, " | vint(", stim_var, ", dist_type) + trials(",
-    n_trials_var, ") ~ 0"
+    .sdt_trials_var(model), ") ~ 0"
   ))
 }
 

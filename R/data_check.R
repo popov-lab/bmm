@@ -131,7 +131,7 @@ bmm_data_check <- function(formula, data, model, min_trials = 10) {
 
   response <- summarise_response_vars(model, data)
   predictors <- summarise_predictor_vars(model, data, formula)
-  cells <- summarise_design_cells(data, formula)
+  cells <- summarise_design_cells(data, formula, trial_level = is_trial_level(model))
   findings <- c(
     response_var_findings(response),
     generic_data_findings(
@@ -258,7 +258,12 @@ re_group_vars <- function(formula) {
   as.character(unique(unlist(vars)))
 }
 
-summarise_design_cells <- function(data, formula) {
+# With one row per trial and crossed grouping variables (subjects x items),
+# every crossing holds one trial, so only the participant-like variable is
+# crossed with the fixed predictors. The other grouping variables are counted
+# per level and only described: few trials per item are normal, and partial
+# pooling handles them
+summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   group_vars <- intersect(re_group_vars(formula), colnames(data))
   fixed_vars <- setdiff(
     intersect(unique(unlist(formula_data_vars(formula))), colnames(data)),
@@ -268,23 +273,38 @@ summarise_design_cells <- function(data, formula) {
     is_discrete_var(data[[v]])
   }, logical(1))]
 
+  other_groups <- NULL
+  if (trial_level && length(group_vars) > 1) {
+    n_levels <- vapply(group_vars, function(v) length(unique(data[[v]])), numeric(1))
+    other_groups <- summarise_group_levels(data, group_vars[-which.min(n_levels)])
+    group_vars <- group_vars[which.min(n_levels)]
+  }
+
   vars <- c(group_vars, cell_vars)
   if (length(vars) == 0) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL, other_groups))
   }
 
   n_combos <- prod(vapply(vars, function(v) {
     length(unique(data[[v]]))
   }, numeric(1)))
   if (n_combos > max_design_cells) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos, other_groups))
   }
 
   counts <- as.data.frame(
     table(data[, vars, drop = FALSE]),
     responseName = "n", stringsAsFactors = FALSE
   )
-  nlist(group_vars, cell_vars, counts, n_combos)
+  nlist(group_vars, cell_vars, counts, n_combos, other_groups)
+}
+
+summarise_group_levels <- function(data, vars) {
+  do.call(rbind, lapply(vars, function(v) {
+    n <- as.vector(table(data[[v]]))
+    data.frame(variable = v, n_levels = length(n), min = min(n),
+               median = stats::median(n), max = max(n))
+  }))
 }
 
 # tabulating the full crossing allocates a cell per combination, so wide
@@ -360,10 +380,16 @@ generic_data_findings <- function(predictors, cells, min_trials) {
   c(findings, cell_count_findings(cells$counts, min_trials))
 }
 
-# aggregate-response models code many trials per row, so row counts per
-# design cell say nothing about trial numbers and min_trials does not apply
+# Two questions about the rows, asked by different callers. Here: does a row
+# summarise many trials, so that row counts per design cell say nothing about
+# trial numbers and min_trials does not apply? summarise_design_cells() asks
+# whether the rows are trials crossed by several grouping variables, and reads
+# is_trial_level() for that. The aggregated SDT models are rows of many trials
+# too, but are not listed: their report counts rows per cell, which flags a
+# cell of two 50-trial rows as sparse. That flaw is left to its own PR, so the
+# aggregated report stays as it is here
 uses_aggregate_data <- function(model) {
-  inherits(model, "m3") || inherits(model, "ezdm") || inherits(model, "mpt")
+  inherits(model, c("m3", "ezdm", "mpt")) && !is_trial_level(model)
 }
 
 cell_count_findings <- function(counts, min_trials) {
@@ -623,6 +649,7 @@ print_cells_section <- function(cells) {
       {signif(cells$n_combos, 3)} cells, above the limit of \\
       {format(max_design_cells, big.mark = ',', scientific = FALSE)}."
     ), "  - ")
+    print_other_groups(cells)
     cat("\n")
     return(invisible())
   }
@@ -633,9 +660,29 @@ print_cells_section <- function(cells) {
     sep = ""
   )
   cat("  observations per cell: min ", min(observed),
-    " / median ", stats::median(observed), " / max ", max(observed), "\n\n",
+    " / median ", stats::median(observed), " / max ", max(observed), "\n",
     sep = ""
   )
+  print_other_groups(cells)
+  cat("\n")
+}
+
+print_other_groups <- function(cells) {
+  others <- cells$other_groups
+  if (is.null(others)) {
+    return(invisible())
+  }
+  cat_wrapped(glue(
+    "Rows are single trials, so only '{cells$group_vars}' (the grouping \
+    variable with the fewest levels) is crossed into cells; the other \
+    grouping variables are counted per level:"
+  ), "  ")
+  for (i in seq_len(nrow(others))) {
+    cat("  ", others$variable[i], ": ", others$n_levels[i], " levels, observations per level: min ",
+      others$min[i], " / median ", others$median[i], " / max ", others$max[i], "\n",
+      sep = ""
+    )
+  }
 }
 
 print_findings_section <- function(findings) {

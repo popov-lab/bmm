@@ -224,7 +224,7 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 # the response column holds one category; the other is trials - Y
 .ppp_counts.sdt_yn <- function(model, fit, draw_ids) {
   response <- model$resp_vars$response
-  trials <- fit$data[[model$other_vars$n_trials]]
+  trials <- fit$data[[.sdt_trials_var(model)]]
   y <- fit$data[[response]]
   list(
     observed = matrix(c(y, trials - y), ncol = 2L,

@@ -330,3 +330,54 @@ test_that("data_check_finding rejects an unrecognized severity", {
   expect_error(data_check_finding("warnings", "text"), "should be one of")
   expect_equal(data_check_finding("note", "text")$severity, "note")
 })
+
+test_that("the trial-level report crosses only the participant variable and counts items per level", {
+  # 4 subjects x 10 items, subject 4 saw only 5 items
+  dat <- expand.grid(id = 1:4, item = 1:10)
+  dat <- dat[!(dat$id == 4 & dat$item > 5), ]
+  dat$stimulus <- dat$item %% 2
+  dat$resp <- (dat$id + dat$item) %% 3 == 0
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id) + (1 | item)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_null(res$pipeline$error)
+  expect_equal(res$cells$group_vars, "id")
+  expect_equal(
+    res$cells$other_groups,
+    data.frame(variable = "item", n_levels = 10L, min = 3L, median = 3.5, max = 4L)
+  )
+  expect_equal(
+    finding_messages(res),
+    "1 design cell(s) have fewer than 10 observations: id=4 (n=5)"
+  )
+  printed <- capture.output(print(res, color = FALSE))
+  expect_true(any(grepl("only 'id' (the grouping", printed, fixed = TRUE)))
+  expect_true(any(grepl(
+    "item: 10 levels, observations per level: min 3 / median 3.5 / max 4", printed, fixed = TRUE
+  )))
+})
+
+# rows of aggregated counts are still counted as observations per cell; the
+# trial-level report must leave this report as it was
+test_that("the report on aggregated sdt_yn rows is unchanged", {
+  dat <- data.frame(id = rep(1:2, each = 2), stimulus = rep(0:1, 2),
+                    n_old = c(10, 35, 12, 30), n_trials = 50)
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("n_old", "stimulus", "n_trials")
+  )
+  printed <- capture.output(print(res, color = FALSE))
+  cells <- which(printed == "Observations per design cell:")
+  expect_identical(printed[cells + 0:4], c(
+    "Observations per design cell:",
+    "  id: 2 non-empty cell(s)",
+    "  observations per cell: min 2 / median 2 / max 2",
+    "",
+    "Findings:"
+  ))
+  expect_identical(
+    finding_messages(res),
+    "2 design cell(s) have fewer than 10 observations: id=1 (n=2); id=2 (n=2)"
+  )
+})
