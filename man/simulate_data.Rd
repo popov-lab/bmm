@@ -33,7 +33,11 @@ example \code{kappa} on the log scale. \code{"native"} is the scale after the
 inverse of the model's link, the scale of \code{\link[=native_parameters]{native_parameters()}}: \code{kappa}
 as a precision, \code{thetat} of \code{\link[=mixture2p]{mixture2p()}} as the probability of recall.
 The weights of a softmax group, such as \code{thetat} and \code{thetant} of
-\code{\link[=mixture3p]{mixture3p()}}, are given as the probabilities themselves.}
+\code{\link[=mixture3p]{mixture3p()}}, are given as the probabilities themselves. They are the
+weights of a display with non-targets; where the set size is 1, the
+non-target weight goes to the target and to guessing in proportion, as in
+the fit, so \code{thetat = 0.6} with \code{thetant = 0.2} gives a probability of
+recall of 0.75 there.}
 
 \item{...}{\code{n_trials}, the number of observations when \code{design} is \code{NULL};
 \code{formula}, the \code{\link[=bmmformula]{bmmformula()}} with the activation functions, for the

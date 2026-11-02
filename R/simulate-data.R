@@ -27,7 +27,11 @@
 #'   inverse of the model's link, the scale of [native_parameters()]: `kappa`
 #'   as a precision, `thetat` of [mixture2p()] as the probability of recall.
 #'   The weights of a softmax group, such as `thetat` and `thetant` of
-#'   [mixture3p()], are given as the probabilities themselves.
+#'   [mixture3p()], are given as the probabilities themselves. They are the
+#'   weights of a display with non-targets; where the set size is 1, the
+#'   non-target weight goes to the target and to guessing in proportion, as in
+#'   the fit, so `thetat = 0.6` with `thetant = 0.2` gives a probability of
+#'   recall of 0.75 there.
 #' @param ... `n_trials`, the number of observations when `design` is `NULL`;
 #'   `formula`, the [bmmformula()] with the activation functions, for the
 #'   custom version of [m3()], whose parameters exist only in that formula.
