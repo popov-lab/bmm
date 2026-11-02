@@ -458,6 +458,27 @@ test_that("log_lik_tcc_options() reads each row's own d, and gives a response of
   expect_identical(log_lik_tcc_options(1, prep), rep(-Inf, 2))
 })
 
+test_that("log_lik and posterior_predict read the options on a 720-position wheel, 180 degrees included", {
+  # on 720 positions the option opposite the target is offset 360, which on
+  # 360 positions is the padding value; the padding must follow n_options
+  withr::local_seed(568)
+  f720 <- tcc_similarity("vonmises", kappa = 4, n_options = 720)
+  dat <- data.frame(err = c(0, 90, 180, -45) * pi / 180, o1 = 0, o2 = c(90, 90, 180, -45) * pi / 180,
+                    o3 = c(NA, 180, NA, 45) * pi / 180)
+  model <- tcc("err", f720, n_options = 720, options = paste0("o", 1:3))
+  sdata <- brms::standata(opt_mock_fit(model, bmf(d ~ 1), dat))
+  d <- c(0.5, 2, 6)
+  prep <- epred_prep(list(d = matrix(d, 3, sdata$N)), sdata)
+  for (i in seq_len(sdata$N)) {
+    x <- unlist(dat[i, paste0("o", 1:3)])
+    x <- x[!is.na(x)]
+    exact <- dtcc(dat$err[i], d, f720, n_options = 720, options = x, log = TRUE)
+    expect_equal(log_lik_tcc_options(i, prep), exact, tolerance = 1e-12, label = paste("row", i))
+    draws <- posterior_predict_tcc_options(i, prep)
+    expect_true(all(draws %in% round(x * 720 / (2 * pi))), label = paste("row", i))
+  }
+})
+
 test_that("posterior_predict_tcc_options() and pp_simulate() draw from each row's options", {
   withr::local_seed(567)
   model <- opt_model()
