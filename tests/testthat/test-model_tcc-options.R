@@ -308,6 +308,19 @@ test_that("each row's own cell is reported, since a fit then sums once per row",
                         mock_fit = 1, rename = FALSE))
 })
 
+test_that("the cells are reported once they outnumber half the rows, not only when each row is one", {
+  # the rows' sets are 1 1 2 2 2 3 3 1, so cond a-a-a-b-b-b-b-b gives 5 cells
+  # of 8 rows and a single b at the end gives 4, exactly half
+  dat <- opt_data()
+  expect_equal(brms::standata(opt_mock_fit(data = dat))$G_tcc_cells, 5)
+  expect_message(bmm(bmf(d ~ cond), dat, opt_model(), backend = "mock", mock_fit = 1, rename = FALSE),
+                 "The 8 rows fall into 5 cells")
+  dat$cond <- c(rep("a", 7), "b")
+  expect_equal(brms::standata(opt_mock_fit(data = dat))$G_tcc_cells, 4)
+  expect_no_message(bmm(bmf(d ~ cond), dat, opt_model(), backend = "mock", mock_fit = 1,
+                        rename = FALSE))
+})
+
 test_that("an options fit reads no d table and is not checked against one", {
   prep <- epred_prep(list(d = cbind(c(1, 45, 300), 2)))
   expect_silent(.tcc_check_grid(opt_model(), prep))
