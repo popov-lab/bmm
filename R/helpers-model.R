@@ -674,7 +674,7 @@ data_column_roles <- list(
     n_old = NA
   ),
   sdt_mafc = c(
-    response = "number of correct responses, or 1/0 for a correct/incorrect trial",
+    response = "number of correct responses, or 1/0 for a correct/incorrect response on one trial",
     n_trials = "number of trials (left out for one row per trial)",
     m = "number of alternatives (a column, or one number)"
   ),
@@ -687,7 +687,7 @@ data_column_roles <- list(
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
   ),
   sdt_yn = c(
-    response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' trial",
+    response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' response on one trial",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
     n_trials = "number of trials (left out for one row per trial)"
   )

@@ -66,8 +66,8 @@ trial_level_docs <- paste0(
   "Without trial-level predictors or item terms, trial rows give the same ",
   "posterior as the counts aggregated from them, which are sufficient ",
   "statistics; the fit only takes longer, because its cost grows with the ",
-  "number of rows. Trial rows are what crossed random effects such as ",
-  "`(1 | id) + (1 | item)` need.\n\n"
+  "number of rows. Crossed random effects such as `(1 | id) + (1 | item)` ",
+  "need trial rows, unless the counts are kept per participant and item.\n\n"
 )
 
 trial_level_stimulus_docs <- paste0(

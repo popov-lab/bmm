@@ -21,8 +21,11 @@ call. Call \code{\link[=bmm_models]{bmm_models()}} to see the list of supported 
 \code{?modelname} (for example \code{?imm}) for their required arguments.}
 
 \item{min_trials}{Numeric. Design cells with fewer observations are flagged
-in the report. Defaults to 10. Ignored for models fit to aggregated data
-(e.g. \code{m3}, \code{ezdm}), where one row summarizes many trials.}
+in the report. Defaults to 10. A grouping variable counted per level is
+judged only when its median level holds at least \code{min_trials}
+observations, and a level is flagged below \code{min(min_trials, median / 2)}.
+Ignored for models fit to aggregated data (e.g. \code{m3}, \code{ezdm}), where one
+row summarizes many trials.}
 }
 \value{
 An object of class \code{bmm_data_check} with a print method. The object
@@ -45,7 +48,11 @@ expects
 values)
 \item the number of observations per design cell (crossing the grouping
 variables from random effects terms with the categorical predictors),
-flagging sparse or empty cells
+flagging sparse or empty cells. With one row per trial
+(\code{sdt_yn()} and \code{sdt_mafc()} without \code{n_trials}), only the first
+grouping variable of the formula, taken as the participant, and any
+grouping variable that is also a discrete predictor are crossed; the
+other grouping variables, such as items, are counted per level
 \item model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced \code{NA}
 values in the non-target features of set size varying designs).

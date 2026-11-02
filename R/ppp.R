@@ -6,8 +6,9 @@
 #' Posterior predictive p-values for count models
 #'
 #' Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
-#' (2010) and their posterior predictive p-values (PPP) for models that fit
-#' aggregated response counts: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
+#' (2010) and their posterior predictive p-values (PPP) for the count models,
+#' whose rows are aggregated counts or, for [sdt_yn()] and [sdt_mafc()] without
+#' `n_trials`, single trials: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
 #' [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()]. TreeBUGS' `PPP()` reports the
 #' same two statistics; Details says where their values differ.
 #'

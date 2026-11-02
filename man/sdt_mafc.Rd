@@ -97,7 +97,7 @@ Provide one row per trial with the following column:
 
 No stimulus column is needed: each trial has exactly one signal alternative.
 \itemize{
-\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Trial rows are what crossed random effects such as \code{(1 | id) + (1 | item)} need.
+\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
 \itemize{
 \item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log binomial coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
 \item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.

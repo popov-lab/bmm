@@ -551,6 +551,9 @@ test_that("a numeric grouping variable with many values stays per level", {
   expect_length(res$cells$cell_vars, 0)
   expect_equal(res$cells$other_groups$variable, c("blk", "item"))
   printed <- paste(trimws(capture.output(print(res, color = FALSE))), collapse = " ")
-  expect_match(printed, "discrete predictors (non-numeric, or numeric with at most 10 values)",
-               fixed = TRUE)
+  expect_match(
+    printed,
+    "discrete predictors (factor, character or logical, or numeric with at most 10 values)",
+    fixed = TRUE
+  )
 })

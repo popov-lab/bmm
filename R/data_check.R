@@ -24,7 +24,11 @@ n_discrete_max <- 10
 #'     values)
 #'   - the number of observations per design cell (crossing the grouping
 #'     variables from random effects terms with the categorical predictors),
-#'     flagging sparse or empty cells
+#'     flagging sparse or empty cells. With one row per trial
+#'     (`sdt_yn()` and `sdt_mafc()` without `n_trials`), only the first
+#'     grouping variable of the formula, taken as the participant, and any
+#'     grouping variable that is also a discrete predictor are crossed; the
+#'     other grouping variables, such as items, are counted per level
 #'   - model-specific diagnostics for common data mistakes (e.g. responses in
 #'     degrees rather than radians for circular models, or misplaced `NA`
 #'     values in the non-target features of set size varying designs).
@@ -40,8 +44,11 @@ n_discrete_max <- 10
 #'   only surface when you call [bmm()].
 #' @inheritParams bmm
 #' @param min_trials Numeric. Design cells with fewer observations are flagged
-#'   in the report. Defaults to 10. Ignored for models fit to aggregated data
-#'   (e.g. `m3`, `ezdm`), where one row summarizes many trials.
+#'   in the report. Defaults to 10. A grouping variable counted per level is
+#'   judged only when its median level holds at least `min_trials`
+#'   observations, and a level is flagged below `min(min_trials, median / 2)`.
+#'   Ignored for models fit to aggregated data (e.g. `m3`, `ezdm`), where one
+#'   row summarizes many trials.
 #' @return An object of class `bmm_data_check` with a print method. The object
 #'   is a list containing the summarized `response`, `predictors` and `cells`
 #'   information (including the full cell count table in `$cells$counts`), all
@@ -738,8 +745,9 @@ print_other_groups <- function(cells) {
   cat_wrapped(glue(
     "Rows are single trials, so of the grouping variables only \
     '{cells$group_vars}' (the first in the formula found in the data, taken as \
-    the participant) and those that are also discrete predictors (non-numeric, \
-    or numeric with at most {n_discrete_max} values) are crossed into cells; \
+    the participant) and those that are also discrete predictors (factor, \
+    character or logical, or numeric with at most {n_discrete_max} values) are \
+    crossed into cells; \
     the others are counted per level:"
   ), "  ")
   for (i in seq_len(nrow(others))) {
