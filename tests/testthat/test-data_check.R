@@ -227,6 +227,12 @@ test_that("bmm_data_check counts the trials of aggregated rows, not the rows (#6
   expect_true(any(grepl("trials per cell: min 100 / median 100 / max 100", out)))
 })
 
+test_that("bmm_data_check prints large trial totals without scientific notation", {
+  out <- capture.output(print(sdt_yn_check(sdt_yn_cells(50000L)), color = FALSE))
+  expect_true(any(grepl("40 rows, 2000000 trials", out, fixed = TRUE)))
+  expect_true(any(grepl("min 100000 / median 100000 / max 100000", out, fixed = TRUE)))
+})
+
 test_that("bmm_data_check flags aggregated cells with fewer than 10 trials in total", {
   res <- sdt_yn_check(sdt_yn_cells(4L))
   msgs <- finding_messages(res)
@@ -246,7 +252,7 @@ test_that("bmm_data_check counts rows and checks no cell when the trial counts a
   expect_false(any(grepl("fewer than", msgs)))
   out <- capture.output(print(res, color = FALSE))
   expect_true(any(grepl("Rows per design cell", out)))
-  expect_true(any(grepl("40 observations", out)))
+  expect_true(any(grepl("Data:  40 rows ('dat')", out, fixed = TRUE)))
 })
 
 test_that("bmm_data_check counts m3 trials as the row sums of the response categories", {
@@ -272,7 +278,7 @@ test_that("bmm_data_check counts m3 trials as the row sums of the response categ
     finding_messages(sparse), fixed = TRUE)))
 })
 
-test_that("bmm_data_check sums mpt trials over all trees of a row", {
+test_that("bmm_data_check checks each mpt tree when the tree column is in the formula", {
   withr::local_seed(445)
   dat <- mpt_2htm_data(n_id = 4, n_items = 4)
   res <- bmm_data_check(
@@ -284,6 +290,20 @@ test_that("bmm_data_check sums mpt trials over all trees of a row", {
   expect_equal(unique(res$cells$counts$n), 4)
   expect_true(any(grepl("8 design cell(s) have fewer than 10 trials",
     finding_messages(res), fixed = TRUE)))
+})
+
+test_that("bmm_data_check sums the mpt trees of a cell when no formula uses the tree column", {
+  dat <- data.frame(
+    id = factor(rep(1:3, each = 2)), item_type = rep(c("old", "new"), 3),
+    old = c(30, 1, 28, 0, 31, 1), new = c(10, 1, 12, 2, 9, 1)
+  )
+  res <- bmm_data_check(
+    bmf(D ~ 1 + (1 | id), g ~ 1), dat,
+    mpt(mpt_2htm_trees(), tree_id = "item_type")
+  )
+  expect_equal(res$cells$counts$n, c(42, 42, 42))
+  expect_equal(res$cells$counts$n_rows, c(2, 2, 2))
+  expect_false(any(grepl("fewer than", finding_messages(res))))
 })
 
 test_that("bmm_data_check takes ezdm trials from n_trials", {
@@ -306,13 +326,18 @@ test_that("data_trials reads the trial counts of each aggregated SDT format", {
   expect_equal(data_trials(sdt_rating(c("r1", "r2", "r3"), stimulus = "s"), counts), c(9, 8))
   expect_equal(data_trials(sdt_ranking(c("r1", "r2", "r3"), m = 3), counts), c(9, 8))
 
-  cols <- .sdt_cdp_response_cols(1, 2, has_guess = FALSE)
+  cols <- c("new1", "know2", "know3", "remember2", "remember3")
   cdp <- as.data.frame(matrix(1:10, nrow = 2, ncol = 5, dimnames = list(NULL, cols)))
   model <- sdt_cdp(stimulus = "s", n_new = 1, n_old = 2)
   expect_equal(data_trials(model, cdp), c(25, 30))
   cdp$guess2 <- 100
   cdp$guess3 <- 1000
   expect_equal(data_trials(model, cdp), c(1125, 1130))
+
+  colnames(cdp) <- paste0("x_", colnames(cdp))
+  cdp$new1 <- 1e6
+  prefixed <- sdt_cdp(response = "x_", stimulus = "s", n_new = 1, n_old = 2)
+  expect_equal(data_trials(prefixed, cdp), c(1125, 1130))
 })
 
 test_that("data_trials reports unreadable counts as NA and trial rows as NULL", {

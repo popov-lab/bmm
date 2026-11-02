@@ -22,9 +22,10 @@ call. Call \code{\link[=bmm_models]{bmm_models()}} to see the list of supported 
 
 \item{min_trials}{Numeric. Design cells with fewer than \code{min_trials} trials
 in total are flagged in the report. Defaults to 10, for every model. For
-\code{mpt()} the total runs over all trees of a row, so a cell can pass while
-one of its trees holds only a few trials; tabulate the trials per tree
-yourself if the trees differ in size. When the trial counts of an
+\code{mpt()} a design cell sums the trials of all its trees unless a formula
+uses the tree column, so a cell can pass while one of its trees holds
+only a few trials; tabulate the trials per tree yourself if the trees
+differ in size. When the trial counts of an
 aggregated model cannot be read (a count column is missing or not
 numeric), the report shows rows per cell and flags none.}
 }

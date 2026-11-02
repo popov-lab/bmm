@@ -46,9 +46,10 @@ n_discrete_max <- 10
 #' @inheritParams bmm
 #' @param min_trials Numeric. Design cells with fewer than `min_trials` trials
 #'   in total are flagged in the report. Defaults to 10, for every model. For
-#'   `mpt()` the total runs over all trees of a row, so a cell can pass while
-#'   one of its trees holds only a few trials; tabulate the trials per tree
-#'   yourself if the trees differ in size. When the trial counts of an
+#'   `mpt()` a design cell sums the trials of all its trees unless a formula
+#'   uses the tree column, so a cell can pass while one of its trees holds
+#'   only a few trials; tabulate the trials per tree yourself if the trees
+#'   differ in size. When the trial counts of an
 #'   aggregated model cannot be read (a count column is missing or not
 #'   numeric), the report shows rows per cell and flags none.
 #' @return An object of class `bmm_data_check` with a print method. The object
@@ -613,11 +614,11 @@ print.bmm_data_check <- function(x, color = getOption("bmm.color_summary", TRUE)
   withr::local_options(bmm.color_summary = color)
   cat("Pre-fit data check\n")
   cat(style("purple1")("Model:"), gsub("\\s+", " ", construct_model_call(x$model)), "\n")
-  size <- if (is.null(x$n_trials)) {
+  size <- switch(x$cells$unit %||% "observations",
+    trials = glue("{x$n_obs} rows, {format(x$n_trials, scientific = FALSE)} trials"),
+    rows = glue("{x$n_obs} rows"),
     glue("{x$n_obs} observations")
-  } else {
-    glue("{x$n_obs} rows, {x$n_trials} trials")
-  }
+  )
   cat(style("purple1")("Data: "), glue("{size} ('{x$data_name}')"), "\n\n")
   print_response_section(x$response)
   print_predictor_section(x$predictors)
@@ -693,8 +694,9 @@ print_cells_section <- function(cells) {
     ": ", length(observed), " non-empty cell(s)\n",
     sep = ""
   )
-  cat("  ", unit, " per cell: min ", min(observed),
-    " / median ", stats::median(observed), " / max ", max(observed), "\n\n",
+  num <- function(x) format(x, scientific = FALSE)
+  cat("  ", unit, " per cell: min ", num(min(observed)),
+    " / median ", num(stats::median(observed)), " / max ", num(max(observed)), "\n\n",
     sep = ""
   )
 }
