@@ -53,6 +53,7 @@ test_that("tcc() refuses a similarity vector the model cannot read", {
   expect_error(tcc("err", similarity = c(1, f[-c(1, 2)], 1.2)), "between 0 and 1")
   expect_error(tcc("err", similarity = replace(f, 5, NA)), "between 0 and 1")
   expect_error(tcc("err", similarity = as.character(f)), "numeric")
+  expect_error(tcc("err", similarity = "vonmises"), "tcc_similarity\\(\\).*sdm\\(\\)")
   expect_error(tcc("err"), "missing.*similarity")
 })
 
