@@ -908,12 +908,11 @@ revert_check_data.tcc <- function(model, data) {
   # brms drops the rows with a missing value in a model variable before fitting
   used <- intersect(c(model$resp_vars$resp_error, predictors), colnames(data))
   kept <- data[stats::complete.cases(data[used]), , drop = FALSE]
-  run_id <- if (length(predictors)) {
-    id <- interaction(kept[predictors], drop = TRUE, lex.order = TRUE)
-    cumsum(c(TRUE, id[-1] != id[-length(id)]))
-  } else {
-    rep(1L, nrow(kept))
-  }
+  # a new run wherever any predictor changes value; interaction() would compare
+  # pasted labels, which coincide for ("a.b", "c") and ("a", "b.c")
+  changed <- Reduce(`|`, lapply(kept[predictors], function(x) x[-1] != x[-length(x)]),
+                    logical(max(nrow(kept) - 1, 0)))
+  run_id <- cumsum(c(TRUE, changed))[seq_len(nrow(kept))]
   sets <- .option_set_table(as.matrix(kept[.option_columns(.option_width(model))]),
                             model$other_vars$n_options)
   key <- paste(run_id, sets$set_id)

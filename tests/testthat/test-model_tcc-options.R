@@ -259,6 +259,22 @@ test_that("the cells are runs of equal predictors times option sets, with each r
   expect_equal(brms::standata(opt_mock_fit(opt_model("gumbel")))$tcc_noise, 2)
 })
 
+test_that("adjacent rows with different predictor values never share a cell", {
+  # interaction() pastes labels with ".", so (1, 5.2) and (1.5, 2) are both
+  # "1.5.2", as are the levels ("a.b", "c") and ("a", "b.c"); one cell across
+  # them would give every row the d of the first
+  dat <- opt_data()[rep(1, 4), ]
+  dat$x1 <- c(1, 1, 1.5, 1.5)
+  dat$x2 <- c(2, 5.2, 2, 5.2)
+  sdata <- brms::standata(opt_mock_fit(formula = bmf(d ~ x1 + x2), data = dat))
+  expect_equal(as.integer(sdata$tcc_row_cell), 1:4)
+  dat <- opt_data()[rep(1, 2), ]
+  dat$a <- c("a.b", "a")
+  dat$b <- c("c", "b.c")
+  sdata <- brms::standata(opt_mock_fit(formula = bmf(d ~ a + b), data = dat))
+  expect_equal(as.integer(sdata$tcc_row_cell), 1:2)
+})
+
 test_that("one cell and one set keep their tables arrays, which brms would declare as scalars", {
   model <- tcc("err", opt_similarity(360), n_alternatives = 4)
   dat <- data.frame(err = c(0, 90, 180, -90, 0) * pi / 180)
