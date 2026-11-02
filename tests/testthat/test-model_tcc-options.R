@@ -356,6 +356,14 @@ test_that("the option-set family takes the link of d from the model", {
   expect_identical(family$link_d, "softplus")
 })
 
+test_that("the option-set formula gives mu no intercept", {
+  # the cell tables carry the response, so a mu intercept would be a free
+  # parameter that no likelihood term reads
+  expect_match(deparse1(bmf2bf(opt_model(), bmf(d ~ 1))$formula), "~ 0$")
+  priors <- brms::prior_summary(opt_mock_fit())
+  expect_identical(unique(priors$dpar[priors$class == "Intercept"]), "d")
+})
+
 test_that("rows with a missing response or predictor are left out of the cells as brms drops them", {
   dat <- opt_data()
   dat$err[2] <- NA
