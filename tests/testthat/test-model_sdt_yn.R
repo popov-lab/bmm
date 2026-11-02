@@ -78,6 +78,10 @@ test_that("trial-level check_data() adds one trial per row and keeps the 0/1 res
                bmf(d ~ 1, criterion ~ 1)),
     "Rename your column 'nTrials'"
   )
+  expect_error(
+    check_data(model, cbind(dat, nTrials = c(2, 3, 4)), bmf(d ~ nTrials, criterion ~ 1)),
+    "Rename your column 'nTrials' and the argument or formula term"
+  )
 })
 
 test_that("trial rows and the cells aggregated from them give the same Stan program", {
@@ -105,24 +109,27 @@ test_that("trial rows and the cells aggregated from them give the same Stan prog
   )
 })
 
-# the trial rows' likelihood is the cell's binomial likelihood without its
-# coefficient: choose(8, 5) = 56 orderings of 5 'old' responses in 8 trials
-test_that("trial rows sum to the cell log-likelihood less log choose(n, y)", {
-  y <- c(1, 0, 1, 1, 0, 1, 0, 1)
-  for (stim in c(0, 1)) {
-    expect_equal(
-      sum(dsdt_yn(y, 1, stim, d = 1.3, criterion = 0.4, log = TRUE)),
-      dsdt_yn(5, 8, stim, d = 1.3, criterion = 0.4, log = TRUE) - log(56),
-      tolerance = 1e-10
-    )
-    expect_equal(
-      sum(dsdt_yn(y, 1, stim, d = 0.2, criterion = -0.7, sdratio = 1.4,
-                  dist = "logistic", log = TRUE)),
-      dsdt_yn(5, 8, stim, d = 0.2, criterion = -0.7, sdratio = 1.4,
-              dist = "logistic", log = TRUE) - log(56),
-      tolerance = 1e-10
-    )
+# the family's log_lik on the Stan data of trial rows sums, per cell, to its
+# log_lik on the Stan data of the cells less log choose(n, y): 10 trials per
+# cell with 2 and 8 'old' responses, choose(10, 2) = choose(10, 8) = 45
+test_that("log_lik_sdt_yn() on trial rows sums to the cell value less log choose(n, y)", {
+  skip_on_cran()
+  trials <- data.frame(stimulus = rep(0:1, each = 10),
+                       resp = c(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1))
+  cells <- data.frame(stimulus = 0:1, resp = c(2, 8), n = 10)
+  mock <- function(data, model) suppressMessages(
+    bmm(bmf(d ~ 1, criterion ~ 1), data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  ll <- function(fit) {
+    data <- brms::standata(fit)
+    prep <- epred_prep(list(d = matrix(1.3, 1, data$N), criterion = matrix(0.4, 1, data$N),
+                            sdratio = matrix(1, 1, data$N)), data)
+    vapply(seq_len(data$N), function(i) log_lik_sdt_yn(i, prep), numeric(1))
   }
+  by_trial <- ll(mock(trials, sdt_yn("resp", "stimulus")))
+  by_cell <- ll(mock(cells, sdt_yn("resp", "stimulus", "n")))
+  expect_equal(as.vector(tapply(by_trial, trials$stimulus, sum)), by_cell - log(45),
+               tolerance = 1e-10)
 })
 
 

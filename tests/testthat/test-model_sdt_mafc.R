@@ -115,19 +115,24 @@ test_that("trial rows and the cells aggregated from them give the same sdt_mafc 
   expect_equal(as.vector(tapply(trial_data$Y, trials$id, sum)), c(15, 12))
 })
 
-# choose(10, 7) = 120 orderings of 7 correct responses in 10 trials
-test_that("sdt_mafc trial rows sum to the cell log-likelihood less log choose(n, y)", {
-  y <- c(1, 1, 0, 1, 1, 0, 1, 1, 0, 1)
-  expect_equal(
-    sum(dsdt_mafc(y, 1, m = 4, d = 1.1, log = TRUE)),
-    dsdt_mafc(7, 10, m = 4, d = 1.1, log = TRUE) - log(120),
-    tolerance = 1e-10
+# the family's log_lik on the Stan data of trial rows sums to its log_lik on
+# the Stan data of the cell less log choose(n, y): 7 correct responses in 10
+# trials, choose(10, 7) = 120
+test_that("log_lik_sdt_mafc() on trial rows sums to the cell value less log choose(n, y)", {
+  skip_on_cran()
+  trials <- data.frame(correct = c(1, 1, 0, 1, 1, 0, 1, 1, 0, 1))
+  cells <- data.frame(correct = 7, n = 10)
+  mock <- function(data, model) suppressMessages(
+    bmm(bmf(d ~ 1), data, model, backend = "mock", mock_fit = 1, rename = FALSE)
   )
-  expect_equal(
-    sum(dsdt_mafc(y, 1, m = 3, d = 2.4, dist = "logistic", log = TRUE)),
-    dsdt_mafc(7, 10, m = 3, d = 2.4, dist = "logistic", log = TRUE) - log(120),
-    tolerance = 1e-10
-  )
+  ll <- function(fit) {
+    data <- brms::standata(fit)
+    prep <- epred_prep(list(d = matrix(1.1, 1, data$N)), data)
+    vapply(seq_len(data$N), function(i) log_lik_sdt_mafc(i, prep), numeric(1))
+  }
+  by_trial <- ll(mock(trials, sdt_mafc("correct", m = 4)))
+  by_cell <- ll(mock(cells, sdt_mafc("correct", "n", m = 4)))
+  expect_equal(sum(by_trial), by_cell - log(120), tolerance = 1e-10)
 })
 
 

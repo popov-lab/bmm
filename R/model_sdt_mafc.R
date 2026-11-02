@@ -193,7 +193,7 @@ built_data_columns.sdt_mafc <- function(model) {
 #' @export
 check_data.sdt_mafc <- function(model, data, formula) {
   if (is_trial_level(model)) {
-    data <- .add_binomial_trials(data, model)
+    data <- .add_binomial_trials(data, model, formula)
   } else {
     .validate_sdt_counts(data, model$resp_vars$response,
                          model$other_vars$n_trials)

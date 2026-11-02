@@ -40,13 +40,13 @@ is_trial_level <- function(model) {
 # trial rows of the binomial models become cells of one trial each. nTrials is
 # the name the multinomial models already reserve for their trial counts; a
 # column the model reads under that name would be overwritten with 1s
-.add_binomial_trials <- function(data, model) {
+.add_binomial_trials <- function(data, model, formula) {
   resp_var <- model$resp_vars$response
   stopif(not_in(resp_var, colnames(data)), "Variables '{resp_var}' missing in the data")
   stopif(
-    "nTrials" %in% unlist(c(model$resp_vars, model$other_vars)),
+    "nTrials" %in% c(unlist(model$resp_vars), unlist(model$other_vars), rhs_vars(formula)),
     "With one row per trial, {model$name} adds a column 'nTrials' to the data. \\
-    Rename your column 'nTrials' and the argument that names it."
+    Rename your column 'nTrials' and the argument or formula term that names it."
   )
   counts <- .trial_rows_to_counts(data[[resp_var]], c(0, 1),
                                   glue("the response column '{resp_var}'"))
@@ -66,14 +66,16 @@ trial_level_docs <- paste0(
   "statistics; the fit only takes longer, because its cost grows with the ",
   "number of rows. Trial rows are what crossed random effects such as ",
   "`(1 | id) + (1 | item)` need.\n\n",
-  "   - In a model with a stimulus column, an item's effect on `d` is informed ",
-  "only by the trials on which the item is the signal: on noise trials `d` ",
-  "does not enter the likelihood, so the item effects on `d` of items shown ",
-  "only as noise stay at their prior.\n",
+  "   - With `criterion` (the default) in a model with a stimulus column, an ",
+  "item's effect on `d` is informed only by the trials on which the item is ",
+  "the signal: on noise trials `d` does not enter the likelihood, so the item ",
+  "effects on `d` of items shown only as noise stay at their prior. With ",
+  "`bias`, `d` also moves the criterion and enters every trial.\n",
   "   - `loo()` leaves out single trials on trial rows and whole cells on ",
-  "aggregated rows. These are different predictions, and the trial-level ",
-  "log-likelihood lacks the binomial (multinomial) coefficient, so ELPD values ",
-  "compare only fits to the same layout. `kfold(fit, group = \"id\")` leaves ",
+  "aggregated rows. These are different predictions, and the log-likelihoods ",
+  "of the trial rows sum to the cell's log-likelihood less the log binomial ",
+  "(multinomial) coefficient, so ELPD values compare only fits to the same ",
+  "layout. `kfold(fit, group = \"id\")` leaves ",
   "out whole participants with either layout.\n",
   "   - `bmm(..., threads = n)` with `backend = \"cmdstanr\"` evaluates the ",
   "likelihood on `n` threads per chain, which shortens trial-level fits on a ",

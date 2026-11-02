@@ -274,37 +274,64 @@ summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   }, logical(1))]
 
   other_groups <- NULL
+  other_counts <- NULL
   if (trial_level && length(group_vars) > 1) {
     n_levels <- vapply(group_vars, function(v) length(unique(data[[v]])), numeric(1))
-    other_groups <- summarise_group_levels(data, group_vars[-which.min(n_levels)])
+    other_counts <- lapply(group_vars[-which.min(n_levels)], function(v) table(data[[v]]))
+    names(other_counts) <- group_vars[-which.min(n_levels)]
+    other_groups <- summarise_group_levels(other_counts)
     group_vars <- group_vars[which.min(n_levels)]
   }
 
   vars <- c(group_vars, cell_vars)
   if (length(vars) == 0) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL, other_groups))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL, other_groups, other_counts))
   }
 
   n_combos <- prod(vapply(vars, function(v) {
     length(unique(data[[v]]))
   }, numeric(1)))
   if (n_combos > max_design_cells) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos, other_groups))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos, other_groups, other_counts))
   }
 
   counts <- as.data.frame(
     table(data[, vars, drop = FALSE]),
     responseName = "n", stringsAsFactors = FALSE
   )
-  nlist(group_vars, cell_vars, counts, n_combos, other_groups)
+  nlist(group_vars, cell_vars, counts, n_combos, other_groups, other_counts)
 }
 
-summarise_group_levels <- function(data, vars) {
-  do.call(rbind, lapply(vars, function(v) {
-    n <- as.vector(table(data[[v]]))
+summarise_group_levels <- function(counts) {
+  do.call(rbind, lapply(names(counts), function(v) {
+    n <- as.vector(counts[[v]])
     data.frame(variable = v, n_levels = length(n), min = min(n),
                median = stats::median(n), max = max(n))
   }))
+}
+
+# the fewest-levels rule can pick a small factor such as a list or a session
+# as the participant variable, so every other grouping variable whose typical
+# level holds min_trials observations is judged per level too; one whose
+# typical level holds fewer (items seen a few times each) is only described
+group_level_findings <- function(counts, min_trials) {
+  if (is.null(min_trials)) {
+    return(list())
+  }
+  findings <- lapply(names(counts), function(v) {
+    n <- counts[[v]]
+    low <- n[n > 0 & n < min_trials]
+    if (stats::median(n) < min_trials || length(low) == 0) {
+      return(NULL)
+    }
+    labels <- paste0(v, "=", names(low), " (n=", low, ")")
+    data_check_finding("note", glue(
+      "{length(low)} level(s) of '{v}' have fewer than {min_trials} \\
+      observations: {paste(utils::head(labels, 3), collapse = '; ')}\\
+      {if (length(low) > 3) ', ...' else ''}"
+    ))
+  })
+  Filter(Negate(is.null), findings)
 }
 
 # tabulating the full crossing allocates a cell per combination, so wide
@@ -377,7 +404,8 @@ generic_data_findings <- function(predictors, cells, min_trials) {
     ))))
   }
 
-  c(findings, cell_count_findings(cells$counts, min_trials))
+  c(findings, cell_count_findings(cells$counts, min_trials),
+    group_level_findings(cells$other_counts, min_trials))
 }
 
 # Two questions about the rows, asked by different callers. Here: does a row
@@ -674,8 +702,8 @@ print_other_groups <- function(cells) {
   }
   cat_wrapped(glue(
     "Rows are single trials, so only '{cells$group_vars}' (the grouping \
-    variable with the fewest levels) is crossed into cells; the other \
-    grouping variables are counted per level:"
+    variable with the fewest levels, the first in the formula on a tie) is \
+    crossed into cells; the other grouping variables are counted per level:"
   ), "  ")
   for (i in seq_len(nrow(others))) {
     cat("  ", others$variable[i], ": ", others$n_levels[i], " levels, observations per level: min ",

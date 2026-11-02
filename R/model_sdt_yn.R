@@ -568,7 +568,7 @@ check_data.sdt_yn <- function(model, data, formula) {
   data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
   if (is_trial_level(model)) {
-    data <- .add_binomial_trials(data, model)
+    data <- .add_binomial_trials(data, model, formula)
   } else {
     .validate_sdt_counts(data, model$resp_vars$response,
                          model$other_vars$n_trials)

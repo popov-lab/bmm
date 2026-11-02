@@ -381,3 +381,17 @@ test_that("the report on aggregated sdt_yn rows is unchanged", {
     "2 design cell(s) have fewer than 10 observations: id=1 (n=2); id=2 (n=2)"
   )
 })
+
+test_that("a small grouping factor taken as participant does not hide a sparse subject", {
+  dat <- expand.grid(id = 1:4, item = 1:20)
+  dat <- dat[!(dat$id == 4 & dat$item > 5), ]
+  dat$list <- dat$id %% 2
+  dat$stimulus <- (dat$item + dat$list) %% 2
+  dat$resp <- (dat$id + dat$item) %% 3 == 0
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | id) + (1 | item) + (1 | list), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(res$cells$group_vars, "list")
+  expect_equal(finding_messages(res), "1 level(s) of 'id' have fewer than 10 observations: id=4 (n=5)")
+})

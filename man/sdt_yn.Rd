@@ -137,8 +137,8 @@ Provide one row per trial with the following columns:
 \itemize{
 \item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Trial rows are what crossed random effects such as \code{(1 | id) + (1 | item)} need.
 \itemize{
-\item In a model with a stimulus column, an item's effect on \code{d} is informed only by the trials on which the item is the signal: on noise trials \code{d} does not enter the likelihood, so the item effects on \code{d} of items shown only as noise stay at their prior.
-\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the trial-level log-likelihood lacks the binomial (multinomial) coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
+\item With \code{criterion} (the default) in a model with a stimulus column, an item's effect on \code{d} is informed only by the trials on which the item is the signal: on noise trials \code{d} does not enter the likelihood, so the item effects on \code{d} of items shown only as noise stay at their prior. With \code{bias}, \code{d} also moves the criterion and enters every trial.
+\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log binomial (multinomial) coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
 \item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.
 }
 }
