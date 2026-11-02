@@ -156,6 +156,20 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), circular_mean_cos(function(x) {
     dimm(x, c(0, 1.5, -2), c(0, 1, 2), c = 1.648721, a = 1, b = 1, s = 1, kappa = 7.389056)
   }), "imm")
+
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "bsc")
+  y <- simulate_data(model, list(kappa = 2, c = 0.5, s = 0), display)$y
+  expect_within_mc(cos(y), circular_mean_cos(function(x) {
+    dimm(x, c(0, 1.5, -2), c(0, 1, 2), c = 1.648721, a = 0, b = 1, s = 1, kappa = 7.389056)
+  }), "imm bsc")
+
+  # abc: weights c + a for the target, a for each non-target, 1 for guessing;
+  # E[cos] of a von Mises at mu is A(kappa) cos(mu), A(7.389056) = 0.9296366
+  model <- imm("y", nt_features = c("nt1", "nt2"), set_size = "set_size", version = "abc")
+  y <- simulate_data(model, list(kappa = 2, c = 0.5, a = -0.5), display)$y
+  expect_within_mc(cos(y), 0.9296366 * (2.255252 + 0.6065307 * (cos(1.5) + cos(-2))) / 4.468313,
+                   "imm abc")
 })
 
 test_that("simulated decisions of the RT models match the closed forms", {
@@ -234,6 +248,12 @@ test_that("simulated counts of the m3 and mpt models match their closed forms", 
   k <- simulate_data(model, list(c = 2, a = 1), data.frame(n_trials = rep(1, n_sim)))$corr
   # softmax activations b + a + c, b + a, b with b = 0, times the number of options
   expect_within_mc(k, exp(3) / (exp(3) + 4 * exp(1) + 5), "m3")
+
+  model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5),
+              choice_rule = "simple", version = "ss")
+  k <- simulate_data(model, list(c = 1, a = -1), data.frame(n_trials = rep(1, n_sim)))$corr
+  # activations b + a + c, b + a, b on the native scale, with the fixed b = 0.1
+  expect_within_mc(k, 3.18616 / (3.18616 + 4 * 0.4678794 + 5 * 0.1), "m3 simple")
 
   model <- mpt(mpt_2htm_trees(), tree_id = "item")
   k <- simulate_data(model, list(D = 0.5, g = -0.3),
