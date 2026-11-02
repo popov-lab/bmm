@@ -149,9 +149,11 @@
 #'   or more (`kappa` up to 200 on 360 options), and differ by 0.013 at `kappa
 #'   = 1000`.
 #'
-#'   Per gradient, Gumbel noise is not cheaper than normal noise: with `d` per
-#'   subject and set size on [oberauer_lin_2017] it cost 1.5 times as much.
-#'   It skips the table build before sampling and has no grid limit. Keep
+#'   On the full wheel, per gradient, Gumbel noise is not cheaper than normal
+#'   noise: with `d` per subject and set size on [oberauer_lin_2017] it cost
+#'   1.5 times as much (with `options` it is much cheaper; see the section
+#'   Forced-choice option sets). It skips the table build before sampling and
+#'   has no grid limit. Keep
 #'   normal noise to stay with the model of Schurgin et al. (2020) and to
 #'   compare `d` with their d'. The two `d` are not on one scale. The
 #'   standard Gumbel distribution has an SD of `pi / sqrt(6)` = 1.28, but

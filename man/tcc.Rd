@@ -148,9 +148,11 @@ integral of the \code{\link[=sdm]{sdm()}}, so the two agree to 1e-8 in log proba
 while the gradient's SD, \code{1 / sqrt(kappa)} radians, spans about 4 options
 or more (\code{kappa} up to 200 on 360 options), and differ by 0.013 at \code{kappa = 1000}.
 
-Per gradient, Gumbel noise is not cheaper than normal noise: with \code{d} per
-subject and set size on \link{oberauer_lin_2017} it cost 1.5 times as much.
-It skips the table build before sampling and has no grid limit. Keep
+On the full wheel, per gradient, Gumbel noise is not cheaper than normal
+noise: with \code{d} per subject and set size on \link{oberauer_lin_2017} it cost
+1.5 times as much (with \code{options} it is much cheaper; see the section
+Forced-choice option sets). It skips the table build before sampling and
+has no grid limit. Keep
 normal noise to stay with the model of Schurgin et al. (2020) and to
 compare \code{d} with their d'. The two \code{d} are not on one scale. The
 standard Gumbel distribution has an SD of \code{pi / sqrt(6)} = 1.28, but
