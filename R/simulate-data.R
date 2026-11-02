@@ -120,6 +120,9 @@
 #' )
 #' bmm::simulate_data(model, pars = list(c = 2, a = 0.5), design = data.frame(n_trials = c(100, 100)))
 simulate_data <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  stopif(!is.null(design) && "n_trials" %in% ...names(),
+         "`n_trials =` sets the number of observations only without a `design`; \\
+         with one, each row is an observation. Give one or the other.")
   UseMethod("simulate_data")
 }
 
@@ -179,6 +182,8 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
   fixed <- setdiff(intersect(model_pars, names(model$fixed_parameters)), names(pars))
   missing <- setdiff(model_pars, c(names(pars), fixed))
   stopif(length(missing) > 0, "No value for the parameter(s) {collapse_comma(missing)}.")
+  na <- names(pars)[vapply(pars, anyNA, logical(1))]
+  stopif(length(na) > 0, "The value(s) of {collapse_comma(na)} contain NA.")
   wrong <- names(pars)[!vapply(pars, is.numeric, logical(1)) | !lengths(pars) %in% c(1L, n)]
   stopif(length(wrong) > 0,
          "The value(s) of {collapse_comma(wrong)} must be numeric, a single value or \\

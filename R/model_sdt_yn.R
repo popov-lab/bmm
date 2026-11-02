@@ -630,7 +630,7 @@ simulate_data.sdt_yn <- function(model, pars, design = NULL, scale = c("link", "
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   response <- rsdt_yn(nrow(design), design[[vars$n_trials]], .coerce_sdt_stimulus(design[[vars$stimulus]]),
-                      d = p$d, criterion = p$criterion, bias = p$bias, sdratio = p$sdratio %||% 1,
+                      d = p$d, criterion = p$criterion, bias = p$bias, sdratio = p$sdratio,
                       dist = vars$dist)
   .simulate_result(design, stats::setNames(list(response), model$resp_vars$response), sim)
 }

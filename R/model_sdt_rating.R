@@ -788,7 +788,7 @@ simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link
   design <- .design_or_n(model, design, c(vars$stimulus, "n_trials"))
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
-  sdratio <- exp(p$sdratio %||% 0)
+  sdratio <- exp(p$sdratio)
   criterion <- .sdt_resolve_criterion(p$criterion, p$bias, p$d, sdratio)
   deltas <- p[grep("^delta[0-9]+$", names(p))]
   thresholds <- .sdt_make_thresholds(criterion, vars$n_ratings, vars$threshold_type, p$spacing,
