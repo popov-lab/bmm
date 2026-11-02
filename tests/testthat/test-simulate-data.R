@@ -114,6 +114,8 @@ test_that("simulate_data() names the design column that holds NA", {
                "column\\(s\\) 'ss' contain NA")
   expect_error(simulate_data(model, pars, data.frame(ss = c(3, 3, 2), nt1 = c(1, 1, 1), nt2 = c(1, NA, NA))),
                "'nt2' contain NA within the set size, in row\\(s\\) 2:")
+  expect_error(simulate_data(model, pars, data.frame(ss = 3, nt1 = 1, nt2 = c(1, rep(NA, 7)))),
+               "in row\\(s\\) 2, 3, 4, 5, 6, \\.\\.\\. \\(7 in all\\):")
   # past a row's set size NA is the layout of displays of different sizes
   data <- simulate_data(model, pars, data.frame(ss = c(1, 2, 3), nt1 = c(NA, 1, 1), nt2 = c(NA, NA, 1)))
   expect_false(anyNA(data$y))

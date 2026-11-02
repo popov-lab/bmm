@@ -169,10 +169,12 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
   nt <- as.matrix(design[columns])
   shown_na <- is.na(nt) & col(nt) < set_size
   bad <- columns[colSums(shown_na) > 0]
+  rows <- which(rowSums(shown_na) > 0)
+  listed <- paste(utils::head(rows, 5), collapse = ", ")
+  if (length(rows) > 5) listed <- glue::glue("{listed}, ... ({length(rows)} in all)")
   stopif(length(bad) > 0,
          "The design's column(s) {collapse_comma(bad)} contain NA within the set size, \\
-         in row(s) {paste(utils::head(which(rowSums(shown_na) > 0), 5), collapse = ', ')}: \\
-         a row's first set_size - 1 non-target columns need values.")
+         in row(s) {listed}: a row's first set_size - 1 non-target columns need values.")
 }
 
 #' The values of a model's parameters for every row of a design
