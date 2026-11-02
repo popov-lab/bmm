@@ -240,6 +240,11 @@ test_that("print.bmmodel() annotates trial-level sdt_yn responses", {
                fixed = TRUE, all = FALSE)
 })
 
+test_that("print.bmmodel() annotates trial-level sdt_mafc responses", {
+  expect_match(capture.output(print(sdt_mafc("c", m = 4))), "c (0/1 per trial; 1 = correct)",
+               fixed = TRUE, all = FALSE)
+})
+
 test_that("print.bmmodel() lists vector-valued response variables", {
   m <- m3(
     resp_cats = c("corr", "other", "npl"),

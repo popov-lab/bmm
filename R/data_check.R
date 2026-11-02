@@ -263,7 +263,8 @@ re_group_vars <- function(formula) {
 # with the fixed predictors. It is the first grouping variable in the formula:
 # the data cannot tell participants from items, and a count of levels picks
 # items whenever there are fewer items than participants. The other grouping
-# variables are counted per level; group_level_findings() judges them
+# variables are counted per level; group_level_findings() judges them. One
+# that is also a discrete fixed predictor stays crossed with the participant
 summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   group_vars <- intersect(re_group_vars(formula), colnames(data))
   fixed_vars <- setdiff(
@@ -280,6 +281,10 @@ summarise_design_cells <- function(data, formula, trial_level = FALSE) {
     other_counts <- lapply(group_vars[-1], function(v) table(droplevels(as.factor(data[[v]]))))
     names(other_counts) <- group_vars[-1]
     other_groups <- summarise_group_levels(other_counts)
+    also_fixed <- intersect(group_vars[-1], fixed_part_vars(formula))
+    cell_vars <- c(cell_vars, also_fixed[vapply(also_fixed, function(v) {
+      is_discrete_var(data[[v]])
+    }, logical(1))])
     group_vars <- group_vars[1]
   }
 
@@ -302,6 +307,25 @@ summarise_design_cells <- function(data, formula, trial_level = FALSE) {
   nlist(group_vars, cell_vars, counts, n_combos, other_groups, other_counts)
 }
 
+# the variables of the population-level part: every `( ... | ... )` term dropped
+fixed_part_vars <- function(formula) {
+  drop_bars <- function(expr) {
+    if (!is.call(expr)) {
+      return(expr)
+    }
+    if (identical(expr[[1]], as.name("(")) && .is_bar_call(expr[[2]])) {
+      return(1)
+    }
+    as.call(lapply(as.list(expr), drop_bars))
+  }
+  unique(unlist(lapply(formula, function(f) {
+    if (!is_formula(f) || length(f) == 0) {
+      return(character(0))
+    }
+    all.vars(drop_bars(f[[length(f)]]))
+  })))
+}
+
 summarise_group_levels <- function(counts) {
   do.call(rbind, lapply(names(counts), function(v) {
     n <- as.vector(counts[[v]])
@@ -315,20 +339,22 @@ summarise_group_levels <- function(counts) {
 # level holds min_trials observations is judged per level too; one whose
 # typical level holds fewer (items seen a few times each) is only described.
 # A level is flagged only when it also holds less than half the typical level,
-# so items drawn at random for each subject are not flagged at the boundary
+# so items drawn at random for each subject are not flagged at the boundary;
+# the message names that bound, not min_trials
 group_level_findings <- function(counts, min_trials) {
   if (is.null(min_trials)) {
     return(list())
   }
   findings <- lapply(names(counts), function(v) {
     n <- counts[[v]]
-    low <- n[n > 0 & n < min(min_trials, stats::median(n) / 2)]
+    threshold <- min(min_trials, stats::median(n) / 2)
+    low <- n[n > 0 & n < threshold]
     if (stats::median(n) < min_trials || length(low) == 0) {
       return(NULL)
     }
     labels <- paste0(v, "=", names(low), " (n=", low, ")")
     data_check_finding("note", glue(
-      "{length(low)} level(s) of '{v}' have fewer than {min_trials} \\
+      "{length(low)} level(s) of '{v}' have fewer than {signif(threshold, 3)} \\
       observations: {paste(utils::head(labels, 3), collapse = '; ')}\\
       {if (length(low) > 3) ', ...' else ''}"
     ))

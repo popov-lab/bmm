@@ -460,3 +460,34 @@ test_that("the report on aggregated rows crosses every grouping variable", {
   expect_equal(res$cells$group_vars, c("id", "item"))
   expect_null(res$cells$other_groups)
 })
+
+# subject 5 holds 8 trials and subject 6 holds 5, against a typical 14: the
+# bound is min(10, 14 / 2) = 7, so only subject 6 is flagged, and the message
+# names 7
+test_that("a per-level finding names the bound it applies", {
+  dat <- expand.grid(id = 1:6, trial = 1:14)
+  dat <- dat[!(dat$id == 5 & dat$trial > 8) & !(dat$id == 6 & dat$trial > 5), ]
+  dat$list <- dat$id %% 2
+  dat$stimulus <- dat$trial %% 2
+  dat$resp <- as.integer((dat$id + dat$trial) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | list) + (1 | id), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(finding_messages(res), "1 level(s) of 'id' have fewer than 7 observations: id=6 (n=5)")
+})
+
+test_that("a grouping variable that is also a fixed predictor stays crossed with the participant", {
+  dat <- expand.grid(id = 1:4, item = 1:24)
+  dat$grp <- factor(ifelse(dat$item <= 12, "A", "B"))
+  dat <- dat[!(dat$id == 1 & dat$item > 15), ]
+  dat$stimulus <- dat$item %% 2
+  dat$resp <- as.integer((dat$id + dat$item) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(d ~ grp + (1 | id) + (1 | grp) + (1 | item), criterion ~ 1 + (1 | id)),
+    dat, sdt_yn("resp", "stimulus")
+  )
+  expect_equal(res$cells$group_vars, "id")
+  expect_equal(res$cells$cell_vars, "grp")
+  expect_equal(finding_messages(res), "1 design cell(s) have fewer than 10 observations: id=1, grp=B (n=3)")
+})
