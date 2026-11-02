@@ -26,6 +26,7 @@ p_upper <- function(v, a, z) (1 - exp(-2 * v * a * z)) / (1 - exp(-2 * v * a))
 n_sim <- 1e5
 
 test_that("simulate_data() output passes check_data() and a mock fit for every simulate case", {
+  # about 30 cases at 0.3 s each: a mock fit per case is what proves the layout
   skip_on_cran()
   withr::local_seed(20261102)
   for (name in names(cases <- model_test_cases("simulate"))) {
