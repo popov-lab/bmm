@@ -4,7 +4,7 @@
 # That file defines a function model_cases_<model>() returning a list with any
 # of these elements, each a named list of cases:
 # - stored_frame: list(model, formula, data), for the stored-frame checks of
-#   test-update.R; every model needs one
+#   test-update-stored-frame.R and test-update-newdata.R; every model needs one
 # - check_data: list(model, data), named after the model, for the check in
 #   test-helpers-data.R that check_data() returns a data.frame, when the data
 #   shared by the other models cannot serve the model
