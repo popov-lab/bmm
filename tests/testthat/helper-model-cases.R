@@ -8,6 +8,8 @@
 # - check_data: list(model, data), named after the model, for the check in
 #   test-helpers-data.R that check_data() returns a data.frame, when the data
 #   shared by the other models cannot serve the model
+#   (a name that is no model's, such as ezdm_4par, is read only by the check
+#   that built_data_columns() declares what check_data() adds)
 # - observables: list(model, data, formula), for test-pp_observables.R: the
 #   model's pp_observables() must name standata slots and be elementwise
 # - sd_default: list(model, formula, data, sd), for test-default-priors.R: sd

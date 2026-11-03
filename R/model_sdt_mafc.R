@@ -170,6 +170,11 @@ sdt_mafc <- function(response, n_trials, m,
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+built_data_columns.sdt_mafc <- function(model) {
+  c("m_afc", "dist_type", NextMethod("built_data_columns"))
+}
+
 #' @export
 check_data.sdt_mafc <- function(model, data, formula) {
   resp_var <- model$resp_vars$response

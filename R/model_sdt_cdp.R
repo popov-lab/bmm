@@ -464,6 +464,11 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+built_data_columns.sdt_cdp <- function(model) {
+  c("nTrials", NextMethod("built_data_columns"))
+}
+
 #' @export
 check_data.sdt_cdp <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus

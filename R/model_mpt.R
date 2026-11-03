@@ -1352,6 +1352,19 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
 # CHECK_data S3 methods                                                  ####
 ############################################################################# !
 
+# the tree indicators and Poss_ columns are named in the model object, so a
+# user column that merely starts with Idx_ or Poss_ is not declared
+#' @exportS3Method
+built_data_columns.mpt <- function(model) {
+  indicators <- model$other_vars$indicators
+  c(
+    "nTrials",
+    unlist(indicators$tree, use.names = FALSE),
+    unlist(indicators$possible, use.names = FALSE),
+    NextMethod("built_data_columns")
+  )
+}
+
 #' @export
 check_data.mpt <- function(model, data, formula) {
   resp_cats <- model$resp_vars$resp_cats
