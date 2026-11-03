@@ -44,6 +44,8 @@ model_cases_mpt <- function() {
     init = list(mpt = list(model = model, formula = re_formula, data = toy_mpt_data())),
     links = list(mpt = list(model = model, settable = c("D", "g"))),
     fixture = list(mpt = list(file = "bmmfit_mpt_ppcheck.rds")),
+    # mpt() without trees has no parameters and no links
+    specimen = list(mpt = model),
     simulate = list(
       mpt = list(
         model = model, pars = list(D = 0.5, g = -0.2),
