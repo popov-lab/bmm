@@ -27,7 +27,10 @@ uses the tree column, so a cell can pass while one of its trees holds
 only a few trials; tabulate the trials per tree yourself if the trees
 differ in size. When the trial counts of an
 aggregated model cannot be read (a count column is missing or not
-numeric), the report shows rows per cell and flags none.}
+numeric), the report shows rows per cell and flags none. A grouping
+variable counted per level is judged only when its median level holds at
+least \code{min_trials} observations, and a level is flagged below
+\code{min(min_trials, median / 2)}.}
 }
 \value{
 An object of class \code{bmm_data_check} with a print method. The object
@@ -58,7 +61,11 @@ where one row summarizes many trials, the trials of all rows in a cell
 are summed: the \code{n_trials} column of \code{sdt_yn()}, \code{sdt_mafc()} and
 \code{ezdm()}, and the row sums of the response count columns of \code{m3()},
 \code{mpt()}, \code{sdt_rating()}, \code{sdt_ranking()} and \code{sdt_cdp()}. For all other
-models a row is one trial
+models a row is one trial. With one row per trial
+(\code{sdt_yn()} and \code{sdt_mafc()} without \code{n_trials}), only the first
+grouping variable of the formula, taken as the participant, and any
+grouping variable that is also a discrete predictor are crossed; the
+other grouping variables, such as items, are counted per level
 \item model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced \code{NA}
 values in the non-target features of set size varying designs).

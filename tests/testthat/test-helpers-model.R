@@ -632,3 +632,12 @@ test_that("update_model_fixed_parameters() works", {
   expect_equal(model1$fixed_parameters, list(mu = 0))
   expect_equal(model2$fixed_parameters, list(kappa = 3))
 })
+
+test_that("model_docs() keeps the trial-level part out of 'all' and the stimulus bullet off sdt_mafc", {
+  docs <- function(model, ...) paste(model_docs(model, ...), collapse = "\n")
+  expect_no_match(docs(sdt_yn("r", "s")), "Requirements for one row per trial", fixed = TRUE)
+  expect_match(docs(sdt_yn("r", "s"), components = "trial_level"), "With `bias`", fixed = TRUE)
+  mafc <- docs(sdt_mafc("c", m = 4), components = "trial_level")
+  expect_match(mafc, "Requirements for one row per trial", fixed = TRUE)
+  expect_no_match(mafc, "criterion", fixed = TRUE)
+})

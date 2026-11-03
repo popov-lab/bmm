@@ -24,9 +24,13 @@ test_that("sdt_mafc accepts m as a constant or a column name", {
   expect_identical(m_col$other_vars$m, "set_size")
 })
 
-test_that("sdt_mafc requires response, n_trials, and m", {
-  expect_error(sdt_mafc("n_correct", "n_trials"))
-  expect_error(sdt_mafc("n_correct", m = 4))
+test_that("sdt_mafc requires response and m, and reads trial rows without n_trials", {
+  expect_error(sdt_mafc("n_correct", "n_trials"), "missing in sdt_mafc\\(\\): m")
+  trial <- sdt_mafc("correct", m = 4)
+  expect_true(trial$other_vars$trial_level)
+  expect_null(trial$other_vars$n_trials)
+  expect_match(trial$requirements, "one row per trial")
+  expect_false(sdt_mafc("n_correct", "n_trials", m = 4)$other_vars$trial_level)
 })
 
 test_that("sdt_mafc rejects m < 2 and invalid distributions", {
@@ -74,10 +78,68 @@ test_that("sdt_mafc check_data resolves per-row set size from a data column", {
   expect_equal(result$m_afc, c(2L, 4L, 6L))
 })
 
+test_that("sdt_mafc requirements list the set-size column only when m names one", {
+  line <- "Number of alternatives (m): one integer >= 2 per row"
+  expect_match(sdt_mafc("c", m = "k")$requirements, line, fixed = TRUE)
+  expect_match(sdt_mafc("c", "n", m = "k")$requirements, line, fixed = TRUE)
+  expect_no_match(sdt_mafc("c", m = 4)$requirements, line, fixed = TRUE)
+})
+
 test_that("sdt_mafc check_data errors when the set-size column is missing", {
   model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
   dat <- data.frame(n_correct = c(70, 65), n_trials = c(100, 100))
   expect_error(check_data(model, dat, bmf(d ~ 1)), "Set-size column")
+})
+
+test_that("trial-level sdt_mafc check_data() names the responses that are not 0 or 1", {
+  model <- sdt_mafc("correct", m = 4)
+  expect_error(
+    check_data(model, data.frame(correct = c(1, 0, 4, 0.5)), bmf(d ~ 1)),
+    "'correct' must hold one of '0', '1' in every row. Found: '4', '0.5'"
+  )
+  checked <- check_data(model, data.frame(correct = c(1, 0, 1)), bmf(d ~ 1))
+  expect_identical(checked$correct, c(1L, 0L, 1L))
+  expect_identical(checked$nTrials, c(1L, 1L, 1L))
+})
+
+test_that("trial rows and the cells aggregated from them give the same sdt_mafc Stan program", {
+  skip_on_cran()
+  # 2 participants x 20 trials (R3)
+  trials <- data.frame(
+    id = rep(1:2, each = 20),
+    correct = c(1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1,
+                1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0)
+  )
+  cells <- data.frame(id = 1:2, correct = c(15, 12), n_trials = 20)
+  mock <- function(data, model) suppressMessages(
+    bmm(bmf(d ~ 1 + (1 | id)), data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_fit <- mock(trials, sdt_mafc("correct", m = 4))
+  cell_fit <- mock(cells, sdt_mafc("correct", "n_trials", m = 4))
+  expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit))
+  trial_data <- brms::standata(trial_fit)
+  expect_equal(as.vector(trial_data$trials), rep(1, 40))
+  expect_equal(as.vector(tapply(trial_data$Y, trials$id, sum)), c(15, 12))
+})
+
+# the family's log_lik on the Stan data of trial rows sums to its log_lik on
+# the Stan data of the cell less log choose(n, y): 7 correct responses in 10
+# trials, choose(10, 7) = 120
+test_that("log_lik_sdt_mafc() on trial rows sums to the cell value less log choose(n, y)", {
+  skip_on_cran()
+  trials <- data.frame(correct = c(1, 1, 0, 1, 1, 0, 1, 1, 0, 1))
+  cells <- data.frame(correct = 7, n = 10)
+  mock <- function(data, model) suppressMessages(
+    bmm(bmf(d ~ 1), data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  ll <- function(fit) {
+    data <- brms::standata(fit)
+    prep <- epred_prep(list(d = matrix(1.1, 1, data$N)), data)
+    vapply(seq_len(data$N), function(i) log_lik_sdt_mafc(i, prep), numeric(1))
+  }
+  by_trial <- ll(mock(trials, sdt_mafc("correct", m = 4)))
+  by_cell <- ll(mock(cells, sdt_mafc("correct", "n", m = 4)))
+  expect_equal(sum(by_trial), by_cell - log(120), tolerance = 1e-10)
 })
 
 
