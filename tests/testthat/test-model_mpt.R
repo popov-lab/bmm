@@ -803,6 +803,7 @@ test_that("internal_parameters() lists the stick-breaking components of an mpt s
 })
 
 test_that("native_parameters() leaves the stick-breaking components out unless they are named", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   tree <- mpt_tree("t", list(
     A = "D + (1 - D) * gA", B = "(1 - D) * gB", C = "(1 - D) * gC"
   ))
