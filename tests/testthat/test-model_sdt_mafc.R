@@ -423,9 +423,12 @@ test_that("the Stan sdt_mafc likelihood matches dsdt_mafc row by row and over bl
     "append_row(d[s:e], d[bad[b]]), append_array(m[s:e], {m[bad[b]]}), dist[s], ",
     "append_array(trials[s:e], {trials[bad[b]]}), ", tables, ");\n  }\n}\n"
   )
-  grid <- expand.grid(m = c(2L, 3L, 4L, 8L), d = c(-1, 0.3, 1.5, 3), cnt = 1:5,
+  grid <- expand.grid(m = c(2L, 3L, 4L, 8L), d = c(-1, 0.3, 1.5, 3), rep = 1:5,
                       dist = seq_along(bmm:::.sdt_dists))
   counts <- rbind(c(20L, 13L), c(20L, 0L), c(20L, 20L), c(1L, 0L), c(1L, 1L))
+  # counts drawn per row: crossed with every (m, d') cell, a block would sum the
+  # same logits once per count, and a permutation of its rows would not show
+  grid$cnt <- withr::with_seed(1, sample.int(nrow(counts), nrow(grid), replace = TRUE))
   grid$trials <- counts[grid$cnt, 1]
   grid$y <- counts[grid$cnt, 2]
   # infinite logits: +Inf where every quadrature term rounds to certainty
