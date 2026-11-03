@@ -1686,8 +1686,9 @@ times_nonzero <- function(count, log_prob) {
 #'   Simulated `mean_rt` is not truncated at `ndt`. When a summary rests on few
 #'   responses (a handful of trials in version `"3par"`, or a rarely reached
 #'   boundary in version `"4par"`, whatever `n_trials` is), `rezdm()` can
-#'   return `mean_rt` below `ndt` or even `mean_rt <= 0`, which `bmm()`
-#'   rejects; drop those rows before fitting.
+#'   return `mean_rt` below `ndt` or even `mean_rt <= 0`. `bmm()` rejects
+#'   only the non-positive mean RTs; drop those rows before fitting. Values
+#'   below `ndt` are valid draws.
 #'
 #' @return `dezdm` gives the log-density of the observed summary statistics
 #'   under the EZDM, and `rezdm` generates random summary statistics from the

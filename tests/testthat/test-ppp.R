@@ -316,6 +316,17 @@ test_that("ppp() counts the second category of a yes/no model as trials minus re
   expect_equal(counts$expected[, , 2], cbind(100 - draws[, 1], 80 - draws[, 2]) - 0.5)
 })
 
+test_that("ppp() reads the trials of trial-level yes/no rows from nTrials", {
+  model <- sdt_yn("resp", "stimulus")
+  fit <- list(data = data.frame(resp = c(1L, 0L), nTrials = 1L))
+  draws <- matrix(c(1, 0, 0, 1), 2, 2)
+  local_mocked_bindings(posterior_predict = function(...) draws,
+                        posterior_epred = function(...) draws * 0 + 0.5, .package = "brms")
+  counts <- .ppp_counts(model, fit, draw_ids = 1:2)
+  expect_equal(counts$observed, cbind(resp = c(1, 0), other = c(0, 1)))
+  expect_equal(counts$replicated[, , 2], 1 - draws)
+})
+
 test_that("ppp() rebuilds the tree column of an mpt fit that no formula kept", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   cases <- model_test_cases("stored_frame")

@@ -586,6 +586,21 @@ pp_simulate.tcc <- function(model, prep) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.tcc <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  n_options <- model$other_vars$n_options
+  y <- rtcc(nrow(design), d = sim$native$d, similarity = model$other_vars$similarity,
+            n_options = n_options)
+  if (model$other_vars$units == "bins") y <- .tcc_bin(y, n_options, "radians")
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
+}
+
+############################################################################# !
 # STORED FRAME                                                           ####
 ############################################################################# !
 

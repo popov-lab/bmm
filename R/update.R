@@ -426,6 +426,9 @@ revert_check_data.non_targets <- function(model, data) {
 #' @exportS3Method
 revert_check_data.sdt_yn <- function(model, data) {
   data$dist_type <- NULL
+  if (is_trial_level(model)) {
+    data$nTrials <- NULL
+  }
   NextMethod("revert_check_data")
 }
 
@@ -440,6 +443,9 @@ revert_check_data.sdt_mafc <- function(model, data) {
   }
   data$m_afc <- NULL
   data$dist_type <- NULL
+  if (is_trial_level(model)) {
+    data$nTrials <- NULL
+  }
   NextMethod("revert_check_data")
 }
 
