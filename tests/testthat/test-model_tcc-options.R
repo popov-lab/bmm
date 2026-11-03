@@ -577,7 +577,9 @@ test_that("the cells counted in transformed data give the summed log_lik, whole 
     K <- biggest[1]
     expect_gt(max(biggest), K)
     d <- c(a = 0.7, b = 2.1, c = 6)[fit$data$cond]
-    # every random-foil row is its own cell, which configure reports
+    # the Stan functions and cell tables as configure builds them for these
+    # rows; suppressMessages() keeps out the many-cells message, which more
+    # random-foil cells than half the rows would bring
     stanvars <- suppressMessages(.tcc_options_configure(model, fit$data, bmf(d ~ cond)))$stanvars
     block <- function(b) paste(vapply(stanvars, function(s) if (s$block == b) s$scode else "", ""),
                                collapse = "\n")
