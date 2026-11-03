@@ -346,7 +346,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_mafc.html"><code>sdt_mafc()</code></a><br>m-Alternative Forced Choice Signal Detection Theory Model</td>
 <td align="left">
-<code>response</code>: number of correct responses<br><code>n_trials</code>: number of trials<br><code>m</code>: number of alternatives (a column, or one number)</td>
+<code>response</code>: number of correct responses, or 1/0 for a correct/incorrect response on one trial<br><code>n_trials</code>: number of trials (left out for one row per trial)<br><code>m</code>: number of alternatives (a column, or one number)</td>
 <td align="left">
 <code>d</code>: Sensitivity</td>
 </tr>
@@ -389,7 +389,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_yn.html"><code>sdt_yn()</code></a><br>Yes/No Signal Detection Theory Model</td>
 <td align="left">
-<code>response</code>: number of ‘old’/‘signal’ responses<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old<br><code>n_trials</code>: number of trials</td>
+<code>response</code>: number of ‘old’/‘signal’ responses, or 1/0 for an ‘old’/‘new’ response on one trial<br><code>stimulus</code>: stimulus type, 0 = noise/new and 1 = signal/old<br><code>n_trials</code>: number of trials (left out for one row per trial)</td>
 <td align="left">
 <code>d</code>: d_a sensitivity (= d’ when sdratio is fixed)<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units; the false-alarm rate depends on it alone<br><code>bias</code>: Alternative to criterion<br>Fixed by default: <code>sdratio</code>
 </td>
@@ -600,10 +600,9 @@ this only tells <code>bmm</code> where to look:</p>
 <span>  stimulus <span class="op">=</span> <span class="st">"stimulus"</span>,</span>
 <span>  n_trials <span class="op">=</span> <span class="st">"n_trials"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>If your data has one row per trial instead of counts, you can pass it as is:
-the column named in <code>response</code> then holds <code>0</code> or <code>1</code>, the column named in
-<code>n_trials</code> holds <code>1</code> on every row, and <code>stimulus</code> codes the item of that
-trial as before. We leave <code>dist</code> at its default, <code>"normal"</code>.</p>
+<p>If your data has one row per trial instead of counts, leave out <code>n_trials</code>:
+the column named in <code>response</code> then holds <code>0</code> or <code>1</code>, and <code>stimulus</code> codes
+the item of that trial as before. We leave <code>dist</code> at its default, <code>"normal"</code>.</p>
 <p>The model has two parameters. <code>d</code> is the sensitivity: the distance between
 the evidence distributions of old and new items. <code>criterion</code> is the decision
 criterion: the point on the evidence axis, measured from the mean of the new

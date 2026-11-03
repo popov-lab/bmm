@@ -255,11 +255,10 @@ model <- sdt_yn(
 )
 ```
 
-If your data has one row per trial instead of counts, you can pass it as
-is: the column named in `response` then holds `0` or `1`, the column
-named in `n_trials` holds `1` on every row, and `stimulus` codes the
-item of that trial as before. We leave `dist` at its default,
-`"normal"`.
+If your data has one row per trial instead of counts, leave out
+`n_trials`: the column named in `response` then holds `0` or `1`, and
+`stimulus` codes the item of that trial as before. We leave `dist` at
+its default, `"normal"`.
 
 The model has two parameters. `d` is the sensitivity: the distance
 between the evidence distributions of old and new items. `criterion` is

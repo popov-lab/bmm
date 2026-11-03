@@ -117,7 +117,7 @@ requirements; they are not modes of a single function.</p>
 <tbody>
 <tr class="odd">
 <td><code><a href="../reference/sdt_yn.html">sdt_yn()</a></code></td>
-<td>counts of “signal”/“old” responses</td>
+<td>counts of “signal”/“old” responses, or one 0/1 row per trial</td>
 <td>
 <code>d</code>, <code>criterion</code>, <code>sdratio</code>
 </td>
@@ -133,7 +133,7 @@ requirements; they are not modes of a single function.</p>
 </tr>
 <tr class="odd">
 <td><code><a href="../reference/sdt_mafc.html">sdt_mafc()</a></code></td>
-<td>counts of correct m-AFC responses</td>
+<td>counts of correct m-AFC responses, or one 0/1 row per trial</td>
 <td><code>d</code></td>
 <td>no</td>
 </tr>
@@ -170,12 +170,14 @@ post-processing toolkit: <code><a href="../reference/roc_sdt.html">roc_sdt()</a>
 only the ingredients are SDT-specific.</p>
 <ol style="list-style-type: decimal">
 <li>
-<strong>Aggregate the data.</strong> All four models consume <em>pre-aggregated counts</em>, not
-trial-level responses: one row per design cell (for example per subject and
+<strong>Aggregate the data, or declare trial rows.</strong> <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code> and
+<code><a href="../reference/sdt_ranking.html">sdt_ranking()</a></code> consume counts per design cell (for example per subject and
 stimulus type), with the counts in the columns the constructor names. If
 your data hold one row per trial, aggregate them first (e.g. with
 <code><a href="https://dplyr.tidyverse.org/reference/count.html" class="external-link">dplyr::count()</a></code> or <code><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">stats::aggregate()</a></code>); the Rating SDT section below
-shows a real reshaping example.</li>
+shows a real reshaping example. <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> and <code><a href="../reference/sdt_mafc.html">sdt_mafc()</a></code> take either
+counts per cell or one row per trial with a 0/1 response: for trial rows,
+leave out <code>n_trials</code>.</li>
 <li>
 <strong>Create the model object.</strong> The constructor maps your column names onto the
 model’s response format — for example <code>sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")</code> — and selects the noise

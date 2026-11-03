@@ -18,9 +18,9 @@ function.
 
 | Constructor | Response format | Key parameters | ROC defined? |
 |----|----|----|----|
-| [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) | counts of “signal”/“old” responses | `d`, `criterion`, `sdratio` | yes |
+| [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) | counts of “signal”/“old” responses, or one 0/1 row per trial | `d`, `criterion`, `sdratio` | yes |
 | [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md) | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
-| [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | counts of correct m-AFC responses | `d` | no |
+| [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | counts of correct m-AFC responses, or one 0/1 row per trial | `d` | no |
 | [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md) | counts per rank position | `d`, `sdratio` (`dist = "normal"` only) | no |
 
 All four assume a latent evidence variable whose noise distribution is
@@ -61,14 +61,20 @@ the [`plot()`](https://rdrr.io/r/graphics/plot.default.html) methods
 Fitting any of the four models follows the same recipe as every `bmm`
 model; only the ingredients are SDT-specific.
 
-1.  **Aggregate the data.** All four models consume *pre-aggregated
-    counts*, not trial-level responses: one row per design cell (for
-    example per subject and stimulus type), with the counts in the
-    columns the constructor names. If your data hold one row per trial,
-    aggregate them first (e.g. with
+1.  **Aggregate the data, or declare trial rows.**
+    [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+    and
+    [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
+    consume counts per design cell (for example per subject and stimulus
+    type), with the counts in the columns the constructor names. If your
+    data hold one row per trial, aggregate them first (e.g. with
     [`dplyr::count()`](https://dplyr.tidyverse.org/reference/count.html)
     or [`stats::aggregate()`](https://rdrr.io/r/stats/aggregate.html));
     the Rating SDT section below shows a real reshaping example.
+    [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+    [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)
+    take either counts per cell or one row per trial with a 0/1
+    response: for trial rows, leave out `n_trials`.
 2.  **Create the model object.** The constructor maps your column names
     onto the model’s response format — for example
     `sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")`

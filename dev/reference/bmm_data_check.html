@@ -23,7 +23,11 @@ where one row summarizes many trials, the trials of all rows in a cell
 are summed: the n_trials column of sdt_yn(), sdt_mafc() and
 ezdm(), and the row sums of the response count columns of m3(),
 mpt(), sdt_rating(), sdt_ranking() and sdt_cdp(). For all other
-models a row is one trial
+models a row is one trial. With one row per trial
+(sdt_yn() and sdt_mafc() without n_trials), only the first
+grouping variable of the formula, taken as the participant, and any
+grouping variable that is also a discrete predictor are crossed; the
+other grouping variables, such as items, are counted per level
 model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced NA
 values in the non-target features of set size varying designs).
@@ -54,7 +58,11 @@ where one row summarizes many trials, the trials of all rows in a cell
 are summed: the n_trials column of sdt_yn(), sdt_mafc() and
 ezdm(), and the row sums of the response count columns of m3(),
 mpt(), sdt_rating(), sdt_ranking() and sdt_cdp(). For all other
-models a row is one trial
+models a row is one trial. With one row per trial
+(sdt_yn() and sdt_mafc() without n_trials), only the first
+grouping variable of the formula, taken as the participant, and any
+grouping variable that is also a discrete predictor are crossed; the
+other grouping variables, such as items, are counted per level
 model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced NA
 values in the non-target features of set size varying designs).
@@ -123,7 +131,11 @@ where one row summarizes many trials, the trials of all rows in a cell
 are summed: the <code>n_trials</code> column of <code><a href="sdt_yn.html">sdt_yn()</a></code>, <code><a href="sdt_mafc.html">sdt_mafc()</a></code> and
 <code><a href="ezdm.html">ezdm()</a></code>, and the row sums of the response count columns of <code><a href="m3.html">m3()</a></code>,
 <code><a href="mpt.html">mpt()</a></code>, <code><a href="sdt_rating.html">sdt_rating()</a></code>, <code><a href="sdt_ranking.html">sdt_ranking()</a></code> and <code><a href="sdt_cdp.html">sdt_cdp()</a></code>. For all other
-models a row is one trial</p></li>
+models a row is one trial. With one row per trial
+(<code><a href="sdt_yn.html">sdt_yn()</a></code> and <code><a href="sdt_mafc.html">sdt_mafc()</a></code> without <code>n_trials</code>), only the first
+grouping variable of the formula, taken as the participant, and any
+grouping variable that is also a discrete predictor are crossed; the
+other grouping variables, such as items, are counted per level</p></li>
 <li><p>model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced <code>NA</code>
 values in the non-target features of set size varying designs).
@@ -173,7 +185,10 @@ uses the tree column, so a cell can pass while one of its trees holds
 only a few trials; tabulate the trials per tree yourself if the trees
 differ in size. When the trial counts of an
 aggregated model cannot be read (a count column is missing or not
-numeric), the report shows rows per cell and flags none.</p></dd>
+numeric), the report shows rows per cell and flags none. A grouping
+variable counted per level is judged only when its median level holds at
+least <code>min_trials</code> observations, and a level is flagged below
+<code>min(min_trials, median / 2)</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

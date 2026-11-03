@@ -75,6 +75,18 @@
   [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
   returns the weights
   ([\#635](https://github.com/popov-lab/bmm/issues/635)).
+- [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+  [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) now
+  take one row per trial: leave out `n_trials` and code `response` as 0
+  or 1. Trial rows allow item random effects, such as
+  `bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id) + (1 | item))`,
+  which counts aggregated over items cannot carry.
+  [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  then reports observations per participant and per item instead of one
+  cell per trial; it takes the first grouping variable of the formula,
+  such as `id` in `(1 | id)`, as the participant. Aggregated counts with
+  `n_trials` work as before
+  ([\#646](https://github.com/popov-lab/bmm/issues/646)).
 
 #### Bug fixes
 

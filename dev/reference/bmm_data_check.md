@@ -31,7 +31,13 @@ and combines them with a readable summary of:
   [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
   [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
   and [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md).
-  For all other models a row is one trial
+  For all other models a row is one trial. With one row per trial
+  ([`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+  [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)
+  without `n_trials`), only the first grouping variable of the formula,
+  taken as the participant, and any grouping variable that is also a
+  discrete predictor are crossed; the other grouping variables, such as
+  items, are counted per level
 
 - model-specific diagnostics for common data mistakes (e.g. responses in
   degrees rather than radians for circular models, or misplaced `NA`
@@ -90,7 +96,9 @@ bmm_data_check(formula, data, model, min_trials = 10)
   trials; tabulate the trials per tree yourself if the trees differ in
   size. When the trial counts of an aggregated model cannot be read (a
   count column is missing or not numeric), the report shows rows per
-  cell and flags none.
+  cell and flags none. A grouping variable counted per level is judged
+  only when its median level holds at least `min_trials` observations,
+  and a level is flagged below `min(min_trials, median / 2)`.
 
 ## Value
 

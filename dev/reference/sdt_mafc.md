@@ -7,7 +7,7 @@ m-Alternative Forced Choice Signal Detection Theory Model
 ``` r
 sdt_mafc(
   response,
-  n_trials,
+  n_trials = NULL,
   m,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   links = NULL,
@@ -19,12 +19,15 @@ sdt_mafc(
 
 - response:
 
-  A single string naming the column with counts of correct responses.
+  A single string naming the column with counts of correct responses,
+  or, with one row per trial (`n_trials = NULL`), 1 for a correct and 0
+  for an incorrect response.
 
 - n_trials:
 
   The name of the variable containing the total number of trials per
-  cell.
+  cell. `NULL` (the default) declares one row per trial: the column
+  named by `response` then holds 0 or 1 in every row.
 
 - m:
 
@@ -82,16 +85,17 @@ An object of class `bmmodel`
 
 - **Requirements:**
 
-  Provide pre-aggregated accuracy data with the following columns:
+  Provide aggregated accuracy data, one row per cell, with the following
+  columns:
 
 &nbsp;
 
 - Response counts (response): number of correct responses
 
-- Number of trials (n_trials): total trials per cell No stimulus column
-  needed (each trial has exactly one signal alternative)
+- Number of trials (n_trials): total trials per cell
 
-&nbsp;
+No stimulus column is needed: each trial has exactly one signal
+alternative.
 
 - **Parameters:**
 
@@ -114,6 +118,38 @@ An object of class `bmmodel`
     - `effects`: normal(0, 0.5)
 
     - `sd`: exponential(1)
+
+- **Requirements for one row per trial:**
+
+  Provide one row per trial with the following column:
+
+&nbsp;
+
+- Response (response): 1 = correct, 0 = incorrect
+
+No stimulus column is needed: each trial has exactly one signal
+alternative.
+
+- **Trial-level data:** Without trial-level predictors or item terms,
+  trial rows give the same posterior as the counts aggregated from them,
+  which are sufficient statistics; the fit only takes longer, because
+  its cost grows with the number of rows. Crossed random effects such as
+  `(1 | id) + (1 | item)` need trial rows, unless the counts are kept
+  per participant and item.
+
+  - `loo()` leaves out single trials on trial rows and whole cells on
+    aggregated rows. These are different predictions, and the
+    log-likelihoods of the trial rows sum to the cell's log-likelihood
+    less the log binomial coefficient, so ELPD values compare only fits
+    to the same layout. `kfold(fit, group = "id")` leaves out whole
+    participants with either layout.
+
+  - `bmm(..., threads = n)` with `backend = "cmdstanr"` evaluates the
+    likelihood on `n` threads per chain, which shortens trial-level fits
+    on a machine with cores to spare.
+
+  - `ppp(fit, participant = "id")` names the participant when the
+    formula has more than one grouping variable, such as item terms.
 
 Models accuracy in m-AFC tasks where each trial presents one signal
 among `m` alternatives and the observer chooses the strongest one. Only
