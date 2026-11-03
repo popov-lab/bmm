@@ -95,11 +95,25 @@ test_that("models without a simplex group carry no simplex prior functions", {
 })
 
 # Golden Stan code: any change to the program of these three models fails the
-# snapshots in _snaps/model_mpt-stancode.md, including a change that comes with
-# a new brms version. After an intended change, read the diff that the failure
-# prints, then accept it with testthat::snapshot_accept("model_mpt-stancode")
-# (or snapshot_review("model_mpt-stancode") to see both versions side by side).
+# snapshots in _snaps/model_mpt-stancode.md. After an intended change, read the
+# diff that the failure prints, then accept it with
+# testthat::snapshot_accept("model_mpt-stancode") (or
+# snapshot_review("model_mpt-stancode") to see both versions side by side).
 # The header line naming the brms and bmm versions is left out.
+# brms writes part of the program, so the snapshots skip under any brms other
+# than golden_brms: a brms release would otherwise fail every open PR at once.
+# After a brms release, set golden_brms to the new version, run this file under
+# it, read the diff and accept it as above.
+golden_brms <- "2.23.0"
+
+skip_unless_golden_brms <- function() {
+  installed <- as.character(utils::packageVersion("brms"))
+  skip_if(
+    installed != golden_brms,
+    paste0("golden Stan code recorded under brms ", golden_brms, ", installed brms ", installed)
+  )
+}
+
 golden_stancode <- function(formula, data, model) {
   code <- suppressMessages(stancode(formula, data, model))
   cat(sub("^// generated with [^\n]*\n", "", code))
@@ -107,6 +121,7 @@ golden_stancode <- function(formula, data, model) {
 
 test_that("the Stan code of the two-high-threshold model is unchanged", {
   skip_on_cran() # expect_snapshot() skips there anyway; this skips building the code
+  skip_unless_golden_brms()
   withr::local_seed(255)
   expect_snapshot(golden_stancode(
     bmf(D ~ 1 + (1 | id), g ~ 1), mpt_2htm_data(n_id = 2),
@@ -116,6 +131,7 @@ test_that("the Stan code of the two-high-threshold model is unchanged", {
 
 test_that("the Stan code of the pair-clustering model is unchanged", {
   skip_on_cran() # expect_snapshot() skips there anyway; this skips building the code
+  skip_unless_golden_brms()
   pcm_tree <- mpt_tree("study", list(
     C = "cp + (1 - cp) * rp * rp",
     E = "2 * (1 - cp) * rp * (1 - rp)",
@@ -129,6 +145,7 @@ test_that("the Stan code of the pair-clustering model is unchanged", {
 
 test_that("the Stan code of the Oberauer and Lewandowsky (2019) model is unchanged", {
   skip_on_cran() # expect_snapshot() skips there anyway; this skips building the code
+  skip_unless_golden_brms()
   # the model and formula of the real-data section of the MPT article
   dat <- oberauer_lewandowsky_2019_e1
   dat$cond <- factor(dat$cond,
