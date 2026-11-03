@@ -260,10 +260,11 @@
 #'   falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales:
 #'   the measured one has five, and `exp(-(x / 15)^2)` for `x` in degrees
 #'   has more. `tcc()` refuses such a correlation when more than 1e-6 of the
-#'   similarity's variation lies on those scales. That happens with a
-#'   similarity whose peak is sharp, such as a Laplace shape from
-#'   [tcc_similarity()] with `kappa` of 3 or more, but not with the measured
-#'   similarity or a von Mises shape. Mixing in a little independent noise, such as `0.999 *
+#'   similarity's variation lies on those scales, which a sharp peak puts
+#'   there: Laplace shapes from [tcc_similarity()] are refused with smooth
+#'   correlations, with the measured one from a `kappa` of about 2, while
+#'   von Mises shapes are accepted unless very narrow (`kappa` in the
+#'   hundreds). Mixing in a little independent noise, such as `0.999 *
 #'   correlation + 0.001 * c(1, rep(0, n_options / 2))`, removes the zero
 #'   eigenvalues. A correlation that falls off like `exp(-x / 10)` has none
 #'   and is accepted with any similarity. Correlated noise needs `noise =
@@ -501,8 +502,9 @@
 #'   noise.
 #' @param correlation_draws With `correlation`, the number of Monte Carlo
 #'   draws for the likelihood table, at least 6000, rounded up to a multiple
-#'   of 6. The table is certified for a number of trials per estimate that
-#'   grows in proportion; see the section Correlated noise.
+#'   of 6; refused without `correlation`. The table is certified for a
+#'   number of trials per estimate that grows in proportion; see the section
+#'   Correlated noise.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references Oberauer, K. (2023). Measurement models for visual working
@@ -569,6 +571,9 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
     .check_option_args(n_options, options, n_alternatives, units)
   }
   .tcc_check_noise_args(similarity, n_options, noise, option_set, correlation, motor_sd)
+  stopif(!missing(correlation_draws) && is.null(correlation),
+         "`correlation_draws` sets the Monte Carlo draws of the correlated-noise table \\
+         and needs `correlation`; without it the table is exact.")
   if (!is.null(correlation)) {
     stopif(!is.numeric(correlation_draws) || length(correlation_draws) != 1 ||
              !isTRUE(is.finite(correlation_draws) && correlation_draws >= 6000),
@@ -647,6 +652,13 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
          is allowed). Its circulant matrix is singular there; mix in a little \\
          independent noise, such as `0.999 * correlation + 0.001 * c(1, rep(0, \\
          {n_options / 2}))`.")
+  # the table's drift grid pads the d grid by 16 / kappa in steps of 0.01, so
+  # a kappa of 0.016 needs 1e5 bins and over 1 GB at d_max = 30; exponential
+  # and measured correlations gave 0.9 to 1.3 with the similarities tried
+  stopif(setup$kappa < 0.1,
+         "`similarity` varies too little across options, relative to the noise \\
+         `correlation` gives it, for the correlated-noise table (kappa = \\
+         {signif(setup$kappa, 2)}, at least 0.1 is needed).")
 }
 
 # the full wheel prints nothing here, so that print() of tcc() without option

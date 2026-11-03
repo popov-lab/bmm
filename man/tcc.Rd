@@ -66,8 +66,9 @@ noise.}
 
 \item{correlation_draws}{With \code{correlation}, the number of Monte Carlo
 draws for the likelihood table, at least 6000, rounded up to a multiple
-of 6. The table is certified for a number of trials per estimate that
-grows in proportion; see the section Correlated noise.}
+of 6; refused without \code{correlation}. The table is certified for a
+number of trials per estimate that grows in proportion; see the section
+Correlated noise.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -265,10 +266,11 @@ lie in the directions where that matrix has noise. A correlation that
 falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales:
 the measured one has five, and \code{exp(-(x / 15)^2)} for \code{x} in degrees
 has more. \code{tcc()} refuses such a correlation when more than 1e-6 of the
-similarity's variation lies on those scales. That happens with a
-similarity whose peak is sharp, such as a Laplace shape from
-\code{\link[=tcc_similarity]{tcc_similarity()}} with \code{kappa} of 3 or more, but not with the measured
-similarity or a von Mises shape. Mixing in a little independent noise, such as \code{0.999 * correlation + 0.001 * c(1, rep(0, n_options / 2))}, removes the zero
+similarity's variation lies on those scales, which a sharp peak puts
+there: Laplace shapes from \code{\link[=tcc_similarity]{tcc_similarity()}} are refused with smooth
+correlations, with the measured one from a \code{kappa} of about 2, while
+von Mises shapes are accepted unless very narrow (\code{kappa} in the
+hundreds). Mixing in a little independent noise, such as \code{0.999 * correlation + 0.001 * c(1, rep(0, n_options / 2))}, removes the zero
 eigenvalues. A correlation that falls off like \code{exp(-x / 10)} has none
 and is accepted with any similarity. Correlated noise needs \code{noise = "gaussian"} and the full wheel.
 

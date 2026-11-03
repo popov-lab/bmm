@@ -155,8 +155,9 @@
 # whole groups of rotations, in chunks of 24,000 envelopes. Draws from the
 # current RNG stream (.tcc_noise_table() sets the seed). For the certification
 # it returns the segments of every chunk that starts before group
-# `keep_groups`: whole chunks, so at least `keep_groups` groups and up to a
-# chunk more (12,000 at the defaults, from 3 chunks of 4,000 groups)
+# `keep_groups`: whole chunks, so every group when the build has fewer, else
+# at least `keep_groups` and up to a chunk more (12,000 at the defaults, from
+# 3 chunks of 4,000 groups)
 .tcc_corr_build <- function(setup, d_values, draws, keep_groups = 1e4, chunk = 24000) {
   n <- setup$n
   n_rot <- .tcc_corr_rotations
@@ -286,6 +287,14 @@
     )
     # the bins carry signed sums, so a P that is 0 can come out a few ulp below
     L <- log(pmax(build$P, 0))
+    # A distance no envelope reached on either side is not impossible, only
+    # rarer than the draws can show. Flooring it at half a draw keeps the
+    # likelihood finite; only weak correlations leave such cells inside the
+    # grid (spike v2, Q2). This runs before the motor kernel, whose tails
+    # would otherwise fill these cells far below the model, unflagged
+    zero <- !is.finite(.tcc_by_distance(L))
+    L[zero[pmin(0:(setup$n - 1), setup$n - 0:(setup$n - 1)) + 1, , drop = FALSE]] <-
+      log(0.5 / build$envelopes)
   }
   kernel <- NULL
   if (motor > 0) {
@@ -294,15 +303,10 @@
   }
   L <- .tcc_by_distance(L)
   if (!is.null(correlation)) {
-    # A cell no envelope reached is not impossible, only rarer than the draws
-    # can show. Flooring it at half a draw keeps the likelihood finite; only
-    # weak correlations leave such cells inside the grid (spike v2, Q2)
-    zero <- !is.finite(L)
-    L[zero] <- log(0.5 / build$envelopes)
     info <- c(
       list(draws = build$envelopes, seed = seed, kappa = setup$kappa,
            zeros = sum(zero),
-           zeros_from = if (any(zero)) min(d_values[col(L)[zero]]) else NA_real_),
+           zeros_from = if (any(zero)) min(d_values[col(zero)[zero]]) else NA_real_),
       .tcc_corr_certify(build$kept, setup, L, d_values, grid, kernel, build$envelopes)
     )
   }

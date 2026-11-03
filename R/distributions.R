@@ -4397,9 +4397,9 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
   .tcc_check_noise_args(similarity, n_options, noise, !is.null(options), correlation, motor_sd,
                         fit = FALSE)
   d <- rep_len(d, n)
-  if (!is.null(correlation) || motor_sd > 0) {
-    return(2 * pi * .tcc_rnoise(d, similarity, correlation, motor_sd * n_options / (2 * pi)) /
-             n_options)
+  sd_steps <- motor_sd * n_options / (2 * pi)
+  if (!is.null(correlation)) {
+    return(2 * pi * .tcc_rnoise(d, similarity, correlation, sd_steps) / n_options)
   }
   offsets <- if (is.null(options)) {
     seq(-n_options / 2 + 1, n_options / 2)
@@ -4416,6 +4416,9 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
     rows <- which(d == value)
     prob <- exp(logp(value))
     out[rows] <- offsets[sample.int(length(offsets), length(rows), replace = TRUE, prob = prob)]
+  }
+  if (sd_steps > 0) {
+    out <- .tcc_rmotor(out, sd_steps, n_options)
   }
   2 * pi * out / n_options
 }
@@ -4438,23 +4441,31 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
 
 # Signed offsets in option steps, simulated as the model generates them: the
 # argmax of d f + z with z ~ N(0, C) drawn by the circulant square root of C
-# (constant mode included), then the click moved by round(e), e ~ N(0,
-# sd_steps^2), and wrapped onto the wheel. NA where d is NA
-.tcc_rnoise <- function(d, similarity, correlation, sd_steps, chunk = 20000) {
+# (constant mode included), then motor noise. NA where d is NA. A chunk holds
+# about 2e6 normals, which several complex copies in the FFTs multiply: a
+# fixed 20,000 rows took 2.4 GB on 3,600 options
+.tcc_rnoise <- function(d, similarity, correlation, sd_steps) {
   n <- 2 * (length(similarity) - 1)
   f <- .tcc_circ_row(similarity)
-  root <- sqrt(pmax(Re(stats::fft(.tcc_circ_row(correlation %||% c(1, rep(0, n / 2))))), 0))
+  root <- sqrt(pmax(Re(stats::fft(.tcc_circ_row(correlation))), 0))
   out <- rep(NA_real_, length(d))
   rows <- which(!is.na(d))
-  for (idx in split(rows, ceiling(seq_along(rows) / chunk))) {
+  for (idx in split(rows, ceiling(seq_along(rows) / max(1, floor(2e6 / n))))) {
     Z <- Re(stats::mvfft(stats::mvfft(matrix(stats::rnorm(n * length(idx)), n)) * root,
                          inverse = TRUE)) / n
     out[idx] <- max.col(t(Z + outer(f, d[idx])), ties.method = "first") - 1
   }
+  .tcc_rmotor(out, sd_steps, n)
+}
+
+# The click moved by round(e), e ~ N(0, sd_steps^2), one normal per non-NA
+# offset, and wrapped onto the wheel, (-n / 2, n / 2]
+.tcc_rmotor <- function(offsets, sd_steps, n) {
   if (sd_steps > 0) {
-    out[rows] <- out[rows] + round(stats::rnorm(length(rows), 0, sd_steps))
+    rows <- which(!is.na(offsets))
+    offsets[rows] <- offsets[rows] + round(stats::rnorm(length(rows), 0, sd_steps))
   }
-  n / 2 - (n / 2 - out) %% n
+  n / 2 - (n / 2 - offsets) %% n
 }
 
 # the offered options of a d or r call as offsets in steps, refused where

@@ -92,6 +92,9 @@ test_that("tcc() refuses correlated or motor noise it cannot fit", {
     "leaves no noise in directions that carry 0.5"
   )
   expect_error(tcc("err", f, correlation = rho, correlation_draws = 100), "at least 6000")
+  # without correlation the table is exact, and the draws would go unused
+  expect_error(tcc("err", f, correlation_draws = 1e6), "needs `correlation`")
+  expect_error(tcc("err", f, motor_sd = 0.05, correlation_draws = 1e6), "needs `correlation`")
   expect_error(tcc("err", f, motor_sd = -1), "non-negative")
   expect_error(tcc("err", f, motor_sd = c(1, 2)), "non-negative")
 })
@@ -103,6 +106,15 @@ test_that("tcc() refuses a constant similarity under correlated noise", {
     tcc("err", similarity = rep(1, 181), correlation = corr_correlation()),
     "`similarity` must vary with distance when `correlation` is given"
   )
+  # nearly constant: kappa 0.016 would need an s grid of 1e5 bins, over 1 GB
+  # at d_max = 30
+  x <- 0:180
+  expect_error(
+    tcc("err", similarity = c(1, rep(0.995, 180)), correlation = exp(-x / 10)),
+    "varies too little across options.*kappa = 0.016"
+  )
+  # kappa 1.0, about the lowest of realistic similarities and correlations
+  expect_silent(tcc("err", similarity = exp(-x / 20), correlation = exp(-x / 30)))
 })
 
 ############################################################################# !
@@ -239,7 +251,7 @@ test_that("the motor kernel is a rounded normal, and the log convolution keeps t
   withr::local_seed(3)
   rounded <- tabulate(round(stats::rnorm(1e6, 0, 2)) + 13, 25)
   # the outer cells expect 0.005 draws, where a single one gives z = 15
-  # (2 of 20 other seeds); they are compared only where 5 or more are expected
+  # (about 2 % of seeds); they are compared only where 5 or more are expected
   keep <- 1e6 * kernel >= 5
   expect_lt(max(abs(rounded - 1e6 * kernel)[keep] / sqrt(1e6 * kernel[keep])), 4.5)
 
@@ -398,7 +410,9 @@ test_that("a correlated fit stores and prints its certification, and warns past 
   # the smallest such number with two significant digits
   needed <- as.numeric(gsub(",", "", sub(".*correlation_draws = ([0-9,]+).*", "\\1", conditionMessage(msg))))
   expect_gte(needed * info$n_pool / 6000, 1.1 * 300)
-  expect_lt((needed - 10^(floor(log10(needed)) - 1)) * info$n_pool / 6000, 1.1 * 300)
+  # the next smaller number with two significant digits: 9,900 below 10,000
+  smaller <- needed - 10^(floor(log10(needed - 1)) - 1)
+  expect_lt(smaller * info$n_pool / 6000, 1.1 * 300)
   expect_null(summary_notes(tcc("err", similarity = corr_similarity()), NULL))
   # round counts print in full, as the warning asks users to type them
   round_info <- list(draws = 3e6, seed = 1L, n_pool = 1e5, zeros = 0L, zeros_from = NA_real_)
@@ -436,6 +450,15 @@ test_that("a weak correlation leaves cells no draw reaches, which the fit report
     glue::glue("reached {info$zeros} cells.*first at d = {signif(info$zeros_from, 3)}")
   )
   expect_silent(bmm:::.tcc_check_certified(info, 10, info$zeros_from - 0.1))
+  # the motor kernel's tails reach every cell, but far below the model: the
+  # unreached cells are counted and floored before it
+  motor <- model
+  motor$other_vars$motor_sd <- deg2rad(2)
+  built <- bmm:::.tcc_noise_table(motor, bmm:::.tcc_grid(motor))
+  expect_gt(built$info$zeros, 0)
+  expect_lt(built$info$zeros_from, 12)
+  expect_true(all(is.finite(built$tab)))
+  expect_warning(bmm:::.tcc_check_certified(built$info, 10, 12), "No Monte Carlo draw")
 })
 
 test_that("update() of a correlated fit reuses the table its fit built", {
@@ -554,6 +577,9 @@ test_that("dtcc(motor_sd) is a pmf, the convolution of the noise-free pmf, and t
   chi2 <- sum((observed[keep] - expected[keep])^2 / expected[keep])
   expect_gt(stats::pchisq(chi2, sum(keep) - 1, lower.tail = FALSE), 0.001)
   expect_error(dtcc(x, 2, f, motor_sd = 0.1, noise = "gumbel"), "requires noise = 'gaussian'")
+  r <- rtcc(4, c(1, NA, 2, NA), f, motor_sd = deg2rad(2))
+  expect_equal(is.na(r), c(FALSE, TRUE, FALSE, TRUE))
+  expect_true(all(r[c(1, 3)] > -pi & r[c(1, 3)] <= pi))
 })
 
 test_that("rtcc(correlation) draws from the distribution of the correlated table", {
