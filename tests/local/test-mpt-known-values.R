@@ -159,7 +159,9 @@ test_that("an mpt model imported from an EQN file recovers its parameters", {
     eqn_file, categories = c(hit = "old", fa = "old", miss = "new", cr = "new"),
     tree_id = "item_type"
   ))
-  dat <- data.frame(item_type = c("old", "new"), two_htm_counts(D, D, g, 1500))
+  # 4000 trials per tree keep the posterior SD of g at about 0.03 of its
+  # value, clear of the 0.05 cap of expect_known_values()
+  dat <- data.frame(item_type = c("old", "new"), two_htm_counts(D, D, g, 4000))
 
   fit <- fit_known(bmf(D ~ 1, g ~ 1), dat, model, seed = 18)
   expect_known_values(fit, list(D = D, g = g))
