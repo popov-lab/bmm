@@ -550,6 +550,11 @@ built_data_columns.sdt_yn <- function(model) {
   c("dist_type", NextMethod("built_data_columns"))
 }
 
+#' @exportS3Method
+data_trials.sdt_yn <- function(model, data) {
+  .row_trials(data, model$other_vars$n_trials)
+}
+
 #' @export
 check_data.sdt_yn <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
