@@ -69,7 +69,7 @@ sdm_parity_y <- c(-pi, -2, -1, -0.3, -0.05, -0.01, 0, 0.004, 0.02, 0.1, 0.6, 2.5
 # tests: compiling takes most of the time of the first one.
 sdm_stan_program <- function(data_scode) {
   chunk <- function(file) read_lines2(system.file("stan_chunks", file, package = "bmm"))
-  funs <- gsub("#include[^\n]*", "", chunk("sdm_simple_funs.stan"))
+  funs <- gsub("#include[^\n]*", "", chunk("sdm_simple_functions.stan"))
   tdata <- chunk("sdm_simple_tdata.stan")
   likelihood <- gsub("target +=", "lp +=", chunk("sdm_simple_likelihood.stan"), fixed = TRUE)
   paste0(

@@ -69,9 +69,9 @@
     list(
       resp_vars = nlist(resp_cats),
       other_vars = nlist(num_options, choice_rule),
-      domain = "Working Memory (categorical), Categorical Decision Making",
-      task = "n-AFC retrieval",
-      name = "The Multinomial / Memory Measurement Model",
+      domain = c("Working memory", "Decision making"),
+      task = "Categorical recall and n-AFC decisions",
+      name = "Memory Measurement Model",
       citation = glue(
         "Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models \\
         for complex working-memory tasks. Psychological Review, 126(6), \\
@@ -425,6 +425,11 @@ built_data_columns.m3 <- function(model) {
   )
 }
 
+#' @exportS3Method
+data_trials.m3 <- function(model, data) {
+  .row_trials(data, model$resp_vars$resp_cats)
+}
+
 #' @export
 check_data.m3 <- function(model, data, formula) {
   resp_name <- model$resp_vars$resp_cats
@@ -636,7 +641,7 @@ m3_gaussian_stanvars <- function(model) {
   )
   sc_path <- system.file("stan_chunks", package = "bmm")
   brms::stanvar(
-    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_funs.stan")), wrapper, sep = "\n"),
+    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_functions.stan")), wrapper, sep = "\n"),
     block = "functions"
   )
 }
@@ -688,6 +693,61 @@ configure_model.m3 <- function(model, data, formula) {
     return(nlist(formula, data, stanvars = m3_gaussian_stanvars(model)))
   }
   nlist(formula, data)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rm3() takes one number of options per category and one size per call, and
+# does not read option counts from columns, so rows are drawn in groups of
+# identical trials, options, values and design variables. The custom
+# version's parameters exist only in its activation functions, which `formula`
+# carries; the other variables those functions read are design columns, which
+# rm3() takes among the parameters
+#' @export
+simulate_data.m3 <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  formula <- if (inherits(model, "m3_custom")) list(...)[["formula"]]
+  stopif(inherits(model, "m3_custom") && is.null(formula),
+         "The custom version of m3 takes its parameters from the activation \\
+         functions: pass the bmmformula you fit as `formula =`.")
+  options <- m3_num_options(model)
+  cats <- model$resp_vars$resp_cats
+  act_funs <- formula %||% construct_m3_act_funs(model, warnings = FALSE)
+  act_vars <- rhs_vars(act_funs[names(act_funs) %in% cats])
+  par_names <- if (is.null(formula)) names(model$parameters) else parameter_info(model, formula)$parameter
+  derived <- setdiff(intersect(act_vars, names(formula)), par_names)
+  stopif(length(derived) > 0,
+         "{collapse_comma(derived)} in the activation formula(s) is predicted by a \\
+         non-linear formula of its own, which simulate_data() does not evaluate. Write \\
+         that formula into the activation functions in place of '{derived[1]}'.")
+  design_vars <- setdiff(act_vars, par_names)
+  undefined <- setdiff(design_vars, names(design))
+  stopif(length(undefined) > 0,
+         "{collapse_comma(undefined)} in your activation formula(s) is neither a \\
+         design column nor a model parameter. Give each new parameter its own \\
+         formula (e.g. {undefined[1]} ~ 1), or add the column to the design.")
+  design <- .design_or_n(model, design, design_vars, trials = "n_trials",
+                         counts = if (is.character(options)) options)
+  not_numeric <- design_vars[!vapply(design[design_vars], function(x) is.numeric(x) || is.logical(x),
+                                     logical(1))]
+  stopif(length(not_numeric) > 0,
+         "The activation formula(s) multiply the design column(s) {collapse_comma(not_numeric)}, \\
+         so they must be numeric: code the covariate as numbers, e.g. as 0/1 indicators. \\
+         bmm() would fit a factor or character column there as a contrast.")
+  sim <- .simulate_pars(model, pars, design, scale, formula)
+  options <- if (is.character(options)) as.matrix(design[options]) else
+    matrix(options, nrow(design), length(options), byrow = TRUE)
+  used <- intersect(names(sim$native), act_vars)
+  counts <- matrix(0L, nrow(design), length(cats), dimnames = list(NULL, cats))
+  for (idx in .row_groups(data.frame(design$n_trials, options, design[design_vars], sim$native))) {
+    i <- idx[1]
+    model$other_vars$num_options <- unname(options[i, ])
+    values <- c(vapply(sim$native[used], `[`, numeric(1), i),
+                vapply(design[design_vars], function(x) as.numeric(x[i]), numeric(1)))
+    counts[idx, ] <- rm3(length(idx), design$n_trials[i], values, model, act_funs = formula)
+  }
+  .simulate_result(design, as.data.frame(counts), sim)
 }
 
 #' @export

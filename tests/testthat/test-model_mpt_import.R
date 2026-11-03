@@ -917,7 +917,7 @@ test_that("mpt_from_string checks a categories list against the trees", {
   )
   expect_error(
     pc_call(pc_categories[-2]),
-    "Tree 'single1'.*positions 1, 2.*line i, so the tree needs 2 entries, but categories gives 0"
+    "Tree 'single1'.*positions 1, 2\\..*needs 2 entries, but categories gives 0"
   )
   expect_error(
     pc_call(modifyList(pc_categories, list(pairs2 = c("E1", "E2", "E3")))),
@@ -1091,7 +1091,7 @@ test_that("mpt_from_string says how many categories entries a tree needs", {
       c("a", "b # y", "1 - a - b"), tree_names = "t1",
       categories = list(t1 = c("x", "z"))
     ),
-    "positions 1, 3\\. Entry i of categories labels line i, so the tree needs 3 entries, but categories gives 2"
+    "positions 1, 3\\..*needs 3 entries, but categories gives 2"
   )
 })
 

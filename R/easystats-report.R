@@ -9,7 +9,7 @@
 #' @details
 #' \itemize{
 #'   \item `format_model()` names the model and its version, e.g. "Bayesian
-#'     Signal Discrimination Model (SDM) by Oberauer (2023) (simple)".
+#'     Signal Discrimination Model (SDM) (simple)".
 #'   \item `report_model()` describes the model in one sentence, with all
 #'     response variables of models such as [ezdm()] or [m3()] in one list,
 #'     the formula of each model parameter as `summary()` prints it, and the
@@ -74,8 +74,9 @@ format_model.bmmfit <- function(x) {
   } else {
     glue(" ({model$version})")
   }
-  # names such as "The Multinomial / Memory Measurement Model" follow "a", and
-  # some end with the period of their reference ("Zhang and Luck (2008).")
+  # the name follows "a" in the report; fits saved with older bmm versions
+  # store names that open with "The" or end with the period of their reference
+  # ("Zhang and Luck (2008).")
   paste0("Bayesian ", sub("\\.$", "", sub("^The ", "", model$name)), version)
 }
 
