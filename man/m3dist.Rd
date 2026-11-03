@@ -30,7 +30,10 @@ will be extracted. The default will attempt to construct the standard
 activation functions for the "ss" and "cs" model version. For a custom m3
 model you need to specify the act_funs argument manually.}
 
-\item{log}{Logical; if \code{TRUE} (default), values are returned on the log scale.}
+\item{log}{Logical; if \code{TRUE} (default until bmm 1.6.0), values are returned on
+the log scale. From bmm 1.6.0 on the default is \code{FALSE}, as in base R
+and the other density functions of bmm. Pass \code{log} to get the same
+result in every version.}
 
 \item{...}{can be used to pass additional variables that are used in the
 activation functions, but not parameters of the model}
@@ -63,7 +66,7 @@ model <- m3(
 )
 
 # No need to provide b parameter
-dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model, log = TRUE)
 rm3(n = 10, size = 100, pars = c(a = 1, c = 2), m3_model = model)
 
 # Can also use full formula (activation formulas are extracted automatically)
