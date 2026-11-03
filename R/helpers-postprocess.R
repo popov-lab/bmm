@@ -32,7 +32,8 @@ postprocess_brm.bmmodel <- function(model, fit, ...) {
   class(fit) <- c("bmmfit", "brmsfit")
   fit <- add_bmm_fit_info(
     fit,
-    nlist(model, user_formula = dots$user_formula, configure_opts = dots$configure_opts),
+    nlist(model, user_formula = dots$user_formula, user_prior = dots$user_prior,
+          configure_opts = dots$configure_opts),
     dots$fit_args
   )
   reset_env(NextMethod("postprocess_brm"))
