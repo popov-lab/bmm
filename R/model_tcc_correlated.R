@@ -40,9 +40,8 @@
 # Everything the build needs from the correlation and the similarity by
 # distance. Eigenvalues below 1e-10 of the largest count as null modes. The
 # similarity's part on null modes is dropped (the estimator conditions on
-# f_R alone), and `dropped` and `min_eigen` are reported for tcc() to refuse
-# a correlation that is not positive semi-definite or would lose more than
-# 1e-6 of the similarity's energy
+# f_R alone), and `dropped` is reported for tcc() to refuse a correlation
+# that would lose more than 1e-6 of the similarity's energy
 .tcc_corr_setup <- function(correlation, similarity) {
   n <- 2 * (length(similarity) - 1)
   lam <- Re(stats::fft(.tcc_circ_row(correlation)))
@@ -57,7 +56,6 @@
   list(
     n = n, f_R = f_R, b = Cp_f / kappa2, kappa = sqrt(kappa2),
     sqrt_lam = sqrt(pmax(lam, 0)) * keep,
-    min_eigen = min(lam) / max(lam),
     dropped = sum((f_c - f_R)^2) / sum(f_c^2)
   )
 }
@@ -155,8 +153,10 @@
 
 # P of each option (n x length(d_values)) from `draws` envelopes, rounded up to
 # whole groups of rotations, in chunks of 24,000 envelopes. Draws from the
-# current RNG stream (.tcc_noise_table() sets the seed). The segments of the
-# first `keep_groups` groups are returned for the certification
+# current RNG stream (.tcc_noise_table() sets the seed). For the certification
+# it returns the segments of every chunk that starts before group
+# `keep_groups`: whole chunks, so at least `keep_groups` groups and up to a
+# chunk more (12,000 at the defaults, from 3 chunks of 4,000 groups)
 .tcc_corr_build <- function(setup, d_values, draws, keep_groups = 1e4, chunk = 24000) {
   n <- setup$n
   n_rot <- .tcc_corr_rotations
@@ -242,8 +242,9 @@
 
 # The table that tcc_lpmf() reads when it comes from R (table = "r"): rows the
 # d grid, columns the distances, log P. Without correlation or motor noise it
-# is .tcc_table(). Built once per session and inputs: update(), loo() refits
-# and kfold() reuse it, and so does postprocess_brm(), which reads `info`
+# is .tcc_table(). Built once per R process and inputs: update(), loo() refits
+# and kfold() in that process reuse it, and so does postprocess_brm(), which
+# reads `info`; parallel future workers each build their own
 .tcc_noise_table <- function(model, grid) {
   ov <- model$other_vars
   similarity <- .tcc_similarity(model)
@@ -377,8 +378,9 @@
     more trials can move by more than 0.1 posterior SD with the table's seed. The \\
     data hold {format(nobs, big.mark = ',', scientific = FALSE)} trials. If an estimate pools more than \\
     {format(info$n_pool, big.mark = ',', scientific = FALSE)} of them, refit with correlation_draws = \\
-    {format(needed, big.mark = ',', scientific = FALSE)} (the build takes 40 to 70 s \\
-    per million draws on one core)."
+    {format(needed, big.mark = ',', scientific = FALSE)} (one million draws took \\
+    about 70 s to build on one core of a laptop under other load; see the \\
+    section Correlated noise of ?tcc)."
   )
   warnif(
     isTRUE(info$zeros_from <= d_max),

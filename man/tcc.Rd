@@ -276,9 +276,13 @@ The response probabilities have no closed form, so the likelihood reads
 them from a table that \code{bmm()} estimates by Monte Carlo before
 sampling, from \code{correlation_draws} draws of the noise (conditioning each
 draw on its component along the similarity). With the default of one
-million draws and the measured correlation, the build took 40 to 70 s on
-one core of an Apple M3 Max laptop, depending on its other load; it is kept for the session, so
-\code{update()}, \code{loo()} refits and \code{kfold()} reuse it. The table's seed
+million draws and the measured correlation, the build took 70.5 and
+70.7 s in two runs on one core of an Apple M3 Max laptop under other
+load. An earlier version of the estimator took 40 s on that laptop when
+it was otherwise idle; timed in turn with it, the current one was about
+7 \% faster. The table is kept in the R process that built it, so
+\code{update()}, \code{loo()} refits and \code{kfold()} in that process reuse it;
+parallel workers (\code{future}) each build their own. The table's seed
 follows from the model, so the same model always gets the same table
 and the user's random number stream is left as it was.
 

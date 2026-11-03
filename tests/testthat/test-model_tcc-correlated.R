@@ -96,6 +96,15 @@ test_that("tcc() refuses correlated or motor noise it cannot fit", {
   expect_error(tcc("err", f, motor_sd = c(1, 2)), "non-negative")
 })
 
+test_that("tcc() refuses a constant similarity under correlated noise", {
+  # every option has the same mean, so the table's drift direction is 0
+  # (kappa = 0) and d is not identified
+  expect_error(
+    tcc("err", similarity = rep(1, 181), correlation = corr_correlation()),
+    "`similarity` must vary with distance when `correlation` is given"
+  )
+})
+
 ############################################################################# !
 # THE MONTE CARLO TABLE                                                  ####
 ############################################################################# !
@@ -429,6 +438,74 @@ test_that("a weak correlation leaves cells no draw reaches, which the fit report
   expect_silent(bmm:::.tcc_check_certified(info, 10, info$zeros_from - 0.1))
 })
 
+test_that("update() of a correlated fit reuses the table its fit built", {
+  skip_on_cran()
+  ns <- asNamespace("bmm")
+  old <- ns$.tcc_cache$noise
+  withr::defer(assign("noise", old, envir = ns$.tcc_cache))
+  assign("noise", NULL, envir = ns$.tcc_cache)
+  builds <- 0
+  build <- bmm:::.tcc_build_noise_table
+  local_mocked_bindings(.tcc_build_noise_table = function(...) {
+    builds <<- builds + 1
+    build(...)
+  })
+  # update() reads the sampler's arguments from the stanfit it updates, which
+  # a plain mock fit lacks (the stub of test-update.R)
+  stub <- function() {
+    methods::new("stanfit", sim = list(
+      iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+      samples = list(structure(list(), args = list(control = list())))
+    ))
+  }
+  model <- tcc("err",
+    similarity = corr_similarity(60), n_options = 60, d_max = 2,
+    correlation = corr_correlation(60, 20), correlation_draws = 6000
+  )
+  fit <- suppressMessages(bmm(bmf(d ~ 1), data.frame(err = c(0, 0.1, -0.2, 1, 3, -2)), model,
+    backend = "mock", mock_fit = stub(), rename = FALSE
+  ))
+  expect_equal(builds, 1)
+  refit <- suppressMessages(update(fit,
+    backend = "mock", mock_fit = stub(), rename = FALSE, recompile = TRUE
+  ))
+  expect_equal(builds, 1)
+  expect_identical(brms::standata(refit)$tcc_tab, brms::standata(fit)$tcc_tab)
+})
+
+test_that("under the identity link the correlated table starts at d = -2 and is finite", {
+  skip_on_cran()
+  expect_warning(
+    model <- tcc("err",
+      similarity = corr_similarity(60), n_options = 60, d_max = 1,
+      correlation = corr_correlation(60, 20), correlation_draws = 6000,
+      links = list(d = "identity")
+    ),
+    "d = identity allow values"
+  )
+  sdata <- brms::standata(corr_mock_fit(model))
+  expect_equal(sdata$tcc_grid_lo, -2)
+  tab <- sdata$tcc_tab
+  # rows from d = -2.02 to 1.04 in steps of 0.02, one column per distance
+  expect_equal(dim(tab), c(154, 31))
+  expect_true(all(is.finite(tab)))
+  # row 2 is d = -2 and row 102 is d = 0: a negative d makes the target rarer
+  # than at d = 0 and rarer than the option opposite it
+  expect_lt(tab[2, 1], tab[102, 1])
+  expect_lt(tab[2, 1], tab[2, 31])
+  expect_lt(abs(sum(c(1, rep(2, 29), 1) * exp(tab[2, ])) - 1), 60 * 0.5 / 6000)
+})
+
+test_that("tcc() refuses a correlation that drops more than 1e-6 of the similarity", {
+  x <- 0:180
+  f <- exp(-x / 20)
+  # a Gaussian correlation has null modes at fine scales, which carry 3.13e-4
+  # of this similarity: inside a threshold of 1e-3, outside one of 1e-6
+  expect_error(tcc("err", f, correlation = exp(-(x / 15)^2)), "carry 0.000313 of the variation")
+  # a nugget of independent noise removes the null modes
+  expect_silent(tcc("err", f, correlation = 0.999 * exp(-(x / 15)^2) + 0.001 * c(1, rep(0, 180))))
+})
+
 test_that("motor noise is converted from the response's unit to option steps", {
   radians <- tcc("err", similarity = corr_similarity(), motor_sd = 2 * pi / 360 * 1.5)
   bins <- tcc("err", similarity = corr_similarity(180), n_options = 180, units = "bins", motor_sd = 1.5)
@@ -498,5 +575,25 @@ test_that("rtcc(correlation) draws from the distribution of the correlated table
   expect_error(
     rtcc(5, 2, f, n_options = 36, correlation = rho, options = c(0, pi)),
     "planned for bmm 1.6.0"
+  )
+})
+
+test_that("rtcc() simulates a correlation with null modes, which tcc() cannot fit", {
+  withr::local_seed(9)
+  f <- corr_similarity(36)
+  # rank 3: the noise has no part finer than one cycle around the wheel. The
+  # circulant square root draws it; the Monte Carlo table cannot condition on it
+  rank3 <- (1 + cos(seq(0, pi, length.out = 19))) / 2
+  r <- rtcc(2000, 2, f, n_options = 36, correlation = rank3)
+  expect_true(all(r > -pi & r <= pi))
+  expect_error(tcc("err", f, n_options = 36, correlation = rank3), "leaves no noise in directions")
+  # dtcc() and rtcc() have no n_alternatives, so their refusals do not name it
+  expect_error(
+    rtcc(5, 2, f, n_options = 36, correlation = rank3, options = c(0, pi)),
+    "cannot be combined with `options`. Correlated noise", fixed = TRUE
+  )
+  expect_error(
+    dtcc(0, 2, f, n_options = 36, motor_sd = 0.1, options = c(0, pi)),
+    "cannot be combined with `options`: motor", fixed = TRUE
   )
 })

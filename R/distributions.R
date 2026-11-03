@@ -4366,7 +4366,8 @@ dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
                  noise = c("gaussian", "gumbel"), options = NULL, motor_sd = 0) {
   noise <- match.arg(noise)
   .tcc_check_similarity(similarity, n_options)
-  .tcc_check_noise_args(similarity, n_options, noise, !is.null(options), NULL, motor_sd)
+  .tcc_check_noise_args(similarity, n_options, noise, !is.null(options), NULL, motor_sd,
+                        fit = FALSE)
   if (!is.null(options)) {
     out <- .tcc_dist_options_logp(x, d, similarity, n_options, noise, options)
     return(if (log) out else exp(out))
@@ -4393,7 +4394,8 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
                  options = NULL, correlation = NULL, motor_sd = 0) {
   noise <- match.arg(noise)
   .tcc_check_similarity(similarity, n_options)
-  .tcc_check_noise_args(similarity, n_options, noise, !is.null(options), correlation, motor_sd)
+  .tcc_check_noise_args(similarity, n_options, noise, !is.null(options), correlation, motor_sd,
+                        fit = FALSE)
   d <- rep_len(d, n)
   if (!is.null(correlation) || motor_sd > 0) {
     return(2 * pi * .tcc_rnoise(d, similarity, correlation, motor_sd * n_options / (2 * pi)) /

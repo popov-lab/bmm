@@ -273,9 +273,13 @@
 #'   them from a table that `bmm()` estimates by Monte Carlo before
 #'   sampling, from `correlation_draws` draws of the noise (conditioning each
 #'   draw on its component along the similarity). With the default of one
-#'   million draws and the measured correlation, the build took 40 to 70 s on
-#'   one core of an Apple M3 Max laptop, depending on its other load; it is kept for the session, so
-#'   `update()`, `loo()` refits and `kfold()` reuse it. The table's seed
+#'   million draws and the measured correlation, the build took 70.5 and
+#'   70.7 s in two runs on one core of an Apple M3 Max laptop under other
+#'   load. An earlier version of the estimator took 40 s on that laptop when
+#'   it was otherwise idle; timed in turn with it, the current one was about
+#'   7 % faster. The table is kept in the R process that built it, so
+#'   `update()`, `loo()` refits and `kfold()` in that process reuse it;
+#'   parallel workers (`future`) each build their own. The table's seed
 #'   follows from the model, so the same model always gets the same table
 #'   and the user's random number stream is left as it was.
 #'
@@ -581,8 +585,10 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 # full-wheel only in 1.5.0: correlated n-AFC needs the argmax over the offered
 # points under their sub-covariance, planned for 1.6.0. Motor noise moves a
 # click on the wheel, which an n-AFC choice does not have, and its table is
-# built for the Gaussian lpmf only
-.tcc_check_noise_args <- function(similarity, n_options, noise, option_set, correlation, motor_sd) {
+# built for the Gaussian lpmf only. `fit` is FALSE for dtcc() and rtcc(),
+# which have no `n_alternatives` and need no Monte Carlo table
+.tcc_check_noise_args <- function(similarity, n_options, noise, option_set, correlation, motor_sd,
+                                  fit = TRUE) {
   stopif(!is.numeric(motor_sd) || length(motor_sd) != 1 ||
            !isTRUE(is.finite(motor_sd) && motor_sd >= 0),
          "`motor_sd` must be a single non-negative number.")
@@ -593,20 +599,23 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
   stopif(noise == "gumbel",
          "{what} requires noise = 'gaussian': correlated and motor noise are \\
          defined for normal noise only.")
+  option_args <- if (fit) "`options` or `n_alternatives`" else "`options`"
   stopif(option_set && !is.null(correlation),
-         "`correlation` cannot be combined with `options` or `n_alternatives`. \\
+         "`correlation` cannot be combined with {option_args}. \\
          Correlated noise in forced choice (the argmax over the offered options \\
          under their sub-covariance) is planned for bmm 1.6.0; fit option sets with \\
          independent noise for now.")
   stopif(option_set,
-         "`motor_sd` cannot be combined with `options` or `n_alternatives`: motor \\
+         "`motor_sd` cannot be combined with {option_args}: motor \\
          noise moves a click on the wheel, and a forced choice has none.")
   if (!is.null(correlation)) {
-    .tcc_check_correlation(correlation, similarity, n_options)
+    .tcc_check_correlation(correlation, similarity, n_options, fit)
   }
 }
 
-.tcc_check_correlation <- function(correlation, similarity, n_options) {
+# rtcc() draws by the circulant square root, which any correlation without a
+# negative eigenvalue has; the last two checks guard the Monte Carlo table
+.tcc_check_correlation <- function(correlation, similarity, n_options, fit) {
   n_values <- n_options / 2 + 1
   stopif(!is.numeric(correlation) || length(correlation) != n_values,
          "`correlation` must be a numeric vector of {n_values} values, one for each \\
@@ -617,11 +626,21 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
   stopif(abs(correlation[1] - 1) > 1e-8,
          "`correlation` must be 1 at distance 0: it is the correlation of an \\
          option's noise with its own.")
-  setup <- .tcc_corr_setup(correlation, similarity)
-  stopif(setup$min_eigen < -1e-8,
+  lam <- Re(stats::fft(.tcc_circ_row(correlation)))
+  stopif(min(lam) / max(lam) < -1e-8,
          "`correlation` is not a valid correlation function on the circle: the \\
          circulant matrix it defines has a negative eigenvalue \\
-         ({signif(setup$min_eigen, 3)} of the largest).")
+         ({signif(min(lam) / max(lam), 3)} of the largest).")
+  if (!fit) {
+    return(invisible())
+  }
+  # the table conditions on the similarity's direction, which a constant one
+  # does not have (kappa = 0)
+  stopif(all(similarity == similarity[1]),
+         "`similarity` must vary with distance when `correlation` is given: a \\
+         constant similarity gives every option the same mean signal, so `d` cannot \\
+         be estimated.")
+  setup <- .tcc_corr_setup(correlation, similarity)
   stopif(!isTRUE(setup$dropped <= 1e-6),
          "`correlation` leaves no noise in directions that carry \\
          {signif(setup$dropped, 3)} of the variation of `similarity` (at most 1e-6 \\
