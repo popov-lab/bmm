@@ -5,17 +5,18 @@
 # slowest tests in the job summary, and exits with status 1 when a test fails
 # or a cap is breached.
 #
-# The runners of one image come in a fast and a slow pool, the slow one about
-# 1.8 times slower on every test alike (2026-11-03), so the file and test caps
-# are shares of the summed time of all tests, which the pool leaves in place.
-# Over 23 runs on both pools (2026-10-30 to 2026-11-03), with test-update.R
-# counted as the three files it was split into, the largest file's share
-# ranged 0.144 to 0.155 (test-conditional_effects.R) and the slowest test's
-# 0.017 to 0.022; the caps are 1.5x those maxima, rounded. The suite cap stays
-# in seconds of wall time, the one guard on the whole suite slowing down: 1.5x
-# the maximum of twelve runs from 2026-10-19 and 2026-10-20 (668 s). Slow-pool
-# runs reached 861 s by 2026-11-03, so read a breach against the runner's CPU
-# in the job summary. Four workers on the 4-vCPU runner double each test's
+# The runners of one image differ in speed, the slowest taking about twice
+# as long as the fastest on every test alike (2026-11-03), so the file and
+# test caps are shares of the summed time of all tests, which the runner
+# leaves in place.
+# Over 39 runs (2026-10-30 to 2026-11-03), with test-update.R counted as the
+# three files it was split into, the largest file's share ranged 0.144 to
+# 0.156 (test-conditional_effects.R) and the slowest test's 0.017 to 0.022;
+# the caps are 1.5x those maxima, rounded. The suite cap stays in seconds of
+# wall time, the one guard on the whole suite slowing down: 1.5x the maximum
+# of twelve runs from 2026-10-19 and 2026-10-20 (668 s). The slowest runners
+# reached 862 s by 2026-11-03, so read a breach against the runner's CPU in
+# the job summary. Four workers on the 4-vCPU runner double each test's
 # time against one worker, so caps from a one-worker run do not carry over.
 # Every later change goes through the ADR.
 caps <- list(suite = 1000, file = 0.23, test = 0.033)

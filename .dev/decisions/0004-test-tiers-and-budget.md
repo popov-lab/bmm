@@ -80,14 +80,15 @@ shares are in § Changes (2026-10-20, 2026-11-03):
 
 | Applies to | Measured maximum | Cap |
 | --- | --- | --- |
-| a test | share 0.022 (23 runs, 2026-10-30 to 2026-11-03) | share 0.033 |
-| a file | share 0.155 (`test-conditional_effects.R`, same runs) | share 0.23 |
+| a test | share 0.022 (39 runs, 2026-10-30 to 2026-11-03) | share 0.033 |
+| a file | share 0.156 (`test-conditional_effects.R`, same runs) | share 0.23 |
 | the suite | 668 s (12 runs, 2026-10-19 and 2026-10-20) | 1000 s |
 
-Two known offenders in `test-update.R` carry their own cap until the #422
-consolidation removes them: "update() takes a slice of the model frame as
-newdata (kfold(), reloo())" (87.6 s, cap 131 s) and "only a slice of a fit's
-model frame counts as stored data" (55.5 s, cap 83 s).
+No test has a cap of its own: `allowed` in the script has been empty since
+the #422 consolidation, and an entry there gives its cap as a share and
+needs one here. A share is of contended time: a file run while the other
+workers are busy takes longer than the same file run alone at the end, so
+a change to `Config/testthat/start-first` can move shares by itself.
 
 History. The pull request's first CI run had one worker:
 `r-lib/actions/setup-r` sets `options(Ncpus = 1)` by default, and testthat
@@ -347,26 +348,31 @@ last.
   no test reads it.
 - 2026-11-03. R6 file and test caps become shares. Pull requests #591,
   #649 and #652 failed on `test-update.R` alone (851 to 854 s, cap 840 s)
-  with every test passing. The `test-timings` artifacts of 23 runs from
-  2026-10-30 to 2026-11-03 show two pools of runners on the same image and
-  cache keys: develop ran the suite in 426 to 433 s on some and 769 to 812 s
-  on others, and every file slowed alike (median 1.79 times, pure-R files as
-  much as Stan files). The 840 s cap held on the fast pool and failed about
-  half the slow-pool runs once `test-update.R` grew to 172 tests. That file
+  with every test passing. The `test-timings` artifacts of 39 runs from
+  2026-10-30 to 2026-11-03 show runners of different speeds on the same
+  image and cache keys: the suite's wall time fell in four bands (426 to
+  476 s, 574 to 591 s, 702 to 769 s, 804 to 862 s; develop alone 426 to
+  458 s and 740 to 824 s), the summed test time ran from 1575 to 3203 s,
+  and within a run every file slowed alike (on three develop pairs the
+  median file was 1.60, 1.77 and 1.88 times slower, as the suite was). The
+  840 s cap held on the fast runners and failed about half the slowest
+  ones once `test-update.R` grew to 172 tests. That file
   was 27% of the summed test time and set the suite's wall time, so it is
   split into `test-update.R` (formula, prior, control and init handling),
   `test-update-stored-frame.R` (update without newdata, #429) and
   `test-update-newdata.R` (the stored frame as newdata, `kfold()` and
   `reloo()`), with the helpers they share in `helper-update.R`. Counted that
-  way, the largest file's share of the summed test time was 0.144 to 0.155
-  and the slowest test's 0.017 to 0.022 on both pools; the caps are 1.5
-  times the maxima: file 0.23, test 0.033. The suite cap stays at 1000 s of
-  wall time, the one guard on the whole suite slowing down, which a share
-  cannot see; slow-pool runs reached 861 s. The job now writes the runner's
-  CPU to its summary and keeps `lscpu` in the timings artifact, so a suite
-  breach can be read against the hardware, and so a later change can
-  calibrate the suite cap per pool.
+  way, the largest file's share of the summed test time was 0.144 to 0.156
+  and the slowest test's 0.017 to 0.022 at every speed; the caps are 1.5
+  times the maxima, rounded: file 0.23, test 0.033. The suite cap stays at
+  1000 s of wall time, the one guard on the whole suite slowing down, which
+  a share cannot see; the slowest runners reached 862 s. The job now writes
+  the runner's CPU to its summary and keeps `lscpu` in the timings
+  artifact, so a suite breach can be read against the hardware, and so a
+  later change can calibrate the suite cap by runner.
   The two new files join `update` in `Config/testthat/start-first`
   (DESCRIPTION), which matches whole names: unlisted, they started last and
   the first run of the split took 906 s of wall time for 3046 s of tests on
-  the slow pool.
+  a slow runner (AMD EPYC 7763). Listed, the next run on the same CPU took
+  821 s for 3111 s; the wall time is now near a quarter of the summed time,
+  the floor for four workers.
