@@ -544,13 +544,17 @@ configure_prior.default <- function(model, data, formula, user_prior, ...) {
 
 #' @export
 configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...) {
-  prior <- fixed_pars_priors(model, formula)
-  default_prior <- set_default_prior(model, data, formula, ...)
-  prior <- combine_prior(default_prior, prior)
-  prior <- combine_prior(prior, user_prior)
-  additional_prior <- NextMethod("configure_prior")
-  message_displaced_priors(user_prior, additional_prior, fixed = model$fixed_parameters)
-  combine_prior(prior, additional_prior)
+  prior <- combine_prior(set_default_prior(model, data, formula, ...), user_prior)
+  # a parameter fixed in the formula is a constraint like the rows of the
+  # model's own method, so its constant() is combined after the user prior, or
+  # a user prior on its intercept would free it (#549); the model's rows come
+  # last because mpt restates such a constant on the link scale
+  constraints <- combine_prior(fixed_pars_priors(model, formula), NextMethod("configure_prior"))
+  message_displaced_priors(
+    user_prior, constraints,
+    fixed = model$fixed_parameters, main_dpar = names(brms::brmsterms(formula)$dpars)[1]
+  )
+  combine_prior(prior, constraints)
 }
 
 # The model-specific priors are constraints the model needs, so they replace a
@@ -559,8 +563,11 @@ configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...
 # string (rows update() carries over from a fit) states no prior to lose. A row
 # on a fixed parameter also names the fixed value, because the constant is on
 # the link scale and can differ from the value the user or the model fixed
-# (constant(0) for mpt's g = 0.5)
-message_displaced_priors <- function(user_prior, model_prior, fixed = list()) {
+# (constant(0) for mpt's g = 0.5). brms stores a row on the main parameter
+# without a dpar label (set_prior(dpar = "mu") keeps ""), so the caller passes
+# that parameter's name for the row to read `dpar = "mu"` and find its fixed
+# value; a cor row belongs to no parameter and keeps no label
+message_displaced_priors <- function(user_prior, model_prior, fixed = list(), main_dpar = "") {
   if (NROW(user_prior) == 0 || NROW(model_prior) == 0) {
     return(invisible())
   }
@@ -575,6 +582,9 @@ message_displaced_priors <- function(user_prior, model_prior, fixed = list()) {
   }
   rows <- paste(vapply(displaced, function(i) {
     row <- user_prior[i, ]
+    if (!nzchar(row$dpar) && !nzchar(row$nlpar) && row$class != "cor") {
+      row$dpar <- main_dpar
+    }
     fields <- c("dpar", "nlpar", "class", "coef", "group", "resp")
     named <- fields[nzchar(unlist(row[fields]))]
     where <- paste0(named, ' = "', unlist(row[named]), '"', collapse = ", ")
