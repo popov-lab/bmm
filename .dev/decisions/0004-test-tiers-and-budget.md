@@ -71,16 +71,18 @@ which the push-time run keeps. The gate is opt-out so a local
 
 A time budget is enforced by the `tests-source` job
 (`.github/scripts/test-budget.R`): the job fails when the suite, a file or a
-test exceeds its cap. The caps are 1.5 times the maxima of twelve
-four-worker runs on the runner (2026-10-19 and 2026-10-20, develop and
-eleven pull-request branches), rounded; the first caps, from this record's
-pull request, are in § Changes (2026-10-20):
+test exceeds its cap. The caps are 1.5 times the maxima of four-worker
+runs on the runner, rounded. A test and a file are capped by their share
+of the summed time of all tests, which does not move with the speed of the
+runner; the suite is capped in seconds of wall time. The first caps, from
+this record's pull request, and the caps in seconds that came before the
+shares are in § Changes (2026-10-20, 2026-11-03):
 
 | Applies to | Measured maximum | Cap |
 | --- | --- | --- |
-| a test | 76.1 s | 115 s |
-| a file | 561 s (`test-update.R`) | 840 s |
-| the suite | 668 s | 1000 s |
+| a test | share 0.022 (23 runs, 2026-10-30 to 2026-11-03) | share 0.033 |
+| a file | share 0.155 (`test-conditional_effects.R`, same runs) | share 0.23 |
+| the suite | 668 s (12 runs, 2026-10-19 and 2026-10-20) | 1000 s |
 
 Two known offenders in `test-update.R` carry their own cap until the #422
 consolidation removes them: "update() takes a slice of the model frame as
@@ -343,3 +345,24 @@ last.
   `tests/recovery/<model>.R` (a bmmtools `validation_plan()`;
   `.github/CONTRIBUTING.md`). `AGENTS.md` lists it in R9. Review checks it;
   no test reads it.
+- 2026-11-03. R6 file and test caps become shares. Pull requests #591,
+  #649 and #652 failed on `test-update.R` alone (851 to 854 s, cap 840 s)
+  with every test passing. The `test-timings` artifacts of 23 runs from
+  2026-10-30 to 2026-11-03 show two pools of runners on the same image and
+  cache keys: develop ran the suite in 426 to 433 s on some and 769 to 812 s
+  on others, and every file slowed alike (median 1.79 times, pure-R files as
+  much as Stan files). The 840 s cap held on the fast pool and failed about
+  half the slow-pool runs once `test-update.R` grew to 172 tests. That file
+  was 27% of the summed test time and set the suite's wall time, so it is
+  split into `test-update.R` (formula, prior, control and init handling),
+  `test-update-stored-frame.R` (update without newdata, #429) and
+  `test-update-newdata.R` (the stored frame as newdata, `kfold()` and
+  `reloo()`), with the helpers they share in `helper-update.R`. Counted that
+  way, the largest file's share of the summed test time was 0.144 to 0.155
+  and the slowest test's 0.017 to 0.022 on both pools; the caps are 1.5
+  times the maxima: file 0.23, test 0.033. The suite cap stays at 1000 s of
+  wall time, the one guard on the whole suite slowing down, which a share
+  cannot see; slow-pool runs reached 861 s. The job now writes the runner's
+  CPU to its summary and keeps `lscpu` in the timings artifact, so a suite
+  breach can be read against the hardware, and so a later change can
+  calibrate the suite cap per pool.
