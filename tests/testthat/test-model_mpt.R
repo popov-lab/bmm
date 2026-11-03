@@ -2226,8 +2226,8 @@ test_that("mpt compiles with structurally impossible categories", {
 
 # tests/local/test-mpt-likelihood.R compares a fit's lp__ with dmpt() once a
 # week; evaluating the compiled model at fixed points needs no sampling, so the
-# same comparison runs on every pull request. Compiling the brms program takes
-# nearly all of its time (20 to 40 s on a laptop)
+# same comparison runs on every pull request. It takes about 15 s on a laptop,
+# nearly all of it compiling the brms program
 test_that("the Stan log density of an mpt model with an impossible category equals dmpt()", {
   skip_unless_stan_tests()
   skip_on_cran() # compiles a Stan program

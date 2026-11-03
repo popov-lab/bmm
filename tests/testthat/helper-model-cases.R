@@ -46,7 +46,9 @@ model_specimen <- function(model, version = NA) {
   if (!is.null(specimen)) {
     # one specimen stands for one version; for a model with versions it would
     # be checked once per version while the versions themselves go unchecked
-    if (!is.na(version)) stop("model_specimen(): '", model, "' has versions; a specimen covers none of them")
+    if (!is.na(version)) {
+      stop("model_specimen(): the specimen of '", model, "' covers no version; version '", version, "' was asked for")
+    }
     return(specimen)
   }
   if (is.na(version)) get_model(model)() else get_model(model)(version = version)

@@ -99,7 +99,6 @@ test_that("models without a simplex group carry no simplex prior functions", {
 # diff that the failure prints, then accept it with
 # testthat::snapshot_accept("model_mpt-stancode") (or
 # snapshot_review("model_mpt-stancode") to see both versions side by side).
-# The header line naming the brms and bmm versions is left out.
 # brms writes part of the program, so the snapshots skip under any brms other
 # than golden_brms: a brms release would otherwise fail every open PR at once,
 # and tests/local/test-golden-stancode.R fails weekly until they are re-recorded.
@@ -115,6 +114,7 @@ skip_unless_golden_brms <- function() {
   )
 }
 
+# the header line naming the brms and bmm versions is left out
 golden_stancode <- function(formula, data, model) {
   code <- suppressMessages(stancode(formula, data, model))
   cat(sub("^// generated with [^\n]*\n", "", code))
