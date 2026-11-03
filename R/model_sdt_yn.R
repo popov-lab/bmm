@@ -612,6 +612,13 @@ bmf2bf.sdt_yn <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# The last argument tells the likelihood that sdratio is fixed at 0 on its log
+# link, a ratio of exactly 1, so it can skip rescaling the signal rows
+.sdt_yn_family_vars <- function(model) {
+  c(.sdt_binomial_row_vars(),
+    as.integer(.sdt_unit_sdratio(model)))
+}
+
 #' @export
 configure_model.sdt_yn <- function(model, data, formula) {
   anchor <- .sdt_anchor_parameter(formula)
@@ -625,11 +632,11 @@ configure_model.sdt_yn <- function(model, data, formula) {
     links = c("identity", model$links$d, model$links[[anchor]],
               model$links$sdratio),
     type = "int",
-    loop = TRUE,
+    loop = FALSE,
     log_lik = log_lik_sdt_yn,
     posterior_predict = posterior_predict_sdt_yn,
     posterior_epred = posterior_epred_sdt_yn,
-    vars = c("vint1[n]", "vint2[n]", "trials[n]")
+    vars = .sdt_yn_family_vars(model)
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")

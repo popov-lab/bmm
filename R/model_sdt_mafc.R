@@ -246,11 +246,11 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     dpars = c("mu", "d"),
     links = c("identity", model$links$d),
     type = "int",
-    loop = TRUE,
+    loop = FALSE,
     log_lik = log_lik_sdt_mafc,
     posterior_predict = posterior_predict_sdt_mafc,
     posterior_epred = posterior_epred_sdt_mafc,
-    vars = c("vint1[n]", "vint2[n]", "trials[n]",
+    vars = c(.sdt_binomial_row_vars(),
              "gh_nodes", "gh_weights", "gl_nodes", "gl_weights")
   )
 
