@@ -22,9 +22,14 @@ n_discrete_max <- 10
 #'   - the data columns each parameter formula uses, and how they are coded
 #'     (factor levels, character vectors, numeric variables with few unique
 #'     values)
-#'   - the number of observations per design cell (crossing the grouping
+#'   - the number of trials per design cell (crossing the grouping
 #'     variables from random effects terms with the categorical predictors),
-#'     flagging sparse or empty cells
+#'     flagging sparse or empty cells. For models fit to aggregated data,
+#'     where one row summarizes many trials, the trials of all rows in a cell
+#'     are summed: the `n_trials` column of `sdt_yn()`, `sdt_mafc()` and
+#'     `ezdm()`, and the row sums of the response count columns of `m3()`,
+#'     `mpt()`, `sdt_rating()`, `sdt_ranking()` and `sdt_cdp()`. For all other
+#'     models a row is one trial
 #'   - model-specific diagnostics for common data mistakes (e.g. responses in
 #'     degrees rather than radians for circular models, or misplaced `NA`
 #'     values in the non-target features of set size varying designs).
@@ -39,13 +44,21 @@ n_discrete_max <- 10
 #'   prior or a problem with the initial values is out of its reach and will
 #'   only surface when you call [bmm()].
 #' @inheritParams bmm
-#' @param min_trials Numeric. Design cells with fewer observations are flagged
-#'   in the report. Defaults to 10. Ignored for models fit to aggregated data
-#'   (e.g. `m3`, `ezdm`), where one row summarizes many trials.
+#' @param min_trials Numeric. Design cells with fewer than `min_trials` trials
+#'   in total are flagged in the report. Defaults to 10, for every model. For
+#'   `mpt()` a design cell sums the trials of all its trees unless a formula
+#'   uses the tree column, so a cell can pass while one of its trees holds
+#'   only a few trials; tabulate the trials per tree yourself if the trees
+#'   differ in size. When the trial counts of an
+#'   aggregated model cannot be read (a count column is missing or not
+#'   numeric), the report shows rows per cell and flags none.
 #' @return An object of class `bmm_data_check` with a print method. The object
 #'   is a list containing the summarized `response`, `predictors` and `cells`
 #'   information (including the full cell count table in `$cells$counts`), all
 #'   `findings`, and the captured results of the validation `pipeline`.
+#'   `$cells$unit` says what a cell's `n` counts (`"trials"`, `"rows"` or
+#'   `"observations"`); when it counts trials, `$cells$counts` also holds each
+#'   cell's `n_rows` and the object its total `n_trials`.
 #' @seealso [bmm()], [check_data()], [data_check_findings()]
 #' @keywords extract_info
 #' @examples
@@ -131,12 +144,13 @@ bmm_data_check <- function(formula, data, model, min_trials = 10) {
 
   response <- summarise_response_vars(model, data)
   predictors <- summarise_predictor_vars(model, data, formula)
-  cells <- summarise_design_cells(data, formula)
+  trials <- data_trials(model, data)
+  cells <- summarise_design_cells(data, formula, trials)
   findings <- c(
     response_var_findings(response),
     generic_data_findings(
       predictors, cells,
-      min_trials = if (uses_aggregate_data(model)) NULL else min_trials
+      min_trials = if (cells$unit != "rows") min_trials
     ),
     data_check_findings(model, data, formula)
   )
@@ -145,6 +159,7 @@ bmm_data_check <- function(formula, data, model, min_trials = 10) {
     nlist(
       model, data_name,
       n_obs = nrow(data),
+      n_trials = if (cells$unit == "trials") sum(trials),
       response, predictors, cells, findings, pipeline
     ),
     class = "bmm_data_check"
@@ -258,7 +273,17 @@ re_group_vars <- function(formula) {
   as.character(unique(unlist(vars)))
 }
 
-summarise_design_cells <- function(data, formula) {
+# A cell's size is its trials, not its rows: for aggregated data a row holds
+# many trials. `unit` names what `counts$n` counts, and "rows" marks an
+# aggregated model whose trial counts could not be read
+summarise_design_cells <- function(data, formula, trials = NULL) {
+  unit <- if (is.null(trials)) {
+    "observations"
+  } else if (identical(trials, NA)) {
+    "rows"
+  } else {
+    "trials"
+  }
   group_vars <- intersect(re_group_vars(formula), colnames(data))
   fixed_vars <- setdiff(
     intersect(unique(unlist(formula_data_vars(formula))), colnames(data)),
@@ -270,21 +295,52 @@ summarise_design_cells <- function(data, formula) {
 
   vars <- c(group_vars, cell_vars)
   if (length(vars) == 0) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL, unit))
   }
 
   n_combos <- prod(vapply(vars, function(v) {
     length(unique(data[[v]]))
   }, numeric(1)))
   if (n_combos > max_design_cells) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos, unit))
   }
 
   counts <- as.data.frame(
     table(data[, vars, drop = FALSE]),
     responseName = "n", stringsAsFactors = FALSE
   )
-  nlist(group_vars, cell_vars, counts, n_combos)
+  # tapply() builds its cells with factor(), as table() does, so both arrays
+  # run over the same levels in the same order
+  if (unit == "trials") {
+    counts$n_rows <- counts$n
+    counts$n <- as.vector(tapply(trials, data[vars], sum, default = 0))
+  }
+  nlist(group_vars, cell_vars, counts, n_combos, unit)
+}
+
+# The trials each row of the user's data stands for: NULL where a row is one
+# trial, NA where a model aggregates trials but its count columns cannot be
+# read. Models fit to aggregated data add a method, so that bmm_data_check()
+# judges cells by trials and never by rows
+data_trials <- function(model, data) {
+  UseMethod("data_trials")
+}
+
+#' @exportS3Method
+data_trials.default <- function(model, data) {
+  NULL
+}
+
+# NA counts add nothing, as in the models that zero them before the fit
+.row_trials <- function(data, cols) {
+  if (length(cols) == 0 || !all(cols %in% colnames(data))) {
+    return(NA)
+  }
+  counts <- data[cols]
+  if (!all(vapply(counts, is.numeric, logical(1)))) {
+    return(NA)
+  }
+  rowSums(counts, na.rm = TRUE)
 }
 
 # tabulating the full crossing allocates a cell per combination, so wide
@@ -357,36 +413,38 @@ generic_data_findings <- function(predictors, cells, min_trials) {
     ))))
   }
 
-  c(findings, cell_count_findings(cells$counts, min_trials))
+  if (identical(cells$unit, "rows")) {
+    findings <- c(findings, list(data_check_finding("note", glue(
+      "The trial counts could not be read from the data, so design cells are \\
+      counted in rows and none is checked for too few trials."
+    ))))
+  }
+  c(findings, cell_count_findings(cells$counts, min_trials, cells$unit))
 }
 
-# aggregate-response models code many trials per row, so row counts per
-# design cell say nothing about trial numbers and min_trials does not apply
-uses_aggregate_data <- function(model) {
-  inherits(model, "m3") || inherits(model, "ezdm") || inherits(model, "mpt")
-}
-
-cell_count_findings <- function(counts, min_trials) {
+cell_count_findings <- function(counts, min_trials, unit = "observations") {
   if (is.null(counts)) {
     return(list())
   }
   findings <- list()
+  # a cell is empty when it has no rows; a cell whose rows hold no trials is sparse
+  rows <- counts$n_rows %||% counts$n
   low <- if (is.null(min_trials)) {
     counts[0, , drop = FALSE]
   } else {
-    counts[counts$n > 0 & counts$n < min_trials, , drop = FALSE]
+    counts[rows > 0 & counts$n < min_trials, , drop = FALSE]
   }
   if (nrow(low) > 0) {
     findings <- c(findings, list(data_check_finding("note", glue(
-      "{nrow(low)} design cell(s) have fewer than {min_trials} observations: \\
+      "{nrow(low)} design cell(s) have fewer than {min_trials} {unit}: \\
       {format_cell_labels(utils::head(low, 3))}\\
       {if (nrow(low) > 3) ', ...' else ''}"
     ))))
   }
-  empty <- counts[counts$n == 0, , drop = FALSE]
+  empty <- counts[rows == 0, , drop = FALSE]
   if (nrow(empty) > 0) {
     findings <- c(findings, list(data_check_finding("note", glue(
-      "{nrow(empty)} design cell combination(s) contain no observations - \\
+      "{nrow(empty)} design cell combination(s) contain no {unit} - \\
       fine if the design is intentionally incomplete."
     ))))
   }
@@ -394,7 +452,7 @@ cell_count_findings <- function(counts, min_trials) {
 }
 
 format_cell_labels <- function(counts) {
-  vars <- setdiff(names(counts), "n")
+  vars <- setdiff(names(counts), c("n", "n_rows"))
   labels <- apply(counts[vars], 1, function(row) {
     paste(paste0(vars, "=", row), collapse = ", ")
   })
@@ -561,7 +619,12 @@ print.bmm_data_check <- function(x, color = getOption("bmm.color_summary", TRUE)
   withr::local_options(bmm.color_summary = color)
   cat("Pre-fit data check\n")
   cat(style("purple1")("Model:"), gsub("\\s+", " ", construct_model_call(x$model)), "\n")
-  cat(style("purple1")("Data: "), glue("{x$n_obs} observations ('{x$data_name}')"), "\n\n")
+  size <- switch(x$cells$unit %||% "observations",
+    trials = glue("{x$n_obs} rows, {format(x$n_trials, scientific = FALSE)} trials"),
+    rows = glue("{x$n_obs} rows"),
+    glue("{x$n_obs} observations")
+  )
+  cat(style("purple1")("Data: "), glue("{size} ('{x$data_name}')"), "\n\n")
   print_response_section(x$response)
   print_predictor_section(x$predictors)
   print_cells_section(x$cells)
@@ -612,11 +675,15 @@ print_predictor_section <- function(predictors) {
 }
 
 print_cells_section <- function(cells) {
+  unit <- cells$unit %||% "observations"
+  heading <- style("green")(paste0(
+    toupper(substr(unit, 1, 1)), substring(unit, 2), " per design cell:\n"
+  ))
   if (is.null(cells$counts)) {
     if (is.null(cells$n_combos)) {
       return(invisible())
     }
-    cat(style("green")("Observations per design cell:\n"))
+    cat(heading)
     cat_wrapped(glue(
       "not tabulated - crossing \\
       {collapse_comma(c(cells$group_vars, cells$cell_vars))} would give \\
@@ -626,14 +693,15 @@ print_cells_section <- function(cells) {
     cat("\n")
     return(invisible())
   }
-  observed <- cells$counts$n[cells$counts$n > 0]
-  cat(style("green")("Observations per design cell:\n"))
+  observed <- cells$counts$n[(cells$counts$n_rows %||% cells$counts$n) > 0]
+  cat(heading)
   cat("  ", paste(c(cells$group_vars, cells$cell_vars), collapse = " x "),
     ": ", length(observed), " non-empty cell(s)\n",
     sep = ""
   )
-  cat("  observations per cell: min ", min(observed),
-    " / median ", stats::median(observed), " / max ", max(observed), "\n\n",
+  num <- function(x) format(x, scientific = FALSE)
+  cat("  ", unit, " per cell: min ", num(min(observed)),
+    " / median ", num(stats::median(observed)), " / max ", num(max(observed)), "\n\n",
     sep = ""
   )
 }

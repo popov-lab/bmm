@@ -620,6 +620,11 @@ built_data_columns.sdt_rating <- function(model) {
   c("nTrials", NextMethod("built_data_columns"))
 }
 
+#' @exportS3Method
+data_trials.sdt_rating <- function(model, data) {
+  .row_trials(data, model$resp_vars$response)
+}
+
 #' @export
 check_data.sdt_rating <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
