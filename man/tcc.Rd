@@ -185,8 +185,8 @@ probability of choosing an option at most 10 degrees from the target is
 0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
 continuous limit, and values of \code{d} fitted with different \code{n_options} are
 not on one scale. With \code{options}, \code{n_options} only places the options:
-the choice is among the offered options alone, and any multiple of \code{m}
-spaces \code{m} options equally.
+the choice is among the offered options alone, and any even multiple of
+\code{m} (at least 4) spaces \code{m} options equally.
 }
 
 \subsection{Grid limit on d}{
