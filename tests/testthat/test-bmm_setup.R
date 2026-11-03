@@ -3,12 +3,14 @@ local_machine <- function(build_tools = TRUE,
                           cmdstan = "2.40.0",
                           cmdstan_toolchain = NULL,
                           rstan = list(version = "2.32.7", error = NULL),
+                          brms = "2.23.0",
                           smoke = function(backend) list(error = NULL, seconds = 42),
                           os = "macos",
                           env = parent.frame()) {
   local_mocked_bindings(
     probe_build_tools = function() build_tools,
     probe_package = function(pkg) switch(pkg, cmdstanr = cmdstanr, rstan = rstan),
+    probe_brms_version = function() brms,
     probe_cmdstan_version = function() cmdstan,
     probe_cmdstan_toolchain = function() cmdstan_toolchain,
     probe_smoke_test = smoke,
@@ -116,6 +118,47 @@ test_that("a failing CmdStan toolchain check reports cmdstanr's reason", {
   expect_match(row_of(report, "CmdStan toolchain")$detail, "C++ compiler was not found", fixed = TRUE)
   expect_match(row_of(report, "CmdStan toolchain")$fix, "xcode-select --install", fixed = TRUE)
   expect_equal(row_of(report, "Backend")$status, "fail")
+})
+
+test_that("cmdstanr 1.0 with a brms older than 2.23.2 warns about update() but still fits", {
+  local_machine(cmdstanr = list(version = "0.99.0", error = NULL), brms = "2.23.0")
+  report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+
+  expect_equal(report$check[2:3], c("cmdstanr", "brms"))
+  brms <- row_of(report, "brms")
+  expect_equal(brms$status, "warn")
+  expect_match(brms$detail, "2.23.0 is older than cmdstanr 0.99.0", fixed = TRUE)
+  expect_match(brms$detail, "update()", fixed = TRUE)
+  expect_match(brms$fix, 'remotes::install_github("paul-buerkner/brms")', fixed = TRUE)
+  expect_match(brms$fix, "update(fit, recompile = TRUE)", fixed = TRUE)
+  expect_equal(row_of(report, "Backend")$status, "pass")
+  expect_equal(row_of(report, "Smoke test")$status, "pass")
+})
+
+test_that("a brms of 2.23.2 or later, or a cmdstanr before 1.0, adds no brms row", {
+  versions <- list(
+    c(cmdstanr = "0.99.0", brms = "2.23.2"),
+    c(cmdstanr = "1.0.0", brms = "2.24.0"),
+    c(cmdstanr = "0.9.0", brms = "2.23.0"),
+    c(cmdstanr = "0.9.0.9006", brms = "2.21.0")
+  )
+  for (v in versions) {
+    local_machine(cmdstanr = list(version = v[["cmdstanr"]], error = NULL), brms = v[["brms"]])
+    report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+    expect_false("brms" %in% report$check, info = paste(v, collapse = " / "))
+  }
+})
+
+test_that("print() shows the brms warning with its fix and says bmm still fits", {
+  local_machine(cmdstanr = list(version = "1.0.0", error = NULL), brms = "2.23.0")
+  report <- suppressMessages(bmm_setup(backend = "cmdstanr"))
+  out <- capture.output(print(report, color = FALSE))
+
+  warn <- grep("^WARN +brms ", out)
+  expect_length(warn, 1)
+  expect_match(paste(out[warn + 1:3], collapse = " "), "Fix: install brms from GitHub", fixed = TRUE)
+  expect_match(out[length(out) - 1], "bmm can fit models with cmdstanr", fixed = TRUE)
+  expect_match(out[length(out)], "The warning above does not stop bmm() from fitting models.", fixed = TRUE)
 })
 
 test_that("a broken rstan fails both backends, because brms needs it after every fit", {
