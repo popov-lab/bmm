@@ -614,7 +614,7 @@ bmf2bf.sdt_yn <- function(model, formula) {
 
 # The last argument tells the likelihood that sdratio is fixed at 0 on its log
 # link, a ratio of exactly 1, so it can skip rescaling the signal rows
-sdt_yn_family_vars <- function(model) {
+.sdt_yn_family_vars <- function(model) {
   c(.sdt_binomial_row_vars(),
     as.integer(.sdt_unit_sdratio(model)))
 }
@@ -636,7 +636,7 @@ configure_model.sdt_yn <- function(model, data, formula) {
     log_lik = log_lik_sdt_yn,
     posterior_predict = posterior_predict_sdt_yn,
     posterior_epred = posterior_epred_sdt_yn,
-    vars = sdt_yn_family_vars(model)
+    vars = .sdt_yn_family_vars(model)
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
