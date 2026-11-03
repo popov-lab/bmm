@@ -78,6 +78,23 @@
 
 #### Bug fixes
 
+- [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  now counts trials, not rows, per design cell, and flags cells with
+  fewer than `min_trials` (default 10) trials in total. Aggregated
+  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md),
+  [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md),
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
+  [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
+  and [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
+  data were flagged as sparse when each row held many trials;
+  [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md),
+  [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) and
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) data were
+  never checked and may now show notes about sparse cells. For
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) a cell counts
+  the trials of all its trees unless a formula uses the tree column, so
+  check trees of very different sizes yourself
+  ([\#647](https://github.com/popov-lab/bmm/issues/647)).
 - [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) returned
   0 instead of 1 at the upper end of the circle (`psdm(pi, 0, 3, 5)`).
   With a `lower.bound` other than `-pi`, such as `mu - pi`, it also

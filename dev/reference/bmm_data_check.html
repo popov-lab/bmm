@@ -16,9 +16,14 @@ expects
 the data columns each parameter formula uses, and how they are coded
 (factor levels, character vectors, numeric variables with few unique
 values)
-the number of observations per design cell (crossing the grouping
+the number of trials per design cell (crossing the grouping
 variables from random effects terms with the categorical predictors),
-flagging sparse or empty cells
+flagging sparse or empty cells. For models fit to aggregated data,
+where one row summarizes many trials, the trials of all rows in a cell
+are summed: the n_trials column of sdt_yn(), sdt_mafc() and
+ezdm(), and the row sums of the response count columns of m3(),
+mpt(), sdt_rating(), sdt_ranking() and sdt_cdp(). For all other
+models a row is one trial
 model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced NA
 values in the non-target features of set size varying designs).
@@ -42,9 +47,14 @@ expects
 the data columns each parameter formula uses, and how they are coded
 (factor levels, character vectors, numeric variables with few unique
 values)
-the number of observations per design cell (crossing the grouping
+the number of trials per design cell (crossing the grouping
 variables from random effects terms with the categorical predictors),
-flagging sparse or empty cells
+flagging sparse or empty cells. For models fit to aggregated data,
+where one row summarizes many trials, the trials of all rows in a cell
+are summed: the n_trials column of sdt_yn(), sdt_mafc() and
+ezdm(), and the row sums of the response count columns of m3(),
+mpt(), sdt_rating(), sdt_ranking() and sdt_cdp(). For all other
+models a row is one trial
 model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced NA
 values in the non-target features of set size varying designs).
@@ -106,9 +116,14 @@ expects</p></li>
 <li><p>the data columns each parameter formula uses, and how they are coded
 (factor levels, character vectors, numeric variables with few unique
 values)</p></li>
-<li><p>the number of observations per design cell (crossing the grouping
+<li><p>the number of trials per design cell (crossing the grouping
 variables from random effects terms with the categorical predictors),
-flagging sparse or empty cells</p></li>
+flagging sparse or empty cells. For models fit to aggregated data,
+where one row summarizes many trials, the trials of all rows in a cell
+are summed: the <code>n_trials</code> column of <code><a href="sdt_yn.html">sdt_yn()</a></code>, <code><a href="sdt_mafc.html">sdt_mafc()</a></code> and
+<code><a href="ezdm.html">ezdm()</a></code>, and the row sums of the response count columns of <code><a href="m3.html">m3()</a></code>,
+<code><a href="mpt.html">mpt()</a></code>, <code><a href="sdt_rating.html">sdt_rating()</a></code>, <code><a href="sdt_ranking.html">sdt_ranking()</a></code> and <code><a href="sdt_cdp.html">sdt_cdp()</a></code>. For all other
+models a row is one trial</p></li>
 <li><p>model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced <code>NA</code>
 values in the non-target features of set size varying designs).
@@ -151,9 +166,14 @@ call. Call <code><a href="bmm_models.html">bmm_models()</a></code> to see the li
 
 
 <dt id="arg-min-trials">min_trials<a class="anchor" aria-label="anchor" href="#arg-min-trials"></a></dt>
-<dd><p>Numeric. Design cells with fewer observations are flagged
-in the report. Defaults to 10. Ignored for models fit to aggregated data
-(e.g. <code>m3</code>, <code>ezdm</code>), where one row summarizes many trials.</p></dd>
+<dd><p>Numeric. Design cells with fewer than <code>min_trials</code> trials
+in total are flagged in the report. Defaults to 10, for every model. For
+<code><a href="mpt.html">mpt()</a></code> a design cell sums the trials of all its trees unless a formula
+uses the tree column, so a cell can pass while one of its trees holds
+only a few trials; tabulate the trials per tree yourself if the trees
+differ in size. When the trial counts of an
+aggregated model cannot be read (a count column is missing or not
+numeric), the report shows rows per cell and flags none.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -161,7 +181,10 @@ in the report. Defaults to 10. Ignored for models fit to aggregated data
     <p>An object of class <code>bmm_data_check</code> with a print method. The object
 is a list containing the summarized <code>response</code>, <code>predictors</code> and <code>cells</code>
 information (including the full cell count table in <code>$cells$counts</code>), all
-<code>findings</code>, and the captured results of the validation <code>pipeline</code>.</p>
+<code>findings</code>, and the captured results of the validation <code>pipeline</code>.
+<code>$cells$unit</code> says what a cell's <code>n</code> counts (<code>"trials"</code>, <code>"rows"</code> or
+<code>"observations"</code>); when it counts trials, <code>$cells$counts</code> also holds each
+cell's <code>n_rows</code> and the object its total <code>n_trials</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -272,7 +295,7 @@ information (including the full cell count table in <code>$cells$counts</code>),
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pre-fit data check</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #AF5FFF;">Model:</span> <span style="color: #FF875F;">m3</span>(resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"), choice_rule = "simple", version = "ss") </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #AF5FFF;">Data: </span> 120 observations ('oberauer_lewandowsky_2019_e1') </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #AF5FFF;">Data: </span> 120 rows, 10979 trials ('oberauer_lewandowsky_2019_e1') </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">Response variables:</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   corr   numeric, range [5, 95] (expected: counts per response category)</span>
@@ -286,9 +309,9 @@ information (including the full cell count table in <code>$cells$counts</code>),
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">Predictor coding:</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ID  [grouping] numeric, range [1, 40]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">Observations per design cell:</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">Trials per design cell:</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ID: 40 non-empty cell(s)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   observations per cell: min 3 / median 3 / max 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   trials per cell: min 252 / median 275 / max 295</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Findings: <span style="color: #00BB00;">No issues detected.</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>

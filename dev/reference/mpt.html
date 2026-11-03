@@ -290,6 +290,15 @@ with a single value per tree can leave a parameter unidentified, as in
 test give three free parameters and rank 2 of 3, so one combination of
 <code>Do</code>, <code>Dn</code> and <code>g</code> cannot be estimated; a second condition that varies
 the response bias identifies them.</p>
+<p><strong>Sparse cells.</strong> <code><a href="bmm_data_check.html">bmm_data_check()</a></code> flags design cells with fewer than
+<code>min_trials</code> trials, counting the trials of a row as the sum of its
+response category columns. Each row holds one tree, so when no formula
+uses the <code>tree_id</code> column, a design cell sums the rows of all trees and
+can pass while one tree holds only a few trials: 40 trials in an old/new
+test and 2 in a source test add up to 42. With the tree column in a
+formula, each tree is a cell of its own and is checked on its own;
+otherwise tabulate the trials per tree yourself when the trees differ in
+size.</p>
 <p><strong>Reading the estimates.</strong> <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports intercepts and regression
 coefficients on the latent (logit or probit) scale. <code><a href="native_parameters.html">native_parameters()</a></code>
 returns the posterior draws of every parameter on the probability scale

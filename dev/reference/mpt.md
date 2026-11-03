@@ -266,6 +266,17 @@ An object of class `bmmodel`
   combination of `Do`, `Dn` and `g` cannot be estimated; a second
   condition that varies the response bias identifies them.
 
+  **Sparse cells.**
+  [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  flags design cells with fewer than `min_trials` trials, counting the
+  trials of a row as the sum of its response category columns. Each row
+  holds one tree, so when no formula uses the `tree_id` column, a design
+  cell sums the rows of all trees and can pass while one tree holds only
+  a few trials: 40 trials in an old/new test and 2 in a source test add
+  up to 42. With the tree column in a formula, each tree is a cell of
+  its own and is checked on its own; otherwise tabulate the trials per
+  tree yourself when the trees differ in size.
+
   **Reading the estimates.**
   [`summary()`](https://rdrr.io/r/base/summary.html) reports intercepts
   and regression coefficients on the latent (logit or probit) scale.

@@ -1513,7 +1513,7 @@ bmm_data_check(bmf(Do ~ 1, Dn ~ 1, g ~ 1), long, model_eqn)
 ``` fansi
 #> Pre-fit data check
 #> Model: mpt_from_eqn(file = eqn_file, categories = c(target_hit = "old", lure_fa = "old", target_miss = "new", lure_cr = "new"), tree_id = "item_type") 
-#> Data:  4 observations ('long') 
+#> Data:  4 rows, 200 trials ('long') 
 #> 
 #> Response variables:
 #>   old  numeric with 4 unique values: 8, 12, 35, 40 (expected: counts per
