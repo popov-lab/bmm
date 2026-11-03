@@ -375,4 +375,5 @@ last.
   the first run of the split took 906 s of wall time for 3046 s of tests on
   a slow runner (AMD EPYC 7763). Listed, the next run on the same CPU took
   821 s for 3111 s; the wall time is now near a quarter of the summed time,
-  the floor for four workers.
+  the floor for four workers. `newdata` joined the list afterwards: it
+  took 110 s on a later run, among the eight largest files.
