@@ -889,9 +889,14 @@ test_that("both Stan yes/no likelihoods match dsdt_yn", {
   grid <- expand.grid(stimulus = 0:1, d = c(0.4, 2), crit = c(-0.6, 0.3, 1.4),
                       sdratio = c(0.7, 1, 1.6), dist = seq_along(bmm:::.sdt_dists))
   # counts strictly inside, at both edges, and single trials, which leave one
-  # side of the binomial empty; seven patterns, so each meets both stimuli
-  grid$trials <- rep_len(c(30L, 30L, 30L, 30L, 1L, 1L, 1L), nrow(grid))
-  grid$y <- rep_len(c(3L, 17L, 0L, 30L, 0L, 1L, 1L), nrow(grid))
+  # side of the binomial empty. Each side splits its rows at a count of 1
+  # (summed once) versus 2 and more (weighted by the count), so 2 and 3 out of
+  # 5 put a count of exactly 2 on each side; 1 and 29 out of 30 put a count of
+  # 1 on each side of a row whose binomial coefficient is not 1. Eleven
+  # patterns, odd and coprime with the 36-row dist blocks, so each pattern
+  # meets both stimuli in every dist
+  grid$trials <- rep_len(c(30L, 30L, 30L, 30L, 1L, 1L, 1L, 5L, 5L, 30L, 30L), nrow(grid))
+  grid$y <- rep_len(c(3L, 17L, 0L, 30L, 0L, 1L, 1L, 2L, 3L, 1L, 29L), nrow(grid))
   N <- nrow(grid)
   K <- length(bmm:::.sdt_dists)
   fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
