@@ -13,7 +13,8 @@ dtcc(
   n_options = 360,
   log = FALSE,
   noise = c("gaussian", "gumbel"),
-  options = NULL
+  options = NULL,
+  motor_sd = 0
 )
 
 rtcc(
@@ -22,7 +23,9 @@ rtcc(
   similarity,
   n_options = 360,
   noise = c("gaussian", "gumbel"),
-  options = NULL
+  options = NULL,
+  correlation = NULL,
+  motor_sd = 0
 )
 }
 \arguments{
@@ -51,7 +54,15 @@ for an \code{x} off the set. As in \code{\link[=tcc]{tcc()}}, the set must inclu
 step of one of the \code{n_options} positions, onto which it is rounded;
 values beyond \code{2 * pi} are refused as not in radians.}
 
+\item{motor_sd}{The SD of the motor noise on the click, in radians: the
+response is the chosen option plus a normal error with this SD, rounded
+to the nearest option. 0 (the default) for none.}
+
 \item{n}{Number of observations to generate.}
+
+\item{correlation}{\code{NULL} (the default) for independent noise, or the
+correlation of the noise of two options at each distance 0, 1, ...,
+\code{n_options / 2}, starting with 1, as in \code{\link[=tcc]{tcc()}}.}
 }
 \value{
 \code{dtcc()} returns the probability of the option each \code{x} falls on (a
@@ -65,7 +76,15 @@ under \code{\link[=tcc]{tcc()}}: each of \code{n_options} options produces a mem
 with mean \code{d * f(x)} plus independent noise, and the response is the
 option with the strongest signal. The noise is normal with unit variance
 or, with \code{noise = "gumbel"}, standard Gumbel, which makes the probability
-of an option the softmax of \code{d * f(x)} over all options.
+of an option the softmax of \code{d * f(x)} over all options. \code{rtcc()} also
+simulates normal noise correlated across options (\code{correlation}), and
+both functions take motor noise on the click (\code{motor_sd}); see the
+sections Correlated noise and Motor noise of \code{\link[=tcc]{tcc()}}.
+}
+\details{
+Under correlated noise the probabilities have no closed form, so
+\code{dtcc()} does not take \code{correlation}: \code{\link[=tcc]{tcc()}} estimates them by Monte
+Carlo for each fit, and \code{log_lik()} of such a fit reads that table.
 }
 \examples{
 f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
@@ -77,6 +96,9 @@ plot(x, dtcc(x, d = 5, similarity = f, noise = "gumbel"), type = "h")
 # a 4-AFC trial with options 90 degrees apart
 four <- c(0, 90, 180, -90) * pi / 180
 dtcc(four, d = 2, similarity = f, options = four)
+# correlated noise and 2 degrees of motor noise
+err <- rtcc(2000, d = 2, similarity = f, correlation = exp(-(0:180) / 10),
+            motor_sd = deg2rad(2))
 }
 \references{
 Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical scaling reveals a unified theory of visual memory strength. Nature Human Behaviour, 4(11), 1156-1172. https://doi.org/10.1038/s41562-020-00938-0
