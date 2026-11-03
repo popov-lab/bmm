@@ -115,6 +115,17 @@ jobs:
           )
         shell: Rscript {0}
 
+      - name: Log the runner's hardware
+        # the runners of one image differ in speed (ADR 0004, 2026-11-03);
+        # the suite cap is in seconds, so a breach is read against this
+        # line, and the artifact keeps it next to the timings; a failure
+        # here must not keep the suite from running
+        continue-on-error: true
+        run: |
+          lscpu > runner-hardware.txt
+          cpu=$(sed -n 's/^Model name: *//p' runner-hardware.txt)
+          echo "Runner CPU: ${cpu}; $(nproc) cores" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Run the suite under the time budget
         timeout-minutes: 30
         run: Rscript .github/scripts/test-budget.R
@@ -132,3 +143,4 @@ jobs:
           path: |
             test-timings.csv
             cran-test-timings.csv
+            runner-hardware.txt

@@ -52,12 +52,14 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
       "test-model_ezdm.R" = 3L,
       "test-model_m3.R" = 2L,
       "test-model_mixture2p.R" = 1L,
+      "test-model_mpt.R" = 1L,
       "test-model_rdm.R" = 1L,
       "test-model_sdm-stan.R" = 2L,
       "test-model_sdt_cdp.R" = 3L,
+      "test-model_sdt_mafc.R" = 1L,
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
-      "test-model_sdt_yn.R" = 1L,
+      "test-model_sdt_yn.R" = 2L,
       "test-sdt-rating-versions.R" = 1L
     ),
     rule = "R1: cmdstan_model() sites per file"
@@ -99,6 +101,7 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
       "test-model_rdm.R" = 1L,
       "test-model_sdm-stan.R" = 2L,
       "test-model_sdt_cdp.R" = 1L,
+      "test-model_sdt_mafc.R" = 1L,
       "test-model_sdt_ranking.R" = 1L,
       "test-model_sdt_rating.R" = 2L,
       "test-model_sdt_yn.R" = 1L,
@@ -166,6 +169,28 @@ test_that("every model has a model-case provider with the cases every model need
     expect_identical(setdiff(model_names(), covered), character(0),
                      info = paste0("R4: no '", kind, "' case for these models"))
   }
+})
+
+test_that("every model has a simulate_data() method and a simulate case per version (R4)", {
+  # coverage is read per version class, because a method that dispatches on
+  # model$version can miss a version silently. A model whose generator cannot
+  # produce data that check_data() accepts is listed here with its reason;
+  # none on develop
+  exempt <- character(0)
+  versions <- unlist(lapply(model_names(), function(name) {
+    version <- eval(formals(get(name, mode = "function"))$version)
+    if (is.null(version)) name else paste0(name, "_", version)
+  }))
+  covered <- unlist(lapply(model_test_cases("simulate"), function(case) class(case$model)))
+  has_method <- vapply(model_names(), function(name) {
+    !is.null(utils::getS3method("simulate_data", name, optional = TRUE))
+  }, logical(1))
+  missing <- setdiff(c(versions, model_names()[!has_method]), c(covered, exempt))
+  expect_identical(missing, character(0), info = paste0(
+    "R4: no 'simulate' case for these models/versions: ", collapse_comma(missing),
+    "; add a `simulate` case to model_cases_<model>() and a simulate_data.<model> method; ",
+    "see ?simulate_data"
+  ))
 })
 
 test_that("every model constructor with ... reports arguments it does not use (#552)", {

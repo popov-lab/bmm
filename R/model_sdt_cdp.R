@@ -470,6 +470,17 @@ built_data_columns.sdt_cdp <- function(model) {
   c("nTrials", NextMethod("built_data_columns"))
 }
 
+# the guess columns count only when all are there, as in check_data()
+#' @exportS3Method
+data_trials.sdt_cdp <- function(model, data) {
+  n_new <- model$other_vars$n_new
+  n_old <- model$other_vars$n_old
+  prefix <- model$resp_vars$response
+  guess_cols <- paste0(prefix, "guess", n_new + seq_len(n_old))
+  has_guess <- all(guess_cols %in% colnames(data))
+  .row_trials(data, .sdt_cdp_response_cols(n_new, n_old, has_guess, prefix))
+}
+
 #' @export
 check_data.sdt_cdp <- function(model, data, formula) {
   stim_var <- model$other_vars$stimulus
@@ -629,6 +640,30 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# kcrit at its fixed -100 leaves out the guess categories (R/K); any other
+# value adds them (R/K/G). sigmar and rho reach the generator on the model's
+# own scale, as the log SD and the unconstrained correlation
+#' @export
+simulate_data.sdt_cdp <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, vars$stimulus, trials = "n_trials")
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  deltas <- p[grep("^delta[0-9]+$", names(p))]
+  thresholds <- .cdp_make_thresholds(p$criterion, p$spacing, vars$n_new, vars$n_old, vars$threshold_type,
+                                     if (length(deltas)) do.call(cbind, deltas))
+  kcrit <- if (!all(p$kcrit == model$fixed_parameters$kcrit)) p$kcrit
+  counts <- rsdt_cdp(nrow(design), design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
+                     dfam = p$dfam, drec = p$drec, thresholds = thresholds, rcrit = p$rcrit,
+                     kcrit = kcrit, sigmar = p$sigmar, rho = p$rho, n_new = vars$n_new, dist = vars$dist)
+  colnames(counts) <- paste0(model$resp_vars$response, colnames(counts))
+  .simulate_result(design, as.data.frame(counts), sim)
 }
 
 # Code-generate the Stan `sdt_cdp_logmu` category logit. The per-distance
