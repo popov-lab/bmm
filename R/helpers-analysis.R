@@ -872,7 +872,7 @@ roc_observed <- function(fit, conditions = NULL) {
   data     <- fit$data
   resp_var <- model$resp_vars$response
   stim_var <- model$other_vars$stimulus
-  nt_var   <- model$other_vars$n_trials
+  nt_var   <- .sdt_trials_var(model)
 
   cond_cols <- intersect(conditions %||% .sdt_criterion_point_dims(fit)$points,
                          names(data))

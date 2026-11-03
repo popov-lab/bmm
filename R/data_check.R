@@ -29,7 +29,11 @@ n_discrete_max <- 10
 #'     are summed: the `n_trials` column of `sdt_yn()`, `sdt_mafc()` and
 #'     `ezdm()`, and the row sums of the response count columns of `m3()`,
 #'     `mpt()`, `sdt_rating()`, `sdt_ranking()` and `sdt_cdp()`. For all other
-#'     models a row is one trial
+#'     models a row is one trial. With one row per trial
+#'     (`sdt_yn()` and `sdt_mafc()` without `n_trials`), only the first
+#'     grouping variable of the formula, taken as the participant, and any
+#'     grouping variable that is also a discrete predictor are crossed; the
+#'     other grouping variables, such as items, are counted per level
 #'   - model-specific diagnostics for common data mistakes (e.g. responses in
 #'     degrees rather than radians for circular models, or misplaced `NA`
 #'     values in the non-target features of set size varying designs).
@@ -51,7 +55,10 @@ n_discrete_max <- 10
 #'   only a few trials; tabulate the trials per tree yourself if the trees
 #'   differ in size. When the trial counts of an
 #'   aggregated model cannot be read (a count column is missing or not
-#'   numeric), the report shows rows per cell and flags none.
+#'   numeric), the report shows rows per cell and flags none. A grouping
+#'   variable counted per level is judged only when its median level holds at
+#'   least `min_trials` observations, and a level is flagged below
+#'   `min(min_trials, median / 2)`.
 #' @return An object of class `bmm_data_check` with a print method. The object
 #'   is a list containing the summarized `response`, `predictors` and `cells`
 #'   information (including the full cell count table in `$cells$counts`), all
@@ -145,7 +152,7 @@ bmm_data_check <- function(formula, data, model, min_trials = 10) {
   response <- summarise_response_vars(model, data)
   predictors <- summarise_predictor_vars(model, data, formula)
   trials <- data_trials(model, data)
-  cells <- summarise_design_cells(data, formula, trials)
+  cells <- summarise_design_cells(data, formula, trials, trial_level = is_trial_level(model))
   findings <- c(
     response_var_findings(response),
     generic_data_findings(
@@ -275,8 +282,17 @@ re_group_vars <- function(formula) {
 
 # A cell's size is its trials, not its rows: for aggregated data a row holds
 # many trials. `unit` names what `counts$n` counts, and "rows" marks an
-# aggregated model whose trial counts could not be read
-summarise_design_cells <- function(data, formula, trials = NULL) {
+# aggregated model whose trial counts could not be read.
+#
+# With one row per trial and crossed grouping variables (subjects x items),
+# every crossing holds one trial, so only the participant variable is crossed
+# with the fixed predictors. It is the first grouping variable in the formula:
+# the data cannot tell participants from items, and a count of levels picks
+# items whenever there are fewer items than participants. The other grouping
+# variables are counted per level; group_level_findings() judges them. One
+# that is also a discrete predictor, in the fixed part or as a random slope, is
+# crossed with the participant instead
+summarise_design_cells <- function(data, formula, trials = NULL, trial_level = FALSE) {
   unit <- if (is.null(trials)) {
     "observations"
   } else if (identical(trials, NA)) {
@@ -293,16 +309,33 @@ summarise_design_cells <- function(data, formula, trials = NULL) {
     is_discrete_var(data[[v]])
   }, logical(1))]
 
+  other_groups <- NULL
+  other_counts <- NULL
+  if (trial_level && length(group_vars) > 1) {
+    also_predictor <- intersect(group_vars[-1], predictor_side_vars(formula))
+    also_predictor <- also_predictor[vapply(also_predictor, function(v) {
+      is_discrete_var(data[[v]])
+    }, logical(1))]
+    cell_vars <- c(cell_vars, also_predictor)
+    per_level <- setdiff(group_vars[-1], also_predictor)
+    if (length(per_level) > 0) {
+      other_counts <- lapply(per_level, function(v) table(droplevels(as.factor(data[[v]]))))
+      names(other_counts) <- per_level
+      other_groups <- summarise_group_levels(other_counts)
+    }
+    group_vars <- group_vars[1]
+  }
+
   vars <- c(group_vars, cell_vars)
   if (length(vars) == 0) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL, unit))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos = NULL, unit, other_groups, other_counts))
   }
 
   n_combos <- prod(vapply(vars, function(v) {
     length(unique(data[[v]]))
   }, numeric(1)))
   if (n_combos > max_design_cells) {
-    return(nlist(group_vars, cell_vars, counts = NULL, n_combos, unit))
+    return(nlist(group_vars, cell_vars, counts = NULL, n_combos, unit, other_groups, other_counts))
   }
 
   counts <- as.data.frame(
@@ -315,7 +348,63 @@ summarise_design_cells <- function(data, formula, trials = NULL) {
     counts$n_rows <- counts$n
     counts$n <- as.vector(tapply(trials, data[vars], sum, default = 0))
   }
-  nlist(group_vars, cell_vars, counts, n_combos, unit)
+  nlist(group_vars, cell_vars, counts, n_combos, unit, other_groups, other_counts)
+}
+
+# the variables outside the grouping side of every `( ... | ... )` term: the
+# population-level part and the random slopes
+predictor_side_vars <- function(formula) {
+  drop_bars <- function(expr) {
+    if (!is.call(expr)) {
+      return(expr)
+    }
+    if (identical(expr[[1]], as.name("(")) && .is_bar_call(expr[[2]])) {
+      return(.drop_re_cor_ids(expr[[2]])[[2]])
+    }
+    as.call(lapply(as.list(expr), drop_bars))
+  }
+  unique(unlist(lapply(formula, function(f) {
+    if (!is_formula(f) || length(f) == 0) {
+      return(character(0))
+    }
+    all.vars(drop_bars(f[[length(f)]]))
+  })))
+}
+
+summarise_group_levels <- function(counts) {
+  do.call(rbind, lapply(names(counts), function(v) {
+    n <- as.vector(counts[[v]])
+    data.frame(variable = v, n_levels = length(n), min = min(n),
+               median = stats::median(n), max = max(n))
+  }))
+}
+
+# a formula that names a small factor such as a list or a session first makes
+# it the participant variable, so every other grouping variable whose typical
+# level holds min_trials observations is judged per level too; one whose
+# typical level holds fewer (items seen a few times each) is only described.
+# A level is flagged only when it also holds less than half the typical level,
+# so items drawn at random for each subject are not flagged at the boundary;
+# the message names that bound, not min_trials
+group_level_findings <- function(counts, min_trials) {
+  if (is.null(min_trials)) {
+    return(list())
+  }
+  findings <- lapply(names(counts), function(v) {
+    n <- counts[[v]]
+    threshold <- min(min_trials, stats::median(n) / 2)
+    low <- n[n > 0 & n < threshold]
+    if (stats::median(n) < min_trials || length(low) == 0) {
+      return(NULL)
+    }
+    labels <- paste0(v, "=", names(low), " (n=", low, ")")
+    data_check_finding("note", glue(
+      "{length(low)} level(s) of '{v}' have fewer than {format(threshold, digits = 15)} \\
+      observations: {paste(utils::head(labels, 3), collapse = '; ')}\\
+      {if (length(low) > 3) ', ...' else ''}"
+    ))
+  })
+  Filter(Negate(is.null), findings)
 }
 
 # The trials each row of the user's data stands for: NULL where a row is one
@@ -419,7 +508,8 @@ generic_data_findings <- function(predictors, cells, min_trials) {
       counted in rows and none is checked for too few trials."
     ))))
   }
-  c(findings, cell_count_findings(cells$counts, min_trials, cells$unit))
+  c(findings, cell_count_findings(cells$counts, min_trials, cells$unit),
+    group_level_findings(cells$other_counts, min_trials))
 }
 
 cell_count_findings <- function(counts, min_trials, unit = "observations") {
@@ -690,6 +780,7 @@ print_cells_section <- function(cells) {
       {signif(cells$n_combos, 3)} cells, above the limit of \\
       {format(max_design_cells, big.mark = ',', scientific = FALSE)}."
     ), "  - ")
+    print_other_groups(cells)
     cat("\n")
     return(invisible())
   }
@@ -701,9 +792,32 @@ print_cells_section <- function(cells) {
   )
   num <- function(x) format(x, scientific = FALSE)
   cat("  ", unit, " per cell: min ", num(min(observed)),
-    " / median ", num(stats::median(observed)), " / max ", num(max(observed)), "\n\n",
+    " / median ", num(stats::median(observed)), " / max ", num(max(observed)), "\n",
     sep = ""
   )
+  print_other_groups(cells)
+  cat("\n")
+}
+
+print_other_groups <- function(cells) {
+  others <- cells$other_groups
+  if (is.null(others)) {
+    return(invisible())
+  }
+  cat_wrapped(glue(
+    "Rows are single trials, so of the grouping variables only \
+    '{cells$group_vars}' (the first in the formula found in the data, taken as \
+    the participant) and those that are also discrete predictors (factor, \
+    character or logical, or numeric with at most {n_discrete_max} values) are \
+    crossed into cells; \
+    the others are counted per level:"
+  ), "  ")
+  for (i in seq_len(nrow(others))) {
+    cat("  ", others$variable[i], ": ", others$n_levels[i], " levels, observations per level: min ",
+      others$min[i], " / median ", others$median[i], " / max ", others$max[i], "\n",
+      sep = ""
+    )
+  }
 }
 
 print_findings_section <- function(findings) {

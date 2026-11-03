@@ -18,17 +18,28 @@
   default_priors <- list(
     d = list(main = "normal(1, 1)", effects = "normal(0, 0.5)", sd = "exponential(1)")
   )
-  requirements <- glue(
-    "Provide pre-aggregated accuracy data with the following columns:", "\n\n",
-    "  - Response counts (response): number of correct responses", "\n",
-    "  - Number of trials (n_trials): total trials per cell", "\n",
-    "  No stimulus column needed (each trial has exactly one signal alternative)"
-  )
+  trial_level <- is.null(n_trials)
+  m_column <- if (is.character(m)) "\n  - Number of alternatives (m): one integer >= 2 per row" else ""
+  requirements <- if (trial_level) {
+    glue(
+      "Provide one row per trial with the following column{if (is.character(m)) 's' else ''}:",
+      "\n\n",
+      "  - Response (response): 1 = correct, 0 = incorrect", m_column,
+      "\n\n  No stimulus column is needed: each trial has exactly one signal alternative."
+    )
+  } else {
+    glue(
+      "Provide aggregated accuracy data, one row per cell, with the following columns:", "\n\n",
+      "  - Response counts (response): number of correct responses", "\n",
+      "  - Number of trials (n_trials): total trials per cell", m_column,
+      "\n\n  No stimulus column is needed: each trial has exactly one signal alternative."
+    )
+  }
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(n_trials, dist, m),
+      other_vars = nlist(n_trials, dist, m, trial_level),
       domain = c("Perception", "Long-term memory"),
       task = "Detection, recognition and confidence judgments",
       name = "m-Alternative Forced Choice Signal Detection Theory Model",
@@ -68,7 +79,9 @@ settable_links.sdt_mafc <- function(model) {
 
 #' @title m-Alternative Forced Choice Signal Detection Theory Model
 #' @name sdt_mafc
-#' @details `r model_docs(.model_sdt_mafc())`
+#' @details `r model_docs(.model_sdt_mafc(n_trials = "n_trials"))`
+#'
+#' `r model_docs(.model_sdt_mafc(), components = "trial_level")`
 #'
 #' Models accuracy in m-AFC tasks where each trial presents one signal among
 #' `m` alternatives and the observer chooses the strongest one. Only `d`
@@ -95,9 +108,11 @@ settable_links.sdt_mafc <- function(model) {
 #' `sdratio` at its default, because only the Gaussian \eqn{d_a} is exactly the
 #' AUC-equivalent index (see the sensitivity section of [sdt_yn()]).
 #' @param response A single string naming the column with counts of correct
-#'   responses.
+#'   responses, or, with one row per trial (`n_trials = NULL`), 1 for a correct
+#'   and 0 for an incorrect response.
 #' @param n_trials The name of the variable containing the total number of
-#'   trials per cell.
+#'   trials per cell. `NULL` (the default) declares one row per trial: the
+#'   column named by `response` then holds 0 or 1 in every row.
 #' @param m Either a single integer >= 2 giving the number of alternatives
 #'   (constant across all rows), or a single string naming a data column that
 #'   gives the number of alternatives per row. A column lets trials with
@@ -145,7 +160,7 @@ settable_links.sdt_mafc <- function(model) {
 #'   backend = "cmdstanr"
 #' )
 #' }
-sdt_mafc <- function(response, n_trials, m,
+sdt_mafc <- function(response, n_trials = NULL, m,
                      dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                      links = NULL, ...) {
   call <- match.call()
@@ -173,20 +188,26 @@ sdt_mafc <- function(response, n_trials, m,
 
 #' @exportS3Method
 built_data_columns.sdt_mafc <- function(model) {
-  c("m_afc", "dist_type", NextMethod("built_data_columns"))
+  c("m_afc", "dist_type", if (is_trial_level(model)) "nTrials",
+    NextMethod("built_data_columns"))
 }
 
 #' @exportS3Method
 data_trials.sdt_mafc <- function(model, data) {
+  if (is_trial_level(model)) {
+    return(NULL)
+  }
   .row_trials(data, model$other_vars$n_trials)
 }
 
 #' @export
 check_data.sdt_mafc <- function(model, data, formula) {
-  resp_var <- model$resp_vars$response
-  n_trials_var <- model$other_vars$n_trials
-
-  .validate_sdt_counts(data, resp_var, n_trials_var)
+  if (is_trial_level(model)) {
+    data <- .add_binomial_trials(data, model, formula)
+  } else {
+    .validate_sdt_counts(data, model$resp_vars$response,
+                         model$other_vars$n_trials)
+  }
 
   reserved <- intersect(c("m_afc", "dist_type"), colnames(data))
   warnif(length(reserved) > 0,
@@ -205,12 +226,9 @@ check_data.sdt_mafc <- function(model, data, formula) {
 
 #' @export
 bmf2bf.sdt_mafc <- function(model, formula) {
-  resp_var <- model$resp_vars$response
-  n_trials_var <- model$other_vars$n_trials
-
   brms::bf(paste0(
-    resp_var, " | vint(m_afc, dist_type) + trials(",
-    n_trials_var, ") ~ 0"
+    model$resp_vars$response, " | vint(m_afc, dist_type) + trials(",
+    .sdt_trials_var(model), ") ~ 0"
   ))
 }
 

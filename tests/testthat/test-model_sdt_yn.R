@@ -38,8 +38,112 @@ test_that("sdt_yn model has default priors", {
   expect_true("effects" %in% names(model$default_priors$d))
 })
 
-test_that("sdt_yn requires n_trials argument", {
-  expect_error(sdt_yn("n_old", "stimulus"))
+test_that("sdt_yn without n_trials declares one row per trial", {
+  trial <- sdt_yn("resp", "stimulus")
+  expect_true(trial$other_vars$trial_level)
+  expect_null(trial$other_vars$n_trials)
+  expect_match(trial$requirements, "one row per trial")
+  cells <- sdt_yn("n_old", "stimulus", "n_trials")
+  expect_false(cells$other_vars$trial_level)
+  expect_match(cells$requirements, "one row per cell")
+  expect_error(sdt_yn("resp"), "missing in sdt_yn\\(\\): stimulus")
+})
+
+
+############################################################################# !
+# TRIAL-LEVEL DATA                                                       ####
+############################################################################# !
+
+test_that("trial-level check_data() names the responses that are not 0 or 1", {
+  model <- sdt_yn("resp", "stimulus")
+  dat <- data.frame(resp = c(0, 1, 2, 3, NA), stimulus = c(0L, 1L, 0L, 1L, 0L))
+  expect_error(
+    check_data(model, dat, bmf(d ~ 1, criterion ~ 1)),
+    "'resp' must hold one of '0', '1' in every row. Found: '2', '3'"
+  )
+  expect_error(
+    check_data(model, data.frame(resp = c(35, 12), stimulus = 0:1), bmf(d ~ 1, criterion ~ 1)),
+    paste0("With one row per trial, the response column 'resp' must hold one of '0', '1' in ",
+           "every row. Found: '35', '12'. For counts aggregated over trials, construct the ",
+           "model with n_trials."),
+    fixed = TRUE
+  )
+})
+
+test_that("trial-level check_data() keeps a missing response missing", {
+  checked <- check_data(sdt_yn("resp", "stimulus"),
+                        data.frame(resp = c(1, NA, 0), stimulus = c(1L, 1L, 0L)),
+                        bmf(d ~ 1, criterion ~ 1))
+  expect_identical(checked$resp, c(1L, NA, 0L))
+})
+
+test_that("trial-level check_data() adds one trial per row and keeps the 0/1 response", {
+  model <- sdt_yn("resp", "stimulus")
+  dat <- data.frame(resp = c(TRUE, FALSE, TRUE), stimulus = c(0L, 1L, 1L))
+  checked <- check_data(model, dat, bmf(d ~ 1, criterion ~ 1))
+  expect_identical(checked$resp, c(1L, 0L, 1L))
+  expect_identical(checked$nTrials, c(1L, 1L, 1L))
+  expect_warning(
+    check_data(model, cbind(dat, nTrials = 5), bmf(d ~ 1, criterion ~ 1)),
+    "'nTrials' in your data is reserved"
+  )
+  expect_error(
+    check_data(sdt_yn("nTrials", "stimulus"), data.frame(nTrials = c(0, 1), stimulus = 0:1),
+               bmf(d ~ 1, criterion ~ 1)),
+    "Rename your column 'nTrials'"
+  )
+  expect_error(
+    check_data(model, cbind(dat, nTrials = c(2, 3, 4)), bmf(d ~ nTrials, criterion ~ 1)),
+    "Rename your column 'nTrials' and the argument or formula term"
+  )
+})
+
+test_that("trial rows and the cells aggregated from them give the same Stan program", {
+  skip_on_cran()
+  # 2 participants x 2 stimulus types x 10 trials (R3)
+  trials <- data.frame(
+    id = rep(1:2, each = 20), stimulus = rep(rep(0:1, each = 10), 2),
+    resp = c(0, 0, 1, 0, 0, 0, 1, 0, 0, 0,  1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
+             0, 1, 0, 0, 0, 1, 0, 0, 0, 0,  1, 1, 1, 0, 1, 1, 1, 1, 0, 1)
+  )
+  cells <- data.frame(id = rep(1:2, each = 2), stimulus = rep(0:1, 2),
+                      resp = c(2, 8, 2, 8), n_trials = 10)
+  formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id))
+  mock <- function(data, model) suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_fit <- mock(trials, sdt_yn("resp", "stimulus"))
+  cell_fit <- mock(cells, sdt_yn("resp", "stimulus", "n_trials"))
+  expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit))
+  trial_data <- brms::standata(trial_fit)
+  expect_equal(as.vector(trial_data$trials), rep(1, 40))
+  expect_equal(
+    as.vector(tapply(trial_data$Y, list(trial_data$vint1, trials$id), sum)),
+    c(2, 8, 2, 8)
+  )
+})
+
+# the family's log_lik on the Stan data of trial rows sums, per cell, to its
+# log_lik on the Stan data of the cells less log choose(n, y): 10 trials per
+# cell with 2 and 8 'old' responses, choose(10, 2) = choose(10, 8) = 45
+test_that("log_lik_sdt_yn() on trial rows sums to the cell value less log choose(n, y)", {
+  skip_on_cran()
+  trials <- data.frame(stimulus = rep(0:1, each = 10),
+                       resp = c(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1))
+  cells <- data.frame(stimulus = 0:1, resp = c(2, 8), n = 10)
+  mock <- function(data, model) suppressMessages(
+    bmm(bmf(d ~ 1, criterion ~ 1), data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  ll <- function(fit) {
+    data <- brms::standata(fit)
+    prep <- epred_prep(list(d = matrix(1.3, 1, data$N), criterion = matrix(0.4, 1, data$N),
+                            sdratio = matrix(1, 1, data$N)), data)
+    vapply(seq_len(data$N), function(i) log_lik_sdt_yn(i, prep), numeric(1))
+  }
+  by_trial <- ll(mock(trials, sdt_yn("resp", "stimulus")))
+  by_cell <- ll(mock(cells, sdt_yn("resp", "stimulus", "n")))
+  expect_equal(as.vector(tapply(by_trial, trials$stimulus, sum)), by_cell - log(45),
+               tolerance = 1e-10)
 })
 
 

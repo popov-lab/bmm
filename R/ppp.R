@@ -6,8 +6,9 @@
 #' Posterior predictive p-values for count models
 #'
 #' Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
-#' (2010) and their posterior predictive p-values (PPP) for models that fit
-#' aggregated response counts: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
+#' (2010) and their posterior predictive p-values (PPP) for the count models,
+#' whose rows are aggregated counts or, for [sdt_yn()] and [sdt_mafc()] without
+#' `n_trials`, single trials: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
 #' [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()]. TreeBUGS' `PPP()` reports the
 #' same two statistics; Details says where their values differ.
 #'
@@ -224,7 +225,7 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 # the response column holds one category; the other is trials - Y
 .ppp_counts.sdt_yn <- function(model, fit, draw_ids) {
   response <- model$resp_vars$response
-  trials <- fit$data[[model$other_vars$n_trials]]
+  trials <- fit$data[[.sdt_trials_var(model)]]
   y <- fit$data[[response]]
   list(
     observed = matrix(c(y, trials - y), ncol = 2L,

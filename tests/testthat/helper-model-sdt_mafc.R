@@ -4,9 +4,14 @@ model_cases_sdt_mafc <- function() {
   re_data <- data.frame(
     n_correct = rep(c(30, 24), 10), n_trials = 40, id = factor(rep(1:10, each = 2))
   )
+  trial_model <- sdt_mafc(response = "correct", m = 4)
+  # one row per trial: 2 participants x 6 trials
+  trial_data <- data.frame(id = rep(1:2, each = 6), correct = c(1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1))
   list(
     stored_frame = list(
       sdt_mafc = list(model = model, formula = bmf(d ~ 1 + cond), data = toy_mafc_data()),
+      sdt_mafc_trial_level = list(model = trial_model, formula = bmf(d ~ 1 + (1 | id)),
+                                  data = trial_data),
       sdt_mafc_m_column = list(
         model = sdt_mafc("n_correct", "n_trials", m = "n_afc"),
         formula = bmf(d ~ 1 + cond), data = toy_mafc_data()
@@ -20,6 +25,7 @@ model_cases_sdt_mafc <- function() {
       sdt_mafc = list(model = model, formula = bmf(d ~ 1 + (1 | id)), data = re_data,
                       sd = c(d = "exponential(1)"))
     ),
+    check_data = list(sdt_mafc_trial_level = list(model = trial_model, data = trial_data)),
     init = list(sdt_mafc = list(model = model, formula = bmf(d ~ 1 + (1 | id)), data = re_data)),
     links = list(sdt_mafc = list(model = model, settable = "d")),
     simulate = list(
