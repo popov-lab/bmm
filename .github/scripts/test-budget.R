@@ -6,7 +6,7 @@
 # or a cap is breached.
 #
 # The runners of one image differ in speed, the slowest taking about twice
-# as long as the fastest on every test alike (2026-11-03), so the file and
+# as long as the fastest on every file alike (2026-11-03), so the file and
 # test caps are shares of the summed time of all tests, which the runner
 # leaves in place.
 # Over 39 runs (2026-10-30 to 2026-11-03), with test-update.R counted as the
@@ -16,7 +16,9 @@
 # wall time, the one guard on the whole suite slowing down: 1.5x the maximum
 # of twelve runs from 2026-10-19 and 2026-10-20 (668 s). The slowest runners
 # reached 862 s by 2026-11-03, so read a breach against the runner's CPU in
-# the job summary. Four workers on the 4-vCPU runner double each test's
+# the job summary. A bad start order adds to that: the first run after the
+# split took 906 s because of the order, not the runner (ADR 0004,
+# 2026-11-03). Four workers on the 4-vCPU runner double each test's
 # time against one worker, so caps from a one-worker run do not carry over.
 # Every later change goes through the ADR.
 caps <- list(suite = 1000, file = 0.23, test = 0.033)
@@ -42,6 +44,10 @@ write.csv(timings, "test-timings.csv", row.names = FALSE)
 
 # a file that errored outside test_that() has no time (see which() below)
 total <- sum(timings$real, na.rm = TRUE)
+# with no time every share is NaN and a breach would read "NA takes NA s"
+if (!is.finite(total) || total <= 0) {
+  stop("no test time recorded (summed time ", total, " s); see test-timings.csv")
+}
 timings$share <- timings$real / total
 by_file <- aggregate(real ~ file, timings, sum)
 by_file$share <- by_file$real / total

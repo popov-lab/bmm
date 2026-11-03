@@ -352,11 +352,12 @@ last.
   2026-10-30 to 2026-11-03 show runners of different speeds on the same
   image and cache keys: the suite's wall time fell in four bands (426 to
   476 s, 574 to 591 s, 702 to 769 s, 804 to 862 s; develop alone 426 to
-  458 s and 740 to 824 s), the summed test time ran from 1575 to 3203 s,
-  and within a run every file slowed alike (on three develop pairs the
-  median file was 1.60, 1.77 and 1.88 times slower, as the suite was). The
-  840 s cap held on the fast runners and failed about half the slowest
-  ones once `test-update.R` grew to 172 tests. That file
+  458 s and 740 to 822 s), the summed test time ran from 1575 to 3203 s,
+  and between a fast and a slow run every file slowed by about the same
+  factor (on three develop pairs the median file was 1.60, 1.77 and 1.88
+  times slower, as the suite was). The 840 s cap held on the fast runners
+  and failed about half the slowest ones once `test-update.R` grew to 172
+  tests or more. That file
   was 27% of the summed test time and set the suite's wall time, so it is
   split into `test-update.R` (formula, prior, control and init handling),
   `test-update-stored-frame.R` (update without newdata, #429) and
