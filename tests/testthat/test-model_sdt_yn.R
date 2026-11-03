@@ -679,9 +679,97 @@ test_that("sdt_yn model produces valid stancode with brms", {
   model <- sdt_yn("n_old", "stimulus", "n_trials", dist = "normal")
   formula <- bmf(d ~ 1, criterion ~ 1)
   code <- stancode(formula, data = dat, model = model)
-  expect_match(code, paste("target += sdt_yn_lpmf(Y[n] | mu[n], d[n], criterion[n],",
-                           "sdratio[n], vint1[n], vint2[n], trials[n]);"), fixed = TRUE)
+  expect_match(code, paste("target += sdt_yn_lpmf(Y | mu, d, criterion,",
+                           "sdratio, vint1, vint2[1], trials, 1);"), fixed = TRUE)
   expect_match(code, "real sdt_log_cumprob(", fixed = TRUE)
+})
+
+test_that("only an sdratio fixed at 0 on its log link takes the equal-variance path", {
+  skip_on_cran() # five stancode() calls, over 0.4 s in CRAN mode (ADR 0004, R10)
+  # the last argument of the likelihood lets it skip rescaling the signal rows,
+  # which is exact only for a ratio of 1
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  dat <- data.frame(n_old = c(10, 40, 15, 35), stimulus = c(0L, 1L, 0L, 1L),
+                    n_trials = 50, cond = c("a", "a", "b", "b"))
+  last_arg <- function(formula) {
+    code <- suppressWarnings(stancode(formula, dat, model))
+    sub(".*vint2\\[1\\], trials, ([01])\\);.*", "\\1",
+        regmatches(code, regexpr("sdt_yn(_bias)?_lpmf\\(Y [^;]*;", code)))
+  }
+  expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond)), "1")
+  expect_equal(last_arg(bmf(d ~ 1, bias ~ cond)), "1")
+  expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond, sdratio = 0)), "1")
+  expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond, sdratio ~ 1)), "0")
+  expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond, sdratio = 0.2)), "0")
+})
+
+# stanc accepts the per-row arrays in any order, so the whole generated call is
+# pinned, serial and threaded, for both families
+sdt_yn_generated_calls <- list(
+  criterion = c(
+    serial = "sdt_yn_lpmf(Y | mu, d, criterion, sdratio, vint1, vint2[1], trials, 1)",
+    threaded = paste("sdt_yn_lpmf(Y[start:end] | mu, d, criterion, sdratio,",
+                     "vint1[start:end], vint2[1], trials[start:end], 1)")
+  ),
+  bias = c(
+    serial = "sdt_yn_bias_lpmf(Y | mu, d, bias, sdratio, vint1, vint2[1], trials, 1)",
+    threaded = paste("sdt_yn_bias_lpmf(Y[start:end] | mu, d, bias, sdratio,",
+                     "vint1[start:end], vint2[1], trials[start:end], 1)")
+  )
+)
+sdt_yn_thread_data <- data.frame(n_old = c(10, 40, 15, 35), stimulus = c(0L, 1L, 0L, 1L),
+                                 n_trials = 50, id = c(1, 1, 2, 2))
+sdt_yn_thread_formulas <- list(criterion = bmf(d ~ 1 + (1 | id), criterion ~ 1),
+                               bias = bmf(d ~ 1 + (1 | id), bias ~ 1))
+
+test_that("sdt_yn slices its per-row arrays exactly when brms slices the response", {
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  formula <- sdt_yn_thread_formulas$criterion
+  vars <- function() configure_model(model, sdt_yn_thread_data, formula)$formula$family$vars
+  serial <- c("vint1", "vint2[1]", "trials", "1")
+  sliced <- c("vint1[start:end]", "vint2[1]", "trials[start:end]", "1")
+
+  expect_equal(vars(), serial)
+  withr::with_options(list(brms.threads = brms::threading(2)), expect_equal(vars(), sliced))
+  # force = TRUE compiles with threads but leaves brms's code unsliced, so
+  # start and end do not exist
+  withr::with_options(list(brms.threads = brms::threading(2, force = TRUE)),
+                      expect_equal(vars(), serial))
+  # brms accepts a bare number for the option
+  withr::with_options(list(brms.threads = 2), expect_equal(vars(), sliced))
+})
+
+test_that("the generated sdt_yn call pairs the sliced response with the sliced arrays", {
+  skip_on_cran()
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  for (anchor in names(sdt_yn_generated_calls)) {
+    formula <- sdt_yn_thread_formulas[[anchor]]
+    expect_match(stancode(formula, sdt_yn_thread_data, model),
+                 sdt_yn_generated_calls[[anchor]][["serial"]], fixed = TRUE)
+    expect_match(stancode(formula, sdt_yn_thread_data, model, threads = brms::threading(2)),
+                 sdt_yn_generated_calls[[anchor]][["threaded"]], fixed = TRUE)
+    expect_match(stancode(formula, sdt_yn_thread_data, model,
+                          threads = brms::threading(2, force = TRUE)),
+                 sdt_yn_generated_calls[[anchor]][["serial"]], fixed = TRUE)
+  }
+})
+
+test_that("the serial and threaded sdt_yn programs pass stanc", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # stanc only, no C++ build: the text tests above cannot see a slice that
+  # names start/end outside reduce_sum's partial function, or an argument the
+  # vectorized signature does not take
+  model <- sdt_yn("n_old", "stimulus", "n_trials")
+  for (anchor in names(sdt_yn_thread_formulas)) {
+    for (threads in list(NULL, brms::threading(2), brms::threading(2, force = TRUE))) {
+      code <- stancode(sdt_yn_thread_formulas[[anchor]], sdt_yn_thread_data, model,
+                       threads = threads)
+      program <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
+      expect_true(program$check_syntax(quiet = TRUE),
+                  info = paste(anchor, if (is.null(threads)) "serial" else "threaded"))
+    }
+  }
 })
 
 ############################################################################# !
@@ -765,49 +853,83 @@ test_that("both Stan yes/no likelihoods match dsdt_yn", {
   skip_unless_stan_tests()
   skip_on_cran()
 
+  # The likelihoods take all rows at once. Called on one-row slices they are
+  # compared with dsdt_yn(); called on all rows of one dist, with their sum
+  # over the one-row calls, which a row read at another row's index would break.
+  # The equal-variance path (last argument 1) runs on every row too, and must
+  # give the general path's bits wherever sdratio is 1
   sc <- system.file("stan_chunks", package = "bmm")
+  one_row <- "(y[i:i] | rep_vector(0, 1), d[i:i], crit[i:i], sdratio[i:i], stimulus[i:i], dist[i], trials[i:i], "
   program <- paste0(
     "functions {\n", read_lines2(file.path(sc, "sdt_dist_functions.stan")), "\n",
     read_lines2(file.path(sc, "sdt_yn_functions.stan")), "\n}\n",
-    "data {\n  int N; array[N] int y; array[N] int trials; array[N] int stimulus;\n",
-    "  array[N] int dist; vector[N] d; vector[N] crit; vector[N] sdratio;\n}\n",
+    "data {\n  int N; int K; array[N] int y; array[N] int trials; array[N] int stimulus;\n",
+    "  array[N] int dist; vector[N] d; vector[N] crit; vector[N] sdratio;\n",
+    "  array[K] int first; array[K] int last;\n}\n",
     "generated quantities {\n  vector[N] lp_crit; vector[N] lp_bias;\n",
+    "  vector[N] ev_crit; vector[N] ev_bias;\n",
+    "  vector[K] all_crit; vector[K] all_bias;\n",
     "  for (i in 1:N) {\n",
-    "    lp_crit[i] = sdt_yn_lpmf(y[i] | 0, d[i], crit[i], sdratio[i], stimulus[i], dist[i], trials[i]);\n",
-    "    lp_bias[i] = sdt_yn_bias_lpmf(y[i] | 0, d[i], crit[i], sdratio[i], stimulus[i], dist[i], trials[i]);\n",
+    "    lp_crit[i] = sdt_yn_lpmf", one_row, "0);\n",
+    "    lp_bias[i] = sdt_yn_bias_lpmf", one_row, "0);\n",
+    "    ev_crit[i] = sdt_yn_lpmf", one_row, "1);\n",
+    "    ev_bias[i] = sdt_yn_bias_lpmf", one_row, "1);\n",
+    "  }\n",
+    "  for (k in 1:K) {\n",
+    "    int s = first[k];\n    int e = last[k];\n",
+    "    all_crit[k] = sdt_yn_lpmf(y[s:e] | rep_vector(0, e - s + 1), d[s:e], crit[s:e],\n",
+    "                              sdratio[s:e], stimulus[s:e], dist[s], trials[s:e], 0);\n",
+    "    all_bias[k] = sdt_yn_bias_lpmf(y[s:e] | rep_vector(0, e - s + 1), d[s:e], crit[s:e],\n",
+    "                                   sdratio[s:e], stimulus[s:e], dist[s], trials[s:e], 0);\n",
     "  }\n}\n"
   )
-  grid <- expand.grid(stimulus = 0:1, dist = seq_along(bmm:::.sdt_dists),
-                      d = c(0.4, 2), crit = c(-0.6, 0.3, 1.4),
-                      sdratio = c(0.7, 1, 1.6))
-  grid$y <- rep_len(c(3L, 17L, 29L), nrow(grid))
-  grid$trials <- 30L
+  grid <- expand.grid(stimulus = 0:1, d = c(0.4, 2), crit = c(-0.6, 0.3, 1.4),
+                      sdratio = c(0.7, 1, 1.6), dist = seq_along(bmm:::.sdt_dists))
+  # counts strictly inside, at both edges, and single trials, which leave one
+  # side of the binomial empty; seven patterns, so each meets both stimuli
+  grid$trials <- rep_len(c(30L, 30L, 30L, 30L, 1L, 1L, 1L), nrow(grid))
+  grid$y <- rep_len(c(3L, 17L, 0L, 30L, 0L, 1L, 1L), nrow(grid))
+  N <- nrow(grid)
+  K <- length(bmm:::.sdt_dists)
   fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
-    data = c(list(N = nrow(grid)), as.list(grid)), fixed_param = TRUE,
-    chains = 1, iter_sampling = 1, iter_warmup = 0, refresh = 0,
+    data = c(list(N = N, K = K, first = match(seq_len(K), grid$dist),
+                  last = N + 1L - match(seq_len(K), rev(grid$dist))),
+             as.list(grid)),
+    fixed_param = TRUE, chains = 1, iter_sampling = 1, iter_warmup = 0, refresh = 0,
     show_messages = FALSE, sig_figs = 17
   )
   csv <- utils::read.csv(fit$output_files()[1], comment.char = "#",
                          check.names = FALSE)
-  idx <- seq_len(nrow(grid))
+  stan <- function(name, n) as.numeric(csv[1, paste0(name, ".", seq_len(n))])
   dist_names <- names(bmm:::.sdt_dists)[grid$dist]
-  r_crit <- vapply(idx, function(i) with(grid[i, ], dsdt_yn(
+  r_crit <- vapply(seq_len(N), function(i) with(grid[i, ], dsdt_yn(
     y, trials, stimulus, d, criterion = crit, sdratio = sdratio,
     dist = dist_names[i], log = TRUE)), numeric(1))
-  r_bias <- vapply(idx, function(i) with(grid[i, ], dsdt_yn(
+  r_bias <- vapply(seq_len(N), function(i) with(grid[i, ], dsdt_yn(
     y, trials, stimulus, d, bias = crit, sdratio = sdratio,
     dist = dist_names[i], log = TRUE)), numeric(1))
-  expect_equal(as.numeric(csv[1, paste0("lp_crit.", idx)]), r_crit, tolerance = 1e-10)
-  expect_equal(as.numeric(csv[1, paste0("lp_bias.", idx)]), r_bias, tolerance = 1e-10)
+  expect_equal(stan("lp_crit", N), r_crit, tolerance = 1e-10)
+  expect_equal(stan("lp_bias", N), r_bias, tolerance = 1e-10)
+  expect_equal(stan("all_crit", K), as.vector(tapply(stan("lp_crit", N), grid$dist, sum)),
+               tolerance = 1e-12)
+  expect_equal(stan("all_bias", K), as.vector(tapply(stan("lp_bias", N), grid$dist, sum)),
+               tolerance = 1e-12)
+  equal <- grid$sdratio == 1
+  expect_identical(stan("ev_crit", N)[equal], stan("lp_crit", N)[equal])
+  expect_identical(stan("ev_bias", N)[equal], stan("lp_bias", N)[equal])
+  # the comparison has teeth: away from a ratio of 1 the two paths differ on
+  # every signal row
+  expect_true(all(stan("ev_crit", N)[!equal & grid$stimulus == 1] !=
+                    stan("lp_crit", N)[!equal & grid$stimulus == 1]))
 })
 
 test_that("a formula with bias selects the bias family and dpar", {
   dat <- data.frame(n_old = c(10, 40), stimulus = c(0, 1), n_trials = 50)
   model <- sdt_yn("n_old", "stimulus", "n_trials")
   code_bias <- bmm::stancode(bmf(d ~ 1, bias ~ 1), data = dat, model = model)
-  expect_match(code_bias, "sdt_yn_bias_lpmf(Y[n] | mu[n], d[n], bias[n]", fixed = TRUE)
+  expect_match(code_bias, "sdt_yn_bias_lpmf(Y | mu, d, bias", fixed = TRUE)
   code_crit <- bmm::stancode(bmf(d ~ 1), data = dat, model = model)
-  expect_match(code_crit, "sdt_yn_lpmf(Y[n] | mu[n], d[n], criterion[n]", fixed = TRUE)
+  expect_match(code_crit, "sdt_yn_lpmf(Y | mu, d, criterion", fixed = TRUE)
   expect_error(bmm::stancode(bmf(d ~ 1, criterion ~ 1, bias ~ 1),
                              data = dat, model = model),
                "gives both 'criterion', 'bias'")

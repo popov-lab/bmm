@@ -292,7 +292,7 @@ test_that("the Stan quadrature tables are the R tables, digit for digit", {
     expect_equal(stan_tab[[nm]], r_tab[[nm]], tolerance = 0, info = nm)
   }
 
-  # The family is loop = TRUE, so a table declared in mafc_pc() is rebuilt per
+  # mafc_logit_pc() runs once per row, so a table declared in it is rebuilt per
   # row per gradient: ~22% more time per leapfrog step.
   expect_false(grepl("to_vector({", read_lines2(file.path(sc_path, "sdt_mafc_functions.stan")),
                      fixed = TRUE))
@@ -350,6 +350,7 @@ test_that("the Stan mafc_logit_pc branches match the registry order", {
 
 
 test_that("the quadrature tables reach sdt_mafc_lpmf in its declared order", {
+  skip_on_cran() # four stancode() calls, over 0.4 s in CRAN mode (ADR 0004, R10)
   # The four tables are positional and each pair shares a Stan type, so a
   # transposed pair compiles and runs. Transposing gl_nodes and gl_weights is
   # silent: every logistic cell stays finite and moves, at m = 16 and d' = 0
@@ -368,10 +369,18 @@ test_that("the quadrature tables reach sdt_mafc_lpmf in its declared order", {
   dat <- data.frame(n_correct = c(70, 65, 80, 60), n_trials = rep(100, 4),
                     id = c(1, 1, 2, 2))
   model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  for (threads in list(NULL, brms::threading(2))) {
-    code <- stancode(bmf(d ~ 1), data = dat, model = model, threads = threads)
-    call <- regmatches(code, regexpr("sdt_mafc_lpmf\\(Y\\[[^;]*?\\);", code))
-    expect_equal(tables(call), declared, info = paste("threads:", !is.null(threads)))
+  # the likelihood takes all rows at once, so m and the trials are sliced
+  # with the response exactly when brms slices it
+  rows <- list(serial = "(Y | mu, d, vint1, vint2[1], trials, ",
+               threaded = "(Y[start:end] | mu, d, vint1[start:end], vint2[1], trials[start:end], ",
+               force = "(Y | mu, d, vint1, vint2[1], trials, ")
+  threads <- list(serial = NULL, threaded = brms::threading(2),
+                  force = brms::threading(2, force = TRUE))
+  for (nm in names(threads)) {
+    code <- stancode(bmf(d ~ 1), data = dat, model = model, threads = threads[[nm]])
+    call <- regmatches(code, regexpr("sdt_mafc_lpmf\\(Y[^;]*?\\);", code))
+    expect_equal(tables(call), declared, info = nm)
+    expect_match(call, rows[[nm]], fixed = TRUE, info = nm)
   }
   # reduce_sum gives the partial log-likelihood its own scope, so the tables
   # have to arrive there in the same order too
