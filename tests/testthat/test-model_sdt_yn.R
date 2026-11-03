@@ -685,7 +685,7 @@ test_that("sdt_yn model produces valid stancode with brms", {
 })
 
 test_that("only an sdratio fixed at 0 on its log link takes the equal-variance path", {
-  skip_on_cran() # five stancode() calls, over 0.4 s in CRAN mode (ADR 0004, R10)
+  skip_on_cran() # six stancode() calls, over 0.4 s in CRAN mode (ADR 0004, R10)
   # the last argument of the likelihood lets it skip rescaling the signal rows,
   # which is exact only for a ratio of 1
   model <- sdt_yn("n_old", "stimulus", "n_trials")
@@ -701,6 +701,7 @@ test_that("only an sdratio fixed at 0 on its log link takes the equal-variance p
   expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond, sdratio = 0)), "1")
   expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond, sdratio ~ 1)), "0")
   expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond, sdratio = 0.2)), "0")
+  expect_equal(last_arg(bmf(d ~ 1, criterion ~ cond, sdratio = -0.2)), "0")
 })
 
 # stanc accepts the per-row arrays in any order, so the whole generated call is
