@@ -20,6 +20,14 @@ model_cases_mixture3p <- function() {
     ),
     init = list(mixture3p = list(model = model, formula = re_formula, data = small_data())),
     links = list(mixture3p = list(model = model, settable = character(0))),
-    fixture = list(mixture3p = list(file = "bmmfit_mixture3p.rds"))
+    fixture = list(mixture3p = list(file = "bmmfit_mixture3p.rds")),
+    simulate = list(
+      mixture3p = list(
+        model = mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size"),
+        pars = list(kappa = 2, thetat = 0.5, thetant = -0.5), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1),
+        simulate_pars = list(mu1 = 0, kappa = 2, thetat = 0.5, thetant = -0.5)
+      )
+    )
   )
 }

@@ -1170,6 +1170,46 @@ pp_simulate.tcc <- function(model, prep) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.tcc <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  n_alternatives <- model$other_vars$n_alternatives
+  design <- .design_or_n(model, design, if (is.character(n_alternatives)) n_alternatives, ...,
+                         ragged = model$other_vars$options %||% character(0))
+  sim <- .simulate_pars(model, pars, design, scale)
+  y <- .simulate_tcc_responses(model, design, sim$native$d)
+  if (model$other_vars$units == "bins") y <- .tcc_bin(y, model$other_vars$n_options, "radians")
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
+}
+
+# one rtcc() call per option set; without offered sets one call for all rows.
+# correlation and motor_sd are options of the model, not versions, so the R4
+# check cannot see a method that drops them
+.simulate_tcc_responses <- function(model, design, d) {
+  n_options <- model$other_vars$n_options
+  draw <- function(rows, options = NULL) {
+    rtcc(length(rows), d = d[rows], similarity = model$other_vars$similarity,
+         n_options = n_options, noise = model$other_vars$noise, options = options,
+         correlation = model$other_vars$correlation, motor_sd = model$other_vars$motor_sd %||% 0)
+  }
+  # .option_offsets() checks the option columns only in rows with a response
+  checked <- design
+  checked[[model$resp_vars[[1]]]] <- 0
+  offsets <- if (inherits(model, "option_set")) .option_offsets(model, checked)
+  if (is.null(offsets)) {
+    return(draw(seq_len(nrow(design))))
+  }
+  y <- numeric(nrow(design))
+  for (rows in split(seq_len(nrow(design)), .option_set_id(offsets))) {
+    offered <- offsets[rows[1], ]
+    y[rows] <- draw(rows, offered[!is.na(offered)] * 2 * pi / n_options)
+  }
+  y
+}
+
+############################################################################# !
 # STORED FRAME                                                           ####
 ############################################################################# !
 
