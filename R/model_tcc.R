@@ -144,18 +144,20 @@
 #'   the option width `2 * pi / n_options`, with the same `kappa` and `c = d *
 #'   sqrt(2 * pi / kappa) / (1 - exp(-2 * kappa))` in the default
 #'   parametrization of [sdm()]. The sum over options stands in for the
-#'   integral of the [sdm()], so the two agree to 1e-8 in log probability
-#'   while the gradient's SD, `1 / sqrt(kappa)` radians, spans about 4 options
+#'   integral of the [sdm()], so the two agree to about 1e-8 in log
+#'   probability (1.4e-8 at `kappa = 200`) while the gradient's SD, `1 / sqrt(kappa)` radians, spans about 4 options
 #'   or more (`kappa` up to 200 on 360 options), and differ by 0.013 at `kappa
 #'   = 1000`.
 #'
 #'   On the full wheel, per gradient, Gumbel noise is not cheaper than normal
-#'   noise: with `d` per subject and set size on [oberauer_lin_2017] it cost
-#'   1.5 times as much (with `options` it is much cheaper; see the section
-#'   Forced-choice option sets). It skips the table build before sampling and
-#'   has no grid limit. Keep
-#'   normal noise to stay with the model of Schurgin et al. (2020) and to
-#'   compare `d` with their d'. The two `d` are not on one scale. The
+#'   noise. With `d` per subject and set size on [oberauer_lin_2017] and the
+#'   data sorted by the predictors of `d`, it cost 1.5 times as much. On the
+#'   same data unsorted it cost about 8 times as much, because the Gumbel
+#'   likelihood sums over the options once for each run of rows that share
+#'   `d` (see the section Speed). With `options` it is much cheaper (see the
+#'   section Forced-choice option sets). It skips the table build before
+#'   sampling and has no grid limit. Keep normal noise to stay with the model
+#'   of Schurgin et al. (2020) and to compare `d` with their d'. The two `d` are not on one scale. The
 #'   standard Gumbel distribution has an SD of `pi / sqrt(6)` = 1.28, but
 #'   matching the response probabilities takes a larger factor: the Gumbel
 #'   `d` with the smallest Kullback-Leibler divergence from the probabilities
@@ -251,7 +253,12 @@
 #'
 #'   The fit is fastest when rows that share a value of `d` are adjacent, so
 #'   bmm offers to sort the data by the predictors of `d`, as for [sdm()].
-#'   Continuous predictors of `d` are supported at the per-trial cost.
+#'   Continuous predictors of `d` are supported at the per-trial cost. On the
+#'   full wheel with Gumbel noise that cost is much higher: on unsorted data,
+#'   the fit described under Noise cost about 8 times as much as with normal
+#'   noise.
+#'   In a non-interactive session `bmm()` cannot ask whether to sort and fits
+#'   the data as they are; set `sort_data = TRUE` to sort them.
 #'
 #' ## Forced-choice option sets
 #'
@@ -361,7 +368,11 @@
 #'   among them; `n_options` must be a multiple of `m`.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
-#' @references Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F.
+#' @references Oberauer, K. (2023). Measurement models for visual working
+#'   memory - A factorial model comparison. *Psychological Review, 130*(3),
+#'   841-852. https://doi.org/10.1037/rev0000328
+#'
+#'   Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F.
 #'   (2023). How do people build up visual memory representations from sensory
 #'   evidence? Revisiting two classic models of choice. *Journal of
 #'   Mathematical Psychology, 117*, 102805.
@@ -451,7 +462,9 @@ print_model_details.tcc <- function(model, ...) {
 .tcc_check_similarity <- function(similarity, n_options) {
   .tcc_check_n_options(n_options)
   n_values <- n_options / 2 + 1
-  stopif(!is.numeric(similarity), "`similarity` must be a numeric vector.")
+  stopif(!is.numeric(similarity),
+         "`similarity` must be a numeric vector. For a von Mises or Laplace shape, use \\
+         tcc_similarity(); to estimate its width, use sdm().")
   stopif(length(similarity) != n_values,
          "`similarity` must hold {n_values} values, one for each distance from 0 to \\
          {n_options / 2} options, but it holds {length(similarity)}.")
@@ -521,6 +534,7 @@ tcc_similarity <- function(shape = c("vonmises", "laplace"), kappa, n_options = 
 }
 
 # a model stored before `noise` existed is the Gaussian cell
+#' @exportS3Method
 cell_args.tcc <- function(model) {
   if (is.null(model$other_vars$noise)) list() else list(noise = model$other_vars$noise)
 }

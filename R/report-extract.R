@@ -236,6 +236,7 @@ cell_args <- function(model) {
   UseMethod("cell_args")
 }
 
+#' @exportS3Method
 cell_args.default <- function(model) {
   list()
 }
