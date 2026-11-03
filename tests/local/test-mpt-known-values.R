@@ -41,8 +41,11 @@ test_that("an mpt fit with a guessing rate given as data recovers its parameter"
   withr::local_seed(12)
   D <- 0.55
   guessing <- c(0.2, 0.25, 0.5)
-  counts <- t(vapply(guessing, function(Gcorr) {
-    draw_counts(c(correct = D + (1 - D) * Gcorr, incorrect = (1 - D) * (1 - Gcorr)), 1500)
+  # unequal trials per row: with equal ones, covariate values read in the
+  # wrong row order shift D by about one posterior SD and pass
+  counts <- t(vapply(seq_along(guessing), function(i) {
+    Gcorr <- guessing[i]
+    draw_counts(c(correct = D + (1 - D) * Gcorr, incorrect = (1 - D) * (1 - Gcorr)), c(3000, 1500, 500)[i])
   }, integer(2)))
   dat <- data.frame(Gcorr = guessing, counts)
   model <- mpt(
@@ -58,8 +61,9 @@ test_that("an mpt fit with a fixed and an equality restriction recovers the free
   withr::local_seed(13)
   D <- 0.65
   # with equal trials per tree a wrong guessing constant moves the old-item
-  # and the new-item estimate of D in opposite directions and almost cancels
-  dat <- data.frame(item_type = c("old", "new"), two_htm_counts(D, D, g = 0.5, n = c(3000, 1000)))
+  # and the new-item estimate of D in opposite directions and almost cancels;
+  # at 12000/2000 a constant off by 0.1 moves D by about eight posterior SDs
+  dat <- data.frame(item_type = c("old", "new"), two_htm_counts(D, D, g = 0.5, n = c(12000, 2000)))
   trees <- list(
     mpt_tree("old", list(old = "Do + (1 - Do) * g", new = "(1 - Do) * (1 - g)")),
     mpt_tree("new", list(old = "(1 - Dn) * g", new = "Dn + (1 - Dn) * (1 - g)"))
