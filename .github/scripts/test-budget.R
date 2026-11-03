@@ -42,11 +42,29 @@ timings <- as.data.frame(results)
 timings <- timings[, c("file", "test", "nb", "failed", "skipped", "error", "warning", "real")]
 write.csv(timings, "test-timings.csv", row.names = FALSE)
 
+# the list reporter keeps the messages out of the log, so print them here,
+# before the stop on missing time below can end the script
+bad <- which(timings$failed > 0 | timings$error)
+if (length(bad)) {
+  messages <- vapply(results[bad], function(test) {
+    hits <- Filter(function(x) inherits(x, c("expectation_failure", "expectation_error")),
+                   test$results)
+    paste(vapply(hits, conditionMessage, character(1)), collapse = "\n")
+  }, character(1))
+  cat("\nFailing tests:\n",
+      paste0("- ", timings$file[bad], " | ",
+             ifelse(is.na(timings$test[bad]), "(code outside test_that())", timings$test[bad]),
+             "\n", messages, collapse = "\n\n"),
+      "\n", sep = "")
+}
+
 # a file that errored outside test_that() has no time (see which() below)
 total <- sum(timings$real, na.rm = TRUE)
-# with no time every share is NaN and a breach would read "NA takes NA s"
+# when every file errored before a test ran (e.g. the package fails to load)
+# all times are NA and aggregate() below finds no rows; all-zero times give
+# NaN shares. Either way there is nothing to budget
 if (!is.finite(total) || total <= 0) {
-  stop("no test time recorded (summed time ", total, " s); see test-timings.csv")
+  stop("no test recorded any time; the failing tests are listed above")
 }
 timings$share <- timings$real / total
 by_file <- aggregate(real ~ file, timings, sum)
@@ -62,8 +80,10 @@ if (nzchar(summary_path)) {
     sprintf("Suite wall time %.0f s (cap %g s); %d tests, %d failed, %d errors, %d skipped.",
             wall, caps$suite, nrow(timings), sum(timings$failed), sum(timings$error),
             sum(timings$skipped)),
-    sprintf("Summed test time %.0f s; largest file %s, share %.3f (cap %g); slowest test share %.4f (cap %g).",
-            total, largest$file, largest$share, caps$file, max(timings$share, na.rm = TRUE), caps$test),
+    sprintf(paste("Summed test time %.0f s; largest file %s, share %.3f (cap %g);",
+                  "slowest test share %.4f (cap %g)."),
+            total, largest$file, largest$share, caps$file,
+            max(timings$share, na.rm = TRUE), caps$test),
     "",
     "| file | test | seconds | share |",
     "| --- | --- | --- | --- |",
@@ -89,23 +109,11 @@ breaches <- c(breaches, sprintf("%s | %s takes %.1f s, share %.4f of %.0f s, cap
                                 timings$file[slow], timings$test[slow], timings$real[slow],
                                 timings$share[slow], total, test_cap[slow]))
 
-cat(sprintf("\nSuite wall time %.0f s; summed test time %.0f s; %d tests, %d failed, %d errors, %d skipped\n",
-            wall, total, nrow(timings), sum(timings$failed), sum(timings$error), sum(timings$skipped)))
+cat(sprintf(paste("\nSuite wall time %.0f s; summed test time %.0f s;",
+                  "%d tests, %d failed, %d errors, %d skipped\n"),
+            wall, total, nrow(timings), sum(timings$failed), sum(timings$error),
+            sum(timings$skipped)))
 cat(sprintf("Largest file %s, share %.3f\n", largest$file, largest$share))
-# the list reporter keeps the messages out of the log, so print them here
-bad <- which(timings$failed > 0 | timings$error)
-if (length(bad)) {
-  messages <- vapply(results[bad], function(test) {
-    hits <- Filter(function(x) inherits(x, c("expectation_failure", "expectation_error")),
-                   test$results)
-    paste(vapply(hits, conditionMessage, character(1)), collapse = "\n")
-  }, character(1))
-  cat("\nFailing tests:\n",
-      paste0("- ", timings$file[bad], " | ",
-             ifelse(is.na(timings$test[bad]), "(code outside test_that())", timings$test[bad]),
-             "\n", messages, collapse = "\n\n"),
-      "\n", sep = "")
-}
 cat("\nSlowest tests:\n")
 print(slowest, row.names = FALSE)
 if (length(breaches)) {
