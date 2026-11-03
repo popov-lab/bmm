@@ -185,8 +185,8 @@
 #'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
 #'   continuous limit, and values of `d` fitted with different `n_options` are
 #'   not on one scale. With `options`, `n_options` only places the options:
-#'   the choice is among the offered options alone, and any even multiple of
-#'   `m` (at least 4) spaces `m` options equally.
+#'   the choice is among the offered options alone, and any even `n_options`
+#'   of at least 4 that is a multiple of `m` spaces `m` options equally.
 #'
 #' ## Grid limit on d
 #'
