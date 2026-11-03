@@ -1,8 +1,11 @@
 bibentry(
   bibtype  = "Article",
-  title    = "A tutorial for estimating mixture models for visual working memory tasks in brms: Introducing the Bayesian Measurement Modeling (bmm) package for R",
+  title    = "A tutorial for estimating Bayesian hierarchical mixture models for visual working memory tasks: Introducing the Bayesian Measurement Modeling (bmm) package for R",
   author   = c(person("Gidon T.", "Frischkorn"), person("Vencislav", "Popov")),
   journal  = "Behavior Research Methods",
   year     = "2025",
+  volume   = "57",
+  number   = "5",
+  pages    = "144",
   doi      = "10.3758/s13428-025-02643-0"
 )
