@@ -169,7 +169,8 @@ A predictor on member \code{p} acts on the logit (or probit) of \code{p}'s share
 the probability left over by the members listed before it. A predictor
 on the first member therefore scales all later members by the same
 factor, leaving their ratios unchanged. Read such effects on the probability scale with
-\code{\link[=native_parameters]{native_parameters()}}.
+\code{\link[=native_parameters]{native_parameters()}}, which returns the group members and leaves out the
+stick-breaking components (\code{gAraw}) unless \code{pars} names them.
 
 \strong{Identifiability.} Printing the model ends with an identifiability
 check for intercept-only formulas. It compares the number of free
