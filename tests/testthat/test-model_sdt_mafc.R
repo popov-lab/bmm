@@ -434,11 +434,13 @@ test_that("the Stan sdt_mafc likelihood matches dsdt_mafc row by row and over bl
   # infinite logits: +Inf where every quadrature term rounds to certainty
   # (normal and logistic at d' = 800), -Inf where exp(-d') overflows
   # (gumbel_min at -800). `forced` rows have the count that logit forces,
-  # `contradicting` rows do not
+  # `contradicting` rows do not. Their trials appear nowhere else in the grid,
+  # so the forced count is checked against the row's own trials, not another
+  # row's
   inf_d <- c(800, 800, -800)
   inf_dist <- c(1L, 4L, 2L)
-  forced <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 20L, y = c(20L, 20L, 0L))
-  contradicting <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 20L, y = c(19L, 19L, 1L))
+  forced <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 7L, y = c(7L, 7L, 0L))
+  contradicting <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 9L, y = c(8L, 8L, 1L))
   good <- rbind(grid[names(forced)], forced)
   good <- good[order(good$dist), ]
   grid <- rbind(good, contradicting)
