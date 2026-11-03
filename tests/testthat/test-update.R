@@ -798,3 +798,83 @@ test_that("update() still treats data with a column Y as the user's data", {
     brms::standata(fit)
   )
 })
+
+# the messages message_displaced_priors() prints, whatever else update() says
+displacement_messages <- function(expr) {
+  msgs <- capture_messages(expr)
+  msgs[grepl("constraint of the model", msgs, fixed = TRUE)]
+}
+
+# a fit made under a constraint carries the constraint in its stored prior, so a
+# test-only class whose configure_prior method constrains kappa's intercept
+# stands in for the shipped models, and the fixture's prior is edited to what
+# such a fit stores; only the prior of the update() call is then new. The
+# fixture was fitted with silent = 2, which update() restores from the stored
+# options and which mutes message2(), so the calls below ask for silent = 1
+constrained_fixture <- function() {
+  fit <- sdm_fixture()
+  class(fit$bmm$model) <- c(class(fit$bmm$model), "constraint_test")
+  fit$prior$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "kappa"] <- "constant(5)"
+  fit
+}
+
+kappa_intercept_prior <- function(fit) {
+  fit$prior$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "kappa"]
+}
+
+test_that("update() says when a model constraint replaces the prior of the call (#549)", {
+  skip_on_cran()
+  local_mocked_s3_method(
+    "configure_prior", "constraint_test",
+    function(model, data, formula, user_prior, ...) {
+      brms::prior_("constant(5)", class = "Intercept", dpar = "kappa")
+    }
+  )
+  fit1 <- constrained_fixture()
+  update_with <- function(...) update(fit1, ..., silent = 1, backend = "mock", mock_fit = 1, rename = FALSE)
+
+  displaced <- brms::prior_("normal(2, 1)", class = "Intercept", dpar = "kappa")
+  msgs <- displacement_messages(fit <- update_with(prior = displaced))
+  expect_length(msgs, 1)
+  expect_match(msgs, 'dpar = "kappa", class = "Intercept": normal(2, 1) replaced by constant(5)', fixed = TRUE)
+  expect_equal(kappa_intercept_prior(fit), "constant(5)")
+})
+
+test_that("update() keeps a prior of the call that no constraint touches, silently (#549)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  local_mocked_s3_method(
+    "configure_prior", "constraint_test",
+    function(model, data, formula, user_prior, ...) {
+      brms::prior_("constant(5)", class = "Intercept", dpar = "kappa")
+    }
+  )
+  fit1 <- constrained_fixture()
+  update_with <- function(...) update(fit1, ..., silent = 1, backend = "mock", mock_fit = 1, rename = FALSE)
+
+  other <- brms::prior_("normal(1, 1)", class = "b", dpar = "c")
+  expect_length(displacement_messages(fit <- update_with(prior = other)), 0)
+  expect_equal(fit$prior$prior[fit$prior$class == "b" & fit$prior$dpar == "c" & fit$prior$coef == ""], "normal(1, 1)")
+  expect_equal(kappa_intercept_prior(fit), "constant(5)")
+
+  # the carried constraint restates the model's own, so nothing is displaced
+  expect_length(displacement_messages(fit <- update_with()), 0)
+  expect_equal(kappa_intercept_prior(fit), "constant(5)")
+})
+
+test_that("a prior of the update() call on a parameter the new formula frees still wins (#549)", {
+  skip_on_cran()
+  fit1 <- sdm_fixture()
+  # mu is fixed at 0 in the fixture; freeing it drops the stored constant(), and
+  # the prior of the call must then replace the fresh default, as before the
+  # prior of the call went through configure_prior()
+  up <- suppressMessages(update(
+    fit1, formula. = bmf(c ~ 0 + set_size, kappa ~ 1, mu ~ 1),
+    prior = brms::prior_("normal(0, 0.3)", class = "Intercept"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_equal(
+    up$prior$prior[up$prior$class == "Intercept" & up$prior$dpar == "" & up$prior$nlpar == ""],
+    "normal(0, 0.3)"
+  )
+  expect_equal(constant_priors(up), 0)
+})

@@ -549,7 +549,44 @@ configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...
   prior <- combine_prior(default_prior, prior)
   prior <- combine_prior(prior, user_prior)
   additional_prior <- NextMethod("configure_prior")
+  message_displaced_priors(user_prior, additional_prior, fixed = model$fixed_parameters)
   combine_prior(prior, additional_prior)
+}
+
+# The model-specific priors are constraints the model needs, so they replace a
+# user prior on the same coefficient; the user is told, because the fit then
+# differs from the priors they asked for (#549). A user row without a prior
+# string (rows update() carries over from a fit) states no prior to lose. A row
+# on a fixed parameter also names the fixed value, because the constant is on
+# the link scale and can differ from the value the user or the model fixed
+# (constant(0) for mpt's g = 0.5)
+message_displaced_priors <- function(user_prior, model_prior, fixed = list()) {
+  if (NROW(user_prior) == 0 || NROW(model_prior) == 0) {
+    return(invisible())
+  }
+  by <- replacing_row(user_prior, model_prior)
+  squish <- function(x) gsub("\\s", "", x)
+  displaced <- which(
+    !is.na(by) & nzchar(user_prior$prior) &
+      squish(user_prior$prior) != squish(model_prior$prior[by])
+  )
+  if (length(displaced) == 0) {
+    return(invisible())
+  }
+  rows <- paste(vapply(displaced, function(i) {
+    row <- user_prior[i, ]
+    fields <- c("dpar", "nlpar", "class", "coef", "group", "resp")
+    named <- fields[nzchar(unlist(row[fields]))]
+    where <- paste0(named, ' = "', unlist(row[named]), '"', collapse = ", ")
+    par <- intersect(c(row$nlpar, row$dpar), names(fixed))
+    fixed_at <- if (length(par)) glue(" ({par} fixed at {fixed[[par]]})") else ""
+    glue("  {where}: {row$prior} replaced by {model_prior$prior[by[i]]}{fixed_at}")
+  }, character(1)), collapse = "\n")
+  message2(
+    "A constraint of the model, or a fixed parameter, replaces the prior you \\
+    set on these coefficients, so it is not used:
+    {rows}"
+  )
 }
 
 #' @title Construct constant priors for fixed model parameters
@@ -756,7 +793,14 @@ combine_prior <- function(prior1, prior2) {
   if (is.null(prior2)) {
     return(prior1)
   }
+  prior <- prior1[is.na(replacing_row(prior1, prior2)), ] + prior2
+  row.names(prior) <- seq_len(nrow(prior))
+  prior
+}
 
+# for each row of prior1, the row of prior2 that replaces it in combine_prior(),
+# or NA; message_displaced_priors() reads the same match
+replacing_row <- function(prior1, prior2) {
   # update() feeds a fit's prior back in, and brms rejects a stored "L" row next
   # to a "cor" row as a duplicated prior
   prior_types <- function(prior) {
@@ -767,11 +811,9 @@ combine_prior <- function(prior1, prior2) {
   # replace that row too, or the more specific row wins in brms (#526)
   as_nlpar_wide <- prior1
   as_nlpar_wide$coef[nzchar(prior1$nlpar) & prior1$coef == "Intercept"] <- ""
-  is_duplicate <- prior_types(prior1) %in% prior_types(prior2) |
-    prior_types(as_nlpar_wide) %in% prior_types(prior2)
-  prior <- prior1[!is_duplicate, ] + prior2
-  row.names(prior) <- seq_len(nrow(prior))
-  prior
+  types2 <- prior_types(prior2)
+  by_type <- match(prior_types(prior1), types2)
+  ifelse(is.na(by_type), match(prior_types(as_nlpar_wide), types2), by_type)
 }
 
 summarise_default_prior <- function(prior_list) {
