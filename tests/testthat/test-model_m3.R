@@ -285,6 +285,65 @@ test_that("m3 custom derives each parameter's default prior from its link and ch
   }
 })
 
+test_that("check_model() on a custom m3 derives its parameters from the formula it is given (#552)", {
+  cats <- c("corr", "other", "dist", "npl")
+  f_d <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d ~ 1)
+  f_e <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + e, npl ~ b, c ~ 1, a ~ 1, e ~ 1)
+  check <- function(model, formula) suppressWarnings(suppressMessages(
+    check_model(model, oberauer_lewandowsky_2019_e1, formula)
+  ))
+  model <- m3(
+    resp_cats = cats, num_options = paste0("n_", cats), choice_rule = "simple",
+    links = list(c = "log", a = "log", d = "log", e = "log"),
+    default_priors = list(
+      d = list(main = "normal(2, 0.5)", effects = "normal(0, 0.5)", sd = "exponential(1)")
+    )
+  )
+
+  twice <- check(check(model, f_d), f_e)
+  once <- check(model, f_e)
+  expect_equal(twice, once)
+  expect_equal(names(twice$parameters), c("b", "a", "c", "e"))
+  expect_equal(twice$default_priors$e$main, "normal(1, 1)")
+
+  # a prior the user passed to m3() outlives the formula that used it
+  expect_equal(twice$default_priors$d$main, "normal(2, 0.5)")
+  back <- check(twice, f_d)
+  expect_equal(back, check(model, f_d))
+  expect_equal(back$default_priors$d$main, "normal(2, 0.5)")
+
+  # a constant the old formula set is not kept by one that drops it
+  f_dfix <- bmf(corr ~ b + a + c, other ~ b + a, dist ~ b + d, npl ~ b, c ~ 1, a ~ 1, d = 0.5)
+  model_dfix <- update_model_fixed_parameters(model, f_dfix)
+  expect_equal(model_dfix$fixed_parameters$d, 0.5)
+  twice <- check(check(model_dfix, f_dfix), f_e)
+  expect_equal(twice, check(model, f_e))
+  expect_equal(names(twice$fixed_parameters), "b")
+})
+
+test_that("a custom m3 fit stored before #552 is re-checked like a fresh model", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  fit <- restructure(load_fixture_fit("bmmfit_m3_ppcheck.rds"))
+  model <- fit$bmm$model
+  expect_equal(names(model$parameters), c("b", "a", "c", "d"))
+
+  same <- suppressWarnings(suppressMessages(
+    check_model(model, fit$data, fit$bmm$user_formula)
+  ))
+  expect_equal(same$parameters, model$parameters)
+  expect_equal(same$default_priors, model$default_priors)
+
+  without_d <- fit$bmm$user_formula
+  without_d$dist <- dist ~ b + a
+  without_d$d <- NULL
+  dropped <- suppressWarnings(suppressMessages(
+    check_model(model, fit$data, without_d)
+  ))
+  expect_equal(names(dropped$parameters), c("b", "a", "c"))
+  expect_equal(names(dropped$default_priors), c("a", "c"))
+})
+
 test_that("m3 works with num_options as a numeric vector", {
   formula <- bmf(
     c ~ 1 + (1 | ID),
