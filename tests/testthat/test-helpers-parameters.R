@@ -395,15 +395,8 @@ test_that("native_transform requires a bmmodel", {
 })
 
 test_that("every link declared by a supported model can be transformed", {
-  models <- model_names()
-  links <- unlist(lapply(models, function(name) {
-    constructor <- get_model(name)
-    versions <- eval(formals(constructor)$version)
-    versions <- if (is.null(versions)) list(NULL) else as.list(versions)
-    unlist(lapply(versions, function(version) {
-      model <- tryCatch(constructor(version = version), error = function(e) NULL)
-      unlist(model$links)
-    }))
+  links <- unlist(lapply(model_names(), function(name) {
+    lapply(model_versions(name), function(version) unlist(model_specimen(name, version)$links))
   }))
   links <- unique(links)
   expect_gt(length(links), 0)
