@@ -84,6 +84,7 @@ test_that("check_data.cswald errors when RT contains negative values", {
 
 test_that("check_data.cswald warns when RT > 10 seconds", {
   # Use crisk version and large dataset to avoid other warnings
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(
     rt = c(runif(99, 0.4, 1.5), 15),
@@ -98,6 +99,7 @@ test_that("check_data.cswald warns when RT > 10 seconds", {
 
 test_that("check_data.cswald warns when RT < 0.1 seconds", {
   # Use crisk version and large dataset to avoid other warnings
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(
     rt = c(0.05, runif(99, 0.4, 1.5)),
@@ -112,6 +114,7 @@ test_that("check_data.cswald warns when RT < 0.1 seconds", {
 
 test_that("check_data.cswald handles different response formats", {
   # Use crisk version to avoid error rate warning, and use larger datasets
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
 
   # integer 0/1 - should work silently
@@ -154,6 +157,7 @@ test_that("check_data.cswald handles different response formats", {
 
 test_that("check_data.cswald errors on invalid response values", {
   # Use crisk version to avoid error rate warning
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
 
   # invalid integer values
@@ -178,6 +182,7 @@ test_that("check_data.cswald errors on invalid response values", {
 })
 
 test_that("check_data.cswald warns about high error rate for simple version", {
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "simple")
 
   # 30% error rate
@@ -193,6 +198,7 @@ test_that("check_data.cswald warns about high error rate for simple version", {
 })
 
 test_that("check_data.cswald does not warn about error rate for crisk version", {
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
 
   # 30% error rate - no warning for crisk
@@ -206,6 +212,7 @@ test_that("check_data.cswald does not warn about error rate for crisk version", 
 
 test_that("check_data.cswald returns a data.frame", {
   # Use crisk version to avoid error rate warning
+  withr::local_seed(445)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(rt = runif(100, 0.4, 1.5), response = rep(c(0, 1), 50))
 
@@ -234,6 +241,7 @@ test_that("bmf2bf.cswald creates correct brms formula", {
 
 test_that("configure_model.cswald_simple returns correct components", {
   skip_on_cran()
+  withr::local_seed(445)
 
   model <- cswald(rt = "rt", response = "response", version = "simple")
   dat <- data.frame(
@@ -252,6 +260,7 @@ test_that("configure_model.cswald_simple returns correct components", {
 
 test_that("configure_model.cswald_crisk returns correct components", {
   skip_on_cran()
+  withr::local_seed(445)
 
   model <- cswald(rt = "rt", response = "response", version = "crisk")
   dat <- data.frame(
@@ -1031,6 +1040,7 @@ test_that("the ndt prior check suggests no negative location on the log1p link e
 
 test_that("cswald simple version runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
   model <- cswald(rt = "rt", response = "response", version = "simple")
@@ -1043,6 +1053,7 @@ test_that("cswald simple version runs with mock backend", {
 
 test_that("cswald crisk version runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5)
   model <- cswald(rt = "rt", response = "response", version = "crisk")
@@ -1055,6 +1066,7 @@ test_that("cswald crisk version runs with mock backend", {
 
 test_that("cswald simple version with predictors runs with mock backend", {
   skip_on_cran()
+  withr::local_seed(445)
 
   dat <- rcswald(n = 200, drift = 2, bound = 1.5, ndt = 0.3)
   dat$condition <- rep(c("A", "B"), each = 100)
@@ -1068,6 +1080,7 @@ test_that("cswald simple version with predictors runs with mock backend", {
 
 test_that("cswald crisk version allows negative drift (more lower responses)", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Generate data with negative drift (biased toward lower boundary)
   dat <- rcswald(n = 100, drift = -1.5, bound = 1.5, ndt = 0.3, zr = 0.5)
@@ -1086,6 +1099,7 @@ test_that("cswald crisk version allows negative drift (more lower responses)", {
 
 test_that("cswald handles all-correct responses", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Data with all correct responses
   dat <- data.frame(
@@ -1104,6 +1118,7 @@ test_that("cswald handles all-correct responses", {
 
 test_that("cswald handles high error rate data with crisk version", {
   skip_on_cran()
+  withr::local_seed(445)
 
   # Data with 50% error rate
   dat <- data.frame(
@@ -1469,6 +1484,7 @@ test_that("cswald posterior_epred returns one column per observation", {
 
 test_that("both cswald versions store their posterior_epred in the family", {
   skip_on_cran()
+  withr::local_seed(445)
   dat <- rcswald(n = 100, drift = 2, bound = 1.5, ndt = 0.3)
   fit <- bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1), dat,
              cswald(rt = "rt", response = "response", version = "simple"),

@@ -1,5 +1,6 @@
 test_that("k2sd works", {
   # Test format
+  withr::local_seed(445)
   kappa <- runif(10)
   expect_length(k2sd(kappa), 10)
   expect_type(k2sd(kappa), "double")

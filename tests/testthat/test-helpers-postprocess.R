@@ -1,4 +1,5 @@
 test_that("bmm version is added to mock model", {
+  withr::local_seed(445)
   fit <- bmm(
     formula = bmmformula(c ~ 1, kappa ~ 1),
     data = data.frame(y = rsdm(n = 10)),

@@ -30,6 +30,7 @@ test_that("sdm posterior_predict draws each prediction from its own posterior dr
 
 test_that("an sdm fit refuses posterior_epred() with a message naming the model", {
   skip_on_cran()
+  withr::local_seed(445)
   dat <- data.frame(y = rsdm(50))
   fit <- bmm(bmf(c ~ 1, kappa ~ 1), dat, sdm(resp_error = "y"),
              backend = "mock", mock = 1, rename = FALSE)

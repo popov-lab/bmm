@@ -118,6 +118,7 @@ test_that("ddm check_data refuses RTs and responses it cannot read", {
 
 test_that("ddm works with mock backend - fixed zr", {
   skip_on_cran()
+  withr::local_seed(445)
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1)
@@ -127,6 +128,7 @@ test_that("ddm works with mock backend - fixed zr", {
 
 test_that("ddm works with mock backend - free zr", {
   skip_on_cran()
+  withr::local_seed(445)
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3, zr = 0.5)
   model <- ddm("rt", "response")
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1)
@@ -136,6 +138,7 @@ test_that("ddm works with mock backend - free zr", {
 
 test_that("ddm formula conversion works correctly", {
   skip_on_cran()
+  withr::local_seed(445)
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response")
@@ -149,6 +152,7 @@ test_that("ddm formula conversion works correctly", {
 
 test_that("ddm with condition effects works", {
   skip_on_cran()
+  withr::local_seed(445)
   
   # Simulate data with condition effects
   n_per_cond <- 25
@@ -167,6 +171,7 @@ test_that("ddm with condition effects works", {
 
 test_that("ddm with hierarchical structure works", {
   skip_on_cran()
+  withr::local_seed(445)
   
   # Simulate hierarchical data
   n_subjects <- 3
@@ -188,6 +193,7 @@ test_that("ddm with hierarchical structure works", {
 
 test_that("ddm allows missing parameters with message", {
   skip_on_cran()
+  withr::local_seed(445)
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response")
@@ -202,6 +208,7 @@ test_that("ddm allows missing parameters with message", {
 
 test_that("ddm default priors are correctly set", {
   skip_on_cran()
+  withr::local_seed(445)
   
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   model <- ddm("rt", "response")
@@ -240,6 +247,7 @@ test_that("posterior_epred_ddm() returns one column per observation", {
 
 test_that("a ddm fit stores posterior_epred_ddm() in its family", {
   skip_on_cran()
+  withr::local_seed(445)
   sim_data <- rddm(50, drift = 2, bound = 1.5, ndt = 0.3)
   fit <- bmm(bmf(drift ~ 1, bound ~ 1, ndt ~ 1), sim_data, ddm("rt", "response"),
              backend = "mock", mock = 1, rename = FALSE)
