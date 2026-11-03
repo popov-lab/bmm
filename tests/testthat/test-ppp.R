@@ -344,3 +344,34 @@ test_that("ppp() checks 'by' before it computes any counts", {
   expect_error(ppp(fit, by = "item_type"), "the counts were computed")
   expect_error(suppressMessages(ppp(fit)), "the counts were computed")
 })
+
+# pasted labels coincide for (1, 5.2) and (1.5, 2) and for ("a.b", "c") and
+# ("a", "b.c"); pasted per-column codes would coincide for (1, 12) and (11, 2)
+test_that(".ppp_index() groups rows by the values of their cell", {
+  numeric_pair <- data.frame(a = c(1, 1.5, 1, 1.5, 1), b = c(5.2, 2, 2, 5.2, 5.2))
+  expect_identical(.ppp_index(numeric_pair), c(2L, 3L, 1L, 4L, 2L))
+
+  factor_pair <- data.frame(
+    f1 = factor(c("a.b", "a", "a.b")),
+    f2 = factor(c("c", "b.c", "c"))
+  )
+  expect_identical(.ppp_index(factor_pair), c(2L, 1L, 2L))
+
+  many_codes <- data.frame(x = c(1:12, 1, 11), y = c(1:12, 12, 2))
+  expect_identical(.ppp_index(many_codes),
+                   c(1L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 13L, 14L, 2L, 12L))
+
+  expect_identical(.ppp_index(numeric_pair[character()]), rep(1L, 5))
+})
+
+test_that("ppp() keeps cells apart whose pasted labels coincide", {
+  # per cell, observed (10, 0) against expected (8, 2) and (0, 10) against
+  # (2, 8) give T1 = 4/8 + 4/2 + 4/2 + 4/8 = 5; pooled into one cell, observed
+  # and expected are both (10, 10) and T1 is 0
+  data <- data.frame(a = c(1, 1.5), b = c(5.2, 2))
+  expected <- ppp_toy_draws(matrix(c(8, 2, 2, 8), 2, byrow = TRUE))
+  local_ppp_counts(matrix(c(10, 0, 0, 10), 2, byrow = TRUE), expected, expected, data)
+  out <- ppp(ppp_toy_fit(data, bmf(D ~ a * b, g ~ 1)), by = c("a", "b"), statistic = "T1")
+  expect_equal(attr(out, "n_cells"), 2L)
+  expect_equal(unname(attr(out, "draws")$T1[, "observed"]), 5)
+})
