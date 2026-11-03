@@ -80,8 +80,11 @@ test_that("tcc() refuses correlated or motor noise it cannot fit", {
   expect_error(tcc("err", f, correlation = rho[-1]), "must be a numeric vector of 181 values")
   expect_error(tcc("err", f, correlation = c(1, rho[-1] * 2)), "between -1 and 1")
   expect_error(tcc("err", f, correlation = c(0.9, rho[-1])), "must be 1 at distance 0")
-  # a measured correlation, such as Schurgin et al.'s, is 1 at 0 only to rounding
+  # a measured correlation, such as Schurgin et al.'s, is 1 at 0 only to
+  # rounding, which can fall on either side of 1
   expect_silent(tcc("err", f, correlation = c(1 - 6e-15, rho[-1])))
+  expect_silent(tcc("err", f, correlation = c(1 + 2e-16, rho[-1])))
+  expect_error(tcc("err", f, correlation = c(1 + 1e-6, rho[-1])), "must be 1 at distance 0")
   expect_error(tcc("err", f, correlation = c(1, rep(-0.9, 180))), "negative eigenvalue")
   # rank 3: the similarity lives mostly on modes without noise
   expect_error(
@@ -226,7 +229,10 @@ test_that("the motor kernel is a rounded normal, and the log convolution keeps t
   expect_equal(kernel[13], pnorm(0.25) - pnorm(-0.25), tolerance = 1e-6)
   withr::local_seed(3)
   rounded <- tabulate(round(stats::rnorm(1e6, 0, 2)) + 13, 25)
-  expect_lt(max(abs(rounded - 1e6 * kernel) / sqrt(1e6 * kernel)), 4.5)
+  # the outer cells expect 0.005 draws, where a single one gives z = 15
+  # (2 of 20 other seeds); they are compared only where 5 or more are expected
+  keep <- 1e6 * kernel >= 5
+  expect_lt(max(abs(rounded - 1e6 * kernel)[keep] / sqrt(1e6 * kernel[keep])), 4.5)
 
   # 40 options, two columns: one with a P of 1e-300, one with exact zeros
   P <- cbind(c(0.5, 0.3, rep(0.2 / 37, 37), 1e-300), c(1, rep(0, 39)))
@@ -266,6 +272,28 @@ test_that("the table's seed depends on its inputs only, and the user's RNG is le
   expect_length(ns$.tcc_cache$noise, 2)
   expect_identical(bmm:::.tcc_noise_table(more, grid)$info$seed, build_seed)
   expect_length(ns$.tcc_cache$noise, 2)
+  # a model that differs only in d_max or in motor noise gets its own table,
+  # never the cached one of another grid or kernel
+  wider <- model
+  wider$other_vars$d_max <- 3
+  wide_grid <- bmm:::.tcc_grid(wider)
+  expect_equal(nrow(bmm:::.tcc_noise_table(wider, wide_grid)$tab), wide_grid$rows)
+  motor <- model
+  motor$other_vars$motor_sd <- 0.1
+  expect_gt(max(abs(bmm:::.tcc_noise_table(motor, grid)$tab - first$tab)), 0.01)
+})
+
+test_that("the certification groups each draw with its rotations across chunks", {
+  # 600-envelope chunks keep the segments of 300 groups from three chunks;
+  # within one group the segments of its six envelopes tile the drift axis
+  # six times, so its probabilities sum to 6 at any d, and ids that restart
+  # in each chunk would merge groups and sum to 12 or 18
+  setup <- bmm:::.tcc_corr_setup(corr_correlation(36, 30), corr_similarity(36))
+  build <- withr::with_seed(8, bmm:::.tcc_corr_build(setup, c(0, 1), 1800, keep_groups = 250, chunk = 600))
+  kept <- build$kept
+  expect_setequal(unique(kept$draw), 1:300)
+  total <- rowsum(stats::pnorm(setup$kappa * (kept$hi - 1.3)) - stats::pnorm(setup$kappa * (kept$lo - 1.3)), kept$draw)
+  expect_equal(range(total), c(6, 6), tolerance = 1e-12)
 })
 
 test_that("the certified number of trials predicts the spread of tables built with other seeds", {
@@ -352,11 +380,16 @@ test_that("a correlated fit stores and prints its certification, and warns past 
     glue::glue("Monte Carlo table from 6,000 draws \\(seed {info$seed}\\).*certified for {info$n_pool} trials")
   )
   many <- data.frame(err = rep(c(0, 0.1, -0.2, 1, 3, -2), 50))
-  needed <- format(signif(6000 * 300 / info$n_pool * 1.05, 2), big.mark = ",", scientific = FALSE)
-  expect_warning(
+  msg <- expect_warning(
     corr_mock_fit(model, many),
-    glue::glue("certified for {info$n_pool} trials.*hold 300 trials.*correlation_draws = {needed}")
+    glue::glue("certified for {info$n_pool} trials.*hold 300 trials.*correlation_draws = ")
   )
+  # the suggested draws, scaled in proportion, certify the 300 trials with
+  # 10 % to spare (the n_pool of another seed differs by a few %), and are
+  # the smallest such number with two significant digits
+  needed <- as.numeric(gsub(",", "", sub(".*correlation_draws = ([0-9,]+).*", "\\1", conditionMessage(msg))))
+  expect_gte(needed * info$n_pool / 6000, 1.1 * 300)
+  expect_lt((needed - 10^(floor(log10(needed)) - 1)) * info$n_pool / 6000, 1.1 * 300)
   expect_null(summary_notes(tcc("err", similarity = corr_similarity()), NULL))
   # round counts print in full, as the warning asks users to type them
   round_info <- list(draws = 3e6, seed = 1L, n_pool = 1e5, zeros = 0L, zeros_from = NA_real_)
@@ -364,6 +397,13 @@ test_that("a correlated fit stores and prints its certification, and warns past 
                                structure(class = c("bmmodel", "tcc")), NULL),
                "3,000,000 draws.*100,000 trials")
   expect_warning(bmm:::.tcc_check_certified(round_info, 2e5, 30), "from 3,000,000 draws")
+  # 1e6 draws certified for 10,000 trials, 10,040 in the data: 1.1 x 1,004,000
+  # is rounded up to 1,200,000; to the nearest, 1,100,000 would certify only
+  # 11,000 of the 11,044 trials the margin asks for
+  expect_warning(
+    bmm:::.tcc_check_certified(list(draws = 1e6, n_pool = 1e4, zeros_from = NA_real_), 10040, 30),
+    "correlation_draws = 1,200,000"
+  )
 })
 
 test_that("a weak correlation leaves cells no draw reaches, which the fit reports", {

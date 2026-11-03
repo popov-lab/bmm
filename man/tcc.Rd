@@ -240,14 +240,16 @@ with mean \code{d * f(x)} and SD 1, with a criterion. It needs no
 correlation, as it reads one signal.
 }
 
-When the correlation is 0 at the opposite side of the wheel, as in the
-correlation Schurgin et al. measured, the target and the opposite option
-are independent, so \code{d} is the d' of a two-alternative choice between
-them: in simulations from that model with \code{d} of 2 and 1, the d' of that
-choice came out at 2.00 and 1.01 (SE about 0.03). With independent
-noise every format has its own
-scale, and the model has no continuous limit: it is the member of the
-family whose correlation is 0 at every distance but 0.
+A two-alternative choice between the target and the opposite option has
+d' = \code{d * (1 - f(180)) / sqrt(1 - correlation(180))}, with \code{f(180)} and
+\code{correlation(180)} the last values of \code{similarity} and \code{correlation}. When
+both are 0, as in the similarity and correlation Schurgin et al. measured,
+\code{d} is that d' (in simulations from their model with \code{d} of 2 and 1, it
+came out at 2.00 and 1.01, SE about 0.03). Independent noise is the
+member of the family whose correlation is 0 at every distance but 0. Its
+forced-choice and change-detection marginals share \code{d} as well, but its
+continuous report has no continuous limit: there \code{d} changes with
+\code{n_options} (see the section Response).
 }
 
 \subsection{Correlated noise}{
@@ -259,11 +261,16 @@ correlation Schurgin et al. (2020) used for their colour wheel falls
 from 0.96 at 1 degree to 0.35 at 15 degrees and is 0 from 90 degrees
 on. The values must define a valid correlation on the circle (a
 circulant matrix without negative eigenvalues), and the similarity must
-lie in the directions where that matrix has noise: a correlation that
-falls off very smoothly, such as \code{exp(-(x / 15)^2)} for \code{x} in degrees,
-has eigenvalues so close to 0 that \code{tcc()} refuses it, while one that
-falls off like \code{exp(-x / 10)}, or the measured one, is accepted.
-Correlated noise needs \code{noise = "gaussian"} and the full wheel.
+lie in the directions where that matrix has noise. A correlation that
+falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales:
+the measured one has five, and \code{exp(-(x / 15)^2)} for \code{x} in degrees
+has more. \code{tcc()} refuses such a correlation when more than 1e-6 of the
+similarity's variation lies on those scales. That happens with a
+similarity whose peak is sharp, such as a Laplace shape from
+\code{\link[=tcc_similarity]{tcc_similarity()}} with \code{kappa} of 3 or more, but not with the measured
+similarity or a von Mises shape. Mixing in a little independent noise, such as \code{0.999 * correlation + 0.001 * c(1, rep(0, n_options / 2))}, removes the zero
+eigenvalues. A correlation that falls off like \code{exp(-x / 10)} has none
+and is accepted with any similarity. Correlated noise needs \code{noise = "gaussian"} and the full wheel.
 
 The response probabilities have no closed form, so the likelihood reads
 them from a table that \code{bmm()} estimates by Monte Carlo before
@@ -278,8 +285,8 @@ and the user's random number stream is left as it was.
 A Monte Carlo table has its own error, which shifts an estimate a little
 with the seed. The shift grows with the number of trials an estimate
 pools, so each table is certified for a number of trials per estimate:
-up to that number, its seed moves an estimate of \code{d} by at most 0.1
-posterior SD on average. With the default draws and the measured
+up to that number, the shift that its seed causes in an estimate of \code{d}
+has an SD across seeds of at most 0.1 posterior SD. With the default draws and the measured
 correlation the table was certified for about 13,000 trials per estimate.
 The number grows in proportion to \code{correlation_draws}, and so does the
 build time. \code{summary()} reports it, and \code{bmm()} warns after the fit when

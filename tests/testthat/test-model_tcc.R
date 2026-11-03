@@ -662,6 +662,7 @@ test_that("adding Gumbel noise leaves the Gaussian Stan programs bit-identical",
 # md5 of the Gumbel and table-from-R programs at 566-tcc-options ef664176,
 # before correlated and motor noise were added; taken as above
 test_that("correlated and motor noise leave the Gumbel and table-from-R programs bit-identical", {
+  skip_on_cran()
   skip_if_not(packageVersion("brms") == "2.23.0", "hashes taken under brms 2.23.0")
   md5_code <- function(model, formula, ...) {
     lines <- strsplit(brms::stancode(tcc_mock_fit(model, formula, ...)), "\n")[[1]]

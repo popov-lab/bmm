@@ -361,9 +361,14 @@
 # A Monte Carlo table is certified for n_pool trials per estimate (see
 # .tcc_corr_certify()); n_pool grows in proportion to the draws, which the
 # warning scales to cover the data. All trials are counted, as a
-# population-level d pools every one of them
+# population-level d pools every one of them. The suggested draws are rounded
+# up, and the 10 % margin covers the n_pool of the refit's own seed, which
+# differed by 4 % between two seeds at 1e6 draws (13,104 and 12,564): with 5 %
+# rounded to the nearest value, a refit could warn again
 .tcc_check_certified <- function(info, nobs, d_max) {
-  needed <- signif(info$draws * nobs / info$n_pool * 1.05, 2)
+  needed <- info$draws * nobs / info$n_pool * 1.1
+  unit <- 10^(floor(log10(needed)) - 1)
+  needed <- ceiling(needed / unit) * unit
   warnif(
     nobs > info$n_pool,
     "The likelihood table of the correlated noise is a Monte Carlo estimate from \\
