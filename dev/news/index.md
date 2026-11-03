@@ -309,6 +309,10 @@
 
 #### Other changes
 
+- [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) fits
+  with one row per trial and the default normal noise
+  (`dist = "normal"`) are faster: each sampling step takes about half
+  the time it did. Estimates are unchanged up to sampling error.
 - [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
   warns when the prior for `ndt` puts most of its mass at or above your
   fastest response time, which `ndt` must stay below. Such a fit can
