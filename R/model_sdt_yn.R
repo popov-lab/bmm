@@ -616,7 +616,7 @@ bmf2bf.sdt_yn <- function(model, formula) {
 # link, a ratio of exactly 1, so it can skip rescaling the signal rows
 sdt_yn_family_vars <- function(model) {
   c(.sdt_binomial_row_vars(),
-    as.integer(isTRUE(model$fixed_parameters$sdratio == 0)))
+    as.integer(.sdt_unit_sdratio(model)))
 }
 
 #' @export
