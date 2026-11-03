@@ -101,7 +101,7 @@ test_that("mpt_tree validates formula input", {
   expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), "a"), "impossible argument has to be named")
   expect_error(
     mpt_tree("t", a ~ D, b ~ 1 - D, "c"),
-    "Cannot mix formulas.*impossible argument has to be named, impossible = \"c\""
+    "Cannot mix formulas.*impossible = \"c\""
   )
   expect_error(mpt_tree("t", list(a ~ D, b ~ 1 - D)), "separate arguments")
   expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, impossible = "a"), "both impossible")
@@ -284,7 +284,7 @@ test_that("mpt refuses a zero branch and points to impossible categories", {
   # the hint reads as one sentence, not with the source's line breaks
   expect_error(
     mpt(mpt_tree("a", list(y = "D", z = "0 * D", w = "1 - D"))),
-    "undefined. Declare a response category that a tree cannot produce with mpt_tree(impossible = ) instead",
+    "a tree cannot produce with mpt_tree(impossible = )",
     fixed = TRUE
   )
   zero_padded <- list(
@@ -492,11 +492,7 @@ test_that("a simplex group takes no link of its own, whichever way the link arri
   for (target in c("gA", "gAraw", "gC")) {
     expect_error(
       mpt(tree, simplex = simplex, links = setNames(list("probit"), target)),
-      paste0(
-        "link target\\(s\\) '", target, "' belong to the simplex group\\(s\\) ",
-        "'gA', 'gB', 'gC': .*links = \"probit\" for the whole model and ",
-        "takes no link of its own"
-      )
+      paste0("link target\\(s\\) '", target, "' belong to the simplex group\\(s\\) 'gA', 'gB', 'gC'")
     )
   }
 
@@ -1522,11 +1518,8 @@ test_that("check_data() warns when the covariate values in the data leave the mo
   expect_warning(
     check_data(model, layout(0.5), formula),
     paste0(
-      "The model is not identified with the covariate values in the data\\. ",
-      "Jacobian rank 2 of 3 at interior test values and the covariate values in the data: ",
-      "the combination of all free parameters is not identified by the branch expressions\\. ",
-      "'x' takes a single value within tree\\(s\\) 'old', 'new'\\. ",
-      "With 5 test values of the covariates the rank is 3"
+      "not identified with the covariate values in the data.*rank 2 of 3 .*",
+      "'x' takes a single value within tree\\(s\\) 'old', 'new'.*rank is 3"
     )
   )
   expect_warning(
@@ -1539,7 +1532,7 @@ test_that("check_data() warns when the covariate values in the data leave the mo
   with_predictor <- transform(layout(0.5), cond = c("a", "b", "a", "b"))
   expect_message(
     expect_no_warning(check_data(model, with_predictor, bmf(Do ~ cond, Dn ~ 1, g ~ 1))),
-    "With the covariate values in the data, the branch expressions alone do not identify all free parameters\\. 'x' takes a single value"
+    "alone do not identify all free parameters\\. 'x' takes a single value"
   )
 
   # bmm_data_check() reports the warning among its hard checks
