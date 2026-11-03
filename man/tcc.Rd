@@ -149,8 +149,10 @@ estimates the width of the gradient from the responses is the \code{\link[=sdm]{
 \subsection{Noise}{
 
 \code{noise} sets the distribution of the noise on each option's signal.
-\code{"gaussian"}, the default, is the model of Schurgin et al. (2020), with
-normal noise of unit variance. Its response probabilities have no closed
+\code{"gaussian"}, the default, is normal noise of unit variance, as in
+Schurgin et al. (2020): independent across options by default, or
+correlated as in their model with \code{correlation} (see the section
+Correlated noise). Its response probabilities have no closed
 form, so on the full wheel the likelihood reads them from a table (see
 the section Grid limit on d); with \code{options} it integrates them per
 cell. With \code{"gumbel"} the noise follows the standard Gumbel (type I
@@ -178,8 +180,9 @@ same data unsorted it cost about 8 times as much, because the Gumbel
 likelihood sums over the options once for each run of rows that share
 \code{d} (see the section Speed). With \code{options} it is much cheaper (see the
 section Forced-choice option sets). It skips the table build before
-sampling and has no grid limit. Keep normal noise to stay with the model
-of Schurgin et al. (2020) and to compare \code{d} with their d'. The two \code{d} are not on one scale. The
+sampling and has no grid limit. Keep normal noise to stay with the
+models of Schurgin et al. (2020); to compare \code{d} with their d', also give
+their \code{correlation}. The normal and Gumbel \code{d} are not on one scale. The
 standard Gumbel distribution has an SD of \code{pi / sqrt(6)} = 1.28, but
 matching the response probabilities takes a larger factor: the Gumbel
 \code{d} with the smallest Kullback-Leibler divergence from the probabilities
@@ -199,15 +202,16 @@ option steps. On the full wheel, the model treats the response as a
 choice among \code{n_options} discrete options, so \code{n_options} should be the
 number of options the participant could choose from.
 
-On the full wheel, \code{n_options} is part of the model, not a resolution
-setting. Each option
+With independent noise on the full wheel, \code{n_options} is part of the
+model, not a resolution setting. Each option
 draws its own noise, and the more options lie near the target, the more
 often one of them wins: at \code{d = 2}, with the Laplace similarity of the
 examples built for each wheel (\code{tcc_similarity(..., n_options = n)}), the
 probability of choosing an option at most 10 degrees from the target is
-0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
-continuous limit, and values of \code{d} fitted with different \code{n_options} are
-not on one scale. With \code{options}, \code{n_options} only places the options:
+0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The
+independent-noise model has no continuous limit, and its values of \code{d}
+fitted with different \code{n_options} are not on one scale; with
+\code{correlation} they are (see the section "One process, three formats"). With \code{options}, \code{n_options} only places the options:
 the choice is among the offered options alone, and any even \code{n_options}
 of at least 4 that is a multiple of \code{m} spaces \code{m} options equally.
 }
@@ -281,8 +285,9 @@ The number grows in proportion to \code{correlation_draws}, and so does the
 build time. \code{summary()} reports it, and \code{bmm()} warns after the fit when
 the data hold more trials, naming a \code{correlation_draws} that would
 cover them. As the correlation weakens towards independence the table
-thins out: some far responses at a large \code{d} are then never drawn, and
-\code{bmm()} warns when that happens below \code{d_max}. For independent noise,
+thins out: some far responses at a large \code{d} are then drawn too rarely
+for their probability to be estimated, or never, and \code{bmm()} warns when
+cells are never drawn below \code{d_max}. For independent noise,
 leave \code{correlation} out; the default table is then exact.
 }
 

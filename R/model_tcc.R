@@ -144,8 +144,10 @@
 #' ## Noise
 #'
 #'   `noise` sets the distribution of the noise on each option's signal.
-#'   `"gaussian"`, the default, is the model of Schurgin et al. (2020), with
-#'   normal noise of unit variance. Its response probabilities have no closed
+#'   `"gaussian"`, the default, is normal noise of unit variance, as in
+#'   Schurgin et al. (2020): independent across options by default, or
+#'   correlated as in their model with `correlation` (see the section
+#'   Correlated noise). Its response probabilities have no closed
 #'   form, so on the full wheel the likelihood reads them from a table (see
 #'   the section Grid limit on d); with `options` it integrates them per
 #'   cell. With `"gumbel"` the noise follows the standard Gumbel (type I
@@ -176,8 +178,9 @@
 #'   likelihood sums over the options once for each run of rows that share
 #'   `d` (see the section Speed). With `options` it is much cheaper (see the
 #'   section Forced-choice option sets). It skips the table build before
-#'   sampling and has no grid limit. Keep normal noise to stay with the model
-#'   of Schurgin et al. (2020) and to compare `d` with their d'. The two `d` are not on one scale. The
+#'   sampling and has no grid limit. Keep normal noise to stay with the
+#'   models of Schurgin et al. (2020); to compare `d` with their d', also give
+#'   their `correlation`. The normal and Gumbel `d` are not on one scale. The
 #'   standard Gumbel distribution has an SD of `pi / sqrt(6)` = 1.28, but
 #'   matching the response probabilities takes a larger factor: the Gumbel
 #'   `d` with the smallest Kullback-Leibler divergence from the probabilities
@@ -196,15 +199,16 @@
 #'   choice among `n_options` discrete options, so `n_options` should be the
 #'   number of options the participant could choose from.
 #'
-#'   On the full wheel, `n_options` is part of the model, not a resolution
-#'   setting. Each option
+#'   With independent noise on the full wheel, `n_options` is part of the
+#'   model, not a resolution setting. Each option
 #'   draws its own noise, and the more options lie near the target, the more
 #'   often one of them wins: at `d = 2`, with the Laplace similarity of the
 #'   examples built for each wheel (`tcc_similarity(..., n_options = n)`), the
 #'   probability of choosing an option at most 10 degrees from the target is
-#'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
-#'   continuous limit, and values of `d` fitted with different `n_options` are
-#'   not on one scale. With `options`, `n_options` only places the options:
+#'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The
+#'   independent-noise model has no continuous limit, and its values of `d`
+#'   fitted with different `n_options` are not on one scale; with
+#'   `correlation` they are (see the section "One process, three formats"). With `options`, `n_options` only places the options:
 #'   the choice is among the offered options alone, and any even `n_options`
 #'   of at least 4 that is a multiple of `m` spaces `m` options equally.
 #'
@@ -276,8 +280,9 @@
 #'   build time. `summary()` reports it, and `bmm()` warns after the fit when
 #'   the data hold more trials, naming a `correlation_draws` that would
 #'   cover them. As the correlation weakens towards independence the table
-#'   thins out: some far responses at a large `d` are then never drawn, and
-#'   `bmm()` warns when that happens below `d_max`. For independent noise,
+#'   thins out: some far responses at a large `d` are then drawn too rarely
+#'   for their probability to be estimated, or never, and `bmm()` warns when
+#'   cells are never drawn below `d_max`. For independent noise,
 #'   leave `correlation` out; the default table is then exact.
 #'
 #' ## Motor noise

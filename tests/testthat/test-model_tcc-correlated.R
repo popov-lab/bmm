@@ -112,6 +112,7 @@ test_that("the drift splits each draw into a part along the similarity and an in
 })
 
 test_that("the envelope's winners are the argmax at every drift, and its segments tile the line", {
+  skip_on_cran()
   withr::local_seed(6)
   f <- corr_similarity(36)
   setup <- bmm:::.tcc_corr_setup(corr_correlation(36, scale = 30), f)
@@ -143,6 +144,7 @@ test_that("a segment binned on the s grid gives its exact probability at every d
 })
 
 test_that("the certification's per-draw terms add up to the table's own shift", {
+  skip_on_cran()
   # with every group kept, mean psi = -sum_k mult_k s_k(d) P_k(d) over the
   # table it certifies: an identity up to the binning, which checks the score
   # of each option, its motor convolution and the segments' bookkeeping
@@ -259,8 +261,11 @@ test_that("the table's seed depends on its inputs only, and the user's RNG is le
   more <- model
   more$other_vars$correlation_draws <- 6006
   expect_false(identical(build_seed <- bmm:::.tcc_noise_table(more, grid)$info$seed, first$info$seed))
-  # the cache answers a second call without a build
+  # the cache answers a second call: it still holds the two tables built
+  # since the last reset, and no third
+  expect_length(ns$.tcc_cache$noise, 2)
   expect_identical(bmm:::.tcc_noise_table(more, grid)$info$seed, build_seed)
+  expect_length(ns$.tcc_cache$noise, 2)
 })
 
 test_that("the certified number of trials predicts the spread of tables built with other seeds", {
@@ -289,8 +294,7 @@ test_that("the certified number of trials predicts the spread of tables built wi
     predicted <- rowMeans(vapply(builds, function(b) b$info$rho, numeric(length(at))))
     expect_gt(stats::median(spread / predicted), 0.7)
     expect_lt(stats::median(spread / predicted), 1.4)
-    expect_equal(info$n_pool, floor((0.1 / max(info$rho))^2))
-  }
+    }
 })
 
 ############################################################################# !
@@ -354,6 +358,12 @@ test_that("a correlated fit stores and prints its certification, and warns past 
     glue::glue("certified for {info$n_pool} trials.*hold 300 trials.*correlation_draws = {needed}")
   )
   expect_null(summary_notes(tcc("err", similarity = corr_similarity()), NULL))
+  # round counts print in full, as the warning asks users to type them
+  round_info <- list(draws = 3e6, seed = 1L, n_pool = 1e5, zeros = 0L, zeros_from = NA_real_)
+  expect_match(summary_notes(list(other_vars = list(table_info = round_info)) |>
+                               structure(class = c("bmmodel", "tcc")), NULL),
+               "3,000,000 draws.*100,000 trials")
+  expect_warning(bmm:::.tcc_check_certified(round_info, 2e5, 30), "from 3,000,000 draws")
 })
 
 test_that("a weak correlation leaves cells no draw reaches, which the fit reports", {

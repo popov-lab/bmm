@@ -207,9 +207,13 @@
   n <- nrow(L)
   half <- (length(kernel) - 1) / 2
   shifted <- function(s) L[((seq_len(n) - 1 - s) %% n) + 1, , drop = FALSE]
-  top <- Reduce(pmax, lapply(-half:half, shifted))
+  # one shifted copy at a time: a list of all of them takes 4 MB per tap at
+  # d_max = 30, over 1 GB for a motor SD of 20 options
+  top <- L
+  for (s in -half:half) top <- pmax(top, shifted(s))
   safe <- ifelse(is.finite(top), top, 0)
-  total <- Reduce(`+`, lapply(-half:half, function(s) kernel[s + half + 1] * exp(shifted(s) - safe)))
+  total <- 0
+  for (s in -half:half) total <- total + kernel[s + half + 1] * exp(shifted(s) - safe)
   ifelse(is.finite(top), safe + log(total), -Inf)
 }
 
@@ -232,8 +236,8 @@
 }
 
 .tcc_motor_steps <- function(other_vars) {
-  sd <- other_vars$motor_sd %||% 0
-  if (identical(other_vars$units, "bins")) sd else sd * other_vars$n_options / (2 * pi)
+  motor_sd <- other_vars$motor_sd %||% 0
+  if (identical(other_vars$units, "bins")) motor_sd else motor_sd * other_vars$n_options / (2 * pi)
 }
 
 # The table that tcc_lpmf() reads when it comes from R (table = "r"): rows the
@@ -261,6 +265,8 @@
   cache[[hash]]
 }
 
+# `seed` is not a user's seed: .tcc_noise_table() derives it from the hash of
+# the table's inputs, so that one model always gets one table
 .tcc_build_noise_table <- function(correlation, similarity, draws, motor, grid, seed) {
   d_values <- grid$lo + (seq_len(grid$rows) - 2) * grid$step
   info <- NULL
@@ -280,8 +286,9 @@
     # the bins carry signed sums, so a P that is 0 can come out a few ulp below
     L <- log(pmax(build$P, 0))
   }
-  kernel <- if (motor > 0) .tcc_motor_kernel(motor)
+  kernel <- NULL
   if (motor > 0) {
+    kernel <- .tcc_motor_kernel(motor)
     L <- .tcc_convolve_log(L, kernel)
   }
   L <- .tcc_by_distance(L)
@@ -360,19 +367,19 @@
   warnif(
     nobs > info$n_pool,
     "The likelihood table of the correlated noise is a Monte Carlo estimate from \\
-    {format(info$draws, big.mark = ',')} draws, certified for \\
-    {format(info$n_pool, big.mark = ',')} trials per estimate: an estimate that pools \\
+    {format(info$draws, big.mark = ',', scientific = FALSE)} draws, certified for \\
+    {format(info$n_pool, big.mark = ',', scientific = FALSE)} trials per estimate: an estimate that pools \\
     more trials can move by more than 0.1 posterior SD with the table's seed. The \\
-    data hold {format(nobs, big.mark = ',')} trials. If an estimate pools more than \\
-    {format(info$n_pool, big.mark = ',')} of them, refit with correlation_draws = \\
-    {format(needed, big.mark = ',', scientific = FALSE)} (the build takes about 40 s \\
+    data hold {format(nobs, big.mark = ',', scientific = FALSE)} trials. If an estimate pools more than \\
+    {format(info$n_pool, big.mark = ',', scientific = FALSE)} of them, refit with correlation_draws = \\
+    {format(needed, big.mark = ',', scientific = FALSE)} (the build takes 40 to 70 s \\
     per million draws on one core)."
   )
   warnif(
     isTRUE(info$zeros_from <= d_max),
     "No Monte Carlo draw of the correlated noise reached {info$zeros} cells of the \\
-    likelihood table, the first at d = {signif(info$zeros_from, 3)}, below d_max = \\
-    {d_max}. Their probability was set to half a draw, which makes the likelihood \\
+    likelihood table, the first at d = {signif(info$zeros_from, 3)}, which is below \\
+    d_max = {d_max}. Their probability was set to half a draw, which makes the likelihood \\
     there a floor, not the model. This happens when the correlation is weak; check \\
     that the posterior of d stays well below {signif(info$zeros_from, 3)}, or raise \\
     correlation_draws."
@@ -407,6 +414,6 @@ summary_notes.tcc <- function(model, x) {
   paste0(
     "Note: the likelihood of the correlated noise reads a Monte Carlo table from ",
     format(info$draws, big.mark = ",", scientific = FALSE), " draws (seed ", info$seed,
-    "),\n      certified for ", format(info$n_pool, big.mark = ","), " trials per estimate."
+    "),\n      certified for ", format(info$n_pool, big.mark = ",", scientific = FALSE), " trials per estimate."
   )
 }
