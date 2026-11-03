@@ -44,6 +44,17 @@ model_cases_sdm <- function() {
     }),
     init = cases(function(model, name) list(model = model, formula = re_formula, data = data_of(name))),
     links = cases(function(model, name) list(model = model, settable = character(0))),
-    fixture = list(sdm = list(file = "bmmfit_example1.rds"))
+    fixture = list(sdm = list(file = "bmmfit_example1.rds")),
+    simulate = cases(function(model, name) {
+      design <- data.frame(ID = rep(1:2, 50))
+      if (name == "sdm_options") {
+        design$opt1 <- 0
+        design$opt2 <- deg2rad(rep(c(90, -45, 180, 10), 25))
+      }
+      list(
+        model = model, pars = list(c = 2, kappa = 1.5), design = design,
+        formula = bmf(c ~ 1, kappa ~ 1), simulate_pars = list(mu = 0, c = 2, kappa = 1.5)
+      )
+    })
   )
 }

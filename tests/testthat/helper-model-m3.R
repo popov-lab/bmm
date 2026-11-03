@@ -48,6 +48,36 @@ model_cases_m3 <- function() {
       m3 = list(model = ss("simple"), settable = c("c", "a")),
       m3_custom = list(model = custom, settable = NULL)
     ),
-    fixture = list(m3 = list(file = "bmmfit_m3_ppcheck.rds"))
+    fixture = list(m3 = list(file = "bmmfit_m3_ppcheck.rds")),
+    simulate = list(
+      # option counts read from columns that differ between rows
+      m3_ss = list(
+        model = ss("simple"), pars = list(c = 1, a = 0),
+        design = data.frame(n_trials = rep(c(50, 80), 10), n_corr = 1, n_other = rep(c(2, 4), each = 10),
+                            n_npl = 5),
+        formula = bmf(c ~ 1, a ~ 1), simulate_pars = list(b = 0.1, c = 1, a = 0)
+      ),
+      m3_cs = list(
+        model = m3(resp_cats = c("corr", "distc", "other", "disto", "npl"), num_options = c(1, 1, 3, 3, 5),
+                   choice_rule = "softmax", version = "cs"),
+        pars = list(c = 2, a = 1, f = 0.3), design = data.frame(n_trials = rep(c(40, 60), 10)),
+        formula = bmf(c ~ 1, a ~ 1, f ~ 1), simulate_pars = list(b = 0, c = 2, a = 1, f = 0.3)
+      ),
+      m3_custom = list(
+        model = m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), choice_rule = "softmax",
+                   version = "custom", links = list(a = "identity", c = "identity")),
+        pars = list(a = 1, c = 2), design = data.frame(n_trials = rep(50, 20)),
+        formula = bmf(corr ~ b + a + c, other ~ b + a, npl ~ b, a ~ 1, c ~ 1),
+        simulate_pars = list(b = 0, a = 1, c = 2)
+      ),
+      # an activation function that reads a design column besides the parameters
+      m3_custom_design_var = list(
+        model = m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), choice_rule = "softmax",
+                   version = "custom", links = list(a = "identity", c = "identity")),
+        pars = list(a = 1, c = 0.5), design = data.frame(n_trials = 50, ss = rep(c(1, 4), 10)),
+        formula = bmf(corr ~ b + a + c * ss, other ~ b + a, npl ~ b, a ~ 1, c ~ 1),
+        simulate_pars = list(b = 0, a = 1, c = 0.5)
+      )
+    )
   )
 }

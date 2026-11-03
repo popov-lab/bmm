@@ -467,6 +467,47 @@ configure_model.sdm <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# activation, scaling and the response options are options of the model, not
+# versions, so the R4 check cannot see a method that drops them
+#' @export
+simulate_data.sdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  n_alternatives <- model$other_vars$n_alternatives
+  design <- .design_or_n(model, design, if (is.character(n_alternatives)) n_alternatives, ...,
+                         ragged = model$other_vars$options %||% character(0))
+  sim <- .simulate_pars(model, pars, design, scale)
+  y <- .simulate_sdm_responses(model, design, sim$native)
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
+}
+
+# one rsdm() call per option set; without offered sets (the continuous model
+# or the full wheel) one call for all rows
+.simulate_sdm_responses <- function(model, design, p) {
+  n_options <- model$other_vars$n_options
+  draw <- function(rows, options = NULL) {
+    rsdm(length(rows), mu = p$mu[rows], c = p$c[rows], kappa = p$kappa[rows],
+         activation = model$other_vars$activation, scaling = model$other_vars$scaling,
+         n_options = n_options, options = options)
+  }
+  # .option_offsets() checks the option columns only in rows with a response
+  checked <- design
+  checked[[model$resp_vars[[1]]]] <- 0
+  offsets <- if (!is.null(n_options)) .option_offsets(model, checked)
+  if (is.null(offsets)) {
+    y <- draw(seq_len(nrow(design)))
+  } else {
+    y <- numeric(nrow(design))
+    for (rows in split(seq_len(nrow(design)), .option_set_id(offsets))) {
+      offered <- offsets[rows[1], ]
+      y[rows] <- draw(rows, offered[!is.na(offered)] * 2 * pi / n_options)
+    }
+  }
+  if (identical(model$other_vars$units, "bins")) .bin_options(y, n_options, "radians") else y
+}
+
+############################################################################# !
 # POSTPROCESS METHODS                                                    ####
 ############################################################################# !
 
