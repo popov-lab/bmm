@@ -101,6 +101,17 @@
 
 #### Bug fixes
 
+- [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) fits with two
+  or more predictors could evaluate some design cells with the
+  parameters of another cell, when the two cells read alike once their
+  values are joined with a dot: `1` and `5.2` against `1.5` and `2`, or
+  factor levels `"a.b"` and `"c"` against `"a"` and `"b.c"`. Estimates
+  for these cells were wrong, with no warning, most of all when the data
+  were sorted by the predictors.
+  [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) pooled such
+  cells into one. Refit affected
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) models and
+  rerun [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md).
 - [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
   now counts trials, not rows, per design cell, and flags cells with
   fewer than `min_trials` (default 10) trials in total. Aggregated
