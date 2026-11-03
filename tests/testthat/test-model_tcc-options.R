@@ -467,6 +467,9 @@ test_that("log_lik and posterior_predict read the options on a 720-position whee
                     o3 = c(NA, 180, NA, 45) * pi / 180)
   model <- tcc("err", f720, n_options = 720, options = paste0("o", 1:3))
   sdata <- brms::standata(opt_mock_fit(model, bmf(d ~ 1), dat))
+  # the Stan cell tables, in steps: {0, 180}, {0, 180, 360}, {0, 360}, {-90, 0, 90}
+  expect_equal(as.integer(sdata$tcc_set_size), c(2L, 3L, 2L, 3L))
+  expect_equal(unname(sdata$tcc_set_off[3, 1:2]), c(0L, 360L))
   d <- c(0.5, 2, 6)
   prep <- epred_prep(list(d = matrix(d, 3, sdata$N)), sdata)
   for (i in seq_len(sdata$N)) {
