@@ -113,7 +113,8 @@ size set in \code{\link[=bmm_options]{bmm_options()}} to it; the other entries o
 \value{
 An object of class brmsfit which contains the posterior draws along
 with many other useful information about the model. Use methods(class =
-"brmsfit") for an overview on available methods.
+"brmsfit") for an overview on available methods. Their \code{newdata} argument
+takes data in the layout you gave to \code{bmm()} (see \code{\link[=standata.bmmfit]{standata.bmmfit()}}).
 }
 \description{
 Fit a Bayesian measurement model using \strong{brms} as a
