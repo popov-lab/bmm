@@ -2134,6 +2134,36 @@ configure_model.mpt <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rmpt() takes one tree and one size per call, so rows are drawn in groups of
+# identical trees, trials, covariates and values. The simplex members are
+# probabilities on both scales
+#' @export
+simulate_data.mpt <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, c(vars$tree_id, vars$covariates), trials = "n_trials")
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  for (group in vars$simplex) {
+    stopif(any(abs(Reduce(`+`, p[group]) - 1) > 1e-8),
+           "The simplex parameters {collapse_comma(group)} are probabilities that \\
+           must sum to 1 in every row.")
+  }
+  tree <- if (is.null(vars$tree_id)) rep(names(vars$trees)[1], nrow(design)) else
+    as.character(design[[vars$tree_id]])
+  cats <- model$resp_vars$resp_cats
+  counts <- matrix(0L, nrow(design), length(cats), dimnames = list(NULL, cats))
+  for (idx in .row_groups(data.frame(tree, design[c("n_trials", vars$covariates)], p))) {
+    i <- idx[1]
+    counts[idx, ] <- rmpt(length(idx), design$n_trials[i], vapply(p, `[`, numeric(1), i), model,
+                          tree = tree[i], covariates = as.list(design[i, vars$covariates, drop = FALSE]))
+  }
+  .simulate_result(design, as.data.frame(counts), sim)
+}
+
+############################################################################# !
 # CONFIGURE_PRIOR S3 METHODS                                             ####
 ############################################################################# !
 

@@ -642,6 +642,30 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# kcrit at its fixed -100 leaves out the guess categories (R/K); any other
+# value adds them (R/K/G). sigmar and rho reach the generator on the model's
+# own scale, as the log SD and the unconstrained correlation
+#' @export
+simulate_data.sdt_cdp <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, vars$stimulus, trials = "n_trials")
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  deltas <- p[grep("^delta[0-9]+$", names(p))]
+  thresholds <- .cdp_make_thresholds(p$criterion, p$spacing, vars$n_new, vars$n_old, vars$threshold_type,
+                                     if (length(deltas)) do.call(cbind, deltas))
+  kcrit <- if (!all(p$kcrit == model$fixed_parameters$kcrit)) p$kcrit
+  counts <- rsdt_cdp(nrow(design), design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
+                     dfam = p$dfam, drec = p$drec, thresholds = thresholds, rcrit = p$rcrit,
+                     kcrit = kcrit, sigmar = p$sigmar, rho = p$rho, n_new = vars$n_new, dist = vars$dist)
+  colnames(counts) <- paste0(model$resp_vars$response, colnames(counts))
+  .simulate_result(design, as.data.frame(counts), sim)
+}
+
 # Code-generate the Stan `sdt_cdp_logmu` category logit. The per-distance
 # log_distance deltas arrive as fixed-arity `real deltaN` args (matching the
 # order in .sdt_cdp_logmu_args) and are packed into a contiguous `deltas` array

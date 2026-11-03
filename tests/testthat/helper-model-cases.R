@@ -23,6 +23,12 @@
 #   every model needs one
 # - links: list(model, settable), for test-links.R: settable is what
 #   settable_links(model) returns, written out; every model needs one
+# - simulate: list(model, pars, design, formula, simulate_pars), for
+#   test-simulate-data.R: simulate_data() output passes check_data() and a mock
+#   fit for formula; pars on the link scale and simulate_pars (every parameter,
+#   the fixed ones included, on the link scale) written as literals; every
+#   model needs one per version (checked); response names the response columns
+#   where the model's resp_vars do not
 # - fixture: list(file), for the tests that read a stored fit
 #   (test-pp_check.R, test-report-extract.R): a file in tests/testthat/assets
 #   written by tests/local/make-fixtures.R

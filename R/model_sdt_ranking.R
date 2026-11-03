@@ -377,6 +377,26 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# sdratio is the log of the SD ratio by definition, behind an identity link;
+# rank columns beyond the largest set size hold no responses
+#' @export
+simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, trials = "n_trials", counts = if (is.character(vars$m)) vars$m)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  counts <- rsdt_ranking(nrow(design), design$n_trials, .sdt_resolve_set_size(vars$m, design),
+                         d = p$d, sdratio = exp(p$sdratio %||% 0), dist = vars$dist)
+  resp <- model$resp_vars$response
+  response <- matrix(0L, nrow(design), length(resp), dimnames = list(NULL, resp))
+  response[, seq_len(ncol(counts))] <- counts
+  .simulate_result(design, as.data.frame(response), sim)
+}
+
 
 # Substitute the quadrature tokens in sdt_ranking_functions.stan with the rules that
 # .ranking_gh_n() and .ranking_gl_rule() select for the data's largest set size;
