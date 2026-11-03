@@ -366,3 +366,7 @@ last.
   CPU to its summary and keeps `lscpu` in the timings artifact, so a suite
   breach can be read against the hardware, and so a later change can
   calibrate the suite cap per pool.
+  The two new files join `update` in `Config/testthat/start-first`
+  (DESCRIPTION), which matches whole names: unlisted, they started last and
+  the first run of the split took 906 s of wall time for 3046 s of tests on
+  the slow pool.
