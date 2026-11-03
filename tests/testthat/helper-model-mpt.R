@@ -42,6 +42,7 @@ model_cases_mpt <- function() {
                  sd = c(D = "exponential(1)", g = "exponential(1)"))
     ),
     init = list(mpt = list(model = model, formula = re_formula, data = toy_mpt_data())),
-    links = list(mpt = list(model = model, settable = c("D", "g")))
+    links = list(mpt = list(model = model, settable = c("D", "g"))),
+    fixture = list(mpt = list(file = "bmmfit_mpt_ppcheck.rds"))
   )
 }

@@ -91,6 +91,35 @@ test_that("ppp() computes T2 as in Klauer (2010), across cells", {
   expect_equal(unname(attr(res, "draws")$T2[, "replicated"]), klauer_t2(wide(replicated), cells, n))
 })
 
+test_that("ppp() T2 of a stored mpt fit equals Klauer's T2 on its own draws (#560)", {
+  # the mocks above skip what a fit adds: brms's draw arrays, the tree of each
+  # row read from the tree indicators, the participant read from (1 | id)
+  fit <- load_fixture_fit("bmmfit_mpt_ppcheck.rds")
+  res <- withr::with_seed(560, ppp(fit, statistic = "T2"))
+  replicated <- withr::with_seed(560, brms::posterior_predict(fit))
+  expected <- brms::posterior_epred(fit)
+  data <- fit$data
+  indicators <- fit$bmm$model$other_vars$indicators$tree
+  # the rows of each tree in participant order, so that a row of the wide
+  # matrices is one participant across both trees
+  rows_of <- lapply(indicators, function(column) {
+    rows <- which(data[[column]] == 1L)
+    rows[order(data$id[rows])]
+  })
+  expect_equal(lengths(rows_of), c(old = 10L, new = 10L))
+  n <- vapply(rows_of, function(rows) rowSums(data$Y[rows, , drop = FALSE]), numeric(10))
+  klauer_draws <- function(counts) {
+    vapply(seq_len(dim(expected)[1]), function(d) {
+      wide <- do.call(cbind, lapply(rows_of, function(rows) counts(d)[rows, , drop = FALSE]))
+      klauer_t2(wide, lapply(rows_of, function(rows) expected[d, rows, ]), n)
+    }, numeric(1))
+  }
+  draws <- attr(res, "draws")$T2
+  expect_equal(nrow(draws), 150L)
+  expect_equal(unname(draws[, "observed"]), klauer_draws(function(d) unclass(data$Y)))
+  expect_equal(unname(draws[, "replicated"]), klauer_draws(function(d) replicated[d, , ]))
+})
+
 test_that("T2 is 0 when the observed covariance is the one the model implies", {
   # E[cov(counts)] by enumeration: 3 participants, 3 binomial trials each
   n_trials <- 3
