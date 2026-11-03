@@ -685,7 +685,7 @@ test_that("the search message states why the branches are searched (#560)", {
   repeated <- mpt(mpt_tree("t", list(hit = "1 - (1 - D)^n", miss = "(1 - D)^n")), covariates = "n")
   expect_message(
     check_data(repeated, data.frame(n = 1:300, hit = 5, miss = 5), bmf(D ~ 1)),
-    "'miss' in tree 't' is approximate.*65,536 points \\(a grid over the parameters for each"
+    "'hit' in tree 't', category 'miss' in tree 't' is approximate.*65,536 points \\(a grid over the parameters for each"
   )
   expect_message(
     mpt(mpt_tree("t", list(y = "0.5 + 0.5 * (a - 0.3)^2", n = "0.5 - 0.5 * (a - 0.3)^2"))),
@@ -734,8 +734,8 @@ test_that("the search message names the reason for pair clustering over the grid
   expect_message(
     check_data(pairs, data, bmf(c ~ 1, r ~ 1, u ~ 1)),
     paste0(
-      "'E4' in tree 'pairs' is approximate.*65,536 points.*",
-      "unsearched 11,488 of the 12,000 .*'E3' in tree 'pairs'; ",
+      "'E2' in tree 'pairs', category 'E3' in tree 'pairs', category 'E4' in tree 'pairs' is approximate.*65,536 points.*",
+      "unsearched 11,488 of the 12,000 .*'E2' in tree 'pairs', category 'E3' in tree 'pairs'; ",
       "it left unsearched 23,488 of the 24,000 .*'E4' in tree 'pairs'\\."
     )
   )

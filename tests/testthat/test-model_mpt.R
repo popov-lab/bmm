@@ -1538,6 +1538,7 @@ test_that("check_data() warns when the covariate values in the data leave the mo
     check_data(model, layout(0.5), formula),
     paste0(
       "not identified with the covariate values in the data.*rank 2 of 3 .*",
+      "the combination of all free parameters is not identified.*",
       "'x' takes a single value within tree\\(s\\) 'old', 'new'.*rank is 3"
     )
   )
