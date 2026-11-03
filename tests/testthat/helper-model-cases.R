@@ -4,7 +4,7 @@
 # That file defines a function model_cases_<model>() returning a list with any
 # of these elements, each a named list of cases:
 # - stored_frame: list(model, formula, data), for the stored-frame checks of
-#   test-update.R; every model needs one
+#   test-update-stored-frame.R and test-update-newdata.R; every model needs one
 # - check_data: list(model, data), named after the model, for the check in
 #   test-helpers-data.R that check_data() returns a data.frame, when the data
 #   shared by the other models cannot serve the model
@@ -23,14 +23,41 @@
 #   every model needs one
 # - links: list(model, settable), for test-links.R: settable is what
 #   settable_links(model) returns, written out; every model needs one
+# - simulate: list(model, pars, design, formula, simulate_pars), for
+#   test-simulate-data.R: simulate_data() output passes check_data() and a mock
+#   fit for formula; pars on the link scale and simulate_pars (every parameter,
+#   the fixed ones included, on the link scale) written as literals; every
+#   model needs one per version (checked); response names the response columns
+#   where the model's resp_vars do not
 # - fixture: list(file), for the tests that read a stored fit
 #   (test-pp_check.R, test-report-extract.R): a file in tests/testthat/assets
 #   written by tests/local/make-fixtures.R
+# - specimen: a built model, named after the model, for the checks that read
+#   the parameters and links a model declares (test-helpers-model.R,
+#   test-helpers-parameters.R), when the constructor called without arguments
+#   declares none, as mpt() does without trees; read through model_specimen()
 # Case names start with the model's name and are unique across providers.
 model_test_cases <- function(kind) {
   env <- environment(model_test_cases)
   providers <- ls(env, pattern = "^model_cases_")
   unlist(lapply(providers, function(p) env[[p]]()[[kind]]), recursive = FALSE)
+}
+
+# the model whose declared parameters and links a check reads: the specimen
+# of the model's own provider (the other providers are not built), or what the
+# constructor returns without arguments
+model_specimen <- function(model, version = NA) {
+  provider <- environment(model_test_cases)[[paste0("model_cases_", model)]]
+  specimen <- provider()$specimen[[model]]
+  if (!is.null(specimen)) {
+    # one specimen stands for one version; for a model with versions it would
+    # be checked once per version while the versions themselves go unchecked
+    if (!is.na(version)) {
+      stop("model_specimen(): the specimen of '", model, "' covers no version; version '", version, "' was asked for")
+    }
+    return(specimen)
+  }
+  if (is.na(version)) get_model(model)() else get_model(model)(version = version)
 }
 
 # a mock fit of a stored-frame case, whose model frame is what update() and

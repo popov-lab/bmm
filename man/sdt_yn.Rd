@@ -7,7 +7,7 @@
 sdt_yn(
   response,
   stimulus,
-  n_trials,
+  n_trials = NULL,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   links = NULL,
   ...
@@ -15,7 +15,9 @@ sdt_yn(
 }
 \arguments{
 \item{response}{The name of the variable in the dataset containing the
-count of "old"/"signal" responses for each cell.}
+count of "old"/"signal" responses for each cell, or, with one row per
+trial (\code{n_trials = NULL}), 1 for an "old"/"signal" response and 0 for a
+"new"/"noise" response.}
 
 \item{stimulus}{The name of the variable in the dataset coding the stimulus
 type: 0 (noise/new) and 1 (signal/old). Logical, and factor or character
@@ -26,9 +28,8 @@ column but are stricter, accepting only numeric or logical input.}
 
 \item{n_trials}{The name of the variable in the dataset containing the
 total number of trials for each cell. It may differ from cell to cell.
-Trial-level data also works: keep one row per trial, with the column
-named by \code{response} holding 0 or 1 and the column named by \code{n_trials}
-holding \code{1}s.}
+\code{NULL} (the default) declares one row per trial: the column named by
+\code{response} then holds 0 or 1 in every row.}
 
 \item{dist}{The noise distribution assumed for the latent evidence variable,
 given here by its cumulative distribution function. One of:
@@ -59,7 +60,8 @@ An object of class \code{bmmodel}
 \description{
 Estimates sensitivity (\code{d}, which is \eqn{d'} under equal
 variance and \eqn{d_a} once \code{sdratio} is estimated) and the decision
-criterion from yes/no detection or old/new recognition counts. The
+criterion from yes/no detection or old/new recognition data, one row per
+trial or counts per cell. The
 criterion is estimated either as \code{criterion}, measured from the mean of the
 noise distribution, or as \code{bias}, measured from the midpoint between the
 noise and signal means; the formula names the one to estimate.
@@ -75,7 +77,7 @@ noise and signal means; the formula names the one to estimate.
 }
 \item \strong{Requirements:}
 
-Provide pre-aggregated data with the following columns:
+Provide aggregated data, one row per cell, with the following columns:
 }
 \itemize{
 \item Response counts (response): number of 'old'/'signal' responses
@@ -124,6 +126,22 @@ Provide pre-aggregated data with the following columns:
 \item \code{effects}: normal(0, 0.3)
 \item \code{sd}: exponential(2)
 }
+}
+\item \strong{Requirements for one row per trial:}
+
+Provide one row per trial with the following columns:
+}
+\itemize{
+\item Response (response): 1 = 'old'/'signal', 0 = 'new'/'noise'
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+}
+\itemize{
+\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
+\itemize{
+\item With \code{criterion} (the default), an item's effect on \code{d} is informed only by the trials on which the item is the signal: on noise trials \code{d} does not enter the likelihood, so the item effects on \code{d} of items shown only as noise stay at their prior. With \code{bias}, \code{d} also moves the criterion and enters every trial.
+\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log binomial coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
+\item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.
+\item \code{ppp(fit, participant = "id")} names the participant when the formula has more than one grouping variable, such as item terms.
 }
 }
 }

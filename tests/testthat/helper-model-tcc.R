@@ -46,6 +46,24 @@ model_cases_tcc <- function() {
         model = bins, data = data.frame(bin = c(0, 3, -7, 90, 181, 12)), formula = bmf(d ~ 1)
       ),
       tcc_options = list(model = options, data = opt_data, formula = bmf(d ~ 1))
+    ),
+    simulate = list(
+      tcc = list(
+        model = model, pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_bins = list(
+        model = bins, pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_gumbel = list(
+        model = gumbel, pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_options = list(
+        model = options, pars = list(d = 0.5), design = opt_data[rep(1:6, 10), c("o1", "o2", "o3", "ID")],
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      )
     )
   )
 }
