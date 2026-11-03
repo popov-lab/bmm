@@ -199,7 +199,7 @@ test_that("parameter_label() keeps the name before the first separator", {
 test_that("estimated parameter labels have balanced parentheses", {
   for (model in model_names()) {
     for (version in model_versions(model)) {
-      spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+      spec <- model_specimen(model, version)
       estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
       labels <- parameter_label(vapply(spec$parameters[estimated], as.character, ""))
       open <- lengths(regmatches(labels, gregexpr("(", labels, fixed = TRUE)))
@@ -258,7 +258,7 @@ test_that("check_model() refuses invalid models and accepts valid models", {
   okmodels <- model_names()
   for (model in okmodels) {
     if (model == "m3") next
-    model <- get_model(model)()
+    model <- model_specimen(model)
     expect_silent(check_model(model))
     expect_type(check_model(model), "list")
   }
