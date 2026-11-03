@@ -369,6 +369,25 @@ configure_model.cswald_crisk <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# the simple version's bound is the distance from a centred start point to
+# either boundary, as in pp_simulate.cswald_simple()
+#' @export
+simulate_data.cswald <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  out <- if (model$version == "simple") {
+    rcswald(nrow(design), p$drift, 2 * p$bound, p$ndt, zr = 0.5, s = p$s)
+  } else {
+    rcswald(nrow(design), p$drift, p$bound, p$ndt, zr = p$zr, s = p$s)
+  }
+  .simulate_result(design, .rt_response(model, out), sim)
+}
+
 log_lik_cswald_crisk <- function(i, prep) {
   drift <- brms::get_dpar(prep, "drift", i = i)
   bound <- brms::get_dpar(prep, "bound", i = i)

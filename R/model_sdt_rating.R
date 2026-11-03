@@ -780,6 +780,35 @@ configure_model.sdt_rating <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                                ####
+############################################################################# !
+
+# sdratio, spacing and the deltas are defined on the log scale behind identity
+# links (.sdt_make_thresholds() exponentiates the latter two), Ro and Rn on the
+# logit scale and logmratio as log(meta-d' / d)
+#' @export
+simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, vars$stimulus, trials = "n_trials")
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  sdratio <- exp(p$sdratio)
+  criterion <- .sdt_resolve_criterion(p$criterion, p$bias, p$d, sdratio)
+  deltas <- p[grep("^delta[0-9]+$", names(p))]
+  thresholds <- .sdt_make_thresholds(criterion, vars$n_ratings, vars$threshold_type, p$spacing,
+                                     if (length(deltas)) do.call(cbind, deltas))
+  args <- list(nrow(design), design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
+               d = p$d, thresholds = thresholds, sdratio = sdratio, dist = vars$dist)
+  counts <- switch(model$version,
+    standard = do.call(rsdt_rating, args),
+    dpsdt = do.call(rsdt_dpsdt, c(args, list(Ro = stats::plogis(p$Ro), Rn = stats::plogis(p$Rn)))),
+    metad = do.call(rsdt_metad, c(args, list(metad = exp(p$logmratio) * p$d)))
+  )
+  colnames(counts) <- model$resp_vars$response
+  .simulate_result(design, as.data.frame(counts), sim)
+}
+
 
 #' @title Rating SDT category log-probability (multinomial logit)
 #' @description R companion to the Stan `sdt_rating_logmu` function. It returns

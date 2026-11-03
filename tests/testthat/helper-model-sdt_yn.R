@@ -34,6 +34,18 @@ model_cases_sdt_yn <- function() {
       sdt_yn = list(model = model, data = data,
                     formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id), sdratio ~ 1))
     ),
-    links = list(sdt_yn = list(model = model, settable = c("d", "criterion", "bias")))
+    links = list(sdt_yn = list(model = model, settable = c("d", "criterion", "bias"))),
+    simulate = list(
+      sdt_yn = list(
+        model = sdt_yn("n_old", "stimulus", "n_trials"), pars = list(d = 1.2, criterion = 0.4),
+        design = data.frame(id = rep(1:2, each = 2), stimulus = rep(0:1, 2), n_trials = 50),
+        formula = bmf(d ~ 1, criterion ~ 1), simulate_pars = list(d = 1.2, criterion = 0.4, sdratio = 0)
+      ),
+      sdt_yn_bias = list(
+        model = sdt_yn("n_old", "stimulus", "n_trials"), pars = list(d = 1.2, bias = 0.2),
+        design = data.frame(stimulus = 0:1, n_trials = 50),
+        formula = bmf(d ~ 1, bias ~ 1), simulate_pars = list(d = 1.2, bias = 0.2, sdratio = 0)
+      )
+    )
   )
 }

@@ -170,6 +170,28 @@ test_that("every model has a model-case provider with the cases every model need
   }
 })
 
+test_that("every model has a simulate_data() method and a simulate case per version (R4)", {
+  # coverage is read per version class, because a method that dispatches on
+  # model$version can miss a version silently. A model whose generator cannot
+  # produce data that check_data() accepts is listed here with its reason;
+  # none on develop
+  exempt <- character(0)
+  versions <- unlist(lapply(model_names(), function(name) {
+    version <- eval(formals(get(name, mode = "function"))$version)
+    if (is.null(version)) name else paste0(name, "_", version)
+  }))
+  covered <- unlist(lapply(model_test_cases("simulate"), function(case) class(case$model)))
+  has_method <- vapply(model_names(), function(name) {
+    !is.null(utils::getS3method("simulate_data", name, optional = TRUE))
+  }, logical(1))
+  missing <- setdiff(c(versions, model_names()[!has_method]), c(covered, exempt))
+  expect_identical(missing, character(0), info = paste0(
+    "R4: no 'simulate' case for these models/versions: ", collapse_comma(missing),
+    "; add a `simulate` case to model_cases_<model>() and a simulate_data.<model> method; ",
+    "see ?simulate_data"
+  ))
+})
+
 test_that("every model constructor with ... reports arguments it does not use (#552)", {
   # a constructor is an export that builds its model with a .model_*()
   # internal; read from the namespace, so a new model is caught without a list
