@@ -441,7 +441,10 @@ test_that("the Stan sdt_mafc likelihood matches dsdt_mafc row by row and over bl
   inf_dist <- c(1L, 4L, 2L)
   forced <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 7L, y = c(7L, 7L, 0L))
   contradicting <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 9L, y = c(8L, 8L, 1L))
-  good <- rbind(grid[names(forced)], forced)
+  # forced rows lead their blocks: a likelihood that summed the first n_finite
+  # rows instead of the finite ones takes in the infinite logit only if it
+  # comes before a finite row
+  good <- rbind(forced, grid[names(forced)])
   good <- good[order(good$dist), ]
   grid <- rbind(good, contradicting)
   ok <- seq_len(nrow(good))
