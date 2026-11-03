@@ -311,11 +311,15 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
   candidates
 }
 
+# Cells numbered 1, 2, ... in lexical order of their values. Codes are combined
+# arithmetically, a column at a time: pasted labels coincide for (1, 5.2) and
+# (1.5, 2), pasted codes for (1, 12) and (11, 2)
 .ppp_index <- function(df) {
-  if (ncol(df) == 0L) {
-    return(rep(1L, nrow(df)))
-  }
-  as.integer(interaction(df, drop = TRUE, lex.order = TRUE))
+  Reduce(function(id, x) {
+    code <- if (is.factor(x)) as.integer(x) else match(x, sort(unique(x)))
+    key <- (id - 1) * max(code, 0L, na.rm = TRUE) + code
+    match(key, sort(unique(key)))
+  }, df, rep(1L, nrow(df)))
 }
 
 # sums the rows of a draws x rows x categories array within each group
