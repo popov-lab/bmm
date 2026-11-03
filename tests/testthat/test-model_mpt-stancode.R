@@ -93,3 +93,68 @@ test_that("models without a simplex group carry no simplex prior functions", {
     expect_no_match(code, "beta_lpdf|beta_rng")
   }
 })
+
+# Golden Stan code: any change to the program of these three models fails the
+# snapshots in _snaps/model_mpt-stancode.md, including a change that comes with
+# a new brms version. After an intended change, read the diff that the failure
+# prints, then accept it with testthat::snapshot_accept("model_mpt-stancode")
+# (or snapshot_review("model_mpt-stancode") to see both versions side by side).
+# The header line naming the brms and bmm versions is left out.
+golden_stancode <- function(formula, data, model) {
+  code <- suppressMessages(stancode(formula, data, model))
+  cat(sub("^// generated with [^\n]*\n", "", code))
+}
+
+test_that("the Stan code of the two-high-threshold model is unchanged", {
+  skip_on_cran() # expect_snapshot() skips there anyway; this skips building the code
+  withr::local_seed(255)
+  expect_snapshot(golden_stancode(
+    bmf(D ~ 1 + (1 | id), g ~ 1), mpt_2htm_data(n_id = 2),
+    mpt(mpt_2htm_trees(), tree_id = "item_type")
+  ))
+})
+
+test_that("the Stan code of the pair-clustering model is unchanged", {
+  skip_on_cran() # expect_snapshot() skips there anyway; this skips building the code
+  pcm_tree <- mpt_tree("study", list(
+    C = "cp + (1 - cp) * rp * rp",
+    E = "2 * (1 - cp) * rp * (1 - rp)",
+    U = "(1 - cp) * (1 - rp) * (1 - rp)"
+  ))
+  expect_snapshot(golden_stancode(
+    bmf(cp ~ 1 + (1 | id), rp ~ 1), data.frame(id = factor(1:2), C = 20L, E = 12L, U = 8L),
+    mpt(pcm_tree)
+  ))
+})
+
+test_that("the Stan code of the Oberauer and Lewandowsky (2019) model is unchanged", {
+  skip_on_cran() # expect_snapshot() skips there anyway; this skips building the code
+  # the model and formula of the real-data section of the MPT article
+  dat <- oberauer_lewandowsky_2019_e1
+  dat$cond <- factor(dat$cond,
+    levels = c("new distractors", "old reordered", "old same"),
+    labels = c("newdist", "oldreord", "oldsame")
+  )
+  dat$tree <- ifelse(dat$cond == "newdist", "newdist", "nodist")
+  trees <- list(
+    mpt_tree("newdist", list(
+      corr  = "Pi * Pb + Pi * (1 - Pb) * (1 - Pd) * (1/5) + (1 - Pi) * (1/15)",
+      other = "Pi * (1 - Pb) * (1 - Pd) * (4/5) + (1 - Pi) * (4/15)",
+      dist  = "Pi * (1 - Pb) * Pd + (1 - Pi) * (5/15)",
+      npl   = "(1 - Pi) * (5/15)"
+    )),
+    mpt_tree("nodist", list(
+      corr  = "Pi * Pb + Pi * (1 - Pb) * (1/5) + (1 - Pi) * (1/15)",
+      other = "Pi * (1 - Pb) * (4/5) + (1 - Pi) * (4/15)",
+      npl   = "(1 - Pi) * (10/15)"
+    ), impossible = "dist")
+  )
+  expect_snapshot(golden_stancode(
+    bmf(
+      Pi ~ 0 + cond + (0 + cond || ID),
+      Pb ~ 0 + cond + (0 + cond || ID),
+      Pd ~ 1 + (1 | ID)
+    ),
+    dat, mpt(trees, tree_id = "tree")
+  ))
+})
