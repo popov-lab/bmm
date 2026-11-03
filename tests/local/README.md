@@ -57,7 +57,9 @@ Files:
   `test-mpt-known-values.R` (one `mpt()` fit per model feature on data
   simulated with known parameters: impossible categories, a covariate,
   restrictions, the probit link, a random intercept, a non-linear parameter
-  formula, a single tree, an EQN import) and
+  formula, a single tree, an EQN import), `test-mpt-likelihood.R` (the
+  `log_lik()`, `lp__` and `posterior_epred()` of an `mpt()` fit with an
+  impossible category against `dmpt()` at the same draws) and
   `test-ppp-fits.R` (`ppp()` on well-specified, misspecified and
   impossible-category `mpt()` fits). Keep each fit
   short (one or two chains, a few hundred iterations) and assert with
