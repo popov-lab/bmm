@@ -155,9 +155,10 @@ cells.
 Simulated `mean_rt` is not truncated at `ndt`. When a summary rests on
 few responses (a handful of trials in version `"3par"`, or a rarely
 reached boundary in version `"4par"`, whatever `n_trials` is), `rezdm()`
-can return `mean_rt` below `ndt` or even `mean_rt <= 0`, which
-[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) rejects; drop
-those rows before fitting.
+can return `mean_rt` below `ndt` or even `mean_rt <= 0`.
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) rejects only
+the non-positive mean RTs; drop those rows before fitting. Values below
+`ndt` are valid draws.
 
 ## References
 

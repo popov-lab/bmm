@@ -177,7 +177,9 @@ on, three rules apply:
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data
 layout a model expects. From the release that adds or exports them,
-`model_spec()`, `simulate_data()` and
+`model_spec()`,
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+and
 [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
 are covered too ([ADR
 0005](https://venpopov.com/bmm/.dev/decisions/0005-model-contract-for-companions-and-extensions.md)).
@@ -243,14 +245,17 @@ them rely on one contract, described in [ADR
   alternative groups, its default priors and init ranges, its response
   and other variables, the role of each data column, the names of its
   density and generator functions, and the contract version;
-- the simulation generic `simulate_data()` and every model’s method for
-  it;
+- the simulation generic
+  [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+  and every model’s method for it;
 - the exported density and generator functions, and
   [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md).
 
 Reading a model object with `$`, its attributes, and internal functions
 are not part of the contract. Code in other packages should not rely on
-them. `model_spec()`, `simulate_data()` and the export of
+them. `model_spec()`,
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+and the export of
 [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
 are being added for 1.5.0 (the generic possibly for 1.6.0); each item is
 covered from the release that contains it. Until the 1.6.0 release pins
@@ -280,10 +285,12 @@ the contract:
 
 A new model has to meet the contract too: once the accessor and the
 generic are in bmm, it needs a complete `model_spec()` and a
-`simulate_data()` method.
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+method.
 [`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)
-will scaffold the `simulate_data()` method, and a convention test will
-fail until the model has both.
+will scaffold the
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+method, and a convention test will fail until the model has both.
 
 ### The companion packages job
 

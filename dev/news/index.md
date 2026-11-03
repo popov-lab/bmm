@@ -75,6 +75,17 @@
   [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
   returns the weights
   ([\#635](https://github.com/popov-lab/bmm/issues/635)).
+- New
+  [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+  simulates data from any bmm model, given its parameters on the model’s
+  own scale (the link scale, or the native scale with
+  `scale = "native"`) and a design, in the layout
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) expects: pass
+  the result to [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)
+  as it is. The true values come back on the link scale in
+  `attr(, "simulate_pars")`. Packages that validate bmm models no longer
+  need an adapter for each model
+  ([\#634](https://github.com/popov-lab/bmm/issues/634)).
 - [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
   [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) now
   take one row per trial: leave out `n_trials` and code `response` as 0

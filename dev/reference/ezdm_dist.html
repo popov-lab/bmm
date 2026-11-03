@@ -199,8 +199,9 @@ chance, so the ratio grows with the number of cells.</p>
 <p>Simulated <code>mean_rt</code> is not truncated at <code>ndt</code>. When a summary rests on few
 responses (a handful of trials in version <code>"3par"</code>, or a rarely reached
 boundary in version <code>"4par"</code>, whatever <code>n_trials</code> is), <code>rezdm()</code> can
-return <code>mean_rt</code> below <code>ndt</code> or even <code>mean_rt &lt;= 0</code>, which <code><a href="bmm.html">bmm()</a></code>
-rejects; drop those rows before fitting.</p>
+return <code>mean_rt</code> below <code>ndt</code> or even <code>mean_rt &lt;= 0</code>. <code><a href="bmm.html">bmm()</a></code> rejects
+only the non-positive mean RTs; drop those rows before fitting. Values
+below <code>ndt</code> are valid draws.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

@@ -528,6 +528,9 @@ Functions for special distributions
   [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md) :
   Distribution functions for Yes/No SDT
 
+- [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+  : Simulate data from a bmm model
+
 ## Data, model and parameter transformations
 
 Utility functions for transforming data and parameters
