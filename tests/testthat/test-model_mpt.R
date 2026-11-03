@@ -456,6 +456,16 @@ test_that("mpt() refuses a link for a parameter the restrictions removed", {
   expect_equal(model$links, list(Do = "probit", g = "logit"))
 })
 
+test_that("a per-parameter link reaches the Stan code of that parameter only", {
+  withr::local_seed(255)
+  code <- suppressMessages(stancode(
+    bmf(D ~ 1, g ~ 1), mpt_2htm_data(n_id = 2),
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "probit"))
+  ))
+  expect_match(code, "Phi(nlp_D[n])", fixed = TRUE)
+  expect_match(code, "inv_logit(nlp_g[n])", fixed = TRUE)
+})
+
 test_that("a malformed links list is described for mpt(), not with another model's example", {
   trees <- mpt_2htm_trees()
   expect_error(
@@ -1069,6 +1079,15 @@ test_that("restrictions are substituted into the trees before parameters are ide
     mpt(cov_tree, covariates = "gc", restrictions = "gc = 0.5"),
     "Covariates"
   )
+})
+
+test_that("a chain of equality restrictions resolves to its last parameter", {
+  # three links: one pass over the restrictions resolves only two
+  tree <- mpt_tree("t", list(
+    w = "a * b", x = "a * (1 - b)", y = "(1 - a) * c * d * e", z = "(1 - a) * (1 - c * d * e)"
+  ))
+  model <- mpt(tree, restrictions = c("b = c", "c = d", "d = e"))
+  expect_named(model$parameters, c("a", "e"), ignore.order = TRUE)
 })
 
 mpt_sep_trees <- function() {
