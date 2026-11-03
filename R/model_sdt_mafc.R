@@ -149,6 +149,7 @@ sdt_mafc <- function(response, n_trials, m,
                      dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
                      links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
 

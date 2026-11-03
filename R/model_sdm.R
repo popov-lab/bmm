@@ -95,6 +95,7 @@ settable_links.sdm <- function(model) {
 #' )
 sdm <- function(resp_error, version = "simple", ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   version <- match.arg(version)
   .model_sdm(resp_error = resp_error, version = version, call = call, ...)
@@ -106,6 +107,7 @@ sdm <- function(resp_error, version = "simple", ...) {
 sdmSimple <- function(resp_error, version = "simple", ...) {
   warning2("The function `sdmSimple()` is deprecated. Please use `sdm()` instead.")
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   .model_sdm(resp_error = resp_error, version = version, call = call, ...)
 }

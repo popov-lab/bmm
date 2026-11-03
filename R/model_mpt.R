@@ -825,6 +825,7 @@ generated_parameters.mpt <- function(model) {
 mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
                 restrictions = NULL, links = "logit", ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "default_priors")
   stop_missing_args()
   # NULL means the default, as in the other model constructors
   links <- links %||% "logit"

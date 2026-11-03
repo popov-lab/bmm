@@ -583,6 +583,7 @@ sdt_rating <- function(response, stimulus,
                        version = c("standard", "dpsdt", "metad"),
                        links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
   threshold_type <- match.arg(threshold_type)

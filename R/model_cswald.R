@@ -183,6 +183,7 @@
 #' )
 cswald <- function(rt, response, links = NULL, version = c("simple", "crisk"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
   .model_cswald(

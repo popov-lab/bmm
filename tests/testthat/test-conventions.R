@@ -167,3 +167,50 @@ test_that("every model has a model-case provider with the cases every model need
                      info = paste0("R4: no '", kind, "' case for these models"))
   }
 })
+
+test_that("every model constructor with ... reports arguments it does not use (#552)", {
+  # a constructor is an export that builds its model with a .model_*()
+  # internal; read from the namespace, so a new model is caught without a list
+  ns <- asNamespace("bmm")
+  exports <- Filter(function(f) is.function(f) && "..." %in% names(formals(f)),
+                    mget(getNamespaceExports("bmm"), envir = ns, inherits = TRUE))
+  calls <- lapply(exports, function(f) all.names(body(f)))
+  constructors <- names(calls)[vapply(calls, function(x) any(grepl("^\\.model_", x)), logical(1))]
+  unchecked <- constructors[!vapply(calls[constructors], function(x) {
+    ".check_constructor_dots" %in% x
+  }, logical(1))]
+  expect_gt(length(constructors), 10)
+  expect_identical(sort(unchecked), character(0),
+                   info = "call .check_constructor_dots() after call <- match.call()")
+
+  calls_to <- function(expr, pattern) {
+    if (!is.call(expr)) return(list())
+    own <- if (is.name(expr[[1]]) && grepl(pattern, as.character(expr[[1]]))) list(expr) else list()
+    inner <- lapply(seq_along(expr)[-1], function(i) {
+      if (identical(expr[[i]], quote(expr = ))) list() else calls_to(expr[[i]], pattern)
+    })
+    c(own, unlist(inner, recursive = FALSE))
+  }
+  strings <- function(expr) {
+    if (is.character(expr)) return(expr)
+    is_c <- is.call(expr) && identical(expr[[1]], quote(c))
+    if (is_c && all(vapply(as.list(expr)[-1], is.character, logical(1)))) unlist(as.list(expr)[-1]) else NULL
+  }
+  # a constructor that reaches its internal through another helper or by
+  # string is invisible to a static read of its body
+  for (name in setdiff(constructors, unchecked)) {
+    check <- as.list(match.call(ns$.check_constructor_dots,
+                                calls_to(body(exports[[name]]), "^\\.check_constructor_dots$")[[1]]))
+    internal_call <- calls_to(body(exports[[name]]), "^\\.model_")[[1]]
+    internal <- get(as.character(internal_call[[1]]), envir = ns)
+    passed <- names(internal_call)[nzchar(names(internal_call))]
+    expected <- setdiff(names(formals(internal)), c(passed, "call", "..."))
+    expect_identical(sort(strings(check$known) %||% character()), sort(expected), label = name,
+                     info = paste0("known = must list the ", as.character(internal_call[[1]]),
+                                   "() formals that ", name, "() leaves to `...`"))
+    for (arg in c("known", "deprecated")) {
+      expect_true(is.null(check[[arg]]) || is.character(strings(check[[arg]])),
+                  label = paste0(name, ": ", arg, " is a character literal"))
+    }
+  }
+})
