@@ -857,9 +857,12 @@ test_that("both Stan yes/no likelihoods match dsdt_yn", {
   # compared with dsdt_yn(); called on all rows of one dist, with their sum
   # over the one-row calls, which a row read at another row's index would break.
   # The equal-variance path (last argument 1) runs on every row too, and must
-  # give the general path's bits wherever sdratio is 1
+  # give the general path's bits wherever sdratio is 1. It is what every fit
+  # with sdratio at its default runs, so its blocks are checked against its own
+  # rows as well: a one-row slice cannot see a row read at another index
   sc <- system.file("stan_chunks", package = "bmm")
   one_row <- "(y[i:i] | rep_vector(0, 1), d[i:i], crit[i:i], sdratio[i:i], stimulus[i:i], dist[i], trials[i:i], "
+  block <- "(y[s:e] | rep_vector(0, e - s + 1), d[s:e], crit[s:e], sdratio[s:e], stimulus[s:e], dist[s], trials[s:e], "
   program <- paste0(
     "functions {\n", read_lines2(file.path(sc, "sdt_dist_functions.stan")), "\n",
     read_lines2(file.path(sc, "sdt_yn_functions.stan")), "\n}\n",
@@ -868,7 +871,7 @@ test_that("both Stan yes/no likelihoods match dsdt_yn", {
     "  array[K] int first; array[K] int last;\n}\n",
     "generated quantities {\n  vector[N] lp_crit; vector[N] lp_bias;\n",
     "  vector[N] ev_crit; vector[N] ev_bias;\n",
-    "  vector[K] all_crit; vector[K] all_bias;\n",
+    "  vector[K] all_crit; vector[K] all_bias; vector[K] all_ev_crit; vector[K] all_ev_bias;\n",
     "  for (i in 1:N) {\n",
     "    lp_crit[i] = sdt_yn_lpmf", one_row, "0);\n",
     "    lp_bias[i] = sdt_yn_bias_lpmf", one_row, "0);\n",
@@ -877,10 +880,10 @@ test_that("both Stan yes/no likelihoods match dsdt_yn", {
     "  }\n",
     "  for (k in 1:K) {\n",
     "    int s = first[k];\n    int e = last[k];\n",
-    "    all_crit[k] = sdt_yn_lpmf(y[s:e] | rep_vector(0, e - s + 1), d[s:e], crit[s:e],\n",
-    "                              sdratio[s:e], stimulus[s:e], dist[s], trials[s:e], 0);\n",
-    "    all_bias[k] = sdt_yn_bias_lpmf(y[s:e] | rep_vector(0, e - s + 1), d[s:e], crit[s:e],\n",
-    "                                   sdratio[s:e], stimulus[s:e], dist[s], trials[s:e], 0);\n",
+    "    all_crit[k] = sdt_yn_lpmf", block, "0);\n",
+    "    all_bias[k] = sdt_yn_bias_lpmf", block, "0);\n",
+    "    all_ev_crit[k] = sdt_yn_lpmf", block, "1);\n",
+    "    all_ev_bias[k] = sdt_yn_bias_lpmf", block, "1);\n",
     "  }\n}\n"
   )
   grid <- expand.grid(stimulus = 0:1, d = c(0.4, 2), crit = c(-0.6, 0.3, 1.4),
@@ -913,6 +916,10 @@ test_that("both Stan yes/no likelihoods match dsdt_yn", {
   expect_equal(stan("all_crit", K), as.vector(tapply(stan("lp_crit", N), grid$dist, sum)),
                tolerance = 1e-12)
   expect_equal(stan("all_bias", K), as.vector(tapply(stan("lp_bias", N), grid$dist, sum)),
+               tolerance = 1e-12)
+  expect_equal(stan("all_ev_crit", K), as.vector(tapply(stan("ev_crit", N), grid$dist, sum)),
+               tolerance = 1e-12)
+  expect_equal(stan("all_ev_bias", K), as.vector(tapply(stan("ev_bias", N), grid$dist, sum)),
                tolerance = 1e-12)
   equal <- grid$sdratio == 1
   expect_identical(stan("ev_crit", N)[equal], stan("lp_crit", N)[equal])
