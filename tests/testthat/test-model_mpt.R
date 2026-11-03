@@ -2224,6 +2224,62 @@ test_that("mpt compiles with structurally impossible categories", {
   ))
 })
 
+# tests/local/test-mpt-likelihood.R compares a fit's lp__ with dmpt() once a
+# week; evaluating the compiled model at fixed points needs no sampling, so the
+# same comparison runs on every pull request. Compiling the brms program takes
+# nearly all of its time (20 to 40 s on a laptop)
+test_that("the Stan log density of an mpt model with an impossible category equals dmpt()", {
+  skip_unless_stan_tests()
+  skip_on_cran() # compiles a Stan program
+  withr::local_seed(21)
+  withr::local_options(bmm.sort_data = FALSE)
+
+  # the impossible category puts the -100 linear predictor of bmf2bf.mpt()
+  # into the comparison
+  dat <- mpt_impossible_data(n_id = 2)
+  dat$corr <- dat$corr + stats::rbinom(nrow(dat), 10, 0.5)
+  model <- mpt(mpt_impossible_trees(), "tree")
+  formula <- bmf(Pm ~ 1, Pb ~ 1)
+  dir <- withr::local_tempdir()
+  stan_model <- cmdstanr::cmdstan_model(
+    cmdstanr::write_stan_file(stancode(formula, dat, model), dir = dir), quiet = TRUE
+  )
+  cmdstanr::write_stan_json(unclass(standata(formula, dat, model)), file.path(dir, "data.json"))
+  # (b_Pm, b_Pb) per row, unequal and of both signs, so that swapped parameters
+  # or links do not cancel
+  points <- rbind(c(0.4, 1.1), c(-1.3, 0.2), c(2, -2.5))
+  cmdstanr::write_stan_json(list(params_r = points), file.path(dir, "pars.json"))
+  # tbb.dll on Windows, as in the log_prob test of test-model_ezdm.R
+  run_path <- if (.Platform$OS.type == "windows") {
+    c(
+      getFromNamespace("toolchain_PATH_env_var", "cmdstanr")(),
+      getFromNamespace("tbb_path", "cmdstanr")()
+    )
+  }
+  status <- withr::with_path(run_path, system2(stan_model$exe_file(), c(
+    "method=log_prob", paste0("unconstrained_params=", file.path(dir, "pars.json")), "jacobian=1",
+    "data", paste0("file=", file.path(dir, "data.json")),
+    "output", paste0("file=", file.path(dir, "out.csv")), "sig_figs=18"
+  ), stdout = FALSE, stderr = file.path(dir, "stderr.txt")))
+  expect_equal(status, 0, info = paste(
+    readLines(file.path(dir, "stderr.txt"), warn = FALSE), collapse = "\n"
+  ))
+  stan_lp <- utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")$lp__
+
+  # lp__ as sampling reports it: the multinomial log-likelihood with its
+  # normalizing constant plus the logistic(0, 1) priors of the intercepts; the
+  # coefficients are unconstrained, so jacobian=1 adds nothing
+  counts <- as.matrix(dat[c("corr", "dist", "npl")])
+  r_lp <- apply(points, 1, function(b) {
+    pars <- c(Pm = stats::plogis(b[1]), Pb = stats::plogis(b[2]))
+    sum(vapply(seq_len(nrow(dat)), function(n) {
+      dmpt(counts[n, ], pars, model, tree = dat$tree[n])
+    }, numeric(1))) + sum(stats::dlogis(b, log = TRUE))
+  })
+  expect_length(stan_lp, nrow(points))
+  expect_lt(max(abs(stan_lp - r_lp)), 1e-10)
+})
+
 test_that("several levels of a factor can share one tree", {
   model <- mpt(mpt_impossible_trees(), tree_id = "tree")
   dat <- mpt_impossible_data()
