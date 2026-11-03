@@ -61,7 +61,10 @@ Files:
   `log_lik()`, `lp__` and `posterior_epred()` of an `mpt()` fit with an
   impossible category against `dmpt()` at the same draws) and
   `test-ppp-fits.R` (`ppp()` on well-specified, misspecified and
-  impossible-category `mpt()` fits). Keep each fit
+  impossible-category `mpt()` fits). `test-golden-stancode.R` fits nothing:
+  it fails when `golden_brms` in `tests/testthat/test-model_mpt-stancode.R`
+  differs from the installed brms, since the golden Stan code snapshots skip
+  there and would otherwise go unchecked after a brms release. Keep each fit
   short (one or two chains, a few hundred iterations) and assert with
   `expect_range()` or a tolerance, never with exact equality to a stored fit.
 - `make-fixtures.R`: regenerates every fixture in `tests/testthat/assets/`

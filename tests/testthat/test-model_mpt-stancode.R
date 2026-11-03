@@ -101,7 +101,8 @@ test_that("models without a simplex group carry no simplex prior functions", {
 # snapshot_review("model_mpt-stancode") to see both versions side by side).
 # The header line naming the brms and bmm versions is left out.
 # brms writes part of the program, so the snapshots skip under any brms other
-# than golden_brms: a brms release would otherwise fail every open PR at once.
+# than golden_brms: a brms release would otherwise fail every open PR at once,
+# and tests/local/test-golden-stancode.R fails weekly until they are re-recorded.
 # After a brms release, set golden_brms to the new version, run this file under
 # it, read the diff and accept it as above.
 golden_brms <- "2.23.0"
