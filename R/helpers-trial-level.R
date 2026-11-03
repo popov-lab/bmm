@@ -38,6 +38,17 @@ is_trial_level <- function(model) {
   model$other_vars$n_trials %||% "nTrials"
 }
 
+# The binomial likelihoods take all rows at once (loop = FALSE), and brms
+# slices only the response under reduce_sum, so their per-row arrays (vint1,
+# trials) are sliced here exactly when brms slices (see
+# brms_slices_likelihood). vint2 is dist_type, one code for every row
+.sdt_binomial_row_vars <- function() {
+  if (brms_slices_likelihood()) {
+    return(c("vint1[start:end]", "vint2[1]", "trials[start:end]"))
+  }
+  c("vint1", "vint2[1]", "trials")
+}
+
 # trial rows of the binomial models become cells of one trial each. nTrials is
 # the name the multinomial models already reserve for their trial counts; a
 # column the model reads under that name would be overwritten with 1s

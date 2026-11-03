@@ -246,11 +246,11 @@ configure_model.sdt_mafc <- function(model, data, formula) {
     dpars = c("mu", "d"),
     links = c("identity", model$links$d),
     type = "int",
-    loop = TRUE,
+    loop = FALSE,
     log_lik = log_lik_sdt_mafc,
     posterior_predict = posterior_predict_sdt_mafc,
     posterior_epred = posterior_epred_sdt_mafc,
-    vars = c("vint1[n]", "vint2[n]", "trials[n]",
+    vars = c(.sdt_binomial_row_vars(),
              "gh_nodes", "gh_weights", "gl_nodes", "gl_weights")
   )
 
@@ -271,6 +271,20 @@ configure_model.sdt_mafc <- function(model, data, formula) {
                   block = "tdata", pll_args = quad_pll_args)
 
   nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.sdt_mafc <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, trials = vars$n_trials, counts = if (is.character(vars$m)) vars$m)
+  sim <- .simulate_pars(model, pars, design, scale)
+  response <- rsdt_mafc(nrow(design), design[[vars$n_trials]], .sdt_resolve_set_size(vars$m, design),
+                        d = sim$native$d, dist = vars$dist)
+  .simulate_result(design, stats::setNames(list(response), model$resp_vars$response), sim)
 }
 
 

@@ -394,6 +394,9 @@ test_that("use_model_template() generates a flat-defaults unversioned scaffold",
   expect_false(grepl("_version_table", out, fixed = TRUE))
   expect_false(grepl("match.arg", out, fixed = TRUE))
   expect_false(grepl("void_mu", out, fixed = TRUE))
+  expect_match(out, "simulate_data.tmpl_unver <- function(model, pars, design = NULL", fixed = TRUE)
+  expect_match(out, "sim <- .simulate_pars(model, pars, design, scale)", fixed = TRUE)
+  expect_match(out, "`simulate` case for every version", fixed = TRUE)
   expect_no_error(parse(text = out))
 })
 

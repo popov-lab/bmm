@@ -612,6 +612,13 @@ bmf2bf.sdt_yn <- function(model, formula) {
 # CONFIGURE_MODEL S3 METHODS                                             ####
 ############################################################################# !
 
+# The last argument tells the likelihood that sdratio is fixed at 0 on its log
+# link, a ratio of exactly 1, so it can skip rescaling the signal rows
+.sdt_yn_family_vars <- function(model) {
+  c(.sdt_binomial_row_vars(),
+    as.integer(.sdt_unit_sdratio(model)))
+}
+
 #' @export
 configure_model.sdt_yn <- function(model, data, formula) {
   anchor <- .sdt_anchor_parameter(formula)
@@ -625,11 +632,11 @@ configure_model.sdt_yn <- function(model, data, formula) {
     links = c("identity", model$links$d, model$links[[anchor]],
               model$links$sdratio),
     type = "int",
-    loop = TRUE,
+    loop = FALSE,
     log_lik = log_lik_sdt_yn,
     posterior_predict = posterior_predict_sdt_yn,
     posterior_epred = posterior_epred_sdt_yn,
-    vars = c("vint1[n]", "vint2[n]", "trials[n]")
+    vars = .sdt_yn_family_vars(model)
   )
 
   sc_path <- system.file("stan_chunks", package = "bmm")
@@ -641,6 +648,22 @@ configure_model.sdt_yn <- function(model, data, formula) {
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.sdt_yn <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, vars$stimulus, trials = vars$n_trials)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  response <- rsdt_yn(nrow(design), design[[vars$n_trials]], .coerce_sdt_stimulus(design[[vars$stimulus]]),
+                      d = p$d, criterion = p$criterion, bias = p$bias, sdratio = p$sdratio,
+                      dist = vars$dist)
+  .simulate_result(design, stats::setNames(list(response), model$resp_vars$response), sim)
 }
 
 

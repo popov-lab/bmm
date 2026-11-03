@@ -406,6 +406,10 @@ test_that(".sdt_unit_sdratio is model-only and keys off the natural-scale value"
   m_fixed$fixed_parameters$sdratio <- 0.3
   expect_false(.sdt_unit_sdratio(m_fixed))
 
+  m_fixed_neg <- m_ev
+  m_fixed_neg$fixed_parameters$sdratio <- -0.3
+  expect_false(.sdt_unit_sdratio(m_fixed_neg))
+
   m_uv <- m_ev
   m_uv$fixed_parameters$sdratio <- NULL
   expect_false(.sdt_unit_sdratio(m_uv))
