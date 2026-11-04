@@ -165,6 +165,21 @@ if (make("bmmfit_example1.rds")) {
   save_fixture(sdm_fit, "bmmfit_example1.rds", seed = 6)
 }
 
+# mixture3p: the weights are softmaxed jointly, and set size 1 has no
+# non-target, so its thetant is switched off; two participants at set sizes
+# 1, 2 and 4
+if (make("bmmfit_mixture3p.rds")) {
+  m3p_data <- oberauer_lin_2017[oberauer_lin_2017$ID %in% 1:2 &
+                                  oberauer_lin_2017$set_size %in% c(1, 2, 4), ]
+  m3p_data$set_size <- factor(m3p_data$set_size)
+  m3p_fit <- do.call(bmm, c(list(
+    formula = bmf(kappa ~ 1, thetat ~ 0 + set_size, thetant ~ 0 + set_size),
+    data = m3p_data,
+    model = mixture3p("dev_rad", nt_features = paste0("col_nt", 1:3), set_size = "set_size")
+  ), fit_args))
+  save_fixture(m3p_fit, "bmmfit_mixture3p.rds", seed = 123)
+}
+
 # The two mock fixtures keep what the parameter routing reads (the formula,
 # the data and the bmm slot of a mock fit), so they carry no draws
 mock_fixture <- function(...) {

@@ -132,6 +132,55 @@ check_model.bmmodel <- function(model, data = NULL, formula = NULL) {
   NextMethod("check_model")
 }
 
+# The model constructors forward `...` to their .model_*() internal, whose own
+# `...` drops whatever matches none of its formals. `known` are the internal's
+# formals the constructor leaves to `...`; R matches them there by unique
+# prefix among those no exact name took, so `link =` reaches `links` and is not
+# reported. `deprecated` names are read with %in%, so only exactly. Unnamed
+# extras are reported because they land in whichever internal formal is next
+# by position.
+.check_constructor_dots <- function(dots, known = character(), deprecated = character()) {
+  dot_names <- names(dots) %||% rep("", length(dots))
+  named <- nzchar(dot_names)
+  free <- setdiff(known, dot_names)
+  prefix <- pmatch(dot_names, free, duplicates.ok = TRUE)
+  unknown <- unique(dot_names[named & !dot_names %in% c(deprecated, known) & is.na(prefix)])
+  if (length(unknown) == 0 && all(named)) {
+    return(invisible())
+  }
+  constructor_fn <- sys.function(-1)
+  call_head <- sys.call(-1)[[1]]
+  head_name <- if (is.call(call_head) && deparse1(call_head[[1]]) %in% c("::", ":::")) call_head[[3]] else call_head
+  is_named_head <- is.name(head_name) &&
+    identical(get0(as.character(head_name), environment(constructor_fn), inherits = FALSE), constructor_fn)
+  help_topic <- deparse1(call_head)
+  constructor <- if (is_named_head) glue("{help_topic}()") else "this model constructor"
+  env <- parent.frame()
+  formal_names <- setdiff(names(formals(constructor_fn)), "...")
+  supplied <- formal_names[!vapply(formal_names, function(name) {
+    eval(call("missing", as.name(name)), env)
+  }, logical(1))]
+  candidates <- setdiff(c(formal_names, known), c(supplied, dot_names, free[prefix[!is.na(prefix)]]))
+  suggestions <- vapply(unknown, function(name) {
+    close <- candidates[utils::adist(name, candidates)[1, ] <= min(2, nchar(name) %/% 2)]
+    if (length(close) == 1) glue(" Did you mean `{close}`?", .trim = FALSE) else ""
+  }, character(1))
+  n_unnamed <- sum(!named)
+  msg <- c(
+    glue("`{unknown}` is not an argument of {constructor} and is ignored.{suggestions}"),
+    if (n_unnamed > 0) glue(
+      "{if (is_named_head) constructor else 'This model constructor'} takes further ",
+      "arguments by name only; it was given ",
+      "{n_unnamed} unnamed argument{if (n_unnamed > 1) 's' else ''}."
+    ),
+    paste0(
+      if (is_named_head) paste0("See ?", help_topic, " for its arguments. "),
+      "From bmm 1.6.0 on this is an error."
+    )
+  )
+  warning2("{paste(msg, collapse = '\n')}")
+}
+
 # check if the user has provided a regular expression for any model variables and
 # replace the regular expression with the actual variables
 replace_regex_variables <- function(model, data) {
@@ -438,8 +487,14 @@ response_annotations <- function(model) {
   if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
+  if (inherits(model, "sdt_yn") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = 'old'/'signal'"))
+  }
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
+  }
+  if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = correct"))
   }
   list()
 }
@@ -501,35 +556,31 @@ print_model_details.default <- function(model, ...) {
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
 
-# maps the `domain` field of each `.model_*()` constructor to the task group
-# shown by bmm_models(); a domain not listed here prints as its own group,
-# so a new model never disappears from the list
-model_groups <- c(
-  "Visual working memory" = "Continuous reproduction",
-  "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
-  "Categorical decision making, memory, and reasoning" = "Processing-tree models",
-  "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
-  "Recognition Memory" = "Detection, recognition and confidence judgments",
-  "Decision Making / Response times" = "Choices and response times"
+# the vocabularies of the `task` and `domain` fields of the model constructors;
+# both fields take one or more of these values. A model is listed under each of
+# its tasks, in this order. A task outside the vocabulary (a model registered by
+# another package) prints as its own group after these, so a model never
+# disappears from the list
+model_tasks <- c(
+  "Continuous reproduction",
+  "Categorical recall and n-AFC decisions",
+  "Detection, recognition and confidence judgments",
+  "Choices and response times"
 )
 
-model_group <- function(domain) {
-  group <- unname(model_groups[domain])
-  group[is.na(group)] <- domain[is.na(group)]
-  group[group == ""] <- "Other models"
-  group
-}
+model_domains <- c(
+  "Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning"
+)
 
-model_registry <- function(models = model_names()) {
-  specs <- lapply(models, function(m) get_model(m)())
+model_registry <- function(models = model_names(),
+                           specs = lapply(models, function(m) get_model(m)())) {
+  tasks <- lapply(specs, function(spec) if (length(spec$task) == 0) "" else spec$task)
   registry <- data.frame(
-    model = models,
-    name = sub("\\.$", "", vapply(specs, `[[`, "", "name")),
-    domain = vapply(specs, `[[`, "", "domain")
+    model = rep(models, lengths(tasks)),
+    name = rep(vapply(specs, `[[`, "", "name"), lengths(tasks)),
+    group = sub("^$", "Other models", unlist(tasks))
   )
-  registry$group <- model_group(registry$domain)
-  known <- unique(unname(model_groups))
-  group_levels <- c(known, setdiff(registry$group, known))
+  group_levels <- c(model_tasks, setdiff(registry$group, model_tasks))
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
@@ -623,8 +674,8 @@ data_column_roles <- list(
     n_old = NA
   ),
   sdt_mafc = c(
-    response = "number of correct responses",
-    n_trials = "number of trials",
+    response = "number of correct responses, or 1/0 for a correct/incorrect response on one trial",
+    n_trials = "number of trials (left out for one row per trial)",
     m = "number of alternatives (a column, or one number)"
   ),
   sdt_ranking = c(
@@ -636,9 +687,9 @@ data_column_roles <- list(
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
   ),
   sdt_yn = c(
-    response = "number of 'old'/'signal' responses",
+    response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' response on one trial",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
-    n_trials = "number of trials"
+    n_trials = "number of trials (left out for one row per trial)"
   )
 )
 
@@ -681,8 +732,10 @@ format_key_parameters <- function(spec) {
 # it estimates; used for the tables of the Get started article
 model_overview <- function(group = NULL) {
   registry <- model_registry()
-  if (!is.null(group)) {
-    registry <- registry[registry$group %in% group, ]
+  registry <- if (is.null(group)) {
+    registry[!duplicated(registry$model), ]
+  } else {
+    registry[registry$group %in% group, ]
   }
   rows <- lapply(seq_len(nrow(registry)), function(i) {
     model <- registry$model[i]
@@ -709,11 +762,12 @@ model_overview <- function(group = NULL) {
 #' Measurement models available in `bmm`
 #'
 #' @details Printed, the result lists the models grouped by the task they are
-#'   meant for, one line per model with its constructor and full name. The
+#'   meant for, one line per model with its constructor and name. The
 #'   groups are: continuous reproduction; categorical recall and n-AFC
 #'   decisions; detection, recognition and confidence judgments; choices and
-#'   response times; processing-tree models. Type `?modelname` (for example
-#'   `?imm`) for the arguments of a model.
+#'   response times. A model that fits several tasks, such as `mpt()`, is
+#'   listed under each. Type `?modelname` (for example `?imm`) for the
+#'   arguments of a model.
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
@@ -880,9 +934,10 @@ model_docs.bmmodel <- function(model, components = "all") {
   priors <- model$default_priors
   priors_info <- summarise_default_prior(priors)
 
+  # the tasks contain commas, so they are joined with a semicolon
   info_all <- list(
-    domain = paste0("* **Domain:** ", model$domain, "\n\n"),
-    task = paste0("* **Task:** ", model$task, "\n\n"),
+    domain = paste0("* **Domain:** ", paste(model$domain, collapse = ", "), "\n\n"),
+    task = paste0("* **Task:** ", paste(model$task, collapse = "; "), "\n\n"),
     name = paste0("* **Name:** ", model$name, "\n\n"),
     citation = paste0("* **Citation:** \n\n", collapse(paste0("   - ", model$citation, "\n")), "\n"),
     version = paste0("* **Version:** ", model$version, "\n\n"),
@@ -890,11 +945,19 @@ model_docs.bmmodel <- function(model, components = "all") {
     parameters = paste0("* **Parameters:** \n\n  ", par_info, "\n"),
     fixed_parameters = paste0("* **Fixed parameters:** \n\n  ", fixed_par_info, "\n"),
     links = paste0("* **Default parameter links:** \n\n     - ", links_info, "\n\n"),
-    prior = paste0("* **Default priors:** \n\n", priors_info, "\n")
+    prior = paste0("* **Default priors:** \n\n", priors_info, "\n"),
+    trial_level = paste0(
+      "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
+      "* **Trial-level data:** ", trial_level_docs,
+      if ("stimulus" %in% names(model$other_vars)) trial_level_stimulus_docs,
+      trial_level_notes_docs, "\n"
+    )
   )
 
+  # the trial-level part needs an instance constructed for trial rows, whose
+  # requirements it shows; a help page asks for it in a second call
   if (length(components) == 1 && components == "all") {
-    components <- names(info_all)
+    components <- setdiff(names(info_all), "trial_level")
   }
 
   if (model$version == "NA" || model$version == "") {
@@ -1007,8 +1070,11 @@ use_model_template <- function(model_name,
      #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
      #   their sites are registered in test-conventions.R (a test requires it)
      # - `model_cases_{model_name}()` in tests/testthat/helper-model-{model_name}.R
-     #   with a `stored_frame`, `sd_default`, `init` and `links` case (a test
-     #   requires them; the case kinds are listed in helper-model-cases.R)
+     #   with a `stored_frame`, `sd_default`, `init`, `links` and `simulate` case
+     #   (a test requires them; the case kinds are listed in helper-model-cases.R)
+     # - the `simulate_data.{model_name}()` method below, after `configure_model()`,
+     #   drawing the responses with `r{model_name}()`; a test requires it and a
+     #   `simulate` case for every version
      # - a `revert_check_data()` method in R/update.R if `check_data()`
      #   consumes or creates columns
      # - a `built_data_columns()` method next to `check_data()` naming every
@@ -1018,7 +1084,13 @@ use_model_template <- function(model_name,
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
      #
-     # In this file, `citation` needs at least one reference, one per element, each
+     # In this file, `domain` and `task` take one or more values of `model_domains`
+     # and `model_tasks` in R/helpers-model.R, and `task` decides the group
+     # `bmm_models()` lists the model under. `name` holds the model's name only,
+     # in title case, and the reference goes in `citation`; a test checks the
+     # vocabularies and that `name` has no year, no \"by\" and no final period
+     #
+     # `citation` needs at least one reference, one per element, each
      # on a single line without a \"- \" bullet and ending in \".\" or a
      # https://doi.org/ URL (a test requires it)\n\n\n"
   )
@@ -1370,6 +1442,28 @@ use_model_template <- function(model_name,
     .open = "<<", .close = ">>"
   )
 
+  simulate_data_header <- glue(
+    "#############################################################################!
+     # SIMULATE_DATA S3 METHODS                                               ####
+     #############################################################################!
+     # Draws data from the model given its parameters and a design. See
+     # ?simulate_data and simulate_data.ddm() in 'R/model_ddm.R'.\n\n\n"
+  )
+
+  simulate_data_method <- glue(
+    "#' @export
+    simulate_data.<<model_name>> <- function(model, pars, design = NULL, scale = c('link', 'native'), ...) {
+       # the design columns the model reads; add them to the Design section of ?simulate_data
+       design <- .design_or_n(model, design, character(0), ...)
+       sim <- .simulate_pars(model, pars, design, scale)
+       # draw one response per row of the design with r<<model_name>>() from the
+       # native values in sim$native and return them under the response names:
+       # .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_var1), sim)
+       stop2('simulate_data() is not yet implemented for <<model_name>>.')
+    }\n\n\n",
+    .open = "<<", .close = ">>"
+  )
+
   postprocess_brm_method <- glue(
     "#' @export
     postprocess_brm.<<model_name>> <- function(model, fit, ...) {
@@ -1391,6 +1485,8 @@ use_model_template <- function(model_name,
     bmf2bf_method,
     configure_model_header,
     configure_model_method,
+    simulate_data_header,
+    simulate_data_method,
     family_functions,
     postprocess_brm_header,
     postprocess_brm_method
@@ -1513,319 +1609,4 @@ add_bmm_version_to_stancode <- function(stancode) {
   )
   class(new_stancode) <- class(stancode)
   new_stancode
-}
-
-############################################################################# !
-# StanCode Helper FUNCTIONS                                              ####
-############################################################################# !
-
-# Return integer positions of all occurrences of a fixed pattern in x
-# simple wrapper around gregexpr that return a 0-length vector if no matches
-# instead of -1
-which_positions <- function(x, pat) {
-  m <- gregexpr(pat, x, fixed = TRUE)[[1]]
-  if (length(m) == 1L && m[1] == -1L) integer(0) else as.integer(m)
-}
-
-
-#' Find the matching closing brace for an opening brace position
-#'
-#' Given a string containing brace-like delimiters, return the index of the
-#' closing brace that matches the opening brace at \code{open_pos}, accounting
-#' for nested braces.
-#'
-#' The function operates on indices of all occurrences of \code{open_brace} and
-#' \code{close_brace} in \code{x} and uses a cumulative-sum depth counter to
-#' identify the first position at which nesting depth returns to zero.
-#'
-#' @param x A length-1 character string.
-#' @param open_pos A 1-based integer index into \code{x} indicating the position
-#'   of an opening brace character.
-#' @param open_brace A length-1 character string giving the opening delimiter
-#'   (default \code{"\{"}).
-#' @param close_brace A length-1 character string giving the closing delimiter
-#'   (default \code{"\}"}).
-#'
-#' @returns A single integer: the 1-based index of the matching closing brace in
-#'   \code{x}.
-#' @noRd
-#' @examples
-#' find_matching_brace("{}", 1L)
-#'
-#' x <- "{{}{}}"
-#' find_matching_brace(x, 1L) # outer brace -> 6
-#' find_matching_brace(x, 2L) # inner brace -> 3
-#' find_matching_brace(x, 4L) # inner brace -> 5
-#'
-#' y <- "abc{def{ghi}jkl}mno"
-#' find_matching_brace(y, 4L) # -> 16
-#' find_matching_brace(y, 8L) # -> 12
-find_matching_brace <- function(x, open_pos,
-                                open_brace = "{", close_brace = "}") {
-  stopif(
-    substr(x, open_pos, open_pos) != open_brace,
-    "Character at open_pos {open_pos} is not open_brace."
-  )
-
-  opens <- which_positions(x, open_brace)
-  closes <- which_positions(x, close_brace)
-
-  # combine + sort
-  pos <- c(opens, closes)
-  stopif(!length(pos), "No braces found.")
-  delta <- c(rep.int(1L, length(opens)), rep.int(-1L, length(closes)))
-
-  delta <- delta[order(pos)]
-  pos <- pos[order(pos)]
-
-  # locate the opening brace occurrence in the brace stream
-  k0 <- match(as.integer(open_pos), pos)
-  stopif(is.na(k0), "open_pos was not found among opening brace indices (unexpected).")
-  stopif(delta[k0] != 1L, "open_pos does not correspond to an opening brace in the stream.")
-
-  # cumulative sum from that opening brace
-  cs <- cumsum(delta[k0:length(delta)])
-
-  # first return to 0 gives the matching close
-  j <- which(cs == 0L)[1]
-  stopif(is.na(j), "No matching closing brace found (unbalanced braces?).")
-
-  pos[k0 + j - 1L]
-}
-
-#' @title Extract code from different STAN program blocks
-#'
-#' @description
-#'   This function extracts the code from the different program blocks of a STAN
-#'   program. This can be used in combination with the `stancode` function to
-#'   access information about the STAN code generated by `brms` and `bmm`.
-#'
-#' @param stan_code The STAN code for which the elements should be extracted
-#' @param blocks A character vector specifying for which program blocks
-#'   the code should be extracted. The default extracks all standard blocks:
-#'   "functions", "data", "transformed data", "parameters", "transformed parameters",
-#'   "model", and "generated quantities"
-#'
-#' @return A named list with each element containing the code of one of the STAN
-#'   program blocks. If a block
-#'
-#' @keywords extract_info
-#'
-#' @examples
-#' # generate simple stan code from brms
-#' stan_code <- stancode(brms::bf(x ~ 1), data = data.frame(x = rnorm(100)))
-#'
-#' extracted_program_blocks <- extract_stan_blocks(stan_code)
-#'
-#' @export
-extract_stan_blocks <- function(stan_code, blocks = c("functions", "data", "transformed data", "parameters", "transformed parameters", "model", "generated quantities")) {
-  stopif(
-    !is.character(stan_code) || length(stan_code) != 1L,
-    "'stan_code' must be a single character string, such as the output of stancode()."
-  )
-  blocks <- match.arg(blocks, several.ok = TRUE)
-  out <- lapply(blocks, function(b) .extract_stan_block(stan_code, b))
-  names(out) <- blocks
-  out
-}
-
-.extract_stan_block <- function(stan_code, block,
-                                include_braces = FALSE,
-                                trim = TRUE) {
-  # Anchor to start-of-line (multiline mode), allow leading spaces/tabs.
-  # Match the exact block name, then optional whitespace, then '{'.
-  header_pat <- paste0("(?m)^[[:space:]]*", block, "[[:space:]]*\\{")
-  m <- regexpr(header_pat, stan_code, perl = TRUE)
-  if (m[1] == -1L) {
-    return(NULL)
-  }
-
-  open_pos <- m[1] + attr(m, "match.length") - 1L # points at '{'
-  close_pos <- find_matching_brace(stan_code, open_pos)
-
-  out <- if (include_braces) {
-    substr(stan_code, open_pos, close_pos)
-  } else {
-    substr(stan_code, open_pos + 1L, close_pos - 1L)
-  }
-
-  if (trim) out <- sub("^\\s+|\\s+$", "", out)
-  out
-}
-
-
-#' @title Extract dimension from parameters in STAN parameter block
-#'
-#' @description
-#'  This functions extracts the names, dimensions, and types from a compiled STAN
-#'  parameters blocks generated by bmm or brms. This function is used to specify
-#'  initial values for bmm models.
-#'
-#' @param parameters_block The parameters block extracted via `extract_stan_blocks`
-#'
-#' @return A list of all parameters, their types, and dimensions as as specified in
-#'   the STAN data generated by bmm and brms. A declaration whose type this
-#'   function does not model is returned with its name and `NA` for its type and
-#'   dimensions, so that only that parameter is left without initial values
-#'
-#' @keywords extract_info
-#'
-#' @examples
-#' # generate simple stan code from brms
-#' stan_code <- stancode(brms::bf(x ~ 1 + cond + (1 + cond | ID)),
-#'   data = data.frame(
-#'     x = rnorm(100),
-#'     ID = rep(1:50, each = 2),
-#'     cond = rep(1:2, times = 50)
-#'   )
-#' )
-#'
-#' extracted_program_blocks <- extract_stan_blocks(stan_code)
-#'
-#' par_dims <- extract_parameter_dimensions(extracted_program_blocks$parameters) #'
-#'
-#' @export
-extract_parameter_dimensions <- function(parameters_block) {
-  lines <- unlist(strsplit(parameters_block, "\n"))
-  lines <- trimws(lines)
-  lines <- gsub("//.*", "", lines)
-  lines <- lines[nzchar(lines)]
-
-  res <- lapply(lines, parse_parameters_line)
-  names(res) <- vapply(res, `[[`, character(1), "name")
-  res
-}
-
-parse_parameters_line <- function(x) {
-  # strip trailing comments and semicolon; normalize whitespace
-  x <- sub("//.*$", "", x)
-  x <- trimws(x)
-  x <- sub(";$", "", x)
-  if (!nzchar(x)) stop2("Empty or comment-only line.")
-
-  # 1) optional leading array[...] prefix
-  array_dims <- character(0)
-  if (grepl("^array\\s*\\[", x, perl = TRUE)) {
-    taken <- take_dims(x)
-    array_dims <- taken$dims
-    x <- trimws(taken$rest)
-  }
-  is_array <- length(array_dims) > 0
-
-  # 2) detect base type
-  base_types <- c(
-    "cholesky_factor_corr", "cholesky_factor_cov",
-    "corr_matrix", "cov_matrix",
-    "row_vector", "unit_vector", "positive_ordered", "simplex", "ordered",
-    "vector", "matrix", "real", "int"
-  )
-  base_type <- NULL
-  for (bt in base_types) {
-    if (grepl(paste0("^", bt, "\\b"), x, perl = TRUE)) {
-      base_type <- bt
-      break
-    }
-  }
-  # a declaration of a type Stan has and this parser does not (sum_to_zero_vector,
-  # complex, tuple) is reported without one, so that it costs the sampler's own
-  # initial value for that parameter and not the whole init list
-  if (is.null(base_type)) {
-    return(list(
-      name = sub(".*[ \\]]", "", x, perl = TRUE), type = NA_character_,
-      types = NA_character_, dims = NA_character_, bounds = NULL
-    ))
-  }
-
-  # consume the base type token
-  x_after_bt <- sub(paste0("^", base_type), "", x, perl = TRUE)
-
-  # 3) constraints <...>
-  bounds <- parse_bounds(x_after_bt)
-  if (!is.null(bounds)) {
-    x_after_bt <- sub("^\\s*<[^>]*>\\s*", "", x_after_bt, perl = TRUE)
-  }
-
-  # 4) base-type dims [ ... ] (needed for most non-scalars)
-  base_dims <- character(0)
-  if (grepl("^\\s*\\[", x_after_bt, perl = TRUE)) {
-    taken <- take_dims(x_after_bt)
-    base_dims <- taken$dims
-    x_after_bt <- trimws(taken$rest)
-  } else {
-    if (base_type %in% c(
-      "vector", "row_vector", "matrix",
-      "simplex", "unit_vector", "ordered", "positive_ordered",
-      "corr_matrix", "cov_matrix", "cholesky_factor_corr", "cholesky_factor_cov"
-    )) {
-      stop2("Missing dimensions for type {base_type}.")
-    }
-  }
-
-  # 5) name
-  name <- trimws(x_after_bt)
-  if (!nzchar(name)) stop2("Missing parameter name.")
-
-  # 6) normalize dims by base type
-  dims_by_type <- switch(base_type,
-    real                 = 1,
-    int                  = 1,
-    vector               = base_dims[1],
-    row_vector           = base_dims[1],
-    simplex              = base_dims[1],
-    unit_vector          = base_dims[1],
-    ordered              = base_dims[1],
-    positive_ordered     = base_dims[1],
-    matrix               = base_dims[1:2],
-    corr_matrix          = base_dims[1],
-    cov_matrix           = base_dims[1],
-    cholesky_factor_corr = base_dims[1],
-    cholesky_factor_cov  = base_dims[1],
-    character(0)
-  )
-  dims <- c(array_dims, dims_by_type)
-
-  # NEW: dual typing
-  types <- if (is_array) c("array", base_type) else base_type
-
-  list(
-    name    = name,
-    type    = base_type, # backward-compat: base type only
-    types   = types, # NEW: includes "array" when applicable
-    dims    = dims,
-    bounds  = bounds
-  )
-}
-
-# The dimensions in the leading [...] of a declaration and the text after it.
-# brms sizes the parameters of mo() and s() by an element of a data array
-# (simplex[Jmo_c[1]], vector[knots_kappa_1[1]]), so the closing bracket is the
-# one that balances the opening one, and only a top-level comma separates
-# dimensions
-take_dims <- function(x) {
-  open <- regexpr("[", x, fixed = TRUE)
-  close <- find_matching_brace(x, open, "[", "]")
-  dims <- trimws(strsplit(substr(x, open + 1L, close - 1L), ",(?![^\\[]*\\])", perl = TRUE)[[1]])
-  list(dims = dims[nzchar(dims)], rest = substring(x, close + 1L))
-}
-
-# helper: parse <...> constraints into a named list
-parse_bounds <- function(s) {
-  if (!grepl("<[^>]*>", s, perl = TRUE)) {
-    return(NULL)
-  }
-  inside <- sub(".*?<([^>]*)>.*", "\\1", s, perl = TRUE)
-  parts <- trimws(unlist(strsplit(inside, ",")))
-  kvs <- lapply(parts, function(p) {
-    if (!grepl("=", p, fixed = TRUE)) {
-      return(NULL)
-    }
-    sp <- strsplit(p, "=", fixed = TRUE)[[1]]
-    setNames(list(trimws(sp[2])), trimws(sp[1]))
-  })
-  # merge into a single named list
-  kvs <- Filter(Negate(is.null), kvs)
-  if (!length(kvs)) {
-    return(list())
-  }
-  Reduce(function(a, b) c(a, b), kvs)
 }

@@ -71,9 +71,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, nt_distances, set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Interference measurement model by Oberauer and Lin (2017).",
+      name = "Interference Measurement Model",
       citation = glue(
         "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
           of visual working memory. Psychological Review, 124(1), 21-59. \\
@@ -233,6 +233,7 @@ imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
                 version = c("full", "bsc", "abc"), variable_precision = FALSE, vp_nodes = 81L,
                 links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), deprecated = "setsize")
   version <- match.arg(version)
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
@@ -469,7 +470,7 @@ configure_model.imm <- function(model, data, formula) {
 
   nlist(
     formula, data,
-    stanvars = .circmix_model_stanvars(model, formula$family, "imm_funs.stan",
+    stanvars = .circmix_model_stanvars(model, formula$family, "imm_functions.stan",
       vint = "ss", vreal = groups
     )
   )
@@ -566,6 +567,7 @@ posterior_predict_imm_abc <- function(i, prep, ...) {
 #' @export
 IMMfull <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = c("links", "variable_precision", "vp_nodes"), deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMfull()` is deprecated. Please use `imm(version = 'full')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -585,6 +587,7 @@ IMMfull <- function(resp_error, nt_features, nt_distances, set_size, regex = FAL
 #' @export
 IMMbsc <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = c("links", "variable_precision", "vp_nodes"), deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMbsc()` is deprecated. Please use `imm(version = 'bsc')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -604,6 +607,8 @@ IMMbsc <- function(resp_error, nt_features, nt_distances, set_size, regex = FALS
 #' @export
 IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = c("nt_distances", "links", "variable_precision", "vp_nodes"),
+                          deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMabc()` is deprecated. Please use `imm(version = 'abc')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -615,4 +620,35 @@ IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
     resp_error = resp_error, nt_features = nt_features, set_size = set_size,
     regex = regex, version = "abc", call = call, ...
   )
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# The trial-wise generator of posterior_predict() takes one display per call
+# and each row's own values, so rows are drawn in groups of identical set size,
+# non-target locations and distances. The fixed background b comes from the
+# model as in the fit; a version without a or s gets NULL for it, as there
+#' @export
+simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, .set_size_column(model),
+                         ragged = c(vars$nt_features, vars$nt_distances))
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  tau <- p$tau %||% rep(0, nrow(design))
+  set_size <- check_var_set_size(vars$set_size, design)$ss_numeric
+  .check_nt_na(design, vars$nt_features, set_size)
+  .check_nt_na(design, vars$nt_distances, set_size)
+  nt <- unname(as.matrix(design[vars$nt_features]))
+  dist <- if (length(vars$nt_distances)) unname(as.matrix(design[vars$nt_distances]))
+  y <- numeric(nrow(design))
+  for (idx in .row_groups(as.data.frame(cbind(set_size, nt, dist)))) {
+    y[idx] <- .rimm_version(
+      p$mu[idx], p$kappa[idx], p$c[idx], p$a[idx], p$s[idx], p$b[idx],
+      set_size[idx[1]], nt[idx[1], ], dist[idx[1], ], tau[idx], model$version
+    )
+  }
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }

@@ -34,6 +34,36 @@ real sdt_log_one_minus_cumprob(real eta, int dist_type) {
   reject("sdt_log_one_minus_cumprob: unknown dist_type: ", dist_type);
 }
 
+// elementwise overloads for the likelihoods that take all rows at once; each
+// element goes through the scalar dispatcher, so both give the same bits
+vector sdt_rms_scale(vector sdratio) {
+  return sqrt((1 + square(sdratio)) / 2);
+}
+
+vector sdt_log_cumprob(vector eta, int dist_type) {
+  vector[rows(eta)] out;
+  for (i in 1:rows(eta)) out[i] = sdt_log_cumprob(eta[i], dist_type);
+  return out;
+}
+
+vector sdt_log_one_minus_cumprob(vector eta, int dist_type) {
+  vector[rows(eta)] out;
+  for (i in 1:rows(eta)) out[i] = sdt_log_one_minus_cumprob(eta[i], dist_type);
+  return out;
+}
+
+// sums of the elementwise values; the vectorized std_normal_lcdf() evaluates
+// each element as the scalar one does and is a single node on the autodiff tape
+real sdt_log_cumprob_sum(vector eta, int dist_type) {
+  if (dist_type == 1) return std_normal_lcdf(eta);
+  return sum(sdt_log_cumprob(eta, dist_type));
+}
+
+real sdt_log_one_minus_cumprob_sum(vector eta, int dist_type) {
+  if (dist_type == 1) return std_normal_lcdf(-eta);
+  return sum(sdt_log_one_minus_cumprob(eta, dist_type));
+}
+
 // Quantile (inverse-CDF) dispatch: F^{-1}(u), u in (0, 1)
 real sdt_quantile(real u, int dist_type) {
   if (dist_type == 1) return inv_Phi(u);

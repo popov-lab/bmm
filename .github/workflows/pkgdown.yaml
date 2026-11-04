@@ -89,8 +89,13 @@ jobs:
       - name: Locate CmdStan install path
         id: cmdstan-path
         run: |
+          # the OS release and runner image key the cache: CmdStan's
+          # precompiled header is stamped with the image's SDK headers, so one
+          # built on another image fails to compile models on this one, even
+          # at the same OS release (macOS, 2026-10-28)
           cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
-              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+              sprintf("release=%s\n", gsub("[^A-Za-z0-9.]+", "-", paste(utils::sessionInfo()$running, Sys.getenv("ImageVersion")))),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE, sep = "")
         shell: Rscript {0}
 
       - name: Cache CmdStan
@@ -98,7 +103,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.cmdstan-path.outputs.path }}
-          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
+          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-path.outputs.release }}-${{ steps.cmdstan-version.outputs.version }}
 
       - name: Set up CmdStan toolchain
         # cmdstanr 1.0 ignores fix and warns when it is TRUE

@@ -125,29 +125,26 @@ The following models are supported:
 
 Continuous reproduction
 \itemize{
-\item imm(): Interference measurement model by Oberauer and Lin (2017)
-\item mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
-\item mixture3p(): Three-parameter mixture model by Bays et al (2009)
-\item sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
+\item imm(): Interference Measurement Model
+\item mixture2p(): Two-Parameter Mixture Model
+\item mixture3p(): Three-Parameter Mixture Model
+\item sdm(): Signal Discrimination Model (SDM)
 }
 
 Categorical recall and n-AFC decisions
 \itemize{
-\item m3(): The Multinomial / Memory Measurement Model
-}
-
-Processing-tree models
-\itemize{
-\item mpt(): Multinomial Processing Tree (MPT) models
+\item m3(): Memory Measurement Model
+\item mpt(): Multinomial Processing Tree (MPT) Model
 }
 
 Detection, recognition and confidence judgments
 \itemize{
-\item sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
-\item sdt_mafc(): Signal Detection Theory (m-AFC)
-\item sdt_ranking(): Signal Detection Theory (Ranking)
-\item sdt_rating(): Signal Detection Theory (Confidence Rating)
-\item sdt_yn(): Signal Detection Theory (Yes/No)
+\item mpt(): Multinomial Processing Tree (MPT) Model
+\item sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model
+\item sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model
+\item sdt_ranking(): Ranking Signal Detection Theory Model
+\item sdt_rating(): Confidence Rating Signal Detection Theory Model
+\item sdt_yn(): Yes/No Signal Detection Theory Model
 }
 
 Choices and response times
@@ -195,10 +192,11 @@ fit <- bmm(
 \dontshow{\}) # examplesIf}
 }
 \references{
-Frischkorn, G. T., & Popov, V. (2023). A tutorial for estimating
-mixture models for visual working memory tasks in brms: Introducing the
-Bayesian Measurement Modeling  (bmm) package for R.
-https://doi.org/10.31234/osf.io/umt57
+Frischkorn, G. T., & Popov, V. (2025). A tutorial for estimating
+Bayesian hierarchical mixture models for visual working memory tasks:
+Introducing the Bayesian Measurement Modeling (bmm) package for R.
+\emph{Behavior Research Methods}, \emph{57}(5), Article 144.
+https://doi.org/10.3758/s13428-025-02643-0
 }
 \seealso{
 \code{\link[=bmm_models]{bmm_models()}}, \code{\link[brms:brm]{brms::brm()}}, \link[=default_prior.bmmformula]{default_prior()}, \code{\link[=bmmformula]{bmmformula()}}, \link[=stancode.bmmformula]{stancode()}, \link[=standata.bmmformula]{standata()}

@@ -32,9 +32,11 @@ bmm-dev
 /tests/internal/cmdstanr_output/
 /tests/internal/*cache*
 
-# per-test timings written by .github/scripts/test-budget.R and cran-budget.R
+# per-test timings written by .github/scripts/test-budget.R and cran-budget.R,
+# and the runner's lscpu the tests-source workflow keeps next to them
 test-timings.csv
 cran-test-timings.csv
+runner-hardware.txt
 
 # what testthat 3.3 writes for each failing test
 /tests/testthat/_problems/

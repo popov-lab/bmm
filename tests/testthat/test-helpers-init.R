@@ -1106,3 +1106,173 @@ test_that("an init function carries no data column the model does not use", {
   # the data in the closure would make every saved fit grow with them
   expect_equal(serialized_size(oberauer_lin_2017), serialized_size(oberauer_lin_2017["dev_rad"]))
 })
+
+# =============================================================================
+# PARAMETERS THE DATA BOUND (#621)
+# =============================================================================
+
+# 80 trials of two participants whose fastest response is 0.03 s, so that the
+# ndt of cswald starts from c(0.012, 0.018): log(0.018 / 0.012) = 0.4055 wide on
+# the log link, 0.006 on the identity link. trial runs to 40
+bounded_ndt_data <- function() {
+  data <- expand.grid(trial = 1:40, id = factor(1:2))
+  data$rt <- 0.03 + rep(c(0, 0.2, 0.45, 0.7), length.out = 80)
+  data$response <- rep(c(1, 0, 1, 1, 0), length.out = 80)
+  data$setsize <- factor(rep(c(2, 4, 6), length.out = 80), ordered = TRUE)
+  data$id2 <- factor(rep(c(2, 1, 1, 2, 2), length.out = 80))
+  data$g <- factor(ifelse(data$id == 1, "a", "b"))
+  data
+}
+
+bounded_ndt_inits <- function(formula, links = NULL, n = 50) {
+  # check_data() warns about responses below 0.1 s and about the identity link
+  init_fun <- suppressWarnings(
+    configured_initfun(cswald("rt", "response", links = links), formula, bounded_ndt_data())
+  )
+  replicate(n, init_fun(), simplify = FALSE)
+}
+
+draws_of <- function(inits, name, index = NULL) {
+  unlist(lapply(inits, function(x) if (is.null(index)) x[[name]] else x[[name]][index]))
+}
+
+test_that("a random slope on trial number starts with an SD scaled to the predictor and the range (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ trial + (1 + trial | id)))
+  slope_sd <- draws_of(inits, "sd_1", 2)
+  expect_lte(max(slope_sd), 0.1 * 0.4055 / 40)
+  expect_gte(min(slope_sd), 0.05 * 0.4054 / 40)
+  intercept_sd <- draws_of(inits, "sd_1", 1)
+  expect_lte(max(intercept_sd), 0.1 * 0.4055)
+  expect_gte(min(intercept_sd), 0.05 * 0.4054)
+})
+
+test_that("a random intercept on an identity link starts with an SD scaled to the range (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + (1 | id)), links = list(ndt = "identity"))
+  sd <- draws_of(inits, "sd_1")
+  expect_lte(max(sd), 0.1 * 0.006 + 1e-12)
+  expect_gte(min(sd), 0.05 * 0.006 - 1e-12)
+  expect_true(all(abs(draws_of(inits, "z_1")) <= 0.5))
+})
+
+test_that("the SDs of one group term across parameters each follow their own parameter and column (#621)", {
+  withr::local_seed(621)
+  # drift (log link, c(1, 2)) is log(2) = 0.6931 wide, bound (log, c(1.5, 2))
+  # log(4 / 3) = 0.2877; the columns are 1 except trial, which reaches 40
+  inits <- bounded_ndt_inits(bmf(
+    drift ~ 1 + (1 + trial | p | id), bound ~ 1 + (1 | id), ndt ~ trial + (1 + trial | p | id)
+  ))
+  upper <- c(0.6931, 0.6931 / 40, 0.4055, 0.4055 / 40)
+  for (k in 1:4) {
+    sd <- draws_of(inits, "sd_1", k)
+    expect_lte(max(sd), 0.1 * upper[k] + 1e-6, label = paste("sd_1 entry", k))
+    expect_gte(min(sd), 0.05 * upper[k] - 1e-6, label = paste("sd_1 entry", k))
+  }
+  expect_lte(max(draws_of(inits, "sd_2")), 0.1 * 0.2877 + 1e-6)
+  expect_gte(min(draws_of(inits, "sd_2")), 0.05 * 0.2877 - 1e-6)
+})
+
+test_that("an mm() term reads its membership suffix as a member, not as an entry (#621)", {
+  withr::local_seed(621)
+  # brms names its columns Z_1_drift_<entry>_<member>
+  inits <- bounded_ndt_inits(bmf(drift ~ 1 + (1 + trial | mm(id, id2)), bound ~ 1, ndt ~ 1))
+  intercept_sd <- draws_of(inits, "sd_1", 1)
+  expect_gte(min(intercept_sd), 0.05 * 0.6931 - 1e-6)
+  expect_lte(max(intercept_sd), 0.1 * 0.6931 + 1e-6)
+  expect_lte(max(draws_of(inits, "sd_1", 2)), 0.1 * 0.6931 / 40 + 1e-6)
+})
+
+test_that("a gr(by = ) term shrinks each row of its SD matrix by that row's column (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + (1 + trial | gr(id, by = g))))
+  expect_equal(dim(inits[[1]]$sd_1), c(2, 2))
+  slope_sd <- unlist(lapply(inits, function(x) x$sd_1[2, ]))
+  expect_lte(max(slope_sd), 0.1 * 0.4055 / 40)
+  intercept_sd <- unlist(lapply(inits, function(x) x$sd_1[1, ]))
+  expect_gte(min(intercept_sd), 0.05 * 0.4054)
+})
+
+test_that("an s() term starts its spline near zero (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + s(trial, k = 5)))
+  # the s(trial) columns brms builds stay within -1 and 1, so only the range shrinks
+  sds <- draws_of(inits, "sds_ndt_1")
+  expect_lte(max(sds), 0.1 * 0.4055)
+  expect_gte(min(sds), 0.05 * 0.4054)
+  expect_true(all(abs(draws_of(inits, "zs_ndt_1_1")) <= 0.5))
+  bs <- draws_of(inits, "bs_ndt")
+  expect_lte(max(abs(bs)), 0.1 * 0.4055)
+  expect_gt(max(abs(bs)), 0)
+})
+
+test_that("a mo() coefficient starts near zero, divided by the categories it spans (#621)", {
+  withr::local_seed(621)
+  # setsize has three levels, so mo() multiplies its coefficient by up to 2
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + mo(setsize)))
+  bsp <- draws_of(inits, "bsp_ndt")
+  expect_lte(max(abs(bsp)), 0.1 * 0.4055 / 2)
+  expect_gt(max(abs(bsp)), 0.05 * 0.4054 / 2)
+  simo <- draws_of(inits, "simo_ndt_1")
+  expect_true(all(simo > 0 & simo < 1))
+})
+
+test_that("unit columns on a range wider than 1 keep the SD draws they had before #621", {
+  dat <- small_data()
+  # written from the base of #621 with the same seed: the shrink factor is 1
+  # for every entry here, so the draws must not move
+  cases <- list(
+    mixture2p = list(
+      model = mixture2p("dev_rad"),
+      formula = bmf(kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 0 + set_size + (0 + set_size | ID)),
+      data = dat,
+      sd = list(
+        sd_1 = c(0.05957906, 0.06431895, 0.09658438, 0.0689548, 0.06884546, 0.0503031, 0.05774589, 0.09981795),
+        sd_2 = c(0.0915609, 0.09422463, 0.09371997, 0.05057796, 0.05859956, 0.08822028, 0.09902488, 0.08486954)
+      )
+    ),
+    m3 = list(
+      model = m3(
+        resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"),
+        choice_rule = "softmax", version = "ss"
+      ),
+      formula = bmf(c ~ 1 + cond + (1 + cond | ID), a ~ 1 + cond + (1 + cond | ID)),
+      data = oberauer_lewandowsky_2019_e1,
+      sd = list(sd_1 = c(0.06884546, 0.0503031, 0.05774589), sd_2 = c(0.06797572, 0.05016843, 0.09157917))
+    ),
+    imm = list(
+      model = imm(
+        resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
+        nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
+      ),
+      formula = bmf(c ~ 0 + set_size + (0 + set_size | ID), a ~ 1 + (1 | ID), s ~ 1, kappa ~ 1),
+      data = dat,
+      sd = list(
+        sd_1 = 0.09658438,
+        sd_2 = c(0.0503031, 0.05774589, 0.09981795, 0.06557165, 0.07012099, 0.05040553, 0.08198434, 0.080004)
+      )
+    ),
+    mixture3p = list(
+      model = mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
+      formula = bmf(
+        kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 0 + set_size + (0 + set_size | ID),
+        thetant ~ 0 + set_size + (0 + set_size | ID)
+      ),
+      data = dat,
+      sd = list(
+        sd_1 = c(0.09981795, 0.06557165, 0.07012099, 0.05040553, 0.08198434, 0.080004, 0.08117632, 0.0833209),
+        sd_2 = c(0.08486954, 0.0583179, 0.09055061, 0.08746704, 0.06303813, 0.06165822, 0.08720842, 0.08545494),
+        par_sd_3_2 = 0.06396304, par_sd_3_3 = 0.06847676, par_sd_3_4 = 0.09026301,
+        par_sd_3_5 = 0.06910732, par_sd_3_6 = 0.0752426, par_sd_3_7 = 0.05078688, par_sd_3_8 = 0.06307569
+      )
+    )
+  )
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    init_fun <- configured_initfun(case$model, case$formula, case$data)
+    inits <- withr::with_seed(621, init_fun())
+    for (sd in names(case$sd)) {
+      expect_equal(as.vector(inits[[sd]]), case$sd[[sd]], tolerance = 1e-6, label = paste(name, sd))
+    }
+  }
+})

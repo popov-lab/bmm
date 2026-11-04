@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_m3.R
 \name{m3}
 \alias{m3}
-\title{The Multinomial / Memory Measurement Model}
+\title{Memory Measurement Model}
 \usage{
 m3(
   resp_cats,
@@ -66,9 +66,9 @@ decision task.
 }
 \details{
 \itemize{
-\item \strong{Domain:} Working Memory (categorical), Categorical Decision Making
-\item \strong{Task:} n-AFC retrieval
-\item \strong{Name:} The Multinomial / Memory Measurement Model
+\item \strong{Domain:} Working memory, Decision making
+\item \strong{Task:} Categorical recall and n-AFC decisions
+\item \strong{Name:} Memory Measurement Model
 \item \strong{Citation:}
 \itemize{
 \item Oberauer, K., & Lewandowsky, S. (2019). Simple measurement models for complex working-memory tasks. Psychological Review, 126(6), 880-932. https://doi.org/10.1037/rev0000159
