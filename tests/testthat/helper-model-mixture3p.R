@@ -56,16 +56,16 @@ model_cases_mixture3p <- function() {
       ),
       mixture3p_slot = list(
         model = mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size", version = "slot"),
-        pars = list(kappa = 2, K = 0.5, pnt = -1), design = nt_display_design(),
-        formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1),
-        simulate_pars = list(mu = 0, kappa = 2, K = 0.5, pnt = -1)
+        pars = list(kappa = 2, K = 0.5, ptarget = 1), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1),
+        simulate_pars = list(mu = 0, kappa = 2, K = 0.5, ptarget = 1)
       ),
       mixture3p_slot_averaging_vp = list(
         model = mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size",
                           version = "slot_averaging", variable_precision = TRUE),
-        pars = list(kappa = 2, K = 0.5, pnt = -1, tau = 0), design = nt_display_design(),
-        formula = bmf(kappa ~ 1, K ~ 1, pnt ~ 1, tau ~ 1),
-        simulate_pars = list(mu = 0, kappa = 2, K = 0.5, pnt = -1, tau = 0)
+        pars = list(kappa = 2, K = 0.5, ptarget = 1, tau = 0), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1, tau ~ 1),
+        simulate_pars = list(mu = 0, kappa = 2, K = 0.5, ptarget = 1, tau = 0)
       )
     )
   )

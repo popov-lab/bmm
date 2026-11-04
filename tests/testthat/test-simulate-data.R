@@ -240,13 +240,13 @@ test_that("simulated statistics of the circular models match their densities", {
 
   # the capacity versions, set size 1 and variable precision, against E[cos] from
   # A = I1 / I0 and J(kappa) = kappa A(kappa): from memory the target is reported
-  # with 1 - pnt and each non-target with pnt / 2; a j-slot item has J = j J(kappa)
+  # with ptarget and each non-target with (1 - ptarget) / 2; a j-slot item has J = j J(kappa)
   nt <- c("nt1", "nt2")
   y <- simulate_data(mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot"),
-                     list(kappa = exp(2), K = 2, pnt = 0.3), display, scale = "native")$y
+                     list(kappa = exp(2), K = 2, ptarget = 0.7), display, scale = "native")$y
   expect_within_mc(cos(y), 0.4017199, "mixture3p slot")
   averaging <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging")
-  y <- simulate_data(averaging, list(kappa = exp(1), K = 4, pnt = 0.3), display, scale = "native")$y
+  y <- simulate_data(averaging, list(kappa = exp(1), K = 4, ptarget = 0.7), display, scale = "native")$y
   expect_within_mc(cos(y), 0.5320389, "mixture3p slot_averaging")
   # at set size 1 the softmax runs over the target and guessing only
   single <- data.frame(set_size = rep(1, n_sim), nt1 = NA, nt2 = NA)
@@ -258,7 +258,7 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), 0.5651793, "mixture3p variable precision")
   averaging_vp <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging",
                             variable_precision = TRUE)
-  y <- simulate_data(averaging_vp, list(kappa = exp(1), K = 4, pnt = 0.3, tau = 1), display, scale = "native")$y
+  y <- simulate_data(averaging_vp, list(kappa = exp(1), K = 4, ptarget = 0.7, tau = 1), display, scale = "native")$y
   expect_within_mc(cos(y), 0.4981567, "mixture3p slot_averaging variable precision")
 
   model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),

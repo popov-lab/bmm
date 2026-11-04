@@ -544,11 +544,11 @@ simulate_data.mixture3p <- function(model, pars, design = NULL, scale = c("link"
       .rmixture3p(p$mu[idx], nt[idx[1], ], ss, weights, p$kappa[idx], tau[idx])
     },
     slot = function(idx, ss) {
-      weights <- .mixture3p_nested_weights(pmin(1, p$K[idx] / ss), p$pnt[idx], ss)
+      weights <- .mixture3p_nested_weights(pmin(1, p$K[idx] / ss), p$ptarget[idx], ss)
       .rmixture3p(p$mu[idx], nt[idx[1], ], ss, weights, p$kappa[idx], tau[idx])
     },
     slot_averaging = function(idx, ss) {
-      .rmixture3p_slot_averaging(p$mu[idx], nt[idx[1], ], ss, p$kappa[idx], p$K[idx], p$pnt[idx], tau[idx])
+      .rmixture3p_slot_averaging(p$mu[idx], nt[idx[1], ], ss, p$kappa[idx], p$K[idx], p$ptarget[idx], tau[idx])
     }
   )
   y <- numeric(nrow(design))
