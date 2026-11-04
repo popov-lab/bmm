@@ -1,18 +1,12 @@
-## Resubmission
-
-This is 1.4.0 resubmitted as 1.4.1, with the version increased as the CRAN policy prefers. The
-submission of 1.4.0 (2026-10-15) was returned by the incoming pretest with a NOTE on
-r-devel-windows-x86_64: overall check time 16 min, of which the tests took 12 min (Debian: OK,
-tests 302 s). The tests that run every model through the full pipeline now skip on CRAN and run on
-the package's continuous integration instead. On win-builder R-devel the check of 1.4.1 took 462 s
-with the tests at 172 s (1.4.0: 16 min and 720 s), Status OK. The package is otherwise unchanged.
-
 ## Changes
 
-See NEWS.md. A feature release: signal detection models for five response formats,
-multinomial processing tree models, new helper functions for priors, parameters and data checks, and
-bug fixes. New imports: graphics, mvtnorm and posterior. New suggested packages: loo, MPTinR,
-pkgbuild, roxygen2, rstan and vctrs.
+A patch release with bug fixes only, see NEWS.md. It follows 1.4.1 (2026-10-16) after a month
+because several bugs gave wrong results without a warning: `sdm()` fits overestimated the
+likelihood when `c` and `kappa` were both large, `sdm()` fits with two or more predictors could
+evaluate a design cell with another cell's parameters (and `ppp()` pooled such cells), `psdm()`
+returned wrong probabilities, a prior on a parameter fixed in the formula freed that parameter, and
+`update()` kept initial values, sampler settings and default priors that belonged to the fit it
+started from. No new exports, no new or changed dependencies.
 
 ## R CMD check results
 
@@ -20,27 +14,27 @@ pkgbuild, roxygen2, rstan and vctrs.
 
 The CRAN incoming feasibility check lists cmdstanr as a suggested package not in a mainstream
 repository, available through `Additional_repositories` (https://stan-dev.r-universe.dev).
-win-builder reports this as INFO; the local check of 1.4.0 with `_R_CHECK_CRAN_INCOMING_=true`
-reported it as the one NOTE. cmdstanr is an optional dependency not required for the package's main
-functionality.
+win-builder reports this as INFO. cmdstanr is an optional dependency not required for the package's
+main functionality.
 
 ## Test environments
 
-* win-builder, R-devel (2026-10-14 r90673, x86_64-w64-mingw32, cmdstanr not installed): Status OK,
-  check time 462 s, tests 172 s
-* win-builder, R-release (R 4.6.1, x86_64-w64-mingw32, cmdstanr not installed): Status OK,
-  check time 476 s, tests 175 s
-* local macOS (arm64), R 4.6.1: `R CMD check --as-cran` on the 1.4.1 tarball: 0 errors, 0 warnings,
-  0 notes, tests 34 s. On 1.4.0 the same check with `_R_CHECK_CRAN_INCOMING_=true`, and a second run
-  with `_R_CHECK_DEPENDS_ONLY_=true` (Suggests unavailable), gave 0 errors, 0 warnings and the note
-  above
-* GitHub Actions (macOS, Windows, Ubuntu; R release): passing on the 1.4.1 commit
-* The macOS builder and R-hub could not be used: the macOS builder stopped at package dependencies
-  (brms and other imports not available there), and R-hub's dependency resolver does not honour
-  `Additional_repositories`, so the optional dependency cmdstanr blocks the build before the check
-  starts
+* win-builder, R-devel (2026-11-03 r90835, x86_64-w64-mingw32, cmdstanr not installed): Status OK,
+  check time 536 s, tests 216 s (an earlier run the same morning: 574 s, tests 244 s)
+* win-builder, R-release (R 4.6.2, x86_64-w64-mingw32, cmdstanr not installed): Status OK,
+  check time 520 s, tests 204 s
+* local macOS (arm64), R 4.6.1: `R CMD check --as-cran` on the 1.4.2 tarball: 0 errors, 0 warnings,
+  0 notes, tests 46 s. The same check with cmdstanr made unloadable: 0 errors, 0 warnings, 0 notes,
+  tests 46 s. The tests CRAN runs take 41.0 s here against 35.9 s for 1.4.1 (mean of two
+  interleaved runs each)
+* GitHub Actions (macOS, Windows, Ubuntu; R release): R CMD check passing; the tests CRAN runs take
+  128 s on the hosted Ubuntu runner
+* The macOS builder and R-hub could not be used, as for 1.4.1: the macOS builder stops at package
+  dependencies (brms and other imports not available there), and R-hub's dependency resolver does
+  not honour `Additional_repositories`, so the optional dependency cmdstanr blocks the build before
+  the check starts
 
 ## Reverse dependencies
 
 One reverse dependency on CRAN, rtprep, which suggests bmm. R CMD check of rtprep 0.1.0 with
-bmm 1.4.0: Status OK. 1.4.1 changes only which tests run on CRAN.
+bmm 1.4.2: Status OK, as with bmm 1.4.1.
