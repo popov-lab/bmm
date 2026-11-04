@@ -229,6 +229,7 @@ test_that("sdt_yn check_data adds dist_type column", {
 ############################################################################# !
 
 test_that("rsdt_yn recycles vectorized parameters per observation", {
+  withr::local_seed(445)
   n_old <- rsdt_yn(4, c(50, 100, 50, 100), c(0L, 1L, 0L, 1L),
                        d = c(0.5, 0.5, 2.5, 2.5), criterion = 0)
   expect_length(n_old, 4)
@@ -254,6 +255,7 @@ test_that("rsdt_yn with zero d produces equal hit and FA rates on average", {
 test_that("d/rsdt_yn refuse a stimulus type they cannot read", {
   # %in% compares a factor as character, so the value check passed and .sdt_eta()
   # returned a silent NA that propagates into a hand-written pp check
+  withr::local_seed(445)
   for (bad in list(factor("1"), "1")) {
     expect_error(
       dsdt_yn(68, 100, bad, d = 1.5, criterion = 0),
@@ -370,6 +372,7 @@ test_that("dsdt_yn matches dbinom in the well-conditioned range", {
 })
 
 test_that("dsdt_yn and rsdt_yn take exactly one of criterion and bias", {
+  withr::local_seed(445)
   expect_error(dsdt_yn(70, 100, 1, d = 1.5), "exactly one of 'criterion'")
   expect_error(dsdt_yn(70, 100, 1, d = 1.5, criterion = 0.5, bias = 0),
                "exactly one of 'criterion'")

@@ -208,6 +208,7 @@ test_that("check_formula works", {
 })
 
 test_that("check_formula warns when a predictor clashes with a parameter name", {
+  withr::local_seed(445)
   withr::local_options(bmm.silent = 2, bmm.sort_data = FALSE)
   model <- sdm(resp_error = "y")
 

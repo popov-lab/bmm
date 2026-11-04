@@ -25,6 +25,10 @@ model_cases_cswald <- function() {
         model = crisk, formula = re_formula + bmf(zr ~ 1), data = toy_rt_data()
       )
     ),
+    rt_data = list(
+      cswald = list(model = simple, formula = rt_formula),
+      cswald_crisk = list(model = crisk, formula = rt_formula)
+    ),
     links = list(
       cswald = list(model = simple, settable = c("drift", "bound", "ndt", "s")),
       cswald_crisk = list(model = crisk, settable = c("drift", "bound", "ndt", "zr", "s"))

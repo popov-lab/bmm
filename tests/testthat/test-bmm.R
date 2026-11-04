@@ -1,4 +1,5 @@
 test_that("Available mock models run without errors", {
+  withr::local_seed(445)
   withr::local_options("bmm.silent" = 2)
   skip_on_cran()
   dat <- data.frame(
@@ -63,6 +64,7 @@ test_that("Available mock models run without errors", {
 })
 
 test_that("Available models produce expected errors", {
+  withr::local_seed(445)
   withr::local_options("bmm.silent" = 2)
   skip_on_cran()
   dat <- data.frame(
@@ -163,6 +165,7 @@ test_that("bmm() builds the default prior and the inits from the data2 brm() get
 
 test_that("bmm() stores the name of the data the user passed", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   withr::local_options("bmm.silent" = 2)
   my_data <- data.frame(y = rimm(n = 5))
   fit <- bmm(bmf(kappa ~ 1, thetat ~ 1), my_data, mixture2p("y"),
@@ -179,8 +182,21 @@ test_that("bmm() stores the name of the data the user passed", {
   expect_equal(attr(fit$data, "data_name"), "counts")
 })
 
+test_that("bmm() stores the prior the user passed, and an empty one for none (#538)", {
+  skip_on_cran()
+  dat <- data.frame(y = c(-0.5, 0.1, 0.4, 1.2))
+  user <- brms::set_prior("normal(1, 0.5)", class = "Intercept", dpar = "kappa")
+  fit_with <- function(prior) suppressMessages(bmm(
+    bmf(c ~ 1, kappa ~ 1), dat, sdm("y"), prior = prior, backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_identical(fit_with(user)$bmm$user_prior, user)
+  # NULL on a fit means it was saved before bmm() stored the prior
+  expect_identical(fit_with(NULL)$bmm$user_prior, brms::empty_prior())
+})
+
 test_that("check_data() methods see the name of the user's data", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(445)
   seen <- NULL
   local_mocked_bindings(order_data_query = function(model, data, formula) {
     seen <<- attr(data, "data_name")
@@ -202,6 +218,7 @@ test_that("check_data() methods see the name of the user's data", {
 })
 
 test_that("bmm() says when the formula is not a bmmformula", {
+  withr::local_seed(445)
   dat <- data.frame(y = rimm(n = 5))
   for (f in list(y ~ 1, brms::bf(y ~ 1), list(kappa ~ 1), NULL, "kappa ~ 1")) {
     expect_error(
@@ -243,6 +260,7 @@ test_that("bmm() and the extractors say when data is missing", {
 })
 
 test_that("bmm() stamps the bmm version into the Stan code of the fit", {
+  withr::local_seed(445)
   fit <- bmm(bmf(c ~ 1, kappa ~ 1), data.frame(y = rsdm(10)), sdm("y"),
     backend = "mock", mock_fit = 1, rename = FALSE
   )
@@ -250,11 +268,13 @@ test_that("bmm() stamps the bmm version into the Stan code of the fit", {
 })
 
 test_that("standata() does not configure the prior, which the Stan data does not use", {
+  withr::local_seed(445)
   local_mocked_bindings(configure_prior = function(...) stop2("configure_prior() called"))
   expect_type(standata(bmf(c ~ 1, kappa ~ 1), data.frame(y = rsdm(10)), sdm("y")), "list")
 })
 
 test_that("stancode() and default_prior() do not build the inits, which they do not return", {
+  withr::local_seed(445)
   local_mocked_bindings(create_initfun = function(...) stop2("create_initfun() called"))
   f <- bmf(c ~ 1, kappa ~ 1)
   dat <- data.frame(y = rsdm(10))

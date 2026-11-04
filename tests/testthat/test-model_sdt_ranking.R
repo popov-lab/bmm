@@ -446,6 +446,7 @@ test_that("sdt_ranking_logmu preserves the draws-by-observation shape", {
 ############################################################################# !
 
 test_that("rsdt_ranking recycles parameters and handles mixed set sizes", {
+  withr::local_seed(445)
   counts <- rsdt_ranking(6, 50, m = c(3L, 5L), d = rnorm(6, 1.2, 0.2))
 
   expect_equal(dim(counts), c(6L, 5L))
@@ -526,6 +527,7 @@ test_that("check_data errors when set size exceeds the number of rank columns", 
 
 test_that("check_data warns about a free sdratio only above set size 20", {
   # the Gaussian quadrature is verified to 1e-6 through m = 20
+  withr::local_seed(445)
   formula <- bmf(d ~ 1, sdratio ~ 1)
   for (m in c(20L, 21L)) {
     ranks <- paste0("rank", seq_len(m))

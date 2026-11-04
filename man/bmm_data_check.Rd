@@ -20,15 +20,23 @@ number of required arguments which need to be specified within the function
 call. Call \code{\link[=bmm_models]{bmm_models()}} to see the list of supported models, and
 \code{?modelname} (for example \code{?imm}) for their required arguments.}
 
-\item{min_trials}{Numeric. Design cells with fewer observations are flagged
-in the report. Defaults to 10. Ignored for models fit to aggregated data
-(e.g. \code{m3}, \code{ezdm}), where one row summarizes many trials.}
+\item{min_trials}{Numeric. Design cells with fewer than \code{min_trials} trials
+in total are flagged in the report. Defaults to 10, for every model. For
+\code{mpt()} a design cell sums the trials of all its trees unless a formula
+uses the tree column, so a cell can pass while one of its trees holds
+only a few trials; tabulate the trials per tree yourself if the trees
+differ in size. When the trial counts of an
+aggregated model cannot be read (a count column is missing or not
+numeric), the report shows rows per cell and flags none.}
 }
 \value{
 An object of class \code{bmm_data_check} with a print method. The object
 is a list containing the summarized \code{response}, \code{predictors} and \code{cells}
 information (including the full cell count table in \verb{$cells$counts}), all
 \code{findings}, and the captured results of the validation \code{pipeline}.
+\verb{$cells$unit} says what a cell's \code{n} counts (\code{"trials"}, \code{"rows"} or
+\code{"observations"}); when it counts trials, \verb{$cells$counts} also holds each
+cell's \code{n_rows} and the object its total \code{n_trials}.
 }
 \description{
 Inspect whether your data is coded the way a \code{bmmodel} expects
@@ -43,9 +51,14 @@ expects
 \item the data columns each parameter formula uses, and how they are coded
 (factor levels, character vectors, numeric variables with few unique
 values)
-\item the number of observations per design cell (crossing the grouping
+\item the number of trials per design cell (crossing the grouping
 variables from random effects terms with the categorical predictors),
-flagging sparse or empty cells
+flagging sparse or empty cells. For models fit to aggregated data,
+where one row summarizes many trials, the trials of all rows in a cell
+are summed: the \code{n_trials} column of \code{sdt_yn()}, \code{sdt_mafc()} and
+\code{ezdm()}, and the row sums of the response count columns of \code{m3()},
+\code{mpt()}, \code{sdt_rating()}, \code{sdt_ranking()} and \code{sdt_cdp()}. For all other
+models a row is one trial
 \item model-specific diagnostics for common data mistakes (e.g. responses in
 degrees rather than radians for circular models, or misplaced \code{NA}
 values in the non-target features of set size varying designs).

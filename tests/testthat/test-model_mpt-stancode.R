@@ -75,6 +75,7 @@ test_that("the per-stick uniform prior of ?mpt replaces the beta priors in every
 })
 
 test_that("models without a simplex group carry no simplex prior functions", {
+  withr::local_seed(445)
   pcm_tree <- mpt_tree("study", list(
     C = "cp + (1 - cp) * rp * rp",
     E = "2 * (1 - cp) * rp * (1 - rp)",

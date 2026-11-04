@@ -15,6 +15,10 @@
 #'   first fails, e.g. on a Mac whose command line tools are missing, and the
 #'   first is the one that decides.
 #'
+#'   With `cmdstanr` 1.0 or later, a "brms" row warns when the installed `brms`
+#'   was released before it. New fits still work, but [update()] can fail on a
+#'   fit saved with an older `cmdstanr`.
+#'
 #'   With `smoke_test = TRUE`, it finally compiles and samples a small
 #'   two-parameter mixture model ([mixture2p()]) through [bmm()], on the
 #'   backend [bmm()] will use. This is the only check that shows the whole
@@ -31,8 +35,9 @@
 #'   installed, even when CmdStan is not, and `rstan` otherwise.
 #'
 #' @return A data frame of class `bmm_setup` with one row per check and the
-#'   columns `check`, `status` (`"pass"`, `"fail"` or `"skip"`), `detail` and
-#'   `fix` (`NA` unless the check failed). It prints as a report.
+#'   columns `check`, `status` (`"pass"`, `"warn"`, `"fail"` or `"skip"`),
+#'   `detail` and `fix` (`NA` unless the check failed or warned). It prints as
+#'   a report.
 #'
 #' @seealso [bmm()], [bmm_data_check()]
 #' @export
@@ -107,6 +112,7 @@ cmdstanr_checks <- function(chosen, fixes) {
   toolchain_error <- probe_cmdstan_toolchain()
   rbind(
     setup_row("cmdstanr", "pass", cmdstanr$version),
+    brms_check(cmdstanr$version),
     if (is.null(version)) {
       setup_row("CmdStan", "fail", "not installed", fixes$cmdstan)
     } else {
@@ -117,6 +123,25 @@ cmdstanr_checks <- function(chosen, fixes) {
     } else {
       setup_row("CmdStan toolchain", "fail", toolchain_error, fixes$toolchain)
     }
+  )
+}
+
+# brms follows cmdstanr 1.0 from its GitHub version 2.23.2 on
+# (paul-buerkner/brms#1947). An older brms reuses the stored model object of a
+# fit saved under cmdstanr 0.9 whose executable is still on disk, and update()
+# then fails inside cmdstanr 1.0. GitHub snapshots of 2.23.2 from before
+# 7 October 2026 lack the change but are not flagged
+brms_check <- function(cmdstanr_version) {
+  brms <- probe_brms_version()
+  if (package_version(cmdstanr_version) < "0.99.0" || package_version(brms) >= "2.23.2") {
+    return(NULL)
+  }
+  setup_row(
+    "brms", "warn",
+    glue("{brms} is older than cmdstanr {cmdstanr_version}: new fits work, but update() can fail \\
+    on a fit saved with an older cmdstanr"),
+    glue('install brms from GitHub with remotes::install_github("paul-buerkner/brms") until a newer \\
+    brms is on CRAN; until then, update(fit, recompile = TRUE) works')
   )
 }
 
@@ -244,6 +269,10 @@ probe_package <- function(pkg) {
   )
 }
 
+probe_brms_version <- function() {
+  format(utils::packageVersion("brms"))
+}
+
 probe_cmdstan_version <- function() {
   cmdstanr::cmdstan_version(error_on_NA = FALSE)
 }
@@ -310,7 +339,7 @@ print_setup_row <- function(status, check, detail) {
   label <- toupper(status)
   prefix <- paste0(label, "  ", check, "  ")
   lines <- strwrap(gsub("\\s+", " ", detail), width = 80, initial = prefix, exdent = nchar(prefix))
-  colors <- c(pass = "green", fail = "red", skip = "grey50")
+  colors <- c(pass = "green", warn = "orange", fail = "red", skip = "grey50")
   lines[1] <- sub(label, style(colors[[status]])(label), lines[1], fixed = TRUE)
   cat(lines, sep = "\n")
 }
@@ -319,12 +348,12 @@ setup_verdict <- function(x) {
   n_fail <- sum(x$status == "fail")
   backend <- attr(x, "backend")
   if (isTRUE(any(x$status[x$check == "Smoke test"] == "pass"))) {
-    ready <- glue("bmm can fit models with {backend} on this machine.")
-    if (n_fail == 0) {
-      return(ready)
-    }
     other <- setdiff(names(backend_requirements), backend)
-    return(c(ready, glue("The failures above matter only for the {other} backend.")))
+    return(c(
+      glue("bmm can fit models with {backend} on this machine."),
+      if (n_fail > 0) glue("The failures above matter only for the {other} backend."),
+      if (any(x$status == "warn")) "The warning above does not stop bmm() from fitting models."
+    ))
   }
   if (n_fail == 0) {
     return("No check failed; run bmm_setup() to compile and sample a test model too.")

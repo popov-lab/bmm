@@ -1,8 +1,11 @@
 test_that("sdm distribution functions run without errors", {
+  withr::local_seed(445)
   n <- 10
   res <- dsdm(runif(n, -pi, pi), mu = 1, c = 3, kappa = 1:n)
   expect_true(length(res) == n)
   res <- psdm(runif(n, -pi, pi), mu = rnorm(n), c = 0:(n - 1), kappa = 0:(n - 1))
+  expect_true(length(res) == n)
+  res <- qsdm(runif(n), mu = rnorm(n), c = 0:(n - 1), kappa = 0:(n - 1))
   expect_true(length(res) == n)
   res <- rsdm(n, mu = rnorm(n), c = 0:(n - 1), kappa = 0:(n - 1))
   expect_true(length(res) == n)
@@ -13,12 +16,30 @@ test_that("sdm distribution functions run without errors", {
   expect_true(all.equal(res, exp(res_log)))
 })
 
+test_that("dsdm, psdm and rsdm stop with the same message for each invalid parameter", {
+  members <- list(
+    dsdm = function(...) dsdm(0.5, ...),
+    psdm = function(...) psdm(0.5, ...),
+    qsdm = function(...) qsdm(0.5, ...),
+    rsdm = function(...) rsdm(2, ...)
+  )
+  for (member in members) {
+    expect_error(member(kappa = -1), "kappa must be non-negative", fixed = TRUE)
+    expect_error(member(kappa = c(1, -1), c = c(1, 2)), "kappa must be non-negative", fixed = TRUE)
+    expect_error(member(c = -1), "c must be non-negative", fixed = TRUE)
+    for (par in list(1, NA, c("bessel", "sqrtexp"), "gauss")) {
+      expect_error(member(parametrization = par), "Parametrization must be one of 'bessel' or 'sqrtexp'", fixed = TRUE)
+    }
+  }
+})
+
 test_that("dsdm integrates to 1", {
   expect_equal(integrate(dsdm, -pi, pi, mu = 0, c = 3, kappa = 3)$value, 1, tolerance = 1e-6)
 })
 
 
 test_that("psdm is between 0 and 1", {
+  withr::local_seed(445)
   res <- psdm(runif(1000, -pi, pi), mu = runif(1000, -pi, pi), c = 3, kappa = 3)
   expect_true(all(res >= 0) && all(res <= 1))
 })
@@ -29,8 +50,247 @@ test_that("psdm returns 0 for q == -pi, 0.5 for q = mu, and 1 for q almost pi, w
   expect_equal(psdm(pi - 0.00000000001, mu = 0, c = 3, kappa = 3), 1)
 })
 
+test_that("psdm returns 1 at the upper end of the circle and 0 at lower.bound", {
+  expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5), 1)
+  expect_equal(psdm(-pi, mu = 0, c = 3, kappa = 5), 0)
+  expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5, lower.tail = FALSE), 0)
+  expect_equal(psdm(1 + pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 1)
+  expect_equal(psdm(1 - pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 0)
+  expect_equal(psdm(2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0, parametrization = "bessel"), 1)
+  expect_equal(psdm(c(-pi, 0, pi), mu = 0, c = 3, kappa = 5), c(0, 0.5, 1))
+})
+
+test_that("psdm counts probability from lower.bound around the circle", {
+  expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5, lower.bound = 0), 0.5)
+  expect_equal(
+    psdm(-2, mu = 0, c = 3, kappa = 5, lower.bound = 0),
+    0.5 + psdm(-2, mu = 0, c = 3, kappa = 5)
+  )
+  expect_equal(
+    psdm(-2, mu = 0, c = 3, kappa = 5, lower.bound = 0),
+    psdm(-2 + 2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0)
+  )
+})
+
+test_that("psdm is 0.5 at mu when lower.bound is mu - pi, whatever mu", {
+  mu <- c(-2.5, -1, 0.3, 1.2, 3)
+  expect_equal(psdm(mu, mu, c = 3, kappa = 5, lower.bound = mu - pi), rep(0.5, 5))
+  expect_equal(psdm(mu + 1, mu, c = 3, kappa = 5, lower.bound = mu - pi) + psdm(mu - 1, mu, c = 3, kappa = 5, lower.bound = mu - pi), rep(1, 5))
+})
+
+test_that("psdm is 1 at the upper end and 0 at lower.bound, also where the sum rounds", {
+  # for these mu, mu + pi is an ulp above (mu - pi) + 2 * pi
+  for (mu in c(-1.9, -2.9, -0.9)) {
+    expect_identical(psdm(mu + pi, mu, c = 3, kappa = 5, lower.bound = mu - pi), 1)
+    expect_identical(psdm(mu - pi, mu, c = 3, kappa = 5, lower.bound = mu - pi), 0)
+  }
+  # here (mu + pi) - (mu - pi) and (lb + 2 * pi) - lb are not exactly 2 * pi
+  expect_identical(psdm(5.3 + pi, mu = 5.3, c = 3, kappa = 5, lower.bound = 5.3 - pi), 1)
+  expect_identical(psdm(1.8 + 2 * pi, lower.bound = 1.8), 1)
+  expect_identical(psdm(4.411322201024876 + 2 * pi, lower.bound = 4.411322201024876), 1)
+})
+
+test_that("psdm matches independently computed values of narrow distributions", {
+  # the expected values come from a Fourier series of the density, not from psdm
+  expect_equal(
+    psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100),
+    c(0.038448322764, 0.961551677236, 1, 1),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100, parametrization = "bessel"),
+    c(0.038542019868, 0.961457980132, 1, 1),
+    tolerance = 1e-8
+  )
+  expect_equal(psdm(2.5886723465579902, mu = 1.2, c = 8, kappa = 2), 0.989500751919, tolerance = 1e-8)
+  # these from a Gauss-Legendre rule and a split integrate(), both outside bmm
+  expect_equal(psdm(-2.8642135609090413, mu = -2.972, c = 3.794, kappa = 12.628), 0.625201913281481, tolerance = 1e-10)
+  expect_equal(psdm(-2.5, mu = -1.142, c = 8.298, kappa = 23.977), 4.48759884265636e-07, tolerance = 1e-8)
+  expect_equal(psdm(1.9, mu = -1.142, c = 8.298, kappa = 23.977), 0.99999913157208, tolerance = 1e-10)
+  expect_equal(qsdm(c(1e-6, 1 - 1e-6), mu = -1.142, c = 8.298, kappa = 23.977), c(-1.7325488416531, 1.71189120227268), tolerance = 1e-8)
+})
+
+test_that("psdm matches independently computed values of very narrow distributions", {
+  # from a Gauss-Legendre rule on 2^18 panels, the same on 2^20
+  expect_equal(
+    psdm(c(-3.1101767270538954, -3e-4, 3e-4), mu = 0, c = 930.8, kappa = 5100.2),
+    c(0, 0.000242686377686503, 0.999757313622313),
+    tolerance = 1e-9
+  )
+  expect_equal(psdm(c(-3e-4, 1e-4), mu = 0, c = 0.02, kappa = 1e7), c(1.40656029687921e-05, 0.938679424969398), tolerance = 1e-9)
+})
+
+test_that("psdm works where |q - mu| is a few ulps inside the cut-off of the kernel", {
+  # a Gauss-Legendre rule gives 1.7e-23 and 1 to double precision
+  q <- c(-0.14049057246282708, 0.14049057246282708)
+  expect_equal(psdm(q, mu = 0, c = 20, kappa = 100), c(0, 1), tolerance = 1e-15)
+})
+
+test_that("psdm and qsdm return NaN for the bessel parametrization above kappa = 1e5", {
+  expect_identical(
+    psdm(c(-pi, -0.01, 0.001, 0.5, pi), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"),
+    rep(NaN, 5)
+  )
+  expect_no_warning(res <- qsdm(c(0, 0.3, 1), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"))
+  expect_identical(res, rep(NaN, 3))
+})
+
+test_that("psdm does not decrease along the circle for a narrow distribution", {
+  q <- seq(-pi, pi, length.out = 201)
+  expect_gte(min(diff(psdm(q, mu = 0, c = 20, kappa = 100))), -1e-12)
+  expect_gte(min(diff(psdm(q, mu = 0.7, c = 20, kappa = 200))), -1e-12)
+})
+
+test_that("psdm pairs q, the parameters and lower.bound element-wise", {
+  expect_no_warning(
+    res <- psdm(c(0.4, -0.3), mu = c(0, 1, -1, 2, 0.5, -0.5), c = 3, kappa = 5, lower.bound = c(-pi, -2, -1))
+  )
+  expect_equal(res, c(
+    psdm(0.4, mu = 0, c = 3, kappa = 5, lower.bound = -pi),
+    psdm(-0.3, mu = 1, c = 3, kappa = 5, lower.bound = -2),
+    psdm(0.4, mu = -1, c = 3, kappa = 5, lower.bound = -1),
+    psdm(-0.3, mu = 2, c = 3, kappa = 5, lower.bound = -pi),
+    psdm(0.4, mu = 0.5, c = 3, kappa = 5, lower.bound = -2),
+    psdm(-0.3, mu = -0.5, c = 3, kappa = 5, lower.bound = -1)
+  ))
+})
+
+test_that("psdm and qsdm return NA for a missing value and nothing for no q", {
+  expect_identical(psdm(NA), NA_real_)
+  expect_identical(psdm(c(0.4, NA), mu = 0)[2], NA_real_)
+  expect_identical(psdm(0.4, mu = c(0, NA))[2], NA_real_)
+  expect_identical(psdm(numeric(0)), numeric(0))
+  expect_identical(qsdm(0.5, mu = NA), NA_real_)
+  expect_identical(qsdm(0.5, kappa = c(5, NA))[2], NA_real_)
+})
+
+test_that("psdm and qsdm return NaN for NaN, infinite and huge positions", {
+  expect_identical(psdm(c(Inf, -Inf, NaN, 1e300, 2e8)), rep(NaN, 5))
+  expect_identical(psdm(0.3, mu = -2e8), NaN)
+  expect_equal(psdm(0.3 + 2 * pi * 1e7, mu = 0, c = 3, kappa = 5), psdm(0.3, mu = 0, c = 3, kappa = 5), tolerance = 1e-8)
+  expect_identical(psdm(0.3, lower.bound = c(Inf, -Inf)), c(NaN, NaN))
+  expect_identical(psdm(0.3, mu = Inf), NaN)
+  expect_identical(qsdm(0.5, lower.bound = c(Inf, -Inf)), c(NaN, NaN))
+  expect_identical(qsdm(NaN), NaN)
+})
+
+test_that("qsdm matches independently computed quantiles", {
+  p <- c(0.025, 0.25, 0.5, 0.75, 0.975)
+  expect_equal(
+    qsdm(p, mu = 0, c = 3, kappa = 5),
+    c(-2.7299962425, -0.3587943398, 0, 0.3587943398, 2.7299962425),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 1.2, c = 8, kappa = 2),
+    c(-1.1371375470, 0.9004783701, 1.1848417892, 1.4571759540, 2.2262380039),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = -2.5, c = 0.5, kappa = 20),
+    c(-2.9749628367, -2.0835147654, -0.3529887814, 1.3949450289, 2.9679771890),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 0, c = 3, kappa = 5, parametrization = "bessel"),
+    c(-2.7469702720, -0.3748796718, 0, 0.3748796718, 2.7469702720),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 1.2, c = 8, kappa = 2, parametrization = "bessel"),
+    c(-1.6664740454, 0.8663819230, 1.1779562294, 1.4706224867, 2.3265643834),
+    tolerance = 1e-8
+  )
+})
+
+test_that("qsdm matches independently computed quantiles of a narrow distribution", {
+  p <- c(0.001, 0.25, 0.75, 0.999)
+  expect_equal(
+    qsdm(p, mu = 0, c = 20, kappa = 50),
+    c(-0.059930398206, -0.012799725231, 0.012799725231, 0.059930398206),
+    tolerance = 1e-8
+  )
+  expect_equal(
+    qsdm(p, mu = 0, c = 20, kappa = 50, parametrization = "bessel"),
+    c(-0.060010882249, -0.012816159925, 0.012816159925, 0.060010882249),
+    tolerance = 1e-8
+  )
+})
+
+test_that("qsdm returns a quantile for p near 1 where lower.bound + 2 * pi rounds", {
+  # the 16 digits matter: (lb + 2 * pi) - lb is not exactly 2 * pi here
+  lb <- 4.411322201024876
+  for (par in c("sqrtexp", "bessel")) {
+    q <- qsdm(1 - 1e-13, mu = 0, c = 3, kappa = 5, lower.bound = lb, parametrization = par)
+    expect_true(q >= lb && q <= lb + 2 * pi)
+  }
+})
+
+test_that("qsdm is the median at mu for a distribution symmetric around mu", {
+  expect_equal(qsdm(0.5, mu = 0), 0, tolerance = 1e-8)
+  expect_equal(qsdm(0.5, mu = 0, parametrization = "bessel"), 0, tolerance = 1e-8)
+  expect_equal(qsdm(0.5, mu = 1, c = 8, kappa = 2, lower.bound = 1 - pi), 1, tolerance = 1e-8)
+  expect_equal(qsdm(0.5, mu = -2.5, c = 8, kappa = 2, lower.bound = -2.5 - pi), -2.5, tolerance = 1e-8)
+})
+
+test_that("psdm(qsdm(p)) returns p to 1e-8 on both parametrizations", {
+  p <- seq(0.01, 0.99, length.out = 25)
+  sets <- list(
+    list(mu = 0, c = 3, kappa = 5),
+    list(mu = 1.2, c = 8, kappa = 2),
+    list(mu = -2.5, c = 0.5, kappa = 20)
+  )
+  for (par in c("sqrtexp", "bessel")) {
+    for (s in sets) {
+      q <- qsdm(p, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
+      back <- psdm(q, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
+      expect_lt(max(abs(back - p)), 1e-8)
+    }
+  }
+})
+
+test_that("qsdm handles lower.tail, log.p and lower.bound like psdm", {
+  expect_equal(qsdm(0.3, lower.tail = FALSE), qsdm(0.7))
+  expect_equal(qsdm(log(0.3), log.p = TRUE), qsdm(0.3))
+  expect_equal(qsdm(log(0.3), lower.tail = FALSE, log.p = TRUE), qsdm(0.7))
+
+  q <- qsdm(c(0.1, 0.5, 0.9), mu = 0, c = 3, kappa = 5, lower.bound = 0)
+  expect_true(all(q >= 0 & q <= 2 * pi))
+  expect_equal(q[2], pi, tolerance = 1e-8)
+  expect_equal(psdm(q, mu = 0, c = 3, kappa = 5, lower.bound = 0), c(0.1, 0.5, 0.9), tolerance = 1e-8)
+})
+
+test_that("qsdm returns the ends of the circle for p = 0 and p = 1", {
+  expect_equal(qsdm(c(0, 1), mu = 0, c = 3, kappa = 5), c(-pi, pi))
+  expect_equal(qsdm(c(0, 1), mu = 0, c = 3, kappa = 5, lower.bound = 1), c(1, 1 + 2 * pi))
+  expect_equal(qsdm(c(0, 1), mu = 0, c = 3, kappa = 5, lower.tail = FALSE), c(pi, -pi))
+})
+
+test_that("qsdm pairs p and the parameters element-wise", {
+  expect_equal(
+    qsdm(c(0.2, 0.8, 0.5), mu = c(0, 2, -1), c = c(3, 5, 1), kappa = c(5, 3, 8)),
+    c(
+      qsdm(0.2, mu = 0, c = 3, kappa = 5),
+      qsdm(0.8, mu = 2, c = 5, kappa = 3),
+      qsdm(0.5, mu = -1, c = 1, kappa = 8)
+    )
+  )
+  expect_length(qsdm(numeric(0)), 0)
+  expect_equal(qsdm(c(0.5, NA), mu = 0), c(0, NA), tolerance = 1e-8)
+})
+
+test_that("qsdm returns NaN with a warning for p outside [0, 1]", {
+  expect_warning(res <- qsdm(c(-0.1, 0.5, 1.1), mu = 0), "NaN")
+  expect_equal(res, c(NaN, 0, NaN), tolerance = 1e-8)
+})
+
+test_that("qsdm stops on an unknown parametrization", {
+  expect_error(qsdm(0.5, parametrization = "gauss"), "Parametrization must be one of")
+})
+
 
 test_that("rsdm returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rsdm(1000, mu = 0, c = 3, kappa = 3)
   expect_true(all(res >= -pi) && all(res <= pi))
 
@@ -92,6 +352,7 @@ test_that("rejection_sampling takes arguments of length n per draw", {
 })
 
 test_that("rejection_sampling validates n and max_f", {
+  withr::local_seed(445)
   expect_error(rejection_sampling(2.5, stats::dunif, 1, stats::runif), "whole number")
   expect_error(rejection_sampling(5, stats::dunif, 0, stats::runif), "max_f")
   expect_error(rejection_sampling(5, stats::dunif, c(1, 2), stats::runif), "max_f")
@@ -100,6 +361,7 @@ test_that("rejection_sampling validates n and max_f", {
 test_that("rejection_sampling errors instead of looping forever", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   # a regression here hangs; fail the test instead of timing out the CI job
+  withr::local_seed(445)
   setTimeLimit(elapsed = 20, transient = TRUE)
   withr::defer(setTimeLimit(elapsed = Inf))
   expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
@@ -109,6 +371,7 @@ test_that("rejection_sampling errors instead of looping forever", {
 })
 
 test_that("conversion between sdm parametrizations works", {
+  withr::local_seed(445)
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
   c_se <- c_bessel2sqrtexp(c_b, kappa)
@@ -117,6 +380,7 @@ test_that("conversion between sdm parametrizations works", {
 })
 
 test_that("dsdm parametrization conversion returns accurate results", {
+  withr::local_seed(445)
   y <- seq(-pi, pi, length.out = 100)
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
@@ -127,23 +391,30 @@ test_that("dsdm parametrization conversion returns accurate results", {
 })
 
 test_that("dmixture2p integrates to 1", {
+  withr::local_seed(445)
+  # integrate()'s default rel.tol (1.2e-4) misses by up to 7e-6 when the peak
+  # sits near -pi or pi, which fails the 1e-6 check on some draws
   expect_equal(integrate(dmixture2p, -pi, pi,
     mu = runif(1, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
-    p_mem = runif(1, min = 0, max = 1)
+    p_mem = runif(1, min = 0, max = 1),
+    rel.tol = 1e-10
   )$value, 1, tolerance = 1e-6)
 })
 
 test_that("dmixture3p integrates to 1", {
+  withr::local_seed(445)
   expect_equal(integrate(dmixture3p, -pi, pi,
     mu = runif(3, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
     p_mem = runif(1, min = 0, max = 0.6),
-    p_nt = runif(1, min = 0, max = 0.3)
+    p_nt = runif(1, min = 0, max = 0.3),
+    rel.tol = 1e-10
   )$value, 1, tolerance = 1e-6)
 })
 
 test_that("dimm integrates to 1", {
+  withr::local_seed(445)
   expect_equal(integrate(dimm, -pi, pi,
     mu = runif(3, min = -pi, pi),
     dist = c(0, runif(2, min = 0.1, max = pi)),
@@ -151,11 +422,13 @@ test_that("dimm integrates to 1", {
     c = runif(1, min = 0, max = 3),
     a = runif(1, min = 0, max = 1),
     s = runif(1, min = 1, max = 20),
-    b = 0
+    b = 0,
+    rel.tol = 1e-10
   )$value, 1, tolerance = 1e-6)
 })
 
 test_that("rmixture2p returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rmixture2p(500,
     mu = runif(1, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
@@ -188,6 +461,7 @@ test_that("rmixture2p recycles parameters to n", {
 })
 
 test_that("rmixture3p returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rmixture3p(500,
     mu = runif(3, min = -pi, pi),
     kappa = runif(1, min = 1, max = 20),
@@ -198,6 +472,7 @@ test_that("rmixture3p returns values between -pi and pi", {
 })
 
 test_that("rimm returns values between -pi and pi", {
+  withr::local_seed(445)
   res <- rimm(500,
     mu = runif(3, min = -pi, pi),
     dist = c(0, runif(2, min = 0.1, max = pi)),
@@ -218,7 +493,7 @@ test_that("dm3 requires custom act_funs to be specified", {
     version = "custom"
   )
   expect_error(
-    dm3(x = c(10, 10, 10, 10), pars = c(a = 1, b = 1, c = 1, f = 1), m3_model = model),
+    dm3(x = c(10, 10, 10, 10), pars = c(a = 1, b = 1, c = 1, f = 1), m3_model = model, log = TRUE),
     "Activation functions can only be generated"
   )
 })
@@ -230,7 +505,7 @@ test_that("dm3 works for a simple m3 model", {
     choice_rule = "simple",
     version = "ss"
   )
-  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model)
+  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = model, log = TRUE)
   expect_type(dens, "double")
   expect_length(dens, 1)
   # compare with # compare with lgamma(size + 1) + sum(x * log(prob) - lgamma(x + 1))
@@ -248,7 +523,7 @@ test_that("dm3 works for a complex span m3 model", {
     choice_rule = "simple",
     version = "cs"
   )
-  dens <- dm3(x = c(20, 5, 10, 5, 10), pars = c(a = 1, b = 1, c = 2, f = 0), m3_model = model)
+  dens <- dm3(x = c(20, 5, 10, 5, 10), pars = c(a = 1, b = 1, c = 2, f = 0), m3_model = model, log = TRUE)
   expect_type(dens, "double")
   expect_length(dens, 1)
   # compare with lgamma(size + 1) + sum(x * log(prob) - lgamma(x + 1))
@@ -279,7 +554,7 @@ test_that("dm3 works for a custom m3 model", {
   )
   dens <- dm3(
     x = c(20, 10, 10), pars = c(background = 1, item = 1, binding = 2),
-    m3_model = model, act_funs = act_funs
+    m3_model = model, act_funs = act_funs, log = TRUE
   )
   expect_type(dens, "double")
   expect_length(dens, 1)
@@ -292,6 +567,7 @@ test_that("dm3 works for a custom m3 model", {
 })
 
 test_that("rm3 works for a simple m3 model", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 50),
@@ -308,6 +584,7 @@ test_that("rm3 works for a simple m3 model", {
 })
 
 test_that("rm3 works for a complexspan m3 model", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "dist_context", "other", "dist_other", "npl"),
     num_options = c(1, 10, 4, 100, 5),
@@ -325,7 +602,7 @@ test_that("rm3 works for a complexspan m3 model", {
 
 # DDM distribution tests ----
 test_that("dddm runs without errors with scalar inputs", {
-  res <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
+  res <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE)
   expect_type(res, "double")
   expect_length(res, 1)
   expect_false(is.na(res))
@@ -333,16 +610,16 @@ test_that("dddm runs without errors with scalar inputs", {
 })
 
 test_that("dddm handles numeric response codes correctly", {
-  res_upper <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
-  res_lower <- dddm(0.5, 0, drift = 2, bound = 1.5, ndt = 0.3)
+  res_upper <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE)
+  res_lower <- dddm(0.5, 0, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE)
   expect_type(res_upper, "double")
   expect_type(res_lower, "double")
   expect_false(identical(res_upper, res_lower))
 })
 
 test_that("dddm handles character response codes correctly", {
-  res_numeric <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)
-  res_char <- dddm(0.5, "upper", drift = 2, bound = 1.5, ndt = 0.3)
+  res_numeric <- dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE)
+  res_char <- dddm(0.5, "upper", drift = 2, bound = 1.5, ndt = 0.3, log = TRUE)
   expect_equal(res_numeric, res_char)
 })
 
@@ -354,13 +631,14 @@ test_that("dddm log parameter works correctly", {
 
 test_that("dddm vectorizes correctly with scalar rt/response and vector parameters", {
   # This is the log_lik case: single observation, multiple posterior samples
+  withr::local_seed(445)
   rt_single <- 0.5
   resp_single <- 1
   drift_vec <- rnorm(10, 2, 0.3)
   bound_vec <- rep(1.5, 10)
   ndt_vec <- rep(0.3, 10)
   
-  res <- dddm(rt_single, resp_single, drift_vec, bound_vec, ndt_vec)
+  res <- dddm(rt_single, resp_single, drift_vec, bound_vec, ndt_vec, log = TRUE)
   expect_length(res, 10)
   expect_false(any(is.na(res)))
   expect_false(any(is.infinite(res)))
@@ -371,48 +649,50 @@ test_that("dddm vectorizes correctly with vector rt/response and scalar paramete
   resp_vec <- c(1, 1, 0)
   drift_scalar <- 2.0
   
-  res <- dddm(rt_vec, resp_vec, drift_scalar, bound = 1.5, ndt = 0.3)
+  res <- dddm(rt_vec, resp_vec, drift_scalar, bound = 1.5, ndt = 0.3, log = TRUE)
   expect_length(res, 3)
   expect_false(any(is.na(res)))
 })
 
 test_that("dddm vectorizes correctly with vector rt/response and vector parameters", {
+  withr::local_seed(445)
   n <- 5
   rt_vec <- runif(n, 0.3, 0.8)
   resp_vec <- sample(0:1, n, replace = TRUE)
   drift_vec <- rnorm(n, 2, 0.3)
   
-  res <- dddm(rt_vec, resp_vec, drift_vec, bound = 1.5, ndt = 0.3)
+  res <- dddm(rt_vec, resp_vec, drift_vec, bound = 1.5, ndt = 0.3, log = TRUE)
   expect_length(res, n)
   expect_false(any(is.na(res)))
 })
 
 test_that("dddm rejects negative RTs", {
   expect_error(
-    dddm(-0.5, 1, drift = 2, bound = 1.5, ndt = 0.3),
+    dddm(-0.5, 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE),
     "Negative RTs are not allowed"
   )
 })
 
 test_that("dddm rejects invalid response codes", {
   expect_error(
-    dddm(0.5, 2, drift = 2, bound = 1.5, ndt = 0.3),
+    dddm(0.5, 2, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE),
     "Invalid numeric responses"
   )
   expect_error(
-    dddm(0.5, "invalid", drift = 2, bound = 1.5, ndt = 0.3),
+    dddm(0.5, "invalid", drift = 2, bound = 1.5, ndt = 0.3, log = TRUE),
     "Invalid responses"
   )
 })
 
 test_that("dddm rejects mismatched rt and response lengths", {
   expect_error(
-    dddm(c(0.5, 0.6), 1, drift = 2, bound = 1.5, ndt = 0.3),
+    dddm(c(0.5, 0.6), 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE),
     "Different number of RTs and responses"
   )
 })
 
 test_that("rddm returns data frame with correct structure", {
+  withr::local_seed(445)
   res <- rddm(10, drift = 2, bound = 1.5, ndt = 0.3)
   expect_s3_class(res, "data.frame")
   expect_equal(nrow(res), 10)
@@ -422,6 +702,7 @@ test_that("rddm returns data frame with correct structure", {
 })
 
 test_that("rddm handles vector parameters correctly", {
+  withr::local_seed(445)
   n <- 5
   drift_vec <- rnorm(n, 2, 0.3)
   res <- rddm(n, drift = drift_vec, bound = 1.5, ndt = 0.3)
@@ -430,6 +711,7 @@ test_that("rddm handles vector parameters correctly", {
 
 test_that("rddm samples from correct boundaries based on drift", {
   # Positive drift should favor upper boundary (response = 1)
+  withr::local_seed(445)
   res_pos <- rddm(1000, drift = 3, bound = 1.5, ndt = 0.3)
   expect_gt(mean(res_pos$response == 1), 0.8)
   
@@ -439,12 +721,14 @@ test_that("rddm samples from correct boundaries based on drift", {
 })
 
 test_that("rddm respects non-decision time", {
+  withr::local_seed(445)
   res <- rddm(100, drift = 2, bound = 1.5, ndt = 0.3)
   expect_true(all(res$rt >= 0.3))
 })
 
 test_that("rddm starting point bias affects response proportions", {
   # Bias toward upper boundary
+  withr::local_seed(445)
   res_upper <- rddm(1000, drift = 0, bound = 1.5, ndt = 0.3, zr = 0.7)
   expect_gt(mean(res_upper$response == 1), 0.6)
   
@@ -458,6 +742,7 @@ test_that("rddm starting point bias affects response proportions", {
 # -----------------------------------------------------------------------------
 
 test_that("dcswald runs without errors and returns correct output", {
+  withr::local_seed(445)
   n <- 10
   rt <- runif(n, 0.4, 1.5)
   response <- sample(c(0, 1), n, replace = TRUE)
@@ -465,7 +750,7 @@ test_that("dcswald runs without errors and returns correct output", {
   # simple version
   res <- dcswald(rt, response,
     drift = 2, bound = 1.5, ndt = 0.3,
-    version = "simple"
+    version = "simple", log = TRUE
   )
   expect_length(res, n)
   expect_type(res, "double")
@@ -473,7 +758,7 @@ test_that("dcswald runs without errors and returns correct output", {
   # crisk version
   res_crisk <- dcswald(rt, response,
     drift = 2, bound = 1.5, ndt = 0.3,
-    zr = 0.5, version = "crisk"
+    zr = 0.5, version = "crisk", log = TRUE
   )
   expect_length(res_crisk, n)
   expect_type(res_crisk, "double")
@@ -488,6 +773,7 @@ test_that("dcswald runs without errors and returns correct output", {
 })
 
 test_that("dcswald handles vectorized parameters", {
+  withr::local_seed(445)
   n <- 5
   rt <- runif(n, 0.4, 1.5)
   response <- sample(c(0, 1), n, replace = TRUE)
@@ -495,19 +781,20 @@ test_that("dcswald handles vectorized parameters", {
   # vectorized drift
   res <- dcswald(rt, response,
     drift = 1:n, bound = 1.5, ndt = 0.3,
-    version = "simple"
+    version = "simple", log = TRUE
   )
   expect_length(res, n)
 
   # all parameters vectorized
   res <- dcswald(rt, response,
     drift = 1:n, bound = seq(1, 2, length.out = n),
-    ndt = seq(0.1, 0.3, length.out = n), version = "simple"
+    ndt = seq(0.1, 0.3, length.out = n), version = "simple", log = TRUE
   )
   expect_length(res, n)
 })
 
 test_that("rcswald generates valid output", {
+  withr::local_seed(445)
   n <- 100
   out <- rcswald(n, drift = 2, bound = 1.5, ndt = 0.3)
 
@@ -519,6 +806,7 @@ test_that("rcswald generates valid output", {
 })
 
 test_that("rcswald handles vectorized parameters", {
+  withr::local_seed(445)
   n <- 10
   out <- rcswald(n,
     drift = runif(n, 1, 3), bound = runif(n, 1, 2),
@@ -652,31 +940,31 @@ test_that("pcswald and qcswald are inverses (round-trip)", {
 test_that("cswald parameter validation works", {
   # negative bound
   expect_error(
-    dcswald(1, 1, drift = 2, bound = -1, ndt = 0.3),
+    dcswald(1, 1, drift = 2, bound = -1, ndt = 0.3, log = TRUE),
     "boundary"
   )
 
   # negative ndt
   expect_error(
-    dcswald(1, 1, drift = 2, bound = 1.5, ndt = -0.1),
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = -0.1, log = TRUE),
     "non-decision time"
   )
 
   expect_error(
-    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5),
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5, log = TRUE),
     "starting point"
   )
 
   # negative s
   expect_error(
-    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, s = -1),
+    dcswald(1, 1, drift = 2, bound = 1.5, ndt = 0.3, s = -1, log = TRUE),
     "diffusion constant"
   )
 })
 
 test_that("dcswald errors when rt < ndt", {
   expect_error(
-    dcswald(rt = 0.2, response = 1, drift = 2, bound = 1.5, ndt = 0.3),
+    dcswald(rt = 0.2, response = 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE),
     "smaller than the non-decision time"
   )
 })
@@ -720,19 +1008,19 @@ test_that("qcswald adaptive bounds work for slow drift", {
 test_that("dcswald handles extreme drift values", {
   # Very high drift - fast accurate responses
   expect_no_error(
-    dcswald(rt = 0.5, response = 1, drift = 10, bound = 1.5, ndt = 0.2)
+    dcswald(rt = 0.5, response = 1, drift = 10, bound = 1.5, ndt = 0.2, log = TRUE)
   )
 
   # Very low drift - slow responses
   expect_no_error(
-    dcswald(rt = 2.0, response = 1, drift = 0.1, bound = 1.5, ndt = 0.2)
+    dcswald(rt = 2.0, response = 1, drift = 0.1, bound = 1.5, ndt = 0.2, log = TRUE)
   )
 
   # Negative drift for crisk version
   expect_no_error(
     dcswald(
       rt = 0.8, response = 0, drift = -2, bound = 1.5, ndt = 0.2,
-      zr = 0.5, version = "crisk"
+      zr = 0.5, version = "crisk", log = TRUE
     )
   )
 })
@@ -740,12 +1028,12 @@ test_that("dcswald handles extreme drift values", {
 test_that("dcswald handles extreme bound values", {
   # Very small bound - fast responses
   expect_no_error(
-    dcswald(rt = 0.3, response = 1, drift = 2, bound = 0.5, ndt = 0.1)
+    dcswald(rt = 0.3, response = 1, drift = 2, bound = 0.5, ndt = 0.1, log = TRUE)
   )
 
   # Very large bound - slow responses
   expect_no_error(
-    dcswald(rt = 5.0, response = 1, drift = 2, bound = 5, ndt = 0.2)
+    dcswald(rt = 5.0, response = 1, drift = 2, bound = 5, ndt = 0.2, log = TRUE)
   )
 })
 
@@ -754,7 +1042,7 @@ test_that("dcswald handles boundary zr values for crisk version", {
   expect_no_error(
     dcswald(
       rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
-      zr = 0.01, version = "crisk"
+      zr = 0.01, version = "crisk", log = TRUE
     )
   )
 
@@ -762,7 +1050,7 @@ test_that("dcswald handles boundary zr values for crisk version", {
   expect_no_error(
     dcswald(
       rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
-      zr = 0.99, version = "crisk"
+      zr = 0.99, version = "crisk", log = TRUE
     )
   )
 
@@ -770,7 +1058,7 @@ test_that("dcswald handles boundary zr values for crisk version", {
   expect_error(
     dcswald(
       rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
-      zr = 0, version = "crisk"
+      zr = 0, version = "crisk", log = TRUE
     ),
     "between 0 and 1"
   )
@@ -778,7 +1066,7 @@ test_that("dcswald handles boundary zr values for crisk version", {
   expect_error(
     dcswald(
       rt = 0.8, response = 1, drift = 2, bound = 1.5, ndt = 0.2,
-      zr = 1, version = "crisk"
+      zr = 1, version = "crisk", log = TRUE
     ),
     "between 0 and 1"
   )
@@ -786,6 +1074,7 @@ test_that("dcswald handles boundary zr values for crisk version", {
 
 test_that("rcswald generates valid data with extreme parameters", {
   # High drift - should produce mostly correct responses
+  withr::local_seed(445)
   dat_high <- rcswald(n = 100, drift = 5, bound = 1.5, ndt = 0.2)
   expect_true(mean(dat_high$response == 1) > 0.9)
   expect_true(all(dat_high$rt > 0.2)) # all RTs > ndt
@@ -820,7 +1109,7 @@ test_that("dcswald error-response likelihood stays finite in the upper tail (#37
   # The simple version routes response = 0 through the shifted-Wald survival.
   # The old naive log(1 - exp(cdf)) cancelled to NaN/-Inf for late RTs.
   ll <- dcswald(c(5, 10, 20, 40),
-    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple", log = TRUE
   )
   expect_true(all(is.finite(ll)))
 })
@@ -828,7 +1117,7 @@ test_that("dcswald error-response likelihood stays finite in the upper tail (#37
 test_that("dcswald error-response survival equals 1 - CDF in mid-range (#376)", {
   rt <- c(0.4, 0.6, 0.9, 1.3)
   ll_error <- dcswald(rt,
-    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple"
+    response = 0, drift = 2, bound = 1, ndt = 0.3, version = "simple", log = TRUE
   )
   cdf <- pcswald(rt,
     response = 1, drift = 2, bound = 1, ndt = 0.3, version = "simple"
@@ -837,6 +1126,7 @@ test_that("dcswald error-response survival equals 1 - CDF in mid-range (#376)", 
 })
 
 test_that("rm3 works without providing b parameter", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -853,6 +1143,7 @@ test_that("rm3 works without providing b parameter", {
 })
 
 test_that("rm3 works with full bmmformula", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -886,7 +1177,7 @@ test_that("dm3 works without providing b parameter", {
     version = "ss"
   )
   # b parameter should be added automatically
-  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model)
+  dens <- dm3(x = c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = model, log = TRUE)
   expect_type(dens, "double")
   expect_length(dens, 1)
 })
@@ -907,7 +1198,7 @@ test_that("dm3 works with full bmmformula", {
   )
   dens <- dm3(
     x = c(20, 10, 10), pars = c(a = 1, c = 2),
-    m3_model = model, act_funs = full_formula
+    m3_model = model, act_funs = full_formula, log = TRUE
   )
   expect_type(dens, "double")
   expect_length(dens, 1)
@@ -916,12 +1207,12 @@ test_that("dm3 works with full bmmformula", {
 test_that("dm3 matches activations and num_options by category, not by position", {
   model <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 5), choice_rule = "simple")
   pars <- c(a = 1, b = 0.1, c = 2)
-  expected <- dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b))
-  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(npl ~ b, other ~ b + a, corr ~ b + a + c)), expected)
+  expected <- dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b), log = TRUE)
+  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(npl ~ b, other ~ b + a, corr ~ b + a + c), log = TRUE), expected)
 
   model$other_vars$num_options <- c(npl = 5, corr = 1, other = 4)
-  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b)), expected)
-  expect_error(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, npl ~ b)), "'other'")
+  expect_equal(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, other ~ b + a, npl ~ b), log = TRUE), expected)
+  expect_error(dm3(c(20, 10, 10), pars, model, bmf(corr ~ b + a + c, npl ~ b), log = TRUE), "'other'")
 })
 
 test_that("dm3 and rm3 use Gaussian-rule probabilities for choice_rule = 'gaussian'", {
@@ -929,17 +1220,18 @@ test_that("dm3 and rm3 use Gaussian-rule probabilities for choice_rule = 'gaussi
               choice_rule = "gaussian", version = "ss")
   probs <- exp(vapply(1:3, function(k) m3_gauss_logp(k, 2.5, 1, 0, 1, 4, 10), numeric(1)))
   expect_equal(sum(probs), 1, tolerance = 1e-6)
-  expect_equal(dm3(c(60, 25, 15), c(a = 1, c = 1.5), model),
+  expect_equal(dm3(c(60, 25, 15), c(a = 1, c = 1.5), model, log = TRUE),
                stats::dmultinom(c(60, 25, 15), prob = probs, log = TRUE), tolerance = 1e-8)
   # the softmax rule gives different probabilities for the same activations
   softmax <- m3(resp_cats = c("corr", "other", "npl"), num_options = c(1, 4, 10), version = "ss")
-  expect_gt(abs(dm3(c(60, 25, 15), c(a = 1, c = 1.5), softmax) - dm3(c(60, 25, 15), c(a = 1, c = 1.5), model)), 0.1)
+  expect_gt(abs(dm3(c(60, 25, 15), c(a = 1, c = 1.5), softmax, log = TRUE) - dm3(c(60, 25, 15), c(a = 1, c = 1.5), model, log = TRUE)), 0.1)
   withr::local_seed(1)
   draws <- rm3(n = 2000, size = 1, pars = c(a = 1, c = 1.5), m3_model = model)
   expect_lt(max(abs(colMeans(draws) - probs)), 0.04)
 })
 
 test_that("rm3 errors when full formula has no activation functions", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -961,6 +1253,7 @@ test_that("rm3 errors when full formula has no activation functions", {
 })
 
 test_that("rm3 with unpack=TRUE returns named vector for n=1", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -982,6 +1275,7 @@ test_that("rm3 with unpack=TRUE returns named vector for n=1", {
 })
 
 test_that("rm3 with unpack=TRUE still returns matrix for n>1", {
+  withr::local_seed(445)
   model <- m3(
     resp_cats = c("corr", "other", "npl"),
     num_options = c(1, 4, 5),
@@ -1006,7 +1300,7 @@ test_that("rm3 with unpack=TRUE still returns matrix for n>1", {
 test_that("dezdm 3par runs without errors and returns correct output", {
   ll <- dezdm(
     mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-    drift = 2, bound = 1.5, ndt = 0.3
+    drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
   expect_type(ll, "double")
   expect_length(ll, 1)
@@ -1018,7 +1312,7 @@ test_that("dezdm 4par runs without errors and returns correct output", {
   ll <- dezdm(
     mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
     n_upper = 80, n_trials = 100,
-    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
   )
   expect_type(ll, "double")
   expect_length(ll, 1)
@@ -1037,6 +1331,7 @@ test_that("dezdm log and non-log outputs are consistent", {
 })
 
 test_that("rezdm 3par returns correct output structure", {
+  withr::local_seed(445)
   res <- rezdm(n = 100, n_trials = 50, drift = 2, bound = 1.5, ndt = 0.3)
   expect_s3_class(res, "data.frame")
   expect_equal(nrow(res), 100)
@@ -1045,6 +1340,7 @@ test_that("rezdm 3par returns correct output structure", {
 })
 
 test_that("rezdm 4par returns correct output structure", {
+  withr::local_seed(445)
   res <- rezdm(
     n = 100, n_trials = 50, drift = 2, bound = 1.5, ndt = 0.3,
     zr = 0.55, version = "4par"
@@ -1061,6 +1357,7 @@ test_that("rezdm 4par returns correct output structure", {
 })
 
 test_that("rezdm 3par returns plausible values", {
+  withr::local_seed(445)
   res <- rezdm(n = 500, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
 
   # mean RT should be greater than ndt
@@ -1108,7 +1405,7 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-      drift = 2, bound = -1, ndt = 0.3
+      drift = 2, bound = -1, ndt = 0.3, log = TRUE
     ),
     "bound must be positive"
   )
@@ -1117,7 +1414,7 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = -0.1
+      drift = 2, bound = 1.5, ndt = -0.1, log = TRUE
     ),
     "ndt must be positive"
   )
@@ -1126,7 +1423,7 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 150, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = 0.3
+      drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
     ),
     "n_upper cannot exceed n_trials"
   )
@@ -1135,7 +1432,7 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 1, n_trials = 1,
-      drift = 2, bound = 1.5, ndt = 0.3
+      drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
     ),
     "n_trials must be larger than 2"
   )
@@ -1143,7 +1440,7 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 2, n_trials = 2,
-      drift = 2, bound = 1.5, ndt = 0.3
+      drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
     ),
     "n_trials must be larger than 2"
   )
@@ -1152,14 +1449,14 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80.5, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = 0.3
+      drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
     ),
     "must be whole numbers"
   )
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100.5,
-      drift = 2, bound = 1.5, ndt = 0.3
+      drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
     ),
     "must be whole numbers"
   )
@@ -1168,7 +1465,7 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = 0.3, version = "5par"
+      drift = 2, bound = 1.5, ndt = 0.3, version = "5par", log = TRUE
     ),
     "should be one of"
   )
@@ -1177,7 +1474,7 @@ test_that("dezdm validates parameters correctly", {
   expect_error(
     dezdm(
       mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = 0.3, version = "4par"
+      drift = 2, bound = 1.5, ndt = 0.3, version = "4par", log = TRUE
     ),
     "must be length 2"
   )
@@ -1187,7 +1484,7 @@ test_that("dezdm validates parameters correctly", {
     dezdm(
       mean_rt = c(0.5, 0.6), var_rt = c(0.02, 0.03),
       n_upper = 80, n_trials = 100,
-      drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5, version = "4par"
+      drift = 2, bound = 1.5, ndt = 0.3, zr = 1.5, version = "4par", log = TRUE
     ),
     "zr must be between 0 and 1"
   )
@@ -1204,6 +1501,7 @@ test_that("rezdm 4par handles cells with fewer than 2 responses at a boundary", 
 
 test_that("rezdm validates parameters correctly", {
   # n must be single integer
+  withr::local_seed(445)
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
     "n must be a single integer"
@@ -1221,11 +1519,47 @@ test_that("rezdm validates parameters correctly", {
   )
 })
 
+test_that("dezdm and rezdm stop with the same message for each invalid parameter", {
+  d_ok <- list(
+    mean_rt = c(0.5, 0.6), var_rt = c(0.02, 0.03), n_upper = 80, n_trials = 100,
+    drift = 2, bound = 1.5, ndt = 0.3
+  )
+  r_ok <- list(n = 5, n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3)
+  bad <- list(
+    list(bound = 0, msg = "bound must be positive"),
+    list(ndt = 0, msg = "ndt must be positive"),
+    list(s = 0, msg = "s must be positive"),
+    list(s = -1, msg = "s must be positive"),
+    list(n_trials = 2, msg = "n_trials must be larger than 2"),
+    list(zr = 1, version = "4par", msg = "zr must be between 0 and 1"),
+    list(zr = 0, version = "4par", msg = "zr must be between 0 and 1")
+  )
+  for (b in bad) {
+    pars <- b[setdiff(names(b), "msg")]
+    expect_error(do.call(dezdm, modifyList(d_ok, pars)), b$msg, fixed = TRUE)
+    expect_error(do.call(rezdm, modifyList(r_ok, pars)), b$msg, fixed = TRUE)
+  }
+})
+
+test_that("rezdm pairs a vector n_trials with the draws", {
+  withr::local_seed(564)
+  n_trials <- c(10, 1000)
+  for (version in c("3par", "4par")) {
+    res <- rezdm(
+      n = 2000, n_trials = n_trials, drift = 1, bound = 1, ndt = 0.2,
+      version = version
+    )
+    expect_equal(res$n_trials, rep(n_trials, 1000))
+    expect_true(all(res$n_upper <= res$n_trials))
+    expect_true(max(res$n_upper[res$n_trials == 10]) <= 10)
+  }
+})
+
 test_that("dezdm handles edge case with near-zero drift", {
   # near-zero drift should not cause errors
   ll <- dezdm(
     mean_rt = 0.5, var_rt = 0.02, n_upper = 50, n_trials = 100,
-    drift = 1e-8, bound = 1.5, ndt = 0.3
+    drift = 1e-8, bound = 1.5, ndt = 0.3, log = TRUE
   )
   expect_true(is.finite(ll))
 })
@@ -1238,7 +1572,7 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
   ll1 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
     n_upper = 50, n_trials = 100,
-    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par"
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par", log = TRUE
   )
   expect_true(is.finite(ll1))
 
@@ -1246,7 +1580,7 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
   ll2 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
     n_upper = 30, n_trials = 100,
-    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.3, version = "4par"
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.3, version = "4par", log = TRUE
   )
   expect_true(is.finite(ll2))
 
@@ -1254,7 +1588,7 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
   ll3 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
     n_upper = 70, n_trials = 100,
-    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par"
+    drift = 1e-8, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par", log = TRUE
   )
   expect_true(is.finite(ll3))
 
@@ -1262,7 +1596,7 @@ test_that("dezdm 4par handles edge case with near-zero drift", {
   ll4 <- dezdm(
     mean_rt = c(0.5, 0.5), var_rt = c(0.02, 0.02),
     n_upper = 50, n_trials = 100,
-    drift = 0, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par"
+    drift = 0, bound = 1.5, ndt = 0.3, zr = 0.5, version = "4par", log = TRUE
   )
   expect_true(is.finite(ll4))
 })
@@ -1272,7 +1606,7 @@ test_that("dezdm 4par handles edge cases with few responses at boundary", {
   ll <- dezdm(
     mean_rt = c(NA, 0.55), var_rt = c(NA, 0.025),
     n_upper = 1, n_trials = 100,
-    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.3, version = "4par"
+    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.3, version = "4par", log = TRUE
   )
   expect_true(is.finite(ll))
 
@@ -1280,7 +1614,7 @@ test_that("dezdm 4par handles edge cases with few responses at boundary", {
   ll <- dezdm(
     mean_rt = c(0.45, NA), var_rt = c(0.018, NA),
     n_upper = 99, n_trials = 100,
-    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par"
+    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.7, version = "4par", log = TRUE
   )
   expect_true(is.finite(ll))
 })
@@ -1328,7 +1662,7 @@ test_that("dezdm 4par leaves out the RT terms of a boundary without summaries (#
     var_rt, var_rt[1], NA
   ), ncol = 2, byrow = TRUE)
   ll <- dezdm(mean_rt_obs, var_rt_obs, n_upper, n_trials, drift = drift,
-              bound = bound, ndt = ndt, zr = zr, version = "4par")
+              bound = bound, ndt = ndt, zr = zr, version = "4par", log = TRUE)
 
   expect_equal(
     ll, binomial + c(upper + lower, lower, upper, 0, upper, upper),
@@ -1348,7 +1682,7 @@ test_that("generated data from rezdm has reasonable density under dezdm", {
     var_rt = sim_data$var_rt,
     n_upper = sim_data$n_upper,
     n_trials = sim_data$n_trials,
-    drift = 2, bound = 1.5, ndt = 0.3
+    drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
 
   # density should be finite and reasonable (not extremely low)
@@ -1362,11 +1696,11 @@ test_that("dezdm 3par is vectorized over observations", {
   # single observation values
   ll1 <- dezdm(
     mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-    drift = 2, bound = 1.5, ndt = 0.3
+    drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
   ll2 <- dezdm(
     mean_rt = 0.55, var_rt = 0.025, n_upper = 75, n_trials = 100,
-    drift = 2, bound = 1.5, ndt = 0.3
+    drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
 
   # vectorized call
@@ -1375,7 +1709,7 @@ test_that("dezdm 3par is vectorized over observations", {
     var_rt = c(0.02, 0.025),
     n_upper = c(80, 75),
     n_trials = c(100, 100),
-    drift = 2, bound = 1.5, ndt = 0.3
+    drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
 
   expect_length(ll_vec, 2)
@@ -1394,7 +1728,7 @@ test_that("dezdm 3par recycles parameters correctly", {
     var_rt = sim_data$var_rt,
     n_upper = sim_data$n_upper,
     n_trials = sim_data$n_trials,
-    drift = 2, bound = 1.5, ndt = 0.3
+    drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
 
   expect_length(ll_vec, 5)
@@ -1407,7 +1741,7 @@ test_that("dezdm 3par recycles parameters correctly", {
       var_rt = sim_data$var_rt[i],
       n_upper = sim_data$n_upper[i],
       n_trials = sim_data$n_trials[i],
-      drift = 2, bound = 1.5, ndt = 0.3
+      drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
     )
   })
 
@@ -1432,7 +1766,7 @@ test_that("dezdm 4par works with matrix inputs", {
     var_rt = var_rt_mat,
     n_upper = sim_data$n_upper,
     n_trials = sim_data$n_trials,
-    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
   )
 
   expect_length(ll_vec, 5)
@@ -1445,7 +1779,7 @@ test_that("dezdm 4par works with matrix inputs", {
       var_rt = c(sim_data$var_rt_upper[i], sim_data$var_rt_lower[i]),
       n_upper = sim_data$n_upper[i],
       n_trials = sim_data$n_trials[i],
-      drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+      drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
     )
   })
 
@@ -1458,7 +1792,7 @@ test_that("dezdm 4par accepts length-2 vectors for single observation", {
     mean_rt = c(0.45, 0.55),
     var_rt = c(0.018, 0.025),
     n_upper = 80, n_trials = 100,
-    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+    drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
   )
 
   expect_length(ll, 1)
@@ -1472,7 +1806,7 @@ test_that("dezdm 3par handles varying n_trials correctly", {
     var_rt = c(0.02, 0.025, 0.022),
     n_upper = c(80, 40, 60),
     n_trials = c(100, 50, 75),
-    drift = 2, bound = 1.5, ndt = 0.3
+    drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
   )
 
   expect_length(ll_vec, 3)
@@ -1492,7 +1826,7 @@ test_that("dmpt matches hand-computed multinomial densities", {
 
   d_old <- dmpt(
     x = c(35, 15), pars = c(D = 0.7, g = 0.5),
-    mpt_model = model, tree = "old"
+    mpt_model = model, tree = "old", log = TRUE
   )
   expect_equal(d_old, dbinom(35, 50, 0.7 + 0.3 * 0.5, log = TRUE))
 
@@ -1517,6 +1851,7 @@ test_that("dmpt evaluates covariates in branch expressions", {
 })
 
 test_that("rmpt generates counts with category names and unpacks", {
+  withr::local_seed(445)
   tree <- mpt_tree("study", list(
     C = "cp + (1 - cp) * rp * rp",
     E = "2 * (1 - cp) * rp * (1 - rp)",
@@ -1537,6 +1872,7 @@ test_that("rmpt generates counts with category names and unpacks", {
 })
 
 test_that("dmpt and rmpt give impossible categories zero probability", {
+  withr::local_seed(445)
   model <- mpt(
     list(
       mpt_tree("withdist", list(
@@ -1558,11 +1894,11 @@ test_that("dmpt and rmpt give impossible categories zero probability", {
 
   # the density must reduce to the multinomial over the possible categories
   expect_equal(
-    dmpt(c(10, 0, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist"),
+    dmpt(c(10, 0, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist", log = TRUE),
     dmultinom(c(10, 30), prob = c(0.2, 0.8), log = TRUE)
   )
   expect_equal(
-    dmpt(c(10, 2, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist"),
+    dmpt(c(10, 2, 30), pars = c(Pm = 0.4), mpt_model = model, tree = "nodist", log = TRUE),
     -Inf
   )
 
@@ -1574,7 +1910,7 @@ test_that("dmpt and rmpt give impossible categories zero probability", {
 test_that("the categorical densities default to the log scale", {
   model <- mpt(mpt_tree("t", list(a = "D", b = "1 - D")))
   expect_equal(
-    dmpt(c(3, 7), pars = c(D = 0.4), mpt_model = model),
+    dmpt(c(3, 7), pars = c(D = 0.4), mpt_model = model, log = TRUE),
     dmpt(c(3, 7), pars = c(D = 0.4), mpt_model = model, log = TRUE)
   )
   m3_model <- m3(
@@ -1582,12 +1918,13 @@ test_that("the categorical densities default to the log scale", {
     choice_rule = "simple", version = "ss"
   )
   expect_equal(
-    dm3(c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = m3_model),
+    dm3(c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = m3_model, log = TRUE),
     dm3(c(20, 10, 10), pars = c(a = 1, c = 2), m3_model = m3_model, log = TRUE)
   )
 })
 
 test_that("dmpt validates its inputs", {
+  withr::local_seed(445)
   tree_old <- mpt_tree("old", list(
     old = "D + (1 - D) * g",
     new = "(1 - D) * (1 - g)"
@@ -1599,24 +1936,24 @@ test_that("dmpt validates its inputs", {
   model <- mpt(list(tree_old, tree_new), tree_id = "item_type")
 
   expect_error(
-    dmpt(c(1, 1), pars = c(D = 0.7), mpt_model = model, tree = "old"),
+    dmpt(c(1, 1), pars = c(D = 0.7), mpt_model = model, tree = "old", log = TRUE),
     "Required"
   )
   expect_error(
-    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model),
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model, log = TRUE),
     "multiple trees"
   )
   expect_error(
-    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model, tree = "foo"),
+    dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = model, tree = "foo", log = TRUE),
     "Unknown tree"
   )
   expect_error(
-    dmpt(c(1, 1), pars = c(D = 1.7, g = 0.5), mpt_model = model, tree = "old"),
+    dmpt(c(1, 1), pars = c(D = 1.7, g = 0.5), mpt_model = model, tree = "old", log = TRUE),
     "between 0 and 1"
   )
   # bmm() refuses 0 and 1 as fixed values, so the distribution functions do too
   expect_error(
-    dmpt(c(1, 1), pars = c(D = 1, g = 0), mpt_model = model, tree = "old"),
+    dmpt(c(1, 1), pars = c(D = 1, g = 0), mpt_model = model, tree = "old", log = TRUE),
     "strictly between 0 and 1. Provided: D = 1, g = 0"
   )
   expect_error(
@@ -1626,7 +1963,7 @@ test_that("dmpt validates its inputs", {
   expect_error(
     dmpt(c(1, 1), pars = c(D = 0.7, g = 0.5), mpt_model = m3(
       resp_cats = c("a", "b"), num_options = c(1, 1)
-    )),
+    ), log = TRUE),
     "created with mpt"
   )
 })
@@ -1644,24 +1981,25 @@ test_that("dmpt matches named counts to the categories", {
 
   d_positional <- dmpt(
     x = c(35, 15), pars = c(D = 0.7, g = 0.5),
-    mpt_model = model, tree = "old"
+    mpt_model = model, tree = "old", log = TRUE
   )
   d_named <- dmpt(
     x = c(new = 15, old = 35), pars = c(D = 0.7, g = 0.5),
-    mpt_model = model, tree = "old"
+    mpt_model = model, tree = "old", log = TRUE
   )
   expect_equal(d_named, d_positional)
 
   expect_error(
     dmpt(
       x = c(wrong = 15, name = 35), pars = c(D = 0.7, g = 0.5),
-      mpt_model = model, tree = "old"
+      mpt_model = model, tree = "old", log = TRUE
     ),
     "categories"
   )
 })
 
 test_that("dmpt and rmpt take log and unpack in the fifth position", {
+  withr::local_seed(445)
   model <- mpt(mpt_tree("t", list(
     corr = "D + (1 - D) * G", other = "(1 - D) * (1 - G)"
   )), covariates = "G")
@@ -1670,11 +2008,12 @@ test_that("dmpt and rmpt take log and unpack in the fifth position", {
 })
 
 test_that("dmpt and rmpt refuse a value given more than once", {
+  withr::local_seed(445)
   model <- mpt(mpt_tree("t", list(
     corr = "D + (1 - D) * G", other = "(1 - D) * (1 - G)"
   )), covariates = "G")
   expect_error(
-    dmpt(c(7, 3), c(D = 0.5), model, covariates = c(G = 0.2), G = 0.8),
+    dmpt(c(7, 3), c(D = 0.5), model, covariates = c(G = 0.2), G = 0.8, log = TRUE),
     "'G' are given more than once"
   )
   expect_error(
@@ -1903,7 +2242,7 @@ test_that("dezdm 4par uses a boundary's RT summaries only from two responses on"
   lpdf <- function(n_upper, mean_rt, var_rt) {
     dezdm(
       mean_rt = mean_rt, var_rt = var_rt, n_upper = n_upper, n_trials = 30,
-      drift = 1, bound = 1.5, ndt = 0.25, zr = 0.6, version = "4par"
+      drift = 1, bound = 1.5, ndt = 0.25, zr = 0.6, version = "4par", log = TRUE
     )
   }
 
@@ -1961,7 +2300,7 @@ test_that("the 3par density takes its binomial on the logit scale drift * bound 
 
   # and the density agrees with the probability-scale binomial where that is exact
   moments <- .ezdm_moments_3par(1.2, 1.5, 1)
-  with_logit <- dezdm(0.6, 0.05, n_upper = 40, n_trials = 50, drift = 1.2, bound = 1.5, ndt = 0.25)
+  with_logit <- dezdm(0.6, 0.05, n_upper = 40, n_trials = 50, drift = 1.2, bound = 1.5, ndt = 0.25, log = TRUE)
   rt <- .ez_rt_terms(moments$VRT, moments$k3, moments$k4, 50)
   with_prob <- stats::dbinom(40, 50, moments$pC, log = TRUE) +
     stats::dgamma(0.05, rt$shape, rt$rate, log = TRUE) +
@@ -1969,7 +2308,7 @@ test_that("the 3par density takes its binomial on the logit scale drift * bound 
   expect_equal(with_logit, with_prob)
 
   # pC rounds to 1 here, and the old form returned -Inf
-  expect_true(is.finite(dezdm(0.3, 1e-4, n_upper = 49, n_trials = 50, drift = 60, bound = 1.5, ndt = 0.25)))
+  expect_true(is.finite(dezdm(0.3, 1e-4, n_upper = 49, n_trials = 50, drift = 60, bound = 1.5, ndt = 0.25, log = TRUE)))
 })
 
 test_that("the 4par density is the same when drift, zr and the boundaries are mirrored", {
@@ -1985,10 +2324,10 @@ test_that("the 4par density is the same when drift, zr and the boundaries are mi
   var_rt <- cbind(moments$vrt_upper * 0.9, moments$vrt_lower * 1.2)
 
   as_coded <- dezdm(mean_rt, var_rt, grid$n_upper, 60,
-    drift = grid$drift, bound = 1.5, ndt = 0.25, zr = grid$zr, s = 0.7, version = "4par"
+    drift = grid$drift, bound = 1.5, ndt = 0.25, zr = grid$zr, s = 0.7, version = "4par", log = TRUE
   )
   mirrored <- dezdm(mean_rt[, 2:1], var_rt[, 2:1], 60 - grid$n_upper, 60,
-    drift = -grid$drift, bound = 1.5, ndt = 0.25, zr = 1 - grid$zr, s = 0.7, version = "4par"
+    drift = -grid$drift, bound = 1.5, ndt = 0.25, zr = 1 - grid$zr, s = 0.7, version = "4par", log = TRUE
   )
 
   expect_true(all(is.finite(as_coded)))
@@ -2011,6 +2350,7 @@ test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.
 })
 
 test_that("dmpt and rmpt ignore parameters the selected tree does not use", {
+  withr::local_seed(445)
   model <- mpt(list(
     mpt_tree("a", list(x = "Do + (1 - Do) * g", y = "(1 - Do) * (1 - g)")),
     mpt_tree("b", list(x = "(1 - Dn) * g", y = "Dn + (1 - Dn) * (1 - g)"))
@@ -2018,19 +2358,101 @@ test_that("dmpt and rmpt ignore parameters the selected tree does not use", {
   all_pars <- c(Do = 0.6, Dn = 0.4, g = 0.3)
 
   expect_equal(
-    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "a"),
+    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "a", log = TRUE),
     dbinom(7, 10, 0.72, log = TRUE)
   )
   expect_equal(
-    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "b"),
-    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "b")
+    dmpt(c(7, 3), pars = all_pars, mpt_model = model, tree = "b", log = TRUE),
+    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "b", log = TRUE)
   )
   draws <- rmpt(5, size = 20, pars = all_pars, mpt_model = model, tree = "b")
   expect_equal(dim(draws), c(5, 2))
   expect_true(all(rowSums(draws) == 20))
 
   expect_error(
-    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "a"),
+    dmpt(c(7, 3), pars = c(Dn = 0.4, g = 0.3), mpt_model = model, tree = "a", log = TRUE),
     "Missing: 'Do'"
   )
+})
+
+# The `log` default of five densities changes from TRUE to FALSE in bmm 1.6.0
+# (#553). These tests pin the 1.5.0 behaviour, so the flip has to edit them.
+
+log_default_calls <- function() {
+  m3_model <- m3(
+    resp_cats = c("corr", "other", "npl"),
+    num_options = c(1, 4, 5),
+    choice_rule = "simple",
+    version = "ss"
+  )
+  mpt_model <- mpt(
+    list(mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))),
+    tree_id = "item_type"
+  )
+  list(
+    dm3 = bquote(dm3(x = c(20, 10, 10), pars = c(a = 1, b = 1, c = 2), m3_model = .(m3_model))),
+    dmpt = bquote(dmpt(x = c(35, 15), pars = c(D = 0.7, g = 0.5), mpt_model = .(mpt_model), tree = "target")),
+    dddm = quote(dddm(0.5, 1, drift = 2, bound = 1.5, ndt = 0.3)),
+    dcswald = quote(dcswald(0.8, 1, drift = 2, bound = 1.5, ndt = 0.3)),
+    dezdm = quote(dezdm(
+      mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
+      drift = 2, bound = 1.5, ndt = 0.3
+    )),
+    dsdm = quote(dsdm(0.3, mu = 0, c = 3, kappa = 3.5)),
+    dmixture2p = quote(dmixture2p(0.3)),
+    dmixture3p = quote(dmixture3p(0.3)),
+    dimm = quote(dimm(0.3)),
+    dsdt_yn = quote(dsdt_yn(68, 100, 1L, d = 1.5, criterion = 0)),
+    dsdt_dpsdt = quote(dsdt_dpsdt(
+      c(10, 20, 30, 40, 5), 1,
+      d = 1.5, thresholds = c(-1, 0, 1, 2), Ro = 0.5
+    )),
+    dsdt_metad = quote(dsdt_metad(
+      c(10, 20, 30, 40), 1,
+      d = 1.5, thresholds = c(-1, 0, 1), metad = 1.2
+    )),
+    dsdt_mafc = quote(dsdt_mafc(90, 100, m = 4, d = 1.5)),
+    dsdt_ranking = quote(dsdt_ranking(c(40, 30, 20, 10), m = 4, d = 1.5)),
+    dsdt_rating = quote(dsdt_rating(c(10, 20, 30, 40), 1, 1.5, c(-1, 0, 1))),
+    dsdt_cdp = quote(dsdt_cdp(
+      counts = c(40, 20, 10, 15, 25, 35, 5, 20, 80), stimulus = 1,
+      dfam = 0.8, drec = 1, rcrit = 0.5, n_new = 3,
+      thresholds = .cdp_make_thresholds(0, -0.3, 3, 3, "parsimonious")
+    ))
+  )
+}
+
+with_log <- function(call, log) {
+  call$log <- log
+  call
+}
+
+test_that("exactly five exported densities default to log = TRUE", {
+  densities <- sort(grep("^d", getNamespaceExports("bmm"), value = TRUE))
+  log_true <- Filter(
+    function(name) identical(formals(getExportedValue("bmm", name))$log, TRUE),
+    densities
+  )
+
+  expect_identical(sort(log_true), c("dcswald", "dddm", "dezdm", "dm3", "dmpt"))
+})
+
+test_that("the five densities with log = TRUE by default return the log density when log is not given", {
+  calls <- log_default_calls()[c("dm3", "dmpt", "dddm", "dcswald", "dezdm")]
+
+  for (name in names(calls)) {
+    expect_no_warning(default <- eval(calls[[name]]))
+    expect_equal(default, eval(with_log(calls[[name]], TRUE)), info = name)
+    expect_equal(exp(default), eval(with_log(calls[[name]], FALSE)), info = name)
+  }
+})
+
+test_that("the other exported densities return the density when log is not given", {
+  calls <- log_default_calls()[-(1:5)]
+
+  for (name in names(calls)) {
+    expect_no_warning(default <- eval(calls[[name]]))
+    expect_equal(default, eval(with_log(calls[[name]], FALSE)), info = name)
+    expect_equal(exp(eval(with_log(calls[[name]], TRUE))), default, info = name)
+  }
 })
