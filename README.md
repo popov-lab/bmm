@@ -95,7 +95,8 @@ each model offers.
 
 **Choices and response times.** Participants choose between two options,
 or report a feature on a circle, such as an orientation or a color, and
-the response time is recorded, either on every trial or as means and variances per condition. See the
+the response time is recorded, either on every trial or as means and
+variances per condition. See the
 [DDM](https://venpopov.com/bmm/articles/bmm_ddm.html), [censored shifted
 Wald](https://venpopov.com/bmm/articles/bmm_cswald.html),
 [EZ-diffusion](https://venpopov.com/bmm/articles/bmm_ezdm.html), [EZ

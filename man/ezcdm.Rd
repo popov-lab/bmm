@@ -66,8 +66,8 @@ EZ Circular Diffusion Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Decision Making / Response times
-\item \strong{Task:} Continuous reproduction tasks with response times
+\item \strong{Domain:} Decision making
+\item \strong{Task:} Choices and response times
 \item \strong{Name:} EZ Circular Diffusion Model
 \item \strong{Citation:}
 \itemize{

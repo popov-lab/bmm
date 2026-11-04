@@ -37,8 +37,8 @@
     list(
       resp_vars = nlist(mean_angle, var_angle, mean_rt, var_rt),
       other_vars = nlist(n_trials),
-      domain = "Decision Making / Response times",
-      task = "Continuous reproduction tasks with response times",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "EZ Circular Diffusion Model",
       citation = c(
         "Qarehdaghi, H., & Amani Rad, J. (2024). EZ-CDM: Fast, simple, robust, and accurate estimation of circular diffusion model parameters. Psychonomic Bulletin & Review, 31(5), 2058-2091. https://doi.org/10.3758/s13423-024-02483-7",
