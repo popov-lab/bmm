@@ -58,7 +58,7 @@
 #'   nlist(
 #'     formula, data,
 #'     stanvars = .circmix_model_stanvars(
-#'       model, formula$family, "mixture3p_funs.stan",
+#'       model, formula$family, "mixture3p_functions.stan",
 #'       vint = "ss", vreal = list(nt = n_nt)
 #'     )
 #'   )
