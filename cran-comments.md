@@ -1,12 +1,20 @@
 ## Changes
 
-A patch release with bug fixes only, see NEWS.md. It follows 1.4.1 (2026-10-16) after a month
-because several bugs gave wrong results without a warning: `sdm()` fits overestimated the
-likelihood when `c` and `kappa` were both large, `sdm()` fits with two or more predictors could
-evaluate a design cell with another cell's parameters (and `ppp()` pooled such cells), `psdm()`
-returned wrong probabilities, a prior on a parameter fixed in the formula freed that parameter, and
-`update()` kept initial values, sampler settings and default priors that belonged to the fit it
-started from. No new exports, no new or changed dependencies.
+A patch release with bug fixes only, see NEWS.md. It comes three weeks after 1.4.1 (published
+2026-10-16), sooner than the one to two months the policy suggests. We did not want to wait because
+several bugs in 1.4.1 give users wrong results without any warning:
+
+* `sdm()` fits overestimated the likelihood when `c` and `kappa` were both large, which biased the
+  estimates upwards.
+* `sdm()` fits with two or more predictors could evaluate a design cell with another cell's
+  parameters, and `ppp()` pooled such cells.
+* `psdm()` returned wrong probabilities, up to 1 off.
+* A prior on a parameter fixed in the formula silently freed that parameter.
+* `update()` kept initial values, sampler settings and default priors that belonged to the fit it
+  started from.
+
+Users fitting these models with 1.4.1 can get wrong estimates now, so we would rather not hold the
+fixes back for the 1.5.0 feature release. No new exports, no new or changed dependencies.
 
 ## R CMD check results
 
