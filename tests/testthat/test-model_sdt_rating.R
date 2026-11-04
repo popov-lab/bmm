@@ -370,7 +370,7 @@ test_that("the generated rating call passes K, the threshold builder and its del
 })
 
 test_that("sdt_rating stancode loads the shared distribution dispatch", {
-  # the noise-distribution dispatch lives in sdt_dist_funs.stan; the rating
+  # the noise-distribution dispatch lives in sdt_dist_functions.stan; the rating
   # likelihood relies on the log-scale dispatchers from that shared chunk.
   dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     spacing = 0.5)
@@ -388,8 +388,8 @@ test_that("sdt_rating stancode loads the shared distribution dispatch", {
 # probability, so both the builders and the kernel meet their R counterparts.
 rating_stan_logmu <- function(grid, deltas, K) {
   sc <- system.file("stan_chunks", package = "bmm")
-  funs <- paste(read_lines2(file.path(sc, "sdt_dist_funs.stan")),
-                read_lines2(file.path(sc, "sdt_rating_funs.stan")), sep = "\n")
+  funs <- paste(read_lines2(file.path(sc, "sdt_dist_functions.stan")),
+                read_lines2(file.path(sc, "sdt_rating_functions.stan")), sep = "\n")
   program <- paste0(
     "functions {\n", funs, "\n}\n",
     "data {\n  int N; int K; array[N] int cat; array[N] int thresh;\n",
@@ -528,8 +528,8 @@ test_that("the generated Stan logmu function reads either anchor as its R compan
   model <- sdt_rating(paste0("r", 1:4), "stimulus")
   sc <- system.file("stan_chunks", package = "bmm")
   program <- paste0(
-    "functions {\n", read_lines2(file.path(sc, "sdt_dist_funs.stan")), "\n",
-    read_lines2(file.path(sc, "sdt_rating_funs.stan")), "\n",
+    "functions {\n", read_lines2(file.path(sc, "sdt_dist_functions.stan")), "\n",
+    read_lines2(file.path(sc, "sdt_rating_functions.stan")), "\n",
     bmm:::.sdt_rating_logmu_stan(model), "\n}\n",
     "data {\n  int N; array[N] int cat; array[N] int anchor; array[N] int dist;\n",
     "  vector[N] d; vector[N] crit; vector[N] sdratio; vector[N] stimulus;\n}\n",
