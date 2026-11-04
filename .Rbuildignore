@@ -17,6 +17,7 @@
 ^index.md$
 ^tests/internal-.*$
 ^tests/internal$
+^tests/recovery$
 ^tests/local$
 ^tests/testthat/assets$
 ^.dev$
@@ -27,3 +28,8 @@
 ^\.lintr$
 ^\.claude$
 ^\.git$
+^bmmtools$
+^explorer$
+^test-timings\.csv$
+^cran-test-timings\.csv$
+^runner-hardware\.txt$

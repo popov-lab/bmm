@@ -255,7 +255,7 @@ test_that("the slot-averaging gradient in K is the right-hand slope at a whole K
   tab <- .circmix_kappa_table()
   code <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
     "\n}\n",
     "data { int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ; }
     parameters { real<lower=0> K; }
@@ -614,7 +614,7 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 # sig_figs is raised because cmdstan writes only 6 significant digits by default,
 # which alone accounts for differences of ~1e-7.
 circmix_stan_values <- function(data) {
-  chunks <- c("circmix_funs.stan", "mixture2p_funs.stan", "mixture3p_funs.stan", "imm_funs.stan")
+  chunks <- c("circmix_functions.stan", "mixture2p_functions.stan", "mixture3p_functions.stan", "imm_functions.stan")
   code <- paste0(
     "functions {\n",
     paste(vapply(chunks, function(chunk) {

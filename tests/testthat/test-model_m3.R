@@ -833,7 +833,7 @@ test_that("the Stan Gaussian-rule wrapper matches its R companion", {
   expect_lt(max(abs(stan - r)), 1e-6)
 })
 
-# Without the std_normal_lcdf fallback in m3_gaussian_funs.stan the value here is still right but the
+# Without the std_normal_lcdf fallback in m3_gaussian_functions.stan the value here is still right but the
 # gradient is non-finite (log(0) times Phi's zero derivative); the fallback's derivative is approximate
 # (5e-4 off the finite difference at this point), hence error = 1e-2
 test_that("the Stan Gaussian-rule kernel has finite gradients where one category trails by 50", {

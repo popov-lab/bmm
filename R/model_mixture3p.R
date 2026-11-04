@@ -135,9 +135,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Three-parameter mixture model by Bays et al (2009).",
+      name = "Three-Parameter Mixture Model",
       citation = c(
         .mixture3p_citation,
         if (version != "simple") .mixture3p_capacity_citation,
@@ -312,6 +312,7 @@ mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE,
                       variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), deprecated = "setsize")
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize
@@ -411,7 +412,7 @@ configure_model.mixture3p <- function(model, data, formula) {
 
   nlist(
     formula, data,
-    stanvars = .circmix_model_stanvars(model, formula$family, "mixture3p_funs.stan",
+    stanvars = .circmix_model_stanvars(model, formula$family, "mixture3p_functions.stan",
       vint = "ss", vreal = list(nt = n_nt)
     )
   )
@@ -519,4 +520,41 @@ posterior_predict_mixture3p_slot_averaging <- function(i, prep, ...) {
     p_target = brms::get_dpar(prep, "ptarget", i = i),
     tau = .circmix_prep_tau(prep, i)
   )
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# The trial-wise generators of posterior_predict() take one display per call
+# and each row's own values, so rows are drawn in groups of identical set size
+# and non-target locations. The simple version weighs its components with the
+# likelihood's softmax over the link values, which drops the non-targets at set
+# size 1 as the fit does
+#' @export
+simulate_data.mixture3p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  nt_features <- model$other_vars$nt_features
+  design <- .design_or_n(model, design, .set_size_column(model), ragged = nt_features)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  tau <- p$tau %||% rep(0, nrow(design))
+  set_size <- check_var_set_size(model$other_vars$set_size, design)$ss_numeric
+  .check_nt_na(design, nt_features, set_size)
+  nt <- unname(as.matrix(design[nt_features]))
+  draw <- switch(model$version,
+    simple = function(idx, ss) {
+      weights <- .mixture3p_softmax_weights(sim$link$thetat[idx], sim$link$thetant[idx], ss)
+      .rmixture3p(p$mu[idx], nt[idx[1], ], ss, weights, p$kappa[idx], tau[idx])
+    },
+    slot = function(idx, ss) {
+      weights <- .mixture3p_nested_weights(pmin(1, p$K[idx] / ss), p$ptarget[idx], ss)
+      .rmixture3p(p$mu[idx], nt[idx[1], ], ss, weights, p$kappa[idx], tau[idx])
+    },
+    slot_averaging = function(idx, ss) {
+      .rmixture3p_slot_averaging(p$mu[idx], nt[idx[1], ], ss, p$kappa[idx], p$K[idx], p$ptarget[idx], tau[idx])
+    }
+  )
+  y <- numeric(nrow(design))
+  for (idx in .row_groups(data.frame(set_size, nt))) y[idx] <- draw(idx, set_size[idx[1]])
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }

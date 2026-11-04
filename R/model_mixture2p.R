@@ -97,9 +97,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Two-parameter mixture model by Zhang and Luck (2008).",
+      name = "Two-Parameter Mixture Model",
       citation = c(
         glue(
           "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
@@ -238,6 +238,7 @@ mixture2p <- function(resp_error, set_size = NULL,
                       variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
 
@@ -322,7 +323,7 @@ configure_model.mixture2p <- function(model, data, formula) {
   nlist(
     formula, data,
     stanvars = .circmix_model_stanvars(
-      model, formula$family, "mixture2p_funs.stan",
+      model, formula$family, "mixture2p_functions.stan",
       vint = if (spec$needs_set_size) "ss" else NULL
     )
   )
@@ -422,4 +423,25 @@ posterior_predict_mixture2p_slot_averaging <- function(i, prep, ...) {
     set_size = prep$data$vint1[i],
     tau = .circmix_prep_tau(prep, i)
   )
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.mixture2p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  needs_set_size <- .mixture2p_version_table[[model$version]]$needs_set_size
+  design <- .design_or_n(model, design, if (needs_set_size) .set_size_column(model), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  args <- list(n = nrow(design), mu = p$mu, kappa = p$kappa, tau = p$tau %||% 0,
+               version = model$version)
+  args <- if (needs_set_size) {
+    c(args, list(K = p$K, set_size = check_var_set_size(model$other_vars$set_size, design)$ss_numeric))
+  } else {
+    c(args, list(p_mem = p$thetat))
+  }
+  y <- do.call(rmixture2p, args)
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }

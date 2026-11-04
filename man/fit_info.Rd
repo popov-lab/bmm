@@ -31,7 +31,8 @@ one matrix per chain for \code{metric = "dense_e"}
 }
 
 Every chain of the fit is reported, also in a fit combined from several
-fits with \code{\link[brms:combine_models]{brms::combine_models()}}. \code{NULL} is returned for what the sampler
+fits with \code{\link[brms:combine_models]{brms::combine_models()}} or extended with \code{\link[=add_chains]{add_chains()}}. \code{NULL}
+is returned for what the sampler
 did not record: anything for a fit without a stanfit or without chains,
 "time" and "time_mean" for variational and Laplace runs, "inv_metric" and
 "step_size" for any algorithm other than NUTS, and "inv_metric" for

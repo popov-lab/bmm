@@ -61,9 +61,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(m, dist),
-      domain = "Perception & Recognition Memory",
-      task = "Ranking Task",
-      name = "Signal Detection Theory (Ranking)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "Ranking Signal Detection Theory Model",
       citation = glue(
         "Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. ",
         "(2026). Extreme-value signal detection theory for recognition memory: ",
@@ -218,6 +218,7 @@ sdt_ranking <- function(response, m,
                         dist = c("gumbel_min", "normal"),
                         links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
 
@@ -246,6 +247,11 @@ sdt_ranking <- function(response, m,
 #' @exportS3Method
 built_data_columns.sdt_ranking <- function(model) {
   c("nTrials", "max_rank", NextMethod("built_data_columns"))
+}
+
+#' @exportS3Method
+data_trials.sdt_ranking <- function(model, data) {
+  .row_trials(data, model$resp_vars$response)
 }
 
 #' @export
@@ -353,13 +359,13 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   formula$family$cats <- resp_cats
   formula$family$dpars <- paste0("mu", resp_cats)
 
-  # sdt_dist_funs.stan supplies sdt_rms_scale(), which the Gaussian branch needs
+  # sdt_dist_functions.stan supplies sdt_rms_scale(), which the Gaussian branch needs
   # to turn d_a into the noise-standardized separation
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
-    read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_dist_functions.stan")),
     .ranking_fill_quadrature(
-      read_lines2(paste0(sc_path, "/sdt_ranking_funs.stan")),
+      read_lines2(paste0(sc_path, "/sdt_ranking_functions.stan")),
       max_m = max(data$max_rank),
       free_sdratio = "sdratio" %in% names(model$parameters) &&
         !"sdratio" %in% names(model$fixed_parameters)
@@ -371,8 +377,28 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
 
-# Substitute the quadrature tokens in sdt_ranking_funs.stan with the rules that
+# sdratio is the log of the SD ratio by definition, behind an identity link;
+# rank columns beyond the largest set size hold no responses
+#' @export
+simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, trials = "n_trials", counts = if (is.character(vars$m)) vars$m)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  counts <- rsdt_ranking(nrow(design), design$n_trials, .sdt_resolve_set_size(vars$m, design),
+                         d = p$d, sdratio = exp(p$sdratio %||% 0), dist = vars$dist)
+  resp <- model$resp_vars$response
+  response <- matrix(0L, nrow(design), length(resp), dimnames = list(NULL, resp))
+  response[, seq_len(ncol(counts))] <- counts
+  .simulate_result(design, as.data.frame(response), sim)
+}
+
+
+# Substitute the quadrature tokens in sdt_ranking_functions.stan with the rules that
 # .ranking_gh_n() and .ranking_gl_rule() select for the data's largest set size;
 # .ranking_prob_r() selects per row, so rows with a smaller set size can use a
 # different rule (they agree to ~1e-8). 17 significant digits round-trips a
