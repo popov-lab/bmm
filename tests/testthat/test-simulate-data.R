@@ -281,6 +281,24 @@ test_that("simulated statistics of the circular models match their densities", {
   y <- simulate_data(model, list(kappa = 2, c = 0.5, a = -0.5), display)$y
   expect_within_mc(cos(y), 0.9296366 * (2.255252 + 0.6065307 * (cos(1.5) + cos(-2))) / 4.468313,
                    "imm abc")
+
+  # full, set size 1 and variable precision, against E[cos] from the Luce choice
+  # over target c + a, non-target j c exp(-s d_j) + a and the background b = 1,
+  # A = I1 / I0 and J(kappa) = kappa A(kappa), computed outside the package
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "full")
+  full_pars <- list(kappa = exp(2), c = 2, a = 0.5, s = 1)
+  y <- simulate_data(model, full_pars, display, scale = "native")$y
+  expect_within_mc(cos(y), 0.3826816, "imm full")
+  single <- data.frame(set_size = rep(1, n_sim), nt1 = NA, nt2 = NA, d1 = NA, d2 = NA)
+  y <- simulate_data(model, full_pars, single, scale = "native")$y
+  expect_within_mc(cos(y), 0.6640262, "imm set size 1")
+  # constant precision gives 0.3238802 at these values
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "full", variable_precision = TRUE)
+  y <- simulate_data(model, list(kappa = exp(1), c = 2, a = 0.5, s = 1, tau = 1), display,
+                     scale = "native")$y
+  expect_within_mc(cos(y), 0.2972343, "imm variable precision")
 })
 
 test_that("simulated decisions of the RT models match the closed forms", {
