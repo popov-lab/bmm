@@ -1,7 +1,7 @@
 ############################################################################# !
 # SHARED NUMERICS FOR THE CIRCULAR MIXTURE MODELS                        ####
 ############################################################################# !
-# R mirror of inst/stan_chunks/circmix_funs.stan, used by the log_lik and
+# R mirror of inst/stan_chunks/circmix_functions.stan, used by the log_lik and
 # posterior_predict methods and by the d* functions in distributions.R. The two
 # implementations must agree to within floating point;
 # tests/testthat/test-helpers-circmix.R checks that against the compiled Stan
@@ -553,7 +553,7 @@ postprocess_brm.circular <- function(model, fit, ...) {
 # threading.
 .circmix_stanvars <- function() {
   tab <- .circmix_kappa_table()
-  .circmix_chunk_stanvar("circmix_funs.stan") +
+  .circmix_chunk_stanvar("circmix_functions.stan") +
     brms::stanvar(
       x = tab$logkappa, name = "circmix_logk",
       pll_args = "data vector circmix_logk"

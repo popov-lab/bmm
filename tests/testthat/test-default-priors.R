@@ -480,6 +480,13 @@ test_that("mock fits carry class-level b and sd priors for every formula shape a
   fit <- bmm(bmf(c ~ 1 + cond + (1 + cond || ID), a ~ 1 + cond + (1 | ID)), oberauer_lewandowsky_2019_e1, model,
     backend = "mock", mock_fit = 1, rename = FALSE)
   expect_defaults_applied(fit, c("c", "a"), c("c", "a"))
+
+  withr::local_seed(255)
+  dat <- mpt_2htm_data(n_id = 2)
+  dat$cond <- rep(c("x", "y"), 2)
+  fit <- bmm(bmf(D ~ 1 + cond + (1 | id), g ~ 1 + cond), dat, mpt(mpt_2htm_trees(), "item_type"),
+    backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_defaults_applied(fit, c("D", "g"), "D")
 })
 
 test_that("default priors work when there are non-linear transformations of default parameters", {

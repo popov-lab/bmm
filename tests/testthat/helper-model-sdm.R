@@ -14,6 +14,12 @@ model_cases_sdm <- function() {
     ),
     init = list(sdm = list(model = model, formula = re_formula, data = small_data())),
     links = list(sdm = list(model = model, settable = character(0))),
-    fixture = list(sdm = list(file = "bmmfit_example1.rds"))
+    fixture = list(sdm = list(file = "bmmfit_example1.rds")),
+    simulate = list(
+      sdm = list(
+        model = sdm("dev_rad"), pars = list(c = 2, kappa = 1.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(c ~ 1, kappa ~ 1), simulate_pars = list(mu = 0, c = 2, kappa = 1.5)
+      )
+    )
   )
 }

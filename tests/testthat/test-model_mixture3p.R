@@ -389,9 +389,9 @@ test_that("the Stan and R likelihoods agree for every version", {
   tab <- .circmix_kappa_table()
   code <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
     "\n",
-    read_lines2(system.file("stan_chunks", "mixture3p_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "mixture3p_functions.stan", package = "bmm")),
     "\n}\n",
     "data {
       int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
@@ -515,8 +515,8 @@ test_that("the generated likelihood passes each parameter to its place in the co
   }
   program <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")), "\n",
-    read_lines2(system.file("stan_chunks", "mixture3p_funs.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "mixture3p_functions.stan", package = "bmm")), "\n",
     paste(wrappers, collapse = "\n"), "}\n",
     "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
     " real circmix_logJ_min; real circmix_dlogJ; }\n",

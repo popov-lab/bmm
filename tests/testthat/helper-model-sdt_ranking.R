@@ -28,6 +28,18 @@ model_cases_sdt_ranking <- function() {
       model = sdt_ranking(c("rank1", "rank2"), m = 2),
       data = data.frame(rank1 = rep(30L, 50), rank2 = rep(20L, 50))
     )),
-    links = list(sdt_ranking = list(model = sdt_ranking(ranks, m = 5), settable = "d"))
+    links = list(sdt_ranking = list(model = sdt_ranking(ranks, m = 5), settable = "d")),
+    simulate = list(
+      sdt_ranking = list(
+        model = sdt_ranking(paste0("rank", 1:3), m = 3), pars = list(d = 1),
+        design = data.frame(n_trials = rep(30, 6)), formula = bmf(d ~ 1), simulate_pars = list(d = 1)
+      ),
+      # set sizes below the number of rank columns, and the free log SD ratio
+      sdt_ranking_normal = list(
+        model = sdt_ranking(paste0("rank", 1:4), m = "m", dist = "normal"), pars = list(d = 1, sdratio = 0.2),
+        design = data.frame(m = rep(3:4, 3), n_trials = 30), formula = bmf(d ~ 1, sdratio ~ 1),
+        simulate_pars = list(d = 1, sdratio = 0.2)
+      )
+    )
   )
 }

@@ -4,7 +4,7 @@
 
 # Threshold-parameterization registry: the position defines the integer
 # thresh_type code passed to Stan -- reordering entries changes the R <-> Stan
-# contract (see sdt_make_thresholds_rating in sdt_rating_funs.stan)
+# contract (see sdt_make_thresholds_rating in sdt_rating_functions.stan)
 .sdt_threshold_types <- c("parsimonious", "equidistant", "log_distance",
                           "log_ratio", "softmax")
 
@@ -130,7 +130,7 @@
     extra_params = character(0),
     logmu_fun = "sdt_rating_logmu",
     logmu_cat_call = "sdt_rating_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_rating_funs.stan",
+    stan_chunk = "sdt_rating_functions.stan",
     citation = glue(
       "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
       "and psychophysics. Wiley."
@@ -160,7 +160,7 @@
     extra_params = c("Ro", "Rn"),
     logmu_fun = "sdt_dpsdt_logmu",
     logmu_cat_call = "sdt_dpsdt_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type, Ro, Rn)",
-    stan_chunk = "sdt_dpsdt_funs.stan",
+    stan_chunk = "sdt_dpsdt_functions.stan",
     citation = c(
       glue(
         "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
@@ -201,7 +201,7 @@
     extra_params = "logmratio",
     logmu_fun = "sdt_metad_logmu",
     logmu_cat_call = "sdt_metad_logmu_cat(cat, thr, d, exp(logmratio) * d, sdratio, stimulus, dist_type)",
-    stan_chunk = "sdt_metad_funs.stan",
+    stan_chunk = "sdt_metad_functions.stan",
     citation = glue(
       "Maniscalco, B., & Lau, H. (2012). A signal detection theoretic ",
       "approach for estimating metacognitive sensitivity from confidence ",
@@ -296,9 +296,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(stimulus, dist, n_ratings, threshold_type),
-      domain = "Perception & Recognition Memory",
-      task = "Signal/Noise or Old/New Recognition",
-      name = "Signal Detection Theory (Confidence Rating)",
+      domain = c("Perception", "Long-term memory"),
+      task = "Detection, recognition and confidence judgments",
+      name = "Confidence Rating Signal Detection Theory Model",
       citation = variant$citation,
       version = version,
       requirements = requirements,
@@ -583,6 +583,7 @@ sdt_rating <- function(response, stimulus,
                        version = c("standard", "dpsdt", "metad"),
                        links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   dist <- match.arg(dist)
   threshold_type <- match.arg(threshold_type)
@@ -617,6 +618,11 @@ sdt_rating <- function(response, stimulus,
 #' @exportS3Method
 built_data_columns.sdt_rating <- function(model) {
   c("nTrials", NextMethod("built_data_columns"))
+}
+
+#' @exportS3Method
+data_trials.sdt_rating <- function(model, data) {
+  .row_trials(data, model$resp_vars$response)
 }
 
 #' @export
@@ -761,7 +767,7 @@ configure_model.sdt_rating <- function(model, data, formula) {
   formula$family$dpars <- paste0("mu", resp_cats)
 
   sc_path <- system.file("stan_chunks", package = "bmm")
-  chunks <- unique(c("sdt_dist_funs.stan", "sdt_rating_funs.stan",
+  chunks <- unique(c("sdt_dist_functions.stan", "sdt_rating_functions.stan",
                      .sdt_rating_variant(model)$stan_chunk))
   stan_funs <- paste(
     paste(vapply(chunks, function(f) read_lines2(paste0(sc_path, "/", f)),
@@ -772,6 +778,35 @@ configure_model.sdt_rating <- function(model, data, formula) {
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                                ####
+############################################################################# !
+
+# sdratio, spacing and the deltas are defined on the log scale behind identity
+# links (.sdt_make_thresholds() exponentiates the latter two), Ro and Rn on the
+# logit scale and logmratio as log(meta-d' / d)
+#' @export
+simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, vars$stimulus, trials = "n_trials")
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  sdratio <- exp(p$sdratio)
+  criterion <- .sdt_resolve_criterion(p$criterion, p$bias, p$d, sdratio)
+  deltas <- p[grep("^delta[0-9]+$", names(p))]
+  thresholds <- .sdt_make_thresholds(criterion, vars$n_ratings, vars$threshold_type, p$spacing,
+                                     if (length(deltas)) do.call(cbind, deltas))
+  args <- list(nrow(design), design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
+               d = p$d, thresholds = thresholds, sdratio = sdratio, dist = vars$dist)
+  counts <- switch(model$version,
+    standard = do.call(rsdt_rating, args),
+    dpsdt = do.call(rsdt_dpsdt, c(args, list(Ro = stats::plogis(p$Ro), Rn = stats::plogis(p$Rn)))),
+    metad = do.call(rsdt_metad, c(args, list(metad = exp(p$logmratio) * p$d)))
+  )
+  colnames(counts) <- model$resp_vars$response
+  .simulate_result(design, as.data.frame(counts), sim)
 }
 
 
