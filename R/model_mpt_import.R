@@ -48,6 +48,11 @@
 #'   [mpt_tree()]). Trees and categories are named as in the returned model,
 #'   i.e. by `tree_names` and by the category labels of the lines. Trees that
 #'   are not listed have no impossible categories.
+#' @param response Character. Name of the data column that holds the
+#'   response category of each trial, for data with one row per trial (see
+#'   the `response` argument of [mpt()]). Its values are the category labels
+#'   of the lines. `NULL` (the default) declares aggregated counts, one
+#'   column per response category.
 #'
 #' @details **Comments.** A line whose first non-blank character is `#` is a
 #'   comment and is skipped. It does not separate trees; only blank lines do.
@@ -176,7 +181,8 @@
 mpt_from_string <- function(text, restrictions = NULL, tree_names,
                             categories = NULL, tree_id = NULL,
                             covariates = NULL, simplex = NULL,
-                            links = "logit", impossible = NULL) {
+                            links = "logit", impossible = NULL,
+                            response = NULL) {
   stop_missing_args()
   # a vector of lines keeps its "" elements, which separate the trees
   text <- paste(text, collapse = "\n")
@@ -321,7 +327,8 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
   )
   model <- .mpt_model_from_branches(
     branches, impossible, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, restrictions = restrictions, links = links
+    simplex = simplex, restrictions = restrictions, links = links,
+    response = response
   )
   attr(model, "mpt_source") <- list(text = text)
   attr(model, "call") <- match.call()
@@ -379,6 +386,11 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
 #'   names must start with a letter and contain only letters, digits, or
 #'   underscores, so files with numeric tree labels need this mapping. Labels
 #'   not listed keep their name.
+#' @param response Character. Name of the data column that holds the
+#'   response category of each trial, for data with one row per trial (see
+#'   the `response` argument of [mpt()]). Its values are the bmm names of the
+#'   categories, which `print(model)` lists under "Response". `NULL` (the
+#'   default) declares aggregated counts, one column per response category.
 #'
 #' @details **File format.** Blank lines and lines that start with `#` are
 #'   skipped. If the first remaining line holds a single integer and nothing
@@ -521,7 +533,7 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
 mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
                          tree_id = NULL, covariates = NULL, simplex = NULL,
                          links = "logit", impossible = NULL,
-                         tree_names = NULL) {
+                         tree_names = NULL, response = NULL) {
   stop_missing_args()
   categories_problem <- .mpt_named_map_problem(categories)
   stopif(
@@ -590,7 +602,8 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   )
   model <- .mpt_model_from_branches(
     branches, impossible, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, restrictions = parameters$restrictions, links = links
+    simplex = simplex, restrictions = parameters$restrictions, links = links,
+    response = response
   )
   attr(model, "mpt_renaming") <- renaming
   attr(model, "mpt_source") <- list(

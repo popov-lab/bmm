@@ -13,7 +13,8 @@ mpt_from_string(
   covariates = NULL,
   simplex = NULL,
   links = "logit",
-  impossible = NULL
+  impossible = NULL,
+  response = NULL
 )
 }
 \arguments{
@@ -59,6 +60,12 @@ occur in a tree, one element per such tree:
 \code{\link[=mpt_tree]{mpt_tree()}}). Trees and categories are named as in the returned model,
 i.e. by \code{tree_names} and by the category labels of the lines. Trees that
 are not listed have no impossible categories.}
+
+\item{response}{Character. Name of the data column that holds the
+response category of each trial, for data with one row per trial (see
+the \code{response} argument of \code{\link[=mpt]{mpt()}}). Its values are the category labels
+of the lines. \code{NULL} (the default) declares aggregated counts, one
+column per response category.}
 }
 \value{
 An object of class \code{bmmodel} (see \code{\link[=mpt]{mpt()}}), with an \code{mpt_source}

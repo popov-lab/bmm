@@ -13,7 +13,8 @@ mpt_from_eqn(
   simplex = NULL,
   links = "logit",
   impossible = NULL,
-  tree_names = NULL
+  tree_names = NULL,
+  response = NULL
 )
 }
 \arguments{
@@ -63,6 +64,12 @@ file onto tree names in bmm, e.g. \code{c("1" = "target", "2" = "lure")}. bmm tr
 names must start with a letter and contain only letters, digits, or
 underscores, so files with numeric tree labels need this mapping. Labels
 not listed keep their name.}
+
+\item{response}{Character. Name of the data column that holds the
+response category of each trial, for data with one row per trial (see
+the \code{response} argument of \code{\link[=mpt]{mpt()}}). Its values are the bmm names of the
+categories, which \code{print(model)} lists under "Response". \code{NULL} (the
+default) declares aggregated counts, one column per response category.}
 }
 \value{
 An object of class \code{bmmodel} (see \code{\link[=mpt]{mpt()}}), with the attributes
