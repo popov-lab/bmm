@@ -125,3 +125,51 @@ test_that("update() still treats data with a column Y as the user's data", {
     brms::standata(fit)
   )
 })
+
+# =============================================================================
+# DATA-SCALED DEFAULT PRIORS AND newdata
+# =============================================================================
+
+# messages of an update() whose default priors were scaled to the old data
+prior_range_messages <- function(fit, newdata) {
+  messages <- character(0)
+  withCallingHandlers(
+    stub_update(fit, newdata = newdata),
+    message = function(m) {
+      messages <<- c(messages, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+  grep("priors of the original fit", messages, value = TRUE)
+}
+
+test_that("update(newdata =) says once that psychometric priors keep the old intensity range", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  dat <- data.frame(x = rep(0:4, 8), y = rep(c(0L, 0L, 1L, 1L, 1L), 8))
+  fit <- stub_frame_fit(list(formula = bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
+                             data = dat, model = psychometric_function("y", "x")))
+  # range 0 to 4: the message needs a centre shift over 1 or a range outside 2 to 8
+  expect_length(prior_range_messages(fit, dat), 0)
+  expect_length(prior_range_messages(fit, transform(dat, x = x * 1.1)), 0)
+  shifted <- prior_range_messages(fit, transform(dat, x = x + 2))
+  expect_length(shifted, 1)
+  expect_match(shifted, "formula.", fixed = TRUE)
+  expect_match(shifted, "prior =", fixed = TRUE)
+  expect_length(prior_range_messages(fit, transform(dat, x = (x - 2) * 3 + 2)), 1)
+  expect_length(prior_range_messages(fit, transform(dat, x = x * 3 + 10)), 1)
+  expect_length(suppressMessages(prior_range_messages(fit, dat[dat$x > 0, ])), 0)
+})
+
+test_that("the psychometric prior range of the log-scale sigmoids is compared on the log axis", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  dat <- data.frame(x = rep(c(0.01, 0.02, 0.04, 0.08, 0.16), 8),
+                    y = rep(c(0L, 0L, 1L, 1L, 1L), 8))
+  model <- psychometric_function("y", "x", sigmoid = "weibull", guess = 0.5, lapse = 0)
+  fit <- stub_frame_fit(list(formula = bmf(midpoint ~ 1, width ~ 1), data = dat, model = model))
+  # x 1.5 moves the log centre by 0.41 of a log range of 2.77 (silent), but the
+  # linear centre by 0.043 of a range of 0.15 (over a quarter)
+  expect_length(prior_range_messages(fit, transform(dat, x = x * 1.5)), 0)
+  expect_length(prior_range_messages(fit, transform(dat, x = x * 10)), 1)
+})

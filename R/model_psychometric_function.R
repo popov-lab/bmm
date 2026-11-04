@@ -174,8 +174,11 @@ settable_links.psychometric_function <- function(model) {
 #' `normal(0, R / 4)` and its random-effect SDs `exponential(4 / R)`; the log of
 #' `width` gets `normal(log(R / 2), 1)`. The priors listed above are these for a
 #' range of 0 to 1; [default_prior()] shows the ones for your data.
-#' `update()` with `newdata` alone keeps the priors of the original fit, so for
-#' intensities on another scale pass a `prior` that fits them.
+#' `update()` with `newdata` alone keeps the priors of the original fit, and
+#' says so when the new intensities shift the centre by more than a quarter of
+#' the old range or change the range by more than a factor of two. Passing
+#' the formula again as `formula.` scales the priors to the new data; `prior`
+#' sets your own.
 #'
 #' @param response The name of the variable in the data with the responses:
 #'   0/1 (or logical) per trial when `n_trials` is `NULL`, and otherwise the
@@ -336,8 +339,33 @@ check_model.psychometric_function <- function(model, data = NULL, formula = NULL
     log_x <- .psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x
     model$default_priors[c("midpoint", "width")] <- .psychometric_shape_priors(x_range)
     model$init_ranges[c("midpoint", "width")] <- .psychometric_shape_inits(x_range, log_x)
+    model$prior_axis_range <- x_range
   }
   NextMethod("check_model")
+}
+
+# update() keeps the checked model when only the data change, so the priors stay
+# scaled to the old intensities; it says so once the new ones would have given
+# priors far from them
+#' @exportS3Method
+update_data_notice.psychometric_function <- function(model, data, formula) {
+  old <- model$prior_axis_range
+  new <- .psychometric_axis_range(model, data, formula)
+  if (is.null(old) || is.null(new)) {
+    return(invisible())
+  }
+  ratio <- diff(new) / diff(old)
+  shifted <- abs(mean(new) - mean(old)) > diff(old) / 4
+  if (!shifted && ratio >= 1 / 2 && ratio <= 2) {
+    return(invisible())
+  }
+  log_axis <- if (.psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x) " (log scale)" else ""
+  message2(
+    "The intensities in newdata span {paste(signif(new, 3), collapse = ' to ')}{log_axis}, \\
+    but the default priors on midpoint and width are the priors of the original fit, \\
+    scaled to {paste(signif(old, 3), collapse = ' to ')}. To scale them to the new data, \\
+    pass the formula again as formula., or give your own with prior =."
+  )
 }
 
 

@@ -177,8 +177,11 @@ the range, the \code{midpoint} intercept gets \code{normal(c, R / 2)}, its effec
 \code{normal(0, R / 4)} and its random-effect SDs \code{exponential(4 / R)}; the log of
 \code{width} gets \code{normal(log(R / 2), 1)}. The priors listed above are these for a
 range of 0 to 1; \code{\link[=default_prior]{default_prior()}} shows the ones for your data.
-\code{update()} with \code{newdata} alone keeps the priors of the original fit, so for
-intensities on another scale pass a \code{prior} that fits them.
+\code{update()} with \code{newdata} alone keeps the priors of the original fit, and
+says so when the new intensities shift the centre by more than a quarter of
+the old range or change the range by more than a factor of two. Passing
+the formula again as \code{formula.} scales the priors to the new data; \code{prior}
+sets your own.
 }
 
 \examples{
