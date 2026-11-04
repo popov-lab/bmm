@@ -209,6 +209,11 @@ check_model.ezcdm_3par <- function(model, data = NULL, formula = NULL) {
 # CHECK_DATA S3 methods                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+data_trials.ezcdm <- function(model, data) {
+  .row_trials(data, model$other_vars$n_trials)
+}
+
 #' @export
 check_data.ezcdm <- function(model, data, formula) {
   resp_vars <- model$resp_vars
