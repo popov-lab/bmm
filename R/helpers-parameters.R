@@ -64,23 +64,93 @@ c_bessel2sqrtexp <- function(c, kappa) {
   c / (besselI(kappa, 0, expon.scaled = TRUE) * sqrt(2 * pi * kappa))
 }
 
-#' @title Transform values from the native to parameter scale or vice versa according to a link function
+#' Transform values between the native and the parameter scale of a link
 #'
 #' @description
-#' This function transforms a vector of values from the native scale to the parameter scale,
-#' according to the specified link function. The function is mainly used internally, to ensure proper
-#' initial values
+#' `link_transform()` applies one of the links bmm uses for model parameters to
+#' a numeric vector. With `inverse = FALSE` it maps values from the native
+#' scale of a parameter, the scale of the model equations, to the parameter
+#' scale, the scale on which `bmm()` samples the intercept and coefficients of
+#' the parameter's formula. With `inverse = TRUE` it maps values from the
+#' parameter scale back to the native scale.
 #'
-#' @param values A numerical vector of values the transformation should be applied to
-#' @param link A character specifying the link to be applied.
-#' Available options are: "identity", "log", "softplus", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
-#' @param inverse A Boolean value indicating if values should be transformed from the native to
-#' the parameter scale (FALSE), or from the parameter scale to the native scale (TRUE)
+#' @param values A numeric vector, matrix or array. With `inverse = FALSE` the
+#'   values are on the native scale, with `inverse = TRUE` on the parameter
+#'   scale. `NA` stays `NA` at its position.
+#' @param link A single string naming the link: `"identity"`, `"log"`,
+#'   `"softplus"`, `"log1p"`, `"logm1"`, `"inverse"`, `"sqrt"`, `"logit"`,
+#'   `"probit"`, `"tan_half"`, `"loglog"` or `"cloglog"`. A `NULL` link is read
+#'   as the identity link, as for a model parameter that declares no link.
+#' @param inverse Logical. `FALSE` (the default) transforms from the native to
+#'   the parameter scale; `TRUE` transforms from the parameter scale to the
+#'   native scale.
 #'
-#' @noRd
+#' @details
+#' The links, with the native values each accepts. `x` is a value on the native
+#' scale, `eta` one on the parameter scale.
+#'
+#' | `link` | `inverse = FALSE`: `eta` from `x` | `inverse = TRUE`: `x` from `eta` | Native values `x` |
+#' |:--|:--|:--|:--|
+#' | `"identity"` | `x` | `eta` | all real numbers |
+#' | `"log"` | `log(x)` | `exp(eta)` | `x > 0` |
+#' | `"softplus"` | `log(exp(x) - 1)` | `log(1 + exp(eta))` | `x > 0` |
+#' | `"log1p"` | `log(1 + x)` | `exp(eta) - 1` | `x > -1` |
+#' | `"logm1"` | `log(x - 1)` | `exp(eta) + 1` | `x > 1` |
+#' | `"inverse"` | `1 / x` | `1 / eta` | `x != 0` |
+#' | `"sqrt"` | `sqrt(x)` | `eta^2` | `x >= 0` |
+#' | `"logit"` | `log(x / (1 - x))` | `1 / (1 + exp(-eta))` | `0 < x < 1` |
+#' | `"probit"` | `qnorm(x)` | `pnorm(eta)` | `0 < x < 1` |
+#' | `"tan_half"` | `tan(x / 2)` | `2 * atan(eta)` | `-pi < x < pi` |
+#' | `"loglog"` | `log(-log(x))` | `exp(-exp(eta))` | `0 < x < 1` |
+#' | `"cloglog"` | `log(-log(1 - x))` | `1 - exp(-exp(eta))` | `0 < x < 1` |
+#'
+#' Values outside these ranges are not checked. For the links other than
+#' `"tan_half"`, a value at an edge the range excludes, such as `0` for `"log"`
+#' and `"inverse"` or `1` for `"logit"`, gives `-Inf` or `Inf` without a
+#' warning, and a value beyond it gives `NaN` (`NA` for `"softplus"`) with a
+#' warning. `"tan_half"` reads `x` as an angle: a value
+#' outside `-pi` to `pi` gives the `eta` of the same angle inside that range,
+#' and returns that angle on the way back. `"sqrt"` squares on the way back, so
+#' a negative `eta` comes back as its absolute value: `-3` gives `9`, and `9`
+#' gives `3`.
+#'
+#' The table holds the links that transform one value at a time. It does not
+#' include `"softmax"`, the link of the mixture weights of models such as
+#' [mixture3p()]: a softmax needs all weights of a group at once and a
+#' reference position, so `link_transform()` stops for it, as for any other
+#' name that is not in the table. [parameter_info()] shows the link of each
+#' parameter of a model in its `link` column; a parameter with `"softmax"`
+#' there is not covered by `link_transform()`. For the weights on the native
+#' scale, use [native_parameters()]. How the weights of a softmax group combine
+#' depends on the model, for [mixture3p()] on the set size (at set size 1 the
+#' non-target weight is zero), and [native_parameters()] applies that.
+#'
+#' @return The transformed values, with the length and dimensions of `values`
+#'   (a matrix stays a matrix).
+#'
+#' @seealso [parameter_info()] for the link of each parameter of a model, and
+#'   [native_parameters()] for the parameters of a fitted model on their native
+#'   scale.
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' # a probability on the parameter scale of a logit link, and back
+#' eta <- link_transform(c(0.2, 0.5, 0.8), "logit")
+#' eta
+#' link_transform(eta, "logit", inverse = TRUE)
+#'
+#' # the native value of a parameter with a log link, from its parameter scale
+#' link_transform(c(-1, 0, 1), "log", inverse = TRUE)
+#'
+#' # the link of each parameter of a model
+#' parameter_info(sdm(resp_error = "y"))$link
 link_transform <- function(values, link, inverse = FALSE) {
-  # Handle NULL or missing link as identity (no transformation)
+  # NULL is what model$links[[par]] returns for a parameter without a link
   if (is.null(link)) link <- "identity"
+  # switch() would pick the alternative at position `link` for a number
+  stopif(!is.character(link) || length(link) != 1, "`link` must be a single string, such as 'log'.")
 
   if(inverse) {
     switch(
@@ -96,7 +166,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       probit = pnorm(values),
       tan_half = 2 * atan(values),
       loglog = exp(-exp(values)),
-      cloglog = 1 - exp(-exp(values)),
+      cloglog = -expm1(-exp(values)),
       stop2("Link '{link}' not recognized.")
     )
   } else {
@@ -569,10 +639,7 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   x <- restructure(x)
   scale <- match.arg(scale)
 
-  model_pars <- setdiff(
-    names(x$bmm$model$parameters),
-    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
-  )
+  model_pars <- .np_model_pars(x)
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
   pars <- pars %||% setdiff(model_pars, internal_parameters(x$bmm$model))
   unknown <- pars[not_in(pars, model_pars)]
@@ -593,6 +660,56 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     "'ndraws' must be a single number between 1 and {brms::ndraws(x)}."
   )
 
+  native <- .native_draw_matrices(x, newdata, pars, re_formula, scale, ndraws, draw_ids, list(...))
+  linpred <- native$draws
+  grid <- native$newdata[, native$grid_vars, drop = FALSE]
+  row.names(grid) <- NULL
+
+  clash <- intersect(names(grid), .np_reserved_names(summary, prob))
+  stopif(
+    length(clash) > 0,
+    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
+    output. Rename them in the data, or pass 'newdata' with different names."
+  )
+
+  if (summary) {
+    .np_summary(linpred, grid, prob, robust)
+  } else {
+    warnif(
+      length(linpred) * nrow(grid) * length(native$draw_ids) > 1e6,
+      "This will return \\
+      {length(linpred) * nrow(grid) * length(native$draw_ids)} rows. Supply 'newdata' \\
+      with the grid cells you need, or set 'ndraws', to return fewer."
+    )
+    .np_long(linpred, grid, .np_draw_index(x, native$draw_ids))
+  }
+}
+
+
+#' Native-scale draws of model parameters as matrices
+#'
+#' @description
+#' The computation behind [native_parameters()], without its reshaping, so that
+#' callers that need one matrix per parameter, such as the \pkg{insight} and
+#' \pkg{marginaleffects} methods, take the same draws.
+#'
+#' @param x A bmmfit object, restructured
+#' @param newdata User supplied prediction data, or `NULL` for the default grid
+#' @param pars Character vector of the requested parameters, all of them among
+#'   [.np_model_pars()]
+#' @param re_formula Passed to [brms::posterior_linpred()]
+#' @param scale `"native"` or `"sampling"`
+#' @param ndraws,draw_ids The draws to use, as in [native_parameters()]
+#' @param dots Further arguments for [brms::posterior_linpred()]
+#' @return A list with `draws`, a named list of draws x grid cell matrices of
+#'   the requested parameters, `newdata`, the completed prediction data,
+#'   `grid_vars`, the variables spanning the grid, and `draw_ids`, sorted
+#'
+#' @keywords internal
+#' @noRd
+.native_draw_matrices <- function(x, newdata, pars, re_formula, scale = "native",
+                                  ndraws = NULL, draw_ids = NULL, dots = list()) {
+  model_pars <- .np_model_pars(x)
   if (is.null(draw_ids)) {
     draw_ids <- if (is.null(ndraws)) {
       seq_len(brms::ndraws(x))
@@ -608,7 +725,7 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   grid_vars <- .np_grid_vars(x, model_pars, re_formula)
   newdata <- .np_newdata(x, grid_vars, newdata)
 
-  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, list(...))
+  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, dots)
   if (scale == "native") {
     transformed <- native_transform(x$bmm$model, linpred, newdata)
     stopif(
@@ -624,29 +741,29 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     )
     linpred <- transformed
   }
-  linpred <- linpred[names(linpred) %in% pars]
-
-  grid <- newdata[, grid_vars, drop = FALSE]
-  row.names(grid) <- NULL
-
-  clash <- intersect(names(grid), .np_reserved_names(summary, prob))
-  stopif(
-    length(clash) > 0,
-    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
-    output. Rename them in the data, or pass 'newdata' with different names."
+  list(
+    draws = linpred[names(linpred) %in% pars], newdata = newdata,
+    grid_vars = grid_vars, draw_ids = draw_ids
   )
+}
 
-  if (summary) {
-    .np_summary(linpred, grid, prob, robust)
-  } else {
-    warnif(
-      length(linpred) * nrow(grid) * length(draw_ids) > 1e6,
-      "This will return \\
-      {length(linpred) * nrow(grid) * length(draw_ids)} rows. Supply 'newdata' \\
-      with the grid cells you need, or set 'ndraws', to return fewer."
-    )
-    .np_long(linpred, grid, .np_draw_index(x, draw_ids))
-  }
+
+#' The parameters a fit can predict
+#'
+#' @description
+#' The model's parameters without the alternatives its formula left out, such
+#' as `bias` in a fit that estimates `criterion`.
+#'
+#' @param x A bmmfit object
+#' @return Character vector of parameter names
+#'
+#' @keywords internal
+#' @noRd
+.np_model_pars <- function(x) {
+  setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  )
 }
 
 

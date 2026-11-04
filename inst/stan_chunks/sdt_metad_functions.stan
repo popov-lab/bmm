@@ -1,4 +1,4 @@
-// meta-d' SDT (Maniscalco & Lau, 2012) category log-probability; needs sdt_rating_funs.stan
+// meta-d' SDT (Maniscalco & Lau, 2012) category log-probability; needs sdt_rating_functions.stan
 // thresholds follow metad, each side rescaled so its mass matches type-1 d; metad = d recovers sdt_rating
 // the two spaces share each threshold's distance from the midpoint between the means, so thresholds given
 // from the type-1 noise mean move by half the difference between the separations

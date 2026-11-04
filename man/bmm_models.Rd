@@ -17,11 +17,12 @@ Measurement models available in \code{bmm}
 }
 \details{
 Printed, the result lists the models grouped by the task they are
-meant for, one line per model with its constructor and full name. The
+meant for, one line per model with its constructor and name. The
 groups are: continuous reproduction; categorical recall and n-AFC
 decisions; detection, recognition and confidence judgments; choices and
-response times; processing-tree models. Type \code{?modelname} (for example
-\code{?imm}) for the arguments of a model.
+response times. A model that fits several tasks, such as \code{mpt()}, is
+listed under each. Type \code{?modelname} (for example \code{?imm}) for the
+arguments of a model.
 }
 \examples{
 bmm_models()

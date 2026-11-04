@@ -65,11 +65,14 @@ test_that("SDM generated Stan code includes run-level denominator chunks", {
 
   code <- stancode(formula, data = dat, model = sdm(resp_error = "y"))
 
-  expect_match(code, "sdm_simple_ldenom_chquad_adaptive", fixed = TRUE)
-  expect_match(code, "sdm_simple_run_ldenom", fixed = TRUE)
-  expect_match(code, "target += sdm_simple_run_ldenom", fixed = TRUE)
+  expect_match(code, "real sdm_simple_ldenom(real c, real kappa", fixed = TRUE)
+  expect_match(code, "target += sdm_simple_run_ldenom(c, kappa, sdm_gl_x, sdm_gl_w, sdm_wide_cosm1,", fixed = TRUE)
+  expect_match(code, "vector[16] sdm_gl_x;", fixed = TRUE)
+  expect_match(code, "vector[16] sdm_gl_w;", fixed = TRUE)
+  expect_match(code, "vector[32] sdm_wide_cosm1;", fixed = TRUE)
+  expect_match(code, "vector[32] sdm_wide_w;", fixed = TRUE)
   expect_false(grepl("c[n] != c[n-1]", code, fixed = TRUE))
-  expect_match(code, "COSN", fixed = TRUE)
+  expect_false(grepl("COSN", code, fixed = TRUE))
 })
 
 test_that("SDM threaded Stan code slices denominator runs correctly", {
@@ -88,6 +91,9 @@ test_that("SDM threaded Stan code slices denominator runs correctly", {
   expect_match(code, "run_start[g] >= start", fixed = TRUE)
   expect_match(code, "run_start[g] <= end", fixed = TRUE)
   expect_match(code, "run_start[g] - start + 1", fixed = TRUE)
+  expect_match(code, "data vector sdm_gl_x, data vector sdm_gl_w, data vector sdm_wide_cosm1, data vector sdm_wide_w", fixed = TRUE)
+  expect_match(code, "sdm_simple_run_ldenom_slice(c, kappa, sdm_gl_x, sdm_gl_w,", fixed = TRUE)
+  expect_match(code, "sdm_wide_cosm1, sdm_wide_w, start,", fixed = TRUE)
 })
 
 test_that("SDM accepts numeric threads shorthand", {
@@ -137,6 +143,71 @@ test_that("SDM run metadata aligns with brms after NA rows are dropped", {
   expect_equal(sum(sdata2$sdm_run_count), sdata2$N)
   expect_equal(as.integer(sdata2$sdm_run_start), c(1L, 11L))
   expect_equal(as.integer(sdata2$sdm_run_count), c(10L, 9L))
+})
+
+# Cells whose values differ but whose labels pasted with "." coincide:
+# (1, 5.2) and (1.5, 2) both read "1.5.2", as do ("a.b", "c") and ("a", "b.c").
+# Every row of a run gets the normalising constant of the run's first row
+test_that("SDM runs split cells whose pasted labels coincide", {
+  model <- sdm(resp_error = "y")
+  runs <- function(data, formula) {
+    out <- sdm_run_metadata(data, formula, model)
+    c(G = out$G_sdm_runs, start = out$sdm_run_start, count = out$sdm_run_count)
+  }
+  numeric_formula <- bmf(c ~ a * b, kappa ~ 1)
+
+  numeric_pair <- data.frame(
+    y = 0,
+    a = c(1, 1, 1, 1, 1.5, 1.5, 1.5, 1.5),
+    b = c(2, 2, 5.2, 5.2, 2, 2, 5.2, 5.2)
+  )
+  expect_equal(runs(numeric_pair, numeric_formula),
+               c(G = 4, start1 = 1, start2 = 3, start3 = 5, start4 = 7,
+                 count1 = 2, count2 = 2, count3 = 2, count4 = 2))
+
+  factor_pair <- data.frame(
+    y = 0,
+    f1 = factor(c("a.b", "a.b", "a", "a", "a")),
+    f2 = factor(c("c", "c", "b.c", "b.c", "b.c"))
+  )
+  expect_equal(runs(factor_pair, bmf(c ~ f1 + f2, kappa ~ 1)),
+               c(G = 2, start1 = 1, start2 = 3, count1 = 2, count2 = 3))
+
+  # A A B A: a cell that recurs after another starts a run of its own
+  recurring <- data.frame(y = 0, a = c(1, 1, 1.5, 1), b = c(5.2, 5.2, 2, 5.2))
+  expect_equal(runs(recurring, numeric_formula),
+               c(G = 3, start1 = 1, start2 = 3, start3 = 4,
+                 count1 = 2, count2 = 1, count3 = 1))
+
+  one_predictor <- data.frame(y = 0, x = factor(c("u", "u", "v", "u", "w", "w")))
+  expect_equal(runs(one_predictor, bmf(c ~ x, kappa ~ 1)),
+               c(G = 4, start1 = 1, start2 = 3, start3 = 4, start4 = 5,
+                 count1 = 2, count2 = 1, count3 = 1, count4 = 2))
+
+  # rows 2 and 5 are dropped, as brms drops them; row 5 sat inside the (1.5, 2) run
+  with_na <- data.frame(
+    y = c(0, NA, 0, 0, 0, 0, 0),
+    a = c(1, 1, 1, 1.5, 1.5, 1.5, 1.5),
+    b = c(2, 2, 5.2, 2, NA, 2, 5.2)
+  )
+  expect_equal(runs(with_na, numeric_formula),
+               c(G = 4, start1 = 1, start2 = 2, start3 = 3, start4 = 5,
+                 count1 = 1, count2 = 1, count3 = 2, count4 = 1))
+})
+
+test_that("standata() of sorted data carries one SDM run per colliding cell", {
+  withr::local_options(bmm.sort_data = TRUE)
+  dat <- data.frame(
+    y = c(-1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5),
+    a = c(1.5, 1, 1.5, 1, 1, 1.5, 1, 1.5),
+    b = c(2, 5.2, 5.2, 2, 5.2, 2, 2, 5.2)
+  )
+  sdata <- suppressMessages(standata(bmf(c ~ a * b, kappa ~ a * b),
+    data = dat, model = sdm(resp_error = "y")
+  ))
+  expect_equal(sdata$G_sdm_runs, 4L)
+  expect_equal(as.integer(sdata$sdm_run_start), c(1L, 3L, 5L, 7L))
+  expect_equal(as.integer(sdata$sdm_run_count), c(2L, 2L, 2L, 2L))
 })
 
 test_that("numeric brms.threads option selects the threaded SDM chunk", {
