@@ -248,6 +248,16 @@ test_that("print.bmmodel() annotates aggregated sdt_yn response counts", {
   expect_true(any(grepl("Fixed:.*sdratio = 0", out)))
 })
 
+test_that("print.bmmodel() annotates trial-level sdt_yn responses", {
+  expect_match(capture.output(print(sdt_yn("r", "s"))), "r (0/1 per trial; 1 = 'old'/'signal')",
+               fixed = TRUE, all = FALSE)
+})
+
+test_that("print.bmmodel() annotates trial-level sdt_mafc responses", {
+  expect_match(capture.output(print(sdt_mafc("c", m = 4))), "c (0/1 per trial; 1 = correct)",
+               fixed = TRUE, all = FALSE)
+})
+
 test_that("print.bmmodel() lists vector-valued response variables", {
   m <- m3(
     resp_cats = c("corr", "other", "npl"),

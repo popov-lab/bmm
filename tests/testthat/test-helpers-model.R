@@ -13,33 +13,64 @@ test_that("supported_models() is deprecated and returns bmm_models() or the plai
   expect_identical(out, model_names())
 })
 
-test_that("model_registry() lists every supported model once, grouped in lookup order", {
+test_that("model_registry() lists each model once per task it names, in the order of the tasks", {
   registry <- model_registry()
   expect_setequal(registry$model, model_names())
-  expect_false(any(duplicated(registry$model)))
+  expect_false(any(duplicated(registry[c("model", "group")])))
   expect_false(any(grepl("\\.$", registry$name)))
   expect_equal(
     unique(registry$group),
-    intersect(unique(unname(model_groups)), registry$group)
+    c(
+      "Continuous reproduction",
+      "Categorical recall and n-AFC decisions",
+      "Detection, recognition and confidence judgments",
+      "Choices and response times"
+    )
   )
-  expect_equal(registry$group[registry$model == "imm"], "Continuous reproduction")
-  expect_equal(registry$group[registry$model == "sdt_yn"], "Detection, recognition and confidence judgments")
-  expect_equal(registry$group[registry$model == "ddm"], "Choices and response times")
-  expect_equal(registry$group[registry$model == "mpt"], "Processing-tree models")
-})
-
-test_that("model_group() keeps an unknown domain as its own group", {
+  groups_of <- function(model) registry$group[registry$model == model]
+  expect_equal(groups_of("imm"), "Continuous reproduction")
+  expect_equal(groups_of("m3"), "Categorical recall and n-AFC decisions")
+  expect_equal(groups_of("sdt_yn"), "Detection, recognition and confidence judgments")
+  expect_equal(groups_of("ddm"), "Choices and response times")
   expect_equal(
-    model_group(c("Visual working memory", "Brand new domain", "")),
-    c("Continuous reproduction", "Brand new domain", "Other models")
+    groups_of("mpt"),
+    c("Categorical recall and n-AFC decisions", "Detection, recognition and confidence judgments")
+  )
+  expect_equal(registry$name[registry$model == "imm"], "Interference Measurement Model")
+})
+
+test_that("model_registry() lists a model with an unknown or empty task after the known groups", {
+  specs <- list(
+    .model_imm(),
+    list(name = "Foo Model", task = "Brand new task"),
+    list(name = "Bar Model", task = c("Brand new task", "Continuous reproduction")),
+    list(name = "Baz Model", task = "")
+  )
+  registry <- model_registry(c("imm", "foo", "bar", "baz"), specs = specs)
+  expect_equal(unique(registry$group), c("Continuous reproduction", "Brand new task", "Other models"))
+  expect_equal(registry$model[registry$group == "Continuous reproduction"], c("bar", "imm"))
+  expect_equal(registry$model[registry$group == "Brand new task"], c("bar", "foo"))
+  expect_equal(registry$model[registry$group == "Other models"], "baz")
+})
+
+test_that("the vocabularies list the tasks and domains in their documented order", {
+  expect_identical(
+    model_tasks,
+    c(
+      "Continuous reproduction",
+      "Categorical recall and n-AFC decisions",
+      "Detection, recognition and confidence judgments",
+      "Choices and response times"
+    )
+  )
+  expect_identical(
+    model_domains,
+    c("Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning")
   )
 })
 
-test_that("format_model_list() appends unknown groups after the known ones and strips the period", {
-  extra <- data.frame(
-    model = "foo", name = "Foo model", domain = "Foo tasks",
-    group = model_group("Foo tasks")
-  )
+test_that("format_model_list() appends unknown groups after the known ones", {
+  extra <- data.frame(model = "foo", name = "Foo model", group = "Foo tasks")
   registry <- rbind(model_registry(), extra)
   txt <- format_model_list(registry, "text")
   expect_gt(which(txt == "Foo tasks"), which(txt == "Choices and response times"))
@@ -49,14 +80,19 @@ test_that("format_model_list() appends unknown groups after the known ones and s
   expect_true(any(grepl("^- \\[`imm\\(\\)`\\]\\(https://venpopov.com/bmm/reference/imm.html\\)", md)))
 })
 
-test_that("bmm_models() prints every model exactly once, without arguments", {
+test_that("bmm_models() prints every model once per task it names, without arguments", {
   expect_output(printed <- print(bmm_models()), "Continuous reproduction")
   expect_s3_class(printed, "bmm_models")
   out <- paste(capture.output(print(bmm_models())), collapse = "\n")
-  for (m in model_names()) {
-    hits <- gregexpr(glue::glue("- {m}\\(\\): "), out)[[1]]
-    expect_length(hits[hits > 0], 1)
+  count <- function(model) {
+    hits <- gregexpr(glue::glue("- {model}\\(\\): "), out)[[1]]
+    length(hits[hits > 0])
   }
+  for (m in model_names()) {
+    expect_equal(count(m), length(get_model(m)()$task), label = m)
+  }
+  expect_equal(count("mpt"), 2)
+  expect_equal(count("imm"), 1)
   expect_match(out, "Continuous reproduction")
   expect_match(out, "Type  \\?modelname")
   expect_no_match(out, "resp_error")
@@ -165,7 +201,7 @@ test_that("parameter_label() keeps the name before the first separator", {
 test_that("estimated parameter labels have balanced parentheses", {
   for (model in model_names()) {
     for (version in model_versions(model)) {
-      spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+      spec <- model_specimen(model, version)
       estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
       labels <- parameter_label(vapply(spec$parameters[estimated], as.character, ""))
       open <- lengths(regmatches(labels, gregexpr("(", labels, fixed = TRUE)))
@@ -224,7 +260,7 @@ test_that("check_model() refuses invalid models and accepts valid models", {
   okmodels <- model_names()
   for (model in okmodels) {
     if (model == "m3") next
-    model <- get_model(model)()
+    model <- model_specimen(model)
     expect_silent(check_model(model))
     expect_type(check_model(model), "list")
   }
@@ -360,6 +396,9 @@ test_that("use_model_template() generates a flat-defaults unversioned scaffold",
   expect_false(grepl("_version_table", out, fixed = TRUE))
   expect_false(grepl("match.arg", out, fixed = TRUE))
   expect_false(grepl("void_mu", out, fixed = TRUE))
+  expect_match(out, "simulate_data.tmpl_unver <- function(model, pars, design = NULL", fixed = TRUE)
+  expect_match(out, "sim <- .simulate_pars(model, pars, design, scale)", fixed = TRUE)
+  expect_match(out, "`simulate` case for every version", fixed = TRUE)
   expect_no_error(parse(text = out))
 })
 
@@ -511,6 +550,40 @@ test_that("model constructors and the template list their fields in the canonica
   }
 })
 
+test_that("every model and version takes its domain, task and name from the vocabulary", {
+  skip_on_cran()
+  for (model in model_names()) {
+    for (version in model_versions(model)) {
+      spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+      label <- paste(model, version)
+      for (field in c("domain", "task")) {
+        values <- spec[[field]]
+        vocabulary <- if (field == "domain") model_domains else model_tasks
+        expect(
+          is.character(values) && length(values) > 0 && all(values %in% vocabulary),
+          glue::glue("{label}: `{field}` must be one or more of the vocabulary, not {collapse_comma(values)}")
+        )
+      }
+      name <- spec$name
+      expect(
+        is.character(name) && length(name) == 1 && nzchar(name),
+        glue::glue("{label}: `name` must be one non-empty string")
+      )
+      expect(
+        !grepl("\\.$|\\b(19|20)[0-9]{2}\\b| by ", name),
+        glue::glue("{label}: `name` holds the model's name only, not a citation: '{name}'")
+      )
+    }
+  }
+})
+
+test_that("use_model_template() points authors to the vocabularies for domain, task and name", {
+  scaffold <- paste(capture.output(use_model_template("tmpl_vocab", testing = TRUE)), collapse = "\n")
+  expect_match(scaffold, "model_domains", fixed = TRUE)
+  expect_match(scaffold, "model_tasks", fixed = TRUE)
+  expect_match(scaffold, "`name` holds the model's name only", fixed = TRUE)
+})
+
 test_that("stancode() works with bmmformula", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)
@@ -563,4 +636,13 @@ test_that("update_model_fixed_parameters() works", {
   model2 <- update_model_fixed_parameters(model1, formula)
   expect_equal(model1$fixed_parameters, list(mu = 0))
   expect_equal(model2$fixed_parameters, list(kappa = 3))
+})
+
+test_that("model_docs() keeps the trial-level part out of 'all' and the stimulus bullet off sdt_mafc", {
+  docs <- function(model, ...) paste(model_docs(model, ...), collapse = "\n")
+  expect_no_match(docs(sdt_yn("r", "s")), "Requirements for one row per trial", fixed = TRUE)
+  expect_match(docs(sdt_yn("r", "s"), components = "trial_level"), "With `bias`", fixed = TRUE)
+  mafc <- docs(sdt_mafc("c", m = 4), components = "trial_level")
+  expect_match(mafc, "Requirements for one row per trial", fixed = TRUE)
+  expect_no_match(mafc, "criterion", fixed = TRUE)
 })

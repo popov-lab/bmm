@@ -495,8 +495,14 @@ response_annotations <- function(model) {
   if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
+  if (inherits(model, "sdt_yn") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = 'old'/'signal'"))
+  }
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
+  }
+  if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = correct"))
   }
   list()
 }
@@ -558,35 +564,31 @@ print_model_details.default <- function(model, ...) {
 # HELPER FUNCTIONS                                                       ####
 ############################################################################# !
 
-# maps the `domain` field of each `.model_*()` constructor to the task group
-# shown by bmm_models(); a domain not listed here prints as its own group,
-# so a new model never disappears from the list
-model_groups <- c(
-  "Visual working memory" = "Continuous reproduction",
-  "Working Memory (categorical), Categorical Decision Making" = "Categorical recall and n-AFC decisions",
-  "Categorical decision making, memory, and reasoning" = "Processing-tree models",
-  "Perception & Recognition Memory" = "Detection, recognition and confidence judgments",
-  "Recognition Memory" = "Detection, recognition and confidence judgments",
-  "Decision Making / Response times" = "Choices and response times"
+# the vocabularies of the `task` and `domain` fields of the model constructors;
+# both fields take one or more of these values. A model is listed under each of
+# its tasks, in this order. A task outside the vocabulary (a model registered by
+# another package) prints as its own group after these, so a model never
+# disappears from the list
+model_tasks <- c(
+  "Continuous reproduction",
+  "Categorical recall and n-AFC decisions",
+  "Detection, recognition and confidence judgments",
+  "Choices and response times"
 )
 
-model_group <- function(domain) {
-  group <- unname(model_groups[domain])
-  group[is.na(group)] <- domain[is.na(group)]
-  group[group == ""] <- "Other models"
-  group
-}
+model_domains <- c(
+  "Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning"
+)
 
-model_registry <- function(models = model_names()) {
-  specs <- lapply(models, function(m) get_model(m)())
+model_registry <- function(models = model_names(),
+                           specs = lapply(models, function(m) get_model(m)())) {
+  tasks <- lapply(specs, function(spec) if (length(spec$task) == 0) "" else spec$task)
   registry <- data.frame(
-    model = models,
-    name = sub("\\.$", "", vapply(specs, `[[`, "", "name")),
-    domain = vapply(specs, `[[`, "", "domain")
+    model = rep(models, lengths(tasks)),
+    name = rep(vapply(specs, `[[`, "", "name"), lengths(tasks)),
+    group = sub("^$", "Other models", unlist(tasks))
   )
-  registry$group <- model_group(registry$domain)
-  known <- unique(unname(model_groups))
-  group_levels <- c(known, setdiff(registry$group, known))
+  group_levels <- c(model_tasks, setdiff(registry$group, model_tasks))
   registry[order(match(registry$group, group_levels), registry$model), ]
 }
 
@@ -687,8 +689,8 @@ data_column_roles <- list(
     n_old = NA
   ),
   sdt_mafc = c(
-    response = "number of correct responses",
-    n_trials = "number of trials",
+    response = "number of correct responses, or 1/0 for a correct/incorrect response on one trial",
+    n_trials = "number of trials (left out for one row per trial)",
     m = "number of alternatives (a column, or one number)"
   ),
   sdt_ranking = c(
@@ -700,9 +702,9 @@ data_column_roles <- list(
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
   ),
   sdt_yn = c(
-    response = "number of 'old'/'signal' responses",
+    response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' response on one trial",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
-    n_trials = "number of trials"
+    n_trials = "number of trials (left out for one row per trial)"
   )
 )
 
@@ -745,8 +747,10 @@ format_key_parameters <- function(spec) {
 # it estimates; used for the tables of the Get started article
 model_overview <- function(group = NULL) {
   registry <- model_registry()
-  if (!is.null(group)) {
-    registry <- registry[registry$group %in% group, ]
+  registry <- if (is.null(group)) {
+    registry[!duplicated(registry$model), ]
+  } else {
+    registry[registry$group %in% group, ]
   }
   rows <- lapply(seq_len(nrow(registry)), function(i) {
     model <- registry$model[i]
@@ -773,11 +777,12 @@ model_overview <- function(group = NULL) {
 #' Measurement models available in `bmm`
 #'
 #' @details Printed, the result lists the models grouped by the task they are
-#'   meant for, one line per model with its constructor and full name. The
+#'   meant for, one line per model with its constructor and name. The
 #'   groups are: continuous reproduction; categorical recall and n-AFC
 #'   decisions; detection, recognition and confidence judgments; choices and
-#'   response times; processing-tree models. Type `?modelname` (for example
-#'   `?imm`) for the arguments of a model.
+#'   response times. A model that fits several tasks, such as `mpt()`, is
+#'   listed under each. Type `?modelname` (for example `?imm`) for the
+#'   arguments of a model.
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
@@ -944,9 +949,10 @@ model_docs.bmmodel <- function(model, components = "all") {
   priors <- model$default_priors
   priors_info <- summarise_default_prior(priors)
 
+  # the tasks contain commas, so they are joined with a semicolon
   info_all <- list(
-    domain = paste0("* **Domain:** ", model$domain, "\n\n"),
-    task = paste0("* **Task:** ", model$task, "\n\n"),
+    domain = paste0("* **Domain:** ", paste(model$domain, collapse = ", "), "\n\n"),
+    task = paste0("* **Task:** ", paste(model$task, collapse = "; "), "\n\n"),
     name = paste0("* **Name:** ", model$name, "\n\n"),
     citation = paste0("* **Citation:** \n\n", collapse(paste0("   - ", model$citation, "\n")), "\n"),
     version = paste0("* **Version:** ", model$version, "\n\n"),
@@ -954,11 +960,19 @@ model_docs.bmmodel <- function(model, components = "all") {
     parameters = paste0("* **Parameters:** \n\n  ", par_info, "\n"),
     fixed_parameters = paste0("* **Fixed parameters:** \n\n  ", fixed_par_info, "\n"),
     links = paste0("* **Default parameter links:** \n\n     - ", links_info, "\n\n"),
-    prior = paste0("* **Default priors:** \n\n", priors_info, "\n")
+    prior = paste0("* **Default priors:** \n\n", priors_info, "\n"),
+    trial_level = paste0(
+      "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
+      "* **Trial-level data:** ", trial_level_docs,
+      if ("stimulus" %in% names(model$other_vars)) trial_level_stimulus_docs,
+      trial_level_notes_docs, "\n"
+    )
   )
 
+  # the trial-level part needs an instance constructed for trial rows, whose
+  # requirements it shows; a help page asks for it in a second call
   if (length(components) == 1 && components == "all") {
-    components <- names(info_all)
+    components <- setdiff(names(info_all), "trial_level")
   }
 
   if (model$version == "NA" || model$version == "") {
@@ -1071,8 +1085,11 @@ use_model_template <- function(model_name,
      #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
      #   their sites are registered in test-conventions.R (a test requires it)
      # - `model_cases_{model_name}()` in tests/testthat/helper-model-{model_name}.R
-     #   with a `stored_frame`, `sd_default`, `init` and `links` case (a test
-     #   requires them; the case kinds are listed in helper-model-cases.R)
+     #   with a `stored_frame`, `sd_default`, `init`, `links` and `simulate` case
+     #   (a test requires them; the case kinds are listed in helper-model-cases.R)
+     # - the `simulate_data.{model_name}()` method below, after `configure_model()`,
+     #   drawing the responses with `r{model_name}()`; a test requires it and a
+     #   `simulate` case for every version
      # - a `revert_check_data()` method in R/update.R if `check_data()`
      #   consumes or creates columns
      # - a `built_data_columns()` method next to `check_data()` naming every
@@ -1082,7 +1099,13 @@ use_model_template <- function(model_name,
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
      #
-     # In this file, `citation` needs at least one reference, one per element, each
+     # In this file, `domain` and `task` take one or more values of `model_domains`
+     # and `model_tasks` in R/helpers-model.R, and `task` decides the group
+     # `bmm_models()` lists the model under. `name` holds the model's name only,
+     # in title case, and the reference goes in `citation`; a test checks the
+     # vocabularies and that `name` has no year, no \"by\" and no final period
+     #
+     # `citation` needs at least one reference, one per element, each
      # on a single line without a \"- \" bullet and ending in \".\" or a
      # https://doi.org/ URL (a test requires it)\n\n\n"
   )
@@ -1434,6 +1457,28 @@ use_model_template <- function(model_name,
     .open = "<<", .close = ">>"
   )
 
+  simulate_data_header <- glue(
+    "#############################################################################!
+     # SIMULATE_DATA S3 METHODS                                               ####
+     #############################################################################!
+     # Draws data from the model given its parameters and a design. See
+     # ?simulate_data and simulate_data.ddm() in 'R/model_ddm.R'.\n\n\n"
+  )
+
+  simulate_data_method <- glue(
+    "#' @export
+    simulate_data.<<model_name>> <- function(model, pars, design = NULL, scale = c('link', 'native'), ...) {
+       # the design columns the model reads; add them to the Design section of ?simulate_data
+       design <- .design_or_n(model, design, character(0), ...)
+       sim <- .simulate_pars(model, pars, design, scale)
+       # draw one response per row of the design with r<<model_name>>() from the
+       # native values in sim$native and return them under the response names:
+       # .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_var1), sim)
+       stop2('simulate_data() is not yet implemented for <<model_name>>.')
+    }\n\n\n",
+    .open = "<<", .close = ">>"
+  )
+
   postprocess_brm_method <- glue(
     "#' @export
     postprocess_brm.<<model_name>> <- function(model, fit, ...) {
@@ -1455,6 +1500,8 @@ use_model_template <- function(model_name,
     bmf2bf_method,
     configure_model_header,
     configure_model_method,
+    simulate_data_header,
+    simulate_data_method,
     family_functions,
     postprocess_brm_header,
     postprocess_brm_method

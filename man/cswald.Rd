@@ -58,8 +58,8 @@ Censored-Shifted Wald Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Decision Making / Response times
-\item \strong{Task:} Choice Reaction Time tasks (with few errors)
+\item \strong{Domain:} Decision making
+\item \strong{Task:} Choices and response times
 \item \strong{Name:} Censored-Shifted Wald Model
 \item \strong{Citation:}
 \itemize{

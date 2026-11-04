@@ -84,8 +84,8 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = list(),
-      domain = "Decision Making / Response times",
-      task = "Choice Reaction Time tasks (with few errors)",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "Censored-Shifted Wald Model",
       citation = glue(
         "Miller, R., Scherbaum, S., Heck, D. W., Goschke, T., & Enge, S. (2018). \\
@@ -367,6 +367,25 @@ configure_model.cswald_crisk <- function(model, data, formula) {
     brms::stanvar(scode = stan_functions, block = "functions")
 
   nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# the simple version's bound is the distance from a centred start point to
+# either boundary, as in pp_simulate.cswald_simple()
+#' @export
+simulate_data.cswald <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  out <- if (model$version == "simple") {
+    rcswald(nrow(design), p$drift, 2 * p$bound, p$ndt, zr = 0.5, s = p$s)
+  } else {
+    rcswald(nrow(design), p$drift, p$bound, p$ndt, zr = p$zr, s = p$s)
+  }
+  .simulate_result(design, .rt_response(model, out), sim)
 }
 
 log_lik_cswald_crisk <- function(i, prep) {
