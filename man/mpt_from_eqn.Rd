@@ -139,8 +139,13 @@ message.
 and tree: a column named by \code{tree_id} holding the bmm tree names, and
 one count column per shared response category, named by \code{bmm_name} in
 the renaming map (see \code{\link[=mpt]{mpt()}}). A category that is \code{impossible} in a
-tree gets 0 (or \code{NA}) in the rows of that tree. TreeBUGS data are wide:
-one row per participant, one column per category label of the EQN file.
+tree gets 0 (or \code{NA}) in the rows of that tree. With \code{response}, \code{\link[=bmm]{bmm()}}
+instead expects one row per trial: the tree column and a column named by
+\code{response} whose values are the bmm names of the categories (\code{bmm_name}
+in the renaming map, listed by \code{print(model)} under "Response"), so a
+file label that \code{categories} maps is given by the name it maps onto.
+TreeBUGS data are wide: one row per participant, one column per category
+label of the EQN file.
 MPTinR data for an EQN model are unnamed, and their columns do not follow
 the file: the trees and, within each tree, the category labels are sorted
 (alphabetically, or numerically when all labels in the file are numbers);

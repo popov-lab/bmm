@@ -108,10 +108,13 @@ the layout \code{\link[=bmm]{bmm()}} expects (one row per participant and tree, 
 column, one count column per response category, 0 for impossible
 categories) and the checks to run before fitting; they apply to models
 from this function as well, with the tree names of \code{tree_names} and the
-category labels of the lines. The data MPTinR fits to a model file in
-this format are wide and positional: one row per participant (or one
-vector for aggregated counts) and one unnamed column per line of the
-model file, in file order, because each line is one response category.
+category labels of the lines. With \code{response}, the data have one row per
+trial instead: the tree column and the column named by \code{response}, whose
+values are the category labels of the lines. The data MPTinR fits to a
+model file in this format are wide and positional: one row per
+participant (or one vector for aggregated counts) and one unnamed column
+per line of the model file, in file order, because each line is one
+response category.
 (For EQN files MPTinR sorts the columns instead; see \code{\link[=mpt_from_eqn]{mpt_from_eqn()}}.)
 Name the columns \verb{<tree>.<category>}; \code{\link[=mpt_data_reshape]{mpt_data_reshape()}} then stacks the
 trees and gives 0 to the categories a tree cannot produce (see Examples).

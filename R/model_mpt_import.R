@@ -81,10 +81,13 @@
 #'   column, one count column per response category, 0 for impossible
 #'   categories) and the checks to run before fitting; they apply to models
 #'   from this function as well, with the tree names of `tree_names` and the
-#'   category labels of the lines. The data MPTinR fits to a model file in
-#'   this format are wide and positional: one row per participant (or one
-#'   vector for aggregated counts) and one unnamed column per line of the
-#'   model file, in file order, because each line is one response category.
+#'   category labels of the lines. With `response`, the data have one row per
+#'   trial instead: the tree column and the column named by `response`, whose
+#'   values are the category labels of the lines. The data MPTinR fits to a
+#'   model file in this format are wide and positional: one row per
+#'   participant (or one vector for aggregated counts) and one unnamed column
+#'   per line of the model file, in file order, because each line is one
+#'   response category.
 #'   (For EQN files MPTinR sorts the columns instead; see [mpt_from_eqn()].)
 #'   Name the columns `<tree>.<category>`; [mpt_data_reshape()] then stacks the
 #'   trees and gives 0 to the categories a tree cannot produce (see Examples).
@@ -446,8 +449,13 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
 #'   and tree: a column named by `tree_id` holding the bmm tree names, and
 #'   one count column per shared response category, named by `bmm_name` in
 #'   the renaming map (see [mpt()]). A category that is `impossible` in a
-#'   tree gets 0 (or `NA`) in the rows of that tree. TreeBUGS data are wide:
-#'   one row per participant, one column per category label of the EQN file.
+#'   tree gets 0 (or `NA`) in the rows of that tree. With `response`, [bmm()]
+#'   instead expects one row per trial: the tree column and a column named by
+#'   `response` whose values are the bmm names of the categories (`bmm_name`
+#'   in the renaming map, listed by `print(model)` under "Response"), so a
+#'   file label that `categories` maps is given by the name it maps onto.
+#'   TreeBUGS data are wide: one row per participant, one column per category
+#'   label of the EQN file.
 #'   MPTinR data for an EQN model are unnamed, and their columns do not follow
 #'   the file: the trees and, within each tree, the category labels are sorted
 #'   (alphabetically, or numerically when all labels in the file are numbers);

@@ -260,20 +260,6 @@ print.mpt_tree <- function(x, ...) {
   raw_pars <- unname(simplex_raw)
   standard_pars <- setdiff(parameters, simplex_pars)
 
-  # generated data columns: one 0/1 indicator per tree, and one per response
-  # category that is impossible in some trees but not others
-  tree_indicators <- if (is.null(tree_id) || length(trees) == 0L) {
-    NULL
-  } else {
-    setNames(paste0("Idx_", names(trees)), names(trees))
-  }
-  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
-  possible_indicators <- if (length(guarded_cats) == 0L) {
-    NULL
-  } else {
-    setNames(paste0("Poss_", guarded_cats), guarded_cats)
-  }
-
   latent_prior <- .mpt_latent_prior(links)
   trial_level <- !is.null(response)
   layout <- if (trial_level) {
@@ -335,7 +321,7 @@ print.mpt_tree <- function(x, ...) {
         simplex = simplex,
         restrictions = restrictions,
         link = links,
-        indicators = list(tree = tree_indicators, possible = possible_indicators),
+        indicators = .mpt_indicator_names(trees, tree_id),
         simplex_raw = simplex_raw
       ),
       domain = c("Long-term memory", "Reasoning", "Decision making"),
@@ -1010,11 +996,7 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     the tree_id column or a covariate. With one row per trial it holds the \\
     category of each trial, so please rename it."
   )
-  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
-  built_columns <- c(
-    if (!is.null(tree_id)) paste0("Idx_", names(trees)),
-    if (length(guarded_cats)) paste0("Poss_", guarded_cats)
-  )
+  built_columns <- unlist(.mpt_indicator_names(trees, tree_id), use.names = FALSE)
   stopif(
     length(intersect(response, built_columns)) > 0,
     "The response column '{response}' collides with a column that bmm builds \\
@@ -2324,6 +2306,21 @@ configure_prior.mpt <- function(model, data, formula, user_prior, ...) {
     return(list(trees))
   }
   trees
+}
+
+# the 0/1 data columns check_data() builds: one per tree when tree_id is given,
+# and one per response category that some trees cannot produce
+.mpt_indicator_names <- function(trees, tree_id) {
+  tree_names <- vapply(trees, `[[`, character(1), "name")
+  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
+  list(
+    tree = if (!is.null(tree_id) && length(trees)) {
+      setNames(paste0("Idx_", tree_names), tree_names)
+    },
+    possible = if (length(guarded_cats)) {
+      setNames(paste0("Poss_", guarded_cats), guarded_cats)
+    }
+  )
 }
 
 .mpt_as_simplex_list <- function(simplex) {

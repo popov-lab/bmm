@@ -3113,6 +3113,30 @@ test_that("mpt(response = ) refuses a response column named like a category or a
   expect_true(is_trial_level(mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Idx_foo")))
 })
 
+test_that("mpt(response = ) allows Idx_<tree> only when no tree_id column builds it", {
+  only <- mpt_tree("only", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))
+  model <- mpt(only, response = "Idx_only")
+  expect_true(is_trial_level(model))
+  checked <- check_data(
+    model, data.frame(Idx_only = c("old", "new", "old")), bmf(D ~ 1, g ~ 1)
+  )
+  expect_identical(names(checked), c("nTrials", "Y"))
+  expect_equal(unname(checked$Y[, "old"]), c(1, 0, 1))
+
+  expect_error(
+    mpt(only, tree_id = "tt", response = "Idx_only"),
+    "column 'Idx_only' collides with a column that bmm builds from the model: 'Idx_only'\\."
+  )
+  two_trees <- list(
+    mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
+    mpt_tree("lure", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))
+  )
+  expect_error(
+    mpt(two_trees, tree_id = "item_type", response = "Idx_target"),
+    "column 'Idx_target' collides .* from the model: 'Idx_target', 'Idx_lure'\\."
+  )
+})
+
 test_that("check_data() on trial rows builds one-hot Y and drops the label column", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
   dat <- mpt_trial_data()
