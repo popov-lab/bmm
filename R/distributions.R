@@ -723,7 +723,7 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
-# R twins of the mixture3p_*_core functions in mixture3p_funs.stan. nt holds the
+# R twins of the mixture3p_*_core functions in mixture3p_functions.stan. nt holds the
 # non-target locations padded to max_set_size - 1 and only the first
 # set_size - 1 are read, so a trial never pays for components its set size does
 # not have. At set size 1 there is no non-target component, which is why no
