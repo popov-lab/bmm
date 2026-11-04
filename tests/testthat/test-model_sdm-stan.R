@@ -61,6 +61,15 @@ sdm_stan_cells <- rbind(sdm_issue_grid, sdm_extended_cells, sdm_tight_cells)
 sdm_parity_cells <- data.frame(lc = c(1, 3, 5), kappa = c(2, 30, 100))
 sdm_parity_y <- c(-pi, -2, -1, -0.3, -0.05, -0.01, 0, 0.004, 0.02, 0.1, 0.6, 2.5)
 
+# four cells of three rows, in sorted order; the labels of the middle two
+# pasted with "." coincide ("1.5.2"), their values do not
+sdm_collision_cells <- data.frame(
+  a = c(1, 1, 1.5, 1.5), b = c(2, 5.2, 2, 5.2),
+  lc = c(1, 3, 0.5, 2), kappa = c(2, 30, 5, 10)
+)
+sdm_collision_rows <- sdm_collision_cells[rep(1:4, each = 3), ]
+sdm_collision_rows$y <- sdm_parity_y
+
 # Runs the installed tdata and likelihood chunks inside generated quantities,
 # once per cell, with the names they read from a brms program (N, the run
 # metadata, c on the log scale, kappa) declared locally and `target +=` turned
@@ -78,10 +87,13 @@ sdm_stan_program <- function(data_scode) {
     "  int<lower=1> K; vector[K] grid_lc; vector[K] grid_kappa;\n",
     "  int<lower=1> P; int<lower=1> n_y; vector[n_y] y_obs;\n",
     "  vector[P] par_lc; vector[P] par_kappa;\n",
+    "  int<lower=1> n_col; vector[n_col] y_col; vector[n_col] lc_col; vector[n_col] kappa_col;\n",
+    "  int<lower=1> G_col; array[G_col] int start_col; array[G_col] int count_col;\n",
     data_scode, "\n}\n",
     "generated quantities {\n",
     "  vector[K] log_z;\n",
     "  vector[P + 1] log_lik;\n",
+    "  real log_lik_collision;\n",
     "  for (k in 1:K) {\n",
     "    int N = 1;\n",
     "    vector[N] c = rep_vector(grid_lc[k], N);\n",
@@ -118,6 +130,21 @@ sdm_stan_program <- function(data_scode) {
     "    lp += sdm_simple_lpdf(Y | mu, c, kappa);\n",
     "    log_lik[p] = lp;\n",
     "  }\n",
+    # the colliding design with the runs standata() gives it
+    "  {\n",
+    "    int N = n_col;\n",
+    "    int G_sdm_runs = G_col;\n",
+    "    array[G_sdm_runs] int sdm_run_start = start_col;\n",
+    "    array[G_sdm_runs] int sdm_run_count = count_col;\n",
+    "    vector[N] Y = y_col;\n",
+    "    vector[N] mu = rep_vector(0, N);\n",
+    "    vector[N] c = lc_col;\n",
+    "    vector[N] kappa = kappa_col;\n",
+    "    real lp = 0;\n",
+    tdata, "\n", likelihood, "\n",
+    "    lp += sdm_simple_lpdf(Y | mu, c, kappa);\n",
+    "    log_lik_collision = lp;\n",
+    "  }\n",
     "}\n"
   )
 }
@@ -137,6 +164,15 @@ sdm_stan_values <- function() {
     ),
     stats::setNames(lapply(model_data, `[[`, "sdata"), vapply(model_data, `[[`, "", "name"))
   )
+  collision <- standata(bmf(c ~ a * b, kappa ~ a * b),
+    data = sdm_collision_rows, model = sdm(resp_error = "y")
+  )
+  data <- c(data, list(
+    n_col = nrow(sdm_collision_rows), y_col = sdm_collision_rows$y,
+    lc_col = sdm_collision_rows$lc, kappa_col = sdm_collision_rows$kappa,
+    G_col = collision$G_sdm_runs, start_col = as.array(collision$sdm_run_start),
+    count_col = as.array(collision$sdm_run_count)
+  ))
   program <- sdm_stan_program(paste(vapply(model_data, `[[`, "", "scode"), collapse = "\n"))
 
   dir <- withr::local_tempdir()
@@ -148,7 +184,8 @@ sdm_stan_values <- function() {
   csv <- utils::read.csv(fit$output_files()[1], comment.char = "#", check.names = FALSE)
   list(
     log_z = as.numeric(csv[1, paste0("log_z.", seq_len(data$K))]),
-    log_lik = as.numeric(csv[1, paste0("log_lik.", seq_len(data$P + 1))])
+    log_lik = as.numeric(csv[1, paste0("log_lik.", seq_len(data$P + 1))]),
+    log_lik_collision = csv[1, "log_lik_collision"]
   )
 }
 
@@ -216,6 +253,19 @@ test_that("the Stan log-likelihood of sdm() runs matches dsdm()", {
   }
   expect_lt(abs(stan$log_lik[nrow(sdm_parity_cells) + 1] - sum(r_log_lik)), 1e-6,
     label = "|Stan - dsdm()| log-likelihood of the three cells as runs of one design"
+  )
+})
+
+test_that("the Stan log-likelihood of sdm() matches dsdm() for cells whose labels coincide", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  stan <- sdm_stan_cached()
+  rows <- sdm_collision_rows
+  r_log_lik <- sum(mapply(function(y, lc, kappa) dsdm(y, 0, exp(lc), kappa, log = TRUE),
+                          rows$y, rows$lc, rows$kappa))
+  expect_lt(abs(stan$log_lik_collision - r_log_lik), 1e-6,
+    label = "|Stan - dsdm()| log-likelihood of four cells, two of them with one pasted label"
   )
 })
 

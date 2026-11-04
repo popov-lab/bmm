@@ -416,8 +416,11 @@ sdm_run_metadata <- function(data, formula, model) {
     ))
   }
 
-  run_id <- interaction(data[predictors], drop = TRUE, lex.order = TRUE)
-  run_start <- c(1L, which(run_id[-1] != run_id[-length(run_id)]) + 1L)
+  # values, not interaction() labels: pasted with ".", the cells (1, 5.2) and
+  # (1.5, 2) would share one run and its first row's normalising constant.
+  # The rows are complete cases here, so no comparison is NA
+  changed <- Reduce(`|`, lapply(data[predictors], function(x) x[-1] != x[-length(x)]))
+  run_start <- c(1L, which(changed) + 1L)
   run_count <- diff(c(run_start, nrow(data) + 1L))
   list(
     G_sdm_runs = length(run_start),
