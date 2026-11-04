@@ -17,8 +17,9 @@ model_cases_psychometric_function <- function() {
         model = model, formula = bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
         data = trial_data
       ),
-      psychometric_function_counts = list(model = counts, formula = bmf(midpoint ~ 1, width ~ 1),
-                                 data = count_data)
+      psychometric_function_counts = list(
+        model = counts, formula = bmf(midpoint ~ 1, width ~ 1), data = count_data
+      )
     ),
     sd_default = list(
       # midpoint's rate is scaled to the intensity range, 4 / R with R = 3 here

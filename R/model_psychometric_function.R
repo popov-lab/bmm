@@ -3,8 +3,8 @@
 ############################################################################# !
 
 .model_psychometric_function <- function(response = NULL, intensity = NULL,
-                                n_trials = NULL, sigmoid = "normal",
-                                guess = NULL, lapse = NULL, call = NULL, ...) {
+                                         n_trials = NULL, sigmoid = "normal",
+                                         guess = NULL, lapse = NULL, call = NULL, ...) {
   log_x <- .psychometric_sigmoids[[sigmoid]]$log_x
   parameters <- list(
     midpoint = paste0(

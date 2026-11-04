@@ -4440,11 +4440,11 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'                                         n_trials = 40, sigmoid = "weibull")
 #' head(dat)
 dpsychometric_function <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
-                          n_trials = 1,
-                          sigmoid = c("normal", "logistic", "gumbel_min",
-                                      "gumbel_max", "weibull", "lognormal",
-                                      "loglogistic"),
-                          log = FALSE) {
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic"),
+                                   log = FALSE) {
   sigmoid <- match.arg(sigmoid)
   stopif(anyNA(x), "x must not contain NA")
   stopif(anyNA(n_trials), "n_trials must not contain NA")
@@ -4464,10 +4464,10 @@ dpsychometric_function <- function(x, intensity, midpoint, width, guess = 0, lap
 #' @rdname psychometric_function_dist
 #' @export
 rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
-                          n_trials = 1,
-                          sigmoid = c("normal", "logistic", "gumbel_min",
-                                      "gumbel_max", "weibull", "lognormal",
-                                      "loglogistic")) {
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic")) {
   sigmoid <- match.arg(sigmoid)
   stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   stopif(anyNA(n_trials), "n_trials must not contain NA")
