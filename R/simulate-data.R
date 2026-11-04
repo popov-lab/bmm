@@ -64,7 +64,7 @@
 #' | [imm()] | as [mixture3p()], plus `nt_distances` for the versions `"full"` and `"bsc"` |
 #' | [m3()] | `n_trials`, the number of trials of each row; `num_options` when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) |
 #' | [mpt()] | `n_trials`; `tree_id` and `covariates` when the model has them |
-#' | [ezdm()] | `n_trials` |
+#' | [ezdm()], [ezcdm()] | `n_trials` |
 #' | [sdt_yn()] | `stimulus`, `n_trials` |
 #' | [sdt_mafc()] | `n_trials`; `m` when it names a column |
 #' | [sdt_ranking()] | `n_trials`; `m` when it names a column |
@@ -77,7 +77,7 @@
 #'   the attribute `simulate_pars`, a data frame with the value of every
 #'   parameter (fixed ones included) for every row on the link scale, the
 #'   values a recovery study compares the estimates with, and `simulate_call`,
-#'   the model's class and the scale. For [ezdm()], rows whose simulated mean
+#'   the model's class and the scale. For [ezdm()] and [ezcdm()], rows whose simulated mean
 #'   response time is not positive are dropped with a warning, because [bmm()]
 #'   rejects them; their row numbers are in the attribute `dropped_rows`. A
 #'   mean response time below the non-decision time is a valid draw and is

@@ -351,6 +351,41 @@ posterior_predict_ezcdm <- function(i, prep, ...) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rezcdm() draws mean_rt from a normal around the mean RT, so the summaries of
+# few trials can have a mean RT that is not positive, which bmm() rejects;
+# redrawing would truncate the sampling distribution dezcdm() assumes, so those
+# rows are dropped, as in simulate_data.ezdm(). The versions differ only in
+# driftangle, which the 3par version fixes at 0
+#' @export
+simulate_data.ezcdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  n_trials <- model$other_vars$n_trials
+  design <- .design_or_n(model, design, trials = n_trials)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  out <- rezcdm(nrow(design), design[[n_trials]], drift = p$drift, bound = p$bound,
+                ndt = p$ndt, driftangle = p$driftangle)
+  resp <- model$resp_vars
+  out <- stats::setNames(
+    out[c("mean_angle", "var_angle", "mean_rt", "var_rt")],
+    unlist(resp[c("mean_angle", "var_angle", "mean_rt", "var_rt")], use.names = FALSE)
+  )
+  dropped <- which(out[[resp$mean_rt]] <= 0)
+  if (length(dropped) == 0) {
+    return(.simulate_result(design, out, sim))
+  }
+  warning2("Dropped {length(dropped)} of {nrow(design)} rows whose simulated mean \\
+           response time is not positive, which bmm() rejects. Their row numbers \\
+           are in attr(, \"dropped_rows\").")
+  sim$link <- sim$link[-dropped, , drop = FALSE]
+  data <- .simulate_result(design[-dropped, , drop = FALSE], out[-dropped, , drop = FALSE], sim)
+  attr(data, "dropped_rows") <- dropped
+  data
+}
+
+############################################################################# !
 # PP_CHECK OBSERVABLES                                                    ####
 ############################################################################# !
 

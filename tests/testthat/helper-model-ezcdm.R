@@ -35,6 +35,19 @@ model_cases_ezcdm <- function() {
       ezcdm = list(model = three, settable = c("drift", "driftangle", "bound", "ndt")),
       ezcdm_4par = list(model = four, settable = c("drift", "driftangle", "bound", "ndt"))
     ),
+    simulate = list(
+      ezcdm_3par = list(
+        model = three, pars = list(drift = 0.4, bound = 0.2, ndt = -1.2),
+        design = data.frame(n_trials = rep(100, 20)), formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+        simulate_pars = list(drift = 0.4, driftangle = 0, bound = 0.2, ndt = -1.2)
+      ),
+      ezcdm_4par = list(
+        model = four, pars = list(drift = 0.4, driftangle = 0.7, bound = 0.2, ndt = -1.2),
+        design = data.frame(n_trials = rep(100, 20)),
+        formula = bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1),
+        simulate_pars = list(drift = 0.4, driftangle = 0.7, bound = 0.2, ndt = -1.2)
+      )
+    ),
     fixture = list(ezcdm = list(file = "bmmfit_ezcdm_ppcheck.rds")),
     observables = list(
       ezcdm = list(model = three, data = sim_data, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1)),

@@ -49,7 +49,7 @@ A data frame: \code{design} with the response columns added. It carries
 the attribute \code{simulate_pars}, a data frame with the value of every
 parameter (fixed ones included) for every row on the link scale, the
 values a recovery study compares the estimates with, and \code{simulate_call},
-the model's class and the scale. For \code{\link[=ezdm]{ezdm()}}, rows whose simulated mean
+the model's class and the scale. For \code{\link[=ezdm]{ezdm()}} and \code{\link[=ezcdm]{ezcdm()}}, rows whose simulated mean
 response time is not positive are dropped with a warning, because \code{\link[=bmm]{bmm()}}
 rejects them; their row numbers are in the attribute \code{dropped_rows}. A
 mean response time below the non-decision time is a valid draw and is
@@ -88,7 +88,7 @@ specified with:\tabular{ll}{
    \code{\link[=imm]{imm()}} \tab as \code{\link[=mixture3p]{mixture3p()}}, plus \code{nt_distances} for the versions \code{"full"} and \code{"bsc"} \cr
    \code{\link[=m3]{m3()}} \tab \code{n_trials}, the number of trials of each row; \code{num_options} when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) \cr
    \code{\link[=mpt]{mpt()}} \tab \code{n_trials}; \code{tree_id} and \code{covariates} when the model has them \cr
-   \code{\link[=ezdm]{ezdm()}} \tab \code{n_trials} \cr
+   \code{\link[=ezdm]{ezdm()}}, \code{\link[=ezcdm]{ezcdm()}} \tab \code{n_trials} \cr
    \code{\link[=sdt_yn]{sdt_yn()}} \tab \code{stimulus}, \code{n_trials} \cr
    \code{\link[=sdt_mafc]{sdt_mafc()}} \tab \code{n_trials}; \code{m} when it names a column \cr
    \code{\link[=sdt_ranking]{sdt_ranking()}} \tab \code{n_trials}; \code{m} when it names a column \cr
