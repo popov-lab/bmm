@@ -46,7 +46,8 @@ model_cases_mixture3p <- function() {
       )
     ),
     fixture = list(mixture3p = list(file = "bmmfit_mixture3p.rds")),
-    # displays of set size 1 to 3; slot averaging with variable precision covers tau
+    # displays of set size 1 to 3; every version runs with and without variable
+    # precision, which the R4 check cannot see
     simulate = list(
       mixture3p = list(
         model = mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size"),
@@ -59,6 +60,20 @@ model_cases_mixture3p <- function() {
         pars = list(kappa = 2, K = 0.5, ptarget = 1), design = nt_display_design(),
         formula = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1),
         simulate_pars = list(mu = 0, kappa = 2, K = 0.5, ptarget = 1)
+      ),
+      mixture3p_vp = list(
+        model = mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size",
+                          variable_precision = TRUE),
+        pars = list(kappa = 2, thetat = 0.5, thetant = -0.5, tau = 0), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1, tau ~ 1),
+        simulate_pars = list(mu = 0, kappa = 2, thetat = 0.5, thetant = -0.5, tau = 0)
+      ),
+      mixture3p_slot_vp = list(
+        model = mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size", version = "slot",
+                          variable_precision = TRUE),
+        pars = list(kappa = 2, K = 0.5, ptarget = 1, tau = 0), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, K ~ 1, ptarget ~ 1, tau ~ 1),
+        simulate_pars = list(mu = 0, kappa = 2, K = 0.5, ptarget = 1, tau = 0)
       ),
       mixture3p_slot_averaging_vp = list(
         model = mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size",

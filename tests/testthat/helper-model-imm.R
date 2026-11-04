@@ -51,6 +51,26 @@ model_cases_imm <- function() {
         formula = bmf(kappa ~ 1, c ~ 1, s ~ 1),
         simulate_pars = list(mu = 0, kappa = 2, c = 0.5, s = 0.3, b = 0)
       ),
+      imm_abc = list(
+        model = imm("y", nt_features = c("nt1", "nt2"), set_size = "set_size", version = "abc"),
+        pars = list(kappa = 2, a = -0.5, c = 0.5), design = nt_display_design()[1:5],
+        formula = bmf(kappa ~ 1, a ~ 1, c ~ 1),
+        simulate_pars = list(mu = 0, kappa = 2, a = -0.5, c = 0.5, b = 0)
+      ),
+      imm_full_vp = list(
+        model = imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
+                    set_size = "set_size", version = "full", variable_precision = TRUE),
+        pars = list(kappa = 2, a = -0.5, c = 0.5, s = 0.3, tau = 0), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, a ~ 1, c ~ 1, s ~ 1, tau ~ 1),
+        simulate_pars = list(mu = 0, kappa = 2, a = -0.5, c = 0.5, s = 0.3, tau = 0, b = 0)
+      ),
+      imm_bsc_vp = list(
+        model = imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
+                    set_size = "set_size", version = "bsc", variable_precision = TRUE),
+        pars = list(kappa = 2, c = 0.5, s = 0.3, tau = 0), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, c ~ 1, s ~ 1, tau ~ 1),
+        simulate_pars = list(mu = 0, kappa = 2, c = 0.5, s = 0.3, tau = 0, b = 0)
+      ),
       imm_abc_vp = list(
         model = imm("y", nt_features = c("nt1", "nt2"), set_size = "set_size", version = "abc",
                     variable_precision = TRUE),
