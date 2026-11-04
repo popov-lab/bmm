@@ -467,7 +467,7 @@ fit_trials <- bmm(
 summary(fit_trials)
 ```
 
-The simulated standard deviations were 0.5 for `D` over participants, 0.6 for `D` over items and 0.4 for `g` over participants, all on the logit scale, and each lies inside its 95% interval in the summary. The item SD is the least certain of them: each item contributes only 30 trials, and on lure trials an undetected item is guessed. The data hold `r nrow(dat_trials)` trials, so a fit to them takes longer than a fit to the `r 2 * 30` aggregated rows, because its cost grows with the number of rows.
+The simulated standard deviations were 0.5 for `D` over participants, 0.6 for `D` over items and 0.4 for `g` over participants, all on the logit scale, and each lies inside its 95% interval in the summary. Each item contributes 30 trials and each participant 60, and on lure trials an undetected item is guessed, so with fewer participants or items the item SD is the first to lose precision. The data hold `r nrow(dat_trials)` trials, so a fit to them takes longer than a fit to the `r 2 * 30` aggregated rows, because its cost grows with the number of rows.
 
 `bmm_data_check()` reports trial rows per participant and gives the items only as the minimum, median and maximum number of trials per item. `ppp()` needs to be told which grouping variable identifies the participants, because the formula now has two:
 
@@ -743,7 +743,7 @@ Importing the model structure is the easy part; what usually needs translating i
 |---|---|
 | model file (EQN, MPTinR text) | `mpt_from_eqn()`, `mpt_from_string()`, or `mpt_tree()` + `mpt()` |
 | wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation]) |
-| frequencies per participant only; no item effects | one row per trial with `mpt(response = )`, and item effects such as `(1 | item)` ([Trial-level data and item effects]) |
+| frequencies per participant only; no item effects | one row per trial with `response =` (in `mpt()`, `mpt_from_eqn()` and `mpt_from_string()`), and item effects such as `(1 | item)` ([Trial-level data and item effects]) |
 | reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_data_reshape(wide, model)`, or `mpt_data_reshape(wide, model, columns = "mptinr")` |
 | `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS' `FE` has no restriction counterpart: leave the random effect out of that parameter's formula |
 | `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model]) |
