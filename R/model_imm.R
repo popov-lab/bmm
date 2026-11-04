@@ -543,7 +543,8 @@ IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
 # The trial-wise generator of posterior_predict() takes one display per call
 # and each row's own values, so rows are drawn in groups of identical set size,
 # non-target locations and distances. The fixed background b comes from the
-# model as in the fit; a version without a or s gets NULL for it, as there
+# model as in the fit; a version without a or s gets NULL for it, as there,
+# and .rimm_version() fills in a value that version's weights never read.
 #' @export
 simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   .circmix_refuse_1_4_model(model)
