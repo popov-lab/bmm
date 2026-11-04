@@ -193,8 +193,15 @@ capture_check_conditions <- function(expr) {
 
 summarise_response_vars <- function(model, data) {
   annotations <- response_annotations(model)
-  info <- lapply(names(model$resp_vars), function(arg) {
-    vars <- model$resp_vars[[arg]]
+  # a trial-level mpt() reads one column naming the categories, not a column
+  # per category
+  resp_vars <- if (inherits(model, "mpt") && is_trial_level(model)) {
+    list(response = model$other_vars$response)
+  } else {
+    model$resp_vars
+  }
+  info <- lapply(names(resp_vars), function(arg) {
+    vars <- resp_vars[[arg]]
     data.frame(
       variable = vars,
       summary = vapply(vars, function(v) describe_data_column(data[[v]]), character(1)),

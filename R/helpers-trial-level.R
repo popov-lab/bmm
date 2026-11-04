@@ -92,8 +92,9 @@ trial_level_stimulus_docs <- paste0(
 trial_level_notes_docs <- paste0(
   "   - `loo()` leaves out single trials on trial rows and whole cells on ",
   "aggregated rows. These are different predictions, and the log-likelihoods ",
-  "of the trial rows sum to the cell's log-likelihood less the log binomial ",
-  "coefficient, so ELPD values compare only fits to the same layout. ",
+  "of the trial rows sum to the cell's log-likelihood less the log of the ",
+  "binomial (or multinomial) coefficient, so ELPD values compare only fits to ",
+  "the same layout. ",
   "`kfold(fit, group = \"id\")` leaves out whole participants with either ",
   "layout.\n",
   "   - `bmm(..., threads = n)` with `backend = \"cmdstanr\"` evaluates the ",

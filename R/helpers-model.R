@@ -484,6 +484,12 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
+  if (inherits(model, "mpt") && is_trial_level(model)) {
+    return(list(
+      resp_cats = glue("one per trial, named in column '{model$other_vars$response}'"),
+      response = "the response category of each trial"
+    ))
+  }
   if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }

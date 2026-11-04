@@ -384,7 +384,12 @@ revert_check_data.m3 <- function(model, data) {
 #' @exportS3Method
 revert_check_data.mpt <- function(model, data) {
   resp_cats <- model$resp_vars$resp_cats
-  data[resp_cats] <- as.data.frame(unclass(data$Y)[, resp_cats, drop = FALSE])
+  counts <- unclass(data$Y)[, resp_cats, drop = FALSE]
+  if (is_trial_level(model)) {
+    data[[model$other_vars$response]] <- resp_cats[max.col(counts, ties.method = "first")]
+  } else {
+    data[resp_cats] <- as.data.frame(counts)
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   tree_id <- model$other_vars$tree_id
