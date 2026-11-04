@@ -294,7 +294,7 @@ wide[1, ]
 bmm_data_check(bmf(D ~ 1), long, model)
 #> Pre-fit data check
 #> Model: mpt_from_string(text = readLines(model_file), restrictions = restr[nzchar(restr)], tree_names = c("target", "lure"), tree_id = "item_type") 
-#> Data:  4 observations ('long') 
+#> Data:  4 rows, 160 trials ('long') 
 #> 
 #> Response variables:
 #>   old  numeric with 4 unique values: 8, 12, 25, 30 (expected: counts per

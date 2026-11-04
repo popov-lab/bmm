@@ -15,7 +15,7 @@ backend interface to Stan."><meta property="og:image" content="https://venpopov.
 
     <a class="navbar-brand me-2" href="../index.html">bmm</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">1.4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -187,7 +187,8 @@ size set in <code><a href="bmm_options.html">bmm_options()</a></code> to it; the
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class brmsfit which contains the posterior draws along
 with many other useful information about the model. Use methods(class =
-"brmsfit") for an overview on available methods.</p>
+"brmsfit") for an overview on available methods. Their <code>newdata</code> argument
+takes data in the layout you gave to <code>bmm()</code> (see <code><a href="standata.bmmfit.html">standata.bmmfit()</a></code>).</p>
     </div>
     <div class="section level2">
     <h2 id="supported-models">Supported Models<a class="anchor" aria-label="anchor" href="#supported-models"></a></h2>
@@ -225,10 +226,11 @@ brms, see <a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">the 
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>Frischkorn, G. T., &amp; Popov, V. (2023). A tutorial for estimating
-mixture models for visual working memory tasks in brms: Introducing the
-Bayesian Measurement Modeling  (bmm) package for R.
-https://doi.org/10.31234/osf.io/umt57</p>
+    <p>Frischkorn, G. T., &amp; Popov, V. (2025). A tutorial for estimating
+Bayesian hierarchical mixture models for visual working memory tasks:
+Introducing the Bayesian Measurement Modeling (bmm) package for R.
+<em>Behavior Research Methods</em>, <em>57</em>(5), Article 144.
+https://doi.org/10.3758/s13428-025-02643-0</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

@@ -61,33 +61,37 @@ sdata1 <- standata(bmf(c ~ 1, kappa ~ 1),
   model = sdm(resp_error = "dev_rad")
 )
 str(sdata1)
-#> List of 15
-#>  $ N            : int 15200
-#>  $ Y            : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...
-#>  $ K            : int 1
-#>  $ Kc           : num 0
-#>  $ X            : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
+#> List of 19
+#>  $ N             : int 15200
+#>  $ Y             : num [1:15200(1d)] 0.384 -0.4538 -0.0873 0.3665 -0.0349 ...
+#>  $ K             : int 1
+#>  $ Kc            : num 0
+#>  $ X             : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr "Intercept"
 #>   ..- attr(*, "assign")= int 0
-#>  $ K_c          : int 1
-#>  $ Kc_c         : num 0
-#>  $ X_c          : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
+#>  $ K_c           : int 1
+#>  $ Kc_c          : num 0
+#>  $ X_c           : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr "Intercept"
 #>   ..- attr(*, "assign")= int 0
-#>  $ K_kappa      : int 1
-#>  $ Kc_kappa     : num 0
-#>  $ X_kappa      : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
+#>  $ K_kappa       : int 1
+#>  $ Kc_kappa      : num 0
+#>  $ X_kappa       : num [1:15200, 1] 1 1 1 1 1 1 1 1 1 1 ...
 #>   ..- attr(*, "dimnames")=List of 2
 #>   .. ..$ : chr [1:15200] "1" "2" "3" "4" ...
 #>   .. ..$ : chr "Intercept"
 #>   ..- attr(*, "assign")= int 0
-#>  $ prior_only   : int 0
-#>  $ G_sdm_runs   : int 1
-#>  $ sdm_run_start: int [1(1d)] 1
-#>  $ sdm_run_count: int [1(1d)] 15200
+#>  $ prior_only    : int 0
+#>  $ sdm_gl_x      : num [1:16] -0.989 -0.945 -0.866 -0.755 -0.618 ...
+#>  $ sdm_gl_w      : num [1:16] 0.0272 0.0623 0.0952 0.1246 0.1496 ...
+#>  $ sdm_wide_cosm1: num [1:32] -0.00001 -0.000091 -0.000258 -0.00052 -0.000894 ...
+#>  $ sdm_wide_w    : num [1:32] 0.00896 0.00909 0.00936 0.00976 0.01031 ...
+#>  $ G_sdm_runs    : int 1
+#>  $ sdm_run_start : int [1(1d)] 1
+#>  $ sdm_run_count : int [1(1d)] 15200
 #>  - attr(*, "class")= chr [1:2] "standata" "list"
 ```

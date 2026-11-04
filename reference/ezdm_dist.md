@@ -84,7 +84,10 @@ rezdm(
 
 - log:
 
-  Logical; if `TRUE`, values are returned on the log scale.
+  Logical; if `TRUE` (default until bmm 1.6.0), values are returned on
+  the log scale. From bmm 1.6.0 on the default is `FALSE`, as in base R
+  and the other density functions of bmm. Pass `log` to get the same
+  result in every version.
 
 - n:
 
@@ -172,7 +175,7 @@ Psychonomic Bulletin & Review.
 # 3-parameter version (single observation)
 dezdm(
   mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-  drift = 2, bound = 1.5, ndt = 0.3
+  drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 )
 #> [1] -30.99022
 
@@ -180,7 +183,7 @@ dezdm(
 dezdm(
   mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025),
   n_upper = c(80, 75), n_trials = c(100, 100),
-  drift = 2, bound = 1.5, ndt = 0.3
+  drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 )
 #> [1] -30.99022 -27.30733
 
@@ -188,7 +191,7 @@ dezdm(
 dezdm(
   mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
   n_upper = 80, n_trials = 100,
-  drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+  drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
 )
 #> [1] -37.10626
 

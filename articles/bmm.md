@@ -67,7 +67,7 @@ bmm_setup(smoke_test = FALSE)
 ```
 
 ``` fansi
-#> bmm setup check (Linux, R 4.6.1)
+#> bmm setup check (Linux, R 4.6.2)
 #> 
 #> PASS  C++ toolchain      R compiled a small test file
 #> PASS  cmdstanr           0.9.0.9002

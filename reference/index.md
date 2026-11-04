@@ -119,6 +119,11 @@ stan data, etc.
 - [`stancode(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/reference/stancode.bmmformula.md)
   : Generate Stan code for bmm models
 
+- [`standata(`*`<bmmfit>`*`)`](https://venpopov.com/bmm/reference/standata.bmmfit.md)
+  :
+
+  Stan data of a fitted `bmm` model
+
 - [`standata(`*`<bmmformula>`*`)`](https://venpopov.com/bmm/reference/standata.bmmformula.md)
   :
 

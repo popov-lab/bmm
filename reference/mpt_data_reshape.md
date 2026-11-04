@@ -168,7 +168,7 @@ long
 bmm_data_check(bmf(Do ~ 1, g ~ 1), long, model)
 #> Pre-fit data check
 #> Model: mpt_from_eqn(file = eqn_file, restrictions = "D_n = D_o", categories = c(hit = "yes", fa = "yes", miss = "no", cr = "no"), tree_id = "item_type") 
-#> Data:  4 observations ('long') 
+#> Data:  4 rows, 160 trials ('long') 
 #> 
 #> Response variables:
 #>   yes  numeric with 4 unique values: 8, 12, 25, 30 (expected: counts per

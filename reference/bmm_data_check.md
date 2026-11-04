@@ -16,9 +16,21 @@ and combines them with a readable summary of:
   (factor levels, character vectors, numeric variables with few unique
   values)
 
-- the number of observations per design cell (crossing the grouping
-  variables from random effects terms with the categorical predictors),
-  flagging sparse or empty cells
+- the number of trials per design cell (crossing the grouping variables
+  from random effects terms with the categorical predictors), flagging
+  sparse or empty cells. For models fit to aggregated data, where one
+  row summarizes many trials, the trials of all rows in a cell are
+  summed: the `n_trials` column of
+  [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.md),
+  [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.md) and
+  [`ezdm()`](https://venpopov.com/bmm/reference/ezdm.md), and the row
+  sums of the response count columns of
+  [`m3()`](https://venpopov.com/bmm/reference/m3.md),
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md),
+  [`sdt_rating()`](https://venpopov.com/bmm/reference/sdt_rating.md),
+  [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.md)
+  and [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.md). For
+  all other models a row is one trial
 
 - model-specific diagnostics for common data mistakes (e.g. responses in
   degrees rather than radians for circular models, or misplaced `NA`
@@ -69,9 +81,15 @@ bmm_data_check(formula, data, model, min_trials = 10)
 
 - min_trials:
 
-  Numeric. Design cells with fewer observations are flagged in the
-  report. Defaults to 10. Ignored for models fit to aggregated data
-  (e.g. `m3`, `ezdm`), where one row summarizes many trials.
+  Numeric. Design cells with fewer than `min_trials` trials in total are
+  flagged in the report. Defaults to 10, for every model. For
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md) a design cell
+  sums the trials of all its trees unless a formula uses the tree
+  column, so a cell can pass while one of its trees holds only a few
+  trials; tabulate the trials per tree yourself if the trees differ in
+  size. When the trial counts of an aggregated model cannot be read (a
+  count column is missing or not numeric), the report shows rows per
+  cell and flags none.
 
 ## Value
 
@@ -79,6 +97,9 @@ An object of class `bmm_data_check` with a print method. The object is a
 list containing the summarized `response`, `predictors` and `cells`
 information (including the full cell count table in `$cells$counts`),
 all `findings`, and the captured results of the validation `pipeline`.
+`$cells$unit` says what a cell's `n` counts (`"trials"`, `"rows"` or
+`"observations"`); when it counts trials, `$cells$counts` also holds
+each cell's `n_rows` and the object its total `n_trials`.
 
 ## See also
 
@@ -191,7 +212,7 @@ bmm_data_check(
 )
 #> Pre-fit data check
 #> Model: m3(resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"), choice_rule = "simple", version = "ss") 
-#> Data:  120 observations ('oberauer_lewandowsky_2019_e1') 
+#> Data:  120 rows, 10979 trials ('oberauer_lewandowsky_2019_e1') 
 #> 
 #> Response variables:
 #>   corr   numeric, range [5, 95] (expected: counts per response category)
@@ -205,9 +226,9 @@ bmm_data_check(
 #> Predictor coding:
 #>   ID  [grouping] numeric, range [1, 40]
 #> 
-#> Observations per design cell:
+#> Trials per design cell:
 #>   ID: 40 non-empty cell(s)
-#>   observations per cell: min 3 / median 3 / max 3
+#>   trials per cell: min 252 / median 275 / max 295
 #> 
 #> Findings: No issues detected.
 #> 

@@ -1,5 +1,286 @@
 # Changelog
 
+## bmm 1.4.2
+
+#### New features
+
+- [`qsdm()`](https://venpopov.com/bmm/reference/SDMdist.md), the
+  quantile function of the SDM distribution, now works; it stopped with
+  “‘qsdm’ is not implemented yet”. It takes `lower.tail`, `log.p` and
+  `lower.bound` as
+  [`psdm()`](https://venpopov.com/bmm/reference/SDMdist.md) does and
+  returns values between `lower.bound` and `lower.bound + 2 * pi`
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+
+#### Bug fixes
+
+- [`sdm()`](https://venpopov.com/bmm/reference/sdm.md) fits with two or
+  more predictors could evaluate some design cells with the parameters
+  of another cell, when the two cells read alike once their values are
+  joined with a dot: `1` and `5.2` against `1.5` and `2`, or factor
+  levels `"a.b"` and `"c"` against `"a"` and `"b.c"`. Estimates for
+  these cells were wrong, with no warning, most of all when the data
+  were sorted by the predictors.
+  [`ppp()`](https://venpopov.com/bmm/reference/ppp.md) pooled such cells
+  into one. Refit affected
+  [`sdm()`](https://venpopov.com/bmm/reference/sdm.md) models and rerun
+  [`ppp()`](https://venpopov.com/bmm/reference/ppp.md)
+  ([\#657](https://github.com/popov-lab/bmm/issues/657)).
+- [`bmm_data_check()`](https://venpopov.com/bmm/reference/bmm_data_check.md)
+  now counts trials, not rows, per design cell, and flags cells with
+  fewer than `min_trials` (default 10) trials in total. Aggregated
+  [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.md),
+  [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.md),
+  [`sdt_rating()`](https://venpopov.com/bmm/reference/sdt_rating.md),
+  [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.md)
+  and [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.md) data
+  were flagged as sparse when each row held many trials;
+  [`m3()`](https://venpopov.com/bmm/reference/m3.md),
+  [`ezdm()`](https://venpopov.com/bmm/reference/ezdm.md) and
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md) data were never
+  checked and may now show notes about sparse cells. For
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md) a cell counts the
+  trials of all its trees unless a formula uses the tree column, so
+  check trees of very different sizes yourself
+  ([\#647](https://github.com/popov-lab/bmm/issues/647)).
+- [`psdm()`](https://venpopov.com/bmm/reference/SDMdist.md) returned 0
+  instead of 1 at the upper end of the circle (`psdm(pi, 0, 3, 5)`).
+  With a `lower.bound` other than `-pi`, such as `mu - pi`, it also
+  returned negative or wrong values for many `q`
+  (`psdm(-2, lower.bound = 0)` gave -0.42). It now returns 1 at
+  `lower.bound + 2 * pi` and counts probability from `lower.bound`
+  around the circle
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+- [`psdm()`](https://venpopov.com/bmm/reference/SDMdist.md) could be
+  wrong with the default `lower.bound` as well. Narrow distributions,
+  with large `c` and `kappa`, were hit hardest:
+  `psdm(0.6, mu = 0, c = 20, kappa = 100)` gave 0.000009 instead of 1.
+  With ordinary values (`c` up to 10, `kappa` up to 30) it could be off
+  by up to 1 at some `q`, though rarely by more than 0.001. Recompute
+  any values you got from
+  [`psdm()`](https://venpopov.com/bmm/reference/SDMdist.md)
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+- A fit updated without recompiling the Stan model (`rstan`, or
+  `cmdstanr` while its compiled model file exists) now stores the
+  initial values and sampler settings it ran with. It kept those of the
+  fit you started from: after `update(newdata = )` the initial values
+  described the old data, and a chained
+  [`update()`](https://rdrr.io/r/stats/update.html) sampled with the
+  `adapt_delta` and step size from before the previous
+  [`update()`](https://rdrr.io/r/stats/update.html). A fit saved before
+  the oversized-file fix
+  ([\#518](https://github.com/popov-lab/bmm/issues/518)) now shrinks
+  through such an [`update()`](https://rdrr.io/r/stats/update.html)
+  ([\#520](https://github.com/popov-lab/bmm/issues/520)).
+- [`cswald()`](https://venpopov.com/bmm/reference/cswald.md) fits with
+  very fast responses no longer fail to start (cmdstanr: “Unable to
+  retrieve the metadata”; rstan: “sampling not done”). The initial value
+  of `ndt` now stays below your fastest response time
+  ([\#548](https://github.com/popov-lab/bmm/issues/548)).
+- A prior you set on a coefficient the model constrains, such as the
+  intercept of a parameter fixed in an
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md) formula
+  (`bmf(g = 0.5)`), was replaced by the constraint without notice. The
+  fit still uses the constraint, but bmm now prints a message naming
+  each such coefficient, your prior and the constant used instead.
+  `update(fit, prior = )` now behaves the same; before, a prior given
+  there replaced the constraint, so the refit sampled a coefficient the
+  model fixes. Your prior on that coefficient has no effect, so you can
+  remove it from `prior`
+  ([\#549](https://github.com/popov-lab/bmm/issues/549)).
+- A prior set on the intercept of a fixed parameter, one fixed in the
+  formula (`bmf(kappa = 3)`) or by the model (such as `mu` in
+  [`sdm()`](https://venpopov.com/bmm/reference/sdm.md)), freed that
+  parameter without notice: the fit sampled it under your prior instead
+  of keeping the constant. The parameter now keeps its constant and bmm
+  prints a message naming your prior;
+  [`update()`](https://rdrr.io/r/stats/update.html) of a fit made before
+  this fix restores the constant too. To estimate the parameter, give it
+  a formula (`kappa ~ 1`); otherwise remove that prior from `prior`
+  ([\#549](https://github.com/popov-lab/bmm/issues/549)).
+- After [`update()`](https://rdrr.io/r/stats/update.html) with a new
+  formula, a parameter that gains or loses its intercept, such as
+  `kappa ~ 0 + cond` updated to `kappa ~ 1 + cond`, now gets the priors
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) gives that
+  formula. It kept bmm’s default priors for the old formula, so the
+  effect of `cond` got the prior meant for its levels. Your own priors
+  from [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) and from
+  earlier [`update()`](https://rdrr.io/r/stats/update.html) calls are
+  kept. Fits saved with earlier versions keep the previous behaviour;
+  refit them with [`bmm()`](https://venpopov.com/bmm/reference/bmm.md)
+  for the new one
+  ([\#538](https://github.com/popov-lab/bmm/issues/538)).
+- `update(formula. = )` with a formula that uses a column the fit did
+  not keep now stops with a message that names the column and says to
+  pass your data as `newdata`. It failed with brms’s “can neither be
+  found in ‘data’ nor in ‘data2’”, which does not say so
+  ([\#552](https://github.com/popov-lab/bmm/issues/552)).
+- A custom [`m3()`](https://venpopov.com/bmm/reference/m3.md) fit can
+  now be updated to a formula with other activation parameters, for
+  example `dist ~ b + e` after `dist ~ b + d`, also when `d` was fixed
+  to a constant. It stopped with “The parameter ‘d’ is not a valid
+  distributional or non-linear parameter”
+  ([\#552](https://github.com/popov-lab/bmm/issues/552)).
+- [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html),
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html),
+  [`predict()`](https://rdrr.io/r/stats/predict.html),
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) and
+  [`loo()`](https://mc-stan.org/loo/reference/loo.html) now take
+  `newdata` in the layout you gave to
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) for every model.
+  Before, models such as
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md),
+  [`m3()`](https://venpopov.com/bmm/reference/m3.md), the SDT models,
+  [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.md) and
+  [`imm()`](https://venpopov.com/bmm/reference/imm.md) stopped with
+  “Missing variables” or “can neither be found in ‘data’ nor in
+  ‘data2’”. For these models, `newdata` needs the columns
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) needs, including
+  the response for
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  ([\#552](https://github.com/popov-lab/bmm/issues/552)).
+- Clearer errors from
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md) and its helpers
+  ([\#559](https://github.com/popov-lab/bmm/issues/559)). A malformed
+  `links` list, a link on a simplex parameter, and a misspelled link
+  name in a model with `restrictions` (which could silently set another
+  parameter’s link) now say what is wrong.
+  [`mpt_tree()`](https://venpopov.com/bmm/reference/mpt_tree.md) refuses
+  a formula inside a branch.
+  [`mpt_data_reshape()`](https://venpopov.com/bmm/reference/mpt_data_reshape.md)
+  and [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) report counts
+  above 2,147,483,647, and an `id` that is a count column, instead of
+  producing `NA`. [`ppp()`](https://venpopov.com/bmm/reference/ppp.md)
+  checks `by` before computing anything.
+  [`native_parameters()`](https://venpopov.com/bmm/reference/native_parameters.md)
+  no longer returns the stick-breaking components (`gAraw`) of a simplex
+  group unless `pars` names them.
+- [`mpt()`](https://venpopov.com/bmm/reference/mpt.md) and
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) now refuse a tree
+  whose branches leave (0, 1\] between the old test points, such as
+  `7 * u * (1 - u)^2` or a product of three members of a four-member
+  simplex group, and a message names any branch whose range they can
+  only search. When your covariate values leave the model unidentified,
+  for example with one value per tree,
+  [`bmm()`](https://venpopov.com/bmm/reference/bmm.md) and
+  [`bmm_data_check()`](https://venpopov.com/bmm/reference/bmm_data_check.md)
+  now warn and name the covariate; give such trees rows with different
+  covariate values
+  ([\#560](https://github.com/popov-lab/bmm/issues/560)).
+- `pp_check(group = )` on a multinomial fit and
+  [`conditional_effects()`](https://venpopov.com/bmm/reference/conditional_effects.bmmfit.md)
+  no longer ignore your predictors whose names start with `Idx_`, `n_`,
+  `LureIdx` or `Item<number>_`, or are named `inv_ss` or `expS`.
+  [`pp_check()`](https://venpopov.com/bmm/reference/pp_check.bmmfit.md)
+  warned that the column was not a predictor and pooled the plot;
+  [`conditional_effects()`](https://venpopov.com/bmm/reference/conditional_effects.bmmfit.md)
+  dropped the panel, and those of its interactions, without a message.
+  bmm now hides only the columns it creates itself
+  ([\#550](https://github.com/popov-lab/bmm/issues/550)).
+- [`fit_info()`](https://venpopov.com/bmm/reference/fit_info.md) reports
+  every chain of a fit combined with
+  [`brms::combine_models()`](https://paulbuerkner.com/brms/reference/combine_models.html).
+  It listed the first fit’s chains only: for
+  `combine_models(fit, update(fit, seed = 2))`, `fit_info("time")` had
+  one row for two chains. It also works for `rstan` fits now, where it
+  returned `NULL`, and `what = "step_size"` returns the adapted step
+  size per chain. `fit_info("time_mean")` no longer returns a mean
+  `chain_id` ([\#555](https://github.com/popov-lab/bmm/issues/555)).
+- [`rezdm()`](https://venpopov.com/bmm/reference/ezdm_dist.md) now
+  accepts a vector `n_trials`, one value per draw, as
+  [`dezdm()`](https://venpopov.com/bmm/reference/ezdm_dist.md) does. It
+  stopped with “the condition has length \> 1”
+  ([\#564](https://github.com/popov-lab/bmm/issues/564)).
+- [`ddm()`](https://venpopov.com/bmm/reference/ddm.md) and
+  [`cswald()`](https://venpopov.com/bmm/reference/cswald.md) now check
+  response times and responses alike
+  ([\#557](https://github.com/popov-lab/bmm/issues/557)). A factor or
+  date-time response time now stops with a message asking for a number.
+  Before, a factor stopped
+  [`cswald()`](https://venpopov.com/bmm/reference/cswald.md) with
+  “missing value where TRUE/FALSE needed”; a date-time, and a factor in
+  [`ddm()`](https://venpopov.com/bmm/reference/ddm.md), failed later in
+  brms. A response time of 0 now stops too. In
+  [`ddm()`](https://venpopov.com/bmm/reference/ddm.md),
+  `cswald(version = "crisk")` and for correct responses in
+  [`cswald()`](https://venpopov.com/bmm/reference/cswald.md), such a fit
+  failed as sampling started; an error response at 0 in
+  [`cswald()`](https://venpopov.com/bmm/reference/cswald.md) was
+  ignored. Remove these rows.
+  [`ddm()`](https://venpopov.com/bmm/reference/ddm.md) accepts a factor
+  response labelled “upper” and “lower”.
+- [`sdm()`](https://venpopov.com/bmm/reference/sdm.md) fits
+  overestimated the likelihood when `c` and `kappa` were both large,
+  without a warning, and pulled the estimates there toward larger `c`
+  and `kappa`. On simulated data the estimates drifted far above the
+  true values. The likelihood is now accurate across the parameter
+  range, and fits take about as long as before. Refit
+  [`sdm()`](https://venpopov.com/bmm/reference/sdm.md) models whose
+  estimates reach large `c` and `kappa`. Fits such as the one in the SDM
+  article change no more than sampling noise
+  ([\#615](https://github.com/popov-lab/bmm/issues/615)).
+- Fits with a random slope on a predictor such as a trial number, an
+  identity link with random effects, or
+  [`mo()`](https://paulbuerkner.com/brms/reference/mo.html) or
+  [`s()`](https://paulbuerkner.com/brms/reference/s.html) terms no
+  longer stop with “Rejecting initial value” when your data bound a
+  parameter, such as `ndt`, which must stay below your fastest response
+  time. [`ddm()`](https://venpopov.com/bmm/reference/ddm.md) now starts
+  `ndt` below your fastest response time, as
+  [`cswald()`](https://venpopov.com/bmm/reference/cswald.md) does
+  ([\#621](https://github.com/popov-lab/bmm/issues/621)).
+
+#### Other changes
+
+- [`cswald()`](https://venpopov.com/bmm/reference/cswald.md) now warns
+  when the prior for `ndt` puts most of its mass at or above your
+  fastest response time, which `ndt` must stay below. Such a fit can
+  fail to start. The warning suggests a prior with a lower location;
+  filtering out anticipations helps too
+  ([\#548](https://github.com/popov-lab/bmm/issues/548)).
+- Model constructors such as
+  [`sdm()`](https://venpopov.com/bmm/reference/sdm.md) and
+  [`mpt()`](https://venpopov.com/bmm/reference/mpt.md) now warn about an
+  argument they do not use, such as `mpt(trees, foo = 1)` or a misspelt
+  `lnks =`, which they ignored without a message. They also warn about
+  an extra argument given by position; give it by name. The warning
+  names the argument and, for a misspelling, the one you probably meant.
+  In bmm 1.6.0 this becomes an error; remove such arguments from your
+  calls ([\#552](https://github.com/popov-lab/bmm/issues/552)).
+- [`cswald()`](https://venpopov.com/bmm/reference/cswald.md) now drops
+  rows with a missing response time or response and warns, as
+  [`ddm()`](https://venpopov.com/bmm/reference/ddm.md) does. It stopped
+  and asked you to remove them
+  ([\#557](https://github.com/popov-lab/bmm/issues/557)).
+- In bmm 1.6.0 the default of `log` in
+  [`dm3()`](https://venpopov.com/bmm/reference/m3dist.md),
+  [`dmpt()`](https://venpopov.com/bmm/reference/mptdist.md),
+  [`dddm()`](https://venpopov.com/bmm/reference/ddm_dist.md),
+  [`dcswald()`](https://venpopov.com/bmm/reference/cswald_dist.md) and
+  [`dezdm()`](https://venpopov.com/bmm/reference/ezdm_dist.md) changes
+  from `TRUE` to `FALSE`, as in base R and the other density functions
+  of bmm. A call without `log` then returns the density, not the log
+  density. Nothing changes in 1.4.2 or 1.5.0. Pass `log = TRUE` to keep
+  the log density
+  ([\#553](https://github.com/popov-lab/bmm/issues/553)).
+- bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or
+  older, [`update()`](https://rdrr.io/r/stats/update.html) can fail on a
+  fit saved with an older CmdStanR, with
+  `argument "show_progress_bar" is missing`. Install brms from GitHub
+  with `remotes::install_github("paul-buerkner/brms")` until a newer
+  brms is on CRAN, or call `update(fit, recompile = TRUE)`.
+  [`bmm_setup()`](https://venpopov.com/bmm/reference/bmm_setup.md) now
+  warns about this combination.
+
+#### Documentation
+
+- `citation("bmm")` and
+  [`?bmm`](https://venpopov.com/bmm/reference/bmm.md) now cite the bmm
+  tutorial as published in Behavior Research Methods, with its volume,
+  issue and article number;
+  [`?bmm`](https://venpopov.com/bmm/reference/bmm.md) cited the 2023
+  preprint ([\#432](https://github.com/popov-lab/bmm/issues/432)).
+
 ## bmm 1.4.1
 
 CRAN release: 2026-10-16

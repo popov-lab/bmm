@@ -21,7 +21,16 @@ psdm(
   parametrization = "sqrtexp"
 )
 
-qsdm(p, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
+qsdm(
+  p,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  lower.tail = TRUE,
+  log.p = FALSE,
+  lower.bound = -pi,
+  parametrization = "sqrtexp"
+)
 
 rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 ```
@@ -82,9 +91,7 @@ rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 ## Value
 
 `dsdm` gives the density, `psdm` gives the distribution function, `qsdm`
-gives the quantile function, `rsdm` generates random deviates, and
-`.dsdm_integrate` is a helper function for calculating the density of
-the SDM distribution.
+gives the quantile function, and `rsdm` generates random deviates.
 
 ## Details
 
@@ -105,11 +112,19 @@ and
 Since responses are on the circle, the cumulative distribution function
 requires you to choose a lower bound of integration. The default is
 \\-\pi\\, as for the brms::pvon_mises() function but you can choose any
-value in the argument `lower_bound` of `psdm`. Another useful choice is
-the mean of the response distribution minus \\\pi\\, e.g.
-`lower_bound = mu-pi`. This is the default in `circular::pvonmises()`,
+value in the argument `lower.bound` of `psdm` and `qsdm`. Another useful
+choice is the mean of the response distribution minus \\\pi\\, e.g.
+`lower.bound = mu-pi`. This is the default in `circular::pvonmises()`,
 and it ensures that 50% of the cumulative probability mass is below the
 mean of the response distribution.
+
+`psdm` is 0 at `lower.bound` and 1 at `lower.bound + 2 * pi`; a `q`
+outside this range is wrapped around the circle. `qsdm` inverts `psdm`
+by root finding and returns values between `lower.bound` and
+`lower.bound + 2 * pi`. Values of `p` outside \[0, 1\] give `NaN` with a
+warning. Missing values give `NA`; `NaN`, infinite values and positions
+(`q`, `mu`, `lower.bound`) beyond 1e8 in absolute value give `NaN`, as
+does the bessel parametrization for `kappa` above 1e5.
 
 ## References
 
