@@ -148,9 +148,10 @@ test_that("a single intensity level centres the priors on it", {
   expect_equal(prior_of(pr, "midpoint"), "normal(40, 20)")
 })
 
-test_that("count data are treated as aggregated by bmm_data_check()", {
-  expect_true(uses_aggregate_data(psychometric("k", "x", n_trials = "n")))
-  expect_false(uses_aggregate_data(psychometric("y", "x")))
+test_that("bmm_data_check() counts the trials of count rows and one per 0/1 row", {
+  counts <- data.frame(k = c(3, 5), n = c(10, 12), x = 1:2)
+  expect_equal(data_trials(psychometric("k", "x", n_trials = "n"), counts), c(10, 12))
+  expect_null(data_trials(psychometric("y", "x"), counts))
 })
 
 test_that("inits for midpoint and width lie inside the data range", {
@@ -428,7 +429,7 @@ test_that("the four Stan families match dpsychometric() and keep finite gradient
   family_args <- paste("trials[n], x[n], guess_fixed[n], lapse_fixed[n],",
                        "dist_type, log_x, zmid, zspan")
   code <- glue(
-    "functions {{\n{read_lines2(file.path(sc_path, 'sdt_dist_funs.stan'))}\n",
+    "functions {{\n{read_lines2(file.path(sc_path, 'sdt_dist_functions.stan'))}\n",
     "{read_lines2(file.path(sc_path, 'psychometric_funs.stan'))}\n}}\n",
     "data {{\n  int N;\n  array[N] int y;\n  array[N] int trials;\n",
     "  vector[N] x;\n  vector[N] midpoint;\n  vector[N] width;\n",

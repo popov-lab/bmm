@@ -17,6 +17,28 @@ model_cases_imm <- function() {
       )
     ),
     init = list(imm = list(model = model, formula = re_formula, data = small_data())),
-    links = list(imm = list(model = model, settable = character(0)))
+    links = list(imm = list(model = model, settable = character(0))),
+    simulate = list(
+      imm_full = list(
+        model = imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
+                    set_size = "set_size", version = "full"),
+        pars = list(kappa = 2, a = -0.5, c = 0.5, s = 0.3), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, a ~ 1, c ~ 1, s ~ 1),
+        simulate_pars = list(mu1 = 0, kappa = 2, a = -0.5, c = 0.5, s = 0.3)
+      ),
+      imm_bsc = list(
+        model = imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
+                    set_size = "set_size", version = "bsc"),
+        pars = list(kappa = 2, c = 0.5, s = 0.3), design = nt_display_design(),
+        formula = bmf(kappa ~ 1, c ~ 1, s ~ 1),
+        simulate_pars = list(mu1 = 0, kappa = 2, c = 0.5, s = 0.3)
+      ),
+      imm_abc = list(
+        model = imm("y", nt_features = c("nt1", "nt2"), set_size = "set_size", version = "abc"),
+        pars = list(kappa = 2, a = -0.5, c = 0.5), design = nt_display_design()[1:5],
+        formula = bmf(kappa ~ 1, a ~ 1, c ~ 1),
+        simulate_pars = list(mu1 = 0, kappa = 2, a = -0.5, c = 0.5)
+      )
+    )
   )
 }

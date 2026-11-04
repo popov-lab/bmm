@@ -384,6 +384,15 @@ built_data_columns.psychometric <- function(model) {
   )
 }
 
+# 0/1 rows are one trial each, so only count data need their trials read
+#' @exportS3Method
+data_trials.psychometric <- function(model, data) {
+  if (is.null(model$other_vars$n_trials)) {
+    return(NULL)
+  }
+  .row_trials(data, model$other_vars$n_trials)
+}
+
 #' @export
 check_data.psychometric <- function(model, data, formula) {
   ov <- model$other_vars
@@ -514,7 +523,7 @@ configure_model.psychometric <- function(model, data, formula) {
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
-    read_lines2(paste0(sc_path, "/sdt_dist_funs.stan")),
+    read_lines2(paste0(sc_path, "/sdt_dist_functions.stan")),
     read_lines2(paste0(sc_path, "/psychometric_funs.stan")),
     sep = "\n"
   )

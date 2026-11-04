@@ -13,6 +13,12 @@ model_cases_mixture2p <- function() {
       )
     ),
     init = list(mixture2p = list(model = model, formula = re_formula, data = small_data())),
-    links = list(mixture2p = list(model = model, settable = character(0)))
+    links = list(mixture2p = list(model = model, settable = character(0))),
+    simulate = list(
+      mixture2p = list(
+        model = model, pars = list(kappa = 2, thetat = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(kappa ~ 1, thetat ~ 1), simulate_pars = list(mu1 = 0, kappa = 2, thetat = 0.5)
+      )
+    )
   )
 }

@@ -7,9 +7,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Two-parameter mixture model by Zhang and Luck (2008).",
+      name = "Two-Parameter Mixture Model",
       citation = glue(
         "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
         representations in visual working memory. Nature, 453(7192), 233-235. \\
@@ -118,4 +118,17 @@ configure_model.mixture2p <- function(model, data, formula) {
   formula$family <- brms::mixture("von_mises", "von_mises", order = "none")
 
   nlist(formula, data)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.mixture2p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  y <- rmixture2p(nrow(design), mu = p$mu1, kappa = p$kappa, p_mem = p$thetat)
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }

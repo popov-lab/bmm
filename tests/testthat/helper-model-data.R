@@ -57,3 +57,16 @@ toy_mpt_data <- function() {
   data$new <- 50L - data$old
   data
 }
+
+# a display per trial for the non_targets models: set sizes 1 to 3, the
+# non-target locations and their distances to the cue, NA beyond the set size
+nt_display_design <- function(n = 90) {
+  design <- data.frame(
+    id = rep_len(1:2, n), set_size = rep_len(1:3, n),
+    nt1 = rep_len(c(1.2, -2.4, 0.6, 2.9, -0.8), n), nt2 = rep_len(c(-1.5, 2.1, -0.3, 1), n),
+    dist1 = rep_len(c(1, 2, 0.5), n), dist2 = rep_len(c(2, 0.5, 1.5, 3), n)
+  )
+  design[design$set_size < 2, c("nt1", "dist1")] <- NA
+  design[design$set_size < 3, c("nt2", "dist2")] <- NA
+  design
+}
