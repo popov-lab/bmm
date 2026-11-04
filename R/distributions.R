@@ -4342,8 +4342,8 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   if (.psychometric_sigmoids[[sigmoid]]$log_x) midpoint * exp(dx) else midpoint + dx
 }
 
-# log P(1) and log P(0) on the log scale, as in psychometric_log_lik() in
-# inst/stan_chunks/psychometric_funs.stan:
+# log P(1) and log P(0) on the log scale, as in psychometric_function_log_lik() in
+# inst/stan_chunks/psychometric_function_functions.stan:
 #   psi     = guess + (1 - guess) (1 - lapse) F(z)
 #   1 - psi = (1 - guess) (lapse + (1 - lapse) (1 - F(z)))
 # The probability scale rounds psi to 0 or 1 in the tails, where Stan stays
@@ -4376,13 +4376,13 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 
 #' @title Distribution functions for the psychometric function model
 #'
-#' @description Density and random generation for the [psychometric()] model:
+#' @description Density and random generation for the [psychometric_function()] model:
 #'   the number of positive responses ("yes", "correct", "longer") out of
 #'   `n_trials` at a stimulus intensity, a binomial with probability
 #'   \deqn{\psi(x) = \gamma + (1 - \gamma)(1 - \lambda) F(x),}{psi(x) = guess + (1 - guess) * (1 - lapse) * F(x),}
 #'   where \eqn{F} is the sigmoid with its midpoint and width.
 #'
-#' @name psychometric_dist
+#' @name psychometric_function_dist
 #'
 #' @param x Integer vector. Number of positive responses, between 0 and
 #'   `n_trials`.
@@ -4401,18 +4401,18 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   `1 - lapse * (1 - guess)`.
 #' @param n_trials Integer vector. Number of trials per observation (default
 #'   1, a single binary response).
-#' @param sigmoid The sigmoid \eqn{F}; see [psychometric()].
+#' @param sigmoid The sigmoid \eqn{F}; see [psychometric_function()].
 #' @param log Logical. If `TRUE`, returns the log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `intensity`,
 #'   `n_trials` and the parameters are recycled to this length.
 #'
-#' @return `dpsychometric()` returns the (log-)density, a binomial probability.
-#'   `rpsychometric()` returns an integer vector with the number of positive
+#' @return `dpsychometric_function()` returns the (log-)density, a binomial probability.
+#'   `rpsychometric_function()` returns an integer vector with the number of positive
 #'   responses per observation.
 #'
 #' @section Parameter scales:
 #' These functions take every argument on the **natural** scale, while
-#' [psychometric()] *estimates* `width` on the log scale and `guess` and `lapse`
+#' [psychometric_function()] *estimates* `width` on the log scale and `guess` and `lapse`
 #' on the logit scale (and `midpoint` on the log scale for the log-scale
 #' sigmoids). Transform a fitted value back before passing it here.
 #'
@@ -4430,16 +4430,16 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @export
 #' @examples
 #' # Probability of 7 correct out of 10 2AFC trials at the midpoint
-#' dpsychometric(7, intensity = 1, midpoint = 1, width = 2, guess = 0.5,
-#'               n_trials = 10)
+#' dpsychometric_function(7, intensity = 1, midpoint = 1, width = 2, guess = 0.5,
+#'                        n_trials = 10)
 #'
 #' # Simulate a method-of-constant-stimuli experiment with a Weibull observer
 #' dat <- data.frame(contrast = rep(c(0.01, 0.02, 0.04, 0.08, 0.16), 4))
-#' dat$n_correct <- rpsychometric(nrow(dat), dat$contrast, midpoint = 0.04,
-#'                                width = 2, guess = 0.5, lapse = 0.02,
-#'                                n_trials = 40, sigmoid = "weibull")
+#' dat$n_correct <- rpsychometric_function(nrow(dat), dat$contrast, midpoint = 0.04,
+#'                                         width = 2, guess = 0.5, lapse = 0.02,
+#'                                         n_trials = 40, sigmoid = "weibull")
 #' head(dat)
-dpsychometric <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
+dpsychometric_function <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
                           n_trials = 1,
                           sigmoid = c("normal", "logistic", "gumbel_min",
                                       "gumbel_max", "weibull", "lognormal",
@@ -4461,9 +4461,9 @@ dpsychometric <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
 }
 
 
-#' @rdname psychometric_dist
+#' @rdname psychometric_function_dist
 #' @export
-rpsychometric <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
+rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
                           n_trials = 1,
                           sigmoid = c("normal", "logistic", "gumbel_min",
                                       "gumbel_max", "weibull", "lognormal",

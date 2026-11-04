@@ -2,7 +2,7 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.model_psychometric <- function(response = NULL, intensity = NULL,
+.model_psychometric_function <- function(response = NULL, intensity = NULL,
                                 n_trials = NULL, sigmoid = "normal",
                                 guess = NULL, lapse = NULL, call = NULL, ...) {
   log_x <- .psychometric_sigmoids[[sigmoid]]$log_x
@@ -63,9 +63,9 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(intensity, n_trials, sigmoid, guess, lapse),
-      domain = "Psychophysics",
-      task = "Detection or discrimination at varying stimulus intensity",
-      name = "Psychometric function",
+      domain = "Perception",
+      task = "Detection, recognition and confidence judgments",
+      name = "Psychometric Function",
       citation = c(
         glue(
           "Wichmann, F. A., & Hill, N. J. (2001). The psychometric function: ",
@@ -90,7 +90,7 @@
         list(guess = c(0.02, 0.1), lapse = c(0.01, 0.05))
       )[names(parameters)]
     ),
-    class = c("bmmodel", "psychometric"),
+    class = c("bmmodel", "psychometric_function"),
     call = call
   )
   set_links(out, NULL)
@@ -100,18 +100,18 @@
 # they would no longer fit the scale they describe under another link, and the
 # log-scale sigmoids need a positive midpoint
 #' @exportS3Method
-settable_links.psychometric <- function(model) {
+settable_links.psychometric_function <- function(model) {
   character(0)
 }
 
 
 #' @title Psychometric Function Model
-#' @name psychometric
+#' @name psychometric_function
 #' @description Estimates the psychometric function, the probability of a
 #'   positive response as a function of stimulus intensity, with its midpoint,
 #'   width, guess rate and lapse rate, from trial-level binary responses or
 #'   from response counts per stimulus level.
-#' @details `r model_docs(.model_psychometric())`
+#' @details `r model_docs(.model_psychometric_function())`
 #'
 #' The default links listed above are those of the default sigmoid; `midpoint`
 #' takes a log link for `"weibull"`, `"lognormal"` and `"loglogistic"`.
@@ -205,7 +205,7 @@ settable_links.psychometric <- function(model) {
 #'   Fitting, sampling, and goodness of fit. \emph{Perception & Psychophysics},
 #'   \emph{63}(8), 1293--1313. \doi{10.3758/BF03194544}
 #'
-#' @seealso [dpsychometric()], [rpsychometric()], [psychometric_threshold()],
+#' @seealso [dpsychometric_function()], [rpsychometric_function()], [psychometric_threshold()],
 #'   and [sdt_mafc()] for m-AFC accuracy at a single stimulus level.
 #' @keywords bmmodel
 #' @export
@@ -214,13 +214,13 @@ settable_links.psychometric <- function(model) {
 #' # 2AFC contrast detection, 40 trials per level, 10 observers
 #' dat <- expand.grid(contrast = c(0.01, 0.02, 0.04, 0.08, 0.16), id = 1:10)
 #' dat$n_trials <- 40L
-#' dat$n_correct <- rpsychometric(nrow(dat), dat$contrast, midpoint = 0.04,
-#'                                width = 2, guess = 0.5, lapse = 0.02,
-#'                                n_trials = dat$n_trials, sigmoid = "weibull")
+#' dat$n_correct <- rpsychometric_function(nrow(dat), dat$contrast, midpoint = 0.04,
+#'                                         width = 2, guess = 0.5, lapse = 0.02,
+#'                                         n_trials = dat$n_trials, sigmoid = "weibull")
 #'
-#' model <- psychometric(response = "n_correct", intensity = "contrast",
-#'                       n_trials = "n_trials", sigmoid = "weibull",
-#'                       guess = 0.5)
+#' model <- psychometric_function(response = "n_correct", intensity = "contrast",
+#'                                n_trials = "n_trials", sigmoid = "weibull",
+#'                                guess = 0.5)
 #'
 #' fit <- bmm(
 #'   formula = bmf(midpoint ~ 1 + (1 | id), width ~ 1, lapse ~ 1),
@@ -233,11 +233,11 @@ settable_links.psychometric <- function(model) {
 #' # contrast at 75% correct, and the slope there
 #' psychometric_threshold(fit, p = 0.75)
 #' }
-psychometric <- function(response, intensity, n_trials = NULL,
-                         sigmoid = c("normal", "logistic", "gumbel_min",
-                                     "gumbel_max", "weibull", "lognormal",
-                                     "loglogistic"),
-                         guess = NULL, lapse = NULL, ...) {
+psychometric_function <- function(response, intensity, n_trials = NULL,
+                                  sigmoid = c("normal", "logistic", "gumbel_min",
+                                              "gumbel_max", "weibull", "lognormal",
+                                              "loglogistic"),
+                                  guess = NULL, lapse = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...))
   stop_missing_args()
@@ -255,9 +255,9 @@ psychometric <- function(response, intensity, n_trials = NULL,
     )
   }
 
-  .model_psychometric(response = response, intensity = intensity,
-                      n_trials = n_trials, sigmoid = sigmoid,
-                      guess = guess, lapse = lapse, call = call, ...)
+  .model_psychometric_function(response = response, intensity = intensity,
+                               n_trials = n_trials, sigmoid = sigmoid,
+                               guess = guess, lapse = lapse, call = call, ...)
 }
 
 
@@ -330,7 +330,7 @@ psychometric <- function(response, intensity, n_trials = NULL,
 }
 
 #' @export
-check_model.psychometric <- function(model, data = NULL, formula = NULL) {
+check_model.psychometric_function <- function(model, data = NULL, formula = NULL) {
   x_range <- .psychometric_axis_range(model, data, formula)
   if (!is.null(x_range)) {
     log_x <- .psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x
@@ -349,7 +349,7 @@ check_model.psychometric <- function(model, data = NULL, formula = NULL) {
 # the intensity axis exactly as width does, and the two trade off along a
 # ridge; on width it bends the sigmoid into a curve that is no longer one
 #' @export
-check_formula.psychometric <- function(model, data, formula) {
+check_formula.psychometric_function <- function(model, data, formula) {
   intensity <- model$other_vars$intensity
   uses_intensity <- vapply(rhs_vars(formula, collapse = FALSE),
                            function(x) intensity %in% x, logical(1))
@@ -373,7 +373,7 @@ check_formula.psychometric <- function(model, data, formula) {
 # Counts in n_trials and a rate fixed by a column are read from the user's own
 # columns, so check_data() builds no column for them
 #' @exportS3Method
-built_data_columns.psychometric <- function(model) {
+built_data_columns.psychometric_function <- function(model) {
   ov <- model$other_vars
   c(
     if (is.null(ov$n_trials)) "psy_trials",
@@ -386,7 +386,7 @@ built_data_columns.psychometric <- function(model) {
 
 # 0/1 rows are one trial each, so only count data need their trials read
 #' @exportS3Method
-data_trials.psychometric <- function(model, data) {
+data_trials.psychometric_function <- function(model, data) {
   if (is.null(model$other_vars$n_trials)) {
     return(NULL)
   }
@@ -394,7 +394,7 @@ data_trials.psychometric <- function(model, data) {
 }
 
 #' @export
-check_data.psychometric <- function(model, data, formula) {
+check_data.psychometric_function <- function(model, data, formula) {
   ov <- model$other_vars
   resp_var <- model$resp_vars$response
 
@@ -485,7 +485,7 @@ check_data.psychometric <- function(model, data, formula) {
 ############################################################################# !
 
 #' @export
-bmf2bf.psychometric <- function(model, formula) {
+bmf2bf.psychometric_function <- function(model, formula) {
   ov <- model$other_vars
   rate_col <- function(rate) {
     if (is.character(ov[[rate]])) ov[[rate]] else paste0("psy_", rate)
@@ -503,7 +503,7 @@ bmf2bf.psychometric <- function(model, formula) {
 ############################################################################# !
 
 #' @export
-configure_model.psychometric <- function(model, data, formula) {
+configure_model.psychometric_function <- function(model, data, formula) {
   formula <- bmf2bf(model, formula)
 
   rates <- intersect(c("guess", "lapse"), names(model$parameters))
@@ -514,9 +514,9 @@ configure_model.psychometric <- function(model, data, formula) {
     links = c("identity", unlist(model$links[dpars], use.names = FALSE)),
     type = "int",
     loop = TRUE,
-    log_lik = log_lik_psychometric,
-    posterior_predict = posterior_predict_psychometric,
-    posterior_epred = posterior_epred_psychometric,
+    log_lik = log_lik_psychometric_function,
+    posterior_predict = posterior_predict_psychometric_function,
+    posterior_epred = posterior_epred_psychometric_function,
     vars = c("trials[n]", "vreal1[n]", "vreal2[n]", "vreal3[n]",
              "vint1[n]", "vint2[n]", "psy_zmid", "psy_zspan")
   )
@@ -524,7 +524,7 @@ configure_model.psychometric <- function(model, data, formula) {
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(
     read_lines2(paste0(sc_path, "/sdt_dist_functions.stan")),
-    read_lines2(paste0(sc_path, "/psychometric_funs.stan")),
+    read_lines2(paste0(sc_path, "/psychometric_function_functions.stan")),
     sep = "\n"
   )
   z <- .psychometric_z_constants(model$other_vars$sigmoid)
@@ -535,7 +535,7 @@ configure_model.psychometric <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
-# psychometric_funs.stan has one family for each combination of estimated
+# psychometric_function_functions.stan has one family for each combination of estimated
 # rates; a fixed rate reaches it as data, in vreal2 (guess) or vreal3 (lapse)
 .psychometric_family_name <- function(rates) {
   suffix <- switch(paste(rates, collapse = "+"),
@@ -544,7 +544,7 @@ configure_model.psychometric <- function(model, data, formula) {
     "lapse" = "_fixguess",
     "_fixboth"
   )
-  paste0("psychometric", suffix)
+  paste0("psychometric_function", suffix)
 }
 
 
@@ -579,19 +579,19 @@ configure_model.psychometric <- function(model, data, formula) {
   )
 }
 
-log_lik_psychometric <- function(i, prep) {
+log_lik_psychometric_function <- function(i, prep) {
   lp <- .psychometric_row_log_probs(i, prep)
   y <- prep$data$Y[i]
   n <- prep$data$trials[i]
   lchoose(n, y) + times_nonzero(y, lp$one) + times_nonzero(n - y, lp$zero)
 }
 
-posterior_predict_psychometric <- function(i, prep, ...) {
+posterior_predict_psychometric_function <- function(i, prep, ...) {
   lp <- .psychometric_row_log_probs(i, prep)
   stats::rbinom(prep$ndraws, prep$data$trials[i], exp(lp$one))
 }
 
-posterior_epred_psychometric <- function(prep) {
+posterior_epred_psychometric_function <- function(prep) {
   rate <- function(name) {
     if (name %in% names(prep$dpars)) {
       prep$dpars[[name]]
@@ -618,7 +618,7 @@ posterior_epred_psychometric <- function(prep) {
 #' Thresholds and slopes of a fitted psychometric function
 #'
 #' Computes, per posterior draw and condition, the stimulus intensity at which
-#' a [psychometric()] fit reaches a target response probability, the slope of
+#' a [psychometric_function()] fit reaches a target response probability, the slope of
 #' the psychometric function there, and the guess and lapse rates, including the
 #' lapse rate as Wichmann and Hill (2001) define it.
 #'
@@ -640,7 +640,7 @@ posterior_epred_psychometric <- function(prep) {
 #' needs `guess` and `lapse` constant along the intensity axis, so a fit whose
 #' formula predicts either by the intensity is refused.
 #'
-#' @param fit A `bmmfit` object returned by [bmm()] with a [psychometric()]
+#' @param fit A `bmmfit` object returned by [bmm()] with a [psychometric_function()]
 #'   model.
 #' @param p Numeric vector of target response probabilities, each strictly
 #'   between 0 and 1. The default 0.75 is the conventional 2AFC threshold.
@@ -669,21 +669,21 @@ posterior_epred_psychometric <- function(prep) {
 #'   Fitting, sampling, and goodness of fit. \emph{Perception & Psychophysics},
 #'   \emph{63}(8), 1293--1313. \doi{10.3758/BF03194544}
 #'
-#' @seealso [psychometric()]
+#' @seealso [psychometric_function()]
 #' @export
 #' @examples
 #' \dontrun{
 #' dat <- expand.grid(contrast = c(0.01, 0.02, 0.04, 0.08, 0.16),
 #'                    cond = c("a", "b"))
 #' dat$n_trials <- 60L
-#' dat$n_correct <- rpsychometric(nrow(dat), dat$contrast,
-#'                                midpoint = ifelse(dat$cond == "a", 0.03, 0.05),
-#'                                width = 2, guess = 0.5, lapse = 0.02,
-#'                                n_trials = 60, sigmoid = "weibull")
+#' dat$n_correct <- rpsychometric_function(nrow(dat), dat$contrast,
+#'                                         midpoint = ifelse(dat$cond == "a", 0.03, 0.05),
+#'                                         width = 2, guess = 0.5, lapse = 0.02,
+#'                                         n_trials = 60, sigmoid = "weibull")
 #' fit <- bmm(
 #'   bmf(midpoint ~ 0 + cond, width ~ 1, lapse ~ 1), dat,
-#'   psychometric("n_correct", "contrast", "n_trials", sigmoid = "weibull",
-#'                guess = 0.5),
+#'   psychometric_function("n_correct", "contrast", "n_trials", sigmoid = "weibull",
+#'                         guess = 0.5),
 #'   cores = 4, backend = "cmdstanr"
 #' )
 #' thr <- psychometric_threshold(fit, p = c(0.75, 0.9))
@@ -698,8 +698,8 @@ psychometric_threshold <- function(fit, p = 0.75, conditions = NULL,
                                    probs = c(0.025, 0.975), ...) {
   .sdt_check_args(fit, conditions, probs, ...)
   model <- fit$bmm$model
-  stopif(!inherits(model, "psychometric"),
-         "psychometric_threshold() is only available for psychometric() fits")
+  stopif(!inherits(model, "psychometric_function"),
+         "psychometric_threshold() is only available for psychometric_function() fits")
   stopif(!is.numeric(p) || length(p) == 0 || anyNA(p) || any(p <= 0 | p >= 1),
          "p must be target probabilities strictly between 0 and 1")
 
@@ -857,7 +857,7 @@ print.bmm_psychometric_threshold <- function(x, ...) {
 # midpoint is the 50% point of the sigmoid, which is a threshold only in
 # yes/no tasks, and the lapse rate psignifit reports is lapse * (1 - guess)
 #' @export
-summary_notes.psychometric <- function(model, x) {
+summary_notes.psychometric_function <- function(model, x) {
   paste(
     "Note: midpoint is where the sigmoid F is 0.5, not a performance threshold,",
     "and lapse is the share of\n      lapse trials; the Wichmann-Hill lapse",

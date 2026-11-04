@@ -24,8 +24,8 @@ psy_count_data <- function() {
 # MODEL CONSTRUCTOR                                                      ####
 ############################################################################# !
 
-test_that("psychometric() estimates exactly the rates it is not given", {
-  pars <- function(...) names(psychometric("y", "x", ...)$parameters)
+test_that("psychometric_function() estimates exactly the rates it is not given", {
+  pars <- function(...) names(psychometric_function("y", "x", ...)$parameters)
   expect_equal(pars(), c("midpoint", "width", "guess", "lapse"))
   expect_equal(pars(guess = 0.5), c("midpoint", "width", "lapse"))
   expect_equal(pars(lapse = 0), c("midpoint", "width", "guess"))
@@ -33,7 +33,7 @@ test_that("psychometric() estimates exactly the rates it is not given", {
 })
 
 test_that("default priors, links and inits cover the estimated parameters only", {
-  model <- psychometric("y", "x", guess = 0.5)
+  model <- psychometric_function("y", "x", guess = 0.5)
   expect_named(model$links, names(model$parameters))
   expect_named(model$default_priors, names(model$parameters))
   expect_named(model$init_ranges, names(model$parameters))
@@ -41,7 +41,7 @@ test_that("default priors, links and inits cover the estimated parameters only",
 
 test_that("log-scale sigmoids give the midpoint a log link", {
   for (sigmoid in psy_sigmoids) {
-    model <- psychometric("y", "x", sigmoid = sigmoid)
+    model <- psychometric_function("y", "x", sigmoid = sigmoid)
     log_x <- sigmoid %in% c("weibull", "lognormal", "loglogistic")
     expect_equal(model$links$midpoint, if (log_x) "log" else "identity",
                  info = sigmoid)
@@ -49,21 +49,21 @@ test_that("log-scale sigmoids give the midpoint a log link", {
   }
 })
 
-test_that("psychometric() refuses rates outside [0, 1) and malformed values", {
+test_that("psychometric_function() refuses rates outside [0, 1) and malformed values", {
   for (bad in list(1, -0.1, c(0.5, 0.25), NA_real_, TRUE, c("a", "b"))) {
-    expect_error(psychometric("y", "x", guess = bad), "guess must be")
-    expect_error(psychometric("y", "x", lapse = bad), "lapse must be")
+    expect_error(psychometric_function("y", "x", guess = bad), "guess must be")
+    expect_error(psychometric_function("y", "x", lapse = bad), "lapse must be")
   }
-  expect_silent(psychometric("y", "x", guess = 0, lapse = 0))
+  expect_silent(psychometric_function("y", "x", guess = 0, lapse = 0))
 })
 
-test_that("psychometric() requires response and intensity", {
-  expect_error(psychometric("y"))
-  expect_error(psychometric(intensity = "x"))
+test_that("psychometric_function() requires response and intensity", {
+  expect_error(psychometric_function("y"))
+  expect_error(psychometric_function(intensity = "x"))
 })
 
-test_that("psychometric() refuses a link changed after construction", {
-  model <- psychometric("y", "x")
+test_that("psychometric_function() refuses a link changed after construction", {
+  model <- psychometric_function("y", "x")
   model$links$width <- "identity"
   expect_error(check_links(model), "cannot be changed")
 })
@@ -80,7 +80,7 @@ prior_of <- function(pr, dpar, class = "Intercept") {
 test_that("midpoint and width priors are scaled to the intensity range", {
   # range -1 to 2: centre 0.5, R = 3
   pr <- default_prior(bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
-                      psy_trial_data(), psychometric("y", "x"))
+                      psy_trial_data(), psychometric_function("y", "x"))
   expect_equal(prior_of(pr, "midpoint"), "normal(0.5, 1.5)")
   expect_equal(prior_of(pr, "width"), glue("normal({signif(log(1.5), 3)}, 1)"))
   expect_equal(prior_of(pr, "guess"), "normal(-3, 1.3)")
@@ -88,7 +88,7 @@ test_that("midpoint and width priors are scaled to the intensity range", {
 
   pr <- default_prior(bmf(midpoint ~ 0 + cond, width ~ 1, guess ~ 1, lapse ~ 1),
                       transform(psy_trial_data(), cond = factor(rep(1:2, 20))),
-                      psychometric("y", "x"))
+                      psychometric_function("y", "x"))
   expect_equal(prior_of(pr, "midpoint", "b"), "normal(0.5, 1.5)")
 })
 
@@ -97,7 +97,7 @@ test_that("rows without a response do not widen the prior range", {
   dat$y[dat$x == 2] <- NA
   # brms fits x from -1 to 1: centre 0, R = 2
   pr <- suppressWarnings(default_prior(
-    bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1), dat, psychometric("y", "x")
+    bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1), dat, psychometric_function("y", "x")
   ))
   expect_equal(prior_of(pr, "midpoint"), "normal(0, 1)")
 })
@@ -107,22 +107,22 @@ test_that("rows with a missing predictor do not widen the prior range", {
   dat$cond[dat$x == 2] <- NA
   # brms fits x from -1 to 1: centre 0, R = 2
   pr <- suppressWarnings(default_prior(
-    bmf(midpoint ~ 1 + cond, width ~ 1, guess ~ 1, lapse ~ 1), dat, psychometric("y", "x")
+    bmf(midpoint ~ 1 + cond, width ~ 1, guess ~ 1, lapse ~ 1), dat, psychometric_function("y", "x")
   ))
   expect_equal(prior_of(pr, "midpoint"), "normal(0, 1)")
 })
 
 test_that("data given as a list get the priors of the data frame", {
   formula <- bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1)
-  model <- psychometric("y", "x")
+  model <- psychometric_function("y", "x")
   expect_equal(prior_of(default_prior(formula, as.list(psy_trial_data()), model), "midpoint"),
                prior_of(default_prior(formula, psy_trial_data(), model), "midpoint"))
 })
 
 test_that("log-scale sigmoids scale their priors to the log range", {
   dat <- psy_count_data()
-  model <- psychometric("n_correct", "contrast", n_trials = "n_trials",
-                        sigmoid = "weibull", guess = 0.5)
+  model <- psychometric_function("n_correct", "contrast", n_trials = "n_trials",
+                                 sigmoid = "weibull", guess = 0.5)
   pr <- default_prior(bmf(midpoint ~ 1, width ~ 1, lapse ~ 1),
                       dat, model)
   log_range <- log(c(0.01, 0.16))
@@ -135,7 +135,7 @@ test_that("log-scale sigmoids scale their priors to the log range", {
 test_that("a user prior on the midpoint replaces the data-scaled default", {
   user <- brms::set_prior("normal(0, 5)", class = "Intercept", dpar = "midpoint")
   fit <- bmm(bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
-             psy_trial_data(), psychometric("y", "x"), prior = user,
+             psy_trial_data(), psychometric_function("y", "x"), prior = user,
              backend = "mock", mock_fit = 1, rename = FALSE)
   expect_equal(prior_of(fit$prior, "midpoint"), "normal(0, 5)")
 })
@@ -143,24 +143,35 @@ test_that("a user prior on the midpoint replaces the data-scaled default", {
 test_that("a single intensity level centres the priors on it", {
   pr <- suppressWarnings(default_prior(
     bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
-    transform(psy_trial_data(), x = 40), psychometric("y", "x")
+    transform(psy_trial_data(), x = 40), psychometric_function("y", "x")
   ))
   expect_equal(prior_of(pr, "midpoint"), "normal(40, 20)")
 })
 
 test_that("bmm_data_check() counts the trials of count rows and one per 0/1 row", {
   counts <- data.frame(k = c(3, 5), n = c(10, 12), x = 1:2)
-  expect_equal(data_trials(psychometric("k", "x", n_trials = "n"), counts), c(10, 12))
-  expect_null(data_trials(psychometric("y", "x"), counts))
+  expect_equal(data_trials(psychometric_function("k", "x", n_trials = "n"), counts), c(10, 12))
+  expect_null(data_trials(psychometric_function("y", "x"), counts))
+})
+
+test_that("0/1 rows keep the model's own trial column, outside the count models' trial layer", {
+  model <- psychometric_function("y", "x")
+  expect_false(is_trial_level(model))
+  dat <- transform(psy_trial_data(), y = as.logical(y), nTrials = 7L)
+  checked <- check_data(model, dat, bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1))
+  expect_identical(checked$y, as.integer(dat$y))
+  expect_identical(unique(checked$psy_trials), 1L)
+  expect_identical(checked$nTrials, dat$nTrials)
+  expect_identical(nrow(checked), nrow(dat))
 })
 
 test_that("inits for midpoint and width lie inside the data range", {
-  model <- check_model(psychometric("y", "x"), psy_trial_data())
+  model <- check_model(psychometric_function("y", "x"), psy_trial_data())
   expect_true(all(model$init_ranges$midpoint >= -1 & model$init_ranges$midpoint <= 2))
   expect_true(all(model$init_ranges$width > 0 & model$init_ranges$width <= 3))
 
   model <- check_model(
-    psychometric("n_correct", "contrast", n_trials = "n_trials", sigmoid = "weibull"),
+    psychometric_function("n_correct", "contrast", n_trials = "n_trials", sigmoid = "weibull"),
     psy_count_data()
   )
   expect_true(all(model$init_ranges$midpoint >= 0.01 & model$init_ranges$midpoint <= 0.16))
@@ -179,11 +190,11 @@ psy_check <- function(model, data, formula = bmf(midpoint ~ 1, width ~ 1)) {
 test_that("trial-level responses must be 0/1, and logical ones are accepted", {
   dat <- psy_trial_data()
   dat$y[1] <- 2L
-  expect_error(psy_check(psychometric("y", "x"), dat), "must be 0/1")
+  expect_error(psy_check(psychometric_function("y", "x"), dat), "must be 0/1")
 
   dat <- psy_trial_data()
   dat$y <- dat$y == 1L
-  out <- psy_check(psychometric("y", "x"), dat)
+  out <- psy_check(psychometric_function("y", "x"), dat)
   expect_identical(out$y, as.integer(dat$y))
   expect_true(all(out$psy_trials == 1L))
 })
@@ -192,13 +203,13 @@ test_that("counts are checked against n_trials", {
   dat <- psy_count_data()
   dat$n_correct[1] <- 41L
   expect_error(
-    psy_check(psychometric("n_correct", "contrast", n_trials = "n_trials"), dat),
+    psy_check(psychometric_function("n_correct", "contrast", n_trials = "n_trials"), dat),
     "must not exceed"
   )
 })
 
 test_that("the intensity column is validated", {
-  model <- psychometric("y", "x")
+  model <- psychometric_function("y", "x")
   expect_error(psy_check(model, psy_trial_data()[, c("y", "id")]), "missing in the data")
   expect_error(psy_check(model, transform(psy_trial_data(), x = as.character(x))),
                "must be numeric")
@@ -213,18 +224,18 @@ test_that("the intensity column is validated", {
 
 test_that("log-scale sigmoids refuse non-positive intensities and name the linear twin", {
   expect_error(
-    psy_check(psychometric("y", "x", sigmoid = "weibull"), psy_trial_data()),
+    psy_check(psychometric_function("y", "x", sigmoid = "weibull"), psy_trial_data()),
     "must be positive.*'gumbel_min'"
   )
   expect_error(
-    psy_check(psychometric("y", "x", sigmoid = "lognormal"), psy_trial_data()),
+    psy_check(psychometric_function("y", "x", sigmoid = "lognormal"), psy_trial_data()),
     "'normal'"
   )
 })
 
 test_that("a rate column must hold probabilities in [0, 1)", {
-  model <- psychometric("n_correct", "contrast", n_trials = "n_trials",
-                        guess = "chance")
+  model <- psychometric_function("n_correct", "contrast", n_trials = "n_trials",
+                                 guess = "chance")
   expect_silent(psy_check(model, psy_count_data()))
   expect_error(psy_check(model, transform(psy_count_data(), chance = 1)),
                "guess rate column 'chance'")
@@ -234,20 +245,20 @@ test_that("a rate column must hold probabilities in [0, 1)", {
 
 test_that("reserved helper columns are announced before they are overwritten", {
   expect_warning(
-    psy_check(psychometric("y", "x"), transform(psy_trial_data(), psy_dist = 9)),
+    psy_check(psychometric_function("y", "x"), transform(psy_trial_data(), psy_dist = 9)),
     "psy_dist.*reserved"
   )
 })
 
 test_that("fixed rates reach the data as values, estimated ones as placeholders", {
-  out <- psy_check(psychometric("y", "x", guess = 0.5), psy_trial_data())
+  out <- psy_check(psychometric_function("y", "x", guess = 0.5), psy_trial_data())
   expect_true(all(out$psy_guess == 0.5))
   expect_true(all(out$psy_lapse == 0))
   expect_true(all(out$psy_logx == 0L))
 
   out <- psy_check(
-    psychometric("n_correct", "contrast", n_trials = "n_trials",
-                 sigmoid = "weibull", guess = "chance"),
+    psychometric_function("n_correct", "contrast", n_trials = "n_trials",
+                          sigmoid = "weibull", guess = "chance"),
     psy_count_data()
   )
   expect_false("psy_guess" %in% names(out))
@@ -257,7 +268,7 @@ test_that("fixed rates reach the data as values, estimated ones as placeholders"
 
 test_that("intensity is refused in the midpoint and width formulas only", {
   dat <- psy_trial_data()
-  model <- psychometric("y", "x")
+  model <- psychometric_function("y", "x")
   expect_error(
     bmm(bmf(midpoint ~ x, width ~ 1, guess ~ 1, lapse ~ 1), dat, model,
         backend = "mock", mock_fit = 1, rename = FALSE),
@@ -282,12 +293,14 @@ test_that("intensity is refused in the midpoint and width formulas only", {
 
 test_that("each combination of fixed rates compiles to its own family", {
   dat <- psy_count_data()
+  counts_model <- function(...) {
+    psychometric_function("n_correct", "contrast", "n_trials", ...)
+  }
   cases <- list(
-    psychometric = psychometric("n_correct", "contrast", "n_trials"),
-    psychometric_fixguess = psychometric("n_correct", "contrast", "n_trials", guess = 0.5),
-    psychometric_fixlapse = psychometric("n_correct", "contrast", "n_trials", lapse = 0),
-    psychometric_fixboth = psychometric("n_correct", "contrast", "n_trials",
-                                        guess = "chance", lapse = 0)
+    psychometric_function = counts_model(),
+    psychometric_function_fixguess = counts_model(guess = 0.5),
+    psychometric_function_fixlapse = counts_model(lapse = 0),
+    psychometric_function_fixboth = counts_model(guess = "chance", lapse = 0)
   )
   for (family in names(cases)) {
     model <- cases[[family]]
@@ -306,7 +319,7 @@ test_that("each combination of fixed rates compiles to its own family", {
 })
 
 test_that("a column guess rate is read from the user's column", {
-  model <- psychometric("n_correct", "contrast", "n_trials", guess = "chance")
+  model <- psychometric_function("n_correct", "contrast", "n_trials", guess = "chance")
   fit <- bmm(bmf(midpoint ~ 1, width ~ 1, lapse ~ 1), psy_count_data(), model,
              backend = "mock", mock_fit = 1, rename = FALSE)
   expect_equal(as.numeric(brms::standata(fit)$vreal2), psy_count_data()$chance)
@@ -341,16 +354,16 @@ psy_oracle_cdf <- function(x, midpoint, width, sigmoid) {
   cdf(qf(0.5) + (axis - location) / scale)
 }
 
-test_that("dpsychometric() is the binomial of guess + (1 - guess)(1 - lapse) F", {
+test_that("dpsychometric_function() is the binomial of guess + (1 - guess)(1 - lapse) F", {
   x <- c(0.2, 0.5, 1, 2, 4)
   for (sigmoid in psy_sigmoids) {
     for (rates in list(c(0, 0), c(0.5, 0.04), c(0.1, 0))) {
       psi <- rates[1] + (1 - rates[1]) * (1 - rates[2]) *
         psy_oracle_cdf(x, midpoint = 1, width = 1.5, sigmoid)
       expect_equal(
-        dpsychometric(c(3, 5, 6, 9, 10), x, midpoint = 1, width = 1.5,
-                      guess = rates[1], lapse = rates[2], n_trials = 10,
-                      sigmoid = sigmoid),
+        dpsychometric_function(c(3, 5, 6, 9, 10), x, midpoint = 1, width = 1.5,
+                               guess = rates[1], lapse = rates[2], n_trials = 10,
+                               sigmoid = sigmoid),
         stats::dbinom(c(3, 5, 6, 9, 10), 10, psi),
         tolerance = 1e-12, info = paste(sigmoid, rates[1], rates[2])
       )
@@ -366,7 +379,7 @@ test_that("the Weibull sigmoid is the classical 1 - exp(-(x / alpha)^beta)", {
   alpha <- exp(log(midpoint) - k[["zmid"]] / beta)
   x <- c(0.005, 0.01, 0.04, 0.1, 0.5)
   expect_equal(
-    dpsychometric(rep(1, 5), x, midpoint, width, sigmoid = "weibull"),
+    dpsychometric_function(rep(1, 5), x, midpoint, width, sigmoid = "weibull"),
     1 - exp(-(x / alpha)^beta),
     tolerance = 1e-12
   )
@@ -379,41 +392,43 @@ test_that("midpoint and width put F at 0.5, 0.05 and 0.95 where they say", {
     spread <- if (sigmoid %in% c("weibull", "lognormal", "loglogistic")) log(at[3] / at[1]) else at[3] - at[1]
     expect_equal(spread, 1.2, info = sigmoid)
     expect_equal(
-      dpsychometric(rep(1, 3), at, midpoint = 2, width = 1.2, sigmoid = sigmoid),
+      dpsychometric_function(rep(1, 3), at, midpoint = 2, width = 1.2, sigmoid = sigmoid),
       c(0.05, 0.5, 0.95), info = sigmoid
     )
   }
 })
 
-test_that("dpsychometric() stays finite far in the tails and at zero rates", {
+test_that("dpsychometric_function() stays finite far in the tails and at zero rates", {
   # a width of zspan makes z the intensity itself. psi rounds to 0 at z = -30,
   # but the log density does not
   zspan <- .psychometric_z_constants("normal")[["zspan"]]
-  lp <- dpsychometric(1, -30, midpoint = 0, width = zspan, log = TRUE)
+  lp <- dpsychometric_function(1, -30, midpoint = 0, width = zspan, log = TRUE)
   expect_true(is.finite(lp))
   expect_equal(lp, stats::pnorm(-30, log.p = TRUE), tolerance = 1e-12)
-  expect_equal(dpsychometric(0, -30, 0, zspan, log = TRUE), 0)
+  expect_equal(dpsychometric_function(0, -30, 0, zspan, log = TRUE), 0)
   # a lapse of zero makes a miss impossible only in the limit, not NaN
-  expect_true(is.finite(dpsychometric(0, 30, 0, zspan, lapse = 0, log = TRUE)))
-  expect_false(anyNA(dpsychometric(0:1, c(-5, 5), 0, 1, guess = 0, lapse = 0, log = TRUE)))
+  expect_true(is.finite(dpsychometric_function(0, 30, 0, zspan, lapse = 0, log = TRUE)))
+  expect_false(anyNA(dpsychometric_function(0:1, c(-5, 5), 0, 1, guess = 0, lapse = 0, log = TRUE)))
 })
 
-test_that("rpsychometric() draws counts with mean n_trials * psi", {
+test_that("rpsychometric_function() draws counts with mean n_trials * psi", {
   withr::local_seed(1234)
-  y <- rpsychometric(20000, 1, midpoint = 1, width = 2, guess = 0.5,
-                     lapse = 0.1, n_trials = 10)
+  y <- rpsychometric_function(20000, 1, midpoint = 1, width = 2, guess = 0.5,
+                              lapse = 0.1, n_trials = 10)
   # F = 0.5 at the midpoint: psi = 0.5 + 0.5 * 0.9 * 0.5
   expect_equal(mean(y) / (10 * 0.725), 1, tolerance = 0.01)
   expect_true(all(y >= 0 & y <= 10))
 })
 
 test_that("the distribution functions validate their arguments", {
-  expect_error(dpsychometric(2, 1, 1, 1, n_trials = 1), "must not exceed")
-  expect_error(dpsychometric(1, 1, 1, 0), "width must be positive")
-  expect_error(dpsychometric(1, 1, 1, 1, guess = 1), "guess must be")
-  expect_error(dpsychometric(1, 0, 1, 1, sigmoid = "weibull"), "intensity must be positive")
-  expect_error(rpsychometric(1, 1, -1, 1, sigmoid = "lognormal"), "midpoint must be positive")
-  expect_error(rpsychometric(1, 1, 1, 1, n_trials = NA), "n_trials must not contain NA")
+  expect_error(dpsychometric_function(2, 1, 1, 1, n_trials = 1), "must not exceed")
+  expect_error(dpsychometric_function(1, 1, 1, 0), "width must be positive")
+  expect_error(dpsychometric_function(1, 1, 1, 1, guess = 1), "guess must be")
+  expect_error(dpsychometric_function(1, 0, 1, 1, sigmoid = "weibull"),
+               "intensity must be positive")
+  expect_error(rpsychometric_function(1, 1, -1, 1, sigmoid = "lognormal"),
+               "midpoint must be positive")
+  expect_error(rpsychometric_function(1, 1, 1, 1, n_trials = NA), "n_trials must not contain NA")
 })
 
 
@@ -421,7 +436,7 @@ test_that("the distribution functions validate their arguments", {
 # R AND STAN PARITY                                                      ####
 ############################################################################# !
 
-test_that("the four Stan families match dpsychometric() and keep finite gradients", {
+test_that("the four Stan families match dpsychometric_function() and keep finite gradients", {
   skip_unless_stan_tests()
   skip_on_cran()
 
@@ -430,7 +445,7 @@ test_that("the four Stan families match dpsychometric() and keep finite gradient
                        "dist_type, log_x, zmid, zspan")
   code <- glue(
     "functions {{\n{read_lines2(file.path(sc_path, 'sdt_dist_functions.stan'))}\n",
-    "{read_lines2(file.path(sc_path, 'psychometric_funs.stan'))}\n}}\n",
+    "{read_lines2(file.path(sc_path, 'psychometric_function_functions.stan'))}\n}}\n",
     "data {{\n  int N;\n  array[N] int y;\n  array[N] int trials;\n",
     "  vector[N] x;\n  vector[N] midpoint;\n  vector[N] width;\n",
     "  vector[N] guess;\n  vector[N] lapse;\n  vector[N] guess_fixed;\n",
@@ -438,17 +453,17 @@ test_that("the four Stan families match dpsychometric() and keep finite gradient
     "  real zmid;\n  real zspan;\n  int gradient_check;\n}}\n",
     "parameters {{\n  real log_width_scale;\n}}\n",
     "model {{\n  if (gradient_check == 1) for (n in 1:N) target += ",
-    "psychometric_log_lik(y[n], trials[n], x[n], ",
+    "psychometric_function_log_lik(y[n], trials[n], x[n], ",
     "midpoint[n], width[n] * exp(log_width_scale), guess[n], lapse[n], ",
     "dist_type, log_x, zmid, zspan);\n}}\n",
     "generated quantities {{\n  matrix[N, 4] lp;\n  for (n in 1:N) {{\n",
-    "    lp[n, 1] = psychometric_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "    lp[n, 1] = psychometric_function_lpmf(y[n] | 0, midpoint[n], width[n], ",
     "guess[n], lapse[n], {family_args});\n",
-    "    lp[n, 2] = psychometric_fixguess_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "    lp[n, 2] = psychometric_function_fixguess_lpmf(y[n] | 0, midpoint[n], width[n], ",
     "lapse[n], {family_args});\n",
-    "    lp[n, 3] = psychometric_fixlapse_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "    lp[n, 3] = psychometric_function_fixlapse_lpmf(y[n] | 0, midpoint[n], width[n], ",
     "guess[n], {family_args});\n",
-    "    lp[n, 4] = psychometric_fixboth_lpmf(y[n] | 0, midpoint[n], width[n], ",
+    "    lp[n, 4] = psychometric_function_fixboth_lpmf(y[n] | 0, midpoint[n], width[n], ",
     "{family_args});\n  }}\n}}\n"
   )
   file <- file.path(tempdir(), "bmm_psychometric_parity.stan")
@@ -512,9 +527,9 @@ test_that("the four Stan families match dpsychometric() and keep finite gradient
                       ncol = length(rates))
     for (j in seq_along(rates)) {
       label <- paste(sigmoid, names(rates)[j])
-      lp_r <- dpsychometric(rows$y, rows$x, rows$midpoint, rows$width,
-                            rows[[rates[[j]][1]]], rows[[rates[[j]][2]]],
-                            n_trials = 10, sigmoid = sigmoid, log = TRUE)
+      lp_r <- dpsychometric_function(rows$y, rows$x, rows$midpoint, rows$width,
+                                     rows[[rates[[j]][1]]], rows[[rates[[j]][2]]],
+                                     n_trials = 10, sigmoid = sigmoid, log = TRUE)
       expect_identical(is.finite(lp_stan[, j]), is.finite(lp_r), info = label)
       # relative, because the extreme-value sigmoids reach log densities near
       # -1e224 on this grid, where an absolute gap of 1e211 is rounding
@@ -551,15 +566,15 @@ test_that("trial-level and count data run through bmm() for every sigmoid", {
     expect_s3_class(
       bmm(bmf(midpoint ~ 1, width ~ 1),
           psy_count_data(),
-          psychometric("n_correct", "contrast", "n_trials", sigmoid = sigmoid,
-                       guess = 0.5, lapse = 0),
+          psychometric_function("n_correct", "contrast", "n_trials", sigmoid = sigmoid,
+                                guess = 0.5, lapse = 0),
           backend = "mock", mock_fit = 1, rename = FALSE),
       "bmmfit"
     )
   }
   expect_s3_class(
     bmm(bmf(midpoint ~ 1 + (1 | id), width ~ 1, guess ~ 1, lapse ~ 1),
-        psy_trial_data(), psychometric("y", "x"),
+        psy_trial_data(), psychometric_function("y", "x"),
         backend = "mock", mock_fit = 1, rename = FALSE),
     "bmmfit"
   )
@@ -588,7 +603,7 @@ summary_value <- function(thr, measure, p = NA, column = "mean") {
 test_that("thresholds and slopes match their closed form", {
   zspan <- .psychometric_z_constants("normal")[["zspan"]]
   fit <- fake_psychometric_fit(
-    psychometric("y", "x", guess = 0.5), psy_trial_data(),
+    psychometric_function("y", "x", guess = 0.5), psy_trial_data(),
     bmf(midpoint ~ 1, width ~ 1, lapse ~ 1)
   )
   # width = zspan makes F the standard normal of x - midpoint
@@ -612,8 +627,8 @@ test_that("thresholds and slopes match their closed form", {
 
 test_that("Weibull thresholds invert the classical Weibull and slopes match a finite difference", {
   fit <- fake_psychometric_fit(
-    psychometric("n_correct", "contrast", "n_trials", sigmoid = "weibull",
-                 guess = 0.5, lapse = 0),
+    psychometric_function("n_correct", "contrast", "n_trials", sigmoid = "weibull",
+                          guess = 0.5, lapse = 0),
     psy_count_data(), bmf(midpoint ~ 1, width ~ 1)
   )
   local_mocked_bindings(
@@ -627,7 +642,7 @@ test_that("Weibull thresholds invert the classical Weibull and slopes match a fi
   x80 <- alpha * (-log(1 - 0.6))^(1 / beta)
   expect_equal(summary_value(thr, "threshold", 0.8), x80)
 
-  psi <- function(x) dpsychometric(1, x, 0.04, 2, guess = 0.5, sigmoid = "weibull")
+  psi <- function(x) dpsychometric_function(1, x, 0.04, 2, guess = 0.5, sigmoid = "weibull")
   h <- 1e-7
   expect_equal(summary_value(thr, "slope", 0.8), (psi(x80 + h) - psi(x80 - h)) / (2 * h),
                tolerance = 1e-6)
@@ -635,7 +650,7 @@ test_that("Weibull thresholds invert the classical Weibull and slopes match a fi
 
 test_that("a target outside the asymptotes gives undefined draws and a warning", {
   fit <- fake_psychometric_fit(
-    psychometric("y", "x", guess = 0.5), psy_trial_data(),
+    psychometric_function("y", "x", guess = 0.5), psy_trial_data(),
     bmf(midpoint ~ 1, width ~ 1, lapse ~ 1)
   )
   local_mocked_bindings(
@@ -651,7 +666,7 @@ test_that("a target outside the asymptotes gives undefined draws and a warning",
 
 test_that("a per-row guess column is a condition of its own", {
   fit <- fake_psychometric_fit(
-    psychometric("n_correct", "contrast", "n_trials", guess = "chance", lapse = 0),
+    psychometric_function("n_correct", "contrast", "n_trials", guess = "chance", lapse = 0),
     psy_count_data(), bmf(midpoint ~ 1, width ~ 1)
   )
   local_mocked_bindings(
@@ -669,7 +684,7 @@ test_that("a per-row guess column is a condition of its own", {
 
 test_that("user conditions must name every column the model reads", {
   fit <- fake_psychometric_fit(
-    psychometric("n_correct", "contrast", "n_trials", guess = "chance", lapse = 0),
+    psychometric_function("n_correct", "contrast", "n_trials", guess = "chance", lapse = 0),
     psy_count_data(), bmf(midpoint ~ 1, width ~ 1)
   )
   local_mocked_bindings(
@@ -684,7 +699,7 @@ test_that("user conditions must name every column the model reads", {
 
 test_that("a grouping column is refused as a condition", {
   fit <- fake_psychometric_fit(
-    psychometric("y", "x", guess = 0.5, lapse = 0), psy_trial_data(),
+    psychometric_function("y", "x", guess = 0.5, lapse = 0), psy_trial_data(),
     bmf(midpoint ~ 1 + (1 | id), width ~ 1)
   )
   local_mocked_bindings(
@@ -697,7 +712,7 @@ test_that("a grouping column is refused as a condition", {
 
 test_that("a guess predicted by the intensity is refused", {
   fit <- fake_psychometric_fit(
-    psychometric("y", "x", lapse = 0), psy_trial_data(),
+    psychometric_function("y", "x", lapse = 0), psy_trial_data(),
     bmf(midpoint ~ 1, width ~ 1, guess ~ 1 + x)
   )
   local_mocked_bindings(
@@ -711,7 +726,7 @@ test_that("a guess predicted by the intensity is refused", {
 })
 
 test_that("psychometric_threshold() validates its arguments", {
-  fit <- fake_psychometric_fit(psychometric("y", "x"), psy_trial_data(),
+  fit <- fake_psychometric_fit(psychometric_function("y", "x"), psy_trial_data(),
                                bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1))
   expect_error(psychometric_threshold(fit, p = 1), "strictly between 0 and 1")
   expect_error(psychometric_threshold(fit, p = NA), "strictly between 0 and 1")
@@ -720,7 +735,7 @@ test_that("psychometric_threshold() validates its arguments", {
 })
 
 test_that("summary() of a psychometric fit points to the Wichmann-Hill lapse rate", {
-  note <- summary_notes(psychometric("y", "x"), NULL)
+  note <- summary_notes(psychometric_function("y", "x"), NULL)
   expect_match(note, "lapse * (1 - guess)", fixed = TRUE)
   expect_match(note, "psychometric_threshold()", fixed = TRUE)
 })
@@ -750,20 +765,20 @@ test_that("log_lik, posterior_predict and posterior_epred agree with the distrib
   prep <- fake_psychometric_prep(dpars, data)
 
   for (i in 1:3) {
-    expected <- dpsychometric(data$Y[i], x[i], dpars$midpoint[, i], dpars$width[, i],
-                              guess = data$vreal2[i], lapse = dpars$lapse[, i],
-                              n_trials = 40, sigmoid = "weibull", log = TRUE)
-    expect_equal(log_lik_psychometric(i, prep), expected)
-    pp <- posterior_predict_psychometric(i, prep)
+    expected <- dpsychometric_function(data$Y[i], x[i], dpars$midpoint[, i], dpars$width[, i],
+                                       guess = data$vreal2[i], lapse = dpars$lapse[, i],
+                                       n_trials = 40, sigmoid = "weibull", log = TRUE)
+    expect_equal(log_lik_psychometric_function(i, prep), expected)
+    pp <- posterior_predict_psychometric_function(i, prep)
     expect_length(pp, n_draws)
     expect_true(all(pp >= 0 & pp <= 40))
   }
 
-  epred <- posterior_epred_psychometric(prep)
+  epred <- posterior_epred_psychometric_function(prep)
   expect_equal(dim(epred), c(n_draws, 3))
   psi <- vapply(1:3, function(i) {
-    dpsychometric(1, x[i], dpars$midpoint[, i], dpars$width[, i],
-                  guess = data$vreal2[i], lapse = dpars$lapse[, i], sigmoid = "weibull")
+    dpsychometric_function(1, x[i], dpars$midpoint[, i], dpars$width[, i],
+                           guess = data$vreal2[i], lapse = dpars$lapse[, i], sigmoid = "weibull")
   }, numeric(n_draws))
   expect_equal(epred, 40 * psi)
 })

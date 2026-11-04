@@ -1,7 +1,7 @@
 # bmm (development version)
 
 ### New models
-* Add the **psychometric function** (`psychometric()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric()` and `rpsychometric()`. See `?psychometric` (#507). Thanks to @GidonFrischkorn
+* Add the **psychometric function** (`psychometric_function()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric_function()` and `rpsychometric_function()`. See `?psychometric_function` (#507). Thanks to @GidonFrischkorn
 
 ### New features
 * bmm fits now work with the easystats packages (#477). `parameters::model_parameters()` and `bayestestR::describe_posterior()` summarise each model parameter on its own, without the fixed `mu` of the response-time models, and `modelbased::estimate_means(fit, by = "set_size", predict = "c")` returns a parameter on its native scale. insight now finds the predictors, response variables, data and priors you gave to `bmm()`; these functions failed on `m3()` and `mpt()` fits.

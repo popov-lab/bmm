@@ -433,7 +433,7 @@ revert_check_data.sdt_yn <- function(model, data) {
 }
 
 #' @exportS3Method
-revert_check_data.psychometric <- function(model, data) {
+revert_check_data.psychometric_function <- function(model, data) {
   data[intersect(.psychometric_reserved_cols, colnames(data))] <- NULL
   NextMethod("revert_check_data")
 }
