@@ -37,6 +37,20 @@ model_cases_psychometric_function <- function() {
       data = data.frame(response = rep(80, 50), stimulus = rep(c(0L, 1L), 25),
                         n_trials = rep(100, 50))
     )),
-    links = list(psychometric_function = list(model = model, settable = character(0)))
+    links = list(psychometric_function = list(model = model, settable = character(0))),
+    simulate = list(
+      psychometric_function = list(
+        model = model, pars = list(midpoint = 0.5, width = 0, guess = -2, lapse = -3),
+        design = data.frame(x = rep(c(-1, 0, 1, 2), 5), id = rep(1:2, each = 10)),
+        formula = bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1),
+        simulate_pars = list(midpoint = 0.5, width = 0, guess = -2, lapse = -3)
+      ),
+      psychometric_function_counts = list(
+        model = counts, pars = list(midpoint = log(0.03), width = 0.5),
+        design = count_data[c("contrast", "n_trials", "chance")],
+        formula = bmf(midpoint ~ 1, width ~ 1),
+        simulate_pars = list(midpoint = log(0.03), width = 0.5)
+      )
+    )
   )
 }

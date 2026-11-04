@@ -549,6 +549,31 @@ configure_model.psychometric_function <- function(model, data, formula) {
 
 
 ############################################################################# !
+# SIMULATE_DATA                                                          ####
+############################################################################# !
+
+#' @export
+simulate_data.psychometric_function <- function(model, pars, design = NULL,
+                                                scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  rate_cols <- unlist(Filter(is.character, vars[c("guess", "lapse")]))
+  design <- .design_or_n(model, design, c(vars$intensity, rate_cols), trials = vars$n_trials)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  rate <- function(name) {
+    p[[name]] %||% if (is.character(vars[[name]])) design[[vars[[name]]]] else vars[[name]]
+  }
+  response <- rpsychometric_function(
+    nrow(design), design[[vars$intensity]], p$midpoint, p$width,
+    guess = rate("guess"), lapse = rate("lapse"),
+    n_trials = if (is.null(vars$n_trials)) 1 else design[[vars$n_trials]],
+    sigmoid = vars$sigmoid
+  )
+  .simulate_result(design, stats::setNames(list(response), model$resp_vars$response), sim)
+}
+
+
+############################################################################# !
 # LOG_LIK & POSTERIOR_PREDICT                                            ####
 ############################################################################# !
 

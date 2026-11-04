@@ -558,6 +558,33 @@ test_that("the four Stan families match dpsychometric_function() and keep finite
 
 
 ############################################################################# !
+# SIMULATE_DATA                                                          ####
+############################################################################# !
+
+test_that("simulate_data() draws 0/1 trials at the response rate the width defines", {
+  skip_on_cran()
+  withr::local_seed(20261104)
+  # with a symmetric sigmoid, midpoint + width / 2 is where F = 0.95 by the
+  # definition of width, so P(1) = 0.2 + (1 - 0.2) * (1 - 0.1) * 0.95 = 0.884
+  data <- simulate_data(
+    psychometric_function("y", "x"),
+    pars = list(midpoint = 0, width = 2, guess = 0.2, lapse = 0.1), scale = "native",
+    design = data.frame(x = rep(1, 1e5))
+  )
+  expect_true(all(data$y %in% c(0, 1)))
+  expect_equal(mean(data$y), 0.884, tolerance = 0.005 / 0.884)
+})
+
+test_that("simulate_data() reads n_trials and a guess column from the design", {
+  model <- psychometric_function("k", "x", n_trials = "n", guess = "chance", lapse = 0)
+  design <- data.frame(x = c(1, 1), n = c(5L, 7L), chance = c(0.5, 0.5))
+  data <- withr::with_seed(1, simulate_data(model, list(midpoint = -50, width = 0), design = design))
+  expect_identical(data$k, c(5L, 7L))
+  expect_error(simulate_data(model, list(midpoint = 0, width = 0), design = design["x"]),
+               "lacks the column")
+})
+
+############################################################################# !
 # FULL PIPELINE                                                          ####
 ############################################################################# !
 
