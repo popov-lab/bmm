@@ -947,7 +947,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "The covariates argument must be a character vector of data column names."
   )
   stopif(
-    !is.null(response) && (!is.character(response) || length(response) != 1L),
+    !is.null(response) &&
+      (!is.character(response) || length(response) != 1L || is.na(response) || !nzchar(response)),
     "The response argument must be a single character string naming the data \\
     column that holds the response category of each trial."
   )
@@ -1000,12 +1001,24 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     trial counts. Please rename: {collapse_comma(reserved)}"
   )
   # check_data() replaces the response column by one count column per category
+  # and then adds the tree and possibility indicators, which revert_check_data()
+  # deletes again, so none of these names can be the response column
   response_collision <- intersect(response, c(resp_cats, tree_id, covariates))
   stopif(
     length(response_collision) > 0,
     "The response column '{response}' has the name of a response category, \\
     the tree_id column or a covariate. With one row per trial it holds the \\
     category of each trial, so please rename it."
+  )
+  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
+  built_columns <- c(
+    if (!is.null(tree_id)) paste0("Idx_", names(trees)),
+    if (length(guarded_cats)) paste0("Poss_", guarded_cats)
+  )
+  stopif(
+    length(intersect(response, built_columns)) > 0,
+    "The response column '{response}' collides with a column that bmm builds \\
+    from the model: {collapse_comma(built_columns)}. Please rename it."
   )
 
   simplex_pars <- unlist(simplex)
@@ -1364,9 +1377,9 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     cat_predictor_formulas <- names(rhs_cats)[lengths(rhs_cats) > 0]
     stopif(
       length(cat_predictor_formulas) > 0,
-      "The responses {collapse_comma(unique(unlist(rhs_cats)))} are what the \\
-      model predicts and cannot be predictors in a parameter formula. Please \\
-      remove them from the formula(s) for: \\
+      "The response column(s) {collapse_comma(unique(unlist(rhs_cats)))} hold \\
+      what the model predicts and cannot be predictors in a parameter formula. \\
+      Please remove them from the formula(s) for: \\
       {collapse_comma(cat_predictor_formulas)}"
     )
     nl_pars <- intersect(names(formula)[is_nl(formula)], names(model$parameters))

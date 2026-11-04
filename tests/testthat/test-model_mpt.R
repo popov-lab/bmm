@@ -616,11 +616,11 @@ test_that("response categories are refused as predictors before brms sees them",
   dat <- mpt_2htm_data()
   expect_error(
     bmm(bmf(D ~ old, g ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
-    "responses 'old' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+    "response column\\(s\\) 'old' hold what the model predicts.*formula\\(s\\) for: 'D'"
   )
   expect_error(
     check_model(model, dat, bmf(D ~ inv_logit(k * new), k ~ 1, g ~ 1)),
-    "responses 'new' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+    "response column\\(s\\) 'new' hold what the model predicts.*formula\\(s\\) for: 'D'"
   )
 })
 
@@ -3094,6 +3094,23 @@ test_that("mpt(response = ) refuses a response column named like a category or a
     mpt(mpt_2htm_trees(), tree_id = "item_type", response = c("a", "b")),
     "response argument must be a single character string"
   )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = NA_character_),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = ""),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Idx_old"),
+    "column 'Idx_old' collides with a column that bmm builds.*model: 'Idx_old', 'Idx_new'\\."
+  )
+  expect_error(
+    mpt(mpt_impossible_trees(), tree_id = "tree", response = "Poss_dist"),
+    "column 'Poss_dist' collides .* bmm builds .*'Idx_withdist', 'Idx_nodist', 'Poss_dist'\\."
+  )
+  expect_true(is_trial_level(mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Idx_foo")))
 })
 
 test_that("check_data() on trial rows builds one-hot Y and drops the label column", {
@@ -3163,7 +3180,7 @@ test_that("a trial-level formula cannot use the response column as a predictor",
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
   expect_error(
     check_model(model, mpt_trial_data(), bmf(D ~ resp, g ~ 1)),
-    "responses 'resp' are what the model predicts.*formula\\(s\\) for: 'D'"
+    "response column\\(s\\) 'resp' hold what the model predicts.*formula\\(s\\) for: 'D'"
   )
 })
 
