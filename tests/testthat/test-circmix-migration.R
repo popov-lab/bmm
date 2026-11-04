@@ -162,6 +162,16 @@ test_that("emmeans() routes a parameter of a 1.4 fit to its nlpar, without a war
   }
 })
 
+# a model stored on a 1.4 fit names its location mu1 and, for imm, has no
+# background b, which the trial-wise generators read
+test_that("simulate_data() refuses the model of a 1.4 fit with a message that says how to rebuild it", {
+  files <- c("bmmfit_v141_mixture2p.rds", "mock_v141_mixture3p.rds", "mock_v141_imm.rds", "bmmfit_mixture3p.rds")
+  for (name in files) {
+    model <- load_fixture_fit(name)$bmm$model
+    expect_error(simulate_data(model, list(kappa = 1), n_trials = 5), "saved by bmm 1.4", label = name)
+  }
+})
+
 # a 1.4 fit keeps the brms mixture and its frame the LureIdx step functions and
 # inv_ss that the mixture's formula reads; check_data() no longer builds them
 test_that("conditional_effects() and pp_check() leave out the columns a 1.4 fit built", {

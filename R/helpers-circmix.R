@@ -869,3 +869,12 @@ postprocess_brm.circular <- function(model, fit, ...) {
     sep = "\n"
   )
 }
+
+# A model stored on a fit from bmm 1.4 names its location mu1 and lacks what the
+# trial-wise generators read (the version tables' parameters, imm's background b)
+.circmix_refuse_1_4_model <- function(model) {
+  constructor <- intersect(c("mixture2p", "mixture3p", "imm"), class(model))[1]
+  stopif("mu1" %in% names(model$parameters),
+         "This {constructor}() model was saved by bmm 1.4. To simulate from it, build \\
+         the model again with {constructor}() and the same arguments.")
+}

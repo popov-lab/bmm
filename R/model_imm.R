@@ -546,6 +546,7 @@ IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
 # model as in the fit; a version without a or s gets NULL for it, as there
 #' @export
 simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  .circmix_refuse_1_4_model(model)
   vars <- model$other_vars
   design <- .design_or_n(model, design, .set_size_column(model),
                          ragged = c(vars$nt_features, vars$nt_distances))

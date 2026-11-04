@@ -431,6 +431,7 @@ posterior_predict_mixture2p_slot_averaging <- function(i, prep, ...) {
 
 #' @export
 simulate_data.mixture2p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  .circmix_refuse_1_4_model(model)
   needs_set_size <- .mixture2p_version_table[[model$version]]$needs_set_size
   design <- .design_or_n(model, design, if (needs_set_size) .set_size_column(model), ...)
   sim <- .simulate_pars(model, pars, design, scale)

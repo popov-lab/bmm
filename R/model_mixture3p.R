@@ -533,6 +533,7 @@ posterior_predict_mixture3p_slot_averaging <- function(i, prep, ...) {
 # size 1 as the fit does
 #' @export
 simulate_data.mixture3p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  .circmix_refuse_1_4_model(model)
   nt_features <- model$other_vars$nt_features
   design <- .design_or_n(model, design, .set_size_column(model), ragged = nt_features)
   sim <- .simulate_pars(model, pars, design, scale)
