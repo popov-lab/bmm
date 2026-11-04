@@ -467,9 +467,9 @@ fit_trials <- bmm(
 summary(fit_trials)
 ```
 
-The simulated standard deviations were 0.5 for `D` over participants, 0.6 for `D` over items and 0.4 for `g` over participants, all on the logit scale, and each lies inside its 95% interval in the summary. Each item contributes 30 trials and each participant 60, and on lure trials an undetected item is guessed, so with fewer participants or items the item SD is the first to lose precision. The data hold `r nrow(dat_trials)` trials, so a fit to them takes longer than a fit to the `r 2 * 30` aggregated rows, because its cost grows with the number of rows.
+The simulated standard deviations were 0.5 for `D` over participants, 0.6 for `D` over items and 0.4 for `g` over participants, all on the logit scale, and each lies inside its 95% interval in the summary. The data hold `r nrow(dat_trials)` trials, so a fit to them takes longer than a fit to the `r 2 * 30` aggregated rows, because its cost grows with the number of rows.
 
-`bmm_data_check()` reports trial rows per participant and gives the items only as the minimum, median and maximum number of trials per item. `ppp()` needs to be told which grouping variable identifies the participants, because the formula now has two:
+`bmm_data_check()` treats each participant as a cell and names participants with too few trials; the items it only counts, as the minimum, median and maximum number of trials per item. `ppp()` needs to be told which grouping variable identifies the participants, because the formula now has two:
 
 ```{r ppp-trials}
 ppp(fit_trials, participant = "id")
@@ -477,7 +477,7 @@ ppp(fit_trials, participant = "id")
 
 The cells are the two trees, as for aggregated data: `ppp()` sums the trial rows of each cell, for $T_2$ per participant, so both statistics compare counts aggregated over trials. The item effects enter through the expected counts.
 
-Neither TreeBUGS nor MPTinR can fit this model. Both take one row of category frequencies per participant (TreeBUGS 1.5.3, `traitMPT(data = )`; MPTinR 1.14.1, `fit.mpt(data = )`), and covariates in TreeBUGS describe participants, not trials. An item effect would have to be squeezed into the trees as separate categories per item, and a trial-level covariate as separate trees per value. In `bmm`, a covariate that changes from trial to trial goes into a branch expression as in [Design-fixed covariates in branch expressions], or into a parameter formula as a predictor, and the trial rows carry its value.
+Neither TreeBUGS nor MPTinR can fit this model. Both take one row of category frequencies per participant (TreeBUGS 1.5.3, `traitMPT(data = )`; MPTinR 1.14.1, `fit.mpt(data = )`), and covariates in TreeBUGS describe participants, not trials. An item effect would have to be squeezed into the model as a separate tree per item, each with its own parameter, which gives fixed rather than random item effects, and a trial-level covariate as separate trees per value. In `bmm`, a covariate that changes from trial to trial goes into a branch expression as in [Design-fixed covariates in branch expressions], or into a parameter formula as a predictor, and the trial rows carry its value.
 
 # Fitting real data
 
