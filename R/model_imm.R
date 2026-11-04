@@ -9,9 +9,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, nt_distances, set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Interference measurement model by Oberauer and Lin (2017).",
+      name = "Interference Measurement Model",
       citation = glue(
         "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
           of visual working memory. Psychological Review, 124(1), 21-59. \\
@@ -352,6 +352,37 @@ configure_model.imm_full <- function(model, data, formula) {
   formula$family <- .imm_mixture_family(max_set_size)
 
   nlist(formula, data)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rimm() takes one display per call and ignores per-row values, so rows are
+# drawn in groups of identical displays and values. The guessing activation b
+# is the reference, exp(0) = 1. bsc has no cue-independent activation (a = 0);
+# abc has no generalization gradient, which infinite distances with s = 1 give
+#' @export
+simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, .set_size_column(model),
+                        ragged = c(vars$nt_features, vars$nt_distances))
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  n_obs <- nrow(design)
+  a <- p$a %||% rep(0, n_obs)
+  s <- p$s %||% rep(1, n_obs)
+  set_size <- check_var_set_size(vars$set_size, design)$ss_numeric
+  .check_nt_na(design, vars$nt_features, set_size)
+  .check_nt_na(design, vars$nt_distances, set_size)
+  nt <- unname(as.matrix(design[vars$nt_features]))
+  dist <- if (is.null(vars$nt_distances)) nt * 0 + Inf else unname(as.matrix(design[vars$nt_distances]))
+  y <- .simulate_by_group(data.frame(set_size, nt, dist, p), function(i, n) {
+    k <- seq_len(set_size[i] - 1)
+    rimm(n, mu = c(p$mu1[i], nt[i, k]), dist = c(0, dist[i, k]), c = p$c[i], a = a[i], b = 1,
+         s = s[i], kappa = p$kappa[i])
+  })
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }
 
 ############################################################################# !

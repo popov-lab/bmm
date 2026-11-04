@@ -42,13 +42,26 @@ real mafc_logit_pc(real d, int m, int dist_type,
   return log_sum_exp(log_terms) - log(fmin(q, 1));
 }
 
-real sdt_mafc_lpmf(int y, real mu, real d, int m, int dist_type, int trials,
-                   data vector gh_nodes, data vector gh_weights,
+// all rows at once (loop = FALSE); dist_type is one code for all rows, m may vary by row
+real sdt_mafc_lpmf(array[] int y, vector mu, vector d, array[] int m, int dist_type,
+                   array[] int trials, data vector gh_nodes, data vector gh_weights,
                    data vector gl_nodes, data vector gl_weights) {
-  real logit_pc = mafc_logit_pc(d, m, dist_type,
+  int N = size(y);
+  vector[N] logit_pc;
+  array[N] int finite;
+  int n_finite = 0;
+  for (n in 1:N) {
+    logit_pc[n] = mafc_logit_pc(d[n], m[n], dist_type,
                                 gh_nodes, gh_weights, gl_nodes, gl_weights);
-  // binomial_logit_lpmf errors on an infinite logit, where every trial is correct or none is
-  if (is_inf(logit_pc))
-    return (y == (logit_pc > 0 ? trials : 0)) ? 0.0 : negative_infinity();
-  return binomial_logit_lpmf(y | trials, logit_pc);
+    // binomial_logit_lpmf errors on an infinite logit, where every trial is correct or none is
+    if (is_inf(logit_pc[n])) {
+      if (y[n] != (logit_pc[n] > 0 ? trials[n] : 0))
+        return negative_infinity();
+    } else {
+      n_finite += 1;
+      finite[n_finite] = n;
+    }
+  }
+  return binomial_logit_lpmf(y[finite[1:n_finite]] | trials[finite[1:n_finite]],
+                             logit_pc[finite[1:n_finite]]);
 }

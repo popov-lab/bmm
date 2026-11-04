@@ -42,9 +42,9 @@ Ranking Signal Detection Theory Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Ranking Task
-\item \strong{Name:} Signal Detection Theory (Ranking)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Ranking Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Meyer-Grant, C. G., Kellen, D., Harding, S. M., & Singmann, H. (2026). Extreme-value signal detection theory for recognition memory: The parametric road not taken. Psychological Review. Advance online publication. https://doi.org/10.1037/rev0000615

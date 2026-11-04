@@ -388,7 +388,9 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 # Whether sdratio is 1 on the natural scale: absent, or fixed at 0 on its log
 # scale. Model-only, because brms::variables() lists sdratio on every real fit
 # (bmm fixes it through a constant prior), and a user-fixed non-zero value
-# breaks d = d' just as an estimated one does.
+# breaks d = d' just as an estimated one does. Also sets the equal-variance
+# argument of the sdt_yn likelihood, so the Stan shortcut and the analysis
+# helpers cannot disagree.
 .sdt_unit_sdratio <- function(model) {
   !"sdratio" %in% names(model$parameters) ||
     isTRUE(model$fixed_parameters$sdratio == 0)
@@ -872,7 +874,7 @@ roc_observed <- function(fit, conditions = NULL) {
   data     <- fit$data
   resp_var <- model$resp_vars$response
   stim_var <- model$other_vars$stimulus
-  nt_var   <- model$other_vars$n_trials
+  nt_var   <- .sdt_trials_var(model)
 
   cond_cols <- intersect(conditions %||% .sdt_criterion_point_dims(fit)$points,
                          names(data))
