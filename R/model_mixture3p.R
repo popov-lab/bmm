@@ -8,9 +8,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Three-parameter mixture model by Bays et al (2009).",
+      name = "Three-Parameter Mixture Model",
       citation = glue(
         "Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). \\
         The precision of visual working memory is set by allocation \\
@@ -142,6 +142,7 @@ settable_links.mixture3p <- function(model) {
 #' )
 mixture3p <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
     set_size <- dots$setsize
@@ -198,6 +199,29 @@ configure_model.mixture3p <- function(model, data, formula) {
   )
 
   nlist(formula, data)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rmixture3p() takes one display per call and ignores per-row weights, so rows
+# are drawn in groups of identical displays and values. native_transform() has
+# set the non-target weight to 0 where the set size is 1, as the likelihood does
+#' @export
+simulate_data.mixture3p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  nt_features <- model$other_vars$nt_features
+  design <- .design_or_n(model, design, .set_size_column(model), ragged = nt_features)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  set_size <- check_var_set_size(model$other_vars$set_size, design)$ss_numeric
+  .check_nt_na(design, nt_features, set_size)
+  nt <- unname(as.matrix(design[nt_features]))
+  y <- .simulate_by_group(data.frame(set_size, nt, p), function(i, n) {
+    rmixture3p(n, mu = c(p$mu1[i], nt[i, seq_len(set_size[i] - 1)]), kappa = p$kappa[i],
+               p_mem = p$thetat[i], p_nt = p$thetant[i])
+  })
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }
 
 #' @export

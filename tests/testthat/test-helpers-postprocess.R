@@ -9,6 +9,8 @@ test_that("bmm version is added to mock model", {
     mock = 1
   )
   expect_true("bmm" %in% names(fit$version))
+  expect_identical(fit$version$R, getRversion())
+  expect_identical(fit_settings(fit)$versions[["R"]], as.character(getRversion()))
 })
 
 

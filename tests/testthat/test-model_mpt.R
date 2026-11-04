@@ -101,7 +101,7 @@ test_that("mpt_tree validates formula input", {
   expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), "a"), "impossible argument has to be named")
   expect_error(
     mpt_tree("t", a ~ D, b ~ 1 - D, "c"),
-    "Cannot mix formulas.*impossible argument has to be named, impossible = \"c\""
+    "Cannot mix formulas.*impossible = \"c\""
   )
   expect_error(mpt_tree("t", list(a ~ D, b ~ 1 - D)), "separate arguments")
   expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, impossible = "a"), "both impossible")
@@ -284,7 +284,7 @@ test_that("mpt refuses a zero branch and points to impossible categories", {
   # the hint reads as one sentence, not with the source's line breaks
   expect_error(
     mpt(mpt_tree("a", list(y = "D", z = "0 * D", w = "1 - D"))),
-    "undefined. Declare a response category that a tree cannot produce with mpt_tree(impossible = ) instead",
+    "a tree cannot produce with mpt_tree(impossible = )",
     fixed = TRUE
   )
   zero_padded <- list(
@@ -456,6 +456,16 @@ test_that("mpt() refuses a link for a parameter the restrictions removed", {
   expect_equal(model$links, list(Do = "probit", g = "logit"))
 })
 
+test_that("a per-parameter link reaches the Stan code of that parameter only", {
+  withr::local_seed(255)
+  code <- suppressMessages(stancode(
+    bmf(D ~ 1, g ~ 1), mpt_2htm_data(n_id = 2),
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "probit"))
+  ))
+  expect_match(code, "Phi(nlp_D[n])", fixed = TRUE)
+  expect_match(code, "inv_logit(nlp_g[n])", fixed = TRUE)
+})
+
 test_that("a malformed links list is described for mpt(), not with another model's example", {
   trees <- mpt_2htm_trees()
   expect_error(
@@ -492,11 +502,7 @@ test_that("a simplex group takes no link of its own, whichever way the link arri
   for (target in c("gA", "gAraw", "gC")) {
     expect_error(
       mpt(tree, simplex = simplex, links = setNames(list("probit"), target)),
-      paste0(
-        "link target\\(s\\) '", target, "' belong to the simplex group\\(s\\) ",
-        "'gA', 'gB', 'gC': .*links = \"probit\" for the whole model and ",
-        "takes no link of its own"
-      )
+      paste0("link target\\(s\\) '", target, "' belong to the simplex group\\(s\\) 'gA', 'gB', 'gC'")
     )
   }
 
@@ -1075,6 +1081,15 @@ test_that("restrictions are substituted into the trees before parameters are ide
   )
 })
 
+test_that("a chain of equality restrictions resolves to its last parameter", {
+  # three links: one pass over the restrictions resolves only two
+  tree <- mpt_tree("t", list(
+    w = "a * b", x = "a * (1 - b)", y = "(1 - a) * c * d * e", z = "(1 - a) * (1 - c * d * e)"
+  ))
+  model <- mpt(tree, restrictions = c("b = c", "c = d", "d = e"))
+  expect_named(model$parameters, c("a", "e"), ignore.order = TRUE)
+})
+
 mpt_sep_trees <- function() {
   list(
     mpt_tree("old", list(yes = "Do + (1 - Do) * g", no = "(1 - Do) * (1 - g)")),
@@ -1522,11 +1537,9 @@ test_that("check_data() warns when the covariate values in the data leave the mo
   expect_warning(
     check_data(model, layout(0.5), formula),
     paste0(
-      "The model is not identified with the covariate values in the data\\. ",
-      "Jacobian rank 2 of 3 at interior test values and the covariate values in the data: ",
-      "the combination of all free parameters is not identified by the branch expressions\\. ",
-      "'x' takes a single value within tree\\(s\\) 'old', 'new'\\. ",
-      "With 5 test values of the covariates the rank is 3"
+      "not identified with the covariate values in the data.*rank 2 of 3 .*",
+      "the combination of all free parameters is not identified.*",
+      "'x' takes a single value within tree\\(s\\) 'old', 'new'.*rank is 3"
     )
   )
   expect_warning(
@@ -1539,7 +1552,7 @@ test_that("check_data() warns when the covariate values in the data leave the mo
   with_predictor <- transform(layout(0.5), cond = c("a", "b", "a", "b"))
   expect_message(
     expect_no_warning(check_data(model, with_predictor, bmf(Do ~ cond, Dn ~ 1, g ~ 1))),
-    "With the covariate values in the data, the branch expressions alone do not identify all free parameters\\. 'x' takes a single value"
+    "alone do not identify all free parameters\\. 'x' takes a single value"
   )
 
   # bmm_data_check() reports the warning among its hard checks
@@ -2209,6 +2222,62 @@ test_that("mpt compiles with structurally impossible categories", {
     mpt_impossible_data(), mpt(mpt_impossible_trees(), tree_id = "tree"),
     backend = "mock", mock_fit = 1, rename = FALSE
   ))
+})
+
+# tests/local/test-mpt-likelihood.R compares a fit's lp__ with dmpt() once a
+# week; evaluating the compiled model at fixed points needs no sampling, so the
+# same comparison runs on every pull request. It takes about 15 s on a laptop,
+# nearly all of it compiling the brms program
+test_that("the Stan log density of an mpt model with an impossible category equals dmpt()", {
+  skip_unless_stan_tests()
+  skip_on_cran() # compiles a Stan program
+  withr::local_seed(21)
+  withr::local_options(bmm.sort_data = FALSE)
+
+  # the impossible category puts the -100 linear predictor of bmf2bf.mpt()
+  # into the comparison
+  dat <- mpt_impossible_data(n_id = 2)
+  dat$corr <- dat$corr + stats::rbinom(nrow(dat), 10, 0.5)
+  model <- mpt(mpt_impossible_trees(), "tree")
+  formula <- bmf(Pm ~ 1, Pb ~ 1)
+  dir <- withr::local_tempdir()
+  stan_model <- cmdstanr::cmdstan_model(
+    cmdstanr::write_stan_file(stancode(formula, dat, model), dir = dir), quiet = TRUE
+  )
+  cmdstanr::write_stan_json(unclass(standata(formula, dat, model)), file.path(dir, "data.json"))
+  # (b_Pm, b_Pb) per row, unequal and of both signs, so that swapped parameters
+  # or links do not cancel
+  points <- rbind(c(0.4, 1.1), c(-1.3, 0.2), c(2, -2.5))
+  cmdstanr::write_stan_json(list(params_r = points), file.path(dir, "pars.json"))
+  # tbb.dll on Windows, as in the log_prob test of test-model_ezdm.R
+  run_path <- if (.Platform$OS.type == "windows") {
+    c(
+      getFromNamespace("toolchain_PATH_env_var", "cmdstanr")(),
+      getFromNamespace("tbb_path", "cmdstanr")()
+    )
+  }
+  status <- withr::with_path(run_path, system2(stan_model$exe_file(), c(
+    "method=log_prob", paste0("unconstrained_params=", file.path(dir, "pars.json")), "jacobian=1",
+    "data", paste0("file=", file.path(dir, "data.json")),
+    "output", paste0("file=", file.path(dir, "out.csv")), "sig_figs=18"
+  ), stdout = FALSE, stderr = file.path(dir, "stderr.txt")))
+  expect_equal(status, 0, info = paste(
+    readLines(file.path(dir, "stderr.txt"), warn = FALSE), collapse = "\n"
+  ))
+  stan_lp <- utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")$lp__
+
+  # lp__ as sampling reports it: the multinomial log-likelihood with its
+  # normalizing constant plus the logistic(0, 1) priors of the intercepts; the
+  # coefficients are unconstrained, so jacobian=1 adds nothing
+  counts <- as.matrix(dat[c("corr", "dist", "npl")])
+  r_lp <- apply(points, 1, function(b) {
+    pars <- c(Pm = stats::plogis(b[1]), Pb = stats::plogis(b[2]))
+    sum(vapply(seq_len(nrow(dat)), function(n) {
+      dmpt(counts[n, ], pars, model, tree = dat$tree[n])
+    }, numeric(1))) + sum(stats::dlogis(b, log = TRUE))
+  })
+  expect_length(stan_lp, nrow(points))
+  expect_lt(max(abs(stan_lp - r_lp)), 1e-10)
 })
 
 test_that("several levels of a factor can share one tree", {

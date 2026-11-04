@@ -1,5 +1,5 @@
 // quadrature tables for mafc_logit_pc(), mirrored by .mafc_gh_* and .mafc_gl_* in R/distributions.R
-// declared here because the loop = TRUE family would rebuild them per row (~22% slower per leapfrog step)
+// declared here because mafc_logit_pc() runs once per row and would rebuild them per row (~22% slower per leapfrog step)
 vector[40] gh_nodes = to_vector({
   -1.14533778415487379e+01, -1.04815605346742640e+01, -9.67355636693402765e+00, -8.94950454385556249e+00,
   -8.27894062365948535e+00, -7.64616376454146440e+00, -7.04173840645382576e+00, -6.45942337758375906e+00,
