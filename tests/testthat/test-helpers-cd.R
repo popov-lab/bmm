@@ -61,6 +61,21 @@ test_that(".circmix_cd_offset() resolves the degenerate decisions", {
   expect_equal(psame_simple(0.3, 8, 0.7, criterion = 0.5, p_s = 0), 1)
 })
 
+test_that(".circmix_cd_offset() keeps its precision for a held item and large criteria", {
+  # with p_s = 1 the offset is -criterion; e^-criterion - 1 + p_s cancels to 0
+  # past criterion 36.7 and loses digits from about 25
+  expect_equal(.circmix_cd_offset(c(10, 30, 40, 200), 1), -c(10, 30, 40, 200))
+  p_s <- 1 - 1e-15
+  expect_equal(
+    .circmix_cd_offset(30, p_s),
+    log(exp(-30) - (1 - p_s)) - log(p_s),
+    tolerance = 1e-12
+  )
+  # a sharp held memory: the bound leaves criterion 48.6 inside the evidence
+  # range, so a probe at pi must still be called "change"
+  expect_lt(psame_simple(pi, 50, 1, criterion = 48.6, p_s = 1), 1e-20)
+})
+
 # range of the log-likelihood ratio over a fine grid of retrieved values, from
 # the decision density itself
 llr_range <- function(kappa, w, p_s) {
@@ -533,9 +548,10 @@ test_that("the Stan and R change-detection functions agree", {
   skip_on_cran()
   tab <- .circmix_kappa_table()
   gl <- .cd_gl_rule()
-  # past -log(1 - p_s), nothing stored, a held slot, the liberal side
-  crit <- c(0, 0.4, -0.3, -0.5, 1.5, 3, -2)
-  ps <- c(0.6, 0.6, 0.6, 0, 0.3, 1, 0.9)
+  # past -log(1 - p_s), nothing stored, a held slot, the liberal side, a held
+  # slot past the criterion where e^-criterion - 1 + p_s cancels
+  crit <- c(0, 0.4, -0.3, -0.5, 1.5, 3, -2, 40)
+  ps <- c(0.6, 0.6, 0.6, 0, 0.3, 1, 0.9, 1)
   d <- c(0.4, 0.4 - 1.2, 0.4 + 2)
   logw <- log(c(0.5, 0.2, 0.15))
   logw_guess <- log(0.15)
@@ -557,6 +573,7 @@ test_that("the Stan and R change-detection functions agree", {
   rows <- function(x) matrix(x, nrow = n, ncol = length(x), byrow = TRUE)
   offset <- .circmix_cd_offset(crit, ps)
   expect_equal(stan("out_offset"), offset, tolerance = 1e-12)
+  expect_equal(stan("out_offset")[8], -40)
   bound <- vapply(c(FALSE, TRUE), function(rich) {
     .circmix_cd_bounded_criterion(crit, ps, rows(kappa_s), rows(lw_s), rich)
   }, numeric(n))
@@ -592,7 +609,12 @@ test_that("the Stan and R change-detection functions agree", {
       )
     }
   }
-  expect_equal(stan("out_sa"), as.vector(sa), tolerance = 1e-12)
+  # criterion 40 is 85 times the range of a trial without a slot (p_s 0.375),
+  # where tanh has saturated and the arc sits at pi: cos h -> h amplifies the
+  # last-digit difference of log1p() and log1m() there
+  saturated <- seq_along(sa) > length(sa) - 2 * length(K)
+  expect_equal(stan("out_sa")[!saturated], as.vector(sa)[!saturated], tolerance = 1e-12)
+  expect_equal(stan("out_sa")[saturated], as.vector(sa)[saturated], tolerance = 1e-8)
   expect_equal(stan("out_bern"), log(c(0.7, 0.3)), tolerance = 1e-12)
 })
 

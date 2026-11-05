@@ -8,11 +8,15 @@
     if (p_s <= 0) {
       return criterion < 0 ? positive_infinity() : negative_infinity();
     }
-    real scaled = expm1(-criterion) + p_s;
-    if (scaled <= 0) {
+    // log(e^-criterion - (1 - p_s)) without the cancellation of expm1(-criterion) + p_s, which is total for a held item
+    if (p_s >= 1) {
+      return -criterion;
+    }
+    real scaled = log1m(p_s) + criterion;
+    if (scaled >= 0) {
       return negative_infinity();
     }
-    return log(scaled) - log(p_s);
+    return -criterion + log1m_exp(scaled) - log(p_s);
   }
 
   // criterion kept inside the trial's range (LLR_min, LLR_max) of the log-likelihood ratio by a scaled tanh on each side of

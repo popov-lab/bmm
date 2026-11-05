@@ -55,14 +55,16 @@
 # +Inf means never "same" and -Inf always "same". With p_s = 0 the likelihood
 # ratio is identically 1, so the sign of the criterion alone decides; with
 # e^-criterion - 1 + p_s <= 0 the decision density exceeds the threshold
-# everywhere.
+# everywhere. log(e^-criterion - (1 - p_s)) is taken as -criterion +
+# log1m_exp(log(1 - p_s) + criterion): e^-criterion - 1 + p_s cancels for a held
+# item (p_s = 1) and loses every digit past criterion 36.7.
 .circmix_cd_offset <- function(criterion, p_s) {
   args <- .circmix_recycle(criterion = criterion, p_s = p_s)
   criterion <- args$criterion
   p_s <- args$p_s
-  scaled <- expm1(-criterion) + p_s
-  out <- log(pmax(scaled, 0)) - log(p_s)
-  out[scaled <= 0] <- -Inf
+  scaled <- log1p(-p_s) + criterion
+  out <- -criterion + log1m_exp(pmin(scaled, 0)) - log(p_s)
+  out[scaled >= 0] <- -Inf
   out[p_s <= 0] <- ifelse(criterion[p_s <= 0] < 0, Inf, -Inf)
   out[criterion == 0] <- 0
   out
