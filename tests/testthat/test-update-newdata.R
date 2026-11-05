@@ -168,7 +168,7 @@ test_that("the psychometric prior-range message names only the parameters left o
   skip_on_cran()
   skip_if_not_installed("rstan")
   dat <- data.frame(x = rep(0:4, 8), y = rep(c(0L, 0L, 1L, 1L, 1L), 8))
-  shifted <- transform(dat, x = x + 2)
+  shifted <- transform(dat, x = x * 3 + 2)
   formula <- bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1)
   model <- psychometric_function("y", "x")
   on_midpoint <- brms::set_prior("normal(4, 1)", class = "Intercept", dpar = "midpoint")
@@ -214,7 +214,7 @@ test_that("the psychometric prior-range message leaves out a parameter the formu
   dat <- data.frame(x = rep(0:4, 8), y = rep(c(0L, 0L, 1L, 1L, 1L), 8))
   fit <- stub_frame_fit(list(formula = bmf(midpoint = 2, width ~ 1, guess ~ 1, lapse ~ 1),
                              data = dat, model = psychometric_function("y", "x")))
-  shifted <- transform(dat, x = x + 2)
+  shifted <- transform(dat, x = x * 3 + 2)
   expect_match(prior_range_messages(fit, shifted), "stay on width.", fixed = TRUE)
   on_width <- brms::set_prior("normal(0, 1)", class = "Intercept", dpar = "width")
   expect_length(prior_range_messages(fit, shifted, prior = on_width), 0)
@@ -230,5 +230,39 @@ test_that("the psychometric prior range of the log-scale sigmoids is compared on
   # x 1.5 moves the log centre by 0.41 of a log range of 2.77 (silent), but the
   # linear centre by 0.043 of a range of 0.15 (over a quarter)
   expect_length(prior_range_messages(fit, transform(dat, x = x * 1.5)), 0)
-  expect_length(prior_range_messages(fit, transform(dat, x = x * 10)), 1)
+  # x 10 shifts the log axis without stretching it, so width's prior stays as it is
+  message <- prior_range_messages(fit, transform(dat, x = x * 10))
+  expect_length(message, 1)
+  expect_match(message, "stay on midpoint.", fixed = TRUE)
+})
+
+# a prior of a class can leave some of its rows on the scaled defaults: the
+# per-level main priors of a formula without intercept, or the SDs of a second
+# grouping variable
+test_that("the psychometric prior-range message names midpoint while any of its scaled rows stay", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  dat <- data.frame(x = rep(0:4, 16), y = rep(c(0L, 0L, 1L, 1L, 1L), 16),
+                    id = factor(rep(1:4, each = 20)), item = factor(rep(1:5, 16)),
+                    cond = factor(rep(c("a", "b"), 40)),
+                    c2 = factor(rep(c("u", "v", "w", "z"), each = 2, length.out = 80)))
+  shifted <- transform(dat, x = x * 10 + 20)
+  model <- psychometric_function("y", "x")
+  on_width <- brms::set_prior("normal(1, 1)", class = "Intercept", dpar = "width")
+
+  fit <- stub_frame_fit(list(formula = bmf(midpoint ~ 0 + cond + c2, width ~ 1, guess ~ 1, lapse ~ 1),
+                             data = dat, model = model))
+  b_prior <- brms::set_prior("normal(0, 10)", class = "b", dpar = "midpoint")
+  expect_match(prior_range_messages(fit, shifted, prior = on_width + b_prior),
+               "stay on midpoint.", fixed = TRUE)
+
+  fit <- stub_frame_fit(list(formula = bmf(midpoint ~ 1 + (1 | id) + (1 | item), width ~ 1,
+                                           guess ~ 1, lapse ~ 1),
+                             data = dat, model = model))
+  on_midpoint <- brms::set_prior("normal(25, 5)", class = "Intercept", dpar = "midpoint")
+  sd_id <- brms::set_prior("exponential(0.1)", class = "sd", group = "id", dpar = "midpoint")
+  expect_match(prior_range_messages(fit, shifted, prior = on_width + on_midpoint + sd_id),
+               "stay on midpoint.", fixed = TRUE)
+  sd_all <- brms::set_prior("exponential(0.1)", class = "sd", dpar = "midpoint")
+  expect_length(prior_range_messages(fit, shifted, prior = on_width + on_midpoint + sd_all), 0)
 })

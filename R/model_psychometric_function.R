@@ -346,21 +346,31 @@ check_model.psychometric_function <- function(model, data = NULL, formula = NULL
 }
 
 # update() keeps the checked model when only the data change, so the priors stay
-# scaled to the old intensities; it says so once the new ones would have given
-# priors far from them. A parameter that is fixed, or whose scaled defaults all
-# have a user prior, has no default there to go stale
+# scaled to the old intensities. The range rule decides whether to speak at
+# all: the scaled priors are rounded to 3 digits, so almost any subset of the
+# data, as a user's own cross-validation folds are, would change some prior
+# string. The rows themselves decide which parameters to name, so user priors,
+# fixed parameters and log-axis widths that would not change are left out
 #' @exportS3Method
-update_data_notice.psychometric_function <- function(model, data, formula, prior = NULL) {
+update_data_notice.psychometric_function <- function(model, data, formula, prior, rechecked_prior) {
   old <- model$prior_axis_range
   new <- .psychometric_axis_range(model, data, formula)
-  stale <- setdiff(c("midpoint", "width"), names(model$fixed_parameters))
-  stale <- stale[!vapply(stale, .psychometric_user_covered, logical(1), formula, prior)]
-  if (is.null(old) || is.null(new) || length(stale) == 0) {
+  if (is.null(old) || is.null(new)) {
     return(invisible())
   }
   ratio <- diff(new) / diff(old)
   shifted <- abs(mean(new) - mean(old)) > diff(old) / 4
   if (!shifted && ratio >= 1 / 2 && ratio <= 2) {
+    return(invisible())
+  }
+  rechecked <- rechecked_prior()
+  cols <- c("prior", "class", "coef", "group", "resp", "dpar", "nlpar")
+  rows_of <- function(p, par) {
+    sort(do.call(paste, as.data.frame(p)[p$dpar == par | p$nlpar == par, cols]))
+  }
+  stale <- Filter(function(par) !identical(rows_of(prior, par), rows_of(rechecked, par)),
+                  c("midpoint", "width"))
+  if (length(stale) == 0) {
     return(invisible())
   }
   log_axis <- if (.psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x) " (log scale)" else ""
@@ -373,27 +383,6 @@ update_data_notice.psychometric_function <- function(model, data, formula, prior
   )
 }
 
-# .psychometric_shape_priors() scales the intercept of both parameters, but the
-# slopes and SDs of midpoint only, so those count only for midpoint and only
-# when its formula estimates them. Any user prior of a class counts, whatever
-# its coef or group: telling which coefficients it leaves on the default would
-# take brms' prior table, for a message that only advises. brms stores the
-# intercept of a non-linear parameter as coefficient "Intercept" of class "b"
-.psychometric_user_covered <- function(par, formula, prior) {
-  f <- formula[[par]] %||% stats::as.formula(paste(par, "~ 1"))
-  labels <- attr(stats::terms(f), "term.labels")
-  random <- grepl("|", labels, fixed = TRUE)
-  needed <- c(if (has_intercept(f)) "Intercept" else "b",
-              if (par == "midpoint" && any(!random)) "b",
-              if (par == "midpoint" && any(random)) "sd")
-  if (NROW(prior) == 0) {
-    return(FALSE)
-  }
-  rows <- (prior$dpar == par | prior$nlpar == par) & nzchar(prior$prior)
-  class <- ifelse(prior$class == "b" & prior$coef == "Intercept", "Intercept", prior$class)
-  covered <- unique(class[rows & (class != "b" | prior$coef == "")])
-  all(needed %in% covered)
-}
 
 ############################################################################# !
 # CHECK_FORMULA S3 METHODS                                               ####
