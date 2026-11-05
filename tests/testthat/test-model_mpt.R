@@ -3137,6 +3137,13 @@ test_that("mpt(response = ) allows Idx_<tree> only when no tree_id column builds
   )
 })
 
+test_that("revert_check_data() gives back a response column named like an indicator bmm does not build", {
+  only <- mpt_tree("only", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))
+  model <- mpt(only, response = "Idx_only")
+  checked <- check_data(model, data.frame(Idx_only = c("old", "new", "old")), bmf(D ~ 1, g ~ 1))
+  expect_identical(revert_check_data(model, checked)$Idx_only, c("old", "new", "old"))
+})
+
 test_that("check_data() on trial rows builds one-hot Y and drops the label column", {
   model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
   dat <- mpt_trial_data()
