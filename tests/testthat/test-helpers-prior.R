@@ -884,4 +884,44 @@ test_that(".align_prior_parameters() moves a prior to the parameter type of the 
   expect_identical(unlist(on_cells[c("class", "coef", "dpar", "nlpar")]),
                    c(class = "b", coef = "Intercept", dpar = "", nlpar = "d"))
   expect_identical(.align_prior_parameters(written_for_cells, cell_formula), written_for_cells)
+
+  # an intercept written as class "Intercept" in the column the formula uses
+  # is the coefficient too, as brms keeps no class "Intercept" there
+  where <- c("class", "coef", "dpar", "nlpar")
+  on_trials <- as.data.frame(.align_prior_parameters(written_for_trials, trial_formula))
+  expect_identical(unlist(on_trials[where]), c(class = "b", coef = "Intercept", dpar = "d", nlpar = ""))
+  on_cells <- as.data.frame(.align_prior_parameters(
+    brms::set_prior("normal(1, 1)", nlpar = "d", class = "Intercept"), cell_formula
+  ))
+  expect_identical(unlist(on_cells[where]), c(class = "b", coef = "Intercept", dpar = "", nlpar = "d"))
+  # a centred dpar keeps its class "Intercept"
+  centred <- brms::set_prior("normal(0, 1)", dpar = "sigma", class = "Intercept")
+  expect_identical(.align_prior_parameters(centred, brms::bf(y ~ x, sigma ~ x)), centred)
+})
+
+test_that("a class = 'Intercept' prior on a trial-row sdt_rating() dpar reaches its intercept", {
+  skip_on_cran()
+  trials <- data.frame(stimulus = rep(0:1, 6), rating = rep(1:4, 3), cond = factor(rep(c("a", "b"), each = 6)))
+  fit <- suppressMessages(bmm(
+    bmf(d ~ 1 + cond, criterion ~ 1, spacing ~ 1), trials, sdt_rating("rating", "stimulus", n_ratings = 4),
+    prior = brms::set_prior("normal(2, 0.3)", dpar = "d", class = "Intercept"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_match(brms::stancode(fit), "lprior += normal_lpdf(b_d[1] | 2, 0.3);", fixed = TRUE)
+})
+
+# sdt_rating() moves a prior between nlpar and dpar (.align_prior_parameters());
+# the message names the parameter as the user wrote it
+test_that("the displaced-prior message labels a moved prior as the user wrote it", {
+  skip_on_cran()
+  withr::local_options(bmm.silent = 1)
+  trials <- data.frame(stimulus = rep(0:1, 6), rating = rep(1:4, 3))
+  msgs <- displacement_messages(bmm(
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), trials, sdt_rating("rating", "stimulus", n_ratings = 4),
+    prior = brms::set_prior("normal(0, 1)", nlpar = "sdratio", coef = "Intercept"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_length(msgs, 1)
+  expect_match(msgs, 'nlpar = "sdratio", class = "b", coef = "Intercept": normal(0, 1) replaced by constant(0) (sdratio fixed at 0)',
+               fixed = TRUE)
 })

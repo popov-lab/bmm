@@ -544,16 +544,17 @@ configure_prior.default <- function(model, data, formula, user_prior, ...) {
 
 #' @export
 configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...) {
-  user_prior <- .align_prior_parameters(user_prior, formula)
-  prior <- combine_prior(set_default_prior(model, data, formula, ...), user_prior)
+  aligned_prior <- .align_prior_parameters(user_prior, formula)
+  prior <- combine_prior(set_default_prior(model, data, formula, ...), aligned_prior)
   # a parameter fixed in the formula is a constraint like the rows of the
   # model's own method, so its constant() is combined after the user prior, or
   # a user prior on its intercept would free it (#549); the model's rows come
   # last because mpt restates such a constant on the link scale
   constraints <- combine_prior(fixed_pars_priors(model, formula), NextMethod("configure_prior"))
   message_displaced_priors(
-    user_prior, constraints,
-    fixed = model$fixed_parameters, main_dpar = names(brms::brmsterms(formula)$dpars)[1]
+    aligned_prior, constraints,
+    fixed = model$fixed_parameters, main_dpar = names(brms::brmsterms(formula)$dpars)[1],
+    as_written = user_prior
   )
   combine_prior(prior, constraints)
 }
@@ -567,8 +568,11 @@ configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...
 # (constant(0) for mpt's g = 0.5). brms stores a row on the main parameter
 # without a dpar label (set_prior(dpar = "mu") keeps ""), so the caller passes
 # that parameter's name for the row to read `dpar = "mu"` and find its fixed
-# value; a cor row belongs to no parameter and keeps no label
-message_displaced_priors <- function(user_prior, model_prior, fixed = list(), main_dpar = "") {
+# value; a cor row belongs to no parameter and keeps no label. A row is
+# labelled as the user wrote it (`as_written`, row for row), not as
+# .align_prior_parameters() moved it
+message_displaced_priors <- function(user_prior, model_prior, fixed = list(), main_dpar = "",
+                                     as_written = user_prior) {
   if (NROW(user_prior) == 0 || NROW(model_prior) == 0) {
     return(invisible())
   }
@@ -582,7 +586,7 @@ message_displaced_priors <- function(user_prior, model_prior, fixed = list(), ma
     return(invisible())
   }
   rows <- paste(vapply(displaced, function(i) {
-    row <- user_prior[i, ]
+    row <- as_written[i, ]
     if (!nzchar(row$dpar) && !nzchar(row$nlpar) && row$class != "cor") {
       row$dpar <- main_dpar
     }
@@ -804,10 +808,11 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 
 # A prior written for one layout of a model whose parameters are nlpars in one
 # layout and dpars in the other (sdt_rating()) names the parameter in the
-# column the formula does not use. Such a row moves to the other column, and an
-# intercept stated as class "Intercept" becomes the coefficient where brms
-# keeps it there. A parameter that is a dpar and an nlpar at once, or neither,
-# is left for brms to report
+# column the formula does not use. Such a row moves to the other column. An
+# intercept stated as class "Intercept" becomes the coefficient on every
+# parameter where brms keeps it there, moved or not, as brms has no class
+# "Intercept" for such a parameter. A parameter that is a dpar and an nlpar at
+# once, or neither, is left for brms to report
 .align_prior_parameters <- function(prior, formula) {
   if (NROW(prior) == 0) {
     return(prior)
@@ -822,7 +827,7 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
   prior$nlpar[to_nlpar] <- prior$dpar[to_nlpar]
   prior$dpar[to_nlpar] <- ""
   par <- ifelse(nzchar(prior$nlpar), prior$nlpar, prior$dpar)
-  as_coef <- (to_dpar | to_nlpar) & prior$class == "Intercept" &
+  as_coef <- prior$class == "Intercept" &
     vapply(par, .intercept_is_coef, logical(1), bterms = bterms)
   prior$class[as_coef] <- "b"
   prior$coef[as_coef] <- "Intercept"
