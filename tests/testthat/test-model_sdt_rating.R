@@ -619,6 +619,23 @@ test_that("trial-level check_data() names the ratings outside 1..n_ratings", {
                "'rating' must not contain NA")
 })
 
+# match() reads TRUE as category 1; the rank column goes through the same helper
+test_that("trial-level check_data() refuses a logical rating or rank column", {
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  dat <- rating_trials()
+  dat$rating <- TRUE
+  expect_error(check_data(model, dat, formula),
+               "The rating column 'rating' is logical (TRUE/FALSE), but it must hold whole numbers from 1 to 4.",
+               fixed = TRUE)
+  dat$rating <- rep(c(TRUE, FALSE), 12)
+  expect_error(check_data(model, dat, formula), "'rating' is logical", fixed = TRUE)
+  ranks <- data.frame(id = 1:4, rank = c(TRUE, FALSE, TRUE, TRUE))
+  expect_error(check_data(sdt_ranking("rank", m = 3), ranks, bmf(d ~ 1)),
+               "The rank column 'rank' is logical (TRUE/FALSE), but it must hold whole numbers from 1 to 3.",
+               fixed = TRUE)
+})
+
 test_that("trial-level check_data() builds a one-hot Y of one trial per row", {
   model <- sdt_rating("rating", "stimulus", n_ratings = 4)
   checked <- check_data(model, rating_trials(), bmf(d ~ 1, criterion ~ 1, spacing ~ 1))

@@ -242,6 +242,12 @@ check_formula.sdt <- function(model, data, formula) {
   stopif(not_in(response, colnames(data)), "Variables '{response}' missing in the data")
   stopif(anyNA(data[[response]]), "The {what} column '{response}' must not contain NA")
   categories <- .sdt_categories(model)
+  # match() reads TRUE as 1, so an all-TRUE column would pass as category 1
+  stopif(
+    is.logical(data[[response]]),
+    "The {what} column '{response}' is logical (TRUE/FALSE), but it must hold \\
+    whole numbers from 1 to {length(categories)}."
+  )
   Y <- .trial_rows_to_counts(data[[response]], seq_along(categories),
                              glue("the {what} column '{response}'"),
                              hint = glue("construct the model with {hint}"))
