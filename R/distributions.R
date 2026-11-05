@@ -2339,7 +2339,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label of
 # the ROC's quantile scale). The lcdf/lccdf entries mirror the Stan
 # dispatchers in inst/stan_chunks/sdt_dist_functions.stan branch for branch, so the
-# two implementations can be read side by side.
+# two implementations can be read side by side. The registry is shared by the
+# SDT models, psychometric_function() and the ordinal kernel
+# (.ordinal_category_log_probs()).
 #
 # The list position defines the integer dist_type code passed to Stan --
 # reordering entries changes the R <-> Stan contract.
@@ -2358,7 +2360,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # The ROC's quantile scale applies -qf(1 - p), not qf(p), so that the model ROC
 # is straight for the asymmetric Gumbels too. For gumbel_min that transform is
 # -log(-log(p)), the loglog, so each Gumbel's qf_label is the other's link name.
-.sdt_dists <- list(
+.noise_dists <- list(
   normal = list(
     cdf = pnorm,
     qf = qnorm,
@@ -2392,6 +2394,16 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     qf_label = "logit"
   )
 )
+
+# registry position defines the Stan dist_type integer
+.noise_dist_id <- function(dist) {
+  match(dist, names(.noise_dists))
+}
+
+.noise_dist_names <- names(.noise_dists)
+
+# alias, remove when no branch reads it
+.sdt_dists <- .noise_dists
 
 # Internal CDF helpers for SDT distributions. All vectorized over eta.
 # Prefer the log-scale pair inside likelihoods: the probability scale
@@ -3528,43 +3540,56 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 }
 
 
-# Category log-probabilities from thresholds: the noise cdf differenced into K
-# interval masses. `d` is d_a, so the separation in noise units is
-# d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled, they stay on the
-# noise-standardized axis, measured from the noise mean. sdratio is the signal/noise SD ratio on the natural
-# scale, and the unequal-variance scaling of signal trials lives here alone (the
-# Stan counterpart is sdt_rating_logmu_cat). Vectorized over observations:
-# thresholds may be an n-by-(K-1) matrix (or a vector, recycled across rows)
-# and d/sdratio/stimulus vectors. Returns an n-by-K matrix, or a length-K
-# vector when all inputs describe a single observation.
+# Category log-probabilities of an ordered-threshold model: the noise cdf
+# differenced into K interval masses. `thresholds` is an n-by-(K-1) matrix (or
+# a vector, recycled across rows) on the noise-standardized axis; `location`
+# shifts the latent variable and `scale` is its SD (both vectors, recycled),
+# so eta = (threshold - location) / scale. Returns an n-by-K matrix, or a
+# length-K vector when all inputs describe a single observation. The Stan
+# counterpart is ordinal_log_prob_cat() in ordinal_functions.stan.
 #
 # An interval above 0 is taken as the difference of two upper tails and one
 # below it as the difference of two lower tails, as in Stan: on the other side
 # both cdf values round to the same number, which returned -Inf, or a clamped
 # probability, for a category that still has mass.
-.sdt_category_log_probs <- function(thresholds, d, sdratio, stimulus, dist) {
+.ordinal_category_log_probs <- function(thresholds, location, scale, dist) {
   thr <- rbind(thresholds)
   dimnames(thr) <- NULL
-  n <- max(nrow(thr), length(d), length(sdratio), length(stimulus))
+  n <- max(nrow(thr), length(location), length(scale))
   if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
-  stimulus <- rep_len(stimulus, n)
-  sdratio <- rep_len(sdratio, n)
+  location <- rep_len(location, n)
+  scale <- rep_len(scale, n)
 
-  shift <- rep_len(d, n) * .sdt_rms_scale(sdratio) * stimulus
-  scale <- ifelse(stimulus == 1, sdratio, 1)
-  eta <- (thr - shift) / scale
+  eta <- (thr - location) / scale
   lower <- cbind(-Inf, eta)
   upper <- cbind(eta, Inf)
 
+  lcdf <- .noise_dists[[dist]]$lcdf
+  lccdf <- .noise_dists[[dist]]$lccdf
   out <- matrix(NA_real_, n, ncol(lower))
   above <- lower > 0
-  out[above] <- log_diff_exp(.sdt_log_ccdf(lower[above], dist),
-                             .sdt_log_ccdf(upper[above], dist))
-  out[!above] <- log_diff_exp(.sdt_log_cdf(upper[!above], dist),
-                              .sdt_log_cdf(lower[!above], dist))
+  out[above] <- log_diff_exp(lccdf(lower[above]), lccdf(upper[above]))
+  out[!above] <- log_diff_exp(lcdf(upper[!above]), lcdf(lower[!above]))
   # -Inf minus -Inf: an interval so far out that both bounds underflow
   out[is.nan(out)] <- -Inf
   if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
+}
+
+# The SDT reading of the ordinal kernel. `d` is d_a, so the separation in
+# noise units is d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled,
+# they stay on the noise-standardized axis, measured from the noise mean.
+# sdratio is the signal/noise SD ratio on the natural scale, and the
+# unequal-variance scaling of signal trials lives here alone (the Stan
+# counterpart is sdt_rating_logmu_cat). Vectorized over observations as
+# .ordinal_category_log_probs().
+.sdt_category_log_probs <- function(thresholds, d, sdratio, stimulus, dist) {
+  n <- max(nrow(rbind(thresholds)), length(d), length(sdratio), length(stimulus))
+  stimulus <- rep_len(stimulus, n)
+  sdratio <- rep_len(sdratio, n)
+  .ordinal_category_log_probs(
+    thresholds, rep_len(d, n) * .sdt_rms_scale(sdratio) * stimulus,
+    ifelse(stimulus == 1, sdratio, 1), dist
+  )
 }
 
 .sdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist) {
@@ -3661,8 +3686,8 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # boundary -- the middle category straddles it -- so the criterion is the
 # centre of that category and the two thresholds around it sit half an
 # interval away. Returns an n-by-(K - 1) matrix. The Stan counterpart is
-# sdt_place_thresholds_rating() in sdt_rating_functions.stan.
-.sdt_assemble_thresholds <- function(criterion, inc, n_ratings) {
+# sdt_place_thresholds_rating() in threshold_functions.stan.
+.assemble_thresholds <- function(criterion, inc, n_ratings) {
   K1 <- n_ratings - 1L
   thr <- matrix(0, length(criterion), K1)
   if (n_ratings %% 2L == 0L) {
@@ -3692,7 +3717,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # side (odd K) is a ratio times the spread, and every further interval is a
 # ratio times the first interval on its side, so the deltas are not
 # exchangeable. deltas is an n-by-(K - 2) matrix.
-.sdt_log_ratio_widths <- function(deltas, n_ratings) {
+.log_ratio_widths <- function(deltas, n_ratings) {
   G <- n_ratings - 2L
   inc <- exp(deltas)
   if (n_ratings %% 2L == 0L) {
@@ -3717,9 +3742,10 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # vectors and deltas an n-by-nd matrix (a vector describes a single draw).
 # Returns an n-by-(K-1) matrix, or a length-(K-1) vector for a single draw.
 # Where the criterion sits is the same for every type and is decided by
-# .sdt_assemble_thresholds(); the two closed forms below agree with it.
-.sdt_make_thresholds <- function(criterion, n_ratings, threshold_type,
-                                 spacing = NULL, deltas = NULL) {
+# .assemble_thresholds(); the two closed forms below agree with it. The Stan
+# counterpart is make_thresholds() in threshold_functions.stan.
+.make_thresholds <- function(criterion, n_ratings, threshold_type,
+                             spacing = NULL, deltas = NULL) {
   K1 <- n_ratings - 1L
 
   n <- max(length(criterion), length(spacing),
@@ -3755,7 +3781,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 
     expl <- cbind(exp(deltas), 1)
     inc <- expl / rowSums(expl) * (n_ratings - 2L) * exp(spacing)
-    thr <- .sdt_assemble_thresholds(criterion, inc, n_ratings)
+    thr <- .assemble_thresholds(criterion, inc, n_ratings)
   } else if (threshold_type == "log_ratio") {
     stopif(is.null(deltas), "deltas is required for log_ratio thresholds")
     n_deltas <- n_ratings - 2L
@@ -3763,19 +3789,23 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
            "deltas must have length n_ratings - 2 = {n_deltas}")
     stopif(n_ratings < 4L, "log_ratio thresholds require n_ratings >= 4")
 
-    thr <- .sdt_assemble_thresholds(criterion, .sdt_log_ratio_widths(deltas, n_ratings),
-                                    n_ratings)
+    thr <- .assemble_thresholds(criterion, .log_ratio_widths(deltas, n_ratings), n_ratings)
   } else {
     stopif(is.null(deltas), "deltas is required for log_distance thresholds")
     n_deltas <- n_ratings - 2L
     stopif(ncol(deltas) != n_deltas,
            "deltas must have length n_ratings - 2 = {n_deltas}")
 
-    thr <- .sdt_assemble_thresholds(criterion, exp(deltas), n_ratings)
+    thr <- .assemble_thresholds(criterion, exp(deltas), n_ratings)
   }
 
   if (n == 1L) thr[1L, ] else thr
 }
+
+# aliases, remove when no branch reads them
+.sdt_assemble_thresholds <- .assemble_thresholds
+.sdt_log_ratio_widths <- .log_ratio_widths
+.sdt_make_thresholds <- .make_thresholds
 
 
 #' @title Distribution functions for Confidence Rating SDT

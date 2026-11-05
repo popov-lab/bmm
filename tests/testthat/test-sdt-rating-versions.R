@@ -328,7 +328,8 @@ test_that("metad R companion with logmratio = 0 reduces to the standard model", 
 # round-trips a double.
 versions_stan_logmu <- function(grid, deltas) {
   sc <- system.file("stan_chunks", package = "bmm")
-  chunks <- c("sdt_dist_functions.stan", "sdt_rating_functions.stan",
+  chunks <- c("sdt_dist_functions.stan", "threshold_functions.stan",
+              "ordinal_functions.stan", "sdt_rating_functions.stan",
               "sdt_dpsdt_functions.stan", "sdt_metad_functions.stan")
   funs <- paste(vapply(file.path(sc, chunks), read_lines2, character(1)),
                 collapse = "\n")
@@ -338,7 +339,7 @@ versions_stan_logmu <- function(grid, deltas) {
     "  vector[N] criterion; vector[N] d; vector[N] sdratio; vector[N] stimulus;\n",
     "  array[N] int dist; vector[N] Ro; vector[N] Rn; vector[N] metad;\n}\n",
     "generated quantities {\n  vector[N] dp; vector[N] md;\n  for (i in 1:N) {\n",
-    "    vector[K - 1] thr = sdt_make_thresholds_rating(criterion[i], 0,\n",
+    "    vector[K - 1] thr = make_thresholds(criterion[i], 0,\n",
     "      deltas[i], K, 3);\n",
     "    dp[i] = sdt_dpsdt_logmu_cat(cat[i], thr, d[i], sdratio[i], stimulus[i],\n",
     "      dist[i], Ro[i], Rn[i]);\n",
