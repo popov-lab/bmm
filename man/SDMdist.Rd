@@ -16,7 +16,9 @@ dsdm(
   log = FALSE,
   parametrization = NULL,
   activation = c("vonmises", "laplace"),
-  scaling = NULL
+  scaling = NULL,
+  n_options = NULL,
+  options = NULL
 )
 
 psdm(
@@ -52,7 +54,9 @@ rsdm(
   kappa = 3.5,
   parametrization = NULL,
   activation = c("vonmises", "laplace"),
-  scaling = NULL
+  scaling = NULL,
+  n_options = NULL,
+  options = NULL
 )
 }
 \arguments{
@@ -76,6 +80,19 @@ with \code{\link[=c_bessel2sqrtexp]{c_bessel2sqrtexp()}} and use \code{scaling =
 \item{scaling}{Character; what \code{c} measures: \code{"density"}, \code{"peak"} or
 \code{"range"}. \code{NULL} (default) means \code{"density"} for the von Mises and
 \code{"peak"} for the Laplace activation. See \code{\link[=sdm]{sdm()}}.}
+
+\item{n_options}{For \code{dsdm()} and \code{rsdm()}: \code{NULL} (the default) for the
+continuous model, or the number of equally spaced response options on the
+wheel, an even number of at least 4. \code{x} is then taken at its nearest
+option, \code{dsdm()} returns the probability of that option divided by the
+step \code{2 * pi / n_options} (a density, comparable with the continuous
+model), and \code{rsdm()} returns option centres in (-pi, pi]. See the section
+"Discrete response options" in \code{\link[=sdm]{sdm()}}.}
+
+\item{options}{For \code{dsdm()} and \code{rsdm()} with \code{n_options}: the offered
+options as offsets from the target in radians, one set for all values;
+the probability is the softmax over these options only, and is 0 for an
+\code{x} that is not among them.}
 
 \item{q}{Vector of quantiles}
 

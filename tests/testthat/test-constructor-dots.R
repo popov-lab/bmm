@@ -80,6 +80,13 @@ test_that("the names a constructor passes on to its model still work", {
   expect_silent(sdm("y", link = list(kappa = "log")))
 })
 
+test_that("the dots come back with a prefix expanded to the known name", {
+  expect_identical(.check_constructor_dots(list(link = 1), known = "links"), list(links = 1))
+  expect_identical(.check_constructor_dots(list(links = 1), known = "links"), list(links = 1))
+  with_unknown <- function(...) .check_constructor_dots(list(...), known = "links")
+  expect_identical(suppressWarnings(with_unknown(link = 1, foo = 2)), list(links = 1, foo = 2))
+})
+
 test_that("a prefix is matched only to an argument no exact name already took", {
   m3_call <- quote(m3(c("a", "b"), c(1, 2), "softmax", "ss", links = list(c = "log")))
   expect_identical(
@@ -186,9 +193,9 @@ test_that("a call through a function object does not print the function", {
   expect_identical(warnings_before_error(quote(do.call(sdm, list("y", foo = 1)))), wording)
   expect_identical(warnings_before_error(quote(Map(sdm, "y", foo = 1))), wording)
   expect_identical(warnings_before_error(quote(lapply("y", sdm, foo = 1))), wording)
-  # sdm() takes four arguments by position (#558), so the fifth reaches `...`
+  # sdm() takes eight arguments by position (#558), so the ninth reaches `...`
   expect_match(
-    warnings_before_error(quote(do.call(sdm, list("y", 1, 2, 3, 4)))),
+    warnings_before_error(quote(do.call(sdm, list("y", 1, 2, 3, 4, 5, 6, 7, 8)))),
     "This model constructor takes further arguments by name only", fixed = TRUE
   )
   expect_match(

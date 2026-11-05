@@ -154,3 +154,16 @@ test_that("log_lik() and posterior_predict() of an m3 fit take the data given to
   withr::local_seed(1)
   expect_equal(from_user, brms::posterior_predict(fit, draw_ids = 1:5))
 })
+
+# newdata in the layout given to bmm() is checked again, and a response that is
+# NA in every row is the only way to predict new trials of a model that builds
+# columns from its data (#558)
+test_that("posterior_predict() of a mixture3p fit takes newdata without a single response", {
+  skip_unless_fixtures()
+  fit <- load_fixture_fit("bmmfit_mixture3p.rds")
+  nd <- fit$data[1:4, setdiff(names(fit$data), built_data_columns(fit$bmm$model))]
+  nd$dev_rad <- NA_real_
+  expect_true(lacks_built_columns(fit, nd))
+  expect_no_warning(pred <- brms::posterior_predict(fit, newdata = nd, draw_ids = 1:3))
+  expect_equal(dim(pred), c(3L, nrow(nd)))
+})

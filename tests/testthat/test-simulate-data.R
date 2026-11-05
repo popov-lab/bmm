@@ -173,6 +173,34 @@ test_that("count models give each row its own number of trials and options", {
   expect_equal(unname(rowSums(mpt_data[c("old", "new")])), c(1, 1000))
 })
 
+test_that("sdm draws each response among its row's offered options", {
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  # a row's NA cells may sit anywhere; a row without options gets no response
+  model <- sdm("y", n_options = 360, options = c("o1", "o2", "o3"), n_alternatives = "n_alt")
+  design <- data.frame(o1 = c(0, 0, NA, 0), o2 = c(pi / 2, NA, NA, pi / 2),
+                       o3 = c(pi, pi / 2, NA, NA), n_alt = c(3, 2, 0, 2))[rep(1:4, 10), ]
+  withr::local_seed(558)
+  data <- simulate_data(model, list(c = 1, kappa = 1), design)
+  offered <- as.matrix(design[c("o1", "o2", "o3")])
+  answered <- !is.na(data$y)
+  expect_identical(answered, unname(rowSums(!is.na(offered)) > 0))
+  expect_true(all(rowSums(abs(offered[answered, ] - data$y[answered]) < 1e-12, na.rm = TRUE) == 1))
+  expect_no_warning(check_data(model, data, formula))
+
+  # 12 bins is the option at 4 on a wheel of 8
+  model <- sdm("y", n_options = 8, units = "bins", options = c("o1", "o2", "o3"))
+  design <- data.frame(o1 = 0, o2 = c(2, -3), o3 = c(12, NA))[rep(1:2, 50), ]
+  data <- simulate_data(model, list(c = 1, kappa = 1), design)
+  offered <- matrix(.bin_options(as.matrix(design[c("o1", "o2", "o3")]), 8, "bins"), nrow(design))
+  expect_true(all(rowSums(offered == data$y, na.rm = TRUE) == 1))
+  expect_true(any(data$y == 4))
+  expect_no_warning(check_data(model, data, formula))
+
+  expect_error(simulate_data(sdm("y", n_options = 360, options = c("o1", "o2")), list(c = 1, kappa = 0.5),
+                             data.frame(o1 = c(0, pi / 4), o2 = pi / 2)),
+               "target \\(an offset of 0\\) is not among the options in row 2")
+})
+
 test_that("the one-display generators get each trial's own values", {
   model <- mixture3p("y", nt_features = "nt1", set_size = 2)
   withr::local_seed(11)
@@ -218,6 +246,21 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), 0.4829029, "sdm laplace peak")
   y <- simulate_data(sdm("y", scaling = "range"), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
   expect_within_mc(cos(y), 0.6224407, "sdm vonmises range")
+
+  # response options: the softmax of cstar s(x) over the offered offsets x,
+  # summed here by hand
+  y <- simulate_data(sdm("y", n_options = 8), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_true(all(abs(y * 4 / pi - round(y * 4 / pi)) < 1e-12))
+  expect_within_mc(y == 0, 0.2758925, "sdm wheel of 8, P(target)")
+  design <- data.frame(o1 = rep(0, n_sim), o2 = pi / 2)
+  y <- simulate_data(sdm("y", n_options = 360, options = c("o1", "o2"), activation = "laplace"),
+                     list(c = 1, kappa = 0.5), design)$y
+  expect_within_mc(cos(y), 0.9251394, "sdm options {0, pi/2} laplace peak")
+  y <- simulate_data(sdm("y", n_options = 360, n_alternatives = 4, scaling = "range"),
+                     list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_within_mc(cos(y), 0.7351053, "sdm 4 alternatives vonmises range")
+  bins <- simulate_data(sdm("y", n_options = 8, units = "bins"), list(c = 1, kappa = 0.5), n_trials = 50)$y
+  expect_true(all(bins %in% -3:4))
 
   display <- data.frame(set_size = rep(3, n_sim), nt1 = 1.5, nt2 = -2, d1 = 1, d2 = 2)
   model <- mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size")
