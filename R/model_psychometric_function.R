@@ -347,13 +347,14 @@ check_model.psychometric_function <- function(model, data = NULL, formula = NULL
 
 # update() keeps the checked model when only the data change, so the priors stay
 # scaled to the old intensities; it says so once the new ones would have given
-# priors far from them. A parameter whose intercept has a user prior has no
-# default there to go stale
+# priors far from them. A parameter that is fixed, or whose scaled defaults all
+# have a user prior, has no default there to go stale
 #' @exportS3Method
 update_data_notice.psychometric_function <- function(model, data, formula, prior = NULL) {
   old <- model$prior_axis_range
   new <- .psychometric_axis_range(model, data, formula)
-  stale <- setdiff(c("midpoint", "width"), .psychometric_user_intercepts(prior))
+  stale <- setdiff(c("midpoint", "width"), names(model$fixed_parameters))
+  stale <- stale[!vapply(stale, .psychometric_user_covered, logical(1), formula, prior)]
   if (is.null(old) || is.null(new) || length(stale) == 0) {
     return(invisible())
   }
@@ -372,17 +373,27 @@ update_data_notice.psychometric_function <- function(model, data, formula, prior
   )
 }
 
-# brms stores the intercept of a non-linear parameter as coefficient
-# "Intercept" of class "b"
-.psychometric_user_intercepts <- function(prior) {
+# .psychometric_shape_priors() scales the intercept of both parameters, but the
+# slopes and SDs of midpoint only, so those count only for midpoint and only
+# when its formula estimates them. Any user prior of a class counts, whatever
+# its coef or group: telling which coefficients it leaves on the default would
+# take brms' prior table, for a message that only advises. brms stores the
+# intercept of a non-linear parameter as coefficient "Intercept" of class "b"
+.psychometric_user_covered <- function(par, formula, prior) {
+  f <- formula[[par]] %||% stats::as.formula(paste(par, "~ 1"))
+  labels <- attr(stats::terms(f), "term.labels")
+  random <- grepl("|", labels, fixed = TRUE)
+  needed <- c(if (has_intercept(f)) "Intercept" else "b",
+              if (par == "midpoint" && any(!random)) "b",
+              if (par == "midpoint" && any(random)) "sd")
   if (NROW(prior) == 0) {
-    return(character(0))
+    return(FALSE)
   }
-  is_intercept <- prior$class == "Intercept" | (prior$class == "b" & prior$coef == "Intercept")
-  rows <- is_intercept & nzchar(prior$prior)
-  unique(c(prior$dpar[rows], prior$nlpar[rows]))
+  rows <- (prior$dpar == par | prior$nlpar == par) & nzchar(prior$prior)
+  class <- ifelse(prior$class == "b" & prior$coef == "Intercept", "Intercept", prior$class)
+  covered <- unique(class[rows & (class != "b" | prior$coef == "")])
+  all(needed %in% covered)
 }
-
 
 ############################################################################# !
 # CHECK_FORMULA S3 METHODS                                               ####

@@ -188,6 +188,38 @@ test_that("the psychometric prior-range message names only the parameters left o
   expect_length(prior_range_messages(fit, shifted, prior = on_midpoint), 0)
 })
 
+# midpoint's slopes and SDs are scaled to the intensities too, so user priors on
+# its intercept alone leave defaults that go stale
+test_that("the psychometric prior-range message counts midpoint's slope and SD defaults", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  dat <- data.frame(x = rep(0:4, 8), y = rep(c(0L, 0L, 1L, 1L, 1L), 8),
+                    id = factor(rep(1:4, each = 10)), cond = factor(rep(c("a", "b"), 20)))
+  shifted <- transform(dat, x = x * 10 + 20)
+  fit <- stub_frame_fit(list(formula = bmf(midpoint ~ 1 + cond + (1 | id), width ~ 1, guess ~ 1, lapse ~ 1),
+                             data = dat, model = psychometric_function("y", "x")))
+  intercepts <- brms::set_prior("normal(4, 1)", class = "Intercept", dpar = "midpoint") +
+    brms::set_prior("normal(0, 1)", class = "Intercept", dpar = "width")
+  message <- prior_range_messages(fit, shifted, prior = intercepts)
+  expect_length(message, 1)
+  expect_match(message, "stay on midpoint.", fixed = TRUE)
+  midpoint_rest <- brms::set_prior("normal(0, 10)", class = "b", dpar = "midpoint") +
+    brms::set_prior("exponential(0.1)", class = "sd", dpar = "midpoint")
+  expect_length(prior_range_messages(fit, shifted, prior = intercepts + midpoint_rest), 0)
+})
+
+test_that("the psychometric prior-range message leaves out a parameter the formula fixes", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  dat <- data.frame(x = rep(0:4, 8), y = rep(c(0L, 0L, 1L, 1L, 1L), 8))
+  fit <- stub_frame_fit(list(formula = bmf(midpoint = 2, width ~ 1, guess ~ 1, lapse ~ 1),
+                             data = dat, model = psychometric_function("y", "x")))
+  shifted <- transform(dat, x = x + 2)
+  expect_match(prior_range_messages(fit, shifted), "stay on width.", fixed = TRUE)
+  on_width <- brms::set_prior("normal(0, 1)", class = "Intercept", dpar = "width")
+  expect_length(prior_range_messages(fit, shifted, prior = on_width), 0)
+})
+
 test_that("the psychometric prior range of the log-scale sigmoids is compared on the log axis", {
   skip_on_cran()
   skip_if_not_installed("rstan")
