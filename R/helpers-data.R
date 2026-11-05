@@ -423,10 +423,20 @@ standata.bmmformula <- function(object, data, model, ...) {
 #' @keywords extract_info
 #' @export
 standata.bmmfit <- function(object, newdata = NULL, ...) {
-  if (lacks_built_columns(object, newdata)) {
-    newdata <- check_newdata(object, newdata)
+  if (!is.null(newdata)) {
+    newdata <- prepare_newdata(object$bmm$model, newdata, object)
   }
   NextMethod()
+}
+
+# newdata in the layout the fit's model frame has, which is what brms reads
+prepare_newdata <- function(model, newdata, fit) {
+  UseMethod("prepare_newdata")
+}
+
+#' @exportS3Method
+prepare_newdata.default <- function(model, newdata, fit) {
+  if (lacks_built_columns(fit, newdata)) check_newdata(fit, newdata) else newdata
 }
 
 # The model frame holds the columns check_data() built, and data in the layout

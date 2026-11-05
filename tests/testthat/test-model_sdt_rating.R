@@ -927,32 +927,73 @@ test_that("revert_check_data() round-trips trial rows and a 1.5.0 one-hot frame"
 })
 
 # A trial fit made through the multinomial (1.5.0) stored a one-hot Y and
-# nTrials; newdata in the user's layout get them built again, which the frame
-# decides, while newdata for a trial-family fit go to brms as they are
-test_that("user-layout newdata predict from a 1.5.0 one-hot trial fit and from the trial family", {
-  skip_on_cran()
+# nTrials; newdata in the user's layout get them built again, its frame slices
+# go to brms as they are
+one_hot_trial_fit <- function(formula) {
   trials <- rating_trials()
   one_hot <- trials[c("id", "stimulus")]
   one_hot[paste0("rating", 1:4)] <- as.data.frame(diag(4)[trials$rating, ])
-  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
-  trial_model <- sdt_rating("rating", "stimulus", n_ratings = 4)
   old <- suppressMessages(bmm(formula, one_hot, sdt_rating(paste0("rating", 1:4), "stimulus"),
                               backend = "mock", mock_fit = 1, rename = FALSE))
-  old$bmm$model <- trial_model
-  newdata <- trials[c(3, 8, 20), ]
+  old$bmm$model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  old
+}
 
-  expect_true(bmm:::lacks_built_columns(old, newdata))
-  checked <- bmm:::check_newdata(old, newdata)
+test_that("user-layout newdata predict from a 1.5.0 one-hot trial fit", {
+  skip_on_cran()
+  old <- one_hot_trial_fit(bmf(d ~ 1, criterion ~ 1, spacing ~ 1))
+  newdata <- rating_trials()[c(3, 8, 20), ]
+
+  checked <- bmm:::prepare_newdata(old$bmm$model, newdata, old)
   expect_equal(unname(checked$Y), unname(diag(4)[newdata$rating, ]))
   expect_identical(checked$nTrials, rep(1L, 3))
   expect_null(attr(checked, "fit_one_hot"))
   old_data <- brms::standata(old, newdata = newdata)
   expect_equal(unname(old_data$Y), unname(diag(4)[newdata$rating, ]))
   expect_equal(as.vector(old_data$trials), rep(1, 3))
+  expect_identical(bmm:::prepare_newdata(old$bmm$model, old$data[c(3, 8, 20), ], old),
+                   old$data[c(3, 8, 20), ])
+})
 
-  new <- suppressMessages(bmm(formula, trials, trial_model, backend = "mock", mock_fit = 1, rename = FALSE))
-  expect_false(bmm:::lacks_built_columns(new, newdata))
-  expect_equal(as.vector(brms::standata(new, newdata = newdata)$Y), newdata$rating)
+# A trial-family fit reads the user's layout. check_data() recodes what bmm()
+# accepts there, and a 1.5.0 frame slice, which kfold() and reloo() of a 1.5.0
+# fit pass to its trial-family refit, gets its rating back. Rows held as
+# numbers go to brms as they are, as do the grids of conditional_effects()
+test_that("newdata for the trial family take the rating and stimulus as bmm() takes them", {
+  skip_on_cran()
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  trials <- rating_trials()
+  fit <- suppressMessages(bmm(formula, trials, sdt_rating("rating", "stimulus", n_ratings = 4),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  model <- fit$bmm$model
+  rows <- c(3, 8, 14, 20)
+  newdata <- trials[rows, ]
+  standata_of <- function(nd) brms::standata(fit, newdata = nd)[c("Y", "vint1")]
+  expected <- list(Y = newdata$rating, vint1 = newdata$stimulus)
+
+  expect_identical(bmm:::prepare_newdata(model, newdata, fit), newdata)
+  expect_equal(lapply(standata_of(newdata), as.vector), expected)
+
+  old <- one_hot_trial_fit(formula)
+  slice <- old$data[rows, ]
+  expect_true(is.matrix(slice$Y))
+  expect_equal(lapply(standata_of(slice), as.vector),
+               list(Y = max.col(slice$Y), vint1 = slice$stimulus))
+
+  recoded <- newdata
+  recoded$rating <- factor(recoded$rating, levels = c(3, 1, 4, 2), ordered = TRUE)
+  recoded$stimulus <- as.character(recoded$stimulus)
+  expect_equal(lapply(standata_of(recoded), as.vector), expected)
+  recoded$rating <- as.character(newdata$rating)
+  recoded$stimulus <- as.logical(newdata$stimulus)
+  expect_equal(lapply(standata_of(recoded), as.vector), expected)
+  recoded$stimulus <- factor(newdata$stimulus)
+  expect_equal(lapply(standata_of(recoded), as.vector), expected)
+
+  newdata$rating[1] <- 6
+  expect_error(standata_of(newdata), "must hold one of '1', '2', '3', '4'")
+  grid <- data.frame(rating = 2.6, stimulus = 0, id = NA)
+  expect_identical(bmm:::prepare_newdata(model, grid, fit), grid)
 })
 
 # sdt_rating()'s trial family plots a parameter's own effects, as the

@@ -672,12 +672,46 @@ sdt_rating <- function(response, stimulus,
 ############################################################################# !
 
 # nTrials is built on trial rows only for newdata of a fit that went through
-# the multinomial (see carry_fit_bounds.sdt_rating()). Declaring it for every
-# layout lets that fit's frame, which holds it, mark user-layout newdata as
-# lacking it; a trial-family frame does not hold it, so no newdata is checked
+# the multinomial (see carry_fit_bounds.sdt_rating() and
+# prepare_newdata.sdt_rating())
 #' @exportS3Method
 built_data_columns.sdt_rating <- function(model) {
   c("nTrials", NextMethod("built_data_columns"))
+}
+
+# Trial-row newdata, read against the fit's frame:
+# - A 1.5.0 trial fit's frame holds the one-hot Y and the nTrials its
+#   multinomial reads. newdata without nTrials are in the user's layout and get
+#   both built (carry_fit_bounds.sdt_rating()); its frame slices, and the grids
+#   cut from them, hold them already.
+# - A trial-family frame is the user's layout, rating and stimulus held as
+#   numbers. A 1.5.0 frame slice, which kfold() and reloo() of a 1.5.0 fit pass
+#   to their trial-family refits, gets its rating back. check_data() then
+#   recodes the columns bmm() accepts and brms refuses, a rating or stimulus
+#   not held as numbers, and names a whole-number rating outside 1..K. Rows held
+#   as numbers go to brms as they are: check_data() refuses the grids of
+#   conditional_effects(), which hold the mean rating and a single stimulus, and
+#   the single rows of reloo()
+#' @exportS3Method
+prepare_newdata.sdt_rating <- function(model, newdata, fit) {
+  if (!is_trial_level(model)) {
+    return(NextMethod("prepare_newdata"))
+  }
+  if (is.matrix(fit$data$Y)) {
+    return(if (not_in("nTrials", names(newdata))) check_newdata(fit, newdata) else newdata)
+  }
+  if (is.matrix(newdata$Y)) {
+    newdata <- revert_check_data(model, newdata)
+  }
+  if (.sdt_rating_newdata_to_recode(model, newdata)) check_newdata(fit, newdata) else newdata
+}
+
+.sdt_rating_newdata_to_recode <- function(model, newdata) {
+  rating <- newdata[[model$resp_vars$response]]
+  not_numbers <- function(x) !is.null(x) && !is.numeric(x) && !all(is.na(x))
+  not_numbers(rating) || not_numbers(newdata[[model$other_vars$stimulus]]) ||
+    (is.numeric(rating) &&
+       any(rating %% 1 == 0 & !rating %in% seq_along(.sdt_categories(model)), na.rm = TRUE))
 }
 
 # Trial rows fitted through the multinomial (1.5.0) stored the one-hot Y and
