@@ -29,7 +29,11 @@ Files:
   - `SW()`: short for `suppressWarnings()`.
   - `SM()`: short for `suppressMessages()`.
 - `helper-mpt.R`: sources `tests/testthat/helper-mpt.R`, so the MPT fits use
-  the same tree and data builders as the unit tests.
+  the same tree and data builders as the unit tests, and defines
+  `draw_counts()` (multinomial counts from probabilities written out by hand)
+  and `expect_known_values()` (a population estimate within four posterior SDs
+  of its true value, as a ratio to that value, from a posterior no wider than
+  5% of it).
 - `helper-reference-fits.R`: `reference_cases()`, one small case per model in
   `model_names()` (model, formula, data, seed; every formula gives a parameter
   a two-level predictor), and `reference_fit(name)`, which fits a case (two
@@ -49,9 +53,18 @@ Files:
   `sdt_rating()` `posterior_predict()` and a `log_distance` fit at six
   categories),
   `test-mpt-fits.R` (`mpt()` fits read through `conditional_effects()`, and
-  the prior-only fit behind the default simplex prior) and
+  the prior-only fit behind the default simplex prior),
+  `test-mpt-known-values.R` (one `mpt()` fit per model feature on data
+  simulated with known parameters: impossible categories, a covariate,
+  restrictions, the probit link, a random intercept, a non-linear parameter
+  formula, a single tree, an EQN import), `test-mpt-likelihood.R` (the
+  `log_lik()`, `lp__` and `posterior_epred()` of an `mpt()` fit with an
+  impossible category against `dmpt()` at the same draws) and
   `test-ppp-fits.R` (`ppp()` on well-specified, misspecified and
-  impossible-category `mpt()` fits). Keep each fit
+  impossible-category `mpt()` fits). `test-golden-stancode.R` fits nothing:
+  it fails when `golden_brms` in `tests/testthat/test-model_mpt-stancode.R`
+  differs from the installed brms, since the golden Stan code snapshots skip
+  there and would otherwise go unchecked after a brms release. Keep each fit
   short (one or two chains, a few hundred iterations) and assert with
   `expect_range()` or a tolerance, never with exact equality to a stored fit.
 - `make-fixtures.R`: regenerates every fixture in `tests/testthat/assets/`

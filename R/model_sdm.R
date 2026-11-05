@@ -186,6 +186,21 @@ configure_model.sdm <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# bmm's Stan code is the sqrtexp form, so the parametrization is given, not
+# left to the generator's default
+#' @export
+simulate_data.sdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  y <- rsdm(nrow(design), mu = p$mu, c = p$c, kappa = p$kappa, parametrization = "sqrtexp")
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
+}
+
+############################################################################# !
 # POSTPROCESS METHODS                                                    ####
 ############################################################################# !
 
@@ -238,8 +253,11 @@ sdm_run_metadata <- function(data, formula, model) {
     ))
   }
 
-  run_id <- interaction(data[predictors], drop = TRUE, lex.order = TRUE)
-  run_start <- c(1L, which(run_id[-1] != run_id[-length(run_id)]) + 1L)
+  # values, not interaction() labels: pasted with ".", the cells (1, 5.2) and
+  # (1.5, 2) would share one run and its first row's normalising constant.
+  # The rows are complete cases here, so no comparison is NA
+  changed <- Reduce(`|`, lapply(data[predictors], function(x) x[-1] != x[-length(x)]))
+  run_start <- c(1L, which(changed) + 1L)
   run_count <- diff(c(run_start, nrow(data) + 1L))
   list(
     G_sdm_runs = length(run_start),
