@@ -192,13 +192,8 @@ check_data.option_set <- function(model, data, formula) {
 
 .check_option_sets <- function(offsets, response, n_options) {
   used <- which(!is.na(response))
+  .check_option_target(offsets, used)
   offered <- offsets[used, , drop = FALSE]
-  target <- rowSums(offered == 0, na.rm = TRUE) == 0
-  stopif(
-    any(target),
-    "The target (an offset of 0) is not among the options in row \\
-    {used[which(target)[1]]}. Each trial must offer the target."
-  )
   chosen <- rowSums(offered == response[used], na.rm = TRUE) == 0
   stopif(
     any(chosen),
@@ -209,6 +204,17 @@ check_data.option_set <- function(model, data, formula) {
     any(twice),
     "The data offers the same option twice in row {used[which(twice)[1]]} \\
     (with n_options = {n_options}, offsets are taken modulo the wheel)."
+  )
+}
+
+# check_data() checks the rows with a response; simulate_data() the rows that
+# offer any option, since a row without options simulates no response
+.check_option_target <- function(offsets, rows) {
+  lacking <- rows[rowSums(offsets[rows, , drop = FALSE] == 0, na.rm = TRUE) == 0]
+  stopif(
+    length(lacking) > 0,
+    "The target (an offset of 0) is not among the options in row \\
+    {lacking[1]}. Each trial must offer the target."
   )
 }
 

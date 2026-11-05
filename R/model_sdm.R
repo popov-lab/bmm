@@ -498,6 +498,7 @@ simulate_data.sdm <- function(model, pars, design = NULL, scale = c("link", "nat
   if (is.null(offsets)) {
     y <- draw(seq_len(nrow(design)))
   } else {
+    .check_option_target(offsets, which(rowSums(!is.na(offsets)) > 0))
     y <- numeric(nrow(design))
     for (rows in split(seq_len(nrow(design)), .option_set_id(offsets))) {
       offered <- offsets[rows[1], ]
