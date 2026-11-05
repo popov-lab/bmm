@@ -705,6 +705,45 @@ test_that("the trial family's log_lik is the category log-probability of the mul
   expect_true(all(predicted %in% 1:4))
 })
 
+# 4000 draws of one parameter point: the share of draws predicting each
+# category is the category probability, within 0.04 (five Monte Carlo SEs at
+# p = 0.5). A reversed or shifted category mapping misses it by over 0.3
+test_that("the trial family's posterior_predict draws each category at its probability", {
+  skip_on_cran()
+  withr::local_seed(667)
+  n <- 4000
+  dat <- data.frame(stimulus = c(0, 1, 1, 0), rating = c(1, 3, 4, 2))
+  prep <- rating_trial_prep(
+    sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant"),
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat,
+    list(d = rep(1.2, n), criterion = rep(0.3, n), spacing = rep(log(0.5), n), sdratio = rep(0, n))
+  )
+  predicted <- vapply(1:4, function(i) bmm:::posterior_predict_sdt_rating_trial(i, prep), numeric(n))
+  share <- vapply(1:4, function(k) colMeans(predicted == k), numeric(4))
+  probs <- bmm:::posterior_epred_sdt_rating_trial(prep)[1, , ]
+  expect_equal(probs[2, ], c(pnorm(-1.4), pnorm(-0.9) - pnorm(-1.4), pnorm(-0.4) - pnorm(-0.9),
+                             1 - pnorm(-0.4)), tolerance = 1e-10)
+  expect_lt(max(abs(share - probs)), 0.04)
+})
+
+# brms can hand a dpar to the family's methods as draws x rows, as one value
+# per draw or as one value; each is recycled over the rows
+test_that("the trial family's methods take a dpar as one value per draw or one value", {
+  skip_on_cran()
+  dat <- data.frame(stimulus = c(0, 1, 1, 0), rating = c(1, 3, 4, 2))
+  prep <- rating_trial_prep(
+    sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant"),
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat,
+    list(d = c(1.2, 0.5), criterion = c(0.3, 0.3), spacing = log(c(0.5, 0.5)), sdratio = c(0, 0))
+  )
+  short <- prep
+  short$dpars$d <- c(1.2, 0.5)
+  short$dpars$sdratio <- 0
+  expect_equal(bmm:::posterior_epred_sdt_rating_trial(short), bmm:::posterior_epred_sdt_rating_trial(prep))
+  expect_equal(vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, short), numeric(2)),
+               vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, prep), numeric(2)))
+})
+
 # a bias is the criterion moved by half the separation: bias -0.3 at d 1.2 is
 # criterion 0.3, so both anchors give the same probabilities
 test_that("every version builds on trial rows with either anchor, and the bias anchor converts", {
@@ -914,6 +953,31 @@ test_that("user-layout newdata predict from a 1.5.0 one-hot trial fit and from t
   new <- suppressMessages(bmm(formula, trials, trial_model, backend = "mock", mock_fit = 1, rename = FALSE))
   expect_false(bmm:::lacks_built_columns(new, newdata))
   expect_equal(as.vector(brms::standata(new, newdata = newdata)$Y), newdata$rating)
+})
+
+# sdt_rating()'s trial family plots a parameter's own effects, as the
+# aggregated fit does, not every predictor of the model
+test_that("conditional_effects() asks brms for a trial-family parameter's own effects only", {
+  skip_on_cran()
+  dat <- rating_trials()
+  dat$cond <- factor(rep(c("a", "b"), 12))
+  fit <- suppressMessages(bmm(bmf(d ~ 1 + cond, criterion ~ 1, delta1 ~ 1, delta2 ~ 1), dat,
+                              sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "log_distance"),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  asked <- list()
+  local_mocked_bindings(.brms_conditional_effects = function(x, ...) {
+    asked[[length(asked) + 1]] <<- list(...)
+    structure(list(), names = character(0), class = "brms_conditional_effects")
+  })
+  for (par in c("d", "criterion", "delta1")) {
+    ce <- bmm:::.ce_compute_and_transform(fit, par, bmm:::.get_parameter_info(fit, par), "native")
+    expect_length(ce, 0)
+  }
+  expect_length(asked, 1)
+  expect_identical(asked[[1]][c("effects", "dpar")], list(effects = "cond", dpar = "d"))
+  bmm:::.ce_compute_and_transform(fit, "criterion", bmm:::.get_parameter_info(fit, "criterion"),
+                                  "native", effects = "cond")
+  expect_identical(asked[[2]][c("dpar", "effects")], list(dpar = "criterion", effects = "cond"))
 })
 
 # The trial family and the one-hot multinomial (aggregated rows of one trial

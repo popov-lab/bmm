@@ -295,7 +295,7 @@
       "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n\n",
       "  Trial rows are fitted through a per-trial likelihood that evaluates ",
       "only the category given on the trial; with K = 6, a row costs about a ",
-      "sixth of what a multinomial over all K categories costs"
+      "sixth of what a multinomial over all K categories costs."
     )
   } else {
     glue(
@@ -917,10 +917,18 @@ centre_dpar_intercepts.sdt_rating <- function(model) {
 }
 
 # one family per version, threshold type and anchor, whose dpar lists differ;
-# the Stan function, the custom family and the R methods share the name
+# the Stan function and the custom family share the name. The R methods are
+# stored on the family under fixed names: brms would look a missing one up by
+# the family name in the family environment, which postprocess_brm() sets to
+# the global environment, where no bmm function is found by any name
 .sdt_rating_trial_family_name <- function(model, anchor) {
   paste("sdt_rating_trial", .sdt_rating_variant_name(model),
         model$other_vars$threshold_type, anchor, sep = "_")
+}
+
+# the version, the fourth part of the family name: no version name holds "_"
+.sdt_rating_trial_version <- function(family) {
+  strsplit(family$name, "_", fixed = TRUE)[[1]][4]
 }
 
 .sdt_rating_variant_name <- function(model) {
@@ -982,23 +990,20 @@ centre_dpar_intercepts.sdt_rating <- function(model) {
 }
 
 # The K category log-probabilities of each row: draws x K for one row i,
-# draws x rows x K for all rows. A dpar fixed by a constant prior comes as one
-# value per draw, recycled over the rows
+# draws x rows x K for all rows. get_dpar() gives draws x rows, or for a dpar
+# brms holds fixed a single value or one value per draw; each is recycled
+# draw-fastest over the rows, the order of a draws x rows matrix
 .sdt_rating_trial_log_probs <- function(prep, i = NULL) {
   consts <- as.integer(prep$family$vars[-1])
   dpars <- setdiff(prep$family$dpars, "mu")
   n_draws <- prep$ndraws
   n_obs <- if (is.null(i)) prep$nobs else 1L
   draws <- lapply(stats::setNames(nm = dpars), function(p) {
-    x <- brms::get_dpar(prep, p, i = i)
-    if (length(x) == n_draws) rep(x, n_obs) else as.vector(x)
+    rep_len(as.vector(brms::get_dpar(prep, p, i = i)), n_draws * n_obs)
   })
   stimulus <- prep$data$vint1
   if (!is.null(i)) stimulus <- stimulus[i]
-  has_extras <- vapply(.sdt_rating_variants, function(v) {
-    length(v$extra_params) > 0 && all(v$extra_params %in% dpars)
-  }, logical(1))
-  version <- if (any(has_extras)) names(which(has_extras))[1] else "standard"
+  version <- .sdt_rating_trial_version(prep$family)
   lp <- .sdt_rating_category_log_probs(
     version, consts[1], consts[2], consts[3], consts[4],
     d = draws$d, criterion = draws[[c("criterion", "bias")[consts[4]]]],

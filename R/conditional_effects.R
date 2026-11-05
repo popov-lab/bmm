@@ -256,6 +256,18 @@ conditional_effects.bmmfit <- function(x,
 
 
 .ce_compute_and_transform <- function(x, par, par_info, scale, ...) {
+  # sdt_rating()'s trial family hands brms plain dpars, for which brms plots the
+  # effects of every formula of the model; the aggregated fit shows only the
+  # parameter's own effects (.ce_nlpar_category_family()), and so does this one
+  args <- if (.is_sdt_rating_trial_fit(x)) .ce_split_args(...)
+  if (!is.null(args) && is.null(args$effects)) {
+    effects <- .ce_own_default_effects(x, par, args$grid$re_formula)
+    if (length(effects) == 0) {
+      return(structure(list(), names = character(0), class = "brms_conditional_effects"))
+    }
+    return(.ce_compute_and_transform(x, par, par_info, scale, effects = effects, ...))
+  }
+
   ce_result <- if (par_info$type == "dpar") {
     .brms_conditional_effects(x, dpar = par_info$brms_name, ...)
   } else if (par_info$type == "nlpar" && .has_category_dpars(x)) {
@@ -811,11 +823,7 @@ conditional_effects.bmmfit <- function(x,
 .ce_nlpar_category_family <- function(x, par, ...) {
   args <- .ce_split_args(...)
   if (is.null(args$effects)) {
-    args$grid$effects <- vapply(
-      .ce_select_own_effects(.ce_brms_default_effects(x, args$grid$re_formula),
-                             .ce_own_effects(x, par)),
-      paste, "", collapse = ":"
-    )
+    args$grid$effects <- .ce_own_default_effects(x, par, args$grid$re_formula)
   }
   # an empty `effects` of the user's is for brms to refuse
   grid <- if (is.null(args$effects) && length(args$grid$effects) == 0) {
@@ -837,6 +845,26 @@ conditional_effects.bmmfit <- function(x,
       }
     ),
     class = "brms_conditional_effects"
+  )
+}
+
+
+#' The effects of brms's default grid that are a parameter's own
+#'
+#' @param x A bmmfit object
+#' @param par Character string. The bmm parameter name.
+#' @param re_formula As in [brms::conditional_effects()]
+#'
+#' @return Character vector of effects, as `effects` of
+#'   [brms::conditional_effects()] takes them; empty for a parameter without
+#'   predictors
+#'
+#' @keywords internal
+#' @noRd
+.ce_own_default_effects <- function(x, par, re_formula) {
+  vapply(
+    .ce_select_own_effects(.ce_brms_default_effects(x, re_formula), .ce_own_effects(x, par)),
+    paste, "", collapse = ":"
   )
 }
 
