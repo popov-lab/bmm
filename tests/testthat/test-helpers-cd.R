@@ -429,6 +429,23 @@ test_that(".cd_custom_family() appends criterion and declares an integer respons
   )
 })
 
+test_that("the observer a family was built with is read back at prediction", {
+  for (knowledge in c("rich", "limited")) {
+    family <- .cd_custom_family(
+      list(
+        links = list(mu = "tan_half", kappa = "log", thetat = "logit", criterion = "identity"),
+        knowledge = knowledge
+      ),
+      "demo_cd", "thetat",
+      log_lik = function(i, prep) NULL, posterior_predict = function(i, prep, ...) NULL,
+      posterior_epred = posterior_epred_undefined("demo")
+    )
+    # prepare_predictions() takes the family from brmsterms() of the stored formula
+    terms <- brms::brmsterms(brms::bf(r | vreal(probe_centered) ~ 1, family = family))
+    expect_identical(.cd_prep_rich(list(family = terms$family)), knowledge == "rich")
+  }
+})
+
 test_that(".cd_prep_nt() drops the probe column", {
   prep <- list(data = list(vreal3 = c(3, 0), vreal1 = c(1, 0), vreal2 = c(2, 0)))
   expect_equal(unname(.cd_prep_nt(prep, 1)), c(2, 3))
