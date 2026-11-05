@@ -78,6 +78,11 @@ model_cases_tcc <- function() {
         pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
         formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
       ),
+      tcc_bins_motor = list(
+        model = tcc("bin", similarity = exp(-(0:90) / 10), n_options = 180, units = "bins", motor_sd = 1),
+        pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
       tcc_options_m = list(
         model = tcc("err", similarity = exp(-(0:180) / 20), options = c("o1", "o2", "o3"), n_alternatives = "m"),
         pars = list(d = 0.5),

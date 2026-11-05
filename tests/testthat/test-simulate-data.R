@@ -272,6 +272,10 @@ test_that("simulated statistics of the circular models match their densities", {
   model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, motor_sd = pi / 6)
   y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
   expect_within_mc(y == 0, 0.2086131, "tcc motor P(target)")
+  # with units = "bins" motor_sd counts option steps: the same one-step cell
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, units = "bins", motor_sd = 1)
+  y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
+  expect_within_mc(y == 0, 0.2086131, "tcc bins motor P(target)")
   bins <- simulate_data(tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, units = "bins"),
                         list(d = 0.5), n_trials = 50)$y
   expect_true(all(bins %in% -5:6))

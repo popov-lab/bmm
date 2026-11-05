@@ -1189,10 +1189,12 @@ simulate_data.tcc <- function(model, pars, design = NULL, scale = c("link", "nat
 # check cannot see a method that drops them
 .simulate_tcc_responses <- function(model, design, d) {
   n_options <- model$other_vars$n_options
+  # rtcc() reads motor_sd in radians; the model holds it in the units of the response
+  motor_sd <- .tcc_motor_steps(model$other_vars) * 2 * pi / n_options
   draw <- function(rows, options = NULL) {
     rtcc(length(rows), d = d[rows], similarity = model$other_vars$similarity,
          n_options = n_options, noise = model$other_vars$noise, options = options,
-         correlation = model$other_vars$correlation, motor_sd = model$other_vars$motor_sd %||% 0)
+         correlation = model$other_vars$correlation, motor_sd = motor_sd)
   }
   # .option_offsets() checks the option columns only in rows with a response
   checked <- design
