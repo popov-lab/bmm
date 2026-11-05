@@ -131,10 +131,10 @@ test_that("update() still treats data with a column Y as the user's data", {
 # =============================================================================
 
 # messages of an update() whose default priors were scaled to the old data
-prior_range_messages <- function(fit, newdata) {
+prior_range_messages <- function(fit, newdata, ...) {
   messages <- character(0)
   withCallingHandlers(
-    stub_update(fit, newdata = newdata),
+    stub_update(fit, newdata = newdata, ...),
     message = function(m) {
       messages <<- c(messages, conditionMessage(m))
       invokeRestart("muffleMessage")
@@ -162,6 +162,30 @@ test_that("update(newdata =) says once that psychometric priors keep the old int
   # new data: this slice spans 3 to 4 and as user data would get the message
   expect_length(prior_range_messages(fit, fit$data[fit$data$x >= 3, ]), 0)
   expect_length(prior_range_messages(fit, dat[dat$x >= 3, ]), 1)
+})
+
+test_that("the psychometric prior-range message names only the parameters left on defaults", {
+  skip_on_cran()
+  skip_if_not_installed("rstan")
+  dat <- data.frame(x = rep(0:4, 8), y = rep(c(0L, 0L, 1L, 1L, 1L), 8))
+  shifted <- transform(dat, x = x + 2)
+  formula <- bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1)
+  model <- psychometric_function("y", "x")
+  on_midpoint <- brms::set_prior("normal(4, 1)", class = "Intercept", dpar = "midpoint")
+  on_width <- brms::set_prior("normal(0, 1)", class = "Intercept", dpar = "width")
+  fit <- stub_frame_fit(list(formula = formula, data = dat, model = model))
+
+  message <- prior_range_messages(fit, shifted, prior = on_midpoint)
+  expect_length(message, 1)
+  expect_match(message, "stay on width.", fixed = TRUE)
+  expect_no_match(message, "midpoint", fixed = TRUE)
+  expect_length(prior_range_messages(fit, shifted, prior = on_midpoint + on_width), 0)
+
+  # a user prior of the original fit is carried into the update, so it is no default either
+  fit <- quietly(bmm(formula, dat, model, prior = on_width,
+                     backend = "mock", mock_fit = stub_stanfit(), rename = FALSE))
+  expect_match(prior_range_messages(fit, shifted), "stay on midpoint.", fixed = TRUE)
+  expect_length(prior_range_messages(fit, shifted, prior = on_midpoint), 0)
 })
 
 test_that("the psychometric prior range of the log-scale sigmoids is compared on the log axis", {

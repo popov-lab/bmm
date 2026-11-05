@@ -140,7 +140,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
-    update_data_notice(model, newdata, user_formula)
+    update_data_notice(model, newdata, user_formula,
+                       combine_prior(object$bmm$user_prior, dots$prior))
     from_stored_frame <- FALSE
     attr(data, "data_name") <- substitute_name(newdata)
   }
@@ -552,12 +553,13 @@ is_same_run <- function(object, dots) {
 
 # a model whose check_model() fits its default priors to the data keeps those
 # priors when update() gets new data under the old formula; its method says so
-# when the new data would have given other priors
-update_data_notice <- function(model, data, formula) {
+# when the new data would have given other priors. `prior` holds the user's
+# priors of the original fit and of this call, which no default replaces
+update_data_notice <- function(model, data, formula, prior = NULL) {
   UseMethod("update_data_notice")
 }
 
 #' @exportS3Method
-update_data_notice.default <- function(model, data, formula) {
+update_data_notice.default <- function(model, data, formula, prior = NULL) {
   invisible()
 }

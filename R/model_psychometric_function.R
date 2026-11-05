@@ -347,12 +347,14 @@ check_model.psychometric_function <- function(model, data = NULL, formula = NULL
 
 # update() keeps the checked model when only the data change, so the priors stay
 # scaled to the old intensities; it says so once the new ones would have given
-# priors far from them
+# priors far from them. A parameter whose intercept has a user prior has no
+# default there to go stale
 #' @exportS3Method
-update_data_notice.psychometric_function <- function(model, data, formula) {
+update_data_notice.psychometric_function <- function(model, data, formula, prior = NULL) {
   old <- model$prior_axis_range
   new <- .psychometric_axis_range(model, data, formula)
-  if (is.null(old) || is.null(new)) {
+  stale <- setdiff(c("midpoint", "width"), .psychometric_user_intercepts(prior))
+  if (is.null(old) || is.null(new) || length(stale) == 0) {
     return(invisible())
   }
   ratio <- diff(new) / diff(old)
@@ -363,10 +365,22 @@ update_data_notice.psychometric_function <- function(model, data, formula) {
   log_axis <- if (.psychometric_sigmoids[[model$other_vars$sigmoid]]$log_x) " (log scale)" else ""
   message2(
     "The intensities in newdata span {paste(signif(new, 3), collapse = ' to ')}{log_axis}, \\
-    but the default priors on midpoint and width are the priors of the original fit, \\
-    scaled to {paste(signif(old, 3), collapse = ' to ')}. To scale them to the new data, \\
-    pass the formula again as formula., or give your own with prior =."
+    but the default priors of the original fit, scaled to \\
+    {paste(signif(old, 3), collapse = ' to ')}, stay on {paste(stale, collapse = ' and ')}. \\
+    To scale them to the new data, pass the formula again as formula., or give \\
+    your own with prior =."
   )
+}
+
+# brms stores the intercept of a non-linear parameter as coefficient
+# "Intercept" of class "b"
+.psychometric_user_intercepts <- function(prior) {
+  if (NROW(prior) == 0) {
+    return(character(0))
+  }
+  is_intercept <- prior$class == "Intercept" | (prior$class == "b" & prior$coef == "Intercept")
+  rows <- is_intercept & nzchar(prior$prior)
+  unique(c(prior$dpar[rows], prior$nlpar[rows]))
 }
 
 
