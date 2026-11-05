@@ -24,7 +24,8 @@ test_that("model_registry() lists each model once per task it names, in the orde
       "Continuous reproduction",
       "Categorical recall and n-AFC decisions",
       "Detection, recognition and confidence judgments",
-      "Choices and response times"
+      "Choices and response times",
+      "Questionnaire and rating-scale responses"
     )
   )
   groups_of <- function(model) registry$group[registry$model == model]
@@ -33,6 +34,7 @@ test_that("model_registry() lists each model once per task it names, in the orde
   expect_equal(groups_of("sdt_yn"), "Detection, recognition and confidence judgments")
   expect_equal(groups_of("psychometric_function"), "Detection, recognition and confidence judgments")
   expect_equal(groups_of("ddm"), "Choices and response times")
+  expect_equal(groups_of("likert_cumulative"), "Questionnaire and rating-scale responses")
   expect_equal(
     groups_of("mpt"),
     c("Categorical recall and n-AFC decisions", "Detection, recognition and confidence judgments")
@@ -61,12 +63,14 @@ test_that("the vocabularies list the tasks and domains in their documented order
       "Continuous reproduction",
       "Categorical recall and n-AFC decisions",
       "Detection, recognition and confidence judgments",
-      "Choices and response times"
+      "Choices and response times",
+      "Questionnaire and rating-scale responses"
     )
   )
   expect_identical(
     model_domains,
-    c("Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning")
+    c("Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning",
+      "Personality and individual differences")
   )
 })
 

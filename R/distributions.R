@@ -3926,6 +3926,94 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 
 
 ############################################################################# !
+# CUMULATIVE MODEL FOR LIKERT ITEMS                                       ####
+############################################################################# !
+
+#' @title Distribution functions for the cumulative Likert model
+#'
+#' @description Density and random generation for [likert_cumulative()]: a
+#'   latent response variable with mean `activation` and noise of SD 1, cut by
+#'   K - 1 ordered thresholds into K response categories.
+#'
+#' @name likert_cumulative_dist
+#'
+#' @param x Integer vector of response categories, from 1 to K.
+#' @param activation Numeric vector. The mean of the latent response variable,
+#'   in units of the noise SD.
+#' @param thresholds Numeric vector of K - 1 increasing thresholds, or an
+#'   n-by-(K - 1) matrix with one row per observation. [likert_cumulative()]
+#'   builds them around 0 from its threshold parameters.
+#' @param dist Character. Noise distribution: "normal" (default, cumulative
+#'   probit), "logistic" (cumulative logit), "gumbel_min" (complementary
+#'   log-log, brms's `cloglog`) or "gumbel_max" (log-log).
+#' @param log Logical. If `TRUE`, returns the log probability (default
+#'   `FALSE`).
+#' @param n Integer. Number of responses to generate. `activation` and the rows
+#'   of `thresholds` are recycled to this length.
+#'
+#' @return `dlikert_cumulative` returns the (log) probability of each
+#'   response. `rlikert_cumulative` returns an integer vector of categories
+#'   from 1 to K.
+#'
+#' @references
+#' Bürkner, P.-C., & Vuorre, M. (2019). Ordinal regression models in
+#'   psychology: A tutorial. \emph{Advances in Methods and Practices in
+#'   Psychological Science}, \emph{2}(1), 77--101.
+#'   \doi{10.1177/2515245918823199}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # probabilities of the five categories at activation 0.5
+#' dlikert_cumulative(1:5, activation = 0.5, thresholds = c(-1.5, -0.5, 0.5, 1.5))
+dlikert_cumulative <- function(x, activation, thresholds,
+                               dist = c("normal", "logistic", "gumbel_min", "gumbel_max"),
+                               log = FALSE) {
+  dist <- match.arg(dist)
+  thr <- .likert_check_thresholds(thresholds)
+  K <- ncol(thr) + 1L
+  stopif(anyNA(x) || any(x %% 1 != 0 | x < 1 | x > K), "x must be whole numbers from 1 to {K}")
+  log_probs <- rbind(.ordinal_category_log_probs(thr, activation, 1, dist))
+  n <- max(nrow(log_probs), length(x))
+  if (nrow(log_probs) != n) {
+    log_probs <- log_probs[rep_len(seq_len(nrow(log_probs)), n), , drop = FALSE]
+  }
+  out <- log_probs[cbind(seq_len(n), rep_len(x, n))]
+  if (log) out else exp(out)
+}
+
+#' @rdname likert_cumulative_dist
+#' @export
+#' @examples
+#' # 200 persons answering one item
+#' y <- rlikert_cumulative(200, activation = rnorm(200), thresholds = c(-1.5, -0.5, 0.5, 1.5))
+#' table(y)
+rlikert_cumulative <- function(n, activation, thresholds,
+                               dist = c("normal", "logistic", "gumbel_min", "gumbel_max")) {
+  dist <- match.arg(dist)
+  stopif(length(n) != 1 || !is.numeric(n) || n < 1 || n %% 1 != 0,
+         "n must be a single positive whole number")
+  thr <- .likert_check_thresholds(thresholds)
+  probs <- exp(rbind(.ordinal_category_log_probs(thr, rep_len(activation, n), 1, dist)))
+  if (nrow(probs) != n) {
+    probs <- probs[rep_len(seq_len(nrow(probs)), n), , drop = FALSE]
+  }
+  upper <- matrixStats::rowCumsums(probs)[, -ncol(probs), drop = FALSE]
+  as.integer(1L + rowSums(stats::runif(n) > upper))
+}
+
+.likert_check_thresholds <- function(thresholds) {
+  thr <- rbind(thresholds)
+  dimnames(thr) <- NULL
+  stopif(ncol(thr) < 2, "thresholds must hold at least 2 thresholds (3 categories)")
+  stopif(anyNA(thr), "thresholds must not contain NA")
+  stopif(any(thr[, -1, drop = FALSE] <= thr[, -ncol(thr), drop = FALSE]),
+         "thresholds must be increasing within each row")
+  thr
+}
+
+
+############################################################################# !
 # CONTINUOUS DUAL-PROCESS (CDP) SDT                                       ####
 ############################################################################# !
 

@@ -251,6 +251,10 @@ test_that("built_data_columns() names what each model's check_data() builds", {
   # counts in n_trials and a guess column: only the lapse slot is built
   expect_setequal(declared("psychometric_function_counts"), c("psy_lapse", "psy_dist", "psy_logx"))
 
+  expect_setequal(declared("likert_cumulative"), c("lc_resp", "lc_k", "lc_dist", "lc_thresh", "lc_item"))
+  expect_setequal(declared("likert_cumulative_ordered"),
+                  c("lc_resp", "lc_k", "lc_dist", "lc_thresh", "lc_item", "lc_key"))
+
   ezdm_4par <- model_test_cases("check_data")$ezdm_4par$model
   expect_setequal(built_data_columns(ezdm_4par), c("rt_used_upper", "rt_used_lower"))
 })

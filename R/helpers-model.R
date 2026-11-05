@@ -580,11 +580,13 @@ model_tasks <- c(
   "Continuous reproduction",
   "Categorical recall and n-AFC decisions",
   "Detection, recognition and confidence judgments",
-  "Choices and response times"
+  "Choices and response times",
+  "Questionnaire and rating-scale responses"
 )
 
 model_domains <- c(
-  "Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning"
+  "Working memory", "Long-term memory", "Perception", "Decision making", "Reasoning",
+  "Personality and individual differences"
 )
 
 model_registry <- function(models = model_names(),
