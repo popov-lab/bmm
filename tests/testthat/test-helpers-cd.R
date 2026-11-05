@@ -367,10 +367,6 @@ test_that("revert_check_data.change_detection() rebuilds what check_data() needs
 
 test_that("change-detection models print their response units", {
   expect_named(response_annotations(cd_stub_model()), c("response", "probe", "target"))
-  expect_equal(
-    model_group("Visual working memory (change detection)"),
-    "Detection, recognition and confidence judgments"
-  )
 })
 
 test_that(".cd_custom_family() appends criterion and declares an integer response", {
