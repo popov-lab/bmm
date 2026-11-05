@@ -671,9 +671,25 @@ sdt_rating <- function(response, stimulus,
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+# nTrials is built on trial rows only for newdata of a fit that went through
+# the multinomial (see carry_fit_bounds.sdt_rating()). Declaring it for every
+# layout lets that fit's frame, which holds it, mark user-layout newdata as
+# lacking it; a trial-family frame does not hold it, so no newdata is checked
 #' @exportS3Method
 built_data_columns.sdt_rating <- function(model) {
-  c(if (!is_trial_level(model)) "nTrials", NextMethod("built_data_columns"))
+  c("nTrials", NextMethod("built_data_columns"))
+}
+
+# Trial rows fitted through the multinomial (1.5.0) stored the one-hot Y and
+# nTrials its formula reads, so newdata for such a fit is built the same way.
+# Read from the fit's frame rather than from the model, which is the same
+# object for both routes
+#' @exportS3Method
+carry_fit_bounds.sdt_rating <- function(model, data, frame = data) {
+  if (is_trial_level(model) && is.matrix(frame$Y)) {
+    attr(data, "fit_one_hot") <- TRUE
+  }
+  data
 }
 
 #' @exportS3Method
@@ -694,7 +710,15 @@ check_data.sdt_rating <- function(model, data, formula) {
   if (is_trial_level(model)) {
     Y <- .sdt_trial_rows_to_counts(model, data, "rating",
                                    "one count column per category in response, without n_ratings")
-    data[[resp_cols]] <- .sdt_trial_category(Y)
+    one_hot <- isTRUE(attr(data, "fit_one_hot"))
+    attr(data, "fit_one_hot") <- NULL
+    if (one_hot) {
+      data <- data[!colnames(data) %in% resp_cols]
+      data$Y <- Y
+      data$nTrials <- 1L
+    } else {
+      data[[resp_cols]] <- .sdt_trial_category(Y)
+    }
     return(NextMethod("check_data"))
   }
 

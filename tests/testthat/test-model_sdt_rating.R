@@ -887,6 +887,35 @@ test_that("revert_check_data() round-trips trial rows and a 1.5.0 one-hot frame"
   expect_false(any(c("Y", "nTrials") %in% names(old)))
 })
 
+# A trial fit made through the multinomial (1.5.0) stored a one-hot Y and
+# nTrials; newdata in the user's layout get them built again, which the frame
+# decides, while newdata for a trial-family fit go to brms as they are
+test_that("user-layout newdata predict from a 1.5.0 one-hot trial fit and from the trial family", {
+  skip_on_cran()
+  trials <- rating_trials()
+  one_hot <- trials[c("id", "stimulus")]
+  one_hot[paste0("rating", 1:4)] <- as.data.frame(diag(4)[trials$rating, ])
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  trial_model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  old <- suppressMessages(bmm(formula, one_hot, sdt_rating(paste0("rating", 1:4), "stimulus"),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  old$bmm$model <- trial_model
+  newdata <- trials[c(3, 8, 20), ]
+
+  expect_true(bmm:::lacks_built_columns(old, newdata))
+  checked <- bmm:::check_newdata(old, newdata)
+  expect_equal(unname(checked$Y), unname(diag(4)[newdata$rating, ]))
+  expect_identical(checked$nTrials, rep(1L, 3))
+  expect_null(attr(checked, "fit_one_hot"))
+  old_data <- brms::standata(old, newdata = newdata)
+  expect_equal(unname(old_data$Y), unname(diag(4)[newdata$rating, ]))
+  expect_equal(as.vector(old_data$trials), rep(1, 3))
+
+  new <- suppressMessages(bmm(formula, trials, trial_model, backend = "mock", mock_fit = 1, rename = FALSE))
+  expect_false(bmm:::lacks_built_columns(new, newdata))
+  expect_equal(as.vector(brms::standata(new, newdata = newdata)$Y), newdata$rating)
+})
+
 # The trial family and the one-hot multinomial (aggregated rows of one trial
 # each, the program 1.5.0 fits to trial rows) share every parameter and prior,
 # so their total log densities agree at any point. log_prob through the
