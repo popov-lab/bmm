@@ -465,6 +465,8 @@ revert_check_data.sdt_ranking <- function(model, data) {
     data[[m]] <- data$max_rank
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), m)
   }
+  # a kfold() training fold can lack the fit's largest set size
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   data$max_rank <- NULL
@@ -488,10 +490,9 @@ revert_check_data.sdt_rating <- function(model, data) {
 revert_check_data.sdt_cdp <- function(model, data) {
   n_new <- model$other_vars$n_new
   n_old <- model$other_vars$n_old
-  # check_data() renamed the count columns cdp1 ... cdpK, and whether guess
-  # columns were present is recorded only in how many there are
+  # check_data() renamed the count columns cdp1 ... cdpK
   Y <- unclass(data$Y)
-  has_guess <- ncol(Y) == n_new + 3L * n_old
+  has_guess <- .sdt_cdp_has_guess_cols(model, Y)
   if (is_trial_level(model)) {
     cats <- .sdt_cdp_category_table(n_new, n_old, has_guess)[.sdt_trial_category(Y), ]
     data[[model$resp_vars$judgment]] <- cats$judgment
@@ -501,6 +502,8 @@ revert_check_data.sdt_cdp <- function(model, data) {
                                         model$resp_vars$response)
     data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
   }
+  # a kfold() training fold can lack every 'guess' judgment of the fit
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")

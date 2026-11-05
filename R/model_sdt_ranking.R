@@ -56,7 +56,7 @@
       "  - Rank (response): the rank the target received on the trial, a whole ",
       "number from 1 = most likely target to the trial's set size", "\n",
       "  - Set size (m): a constant or a column giving the number of ranked ",
-      "items on each trial", "\n",
+      "items on each trial", "\n\n",
       "  No stimulus column needed (all trials include exactly one target)"
     )
   } else {
@@ -66,7 +66,7 @@
       "giving the number of trials in which the target received that rank ",
       "(column 1 = most likely target, column m = least)", "\n",
       "  - Set size (m): a constant or a column giving the number of ranked ",
-      "items per row; rows with fewer ranks leave the surplus columns at 0", "\n",
+      "items per row; rows with fewer ranks leave the surplus columns at 0", "\n\n",
       "  No stimulus column needed (all trials include exactly one target)"
     )
   }
@@ -289,8 +289,16 @@ check_data.sdt_ranking <- function(model, data, formula) {
   stopif(anyNA(max_rank),
          "Set-size column '{model$other_vars$m}' must not contain NA")
 
+  # data checked against a fit keep its number of ranks (carry_fit_bounds()),
+  # which a subset without the largest set size would otherwise lower
+  n_ranks <- attr(data, "fit_n_ranks")
+  attr(data, "fit_n_ranks") <- NULL
   if (is_trial_level(model)) {
-    model$other_vars$n_ranks <- max(max_rank)
+    n_ranks <- n_ranks %||% max(max_rank)
+    stopif(max(max_rank) > n_ranks,
+           "The data hold a set size of {max(max_rank)}, above the {n_ranks} \\
+           the model was fitted with.")
+    model$other_vars$n_ranks <- n_ranks
     Y <- .sdt_trial_rows_to_counts(model, data, "rank",
                                    "one rank-count column per rank position in response")
     over <- which(.sdt_trial_category(Y) > max_rank)

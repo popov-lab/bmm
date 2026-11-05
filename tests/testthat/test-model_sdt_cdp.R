@@ -856,6 +856,9 @@ test_that("judgment and confidence declare one row per trial", {
   expect_error(sdt_cdp("rk", "stimulus", n_new = 2, n_old = 2,
                        judgment = "judgment", confidence = "confidence"),
                "no count columns for the prefix response = 'rk'")
+  expect_error(sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                       judgment = "x", confidence = "x"),
+               "two different columns; both name 'x'")
 })
 
 test_that("trial-level check_data() names the judgment and confidence pairs off the scale", {
@@ -890,6 +893,41 @@ test_that("guess judgments switch the Know/Guess split on for trial rows", {
   expect_true(attr(checked, "has_guess"))
   # new1, new2, guess3, guess4, know3, ...: the guess at confidence 3 is category 3
   expect_identical(unname(checked$Y[3, ]), c(0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L))
+})
+
+test_that("the Know/Guess messages speak of 'guess' judgments for trial rows", {
+  model <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                   judgment = "judgment", confidence = "confidence")
+  formula <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1)
+  with_kcrit <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1, kcrit ~ 1)
+  dat <- cdp_trials()
+  dat$judgment[3] <- "guess"
+  checked <- check_model(model, dat, formula)
+  expect_error(check_formula(checked, check_data(checked, dat, formula), formula),
+               "The data contain 'guess' judgments, so the Know/Guess criterion kcrit")
+  checked <- check_model(model, cdp_trials(), with_kcrit)
+  expect_warning(
+    check_formula(checked, check_data(checked, cdp_trials(), with_kcrit), with_kcrit),
+    "the data have no 'guess' judgments.*add trials judged 'guess'"
+  )
+})
+
+# carry_fit_bounds() hands check_data() the fit's categories for newdata and
+# the stored frame
+test_that("trial-level check_data() keeps the fit's Guess categories", {
+  model <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                   judgment = "judgment", confidence = "confidence")
+  formula <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1, kcrit ~ 1)
+  dat <- cdp_trials()
+  attr(dat, "fit_has_guess") <- TRUE
+  checked <- check_data(model, dat, formula)
+  expect_identical(ncol(checked$Y), 8L)
+  expect_true(attr(checked, "has_guess"))
+  expect_null(attr(checked, "fit_has_guess"))
+  dat$judgment[3] <- "guess"
+  attr(dat, "fit_has_guess") <- FALSE
+  expect_error(check_data(model, dat, formula),
+               "'guess' judgments, but the model was fitted without them")
 })
 
 test_that("cdp trial rows and the cells aggregated from them give the same Stan program", {

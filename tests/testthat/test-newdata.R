@@ -124,6 +124,39 @@ test_that("newdata with a set size above the fit's maximum is refused", {
   }
 })
 
+# trial rows of sdt_ranking() with a set-size column, and of sdt_cdp(), learn
+# the number of categories from the data; newdata without the largest set size
+# or without a 'guess' judgment must keep the fit's, or brms refuses the
+# narrower Y
+test_that("trial-level newdata without the largest category keeps the fit's categories", {
+  skip_on_cran()
+  subsets <- list(
+    sdt_ranking_trial_level = function(user) user$set_size == 3,
+    sdt_cdp_trial_level = function(user) user$judgment != "guess"
+  )
+  for (case_name in names(subsets)) {
+    fit <- newdata_fit(case_name)
+    user <- as.data.frame(newdata_cases()[[case_name]]$data)
+    rows <- subsets[[case_name]](user)
+    from_user <- brms::standata(fit, newdata = user[rows, , drop = FALSE])
+    expect_identical(ncol(from_user$Y), ncol(fit$data$Y), info = case_name)
+    expect_equal(
+      from_user, brms::standata(fit, newdata = fit$data[rows, , drop = FALSE]),
+      info = case_name
+    )
+  }
+})
+
+test_that("trial-level newdata beyond the fit's categories is refused", {
+  skip_on_cran()
+  user <- as.data.frame(newdata_cases()$sdt_ranking_trial_level$data)
+  user$set_size[1] <- 5
+  expect_error(
+    brms::standata(newdata_fit("sdt_ranking_trial_level"), newdata = user),
+    "set size of 5, above the 4 the model was fitted with", fixed = TRUE
+  )
+})
+
 test_that("newdata without a column check_data() needs stops with its message", {
   skip_on_cran()
   case <- newdata_cases()$sdt_yn

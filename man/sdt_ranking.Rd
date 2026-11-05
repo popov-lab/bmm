@@ -58,8 +58,9 @@ Provide pre-aggregated ranking counts in wide format:
 \itemize{
 \item Rank-count columns (response): one column per rank position, each giving the number of trials in which the target received that rank (column 1 = most likely target, column m = least)
 \item Set size (m): a constant or a column giving the number of ranked items per row; rows with fewer ranks leave the surplus columns at 0
-No stimulus column needed (all trials include exactly one target)
 }
+
+No stimulus column needed (all trials include exactly one target)
 \itemize{
 \item \strong{Parameters:}
 \itemize{
@@ -138,8 +139,9 @@ Provide one row per trial with the following columns:
 \itemize{
 \item Rank (response): the rank the target received on the trial, a whole number from 1 = most likely target to the trial's set size
 \item Set size (m): a constant or a column giving the number of ranked items on each trial
-No stimulus column needed (all trials include exactly one target)
 }
+
+No stimulus column needed (all trials include exactly one target)
 \itemize{
 \item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
 \itemize{

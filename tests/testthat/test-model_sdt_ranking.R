@@ -706,6 +706,28 @@ test_that("trial-level check_data() takes the number of ranks from the largest s
   expect_null(data_trials(model, ranking_trials()))
 })
 
+# carry_fit_bounds() hands check_data() the fit's number of ranks for newdata
+# and the stored frame
+test_that("trial-level check_data() keeps the fit's number of ranks", {
+  model <- sdt_ranking("rank", m = "set_size")
+  dat <- ranking_trials()[ranking_trials()$set_size == 3, ]
+  attr(dat, "fit_n_ranks") <- 4L
+  checked <- check_data(model, dat, bmf(d ~ 1))
+  expect_identical(colnames(checked$Y), c("rank1", "rank2", "rank3", "rank4"))
+  expect_null(attr(checked, "fit_n_ranks"))
+  dat <- ranking_trials()
+  attr(dat, "fit_n_ranks") <- 3L
+  expect_error(check_data(model, dat, bmf(d ~ 1)),
+               "set size of 4, above the 3 the model was fitted with", fixed = TRUE)
+})
+
+test_that("the last requirement of each layout is a paragraph of its own", {
+  for (response in list("rank", paste0("rank", 1:4))) {
+    expect_match(sdt_ranking(response, m = 4)$requirements,
+                 "\n\nNo stimulus column needed")
+  }
+})
+
 test_that("ranking trial rows and the cells aggregated from them give the same Stan program", {
   skip_on_cran()
   trials <- ranking_trials()
