@@ -141,7 +141,8 @@ find_response.bmmfit <- function(x, combine = TRUE, ...) {
 #' @exportS3Method insight::get_data
 get_data.bmmfit <- function(x, effects = "all", component = "all",
                             source = "frame", verbose = FALSE, ...) {
-  data <- x$data[setdiff(names(x$data), built_data_columns(x$bmm$model))]
+  data <- insight_frame(x$bmm$model, x$data)
+  data <- data[setdiff(names(data), built_data_columns(x$bmm$model))]
   data <- do.call(cbind, lapply(names(data), function(col) {
     if (is.matrix(data[[col]])) as.data.frame(data[[col]]) else data[col]
   }))
@@ -157,6 +158,19 @@ get_data.bmmfit <- function(x, effects = "all", component = "all",
     fixed = data[setdiff(names(data), setdiff(groups, insight::find_predictors(x, flatten = TRUE)))],
     data
   )
+}
+
+
+# The model frame as insight reads it. A model whose likelihood reads only the
+# copies check_data() builds, such as likert_cumulative()'s lc_resp, gives the
+# user's columns back here, because brms keeps none of them in the frame
+insight_frame <- function(model, data) {
+  UseMethod("insight_frame")
+}
+
+#' @exportS3Method
+insight_frame.default <- function(model, data) {
+  data
 }
 
 

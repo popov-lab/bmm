@@ -19,12 +19,12 @@
     "https://doi.org/10.1111/j.2517-6161.1980.tb01109.x"
   ),
   burkner_vuorre = glue(
-    "Bürkner, P.-C., & Vuorre, M. (2019). Ordinal regression models in ",
+    "B\u00fcrkner, P.-C., & Vuorre, M. (2019). Ordinal regression models in ",
     "psychology: A tutorial. Advances in Methods and Practices in Psychological ",
     "Science, 2(1), 77-101. https://doi.org/10.1177/2515245918823199"
   ),
   burkner = glue(
-    "Bürkner, P.-C. (2021). Bayesian item response modeling in R with brms ",
+    "B\u00fcrkner, P.-C. (2021). Bayesian item response modeling in R with brms ",
     "and Stan. Journal of Statistical Software, 100(5). ",
     "https://doi.org/10.18637/jss.v100.i05"
   ),
@@ -544,6 +544,15 @@ check_formula.likert_cumulative <- function(model, data, formula) {
              kernel; with dist = 'logistic' this is the graded response model")
   }
   invisible()
+}
+
+# insight reads the response, item and keying, which the model frame keeps only
+# as check_data()'s copies
+#' @exportS3Method
+insight_frame.likert_cumulative <- function(model, data) {
+  data <- revert_check_data(model, data)
+  attr(data, "rebuilt") <- NULL
+  data
 }
 
 #' @exportS3Method
