@@ -234,6 +234,22 @@ test_that("check_data() says what a single set size leaves of the capacity", {
   }
 })
 
+test_that("a refit from the fit's frame keeps the single-set-size warning, a prediction does not", {
+  skip_on_cran()
+  constant_set_size <- subset(oberauer_lin_2017, set_size == 4 & ID %in% 1:2)
+  formula <- bmf(kappa ~ 1, K ~ 1)
+  fit <- suppressWarnings(suppressMessages(bmm(
+    formula, constant_set_size, mixture2p("dev_rad", set_size = "set_size", version = "slot"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  # update() checks the stored frame so, and estimates K from it again
+  expect_warning(
+    check_stored_data(fit$bmm$model, fit$data, formula),
+    "cannot test the capacity rule"
+  )
+  expect_no_warning(check_newdata(fit, constant_set_size))
+})
+
 test_that("mu1 keeps working as a deprecated name for mu", {
   expect_warning(
     check_formula(
@@ -360,9 +376,9 @@ test_that("the Stan and R likelihoods agree for every version", {
   tab <- .circmix_kappa_table()
   code <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
     "\n",
-    read_lines2(system.file("stan_chunks", "mixture2p_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "mixture2p_functions.stan", package = "bmm")),
     "\n}\n",
     "data {
       int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
@@ -467,8 +483,8 @@ test_that("the generated likelihood passes each parameter to its place in the co
   }
   program <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")), "\n",
-    read_lines2(system.file("stan_chunks", "mixture2p_funs.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "mixture2p_functions.stan", package = "bmm")), "\n",
     paste(wrappers, collapse = "\n"), "}\n",
     "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
     " real circmix_logJ_min; real circmix_dlogJ; }\n",

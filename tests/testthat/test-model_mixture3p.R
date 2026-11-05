@@ -448,9 +448,9 @@ test_that("the Stan and R likelihoods agree for every version", {
   tab <- .circmix_kappa_table()
   code <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
     "\n",
-    read_lines2(system.file("stan_chunks", "mixture3p_funs.stan", package = "bmm")),
+    read_lines2(system.file("stan_chunks", "mixture3p_functions.stan", package = "bmm")),
     "\n}\n",
     "data {
       int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
@@ -574,8 +574,8 @@ test_that("the generated likelihood passes each parameter to its place in the co
   }
   program <- paste0(
     "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_funs.stan", package = "bmm")), "\n",
-    read_lines2(system.file("stan_chunks", "mixture3p_funs.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")), "\n",
+    read_lines2(system.file("stan_chunks", "mixture3p_functions.stan", package = "bmm")), "\n",
     paste(wrappers, collapse = "\n"), "}\n",
     "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
     " real circmix_logJ_min; real circmix_dlogJ; }\n",
@@ -634,4 +634,21 @@ test_that("the capacity versions warn when the set size does not vary", {
       "dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size", version = "slot"
     ))
   )
+})
+
+test_that("a refit from the fit's frame keeps the single-set-size warning, a prediction does not", {
+  skip_on_cran()
+  one_size <- subset(oberauer_lin_2017, set_size == 4 & ID %in% 1:2)
+  formula <- bmf(kappa ~ 1, K ~ 1, ptarget ~ 1)
+  fit <- suppressWarnings(suppressMessages(bmm(
+    formula, one_size,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:3), set_size = "set_size", version = "slot"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  # update() checks the stored frame so, and estimates K from it again
+  expect_warning(
+    check_stored_data(fit$bmm$model, fit$data, formula),
+    "K is estimated from the responses at set size 4"
+  )
+  expect_no_warning(check_newdata(fit, one_size))
 })

@@ -126,8 +126,9 @@ chance, so the ratio grows with the number of cells.
 Simulated \code{mean_rt} is not truncated at \code{ndt}. When a summary rests on few
 responses (a handful of trials in version \code{"3par"}, or a rarely reached
 boundary in version \code{"4par"}, whatever \code{n_trials} is), \code{rezdm()} can
-return \code{mean_rt} below \code{ndt} or even \code{mean_rt <= 0}, which \code{bmm()}
-rejects; drop those rows before fitting.
+return \code{mean_rt} below \code{ndt} or even \code{mean_rt <= 0}. \code{bmm()} rejects
+only the non-positive mean RTs; drop those rows before fitting. Values
+below \code{ndt} are valid draws.
 }
 \examples{
 # 3-parameter version (single observation)

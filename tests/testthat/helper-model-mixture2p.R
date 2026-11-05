@@ -34,6 +34,34 @@ model_cases_mixture2p <- function() {
     links = list(
       mixture2p = list(model = model, settable = c("mu", "kappa", "thetat")),
       mixture2p_slot_averaging_vp = list(model = capacity_vp, settable = c("mu", "kappa", "tau", "K"))
+    ),
+    # the capacity versions read set_size from the design; every version runs
+    # with and without variable precision, which the R4 check cannot see
+    simulate = list(
+      mixture2p = list(
+        model = model, pars = list(kappa = 2, thetat = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(kappa ~ 1, thetat ~ 1), simulate_pars = list(mu = 0, kappa = 2, thetat = 0.5)
+      ),
+      mixture2p_slot = list(
+        model = mixture2p("dev_rad", set_size = "set_size", version = "slot"),
+        pars = list(kappa = 2, K = 1), design = data.frame(ID = rep(1:2, 50), set_size = rep(c(2, 4), each = 50)),
+        formula = bmf(kappa ~ 1, K ~ 1), simulate_pars = list(mu = 0, kappa = 2, K = 1)
+      ),
+      mixture2p_vp = list(
+        model = mixture2p("dev_rad", variable_precision = TRUE), pars = list(kappa = 2, thetat = 0.5, tau = 0),
+        design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(kappa ~ 1, thetat ~ 1, tau ~ 1), simulate_pars = list(mu = 0, kappa = 2, tau = 0, thetat = 0.5)
+      ),
+      mixture2p_slot_vp = list(
+        model = mixture2p("dev_rad", set_size = "set_size", version = "slot", variable_precision = TRUE),
+        pars = list(kappa = 2, K = 1, tau = 0), design = data.frame(ID = rep(1:2, 50), set_size = rep(c(2, 4), each = 50)),
+        formula = bmf(kappa ~ 1, K ~ 1, tau ~ 1), simulate_pars = list(mu = 0, kappa = 2, tau = 0, K = 1)
+      ),
+      mixture2p_slot_averaging_vp = list(
+        model = capacity_vp, pars = list(kappa = 2, K = 1, tau = 0),
+        design = data.frame(ID = rep(1:2, 50), set_size = rep(c(2, 4), each = 50)),
+        formula = bmf(kappa ~ 1, K ~ 1, tau ~ 1), simulate_pars = list(mu = 0, kappa = 2, tau = 0, K = 1)
+      )
     )
   )
 }

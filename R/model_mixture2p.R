@@ -97,9 +97,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(set_size),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Two-parameter mixture model by Zhang and Luck (2008).",
+      name = "Two-Parameter Mixture Model",
       citation = c(
         glue(
           "Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution \\
@@ -238,6 +238,7 @@ mixture2p <- function(resp_error, set_size = NULL,
                       variable_precision = FALSE, vp_nodes = 81L, links = NULL,
                       ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
 
@@ -261,10 +262,9 @@ mixture2p <- function(resp_error, set_size = NULL,
 
 #' @export
 check_data.mixture2p <- function(model, data, formula) {
-  # data checked against a fit, such as newdata for a prediction, may hold one
-  # set size; the warning below is about the data K is estimated from
-  against_fit <- isTRUE(attr(data, "checked_against_fit"))
-  attr(data, "checked_against_fit") <- NULL
+  # newdata for a prediction may hold one set size; the warning below is about
+  # the data K is estimated from, which a refit from the fit's frame still is
+  for_prediction <- isTRUE(attr(data, "prediction_newdata"))
   # a model saved by bmm 1.4 has no version, and its single version needs no set
   # size; prior_info() checks the data of such fits again
   if (!isTRUE(.mixture2p_version_table[[model$version]]$needs_set_size)) {
@@ -273,7 +273,7 @@ check_data.mixture2p <- function(model, data, formula) {
 
   ss <- check_var_set_size(model$other_vars$set_size, data)
   warnif(
-    !against_fit && length(unique(ss$ss_numeric)) == 1,
+    !for_prediction && length(unique(ss$ss_numeric)) == 1,
     "The set size does not vary, so the data cannot test the capacity rule of \\
     the '{model$version}' version. K is estimated from the responses at set \\
     size {ss$max_set_size}, and reflects only its prior where it reaches \\
@@ -283,14 +283,6 @@ check_data.mixture2p <- function(model, data, formula) {
   attr(data, "max_set_size") <- ss$max_set_size
 
   NextMethod("check_data")
-}
-
-# the capacity rule takes any set size, so the fit hands over no bound, only
-# that the data are not the fit's own
-#' @exportS3Method
-carry_fit_bounds.mixture2p <- function(model, data) {
-  attr(data, "checked_against_fit") <- TRUE
-  data
 }
 
 #' @exportS3Method
@@ -331,7 +323,7 @@ configure_model.mixture2p <- function(model, data, formula) {
   nlist(
     formula, data,
     stanvars = .circmix_model_stanvars(
-      model, formula$family, "mixture2p_funs.stan",
+      model, formula$family, "mixture2p_functions.stan",
       vint = if (spec$needs_set_size) "ss" else NULL
     )
   )
@@ -431,4 +423,26 @@ posterior_predict_mixture2p_slot_averaging <- function(i, prep, ...) {
     set_size = prep$data$vint1[i],
     tau = .circmix_prep_tau(prep, i)
   )
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.mixture2p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  .circmix_refuse_1_4_model(model)
+  needs_set_size <- .mixture2p_version_table[[model$version]]$needs_set_size
+  design <- .design_or_n(model, design, if (needs_set_size) .set_size_column(model), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  args <- list(n = nrow(design), mu = p$mu, kappa = p$kappa, tau = p$tau %||% 0,
+               version = model$version)
+  args <- if (needs_set_size) {
+    c(args, list(K = p$K, set_size = check_var_set_size(model$other_vars$set_size, design)$ss_numeric))
+  } else {
+    c(args, list(p_mem = p$thetat))
+  }
+  y <- do.call(rmixture2p, args)
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }

@@ -85,8 +85,13 @@ jobs:
       - name: Locate CmdStan install path
         id: cmdstan-path
         run: |
+          # the OS release and runner image key the cache: CmdStan's
+          # precompiled header is stamped with the image's SDK headers, so one
+          # built on another image fails to compile models on this one, even
+          # at the same OS release (macOS, 2026-10-28)
           cat(sprintf("path=%s\n", cmdstanr::cmdstan_default_install_path()),
-              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+              sprintf("release=%s\n", gsub("[^A-Za-z0-9.]+", "-", paste(utils::sessionInfo()$running, Sys.getenv("ImageVersion")))),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE, sep = "")
         shell: Rscript {0}
 
       - name: Cache CmdStan
@@ -94,7 +99,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.cmdstan-path.outputs.path }}
-          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-version.outputs.version }}
+          key: cmdstan-${{ runner.os }}-${{ steps.cmdstan-path.outputs.release }}-${{ steps.cmdstan-version.outputs.version }}
 
       - name: Set up CmdStan toolchain
         # cmdstanr 1.0 ignores fix and warns when it is TRUE
@@ -109,6 +114,17 @@ jobs:
             version = "${{ steps.cmdstan-version.outputs.version }}"
           )
         shell: Rscript {0}
+
+      - name: Log the runner's hardware
+        # the runners of one image differ in speed (ADR 0004, 2026-11-03);
+        # the suite cap is in seconds, so a breach is read against this
+        # line, and the artifact keeps it next to the timings; a failure
+        # here must not keep the suite from running
+        continue-on-error: true
+        run: |
+          lscpu > runner-hardware.txt
+          cpu=$(sed -n 's/^Model name: *//p' runner-hardware.txt)
+          echo "Runner CPU: ${cpu}; $(nproc) cores" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the suite under the time budget
         timeout-minutes: 30
@@ -127,3 +143,4 @@ jobs:
           path: |
             test-timings.csv
             cran-test-timings.csv
+            runner-hardware.txt

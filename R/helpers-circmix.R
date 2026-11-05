@@ -1,7 +1,7 @@
 ############################################################################# !
 # SHARED NUMERICS FOR THE CIRCULAR MIXTURE MODELS                        ####
 ############################################################################# !
-# R mirror of inst/stan_chunks/circmix_funs.stan, used by the log_lik and
+# R mirror of inst/stan_chunks/circmix_functions.stan, used by the log_lik and
 # posterior_predict methods and by the d* functions in distributions.R. The two
 # implementations must agree to within floating point;
 # tests/testthat/test-helpers-circmix.R checks that against the compiled Stan
@@ -517,9 +517,10 @@
 #' @export
 postprocess_brm.circular <- function(model, fit, ...) {
   fit <- NextMethod("postprocess_brm")
-  # a stanfit can hold no draws, as with iter = warmup
+  # a stanfit can hold no draws, as with iter = warmup; brms then counts 0 of
+  # them for rstan and NA for cmdstanr
   if (isTRUE(model$variable_precision) && has_draws(fit) &&
-    brms::ndraws(fit) > 0 && identical(fit$algorithm, "sampling")) {
+    isTRUE(brms::ndraws(fit) > 0) && identical(fit$algorithm, "sampling")) {
     .circmix_warn_vp_bound(
       .circmix_vp_shape_min(fit),
       divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
@@ -620,7 +621,7 @@ postprocess_brm.circular <- function(model, fit, ...) {
 # threading.
 .circmix_stanvars <- function() {
   tab <- .circmix_kappa_table()
-  .circmix_chunk_stanvar("circmix_funs.stan") +
+  .circmix_chunk_stanvar("circmix_functions.stan") +
     brms::stanvar(
       x = tab$logkappa, name = "circmix_logk",
       pll_args = "data vector circmix_logk"
@@ -867,4 +868,13 @@ postprocess_brm.circular <- function(model, fit, ...) {
     "priors and says so in a message.",
     sep = "\n"
   )
+}
+
+# A model stored on a fit from bmm 1.4 names its location mu1 and lacks what the
+# trial-wise generators read (the version tables' parameters, imm's background b)
+.circmix_refuse_1_4_model <- function(model) {
+  constructor <- intersect(c("mixture2p", "mixture3p", "imm"), class(model))[1]
+  stopif("mu1" %in% names(model$parameters),
+         "This {constructor}() model was saved by bmm 1.4. To simulate from it, build \\
+         the model again with {constructor}() and the same arguments.")
 }

@@ -278,3 +278,17 @@ test_that("log_lik() of a ddm fit is the density of each observation under each 
                       dpars$ndt[, i], zr = dpars$zr[, i], log = TRUE))
   }
 })
+
+test_that("the initial ndt of ddm is drawn from 0.4 to 0.6 times the fastest response (#621)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_seed(621)
+  data <- data.frame(
+    rt = c(0.03, 0.035, 0.03 + rep(c(0.1, 0.3, 0.5, 0.8), length.out = 38)),
+    response = rep(c(1, 1, 1, 0), length.out = 40)
+  )
+  # check_data() warns about responses below 0.1 s
+  cfg <- suppressWarnings(configure_fit(bmf(drift ~ 1, bound ~ 1, ndt ~ 1), data, ddm("rt", "response")))
+  ndt <- exp(replicate(200, cfg$config_args$init()$Intercept_ndt))
+  expect_gte(min(ndt), 0.012 - 1e-9)
+  expect_lte(max(ndt), 0.018 + 1e-9)
+})
