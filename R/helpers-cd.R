@@ -26,9 +26,11 @@
 # When precision varies across slot counts (slot averaging) the observer may
 # know the precision of the current trial ("rich": one boundary per precision
 # state) or only its distribution ("limited": one boundary from the marginal
-# target density over the states, their Eq. B.11 and footnote 1). Lin and
-# Oberauer's data favoured the limited observer (their Table 2), so the models
-# default to it. Variable precision is not available for change detection yet.
+# target density over the states, their Eq. B.11 and footnote 1). The models
+# default to the limited observer. Lin and Oberauer's Table 2 favours it under
+# variable precision, which change detection does not offer yet; their slot
+# model varied a different knowledge, whether the item is stored, so the table
+# says nothing about the slot-averaging case this argument changes.
 
 # Gauss-Legendre rule on [-1, 1] by Golub-Welsch. 32 nodes integrate a von
 # Mises over the arc to about 1e-10 against a 2e6-point reference rule
