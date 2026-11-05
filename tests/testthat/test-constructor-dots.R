@@ -10,6 +10,7 @@ constructor_calls <- function() {
     cswald = quote(cswald("rt", "resp")),
     ddm = quote(ddm("rt", "resp")),
     ezdm = quote(ezdm("m", "v", "u", "n")),
+    likert_cumulative = quote(likert_cumulative("y", "item", n_categories = 5)),
     imm = quote(imm("y", "nt", "d", 2)),
     IMMfull = quote(IMMfull("y", "nt", "d", 2)),
     IMMbsc = quote(IMMbsc("y", "nt", "d", 2)),

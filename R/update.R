@@ -483,6 +483,37 @@ revert_check_data.sdt_ranking <- function(model, data) {
   NextMethod("revert_check_data")
 }
 
+# brms keeps item and keying only when a formula names them; lc_item and lc_key
+# are check_data()'s integer copies of them. An ordered factor response gets its
+# levels back from the model, which check_model() gave them; a model that has
+# not met the data knows no K, which only an ordered factor carries, so the
+# response comes back as one with the levels 1..K
+#' @exportS3Method
+revert_check_data.likert_cumulative <- function(model, data) {
+  resp_var <- model$resp_vars$response
+  levels <- model$other_vars$response_levels
+  if (is.null(levels) && is.null(model$other_vars$n_categories)) {
+    levels <- as.character(seq_len(max(data$lc_k)))
+  }
+  data[[resp_var]] <- if (is.null(levels)) {
+    data$lc_resp
+  } else {
+    factor(levels[data$lc_resp], levels = levels, ordered = TRUE)
+  }
+  item <- model$resp_vars$item
+  if (not_in(item, colnames(data))) {
+    data[[item]] <- factor(data$lc_item)
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), item)
+  }
+  keying <- model$resp_vars$keying
+  if (!is.null(keying) && not_in(keying, colnames(data))) {
+    data[[keying]] <- data$lc_key
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), keying)
+  }
+  data[intersect(.likert_reserved_cols, colnames(data))] <- NULL
+  NextMethod("revert_check_data")
+}
+
 #' @exportS3Method
 revert_check_data.sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response

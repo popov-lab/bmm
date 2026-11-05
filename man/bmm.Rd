@@ -155,6 +155,11 @@ Choices and response times
 \item ezdm(): EZ-Diffusion Model
 }
 
+Questionnaire and rating-scale responses
+\itemize{
+\item likert_cumulative(): Cumulative Response Model for Likert Items (probit)
+}
+
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
 }
 
