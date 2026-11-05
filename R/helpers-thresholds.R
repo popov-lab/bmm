@@ -11,7 +11,7 @@
 # thresh_type code passed to Stan -- reordering entries changes the R <-> Stan
 # contract (see make_thresholds in threshold_functions.stan)
 .threshold_types <- c("parsimonious", "equidistant", "log_distance",
-                          "log_ratio", "softmax")
+                      "log_ratio", "softmax")
 
 # Parameter spec for one threshold parameterization. parsimonious/equidistant
 # need a single spacing; log_distance/log_ratio need K-2 interval deltas, named
