@@ -158,7 +158,10 @@ test_that("update(newdata =) says once that psychometric priors keep the old int
   expect_match(shifted, "prior =", fixed = TRUE)
   expect_length(prior_range_messages(fit, transform(dat, x = (x - 2) * 3 + 2)), 1)
   expect_length(prior_range_messages(fit, transform(dat, x = x * 3 + 10)), 1)
-  expect_length(suppressMessages(prior_range_messages(fit, dat[dat$x > 0, ])), 0)
+  # kfold() and reloo() hand update() slices of the model frame, which are not
+  # new data: this slice spans 3 to 4 and as user data would get the message
+  expect_length(prior_range_messages(fit, fit$data[fit$data$x >= 3, ]), 0)
+  expect_length(prior_range_messages(fit, dat[dat$x >= 3, ]), 1)
 })
 
 test_that("the psychometric prior range of the log-scale sigmoids is compared on the log axis", {
