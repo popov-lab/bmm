@@ -30,7 +30,8 @@ n_discrete_max <- 10
 #'     `ezdm()`, and the row sums of the response count columns of `m3()`,
 #'     `mpt()`, `sdt_rating()`, `sdt_ranking()` and `sdt_cdp()`. For all other
 #'     models a row is one trial. With one row per trial
-#'     (`sdt_yn()` and `sdt_mafc()` without `n_trials`), only the first
+#'     (`sdt_yn()` and `sdt_mafc()` without `n_trials`, `mpt()` with
+#'     `response`), only the first
 #'     grouping variable of the formula, taken as the participant, and any
 #'     grouping variable that is also a discrete predictor are crossed; the
 #'     other grouping variables, such as items, are counted per level

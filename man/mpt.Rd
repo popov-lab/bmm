@@ -91,10 +91,15 @@ to the other link, in the list or afterwards with
 \code{model$links$D <- "probit"}, takes that link's default priors (see
 Details).}
 
-\item{response}{Character. Name of the data column that holds, with one row
-per trial, the response category of each trial: a character or factor
-column whose values are branch names. \code{NULL} (the default) declares
-aggregated data with one count column per response category. See Details.}
+\item{response}{Character. A single non-empty string naming the data column
+that holds, with one row per trial, the response category of each trial:
+a character or factor column whose values are branch names. The column
+cannot carry the name of a response category, the \code{tree_id} column or a
+covariate, nor of a column that \code{bmm()} builds: \code{Y}, \code{nTrials},
+\verb{Idx_<tree>} when \code{tree_id} is set, and \verb{Poss_<category>} for a category
+declared impossible in a tree.
+\code{NULL} (the default) declares aggregated data with one count column per
+response category. See Details.}
 
 \item{...}{used internally for testing, ignore it}
 }

@@ -469,7 +469,7 @@ summary(fit_trials)
 
 The simulated standard deviations were 0.5 for `D` over participants, 0.6 for `D` over items and 0.4 for `g` over participants, all on the logit scale, and each lies inside its 95% interval in the summary. The data hold `r nrow(dat_trials)` trials, so a fit to them takes longer than a fit to the `r 2 * 30` aggregated rows, because its cost grows with the number of rows.
 
-`bmm_data_check()` treats each participant as a cell and names participants with too few trials; the items it only counts, as the minimum, median and maximum number of trials per item. `ppp()` needs to be told which grouping variable identifies the participants, because the formula now has two:
+`bmm_data_check()` treats each participant as a cell and names participants with too few trials. The items it counts per level, as the minimum, median and maximum number of trials per item, and it names an item only when that item holds far fewer trials than the typical item. The argument `min_trials` in `?bmm_data_check` gives the exact rule. `ppp()` needs to be told which grouping variable identifies the participants, because the formula now has two:
 
 ```{r ppp-trials}
 ppp(fit_trials, participant = "id")

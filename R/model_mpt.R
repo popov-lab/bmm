@@ -607,10 +607,15 @@ generated_parameters.mpt <- function(model) {
 #'   to the other link, in the list or afterwards with
 #'   `model$links$D <- "probit"`, takes that link's default priors (see
 #'   Details).
-#' @param response Character. Name of the data column that holds, with one row
-#'   per trial, the response category of each trial: a character or factor
-#'   column whose values are branch names. `NULL` (the default) declares
-#'   aggregated data with one count column per response category. See Details.
+#' @param response Character. A single non-empty string naming the data column
+#'   that holds, with one row per trial, the response category of each trial:
+#'   a character or factor column whose values are branch names. The column
+#'   cannot carry the name of a response category, the `tree_id` column or a
+#'   covariate, nor of a column that `bmm()` builds: `Y`, `nTrials`,
+#'   `Idx_<tree>` when `tree_id` is set, and `Poss_<category>` for a category
+#'   declared impossible in a tree.
+#'   `NULL` (the default) declares aggregated data with one count column per
+#'   response category. See Details.
 #' @param ... used internally for testing, ignore it
 #'
 #' @details `r model_docs(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
