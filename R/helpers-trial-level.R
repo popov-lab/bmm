@@ -74,8 +74,8 @@ is_trial_level <- function(model) {
 }
 
 # the "Trial-level data" part of the help page of the SDT models that carry
-# the marker; model_docs() appends it under the trial-level requirements, with the
-# stimulus bullet only for models with a stimulus column
+# the marker; model_docs() appends it under the trial-level requirements, with
+# the stimulus bullet only for models with a stimulus column
 trial_level_docs <- paste0(
   "Without trial-level predictors or item terms, trial rows give the same ",
   "posterior as the counts aggregated from them, which are sufficient ",
