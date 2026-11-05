@@ -62,7 +62,8 @@
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(intensity, n_trials, sigmoid, guess, lapse),
+      other_vars = nlist(intensity, n_trials, sigmoid, guess, lapse,
+                         trial_level = is.null(n_trials)),
       domain = "Perception",
       task = "Detection, recognition and confidence judgments",
       name = "Psychometric Function",

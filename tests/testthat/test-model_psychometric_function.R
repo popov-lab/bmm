@@ -154,15 +154,35 @@ test_that("bmm_data_check() counts the trials of count rows and one per 0/1 row"
   expect_null(data_trials(psychometric_function("y", "x"), counts))
 })
 
-test_that("0/1 rows keep the model's own trial column, outside the count models' trial layer", {
+test_that("0/1 rows are marked as trial rows but keep the model's own trial column", {
   model <- psychometric_function("y", "x")
-  expect_false(is_trial_level(model))
+  expect_true(is_trial_level(model))
+  expect_false(is_trial_level(psychometric_function("k", "x", n_trials = "n")))
   dat <- transform(psy_trial_data(), y = as.logical(y), nTrials = 7L)
   checked <- check_data(model, dat, bmf(midpoint ~ 1, width ~ 1, guess ~ 1, lapse ~ 1))
   expect_identical(checked$y, as.integer(dat$y))
   expect_identical(unique(checked$psy_trials), 1L)
   expect_identical(checked$nTrials, dat$nTrials)
   expect_identical(nrow(checked), nrow(dat))
+})
+
+# one 0/1 row per participant and item: crossing id with item would report
+# every cell as a single observation
+test_that("bmm_data_check() takes the first grouping variable of 0/1 rows as the participant", {
+  dat <- expand.grid(item = factor(1:20), id = factor(1:4))
+  dat$x <- rep(c(-1, 0, 1, 2), length.out = nrow(dat))
+  dat$y <- as.integer((as.integer(dat$id) + as.integer(dat$item)) %% 3 == 0)
+  res <- bmm_data_check(
+    bmf(midpoint ~ 1 + (1 | id) + (1 | item), width ~ 1, guess ~ 1, lapse ~ 1),
+    dat, psychometric_function("y", "x")
+  )
+  expect_null(res$pipeline$error)
+  expect_equal(res$cells$group_vars, "id")
+  expect_equal(
+    res$cells$other_groups,
+    data.frame(variable = "item", n_levels = 20L, min = 4L, median = 4, max = 4L)
+  )
+  expect_length(res$findings, 0)
 })
 
 test_that("inits for midpoint and width lie inside the data range", {
