@@ -25,7 +25,28 @@ bmmtools::validation_plan(
   # the model counts item among its response columns, so the generator returns
   # it, in the order of the design's rows
   trial_design = data.frame(item_loc = seq(-1.2, 1.2, length.out = n_items)),
-  sbc = list(n_subjects = 50L, n_trials = n_items, n_sims = 100L),
+  # SBC hands its generator one prior draw under brms's draw names; the r_
+  # draws are deviations from the population value
+  sbc = list(
+    n_subjects = 50L, n_trials = n_items, n_sims = 100L,
+    generator = function(draws, data) {
+      K <- 5L
+      person <- function(par) {
+        draws[[paste0("b_", par, "_Intercept")]] +
+          draws[paste0("r_id__", par, "[", data$id, ",Intercept]")]
+      }
+      spacing <- person("spacing")
+      latent <- person("activation") + data$item_loc + switch(likert_dist,
+        normal = stats::rnorm(nrow(data)),
+        logistic = stats::rlogis(nrow(data))
+      )
+      data$y <- vapply(seq_len(nrow(data)), function(i) {
+        thresholds <- exp(spacing[i]) * log(seq_len(K - 1) / (K - seq_len(K - 1)))
+        1L + sum(latent[i] > thresholds)
+      }, integer(1))
+      data
+    }
+  ),
   prior_check = list(n_subjects = 50L, n_trials = n_items),
   generator = function(pars, n_trials, model, trial_design) {
     K <- 5L
