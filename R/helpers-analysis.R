@@ -399,9 +399,10 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
 
 # Posterior draws of one parameter on the scale the likelihood reads it, with
 # conditions overriding the first data row so every formula variable is
-# present. The parameters are nlpars for the multinomial models (rating,
-# ranking) and dpars for the custom-family models (binary, mafc); which applies
-# is derived from the model class so callers never need to know. d,
+# present. The parameters are nlpars for the multinomial models (rating and
+# ranking on aggregated rows) and dpars for the custom families (binary, mafc,
+# rating on trial rows, where the threshold deltas stay nlpars); which applies
+# is derived from the model class and family so callers never need to know. d,
 # criterion and bias reach the kernels through the model's inverse link, so
 # they get it here too; sdratio and the threshold parameters stay on the log scale that
 # the SDT helpers exponentiate themselves.
@@ -413,7 +414,12 @@ roc_sdt <- function(fit, conditions = NULL, n_points = 100,
     newdata[cols] <- conditions[cols]
   }
   model <- fit$bmm$model
-  linpred <- if (inherits(model, c("sdt_rating", "sdt_ranking"))) {
+  use_nlpar <- if (.is_sdt_rating_trial_fit(fit)) {
+    startsWith(param, "delta")
+  } else {
+    inherits(model, c("sdt_rating", "sdt_ranking"))
+  }
+  linpred <- if (use_nlpar) {
     brms::posterior_linpred(fit, nlpar = param, newdata = newdata,
                             re_formula = NA, allow_new_levels = TRUE, ...)
   } else {
@@ -844,7 +850,7 @@ roc_observed <- function(fit, conditions = NULL) {
   data      <- fit$data
   stim_var  <- model$other_vars$stimulus
   n_ratings <- model$other_vars$n_ratings
-  y_mat     <- data$Y
+  y_mat     <- .observed_counts(model, data)
 
   split  <- .sdt_condition_masks(data, conditions %||% character(0))
   n_cond <- length(split$masks)

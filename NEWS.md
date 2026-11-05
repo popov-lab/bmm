@@ -36,6 +36,7 @@
 
 ### Other changes
 * `sdt_yn()` fits with one row per trial and the default normal noise (`dist = "normal"`) are faster: each sampling step takes about half the time it did. Estimates are unchanged up to sampling error.
+* `sdt_rating()` fits with one row per trial (`n_ratings`) are faster: with six rating categories, each sampling step takes about a sixth of the time it did. Estimates are unchanged up to sampling error, and priors written for count data, such as `set_prior("normal(1, 1)", nlpar = "d")`, apply unchanged.
 * `cswald()` now warns when the prior for `ndt` puts most of its mass at or above your fastest response time, which `ndt` must stay below. Such a fit can fail to start. The warning suggests a prior with a lower location; filtering out anticipations helps too (#548).
 * Model constructors such as `sdm()` and `mpt()` now warn about an argument they do not use, such as `mpt(trees, foo = 1)` or a misspelt `lnks =`, which they ignored without a message. They also warn about an extra argument given by position; give it by name. The warning names the argument and, for a misspelling, the one you probably meant. In bmm 1.6.0 this becomes an error; remove such arguments from your calls (#552).
 * `cswald()` now drops rows with a missing response time or response and warns, as `ddm()` does. It stopped and asked you to remove them (#557).

@@ -241,8 +241,24 @@ bmf2bf <- function(model, formula) {
 #' @export
 bmf2bf.bmmodel <- function(model, formula = bmmformula()) {
   brms_formula <- NextMethod("bmf2bf") %||% brms::bf(glue("{model$resp_vars[[1]]} ~ 1"))
-  components <- lapply(formula, function(x) if (is_nl(x)) brms::nlf(x) else brms::lf(x))
+  center <- if (!centre_dpar_intercepts(model)) FALSE
+  components <- lapply(formula, function(x) {
+    if (is_nl(x)) brms::nlf(x) else brms::lf(x, center = center)
+  })
   Reduce(`+`, components, init = brms_formula)
+}
+
+# brms centres the intercept of a dpar with predictors, so its prior is on the
+# value at the predictor means, and never centres an nlpar. A model whose
+# parameters are nlpars in one data layout and dpars in the other answers
+# FALSE, so that one formula and one prior mean the same in both layouts
+centre_dpar_intercepts <- function(model) {
+  UseMethod("centre_dpar_intercepts")
+}
+
+#' @exportS3Method
+centre_dpar_intercepts.default <- function(model) {
+  TRUE
 }
 
 #' @export

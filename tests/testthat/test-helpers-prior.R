@@ -853,3 +853,35 @@ test_that("the displaced-prior message names the main parameter, which brms stor
     fixed = TRUE
   )
 })
+
+# sdt_rating()'s parameters are nlpars on aggregated rows and dpars on trial
+# rows, where the threshold deltas stay nlpars; a prior written for either
+# layout moves to the column the formula uses
+test_that(".align_prior_parameters() moves a prior to the parameter type of the formula", {
+  skip_on_cran()
+  trials <- data.frame(stimulus = rep(0:1, 6), rating = rep(1:4, 3))
+  cells <- data.frame(stimulus = 0:1, r1 = 1, r2 = 2, r3 = 3, r4 = 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1)
+  mock <- function(data, model) suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_formula <- mock(trials, sdt_rating("rating", "stimulus", n_ratings = 4,
+                                           threshold_type = "log_distance"))$formula
+  cell_formula <- mock(cells, sdt_rating(paste0("r", 1:4), "stimulus",
+                                         threshold_type = "log_distance"))$formula
+
+  written_for_cells <- brms::set_prior("normal(1, 1)", nlpar = "d") +
+    brms::set_prior("exponential(3)", nlpar = "d", class = "sd") +
+    brms::set_prior("normal(0, 2)", nlpar = "delta1")
+  on_trials <- as.data.frame(.align_prior_parameters(written_for_cells, trial_formula))
+  expect_identical(on_trials$dpar, c("d", "d", ""))
+  expect_identical(on_trials$nlpar, c("", "", "delta1"))
+  expect_identical(on_trials$class, c("b", "sd", "b"))
+  expect_identical(on_trials$lb, as.data.frame(written_for_cells)$lb)
+
+  written_for_trials <- brms::set_prior("normal(1, 1)", dpar = "d", class = "Intercept")
+  on_cells <- as.data.frame(.align_prior_parameters(written_for_trials, cell_formula))
+  expect_identical(unlist(on_cells[c("class", "coef", "dpar", "nlpar")]),
+                   c(class = "b", coef = "Intercept", dpar = "", nlpar = "d"))
+  expect_identical(.align_prior_parameters(written_for_cells, cell_formula), written_for_cells)
+})

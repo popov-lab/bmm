@@ -544,6 +544,7 @@ configure_prior.default <- function(model, data, formula, user_prior, ...) {
 
 #' @export
 configure_prior.bmmodel <- function(model, data, formula, user_prior = NULL, ...) {
+  user_prior <- .align_prior_parameters(user_prior, formula)
   prior <- combine_prior(set_default_prior(model, data, formula, ...), user_prior)
   # a parameter fixed in the formula is a constraint like the rows of the
   # model's own method, so its constant() is combined after the user prior, or
@@ -639,8 +640,9 @@ fixed_pars_priors <- function(model, formula, additional_pars = list()) {
   )
 
   # flexibly set the variables for set_prior
-  classes <- ifelse(pars %in% dpars, "Intercept", "b")
-  coefs <- ifelse(pars %in% dpars, "", "Intercept")
+  as_coef <- vapply(pars, .intercept_is_coef, logical(1), bterms = bterms)
+  classes <- ifelse(as_coef, "b", "Intercept")
+  coefs <- ifelse(as_coef, "Intercept", "")
   dpars <- ifelse(pars %in% dpars, pars, "")
   nlpars <- ifelse(pars %in% nlpars, pars, "")
   brms::set_prior(priors, class = classes, coef = coefs, dpar = dpars, nlpar = nlpars)
@@ -781,16 +783,50 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
 # Helper function to create a prior object conditional on parameter type
 .build_prior <- function(prior_desc, class, par, bterms, ...) {
   args <- c(list(prior = prior_desc, class = class), list(...))
+  if (class == "Intercept" && .intercept_is_coef(par, bterms)) {
+    args$class <- "b"
+    args$coef <- "Intercept"
+  }
   if (par %in% names(bterms$nlpars)) {
-    if (class == "Intercept") {
-      args$class <- "b" # Intercept priors in brms are stored in `b` for nlpars
-      args$coef <- "Intercept"
-    }
     args$nlpar <- par
   } else {
     args$dpar <- par
   }
   do.call(brms::prior_, args)
+}
+
+# brms stores the intercept as the coefficient "Intercept" of class "b" for an
+# nlpar and for a dpar formula with center = FALSE (see centre_dpar_intercepts()),
+# and as a class "Intercept" of its own for a centred dpar
+.intercept_is_coef <- function(par, bterms) {
+  par %in% names(bterms$nlpars) || isFALSE(attr(bterms$dpars[[par]]$fe, "center"))
+}
+
+# A prior written for one layout of a model whose parameters are nlpars in one
+# layout and dpars in the other (sdt_rating()) names the parameter in the
+# column the formula does not use. Such a row moves to the other column, and an
+# intercept stated as class "Intercept" becomes the coefficient where brms
+# keeps it there. A parameter that is a dpar and an nlpar at once, or neither,
+# is left for brms to report
+.align_prior_parameters <- function(prior, formula) {
+  if (NROW(prior) == 0) {
+    return(prior)
+  }
+  bterms <- brms::brmsterms(formula)
+  dpars <- names(bterms$dpars)
+  nlpars <- names(bterms$nlpars)
+  to_dpar <- prior$nlpar %in% setdiff(dpars, nlpars)
+  to_nlpar <- prior$dpar %in% setdiff(nlpars, dpars)
+  prior$dpar[to_dpar] <- prior$nlpar[to_dpar]
+  prior$nlpar[to_dpar] <- ""
+  prior$nlpar[to_nlpar] <- prior$dpar[to_nlpar]
+  prior$dpar[to_nlpar] <- ""
+  par <- ifelse(nzchar(prior$nlpar), prior$nlpar, prior$dpar)
+  as_coef <- (to_dpar | to_nlpar) & prior$class == "Intercept" &
+    vapply(par, .intercept_is_coef, logical(1), bterms = bterms)
+  prior$class[as_coef] <- "b"
+  prior$coef[as_coef] <- "Intercept"
+  prior
 }
 
 # internal function to combine two priors (e.g. the default prior with the user
@@ -816,11 +852,13 @@ replacing_row <- function(prior1, prior2) {
   prior_types <- function(prior) {
     do.call(paste, as_prior_table(prior)[, c("class", "dpar", "nlpar", "coef", "group", "resp")])
   }
-  # brms stores the intercept of a non-linear parameter as the coefficient
-  # "Intercept" of class "b", so a prior on the whole nlpar (no coef) must
-  # replace that row too, or the more specific row wins in brms (#526)
+  # brms stores the intercept of a non-linear parameter, and of an uncentred
+  # dpar, as the coefficient "Intercept" of class "b", so a prior on the whole
+  # parameter (no coef) must replace that row too, or the more specific row
+  # wins in brms (#526)
   as_nlpar_wide <- prior1
-  as_nlpar_wide$coef[nzchar(prior1$nlpar) & prior1$coef == "Intercept"] <- ""
+  as_nlpar_wide$coef[prior1$coef == "Intercept" &
+                       (nzchar(prior1$nlpar) | nzchar(prior1$dpar) & prior1$class == "b")] <- ""
   types2 <- prior_types(prior2)
   by_type <- match(prior_types(prior1), types2)
   ifelse(is.na(by_type), match(prior_types(as_nlpar_wide), types2), by_type)

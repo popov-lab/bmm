@@ -228,6 +228,28 @@ check_formula.sdt <- function(model, data, formula) {
   paste0(response, seq_len(n_categories))
 }
 
+# The response counts of the rows a multinomial-type fit was made with, rows x
+# categories: the Y that check_data() built (aggregated rows, and the trial
+# rows that 1.5.0 fitted through the multinomial), or the one-hot form of the
+# rating that sdt_rating()'s trial family reads itself
+.observed_counts <- function(model, data) {
+  if (is.matrix(data$Y)) {
+    return(unclass(data$Y))
+  }
+  .one_hot(data[[model$resp_vars$response]], .sdt_categories(model))
+}
+
+# category numbers as one-hot counts, one dimension more: a rows vector
+# becomes rows x K, a draws x rows matrix of predictions draws x rows x K
+.one_hot <- function(y, categories) {
+  K <- length(categories)
+  shape <- if (is.matrix(y)) dim(y) else length(y)
+  out <- array(as.integer(rep(as.vector(y), K) == rep(seq_len(K), each = length(y))),
+               c(shape, K))
+  dimnames(out) <- c(rep(list(NULL), length(shape)), list(categories))
+  out
+}
+
 # the category of each trial row, the column holding the most trials: in a
 # one-hot row its only trial
 .sdt_trial_category <- function(Y) {
