@@ -364,6 +364,27 @@ test_that("data_trials reports unreadable counts as NA and trial rows as NULL", 
   expect_null(data_trials(mixture2p(resp_error = "y"), counts))
   expect_null(data_trials(sdt_yn("r1", stimulus = "s"), counts))
   expect_null(data_trials(sdt_mafc("r1", m = 4), counts))
+  expect_null(data_trials(sdt_rating("r1", stimulus = "s", n_ratings = 4), counts))
+  expect_null(data_trials(sdt_ranking("r1", m = 4), counts))
+  expect_null(data_trials(sdt_cdp(stimulus = "s", n_new = 2, n_old = 2,
+                                  judgment = "r1", confidence = "n"), counts))
+})
+
+# the rating column holds one trial per row, not counts: a report that read it
+# as counts would say the trials could not be read and check nothing
+test_that("the trial-level rating report counts observations and flags a 5-trial subject", {
+  dat <- expand.grid(id = 1:4, item = 1:12)
+  dat <- dat[!(dat$id == 4 & dat$item > 5), ]
+  dat$stimulus <- dat$item %% 2
+  dat$rating <- (dat$id + dat$item) %% 4 + 1
+  res <- bmm_data_check(
+    bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id), spacing ~ 1),
+    dat, sdt_rating("rating", "stimulus", n_ratings = 4)
+  )
+  expect_null(res$pipeline$error)
+  expect_identical(res$cells$unit, "observations")
+  expect_null(res$n_trials)
+  expect_equal(finding_messages(res), "1 design cell(s) have fewer than 10 observations: id=4 (n=5)")
 })
 
 test_that("bmm_data_check needs nothing beyond check_data and check_formula", {

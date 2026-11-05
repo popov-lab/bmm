@@ -496,6 +496,16 @@ response_annotations <- function(model) {
   if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
     return(list(response = "0/1 per trial; 1 = correct"))
   }
+  if (inherits(model, "sdt_rating") && is_trial_level(model)) {
+    return(list(response = glue("rating per trial, 1 to {model$other_vars$n_ratings}")))
+  }
+  if (inherits(model, "sdt_ranking") && is_trial_level(model)) {
+    return(list(response = "rank of the target per trial; 1 = ranked first"))
+  }
+  if (inherits(model, "sdt_cdp") && is_trial_level(model)) {
+    return(list(judgment = "'new', 'know', 'remember' or 'guess' per trial",
+                confidence = "confidence per trial, on the unified scale"))
+  }
   list()
 }
 
@@ -949,7 +959,7 @@ model_docs.bmmodel <- function(model, components = "all") {
     trial_level = paste0(
       "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
       "* **Trial-level data:** ", trial_level_docs,
-      if ("stimulus" %in% names(model$other_vars)) trial_level_stimulus_docs,
+      if ("bias" %in% names(model$parameters)) trial_level_stimulus_docs,
       trial_level_notes_docs, "\n"
     )
   )

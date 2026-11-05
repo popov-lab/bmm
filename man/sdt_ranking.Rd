@@ -7,10 +7,12 @@
 sdt_ranking(response, m, dist = c("gumbel_min", "normal"), links = NULL, ...)
 }
 \arguments{
-\item{response}{A character vector of column names with the target rank-count
-columns, ordered from rank 1 (most likely target) to rank \code{m} (least).
-With a constant \code{m}, supply exactly \code{m} columns; with a varying set size,
-supply \code{max(m)} columns.}
+\item{response}{For aggregated data, a character vector of column names
+with the target rank-count columns, ordered from rank 1 (most likely
+target) to rank \code{m} (least). With a constant \code{m}, supply exactly \code{m}
+columns; with a varying set size, supply \code{max(m)} columns. For one row per
+trial, the name of a single column holding the rank of the target on each
+trial, a whole number from 1 to that trial's set size.}
 
 \item{m}{Either a single integer >= 2 giving the number of ranked items
 (constant across all rows), or a single string naming a data column that
@@ -124,6 +126,29 @@ The set size \code{m} may be a constant or the name of a data column. Supply a
 column to fit trials with different set sizes in a single model: the response
 has \code{max(m)} columns, and rows with a smaller set size switch off the surplus
 rank categories (the multinomial then renormalizes over the valid ranks).
+\subsection{One row per trial}{
+
+Name a single column in \code{response} that holds the rank the target received
+on each trial.
+\itemize{
+\item \strong{Requirements for one row per trial:}
+
+Provide one row per trial with the following columns:
+}
+\itemize{
+\item Rank (response): the rank the target received on the trial, a whole number from 1 = most likely target to the trial's set size
+\item Set size (m): a constant or a column giving the number of ranked items on each trial
+No stimulus column needed (all trials include exactly one target)
+}
+\itemize{
+\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
+\itemize{
+\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
+\item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.
+\item \code{ppp(fit, participant = "id")} names the participant when the formula has more than one grouping variable, such as item terms.
+}
+}
+}
 }
 
 \examples{

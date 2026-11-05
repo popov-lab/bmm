@@ -828,3 +828,118 @@ test_that("the Stan cdp gradient is right where a threshold meets the strength m
     expect_lt(max(abs(grad$error)), 1e-5, label = paste(tie, "max |autodiff - finite difference|"))
   }
 })
+
+
+############################################################################# !
+# TRIAL-LEVEL DATA                                                       ####
+############################################################################# !
+
+# 2 participants x 2 stimulus types x 4 trials on a 2 new / 2 old scale
+cdp_trials <- function() {
+  data.frame(
+    id = rep(1:2, each = 8), stimulus = rep(rep(0:1, each = 4), 2),
+    judgment = c("new", "new", "know", "new",  "remember", "know", "remember", "new",
+                 "new", "know", "new", "new",  "remember", "remember", "know", "remember"),
+    confidence = c(1, 2, 3, 1,  4, 3, 3, 2,  2, 4, 1, 1,  4, 3, 4, 4)
+  )
+}
+
+test_that("judgment and confidence declare one row per trial", {
+  trial <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                   judgment = "judgment", confidence = "confidence")
+  expect_true(trial$other_vars$trial_level)
+  expect_identical(trial$resp_vars, list(judgment = "judgment", confidence = "confidence"))
+  expect_match(trial$requirements, "one row per trial")
+  expect_false(sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2)$other_vars$trial_level)
+  expect_error(sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2, judgment = "judgment"),
+               "judgment and confidence go together")
+  expect_error(sdt_cdp("rk", "stimulus", n_new = 2, n_old = 2,
+                       judgment = "judgment", confidence = "confidence"),
+               "no count columns for the prefix response = 'rk'")
+})
+
+test_that("trial-level check_data() names the judgment and confidence pairs off the scale", {
+  model <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                   judgment = "judgment", confidence = "confidence")
+  formula <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1)
+  dat <- cdp_trials()
+  dat$confidence[c(1, 3)] <- c(3, 1)
+  expect_error(check_data(model, dat, formula),
+               "Found: 'new' with confidence 3, 'know' with confidence 1")
+  dat <- cdp_trials()
+  dat$judgment[2] <- "old"
+  expect_error(check_data(model, dat, formula), "Judgment values 'old' not allowed")
+  dat <- cdp_trials()
+  dat$confidence[2] <- NA
+  expect_error(check_data(model, dat, formula), "must not contain NA")
+})
+
+test_that("guess judgments switch the Know/Guess split on for trial rows", {
+  model <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                   judgment = "judgment", confidence = "confidence")
+  formula <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1)
+  checked <- check_data(model, cdp_trials(), formula)
+  expect_false(attr(checked, "has_guess"))
+  expect_identical(ncol(checked$Y), 6L)
+  expect_identical(checked$nTrials, rep(1L, 16))
+  expect_false(any(c("judgment", "confidence") %in% names(checked)))
+  expect_null(data_trials(model, cdp_trials()))
+  dat <- cdp_trials()
+  dat$judgment[3] <- "guess"
+  checked <- check_data(model, dat, formula)
+  expect_true(attr(checked, "has_guess"))
+  # new1, new2, guess3, guess4, know3, ...: the guess at confidence 3 is category 3
+  expect_identical(unname(checked$Y[3, ]), c(0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L))
+})
+
+test_that("cdp trial rows and the cells aggregated from them give the same Stan program", {
+  skip_on_cran()
+  trials <- cdp_trials()
+  cells <- aggregate_sdt_cdp_data(trials, "judgment", "confidence")
+  expect_equal(unname(as.matrix(cells[c("new1", "new2", "know3", "know4", "remember3", "remember4")])),
+               rbind(c(2, 1, 1, 0, 0, 0), c(0, 1, 1, 0, 1, 1), c(2, 1, 0, 1, 0, 0),
+                     c(0, 0, 0, 1, 1, 2)))
+  formula <- bmf(dfam ~ 1 + (1 | id), drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1)
+  mock <- function(data, model) suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_fit <- mock(trials, sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                                    judgment = "judgment", confidence = "confidence"))
+  cell_fit <- mock(cells, sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2))
+  expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit))
+  expect_match(brms::stancode(trial_fit), "mucdp6", fixed = TRUE)
+  trial_data <- brms::standata(trial_fit)
+  expect_equal(as.vector(rowSums(trial_data$Y)), rep(1, 16))
+  expect_equal(unname(rowsum(trial_data$Y, paste(trials$id, trials$stimulus))),
+               unname(brms::standata(cell_fit)$Y))
+})
+
+# one-hot rows carry no multinomial coefficient: 4! / (1! 1! 0! 0! 2! 0!) = 12
+# orderings of the cell's 4 trials
+test_that("cdp trial rows sum to the cell log-likelihood less the log multinomial coefficient", {
+  one_hot <- diag(6)[c(5, 1, 2, 5), ]
+  thresholds <- c(-0.5, 0.1, 0.8)
+  for (stim in c(0, 1)) {
+    expect_equal(
+      sum(dsdt_cdp(one_hot, stim, dfam = 0.9, drec = 0.7, thresholds = thresholds,
+                   rcrit = 0.3, sigmar = 0.2, rho = 0.3, n_new = 2, log = TRUE)),
+      dsdt_cdp(c(1, 1, 0, 0, 2, 0), stim, dfam = 0.9, drec = 0.7, thresholds = thresholds,
+               rcrit = 0.3, sigmar = 0.2, rho = 0.3, n_new = 2, log = TRUE) - log(12),
+      tolerance = 1e-10
+    )
+  }
+})
+
+test_that("revert_check_data() gives trial rows their judgment and confidence back", {
+  model <- sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                   judgment = "judgment", confidence = "confidence")
+  formula <- bmf(dfam ~ 1, drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1, kcrit ~ 1)
+  dat <- cdp_trials()
+  dat$judgment[c(3, 6)] <- "guess"
+  checked <- check_data(model, dat, formula)
+  reverted <- revert_check_data(model, checked)
+  expect_identical(reverted$judgment, dat$judgment)
+  expect_equal(reverted$confidence, dat$confidence)
+  expect_false(any(c("Y", "nTrials") %in% names(reverted)))
+  expect_identical(check_data(model, reverted, formula)$Y, checked$Y)
+})
