@@ -173,6 +173,34 @@ test_that("count models give each row its own number of trials and options", {
   expect_equal(unname(rowSums(mpt_data[c("old", "new")])), c(1, 1000))
 })
 
+test_that("sdm draws each response among its row's offered options", {
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  # a row's NA cells may sit anywhere; a row without options gets no response
+  model <- sdm("y", n_options = 360, options = c("o1", "o2", "o3"), n_alternatives = "n_alt")
+  design <- data.frame(o1 = c(0, 0, NA, 0), o2 = c(pi / 2, NA, NA, pi / 2),
+                       o3 = c(pi, pi / 2, NA, NA), n_alt = c(3, 2, 0, 2))[rep(1:4, 10), ]
+  withr::local_seed(558)
+  data <- simulate_data(model, list(c = 1, kappa = 1), design)
+  offered <- as.matrix(design[c("o1", "o2", "o3")])
+  answered <- !is.na(data$y)
+  expect_identical(answered, unname(rowSums(!is.na(offered)) > 0))
+  expect_true(all(rowSums(abs(offered[answered, ] - data$y[answered]) < 1e-12, na.rm = TRUE) == 1))
+  expect_no_warning(check_data(model, data, formula))
+
+  # 12 bins is the option at 4 on a wheel of 8
+  model <- sdm("y", n_options = 8, units = "bins", options = c("o1", "o2", "o3"))
+  design <- data.frame(o1 = 0, o2 = c(2, -3), o3 = c(12, NA))[rep(1:2, 50), ]
+  data <- simulate_data(model, list(c = 1, kappa = 1), design)
+  offered <- matrix(.bin_options(as.matrix(design[c("o1", "o2", "o3")]), 8, "bins"), nrow(design))
+  expect_true(all(rowSums(offered == data$y, na.rm = TRUE) == 1))
+  expect_true(any(data$y == 4))
+  expect_no_warning(check_data(model, data, formula))
+
+  expect_error(simulate_data(sdm("y", n_options = 360, options = c("o1", "o2")), list(c = 1, kappa = 0.5),
+                             data.frame(o1 = c(0, pi / 4), o2 = pi / 2)),
+               "target \\(an offset of 0\\) is not among the options in row 2")
+})
+
 test_that("the one-display generators get each trial's own values", {
   model <- mixture3p("y", nt_features = "nt1", set_size = 2)
   withr::local_seed(11)
