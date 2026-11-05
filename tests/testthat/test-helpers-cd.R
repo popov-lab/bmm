@@ -432,7 +432,7 @@ test_that(".cd_stan_wrapper() emits an lpmf with a scalar probe and the observer
 
 cd_chunks <- function() {
   paste(vapply(
-    c("circmix_funs.stan", "cd_funs.stan", "circmix_cd_funs.stan"),
+    c("circmix_functions.stan", "cd_functions.stan", "circmix_cd_functions.stan"),
     function(f) read_lines2(system.file("stan_chunks", f, package = "bmm")),
     character(1)
   ), collapse = "\n")

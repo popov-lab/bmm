@@ -1,7 +1,7 @@
 ############################################################################# !
 # CHANGE DETECTION ON THE CIRCULAR MIXTURES                              ####
 ############################################################################# !
-# R twins of inst/stan_chunks/circmix_cd_funs.stan and cd_funs.stan, used by
+# R twins of inst/stan_chunks/circmix_cd_functions.stan and cd_functions.stan, used by
 # the log_lik and posterior_predict methods and by the d*_cd functions of the
 # change-detection models. Every function takes one row per observation (or
 # per posterior draw), as the circmix densities in helpers-circmix.R do.
@@ -379,8 +379,8 @@ check_formula.change_detection <- function(model, data, formula) {
 # the kappa(J) table, and needs pll_args for the threaded partial_log_lik.
 .cd_stanvars <- function() {
   gl <- .cd_gl_rule()
-  .circmix_chunk_stanvar("cd_funs.stan") +
-    .circmix_chunk_stanvar("circmix_cd_funs.stan") +
+  .circmix_chunk_stanvar("cd_functions.stan") +
+    .circmix_chunk_stanvar("circmix_cd_functions.stan") +
     brms::stanvar(x = gl$x, name = "cd_gl_x", pll_args = "data vector cd_gl_x") +
     brms::stanvar(x = gl$w, name = "cd_gl_w", pll_args = "data vector cd_gl_w")
 }
