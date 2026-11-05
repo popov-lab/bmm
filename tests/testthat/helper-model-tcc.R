@@ -63,6 +63,17 @@ model_cases_tcc <- function() {
       tcc_options = list(
         model = options, pars = list(d = 0.5), design = opt_data[rep(1:6, 10), c("o1", "o2", "o3", "ID")],
         formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_options_m = list(
+        model = tcc("err", similarity = exp(-(0:180) / 20), options = c("o1", "o2", "o3"), n_alternatives = "m"),
+        pars = list(d = 0.5),
+        design = transform(opt_data[rep(1:6, 10), c("o1", "o2", "o3", "ID")], m = c(2, 3, 2, 3, 3, 2)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_alternatives = list(
+        model = tcc("dev_rad", similarity = exp(-(0:180) / 20), n_alternatives = 4),
+        pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
       )
     )
   )
