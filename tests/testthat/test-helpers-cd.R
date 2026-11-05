@@ -292,6 +292,30 @@ test_that(".circmix_cd_slot_averaging_psame() judges an item without a slot at k
   }
 })
 
+test_that(".circmix_cd_slot_averaging_psame() judges a held item as stored (p_s = 1)", {
+  # K 3.5 over two items: one slot or two, each its own arc for the rich observer
+  branch <- .circmix_slot_averaging_branches(3.5, 2, 6)
+  kappa <- c(branch$kappa_lo, branch$kappa_hi)
+  w <- c(1 - branch$extra, branch$extra)
+  log_i0 <- .circmix_log_besselI0(kappa)
+  arc <- function(k, h) {
+    stats::integrate(function(x) vm_density(x, k), 0.4 - h, 0.4 + h, rel.tol = 1e-12)$value
+  }
+  # with p_s = 1 a state's log-likelihood ratio is log I0(kappa) - kappa cos(x),
+  # ranging over log I0(kappa) -+ kappa; the narrowest range bounds the criterion
+  hi <- min(log_i0 + kappa)
+  lo <- max(log_i0 - kappa)
+  for (criterion in c(0.4, -0.3)) {
+    bounded <- if (criterion > 0) hi * tanh(criterion / hi) else -lo * tanh(criterion / -lo)
+    h <- acos((log_i0 - bounded) / kappa)
+    expect_equal(
+      .circmix_cd_slot_averaging_psame(matrix(0.4), matrix(0), branch, criterion, TRUE),
+      sum(w * c(arc(kappa[1], h[1]), arc(kappa[2], h[2]))),
+      tolerance = 1e-9
+    )
+  }
+})
+
 test_that(".cd_bernoulli_ld() scores 1 as 'change' and clamps the probability", {
   expect_equal(.cd_bernoulli_ld(c(1, 0), c(0.3, 0.3)), log(c(0.7, 0.3)))
   expect_true(all(is.finite(.cd_bernoulli_ld(c(1, 0), c(1, 0)))))
