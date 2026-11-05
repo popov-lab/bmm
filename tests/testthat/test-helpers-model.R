@@ -31,6 +31,7 @@ test_that("model_registry() lists each model once per task it names, in the orde
   expect_equal(groups_of("imm"), "Continuous reproduction")
   expect_equal(groups_of("m3"), "Categorical recall and n-AFC decisions")
   expect_equal(groups_of("sdt_yn"), "Detection, recognition and confidence judgments")
+  expect_equal(groups_of("psychometric_function"), "Detection, recognition and confidence judgments")
   expect_equal(groups_of("ddm"), "Choices and response times")
   expect_equal(
     groups_of("mpt"),

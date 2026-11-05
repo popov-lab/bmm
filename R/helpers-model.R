@@ -503,6 +503,14 @@ response_annotations.default <- function(model) {
   if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
     return(list(response = "0/1 per trial; 1 = correct"))
   }
+  if (inherits(model, "psychometric_function")) {
+    response <- if (is.null(model$other_vars$n_trials)) {
+      "0/1 or logical per trial"
+    } else {
+      "count of positive responses per row"
+    }
+    return(list(response = response))
+  }
   list()
 }
 
@@ -674,6 +682,13 @@ data_column_roles <- list(
   ),
   sdm = c(
     resp_error = "response error relative to the target, in radians"
+  ),
+  psychometric_function = c(
+    response = "0/1 response per trial, or the number of positive responses out of `n_trials`",
+    intensity = "stimulus intensity",
+    n_trials = "number of trials (optional; omit for one binary response per row)",
+    guess = "guess rate per row, e.g. 1 / m in m-AFC (optional; or one number, or estimated)",
+    lapse = "lapse rate per row (optional; or one number, or estimated)"
   ),
   sdt_cdp = c(
     response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",

@@ -69,6 +69,7 @@
 #' | [sdt_mafc()] | `n_trials`; `m` when it names a column |
 #' | [sdt_ranking()] | `n_trials`; `m` when it names a column |
 #' | [sdt_rating()], [sdt_cdp()] | `stimulus`, `n_trials` |
+#' | [psychometric_function()] | `intensity`; `n_trials` when it names a column (else each row is one 0/1 trial); `guess` and `lapse` when they name columns |
 #'
 #' The simplex groups of [mpt()] are given as probabilities that sum to 1 on
 #' both scales.

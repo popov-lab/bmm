@@ -134,12 +134,14 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     logical(1)
   )]
 
+  notice_data <- NULL
   if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
     data <- check_stored_data(model, newdata %||% olddata, user_formula)
     from_stored_frame <- !missing(formula.)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
+    notice_data <- newdata
     from_stored_frame <- FALSE
     attr(data, "data_name") <- substitute_name(newdata)
   }
@@ -183,6 +185,15 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     configure_prior,
     c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
   )
+  if (!is.null(notice_data) && missing(formula.)) {
+    update_data_notice(model, notice_data, user_formula, prior, function() {
+      rechecked <- check_model(model, notice_data, user_formula)
+      suppressWarnings(suppressMessages(brms::do_call(
+        configure_prior,
+        c(list(rechecked, data, config_args$formula, user_prior), fit_frame_args(object, dots))
+      )))
+    })
+  }
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 
@@ -433,6 +444,12 @@ revert_check_data.sdt_yn <- function(model, data) {
 }
 
 #' @exportS3Method
+revert_check_data.psychometric_function <- function(model, data) {
+  data[intersect(.psychometric_reserved_cols, colnames(data))] <- NULL
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
 revert_check_data.sdt_mafc <- function(model, data) {
   m <- model$other_vars$m
   # brms keeps a set-size column named by `m` only when a formula predicts
@@ -541,4 +558,19 @@ is_same_run <- function(object, dots) {
   !is.null(object$backend) && !is.null(object$algorithm) &&
     identical(dots$backend %||% object$backend, object$backend) &&
     identical(dots$algorithm %||% object$algorithm, object$algorithm)
+}
+
+# a model whose check_model() fits its default priors to the data keeps those
+# priors when update() gets new data under the old formula; its method says so
+# when the new data would have given other priors. `prior` is the prior the
+# update uses, and `rechecked_prior()` builds the one a model re-checked on the
+# new data would use: a function, so that only a method that compares them
+# pays for the second check_model() and configure_prior()
+update_data_notice <- function(model, data, formula, prior, rechecked_prior) {
+  UseMethod("update_data_notice")
+}
+
+#' @exportS3Method
+update_data_notice.default <- function(model, data, formula, prior, rechecked_prior) {
+  invisible()
 }
