@@ -10,6 +10,20 @@
 * New `simulate_data()` simulates data from any bmm model, given its parameters on the model's own scale (the link scale, or the native scale with `scale = "native"`) and a design, in the layout `bmm()` expects: pass the result to `bmm()` as it is. The true values come back on the link scale in `attr(, "simulate_pars")`. Packages that validate bmm models no longer need an adapter for each model (#634).
 * `sdt_yn()` and `sdt_mafc()` now take one row per trial: leave out `n_trials` and code `response` as 0 or 1. Trial rows allow item random effects, such as `bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id) + (1 | item))`, which counts aggregated over items cannot carry. `bmm_data_check()` then reports observations per participant and per item instead of one cell per trial; it takes the first grouping variable of the formula, such as `id` in `(1 | id)`, as the participant. Aggregated counts with `n_trials` work as before (#646).
 
+### Changes to default priors
+<!-- From 1.5.0 every change to a default prior is listed here (ADR 0008 § D4); defaults do not change inside a minor line. -->
+* bmm now states its policy on default priors: a default prior changes only in a minor release (1.5.0, 1.6.0) and is listed under this heading; no default changes in a patch release (1.5.x). bmm 1.6.0 will record the prior set a fit used and let you ask for an older set, so older analyses can be reproduced.
+
+### Companion packages
+<!-- Contract items that change in 1.5.0 (ADR 0005 announcement rule). Filled by the pull request that lands each change. -->
+<!-- `mu1` -> `mu` in mixture2p, mixture3p and imm (#434, #590) -->
+<!-- `pnt` -> `ptarget` = P(target | memory) in mixture3p and imm (#434, #590) -->
+<!-- `model_spec()` exported, also for fitted models (#633) -->
+
+### Deprecated functions and arguments
+<!-- Nothing deprecated in 1.5.0 yet. Announcements of removals scheduled for 1.6.0: -->
+* The forms deprecated in bmm 0.4 and 1.0 (`fit_model()`, `IMMfull()`, `IMMabc()`, `IMMbsc()`, `sdmSimple()`, the `setsize` argument of `mixture3p()` and `imm()`, and the `parallel` argument of `bmm()`) will be removed in bmm 1.6.0. They keep working in every 1.5.x release and now warn with the replacement. Use `bmm()`, `imm()`, `imm(version = "abc")`, `imm(version = "bsc")`, `sdm()`, `set_size` and `cores` instead.
+
 ### Other changes
 * `sdt_yn()` fits with one row per trial and the default normal noise (`dist = "normal"`) are faster: each sampling step takes about half the time it did. Estimates are unchanged up to sampling error.
 * `bmm_models()` and the help pages now show each model by its name only, such as "Two-Parameter Mixture Model", without the citation, which stays in the `Citation` field of the help page. A model that fits several tasks, such as `mpt()`, is listed under each of them (#554).
