@@ -195,14 +195,14 @@
       if (abs(h_new - h) < 1e-12) {
         // one more Newton step, from the root itself: the step from h carries h's gradient times a factor of the size of
         // the last residual, which near saturation (sin h small) is not small. Up to about 10 times the range the
-        // step's gradient is the implicit one and its value moves by at most 5e-12 (measured); nearer saturation the
-        // level's rounding sets the root, and R and Stan differ by up to 4.3e-9 in h at 16-17 times, each about as far
-        // from the true root
+        // step's gradient is the implicit one and its value moves by about 6e-12 at most (measured). Nearer saturation
+        // the rounding of the level and of cos h near 1 (the root reaches sqrt(2^-53) = 1.05e-8) sets the residual:
+        // R's and Stan's h differ by up to a factor 1.5 at 16-19 times, each about as far from the true root (to 18 times)
         vector[S] lp_root = base + kappa * cos(h_new);
         real step = (log_sum_exp(lp_root) - level) / (sin(h_new) * dot_product(softmax(lp_root), kappa));
-        // from a converged root a true correction is tiny against the arc; one of the arc's own size is rounding noise
-        // (it can leave the circle, or land far from the root inside it), so it is dropped. The bracket of the last two
-        // iterates would drop the good steps too
+        // from a converged root a true correction is tiny against the arc (0.1% of it up to 14 times the range); one of
+        // the arc's own size is that rounding (it can leave the circle, or land far from the root inside it), so it is
+        // dropped. The bracket of the last two iterates would drop the good steps too
         return abs(step) < 0.5 * fmin(h_new, pi() - h_new) ? h_new + step : h_new;
       }
       h = h_new;
