@@ -193,7 +193,11 @@
         h_new = 0.5 * (lo + hi);
       }
       if (abs(h_new - h) < 1e-12) {
-        return h_new;
+        // one more Newton step, from the root itself: the step from h carries h's gradient times a factor of the size of
+        // the last residual, which near saturation (sin h small) is not small; from the root the gradient is the
+        // implicit one, and the value moves within the loop's tolerance (at most 5e-12 measured)
+        vector[S] lp_root = base + kappa * cos(h_new);
+        return h_new + (log_sum_exp(lp_root) - level) / (sin(h_new) * dot_product(softmax(lp_root), kappa));
       }
       h = h_new;
     }

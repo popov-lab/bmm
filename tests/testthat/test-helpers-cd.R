@@ -975,25 +975,32 @@ forward_slope <- function(f, x, h) {
   (4 * r2 - r1) / 3
 }
 
-test_that("the limited observer's K gradient at a whole K / set size holds near saturation", {
+test_that("the limited observer's K gradient at and just above a whole K holds near saturation", {
   skip_unless_stan_tests()
   skip_on_cran()
-  # kappa 0.3, criterion +-3: about 10 times the range, where the arc is near
-  # 0 or pi and its slope in extra is the difference of two terms of 1e4
+  # kappa 0.3 at criterion +-3 and kappa 2 at criterion 10: about 10 times the
+  # range, where the arc is near 0 or pi and its slope in extra is the
+  # difference of two terms of 1e4. At K = 2 the expansion of a whole K, just
+  # above it the Newton root of the shared arc
   model <- cd_gradient_model()
-  K <- 2
-  for (criterion in c(-3, 3)) {
-    data <- list(y = 0L, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L)
-    slope <- K * forward_slope(function(K) cd_gradient_loglik(data, 0.3, criterion, K), K, 0.02)
-    # scaled to a slope of 10, which the six printed digits resolve to 1e-6
-    data$scale <- 10 / abs(slope)
-    label <- paste("K gradient near saturation, criterion", criterion)
-    diagnosed <- cd_gradient_diagnose(
-      model, data, list(log_kappa = log(0.3), criterion = criterion, K = K)
-    )
-    expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
-    skip_if(is.null(diagnosed))
-    expect_equal(diagnosed$gradients()$model[3] - 1, sign(slope) * 10, tolerance = 1e-3, label = label)
+  cases <- list(c(0.3, -3), c(0.3, 3), c(2, 10))
+  for (K in c(2, 2 + 1e-9)) {
+    for (case in cases) {
+      data <- list(y = 0L, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L)
+      slope <- K * forward_slope(function(K) cd_gradient_loglik(data, case[1], case[2], K), K, 0.02)
+      # scaled to a slope of 10, which the six printed digits resolve to 1e-6
+      data$scale <- 10 / abs(slope)
+      label <- paste("K gradient near saturation, K", K, "kappa", case[1], "criterion", case[2])
+      diagnosed <- cd_gradient_diagnose(
+        model, data, list(log_kappa = log(case[1]), criterion = case[2], K = K)
+      )
+      expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
+      skip_if(is.null(diagnosed))
+      expect_equal(
+        diagnosed$gradients()$model[3] - 1, sign(slope) * 10,
+        tolerance = 1e-3, label = label
+      )
+    }
   }
 })
 
