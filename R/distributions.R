@@ -1728,8 +1728,9 @@ times_nonzero <- function(count, log_prob) {
 #'   Simulated `mean_rt` is not truncated at `ndt`. When a summary rests on few
 #'   responses (a handful of trials in version `"3par"`, or a rarely reached
 #'   boundary in version `"4par"`, whatever `n_trials` is), `rezdm()` can
-#'   return `mean_rt` below `ndt` or even `mean_rt <= 0`, which `bmm()`
-#'   rejects; drop those rows before fitting.
+#'   return `mean_rt` below `ndt` or even `mean_rt <= 0`. `bmm()` rejects
+#'   only the non-positive mean RTs; drop those rows before fitting. Values
+#'   below `ndt` are valid draws.
 #'
 #' @return `dezdm` gives the log-density of the observed summary statistics
 #'   under the EZDM, and `rezdm` generates random summary statistics from the
@@ -2338,7 +2339,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # lcdf/lccdf (log CDF and log complementary CDF), and qf_label (axis label of
 # the ROC's quantile scale). The lcdf/lccdf entries mirror the Stan
 # dispatchers in inst/stan_chunks/sdt_dist_functions.stan branch for branch, so the
-# two implementations can be read side by side.
+# two implementations can be read side by side. The registry is shared by the
+# SDT models, psychometric_function() and the ordinal kernel
+# (.ordinal_category_log_probs()).
 #
 # The list position defines the integer dist_type code passed to Stan --
 # reordering entries changes the R <-> Stan contract.
@@ -2357,7 +2360,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 # The ROC's quantile scale applies -qf(1 - p), not qf(p), so that the model ROC
 # is straight for the asymmetric Gumbels too. For gumbel_min that transform is
 # -log(-log(p)), the loglog, so each Gumbel's qf_label is the other's link name.
-.sdt_dists <- list(
+.noise_dists <- list(
   normal = list(
     cdf = pnorm,
     qf = qnorm,
@@ -2391,6 +2394,16 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     qf_label = "logit"
   )
 )
+
+# registry position defines the Stan dist_type integer
+.noise_dist_id <- function(dist) {
+  match(dist, names(.noise_dists))
+}
+
+.noise_dist_names <- names(.noise_dists)
+
+# alias, remove when no branch reads it
+.sdt_dists <- .noise_dists
 
 # Internal CDF helpers for SDT distributions. All vectorized over eta.
 # Prefer the log-scale pair inside likelihoods: the probability scale
@@ -3527,43 +3540,56 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 }
 
 
-# Category log-probabilities from thresholds: the noise cdf differenced into K
-# interval masses. `d` is d_a, so the separation in noise units is
-# d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled, they stay on the
-# noise-standardized axis, measured from the noise mean. sdratio is the signal/noise SD ratio on the natural
-# scale, and the unequal-variance scaling of signal trials lives here alone (the
-# Stan counterpart is sdt_rating_logmu_cat). Vectorized over observations:
-# thresholds may be an n-by-(K-1) matrix (or a vector, recycled across rows)
-# and d/sdratio/stimulus vectors. Returns an n-by-K matrix, or a length-K
-# vector when all inputs describe a single observation.
+# Category log-probabilities of an ordered-threshold model: the noise cdf
+# differenced into K interval masses. `thresholds` is an n-by-(K-1) matrix (or
+# a vector, recycled across rows) on the noise-standardized axis; `location`
+# shifts the latent variable and `scale` is its SD (both vectors, recycled),
+# so eta = (threshold - location) / scale. Returns an n-by-K matrix, or a
+# length-K vector when all inputs describe a single observation. The Stan
+# counterpart is ordinal_log_prob_cat() in ordinal_functions.stan.
 #
 # An interval above 0 is taken as the difference of two upper tails and one
 # below it as the difference of two lower tails, as in Stan: on the other side
 # both cdf values round to the same number, which returned -Inf, or a clamped
 # probability, for a category that still has mass.
-.sdt_category_log_probs <- function(thresholds, d, sdratio, stimulus, dist) {
+.ordinal_category_log_probs <- function(thresholds, location, scale, dist) {
   thr <- rbind(thresholds)
   dimnames(thr) <- NULL
-  n <- max(nrow(thr), length(d), length(sdratio), length(stimulus))
+  n <- max(nrow(thr), length(location), length(scale))
   if (nrow(thr) != n) thr <- thr[rep_len(seq_len(nrow(thr)), n), , drop = FALSE]
-  stimulus <- rep_len(stimulus, n)
-  sdratio <- rep_len(sdratio, n)
+  location <- rep_len(location, n)
+  scale <- rep_len(scale, n)
 
-  shift <- rep_len(d, n) * .sdt_rms_scale(sdratio) * stimulus
-  scale <- ifelse(stimulus == 1, sdratio, 1)
-  eta <- (thr - shift) / scale
+  eta <- (thr - location) / scale
   lower <- cbind(-Inf, eta)
   upper <- cbind(eta, Inf)
 
+  lcdf <- .noise_dists[[dist]]$lcdf
+  lccdf <- .noise_dists[[dist]]$lccdf
   out <- matrix(NA_real_, n, ncol(lower))
   above <- lower > 0
-  out[above] <- log_diff_exp(.sdt_log_ccdf(lower[above], dist),
-                             .sdt_log_ccdf(upper[above], dist))
-  out[!above] <- log_diff_exp(.sdt_log_cdf(upper[!above], dist),
-                              .sdt_log_cdf(lower[!above], dist))
+  out[above] <- log_diff_exp(lccdf(lower[above]), lccdf(upper[above]))
+  out[!above] <- log_diff_exp(lcdf(upper[!above]), lcdf(lower[!above]))
   # -Inf minus -Inf: an interval so far out that both bounds underflow
   out[is.nan(out)] <- -Inf
   if (n == 1L && !is.matrix(thresholds)) out[1L, ] else out
+}
+
+# The SDT reading of the ordinal kernel. `d` is d_a, so the separation in
+# noise units is d * .sdt_rms_scale(sdratio); the thresholds are NOT rescaled,
+# they stay on the noise-standardized axis, measured from the noise mean.
+# sdratio is the signal/noise SD ratio on the natural scale, and the
+# unequal-variance scaling of signal trials lives here alone (the Stan
+# counterpart is sdt_rating_logmu_cat). Vectorized over observations as
+# .ordinal_category_log_probs().
+.sdt_category_log_probs <- function(thresholds, d, sdratio, stimulus, dist) {
+  n <- max(nrow(rbind(thresholds)), length(d), length(sdratio), length(stimulus))
+  stimulus <- rep_len(stimulus, n)
+  sdratio <- rep_len(sdratio, n)
+  .ordinal_category_log_probs(
+    thresholds, rep_len(d, n) * .sdt_rms_scale(sdratio) * stimulus,
+    ifelse(stimulus == 1, sdratio, 1), dist
+  )
 }
 
 .sdt_category_probs <- function(thresholds, d, sdratio, stimulus, dist) {
@@ -3660,8 +3686,8 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # boundary -- the middle category straddles it -- so the criterion is the
 # centre of that category and the two thresholds around it sit half an
 # interval away. Returns an n-by-(K - 1) matrix. The Stan counterpart is
-# sdt_place_thresholds_rating() in sdt_rating_functions.stan.
-.sdt_assemble_thresholds <- function(criterion, inc, n_ratings) {
+# sdt_place_thresholds_rating() in threshold_functions.stan.
+.assemble_thresholds <- function(criterion, inc, n_ratings) {
   K1 <- n_ratings - 1L
   thr <- matrix(0, length(criterion), K1)
   if (n_ratings %% 2L == 0L) {
@@ -3691,7 +3717,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # side (odd K) is a ratio times the spread, and every further interval is a
 # ratio times the first interval on its side, so the deltas are not
 # exchangeable. deltas is an n-by-(K - 2) matrix.
-.sdt_log_ratio_widths <- function(deltas, n_ratings) {
+.log_ratio_widths <- function(deltas, n_ratings) {
   G <- n_ratings - 2L
   inc <- exp(deltas)
   if (n_ratings %% 2L == 0L) {
@@ -3716,9 +3742,10 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 # vectors and deltas an n-by-nd matrix (a vector describes a single draw).
 # Returns an n-by-(K-1) matrix, or a length-(K-1) vector for a single draw.
 # Where the criterion sits is the same for every type and is decided by
-# .sdt_assemble_thresholds(); the two closed forms below agree with it.
-.sdt_make_thresholds <- function(criterion, n_ratings, threshold_type,
-                                 spacing = NULL, deltas = NULL) {
+# .assemble_thresholds(); the two closed forms below agree with it. The Stan
+# counterpart is make_thresholds() in threshold_functions.stan.
+.make_thresholds <- function(criterion, n_ratings, threshold_type,
+                             spacing = NULL, deltas = NULL) {
   K1 <- n_ratings - 1L
 
   n <- max(length(criterion), length(spacing),
@@ -3754,7 +3781,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 
     expl <- cbind(exp(deltas), 1)
     inc <- expl / rowSums(expl) * (n_ratings - 2L) * exp(spacing)
-    thr <- .sdt_assemble_thresholds(criterion, inc, n_ratings)
+    thr <- .assemble_thresholds(criterion, inc, n_ratings)
   } else if (threshold_type == "log_ratio") {
     stopif(is.null(deltas), "deltas is required for log_ratio thresholds")
     n_deltas <- n_ratings - 2L
@@ -3762,19 +3789,23 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
            "deltas must have length n_ratings - 2 = {n_deltas}")
     stopif(n_ratings < 4L, "log_ratio thresholds require n_ratings >= 4")
 
-    thr <- .sdt_assemble_thresholds(criterion, .sdt_log_ratio_widths(deltas, n_ratings),
-                                    n_ratings)
+    thr <- .assemble_thresholds(criterion, .log_ratio_widths(deltas, n_ratings), n_ratings)
   } else {
     stopif(is.null(deltas), "deltas is required for log_distance thresholds")
     n_deltas <- n_ratings - 2L
     stopif(ncol(deltas) != n_deltas,
            "deltas must have length n_ratings - 2 = {n_deltas}")
 
-    thr <- .sdt_assemble_thresholds(criterion, exp(deltas), n_ratings)
+    thr <- .assemble_thresholds(criterion, exp(deltas), n_ratings)
   }
 
   if (n == 1L) thr[1L, ] else thr
 }
+
+# aliases, remove when no branch reads them
+.sdt_assemble_thresholds <- .assemble_thresholds
+.sdt_log_ratio_widths <- .log_ratio_widths
+.sdt_make_thresholds <- .make_thresholds
 
 
 #' @title Distribution functions for Confidence Rating SDT
@@ -4335,4 +4366,186 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
   counts
+}
+
+
+############################################################################# !
+# PSYCHOMETRIC FUNCTION DISTRIBUTION FUNCTIONS                            ####
+############################################################################# !
+
+# Each sigmoid is a standard CDF from .sdt_dists read on the linear or on the
+# log stimulus axis; weibull is gumbel_min on log intensity, as in MATLAB
+# psignifit 4 (Python psignifit's weibull is its gumbel on the linear axis and
+# leaves the log transform of the intensities to the user).
+# The order is the order of the `sigmoid` argument, normal first as its default.
+.psychometric_sigmoids <- list(
+  normal      = list(dist = "normal",     log_x = FALSE),
+  logistic    = list(dist = "logistic",   log_x = FALSE),
+  gumbel_min  = list(dist = "gumbel_min", log_x = FALSE),
+  gumbel_max  = list(dist = "gumbel_max", log_x = FALSE),
+  weibull     = list(dist = "gumbel_min", log_x = TRUE),
+  lognormal   = list(dist = "normal",     log_x = TRUE),
+  loglogistic = list(dist = "logistic",   log_x = TRUE)
+)
+
+# Standard-axis location of the midpoint (F = 0.5) and the standard-axis span
+# from F = 0.05 to F = 0.95, which `width` covers on the stimulus axis
+.psychometric_z_constants <- function(sigmoid) {
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  c(zmid = qf(0.5), zspan = qf(0.95) - qf(0.05))
+}
+
+.psychometric_z <- function(intensity, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  dx <- if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    log(intensity) - log(midpoint)
+  } else {
+    intensity - midpoint
+  }
+  k[["zmid"]] + k[["zspan"]] * dx / width
+}
+
+# Stimulus intensity at which the sigmoid F reaches f, the inverse of
+# .psychometric_z() followed by F
+.psychometric_x_at <- function(f, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  dx <- (qf(f) - k[["zmid"]]) * width / k[["zspan"]]
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) midpoint * exp(dx) else midpoint + dx
+}
+
+# log P(1) and log P(0) on the log scale, as in psychometric_function_log_lik() in
+# inst/stan_chunks/psychometric_function_functions.stan:
+#   psi     = guess + (1 - guess) (1 - lapse) F(z)
+#   1 - psi = (1 - guess) (lapse + (1 - lapse) (1 - F(z)))
+# The probability scale rounds psi to 0 or 1 in the tails, where Stan stays
+# finite, and a guess or lapse of exactly 0 must give log(0) = -Inf, not NaN.
+.psychometric_log_probs <- function(intensity, midpoint, width, guess, lapse,
+                                    sigmoid) {
+  dist <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]
+  z <- .psychometric_z(intensity, midpoint, width, sigmoid)
+  list(
+    one = log_sum_exp(log(guess), log1p(-guess) + log1p(-lapse) + dist$lcdf(z)),
+    zero = log1p(-guess) + log_sum_exp(log(lapse), log1p(-lapse) + dist$lccdf(z))
+  )
+}
+
+.psychometric_check_pars <- function(intensity, midpoint, width, guess, lapse,
+                                     sigmoid) {
+  stopif(anyNA(c(intensity, midpoint, width, guess, lapse)),
+         "intensity, midpoint, width, guess and lapse must not contain NA")
+  stopif(any(width <= 0), "width must be positive")
+  stopif(any(guess < 0 | guess >= 1), "guess must be in [0, 1)")
+  stopif(any(lapse < 0 | lapse >= 1), "lapse must be in [0, 1)")
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    stopif(any(intensity <= 0),
+           "intensity must be positive for sigmoid = '{sigmoid}', which reads \\
+           it on the log scale")
+    stopif(any(midpoint <= 0),
+           "midpoint must be positive for sigmoid = '{sigmoid}'")
+  }
+}
+
+#' @title Distribution functions for the psychometric function model
+#'
+#' @description Density and random generation for the [psychometric_function()] model:
+#'   the number of positive responses ("yes", "correct", "longer") out of
+#'   `n_trials` at a stimulus intensity, a binomial with probability
+#'   \deqn{\psi(x) = \gamma + (1 - \gamma)(1 - \lambda) F(x),}{psi(x) = guess + (1 - guess) * (1 - lapse) * F(x),}
+#'   where \eqn{F} is the sigmoid with its midpoint and width.
+#'
+#' @name psychometric_function_dist
+#'
+#' @param x Integer vector. Number of positive responses, between 0 and
+#'   `n_trials`.
+#' @param intensity Numeric vector. Stimulus intensity. Must be positive for the
+#'   sigmoids that read it on the log scale (`"weibull"`, `"lognormal"`,
+#'   `"loglogistic"`).
+#' @param midpoint Numeric. Intensity at which the sigmoid \eqn{F} is 0.5, in
+#'   the units of `intensity`. Positive for the log-scale sigmoids.
+#' @param width Numeric, positive. Distance on the intensity axis between the
+#'   points where \eqn{F} is 0.05 and 0.95; for the log-scale sigmoids, in log
+#'   units of intensity.
+#' @param guess Numeric in \[0, 1). Guess rate, the lower asymptote: 0.5 in
+#'   2AFC, `1 / m` in m-AFC.
+#' @param lapse Numeric in \[0, 1). Proportion of trials on which the observer
+#'   does not attend and responds at the guess rate. The upper asymptote is
+#'   `1 - lapse * (1 - guess)`.
+#' @param n_trials Integer vector. Number of trials per observation (default
+#'   1, a single binary response).
+#' @param sigmoid The sigmoid \eqn{F}; see [psychometric_function()].
+#' @param log Logical. If `TRUE`, returns the log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `intensity`,
+#'   `n_trials` and the parameters are recycled to this length.
+#'
+#' @return `dpsychometric_function()` returns the (log-)density, a binomial probability.
+#'   `rpsychometric_function()` returns an integer vector with the number of positive
+#'   responses per observation.
+#'
+#' @section Parameter scales:
+#' These functions take every argument on the **natural** scale, while
+#' [psychometric_function()] *estimates* `width` on the log scale and `guess` and `lapse`
+#' on the logit scale (and `midpoint` on the log scale for the log-scale
+#' sigmoids). Transform a fitted value back before passing it here.
+#'
+#' @references
+#' Schütt, H. H., Harmeling, S., Macke, J. H., & Wichmann, F. A. (2016).
+#'   Painfree and accurate Bayesian estimation of psychometric functions for
+#'   (potentially) overdispersed data. \emph{Vision Research}, \emph{122},
+#'   105--123. \doi{10.1016/j.visres.2016.02.002}
+#'
+#' Wichmann, F. A., & Hill, N. J. (2001). The psychometric function: I.
+#'   Fitting, sampling, and goodness of fit. \emph{Perception & Psychophysics},
+#'   \emph{63}(8), 1293--1313. \doi{10.3758/BF03194544}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Probability of 7 correct out of 10 2AFC trials at the midpoint
+#' dpsychometric_function(7, intensity = 1, midpoint = 1, width = 2, guess = 0.5,
+#'                        n_trials = 10)
+#'
+#' # Simulate a method-of-constant-stimuli experiment with a Weibull observer
+#' dat <- data.frame(contrast = rep(c(0.01, 0.02, 0.04, 0.08, 0.16), 4))
+#' dat$n_correct <- rpsychometric_function(nrow(dat), dat$contrast, midpoint = 0.04,
+#'                                         width = 2, guess = 0.5, lapse = 0.02,
+#'                                         n_trials = 40, sigmoid = "weibull")
+#' head(dat)
+dpsychometric_function <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic"),
+                                   log = FALSE) {
+  sigmoid <- match.arg(sigmoid)
+  stopif(anyNA(x), "x must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
+  stopif(any(x < 0), "x must be non-negative")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(x > n_trials), "x must not exceed n_trials")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+
+  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
+  out <- lchoose(n_trials, x) +
+    times_nonzero(x, lp$one) +
+    times_nonzero(n_trials - x, lp$zero)
+  if (log) out else exp(out)
+}
+
+
+#' @rdname psychometric_function_dist
+#' @export
+rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic")) {
+  sigmoid <- match.arg(sigmoid)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+
+  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
+  stats::rbinom(n, rep_len(n_trials, n), rep_len(exp(lp$one), n))
 }

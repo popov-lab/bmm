@@ -388,15 +388,17 @@ test_that("sdt_rating stancode loads the shared distribution dispatch", {
 # probability, so both the builders and the kernel meet their R counterparts.
 rating_stan_logmu <- function(grid, deltas, K) {
   sc <- system.file("stan_chunks", package = "bmm")
-  funs <- paste(read_lines2(file.path(sc, "sdt_dist_functions.stan")),
-                read_lines2(file.path(sc, "sdt_rating_functions.stan")), sep = "\n")
+  chunks <- c("sdt_dist_functions.stan", "threshold_functions.stan",
+              "ordinal_functions.stan", "sdt_rating_functions.stan")
+  funs <- paste(vapply(file.path(sc, chunks), read_lines2, character(1)),
+                collapse = "\n")
   program <- paste0(
     "functions {\n", funs, "\n}\n",
     "data {\n  int N; int K; array[N] int cat; array[N] int thresh;\n",
     "  vector[N] criterion; vector[N] spacing; array[N, K - 2] real deltas;\n",
     "  vector[N] d; vector[N] sdratio; vector[N] stimulus; array[N] int dist;\n}\n",
     "generated quantities {\n  vector[N] lp;\n  for (i in 1:N) {\n",
-    "    vector[K - 1] thr = sdt_make_thresholds_rating(criterion[i], spacing[i],\n",
+    "    vector[K - 1] thr = make_thresholds(criterion[i], spacing[i],\n",
     "      deltas[i], K, thresh[i]);\n",
     "    lp[i] = sdt_rating_logmu_cat(cat[i], thr, d[i], sdratio[i], stimulus[i], dist[i]);\n",
     "  }\n}\n"
@@ -529,6 +531,8 @@ test_that("the generated Stan logmu function reads either anchor as its R compan
   sc <- system.file("stan_chunks", package = "bmm")
   program <- paste0(
     "functions {\n", read_lines2(file.path(sc, "sdt_dist_functions.stan")), "\n",
+    read_lines2(file.path(sc, "threshold_functions.stan")), "\n",
+    read_lines2(file.path(sc, "ordinal_functions.stan")), "\n",
     read_lines2(file.path(sc, "sdt_rating_functions.stan")), "\n",
     bmm:::.sdt_rating_logmu_stan(model), "\n}\n",
     "data {\n  int N; array[N] int cat; array[N] int anchor; array[N] int dist;\n",

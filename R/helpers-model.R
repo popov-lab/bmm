@@ -494,8 +494,22 @@ response_annotations.default <- function(model) {
   if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
+  if (inherits(model, "sdt_yn") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = 'old'/'signal'"))
+  }
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
+  }
+  if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = correct"))
+  }
+  if (inherits(model, "psychometric_function")) {
+    response <- if (is.null(model$other_vars$n_trials)) {
+      "0/1 or logical per trial"
+    } else {
+      "count of positive responses per row"
+    }
+    return(list(response = response))
   }
   list()
 }
@@ -669,6 +683,13 @@ data_column_roles <- list(
   sdm = c(
     resp_error = "response error relative to the target, in radians"
   ),
+  psychometric_function = c(
+    response = "0/1 response per trial, or the number of positive responses out of `n_trials`",
+    intensity = "stimulus intensity",
+    n_trials = "number of trials (optional; omit for one binary response per row)",
+    guess = "guess rate per row, e.g. 1 / m in m-AFC (optional; or one number, or estimated)",
+    lapse = "lapse rate per row (optional; or one number, or estimated)"
+  ),
   sdt_cdp = c(
     response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",
     stimulus = "stimulus type, 0 = new and 1 = old",
@@ -676,8 +697,8 @@ data_column_roles <- list(
     n_old = NA
   ),
   sdt_mafc = c(
-    response = "number of correct responses",
-    n_trials = "number of trials",
+    response = "number of correct responses, or 1/0 for a correct/incorrect response on one trial",
+    n_trials = "number of trials (left out for one row per trial)",
     m = "number of alternatives (a column, or one number)"
   ),
   sdt_ranking = c(
@@ -689,9 +710,9 @@ data_column_roles <- list(
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
   ),
   sdt_yn = c(
-    response = "number of 'old'/'signal' responses",
+    response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' response on one trial",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
-    n_trials = "number of trials"
+    n_trials = "number of trials (left out for one row per trial)"
   )
 )
 
@@ -966,11 +987,19 @@ model_docs.bmmodel <- function(model, components = "all") {
     parameters = paste0("* **Parameters:** \n\n  ", par_info, "\n"),
     fixed_parameters = paste0("* **Fixed parameters:** \n\n  ", fixed_par_info, "\n"),
     links = paste0("* **Default parameter links:** \n\n     - ", links_info, "\n\n"),
-    prior = paste0("* **Default priors:** \n\n", priors_info, "\n")
+    prior = paste0("* **Default priors:** \n\n", priors_info, "\n"),
+    trial_level = paste0(
+      "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
+      "* **Trial-level data:** ", trial_level_docs,
+      if ("stimulus" %in% names(model$other_vars)) trial_level_stimulus_docs,
+      trial_level_notes_docs, "\n"
+    )
   )
 
+  # the trial-level part needs an instance constructed for trial rows, whose
+  # requirements it shows; a help page asks for it in a second call
   if (length(components) == 1 && components == "all") {
-    components <- names(info_all)
+    components <- setdiff(names(info_all), "trial_level")
   }
 
   if (model$version == "NA" || model$version == "") {
@@ -1085,9 +1114,12 @@ use_model_template <- function(model_name,
      #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
      #   their sites are registered in test-conventions.R (a test requires it)
      # - `model_cases_{model_name}()` in tests/testthat/helper-model-{model_name}.R
-     #   with a `stored_frame`, `sd_default`, `init` and `links` case (a test
-     #   requires them; the case kinds are listed in helper-model-cases.R)
-     # - a `revert_check_data.<model>()` method in R/update.R if `check_data()`
+     #   with a `stored_frame`, `sd_default`, `init`, `links` and `simulate` case
+     #   (a test requires them; the case kinds are listed in helper-model-cases.R)
+     # - the `simulate_data.{model_name}()` method below, after `configure_model()`,
+     #   drawing the responses with `r{model_name}()`; a test requires it and a
+     #   `simulate` case for every version
+     # - a `revert_check_data()` method in R/update.R if `check_data()`
      #   consumes or creates columns
      # - a `built_data_columns()` method next to `check_data()` naming every
      #   column it creates except the `Y` response matrix, so pp_check(),
@@ -1454,6 +1486,28 @@ use_model_template <- function(model_name,
     .open = "<<", .close = ">>"
   )
 
+  simulate_data_header <- glue(
+    "#############################################################################!
+     # SIMULATE_DATA S3 METHODS                                               ####
+     #############################################################################!
+     # Draws data from the model given its parameters and a design. See
+     # ?simulate_data and simulate_data.ddm() in 'R/model_ddm.R'.\n\n\n"
+  )
+
+  simulate_data_method <- glue(
+    "#' @export
+    simulate_data.<<model_name>> <- function(model, pars, design = NULL, scale = c('link', 'native'), ...) {
+       # the design columns the model reads; add them to the Design section of ?simulate_data
+       design <- .design_or_n(model, design, character(0), ...)
+       sim <- .simulate_pars(model, pars, design, scale)
+       # draw one response per row of the design with r<<model_name>>() from the
+       # native values in sim$native and return them under the response names:
+       # .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_var1), sim)
+       stop2('simulate_data() is not yet implemented for <<model_name>>.')
+    }\n\n\n",
+    .open = "<<", .close = ">>"
+  )
+
   postprocess_brm_method <- glue(
     "#' @export
     postprocess_brm.<<model_name>> <- function(model, fit, ...) {
@@ -1475,6 +1529,8 @@ use_model_template <- function(model_name,
     bmf2bf_method,
     configure_model_header,
     configure_model_method,
+    simulate_data_header,
+    simulate_data_method,
     family_functions,
     postprocess_brm_header,
     postprocess_brm_method
