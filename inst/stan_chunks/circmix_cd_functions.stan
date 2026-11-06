@@ -2,8 +2,10 @@
 
   // log crossing level of the decision density against the uniform (Appendix B); +Inf never "same", -Inf always "same"
   real circmix_cd_offset(real criterion, real p_s) {
+    // 0 whatever p_s, written with its slope in the criterion (-1 / p_s) so that a criterion at 0 keeps its gradient;
+    // nothing stored takes the limit p_s -> 0
     if (criterion == 0) {
-      return 0;
+      return p_s > 0 ? -criterion / p_s : 0;
     }
     if (p_s <= 0) {
       return criterion < 0 ? positive_infinity() : negative_infinity();

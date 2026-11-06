@@ -907,6 +907,43 @@ test_that("at a whole K / set size the K gradient is the slope from above", {
   }
 })
 
+# R twin of cd_gradient_model()'s target, without the Jacobian of K
+cd_gradient_loglik <- function(data, kappa, criterion, K) {
+  p_s_observer <- if (identical(data$ps_from_K, 1L)) min(1, K / data$ss) else data$p_s
+  .cd_bernoulli_ld(data$y, psame_simple(data$probe, kappa, data$p_s, criterion, p_s_observer)) +
+    .cd_bernoulli_ld(data$y, .circmix_cd_slot_averaging_psame(
+      matrix(data$probe), matrix(0), .circmix_slot_averaging_branches(K, data$ss, kappa),
+      criterion, data$rich == 1
+    ))
+}
+
+test_that("at criterion 0 the criterion keeps its gradient", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # the offset is 0 at criterion 0 whatever p_s, but its slope there is -1 / p_s;
+  # brms starts an estimated criterion at exactly 0
+  model <- cd_gradient_model()
+  step <- 1e-6
+  for (rich in 0:1) {
+    for (y in 0:1) {
+      data <- list(y = y, probe = 0.6, p_s = 0.6, ss = 2L, rich = rich)
+      label <- paste("criterion gradient at 0, rich", rich, "y", y)
+      diagnosed <- cd_gradient_diagnose(
+        model, data, list(log_kappa = log(8), criterion = 0, K = 3.5)
+      )
+      expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
+      skip_if(is.null(diagnosed))
+      expect_equal(
+        diagnosed$gradients()$model[2],
+        (cd_gradient_loglik(data, 8, step, 3.5) - cd_gradient_loglik(data, 8, -step, 3.5)) /
+          (2 * step),
+        tolerance = 1e-4,
+        label = label
+      )
+    }
+  }
+})
+
 test_that("an estimated criterion is announced as bounded", {
   model <- structure(
     list(fixed_parameters = list(mu = 0, criterion = 0)),
