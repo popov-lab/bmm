@@ -744,6 +744,40 @@ test_that("the trial family's methods take a dpar as one value per draw or one v
                vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, prep), numeric(2)))
 })
 
+# The methods read the version from the family name. Ro and Rn of dpsdt and
+# logmratio of metad move every category's probability, so a method that
+# computed another version misses the version's density
+test_that("the trial family's methods compute the version the family names", {
+  skip_on_cran()
+  dat <- data.frame(stimulus = c(0, 1, 1, 0), rating = c(1, 3, 4, 2))
+  counts <- diag(4)[dat$rating, ]
+  thresholds <- c(-0.2, 0.3, 0.8)
+  shared <- list(d = 1.2, criterion = 0.3, spacing = log(0.5), sdratio = 0)
+  cases <- list(
+    standard = list(formula = list(), dpars = list(),
+                    density = dsdt_rating(counts, dat$stimulus, d = 1.2, thresholds = thresholds,
+                                          log = TRUE)),
+    dpsdt = list(formula = list(Ro ~ 1, Rn ~ 1), dpars = list(Ro = qlogis(0.3), Rn = qlogis(0.2)),
+                 density = dsdt_dpsdt(counts, dat$stimulus, d = 1.2, thresholds = thresholds,
+                                      Ro = 0.3, Rn = 0.2, log = TRUE)),
+    metad = list(formula = list(logmratio ~ 1), dpars = list(logmratio = log(0.6)),
+                 density = dsdt_metad(counts, dat$stimulus, d = 1.2, thresholds = thresholds,
+                                      metad = 0.72, log = TRUE))
+  )
+  for (version in names(cases)) {
+    case <- cases[[version]]
+    prep <- rating_trial_prep(
+      sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant", version = version),
+      do.call(bmf, c(list(d ~ 1, criterion ~ 1, spacing ~ 1), case$formula)), dat,
+      c(shared, case$dpars)
+    )
+    expect_equal(vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, prep), numeric(1)),
+                 case$density, tolerance = 1e-10, info = version)
+    epred <- bmm:::posterior_epred_sdt_rating_trial(prep)[1, , ]
+    expect_equal(log(epred[cbind(1:4, dat$rating)]), case$density, tolerance = 1e-10, info = version)
+  }
+})
+
 # a bias is the criterion moved by half the separation: bias -0.3 at d 1.2 is
 # criterion 0.3, so both anchors give the same probabilities
 test_that("every version builds on trial rows with either anchor, and the bias anchor converts", {
