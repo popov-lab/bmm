@@ -358,7 +358,10 @@ test_that(".circmix_cd_slot_averaging_psame() judges a held item as stored (p_s 
 
 test_that("P('same') of a held item is continuous in K at a whole K / set size", {
   # set size 2, K rising to 4: the one-slot state's weight vanishes, and the
-  # value from below must meet the value at K = 4 under both observers
+  # value from below must meet the value at K = 4 under both observers. What
+  # is left at 1e-13 below is the K-slope times the step (5.0e-11 at most, the
+  # limited observer at criterion 5), 20 times under the threshold; the jumps
+  # of a shared range were 2.8e-5 and more
   psame_at_K <- function(K, criterion, rich) {
     .circmix_cd_slot_averaging_psame(
       matrix(0.6), matrix(0), .circmix_slot_averaging_branches(K, 2, 8), criterion, rich
@@ -367,7 +370,7 @@ test_that("P('same') of a held item is continuous in K at a whole K / set size",
   for (criterion in c(5, 0.5, -0.5, -3)) {
     for (rich in c(TRUE, FALSE)) {
       expect_lt(
-        abs(psame_at_K(4 * (1 - 1e-12), criterion, rich) - psame_at_K(4, criterion, rich)),
+        abs(psame_at_K(4 * (1 - 1e-13), criterion, rich) - psame_at_K(4, criterion, rich)),
         1e-9,
         label = paste("jump at K = 4, criterion", criterion, "rich", rich)
       )
