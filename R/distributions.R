@@ -882,6 +882,240 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   )
 }
 
+#' @title Distribution functions for the three-parameter mixture model of
+#'   change detection (mixture3p_cd)
+#'
+#' @description Probability and random generation for single-probe change
+#'   detection when memory is the three-parameter mixture model: the observer
+#'   retrieves a feature from the memory of [mixture3p()] (the target, a
+#'   non-target or a guess) and compares it with the probe, following the
+#'   decision rule of Lin and Oberauer (2022). See [mixture3p_cd()].
+#'
+#' @name mixture3p_cd_dist
+#'
+#' @param response Vector of responses, 0 = "same" and 1 = "change"
+#' @param n Number of observations to generate data for
+#' @param probe Vector of probes in radians, in the same frame as `mu`
+#' @param mu Vector of locations. The first value is the location of the
+#'   target item and any further values are the locations of the non-target
+#'   items, as in [dmixture3p()].
+#' @param kappa Vector of precision values
+#' @param p_mem Vector of probabilities of retrieving the target
+#' @param p_nt Vector of probabilities of retrieving a non-target, summed over
+#'   the non-targets, which share it equally. Must be 0 when `mu` holds only
+#'   the target.
+#' @param criterion Vector of decision criteria, on the scale of the model
+#'   parameter: 0, the default, is the unbiased observer, and other values are
+#'   kept inside each trial's range of evidence as in the model (see the
+#'   section "Decision criterion" of [mixture3p_cd()]).
+#' @param variable_precision Must be `FALSE`; variable precision is planned
+#'   for bmm 1.6.0.
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @details "Change" is the response when the retrieved feature falls outside
+#'   an arc around the probe, whose half-width follows from `kappa`,
+#'   `criterion` and the observer's prior that the feature comes from the
+#'   probed item, here `p_mem` (Lin & Oberauer, 2022, Appendix B).
+#'   `dmixture3p_cd()` integrates the retrieval mixture over that arc.
+#'   `rmixture3p_cd()` draws the remembered feature of every trial and lets
+#'   the observer decide on it, so it does not use `dmixture3p_cd()`. The
+#'   capacity versions of [mixture3p_cd()] reach these functions through
+#'   `p_mem = min(1, K / set_size) * ptarget` and
+#'   `p_nt = min(1, K / set_size) * (1 - ptarget)`, as for [dmixture3p()];
+#'   slot averaging has no counterpart here.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dmixture3p_cd()` gives the probability of each response, and
+#'   `rmixture3p_cd()` random responses coded 0 ("same") and 1 ("change").
+#'
+#' @export
+#'
+#' @examples
+#' # P("change") for a probe at the target, at a non-target and far from both
+#' dmixture3p_cd(1,
+#'   probe = c(0, 2, -1), mu = c(0, 2, -2.5), kappa = 8,
+#'   p_mem = 0.7, p_nt = 0.1
+#' )
+#' mean(rmixture3p_cd(1000,
+#'   probe = 2, mu = c(0, 2, -2.5), kappa = 8,
+#'   p_mem = 0.7, p_nt = 0.1
+#' ))
+dmixture3p_cd <- function(response, probe, mu = c(0, 2, -1.5), kappa = 5,
+                          p_mem = 0.6, p_nt = 0.2, criterion = 0,
+                          variable_precision = FALSE, log = FALSE) {
+  .cd_check_variable_precision(variable_precision)
+  .check_mixture3p_cd_args(mu, kappa, p_mem, p_nt)
+  stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
+
+  args <- .circmix_recycle(
+    response = response, probe = probe, kappa = kappa, p_mem = p_mem,
+    p_nt = p_nt, criterion = criterion
+  )
+  n <- length(args$response)
+  set_size <- length(mu)
+  weights <- .mixture3p_marginal_weights(args$p_mem, args$p_nt, set_size, n)
+  p_same <- .circmix_cd_psame(
+    args$probe - .circmix_locations(rep_len(mu[1], n), mu[-1], set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$criterion, args$p_mem
+  )
+  out <- .cd_bernoulli_ld(args$response, p_same)
+  if (log) out else exp(out)
+}
+
+#' @rdname mixture3p_cd_dist
+#' @export
+rmixture3p_cd <- function(n, probe, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6,
+                          p_nt = 0.2, criterion = 0, variable_precision = FALSE) {
+  .cd_check_variable_precision(variable_precision)
+  .check_mixture3p_cd_args(mu, kappa, p_mem, p_nt)
+  set_size <- length(mu)
+  .mixture3p_cd_observe(
+    probe = rep_len(probe, n), mu = mu[1],
+    nt = matrix(mu[-1], nrow = n, ncol = set_size - 1, byrow = TRUE),
+    set_size = set_size, kappa = kappa, w1 = p_mem, w2 = p_nt,
+    criterion = criterion, version = "marginal", rich = FALSE
+  )
+}
+
+# dmixture3p() lets p_nt go missing from the mixture when mu holds only the
+# target; P("change") would absorb it here
+.check_mixture3p_cd_args <- function(mu, kappa, p_mem, p_nt) {
+  .check_mixture3p_args(kappa, p_mem, p_nt, 0)
+  stopif(
+    length(mu) == 1 && isTRUE(any(p_nt > 0)),
+    "With a single item (mu of length 1) there is no non-target to retrieve, \\
+    so p_nt must be 0."
+  )
+}
+
+# P("same") for one row per observation or posterior draw, at one set size
+# and one row of non-targets; twin of the mixture3p_cd_<version>_core
+# functions in mixture3p_cd_functions.stan. w1 and w2 are thetat and thetant
+# under "simple" and K and ptarget under the capacity versions. The observer's
+# prior p_s is the target's retrieval weight, except under slot averaging,
+# where .circmix_cd_slot_averaging_psame() sets it.
+.mixture3p_cd_psame <- function(probe, mu, kappa, w1, w2, criterion, set_size,
+                                nt, version, rich) {
+  args <- .circmix_recycle(
+    probe = probe, mu = mu, kappa = kappa, w1 = w1, w2 = w2, criterion = criterion
+  )
+  d <- args$probe - .circmix_locations(args$mu, nt, set_size)
+  if (version == "slot_averaging") {
+    return(.circmix_cd_slot_averaging_psame(
+      d, .mixture3p_swap_weights(args$w2, set_size),
+      .circmix_slot_averaging_branches(args$w1, set_size, args$kappa),
+      args$criterion, rich
+    ))
+  }
+  weights <- if (version == "slot") {
+    .mixture3p_nested_weights(pmin(1, args$w1 / set_size), args$w2, set_size)
+  } else {
+    .mixture3p_softmax_weights(args$w1, args$w2, set_size)
+  }
+  .circmix_cd_psame(
+    d, weights$logw, weights$logw_guess, args$kappa, args$criterion,
+    exp(weights$logw[, 1])
+  )
+}
+
+# The observer of mixture3p_cd, trial by trial: draw which item is retrieved
+# (and under slot averaging how many slots it holds) and the remembered
+# feature x, then answer "change" when the log-likelihood ratio
+# -log(1 - p_s + p_s 2 pi f(x)) exceeds the bounded criterion, f being the
+# observer's density of x around the probe. It shares no code with
+# .mixture3p_cd_psame(), which integrates over x, so the two check each other.
+# One row per trial: set_size may vary by row, nt holds a row's non-targets in
+# its first set_size - 1 columns. Version "marginal" takes the probabilities
+# of rmixture3p_cd() in w1 (target) and w2 (all non-targets).
+.mixture3p_cd_observe <- function(probe, mu, nt, set_size, kappa, w1, w2,
+                                  criterion, version, rich) {
+  n <- length(probe)
+  args <- lapply(
+    list(mu = mu, kappa = kappa, w1 = w1, w2 = w2, criterion = criterion, ss = set_size),
+    rep_len, length.out = n
+  )
+  ss <- args$ss
+  swaps <- ss > 1
+  kappa <- args$kappa
+  kappa_lo <- kappa_hi <- kappa_x <- kappa
+  w_hi <- rep(0, n)
+  if (version == "slot_averaging") {
+    share <- args$w1 / ss
+    whole <- floor(share)
+    extra <- share - whole
+    slots <- whole + (stats::runif(n) < extra)
+    stored <- slots >= 1
+    held <- whole >= 1
+    kappa_hi <- .circmix_kappa((whole + 1) * .circmix_J(kappa))
+    kappa_lo[held] <- .circmix_kappa(whole[held] * .circmix_J(kappa[held]))
+    kappa_x <- ifelse(slots > whole, kappa_hi, kappa_lo)
+    p_target <- stored * ifelse(swaps, args$w2, 1)
+    p_swap <- stored * swaps * (1 - args$w2)
+    p_s <- ifelse(held, 1, extra)
+    w_hi <- if (rich) as.numeric(slots > whole) else extra
+    w_hi[!held] <- 1
+  } else {
+    if (version == "simple") {
+      e_target <- exp(args$w1)
+      e_swap <- ifelse(swaps, exp(args$w2), 0)
+      p_target <- e_target / (1 + e_target + e_swap)
+      p_swap <- e_swap / (1 + e_target + e_swap)
+    } else if (version == "slot") {
+      p_mem <- pmin(1, args$w1 / ss)
+      p_target <- p_mem * ifelse(swaps, args$w2, 1)
+      p_swap <- p_mem * swaps * (1 - args$w2)
+    } else {
+      p_target <- args$w1
+      p_swap <- swaps * args$w2
+    }
+    p_s <- p_target
+  }
+
+  u <- stats::runif(n)
+  from_target <- u < p_target
+  from_swap <- !from_target & u < p_target + p_swap
+  location <- args$mu
+  swapped <- which(from_swap)
+  which_nt <- ceiling(stats::runif(length(swapped)) * (ss[swapped] - 1))
+  location[swapped] <- nt[cbind(swapped, which_nt)]
+  remembered <- from_target | from_swap
+  x <- stats::runif(n, -pi, pi)
+  x[remembered] <- location[remembered] +
+    brms::rvon_mises(sum(remembered), 0, kappa_x[remembered])
+
+  # 2 pi times a von Mises density, exp(kappa (cos d - 1)) / (I0(kappa) e^-kappa)
+  vm2pi <- function(cos_d, k) exp(k * (cos_d - 1)) / besselI(k, 0, expon.scaled = TRUE)
+  mix2pi <- function(cos_d) {
+    out <- w_hi * vm2pi(cos_d, kappa_hi)
+    lo <- w_hi < 1
+    out[lo] <- out[lo] + (1 - w_hi[lo]) * vm2pi(cos_d[lo], kappa_lo[lo])
+    out
+  }
+  density <- mix2pi(cos(x - probe))
+  llr <- -log(1 - p_s + p_s * density)
+  # the trial's range of evidence: the density is largest at the probe and
+  # smallest opposite it
+  llr_max <- -log(1 - p_s + p_s * mix2pi(rep(-1, n)))
+  llr_min <- -log(1 - p_s + p_s * mix2pi(rep(1, n)))
+  crit <- args$criterion
+  bounded <- crit
+  up <- crit > 0
+  bounded[up] <- llr_max[up] * tanh(crit[up] / llr_max[up])
+  down <- crit < 0
+  bounded[down] <- -llr_min[down] * tanh(crit[down] / -llr_min[down])
+  change <- llr > bounded
+  # with p_s = 0 the ratio is 1 everywhere: the sign of the criterion decides,
+  # and at 0 the limit p_s -> 0 keeps the arc where the density exceeds 1 / 2 pi
+  blind <- p_s <= 0
+  change[blind] <- ifelse(crit[blind] == 0, density[blind] < 1, crit[blind] < 0)
+  as.integer(change)
+}
+
 #' @title Distribution functions for the Interference Measurement Model (IMM)
 #'
 #' @description Density, distribution, and random generation functions for the

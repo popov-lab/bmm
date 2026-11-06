@@ -139,6 +139,7 @@ Categorical recall and n-AFC decisions
 
 Detection, recognition and confidence judgments
 \itemize{
+\item mixture3p_cd(): Three-Parameter Mixture Model for Change Detection
 \item mpt(): Multinomial Processing Tree (MPT) Model
 \item sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model
 \item sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model

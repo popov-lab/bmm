@@ -679,6 +679,13 @@ data_column_roles <- list(
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     set_size = "set size (a column, or one number)"
   ),
+  mixture3p_cd = c(
+    response = "0 = 'same', 1 = 'change'",
+    probe = "feature shown at test, in radians",
+    target = "feature shown at the probed location, in radians",
+    nt_features = "non-target features relative to the target, in radians, one column per non-target",
+    set_size = "set size (a column, or one number)"
+  ),
   mpt = c(
     trees = "number of responses in each response category, one column per category, named after the branches of the trees",
     tree_id = "the tree each row belongs to (models with several trees)",
