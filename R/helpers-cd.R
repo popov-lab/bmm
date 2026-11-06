@@ -206,8 +206,9 @@
 # f decreases strictly on (0, pi), with f'(h) = -sin(h) sum_n softmax_n kappa_n,
 # so Newton converges from the closed form at the mean kappa; a step leaving the
 # bracket is replaced by bisection. The Stan twin adds one Newton step from the
-# converged root, whose gradient is then the implicit-function one; its value
-# moves within the loop's tolerance (at most 5e-12). kappa and lw are n x S.
+# converged root, kept while it stays inside (0, pi), whose gradient is then the
+# implicit-function one; its value moves within the loop's tolerance (at most
+# 5e-12). kappa and lw are n x S.
 .circmix_cd_limited_hw <- function(kappa, lw, offset, start) {
   n <- nrow(kappa)
   base <- lw - .circmix_log_besselI0(kappa)

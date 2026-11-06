@@ -197,7 +197,10 @@
         // the last residual, which near saturation (sin h small) is not small; from the root the gradient is the
         // implicit one, and the value moves within the loop's tolerance (at most 5e-12 measured)
         vector[S] lp_root = base + kappa * cos(h_new);
-        return h_new + (log_sum_exp(lp_root) - level) / (sin(h_new) * dot_product(softmax(lp_root), kappa));
+        real h_root = h_new + (log_sum_exp(lp_root) - level) / (sin(h_new) * dot_product(softmax(lp_root), kappa));
+        // near saturation the level's rounding sets the residual, and the step can be the arc's own size; one that
+        // leaves the circle is dropped (the bracket of the last two iterates would drop the good steps too)
+        return h_root > 0 && h_root < pi() ? h_root : h_new;
       }
       h = h_new;
     }
