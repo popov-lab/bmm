@@ -186,8 +186,9 @@ test_that("a call through a function object does not print the function", {
   expect_identical(warnings_before_error(quote(do.call(sdm, list("y", foo = 1)))), wording)
   expect_identical(warnings_before_error(quote(Map(sdm, "y", foo = 1))), wording)
   expect_identical(warnings_before_error(quote(lapply("y", sdm, foo = 1))), wording)
+  # sdm() takes four arguments by position (#558), so the fifth reaches `...`
   expect_match(
-    warnings_before_error(quote(do.call(sdm, list("y", 1, 2)))),
+    warnings_before_error(quote(do.call(sdm, list("y", 1, 2, 3, 4)))),
     "This model constructor takes further arguments by name only", fixed = TRUE
   )
   expect_match(

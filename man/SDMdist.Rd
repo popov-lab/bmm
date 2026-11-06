@@ -8,7 +8,16 @@
 \alias{rsdm}
 \title{Distribution functions for the Signal Discrimination Model (SDM)}
 \usage{
-dsdm(x, mu = 0, c = 3, kappa = 3.5, log = FALSE, parametrization = "sqrtexp")
+dsdm(
+  x,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  log = FALSE,
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
+)
 
 psdm(
   q,
@@ -18,7 +27,9 @@ psdm(
   lower.tail = TRUE,
   log.p = FALSE,
   lower.bound = -pi,
-  parametrization = "sqrtexp"
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
 )
 
 qsdm(
@@ -29,10 +40,20 @@ qsdm(
   lower.tail = TRUE,
   log.p = FALSE,
   lower.bound = -pi,
-  parametrization = "sqrtexp"
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
 )
 
-rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
+rsdm(
+  n,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
+)
 }
 \arguments{
 \item{x}{Vector of quantiles}
@@ -45,9 +66,16 @@ rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
-\item{parametrization}{Character; either \code{"bessel"} or \code{"sqrtexp"}
-(default). See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for details on the
-parameterization.}
+\item{parametrization}{Deprecated since bmm 1.5.0; use \code{scaling}
+instead. \code{"sqrtexp"} is \code{scaling = "density"}; for \code{"bessel"}, convert \code{c}
+with \code{\link[=c_bessel2sqrtexp]{c_bessel2sqrtexp()}} and use \code{scaling = "density"}.}
+
+\item{activation}{Character; the activation kernel of the SDM,
+\code{"vonmises"} (default) or \code{"laplace"}. See \code{\link[=sdm]{sdm()}}.}
+
+\item{scaling}{Character; what \code{c} measures: \code{"density"}, \code{"peak"} or
+\code{"range"}. \code{NULL} (default) means \code{"density"} for the von Mises and
+\code{"peak"} for the Laplace activation. See \code{\link[=sdm]{sdm()}}.}
 
 \item{q}{Vector of quantiles}
 
@@ -76,13 +104,25 @@ memory strength \code{c}, and precision \code{kappa}. Currently only a
 single activation source is supported.
 }
 \details{
-\strong{Parametrization}
+\strong{Activation and scaling}
 
-See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for details on the parameterization.
-Oberauer (2023) introduced the SDM with the bessel parametrization. The
-sqrtexp parametrization is the default in the \code{bmm} package for
-numerical stability and efficiency. The two parametrizations are related by
-the functions \code{c_bessel2sqrtexp()} and \code{c_sqrtexp2bessel()}.
+The density is \eqn{\exp(c^* s(x - \mu)) / Z}, where \eqn{s} is the
+activation function with \eqn{s(0) = 1}, \eqn{c^*} its peak, and \eqn{Z}
+normalises the density over the circle. \code{scaling} says how \code{c} translates
+into \eqn{c^*}; the sections "Activation functions", "Scaling of the
+activation" and "What \code{c} means" in \code{\link[=sdm]{sdm()}} give the formulas. The
+default, the von Mises activation with \code{scaling = "density"}, is what
+these functions computed before \code{activation} and \code{scaling} existed (the
+sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
+exact density of the von Mises distribution instead (the bessel
+parametrization); \code{c_bessel2sqrtexp()} and \code{c_sqrtexp2bessel()} convert
+between the two. For the Laplace activation with \code{scaling = "density"},
+\code{c_laplace_circle2line()} and \code{c_laplace_line2circle()} convert between
+\code{bmm}'s \code{c} and that of Oberauer (2023, eq. 2). See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article}.
+At exactly \code{kappa = 0} the range scaling is undefined, because target and
+opposite have the same activation: \code{dsdm}, \code{psdm} and \code{qsdm} return \code{NaN}
+and \code{rsdm} stops with an error. Fits
+never reach it, since \code{kappa} has a log link.
 
 \strong{The cumulative distribution function}
 
@@ -114,12 +154,14 @@ plot(x, dsdm(x, 0, 2, 3),
 )
 lines(x, dsdm(x, 0, 9, 1), col = "red")
 lines(x, dsdm(x, 0, 2, 8), col = "green")
+lines(x, dsdm(x, 0, 4, 3, activation = "laplace"), col = "blue")
 legend("topright", c(
   "c=2, kappa=3.0, mu=0",
   "c=9, kappa=1.0, mu=0",
-  "c=2, kappa=8, mu=1"
+  "c=2, kappa=8, mu=1",
+  "Laplace, c=4, kappa=3"
 ),
-col = c("black", "red", "green"), lty = 1, cex = 0.8
+col = c("black", "red", "green", "blue"), lty = 1, cex = 0.8
 )
 
 # plot the cumulative distribution function of the SDM distribution

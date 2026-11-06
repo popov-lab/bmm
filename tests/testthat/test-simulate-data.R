@@ -211,6 +211,14 @@ test_that("simulated statistics of the circular models match their densities", {
   y <- simulate_data(sdm("y"), list(c = 2, kappa = 1.75), n_trials = n_sim)$y
   expect_within_mc(cos(y), circular_mean_cos(function(x) dsdm(x, 0, 7.389056, 5.754603)), "sdm")
 
+  # E[cos] of exp(cstar s(x)) by quadrature of the kernel itself, c = e,
+  # kappa = e^0.5; the default cell gives 0.3261631 at these values, so a
+  # method that ignores activation or scaling fails both
+  y <- simulate_data(sdm("y", activation = "laplace"), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_within_mc(cos(y), 0.4829029, "sdm laplace peak")
+  y <- simulate_data(sdm("y", scaling = "range"), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_within_mc(cos(y), 0.6224407, "sdm vonmises range")
+
   display <- data.frame(set_size = rep(3, n_sim), nt1 = 1.5, nt2 = -2, d1 = 1, d2 = 2)
   model <- mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size")
   y <- simulate_data(model, list(kappa = 2, thetat = 0.5, thetant = -0.5), display)$y

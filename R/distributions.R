@@ -95,9 +95,14 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param c Vector of memory strength values
 #' @param kappa Vector of precision values
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
-#' @param parametrization Character; either `"bessel"` or `"sqrtexp"`
-#'   (default). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
-#'   parameterization.
+#' @param parametrization Deprecated since bmm 1.5.0; use `scaling`
+#'   instead. `"sqrtexp"` is `scaling = "density"`; for `"bessel"`, convert `c`
+#'   with [c_bessel2sqrtexp()] and use `scaling = "density"`.
+#' @param activation Character; the activation kernel of the SDM,
+#'   `"vonmises"` (default) or `"laplace"`. See [sdm()].
+#' @param scaling Character; what `c` measures: `"density"`, `"peak"` or
+#'   `"range"`. `NULL` (default) means `"density"` for the von Mises and
+#'   `"peak"` for the Laplace activation. See [sdm()].
 #' @param log.p Logical; if `TRUE`, probabilities are returned on the log
 #'   scale.
 #' @param lower.bound Numeric; Lower bound of integration for the cumulative
@@ -113,13 +118,25 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'   function, `qsdm` gives the quantile function, and `rsdm` generates
 #'   random deviates.
 #'
-#' @details **Parametrization**
+#' @details **Activation and scaling**
 #'
-#' See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
-#' Oberauer (2023) introduced the SDM with the bessel parametrization. The
-#' sqrtexp parametrization is the default in the `bmm` package for
-#' numerical stability and efficiency. The two parametrizations are related by
-#' the functions `c_bessel2sqrtexp()` and `c_sqrtexp2bessel()`.
+#' The density is \eqn{\exp(c^* s(x - \mu)) / Z}, where \eqn{s} is the
+#' activation function with \eqn{s(0) = 1}, \eqn{c^*} its peak, and \eqn{Z}
+#' normalises the density over the circle. `scaling` says how `c` translates
+#' into \eqn{c^*}; the sections "Activation functions", "Scaling of the
+#' activation" and "What `c` means" in [sdm()] give the formulas. The
+#' default, the von Mises activation with `scaling = "density"`, is what
+#' these functions computed before `activation` and `scaling` existed (the
+#' sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
+#' exact density of the von Mises distribution instead (the bessel
+#' parametrization); `c_bessel2sqrtexp()` and `c_sqrtexp2bessel()` convert
+#' between the two. For the Laplace activation with `scaling = "density"`,
+#' `c_laplace_circle2line()` and `c_laplace_line2circle()` convert between
+#' `bmm`'s `c` and that of Oberauer (2023, eq. 2). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#' At exactly `kappa = 0` the range scaling is undefined, because target and
+#' opposite have the same activation: `dsdm`, `psdm` and `qsdm` return `NaN`
+#' and `rsdm` stops with an error. Fits
+#' never reach it, since `kappa` has a log link.
 #'
 #' **The cumulative distribution function**
 #'
@@ -153,12 +170,14 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' )
 #' lines(x, dsdm(x, 0, 9, 1), col = "red")
 #' lines(x, dsdm(x, 0, 2, 8), col = "green")
+#' lines(x, dsdm(x, 0, 4, 3, activation = "laplace"), col = "blue")
 #' legend("topright", c(
 #'   "c=2, kappa=3.0, mu=0",
 #'   "c=9, kappa=1.0, mu=0",
-#'   "c=2, kappa=8, mu=1"
+#'   "c=2, kappa=8, mu=1",
+#'   "Laplace, c=4, kappa=3"
 #' ),
-#' col = c("black", "red", "green"), lty = 1, cex = 0.8
+#' col = c("black", "red", "green", "blue"), lty = 1, cex = 0.8
 #' )
 #'
 #' # plot the cumulative distribution function of the SDM distribution
@@ -171,37 +190,30 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
-                 parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
-  .dsdm_numer <- .sdm_numer(parametrization)
-
-  lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
-
-  denom <- if (any(length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
-    .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
-  } else {
-    .dsdm_integrate_numer(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
-  }
-
-  denom <- 2 * denom
-
-  if (!log) {
-    return(exp(lnumerator) / denom)
-  }
-  lnumerator - log(denom)
+                 parametrization = NULL, activation = c("vonmises", "laplace"),
+                 scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
+  log_cstar <- .sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization)
+  out <- exp(log_cstar + .sdm_log_s(x - mu, kappa, activation)) -
+    .sdm_log_z(log_cstar, kappa, activation)
+  if (log) out else exp(out)
 }
 
 #' @rdname SDMdist
 #' @export
 psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
-                 lower.bound = -pi, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
+                 lower.bound = -pi, parametrization = NULL,
+                 activation = c("vonmises", "laplace"), scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
+  amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
   # mapply() refuses a zero-length q next to scalar parameters
   out <- if (length(q) == 0) {
     numeric(0)
   } else {
-    as.numeric(mapply(.psdm_one, q, mu, c, kappa, lower.bound,
-      MoreArgs = list(numer = .sdm_numer(parametrization))
+    as.numeric(mapply(.psdm_one, q, mu, amp, kappa, lower.bound,
+      MoreArgs = list(activation = activation)
     ))
   }
 
@@ -217,59 +229,71 @@ psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @rdname SDMdist
 #' @export
 qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
-                 lower.bound = -pi, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
+                 lower.bound = -pi, parametrization = NULL,
+                 activation = c("vonmises", "laplace"), scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
+  amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
   if (length(p) == 0) {
     numeric(0)
   } else {
     p <- if (log.p) exp(p) else p
     p <- if (lower.tail) p else 1 - p
     warnif(any(p < 0 | p > 1, na.rm = TRUE), "NaNs produced")
-    as.numeric(mapply(.qsdm_root, p, mu, c, kappa, lower.bound,
-      MoreArgs = list(numer = .sdm_numer(parametrization))
+    as.numeric(mapply(.qsdm_root, p, mu, amp, kappa, lower.bound,
+      MoreArgs = list(activation = activation)
     ))
   }
 }
 
 #' @rdname SDMdist
 #' @export
-rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
+rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
+                 activation = c("vonmises", "laplace"), scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
   stopif(length(n) > 1, "n must be a single integer")
-  .dsdm_numer <- .sdm_numer(parametrization)
+  amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
 
-  # compare to the peak on the log scale: the unnormalized density itself
-  # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
+  # the density over its value at the peak, on the log scale: the
+  # unnormalized density itself overflows for large c and kappa
   rejection_sampling(
     n = n,
-    f = function(x, mu, c, kappa) {
-      exp(.dsdm_numer(x, mu, c, kappa, log = TRUE) - .dsdm_numer(mu, mu, c, kappa, log = TRUE))
-    },
+    f = function(x, mu, amp, kappa) exp(amp * expm1(.sdm_log_s(x - mu, kappa, activation))),
     max_f = 1,
     proposal_fun = function(n) stats::runif(n, -pi, pi),
-    mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
+    mu = .recycle_draws(mu, n), amp = .recycle_draws(amp, n), kappa = .recycle_draws(kappa, n)
   )
 }
 
-.psdm_one <- function(q, mu, c, kappa, lower.bound, numer) {
-  undefined <- .sdm_undefined(
-    c(q, mu, c, kappa, lower.bound),
-    positions = c(q, mu, lower.bound),
-    amplitude = numer(0, 0, c, kappa, log = TRUE)
-  )
+# log c* of a d/p/q/r call. The deprecated parametrization = "bessel" takes c
+# of the exact von Mises density, whose peak is c / (2 pi I0(kappa) e^-kappa)
+.sdm_dist_log_cstar <- function(c, kappa, activation, scaling, parametrization) {
+  if (identical(parametrization, "sqrtexp")) {
+    warn_deprecated('parametrization = "sqrtexp"', with = 'scaling = "density"', since = "1.5.0")
+  } else if (identical(parametrization, "bessel")) {
+    warn_deprecated('parametrization = "bessel"', with = NULL, since = "1.5.0",
+      details = 'Convert c with `c_bessel2sqrtexp(c, kappa)` and use `scaling = "density"`.'
+    )
+    return(log(c) - log(2 * pi * besselI(kappa, 0, expon.scaled = TRUE)))
+  }
+  if (is.null(scaling)) {
+    scaling <- .sdm_default_scaling(activation)
+  }
+  .sdm_log_cstar(log(c), kappa, activation, scaling)
+}
+
+.psdm_one <- function(q, mu, amp, kappa, lower.bound, activation) {
+  undefined <- .sdm_undefined(c(q, mu, amp, kappa, lower.bound), positions = c(q, mu, lower.bound))
   if (!is.null(undefined)) {
     undefined
   } else {
-    .sdm_cdf(q, mu, lower.bound, .sdm_kernel(numer, c, kappa))
+    .sdm_cdf(q, mu, lower.bound, .sdm_kernel(amp, kappa, activation))
   }
 }
 
-.qsdm_root <- function(p, mu, c, kappa, lower.bound, numer) {
-  undefined <- .sdm_undefined(
-    c(p, mu, c, kappa, lower.bound),
-    positions = c(mu, lower.bound),
-    amplitude = numer(0, 0, c, kappa, log = TRUE)
-  )
+.qsdm_root <- function(p, mu, amp, kappa, lower.bound, activation) {
+  undefined <- .sdm_undefined(c(p, mu, amp, kappa, lower.bound), positions = c(mu, lower.bound))
   if (!is.null(undefined)) {
     undefined
   } else if (p < 0 || p > 1) {
@@ -279,7 +303,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   } else if (p == 1) {
     lower.bound + 2 * pi
   } else {
-    kernel <- .sdm_kernel(numer, c, kappa)
+    kernel <- .sdm_kernel(amp, kappa, activation)
     base <- .sdm_mass_below(lower.bound, mu, kernel)
     # f.lower and f.upper are the CDF at the ends by definition, so the
     # bracket holds however the CDF rounds next to them
@@ -292,29 +316,36 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 }
 
 # NULL for usable arguments. Otherwise NA for a missing value, and NaN for NaN,
-# an infinite value, a position beyond 1e8 (where an ulp is about 1.5e-8
-# radians) or an amplitude that is not finite: R's besselI() returns 0 for
-# kappa above 1e5. `amplitude` is evaluated only for finite arguments
-.sdm_undefined <- function(values, positions, amplitude) {
+# an infinite value or a position beyond 1e8 (where an ulp is about 1.5e-8
+# radians). The peak `amp` is among the values: with the bessel
+# parametrization it is infinite for kappa above 1e5, where R's besselI()
+# returns 0
+.sdm_undefined <- function(values, positions) {
   if (anyNA(values) && !any(is.nan(values))) {
     NA_real_
-  } else if (!all(is.finite(values)) || any(abs(positions) > 1e8) ||
-               !is.finite(amplitude)) {
+  } else if (!all(is.finite(values)) || any(abs(positions) > 1e8)) {
     NaN
   }
 }
 
-# The numerator over its peak in u = x - mu, in the sin()/expm1() form that
-# keeps its digits near the peak at large c and kappa. It is below exp(-50)
-# past `end`; the breaks keep integrate() from missing a peak that is far
-# narrower than the range it integrates over
-.sdm_kernel <- function(numer, c, kappa) {
-  amp <- numer(0, 0, c, kappa, log = TRUE)
-  depth <- if (amp > 50) -log1p(-50 / amp) / (2 * kappa) else Inf
-  end <- if (depth < 1) 2 * asin(sqrt(depth)) else pi
-  breaks <- 64^seq_len(8) / sqrt(kappa * max(amp, 1))
+# The density over its peak in u = x - mu, in the expm1() form that keeps its
+# digits near the peak at large c and kappa. It is below exp(-50) past `end`,
+# where amp * expm1(log s(u)) = -50; the breaks, at multiples of the width of
+# the peak, keep integrate() from missing a peak that is far narrower than the
+# range it integrates over
+.sdm_kernel <- function(amp, kappa, activation) {
+  depth <- if (amp > 50) -log1p(-50 / amp) else Inf
+  if (activation == "vonmises") {
+    depth <- depth / (2 * kappa)
+    end <- if (depth < 1) 2 * asin(sqrt(depth)) else pi
+    width <- sqrt(kappa * max(amp, 1))
+  } else {
+    end <- min(depth / kappa, pi)
+    width <- kappa * max(amp, 1)
+  }
+  breaks <- 64^seq_len(8) / width
   kernel <- list(
-    f = function(u) exp(amp * expm1(-2 * kappa * sin(u / 2)^2)),
+    f = function(u) exp(amp * expm1(.sdm_log_s(u, kappa, activation))),
     ends = c(breaks[breaks < end], end)
   )
   kernel$norm <- 2 * .sdm_beyond(kernel, 0)
@@ -380,48 +411,23 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   }
 }
 
-.check_sdm_args <- function(c, kappa, parametrization) {
+.check_sdm_args <- function(c, kappa, parametrization, activation, scaling) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
   stopif(
-    !is.character(parametrization) || length(parametrization) != 1 ||
-      !parametrization %in% c("bessel", "sqrtexp"),
+    !is.null(parametrization) && (!is.character(parametrization) || length(parametrization) != 1 ||
+      !parametrization %in% c("bessel", "sqrtexp")),
     "Parametrization must be one of 'bessel' or 'sqrtexp'"
   )
-}
-
-.sdm_numer <- function(parametrization) {
-  switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp
+  stopif(
+    !is.null(scaling) && (!is.character(scaling) || length(scaling) != 1 || !scaling %in% .sdm_scalings),
+    "scaling must be one of 'density', 'peak' or 'range'"
+  )
+  stopif(
+    !is.null(parametrization) && (activation != "vonmises" || !is.null(scaling)),
+    "`parametrization` is deprecated and applies only to the von Mises activation without `scaling`."
   )
 }
-
-# helper functions for calculating the density of the SDM distribution
-.dsdm_numer_bessel <- function(x, mu, c, kappa, log = FALSE) {
-  be <- besselI(kappa, nu = 0, expon.scaled = TRUE)
-  out <- c * exp(kappa * (cos(x - mu) - 1)) / (2 * pi * be)
-  if (!log) {
-    out <- exp(out)
-  }
-  out
-}
-
-.dsdm_numer_sqrtexp <- function(x, mu, c, kappa, log = FALSE) {
-  out <- c * exp(kappa * (cos(x - mu) - 1)) * sqrt(kappa) / sqrt(2 * pi)
-  if (!log) {
-    out <- exp(out)
-  }
-  out
-}
-
-.dsdm_integrate_numer <- function(fun, mu, c, kappa, lower, upper) {
-  stats::integrate(fun, lower = lower, upper = upper, mu, c, kappa)$value
-}
-
-.dsdm_integrate_numer_v <- Vectorize(.dsdm_integrate_numer,
-  vectorize.args = c("mu", "c", "kappa", "lower", "upper")
-)
 
 
 #' @title Distribution functions for the two-parameter mixture model (mixture2p)

@@ -1,3 +1,13 @@
+# the deprecated `parametrization` (#558) warns on every call; the tests that
+# wrap a call in this check the values it still gives
+quiet_parametrization <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl("`parametrization = ", conditionMessage(w), fixed = TRUE)) {
+      invokeRestart("muffleWarning")
+    }
+  })
+}
+
 test_that("sdm distribution functions run without errors", {
   withr::local_seed(445)
   n <- 10
@@ -56,7 +66,7 @@ test_that("psdm returns 1 at the upper end of the circle and 0 at lower.bound", 
   expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5, lower.tail = FALSE), 0)
   expect_equal(psdm(1 + pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 1)
   expect_equal(psdm(1 - pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 0)
-  expect_equal(psdm(2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0, parametrization = "bessel"), 1)
+  expect_equal(quiet_parametrization(psdm(2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0, parametrization = "bessel")), 1)
   expect_equal(psdm(c(-pi, 0, pi), mu = 0, c = 3, kappa = 5), c(0, 0.5, 1))
 })
 
@@ -98,7 +108,7 @@ test_that("psdm matches independently computed values of narrow distributions", 
     tolerance = 1e-8
   )
   expect_equal(
-    psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100, parametrization = "bessel"),
+    quiet_parametrization(psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100, parametrization = "bessel")),
     c(0.038542019868, 0.961457980132, 1, 1),
     tolerance = 1e-8
   )
@@ -128,10 +138,10 @@ test_that("psdm works where |q - mu| is a few ulps inside the cut-off of the ker
 
 test_that("psdm and qsdm return NaN for the bessel parametrization above kappa = 1e5", {
   expect_identical(
-    psdm(c(-pi, -0.01, 0.001, 0.5, pi), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"),
+    quiet_parametrization(psdm(c(-pi, -0.01, 0.001, 0.5, pi), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel")),
     rep(NaN, 5)
   )
-  expect_no_warning(res <- qsdm(c(0, 0.3, 1), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"))
+  expect_no_warning(res <- quiet_parametrization(qsdm(c(0, 0.3, 1), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel")))
   expect_identical(res, rep(NaN, 3))
 })
 
@@ -192,12 +202,12 @@ test_that("qsdm matches independently computed quantiles", {
     tolerance = 1e-8
   )
   expect_equal(
-    qsdm(p, mu = 0, c = 3, kappa = 5, parametrization = "bessel"),
+    quiet_parametrization(qsdm(p, mu = 0, c = 3, kappa = 5, parametrization = "bessel")),
     c(-2.7469702720, -0.3748796718, 0, 0.3748796718, 2.7469702720),
     tolerance = 1e-8
   )
   expect_equal(
-    qsdm(p, mu = 1.2, c = 8, kappa = 2, parametrization = "bessel"),
+    quiet_parametrization(qsdm(p, mu = 1.2, c = 8, kappa = 2, parametrization = "bessel")),
     c(-1.6664740454, 0.8663819230, 1.1779562294, 1.4706224867, 2.3265643834),
     tolerance = 1e-8
   )
@@ -211,7 +221,7 @@ test_that("qsdm matches independently computed quantiles of a narrow distributio
     tolerance = 1e-8
   )
   expect_equal(
-    qsdm(p, mu = 0, c = 20, kappa = 50, parametrization = "bessel"),
+    quiet_parametrization(qsdm(p, mu = 0, c = 20, kappa = 50, parametrization = "bessel")),
     c(-0.060010882249, -0.012816159925, 0.012816159925, 0.060010882249),
     tolerance = 1e-8
   )
@@ -221,14 +231,14 @@ test_that("qsdm returns a quantile for p near 1 where lower.bound + 2 * pi round
   # the 16 digits matter: (lb + 2 * pi) - lb is not exactly 2 * pi here
   lb <- 4.411322201024876
   for (par in c("sqrtexp", "bessel")) {
-    q <- qsdm(1 - 1e-13, mu = 0, c = 3, kappa = 5, lower.bound = lb, parametrization = par)
+    q <- quiet_parametrization(qsdm(1 - 1e-13, mu = 0, c = 3, kappa = 5, lower.bound = lb, parametrization = par))
     expect_true(q >= lb && q <= lb + 2 * pi)
   }
 })
 
 test_that("qsdm is the median at mu for a distribution symmetric around mu", {
   expect_equal(qsdm(0.5, mu = 0), 0, tolerance = 1e-8)
-  expect_equal(qsdm(0.5, mu = 0, parametrization = "bessel"), 0, tolerance = 1e-8)
+  expect_equal(quiet_parametrization(qsdm(0.5, mu = 0, parametrization = "bessel")), 0, tolerance = 1e-8)
   expect_equal(qsdm(0.5, mu = 1, c = 8, kappa = 2, lower.bound = 1 - pi), 1, tolerance = 1e-8)
   expect_equal(qsdm(0.5, mu = -2.5, c = 8, kappa = 2, lower.bound = -2.5 - pi), -2.5, tolerance = 1e-8)
 })
@@ -242,8 +252,8 @@ test_that("psdm(qsdm(p)) returns p to 1e-8 on both parametrizations", {
   )
   for (par in c("sqrtexp", "bessel")) {
     for (s in sets) {
-      q <- qsdm(p, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
-      back <- psdm(q, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
+      q <- quiet_parametrization(qsdm(p, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par))
+      back <- quiet_parametrization(psdm(q, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par))
       expect_lt(max(abs(back - p)), 1e-8)
     }
   }
@@ -385,8 +395,8 @@ test_that("dsdm parametrization conversion returns accurate results", {
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
   c_se <- c_bessel2sqrtexp(c_b, kappa)
-  d1 <- dsdm(y, 0, c_b, kappa, parametrization = "bessel")
-  d2 <- dsdm(y, 0, c_se, kappa, parametrization = "sqrtexp")
+  d1 <- quiet_parametrization(dsdm(y, 0, c_b, kappa, parametrization = "bessel"))
+  d2 <- quiet_parametrization(dsdm(y, 0, c_se, kappa, parametrization = "sqrtexp"))
   expect_equal(d1, d2)
 })
 
