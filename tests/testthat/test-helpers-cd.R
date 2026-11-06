@@ -255,6 +255,23 @@ test_that("both observers coincide when there is a single precision state", {
   }
 })
 
+test_that("a padded precision state contributes nothing under either observer", {
+  d <- matrix(c(0.5, 1.4), nrow = 1)
+  logw <- matrix(log(c(0.6, 0.3)), 1)
+  states <- two_states()
+  # kappa 0 has no evidence range, so the padded state's own arc is NaN
+  padded <- list(kappa = cbind(states$kappa, 0), lw = cbind(states$lw, -Inf))
+  for (rich in c(TRUE, FALSE)) {
+    for (criterion in c(0, 0.4, -0.3)) {
+      expect_identical(
+        .circmix_cd_mix_psame(d, logw, log(0.1), padded$kappa, padded$lw, criterion, 0.6, rich),
+        .circmix_cd_mix_psame(d, logw, log(0.1), states$kappa, states$lw, criterion, 0.6, rich),
+        label = paste("padded, rich", rich, "criterion", criterion)
+      )
+    }
+  }
+})
+
 test_that("the knowledge-limited boundary lies between the per-state boundaries", {
   for (extra in c(0.1, 0.5, 0.9)) {
     states <- two_states(extra = extra)
@@ -642,6 +659,7 @@ cd_stan_values <- function(data) {
     generated quantities {
       vector[NC] out_offset; vector[NC] out_crit; vector[ND] out_mass;
       vector[NC] out_psame; vector[NC] out_limited; array[2] vector[NC] out_mix;
+      array[2] vector[NC] out_mix_padded;
       array[2, NB] vector[NC] out_sa; vector[NC] out_bound; vector[NC] out_bound_flat;
       array[2] real out_bern;
       for (c in 1:NC) {
@@ -654,6 +672,9 @@ cd_stan_values <- function(data) {
         for (r in 1:2) {
           out_mix[r, c] = circmix_cd_mix_psame(d, logw, logw_guess, kappa_s, lw_s,
                                                crit[c], ps[c], r - 1, gl_x, gl_w);
+          out_mix_padded[r, c] = circmix_cd_mix_psame(
+            d, logw, logw_guess, append_row(kappa_s, 0), append_row(lw_s, negative_infinity()),
+            crit[c], ps[c], r - 1, gl_x, gl_w);
           for (b in 1:NB) {
             vector[4] branch = circmix_slot_averaging_branches(K[b], ss[b], 7, logk,
                                                                dlogk, logJ_min, dlogJ);
@@ -742,6 +763,9 @@ test_that("the Stan and R change-detection functions agree", {
     )
   }, numeric(n))
   expect_equal(stan("out_mix"), as.vector(t(mix)), tolerance = 1e-12)
+  # a padded state (log weight -Inf, kappa 0, whose own arc is NaN) adds
+  # nothing; the longer sums may round differently in the last digit
+  expect_equal(stan("out_mix_padded"), stan("out_mix"), tolerance = 1e-14)
 
   sa <- array(NA_real_, c(2, length(K), n))
   for (r in 1:2) {
