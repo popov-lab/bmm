@@ -194,8 +194,10 @@
       }
       if (abs(h_new - h) < 1e-12) {
         // one more Newton step, from the root itself: the step from h carries h's gradient times a factor of the size of
-        // the last residual, which near saturation (sin h small) is not small; from the root the gradient is the
-        // implicit one, and the value moves within the loop's tolerance (at most 5e-12 measured)
+        // the last residual, which near saturation (sin h small) is not small. Up to about 10 times the range the
+        // step's gradient is the implicit one and its value moves by at most 5e-12 (measured); nearer saturation the
+        // level's rounding sets the root, and R and Stan differ by up to 4.3e-9 in h at 16-17 times, each about as far
+        // from the true root
         vector[S] lp_root = base + kappa * cos(h_new);
         real h_root = h_new + (log_sum_exp(lp_root) - level) / (sin(h_new) * dot_product(softmax(lp_root), kappa));
         // near saturation the level's rounding sets the residual, and the step can be the arc's own size; one that
