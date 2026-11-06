@@ -40,13 +40,6 @@
   does, instead of thresholds. `performance::model_performance()`
   returns LOOIC and WAIC only; R2 and RMSE are not defined for bmm
   models.
-- [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), the
-  quantile function of the SDM distribution, now works; it stopped with
-  “‘qsdm’ is not implemented yet”. It takes `lower.tail`, `log.p` and
-  `lower.bound` as
-  [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) does and
-  returns values between `lower.bound` and `lower.bound + 2 * pi`
-  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
 - `report_methods(fit)` drafts the methods paragraph for a fitted model:
   the model, the versions of bmm, brms, Stan and R, the sampler
   settings, the formula, the priors and the convergence diagnostics,
@@ -99,6 +92,53 @@
   `n_trials` work as before
   ([\#646](https://github.com/popov-lab/bmm/issues/646)).
 
+#### Other changes
+
+- [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) fits
+  with one row per trial and the default normal noise
+  (`dist = "normal"`) are faster: each sampling step takes about half
+  the time it did. Estimates are unchanged up to sampling error.
+- [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
+  and the help pages now show each model by its name only, such as
+  “Two-Parameter Mixture Model”, without the citation, which stays in
+  the `Citation` field of the help page. A model that fits several
+  tasks, such as
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), is listed
+  under each of them
+  ([\#554](https://github.com/popov-lab/bmm/issues/554)).
+
+#### Documentation
+
+- bmm now follows a written lifecycle policy. A deprecated function or
+  argument keeps working, with a warning that names its replacement and
+  the earliest release that may remove it, for at least one minor
+  release: something deprecated in 1.5.0 works in every 1.5.x release
+  and is removed in 1.6.0 at the earliest. Every deprecation and removal
+  is listed under “Deprecated functions and arguments” in this file, and
+  breaking changes are announced in a GitHub issue before the release
+  that contains them. See the contributing guide
+  ([\#441](https://github.com/popov-lab/bmm/issues/441)).
+- For developers: the header of the file
+  [`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)
+  writes named an outdated place for a new model’s test cases. It now
+  points to `model_cases_<name>()` in
+  `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`,
+  `sd_default`, `init` and `links` case, and it lists
+  `tests/testthat/test-model_<name>.R` for the model’s own tests
+  ([\#580](https://github.com/popov-lab/bmm/issues/580)).
+
+## bmm 1.4.2
+
+#### New features
+
+- [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), the
+  quantile function of the SDM distribution, now works; it stopped with
+  “‘qsdm’ is not implemented yet”. It takes `lower.tail`, `log.p` and
+  `lower.bound` as
+  [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) does and
+  returns values between `lower.bound` and `lower.bound + 2 * pi`
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+
 #### Bug fixes
 
 - [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) fits with two
@@ -111,7 +151,8 @@
   [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) pooled such
   cells into one. Refit affected
   [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) models and
-  rerun [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md).
+  rerun [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md)
+  ([\#657](https://github.com/popov-lab/bmm/issues/657)).
 - [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
   now counts trials, not rows, per design cell, and flags cells with
   fewer than `min_trials` (default 10) trials in total. Aggregated
@@ -320,10 +361,6 @@
 
 #### Other changes
 
-- [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) fits
-  with one row per trial and the default normal noise
-  (`dist = "normal"`) are faster: each sampling step takes about half
-  the time it did. Estimates are unchanged up to sampling error.
 - [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
   warns when the prior for `ndt` puts most of its mass at or above your
   fastest response time, which `ndt` must stay below. Such a fit can
@@ -353,8 +390,8 @@
   and [`dezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
   changes from `TRUE` to `FALSE`, as in base R and the other density
   functions of bmm. A call without `log` then returns the density, not
-  the log density. Nothing changes in 1.5.0. Pass `log = TRUE` to keep
-  the log density
+  the log density. Nothing changes in 1.4.2 or 1.5.0. Pass `log = TRUE`
+  to keep the log density
   ([\#553](https://github.com/popov-lab/bmm/issues/553)).
 - bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or
   older, [`update()`](https://rdrr.io/r/stats/update.html) can fail on a
@@ -364,14 +401,6 @@
   brms is on CRAN, or call `update(fit, recompile = TRUE)`.
   [`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
   now warns about this combination.
-- [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
-  and the help pages now show each model by its name only, such as
-  “Two-Parameter Mixture Model”, without the citation, which stays in
-  the `Citation` field of the help page. A model that fits several
-  tasks, such as
-  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), is listed
-  under each of them
-  ([\#554](https://github.com/popov-lab/bmm/issues/554)).
 
 #### Documentation
 
@@ -381,23 +410,6 @@
   volume, issue and article number;
   [`?bmm`](https://venpopov.com/bmm/dev/reference/bmm.md) cited the 2023
   preprint ([\#432](https://github.com/popov-lab/bmm/issues/432)).
-- bmm now follows a written lifecycle policy. A deprecated function or
-  argument keeps working, with a warning that names its replacement and
-  the earliest release that may remove it, for at least one minor
-  release: something deprecated in 1.5.0 works in every 1.5.x release
-  and is removed in 1.6.0 at the earliest. Every deprecation and removal
-  is listed under “Deprecated functions and arguments” in this file, and
-  breaking changes are announced in a GitHub issue before the release
-  that contains them. See the contributing guide
-  ([\#441](https://github.com/popov-lab/bmm/issues/441)).
-- For developers: the header of the file
-  [`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)
-  writes named an outdated place for a new model’s test cases. It now
-  points to `model_cases_<name>()` in
-  `tests/testthat/helper-model-<name>.R`, which needs a `stored_frame`,
-  `sd_default`, `init` and `links` case, and it lists
-  `tests/testthat/test-model_<name>.R` for the model’s own tests
-  ([\#580](https://github.com/popov-lab/bmm/issues/580)).
 
 ## bmm 1.4.1
 
