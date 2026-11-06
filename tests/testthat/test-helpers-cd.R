@@ -828,6 +828,16 @@ cd_gradient_diagnose <- function(model, data, init) {
   )
 }
 
+# R twin of cd_gradient_model()'s target, without the Jacobian of K
+cd_gradient_loglik <- function(data, kappa, criterion, K) {
+  p_s_observer <- if (identical(data$ps_from_K, 1L)) min(1, K / data$ss) else data$p_s
+  .cd_bernoulli_ld(data$y, psame_simple(data$probe, kappa, data$p_s, criterion, p_s_observer)) +
+    .cd_bernoulli_ld(data$y, .circmix_cd_slot_averaging_psame(
+      matrix(data$probe), matrix(0), .circmix_slot_averaging_branches(K, data$ss, kappa),
+      criterion, data$rich == 1
+    ))
+}
+
 test_that("a criterion past the cliff and a whole K keep finite gradients", {
   skip_unless_stan_tests()
   skip_on_cran()
@@ -851,24 +861,35 @@ test_that("a criterion past the cliff and a whole K keep finite gradients", {
   }
 })
 
-test_that("an observer's p_s of exactly 1 as a parameter keeps finite gradients", {
+test_that("an observer's p_s of exactly 1 as a parameter gives finite gradients from above", {
   skip_unless_stan_tests()
   skip_on_cran()
   # p_s = min(1, K / ss) is a parameter equal to 1 at K = ss (above ss, fmin()
   # returns a constant); log1m(p_s) there would put an infinite partial on the
-  # stack of the bound and of the offset, and K's gradient would be NaN
+  # stack of the bound and of the offset, and K's gradient would be NaN. At the
+  # tie the K gradient is the slope from above, where p_s stays 1, for both
+  # signs of the criterion
   model <- cd_gradient_model()
   for (K in c(2, 2.5)) {
+    step <- K * 1e-7
     for (criterion in c(0.4, -0.4)) {
       for (y in 0:1) {
+        data <- list(y = y, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L, ps_from_K = 1L)
         diagnosed <- cd_gradient_diagnose(
-          model, list(y = y, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L, ps_from_K = 1L),
-          list(log_kappa = log(8), criterion = criterion, K = K)
+          model, data, list(log_kappa = log(8), criterion = criterion, K = K)
         )
         label <- paste("K", K, "criterion", criterion, "y", y)
         expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
         skip_if(is.null(diagnosed))
-        expect_true(all(is.finite(diagnosed$gradients()$model)), label = label)
+        gradient <- diagnosed$gradients()$model
+        expect_true(all(is.finite(gradient)), label = label)
+        expect_equal(
+          gradient[3] - 1,
+          K * (cd_gradient_loglik(data, 8, criterion, K + step) -
+            cd_gradient_loglik(data, 8, criterion, K)) / step,
+          tolerance = 1e-4,
+          label = paste("K gradient,", label)
+        )
       }
     }
   }
@@ -906,16 +927,6 @@ test_that("at a whole K / set size the K gradient is the slope from above", {
     }
   }
 })
-
-# R twin of cd_gradient_model()'s target, without the Jacobian of K
-cd_gradient_loglik <- function(data, kappa, criterion, K) {
-  p_s_observer <- if (identical(data$ps_from_K, 1L)) min(1, K / data$ss) else data$p_s
-  .cd_bernoulli_ld(data$y, psame_simple(data$probe, kappa, data$p_s, criterion, p_s_observer)) +
-    .cd_bernoulli_ld(data$y, .circmix_cd_slot_averaging_psame(
-      matrix(data$probe), matrix(0), .circmix_slot_averaging_branches(K, data$ss, kappa),
-      criterion, data$rich == 1
-    ))
-}
 
 test_that("at criterion 0 the criterion keeps its gradient", {
   skip_unless_stan_tests()

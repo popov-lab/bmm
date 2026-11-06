@@ -38,7 +38,9 @@
       }
       return hi * tanh(criterion / hi);
     }
-    real lo = log1p(p_s * expm1(log_max));
+    // p_s = 1 as for hi: the offset drops d/dp_s there too, so a p_s that reaches 1 (min(1, K / ss)) gives the slope from
+    // above for both signs of the criterion
+    real lo = p_s >= 1 ? log_max : log1p(p_s * expm1(log_max));
     return lo * tanh(criterion / lo);
   }
 
