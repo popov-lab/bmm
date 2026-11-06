@@ -63,7 +63,7 @@ test_that("the simulate_pars attribute holds the link values whatever the scale"
                         design, scale = "native")
   expect_identical(data$cond, design$cond)
   expect_equal(attr(data, "simulate_pars"), data.frame(
-    mu1 = c(0, 0), kappa = c(1, 1), thetat = log(c(0.6, 0.5) / c(0.2, 0.3)),
+    mu = c(0, 0), kappa = c(1, 1), thetat = log(c(0.6, 0.5) / c(0.2, 0.3)),
     thetant = log(0.2 / c(0.2, 0.3))
   ))
   expect_identical(attr(data, "simulate_call"), list(model = class(model), scale = "native"))
@@ -237,6 +237,29 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), circular_mean_cos(function(x) {
     dmixture3p(x, c(0, 1.5, -2), 7.389056, p_mem = 0.5064804, p_nt = 0.1863237)
   }), "mixture3p")
+
+  # the capacity versions, set size 1 and variable precision, against E[cos] from
+  # A = I1 / I0 and J(kappa) = kappa A(kappa): from memory the target is reported
+  # with 1 - pnt and each non-target with pnt / 2; a j-slot item has J = j J(kappa)
+  nt <- c("nt1", "nt2")
+  y <- simulate_data(mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot"),
+                     list(kappa = exp(2), K = 2, pnt = 0.3), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.4017199, "mixture3p slot")
+  averaging <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging")
+  y <- simulate_data(averaging, list(kappa = exp(1), K = 4, pnt = 0.3), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.5320389, "mixture3p slot_averaging")
+  # at set size 1 the softmax runs over the target and guessing only
+  single <- data.frame(set_size = rep(1, n_sim), nt1 = NA, nt2 = NA)
+  y <- simulate_data(model, list(kappa = exp(2), thetat = 0.5, thetant = 0.2), single, scale = "native")$y
+  expect_within_mc(cos(y), 0.5810229, "mixture3p set size 1")
+  # constant precision gives 0.6158454 and 0.5320389 at these values
+  y <- simulate_data(mixture3p("y", nt_features = nt, set_size = "set_size", variable_precision = TRUE),
+                     list(kappa = exp(1), thetat = 0.8, thetant = 0.1, tau = 1), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.5651793, "mixture3p variable precision")
+  averaging_vp <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging",
+                            variable_precision = TRUE)
+  y <- simulate_data(averaging_vp, list(kappa = exp(1), K = 4, pnt = 0.3, tau = 1), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.4981567, "mixture3p slot_averaging variable precision")
 
   model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
                set_size = "set_size", version = "full")

@@ -3,7 +3,7 @@
 #'   formula, with its family, and any stanvars for the model specified by the
 #'   user. Default priors are not built here but by [configure_prior()] from the
 #'   model's `default_priors`; a model that needs priors beyond those defines
-#'   its own `configure_prior.<model>()` method (e.g. `mixture3p`, `mpt`). It
+#'   its own `configure_prior.<model>()` method (e.g. `mpt`). It
 #'   will call the appropriate configure_model.* functions based on the list of
 #'   classes defined in the .model_* functions. Each model has one method, for
 #'   its model class, or one per version class when the versions are configured

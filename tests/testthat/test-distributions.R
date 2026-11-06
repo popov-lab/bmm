@@ -413,6 +413,19 @@ test_that("dmixture3p integrates to 1", {
   )$value, 1, tolerance = 1e-6)
 })
 
+# as in dmixture2p(), a parameter vector longer than x sets the length
+test_that("dmixture3p recycles its parameters to the longest argument", {
+  at <- function(x, ...) dmixture3p(x, ...)
+  expect_equal(
+    dmixture3p(0.3, kappa = c(1, 5, 20)),
+    c(at(0.3, kappa = 1), at(0.3, kappa = 5), at(0.3, kappa = 20))
+  )
+  expect_equal(
+    dmixture3p(c(0.3, -1), p_mem = c(0.5, 0.7), p_nt = c(0.1, 0.2), tau = c(0, 1)),
+    c(at(0.3, p_mem = 0.5, p_nt = 0.1, tau = 0), at(-1, p_mem = 0.7, p_nt = 0.2, tau = 1))
+  )
+})
+
 test_that("dimm integrates to 1", {
   withr::local_seed(445)
   expect_equal(integrate(dimm, -pi, pi,

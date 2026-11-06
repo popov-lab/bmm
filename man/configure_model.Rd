@@ -29,7 +29,7 @@ Called by bmm() to automatically construct the model
 formula, with its family, and any stanvars for the model specified by the
 user. Default priors are not built here but by \code{\link[=configure_prior]{configure_prior()}} from the
 model's \code{default_priors}; a model that needs priors beyond those defines
-its own \verb{configure_prior.<model>()} method (e.g. \code{mixture3p}, \code{mpt}). It
+its own \verb{configure_prior.<model>()} method (e.g. \code{mpt}). It
 will call the appropriate configure_model.* functions based on the list of
 classes defined in the .model_* functions. Each model has one method, for
 its model class, or one per version class when the versions are configured
