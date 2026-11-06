@@ -60,10 +60,13 @@ Your PR also needs:
   short form in [AGENTS.md](https://venpopov.com/bmm/AGENTS.md),
   “Testing Requirements”).
 - **A NEWS bullet** for anything users can see, under the development
-  heading of the branch you target: `# bmm (development version)` on
-  `develop`, `# bmm 1.6.0 (development)` on `dev-1.6.0`. Keep it short:
-  what changes for the user and what they should do. Do not describe how
-  the fix works.
+  heading of the branch you target. Both `develop` and `dev-1.6.0` keep
+  the one heading `# bmm (development version)`; on `dev-1.6.0` open
+  your bullet with `[1.6.0]`, so the release can split the bullets by
+  that tag ([ADR
+  0008](https://venpopov.com/bmm/.dev/decisions/0008-roadmap-to-2027-03.md)
+  § D15). Keep it short: what changes for the user and what they should
+  do. Do not describe how the fix works.
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the [developer
   notes](https://venpopov.com/bmm/dev-notes/) and follow the
@@ -196,6 +199,14 @@ breaking change (rule 3) and say in NEWS how to get the old default
 back. For a changed data layout, accept both layouts for the window and
 give the old and the new column names as `what` and `with`.
 
+Default priors follow their own rule ([ADR
+0008](https://venpopov.com/bmm/.dev/decisions/0008-roadmap-to-2027-03.md)
+§ D4): a default prior changes only in a minor release, never in a patch
+release, and every change is listed under the heading
+`### Changes to default priors` in the section of its release, on a PR
+labelled `prior-change`. From bmm 1.6.0 a fit records the prior set it
+used and `bmm_options(prior_version = )` reproduces an older set.
+
 If your PR deprecates something:
 
 - Deprecate in a minor release (1.5.0, 1.6.0), not in a patch release,
@@ -253,14 +264,15 @@ them rely on one contract, described in [ADR
 
 Reading a model object with `$`, its attributes, and internal functions
 are not part of the contract. Code in other packages should not rely on
-them. `model_spec()`,
+them.
 [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
 and the export of
 [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
-are being added for 1.5.0 (the generic possibly for 1.6.0); each item is
-covered from the release that contains it. Until the 1.6.0 release pins
-contract version 1.0, the contract may still change, and the
-announcement rule below applies to every such change.
+are on `develop` for 1.5.0; `model_spec()` is being added for 1.5.0 and
+also accepts a fitted model (`model_spec(fit)` reads the model the fit
+stores). Each item is covered from the release that contains it. Until
+the 1.6.0 release pins contract version 1.0, the contract may still
+change, and the announcement rule below applies to every such change.
 
 ### When your PR changes the contract
 
@@ -351,6 +363,8 @@ Three rules apply to all tiers:
   author pushes afterwards, you can still re-request changes.
 - We may decline a PR that conflicts with the principles of the package.
   Talk to us early, especially if your change touches many files.
+- A `review/<branch>` branch that holds review fixes for a PR is deleted
+  once that PR merges.
 
 ### While there is one active maintainer
 
@@ -359,8 +373,12 @@ not stuck, the maintainer may merge their own PR without a GitHub
 approval when all of the following hold:
 
 - CI is green.
-- An independent review was done, and the PR says what was checked and
-  what changed after it.
+- An independent review was done, and the maintainer has posted a
+  comment on the PR that says what was reviewed, what changed after the
+  review and what was decided. This holds for every PR an AI agent wrote
+  ([ADR
+  0008](https://venpopov.com/bmm/.dev/decisions/0008-roadmap-to-2027-03.md)
+  § D6).
 - For the pipeline or exported API tier, the PR stays open for at least
   72 hours with that summary posted, so others can object.
 
@@ -392,7 +410,9 @@ code belongs, ask.
 
 You may use AI tools. You are responsible for every line you submit and
 must be able to explain it in review. Tell us in the PR if a large share
-was generated.
+was generated. A PR written largely by an agent merges only after a
+maintainer has posted the summary comment described under “While there
+is one active maintainer”.
 
 ## Licence
 

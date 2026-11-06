@@ -92,6 +92,37 @@
   `n_trials` work as before
   ([\#646](https://github.com/popov-lab/bmm/issues/646)).
 
+#### Changes to default priors
+
+- bmm now states its policy on default priors: a default prior changes
+  only in a minor release (1.5.0, 1.6.0) and is listed under this
+  heading; no default changes in a patch release (1.5.x). bmm 1.6.0 will
+  record the prior set a fit used and let you ask for an older set, so
+  older analyses can be reproduced.
+
+#### Companion packages
+
+#### Deprecated functions and arguments
+
+- The forms deprecated in bmm 0.4 and 1.0
+  ([`fit_model()`](https://venpopov.com/bmm/dev/reference/bmm.md),
+  [`IMMfull()`](https://venpopov.com/bmm/dev/reference/imm.md),
+  [`IMMabc()`](https://venpopov.com/bmm/dev/reference/imm.md),
+  [`IMMbsc()`](https://venpopov.com/bmm/dev/reference/imm.md),
+  [`sdmSimple()`](https://venpopov.com/bmm/dev/reference/sdm.md), the
+  `setsize` argument of
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
+  and [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md), and the
+  `parallel` argument of
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md)) will be
+  removed in bmm 1.6.0. They keep working in every 1.5.x release and now
+  warn with the replacement. Use
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md),
+  [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md),
+  `imm(version = "abc")`, `imm(version = "bsc")`,
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), `set_size`
+  and `cores` instead.
+
 #### Other changes
 
 - [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) fits

@@ -74,7 +74,7 @@
 <ul><li>
 <strong>Tests</strong> for new behaviour, in <code>tests/testthat/</code>. Test what your code does, not how R subsets a data frame. A new model adds <code>test-model_&lt;name&gt;.R</code> and a provider <code>model_cases_&lt;name&gt;()</code> in <code>tests/testthat/helper-model-&lt;name&gt;.R</code> with a <code>stored_frame</code>, <code>sd_default</code>, <code>init</code> and <code>links</code> case, which the cross-model tests read. Gate tests by tier: <code>skip_unless_stan_tests()</code> for a test that compiles Stan (and update that file’s count of <code>cmdstan_model()</code> and <code>$sample()</code> in <code>test-conventions.R</code>), <code>skip_on_cran()</code> for one over 0.4 s in CRAN mode (rules R1, R4, R9 and R10 in <a href="../.dev/decisions/0004-test-tiers-and-budget.html">ADR 0004</a>; short form in <a href="../AGENTS.html">AGENTS.md</a>, “Testing Requirements”).</li>
 <li>
-<strong>A NEWS bullet</strong> for anything users can see, under the development heading of the branch you target: <code># bmm (development version)</code> on <code>develop</code>, <code># bmm 1.6.0 (development)</code> on <code>dev-1.6.0</code>. Keep it short: what changes for the user and what they should do. Do not describe how the fix works.</li>
+<strong>A NEWS bullet</strong> for anything users can see, under the development heading of the branch you target. Both <code>develop</code> and <code>dev-1.6.0</code> keep the one heading <code># bmm (development version)</code>; on <code>dev-1.6.0</code> open your bullet with <code>[1.6.0]</code>, so the release can split the bullets by that tag (<a href="../.dev/decisions/0008-roadmap-to-2027-03.html">ADR 0008</a> § D15). Keep it short: what changes for the user and what they should do. Do not describe how the fix works.</li>
 <li>
 <strong>Documentation</strong> for new or changed exported functions (roxygen).</li>
 <li>
@@ -114,6 +114,7 @@
 <strong>Announce breaking changes.</strong> A change is breaking when a script that ran before now fails, has to be edited, or gives different results for the same data and model. Removing a deprecated form counts. A bug fix that corrects results is not; it goes in NEWS under the bug fixes. We announce a breaking change in a GitHub issue before the release that contains it, with the old and the new code side by side (use the “Breaking change” issue template).</li>
 </ol><p>The rules cover what users type or read: exported functions and their arguments, model parameter names, documented defaults, and the data layout a model expects. From the release that adds or exports them, <code>model_spec()</code>, <code><a href="reference/simulate_data.html">simulate_data()</a></code> and <code><a href="reference/link_transform.html">link_transform()</a></code> are covered too (<a href="../.dev/decisions/0005-model-contract-for-companions-and-extensions.html">ADR 0005</a>). Internal functions are not covered. Fits saved by an earlier release are covered: they keep working with <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> and the extraction functions, through <code><a href="reference/restructure.bmmfit.html">restructure()</a></code> where they need converting, or the NEWS bullet says they must be refitted.</p>
 <p>A changed default has no old form to warn about. Announce it as a breaking change (rule 3) and say in NEWS how to get the old default back. For a changed data layout, accept both layouts for the window and give the old and the new column names as <code>what</code> and <code>with</code>.</p>
+<p>Default priors follow their own rule (<a href="../.dev/decisions/0008-roadmap-to-2027-03.html">ADR 0008</a> § D4): a default prior changes only in a minor release, never in a patch release, and every change is listed under the heading <code>### Changes to default priors</code> in the section of its release, on a PR labelled <code>prior-change</code>. From bmm 1.6.0 a fit records the prior set it used and <code>bmm_options(prior_version = )</code> reproduces an older set.</p>
 <p>If your PR deprecates something:</p>
 <ul><li>Deprecate in a minor release (1.5.0, 1.6.0), not in a patch release, so that users meet the warning before the release that may remove the form.</li>
 <li>Keep the old form working by passing it on to the new one. If the new form gives a different result, say so in <code>details</code>. Keep a deprecated function exported and mark its help page as deprecated (title <code>Deprecated: use new()</code>, <code>@keywords deprecated</code>). If a call gives both the old and the new argument, stop and name both.</li>
@@ -129,7 +130,7 @@
 <ul><li>what <code>model_spec()</code> returns for a model: its name, package, version, domain and task, its parameters with their links, fixed values and alternative groups, its default priors and init ranges, its response and other variables, the role of each data column, the names of its density and generator functions, and the contract version;</li>
 <li>the simulation generic <code><a href="reference/simulate_data.html">simulate_data()</a></code> and every model’s method for it;</li>
 <li>the exported density and generator functions, and <code><a href="reference/link_transform.html">link_transform()</a></code>.</li>
-</ul><p>Reading a model object with <code>$</code>, its attributes, and internal functions are not part of the contract. Code in other packages should not rely on them. <code>model_spec()</code>, <code><a href="reference/simulate_data.html">simulate_data()</a></code> and the export of <code><a href="reference/link_transform.html">link_transform()</a></code> are being added for 1.5.0 (the generic possibly for 1.6.0); each item is covered from the release that contains it. Until the 1.6.0 release pins contract version 1.0, the contract may still change, and the announcement rule below applies to every such change.</p>
+</ul><p>Reading a model object with <code>$</code>, its attributes, and internal functions are not part of the contract. Code in other packages should not rely on them. <code><a href="reference/simulate_data.html">simulate_data()</a></code> and the export of <code><a href="reference/link_transform.html">link_transform()</a></code> are on <code>develop</code> for 1.5.0; <code>model_spec()</code> is being added for 1.5.0 and also accepts a fitted model (<code>model_spec(fit)</code> reads the model the fit stores). Each item is covered from the release that contains it. Until the 1.6.0 release pins contract version 1.0, the contract may still change, and the announcement rule below applies to every such change.</p>
 <div class="section level3">
 <h3 id="when-your-pr-changes-the-contract">When your PR changes the contract<a class="anchor" aria-label="anchor" href="#when-your-pr-changes-the-contract"></a></h3>
 <p>A change to any item above is announced, whether or not it breaks a script. This extends rule 3 of “Deprecating and removing features” to the contract:</p>
@@ -172,11 +173,12 @@
 <ul><li>All three <code>R-CMD-check</code> jobs (<code>ubuntu-latest</code>, <code>macos-latest</code>, <code>windows-latest</code>, each on <code>release</code>) must pass. CI runs on pushes and PRs to <code>master</code>, <code>develop</code> and <code>dev-*</code>.</li>
 <li>Approvals stay valid after new pushes. If you review a PR and the author pushes afterwards, you can still re-request changes.</li>
 <li>We may decline a PR that conflicts with the principles of the package. Talk to us early, especially if your change touches many files.</li>
+<li>A <code>review/&lt;branch&gt;</code> branch that holds review fixes for a PR is deleted once that PR merges.</li>
 </ul><div class="section level3">
 <h3 id="while-there-is-one-active-maintainer">While there is one active maintainer<a class="anchor" aria-label="anchor" href="#while-there-is-one-active-maintainer"></a></h3>
 <p>At the moment one maintainer does most of the reviewing. So that PRs are not stuck, the maintainer may merge their own PR without a GitHub approval when all of the following hold:</p>
 <ul><li>CI is green.</li>
-<li>An independent review was done, and the PR says what was checked and what changed after it.</li>
+<li>An independent review was done, and the maintainer has posted a comment on the PR that says what was reviewed, what changed after the review and what was decided. This holds for every PR an AI agent wrote (<a href="../.dev/decisions/0008-roadmap-to-2027-03.html">ADR 0008</a> § D6).</li>
 <li>For the pipeline or exported API tier, the PR stays open for at least 72 hours with that summary posted, so others can object.</li>
 </ul><p>PRs from other contributors always need an approval from a maintainer. This fallback ends when a second person takes on regular reviews.</p>
 </div>
@@ -193,7 +195,7 @@
 </div>
 <div class="section level2">
 <h2 id="ai-assisted-contributions">AI-assisted contributions<a class="anchor" aria-label="anchor" href="#ai-assisted-contributions"></a></h2>
-<p>You may use AI tools. You are responsible for every line you submit and must be able to explain it in review. Tell us in the PR if a large share was generated.</p>
+<p>You may use AI tools. You are responsible for every line you submit and must be able to explain it in review. Tell us in the PR if a large share was generated. A PR written largely by an agent merges only after a maintainer has posted the summary comment described under “While there is one active maintainer”.</p>
 </div>
 <div class="section level2">
 <h2 id="licence">Licence<a class="anchor" aria-label="anchor" href="#licence"></a></h2>

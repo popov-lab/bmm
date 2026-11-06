@@ -61,6 +61,23 @@
 <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> and <code><a href="../reference/sdt_mafc.html">sdt_mafc()</a></code> now take one row per trial: leave out <code>n_trials</code> and code <code>response</code> as 0 or 1. Trial rows allow item random effects, such as <code>bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id) + (1 | item))</code>, which counts aggregated over items cannot carry. <code><a href="../reference/bmm_data_check.html">bmm_data_check()</a></code> then reports observations per participant and per item instead of one cell per trial; it takes the first grouping variable of the formula, such as <code>id</code> in <code>(1 | id)</code>, as the participant. Aggregated counts with <code>n_trials</code> work as before (<a href="https://github.com/popov-lab/bmm/issues/646" class="external-link">#646</a>).</li>
 </ul></div>
 <div class="section level4">
+<h4 id="changes-to-default-priors-development-version">Changes to default priors<a class="anchor" aria-label="anchor" href="#changes-to-default-priors-development-version"></a></h4>
+<!-- From 1.5.0 every change to a default prior is listed here (ADR 0008 § D4); defaults do not change inside a minor line. -->
+<ul><li>bmm now states its policy on default priors: a default prior changes only in a minor release (1.5.0, 1.6.0) and is listed under this heading; no default changes in a patch release (1.5.x). bmm 1.6.0 will record the prior set a fit used and let you ask for an older set, so older analyses can be reproduced.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="companion-packages-development-version">Companion packages<a class="anchor" aria-label="anchor" href="#companion-packages-development-version"></a></h4>
+<!-- Contract items that change in 1.5.0 (ADR 0005 announcement rule). Filled by the pull request that lands each change. -->
+<!-- `mu1` -> `mu` in mixture2p, mixture3p and imm (<a href='https://github.com/popov-lab/bmm/issues/434'>#434</a>, <a href='https://github.com/popov-lab/bmm/issues/590'>#590</a>) -->
+<!-- `pnt` -> `ptarget` = P(target | memory) in mixture3p and imm (<a href='https://github.com/popov-lab/bmm/issues/434'>#434</a>, <a href='https://github.com/popov-lab/bmm/issues/590'>#590</a>) -->
+<!-- `model_spec()` exported, also for fitted models (<a href='https://github.com/popov-lab/bmm/issues/633'>#633</a>) -->
+</div>
+<div class="section level4">
+<h4 id="deprecated-functions-and-arguments-development-version">Deprecated functions and arguments<a class="anchor" aria-label="anchor" href="#deprecated-functions-and-arguments-development-version"></a></h4>
+<!-- Nothing deprecated in 1.5.0 yet. Announcements of removals scheduled for 1.6.0: -->
+<ul><li>The forms deprecated in bmm 0.4 and 1.0 (<code><a href="../reference/bmm.html">fit_model()</a></code>, <code><a href="../reference/imm.html">IMMfull()</a></code>, <code><a href="../reference/imm.html">IMMabc()</a></code>, <code><a href="../reference/imm.html">IMMbsc()</a></code>, <code><a href="../reference/sdm.html">sdmSimple()</a></code>, the <code>setsize</code> argument of <code><a href="../reference/mixture3p.html">mixture3p()</a></code> and <code><a href="../reference/imm.html">imm()</a></code>, and the <code>parallel</code> argument of <code><a href="../reference/bmm.html">bmm()</a></code>) will be removed in bmm 1.6.0. They keep working in every 1.5.x release and now warn with the replacement. Use <code><a href="../reference/bmm.html">bmm()</a></code>, <code><a href="../reference/imm.html">imm()</a></code>, <code>imm(version = "abc")</code>, <code>imm(version = "bsc")</code>, <code><a href="../reference/sdm.html">sdm()</a></code>, <code>set_size</code> and <code>cores</code> instead.</li>
+</ul></div>
+<div class="section level4">
 <h4 id="other-changes-development-version">Other changes<a class="anchor" aria-label="anchor" href="#other-changes-development-version"></a></h4>
 <ul><li>
 <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> fits with one row per trial and the default normal noise (<code>dist = "normal"</code>) are faster: each sampling step takes about half the time it did. Estimates are unchanged up to sampling error.</li>
