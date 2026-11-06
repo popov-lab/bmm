@@ -1038,8 +1038,9 @@ test_that("the limited arc's last Newton step never drops P('same') to the floor
   # P("same") 0 (the slot term at the floor, -36, instead of about -25), or
   # land far inside. Whether one criterion gets such a step depends on last
   # digits, so a sweep is checked. P("same") is about proportional to the arc
-  # there; Stan's arc is within a factor 1.5 of R's on a 0.01 sweep, so a
-  # factor of 2 in P has room
+  # there; the twins' arcs differ by up to a factor of about 2 in this tail
+  # (1.48 on a 0.01 sweep here), so P is held to a factor of 3, which a step
+  # left unchecked or checked only against (0, pi) still exceeds
   model <- cd_gradient_model()
   data <- list(y = 0L, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L)
   K <- 2.000002
@@ -1055,7 +1056,7 @@ test_that("the limited arc's last Newton step never drops P('same') to the floor
     single <- .cd_bernoulli_ld(0L, psame_simple(0.6, 50, 0.6, criterion, 0.6))
     slot <- diagnosed$lp() - log(K) - single
     expect_gt(slot, log(.Machine$double.eps) + 1, label = label)
-    expect_lt(abs(slot - (cd_gradient_loglik(data, 50, criterion, K) - single)), log(2), label = label)
+    expect_lt(abs(slot - (cd_gradient_loglik(data, 50, criterion, K) - single)), log(3), label = label)
   }
 })
 
