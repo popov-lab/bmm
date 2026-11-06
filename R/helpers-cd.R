@@ -207,11 +207,12 @@
 # so Newton converges from the closed form at the mean kappa; a step leaving the
 # bracket is replaced by bisection. The Stan twin adds one Newton step from the
 # converged root, kept while it is under half the distance to 0 or pi. Up to
-# about 10 times the range its gradient is the implicit-function one and its
-# value moves by about 6e-12 at most (measured). Nearer saturation the
+# about 10 times the range its gradient is the implicit-function one and the
+# root moves by rounding only, of the order of 1e-11. Nearer saturation the
 # rounding of the level and of cos h near 1 (the root reaches sqrt(2^-53) =
-# 1.05e-8) sets the residual: the twins' h differ by up to a factor 1.5 at
-# 16-19 times, each about as far from the true root (checked to 18 times).
+# 1.05e-8) sets the residual: the twins' arcs differ by up to a factor of
+# about 2 at 16-19 times, each about as far from the true root (checked to
+# 18 times).
 # kappa and lw are n x S.
 .circmix_cd_limited_hw <- function(kappa, lw, offset, start) {
   n <- nrow(kappa)
