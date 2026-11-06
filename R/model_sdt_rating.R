@@ -131,6 +131,7 @@
     logmu_fun = "sdt_rating_logmu",
     logmu_cat_call = "sdt_rating_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type)",
     stan_chunk = "sdt_rating_functions.stan",
+    functions = list(density = "dsdt_rating", generator = "rsdt_rating"),
     citation = glue(
       "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
       "and psychophysics. Wiley."
@@ -161,6 +162,7 @@
     logmu_fun = "sdt_dpsdt_logmu",
     logmu_cat_call = "sdt_dpsdt_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type, Ro, Rn)",
     stan_chunk = "sdt_dpsdt_functions.stan",
+    functions = list(density = "dsdt_dpsdt", generator = "rsdt_dpsdt"),
     citation = c(
       glue(
         "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
@@ -202,6 +204,7 @@
     logmu_fun = "sdt_metad_logmu",
     logmu_cat_call = "sdt_metad_logmu_cat(cat, thr, d, exp(logmratio) * d, sdratio, stimulus, dist_type)",
     stan_chunk = "sdt_metad_functions.stan",
+    functions = list(density = "dsdt_metad", generator = "rsdt_metad"),
     citation = glue(
       "Maniscalco, B., & Lau, H. (2012). A signal detection theoretic ",
       "approach for estimating metacognitive sensitivity from confidence ",
@@ -307,7 +310,8 @@
       fixed_parameters = fixed_parameters,
       alternative_parameters = list(c("criterion", "bias")),
       default_priors = default_priors,
-      init_ranges = init_ranges
+      init_ranges = init_ranges,
+      functions = variant$functions
     ),
     class = c("bmmodel", "sdt", "sdt_rating", paste0("sdt_rating_", version)),
     call = call

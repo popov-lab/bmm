@@ -47,7 +47,8 @@
         mu1 = c(-0.65, 0.65),
         kappa = c(3.8, 15),
         thetat = c(0.25, 0.75)
-      )
+      ),
+      functions = list(density = "dmixture2p", generator = "rmixture2p")
     ),
     class = c("bmmodel", "circular", "mixture2p"),
     call = call

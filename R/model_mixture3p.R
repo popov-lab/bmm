@@ -57,7 +57,8 @@
         kappa = c(3.8, 15),
         thetat = c(-1.1, 1.1),
         thetant = c(-1.1, 1.1)
-      )
+      ),
+      functions = list(density = "dmixture3p", generator = "rmixture3p")
     ),
     # attributes
     regex = regex,

@@ -8,6 +8,7 @@
 * New `add_chains()` samples more chains for a fitted model and returns one fit with all chains; `fit_info()` reports each of them. Criteria added with `brms::add_criterion()`, such as `loo`, are removed from the result, because they describe the old chains only; add them again (#555).
 * `link_transform()` is now exported. It converts values between the native scale of a model parameter and the scale of its link (`log`, `logit`, `tan_half` and nine others), so packages that transform bmm parameters can use bmm's table and need no copy. The `softmax` link of mixture weights is not part of it; `native_parameters()` returns the weights (#635).
 * New `simulate_data()` simulates data from any bmm model, given its parameters on the model's own scale (the link scale, or the native scale with `scale = "native"`) and a design, in the layout `bmm()` expects: pass the result to `bmm()` as it is. The true values come back on the link scale in `attr(, "simulate_pars")`. Packages that validate bmm models no longer need an adapter for each model (#634).
+* New `model_spec()` returns a model's specification in one documented list: its parameters with their links and fixed values, the default priors, the initial value ranges, the data columns it reads and the names of its density and generator functions. It also takes a fitted model. Packages that build on bmm should read this list instead of the fields of the model object, which can change in any release (#633).
 * `sdt_yn()` and `sdt_mafc()` now take one row per trial: leave out `n_trials` and code `response` as 0 or 1. Trial rows allow item random effects, such as `bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id) + (1 | item))`, which counts aggregated over items cannot carry. `bmm_data_check()` then reports observations per participant and per item instead of one cell per trial; it takes the first grouping variable of the formula, such as `id` in `(1 | id)`, as the participant. Aggregated counts with `n_trials` work as before (#646).
 
 ### Changes to default priors
@@ -18,7 +19,6 @@
 <!-- Contract items that change in 1.5.0 (ADR 0005 announcement rule). Filled by the pull request that lands each change. -->
 <!-- `mu1` -> `mu` in mixture2p, mixture3p and imm (#434, #590) -->
 <!-- `pnt` -> `ptarget` = P(target | memory) in mixture3p and imm (#434, #590) -->
-<!-- `model_spec()` exported, also for fitted models (#633) -->
 
 ### Deprecated functions and arguments
 <!-- Nothing deprecated in 1.5.0 yet. Announcements of removals scheduled for 1.6.0: -->

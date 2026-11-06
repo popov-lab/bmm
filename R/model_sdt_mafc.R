@@ -61,7 +61,8 @@
       links = list(d = "identity"),
       fixed_parameters = list(),
       default_priors = default_priors,
-      init_ranges = list(d = c(0.5, 1.5))
+      init_ranges = list(d = c(0.5, 1.5)),
+      functions = list(density = "dsdt_mafc", generator = "rsdt_mafc")
     ),
     class = c("bmmodel", "sdt", "sdt_mafc"),
     call = call

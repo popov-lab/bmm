@@ -93,7 +93,8 @@
       links = .ezdm_version_table[[version]][["links"]],
       fixed_parameters = .ezdm_version_table[[version]][["fixed_parameters"]],
       default_priors = .ezdm_version_table[[version]][["priors"]],
-      init_ranges = .ezdm_version_table[[version]][["init_ranges"]]
+      init_ranges = .ezdm_version_table[[version]][["init_ranges"]],
+      functions = list(density = "dezdm", generator = "rezdm")
     ),
     class = c("bmmodel", "ezdm", paste0("ezdm_", version)),
     call = call

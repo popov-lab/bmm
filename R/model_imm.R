@@ -56,7 +56,8 @@
         a = c(0.51, 2),
         c = c(0.51, 2),
         s = c(0.51, 2)
-      )
+      ),
+      functions = list(density = "dimm", generator = "rimm")
     ),
     # attributes
     regex = regex,

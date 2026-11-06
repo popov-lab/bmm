@@ -768,6 +768,7 @@ model_overview <- function(group = NULL) {
 #'   response times. A model that fits several tasks, such as `mpt()`, is
 #'   listed under each. Type `?modelname` (for example `?imm`) for the
 #'   arguments of a model.
+#' @family model information
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
@@ -1083,6 +1084,14 @@ use_model_template <- function(model_name,
      #   (a test requires it)
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
+     # - the exported density and generator, d{model_name}() and r{model_name}(),
+     #   that the `functions` field of the constructor below names (a test
+     #   requires them)
+     #
+     # `model_spec()` (R/model-spec.R) returns what companion packages may rely
+     # on: every field it reads must be filled in the constructor, and a
+     # `data_column_roles` entry gives its `data_columns` (a test checks every
+     # model and version)
      #
      # In this file, `domain` and `task` take one or more values of `model_domains`
      # and `model_tasks` in R/helpers-model.R, and `task` decides the group
@@ -1197,7 +1206,8 @@ use_model_template <- function(model_name,
             links = .<<model_name>>_version_table[[version]][["links"]],
             fixed_parameters = .<<model_name>>_version_table[[version]][["fixed_parameters"]],
             default_priors = .<<model_name>>_version_table[[version]][["priors"]],
-            init_ranges = .<<model_name>>_version_table[[version]][["init_ranges"]]
+            init_ranges = .<<model_name>>_version_table[[version]][["init_ranges"]],
+            functions = list(density = "d<<model_name>>", generator = "r<<model_name>>")
           ),
           class = c("bmmodel", "<<model_name>>", paste0("<<model_name>>_", version)),
           call = call
@@ -1231,7 +1241,8 @@ use_model_template <- function(model_name,
             links = .<<model_name>>_defaults[["links"]],
             fixed_parameters = .<<model_name>>_defaults[["fixed_parameters"]],
             default_priors = .<<model_name>>_defaults[["priors"]],
-            init_ranges = .<<model_name>>_defaults[["init_ranges"]]
+            init_ranges = .<<model_name>>_defaults[["init_ranges"]],
+            functions = list(density = "d<<model_name>>", generator = "r<<model_name>>")
           ),
           class = c("bmmodel", "<<model_name>>"),
           call = call
