@@ -233,6 +233,16 @@ test_that(".np_quadratic_form computes z' Sigma z per draw and cell", {
   }
 })
 
+test_that(".np_ranef_prefix builds the prefix of the sd_ and cor_ names like brms", {
+  # the variables are sd_ID__kappa_Intercept, sd_ID__Intercept (dpar mu is
+  # dropped), sd_ID__mu1_Intercept, sd_ID__y_a_Intercept and sd_ID__a_Intercept
+  expect_equal(.np_ranef_prefix("", "kappa", ""), "kappa_")
+  expect_equal(.np_ranef_prefix("", "mu", ""), "")
+  expect_equal(.np_ranef_prefix("", "mu1", ""), "mu1_")
+  expect_equal(.np_ranef_prefix("y", "", "a"), "y_a_")
+  expect_equal(.np_ranef_prefix("", "", "a"), "a_")
+})
+
 test_that(".np_mc_stats summarises the levels of each cell separately", {
   values <- cbind(matrix(1:6, 2), matrix(10 * (1:6), 2))
   out <- .np_mc_stats(values, n_cells = 2, n_levels = 3, "mean", circular = FALSE)
@@ -340,6 +350,46 @@ test_that("Monte Carlo over new levels agrees with the closed form on a fit", {
   exact <- .np_population_moments(eta, latent$sd, "log")
   se <- exact$sd / sqrt(n)
   expect_lt(max(abs(mc$a$mean - exact$mean) / se), 5)
+})
+
+test_that("the Monte Carlo path samples the same new levels for every parameter", {
+  skip_on_cran()
+  fit <- load_pop_m3_fit()
+  grid_vars <- .np_grid_vars(fit, names(fit$bmm$model$parameters), NA)
+  newdata <- .np_newdata(fit, grid_vars, NULL)
+  n_cells <- nrow(newdata)
+  # brms prepares the whole model per call, so the rows and draws are free and
+  # each parameter costs about a quarter of a second
+  n <- 2
+  draw_ids <- 1:2
+  pars <- c("a", "c")
+  persons <- newdata[rep(seq_len(n_cells), each = n), , drop = FALSE]
+  persons$ID <- rep(paste0("bmm_population_", seq_len(n)), times = n_cells)
+  row.names(persons) <- NULL
+  fresh <- function(par) {
+    withr::with_seed(531, {
+      eta <- brms::posterior_linpred(
+        fit, newdata = persons, re_formula = NULL, draw_ids = draw_ids, nlpar = par,
+        allow_new_levels = TRUE, sample_new_levels = "gaussian"
+      )
+      list(
+        stats = .np_mc_stats(eta, n_cells, n, "mean", circular = FALSE),
+        state = get(".Random.seed", envir = globalenv())
+      )
+    })
+  }
+
+  withr::local_seed(531)
+  mc <- .np_population_mc(
+    fit, pars, pars, newdata, grid_vars, NULL, draw_ids, "mean", native = FALSE,
+    links = list(a = "log", c = "log"), ndraws_population = n, dots = list()
+  )
+  state <- get(".Random.seed", envir = globalenv())
+  # with two levels per cell the mean and sd identify the simulated levels
+  expect_equal(mc$a, fresh("a")$stats)
+  fresh_c <- fresh("c")
+  expect_equal(mc$c, fresh_c$stats)
+  expect_identical(state, fresh_c$state)
 })
 
 test_that("native_parameters returns a statistic column and the method", {
