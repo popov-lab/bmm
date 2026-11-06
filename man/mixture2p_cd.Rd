@@ -17,7 +17,7 @@ mixture2p_cd(
 )
 }
 \arguments{
-\item{response}{The name of the variable in the dataset containing the
+\item{response}{The name of the variable in the data containing the
 change-detection response, coded 0 ("same") and 1 ("change"). A logical
 variable is accepted and coded \code{TRUE} = "change".}
 
@@ -28,28 +28,29 @@ in radians.}
 probed location in the memory array, in radians. On "same" trials it
 equals the probe.}
 
-\item{set_size}{Name of the variable in the dataset containing the set size,
+\item{set_size}{Name of the variable in the data containing the set size,
 or a single number if the set size is constant. Required by the \code{"slot"}
 and \code{"slot_averaging"} versions and ignored by \code{"simple"}. With a single
-set size the capacity rule cannot be tested: \code{K} is then estimated from the
-responses at that set size, and only below it.}
+set size the capacity rule cannot be tested: \code{K} is then estimated from
+the responses at that set size, and only below it.}
 
 \item{version}{Which storage model to use: \code{"simple"} (default), \code{"slot"}
-or \code{"slot_averaging"}. They are the versions of \code{\link[=mixture2p]{mixture2p()}}.}
+or \code{"slot_averaging"}, the versions of \code{\link[=mixture2p]{mixture2p()}}.}
 
-\item{variable_precision}{Must be \code{FALSE}. Variable precision is not
-available for change detection yet; it is planned for bmm 1.6.0.}
+\item{variable_precision}{Must be \code{FALSE}. Variable precision is planned for
+change detection in bmm 1.6.0; \code{TRUE} stops with an error.}
 
-\item{knowledge}{What the observer knows about the precision of the current
-trial when precision varies across trials. With \code{"limited"} (default), the
-observer knows only the distribution of precision and uses one decision
-boundary for all trials; with \code{"rich"}, the observer knows the precision of
-the trial and sets the boundary accordingly. Until bmm 1.6.0 brings
-variable precision, precision varies only under \code{version = "slot_averaging"}, for an item that holds one slot or one more, and
-\code{knowledge} changes the predictions of that version only. Lin and Oberauer
-(2022) found the limited observer described their data better under
-variable precision; for slot averaging they varied a different knowledge,
-whether the item is stored, which this argument does not model.}
+\item{knowledge}{What the observer knows about the precision of the
+current trial when it varies across trials: \code{"limited"} (default) or
+\code{"rich"}. In this version of bmm precision varies only under
+\code{version = "slot_averaging"}, where a held item has one of two slot counts;
+the other versions give the same predictions with either value. The
+limited observer knows only the distribution of the slot counts and uses
+one decision boundary for all trials; the rich observer knows the slot
+count of the trial and sets the boundary from it. Lin and Oberauer (2022)
+found the limited observer fit better under variable precision; for slot
+averaging they varied whether the observer knows that the item is stored,
+which this argument does not model.}
 
 \item{links}{A named list of link functions for the model parameters, e.g.
 \code{list(kappa = "softplus")}. Defaults are \code{"log"} for \code{kappa} and \code{K},
@@ -79,7 +80,7 @@ Two-Parameter Mixture Model for Change Detection
 }
 }
 \itemize{
-\item The probe and the target should be in radians: the feature shown at test, and the feature shown at the probed location in the memory array
+\item The probe and the target should be in radians: the feature shown at test and the feature shown at the probed location in the memory array
 \itemize{
 \item The 'slot' and 'slot_averaging' versions additionally require a set_size variable, which should vary for the capacity rule to be testable
 }
@@ -230,61 +231,51 @@ Two-Parameter Mixture Model for Change Detection
 }
 \section{The observer}{
 
-Each trial shows a memory array and then a probe at one location; the
-response is whether the probe differs from the item that was there. The
-observer retrieves a feature \code{x} for the probed location from the same
-memory as \code{\link[=mixture2p]{mixture2p()}}: with the probability of a memory response (\code{thetat},
-or \code{min(1, K / set_size)} under \code{"slot"}) from a von Mises distribution
-around the target with precision \code{kappa}, otherwise uniformly. The observer
-then compares \code{x} with the probe (Lin & Oberauer, 2022, Eq. 8) and answers
-"change" when the log-likelihood ratio of a change against no change,
-\verb{log[(1 / 2pi) / (p_s vM(x | probe, kappa) + (1 - p_s) / 2pi)]}, exceeds
-\code{criterion}. Here \code{p_s} is the observer's prior that the probed item is in
-memory, the probability of a memory response. This puts a "same" region
-around the probe, and the probability of a "same" response is the retrieval
-mass inside it.
+On each trial one item of the memory array is probed, and the participant
+says whether the probe is the same as the item shown at that location or a
+change. The observer retrieves a feature from the same memory as in
+\code{\link[=mixture2p]{mixture2p()}}: from memory with the probability of a memory response, and
+as a guess otherwise. It then compares the retrieved feature with the
+probe (Lin & Oberauer, 2022, Eq. 8). "Change" is the answer when the
+log-likelihood ratio of a change against no change exceeds \code{criterion},
+which puts a "same" region around the probe; the probability of a "same"
+response is the retrieval mass inside it. The observer's prior that the
+probed item is stored is the probability of a memory response (\code{thetat},
+or \code{min(1, K / set_size)}).
 
-Under \code{"slot_averaging"} an item holds \code{floor(K / set_size)} slots or one
-more. An item with at least one slot is known to be stored (\code{p_s = 1}), and
-its precision is that of the slots it holds; an item with no slot may still
-receive the extra one, and the observer's prior that it is stored is the
-probability of that.
-
-The memory parameters have the same names and meanings as in \code{\link[=mixture2p]{mixture2p()}},
-plus \code{criterion}, so the two models can share parameters in a joint fit of
-both tasks. Whether a person gives the same values in both tasks is an
-empirical question rather than something the model guarantees: the precision
-estimated from continuous reproduction includes response noise that change
-detection does not have, for example.
+The memory parameters have the same names, links and default priors as in
+\code{\link[=mixture2p]{mixture2p()}}, plus \code{criterion}. Whether a person gives the same values in
+both tasks is an empirical question rather than something the model
+guarantees: the precision estimated from continuous reproduction includes
+response noise that change detection does not have, for example.
 }
 
 \section{Decision criterion}{
 
-\code{criterion} is fixed to 0 by default, the unbiased observer, for whom \code{p_s}
-drops out of the decision. Give it a formula (\code{criterion ~ 1}) to estimate
-it; positive values favour "same" responses. An estimated criterion is kept
-inside the range of evidence each trial can produce: it equals Lin and
-Oberauer's criterion near 0 and is compressed toward the ends of that range,
-so both responses stay possible on every trial. Without the bound, a
-criterion past the range makes one response impossible on some trials, and
-the likelihood has edges the sampler cannot cross. Large estimated values are
-therefore not directly comparable with Lin and Oberauer's (2022) unbounded
-criterion; bmm prints a message when the criterion is estimated.
+\code{criterion} is fixed to 0 by default, the unbiased observer, for whom the
+prior of storage drops out of the decision. Give it a formula, such as
+\code{criterion ~ 1}, to estimate it; positive values favour "same" responses.
+An estimated criterion is kept inside the range of evidence each trial can
+produce: it equals Lin and Oberauer's (2022) criterion near 0 and is
+compressed toward the ends of that range, so both responses stay possible
+on every trial. Without the bound, a criterion past the range makes one
+response impossible and the likelihood drops off a cliff the sampler cannot
+cross. Large estimated values are therefore not directly comparable with
+Lin and Oberauer's unbounded criterion. bmm prints a message saying so when
+the criterion is estimated.
 }
 
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # half of the trials probe the target itself, the others a random colour
-dat <- data.frame(
-  target = 0,
-  probe = c(rep(0, 1000), runif(1000, -pi, pi))
-)
-dat$change <- rmixture2p_cd(2000, dat$probe - dat$target, kappa = 6, p_mem = 0.7)
+design <- data.frame(target = 0, probe = c(rep(0, 1000), runif(1000, -pi, pi)))
+model <- mixture2p_cd(response = "change", probe = "probe", target = "target")
+dat <- simulate_data(model, pars = list(kappa = 2, thetat = 1), design = design)
 
 fit <- bmm(
   formula = bmmformula(kappa ~ 1, thetat ~ 1),
   data = dat,
-  model = mixture2p_cd(response = "change", probe = "probe", target = "target"),
+  model = model,
   cores = 4,
   iter = 500,
   backend = "cmdstanr"
@@ -300,7 +291,7 @@ working memory: Applications to the change detection task. Cognitive
 Psychology, 133, 101463. \doi{10.1016/j.cogpsych.2022.101463}
 }
 \seealso{
-\code{\link[=mixture2p]{mixture2p()}}, the same memory model for continuous reproduction;
-\link{mixture2p_cd_dist} for the probability and random generation functions.
+\code{\link[=mixture2p]{mixture2p()}} for continuous reproduction, \link{mixture2p_cd_dist} for
+the distribution functions.
 }
 \keyword{bmmodel}
