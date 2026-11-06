@@ -83,10 +83,10 @@
 # precision states kappa with log weights lw (n x S): the marginal one for the
 # limited observer; the rich observer calls this once per state, with that
 # state alone, so each arc has its own range and a state's arc vanishes with
-# its weight (a shared range over the states jumps at a whole K / set size,
-# where a state drops out). tanh rounds to 1 in double precision past about 18
-# times the range, where the cliff would return; the likelihood there is
-# already about -18 per trial.
+# its weight (the narrowest range over the states jumps at a whole K / set
+# size, where a state drops out). tanh rounds to 1 in double precision past
+# about 18 times the range, where the cliff would return; the likelihood there
+# is already about -18 per trial.
 .circmix_cd_bounded_criterion <- function(criterion, p_s, kappa, lw) {
   kappa <- as.matrix(kappa)
   n <- max(nrow(kappa), length(criterion), length(p_s))
@@ -96,13 +96,13 @@
   criterion <- rep_len(criterion, n)
   p_s <- rep_len(p_s, n)
   log_i0 <- .circmix_log_besselI0(kappa)
-  # Kept although the limited observer's P("same") steps at a whole K / set
-  # size for a sharp memory: just below it the vanishing slot state still sets
-  # log_min, and LLR_max levels off with the finite slope m_lo / m_hi - 1 in
-  # extra (m = e^-kappa / I0(kappa); 10 at a single-slot kappa of 2, 2.2e6 at
-  # 8, 1.4e34 at 40), below double resolution from kappa about 20. Both
-  # observers do the same as K reaches the set size, where p_s -> 1. It is the
-  # range the observer's own density gives.
+  # The marginal range is kept although the limited observer's P("same") steps
+  # at a whole K / set size for a sharp memory: just below it the vanishing
+  # slot state still sets log_min, and LLR_max levels off with the finite slope
+  # m_lo / m_hi - 1 in extra (m = e^-kappa / I0(kappa); 10 at a single-slot
+  # kappa of 2, 2.2e6 at 8, 1.4e34 at 40), below double resolution from kappa
+  # about 20. Both observers do the same as K reaches the set size, where
+  # p_s -> 1. It is the range the observer's own density gives.
   .circmix_cd_bound(
     criterion, p_s,
     matrixStats::rowLogSumExps(lw - log_i0 - kappa),

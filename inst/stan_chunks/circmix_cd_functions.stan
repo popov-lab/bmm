@@ -57,11 +57,11 @@
     for (n in 1:S) {
       base[n] = lw[n] - log_modified_bessel_first_kind(0, kappa[n]);
     }
-    // kept although the limited observer's P("same") steps at a whole K / ss for a sharp memory: just below it the
-    // vanishing slot state still sets log_min, and LLR_max levels off with the finite slope m_lo / m_hi - 1 in extra
-    // (m = e^-kappa / I0(kappa); 10 at a single-slot kappa of 2, 2.2e6 at 8, 1.4e34 at 40), below double resolution
-    // from kappa about 20. Both observers do the same as K reaches ss, where p_s -> 1. It is the range the observer's
-    // own density gives
+    // the marginal range is kept although the limited observer's P("same") steps at a whole K / ss for a sharp memory:
+    // just below it the vanishing slot state still sets log_min, and LLR_max levels off with the finite slope
+    // m_lo / m_hi - 1 in extra (m = e^-kappa / I0(kappa); 10 at a single-slot kappa of 2, 2.2e6 at 8, 1.4e34 at 40),
+    // below double resolution from kappa about 20. Both observers do the same as K reaches ss, where p_s -> 1. It is
+    // the range the observer's own density gives
     return circmix_cd_bound(criterion, p_s, log_sum_exp(base - kappa), log_sum_exp(base + kappa));
   }
 
