@@ -54,6 +54,8 @@ test_that("p_s drops out of the boundary at criterion 0 (Lin & Oberauer, Appendi
 test_that(".circmix_cd_offset() resolves the degenerate decisions", {
   # nothing is stored: the likelihood ratio is 1 and the criterion decides
   expect_equal(.circmix_cd_offset(c(-0.3, 0.3), 0), c(Inf, -Inf))
+  # the tie of nothing stored and criterion 0 takes the limit p_s -> 0
+  expect_identical(.circmix_cd_offset(0, 0), 0)
   # a criterion this liberal accepts every retrieved value as "same"
   expect_equal(.circmix_cd_offset(-log(0.5), 0.4), -Inf)
   expect_equal(.circmix_cd_crit_angle(8, c(Inf, -Inf)), c(0, pi))
@@ -679,10 +681,11 @@ test_that("the Stan and R change-detection functions agree", {
   tab <- .circmix_kappa_table()
   gl <- .cd_gl_rule()
   # past -log(1 - p_s), nothing stored, a held slot, the liberal side, the size
-  # of the range of a flat memory with a small p_s, a held slot past the
-  # criterion where e^-criterion - 1 + p_s cancels
-  crit <- c(0, 0.4, -0.3, -0.5, 1.5, 3, -2, 1e-8, 40)
-  ps <- c(0.6, 0.6, 0.6, 0, 0.3, 1, 0.9, 1e-4, 1)
+  # of the range of a flat memory with a small p_s, the tie of nothing stored at
+  # criterion 0, a held slot past the criterion where e^-criterion - 1 + p_s
+  # cancels
+  crit <- c(0, 0.4, -0.3, -0.5, 1.5, 3, -2, 1e-8, 0, 40)
+  ps <- c(0.6, 0.6, 0.6, 0, 0.3, 1, 0.9, 1e-4, 0, 1)
   d <- c(0.4, 0.4 - 1.2, 0.4 + 2)
   logw <- log(c(0.5, 0.2, 0.15))
   logw_guess <- log(0.15)
@@ -704,7 +707,7 @@ test_that("the Stan and R change-detection functions agree", {
   rows <- function(x) matrix(x, nrow = n, ncol = length(x), byrow = TRUE)
   offset <- .circmix_cd_offset(crit, ps)
   expect_equal(stan("out_offset"), offset, tolerance = 1e-12)
-  expect_equal(stan("out_offset")[9], -40)
+  expect_identical(stan("out_offset")[c(9, 10)], c(0, -40))
   expect_equal(
     stan("out_bound"),
     .circmix_cd_bounded_criterion(crit, ps, rows(kappa_s), rows(lw_s)),
