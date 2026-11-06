@@ -132,8 +132,9 @@ llr_max_flat <- function(kappa, p_s) {
 test_that("the upper end of the evidence range keeps its digits for a flat memory or a small p_s", {
   # tanh has saturated, so the bounded criterion is the range's upper end
   upper <- function(kappa, p_s) .circmix_cd_bounded_criterion(1e300, p_s, kappa, 0)
-  p_s <- 1e-10
-  expect_lt(abs(upper(3, p_s) / -log1p(-p_s * (1 - exp(-3) / besselI(3, 0))) - 1), 1e-12)
+  # -log(1 - x) by its series in x = p_s (1 - m), which needs no log1p
+  x <- 1e-10 * (1 - exp(-3) / besselI(3, 0))
+  expect_lt(abs(upper(3, 1e-10) / (x + x^2 / 2 + x^3 / 3) - 1), 1e-12)
   # 1 - m cancels as kappa -> 0; .circmix_log_besselI0() itself is good to
   # about 5e-13 relative there, hence 2e-12
   for (p_s in c(1e-10, 1e-4)) {
