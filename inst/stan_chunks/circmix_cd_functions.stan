@@ -230,7 +230,7 @@
   // (extra = 0, so the value is unchanged) to give K the slope from above without log(extra) on the stack, as
   // circmix_slot_averaging_ld() does. Rich: P is linear in extra, each state having its own arc. Limited: the marginal
   // range and the shared arc move with extra too; the arc's slope is the implicit one, from
-  // log((1 - extra) vM(hw | kappa_lo) + extra vM(hw | kappa_hi)) = level
+  // log((1 - extra) vM(hw | kappa_lo) + extra vM(hw | kappa_hi)) = level, to first order level - extra (vM_hi / vM_lo - 1)
   real circmix_cd_whole_slots_psame(vector d, vector logw, real kappa_lo, real kappa_hi,
                                     real extra, real criterion, int rich,
                                     data vector gl_x, data vector gl_w) {
@@ -246,12 +246,12 @@
                      + log1p(extra * expm1(kappa_lo - kappa_hi + log_i0_lo - log_i0_hi));
       real log_max = kappa_lo - log_i0_lo
                      + log1p(extra * expm1(kappa_hi - kappa_lo + log_i0_lo - log_i0_hi));
-      hw_lo = circmix_cd_crit_angle(kappa_lo, circmix_cd_offset(
-        circmix_cd_bound(criterion, 1, log_min, log_max), 1));
-      if (hw_lo > 0 && hw_lo < pi()) {
-        hw_lo += extra * expm1((kappa_hi - kappa_lo) * cos(hw_lo) + log_i0_lo - log_i0_hi)
-                 / (kappa_lo * sin(hw_lo));
-      }
+      real level = circmix_cd_offset(circmix_cd_bound(criterion, 1, log_min, log_max), 1);
+      real h0 = circmix_cd_crit_angle(kappa_lo, level);
+      // the implicit slope enters through the level, so that one acos carries the difference of the level's slope and
+      // the shift; added after the acos, the two nearly cancel near saturation and keep none of their digits
+      hw_lo = circmix_cd_crit_angle(kappa_lo, level - extra * expm1((kappa_hi - kappa_lo) * cos(h0)
+                                                                     + log_i0_lo - log_i0_hi));
       hw_hi = hw_lo;
     }
     real p_lo = circmix_cd_psame_at(d, logw, negative_infinity(), kappa_lo, hw_lo, gl_x, gl_w);

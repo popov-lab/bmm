@@ -820,6 +820,8 @@ test_that("an infinite level gives kappa a finite gradient in circmix_cd_crit_an
 # One program for the gradient checks, compiled once per session: a single
 # precision term and a slot-averaging term in K. With ps_from_K the observer
 # of the first term has p_s = min(1, K / ss), as a slot model's observer has.
+# scale multiplies the slot-averaging term, so that a small K slope shows in
+# the six digits diagnose() prints next to the Jacobian's 1.
 # Parameters in declaration order: log_kappa, criterion, K; diagnose() reports
 # the gradient of K on log K, Jacobian (+1) included
 cd_gradient_model <- function() {
@@ -828,6 +830,7 @@ cd_gradient_model <- function() {
     "data {
       int y; real probe; real p_s; int ss; int rich; vector[32] gl_x; vector[32] gl_w;
       int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ; int ps_from_K;
+      real scale;
     }
     parameters { real log_kappa; real criterion; real<lower=0> K; }
     model {
@@ -837,8 +840,8 @@ cd_gradient_model <- function() {
                                   kappa, criterion, p_s_observer, gl_x, gl_w));
       vector[4] branch = circmix_slot_averaging_branches(K, ss, kappa, logk, dlogk,
                                                          logJ_min, dlogJ);
-      target += cd_bernoulli_lpmf(y | circmix_cd_slot_averaging_psame(
-                                  [probe]', [0.0]', branch, criterion, rich, gl_x, gl_w));
+      target += scale * cd_bernoulli_lpmf(y | circmix_cd_slot_averaging_psame(
+                                          [probe]', [0.0]', branch, criterion, rich, gl_x, gl_w));
     }"
   )
   cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
@@ -851,7 +854,8 @@ cd_gradient_diagnose <- function(model, data, init) {
     model$diagnose(
       data = utils::modifyList(list(
         gl_x = gl$x, gl_w = gl$w, NK = length(tab$logkappa), logk = tab$logkappa,
-        dlogk = tab$dlogkappa, logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, ps_from_K = 0L
+        dlogk = tab$dlogkappa, logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, ps_from_K = 0L,
+        scale = 1
       ), data),
       init = list(init), error = 1e300
     ),
@@ -863,7 +867,7 @@ cd_gradient_diagnose <- function(model, data, init) {
 cd_gradient_loglik <- function(data, kappa, criterion, K) {
   p_s_observer <- if (identical(data$ps_from_K, 1L)) min(1, K / data$ss) else data$p_s
   .cd_bernoulli_ld(data$y, psame_simple(data$probe, kappa, data$p_s, criterion, p_s_observer)) +
-    .cd_bernoulli_ld(data$y, .circmix_cd_slot_averaging_psame(
+    (data$scale %||% 1) * .cd_bernoulli_ld(data$y, .circmix_cd_slot_averaging_psame(
       matrix(data$probe), matrix(0), .circmix_slot_averaging_branches(K, data$ss, kappa),
       criterion, data$rich == 1
     ))
@@ -958,6 +962,38 @@ test_that("at a whole K / set size the K gradient is the slope from above", {
         )
       }
     }
+  }
+})
+
+# one-sided Richardson difference from above, for slopes the twin's own
+# rounding hides at a single small step
+forward_slope <- function(f, x, h) {
+  f0 <- f(x)
+  step <- function(h) (f(x + h) - f0) / h
+  r1 <- 2 * step(h / 2) - step(h)
+  r2 <- 2 * step(h / 4) - step(h / 2)
+  (4 * r2 - r1) / 3
+}
+
+test_that("the limited observer's K gradient at a whole K / set size holds near saturation", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # kappa 0.3, criterion +-3: about 10 times the range, where the arc is near
+  # 0 or pi and its slope in extra is the difference of two terms of 1e4
+  model <- cd_gradient_model()
+  K <- 2
+  for (criterion in c(-3, 3)) {
+    data <- list(y = 0L, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L)
+    slope <- K * forward_slope(function(K) cd_gradient_loglik(data, 0.3, criterion, K), K, 0.02)
+    # scaled to a slope of 10, which the six printed digits resolve to 1e-6
+    data$scale <- 10 / abs(slope)
+    label <- paste("K gradient near saturation, criterion", criterion)
+    diagnosed <- cd_gradient_diagnose(
+      model, data, list(log_kappa = log(0.3), criterion = criterion, K = K)
+    )
+    expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
+    skip_if(is.null(diagnosed))
+    expect_equal(diagnosed$gradients()$model[3] - 1, sign(slope) * 10, tolerance = 1e-3, label = label)
   }
 })
 
