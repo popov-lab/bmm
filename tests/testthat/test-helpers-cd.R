@@ -707,21 +707,23 @@ test_that("an infinite level gives kappa a finite gradient in circmix_cd_crit_an
 })
 
 # One program for the gradient checks, compiled once per session: a single
-# precision term and a slot-averaging term in K. Parameters in declaration
-# order: log_kappa, criterion, K; diagnose() reports the gradient of K on
-# log K, Jacobian (+1) included
+# precision term and a slot-averaging term in K. With ps_from_K the observer
+# of the first term has p_s = min(1, K / ss), as a slot model's observer has.
+# Parameters in declaration order: log_kappa, criterion, K; diagnose() reports
+# the gradient of K on log K, Jacobian (+1) included
 cd_gradient_model <- function() {
   code <- paste0(
     "functions {\n", cd_chunks(), "\n}\n",
     "data {
       int y; real probe; real p_s; int ss; int rich; vector[32] gl_x; vector[32] gl_w;
-      int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
+      int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ; int ps_from_K;
     }
     parameters { real log_kappa; real criterion; real<lower=0> K; }
     model {
       real kappa = exp(log_kappa);
+      real p_s_observer = ps_from_K ? fmin(1, K / ss) : p_s;
       target += cd_bernoulli_lpmf(y | circmix_cd_psame([probe]', [log(p_s)]', log1m(p_s),
-                                  kappa, criterion, p_s, gl_x, gl_w));
+                                  kappa, criterion, p_s_observer, gl_x, gl_w));
       vector[4] branch = circmix_slot_averaging_branches(K, ss, kappa, logk, dlogk,
                                                          logJ_min, dlogJ);
       target += cd_bernoulli_lpmf(y | circmix_cd_slot_averaging_psame(
@@ -736,10 +738,10 @@ cd_gradient_diagnose <- function(model, data, init) {
   tab <- .circmix_kappa_table()
   tryCatch(
     model$diagnose(
-      data = c(data, list(
+      data = utils::modifyList(list(
         gl_x = gl$x, gl_w = gl$w, NK = length(tab$logkappa), logk = tab$logkappa,
-        dlogk = tab$dlogkappa, logJ_min = tab$logJ_min, dlogJ = tab$dlogJ
-      )),
+        dlogk = tab$dlogkappa, logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, ps_from_K = 0L
+      ), data),
       init = list(init), error = 1e300
     ),
     error = function(e) NULL
@@ -766,6 +768,29 @@ test_that("a criterion past the cliff and a whole K keep finite gradients", {
     gradient <- diagnosed$gradients()
     expect_true(all(is.finite(gradient$model)))
     expect_lt(gradient$model[2], 0)
+  }
+})
+
+test_that("an observer's p_s of exactly 1 as a parameter keeps finite gradients", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # p_s = min(1, K / ss) is a parameter equal to 1 at K = ss (above ss, fmin()
+  # returns a constant); log1m(p_s) there would put an infinite partial on the
+  # stack of the bound and of the offset, and K's gradient would be NaN
+  model <- cd_gradient_model()
+  for (K in c(2, 2.5)) {
+    for (criterion in c(0.4, -0.4)) {
+      for (y in 0:1) {
+        diagnosed <- cd_gradient_diagnose(
+          model, list(y = y, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L, ps_from_K = 1L),
+          list(log_kappa = log(8), criterion = criterion, K = K)
+        )
+        label <- paste("K", K, "criterion", criterion, "y", y)
+        expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
+        skip_if(is.null(diagnosed))
+        expect_true(all(is.finite(diagnosed$gradients()$model)), label = label)
+      }
+    }
   }
 })
 
