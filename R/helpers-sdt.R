@@ -123,8 +123,9 @@ check_formula.sdt <- function(model, data, formula) {
     (signal); found {collapse_comma(sort(unexpected))}")
 
   # one rate cannot separate sensitivity from bias, so d and criterion would be
-  # estimated from a single hit or false-alarm rate
-  stopif(length(unique(stim_vals)) == 1,
+  # estimated from a single hit or false-alarm rate. newdata for a prediction
+  # estimate nothing, and the signal rows alone are a legitimate subset
+  stopif(length(unique(stim_vals)) == 1 && !isTRUE(attr(data, "prediction_newdata")),
     "Stimulus variable '{stim_var}' is {stim_vals[1]} in every row. The model \\
     needs both noise (0) and signal (1) rows to estimate d and criterion")
 
