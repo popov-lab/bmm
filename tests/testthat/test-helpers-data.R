@@ -195,13 +195,9 @@ test_that("check_data() returns a data.frame()", {
 # check. It is compared with all returned columns, since a declared column may
 # overwrite one the user supplied. Cases of the check_data kind are read too,
 # for models whose stored-frame case cannot show a column (the ezdm 4par
-# indicators). sdt_rating() builds nTrials on trial rows only for newdata of a
-# trial fit made through the multinomial (1.5.0), whose frame holds it
-# (carry_fit_bounds.sdt_rating()); declaring it lets standata() see that
-# user-layout newdata lack it, at the cost of hiding a user column nTrials.
+# indicators).
 test_that("built_data_columns() declares exactly the columns check_data() adds", {
   cases <- c(model_test_cases("stored_frame"), model_test_cases("check_data"))
-  built_for_a_1_5_0_fit <- list(sdt_rating_trial_level = "nTrials")
   for (name in names(cases)) {
     case <- cases[[name]]
     checked <- suppressWarnings(suppressMessages(
@@ -215,7 +211,7 @@ test_that("built_data_columns() declares exactly the columns check_data() adds",
       info = paste0(name, ": check_data() adds a column built_data_columns() does not declare")
     )
     expect_identical(
-      setdiff(declared, c(names(checked), built_for_a_1_5_0_fit[[name]])), character(0),
+      setdiff(declared, names(checked)), character(0),
       info = paste0(name, ": built_data_columns() declares a column check_data() does not build")
     )
   }
@@ -236,7 +232,7 @@ test_that("built_data_columns() names what each model's check_data() builds", {
   expect_setequal(declared("sdt_mafc"), c("m_afc", "dist_type"))
   expect_setequal(declared("sdt_ranking"), c("nTrials", "max_rank"))
   expect_setequal(declared("sdt_rating"), "nTrials")
-  expect_setequal(declared("sdt_rating_trial_level"), "nTrials")
+  expect_setequal(declared("sdt_rating_trial_level"), character(0))
   expect_setequal(declared("sdt_cdp"), "nTrials")
   expect_setequal(
     declared("mpt_impossible"),

@@ -892,6 +892,23 @@ test_that("the count-reading helpers read the trial family's ratings", {
   expect_equal(sort(unique(plot_data$pred_median)), c(0, 0.5))
 })
 
+# trial rows build no column, so a column nTrials is the user's predictor, in
+# the frame and in get_data(), pp_check(group = ) and conditional_effects()
+test_that("a user column nTrials on trial rows stays the user's predictor", {
+  skip_on_cran()
+  trials <- rating_trials()
+  trials$nTrials <- rep(1:12, 2)
+  fit <- suppressMessages(bmm(bmf(d ~ 1 + nTrials, criterion ~ 1, spacing ~ 1), trials,
+                              sdt_rating("rating", "stimulus", n_ratings = 4),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  expect_setequal(fit$data$nTrials, 1:12)
+  expect_identical(bmm:::built_data_columns(fit$bmm$model), character(0))
+  expect_true("nTrials" %in% names(bmm:::get_data.bmmfit(fit)))
+  expect_true("nTrials" %in% bmm:::.resolve_pp_conditions(fit))
+  ce <- structure(list(nTrials = data.frame()), class = "brms_conditional_effects")
+  expect_named(bmm:::.filter_internal_effects(ce, fit), "nTrials")
+})
+
 test_that("sdt post-processing asks a trial fit for dpars and its deltas for nlpars", {
   skip_on_cran()
   fit <- suppressMessages(bmm(

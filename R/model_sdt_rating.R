@@ -671,12 +671,12 @@ sdt_rating <- function(response, stimulus,
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
-# nTrials is built on trial rows only for newdata of a fit that went through
-# the multinomial (see carry_fit_bounds.sdt_rating() and
-# prepare_newdata.sdt_rating())
+# The trial family reads the user's rating, so trial rows build no column. A
+# user column nTrials on trial rows is then the user's predictor; the nTrials of
+# a 1.5.0 trial fit's frame is prepare_newdata.sdt_rating()'s concern
 #' @exportS3Method
 built_data_columns.sdt_rating <- function(model) {
-  c("nTrials", NextMethod("built_data_columns"))
+  c(if (!is_trial_level(model)) "nTrials", NextMethod("built_data_columns"))
 }
 
 # Trial-row newdata, read against the fit's frame:
