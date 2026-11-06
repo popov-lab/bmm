@@ -923,13 +923,14 @@ test_that("at a whole K / set size the K gradient is the slope from above", {
   skip_unless_stan_tests()
   skip_on_cran()
   # extra = 0 has no extra-slot state to take log(extra) of; dropping the state
-  # instead would leave K without a gradient
+  # instead would leave K without a gradient. Criteria 5 and -3: the bound moves
+  # with the limited observer's range only near saturation (about c^3 / range^3)
   model <- cd_gradient_model()
   K <- 4
   step <- K * 1e-7
   for (rich in 0:1) {
     for (y in 0:1) {
-      for (criterion in c(0, 0.5, -0.5)) {
+      for (criterion in c(0, 0.5, -0.5, 5, -3)) {
         loglik <- function(K) {
           .cd_bernoulli_ld(y, .circmix_cd_slot_averaging_psame(
             matrix(0.6), matrix(0), .circmix_slot_averaging_branches(K, 2, 8), criterion, rich == 1
