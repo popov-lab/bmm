@@ -36,6 +36,7 @@ simulates for it. What that is depends on the model:\tabular{ll}{
    \code{sdt_yn()} \tab Number of "old"/"signal" responses, the number of trials times their probability \cr
    \code{sdt_mafc()} \tab Number of correct responses, the number of trials times their probability \cr
    \code{m3()}, \code{sdt_rating()}, \code{sdt_ranking()}, \code{sdt_cdp()} \tab Expected count of each response category, from the multinomial family of \pkg{brms} \cr
+   \code{mixture2p_cd()} \tab Probability of a "change" response \cr
    \code{sdm()}, \code{mixture2p()}, \code{mixture3p()}, \code{imm()} \tab Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error \cr
 }
 

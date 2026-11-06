@@ -651,6 +651,233 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   )
 }
 
+#' @title Distribution functions for the two-parameter mixture model of change
+#'   detection (mixture2p_cd)
+#'
+#' @description Probability and random generation for single-probe change
+#'   detection when memory is the two-parameter mixture model: the observer
+#'   retrieves a feature from the memory of [mixture2p()] and compares it with
+#'   the probe, following the decision rule of Lin and Oberauer (2022). See
+#'   [mixture2p_cd()].
+#'
+#' @name mixture2p_cd_dist
+#'
+#' @param response Vector of responses, 0 = "same" and 1 = "change"
+#' @param n Number of observations to generate data for
+#' @param probe Vector of probes in radians, relative to the target (the probe
+#'   minus the feature shown at the probed location)
+#' @param mu Vector of locations of memory relative to the target
+#' @param kappa Vector of precision values; under `"slot_averaging"` the
+#'   precision of an item held in a single slot
+#' @param p_mem Vector of probabilities of a memory response, `thetat` of
+#'   [mixture2p_cd()] on its native scale. Used by the `"simple"` version.
+#' @param criterion Vector of decision criteria, on the scale of the model
+#'   parameter: 0, the default, is the unbiased observer, and other values are
+#'   kept inside each trial's range of evidence as in the model (see the
+#'   section "Decision criterion" of [mixture2p_cd()]).
+#' @param K Vector of memory capacities. Used by the `"slot"` and
+#'   `"slot_averaging"` versions.
+#' @param set_size Vector of set sizes. Required by the `"slot"` and
+#'   `"slot_averaging"` versions.
+#' @param version `"simple"`, `"slot"` or `"slot_averaging"`. See
+#'   [mixture2p_cd()].
+#' @param variable_precision Must be `FALSE`; variable precision is planned
+#'   for bmm 1.6.0.
+#' @param knowledge `"limited"` (default) or `"rich"`: whether the observer
+#'   knows only the distribution of precision or the precision of the current
+#'   trial. Changes the result only under `"slot_averaging"`. See
+#'   [mixture2p_cd()].
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @details "Change" is the response when the retrieved feature falls outside
+#'   an arc around the probe, whose half-width follows from `kappa`,
+#'   `criterion` and the prior that the item is stored (Lin & Oberauer, 2022,
+#'   Appendix B). `dmixture2p_cd()` integrates the retrieval mixture over that
+#'   arc. `rmixture2p_cd()` draws the remembered feature of every trial and
+#'   lets the observer decide on it, so it does not use `dmixture2p_cd()`.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dmixture2p_cd()` gives the probability of each response, and
+#'   `rmixture2p_cd()` random responses coded 0 ("same") and 1 ("change").
+#'
+#' @export
+#'
+#' @examples
+#' # P("change") grows with the distance of the probe from the target
+#' probe <- seq(0, pi, length.out = 50)
+#' plot(probe, dmixture2p_cd(1, probe, kappa = 8, p_mem = 0.8),
+#'   type = "l", ylab = "P(change)"
+#' )
+#' mean(rmixture2p_cd(1000, probe = 0, kappa = 8, p_mem = 0.8))
+dmixture2p_cd <- function(response, probe, mu = 0, kappa = 5, p_mem = 0.6,
+                          criterion = 0, K = 3, set_size = NULL,
+                          version = "simple", variable_precision = FALSE,
+                          knowledge = c("limited", "rich"), log = FALSE) {
+  version <- match.arg(version, names(.mixture2p_version_table))
+  knowledge <- match.arg(knowledge)
+  .cd_check_variable_precision(variable_precision)
+  .check_mixture2p_args(kappa, p_mem, 0, K, set_size, version)
+  .mixture2p_cd_check_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
+  stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
+
+  args <- .circmix_recycle(
+    response = response, probe = probe, mu = mu, kappa = kappa, p_mem = p_mem,
+    criterion = criterion, K = K, set_size = set_size %||% 1
+  )
+  p_same <- .mixture2p_cd_psame(
+    args$probe, args$mu, args$kappa, args$p_mem, args$criterion, args$K,
+    args$set_size, version, knowledge == "rich"
+  )
+  out <- .cd_bernoulli_ld(args$response, p_same)
+  if (log) out else exp(out)
+}
+
+#' @rdname mixture2p_cd_dist
+#' @export
+rmixture2p_cd <- function(n, probe, mu = 0, kappa = 5, p_mem = 0.6,
+                          criterion = 0, K = 3, set_size = NULL,
+                          version = "simple", variable_precision = FALSE,
+                          knowledge = c("limited", "rich")) {
+  version <- match.arg(version, names(.mixture2p_version_table))
+  knowledge <- match.arg(knowledge)
+  .cd_check_variable_precision(variable_precision)
+  .check_mixture2p_args(kappa, p_mem, 0, K, set_size, version)
+  .mixture2p_cd_check_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
+
+  recycle <- function(x) rep_len(x, n)
+  .mixture2p_cd_observe(
+    recycle(probe), recycle(mu), recycle(kappa), recycle(p_mem),
+    recycle(criterion), recycle(K), recycle(set_size %||% 1), version,
+    knowledge == "rich"
+  )
+}
+
+# the constructor's set-size refusal, and the arguments a version ignores
+.mixture2p_cd_check_version_args <- function(version, set_size, supplied = logical()) {
+  needs_set_size <- .mixture2p_version_table[[version]]$needs_set_size
+  stopif(
+    needs_set_size && is.null(set_size),
+    "The '{version}' version of mixture2p_cd predicts the probability of a \\
+    memory response from the set size, so the set_size argument is required."
+  )
+  unused <- if (needs_set_size) "p_mem" else c("K", "set_size")
+  ignored <- intersect(unused, names(supplied)[supplied])
+  warnif(
+    length(ignored) > 0,
+    "The '{version}' version of mixture2p_cd ignores {collapse_comma(ignored)}."
+  )
+}
+
+# P("same") for one row per observation or posterior draw; twin of the
+# mixture2p_cd_<version>_core functions in mixture2p_cd_functions.stan. The
+# observer's prior that the probed item is stored is the probability of a
+# memory response, except under slot averaging (see
+# .circmix_cd_slot_averaging_psame()).
+.mixture2p_cd_psame <- function(probe, mu, kappa, p_mem, criterion, K,
+                                set_size, version, rich) {
+  args <- .circmix_recycle(
+    probe = probe, mu = mu, kappa = kappa, p_mem = p_mem, criterion = criterion,
+    K = K, set_size = set_size
+  )
+  d <- matrix(args$probe - args$mu)
+  if (version == "slot_averaging") {
+    return(.circmix_cd_slot_averaging_psame(
+      d, matrix(0, nrow = nrow(d)),
+      .circmix_slot_averaging_branches(args$K, args$set_size, args$kappa),
+      args$criterion, rich
+    ))
+  }
+  p_mem <- if (version == "slot") pmin(1, args$K / args$set_size) else args$p_mem
+  weights <- .mixture2p_weights(p_mem)
+  .circmix_cd_psame(d, weights$logw, weights$logw_guess, args$kappa, args$criterion, p_mem)
+}
+
+# The observer of mixture2p_cd, trial by trial: draw how many slots the item
+# holds and the remembered feature x, then answer "change" when the
+# log-likelihood ratio -log(1 - p_s + p_s 2 pi f(x)) exceeds the bounded
+# criterion, f being the observer's density of x around the probe. It shares
+# no code with .mixture2p_cd_psame(), which integrates over x, so the two
+# check each other; simulate_data() draws through it for the same reason.
+.mixture2p_cd_observe <- function(probe, mu, kappa, p_mem, criterion, K,
+                                  set_size, version, rich) {
+  args <- .circmix_recycle(
+    probe = probe, mu = mu, kappa = kappa, p_mem = p_mem, criterion = criterion,
+    K = K, set_size = set_size
+  )
+  n <- length(args$probe)
+  kappa <- args$kappa
+  # the observer's density is a mix of at most two precision states, lo and hi
+  if (version == "slot_averaging") {
+    share <- args$K / args$set_size
+    whole <- floor(share)
+    extra <- share - whole
+    slots <- whole + (stats::runif(n) < extra)
+    kappa_lo <- .cd_slot_kappa(kappa, whole)
+    kappa_hi <- .cd_slot_kappa(kappa, whole + 1)
+    held <- whole >= 1
+    p_s <- ifelse(held, 1, extra)
+    stored <- slots >= 1
+    kappa_x <- ifelse(slots == whole, kappa_lo, kappa_hi)
+    w_hi <- if (rich) as.numeric(slots > whole) else extra
+    w_hi[!held] <- 1
+  } else {
+    p_s <- if (version == "slot") pmin(1, args$K / args$set_size) else args$p_mem
+    stored <- stats::runif(n) < p_s
+    kappa_lo <- kappa_hi <- kappa_x <- kappa
+    w_hi <- rep(0, n)
+  }
+  x <- stats::runif(n, -pi, pi)
+  x[stored] <- args$mu[stored] + brms::rvon_mises(sum(stored), 0, kappa_x[stored])
+
+  # 2 pi times a von Mises density, exp(kappa (cos d - 1)) / I0(kappa) e^-kappa
+  vm2pi <- function(cos_d, k) exp(k * (cos_d - 1)) / besselI(k, 0, expon.scaled = TRUE)
+  mix2pi <- function(cos_d) {
+    out <- w_hi * vm2pi(cos_d, kappa_hi)
+    lo <- w_hi < 1
+    out[lo] <- out[lo] + (1 - w_hi[lo]) * vm2pi(cos_d[lo], kappa_lo[lo])
+    out
+  }
+  llr <- -log(1 - p_s + p_s * mix2pi(cos(x - args$probe)))
+  # the trial's range of evidence: the density is largest at the probe and
+  # smallest opposite it
+  llr_max <- -log(1 - p_s + p_s * mix2pi(rep(-1, n)))
+  llr_min <- -log(1 - p_s + p_s * mix2pi(rep(1, n)))
+  crit <- args$criterion
+  bounded <- crit
+  up <- crit > 0
+  bounded[up] <- llr_max[up] * tanh(crit[up] / llr_max[up])
+  down <- crit < 0
+  bounded[down] <- -llr_min[down] * tanh(crit[down] / -llr_min[down])
+  as.integer(llr > bounded)
+}
+
+# the precision of an item held in `slots` slots of precision kappa each: the
+# concentration whose Fisher information kappa I1 / I0 is `slots` times that
+# of one slot
+.cd_slot_kappa <- function(kappa, slots) {
+  fisher <- function(k) k * besselI(k, 1, TRUE) / besselI(k, 0, TRUE)
+  key <- unique(data.frame(kappa = kappa, slots = slots))
+  key$out <- mapply(function(k, s) {
+    if (s <= 0) return(0)
+    if (s == 1) return(k)
+    target <- log(s * fisher(k))
+    exp(stats::uniroot(
+      function(lk) log(fisher(exp(lk))) - target,
+      c(log(k), log(s * k + 1)), tol = 1e-12
+    )$root)
+  }, key$kappa, key$slots)
+  key$out[match(paste(kappa, slots), paste(key$kappa, key$slots))]
+}
+
 #' @title Distribution functions for the three-parameter mixture model (mixture3p)
 #'
 #' @description Density, distribution, and random generation functions for the
