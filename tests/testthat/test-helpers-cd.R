@@ -482,12 +482,15 @@ test_that("standata() builds newdata with an unknown response, as posterior_pred
     prior = brms::prior(constant(0), class = "Intercept", dpar = "criterion"),
     backend = "mock", mock_fit = 1, rename = FALSE
   ))
-  # standata.bmmfit() hands newdata in the user's layout to check_newdata()
-  newdata <- check_newdata(
-    list(bmm = list(model = cd_stub_model(), user_formula = bmf(kappa ~ 1))),
-    data.frame(r = NA, p = c(1, -1), t = 0)
+  # a bmmfit of the current version, which restructure() leaves as it is;
+  # standata.bmmfit() rebuilds probe_centered from newdata in the user's layout
+  fit$bmm <- list(model = cd_stub_model(), user_formula = bmf(kappa ~ 1))
+  fit$version$bmm <- utils::packageVersion("bmm")
+  class(fit) <- c("bmmfit", class(fit))
+  standata <- brms::standata(
+    fit, newdata = data.frame(r = NA, p = c(1, -1), t = 0),
+    check_response = FALSE, internal = TRUE
   )
-  standata <- brms::standata(fit, newdata = newdata, check_response = FALSE, internal = TRUE)
   expect_equal(as.numeric(standata$vreal1), c(1, -1))
   expect_true(all(is.na(standata$Y)))
 })
