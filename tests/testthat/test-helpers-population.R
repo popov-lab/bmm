@@ -431,3 +431,18 @@ test_that("the sampling scale reports the latent normal distribution", {
     exp(latent$value[latent$statistic == "q75"])
   )
 })
+
+test_that("values of grouping variables in newdata are ignored on the population path", {
+  skip_on_cran()
+  fit <- load_pop_m3_fit()
+  grid <- data.frame(cond = factor(levels(fit$data$cond), levels = levels(fit$data$cond)))
+  population <- function(newdata) {
+    native_parameters(
+      fit, population_summary = "mean", pars = "a", draw_ids = 1:10, newdata = newdata
+    )
+  }
+  reference <- population(grid)
+  expect_equal(population(transform(grid, ID = "new")), reference)
+  expect_equal(population(transform(grid, ID = NA)), reference)
+  expect_equal(population(transform(grid, ID = 3L)), reference)
+})

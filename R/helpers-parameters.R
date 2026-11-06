@@ -835,6 +835,12 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   # a population summary integrates the grouping factors out, so they never
   # span the grid
   grid_vars <- .np_grid_vars(x, model_pars, if (population) NA else re_formula)
+  if (population && !is.null(newdata)) {
+    # the result does not depend on the level, but brms leaves the coefficients
+    # of a sampled new level unnamed, so the user's values are replaced by the
+    # ones of the model data
+    newdata <- newdata[not_in(names(newdata), setdiff(.np_group_vars(x), grid_vars))]
+  }
   newdata <- .np_newdata(x, grid_vars, newdata)
   out <- list(newdata = newdata, grid_vars = grid_vars, draw_ids = draw_ids)
 
