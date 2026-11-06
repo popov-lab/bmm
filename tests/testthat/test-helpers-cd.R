@@ -257,6 +257,28 @@ test_that("both observers coincide when there is a single precision state", {
   }
 })
 
+test_that(".circmix_cd_mix_psame() takes each row's criterion and p_s", {
+  # log_lik() passes one row per draw, each with its own criterion
+  d <- matrix(c(0.5, 1.4, -0.2, 2), nrow = 2)
+  logw <- matrix(log(c(0.6, 0.5, 0.3, 0.4)), nrow = 2)
+  kappa <- matrix(c(6, 4, 14, 9), nrow = 2)
+  lw <- matrix(log(c(0.65, 0.2, 0.35, 0.8)), nrow = 2)
+  criterion <- c(0.4, -0.3)
+  p_s <- c(0.6, 0.9)
+  for (rich in c(TRUE, FALSE)) {
+    single <- vapply(1:2, function(i) {
+      .circmix_cd_mix_psame(
+        d[i, , drop = FALSE], logw[i, , drop = FALSE], log(0.1), kappa[i, , drop = FALSE],
+        lw[i, , drop = FALSE], criterion[i], p_s[i], rich
+      )
+    }, numeric(1))
+    expect_identical(
+      .circmix_cd_mix_psame(d, logw, log(0.1), kappa, lw, criterion, p_s, rich), single,
+      label = paste("two rows, rich", rich)
+    )
+  }
+})
+
 test_that("a padded precision state contributes nothing under either observer", {
   d <- matrix(c(0.5, 1.4), nrow = 1)
   logw <- matrix(log(c(0.6, 0.3)), 1)
