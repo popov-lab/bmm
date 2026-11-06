@@ -121,6 +121,24 @@ test_that(".circmix_cd_bounded_criterion() keeps 0 and stays inside the evidence
   }
 })
 
+# LLR_max of one state, -log(1 - p_s (1 - m)) with m = e^-kappa / I0(kappa),
+# from the series of log I0 for a nearly flat memory
+llr_max_flat <- function(kappa, p_s) {
+  -log1p(p_s * expm1(-kappa - (kappa^2 / 4 - kappa^4 / 64)))
+}
+
+test_that("the upper end of the evidence range keeps its digits for a flat memory or a small p_s", {
+  # tanh has saturated, so the bounded criterion is the range's upper end
+  upper <- function(kappa, p_s) .circmix_cd_bounded_criterion(1e300, p_s, kappa, 0)
+  p_s <- 1e-10
+  expect_lt(abs(upper(3, p_s) / -log1p(-p_s * (1 - exp(-3) / besselI(3, 0))) - 1), 1e-12)
+  # 1 - m cancels as kappa -> 0; .circmix_log_besselI0() itself is good to
+  # about 5e-13 relative there, hence 2e-12
+  for (p_s in c(1e-10, 1e-4)) {
+    expect_lt(abs(upper(1e-4, p_s) / llr_max_flat(1e-4, p_s) - 1), 2e-12, label = paste("p_s", p_s))
+  }
+})
+
 test_that("a criterion beyond a trial's evidence leaves both responses possible", {
   # unbounded, criterion 0.5 lies past -log(1 - p_s) and the arc covers the circle
   p <- psame_simple(c(0.3, pi), 8, 0.7, criterion = 0.5, p_s = 0.1)
@@ -573,11 +591,12 @@ cd_stan_values <- function(data) {
     generated quantities {
       vector[NC] out_offset; vector[NC] out_crit; vector[ND] out_mass;
       vector[NC] out_psame; vector[NC] out_limited; array[2] vector[NC] out_mix;
-      array[2, NB] vector[NC] out_sa; vector[NC] out_bound;
+      array[2, NB] vector[NC] out_sa; vector[NC] out_bound; vector[NC] out_bound_flat;
       array[2] real out_bern;
       for (c in 1:NC) {
         out_offset[c] = circmix_cd_offset(crit[c], ps[c]);
         out_bound[c] = circmix_cd_bounded_criterion(crit[c], ps[c], kappa_s, lw_s);
+        out_bound_flat[c] = circmix_cd_bounded_criterion(crit[c], ps[c], [1e-4]', [0.0]');
         out_crit[c] = circmix_cd_crit_angle(7, out_offset[c]);
         out_psame[c] = circmix_cd_psame(d, logw, logw_guess, 7, crit[c], ps[c], gl_x, gl_w);
         out_limited[c] = circmix_cd_limited_hw(kappa_s, lw_s, out_offset[c], 1.0);
@@ -610,10 +629,11 @@ test_that("the Stan and R change-detection functions agree", {
   skip_on_cran()
   tab <- .circmix_kappa_table()
   gl <- .cd_gl_rule()
-  # past -log(1 - p_s), nothing stored, a held slot, the liberal side, a held
-  # slot past the criterion where e^-criterion - 1 + p_s cancels
-  crit <- c(0, 0.4, -0.3, -0.5, 1.5, 3, -2, 40)
-  ps <- c(0.6, 0.6, 0.6, 0, 0.3, 1, 0.9, 1)
+  # past -log(1 - p_s), nothing stored, a held slot, the liberal side, the size
+  # of the range of a flat memory with a small p_s, a held slot past the
+  # criterion where e^-criterion - 1 + p_s cancels
+  crit <- c(0, 0.4, -0.3, -0.5, 1.5, 3, -2, 1e-8, 40)
+  ps <- c(0.6, 0.6, 0.6, 0, 0.3, 1, 0.9, 1e-4, 1)
   d <- c(0.4, 0.4 - 1.2, 0.4 + 2)
   logw <- log(c(0.5, 0.2, 0.15))
   logw_guess <- log(0.15)
@@ -635,12 +655,20 @@ test_that("the Stan and R change-detection functions agree", {
   rows <- function(x) matrix(x, nrow = n, ncol = length(x), byrow = TRUE)
   offset <- .circmix_cd_offset(crit, ps)
   expect_equal(stan("out_offset"), offset, tolerance = 1e-12)
-  expect_equal(stan("out_offset")[8], -40)
+  expect_equal(stan("out_offset")[9], -40)
   expect_equal(
     stan("out_bound"),
     .circmix_cd_bounded_criterion(crit, ps, rows(kappa_s), rows(lw_s)),
     tolerance = 1e-12
   )
+  expect_equal(
+    stan("out_bound_flat"),
+    .circmix_cd_bounded_criterion(crit, ps, 1e-4, 0),
+    tolerance = 1e-12
+  )
+  # criterion 1e-8 is about the range there (1e-8), so the bound shows its digits
+  flat <- llr_max_flat(1e-4, 1e-4)
+  expect_lt(abs(stan("out_bound_flat")[8] / (flat * tanh(1e-8 / flat)) - 1), 2e-12)
   expect_equal(stan("out_crit"), .circmix_cd_crit_angle(7, offset), tolerance = 1e-12)
   expect_equal(
     stan("out_mass"),

@@ -106,8 +106,16 @@
 # log_min and log_max are the log of the smallest and largest value of 2 pi
 # times the decision density over the circle
 .circmix_cd_bound <- function(criterion, p_s, log_min, log_max) {
-  # on the log scale: exp(log_min) underflows for sharp memories when p_s = 1
-  hi <- -matrixStats::rowLogSumExps(cbind(log1p(-p_s), log(p_s) + log_min))
+  # LLR_max = -log(1 + p_s (m - 1)). log1p keeps the digits of a small
+  # p_s (1 - m), which the log-sum-exp form loses to 1 - m for a flat memory;
+  # near p_s (1 - m) = 1, where m underflows for a sharp held memory, only the
+  # log-sum-exp form is exact
+  shift <- p_s * expm1(log_min)
+  hi <- ifelse(
+    shift > -0.5,
+    -log1p(shift),
+    -matrixStats::rowLogSumExps(cbind(log1p(-p_s), log(p_s) + log_min))
+  )
   lo <- log1p(p_s * expm1(log_max))
   out <- criterion
   up <- which(criterion > 0 & p_s > 0)

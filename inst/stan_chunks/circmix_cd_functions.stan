@@ -22,8 +22,18 @@
   // the scaled tanh bound, given the log of the smallest and largest value of 2 pi times the decision density
   real circmix_cd_bound(real criterion, real p_s, real log_min, real log_max) {
     if (criterion > 0) {
-      // p_s = 1 (a held slot) has no 1 - p_s term; log1m(1) would put an infinite partial on the stack
-      real hi = p_s >= 1 ? -log_min : -log_sum_exp(log1m(p_s), log(p_s) + log_min);
+      // LLR_max = -log(1 + p_s (m - 1)): log1p keeps the digits of a small p_s (1 - m), which log_sum_exp loses to 1 - m
+      // for a flat memory; near p_s (1 - m) = 1 (m underflows for a sharp held memory) only log_sum_exp is exact. p_s = 1
+      // (a held slot) has no 1 - p_s term; log1m(1) would put an infinite partial on the stack
+      real shift = p_s * expm1(log_min);
+      real hi;
+      if (p_s >= 1) {
+        hi = -log_min;
+      } else if (shift > -0.5) {
+        hi = -log1p(shift);
+      } else {
+        hi = -log_sum_exp(log1m(p_s), log(p_s) + log_min);
+      }
       return hi * tanh(criterion / hi);
     }
     real lo = log1p(p_s * expm1(log_max));
