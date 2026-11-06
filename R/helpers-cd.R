@@ -341,12 +341,12 @@
 # because it is the last distributional parameter of the family.
 .cd_add_criterion <- function(spec) {
   spec$parameters$criterion <- glue(
-    "Decision criterion on the log-likelihood ratio of 'change' against \\
-    'same'; larger values make 'change' responses less likely. Fixed to 0, the \\
-    unbiased observer, by default. When estimated, it is kept inside the range \\
-    of evidence each trial can produce (it equals Lin and Oberauer's \\
-    criterion near 0 and is compressed toward that range's ends), so both \\
-    responses stay possible on every trial."
+    "Decision criterion, Lin and Oberauer's (2022) bias beta on the \\
+    log-likelihood ratio of 'change' against 'same'; positive values favour \\
+    'same' responses. Fixed to 0, the unbiased observer, by default. When \\
+    estimated, it is kept inside the range of evidence each trial can produce \\
+    (it equals Lin and Oberauer's criterion near 0 and is compressed toward \\
+    that range's ends), so both responses stay possible on every trial."
   )
   spec$links$criterion <- "identity"
   spec$fixed_parameters$criterion <- 0
