@@ -199,10 +199,11 @@
         // level's rounding sets the root, and R and Stan differ by up to 4.3e-9 in h at 16-17 times, each about as far
         // from the true root
         vector[S] lp_root = base + kappa * cos(h_new);
-        real h_root = h_new + (log_sum_exp(lp_root) - level) / (sin(h_new) * dot_product(softmax(lp_root), kappa));
-        // near saturation the level's rounding sets the residual, and the step can be the arc's own size; one that
-        // leaves the circle is dropped (the bracket of the last two iterates would drop the good steps too)
-        return h_root > 0 && h_root < pi() ? h_root : h_new;
+        real step = (log_sum_exp(lp_root) - level) / (sin(h_new) * dot_product(softmax(lp_root), kappa));
+        // from a converged root a true correction is tiny against the arc; one of the arc's own size is rounding noise
+        // (it can leave the circle, or land far from the root inside it), so it is dropped. The bracket of the last two
+        // iterates would drop the good steps too
+        return abs(step) < 0.5 * fmin(h_new, pi() - h_new) ? h_new + step : h_new;
       }
       h = h_new;
     }

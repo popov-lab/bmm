@@ -1029,23 +1029,34 @@ test_that("the limited observer's K gradient at and just above a whole K holds n
   }
 })
 
-test_that("the limited arc's last Newton step keeps it on the circle", {
+test_that("the limited arc's last Newton step never drops P('same') to the floor", {
   skip_unless_stan_tests()
   skip_on_cran()
-  # kappa 50, criterion -18 times the range, extra 1e-6: the level's rounding
-  # sets the root, and a step from it of about the arc's own size would leave
-  # (0, pi) and make P("same") 0 (log-lik at the floor, -36, instead of -25)
+  # kappa 50, extra 1e-6, criterion 17.5-19 times below the range (2.872):
+  # the rounding of the level and of cos h near 1 sets the root's residual, and
+  # a step from it of the arc's own size can leave (0, pi), which makes
+  # P("same") 0 (the slot term at the floor, -36, instead of about -25), or
+  # land far inside. Whether one criterion gets such a step depends on last
+  # digits, so a sweep is checked. P("same") is about proportional to the arc
+  # there; Stan's arc is within a factor 1.5 of R's on a 0.01 sweep, so a
+  # factor of 2 in P has room
   model <- cd_gradient_model()
   data <- list(y = 0L, probe = 0.6, p_s = 0.6, ss = 2L, rich = 0L)
-  criterion <- -51.7036409663
   K <- 2.000002
-  diagnosed <- cd_gradient_diagnose(
-    model, data, list(log_kappa = log(50), criterion = criterion, K = K)
-  )
-  expect_false(is.null(diagnosed), label = "diagnose ran")
-  skip_if(is.null(diagnosed))
-  # lp includes the Jacobian of K's lower bound, log K
-  expect_equal(diagnosed$lp(), cd_gradient_loglik(data, 50, criterion, K) + log(K), tolerance = 1e-4)
+  for (multiple in seq(17.5, 19, by = 0.1)) {
+    criterion <- -multiple * 51.7036409663 / 18
+    label <- paste("slot term at", multiple, "times the range")
+    diagnosed <- cd_gradient_diagnose(
+      model, data, list(log_kappa = log(50), criterion = criterion, K = K)
+    )
+    expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
+    skip_if(is.null(diagnosed))
+    # lp holds the Jacobian of K's lower bound, log K, and the single-precision term
+    single <- .cd_bernoulli_ld(0L, psame_simple(0.6, 50, 0.6, criterion, 0.6))
+    slot <- diagnosed$lp() - log(K) - single
+    expect_gt(slot, log(.Machine$double.eps) + 1, label = label)
+    expect_lt(abs(slot - (cd_gradient_loglik(data, 50, criterion, K) - single)), log(2), label = label)
+  }
 })
 
 test_that("at criterion 0 the criterion keeps its gradient", {

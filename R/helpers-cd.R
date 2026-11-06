@@ -206,11 +206,11 @@
 # f decreases strictly on (0, pi), with f'(h) = -sin(h) sum_n softmax_n kappa_n,
 # so Newton converges from the closed form at the mean kappa; a step leaving the
 # bracket is replaced by bisection. The Stan twin adds one Newton step from the
-# converged root, kept while it stays inside (0, pi). Up to about 10 times the
-# range its gradient is the implicit-function one and its value moves by at
-# most 5e-12 (measured); nearer saturation the level's rounding sets the root,
-# and the twins differ by up to 4.3e-9 in h at 16-17 times, each about as far
-# from the true root. kappa and lw are n x S.
+# converged root, kept while it is under half the distance to 0 or pi. Up to
+# about 10 times the range its gradient is the implicit-function one and its
+# value moves by at most 5e-12 (measured); nearer saturation the level's
+# rounding sets the root, and the twins differ by up to 4.3e-9 in h at 16-17
+# times, each about as far from the true root. kappa and lw are n x S.
 .circmix_cd_limited_hw <- function(kappa, lw, offset, start) {
   n <- nrow(kappa)
   base <- lw - .circmix_log_besselI0(kappa)
