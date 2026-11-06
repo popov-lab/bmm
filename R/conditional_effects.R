@@ -265,7 +265,10 @@ conditional_effects.bmmfit <- function(x,
     if (length(effects) == 0) {
       return(structure(list(), names = character(0), class = "brms_conditional_effects"))
     }
-    return(.ce_compute_and_transform(x, par, par_info, scale, effects = effects, ...))
+    # replaces a user's `effects = NULL`, which the dots still hold
+    dots <- list(...)
+    dots$effects <- effects
+    return(do.call(.ce_compute_and_transform, c(list(x, par, par_info, scale), dots)))
   }
 
   ce_result <- if (par_info$type == "dpar") {

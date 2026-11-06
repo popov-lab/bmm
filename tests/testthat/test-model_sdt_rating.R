@@ -1070,6 +1070,10 @@ test_that("conditional_effects() asks brms for a trial-family parameter's own ef
   bmm:::.ce_compute_and_transform(fit, "criterion", bmm:::.get_parameter_info(fit, "criterion"),
                                   "native", effects = "cond")
   expect_identical(asked[[2]][c("dpar", "effects")], list(dpar = "criterion", effects = "cond"))
+  # a wrapper that passes its own default on
+  bmm:::.ce_compute_and_transform(fit, "d", bmm:::.get_parameter_info(fit, "d"), "native",
+                                  effects = NULL)
+  expect_identical(asked[[3]][c("effects", "dpar")], list(effects = "cond", dpar = "d"))
 })
 
 # The trial family and the one-hot multinomial (aggregated rows of one trial
