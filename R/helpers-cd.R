@@ -96,8 +96,16 @@
   criterion <- rep_len(criterion, n)
   p_s <- rep_len(p_s, n)
   log_i0 <- .circmix_log_besselI0(kappa)
-  log_min <- matrixStats::rowLogSumExps(lw - log_i0 - kappa)
-  log_max <- matrixStats::rowLogSumExps(lw - log_i0 + kappa)
+  .circmix_cd_bound(
+    criterion, p_s,
+    matrixStats::rowLogSumExps(lw - log_i0 - kappa),
+    matrixStats::rowLogSumExps(lw - log_i0 + kappa)
+  )
+}
+
+# log_min and log_max are the log of the smallest and largest value of 2 pi
+# times the decision density over the circle
+.circmix_cd_bound <- function(criterion, p_s, log_min, log_max) {
   # on the log scale: exp(log_min) underflows for sharp memories when p_s = 1
   hi <- -matrixStats::rowLogSumExps(cbind(log1p(-p_s), log(p_s) + log_min))
   lo <- log1p(p_s * expm1(log_max))
@@ -267,8 +275,10 @@
 # two slot counts. With none held, retrieval is a guess with probability
 # 1 - extra and the item at kappa_hi otherwise; the observer's prior of storage
 # is extra, and both cases are judged with the precision the item would have at
-# kappa_hi. extra = 0 leaves out the state it weights, as the Stan twin must to
-# keep log(0) off the autodiff stack.
+# kappa_hi. extra = 0 leaves out the state it weights. The Stan twin cannot
+# simply leave it out with a slot held: K would lose its gradient there, so it
+# writes the same value as its first-order expansion in extra, whose gradient
+# is the slope from above (circmix_cd_whole_slots_psame()).
 .circmix_cd_slot_averaging_psame <- function(d, logw, branch, criterion, rich) {
   n <- nrow(d)
   criterion <- rep_len(criterion, n)

@@ -706,14 +706,11 @@ test_that("an infinite level gives kappa a finite gradient in circmix_cd_crit_an
   }
 })
 
-test_that("a criterion past the cliff and a whole K keep finite gradients", {
-  skip_unless_stan_tests()
-  skip_on_cran()
-  # unbounded, criterion 2 at p_s 0.3 lies past -log(1 - p_s) = 0.36: the arc
-  # covers the circle, a "change" response sits on the probability floor
-  # (log 2.2e-16 = -36) and the criterion has no gradient to leave it. K = 4
-  # at set size 2 holds whole slots, where log(extra) would be log(0) and give
-  # K a NaN gradient
+# One program for the gradient checks, compiled once per session: a single
+# precision term and a slot-averaging term in K. Parameters in declaration
+# order: log_kappa, criterion, K; diagnose() reports the gradient of K on
+# log K, Jacobian (+1) included
+cd_gradient_model <- function() {
   code <- paste0(
     "functions {\n", cd_chunks(), "\n}\n",
     "data {
@@ -731,28 +728,77 @@ test_that("a criterion past the cliff and a whole K keep finite gradients", {
                                   [probe]', [0.0]', branch, criterion, rich, gl_x, gl_w));
     }"
   )
-  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+  cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+}
+
+cd_gradient_diagnose <- function(model, data, init) {
   gl <- .cd_gl_rule()
   tab <- .circmix_kappa_table()
+  tryCatch(
+    model$diagnose(
+      data = c(data, list(
+        gl_x = gl$x, gl_w = gl$w, NK = length(tab$logkappa), logk = tab$logkappa,
+        dlogk = tab$dlogkappa, logJ_min = tab$logJ_min, dlogJ = tab$dlogJ
+      )),
+      init = list(init), error = 1e300
+    ),
+    error = function(e) NULL
+  )
+}
+
+test_that("a criterion past the cliff and a whole K keep finite gradients", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # unbounded, criterion 2 at p_s 0.3 lies past -log(1 - p_s) = 0.36: the arc
+  # covers the circle, a "change" response sits on the probability floor
+  # (log 2.2e-16 = -36) and the criterion has no gradient to leave it. K = 4
+  # at set size 2 holds whole slots, where log(extra) would be log(0) and give
+  # K a NaN gradient
+  model <- cd_gradient_model()
   for (rich in 0:1) {
-    diagnosed <- tryCatch(
-      model$diagnose(
-        data = list(
-          y = 1L, probe = pi, p_s = 0.3, ss = 2L, rich = rich, gl_x = gl$x, gl_w = gl$w,
-          NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
-          logJ_min = tab$logJ_min, dlogJ = tab$dlogJ
-        ),
-        init = list(list(log_kappa = log(8), criterion = 2, K = 4)), error = 1e300
-      ),
-      error = function(e) NULL
+    diagnosed <- cd_gradient_diagnose(
+      model, list(y = 1L, probe = pi, p_s = 0.3, ss = 2L, rich = rich),
+      list(log_kappa = log(8), criterion = 2, K = 4)
     )
     expect_false(is.null(diagnosed), label = paste("diagnose ran, rich =", rich))
     skip_if(is.null(diagnosed))
     expect_gt(diagnosed$lp(), 2 * log(1e-4))
     gradient <- diagnosed$gradients()
     expect_true(all(is.finite(gradient$model)))
-    # parameters in declaration order: log_kappa, criterion, K
     expect_lt(gradient$model[2], 0)
+  }
+})
+
+test_that("at a whole K / set size the K gradient is the slope from above", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # extra = 0 has no extra-slot state to take log(extra) of; dropping the state
+  # instead would leave K without a gradient
+  model <- cd_gradient_model()
+  K <- 4
+  step <- K * 1e-7
+  for (rich in 0:1) {
+    for (y in 0:1) {
+      for (criterion in c(0, 0.5, -0.5)) {
+        loglik <- function(K) {
+          .cd_bernoulli_ld(y, .circmix_cd_slot_averaging_psame(
+            matrix(0.6), matrix(0), .circmix_slot_averaging_branches(K, 2, 8), criterion, rich == 1
+          ))
+        }
+        diagnosed <- cd_gradient_diagnose(
+          model, list(y = y, probe = 0.6, p_s = 0.6, ss = 2L, rich = rich),
+          list(log_kappa = log(8), criterion = criterion, K = K)
+        )
+        expect_false(is.null(diagnosed))
+        skip_if(is.null(diagnosed))
+        expect_equal(
+          diagnosed$gradients()$model[3] - 1,
+          K * (loglik(K + step) - loglik(K)) / step,
+          tolerance = 1e-4,
+          label = paste("K gradient, rich", rich, "y", y, "criterion", criterion)
+        )
+      }
+    }
   }
 })
 

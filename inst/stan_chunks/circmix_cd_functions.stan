@@ -19,6 +19,17 @@
     return -criterion + log1m_exp(scaled) - log(p_s);
   }
 
+  // the scaled tanh bound, given the log of the smallest and largest value of 2 pi times the decision density
+  real circmix_cd_bound(real criterion, real p_s, real log_min, real log_max) {
+    if (criterion > 0) {
+      // p_s = 1 (a held slot) has no 1 - p_s term; log1m(1) would put an infinite partial on the stack
+      real hi = p_s >= 1 ? -log_min : -log_sum_exp(log1m(p_s), log(p_s) + log_min);
+      return hi * tanh(criterion / hi);
+    }
+    real lo = log1p(p_s * expm1(log_max));
+    return lo * tanh(criterion / lo);
+  }
+
   // criterion kept inside the trial's range (LLR_min, LLR_max) of the log-likelihood ratio by a scaled tanh on each side of
   // 0 (slope 1 at 0, criterion = 0 unchanged), so that both responses stay possible: the range of the decision density
   // over the precision states (kappa, lw), the marginal one for the limited observer; the rich observer passes one state
@@ -32,16 +43,7 @@
     for (n in 1:S) {
       base[n] = lw[n] - log_modified_bessel_first_kind(0, kappa[n]);
     }
-    // log of the smallest and largest value of 2 pi times the decision density over the circle
-    real log_min = log_sum_exp(base - kappa);
-    real log_max = log_sum_exp(base + kappa);
-    if (criterion > 0) {
-      // p_s = 1 (a held slot) has no 1 - p_s term; log1m(1) would put an infinite partial on the stack
-      real hi = p_s >= 1 ? -log_min : -log_sum_exp(log1m(p_s), log(p_s) + log_min);
-      return hi * tanh(criterion / hi);
-    }
-    real lo = log1p(p_s * expm1(log_max));
-    return lo * tanh(criterion / lo);
+    return circmix_cd_bound(criterion, p_s, log_sum_exp(base - kappa), log_sum_exp(base + kappa));
   }
 
   // log crossing level for the bounded criterion
@@ -205,10 +207,44 @@
     return dot_product(exp(lw), ps);
   }
 
+  // a held item at a whole K / ss: P("same") of the kappa_lo state alone, written as its first-order expansion in extra
+  // (extra = 0, so the value is unchanged) to give K the slope from above without log(extra) on the stack, as
+  // circmix_slot_averaging_ld() does. Rich: P is linear in extra, each state having its own arc. Limited: the marginal
+  // range and the shared arc move with extra too; the arc's slope is the implicit one, from
+  // log((1 - extra) vM(hw | kappa_lo) + extra vM(hw | kappa_hi)) = level
+  real circmix_cd_whole_slots_psame(vector d, vector logw, real kappa_lo, real kappa_hi,
+                                    real extra, real criterion, int rich,
+                                    data vector gl_x, data vector gl_w) {
+    real hw_lo;
+    real hw_hi;
+    if (rich) {
+      hw_lo = circmix_cd_crit_angle(kappa_lo, circmix_cd_level(criterion, 1, [kappa_lo]', [0.0]'));
+      hw_hi = circmix_cd_crit_angle(kappa_hi, circmix_cd_level(criterion, 1, [kappa_hi]', [0.0]'));
+    } else {
+      real log_i0_lo = log_modified_bessel_first_kind(0, kappa_lo);
+      real log_i0_hi = log_modified_bessel_first_kind(0, kappa_hi);
+      real log_min = -kappa_lo - log_i0_lo
+                     + log1p(extra * expm1(kappa_lo - kappa_hi + log_i0_lo - log_i0_hi));
+      real log_max = kappa_lo - log_i0_lo
+                     + log1p(extra * expm1(kappa_hi - kappa_lo + log_i0_lo - log_i0_hi));
+      hw_lo = circmix_cd_crit_angle(kappa_lo, circmix_cd_offset(
+        circmix_cd_bound(criterion, 1, log_min, log_max), 1));
+      if (hw_lo > 0 && hw_lo < pi()) {
+        hw_lo += extra * expm1((kappa_hi - kappa_lo) * cos(hw_lo) + log_i0_lo - log_i0_hi)
+                 / (kappa_lo * sin(hw_lo));
+      }
+      hw_hi = hw_lo;
+    }
+    real p_lo = circmix_cd_psame_at(d, logw, negative_infinity(), kappa_lo, hw_lo, gl_x, gl_w);
+    return p_lo + extra * (circmix_cd_psame_at(d, logw, negative_infinity(), kappa_hi, hw_hi,
+                                               gl_x, gl_w) - p_lo);
+  }
+
   // slot averaging; branch from circmix_slot_averaging_branches(), [held, kappa_lo, kappa_hi, extra]. With a slot held the
   // observer knows the item is stored (p_s = 1) and the two slot counts are the precision states; with none held the item
   // is guessed with 1 - extra and at kappa_hi with extra, which is also the observer's prior of storage. log(extra) at a
-  // whole K / set size is log(0), whose NaN adjoint would reach K, so extra = 0 leaves out the state it weights
+  // whole K / set size is log(0), whose NaN adjoint would reach K: with no slot held (K = 0) extra = 0 leaves out the
+  // state it weights, with one held the value is written in a form whose gradient is the slope from above
   real circmix_cd_slot_averaging_psame(vector d, vector logw, vector branch,
                                        real criterion, int rich,
                                        data vector gl_x, data vector gl_w) {
@@ -222,8 +258,8 @@
                               criterion, extra, gl_x, gl_w);
     }
     if (extra == 0) {
-      return circmix_cd_psame(d, logw, negative_infinity(), branch[2], criterion, 1,
-                              gl_x, gl_w);
+      return circmix_cd_whole_slots_psame(d, logw, branch[2], branch[3], extra, criterion, rich,
+                                          gl_x, gl_w);
     }
     return circmix_cd_mix_psame(d, logw, negative_infinity(), branch[2:3],
                                 [log1m(extra), log(extra)]', criterion, 1, rich,
