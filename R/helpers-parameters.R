@@ -620,7 +620,10 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' **Circular location parameters** (`tan_half` link): `"mean"` returns the
 #' circular mean direction and the circular SD `sqrt(-2 * log(rho))`, where
 #' `rho` is the mean resultant length, both by Gauss-Hermite quadrature with 200
-#' nodes. `"median"` returns the circular median, the direction with the
+#' nodes, whose error is at most `2e-7` up to `s = 1.5` and grows to `1.3e-5`
+#' at `s = 2`, `3.8e-4` at `s = 3` and `6.1e-3` at `s = 5`. A between-participant
+#' SD above about `1.5` on the `tan(theta / 2)` scale is rare. `"median"`
+#' returns the circular median, the direction with the
 #' smallest expected arc distance to the parameter, without quartiles. Once
 #' enough mass wraps around `pi` the circular median is no longer
 #' `2 * atan(eta)`.

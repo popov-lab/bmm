@@ -2,7 +2,7 @@
 # native_parameters(population_summary = ) and its helpers
 # Tier 1: Unit tests of the integrals (no fitted model)
 # Tier 2: Fixture-based tests (skip when the fixtures are not available)
-# Model-fitting tests live in tests/internal/test-native_parameters.R
+# Model-fitting tests live in tests/local/test-native_parameters.R
 # ===========================================================================
 
 load_pop_m3_fit <- function() {

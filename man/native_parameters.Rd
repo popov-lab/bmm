@@ -199,7 +199,10 @@ reproducible output.
 \strong{Circular location parameters} (\code{tan_half} link): \code{"mean"} returns the
 circular mean direction and the circular SD \code{sqrt(-2 * log(rho))}, where
 \code{rho} is the mean resultant length, both by Gauss-Hermite quadrature with 200
-nodes. \code{"median"} returns the circular median, the direction with the
+nodes, whose error is at most \code{2e-7} up to \code{s = 1.5} and grows to \code{1.3e-5}
+at \code{s = 2}, \code{3.8e-4} at \code{s = 3} and \code{6.1e-3} at \code{s = 5}. A between-participant
+SD above about \code{1.5} on the \code{tan(theta / 2)} scale is rare. \code{"median"}
+returns the circular median, the direction with the
 smallest expected arc distance to the parameter, without quartiles. Once
 enough mass wraps around \code{pi} the circular median is no longer
 \code{2 * atan(eta)}.
