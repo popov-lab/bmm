@@ -1007,9 +1007,10 @@ test_that("user-layout newdata predict from a 1.5.0 one-hot trial fit", {
 })
 
 # A trial-family fit reads the user's layout. check_data() recodes what bmm()
-# accepts there, and a 1.5.0 frame slice, which kfold() and reloo() of a 1.5.0
-# fit pass to its trial-family refit, gets its rating back. Rows held as
-# numbers go to brms as they are, as do the grids of conditional_effects()
+# accepts there and names what brms would take or misread, and a 1.5.0 frame
+# slice, which kfold() and reloo() of a 1.5.0 fit pass to its trial-family
+# refit, gets its rating back. Rows in the frame's coding go to brms as they
+# are, as do the grids of the SDT helpers (stimulus 0, rating 3)
 test_that("newdata for the trial family take the rating and stimulus as bmm() takes them", {
   skip_on_cran()
   formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
@@ -1041,9 +1042,29 @@ test_that("newdata for the trial family take the rating and stimulus as bmm() ta
   recoded$stimulus <- factor(newdata$stimulus)
   expect_equal(lapply(standata_of(recoded), as.vector), expected)
 
-  newdata$rating[1] <- 6
-  expect_error(standata_of(newdata), "must hold one of '1', '2', '3', '4'")
-  grid <- data.frame(rating = 2.6, stimulus = 0, id = NA)
+  # the kernel multiplies by the stimulus, so a 1/2 or -1/1 coding gave wrong
+  # predictions without an error
+  miscoded <- function(col, values) {
+    nd <- newdata
+    nd[[col]] <- values
+    standata_of(nd)
+  }
+  expect_error(miscoded("rating", c(6, newdata$rating[-1])), "must hold one of '1', '2', '3', '4'")
+  expect_error(miscoded("rating", c(1.9, newdata$rating[-1])), "must hold one of '1', '2', '3', '4'")
+  expect_error(miscoded("rating", c(NA, newdata$rating[-1])), "'rating' must not contain NA")
+  expect_error(miscoded("stimulus", newdata$stimulus + 1), "and 1 \\(signal\\); found '2'")
+  expect_error(miscoded("stimulus", 2 * newdata$stimulus - 1), "and 1 \\(signal\\); found '-1'")
+  expect_error(miscoded("stimulus", c(NA, newdata$stimulus[-1])), "but 1 of 4 values are NA")
+
+  # a prediction estimates nothing, so the signal rows alone are newdata in
+  # any type bmm() takes
+  signal <- trials[trials$stimulus == 1, ][1:4, ]
+  expect_identical(bmm:::prepare_newdata(model, signal, fit), signal)
+  as_factor <- signal
+  as_factor$stimulus <- factor(as_factor$stimulus)
+  expect_equal(standata_of(as_factor), standata_of(signal))
+
+  grid <- data.frame(rating = 3, stimulus = 0, id = NA)
   expect_identical(bmm:::prepare_newdata(model, grid, fit), grid)
 })
 

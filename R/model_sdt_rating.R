@@ -688,10 +688,12 @@ built_data_columns.sdt_rating <- function(model) {
 #   numbers. A 1.5.0 frame slice, which kfold() and reloo() of a 1.5.0 fit pass
 #   to their trial-family refits, gets its rating back. check_data() then
 #   recodes the columns bmm() accepts and brms refuses, a rating or stimulus
-#   not held as numbers, and names a whole-number rating outside 1..K. Rows held
-#   as numbers go to brms as they are: check_data() refuses the grids of
-#   conditional_effects(), which hold the mean rating and a single stimulus, and
-#   the single rows of reloo()
+#   not held as numbers, and names the values brms would take or misread: NA,
+#   a rating outside 1..K, and a stimulus other than 0 and 1, which the kernel
+#   multiplies by. Rows already in the frame's coding need no recoding and go
+#   to brms as they are: the single frame rows of reloo(), and the grids of the
+#   SDT helpers (roc_sdt(), sdt_thresholds(), latent_sdt(), auc_sdt(),
+#   sdt_sensitivity()), which hold stimulus 0 and a rating of 3
 #' @exportS3Method
 prepare_newdata.sdt_rating <- function(model, newdata, fit) {
   if (!is_trial_level(model)) {
@@ -708,10 +710,11 @@ prepare_newdata.sdt_rating <- function(model, newdata, fit) {
 
 .sdt_rating_newdata_to_recode <- function(model, newdata) {
   rating <- newdata[[model$resp_vars$response]]
-  not_numbers <- function(x) !is.null(x) && !is.numeric(x) && !all(is.na(x))
-  not_numbers(rating) || not_numbers(newdata[[model$other_vars$stimulus]]) ||
-    (is.numeric(rating) &&
-       any(rating %% 1 == 0 & !rating %in% seq_along(.sdt_categories(model)), na.rm = TRUE))
+  stimulus <- newdata[[model$other_vars$stimulus]]
+  not_numbers <- function(x) !is.null(x) && !is.numeric(x)
+  not_numbers(rating) || not_numbers(stimulus) ||
+    any(!rating %in% seq_along(.sdt_categories(model))) ||
+    any(!stimulus %in% c(0, 1))
 }
 
 # Trial rows fitted through the multinomial (1.5.0) stored the one-hot Y and
