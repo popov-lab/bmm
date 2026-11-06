@@ -29,6 +29,23 @@
 * `sdm()` fits overestimated the likelihood when `c` and `kappa` were both large, without a warning, and pulled the estimates there toward larger `c` and `kappa`. On simulated data the estimates drifted far above the true values. The likelihood is now accurate across the parameter range, and fits take about as long as before. Refit `sdm()` models whose estimates reach large `c` and `kappa`. Fits such as the one in the SDM article change no more than sampling noise (#615).
 * Fits with a random slope on a predictor such as a trial number, an identity link with random effects, or `mo()` or `s()` terms no longer stop with "Rejecting initial value" when your data bound a parameter, such as `ndt`, which must stay below your fastest response time. `ddm()` now starts `ndt` below your fastest response time, as `cswald()` does (#621).
 
+### Changes to default priors
+<!-- [1.6.0] bullets: every default-prior change in 1.6.0 (ADR 0008 § D4). -->
+<!-- [1.6.0] fits record the prior set they used; `bmm_options(prior_version = )` reproduces an older set -->
+
+### Companion packages
+<!-- [1.6.0] contract changes (ADR 0005 announcement rule), filled by the pull request that lands each: -->
+<!-- [1.6.0] `bmm_contract_version()` = 1.0 pinned; `register_bmm_model()` (#442) -->
+<!-- [1.6.0] the `log` default of `dm3()`, `dmpt()`, `dddm()`, `dcswald()`, `dezdm()` becomes FALSE (#553) -->
+<!-- [1.6.0] `supported_models()` and `parameters()` removed (#474, #481) -->
+
+### Deprecated functions and arguments
+<!-- [1.6.0] removals scheduled by ADR 0008, filled by the pull request that lands each: -->
+<!-- [1.6.0] `supported_models()` and `parameters()` removed; use `bmm_models()` and `parameter_info()` -->
+<!-- [1.6.0] `fit_model()`, `IMMfull()`, `IMMabc()`, `IMMbsc()`, `sdmSimple()`, `setsize =`, `parallel =` removed -->
+<!-- [1.6.0] an argument a model constructor does not use is an error, not a warning (#552) -->
+<!-- [1.6.0] the `log` default of five density functions changes (#553) -->
+
 ### Other changes
 * `cswald()` now warns when the prior for `ndt` puts most of its mass at or above your fastest response time, which `ndt` must stay below. Such a fit can fail to start. The warning suggests a prior with a lower location; filtering out anticipations helps too (#548).
 * Model constructors such as `sdm()` and `mpt()` now warn about an argument they do not use, such as `mpt(trees, foo = 1)` or a misspelt `lnks =`, which they ignored without a message. They also warn about an extra argument given by position; give it by name. The warning names the argument and, for a misspelling, the one you probably meant. In bmm 1.6.0 this becomes an error; remove such arguments from your calls (#552).
