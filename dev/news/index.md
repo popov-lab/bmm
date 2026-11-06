@@ -91,6 +91,12 @@
   such as `id` in `(1 | id)`, as the participant. Aggregated counts with
   `n_trials` work as before
   ([\#646](https://github.com/popov-lab/bmm/issues/646)).
+- mixture2p, mixture3p and imm: a fit with `variable_precision = TRUE`
+  that has divergent transitions now warns when its posterior presses
+  against the smallest gamma shape the quadrature accepts, 60 /
+  `vp_nodes`, and names the `vp_nodes` to refit with. Before, such a fit
+  showed only the divergences. The refit takes about 1.5 times as long
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
 
 #### Changes to default priors
 
