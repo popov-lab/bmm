@@ -131,9 +131,12 @@ find_predictors.bmmfit <- function(x, effects = "fixed", component = "all",
 #' @exportS3Method insight::find_response
 find_response.bmmfit <- function(x, combine = TRUE, ...) {
   # a model fitted to counts names the columns of its response matrix, which
-  # need not be its resp_vars (sdt_cdp() stores a column prefix there)
+  # need not be its resp_vars (sdt_cdp() stores a column prefix there). The
+  # change-detection models name the probe and the target among their
+  # resp_vars, which brms keeps only as the built probe_centered
   response <- x$data[[all.vars(brms::brmsterms(x$formula)$respform)[1]]]
-  colnames(response) %||% unlist(x$bmm$model$resp_vars, use.names = FALSE)
+  colnames(response) %||%
+    intersect(unlist(x$bmm$model$resp_vars, use.names = FALSE), names(x$data))
 }
 
 
