@@ -208,6 +208,25 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), circular_mean_cos(function(x) dmixture2p(x, 0, 7.389056, 0.5986877)),
                    "mixture2p")
 
+  # the capacity versions and variable precision, against E[cos] from
+  # A = I1 / I0 and J(kappa) = kappa A(kappa): a j-slot item has J = j J(kappa),
+  # variable precision draws J from gamma(J / tau, tau), integrated here
+  slot <- data.frame(set_size = rep(4, n_sim))
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot"),
+                     list(kappa = exp(2), K = 2), slot, scale = "native")$y
+  expect_within_mc(cos(y), 0.4648183, "mixture2p slot")
+  pair <- data.frame(set_size = rep(2, n_sim))
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot_averaging"),
+                     list(kappa = exp(1), K = 3), pair, scale = "native")$y
+  expect_within_mc(cos(y), 0.8378172, "mixture2p slot_averaging")
+  # constant precision gives 0.7081129 and 0.8378172 at these values
+  y <- simulate_data(mixture2p("y", variable_precision = TRUE),
+                     list(kappa = exp(1), thetat = 0.9, tau = 1), n_trials = n_sim, scale = "native")$y
+  expect_within_mc(cos(y), 0.6498559, "mixture2p variable precision")
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot_averaging", variable_precision = TRUE),
+                     list(kappa = exp(1), K = 3, tau = 1), pair, scale = "native")$y
+  expect_within_mc(cos(y), 0.7917740, "mixture2p slot_averaging variable precision")
+
   y <- simulate_data(sdm("y"), list(c = 2, kappa = 1.75), n_trials = n_sim)$y
   expect_within_mc(cos(y), circular_mean_cos(function(x) dsdm(x, 0, 7.389056, 5.754603)), "sdm")
 
