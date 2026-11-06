@@ -943,8 +943,10 @@ test_that("an observer's p_s of exactly 1 as a parameter gives finite gradients 
         expect_true(all(is.finite(gradient)), label = label)
         expect_equal(
           gradient[3] - 1,
-          K * (cd_gradient_loglik(data, 8, criterion, K + step) -
-            cd_gradient_loglik(data, 8, criterion, K)) / step,
+          K * (
+            cd_gradient_loglik(data, 8, criterion, K + step) -
+              cd_gradient_loglik(data, 8, criterion, K)
+          ) / step,
           tolerance = 1e-4,
           label = paste("K gradient,", label)
         )
