@@ -504,9 +504,18 @@ check_formula.change_detection <- function(model, data, formula) {
 }
 
 # A logical response is accepted and coerced, as for the diffusion models.
+# Newdata for a prediction may leave the response unknown (NA): brms reads it
+# for log_lik() only, and refuses NA there itself.
 .cd_check_binary_response <- function(data, resp) {
   values <- data[[resp]]
-  stopif(anyNA(values), "The response variable '{resp}' contains missing values.")
+  known <- !is.na(values)
+  stopif(
+    !all(known) && !isTRUE(attr(data, "prediction_newdata")),
+    "The response variable '{resp}' contains missing values."
+  )
+  if (!any(known)) {
+    return(data)
+  }
   if (is.logical(values)) {
     warning2(
       "The response variable '{resp}' is logical and will be coded as 1 for \\
@@ -516,7 +525,7 @@ check_formula.change_detection <- function(model, data, formula) {
     return(data)
   }
   stopif(
-    !is.numeric(values) || !all(values %in% c(0, 1)),
+    !is.numeric(values) || !all(values[known] %in% c(0, 1)),
     "The response variable '{resp}' must be coded as 0 ('same') and 1 \\
     ('change'), or be logical."
   )

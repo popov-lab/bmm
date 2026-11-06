@@ -420,6 +420,52 @@ test_that("check_data.change_detection() refuses a missing probe or target", {
   )
 })
 
+test_that("prediction newdata may leave the response unknown", {
+  dat <- data.frame(r = c(0, NA, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
+  attr(dat, "prediction_newdata") <- TRUE
+  expect_identical(check_data(cd_stub_model(), dat, bmf(kappa ~ 1))$r, dat$r)
+  attr(dat, "prediction_newdata") <- NULL
+  expect_error(check_data(cd_stub_model(), dat, bmf(kappa ~ 1)), "missing")
+  unknown <- data.frame(r = NA, p = 0.5, t = 0.2)
+  attr(unknown, "prediction_newdata") <- TRUE
+  expect_silent(check_data(cd_stub_model(), unknown, bmf(kappa ~ 1)))
+})
+
+test_that("standata() builds newdata with an unknown response, as posterior_predict() asks", {
+  skip_on_cran()
+  model <- list(
+    links = list(mu = "tan_half", kappa = "log", thetat = "logit", criterion = "identity"),
+    variable_precision = FALSE, knowledge = "limited"
+  )
+  family <- .cd_custom_family(
+    model, "demo_cd", "thetat",
+    log_lik = function(i, prep) NULL, posterior_predict = function(i, prep, ...) NULL,
+    posterior_epred = posterior_epred_undefined("demo")
+  )
+  core <- brms::stanvar(scode = "
+  real demo_cd_core(int y, real mu, real kappa, real thetat, real criterion, real probe,
+                    int rich, data vector logk, data vector dlogk, data real logJ_min,
+                    data real dlogJ, data vector gl_x, data vector gl_w) {
+    return 0;
+  }", block = "functions", name = "demo_cd_core")
+  dat <- data.frame(r = c(0L, 1L, 1L), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
+  fit <- suppressWarnings(brms::brm(
+    brms::bf(r | vreal(probe_centered) ~ 1, kappa ~ 1, thetat ~ 1, criterion ~ 1, family = family),
+    check_data(cd_stub_model(), dat, bmf(kappa ~ 1)),
+    stanvars = .cd_model_stanvars(model, family, character(0)) + core,
+    prior = brms::prior(constant(0), class = "Intercept", dpar = "criterion"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  # standata.bmmfit() hands newdata in the user's layout to check_newdata()
+  newdata <- check_newdata(
+    list(bmm = list(model = cd_stub_model(), user_formula = bmf(kappa ~ 1))),
+    data.frame(r = NA, p = c(1, -1), t = 0)
+  )
+  standata <- brms::standata(fit, newdata = newdata, check_response = FALSE, internal = TRUE)
+  expect_equal(as.numeric(standata$vreal1), c(1, -1))
+  expect_true(all(is.na(standata$Y)))
+})
+
 test_that("check_data.change_detection() declares the column it builds", {
   model <- cd_stub_model()
   dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
