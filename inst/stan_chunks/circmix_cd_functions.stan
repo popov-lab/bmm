@@ -20,34 +20,21 @@
   }
 
   // criterion kept inside the trial's range (LLR_min, LLR_max) of the log-likelihood ratio by a scaled tanh on each side of
-  // 0 (slope 1 at 0, criterion = 0 unchanged), so that both responses stay possible: the range of the marginal decision
-  // density over the precision states, or for the rich observer the narrowest range of a single state; lw = -Inf is padding
-  real circmix_cd_bounded_criterion(real criterion, real p_s, vector kappa, vector lw, int rich) {
+  // 0 (slope 1 at 0, criterion = 0 unchanged), so that both responses stay possible: the range of the decision density
+  // over the precision states (kappa, lw), the marginal one for the limited observer; the rich observer passes one state
+  // at a time, so that each arc has its own range and vanishes with its weight
+  real circmix_cd_bounded_criterion(real criterion, real p_s, vector kappa, vector lw) {
     if (criterion == 0 || p_s <= 0) {
       return criterion;
     }
     int S = num_elements(kappa);
-    // log of the smallest and largest value of 2 pi times the decision density over the circle
-    real log_min;
-    real log_max;
-    if (rich && S > 1) {
-      log_min = negative_infinity();
-      log_max = positive_infinity();
-      for (n in 1:S) {
-        if (!is_inf(lw[n])) {
-          real log_i0 = log_modified_bessel_first_kind(0, kappa[n]);
-          log_min = fmax(log_min, -kappa[n] - log_i0);
-          log_max = fmin(log_max, kappa[n] - log_i0);
-        }
-      }
-    } else {
-      vector[S] base;
-      for (n in 1:S) {
-        base[n] = lw[n] - log_modified_bessel_first_kind(0, kappa[n]);
-      }
-      log_min = log_sum_exp(base - kappa);
-      log_max = log_sum_exp(base + kappa);
+    vector[S] base;
+    for (n in 1:S) {
+      base[n] = lw[n] - log_modified_bessel_first_kind(0, kappa[n]);
     }
+    // log of the smallest and largest value of 2 pi times the decision density over the circle
+    real log_min = log_sum_exp(base - kappa);
+    real log_max = log_sum_exp(base + kappa);
     if (criterion > 0) {
       // p_s = 1 (a held slot) has no 1 - p_s term; log1m(1) would put an infinite partial on the stack
       real hi = p_s >= 1 ? -log_min : -log_sum_exp(log1m(p_s), log(p_s) + log_min);
@@ -58,8 +45,8 @@
   }
 
   // log crossing level for the bounded criterion
-  real circmix_cd_level(real criterion, real p_s, vector kappa, vector lw, int rich) {
-    return circmix_cd_offset(circmix_cd_bounded_criterion(criterion, p_s, kappa, lw, rich), p_s);
+  real circmix_cd_level(real criterion, real p_s, vector kappa, vector lw) {
+    return circmix_cd_offset(circmix_cd_bounded_criterion(criterion, p_s, kappa, lw), p_s);
   }
 
   // half-width of the "same" arc around the probe for a von Mises decision density at kappa
@@ -145,7 +132,7 @@
   real circmix_cd_psame(vector d, vector logw, real logw_guess, real kappa,
                         real criterion, real p_s, data vector gl_x,
                         data vector gl_w) {
-    real level = circmix_cd_level(criterion, p_s, [kappa]', [0.0]', 0);
+    real level = circmix_cd_level(criterion, p_s, [kappa]', [0.0]');
     return circmix_cd_psame_at(d, logw, logw_guess, kappa,
                                circmix_cd_crit_angle(kappa, level), gl_x, gl_w);
   }
@@ -192,19 +179,23 @@
     return h;
   }
 
-  // P("same") over precision states (kappa_n, normalised log weight lw_n); rich: a boundary per state, limited: one shared boundary
+  // P("same") over precision states (kappa_n, normalised log weight lw_n, -Inf for padding); rich: a boundary per state
+  // from that state alone, limited: one shared boundary from the marginal density
   real circmix_cd_mix_psame(vector d, vector logw, real logw_guess, vector kappa,
                             vector lw, real criterion, real p_s, int rich,
                             data vector gl_x, data vector gl_w) {
     int S = num_elements(kappa);
-    real level = circmix_cd_level(criterion, p_s, kappa, lw, rich);
-    vector[S] ps;
+    vector[S] ps = rep_vector(0, S);
     if (rich || S == 1) {
       for (n in 1:S) {
-        ps[n] = circmix_cd_psame_at(d, logw, logw_guess, kappa[n],
-                                    circmix_cd_crit_angle(kappa[n], level), gl_x, gl_w);
+        if (!is_inf(lw[n])) {
+          real level = circmix_cd_level(criterion, p_s, [kappa[n]]', [0.0]');
+          ps[n] = circmix_cd_psame_at(d, logw, logw_guess, kappa[n],
+                                      circmix_cd_crit_angle(kappa[n], level), gl_x, gl_w);
+        }
       }
     } else {
+      real level = circmix_cd_level(criterion, p_s, kappa, lw);
       real start = circmix_cd_crit_angle(exp(log_sum_exp(lw + log(kappa))), level);
       real hw = circmix_cd_limited_hw(kappa, lw, level, start);
       for (n in 1:S) {

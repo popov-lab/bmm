@@ -88,7 +88,7 @@ llr_range <- function(kappa, w, p_s) {
 
 test_that(".circmix_cd_bounded_criterion() keeps 0 and stays inside the evidence range", {
   one <- function(criterion, p_s = 0.6, kappa = 8) {
-    .circmix_cd_bounded_criterion(criterion, p_s, kappa, 0, FALSE)
+    .circmix_cd_bounded_criterion(criterion, p_s, kappa, 0)
   }
   expect_identical(one(0), 0)
   expect_equal(one(1e-7) / 1e-7, 1, tolerance = 1e-6)
@@ -107,16 +107,17 @@ test_that(".circmix_cd_bounded_criterion() keeps 0 and stays inside the evidence
     n <- length(criteria)
     kappa <- matrix(case$kappa, n, length(case$kappa), byrow = TRUE)
     lw <- matrix(log(case$w), n, length(case$w), byrow = TRUE)
-    bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, kappa, lw, FALSE)
+    bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, kappa, lw)
     expect_true(all(bounded > marginal[1] & bounded < marginal[2]))
     expect_equal(bounded[6], marginal[2] * tanh(3), tolerance = 1e-6)
-    # the rich observer has an arc per state, so the narrowest single-state range binds
-    narrowest <- c(
-      max(vapply(case$kappa, function(k) llr_range(k, 1, case$p_s)[1], numeric(1))),
-      min(vapply(case$kappa, function(k) llr_range(k, 1, case$p_s)[2], numeric(1)))
-    )
-    bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, kappa, lw, TRUE)
-    expect_true(all(bounded > narrowest[1] & bounded < narrowest[2]))
+    # the rich observer bounds each state by that state's own range
+    for (k in case$kappa) {
+      own <- llr_range(k, 1, case$p_s)
+      criteria <- c(c(3, 1, 0.2) * own[1], c(0.2, 1, 3) * own[2])
+      bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, k, 0)
+      expect_true(all(bounded > own[1] & bounded < own[2]))
+      expect_equal(bounded[6], own[2] * tanh(3), tolerance = 1e-6)
+    }
   }
 })
 
@@ -141,7 +142,7 @@ test_that(".circmix_cd_psame() matches a fine trapezoid rule over the arc", {
     probe <- case[1]
     kappa <- case[2]
     p_mem <- case[3]
-    hw <- .circmix_cd_crit_angle(kappa, .circmix_cd_level(case[4], p_mem, kappa, 0, FALSE))
+    hw <- .circmix_cd_crit_angle(kappa, .circmix_cd_level(case[4], p_mem, kappa, 0))
     x <- seq(probe - hw, probe + hw, length.out = 2e5 + 1)
     f <- p_mem * vm_density(x, kappa) + (1 - p_mem) / (2 * pi)
     trapezoid <- sum((f[-1] + f[-length(f)]) / 2) * (x[2] - x[1])
@@ -186,11 +187,11 @@ test_that(".circmix_cd_mix_psame() matches adaptive integration over the arc", {
     0.1 * hw / pi + sum(c(0.6, 0.3) * vapply(-d, x_mass, numeric(1)))
   }
   for (criterion in c(0, 0.4, -0.3)) {
-    offset <- .circmix_cd_level(criterion, 0.6, states$kappa, states$lw, TRUE)
     rich <- sum(w * vapply(1:2, function(s) {
+      offset <- .circmix_cd_level(criterion, 0.6, states$kappa[s], 0)
       arc(states$kappa[s], .circmix_cd_crit_angle(states$kappa[s], offset))
     }, numeric(1)))
-    offset <- .circmix_cd_level(criterion, 0.6, states$kappa, states$lw, FALSE)
+    offset <- .circmix_cd_level(criterion, 0.6, states$kappa, states$lw)
     marginal <- function(h) {
       sum(w * exp(states$kappa * cos(h) - .circmix_log_besselI0(states$kappa)))
     }
@@ -302,9 +303,10 @@ test_that(".circmix_cd_slot_averaging_psame() judges a held item as stored (p_s 
     stats::integrate(function(x) vm_density(x, k), 0.4 - h, 0.4 + h, rel.tol = 1e-12)$value
   }
   # with p_s = 1 a state's log-likelihood ratio is log I0(kappa) - kappa cos(x),
-  # ranging over log I0(kappa) -+ kappa; the narrowest range bounds the criterion
-  hi <- min(log_i0 + kappa)
-  lo <- max(log_i0 - kappa)
+  # ranging over log I0(kappa) -+ kappa; each state's own range bounds the
+  # criterion of its arc
+  hi <- log_i0 + kappa
+  lo <- log_i0 - kappa
   for (criterion in c(0.4, -0.3)) {
     bounded <- if (criterion > 0) hi * tanh(criterion / hi) else -lo * tanh(criterion / -lo)
     h <- acos((log_i0 - bounded) / kappa)
@@ -313,6 +315,25 @@ test_that(".circmix_cd_slot_averaging_psame() judges a held item as stored (p_s 
       sum(w * c(arc(kappa[1], h[1]), arc(kappa[2], h[2]))),
       tolerance = 1e-9
     )
+  }
+})
+
+test_that("P('same') of a held item is continuous in K at a whole K / set size", {
+  # set size 2, K rising to 4: the one-slot state's weight vanishes, and the
+  # value from below must meet the value at K = 4 under both observers
+  psame_at_K <- function(K, criterion, rich) {
+    .circmix_cd_slot_averaging_psame(
+      matrix(0.6), matrix(0), .circmix_slot_averaging_branches(K, 2, 8), criterion, rich
+    )
+  }
+  for (criterion in c(5, 0.5, -0.5, -3)) {
+    for (rich in c(TRUE, FALSE)) {
+      expect_lt(
+        abs(psame_at_K(4 * (1 - 1e-12), criterion, rich) - psame_at_K(4, criterion, rich)),
+        1e-9,
+        label = paste("jump at K = 4, criterion", criterion, "rich", rich)
+      )
+    }
   }
 })
 
@@ -552,15 +573,15 @@ cd_stan_values <- function(data) {
     generated quantities {
       vector[NC] out_offset; vector[NC] out_crit; vector[ND] out_mass;
       vector[NC] out_psame; vector[NC] out_limited; array[2] vector[NC] out_mix;
-      array[2, NB] vector[NC] out_sa; array[2] vector[NC] out_bound;
+      array[2, NB] vector[NC] out_sa; vector[NC] out_bound;
       array[2] real out_bern;
       for (c in 1:NC) {
         out_offset[c] = circmix_cd_offset(crit[c], ps[c]);
+        out_bound[c] = circmix_cd_bounded_criterion(crit[c], ps[c], kappa_s, lw_s);
         out_crit[c] = circmix_cd_crit_angle(7, out_offset[c]);
         out_psame[c] = circmix_cd_psame(d, logw, logw_guess, 7, crit[c], ps[c], gl_x, gl_w);
         out_limited[c] = circmix_cd_limited_hw(kappa_s, lw_s, out_offset[c], 1.0);
         for (r in 1:2) {
-          out_bound[r, c] = circmix_cd_bounded_criterion(crit[c], ps[c], kappa_s, lw_s, r - 1);
           out_mix[r, c] = circmix_cd_mix_psame(d, logw, logw_guess, kappa_s, lw_s,
                                                crit[c], ps[c], r - 1, gl_x, gl_w);
           for (b in 1:NB) {
@@ -615,10 +636,11 @@ test_that("the Stan and R change-detection functions agree", {
   offset <- .circmix_cd_offset(crit, ps)
   expect_equal(stan("out_offset"), offset, tolerance = 1e-12)
   expect_equal(stan("out_offset")[8], -40)
-  bound <- vapply(c(FALSE, TRUE), function(rich) {
-    .circmix_cd_bounded_criterion(crit, ps, rows(kappa_s), rows(lw_s), rich)
-  }, numeric(n))
-  expect_equal(stan("out_bound"), as.vector(t(bound)), tolerance = 1e-12)
+  expect_equal(
+    stan("out_bound"),
+    .circmix_cd_bounded_criterion(crit, ps, rows(kappa_s), rows(lw_s)),
+    tolerance = 1e-12
+  )
   expect_equal(stan("out_crit"), .circmix_cd_crit_angle(7, offset), tolerance = 1e-12)
   expect_equal(
     stan("out_mass"),

@@ -25,8 +25,9 @@
 #
 # When precision varies across slot counts (slot averaging) the observer may
 # know the precision of the current trial ("rich": one boundary per precision
-# state) or only its distribution ("limited": one boundary from the marginal
-# target density over the states, their Eq. B.11 and footnote 1). The models
+# state, from that state's density alone) or only its distribution ("limited":
+# one boundary from the marginal target density over the states, their Eq. B.11
+# and footnote 1). The models
 # default to the limited observer. Lin and Oberauer's Table 2 favours it under
 # variable precision, which change detection does not offer yet; their slot
 # model varied a different knowledge, whether the item is stored, so the table
@@ -78,13 +79,15 @@
 # and past -log(1 - p_s) the arc is clamped, so the likelihood falls off a
 # cliff (a log barrier, then the probability floor) that the sampler cannot
 # cross. Bounded, it has slope 1 at 0, leaves 0 unchanged, and keeps both
-# responses possible. The range is that of the marginal decision density over
-# the precision states, or for the rich observer the narrowest range of a
-# single state, since each state has its own arc. tanh rounds to 1 in double
-# precision past about 18 times the range, where the cliff would return; the
-# likelihood there is already about -18 per trial. kappa and lw are n x S;
-# lw = -Inf marks padding.
-.circmix_cd_bounded_criterion <- function(criterion, p_s, kappa, lw, rich) {
+# responses possible. The range is that of the decision density over the
+# precision states kappa with log weights lw (n x S): the marginal one for the
+# limited observer; the rich observer calls this once per state, with that
+# state alone, so each arc has its own range and a state's arc vanishes with
+# its weight (a shared range over the states jumps at a whole K / set size,
+# where a state drops out). tanh rounds to 1 in double precision past about 18
+# times the range, where the cliff would return; the likelihood there is
+# already about -18 per trial.
+.circmix_cd_bounded_criterion <- function(criterion, p_s, kappa, lw) {
   kappa <- as.matrix(kappa)
   n <- max(nrow(kappa), length(criterion), length(p_s))
   kappa <- kappa[rep_len(seq_len(nrow(kappa)), n), , drop = FALSE]
@@ -93,16 +96,8 @@
   criterion <- rep_len(criterion, n)
   p_s <- rep_len(p_s, n)
   log_i0 <- .circmix_log_besselI0(kappa)
-  if (rich && ncol(kappa) > 1) {
-    padding <- is.infinite(lw)
-    log_min <- ifelse(padding, -Inf, -kappa - log_i0)
-    log_max <- ifelse(padding, Inf, kappa - log_i0)
-    log_min <- matrixStats::rowMaxs(matrix(log_min, nrow = n))
-    log_max <- matrixStats::rowMins(matrix(log_max, nrow = n))
-  } else {
-    log_min <- matrixStats::rowLogSumExps(lw - log_i0 - kappa)
-    log_max <- matrixStats::rowLogSumExps(lw - log_i0 + kappa)
-  }
+  log_min <- matrixStats::rowLogSumExps(lw - log_i0 - kappa)
+  log_max <- matrixStats::rowLogSumExps(lw - log_i0 + kappa)
   # on the log scale: exp(log_min) underflows for sharp memories when p_s = 1
   hi <- -matrixStats::rowLogSumExps(cbind(log1p(-p_s), log(p_s) + log_min))
   lo <- log1p(p_s * expm1(log_max))
@@ -114,8 +109,8 @@
   out
 }
 
-.circmix_cd_level <- function(criterion, p_s, kappa, lw, rich) {
-  .circmix_cd_offset(.circmix_cd_bounded_criterion(criterion, p_s, kappa, lw, rich), p_s)
+.circmix_cd_level <- function(criterion, p_s, kappa, lw) {
+  .circmix_cd_offset(.circmix_cd_bounded_criterion(criterion, p_s, kappa, lw), p_s)
 }
 
 .circmix_cd_crit_angle <- function(kappa, offset) {
@@ -177,7 +172,7 @@
 .circmix_cd_psame <- function(d, logw, logw_guess, kappa, criterion, p_s) {
   n <- nrow(d)
   kappa <- rep_len(kappa, n)
-  level <- .circmix_cd_level(rep_len(criterion, n), rep_len(p_s, n), kappa, 0, FALSE)
+  level <- .circmix_cd_level(rep_len(criterion, n), rep_len(p_s, n), kappa, 0)
   hw <- .circmix_cd_crit_angle(kappa, level)
   .circmix_cd_psame_at(d, logw, logw_guess, kappa, hw)
 }
@@ -231,13 +226,21 @@
 }
 
 # P("same") over precision states: kappa and lw are n x S, lw holding the
-# normalised log weight of each state (-Inf for padding). A row with a single
-# state takes the closed-form boundary under either knowledge, because the two
-# observers coincide when there is nothing to know.
+# normalised log weight of each state (-Inf for padding, which contributes
+# nothing). A row with a single state takes the closed-form boundary under
+# either knowledge, because the two observers coincide when there is nothing to
+# know.
 .circmix_cd_mix_psame <- function(d, logw, logw_guess, kappa, lw, criterion,
                                   p_s, rich) {
   n <- nrow(kappa)
-  offset <- .circmix_cd_level(rep_len(criterion, n), rep_len(p_s, n), kappa, lw, rich)
+  S <- ncol(kappa)
+  criterion <- rep_len(criterion, n)
+  p_s <- rep_len(p_s, n)
+  if (rich) {
+    offset <- .circmix_cd_level(rep(criterion, S), rep(p_s, S), as.vector(kappa), 0)
+  } else {
+    offset <- .circmix_cd_level(criterion, p_s, kappa, lw)
+  }
   hw <- .circmix_cd_crit_angle(kappa, offset)
   shared <- which(!rich & rowSums(is.finite(lw)) > 1)
   if (length(shared)) {
@@ -252,6 +255,7 @@
     )
   }
   hw <- matrix(hw, nrow = n)
+  hw[is.infinite(lw)] <- 0
   ps <- vapply(seq_len(ncol(kappa)), function(s) {
     .circmix_cd_psame_at(d, logw, logw_guess, kappa[, s], hw[, s])
   }, numeric(n))
