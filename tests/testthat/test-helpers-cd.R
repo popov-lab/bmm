@@ -112,13 +112,14 @@ test_that(".circmix_cd_bounded_criterion() keeps 0 and stays inside the evidence
     bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, kappa, lw)
     expect_true(all(bounded > marginal[1] & bounded < marginal[2]))
     expect_equal(bounded[6], marginal[2] * tanh(3), tolerance = 1e-6)
-    # the rich observer bounds each state by that state's own range
+    # a single state is bounded by its own range, which is what the rich
+    # observer applies to each state
     for (k in case$kappa) {
       own <- llr_range(k, 1, case$p_s)
       criteria <- c(c(3, 1, 0.2) * own[1], c(0.2, 1, 3) * own[2])
       bounded <- .circmix_cd_bounded_criterion(criteria, case$p_s, k, 0)
-      expect_true(all(bounded > own[1] & bounded < own[2]))
-      expect_equal(bounded[6], own[2] * tanh(3), tolerance = 1e-6)
+      expect_true(all(bounded > own[1] & bounded < own[2]), label = paste("kappa", k))
+      expect_equal(bounded[6], own[2] * tanh(3), tolerance = 1e-6, label = paste("kappa", k))
     }
   }
 })
