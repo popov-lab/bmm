@@ -96,6 +96,13 @@
   criterion <- rep_len(criterion, n)
   p_s <- rep_len(p_s, n)
   log_i0 <- .circmix_log_besselI0(kappa)
+  # Kept although the limited observer's P("same") steps at a whole K / set
+  # size for a sharp memory: just below it the vanishing slot state still sets
+  # log_min, and LLR_max levels off with the finite slope m_lo / m_hi - 1 in
+  # extra (m = e^-kappa / I0(kappa); 10 at a single-slot kappa of 2, 2.2e6 at
+  # 8, 1.4e34 at 40), below double resolution from kappa about 20. Both
+  # observers do the same as K reaches the set size, where p_s -> 1. It is the
+  # range the observer's own density gives.
   .circmix_cd_bound(
     criterion, p_s,
     matrixStats::rowLogSumExps(lw - log_i0 - kappa),

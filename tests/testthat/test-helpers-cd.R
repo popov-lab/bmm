@@ -356,7 +356,7 @@ test_that(".circmix_cd_slot_averaging_psame() judges a held item as stored (p_s 
   }
 })
 
-test_that("P('same') of a held item is continuous in K at a whole K / set size", {
+test_that("P('same') of a held item at kappa 8 meets its value at a whole K / set size", {
   # set size 2, K rising to 4: the one-slot state's weight vanishes, and the
   # value from below must meet the value at K = 4 under both observers. What
   # is left at 1e-13 below is the K-slope times the step (5.0e-11 at most, the
