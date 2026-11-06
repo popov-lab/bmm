@@ -947,13 +947,14 @@ test_that("at a whole K / set size the K gradient is the slope from above", {
           model, list(y = y, probe = 0.6, p_s = 0.6, ss = 2L, rich = rich),
           list(log_kappa = log(8), criterion = criterion, K = K)
         )
-        expect_false(is.null(diagnosed))
+        label <- paste("rich", rich, "y", y, "criterion", criterion)
+        expect_false(is.null(diagnosed), label = paste("diagnose ran,", label))
         skip_if(is.null(diagnosed))
         expect_equal(
           diagnosed$gradients()$model[3] - 1,
           K * (loglik(K + step) - loglik(K)) / step,
           tolerance = 1e-4,
-          label = paste("K gradient, rich", rich, "y", y, "criterion", criterion)
+          label = paste("K gradient,", label)
         )
       }
     }
