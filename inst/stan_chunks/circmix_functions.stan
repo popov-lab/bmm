@@ -72,6 +72,26 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
+  // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0, kappa = 0, or a grid narrower than 1e-6)
+  real circmix_vp_shape(real kappa, real tau, int nodes) {
+    // kappa = 0 has J = 0: the gamma on J is a point mass there, as in R
+    if (tau <= 0 || kappa <= 0) {
+      return positive_infinity();
+    }
+    real shape = circmix_J(kappa) / tau;
+    if (shape < 60.0 / nodes) {
+      reject("bmm: the variable-precision quadrature needs a gamma shape ",
+             "J(kappa)/tau of at least 60 / vp_nodes = ", 60.0 / nodes,
+             ", but got ", shape,
+             ". Raise vp_nodes above ", 60.0 / shape,
+             ", or use a more informative prior on tau.");
+    }
+    if (8 * sqrt(trigamma(shape)) < 1e-6) {
+      return positive_infinity();
+    }
+    return shape;
+  }
+
   // first and second derivative in t = log J of the log integrand in circmix_vp_component(), as .circmix_vp_slopes()
   vector circmix_vp_slopes(real t, real c, real shape, real tau,
                            data vector logk, data vector dlogk,
@@ -137,19 +157,8 @@
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
-    // kappa = 0 has J = 0: the gamma on J is a point mass there, as in R
-    if (tau <= 0 || kappa <= 0) {
-      return circmix_ld(cosd, logw, logw_guess, kappa);
-    }
-    real shape = circmix_J(kappa) / tau;
-    if (shape < 60.0 / nodes) {
-      reject("bmm: the variable-precision quadrature needs a gamma shape ",
-             "J(kappa)/tau of at least 60 / vp_nodes = ", 60.0 / nodes,
-             ", but got ", shape,
-             ". Raise vp_nodes above ", 60.0 / shape,
-             ", or use a more informative prior on tau.");
-    }
-    if (8 * sqrt(trigamma(shape)) < 1e-6) {
+    real shape = circmix_vp_shape(kappa, tau, nodes);
+    if (is_inf(shape)) {
       return circmix_ld(cosd, logw, logw_guess, kappa);
     }
     int k = num_elements(cosd);
@@ -170,23 +179,36 @@
     return [f, q - f]';
   }
 
+  // slot-averaging branches: [held, kappa_lo, kappa_hi, extra]; kappa_lo is 0 when no slot is held, extra is the probability of one more slot
+  vector circmix_slot_averaging_branches(real K, int ss, real kappa,
+                                         data vector logk, data vector dlogk,
+                                         data real logJ_min, data real dlogJ) {
+    vector[2] allocation = circmix_slots(K, ss);
+    real slots = allocation[1];
+    real J1 = circmix_J(kappa);
+    int held = slots >= 0.5;
+    real kappa_lo = 0;
+    if (held) {
+      kappa_lo = circmix_kappa(slots * J1, logk, dlogk, logJ_min, dlogJ);
+    }
+    real kappa_hi = circmix_kappa((slots + 1) * J1, logk, dlogk, logJ_min, dlogJ);
+    // extra stays on the probability scale: log(extra) at a whole K / ss is log(0), whose NaN adjoint reaches K even unused
+    return [held, kappa_lo, kappa_hi, allocation[2]]';
+  }
+
   // slot averaging (Zhang & Luck, 2008): a j-slot item has J = j * J(kappa); composes with variable precision via tau
   real circmix_slot_averaging_ld(vector cosd, vector logw, real K, int ss,
                                  real kappa, real tau, int nodes,
                                  data vector logk, data vector dlogk,
                                  data real logJ_min, data real dlogJ) {
-    vector[2] allocation = circmix_slots(K, ss);
-    real slots = allocation[1];
-    real extra = allocation[2];
-    real J1 = circmix_J(kappa);
-
-    real kappa_hi = circmix_kappa((slots + 1) * J1, logk, dlogk, logJ_min, dlogJ);
-    real ld_hi = circmix_vp_ld(cosd, logw, negative_infinity(), kappa_hi, tau,
+    vector[4] branch = circmix_slot_averaging_branches(K, ss, kappa, logk, dlogk,
+                                                       logJ_min, dlogJ);
+    real extra = branch[4];
+    real ld_hi = circmix_vp_ld(cosd, logw, negative_infinity(), branch[3], tau,
                                nodes, logk, dlogk, logJ_min, dlogJ);
     real ld_lo = -log(2 * pi());
-    if (slots >= 0.5) {
-      real kappa_lo = circmix_kappa(slots * J1, logk, dlogk, logJ_min, dlogJ);
-      ld_lo = circmix_vp_ld(cosd, logw, negative_infinity(), kappa_lo, tau,
+    if (branch[1] == 1) {
+      ld_lo = circmix_vp_ld(cosd, logw, negative_infinity(), branch[2], tau,
                             nodes, logk, dlogk, logJ_min, dlogJ);
     }
     if (extra > 0) {
@@ -194,4 +216,9 @@
     }
     // whole K / ss: the same value without log(0), whose NaN adjoint would poison K; the gradient is the right-hand slope
     return ld_lo + extra * expm1(ld_hi - ld_lo);
+  }
+
+  // target first, then the ss - 1 active non-targets of a trial
+  vector circmix_locations(real mu, vector nt, int ss) {
+    return append_row(mu, head(nt, ss - 1));
   }
