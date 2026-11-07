@@ -4665,6 +4665,15 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @param noise The noise on each option's signal, `"gaussian"` or `"gumbel"`
 #'   (see the section Noise of [tcc()]).
 #' @param log Logical; if `TRUE`, the log probability is returned.
+#' @param options `NULL` (the default) for a choice among all `n_options`
+#'   options, or the offered options as offsets from the target in radians,
+#'   one set for all values (see the section "Forced-choice option sets" of
+#'   [tcc()]). The probability is then taken over these options only, and is 0
+#'   for an `x` off the set. As in [tcc()], the set must include the target
+#'   (an offset of 0) and offer each option once (`pi` and `-pi`, or `0` and
+#'   `2 * pi`, are one option), and each option must sit within a tenth of a
+#'   step of one of the `n_options` positions, onto which it is rounded;
+#'   values beyond `2 * pi` are refused as not in radians.
 #'
 #' @return `dtcc()` returns the probability of the option each `x` falls on (a
 #'   probability mass, not a density: divide by `2 * pi / n_options` for the
@@ -4682,11 +4691,19 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
 #' # Gumbel noise: the softmax of d * f(x)
 #' plot(x, dtcc(x, d = 5, similarity = f, noise = "gumbel"), type = "h")
+#' # a 4-AFC trial with options 90 degrees apart
+#' four <- c(0, 90, 180, -90) * pi / 180
+#' dtcc(four, d = 2, similarity = f, options = four)
 #' @export
 dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
-                 noise = c("gaussian", "gumbel")) {
-  logp <- .tcc_noise_logp(match.arg(noise))
+                 noise = c("gaussian", "gumbel"), options = NULL) {
+  noise <- match.arg(noise)
   .tcc_check_similarity(similarity, n_options)
+  if (!is.null(options)) {
+    out <- .tcc_dist_options_logp(x, d, similarity, n_options, noise, options)
+    return(if (log) out else exp(out))
+  }
+  logp <- .tcc_noise_logp(noise)
   dist <- abs(.tcc_bin(x, n_options, "radians")) + 1
   n <- if (length(x) && length(d)) max(length(x), length(d)) else 0L
   dist <- rep_len(dist, n)
@@ -4701,20 +4718,81 @@ dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
 
 #' @rdname tcc_dist
 #' @export
-rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbel")) {
-  logp <- .tcc_noise_logp(match.arg(noise))
+rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbel"),
+                 options = NULL) {
+  noise <- match.arg(noise)
   .tcc_check_similarity(similarity, n_options)
   d <- rep_len(d, n)
-  offsets <- seq(-n_options / 2 + 1, n_options / 2)
+  offsets <- if (is.null(options)) {
+    seq(-n_options / 2 + 1, n_options / 2)
+  } else {
+    .tcc_dist_options(n_options, options)
+  }
+  logp <- if (is.null(options)) {
+    function(value) .tcc_noise_logp(noise)(value, similarity)[abs(offsets) + 1]
+  } else {
+    function(value) .tcc_set_logp(value, similarity[abs(offsets) + 1], noise)
+  }
   out <- rep(NA_real_, n)
   for (value in unique(d[!is.na(d)])) {
     rows <- which(d == value)
-    prob <- exp(logp(value, similarity))[abs(offsets) + 1]
-    out[rows] <- sample(offsets, length(rows), replace = TRUE, prob = prob)
+    prob <- exp(logp(value))
+    out[rows] <- offsets[sample.int(length(offsets), length(rows), replace = TRUE, prob = prob)]
   }
   2 * pi * out / n_options
 }
 
 .tcc_noise_logp <- function(noise) {
   if (noise == "gumbel") .tcc_gumbel_logp else .tcc_logp
+}
+
+# the offered options of a d or r call as offsets in steps, refused where
+# check_data() would refuse them, so that dtcc() never returns a probability
+# for a set that tcc() cannot fit
+.tcc_dist_options <- function(n_options, options) {
+  stopif(!is.numeric(options), "`options` must be numeric, in radians.")
+  stopif(length(options) == 0 || anyNA(options), "`options` must not be missing or empty.")
+  # not .check_option_units(), whose message points to a units argument these lack
+  stopif(
+    any(abs(options) > 2 * pi),
+    "`options` must be in radians, but values beyond 2*pi show they are not. \\
+    Convert them with deg2rad()."
+  )
+  steps <- options * n_options / (2 * pi)
+  off_grid <- abs(steps - round(steps))
+  at <- which.max(off_grid)
+  stopif(
+    off_grid[at] > 0.1,
+    "Option {at} of `options` lies {signif(off_grid[at], 2)} of a step from the nearest of \\
+    the {n_options} positions on the wheel. Options must sit on those positions: check \\
+    n_options and that `options` is in radians."
+  )
+  offsets <- .bin_options(round(steps), n_options, "bins")
+  stopif(
+    anyDuplicated(offsets) > 0,
+    "`options` offers the same option twice (with n_options = {n_options}, offsets are \\
+    taken modulo the wheel)."
+  )
+  stopif(
+    !0L %in% offsets,
+    "The target (an offset of 0) is not among `options`. Each trial must offer the target."
+  )
+  offsets
+}
+
+# log P of the option each x falls on among the offered options, -Inf off them
+.tcc_dist_options_logp <- function(x, d, similarity, n_options, noise, options) {
+  offsets <- .tcc_dist_options(n_options, options)
+  f <- similarity[abs(offsets) + 1]
+  at <- match(.bin_options(x, n_options, "radians"), offsets)
+  n <- if (length(x) && length(d)) max(length(x), length(d)) else 0L
+  at <- rep_len(at, n)
+  d <- rep_len(d, n)
+  out <- ifelse(is.na(rep_len(x, n)), NA_real_, -Inf)
+  for (value in unique(d[!is.na(d)])) {
+    rows <- which(d == value & !is.na(at))
+    out[rows] <- .tcc_set_logp(value, f, noise)[at[rows]]
+  }
+  out[is.na(d)] <- NA_real_
+  out
 }
