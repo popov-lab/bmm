@@ -160,3 +160,67 @@ test_that("rcswald() returns n draws, draw i from the i-th parameter elements", 
     expect_mean_near(rows$rt, ndt[k] + wiener_mean_dt(drift[k], bound[k], z, s[k]), sd(rows$rt) / sqrt(nrow(rows)))
   }
 })
+
+# --- ezdm ---------------------------------------------------------------------
+
+test_that("dezdm() recycles the summary statistics and the parameters to the longest argument", {
+  expect_elementwise(dezdm, list(mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025), n_upper = c(80, 75),
+                                 n_trials = 100, drift = c(2, 1.5, 1), bound = 1.5, ndt = c(0.3, 0.25)))
+  expect_elementwise(dezdm, list(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100, drift = 2,
+                                 bound = c(1, 1.5, 2), ndt = 0.3, s = c(1, 1.2)),
+                     fixed = list(log = FALSE))
+  mean_rt <- rbind(c(0.45, 0.55), c(0.5, 0.6))
+  var_rt <- rbind(c(0.018, 0.025), c(0.02, 0.03))
+  expect_elementwise(dezdm, list(mean_rt = mean_rt, var_rt = var_rt, n_upper = c(80, 60, 70), n_trials = 100,
+                                 drift = c(2, 1.5, 1), bound = 1.5, ndt = 0.3, zr = c(0.55, 0.45)),
+                     fixed = list(version = "4par"))
+})
+
+test_that("rezdm() returns n draws, draw i from the i-th parameter elements", {
+  skip_on_cran()
+  withr::local_seed(4444)
+  drift <- c(1, 2, 0.5)
+  bound <- c(1, 1.5, 2)
+  ndt <- c(0.2, 0.3, 0.4)
+  n_trials <- c(50, 100, 80)
+  s <- c(1, 1.2, 0.9)
+  n <- 1500
+  g <- group_of(n, 3)
+  out <- rezdm(n, n_trials, drift, bound, ndt, s = s)
+  expect_equal(nrow(out), n)
+  for (k in 1:3) {
+    rows <- out[g == k, ]
+    expect_equal(unique(rows$n_trials), n_trials[k])
+    # a symmetric start point: P(upper) = plogis(v a / s^2), mean decision time a / (2 v) tanh(a v / (2 s^2))
+    p_up <- plogis(drift[k] * bound[k] / s[k]^2)
+    expect_mean_near(rows$n_upper / n_trials[k], p_up, se_prop(p_up, n_trials[k] * nrow(rows)))
+    m_rt <- ndt[k] + bound[k] / (2 * drift[k]) * tanh(bound[k] * drift[k] / (2 * s[k]^2))
+    expect_mean_near(rows$mean_rt, m_rt, sd(rows$mean_rt) / sqrt(nrow(rows)))
+  }
+})
+
+test_that("rezdm(version = '4par') pairs the start point and both boundary means per draw", {
+  skip_on_cran()
+  withr::local_seed(4444)
+  drift <- c(0.5, 1, 0.8)
+  bound <- c(1, 1.2, 1.5)
+  ndt <- c(0.2, 0.3, 0.4)
+  zr <- c(0.4, 0.5, 0.6)
+  n_trials <- c(100, 150, 120)
+  n <- 1500
+  g <- group_of(n, 3)
+  out <- rezdm(n, n_trials, drift, bound, ndt, zr = zr, version = "4par")
+  expect_equal(nrow(out), n)
+  for (k in 1:3) {
+    rows <- out[g == k, ]
+    z <- zr[k] * bound[k]
+    p_up <- wiener_p_upper(drift[k], bound[k], z)
+    expect_mean_near(rows$n_upper / n_trials[k], p_up, se_prop(p_up, n_trials[k] * nrow(rows)))
+    upper <- rows$mean_rt_upper
+    lower <- rows$mean_rt_lower
+    expect_mean_near(upper[!is.na(upper)], ndt[k] + wiener_mean_dt_upper(drift[k], bound[k], z),
+                     sd(upper, na.rm = TRUE) / sqrt(sum(!is.na(upper))))
+    expect_mean_near(lower[!is.na(lower)], ndt[k] + wiener_mean_dt_lower(drift[k], bound[k], z),
+                     sd(lower, na.rm = TRUE) / sqrt(sum(!is.na(lower))))
+  }
+})
