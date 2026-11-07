@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### New models
+* Add the **EZ Circular Diffusion Model** (`ezcdm`) for continuous-report tasks with response times (Qarehdaghi & Amani Rad, 2024). It estimates drift rate, boundary and non-decision time, and in `version = "4par"` the drift angle, from the circular mean and variance of the response angles and the mean and variance of the response times per participant and condition. `ezcdm_summary_stats()` computes these statistics from trial data and by default corrects them for contaminant trials. Also adds `dezcdm()` and `rezcdm()`. See `?ezcdm` and the EZ circular diffusion article (#150). Thanks to @GidonFrischkorn
+
 ### New features
 * bmm fits now work with the easystats packages (#477). `parameters::model_parameters()` and `bayestestR::describe_posterior()` summarise each model parameter on its own, without the fixed `mu` of the response-time models, and `modelbased::estimate_means(fit, by = "set_size", predict = "c")` returns a parameter on its native scale. insight now finds the predictors, response variables, data and priors you gave to `bmm()`; these functions failed on `m3()` and `mpt()` fits.
 * `modelbased::estimate_means()`, `estimate_contrasts()` and `estimate_relation()` with `predict = "<parameter>"` now return that model parameter on its native scale, as `native_parameters()` does (#479). The mixture weights are probabilities: `predict = "thetat"` gives the probability of a target response. These calls failed on `mixture3p()`, `mpt()` and `m3()` fits. `insight::get_predicted()` without `predict` now predicts the first estimated parameter and says which.
@@ -20,6 +23,7 @@
 * Fits made with bmm versions before 0.4.5 (development versions from February and March 2024) work again with `update()`, `prior_info()`, `native_parameters()` and `conditional_effects()`. For `mixture2p()`, `mixture3p()` and `imm()` fits, `update()` stopped with an empty error message and the other functions failed; `imm()` fits of the `bsc` and `abc` versions were read as `full` (#458).
 * `dmixture3p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))` (#585). It stopped with "number of items to replace is not a multiple of replacement length".
 * `dimm()` now returns one density per value when a parameter is a vector longer than `x`, as in `dimm(0.3, c = c(1, 5, 20))` (#586). It returned a single density, for the first value.
+* `ezdm` now stops with an error naming the column when `n_trials` holds non-integer values. It used to warn that the counts "should be whole numbers" and continue, after which brms stopped with "Number of trials must be non-negative integers".
 
 ### Deprecated functions and arguments
 * mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas and `links` that name `mu1` still work, with a warning, until bmm 1.6.0 at the earliest; rename it to `mu`. The draws of the location lose the name as well: `b_mu1_Intercept` is now `b_Intercept` (#434).

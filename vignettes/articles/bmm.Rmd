@@ -118,7 +118,10 @@ was built from.
 Participants reproduce a continuous feature, such as a color or an
 orientation, and the response error on the circle is the dependent variable.
 The [continuous reproduction article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html)
-describes the task and compares the models.
+describes the task and compares the models. If you also recorded response
+times, see the
+[EZ circular diffusion article](https://venpopov.com/bmm/articles/bmm_ezcdm.html)
+under "Choices and response times" below.
 
 ```{r, echo = FALSE}
 knitr::kable(bmm:::model_overview(group = "Continuous reproduction"))
@@ -205,7 +208,12 @@ every trial. The [DDM article](https://venpopov.com/bmm/articles/bmm_ddm.html)
 and the [censored shifted Wald article](https://venpopov.com/bmm/articles/bmm_cswald.html)
 cover trial-level data. The [EZ-diffusion article](https://venpopov.com/bmm/articles/bmm_ezdm.html)
 covers the case where you only have the mean and variance of the response
-times and the accuracy per condition. Fast guesses and other contaminant
+times and the accuracy per condition. When participants report a feature on
+a circle instead, such as an orientation or a color on a color wheel, and
+response times are recorded, the
+[EZ circular diffusion article](https://venpopov.com/bmm/articles/bmm_ezcdm.html)
+covers the circular mean and variance of the responses together with the mean
+and variance of the response times. Fast guesses and other contaminant
 responses are the topic of the
 [response time contamination article](https://venpopov.com/bmm/articles/bmm_rt_contamination.html).
 

@@ -201,6 +201,24 @@ test_that("ezdm drops the summaries bmm() rejects and keeps those below ndt", {
   expect_true(any(data$mean_rt < exp(-1)))
 })
 
+test_that("ezcdm drops the summaries bmm() rejects and keeps those below ndt", {
+  model <- ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials")
+  withr::local_seed(2)
+  # with three trials, drift 0.01, bound 3 and ndt = 0.2, this seed draws mean
+  # RTs at or below 0 and mean RTs between 0 and ndt
+  expect_warning(
+    data <- simulate_data(model, list(drift = -4.60517, bound = 1.098612, ndt = -1.609438),
+                          data.frame(n_trials = rep(3, 5000))),
+    "Dropped [0-9]+ of 5000 rows.*not positive"
+  )
+  dropped <- attr(data, "dropped_rows")
+  expect_gt(length(dropped), 0)
+  expect_identical(nrow(data) + length(dropped), 5000L)
+  expect_identical(nrow(attr(data, "simulate_pars")), nrow(data))
+  expect_true(all(data$mean_rt > 0))
+  expect_true(any(data$mean_rt < 0.2))
+})
+
 test_that("simulated statistics of the circular models match their densities", {
   skip_on_cran()
   withr::local_seed(1)
@@ -326,6 +344,28 @@ test_that("simulated decisions of the RT models match the closed forms", {
                              version = "4par"),
                         list(drift = 1, bound = 0.1823216, ndt = -1.2, zr = -0.3), design)
   expect_within_mc(data$n_upper / 100, p_upper(v = 1, a = 1.2, z = 0.4255575), "ezdm 4par")
+})
+
+test_that("simulated ezcdm summaries match the first-passage time and the drift angle", {
+  skip_on_cran()
+  withr::local_seed(4)
+  design <- data.frame(n_trials = rep(20, n_sim))
+  # drift v = 1.5, bound (radius) a = 1.2, ndt = 0.3. Optional stopping on
+  # X_t - mu t gives E[T] = (a / v) I1(a v) / I0(a v) = 0.5296317 for the
+  # two-dimensional diffusion with unit noise, which a brute-force Euler
+  # simulation of that diffusion to the circle matches within 0.5 Monte Carlo
+  # SE at 1e6 paths; E[mean_rt] = ndt + E[T]
+  data <- simulate_data(ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials"),
+                        list(drift = 0.4054651, bound = 0.1823216, ndt = -1.2039728), design)
+  expect_within_mc(data$mean_rt, 0.8296317, "ezcdm 3par")
+
+  # the circular means are symmetric about the drift angle and too
+  # concentrated around it to wrap at -pi, pi, so their mean is the drift angle
+  data <- simulate_data(ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials",
+                              version = "4par"),
+                        list(drift = 0.4054651, driftangle = 0.7, bound = 0.1823216,
+                             ndt = -1.2039728), design)
+  expect_within_mc(data$mean_angle, 0.7, "ezcdm 4par")
 })
 
 test_that("simulated responses of the signal detection models match their densities", {
