@@ -317,7 +317,7 @@ conditional_effects.bmmfit <- function(x,
 .filter_internal_effects <- function(ce_result, bmmfit) {
   model <- bmmfit$bmm$model
   internal_vars <- c(
-    built_data_columns(model),
+    fit_built_columns(bmmfit),
     model$other_vars$nt_features,
     model$other_vars$nt_distances
   )

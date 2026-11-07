@@ -20,7 +20,10 @@
 type.}
 
 \item{nlpar}{Character string. Explicit non-linear parameter name. If
-provided, takes precedence over \code{dpar}.}
+provided, takes precedence over \code{dpar}. The parameters of \code{mixture2p()},
+\code{mixture3p()} and \code{imm()} are distributional since bmm 1.5.0, so on their
+fits \code{nlpar = "kappa"} and \code{dpar = "mu1"}, the bmm 1.4 forms, are read as
+\code{dpar = "kappa"} and \code{dpar = "mu"}, with a deprecation warning.}
 
 \item{trms, xlev, grid}{Arguments passed by emmeans internally.}
 }

@@ -296,6 +296,55 @@ becomes the precision of the average trial. Shown for \code{"simple"}:
 }
 }
 }
+\section{Priors from bmm 1.4}{
+
+Since bmm 1.5.0, the parameters of this model are distributional parameters
+(\code{dpar}) of a custom family, and the location \code{mu1} is called \code{mu}. Calls
+written for bmm 1.4 keep working until bmm 1.6.0 at the earliest: bmm translates their priors,
+formulas, \code{links} and \code{emmeans(nlpar = )}, and warns with the code to use
+instead.
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{# an intercept prior
+set_prior("normal(2, 1)", class = "b", coef = "Intercept", nlpar = "kappa") # 1.4
+set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")              # 1.5
+
+# a prior on all coefficients
+set_prior("normal(0, 0.5)", class = "b", nlpar = "kappa")                   # 1.4
+set_prior("normal(0, 0.5)", class = "Intercept", dpar = "kappa") +          # 1.5
+  set_prior("normal(0, 0.5)", class = "b", dpar = "kappa")
+
+# a prior on the random-effect standard deviations
+set_prior("exponential(2)", class = "sd", nlpar = "kappa")                  # 1.4
+set_prior("exponential(2)", class = "sd", dpar = "kappa")                   # 1.5
+
+# the location, and emmeans()
+bmf(mu1 ~ 1 + cond, kappa ~ 1 + cond)                                      # 1.4
+bmf(mu ~ 1 + cond, kappa ~ 1 + cond)                                       # 1.5
+emmeans(fit, ~ cond, nlpar = "kappa")                                      # 1.4
+emmeans(fit, ~ cond, dpar = "kappa")                                       # 1.5
+}\if{html}{\out{</div>}}
+
+In bmm 1.4 a \code{class = "b"} prior also covered the intercept, so it now
+becomes two priors with the same distribution, unless the intercept has a prior of
+its own. One prior changes its meaning.
+When a formula has an intercept and predictors, such as \code{kappa ~ 1 + cond},
+brms centres the predictors of a distributional parameter, so an intercept
+prior applies at the average over the conditions, weighted by their number of
+trials, not at the reference condition. The slopes keep their meaning, and so
+do intercept-only formulas
+and formulas with one coefficient per condition (\code{kappa ~ 0 + cond}). If your
+intercept prior was meant for the reference condition, give it for the
+average instead.
+
+Two things are not translated. The draws of the location are named after
+\code{mu} (\code{b_Intercept} instead of \code{b_mu1_Intercept}), and calls that go straight
+to brms need \verb{dpar =}: \code{posterior_linpred(fit, dpar = "kappa")}, not
+\code{nlpar = "kappa"}. Fits saved with bmm 1.4 work as before with \code{summary()},
+\code{prior_info()}, \code{emmeans()}, \code{native_parameters()} and \code{conditional_effects()}.
+\code{update()} samples them again under the custom family, translates their
+priors and says so in a message.
+}
+
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # generate artificial data from the Bays et al (2009) 3-parameter mixture model

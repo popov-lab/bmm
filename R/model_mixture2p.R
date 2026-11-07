@@ -123,6 +123,7 @@
       default_priors = spec$priors,
       init_ranges = spec$init_ranges,
       deprecated_parameters = list(mu1 = "mu"),
+      dpar_since = "1.5.0",
       variable_precision = variable_precision,
       vp_nodes = as.integer(vp_nodes)
     ),
@@ -147,6 +148,8 @@
 #' With `variable_precision = TRUE` every version gains `tau`, and `kappa`
 #' becomes the precision of the average trial. Shown for `"simple"`:
 #' `r model_docs(.model_mixture2p(variable_precision = TRUE), components = c('parameters', 'links', 'prior'))`
+#' @section Priors from bmm 1.4:
+#' `r .circmix_prior_migration_doc()`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -262,7 +265,9 @@ check_data.mixture2p <- function(model, data, formula) {
   # newdata for a prediction may hold one set size; the warning below is about
   # the data K is estimated from, which a refit from the fit's frame still is
   for_prediction <- isTRUE(attr(data, "prediction_newdata"))
-  if (!.mixture2p_version_table[[model$version]]$needs_set_size) {
+  # a model saved by bmm 1.4 has no version, and its single version needs no set
+  # size; prior_info() checks the data of such fits again
+  if (!isTRUE(.mixture2p_version_table[[model$version]]$needs_set_size)) {
     return(NextMethod("check_data"))
   }
 
@@ -283,7 +288,7 @@ check_data.mixture2p <- function(model, data, formula) {
 #' @exportS3Method
 built_data_columns.mixture2p <- function(model) {
   c(
-    if (.mixture2p_version_table[[model$version]]$needs_set_size) "ss_numeric",
+    if (isTRUE(.mixture2p_version_table[[model$version]]$needs_set_size)) "ss_numeric",
     NextMethod("built_data_columns")
   )
 }
@@ -426,6 +431,7 @@ posterior_predict_mixture2p_slot_averaging <- function(i, prep, ...) {
 
 #' @export
 simulate_data.mixture2p <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  .circmix_refuse_1_4_model(model)
   needs_set_size <- .mixture2p_version_table[[model$version]]$needs_set_size
   design <- .design_or_n(model, design, if (needs_set_size) .set_size_column(model), ...)
   sim <- .simulate_pars(model, pars, design, scale)

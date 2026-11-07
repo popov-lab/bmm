@@ -17,11 +17,14 @@
 
 ### Bug fixes
 * `dmixture2p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture2p(0.3, kappa = c(1, 5, 20))` (#584). It stopped with "number of items to replace is not a multiple of replacement length".
+* Fits made with bmm versions before 0.4.5 (development versions from February and March 2024) work again with `update()`, `prior_info()`, `native_parameters()` and `conditional_effects()`. For `mixture2p()`, `mixture3p()` and `imm()` fits, `update()` stopped with an empty error message and the other functions failed; `imm()` fits of the `bsc` and `abc` versions were read as `full` (#458).
 * `dmixture3p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))` (#585). It stopped with "number of items to replace is not a multiple of replacement length".
 * `dimm()` now returns one density per value when a parameter is a vector longer than `x`, as in `dimm(0.3, c = c(1, 5, 20))` (#586). It returned a single density, for the first value.
 
 ### Deprecated functions and arguments
-* mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas that use `mu1` still work and warn; rename it to `mu`. Priors you set yourself on the parameters of these models now take `dpar =` instead of `nlpar =`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")` (#398).
+* mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas and `links` that name `mu1` still work, with a warning, until bmm 1.6.0 at the earliest; rename it to `mu`. The draws of the location lose the name as well: `b_mu1_Intercept` is now `b_Intercept` (#434).
+* mixture2p, mixture3p and imm: their parameters are now distributional, so priors take `dpar =` instead of `nlpar =`, and an intercept prior takes `class = "Intercept"`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")`. Priors written for bmm 1.4 still work until bmm 1.6.0 at the earliest, and the warning prints the new code. Under an intercept and predictors, an intercept prior now applies at the mean of the predictors. See "Priors from bmm 1.4" in `?mixture2p` (#434).
+* `emmeans()` on mixture2p, mixture3p and imm fits: `nlpar = "kappa"` and `dpar = "mu1"` still work, with a warning, until bmm 1.6.0 at the earliest; write `dpar = "kappa"` and `dpar = "mu"`. Calls that go straight to brms, such as `posterior_linpred(fit, nlpar = "kappa")`, are not translated and need `dpar =` (#434).
 
 ### Changes to default priors
 <!-- From 1.5.0 every change to a default prior is listed here (ADR 0008 § D4); defaults do not change inside a minor line. -->
@@ -39,6 +42,7 @@
 
 ### Other changes
 * `sdt_yn()` fits with one row per trial and the default normal noise (`dist = "normal"`) are faster: each sampling step takes about half the time it did. Estimates are unchanged up to sampling error.
+* mixture2p, mixture3p and imm fits saved with bmm 1.4 or earlier still work with `summary()` and the other extractors. `update()` samples them again under the new custom family, translates their priors and says so in a message. The constant priors that bmm 1.4 set on the set-size-1 level of mixture3p and imm are dropped, so bmm no longer fixes that level (#434).
 * **mixture3p** no longer fixes the non-target weight `thetant` to zero at set size 1 when a formula estimates one value per set size. With one item there is nothing to swap to, so that value is not informed by the data and only reflects its prior. `bmm()` now warns and names every coefficient the other trials leave undetermined, including those of a formula with an intercept or a predictor that varies only at set size 1. Read the set-size-1 coefficient as prior-only (#398).
 * **imm** no longer fixes the set-size-1 levels of `a` and `s` when a formula estimates one value per set size. With one item there is no non-target, so set size 1 says nothing about `s`, and about `a` only through its sum with `c`; `bmm()` now warns and names the coefficients that depend on their priors. Give set size 1 a level of its own in a factor, so that only its coefficients depend on their priors, or let `c` take one value across set sizes (#398).
 * **mixture3p** and **imm** now accept an intercept together with `set_size` as a predictor, e.g. `kappa ~ 1 + set_size`; they used to require `0 + set_size` (#398).

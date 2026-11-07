@@ -98,6 +98,7 @@
       default_priors = spec$priors,
       init_ranges = spec$init_ranges,
       deprecated_parameters = list(mu1 = "mu"),
+      dpar_since = "1.5.0",
       variable_precision = variable_precision,
       vp_nodes = as.integer(vp_nodes)
     ),
@@ -136,6 +137,8 @@ settable_links.imm <- function(model) {
 #' #### Version: `abc`
 #' `r model_docs(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #'
+#' @section Priors from bmm 1.4:
+#' `r .circmix_prior_migration_doc()`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -544,6 +547,7 @@ IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
 # and .rimm_version() fills in a value that version's weights never read.
 #' @export
 simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  .circmix_refuse_1_4_model(model)
   vars <- model$other_vars
   design <- .design_or_n(model, design, .set_size_column(model),
                          ragged = c(vars$nt_features, vars$nt_distances))

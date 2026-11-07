@@ -174,7 +174,7 @@ check_formula.bmmodel <- function(model, data, formula) {
 # A model that renames a parameter lists the old name in deprecated_parameters,
 # so that formulas written against the old name keep working for a release
 # instead of failing as an unrecognized parameter.
-rename_deprecated_parameters <- function(model, formula) {
+rename_deprecated_parameters <- function(model, formula, warn = TRUE) {
   renames <- model$deprecated_parameters
   used <- intersect(names(renames), names(formula))
   if (length(used) == 0) {
@@ -190,12 +190,6 @@ rename_deprecated_parameters <- function(model, formula) {
     "The formula gives both {collapse_comma(used[both])} and its new name \\
     {collapse_comma(new_names[both])}. Please keep only the new name."
   )
-  warning2(
-    "The parameter(s) {collapse_comma(used)} were renamed to \\
-    {collapse_comma(new_names)}. The old name(s) still work, but will be \\
-    removed in a future release."
-  )
-
   out <- unclass(formula)
   for (i in seq_along(used)) {
     if (is_formula(out[[used[i]]])) {
@@ -203,7 +197,22 @@ rename_deprecated_parameters <- function(model, formula) {
     }
   }
   names(out)[match(used, names(out))] <- new_names
+  if (warn) {
+    warn_deprecated(
+      what = glue("bmf({formula_code(unclass(formula)[used], used)})"),
+      with = glue("bmf({formula_code(out[new_names], new_names)})"),
+      since = model$dpar_since
+    )
+  }
   new_bmmformula(out)
+}
+
+# a parameter's formula or constant as users write it in bmf()
+formula_code <- function(formulas, pars) {
+  vapply(seq_along(pars), function(i) {
+    f <- formulas[[i]]
+    if (is_formula(f)) deparse1(f) else paste(pars[i], "=", deparse1(c(f)))
+  }, character(1))
 }
 
 # A predictor whose name matches a predicted parameter is flagged non-linear

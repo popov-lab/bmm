@@ -89,9 +89,18 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   )
 
   object <- restructure(object)
+  # a mixture2p, mixture3p or imm fit from before bmm 1.5.0 is refitted under
+  # the custom family of the current version, from a model object rebuilt for it
+  old_family <- is_mixture_family_fit(object)
+  if (old_family) {
+    old_fit_model <- object$bmm$model
+    object <- upgrade_mixture_family_model(object)
+  }
 
   model <- object$bmm$model
-  old_user_formula <- object$bmm$user_formula
+  # the stored formula is not what the user typed in this call, so a mu1 in it
+  # is renamed without a warning
+  old_user_formula <- rename_deprecated_parameters(model, object$bmm$user_formula, warn = FALSE)
   olddata <- object$data
   old_file <- object$file
   configure_opts <- object$bmm$configure_opts
@@ -164,6 +173,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # carrying neither label
   stored_prior <- object$bmm$user_prior
   old_prior <- stored_prior %||% carried_prior(object$prior)
+  if (old_family) {
+    stored <- translate_stored_prior(old_fit_model, model, config_args$formula, old_prior,
+                                     fitted_with = object$version$bmm)
+    old_prior <- stored$prior
+    message2("{stored$message}")
+  }
   if (is.null(stored_prior) && length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
@@ -178,7 +193,13 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # must win over it, and the message naming the displaced rows is printed
   # there, exactly as for the prior of bmm() (#549). Combined afterwards, a
   # prior on a constrained coefficient would replace the constraint in silence
-  user_prior <- combine_prior(old_prior, dots$prior)
+  # a prior written for the parameters of bmm 1.4 is translated here, before it
+  # joins the carried rows: translated after, an old-form row and a new-form row
+  # on the same coefficient would both reach brms, and the stored prior would be
+  # translated, with a warning, at every later update()
+  user_prior <- combine_prior(
+    old_prior, translate_deprecated_priors(model, config_args$formula, dots$prior)
+  )
   prior <- brms::do_call(
     configure_prior,
     c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
