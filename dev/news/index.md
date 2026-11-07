@@ -110,6 +110,15 @@
   such as `id` in `(1 | id)`, as the participant. Aggregated counts with
   `n_trials` work as before
   ([\#646](https://github.com/popov-lab/bmm/issues/646)).
+- [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+  gained `population_summary`. With `"mean"` it returns the mean and SD
+  of each parameter across participants, with `"median"` the median and
+  quartiles, integrated over the group-level effects in every posterior
+  draw. Use it to report group-level results on the native scale.
+  `re_formula = NA` gives the median participant, and predicting for a
+  new level gives one new participant, whose interval is not a credible
+  interval for the population mean
+  ([\#531](https://github.com/popov-lab/bmm/issues/531)).
 - mixture2p, mixture3p and imm: a fit with `variable_precision = TRUE`
   that has divergent transitions now warns when its posterior presses
   against the smallest gamma shape the quadrature accepts, 60 /
@@ -220,6 +229,13 @@
   straight to brms, such as `posterior_linpred(fit, nlpar = "kappa")`,
   are not translated and need `dpar =`
   ([\#434](https://github.com/popov-lab/bmm/issues/434)).
+- [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md):
+  passing `log` by position is deprecated, because `tau` now takes that
+  position. Until bmm 1.6.0 a logical value there is still read as
+  `log`, with a warning; write `log = TRUE` instead
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
 
 #### Changes to default priors
 
@@ -267,9 +283,10 @@
   longer fixes that level
   ([\#434](https://github.com/popov-lab/bmm/issues/434)).
 - **mixture3p** no longer fixes the non-target weight `thetant` to zero
-  at set size 1 when a formula estimates one value per set size. With
-  one item there is nothing to swap to, so that value is not informed by
-  the data and only reflects its prior.
+  at set size 1 when a formula estimates one value per set size, and the
+  capacity versions leave `ptarget` free alike. With one item there is
+  nothing to swap to, so that value is not informed by the data and only
+  reflects its prior.
   [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns and
   names every coefficient the other trials leave undetermined, including
   those of a formula with an intercept or a predictor that varies only
@@ -287,6 +304,17 @@
 - **mixture3p** and **imm** now accept an intercept together with
   `set_size` as a predictor, e.g. `kappa ~ 1 + set_size`; they used to
   require `0 + set_size`
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) now
+  use the exact sampler that
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  uses, so the same seed gives different draws than in bmm 1.4.2 and
+  earlier.
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  used to draw from a grid, which spread the draws too widely at high
+  precision. Rerun simulations that rely on particular draws
   ([\#398](https://github.com/popov-lab/bmm/issues/398)).
 - For developers:
   [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md)
@@ -556,22 +584,6 @@ CRAN release: 2026-11-06
   [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) does
   ([\#621](https://github.com/popov-lab/bmm/issues/621)).
 
-#### Deprecated functions and arguments
-
-- mixture2p, mixture3p and imm: the location parameter `mu1` is now
-  called `mu`. Formulas that use `mu1` still work and warn until bmm
-  1.6.0 at the earliest; rename it to `mu`. Priors you set yourself on
-  the parameters of these models now take `dpar =` instead of `nlpar =`,
-  e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")`
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
-- [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
-  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md):
-  passing `log` by position is deprecated, because `tau` now takes that
-  position. Until bmm 1.6.0 a logical value there is still read as
-  `log`, with a warning; write `log = TRUE` instead
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
-
 #### Other changes
 
 - [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
@@ -614,51 +626,6 @@ CRAN release: 2026-11-06
   brms is on CRAN, or call `update(fit, recompile = TRUE)`.
   [`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
   now warns about this combination.
-- **mixture3p** no longer fixes the non-target weight `thetant` to zero
-  at set size 1 when a formula estimates one value per set size, and the
-  capacity versions leave `ptarget` free alike. With one item there is
-  nothing to swap to, so the data say nothing about that value.
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns and
-  names every coefficient the other trials leave undetermined. Read them
-  as prior-only, or code set size as a factor without an intercept
-  (`0 + set_size`), so that only the set-size-1 coefficient is affected
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
-- **imm** no longer fixes the set-size-1 levels of `a` and `s` when a
-  formula estimates one value per set size. With one item there is no
-  non-target, so set size 1 says nothing about `s`, and about `a` only
-  through its sum with `c`;
-  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns and
-  names the coefficients that depend on their priors. Give set size 1 a
-  level of its own in a factor, so that only its coefficients depend on
-  their priors, or let `c` take one value across set sizes
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
-- **mixture3p** and **imm** now accept an intercept together with
-  `set_size` as a predictor, e.g. `kappa ~ 1 + set_size`; they used to
-  require `0 + set_size`
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
-- [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
-  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  and [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) now
-  use the exact sampler that
-  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
-  uses, so the same seed gives different draws than in bmm 1.4.0.
-  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  used to draw from a grid, which spread the draws too widely at high
-  precision. Rerun simulations that rely on particular draws
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
-- For developers:
-  [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md)
-  no longer adds the `LureIdx*` and `inv_ss` columns for **mixture3p**
-  and **imm**, whose likelihoods read the set size directly
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
-- [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
-  and the help pages now show each model by its name only, such as
-  “Two-Parameter Mixture Model”, without the citation, which stays in
-  the `Citation` field of the help page. A model that fits several
-  tasks, such as
-  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), is listed
-  under each of them
-  ([\#554](https://github.com/popov-lab/bmm/issues/554)).
 
 #### Documentation
 

@@ -18,9 +18,11 @@ native_parameters(
   newdata = NULL,
   pars = NULL,
   re_formula = NULL,
+  population_summary = c("none", "mean", "median"),
   scale = c("native", "sampling"),
   ndraws = NULL,
   draw_ids = NULL,
+  ndraws_population = 1000,
   summary = FALSE,
   prob = 0.95,
   robust = FALSE,
@@ -53,7 +55,16 @@ native_parameters(
 
   Which group-level effects to include, as in
   [`brms::posterior_linpred()`](https://mc-stan.org/rstantools/reference/posterior_linpred.html).
+  With `population_summary`, the group-level effects to integrate over.
   See Details.
+
+- population_summary:
+
+  `"none"` (the default) returns the parameters at the group levels in
+  the grid. `"mean"` returns, for every draw and grid cell, the mean and
+  SD of the parameter across the levels of the grouping factors, e.g.
+  across participants; `"median"` returns their median and quartiles.
+  See *Population summaries*.
 
 - scale:
 
@@ -70,6 +81,12 @@ native_parameters(
 
   Indices of the draws to use. Overrides `ndraws` and makes the result
   reproducible.
+
+- ndraws_population:
+
+  Number of group levels simulated per posterior draw for the population
+  summaries that are computed by Monte Carlo. See *Population
+  summaries*.
 
 - summary:
 
@@ -89,7 +106,8 @@ native_parameters(
 
   Further arguments passed to
   [`brms::posterior_linpred()`](https://mc-stan.org/rstantools/reference/posterior_linpred.html),
-  such as `allow_new_levels` and `sample_new_levels`.
+  such as `allow_new_levels` and `sample_new_levels`. These two cannot
+  be combined with `population_summary`.
 
 ## Value
 
@@ -100,6 +118,14 @@ of `x`, so they can be joined with the output of
 `posterior::as_draws_df(x)`. If `summary = TRUE`, a `data.frame` with
 one row per grid cell and parameter, with columns `Estimate`,
 `Est.Error` and the interval bounds.
+
+With `population_summary`, both formats have a `statistic` column after
+`parameter`, and one row per statistic. The attribute
+`"population_method"` is a `data.frame` with one row per parameter and
+statistic: the `link`, the `method` (`"closed form"`, `"Gauss-Hermite"`,
+`"root search"`, `"Monte Carlo"` or `"no group-level effects"`), `n`
+(the quadrature nodes or the simulated levels per draw) and the `groups`
+integrated over.
 
 ## Transform first, then summarise
 
@@ -129,17 +155,102 @@ rows of the output rather than read off the coefficients.
 ## Group-level effects
 
 `re_formula = NULL` (the default) returns subject-specific parameters
-and adds the grouping variables to the grid. `re_formula = NA` sets all
-group-level effects to zero, which under a non-identity link gives the
-*median* subject, not the population mean. The population mean requires
-marginalising over the distribution of group-level effects, which is
-done by predicting for a new level:
+and adds the grouping variables to the grid. For a group-level summary,
+three quantities are easily confused under a non-identity link:
 
-    native_parameters(fit, newdata = transform(nd, id = "new"),
-                      allow_new_levels = TRUE, sample_new_levels = "gaussian")
+1.  **The median subject.** `re_formula = NA` sets all group-level
+    effects to zero. Because the inverse link is monotone, this is the
+    parameter of the *median* subject, not the mean across subjects.
 
-These three quantities differ substantially at between-subject standard
-deviations typical for working memory data.
+2.  **The population mean.** `population_summary = "mean"` averages the
+    parameter over the distribution of the group-level effects,
+    separately for every posterior draw. Its credible interval describes
+    the uncertainty about the population mean, and the `sd` statistic is
+    the spread across subjects on the native scale.
+
+3.  **A new subject.** Predicting for a new level,
+
+        native_parameters(fit, newdata = transform(nd, id = "new"),
+                          allow_new_levels = TRUE, sample_new_levels = "gaussian")
+
+    draws one new subject per posterior draw. Its interval mixes the
+    posterior uncertainty with the variability between subjects: it
+    predicts where one more subject would fall. It is *not* a credible
+    interval for the population mean.
+
+The three differ substantially at between-subject standard deviations
+typical for working memory data. `population_summary = "median"` returns
+(1) together with the quartiles across subjects.
+
+## Population summaries
+
+With `population_summary = "mean"` or `"median"`, each parameter is
+integrated, for every posterior draw and grid cell, over the
+distribution of the group-level effects that `re_formula` selects: all
+of them for `NULL`, the terms it lists for a formula (with the same
+meaning as in
+[`brms::posterior_linpred()`](https://mc-stan.org/rstantools/reference/posterior_linpred.html)),
+and none for `NA`, which returns the median subject with zero spread.
+Grouping variables never span the grid, and values given for them in
+`newdata` are ignored.
+
+`"mean"` returns the statistics `mean` and `sd`, `"median"` the
+statistics `median`, `q25` and `q75`. They are computed per posterior
+draw and summarised only afterwards, so `summary = TRUE` reports, for
+example, the posterior mean and credible interval of the population
+mean. Two summaries are therefore involved: `population_summary`
+summarises *across subjects* within a draw, `robust` *across draws*. A
+difference between two conditions is the difference of their population
+means, taken draw by draw.
+
+**Computation.** A parameter is computed exactly or by quadrature when
+its `brms` formula is linear, its group-level terms are plain terms such
+as `(1 + x | id)`, `(1 + x || id)`, `(1 | id:condition)` or terms of
+several grouping factors, and its native value is the inverse link of
+its own linear predictor. Its linear predictor is then normal across
+subjects, with mean `eta` (the median subject) and standard deviation
+`s = sqrt(z' Sigma z)`, where `z` is the group-level design of the grid
+cell and `Sigma` the covariance matrix of the group-level effects in
+that draw, summed over independent terms. Then:
+
+- identity link: `eta` and `s`;
+
+- log link: `exp(eta + s^2 / 2)` and that value times
+  `sqrt(exp(s^2) - 1)`;
+
+- probit link: the mean is `pnorm(eta / sqrt(1 + s^2))`;
+
+- all other links, and the SD under the probit link: Gauss-Hermite
+  quadrature with 100 nodes, which for the logit and probit links is
+  accurate to better than `1e-6` up to `s = 3`;
+
+- the median and quartiles are exact for every link: the inverse link of
+  `eta` and of `eta -/+ 0.674 * s`.
+
+All other parameters are computed by Monte Carlo. These include mixture
+weights transformed through a softmax, parameters defined by non-linear
+formulas, parameters whose transformation depends on the design, and
+terms such as `mm()`, `cs()` or `gr(by = )`. For every draw, `brms`
+simulates `ndraws_population` new levels of each grouping factor from
+that draw's covariance matrix. The same simulated levels enter every
+parameter and every grid cell, and the parameters are transformed
+jointly. The Monte Carlo error of a population mean is about
+`sd / sqrt(ndraws_population)` within a draw, and it widens the
+posterior SD of the summary. `native_parameters()` warns when it widens
+by more than 2% and names the `ndraws_population` needed. This path uses
+the random number generator, so set a seed before the call for
+reproducible output.
+
+**Circular location parameters** (`tan_half` link): `"mean"` returns the
+circular mean direction and the circular SD `sqrt(-2 * log(rho))`, where
+`rho` is the mean resultant length, both by Gauss-Hermite quadrature
+with 200 nodes, whose error is at most `2e-7` up to `s = 1.5` and grows
+to `1.3e-5` at `s = 2`, `3.8e-4` at `s = 3` and `6.1e-3` at `s = 5`. A
+between-participant SD above about `1.5` on the `tan(theta / 2)` scale
+is rare. `"median"` returns the circular median, the direction with the
+smallest expected arc distance to the parameter, without quartiles. Once
+enough mass wraps around `pi` the circular median is no longer
+`2 * atan(eta)`.
 
 ## What is returned
 
@@ -239,5 +350,14 @@ quantile(
 
 # posterior summaries of the transformed draws
 native_parameters(fit, re_formula = NA, summary = TRUE)
+
+# with group-level effects: the mean and SD across subjects of kappa
+fit_re <- bmm(
+  bmf(c ~ 0 + set_size, kappa ~ 1 + (1 | ID)),
+  data = oberauer_lin_2017,
+  model = sdm(resp_error = "dev_rad")
+)
+native_parameters(fit_re, pars = "kappa", population_summary = "mean",
+                  summary = TRUE)
 }
 ```
