@@ -223,7 +223,7 @@ current_constructor <- function(model) {
   constructor <- get_model(name)
   # the circular mixture models cite the variable-precision source only when
   # the model uses it
-  args <- list()
+  args <- cell_args(model)
   if ("variable_precision" %in% names(formals(constructor))) {
     args$variable_precision <- isTRUE(model$variable_precision)
   }
@@ -232,4 +232,16 @@ current_constructor <- function(model) {
     return(do.call(constructor, args))
   }
   if (model$version %in% versions) do.call(constructor, c(list(version = model$version), args))
+}
+
+# Arguments other than the version that select a cell of a constructor with
+# its own name and citation, as tcc(noise = "gumbel") does; without them the
+# rebuilt model is the default cell and cites the wrong authors
+cell_args <- function(model) {
+  UseMethod("cell_args")
+}
+
+#' @exportS3Method
+cell_args.default <- function(model) {
+  list()
 }
