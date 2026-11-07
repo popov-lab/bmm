@@ -20,7 +20,7 @@
 #'   slopes alike) and replaces the `student_t(3, 0, 2.5)` default of `brms`. To
 #'   override it, address the parameter with `dpar` or `nlpar` in
 #'   [brms::set_prior()], e.g. `set_prior("exponential(2)", class = "sd",
-#'   nlpar = "kappa")`.
+#'   dpar = "kappa")`.
 #'
 #'   Correlations among random effects belong to a grouping factor rather than to
 #'   one parameter, so they get a single default for the whole model: `lkj(2)`
@@ -96,12 +96,13 @@ default_prior.bmmformula <- function(object, data, model, formula = object, ...)
 #'
 #'   Parameters that exist only because the family machinery requires them are
 #'   omitted: a fixed parameter the model does not declare (the `mu` brms
-#'   forces on the custom families of the response-time models, or the `mu2`
-#'   and `kappa2` of a two-component `brms::mixture()` family), and the
-#'   mixture-weight reference component `theta2`, which brms lists with a
-#'   default prior although the sampler holds it at zero. Fixed parameters the
-#'   model does declare are reported, since the user can estimate them: `mu`
-#'   for `sdm()`, `mu1` for the circular mixture models, `zr` for `ddm()`.
+#'   forces on the custom families of the response-time models, or, in fits
+#'   saved before bmm 1.5.0, the `mu2` and `kappa2` of a two-component
+#'   `brms::mixture()` family), and the mixture-weight reference component
+#'   `theta2` of those fits, which brms lists with a default prior although the
+#'   sampler holds it at zero. Fixed parameters the model does declare are
+#'   reported, since the user can estimate them: `mu` for `sdm()` and the
+#'   circular mixture models, `zr` for `ddm()`.
 #' @return A `data.frame` of class `bmm_prior_info` with columns
 #'   `parameter`, `link`, `class`, `coef`, `group`, `prior` and `source`.
 #'   Subsetting the report with `[` returns a plain `data.frame`, as the
@@ -227,7 +228,7 @@ prior_provenance <- function(fit) {
 #   - fixed parameters the model never declares: the mu that brms forces on
 #     every custom family (the response-time models), and the second-component
 #     mu2/kappa2 of a brms::mixture() family. Fixed parameters the model does
-#     declare (sdm's mu, mixture2p's mu1) are real and stay.
+#     declare (sdm's and mixture2p's mu) are real and stay.
 #   - the mixture-weight reference component: brms reports a default prior for
 #     the theta<k> it did not linearly predict, but the generated Stan code
 #     sets it to rep_vector(0.0, N) as the softmax reference, so the prior is
@@ -481,8 +482,8 @@ upfirst <- function(x) {
 #' parameters should be fixed to a constant and put the appropriate constant
 #' priors. Any additional priors that a developer wants to specify, which are
 #' not based on information in the model object, can be defined in the
-#' configure_prior.* method for the model. See configure_prior.imm_full for an
-#' example.
+#' configure_prior.* method for the model, as `mpt` does; the example shows
+#' the form such a method takes.
 #' @param model A `bmmodel` object
 #' @param data A data.frame containing the data used in the model
 #' @param formula A `brmsformula` object returned from configure_model()
@@ -495,41 +496,12 @@ upfirst <- function(x) {
 #' @export
 #'
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
-#' configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
-#'   # if there is set_size 1 in the data, set constant prior over thetant for set_size1
-#'   prior <- brms::empty_prior()
-#'   set_size_var <- model$other_vars$set_size
-#'   prior_cond <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
-#'
-#'   thetant_preds <- rhs_vars(formula$pforms$thetant)
-#'   if (prior_cond && set_size_var %in% thetant_preds) {
-#'     prior <- prior + brms::prior_("constant(-100)",
-#'       class = "b",
-#'       coef = paste0(set_size_var, 1),
-#'       nlpar = "thetant"
-#'     )
+#' configure_prior.mymodel <- function(model, data, formula, user_prior, ...) {
+#'   # a prior that depends on the data, which the model object cannot declare
+#'   if (!"condition" %in% names(data)) {
+#'     return(NULL)
 #'   }
-#'   # check if there is a random effect on theetant that include set_size as predictor
-#'   bterms <- brms::brmsterms(formula$pforms$thetant)
-#'   re_terms <- bterms$dpars$mu$re
-#'   if (!is.null(re_terms)) {
-#'     for (i in 1:nrow(re_terms)) {
-#'       group <- re_terms$group[[i]]
-#'       form <- re_terms$form[[i]]
-#'       thetant_preds <- rhs_vars(form)
-#'
-#'       if (prior_cond && set_size_var %in% thetant_preds) {
-#'         prior <- prior + brms::prior_("constant(1e-8)",
-#'           class = "sd",
-#'           coef = paste0(set_size_var, 1),
-#'           group = group,
-#'           nlpar = "thetant"
-#'         )
-#'       }
-#'     }
-#'   }
-#'
-#'   prior
+#'   brms::prior_("normal(0, 0.5)", class = "b", dpar = "kappa")
 #' }
 #'
 #' @keywords internal developer
@@ -869,6 +841,154 @@ replacing_row <- function(prior1, prior2) {
   ifelse(is.na(by_type), match(prior_types(as_nlpar_wide), types2), by_type)
 }
 
+# Until bmm 1.5.0, the parameters of mixture2p, mixture3p and imm were
+# non-linear parameters of a brms mixture, and their location was mu1. A model
+# that declares `dpar_since` still takes priors written that way, passes them
+# on as the distributional parameters they are now, and warns once per call.
+translate_deprecated_priors <- function(model, formula, prior) {
+  translated <- translate_nlpar_priors(model, formula, prior)
+  warn_deprecated(translated$what, translated$with, since = model$dpar_since,
+                  details = translated$details)
+  translated$prior
+}
+
+# One old row can become two: in 1.4 a class "b" prior on an nlpar covered its
+# intercept too (#526), while a dpar keeps the intercept in a class of its own.
+# brms centres the predictors of a dpar under an intercept, so an intercept
+# prior under `1 + x` moves from the reference level to the predictor means;
+# `details` says so for those parameters
+translate_nlpar_priors <- function(model, formula, prior) {
+  unchanged <- list(prior = prior, what = character(0), with = character(0))
+  if (is.null(model$dpar_since) || NROW(prior) == 0) {
+    return(unchanged)
+  }
+  bterms <- brms::brmsterms(formula)
+  renames <- model$deprecated_parameters
+  is_old <- (nzchar(prior$nlpar) & not_in(prior$nlpar, names(bterms$nlpars))) |
+    prior$dpar %in% names(renames)
+  if (!any(is_old)) {
+    return(unchanged)
+  }
+
+  old_par <- ifelse(nzchar(prior$nlpar), prior$nlpar, prior$dpar)
+  new_par <- old_par
+  renamed <- old_par %in% names(renames)
+  new_par[renamed] <- unlist(renames[old_par[renamed]], use.names = FALSE)
+  was_nlpar <- is_old & nzchar(prior$nlpar)
+  # a non-linear dpar has no linear terms to put an intercept or slope prior on
+  linear <- vapply(new_par, function(p) !is.null(bterms$dpars[[p]]$fe), logical(1))
+  unknown <- is_old & (not_in(new_par, names(bterms$dpars)) | (was_nlpar & !linear))
+  main <- names(bterms$dpars)[1]
+  model_name <- c(intersect(class(model), model_names()), class(model)[2])[1]
+  stopif(
+    any(unknown),
+    "{paste0('`', prior_code(prior[unknown, ]), '`', collapse = ', ')} names no parameter of \\
+    {model_name}(). Since bmm {model$dpar_since}, the parameters of {model_name}() \\
+    are distributional: give their priors with `dpar =` and one of \\
+    {collapse_comma(names(bterms$dpars))}."
+  )
+
+  rows <- list()
+  source <- integer(0)
+  generated <- logical(0)
+  shifts <- rep(FALSE, nrow(prior))
+  for (i in seq_len(nrow(prior))) {
+    row <- prior[i, ]
+    new_rows <- list(row)
+    gen <- FALSE
+    if (is_old[i]) {
+      row$nlpar <- ""
+      # brms stores the main dpar without a label, as set_prior() does
+      row$dpar <- if (new_par[i] == main) "" else new_par[i]
+      new_rows <- list(row)
+    }
+    # mu1 was a dpar in 1.4 already, so only a former nlpar changes its classes
+    if (was_nlpar[i]) {
+      terms <- stats::terms(bterms$dpars[[new_par[i]]]$fe)
+      intercept <- has_intercept(terms)
+      predictors <- length(attr(terms, "term.labels")) > 0
+      shifts[i] <- intercept && predictors
+      as_intercept <- row
+      as_intercept$class <- "Intercept"
+      as_intercept$coef <- ""
+      if (row$class == "b" && row$coef == "") {
+        keep <- c(intercept, predictors || !intercept)
+        new_rows <- list(as_intercept, row)[keep]
+        gen <- c(TRUE, FALSE)[keep]
+      } else if (row$class == "Intercept" || (row$class == "b" && row$coef == "Intercept")) {
+        new_rows <- list(as_intercept)
+      }
+    }
+    rows <- c(rows, new_rows)
+    source <- c(source, rep(i, length(new_rows)))
+    generated <- c(generated, rep_len(gen, length(new_rows)))
+  }
+  out <- do.call(rbind, rows)
+  # in 1.4 an intercept prior of its own was more specific than the class
+  # prior that otherwise covered the intercept, so it still wins
+  keys <- do.call(paste, out[, c("class", "dpar", "nlpar", "coef", "group", "resp")])
+  survives <- !(generated & keys %in% keys[!generated])
+  out <- out[survives, ]
+  source <- source[survives]
+  row.names(out) <- NULL
+
+  old_rows <- which(is_old)
+  what <- prior_code(prior[old_rows, ])
+  with <- vapply(old_rows, function(i) paste(prior_code(out[source == i, ], main), collapse = " + "),
+                 character(1))
+  n_new <- vapply(old_rows, function(i) sum(source == i), integer(1))
+  to_intercept <- vapply(old_rows, function(i) any(out$class[source == i] == "Intercept"), logical(1))
+  split <- new_par[old_rows][n_new == 2]
+  dropped <- what[n_new == 0]
+  moved <- new_par[old_rows][shifts[old_rows] & to_intercept]
+
+  details <- c(
+    if (length(dropped) > 0) {
+      glue("`{dropped}` is now covered by the intercept prior given with it, so it is dropped.")
+    },
+    if (length(split) > 0) {
+      glue(
+        "In bmm 1.4 a class \"b\" prior also covered the intercept, so it is now \\
+        given twice, for {collapse_comma(unique(split))}."
+      )
+    },
+    if (length(moved) > 0) {
+      glue(
+        "brms centres the predictors of distributional parameters, so the intercept \\
+        prior of {collapse_comma(unique(moved))} now applies at the mean of its \\
+        predictors (for a factor, the average over its levels weighted by their \\
+        number of trials), not at their reference level. The slopes keep their meaning. If \\
+        the intercept prior was meant for the reference level, give it for the \\
+        average over the predictors instead."
+      )
+    }
+  )
+  list(prior = out, what = what, with = with, details = details)
+}
+
+# set_prior() code for each row, as users would type it. With `main`, a row of
+# the main dpar names it, because users know it by that name
+prior_code <- function(prior, main = NULL) {
+  vapply(seq_len(nrow(prior)), function(i) {
+    row <- prior[i, ]
+    if (!is.null(main) && !nzchar(row$dpar) && !nzchar(row$nlpar)) {
+      row$dpar <- main
+    }
+    args <- glue('"{row$prior}"')
+    for (col in c("class", "coef", "group", "resp", "dpar", "nlpar")) {
+      if (nzchar(row[[col]])) {
+        args <- c(args, glue('{col} = "{row[[col]]}"'))
+      }
+    }
+    for (col in c("lb", "ub")) {
+      if (!is.na(row[[col]]) && nzchar(row[[col]])) {
+        args <- c(args, glue("{col} = {row[[col]]}"))
+      }
+    }
+    paste0("set_prior(", paste(args, collapse = ", "), ")")
+  }, character(1))
+}
+
 summarise_default_prior <- function(prior_list) {
   pars <- names(prior_list)
   out <- ""
@@ -881,47 +1001,4 @@ summarise_default_prior <- function(prior_list) {
     }
   }
   out
-}
-
-constrain_set_size1_fixef <- function(formula, nlpars, set_size_var, prior_value) {
-  nl_pforms <- formula$pforms[nlpars]
-  has_setsize <- vapply(nl_pforms, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
-  if (!any(has_setsize)) {
-    return(NULL)
-  }
-    
-  brms::prior_(prior_value,
-    class = "b",
-    coef = paste0(set_size_var, 1),
-    nlpar = nlpars[has_setsize]
-  )
-}
-
-constrain_set_size1_ranef <- function(formula, nlpars, set_size_var, prior_value) {
-  re_terms_list <- lapply(nlpars, function(nlp) {
-    bterms <- brms::brmsterms(formula$pforms[[nlp]])
-    re <- bterms$dpars$mu$re
-    if (NROW(re) > 0) {
-      data.frame(nlpar = nlp, group = re$group, form = I(re$form), stringsAsFactors = FALSE)
-    }
-  })
-  
-  re_terms_df <- do.call(rbind, re_terms_list)
-  if (is.null(re_terms_df)) {
-    return(NULL)
-  }
-  
-  has_setsize <- vapply(re_terms_df$form, function(x) set_size_var %in% rhs_vars(x), logical(1))
-  
-  if (!any(has_setsize)) {
-    return(NULL)
-  }
-
-  brms::prior_(prior_value,
-    class = "sd",
-    coef = paste0(set_size_var, 1),
-    group = re_terms_df$group[has_setsize],
-    nlpar = re_terms_df$nlpar[has_setsize]
-  )
 }

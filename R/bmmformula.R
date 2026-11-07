@@ -149,6 +149,8 @@ check_formula.bmmodel <- function(model, data, formula) {
     bmmformula(kappa ~ 1, thetat ~ 1) or bmf(kappa ~ 1, thetat ~ 1)"
   )
 
+  formula <- rename_deprecated_parameters(model, formula)
+
   wpar <- unrecognized_parameters(model, formula)
   valid_pars <- collapse_comma(names(model$parameters))
   stopif(length(wpar), "Unrecognized model parameters: \\
@@ -167,6 +169,50 @@ check_formula.bmmodel <- function(model, data, formula) {
   formula <- add_missing_parameters(model, formula)
   warn_predictor_parameter_clash(data, formula)
   NextMethod("check_formula")
+}
+
+# A model that renames a parameter lists the old name in deprecated_parameters,
+# so that formulas written against the old name keep working for a release
+# instead of failing as an unrecognized parameter.
+rename_deprecated_parameters <- function(model, formula, warn = TRUE) {
+  renames <- model$deprecated_parameters
+  used <- intersect(names(renames), names(formula))
+  if (length(used) == 0) {
+    return(formula)
+  }
+
+  new_names <- unlist(renames[used], use.names = FALSE)
+  # renaming would leave two formulas for one parameter, and only the first
+  # would be used
+  both <- new_names %in% names(formula)
+  stopif(
+    any(both),
+    "The formula gives both {collapse_comma(used[both])} and its new name \\
+    {collapse_comma(new_names[both])}. Please keep only the new name."
+  )
+  out <- unclass(formula)
+  for (i in seq_along(used)) {
+    if (is_formula(out[[used[i]]])) {
+      out[[used[i]]][[2]] <- as.name(new_names[i])
+    }
+  }
+  names(out)[match(used, names(out))] <- new_names
+  if (warn) {
+    warn_deprecated(
+      what = glue("bmf({formula_code(unclass(formula)[used], used)})"),
+      with = glue("bmf({formula_code(out[new_names], new_names)})"),
+      since = model$dpar_since
+    )
+  }
+  new_bmmformula(out)
+}
+
+# a parameter's formula or constant as users write it in bmf()
+formula_code <- function(formulas, pars) {
+  vapply(seq_along(pars), function(i) {
+    f <- formulas[[i]]
+    if (is_formula(f)) deparse1(f) else paste(pars[i], "=", deparse1(c(f)))
+  }, character(1))
 }
 
 # A predictor whose name matches a predicted parameter is flagged non-linear
@@ -193,23 +239,6 @@ warn_predictor_parameter_clash <- function(data, formula) {
 #' @export
 check_formula.default <- function(model, data, formula) {
   formula
-}
-
-#' @export
-check_formula.non_targets <- function(model, data, formula) {
-  set_size_var <- model$other_vars$set_size
-  pred_list <- rhs_vars(formula, collapse = FALSE)
-  has_set_size <- vapply(pred_list, function(x) set_size_var %in% x, logical(1))
-  ss_forms <- formula[has_set_size]
-  intercepts <- vapply(ss_forms, has_intercept, logical(1))
-  stopif(
-    any(intercepts),
-    "The formula for parameter(s) {names(ss_forms)[intercepts]} contains \\
-    an intercept and also uses set_size as a predictor. This model requires \\
-    that the intercept is supressed when set_size is used as predictor. \\
-    Try using 0 + {set_size_var} instead."
-  )
-  NextMethod("check_formula")
 }
 
 #' @title Convert `bmmformula` objects to `brmsformula` objects
