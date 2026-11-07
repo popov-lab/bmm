@@ -130,3 +130,33 @@ test_that("rddm(1, <vectors>) keeps one draw per element until 1.6.0, with a war
   expect_equal(nrow(out), 3)
   expect_no_warning(expect_equal(nrow(rddm(1, drift = 1, bound = 1, ndt = 0.2)), 1))
 })
+
+# --- cswald (tests only while #406 is open; multiples of each other) ----------
+
+test_that("dcswald() recycles the observations and the parameters to the longest argument", {
+  expect_elementwise(dcswald, list(rt = 0.6, response = 1, drift = c(1, 2, 3), bound = c(1.5, 1, 2), ndt = 0.2))
+  expect_elementwise(dcswald, list(rt = c(0.6, 0.7, 0.8), response = c(1, 0, 1), drift = c(1, 2, 3),
+                                   bound = 1.5, ndt = c(0.2, 0.3, 0.1), zr = c(0.4, 0.5, 0.6), s = c(1, 1.2, 0.9)),
+                     fixed = list(version = "crisk", log = FALSE))
+})
+
+test_that("rcswald() returns n draws, draw i from the i-th parameter elements", {
+  skip_on_cran()
+  withr::local_seed(4443)
+  drift <- c(0.5, 2, 1)
+  bound <- c(1, 1.5, 2)
+  ndt <- c(0.2, 0.3, 0.4)
+  zr <- c(0.3, 0.5, 0.7)
+  s <- c(1, 1.5, 0.8)
+  n <- 6000
+  g <- group_of(n, 3)
+  out <- rcswald(n, drift, bound, ndt, zr, s)
+  expect_equal(nrow(out), n)
+  for (k in 1:3) {
+    z <- zr[k] * bound[k]
+    p_up <- wiener_p_upper(drift[k], bound[k], z, s[k])
+    rows <- out[g == k, ]
+    expect_mean_near(rows$response, p_up, se_prop(p_up, nrow(rows)))
+    expect_mean_near(rows$rt, ndt[k] + wiener_mean_dt(drift[k], bound[k], z, s[k]), sd(rows$rt) / sqrt(nrow(rows)))
+  }
+})
