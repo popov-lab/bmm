@@ -5,10 +5,19 @@
 \title{Vector arguments of the distribution functions}
 \description{
 The density (\verb{d*()}) and random generation (\verb{r*()}) functions
-of the bmm models take their per-observation arguments as vectors, or as
-matrices with one row per observation, and recycle them as \code{\link[stats:dnorm]{stats::dnorm()}}
-and \code{\link[stats:rnorm]{stats::rnorm()}} do. This page states the rules; the help page of each
-distribution repeats them under "Vector arguments".
+of the sdm, ddm and ezdm models and of the signal detection models
+(\code{sdt_yn}, \code{sdt_mafc}, \code{sdt_rating}, \code{sdt_dpsdt}, \code{sdt_metad},
+\code{sdt_ranking} and \code{sdt_cdp}) take their per-observation arguments as
+vectors, or as matrices with one row per observation, and recycle them as
+\code{\link[stats:dnorm]{stats::dnorm()}} and \code{\link[stats:rnorm]{stats::rnorm()}} do. This page states the rules; the
+help page of each of these distributions repeats them under "Vector
+arguments".
+
+The other distribution functions do not follow these rules yet:
+\code{\link[=dcswald]{dcswald()}} and \code{\link[=rcswald]{rcswald()}}, the circular mixtures (\code{\link[=dmixture2p]{dmixture2p()}},
+\code{\link[=dmixture3p]{dmixture3p()}}, \code{\link[=dimm]{dimm()}} and their \verb{r*()} functions), \code{\link[=dm3]{dm3()}} and \code{\link[=rm3]{rm3()}},
+\code{\link[=dmpt]{dmpt()}} and \code{\link[=rmpt]{rmpt()}}, and \code{\link[=dpsychometric_function]{dpsychometric_function()}} and
+\code{\link[=rpsychometric_function]{rpsychometric_function()}}.
 }
 \section{Vector arguments}{
 
@@ -23,7 +32,10 @@ length.
 \code{x} (its rows, when the observations are rows of counts) and the
 per-observation arguments, the others recycled to that length. Value \code{i}
 is what the call on the \code{i}-th elements alone returns. An empty vector
-of observations gives an empty result.
+of observations gives an empty result. Where an observation is a vector
+of counts (\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()},
+\code{dsdt_ranking()} and \code{dsdt_cdp()}), a vector is always one observation:
+pass a matrix with zero rows for none.
 \item A set of values that describes one observation, such as the \code{thresholds}
 of the rating models, is a vector when every observation shares it and a
 matrix with one row per observation otherwise: row \code{i} belongs to

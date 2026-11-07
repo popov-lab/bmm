@@ -45,4 +45,4 @@ proposal <- function(n) runif(n, min = -pi, max = pi)
 samples <- rejection_sampling(1000, target_density, max_f = target_density(0), proposal)
 }
 \keyword{deprecated}
-\keyword{internal}
+\keyword{distribution}

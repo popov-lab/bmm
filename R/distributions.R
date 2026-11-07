@@ -1,10 +1,19 @@
 #' @title Vector arguments of the distribution functions
 #'
 #' @description The density (`d*()`) and random generation (`r*()`) functions
-#'   of the bmm models take their per-observation arguments as vectors, or as
-#'   matrices with one row per observation, and recycle them as [stats::dnorm()]
-#'   and [stats::rnorm()] do. This page states the rules; the help page of each
-#'   distribution repeats them under "Vector arguments".
+#'   of the sdm, ddm and ezdm models and of the signal detection models
+#'   (`sdt_yn`, `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`,
+#'   `sdt_ranking` and `sdt_cdp`) take their per-observation arguments as
+#'   vectors, or as matrices with one row per observation, and recycle them as
+#'   [stats::dnorm()] and [stats::rnorm()] do. This page states the rules; the
+#'   help page of each of these distributions repeats them under "Vector
+#'   arguments".
+#'
+#'   The other distribution functions do not follow these rules yet:
+#'   [dcswald()] and [rcswald()], the circular mixtures ([dmixture2p()],
+#'   [dmixture3p()], [dimm()] and their `r*()` functions), [dm3()] and [rm3()],
+#'   [dmpt()] and [rmpt()], and [dpsychometric_function()] and
+#'   [rpsychometric_function()].
 #'
 #' @section Vector arguments:
 #' - `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or matrix
@@ -17,7 +26,10 @@
 #'   `x` (its rows, when the observations are rows of counts) and the
 #'   per-observation arguments, the others recycled to that length. Value `i`
 #'   is what the call on the `i`-th elements alone returns. An empty vector
-#'   of observations gives an empty result.
+#'   of observations gives an empty result. Where an observation is a vector
+#'   of counts (`dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`,
+#'   `dsdt_ranking()` and `dsdt_cdp()`), a vector is always one observation:
+#'   pass a matrix with zero rows for none.
 #' - A set of values that describes one observation, such as the `thresholds`
 #'   of the rating models, is a vector when every observation shares it and a
 #'   matrix with one row per observation otherwise: row `i` belongs to
@@ -57,7 +69,7 @@ NULL
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
-#' @keywords deprecated internal
+#' @keywords distribution deprecated
 #'
 #' @examples
 #' target_density <- function(x) brms::dvon_mises(x, mu = 0, kappa = 10)
@@ -234,6 +246,8 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
     mu <- rep_len(mu, n)
     c <- rep_len(c, n)
     kappa <- rep_len(kappa, n)
+    # sprintf rather than glue: 17 significant digits round-trip a double, so
+    # two sets share a key only if their values are identical
     set <- sprintf("%.17g,%.17g,%.17g", mu, c, kappa)
     first <- !duplicated(set)
     .dsdm_integrate_numer_v(.dsdm_numer, mu[first], c[first], kappa[first],
