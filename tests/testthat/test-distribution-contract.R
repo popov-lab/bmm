@@ -89,3 +89,44 @@ test_that("rejection_sampling() is deprecated and still samples", {
   )
   expect_length(x, 10)
 })
+
+# --- ddm ----------------------------------------------------------------------
+
+test_that("dddm() recycles the observations and the parameters to the longest argument", {
+  expect_elementwise(dddm, list(rt = c(0.6, 0.7), response = c(1, 0), drift = 1:3,
+                                bound = c(1, 1.5), ndt = 0.2, zr = c(0.4, 0.5, 0.6)))
+  expect_elementwise(dddm, list(rt = 0.6, response = 1, drift = c(1, 2, 3), bound = 1, ndt = 0.2),
+                     fixed = list(log = FALSE))
+  expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8), response = c("upper", "lower", "upper"),
+                                drift = 1, bound = c(1, 1.5), ndt = 0.2))
+})
+
+test_that("rddm() returns n draws, draw i from the i-th parameter elements", {
+  skip_on_cran()
+  withr::local_seed(4442)
+  drift <- c(0.5, 2, 1)
+  bound <- c(1, 1.5, 2)
+  ndt <- c(0.2, 0.3, 0.4)
+  zr <- c(0.3, 0.5, 0.7)
+  n <- 6000
+  g <- group_of(n, 3)
+  out <- rddm(n, drift, bound, ndt, zr)
+  expect_equal(nrow(out), n)
+  for (k in 1:3) {
+    z <- zr[k] * bound[k]
+    p_up <- wiener_p_upper(drift[k], bound[k], z)
+    rows <- out[g == k, ]
+    expect_mean_near(rows$response, p_up, se_prop(p_up, nrow(rows)))
+    expect_mean_near(rows$rt, ndt[k] + wiener_mean_dt(drift[k], bound[k], z), sd(rows$rt) / sqrt(nrow(rows)))
+  }
+  expect_equal(nrow(rddm(5, drift = c(1, 2), bound = 1, ndt = 0.2)), 5)
+  expect_equal(nrow(rddm(2, drift = c(1, 2, 3), bound = 1, ndt = 0.2)), 2)
+})
+
+test_that("rddm(1, <vectors>) keeps one draw per element until 1.6.0, with a warning", {
+  withr::local_seed(4442)
+  out <- NULL
+  expect_warning(out <- rddm(1, drift = c(1, 2, 3), bound = 1, ndt = 0.2), "deprecated since bmm 1.5.0")
+  expect_equal(nrow(out), 3)
+  expect_no_warning(expect_equal(nrow(rddm(1, drift = 1, bound = 1, ndt = 0.2)), 1))
+})

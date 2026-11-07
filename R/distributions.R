@@ -1543,7 +1543,9 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
 #'
 #' @param rt Vector of response times for which the density should be returned
 #' @param response Vector of responses for which the density should be returned
-#' @param n Number of random samples to generate
+#' @param n Number of random samples to generate. Until bmm 1.6.0, `n = 1`
+#'   with parameter vectors still gives one draw per element, with a
+#'   deprecation warning; pass the number of draws.
 #' @param drift Drift rates of the ddm
 #' @param bound Boundary separation of the ddm
 #' @param ndt Non-decision time of the ddm
@@ -1582,21 +1584,15 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
     Please pass vectors of equal length."
   )
 
-  # recycle rt/response to match parameter length for log_lik (one observation,
-  # multiple posterior draws)
-  max_len <- max(lengths(list(drift, bound, ndt, zr)))
-
-  if (length(rt) == 1 && max_len > 1) {
-    rt <- rep(rt, max_len)
-    response <- rep(response, max_len)
-  }
-
+  n <- .obs_length(rt, drift, bound, ndt, zr)
+  bound <- rep_len(bound, n)
+  zr <- rep_len(zr, n)
   out <- rtdists::ddiffusion(
-    rt = rt,
-    response = response,
+    rt = rep_len(rt, n),
+    response = rep_len(response, n),
     a = bound,
-    v = drift,
-    t0 = ndt,
+    v = rep_len(drift, n),
+    t0 = rep_len(ndt, n),
     z = zr * bound
   )
 
@@ -1606,17 +1602,24 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
 #' @name ddm_dist
 #' @export
 rddm <- function(n, drift, bound, ndt, zr = 0.5) {
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
   max_len <- max(lengths(list(drift, bound, ndt, zr)))
-
-  if (max_len > 1L) {
-    if (!n %in% c(1, max_len)) {
-      stop2("Can only sample exactly once for each condition.")
-    }
+  # until 1.6.0, n = 1 with parameter vectors still means one draw per element
+  if (n == 1 && max_len > 1) {
+    warn_deprecated(
+      what = "rddm(1, <parameter vectors>)",
+      with = glue("rddm({max_len}, <parameter vectors>)"),
+      since = "1.5.0",
+      details = "`n` is the number of draws; the parameters are recycled to it."
+    )
     n <- max_len
   }
 
-  sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound)
-  sim_data$response <- ifelse(sim_data$response == "upper",1,0)
+  bound <- rep_len(bound, n)
+  sim_data <- rtdists::rdiffusion(
+    n = n, a = bound, v = rep_len(drift, n), t0 = rep_len(ndt, n), z = rep_len(zr, n) * bound
+  )
+  sim_data$response <- ifelse(sim_data$response == "upper", 1, 0)
   sim_data
 }
 
