@@ -272,7 +272,8 @@ test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus p
   withr::local_seed(4445)
   d <- c(0.5, 1.5, 2.5)
   criterion <- c(0.2, 0.8, 0.5)
-  stimulus <- c(1, 0, 1)
+  # not a palindrome, so a reversed pairing is visible
+  stimulus <- c(0, 1, 1)
   sdratio <- c(1, 1.5, 1)
   n_trials <- c(50, 100, 80)
   n <- 1500
@@ -310,7 +311,8 @@ expect_category_props <- function(counts, n_trials, probs) {
 test_that("rsdt_rating() pairs sensitivity, stimulus, thresholds and variance ratio per draw", {
   withr::local_seed(4445)
   d <- c(0.5, 1.5, 1)
-  stimulus <- c(1, 0, 1)
+  # not a palindrome, so a reversed pairing is visible
+  stimulus <- c(0, 1, 1)
   sdratio <- c(1, 1.5, 1.2)
   n_trials <- 100
   n <- 1500
@@ -325,7 +327,8 @@ test_that("rsdt_rating() pairs sensitivity, stimulus, thresholds and variance ra
 test_that("rsdt_dpsdt() pairs recollection with the rating parameters per draw", {
   withr::local_seed(4445)
   d <- c(0.5, 1.5, 1)
-  stimulus <- c(1, 0, 1)
+  # not a palindrome, so a reversed pairing is visible
+  stimulus <- c(0, 1, 1)
   Ro <- c(0.2, 0.5, 0.3)
   Rn <- c(0, 0.2, 0.1)
   n_trials <- 100
@@ -344,7 +347,8 @@ test_that("rsdt_metad() pairs metacognitive sensitivity with the rating paramete
   withr::local_seed(4445)
   d <- c(1, 1, 1.5)
   metad <- c(0.5, 1.5, 1)
-  stimulus <- c(1, 0, 1)
+  # not a palindrome, so a reversed pairing is visible
+  stimulus <- c(0, 1, 1)
   n_trials <- 100
   n <- 1500
   g <- group_of(n, 3)
@@ -383,7 +387,8 @@ test_that("rsdt_cdp() pairs familiarity, recollection, criterion and thresholds 
   dfam <- c(0.8, 1.2, 0.5)
   drec <- c(1, 0.5, 1.5)
   rcrit <- c(0.5, 0.3, 0.7)
-  stimulus <- c(1, 0, 1)
+  # not a palindrome, so a reversed pairing is visible
+  stimulus <- c(0, 1, 1)
   thr5 <- rbind(c(-1.1, -0.5, 0, 0.6, 1.3), c(-1, -0.4, 0.1, 0.7, 1.4), c(-1.2, -0.6, -0.1, 0.5, 1.2))
   n_trials <- 100
   n <- 900
