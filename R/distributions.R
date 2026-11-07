@@ -4599,7 +4599,8 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #'   observation.
 #' @param rcrit Numeric vector. Remember criterion on the recollection axis.
 #' @param kcrit Know criterion on the familiarity axis. `NULL` (default) for
-#'   the R/K model; finite values enable the R/K/G model.
+#'   the R/K model; finite values enable the R/K/G model. Give a finite value
+#'   for every observation or `NULL`; a mix of the two is an error.
 #' @param sigmar Numeric vector. Log SD of the recollection target
 #'   distribution (0 = SD 1).
 #' @param rho Numeric vector. F-R correlation on the unconstrained scale;

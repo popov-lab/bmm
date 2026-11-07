@@ -61,7 +61,8 @@ observation.}
 \item{rcrit}{Numeric vector. Remember criterion on the recollection axis.}
 
 \item{kcrit}{Know criterion on the familiarity axis. \code{NULL} (default) for
-the R/K model; finite values enable the R/K/G model.}
+the R/K model; finite values enable the R/K/G model. Give a finite value
+for every observation or \code{NULL}; a mix of the two is an error.}
 
 \item{sigmar}{Numeric vector. Log SD of the recollection target
 distribution (0 = SD 1).}
