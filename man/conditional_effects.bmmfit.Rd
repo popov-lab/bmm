@@ -61,10 +61,10 @@ This method provides a more intuitive interface than directly calling
 bmm models use two types of parameters internally:
 \itemize{
 \item \strong{Non-linear parameters (\code{nlpar})}: Model parameters that enter the
-likelihood through a non-linear formula, like \code{kappa} and \code{thetat} of
-\code{\link[=mixture3p]{mixture3p()}} or \code{c} and \code{a} of \code{\link[=m3]{m3()}}
+likelihood through a non-linear formula, like \code{c} and \code{a} of \code{\link[=m3]{m3()}}
 \item \strong{Distributional parameters (\code{dpar})}: Parameters of the response
-distribution itself, like \code{kappa} and \code{c} of \code{\link[=sdm]{sdm()}}
+distribution itself, like \code{kappa} and \code{c} of \code{\link[=sdm]{sdm()}} or \code{kappa} and
+\code{thetat} of \code{\link[=mixture2p]{mixture2p()}}
 }
 
 Users should not need to know this distinction - \code{conditional_effects.bmmfit()}
@@ -143,7 +143,7 @@ plot(ce_kappa)
 ce_kappa_log <- conditional_effects(fit, par = "kappa", scale = "sampling")
 plot(ce_kappa_log)
 
-# Get effects for thetat (memory probability)
+# Get effects for thetat (probability of a target response)
 ce_thetat <- conditional_effects(fit, par = "thetat")
 plot(ce_thetat)
 
