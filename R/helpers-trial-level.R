@@ -7,6 +7,9 @@
 # in other_vars$trial_level; data are never sniffed, because 0/1 counts with
 # one trial per cell are legal aggregated data. A model without the marker
 # takes cells only (m3, ezdm) or is a trial model anyway (circular, RT models)
+# psychometric_function() carries the marker too, but keeps its 0/1 rows as
+# they are and has no nTrials layer: for it the marker only tells
+# bmm_data_check() that a row is one trial of one participant
 is_trial_level <- function(model) {
   isTRUE(model$other_vars$trial_level)
 }
@@ -72,10 +75,10 @@ is_trial_level <- function(model) {
   data
 }
 
-# the "Trial-level data" part of the help page of every model that carries the
-# marker; model_docs() appends it under the trial-level requirements, with the
-# stimulus bullet only for the models whose sensitivity d has a criterion and a
-# bias anchor (not sdt_cdp(), whose stimulus column reaches dfam and drec)
+# the "Trial-level data" part of the help page of the SDT models that carry
+# the marker; model_docs() appends it under the trial-level requirements, with
+# the stimulus bullet only for the models whose sensitivity d has a criterion
+# and a bias anchor (not sdt_cdp(), whose stimulus column reaches dfam and drec)
 trial_level_docs <- paste0(
   "Without trial-level predictors or item terms, trial rows give the same ",
   "posterior as the counts aggregated from them, which are sufficient ",
