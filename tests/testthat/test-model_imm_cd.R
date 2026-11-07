@@ -201,6 +201,7 @@ test_that("check_data() refuses a missing set size and checks the distances as i
 })
 
 test_that("the set-size-1 levels of s, a and c are flagged as undetermined", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   data <- imm_cd_data()
   expect_warning(
     bmm(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 0 + set_size), data, cdimm_model(),
@@ -215,6 +216,7 @@ test_that("the set-size-1 levels of s, a and c are flagged as undetermined", {
 })
 
 test_that("an estimated criterion is announced with the bound", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   expect_message(
     bmm(bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1, criterion ~ 1), imm_cd_data(), cdimm_model(),
         backend = "mock", mock_fit = 1, rename = FALSE),
@@ -223,6 +225,7 @@ test_that("an estimated criterion is announced with the bound", {
 })
 
 test_that("the generated program passes the set size as an integer, the probe, non-targets and distances as reals", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   data <- imm_cd_data()
   code <- stancode(cdimm_formulas$full, data, cdimm_model())
   expect_match(code, "array[N] int vint1", fixed = TRUE)
