@@ -616,11 +616,11 @@ test_that("response categories are refused as predictors before brms sees them",
   dat <- mpt_2htm_data()
   expect_error(
     bmm(bmf(D ~ old, g ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
-    "response counts 'old' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+    "response column\\(s\\) 'old' hold what the model predicts.*formula\\(s\\) for: 'D'"
   )
   expect_error(
     check_model(model, dat, bmf(D ~ inv_logit(k * new), k ~ 1, g ~ 1)),
-    "response counts 'new' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+    "response column\\(s\\) 'new' hold what the model predicts.*formula\\(s\\) for: 'D'"
   )
 })
 
@@ -3053,4 +3053,195 @@ test_that("mpt keeps the trees as given before the restrictions", {
   expect_equal(deparse(restricted$other_vars$trees$old$branches$old), "D + (1 - D) * 0.5")
   expect_equal(deparse(restricted$other_vars$trees$new$branches$new), "D + (1 - D) * 0.5")
   expect_null(mpt(trees, tree_id = "item_type")$other_vars$unrestricted_trees)
+})
+
+############################################################################# !
+# ONE ROW PER TRIAL: mpt(response = )                                    ####
+############################################################################# !
+
+test_that("mpt(response = ) declares trial rows and says so", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  expect_identical(model$other_vars$response, "resp")
+  expect_true(is_trial_level(model))
+  expect_match(model$requirements, "One row per trial", fixed = TRUE)
+  expect_false(grepl("aggregated response counts", model$requirements, fixed = TRUE))
+  expect_output(print(model), "one row per trial; column 'resp' names the response category")
+
+  aggregated <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  expect_false(is_trial_level(aggregated))
+  expect_null(aggregated$other_vars$response)
+  expect_match(aggregated$requirements, "aggregated response counts", fixed = TRUE)
+  expect_output(print(aggregated), "response counts in one column per category")
+})
+
+test_that("mpt(response = ) refuses a response column named like a category or a built column", {
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "old"),
+    "response column 'old' has the name of a response category"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "item_type"),
+    "response column 'item_type' has the name of a response category, the tree_id column"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Y"),
+    "names 'Y' and 'nTrials' are reserved.*Please rename: 'Y'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "nTrials"),
+    "Please rename: 'nTrials'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = c("a", "b")),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = NA_character_),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = ""),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Idx_old"),
+    "column 'Idx_old' collides with a column that bmm builds.*model: 'Idx_old', 'Idx_new'\\."
+  )
+  expect_error(
+    mpt(mpt_impossible_trees(), tree_id = "tree", response = "Poss_dist"),
+    "column 'Poss_dist' collides .* bmm builds .*'Idx_withdist', 'Idx_nodist', 'Poss_dist'\\."
+  )
+  expect_true(is_trial_level(mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Idx_foo")))
+})
+
+test_that("mpt(response = ) allows Idx_<tree> only when no tree_id column builds it", {
+  only <- mpt_tree("only", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))
+  model <- mpt(only, response = "Idx_only")
+  expect_true(is_trial_level(model))
+  checked <- check_data(
+    model, data.frame(Idx_only = c("old", "new", "old")), bmf(D ~ 1, g ~ 1)
+  )
+  expect_identical(names(checked), c("nTrials", "Y"))
+  expect_equal(unname(checked$Y[, "old"]), c(1, 0, 1))
+
+  expect_error(
+    mpt(only, tree_id = "tt", response = "Idx_only"),
+    "column 'Idx_only' collides with a column that bmm builds from the model: 'Idx_only'\\."
+  )
+  two_trees <- list(
+    mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
+    mpt_tree("lure", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))
+  )
+  expect_error(
+    mpt(two_trees, tree_id = "item_type", response = "Idx_target"),
+    "column 'Idx_target' collides .* from the model: 'Idx_target', 'Idx_lure'\\."
+  )
+})
+
+test_that("revert_check_data() gives back a response column named like an indicator bmm does not build", {
+  only <- mpt_tree("only", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))
+  model <- mpt(only, response = "Idx_only")
+  checked <- check_data(model, data.frame(Idx_only = c("old", "new", "old")), bmf(D ~ 1, g ~ 1))
+  expect_identical(revert_check_data(model, checked)$Idx_only, c("old", "new", "old"))
+})
+
+test_that("check_data() on trial rows builds one-hot Y and drops the label column", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  dat <- mpt_trial_data()
+  checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
+  expect_false("resp" %in% names(checked))
+  expect_identical(colnames(checked$Y), c("old", "new"))
+  expect_equal(unname(checked$Y[, "old"]), as.numeric(dat$resp == "old"))
+  expect_identical(checked$nTrials, rep(1L, nrow(dat)))
+
+  dat$resp <- factor(dat$resp, levels = c("new", "old"))
+  from_factor <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
+  expect_identical(from_factor$Y, checked$Y)
+})
+
+test_that("check_data() on trial rows rejects unknown, missing and non-label responses", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  formula <- bmf(D ~ 1, g ~ 1)
+  dat <- mpt_trial_data()
+
+  unknown <- dat
+  unknown$resp[c(2, 7)] <- c("Old", "unsure")
+  expect_error(
+    check_data(model, unknown, formula),
+    paste0("All values of the response column 'resp' must name a response category.\n",
+           "Response categories: 'old', 'new'\nUnmatched values: 'Old', 'unsure'"),
+    fixed = TRUE
+  )
+
+  missing <- dat
+  missing$resp[c(4, 9)] <- NA
+  expect_error(
+    check_data(model, missing, formula),
+    "column 'resp' is missing in 2 row\\(s\\) \\(first: row 4\\).*not counted as 0 responses.*remove these rows"
+  )
+
+  numeric_resp <- dat
+  numeric_resp$resp <- as.integer(dat$resp == "old")
+  expect_error(
+    check_data(model, numeric_resp, formula),
+    "column 'resp' must be a character or factor column .* It is integer"
+  )
+
+  expect_error(
+    check_data(model, dat[names(dat) != "resp"], formula),
+    "The response column 'resp' is not present in the data."
+  )
+  dat$nTrials <- 1L
+  expect_error(check_data(model, dat, formula), "'nTrials' would be overwritten")
+})
+
+test_that("trial rows answered in a category their tree cannot produce are refused", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree", response = "resp")
+  dat <- data.frame(
+    id = factor(rep(1:2, each = 4)),
+    tree = rep(c("withdist", "withdist", "nodist", "nodist"), 2),
+    resp = c("corr", "dist", "npl", "corr", "dist", "npl", "dist", "corr")
+  )
+  expect_error(
+    check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1)),
+    "category 'dist' is declared impossible for 1 row\\(s\\).*first: row 7, count 1"
+  )
+})
+
+test_that("a trial-level formula cannot use the response column as a predictor", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  expect_error(
+    check_model(model, mpt_trial_data(), bmf(D ~ resp, g ~ 1)),
+    "response column\\(s\\) 'resp' hold what the model predicts.*formula\\(s\\) for: 'D'"
+  )
+})
+
+test_that("trial rows and the counts aggregated from them give the same Stan program", {
+  trial_model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  formula <- bmf(D ~ 1 + (1 | id), g ~ 1 + (1 | id))
+  trials <- mpt_trial_data()
+  cells <- aggregate(
+    cbind(old = trials$resp == "old", new = trials$resp == "new") ~ id + item_type,
+    trials, sum
+  )
+  expect_identical(stancode(formula, trials, trial_model), stancode(formula, cells, model))
+
+  data <- standata(formula, trials, trial_model)
+  expect_equal(unname(rowSums(data$Y)), rep(1, 20))
+  expect_identical(as.vector(data$trials), rep(1L, 20))
+})
+
+test_that("dmpt() of one-hot trial rows sums to the cell's log-pmf less the multinomial coefficient", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  pars <- c(D = 0.6, g = 0.5)
+  # tree old: P(old) = 0.6 + 0.4 * 0.5 = 0.8, P(new) = 0.2; 3 old, 2 new
+  trials <- list(c(old = 1, new = 0), c(old = 1, new = 0), c(old = 0, new = 1),
+                 c(old = 1, new = 0), c(old = 0, new = 1))
+  per_trial <- vapply(trials, function(x) dmpt(x, pars, model, tree = "old", log = TRUE),
+                      numeric(1))
+  expect_equal(sum(per_trial), 3 * log(0.8) + 2 * log(0.2))
+  cell <- dmpt(c(old = 3, new = 2), pars, model, tree = "old", log = TRUE)
+  # choose(5, 3) = 10
+  expect_equal(cell - log(10), sum(per_trial))
 })
