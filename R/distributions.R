@@ -135,6 +135,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'   single activation source is supported.
 #'
 #' @name SDMdist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param x Vector of quantiles
 #' @param q Vector of quantiles
@@ -1543,6 +1544,7 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
 #'
 #' @name ddm_dist
 #'
+#' @inheritSection bmm_distributions Vector arguments
 #' @param rt Vector of response times for which the density should be returned
 #' @param response Vector of responses for which the density should be returned
 #' @param n Number of random samples to generate. Until bmm 1.6.0, `n = 1`
@@ -2008,6 +2010,7 @@ times_nonzero <- function(count, log_prob) {
 #'   upper boundary.
 #'
 #' @name ezdm_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param mean_rt Observed mean reaction time(s) in seconds. For version
 #'   "3par", a numeric vector or single value. For version "4par", either a vector
@@ -2961,6 +2964,7 @@ sdt_bias <- function(hit_rate, fa_rate,
 #'   out of a fixed number of trials (a binomial likelihood).
 #'
 #' @name sdt_yn_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
@@ -3284,6 +3288,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
 #'   here `Ro`/`Rn` are supplied directly as probabilities in `[0, 1]`.
 #'
 #' @name sdt_dpsdt_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @inheritParams sdt_rating_dist
 #' @param Ro Numeric vector in `[0, 1]`. Recollection probability for old
@@ -3398,6 +3403,7 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
 #'   be even (an odd number of `thresholds`).
 #'
 #' @name sdt_metad_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @inheritParams sdt_rating_dist
 #' @param metad Numeric vector. Metacognitive sensitivity (type-2 sensitivity),
@@ -3505,6 +3511,7 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
 #'   generates (or evaluates) one observation per element.
 #'
 #' @name sdt_mafc_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param n_correct Integer vector. Number of correct responses.
 #' @param n_trials Integer vector. Total number of trials per observation.
@@ -3777,6 +3784,7 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'   (numerical integration).
 #'
 #' @name sdt_ranking_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param counts Integer matrix with one row per observation and one rank-count
 #'   column per rank position (1 = most likely target), or a vector for a
@@ -4151,6 +4159,7 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 #'   ordered rating categories (multinomial likelihood).
 #'
 #' @name sdt_rating_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param counts Integer matrix with one row per observation and one column
 #'   per rating category, ordered from "definitely noise" (1) to "definitely
@@ -4572,6 +4581,7 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #'   [sdt_cdp()] for the model and [sdt_rating()] when no R/K split is
 #'   available.
 #' @name sdt_cdp_dist
+#' @inheritSection bmm_distributions Vector arguments
 #' @param counts Integer matrix with one row per observation and one column per
 #'   response category in the canonical order `new`, `[guess]`, `know`,
 #'   `remember` (each block ordered by confidence; see [sdt_cdp()]), or a
