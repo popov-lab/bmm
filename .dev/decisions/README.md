@@ -25,9 +25,11 @@ record, and the old one is marked superseded with a link to the new one.
 
 | No. | Decision | Status |
 |---|---|---|
-| [0001](0001-release-scope-1.4-to-1.6.md) | Release scope for 1.4.0, 1.5.0 and 1.6.0 | accepted 2026-10-04 |
-| [0002](0002-release-integration-branches.md) | Integration branches for the next two releases | accepted 2026-10-04 |
+| [0001](0001-release-scope-1.4-to-1.6.md) | Release scope for 1.4.0, 1.5.0 and 1.6.0 | accepted 2026-10-04; scope sections superseded by 0008 |
+| [0002](0002-release-integration-branches.md) | Integration branches for the next two releases | accepted 2026-10-04; NEWS layout amended by 0008 |
 | [0003](0003-model-fit-files.md) | Large model-fit files: keep the history, stop the growth | accepted 2026-10-04 |
 | [0004](0004-test-tiers-and-budget.md) | Test tiers, a time budget, and rules for the test suite | accepted 2026-10-13 |
 | [0005](0005-model-contract-for-companions-and-extensions.md) | The model contract for companion and extension packages | proposed 2026-10-29 |
 | [0006](0006-trial-level-data-for-count-models.md) | Trial-level data for the count models | accepted 2026-11-02 |
+| [0007](0007-likert-cumulative-and-constructor-naming.md) | Cumulative response models for Likert items and constructor naming | accepted 2026-11-05 (on `dev-1.6.0`) |
+| [0008](0008-roadmap-to-2027-03.md) | Roadmap from November 2026 to the TeaP workshop (March 2027) | accepted 2026-11-06 |
