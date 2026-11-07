@@ -57,7 +57,7 @@ NULL
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
-#' @keywords deprecated
+#' @keywords deprecated internal
 #'
 #' @examples
 #' target_density <- function(x) brms::dvon_mises(x, mu = 0, kappa = 10)
