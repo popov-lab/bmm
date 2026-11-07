@@ -230,6 +230,7 @@ test_that("built_data_columns() names what each model's check_data() builds", {
   expect_setequal(declared("sdt_mafc"), c("m_afc", "dist_type"))
   expect_setequal(declared("sdt_ranking"), c("nTrials", "max_rank"))
   expect_setequal(declared("sdt_rating"), "nTrials")
+  expect_setequal(declared("sdt_rating_trial_level"), character(0))
   expect_setequal(declared("sdt_cdp"), "nTrials")
   expect_setequal(
     declared("mpt_impossible"),

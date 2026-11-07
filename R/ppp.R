@@ -215,9 +215,15 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 }
 
 .ppp_counts.default <- function(model, fit, draw_ids) {
+  observed <- .observed_counts(model, fit$data)
+  replicated <- brms::posterior_predict(fit, draw_ids = draw_ids)
+  # sdt_rating()'s trial family predicts the category of each row
+  if (length(dim(replicated)) == 2L) {
+    replicated <- .one_hot(replicated, colnames(observed))
+  }
   list(
-    observed = unclass(fit$data$Y),
-    replicated = brms::posterior_predict(fit, draw_ids = draw_ids),
+    observed = observed,
+    replicated = replicated,
     expected = brms::posterior_epred(fit, draw_ids = draw_ids)
   )
 }
