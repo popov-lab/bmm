@@ -10,9 +10,9 @@
 #' bmm models use two types of parameters internally in brms:
 #' \itemize{
 #'   \item **Distributional parameters (`dpar`)**: Used in models with
-#'     `custom_family(dpars = ...)` (e.g., SDM, EZDM)
+#'     `custom_family(dpars = ...)` (e.g., SDM, EZDM, mixture2p, mixture3p, IMM)
 #'   \item **Non-linear parameters (`nlpar`)**: Used in models with `bmf2bf()`
-#'     + `nlf()` (e.g., mixture2p, mixture3p, IMM, M3)
+#'     + `nlf()` (e.g., M3)
 #' }
 #'
 #' Users should not need to know this distinction. These methods intercept the

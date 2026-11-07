@@ -252,19 +252,18 @@ test_that("mu1 keeps working as a deprecated name for mu", {
   )
 })
 
-test_that("a formula for mu1 frees mu, with a warning", {
+test_that("a formula for mu1 still reaches mu, with a warning", {
   expect_warning(
     fit <- bmm(bmf(kappa ~ 1, thetat ~ 1, mu1 ~ 1), oberauer_lin_2017,
-      mixture2p("dev_rad"),
-      backend = "mock", mock_fit = 1, rename = FALSE
+      mixture2p("dev_rad"), backend = "mock", mock_fit = 1, rename = FALSE
     ),
     "renamed to 'mu'"
   )
-  # mu is fixed to 0 unless a formula frees it; before, the old name left it
-  # fixed under constant(0) and the location was silently not estimated
-  expect_null(fit$bmm$model$fixed_parameters$mu)
+  # mu is fixed to 0 unless a formula frees it, so a default intercept prior
+  # on the location shows that the mu1 formula reached it
   mu_rows <- fit$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "", ]
   expect_equal(mu_rows$prior, "normal(0, 0.5)")
+  expect_false("mu" %in% names(fit$bmm$model$fixed_parameters))
 })
 
 test_that("every version runs through the bmm() pipeline", {

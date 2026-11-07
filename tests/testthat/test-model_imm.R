@@ -177,6 +177,30 @@ test_that("a formula naming mu1 still fits, with a warning", {
     "'mu1' were renamed to 'mu'"
   )
   expect_true("mu" %in% names(fit$formula$pforms))
+  # mu is fixed to 0 unless a formula frees it, so a default intercept prior
+  # on the location shows that the mu1 formula reached it
+  mu_rows <- fit$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "", ]
+  expect_equal(mu_rows$prior, "normal(0, 0.5)")
+  expect_false("mu" %in% names(fit$bmm$model$fixed_parameters))
+})
+
+test_that("imm cites van den Berg et al. only with variable precision", {
+  expect_length(model_citation(imm_model()), 1)
+  vp <- model_citation(imm_model(variable_precision = TRUE))
+  expect_length(vp, 2)
+  expect_identical(vp[2], model_citation(mixture2p("y", variable_precision = TRUE))[2])
+})
+
+test_that("an intercept next to set_size reaches imm without a set-size-1 pin", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  # set size 1 is left to the priors; check_formula.imm() says which coefficients
+  fit <- suppressWarnings(
+    bmm(bmf(kappa ~ 1 + set_size, c ~ 1, a ~ 1 + set_size, s ~ 0 + set_size),
+      oberauer_lin_2017, imm_model(),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    )
+  )
+  expect_false(any(grepl("constant", fit$prior$prior[fit$prior$dpar %in% c("a", "s")])))
 })
 
 test_that("each imm family refuses the expected response under its own name", {

@@ -130,18 +130,18 @@ supply \code{newdata} for such models.
 }
 
 \section{Circular location parameters}{
-The circular models sample their location parameter (\code{mu} for \code{sdm} and
-\code{mixture2p}, \code{mu1} for \code{mixture3p} and \code{imm}) through a \code{tan_half} link, and it is
+The circular models sample their location parameter \code{mu} through a
+\code{tan_half} link, and it is
 returned in radians in \verb{(-pi, pi)} — a response bias relative to the target,
 since the response variable is the angular error. It is fixed to \code{0} unless
-the \code{bmmformula} predicts it explicitly, so an all-zero \code{mu1} means the model
+the \code{bmmformula} predicts it explicitly, so an all-zero \code{mu} means the model
 never estimated one.
 
 The inverse link is \code{2 * atan()}, and the caveat above applies to it with
-particular force: \code{2 * atan(b_mu1_conditionB)} is neither the bias in
+particular force: \code{2 * atan(b_conditionB)} is neither the bias in
 condition B nor the difference between conditions. The bias in condition B is
-\code{2 * atan(b_mu1_Intercept + b_mu1_conditionB)}, and the difference between the
-conditions is that value minus \code{2 * atan(b_mu1_Intercept)}, taken draw by
+\code{2 * atan(b_Intercept + b_conditionB)}, and the difference between the
+conditions is that value minus \code{2 * atan(b_Intercept)}, taken draw by
 draw.
 }
 

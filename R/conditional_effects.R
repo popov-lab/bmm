@@ -49,10 +49,10 @@
 #' bmm models use two types of parameters internally:
 #' \itemize{
 #'   \item **Non-linear parameters (`nlpar`)**: Model parameters that enter the
-#'     likelihood through a non-linear formula, like `kappa` and `thetat` of
-#'     [mixture3p()] or `c` and `a` of [m3()]
+#'     likelihood through a non-linear formula, like `c` and `a` of [m3()]
 #'   \item **Distributional parameters (`dpar`)**: Parameters of the response
-#'     distribution itself, like `kappa` and `c` of [sdm()]
+#'     distribution itself, like `kappa` and `c` of [sdm()] or `kappa` and
+#'     `thetat` of [mixture2p()]
 #' }
 #'
 #' Users should not need to know this distinction - `conditional_effects.bmmfit()`

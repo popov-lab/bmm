@@ -216,13 +216,14 @@ test_that("configure_model() drops the set-size sentinel machinery", {
   expect_match(code, "array[N] real vreal7", fixed = TRUE)
 })
 
-test_that("an intercept is still refused when set_size is a predictor", {
-  expect_error(
+test_that("set_size may now be used with an intercept", {
+  # the restriction existed so that the set-size-1 coefficient could be pinned
+  # by a constant prior; with a ragged likelihood there is nothing to pin
+  expect_silent(
     bmm(bmf(kappa ~ 1 + set_size, thetat ~ 1, thetant ~ 1), oberauer_lin_2017,
       nt_model(),
       backend = "mock", mock_fit = 1, rename = FALSE
-    ),
-    "contains \\s*an intercept"
+    )
   )
 })
 
@@ -322,6 +323,39 @@ test_that("the set-size-1 warning names exactly the coefficients no other trial 
   )
 })
 
+test_that("mixture3p and imm end their set-size-1 warnings with the same sentence", {
+  dat <- oberauer_lin_2017
+  last_sentence <- function(model, formula) {
+    model <- check_model(model, dat, formula)
+    messages <- character(0)
+    withCallingHandlers(
+      check_formula(model, check_data(model, dat, formula), formula),
+      warning = function(w) {
+        messages <<- c(messages, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+    expect_length(messages, 1)
+    sub(".*\\. ([^.]+\\.)$", "\\1", gsub("\\s+", " ", messages))
+  }
+  imm_bsc <- imm(
+    "dev_rad", nt_features = "col_nt", nt_distances = "dist_nt",
+    set_size = "set_size", regex = TRUE, version = "bsc"
+  )
+  from_mixture3p <- last_sentence(
+    nt_model(), bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size)
+  )
+  from_imm <- last_sentence(imm_bsc, bmf(kappa ~ 1, c ~ 1, s ~ 0 + set_size))
+  expect_equal(from_mixture3p, from_imm)
+  expect_equal(
+    from_mixture3p,
+    paste(
+      "Give set size 1 a level of its own in a factor, so that only the",
+      "set-size-1 coefficients depend on their priors."
+    )
+  )
+})
+
 test_that("every version runs through the bmm() pipeline", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017
@@ -364,9 +398,12 @@ test_that("every version's family refuses the expected response by name", {
   }
 })
 
-test_that("the capacity versions also cite the slot model", {
+test_that("the capacity versions cite the slot model, variable precision its source", {
   expect_length(model_citation(nt_model()), 1)
   expect_match(model_citation(nt_model(version = "slot"))[2], "Zhang, W., & Luck")
+  vp <- model_citation(nt_model(version = "slot", variable_precision = TRUE))
+  expect_length(vp, 3)
+  expect_identical(vp[3], model_citation(mixture2p("y", variable_precision = TRUE))[2])
 })
 
 test_that("a formula for mu1 still reaches mu, with a warning", {
@@ -380,6 +417,7 @@ test_that("a formula for mu1 still reaches mu, with a warning", {
   # on the location shows that the mu1 formula reached it
   mu_rows <- fit$prior[fit$prior$class == "Intercept" & fit$prior$dpar == "", ]
   expect_equal(mu_rows$prior, "normal(0, 0.5)")
+  expect_false("mu" %in% names(fit$bmm$model$fixed_parameters))
 })
 
 test_that("the Stan and R likelihoods agree for every version", {

@@ -137,7 +137,8 @@
       name = "Three-Parameter Mixture Model",
       citation = c(
         .mixture3p_citation,
-        if (version != "simple") .mixture3p_capacity_citation
+        if (version != "simple") .mixture3p_capacity_citation,
+        if (variable_precision) .circmix_vp_citation
       ),
       version = version,
       requirements = glue(
@@ -318,58 +319,10 @@ check_formula.mixture3p <- function(model, data, formula) {
     !isTRUE(any(data[["ss_numeric"]] == 1))) {
     return(invisible())
   }
-  coefs <- .set_size_one_unidentified(swap, swap_formula, data)
-  warnif(
-    length(coefs) > 0,
-    "Trials with a set size of 1 have no non-target, so they say nothing about \\
-    '{swap}'. The other trials do not determine {collapse_comma(coefs)} in the \\
-    formula for '{swap}', so the posteriors of these coefficients depend on \\
-    their priors. Give set size 1 a level of its own in a factor, and read that \\
-    level's coefficient as prior-only."
+  .warn_set_size_one(
+    .set_size_one_undetermined(swap, formula, data), swap,
+    reason = glue("say nothing about '{swap}'")
   )
-}
-
-# The coefficients of `formula` that the trials with more than one item leave
-# undetermined, named as in the fit's draws. Group-level terms are judged by
-# their columns pooled over groups, which is what their sd is estimated from.
-.set_size_one_unidentified <- function(par, formula, data) {
-  # a variable missing from the data is left to brms, which names it
-  vars <- all.vars(formula[[3]])
-  if (!all(vars %in% names(data))) {
-    return(character(0))
-  }
-  data <- data[stats::complete.cases(data[c(vars, "ss_numeric")]), ]
-  informed <- data[["ss_numeric"]] > 1
-  bterms <- brms::brmsterms(brms::bf(formula))$dpars$mu
-  X <- get_model_matrix(bterms$fe, data)
-  out <- if (!is.null(X)) glue("b_{par}_{.undetermined_columns(X, informed)}")
-  re <- bterms$re
-  if (is.data.frame(re)) {
-    for (i in seq_len(nrow(re))) {
-      Z <- get_model_matrix(re$form[[i]], data)
-      out <- c(out, glue("sd_{re$group[i]}__{par}_{.undetermined_columns(Z, informed)}"))
-    }
-  }
-  as.character(out)
-}
-
-# Columns of X involved in a direction that X[rows, ] leaves free but X fixes
-.undetermined_columns <- function(X, rows) {
-  norms <- sqrt(colSums(X^2))
-  X <- sweep(X, 2, ifelse(norms > 0, norms, 1), "/")
-  free <- .null_space(X)
-  free_in_rows <- .null_space(X[rows, , drop = FALSE])
-  lost <- free_in_rows - free %*% crossprod(free, free_in_rows)
-  colnames(X)[rowSums(abs(lost)) > 1e-8]
-}
-
-.null_space <- function(M) {
-  if (!nrow(M)) {
-    return(diag(ncol(M)))
-  }
-  s <- svd(M, nu = 0, nv = ncol(M))
-  d <- c(s$d, rep(0, ncol(M) - length(s$d)))
-  s$v[, d <= 1e-8 * max(d), drop = FALSE]
 }
 
 ############################################################################# !

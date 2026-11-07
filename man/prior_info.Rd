@@ -64,7 +64,7 @@ and \code{kappa2} of a two-component \code{brms::mixture()} family), and the
 mixture-weight reference component \code{theta2}, which brms lists with a
 default prior although the sampler holds it at zero. Fixed parameters the
 model does declare are reported, since the user can estimate them: \code{mu}
-for \code{sdm()}, \code{mu1} for the circular mixture models, \code{zr} for \code{ddm()}.
+for \code{sdm()} and the circular mixture models, \code{zr} for \code{ddm()}.
 }
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}

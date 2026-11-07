@@ -38,9 +38,9 @@ objects by automatically resolving whether a parameter is a distributional
 bmm models use two types of parameters internally in brms:
 \itemize{
 \item \strong{Distributional parameters (\code{dpar})}: Used in models with
-\code{custom_family(dpars = ...)} (e.g., SDM, EZDM)
+\code{custom_family(dpars = ...)} (e.g., SDM, EZDM, mixture2p, mixture3p, IMM)
 \item \strong{Non-linear parameters (\code{nlpar})}: Used in models with \code{bmf2bf()}
-+ \code{nlf()} (e.g., mixture2p, mixture3p, IMM, M3)
++ \code{nlf()} (e.g., M3)
 }
 
 Users should not need to know this distinction. These methods intercept the
