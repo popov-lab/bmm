@@ -2162,35 +2162,48 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
 
   .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
 
+  if (version == "4par") {
+    pair_or_matrix <- function(x) if (is.matrix(x)) ncol(x) == 2 else length(x) %in% c(0, 2)
+    stopif(
+      !pair_or_matrix(mean_rt) || !pair_or_matrix(var_rt),
+      "mean_rt and var_rt must be length 2 (one observation) or matrices with 2 columns"
+    )
+    # a vector holds the upper and lower summaries of one observation, so it
+    # recycles as one row beside a matrix
+    mean_rt <- matrix(mean_rt, ncol = 2)
+    var_rt <- matrix(var_rt, ncol = 2)
+  }
+
+  # zr is not a parameter of version "3par", so it does not set the length there
+  n <- .obs_length(
+    mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, s,
+    if (version == "4par") zr
+  )
+  if (n == 0L) {
+    return(numeric(0))
+  }
+
+  # the count checks compare recycled vectors, so that lengths that are not
+  # multiples of each other recycle silently, as the contract requires
+  n_upper <- rep_len(n_upper, n)
+  n_trials <- rep_len(n_trials, n)
   stopif(isTRUE(any(n_upper < 0)), "n_upper cannot be negative")
   stopif(isTRUE(any(n_upper > n_trials)), "n_upper cannot exceed n_trials")
   stopif(
     isTRUE(any(n_upper != round(n_upper) | n_trials != round(n_trials))),
     "n_upper and n_trials must be whole numbers"
   )
-  if (.obs_length(mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, zr, s) == 0L) {
-    return(numeric(0))
-  }
 
-  if (version == "4par") {
-    if (!is.matrix(mean_rt)) {
-      stopif(
-        length(mean_rt) != 2 || length(var_rt) != 2,
-        "mean_rt and var_rt must be length 2 or matrices with 2 cols"
-      )
-    } else {
-      stopif(ncol(mean_rt) != 2, "mean_rt matrix must have 2 columns")
-      stopif(ncol(var_rt) != 2, "var_rt matrix must have 2 columns")
-    }
-    ll <- .dezdm_4par(
-      mean_rt, var_rt, n_upper, n_trials,
-      drift, bound, ndt, zr, s
-    )
+  mean_rt <- .recycle_obs(mean_rt, n)
+  var_rt <- .recycle_obs(var_rt, n)
+  drift <- rep_len(drift, n)
+  bound <- rep_len(bound, n)
+  ndt <- rep_len(ndt, n)
+  s <- rep_len(s, n)
+  ll <- if (version == "4par") {
+    .dezdm_4par(mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, rep_len(zr, n), s)
   } else {
-    ll <- .dezdm_3par(
-      mean_rt, var_rt, n_upper, n_trials,
-      drift, bound, ndt, s
-    )
+    .dezdm_3par(mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, s)
   }
 
   if (!log) {
@@ -2226,29 +2239,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   )
 }
 
-# Internal: 3par density - vectorized
-# Handles both: (1) vector observations with scalar parameters, and
-#               (2) scalar observations with vector parameters (for log_lik)
+# Internal: 3par density; dezdm() has recycled every argument to one length
 .dezdm_3par <- function(mean_rt, var_rt, n_upper, n_trials,
                         drift, bound, ndt, s) {
-  # determine common length from observations AND parameters
-  # this allows log_lik to work (scalar obs, vector params)
-  n <- max(
-    length(mean_rt), length(var_rt), length(n_upper),
-    length(n_trials), length(drift), length(bound),
-    length(ndt), length(s)
-  )
-
-  # recycle all inputs to common length
-  mean_rt <- rep_len(mean_rt, n)
-  var_rt <- rep_len(var_rt, n)
-  n_upper <- rep_len(n_upper, n)
-  n_trials <- rep_len(n_trials, n)
-  ndt <- rep_len(ndt, n)
-  drift <- rep_len(drift, n)
-  bound <- rep_len(bound, n)
-  s <- rep_len(s, n)
-
   # a symmetric start point makes the decision time independent of the boundary
   # hit, so all n_trials responses inform one set of cumulants
   moments <- .ezdm_moments_3par(drift, bound, s)
@@ -2263,67 +2256,20 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     )
 }
 
-# Internal: 4par density - vectorized
-# Handles both: (1) vector observations with scalar parameters, and
-#               (2) scalar observations with vector parameters (for log_lik)
-# mean_rt, var_rt: matrices with 2 columns (upper, lower) and n rows
-#                  OR vectors of length 2 for single observation
-# n_upper, n_trials: vectors of length n (or scalars for single obs)
-# drift, bound, ndt, zr, s: scalars or vectors (recycled)
+# Internal: 4par density; dezdm() has recycled every argument to one length,
+# mean_rt and var_rt to matrices with the upper and lower summaries as columns
 .dezdm_4par <- function(mean_rt, var_rt, n_upper, n_trials,
                         drift, bound, ndt, zr, s) {
-  # handle single observation (vectors) vs multiple (matrices)
-  if (is.matrix(mean_rt)) {
-    n_obs <- nrow(mean_rt)
-    mean_rt_upper <- mean_rt[, 1]
-    mean_rt_lower <- mean_rt[, 2]
-    var_rt_upper <- var_rt[, 1]
-    var_rt_lower <- var_rt[, 2]
-  } else {
-    # single observation - length 2 vectors
-    n_obs <- 1
-    mean_rt_upper <- mean_rt[1]
-    mean_rt_lower <- mean_rt[2]
-    var_rt_upper <- var_rt[1]
-    var_rt_lower <- var_rt[2]
-  }
-
-  # determine common length from observations AND parameters
-
-  # this allows log_lik to work (scalar obs, vector params)
-  n <- max(
-    n_obs, length(n_upper), length(n_trials),
-    length(drift), length(bound), length(ndt),
-    length(zr), length(s)
-  )
-
-  # recycle observation values to common length
-  mean_rt_upper <- rep_len(mean_rt_upper, n)
-  mean_rt_lower <- rep_len(mean_rt_lower, n)
-  var_rt_upper <- rep_len(var_rt_upper, n)
-  var_rt_lower <- rep_len(var_rt_lower, n)
-  n_upper <- rep_len(n_upper, n)
-  n_trials <- rep_len(n_trials, n)
+  mean_rt_upper <- mean_rt[, 1]
+  mean_rt_lower <- mean_rt[, 2]
+  var_rt_upper <- var_rt[, 1]
+  var_rt_lower <- var_rt[, 2]
 
   n_lower <- n_trials - n_upper
   moments <- .ezdm_moments_4par(drift, bound, zr, s)
-
-  # recycle moments and ndt to common length
-  mdt_upper <- rep_len(moments$mdt_upper, n)
-  mdt_lower <- rep_len(moments$mdt_lower, n)
-  vrt_upper <- rep_len(moments$vrt_upper, n)
-  vrt_lower <- rep_len(moments$vrt_lower, n)
-  k3_upper <- rep_len(moments$k3_upper, n)
-  k3_lower <- rep_len(moments$k3_lower, n)
-  k4_upper <- rep_len(moments$k4_upper, n)
-  k4_lower <- rep_len(moments$k4_lower, n)
-  ndt <- rep_len(ndt, n)
-
-  b_upper <- rep_len(zr * bound, n)
-  b_lower <- rep_len((1 - zr) * bound, n)
   ll <- .ez_binomial_logit(
     n_upper, n_trials,
-    .ezdm_logit_pc(b_upper, b_lower, rep_len(drift / s^2, n))
+    .ezdm_logit_pc(zr * bound, (1 - zr) * bound, drift / s^2)
   )
 
   # a boundary with fewer than two responses has no sample variance, and one
@@ -2342,7 +2288,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   if (any(upper_valid)) {
     ll[upper_valid] <- ll[upper_valid] + boundary_ll(
       upper_valid, mean_rt_upper, var_rt_upper, n_upper,
-      mdt_upper, vrt_upper, k3_upper, k4_upper
+      moments$mdt_upper, moments$vrt_upper, moments$k3_upper, moments$k4_upper
     )
   }
 
@@ -2350,7 +2296,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   if (any(lower_valid)) {
     ll[lower_valid] <- ll[lower_valid] + boundary_ll(
       lower_valid, mean_rt_lower, var_rt_lower, n_lower,
-      mdt_lower, vrt_lower, k3_lower, k4_lower
+      moments$mdt_lower, moments$vrt_lower, moments$k3_lower, moments$k4_lower
     )
   }
 

@@ -185,6 +185,39 @@ test_that("dezdm() recycles the summary statistics and the parameters to the lon
                      fixed = list(version = "4par"))
 })
 
+test_that("dezdm() recycles parameters of non-multiple lengths to a longer set of observations", {
+  # the counts are checked after recycling, so non-multiple lengths raise no warning
+  expect_elementwise(dezdm, list(mean_rt = 0.6, var_rt = 0.04, n_upper = c(20, 22, 18, 21), n_trials = c(40, 42, 45),
+                                 drift = c(0.8, 1, 1.2), bound = 1.4, ndt = c(0.25, 0.3)))
+  # zr is not a parameter of version "3par" and does not count towards the length
+  expect_elementwise(dezdm, list(mean_rt = c(0.6, 0.65), var_rt = 0.04, n_upper = 20, n_trials = 40, drift = 0.8,
+                                 bound = 1.4, ndt = 0.25),
+                     fixed = list(zr = numeric(0)))
+  expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62)), var_rt = rbind(c(0.03, 0.05)),
+                                 n_upper = c(20, 22, 18, 21), n_trials = c(40, 42, 45), drift = 0.8,
+                                 bound = c(1.2, 1.5, 1.8), ndt = 0.25, zr = c(0.4, 0.6)),
+                     fixed = list(version = "4par"))
+  expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62)), var_rt = rbind(c(0.03, 0.05), c(0.06, 0.02)),
+                                 n_upper = 20, n_trials = 40, drift = 0.8, bound = 1.4, ndt = 0.25),
+                     fixed = list(version = "4par"))
+})
+
+test_that("dezdm() reads a length-2 vector beside a matrix as one 4par observation", {
+  pair_mean <- c(0.55, 0.62)
+  pair_var <- c(0.03, 0.05)
+  var_rt <- rbind(c(0.03, 0.05), c(0.06, 0.02))
+  expect_elementwise(dezdm, list(var_rt = var_rt, n_upper = 20, n_trials = 40,
+                                 drift = 0.8, bound = 1.4, ndt = 0.25),
+                     fixed = list(mean_rt = pair_mean, version = "4par"))
+  expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62), c(0.5, 0.6)), n_upper = 20, n_trials = 40,
+                                 drift = 0.8, bound = 1.4, ndt = 0.25),
+                     fixed = list(var_rt = pair_var, version = "4par"))
+  expect_equal(
+    dezdm(pair_mean, var_rt, 20, 40, drift = 0.8, bound = 1.4, ndt = 0.25, version = "4par"),
+    dezdm(rbind(c(0.55, 0.62), c(0.55, 0.62)), var_rt, 20, 40, drift = 0.8, bound = 1.4, ndt = 0.25, version = "4par")
+  )
+})
+
 test_that("rezdm() returns n draws, draw i from the i-th parameter elements", {
   withr::local_seed(4444)
   drift <- c(1, 2, 0.5)
