@@ -139,6 +139,14 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   if (is.matrix(x)) x[rep_len(seq_len(nrow(x)), n), , drop = FALSE] else rep_len(x, n)
 }
 
+# the n check of the exported r*() samplers, the same as in rsdm()
+.check_n_draws <- function(n) {
+  stopif(
+    !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
+    "n must be a single positive whole number."
+  )
+}
+
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
 #' @description Density, distribution function, and random generation for the
@@ -1629,7 +1637,7 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
 #' @name ddm_dist
 #' @export
 rddm <- function(n, drift, bound, ndt, zr = 0.5) {
-  stopif(length(n) != 1 || is.na(n) || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   max_len <- max(lengths(list(drift, bound, ndt, zr)))
   # until 1.6.0, n = 1 with parameter vectors still means one draw per element
   if (n == 1 && max_len > 1) {
@@ -2219,7 +2227,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   version <- match.arg(version)
 
   .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
-  stopif(length(n) > 1, "n must be a single integer")
+  .check_n_draws(n)
 
   if (version == "4par") {
     .rezdm_4par(n, n_trials, drift, bound, ndt, zr, s)
@@ -3050,7 +3058,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
                     bias = NULL, sdratio = 1,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(!is.numeric(stimulus) && !is.logical(stimulus),
          "stimulus must be numeric or logical, coded 0 (noise) or 1 (signal); \\
@@ -3345,7 +3353,7 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3454,7 +3462,7 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3557,7 +3565,7 @@ rsdt_mafc <- function(n, n_trials, m, d,
                       dist = c("normal", "gumbel_min", "gumbel_max",
                                "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(n_trials < 1), "n_trials must be positive")
 
@@ -3858,7 +3866,7 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
 rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
                          dist = c("gumbel_min", "normal")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(sdratio <= 0), "sdratio must be positive")
@@ -4230,7 +4238,7 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
                         dist = c("normal", "gumbel_min", "gumbel_max",
                                  "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -4667,7 +4675,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
                      rcrit, kcrit = NULL, sigmar = 0, rho = 0,
                      n_new = NULL, dist = "normal") {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -4865,7 +4873,7 @@ rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lap
                                                "gumbel_max", "weibull", "lognormal",
                                                "loglogistic")) {
   sigmoid <- match.arg(sigmoid)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  .check_n_draws(n)
   stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(n_trials < 1), "n_trials must be positive")
   .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)

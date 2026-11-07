@@ -724,6 +724,31 @@ test_that("rddm returns data frame with correct structure", {
   expect_true(all(res$response %in% c(0, 1)))
 })
 
+test_that("the samplers refuse an n that is not a single positive whole number", {
+  withr::local_seed(4443)
+  calls <- list(
+    rddm = function(n) rddm(n, drift = 1, bound = 1, ndt = 0.2),
+    rezdm = function(n) rezdm(n, n_trials = 100, drift = 1, bound = 1, ndt = 0.2),
+    rsdt_yn = function(n) rsdt_yn(n, 10, 1, 1, criterion = 0),
+    rsdt_rating = function(n) rsdt_rating(n, 10, 1, 1, thresholds = c(-0.5, 0.5)),
+    rsdt_dpsdt = function(n) rsdt_dpsdt(n, 10, 1, 1, thresholds = c(-0.5, 0.5), Ro = 0.2),
+    rsdt_metad = function(n) rsdt_metad(n, 10, 1, 1, thresholds = c(-0.5, 0, 0.5), metad = 1),
+    rsdt_mafc = function(n) rsdt_mafc(n, 10, m = 2, d = 1),
+    rsdt_ranking = function(n) rsdt_ranking(n, 10, m = 3, d = 1),
+    rsdt_cdp = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = c(-0.5, 0.5, 1),
+                                    rcrit = 0.5, n_new = 1),
+    rpsychometric_function = function(n) rpsychometric_function(n, 0, midpoint = 0, width = 1)
+  )
+  for (name in names(calls)) {
+    for (bad in list(2.5, NA, NA_real_, 0, -1, c(2, 3), "3", numeric(0), Inf)) {
+      expect_error(calls[[name]](bad), "n must be a single positive whole number",
+                   info = paste(name, format(bad)))
+    }
+    out <- calls[[name]](2)
+    expect_equal(NROW(out), 2, info = name)
+  }
+})
+
 test_that("rddm handles vector parameters correctly", {
   withr::local_seed(445)
   n <- 5
@@ -1527,7 +1552,7 @@ test_that("rezdm validates parameters correctly", {
   withr::local_seed(445)
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
-    "n must be a single integer"
+    "n must be a single positive whole number"
   )
 
   # n_trials must be larger than 2
