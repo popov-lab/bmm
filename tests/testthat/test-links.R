@@ -271,18 +271,6 @@ test_that("a custom link set on a model reaches the brms family", {
   expect_equal(c(family$link_thetat, family$link_thetant), c("identity", "identity"))
 })
 
-test_that("a custom link set on imm reaches its custom family", {
-  ff <- bmmformula(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
-  model <- imm("dev_rad", nt_features = paste0("col_nt", 1:7),
-    nt_distances = paste0("dist_nt", 1:7), set_size = "set_size",
-    links = list(c = "softplus")
-  )
-  data <- check_data(model, oberauer_lin_2017, ff)
-  family <- configure_model(model, data, ff)$formula$family
-  expect_equal(family$link_c, "softplus")
-  expect_equal(family$link_a, "log")
-})
-
 test_that("a custom link set on mixture2p reaches its custom family", {
   dat <- data.frame(y = c(0.1, -0.2, 0.3), ss = c(2, 4, 6))
   model <- mixture2p("y", set_size = "ss", version = "slot",
@@ -293,6 +281,18 @@ test_that("a custom link set on mixture2p reaches its custom family", {
   family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
   expect_equal(family$link_kappa, "softplus")
   expect_equal(family$link_K, "softplus")
+})
+
+test_that("a custom link set on imm reaches its custom family", {
+  ff <- bmmformula(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
+  model <- imm("dev_rad", nt_features = paste0("col_nt", 1:7),
+    nt_distances = paste0("dist_nt", 1:7), set_size = "set_size",
+    links = list(c = "softplus")
+  )
+  data <- check_data(model, oberauer_lin_2017, ff)
+  family <- configure_model(model, data, ff)$formula$family
+  expect_equal(family$link_c, "softplus")
+  expect_equal(family$link_a, "log")
 })
 
 test_that("links set after construction are checked by the pipeline", {
