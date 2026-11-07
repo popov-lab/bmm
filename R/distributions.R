@@ -1,9 +1,43 @@
-#' Rejection Sampling
+#' @title Vector arguments of the distribution functions
 #'
-#' Performs rejection sampling to generate samples from a target distribution.
-#' Each draw can come from its own target: draw `i` is sampled from `f`
-#' evaluated at the `i`-th element of every per-draw argument in `...`, under
-#' the envelope `max_f[i]`.
+#' @description The density (`d*()`) and random generation (`r*()`) functions
+#'   of the bmm models take their per-observation arguments as vectors, or as
+#'   matrices with one row per observation, and recycle them as [stats::dnorm()]
+#'   and [stats::rnorm()] do. This page states the rules; the help page of each
+#'   distribution repeats them under "Vector arguments".
+#'
+#' @section Vector arguments:
+#' - `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or matrix
+#'   with `n` rows. Every per-observation argument (a parameter, a stimulus, a
+#'   number of trials) is recycled to length `n` with [rep_len()], as in
+#'   [stats::rnorm()]: draw `i` uses element `i`, or row `i` of a matrix. A
+#'   shorter vector is repeated, also when `n` is not a multiple of its
+#'   length.
+#' - `d*(x, ...)` returns one value per observation: as many as the longest of
+#'   `x` (its rows, when the observations are rows of counts) and the
+#'   per-observation arguments, the others recycled to that length. Value `i`
+#'   is what the call on the `i`-th elements alone returns. An empty `x`
+#'   gives an empty result.
+#' - A set of values that describes one observation, such as the `thresholds`
+#'   of the rating models, is a vector when every observation shares it and a
+#'   matrix with one row per observation otherwise: row `i` belongs to
+#'   observation `i`, or to draw `i`.
+#' - Configuration arguments such as `version`, `dist`, `log`,
+#'   `parametrization` and `n_new` are single values and are never recycled.
+#'
+#' @name bmm_distributions
+#' @keywords distribution
+NULL
+
+#' @title Deprecated: rejection sampling
+#'
+#' @description `rejection_sampling()` is deprecated since bmm 1.5.0 and will
+#'   be removed in bmm 1.6.0 at the earliest. It was the sampler behind
+#'   [rsdm()], which no longer needs the export; nothing replaces it. It still
+#'   performs rejection sampling from a target distribution, with a warning.
+#'   Each draw can come from its own target: draw `i` is sampled from `f`
+#'   evaluated at the `i`-th element of every per-draw argument in `...`, under
+#'   the envelope `max_f[i]`.
 #'
 #' @param n Integer. The number of samples to generate.
 #' @param f Function. The target density divided by the proposal density, up to
@@ -23,22 +57,12 @@
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
-#' @keywords distribution
+#' @keywords deprecated
 #'
 #' @examples
 #' target_density <- function(x) brms::dvon_mises(x, mu = 0, kappa = 10)
 #' proposal <- function(n) runif(n, min = -pi, max = pi)
-#' samples <- rejection_sampling(10000, target_density, max_f = target_density(0), proposal)
-#' hist(samples, freq = FALSE)
-#' curve(target_density, col = "red", add = TRUE)
-#'
-#' # one location per draw
-#' mu <- rep(c(0, 2), 5000)
-#' samples <- rejection_sampling(
-#'   10000, brms::dvon_mises, max_f = brms::dvon_mises(0, 0, 10), proposal,
-#'   mu = mu, kappa = 10
-#' )
-#' tapply(samples, mu, mean)
+#' samples <- rejection_sampling(1000, target_density, max_f = target_density(0), proposal)
 rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   stopif(
     !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
@@ -48,7 +72,17 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
     !is.numeric(max_f) || !length(max_f) %in% c(1, n) || !all(is.finite(max_f) & max_f > 0),
     "max_f must be finite and positive, with one value or one value per draw."
   )
+  warn_deprecated("rejection_sampling()", NULL, since = "1.5.0")
+  .rejection_sampling(n, f, max_f, proposal_fun, ...)
+}
 
+# Draw i is sampled from f at the i-th element of every length-n argument in
+# ..., under the envelope max_f[i]; arguments of any other length are passed
+# whole to f (the callers recycle what they want per draw). f takes a vector
+# of proposals, generally not of length n, and must be vectorized over it and
+# over the per-draw arguments. max_f has one value or one per draw, and a
+# bound below the maximum of f biases the draws without a warning.
+.rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   dots <- list(...)
   per_draw <- n > 1 & lengths(dots) == n
   max_f <- rep_len(max_f, n)
@@ -74,9 +108,22 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   out
 }
 
-# a single value is passed to rejection_sampling() whole rather than repeated
+# a single value is passed to .rejection_sampling() whole rather than repeated
 # for every draw, so that f computes what depends on it (e.g. besselI) once
 .recycle_draws <- function(x, n) if (length(x) == 1) x else rep_len(x, n)
+
+# The common length of a d*() call's per-observation arguments (contract in
+# ?bmm_distributions): the longest, counting a matrix by its rows, or 0 when
+# one of them is empty, as in dnorm(). .recycle_obs() then gives observation i
+# element i of a vector and row i of a matrix.
+.obs_length <- function(...) {
+  lens <- vapply(list(...), function(a) if (is.matrix(a)) nrow(a) else length(a), integer(1))
+  if (any(lens == 0L)) 0L else max(lens)
+}
+
+.recycle_obs <- function(x, n) {
+  if (is.matrix(x)) x[rep_len(seq_len(nrow(x)), n), , drop = FALSE] else rep_len(x, n)
+}
 
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
@@ -175,13 +222,18 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   .check_sdm_args(c, kappa, parametrization)
   .dsdm_numer <- .sdm_numer(parametrization)
 
-  lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
-
-  denom <- if (any(length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
+  n <- .obs_length(x, mu, c, kappa)
+  x <- rep_len(x, n)
+  # scalar parameters keep the single normalising integral
+  denom <- if (any(lengths(list(mu, c, kappa)) > 1)) {
+    mu <- rep_len(mu, n)
+    c <- rep_len(c, n)
+    kappa <- rep_len(kappa, n)
     .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
   } else {
     .dsdm_integrate_numer(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
   }
+  lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
 
   denom <- 2 * denom
 
@@ -240,7 +292,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 
   # compare to the peak on the log scale: the unnormalized density itself
   # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
-  rejection_sampling(
+  .rejection_sampling(
     n = n,
     f = function(x, mu, c, kappa) {
       exp(.dsdm_numer(x, mu, c, kappa, log = TRUE) - .dsdm_numer(mu, mu, c, kappa, log = TRUE))
