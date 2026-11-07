@@ -707,11 +707,14 @@ test_that("dddm rejects invalid response codes", {
   )
 })
 
-test_that("dddm rejects mismatched rt and response lengths", {
-  expect_error(
-    dddm(c(0.5, 0.6), 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE),
-    "Different number of RTs and responses"
+test_that("dddm recycles rt and response of different lengths", {
+  expect_equal(
+    dddm(0.6, c(1, 0), drift = 1, bound = 1, ndt = 0.2, log = FALSE),
+    c(dddm(0.6, 1, drift = 1, bound = 1, ndt = 0.2, log = FALSE),
+      dddm(0.6, 0, drift = 1, bound = 1, ndt = 0.2, log = FALSE))
   )
+  expect_length(dddm(c(0.5, 0.6, 0.7), c(1, 0), drift = 2, bound = 1.5, ndt = 0.3, log = TRUE), 3)
+  expect_length(dddm(numeric(0), c(1, 0), drift = 2, bound = 1.5, ndt = 0.3, log = TRUE), 0)
 })
 
 test_that("rddm returns data frame with correct structure", {

@@ -108,6 +108,9 @@ test_that("dddm() recycles the observations and the parameters to the longest ar
                      fixed = list(log = FALSE))
   expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8), response = c("upper", "lower", "upper"),
                                 drift = 1, bound = c(1, 1.5), ndt = 0.2))
+  expect_elementwise(dddm, list(rt = 0.6, response = c(1, 0), drift = 1, bound = 1, ndt = 0.2))
+  expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8), response = c("upper", "lower"),
+                                drift = c(1, 2), bound = 1, ndt = 0.2))
 })
 
 test_that("rddm() returns n draws, draw i from the i-th parameter elements", {

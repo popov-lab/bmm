@@ -1612,13 +1612,7 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
     vector with 'upper' and 'lower'."
   )
 
-  stopif(
-    length(rt) != length(response),
-    "Different number of RTs and responses passed to dddm. \\
-    Please pass vectors of equal length."
-  )
-
-  n <- .obs_length(rt, drift, bound, ndt, zr)
+  n <- .obs_length(rt, response, drift, bound, ndt, zr)
   if (n == 0L) return(numeric(0))
   bound <- rep_len(bound, n)
   zr <- rep_len(zr, n)
