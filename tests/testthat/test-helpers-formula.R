@@ -154,10 +154,10 @@ test_that("add_missing_parameters adds only the first of a set of alternatives",
   model$alternative_parameters <- list(c("a", "s"))
 
   out <- suppressMessages(add_missing_parameters(model, bmf(c ~ 1)))
-  expect_equal(names(out), c("mu1", "kappa", "a", "c"))
+  expect_equal(names(out), c("mu", "kappa", "a", "c", "b"))
 
   out <- suppressMessages(add_missing_parameters(model, bmf(s ~ 1)))
-  expect_equal(names(out), c("mu1", "kappa", "c", "s"))
+  expect_equal(names(out), c("mu", "kappa", "c", "s", "b"))
   expect_message(add_missing_parameters(model, bmf(s ~ 1)), "parameter c ")
   expect_no_message(add_missing_parameters(model, bmf(c ~ 1, s ~ 1, kappa ~ 1)))
 })
