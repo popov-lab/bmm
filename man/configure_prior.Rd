@@ -31,46 +31,17 @@ object. The function will also recognize if the user has specified that some
 parameters should be fixed to a constant and put the appropriate constant
 priors. Any additional priors that a developer wants to specify, which are
 not based on information in the model object, can be defined in the
-configure_prior.* method for the model. See configure_prior.imm_full for an
-example.
+configure_prior.* method for the model, as \code{mpt} does; the example shows
+the form such a method takes.
 }
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
-configure_prior.mixture3p <- function(model, data, formula, user_prior, ...) {
-  # if there is set_size 1 in the data, set constant prior over thetant for set_size1
-  prior <- brms::empty_prior()
-  set_size_var <- model$other_vars$set_size
-  prior_cond <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
-
-  thetant_preds <- rhs_vars(formula$pforms$thetant)
-  if (prior_cond && set_size_var \%in\% thetant_preds) {
-    prior <- prior + brms::prior_("constant(-100)",
-      class = "b",
-      coef = paste0(set_size_var, 1),
-      nlpar = "thetant"
-    )
+configure_prior.mymodel <- function(model, data, formula, user_prior, ...) {
+  # a prior that depends on the data, which the model object cannot declare
+  if (!"condition" \%in\% names(data)) {
+    return(NULL)
   }
-  # check if there is a random effect on theetant that include set_size as predictor
-  bterms <- brms::brmsterms(formula$pforms$thetant)
-  re_terms <- bterms$dpars$mu$re
-  if (!is.null(re_terms)) {
-    for (i in 1:nrow(re_terms)) {
-      group <- re_terms$group[[i]]
-      form <- re_terms$form[[i]]
-      thetant_preds <- rhs_vars(form)
-
-      if (prior_cond && set_size_var \%in\% thetant_preds) {
-        prior <- prior + brms::prior_("constant(1e-8)",
-          class = "sd",
-          coef = paste0(set_size_var, 1),
-          group = group,
-          nlpar = "thetant"
-        )
-      }
-    }
-  }
-
-  prior
+  brms::prior_("normal(0, 0.5)", class = "b", dpar = "kappa")
 }
 \dontshow{\}) # examplesIf}
 }
