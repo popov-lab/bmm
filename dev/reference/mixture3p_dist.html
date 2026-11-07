@@ -7,11 +7,11 @@
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Distribution functions for the three-parameter mixture model (mixture3p) — mixture3p_dist"><meta name="description" content="Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of mu, precision of
-memory representations kappa, probability of recalling items from memory
-p_mem, and probability of recalling non-targets p_nt."><meta property="og:description" content="Density, distribution, and random generation functions for the
+memory representations kappa, probability of a target response p_mem,
+and probability of a non-target response p_nt."><meta property="og:description" content="Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of mu, precision of
-memory representations kappa, probability of recalling items from memory
-p_mem, and probability of recalling non-targets p_nt."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+memory representations kappa, probability of a target response p_mem,
+and probability of a non-target response p_nt."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -52,8 +52,8 @@ p_mem, and probability of recalling non-targets p_nt."><meta property="og:image"
     <div class="ref-description section level2">
     <p>Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of <code>mu</code>, precision of
-memory representations <code>kappa</code>, probability of recalling items from memory
-<code>p_mem</code>, and probability of recalling non-targets <code>p_nt</code>.</p>
+memory representations <code>kappa</code>, probability of a target response <code>p_mem</code>,
+and probability of a non-target response <code>p_nt</code>.</p>
     </div>
 
     <div class="section level2">
@@ -64,6 +64,8 @@ memory representations <code>kappa</code>, probability of recalling items from m
 <span>  kappa <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  p_mem <span class="op">=</span> <span class="fl">0.6</span>,</span>
 <span>  p_nt <span class="op">=</span> <span class="fl">0.2</span>,</span>
+<span>  tau <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  vp_nodes <span class="op">=</span> <span class="fl">81L</span>,</span>
 <span>  log <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -71,7 +73,7 @@ memory representations <code>kappa</code>, probability of recalling items from m
 <span></span>
 <span><span class="fu">qmixture3p</span><span class="op">(</span><span class="va">p</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>, kappa <span class="op">=</span> <span class="fl">5</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span>, p_nt <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">rmixture3p</span><span class="op">(</span><span class="va">n</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>, kappa <span class="op">=</span> <span class="fl">5</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span>, p_nt <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">rmixture3p</span><span class="op">(</span><span class="va">n</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>, kappa <span class="op">=</span> <span class="fl">5</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span>, p_nt <span class="op">=</span> <span class="fl">0.2</span>, tau <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -89,19 +91,46 @@ items.</p></dd>
 
 
 <dt id="arg-kappa">kappa<a class="anchor" aria-label="anchor" href="#arg-kappa"></a></dt>
-<dd><p>Vector of precision values</p></dd>
+<dd><p>Vector of precision values. With <code>tau &gt; 0</code> this is the
+concentration of the average trial, whose Fisher information <code>J(kappa)</code> is
+the mean of <code>J</code>.</p></dd>
 
 
 <dt id="arg-p-mem">p_mem<a class="anchor" aria-label="anchor" href="#arg-p-mem"></a></dt>
-<dd><p>Vector of probabilities for memory recall</p></dd>
+<dd><p>Vector of probabilities of a target response. For a
+<code><a href="mixture3p.html">mixture3p()</a></code> fit these are <code>thetat</code> on its native scale (version
+<code>"simple"</code>, see <code><a href="native_parameters.html">native_parameters()</a></code>) or <code>min(1, K / set_size) * ptarget</code>
+(versions <code>"slot"</code> and <code>"slot_averaging"</code>).</p></dd>
 
 
 <dt id="arg-p-nt">p_nt<a class="anchor" aria-label="anchor" href="#arg-p-nt"></a></dt>
-<dd><p>Vector of probabilities for swap errors</p></dd>
+<dd><p>Vector of probabilities of a non-target response, summed over
+the non-targets, which share it equally. For a <code><a href="mixture3p.html">mixture3p()</a></code> fit these are
+<code>thetant</code> on its native scale (version <code>"simple"</code>) or
+<code>min(1, K / set_size) * (1 - ptarget)</code> (capacity versions). Unlike
+<code>ptarget</code>, <code>p_mem</code> and <code>p_nt</code> are not conditional on a response from
+memory.</p></dd>
+
+
+<dt id="arg-tau">tau<a class="anchor" aria-label="anchor" href="#arg-tau"></a></dt>
+<dd><p>Vector of scales for trial-to-trial variability in precision. The
+Fisher information <code>J</code> of a memory representation is drawn from
+<code>gamma(mean = J(kappa), scale = tau)</code>. <code>tau = 0</code>, the default, is constant
+precision. See <code><a href="mixture3p.html">mixture3p()</a></code>.</p></dd>
+
+
+<dt id="arg-vp-nodes">vp_nodes<a class="anchor" aria-label="anchor" href="#arg-vp-nodes"></a></dt>
+<dd><p>Number of quadrature nodes used when <code>tau &gt; 0</code>; must be an
+odd number of at least 41. See <code><a href="mixture2p.html">mixture2p()</a></code>. The random generation
+function needs no nodes: it draws <code>J</code> from its gamma distribution and then
+the response, which is exact.</p></dd>
 
 
 <dt id="arg-log">log<a class="anchor" aria-label="anchor" href="#arg-log"></a></dt>
-<dd><p>Logical; if <code>TRUE</code>, values are returned on the log scale.</p></dd>
+<dd><p>Logical; if <code>TRUE</code>, values are returned on the log scale. Pass
+it by name: in bmm 1.4 it was the sixth argument, which is now <code>tau</code>.
+Until bmm 1.6.0 a logical value in that position is still read as <code>log</code>,
+with a warning.</p></dd>
 
 
 <dt id="arg-q">q<a class="anchor" aria-label="anchor" href="#arg-q"></a></dt>
@@ -120,15 +149,18 @@ items.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>dmixture3p</code> gives the density of the three-parameter mixture model,
 <code>pmixture3p</code> gives the cumulative distribution function of the
-two-parameter mixture model, <code>qmixture3p</code> gives the quantile function of
-the two-parameter mixture model, and <code>rmixture3p</code> gives the random
-generation function for the two-parameter mixture model.</p>
+three-parameter mixture model, <code>qmixture3p</code> gives the quantile function of
+the three-parameter mixture model, and <code>rmixture3p</code> gives the random
+generation function for the three-parameter mixture model.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>Bays, P. M., Catalao, R. F. G., &amp; Husain, M. (2009). The
 precision of visual working memory is set by allocation of a shared
-resource. Journal of Vision, 9(10), 7.</p>
+resource. Journal of Vision, 9(10), Article 7.</p>
+<p>van den Berg, R., Shin, H., Chou, W.-C., George, R., &amp; Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.</p>
     </div>
 
     <div class="section level2">

@@ -151,10 +151,10 @@ dat$n_old <- rsdt_yn(nrow(dat), dat$n_trials, dat$stimulus,
                      d = 1.5, criterion = 0.9)
 head(dat)
 #>   id stimulus n_trials n_old
-#> 1  1        0      100    19
-#> 2  2        0      100    17
-#> 3  3        0      100    14
-#> 4  4        0      100    15
-#> 5  5        0      100    16
-#> 6  6        0      100    17
+#> 1  1        0      100    22
+#> 2  2        0      100    20
+#> 3  3        0      100    20
+#> 4  4        0      100    22
+#> 5  5        0      100    14
+#> 6  6        0      100    25
 ```

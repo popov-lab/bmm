@@ -108,18 +108,17 @@ model parameter, each with draws in rows and prediction grid cells in
 columns. These are <code><a href="https://mc-stan.org/rstantools/reference/posterior_linpred.html" class="external-link">brms::posterior_linpred()</a></code> output, so they are on the
 <em>link</em> scale for distributional parameters and are the raw value for
 non-linear parameters. For <code>bmm</code>'s <code>nlpar</code>-based models the link is a
-fiction maintained by the model's own <code>nlf()</code> expression — <code>imm</code> declares
-<code>c = "log"</code> because <code>configure_model.imm_abc()</code> writes <code>exp(c)</code> into the
-formula, not because <code>brms</code> applies a link — so a model that declares a link
-it does not actually apply in its <code>nlf()</code> will get silently wrong output
-here.</p></dd>
+fiction maintained by the model's own <code>nlf()</code> expression, which has to
+apply the inverse of the declared link itself, so a model that declares a
+link it does not actually apply in its <code>nlf()</code> will get silently wrong
+output here.</p></dd>
 
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
 <dd><p>The prediction grid the draws were computed on, with one row per
 column of the <code>linpred</code> matrices. These are rows of the fitted model's own
 data, so they carry the <code>bmm</code>-internal columns a design-dependent
-transformation keys on (<code>LureIdx*</code>, <code>inv_ss</code>, <code>Idx_*</code>, matrix columns).
+transformation keys on (<code>ss_numeric</code>, <code>Idx_*</code>, matrix columns).
 <code>native_transform.non_targets()</code> is the worked example.</p></dd>
 
 

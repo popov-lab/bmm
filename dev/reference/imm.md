@@ -15,6 +15,9 @@ imm(
   set_size,
   regex = FALSE,
   version = c("full", "bsc", "abc"),
+  variable_precision = FALSE,
+  vp_nodes = 81L,
+  links = NULL,
   ...
 )
 
@@ -65,6 +68,29 @@ IMMabc(resp_error, nt_features, set_size, regex = FALSE, ...)
   Character. The version of the IMM model to use. Can be one of `full`,
   `bsc`, or `abc`. The default is `full`.
 
+- variable_precision:
+
+  Logical; if `TRUE`, the precision of memory varies from trial to trial
+  (van den Berg et al., 2012). This adds the parameter `tau`, and
+  `kappa` then describes the average trial: it is the concentration
+  whose Fisher information `J(kappa)` is the mean of `J`; see
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
+  for the parameterisation. The capacity models of Zhang and Luck (2008)
+  do not apply to the IMM, which has no discrete slots – its bottleneck
+  is the ratio of context to general activation – so variable precision
+  is the only extension offered here.
+
+- vp_nodes:
+
+  Number of quadrature nodes used when `variable_precision = TRUE`; must
+  be an odd number of at least 41, default 81. See
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
+  for the accuracy this buys and the shapes it refuses.
+
+- links:
+
+  A named list of link functions for the model parameters.
+
 - ...:
 
   used internally for testing, ignore it
@@ -91,22 +117,19 @@ An object of class `bmmodel`
 
 - **Requirements:**
 
-  - The response vairable should be in radians and represent the angular
+  - The response variable should be in radians and represent the angular
     error relative to the target
 
-&nbsp;
-
-- The non-target features should be in radians and be centered relative
-  to the target
-
-&nbsp;
+  - The non-target features should be in radians and be centered
+    relative to the target
 
 - **Parameters:**
 
-  - `mu1`: Location parameter of the von Mises distribution for memory
-    responses (in radians). Fixed internally to 0 by default.
+  - `mu`: Location of the von Mises distribution of memory responses (in
+    radians). Fixed internally to 0 by default.
 
-  - `kappa`: Concentration parameter of the von Mises distribution
+  - `kappa`: Concentration of the von Mises distribution of memory
+    responses
 
   - `a`: General activation of memory items
 
@@ -114,21 +137,25 @@ An object of class `bmmodel`
 
   - `s`: Spatial similarity gradient
 
+  - `b`: Background activation, the reference against which the
+    activations of the target and the non-targets are weighed. Fixed
+    internally to 0 on its log scale, i.e. to an activation of 1;
+    freeing it leaves the remaining activations unidentified, since only
+    their ratio to the background enters the likelihood.
+
 - **Fixed parameters:**
 
-  - `mu1` = 0
+  - `mu` = 0
 
-  - `mu2` = 0
-
-  - `kappa2` = -100
+  - `b` = 0
 
 - **Default parameter links:**
 
-  - mu1 = tan_half; kappa = log; a = log; c = log; s = log
+  - mu = tan_half; kappa = log; a = log; c = log; s = log; b = log
 
 - **Default priors:**
 
-  - `mu1`:
+  - `mu`:
 
     - `main`: normal(0, 0.5)
 
@@ -161,6 +188,14 @@ An object of class `bmmodel`
     - `sd`: exponential(1)
 
   - `s`:
+
+    - `main`: normal(0, 1)
+
+    - `effects`: normal(0, 1)
+
+    - `sd`: exponential(1)
+
+  - `b`:
 
     - `main`: normal(0, 1)
 
@@ -172,42 +207,43 @@ An object of class `bmmodel`
 
 - **Requirements:**
 
-  - The response vairable should be in radians and represent the angular
+  - The response variable should be in radians and represent the angular
     error relative to the target
 
-&nbsp;
-
-- The non-target features should be in radians and be centered relative
-  to the target
-
-&nbsp;
+  - The non-target features should be in radians and be centered
+    relative to the target
 
 - **Parameters:**
 
-  - `mu1`: Location parameter of the von Mises distribution for memory
-    responses (in radians). Fixed internally to 0 by default.
+  - `mu`: Location of the von Mises distribution of memory responses (in
+    radians). Fixed internally to 0 by default.
 
-  - `kappa`: Concentration parameter of the von Mises distribution
+  - `kappa`: Concentration of the von Mises distribution of memory
+    responses
 
   - `c`: Context activation
 
   - `s`: Spatial similarity gradient
 
+  - `b`: Background activation, the reference against which the
+    activations of the target and the non-targets are weighed. Fixed
+    internally to 0 on its log scale, i.e. to an activation of 1;
+    freeing it leaves the remaining activations unidentified, since only
+    their ratio to the background enters the likelihood.
+
 - **Fixed parameters:**
 
-  - `mu1` = 0
+  - `mu` = 0
 
-  - `mu2` = 0
-
-  - `kappa2` = -100
+  - `b` = 0
 
 - **Default parameter links:**
 
-  - mu1 = tan_half; kappa = log; c = log; s = log
+  - mu = tan_half; kappa = log; c = log; s = log; b = log
 
 - **Default priors:**
 
-  - `mu1`:
+  - `mu`:
 
     - `main`: normal(0, 0.5)
 
@@ -239,46 +275,55 @@ An object of class `bmmodel`
 
     - `sd`: exponential(1)
 
+  - `b`:
+
+    - `main`: normal(0, 1)
+
+    - `effects`: normal(0, 1)
+
+    - `sd`: exponential(1)
+
 ### Version: `abc`
 
 - **Requirements:**
 
-  - The response vairable should be in radians and represent the angular
+  - The response variable should be in radians and represent the angular
     error relative to the target
 
-&nbsp;
-
-- The non-target features should be in radians and be centered relative
-  to the target
-
-&nbsp;
+  - The non-target features should be in radians and be centered
+    relative to the target
 
 - **Parameters:**
 
-  - `mu1`: Location parameter of the von Mises distribution for memory
-    responses (in radians). Fixed internally to 0 by default.
+  - `mu`: Location of the von Mises distribution of memory responses (in
+    radians). Fixed internally to 0 by default.
 
-  - `kappa`: Concentration parameter of the von Mises distribution
+  - `kappa`: Concentration of the von Mises distribution of memory
+    responses
 
   - `a`: General activation of memory items
 
   - `c`: Context activation
 
+  - `b`: Background activation, the reference against which the
+    activations of the target and the non-targets are weighed. Fixed
+    internally to 0 on its log scale, i.e. to an activation of 1;
+    freeing it leaves the remaining activations unidentified, since only
+    their ratio to the background enters the likelihood.
+
 - **Fixed parameters:**
 
-  - `mu1` = 0
+  - `mu` = 0
 
-  - `mu2` = 0
-
-  - `kappa2` = -100
+  - `b` = 0
 
 - **Default parameter links:**
 
-  - mu1 = tan_half; kappa = log; a = log; c = log
+  - mu = tan_half; kappa = log; a = log; c = log; b = log
 
 - **Default priors:**
 
-  - `mu1`:
+  - `mu`:
 
     - `main`: normal(0, 0.5)
 
@@ -310,11 +355,78 @@ An object of class `bmmodel`
 
     - `sd`: exponential(1)
 
-Additionally, all imm models have an internal parameter that is fixed to
-0 to allow the model to be identifiable. This parameter is not estimated
-and is not included in the model formula. The parameter is:
+  - `b`:
 
-- b = "Background activation (internally fixed to 0)"
+    - `main`: normal(0, 1)
+
+    - `effects`: normal(0, 1)
+
+    - `sd`: exponential(1)
+
+## Priors from bmm 1.4
+
+Since bmm 1.5.0, the parameters of this model are distributional
+parameters (`dpar`) of a custom family, and the location `mu1` is called
+`mu`. Calls written for bmm 1.4 keep working until bmm 1.6.0 at the
+earliest: bmm translates their priors, formulas, `links` and
+`emmeans(nlpar = )`, and warns with the code to use instead.
+
+    # an intercept prior
+    set_prior("normal(2, 1)", class = "b", coef = "Intercept", nlpar = "kappa") # 1.4
+    set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")              # 1.5
+
+    # a prior on all coefficients
+    set_prior("normal(0, 0.5)", class = "b", nlpar = "kappa")                   # 1.4
+    set_prior("normal(0, 0.5)", class = "Intercept", dpar = "kappa") +          # 1.5
+      set_prior("normal(0, 0.5)", class = "b", dpar = "kappa")
+
+    # a prior on the random-effect standard deviations
+    set_prior("exponential(2)", class = "sd", nlpar = "kappa")                  # 1.4
+    set_prior("exponential(2)", class = "sd", dpar = "kappa")                   # 1.5
+
+    # the location, and emmeans()
+    bmf(mu1 ~ 1 + cond, kappa ~ 1 + cond)                                      # 1.4
+    bmf(mu ~ 1 + cond, kappa ~ 1 + cond)                                       # 1.5
+    emmeans(fit, ~ cond, nlpar = "kappa")                                      # 1.4
+    emmeans(fit, ~ cond, dpar = "kappa")                                       # 1.5
+
+In bmm 1.4 a `class = "b"` prior also covered the intercept, so it now
+becomes two priors with the same distribution, unless the intercept has
+a prior of its own. One prior changes its meaning. When a formula has an
+intercept and predictors, such as `kappa ~ 1 + cond`, brms centres the
+predictors of a distributional parameter, so an intercept prior applies
+at the average over the conditions, weighted by their number of trials,
+not at the reference condition. The slopes keep their meaning, and so do
+intercept-only formulas and formulas with one coefficient per condition
+(`kappa ~ 0 + cond`). If your intercept prior was meant for the
+reference condition, give it for the average instead.
+
+Two things are not translated. The draws of the location are named after
+`mu` (`b_Intercept` instead of `b_mu1_Intercept`), and calls that go
+straight to brms need `dpar =`:
+`posterior_linpred(fit, dpar = "kappa")`, not `nlpar = "kappa"`. Fits
+saved with bmm 1.4 work as before with
+[`summary()`](https://rdrr.io/r/base/summary.html),
+[`prior_info()`](https://venpopov.com/bmm/dev/reference/prior_info.md),
+`emmeans()`,
+[`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+and
+[`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md).
+[`update()`](https://rdrr.io/r/stats/update.html) samples them again
+under the custom family, translates their priors and says so in a
+message.
+
+## References
+
+Oberauer, K., & Lin, H.-Y. (2017). An interference model of visual
+working memory. Psychological Review, 124(1), 21-59.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
+
+Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
+representations in visual working memory. Nature, 453(7192), 233-235.
 
 ## Examples
 

@@ -97,6 +97,110 @@
   `vp_nodes`, and names the `vp_nodes` to refit with. Before, such a fit
   showed only the divergences. The refit takes about 1.5 times as long
   ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- mixture2p:
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
+  gains `version = "slot"` and `version = "slot_averaging"`, the
+  capacity models of Zhang and Luck (2008). In the slot model an item is
+  held at full precision or not at all; in slot averaging `K` slots are
+  shared out over the items, and an item holding more slots is more
+  precise. Both need `set_size`, which should vary: with a single set
+  size, `K` is estimated only below it.
+  [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
+  and
+  [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
+  gain `K`, `set_size` and `version`; their capacity versions stop
+  without `set_size`
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- mixture3p:
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
+  gains `version = "slot"` and `version = "slot_averaging"`, which
+  replace the target and non-target weights by a capacity `K` (how often
+  a response comes from memory) and `ptarget`, the probability that a
+  response from memory reports the target rather than a non-target. See
+  [`?mixture3p`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- mixture2p, mixture3p and imm: the new argument
+  `variable_precision = TRUE` lets memory precision vary from trial to
+  trial (van den Berg et al., 2012) and adds the parameter `tau`; `tau`
+  near 0 is the constant-precision model, and `kappa` then describes the
+  average trial (under slot averaging, the average slot). It works with
+  every version. Fits take much longer, and `tau` needs a lot of data.
+  `vp_nodes` sets the accuracy of the integral; where it is too low,
+  Stan rejects the proposal and says how far to raise it.
+  [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+  [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) and
+  [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) gain
+  `tau` ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- mixture2p, mixture3p and imm: the `links` argument is now applied,
+  e.g. `imm(..., links = list(c = "softplus"))`. Before, these models
+  refused any link change. mixture3p still refuses links on its mixture
+  weights `thetat` and `thetant`. The imm background activation `b` now
+  appears in the parameter list, fixed to 0 on its log scale, which is
+  an activation of 1
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+
+#### Bug fixes
+
+- [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
+  now returns one density per value when a parameter is a vector longer
+  than `x`, as in `dmixture2p(0.3, kappa = c(1, 5, 20))`
+  ([\#584](https://github.com/popov-lab/bmm/issues/584)). It stopped
+  with “number of items to replace is not a multiple of replacement
+  length”.
+- Fits made with bmm versions before 0.4.5 (development versions from
+  February and March 2024) work again with
+  [`update()`](https://rdrr.io/r/stats/update.html),
+  [`prior_info()`](https://venpopov.com/bmm/dev/reference/prior_info.md),
+  [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
+  and
+  [`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md).
+  For
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md),
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
+  and [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md) fits,
+  [`update()`](https://rdrr.io/r/stats/update.html) stopped with an
+  empty error message and the other functions failed;
+  [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md) fits of the
+  `bsc` and `abc` versions were read as `full`
+  ([\#458](https://github.com/popov-lab/bmm/issues/458)).
+- [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  now returns one density per value when a parameter is a vector longer
+  than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))`
+  ([\#585](https://github.com/popov-lab/bmm/issues/585)). It stopped
+  with “number of items to replace is not a multiple of replacement
+  length”.
+- [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) now
+  returns one density per value when a parameter is a vector longer than
+  `x`, as in `dimm(0.3, c = c(1, 5, 20))`
+  ([\#586](https://github.com/popov-lab/bmm/issues/586)). It returned a
+  single density, for the first value.
+
+#### Deprecated functions and arguments
+
+- mixture2p, mixture3p and imm: the location parameter `mu1` is now
+  called `mu`. Formulas and `links` that name `mu1` still work, with a
+  warning, until bmm 1.6.0 at the earliest; rename it to `mu`. The draws
+  of the location lose the name as well: `b_mu1_Intercept` is now
+  `b_Intercept` ([\#434](https://github.com/popov-lab/bmm/issues/434)).
+- mixture2p, mixture3p and imm: their parameters are now distributional,
+  so priors take `dpar =` instead of `nlpar =`, and an intercept prior
+  takes `class = "Intercept"`,
+  e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")`.
+  Priors written for bmm 1.4 still work until bmm 1.6.0 at the earliest,
+  and the warning prints the new code. Under an intercept and
+  predictors, an intercept prior now applies at the mean of the
+  predictors. See “Priors from bmm 1.4” in
+  [`?mixture2p`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
+  ([\#434](https://github.com/popov-lab/bmm/issues/434)).
+- `emmeans()` on mixture2p, mixture3p and imm fits: `nlpar = "kappa"`
+  and `dpar = "mu1"` still work, with a warning, until bmm 1.6.0 at the
+  earliest; write `dpar = "kappa"` and `dpar = "mu"`. Calls that go
+  straight to brms, such as `posterior_linpred(fit, nlpar = "kappa")`,
+  are not translated and need `dpar =`
+  ([\#434](https://github.com/popov-lab/bmm/issues/434)).
 
 #### Changes to default priors
 
@@ -135,6 +239,41 @@
   with one row per trial and the default normal noise
   (`dist = "normal"`) are faster: each sampling step takes about half
   the time it did. Estimates are unchanged up to sampling error.
+- mixture2p, mixture3p and imm fits saved with bmm 1.4 or earlier still
+  work with [`summary()`](https://rdrr.io/r/base/summary.html) and the
+  other extractors. [`update()`](https://rdrr.io/r/stats/update.html)
+  samples them again under the new custom family, translates their
+  priors and says so in a message. The constant priors that bmm 1.4 set
+  on the set-size-1 level of mixture3p and imm are dropped, so bmm no
+  longer fixes that level
+  ([\#434](https://github.com/popov-lab/bmm/issues/434)).
+- **mixture3p** no longer fixes the non-target weight `thetant` to zero
+  at set size 1 when a formula estimates one value per set size. With
+  one item there is nothing to swap to, so that value is not informed by
+  the data and only reflects its prior.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns and
+  names every coefficient the other trials leave undetermined, including
+  those of a formula with an intercept or a predictor that varies only
+  at set size 1. Read the set-size-1 coefficient as prior-only
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- **imm** no longer fixes the set-size-1 levels of `a` and `s` when a
+  formula estimates one value per set size. With one item there is no
+  non-target, so set size 1 says nothing about `s`, and about `a` only
+  through its sum with `c`;
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns and
+  names the coefficients that depend on their priors. Give set size 1 a
+  level of its own in a factor, so that only its coefficients depend on
+  their priors, or let `c` take one value across set sizes
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- **mixture3p** and **imm** now accept an intercept together with
+  `set_size` as a predictor, e.g. `kappa ~ 1 + set_size`; they used to
+  require `0 + set_size`
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- For developers:
+  [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md)
+  no longer adds the `LureIdx*` and `inv_ss` columns for **mixture3p**
+  and **imm**, whose likelihoods read the set size directly
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
 - [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
   and the help pages now show each model by its name only, such as
   “Two-Parameter Mixture Model”, without the citation, which stays in
@@ -165,6 +304,8 @@
   ([\#580](https://github.com/popov-lab/bmm/issues/580)).
 
 ## bmm 1.4.2
+
+CRAN release: 2026-11-06
 
 #### New features
 
@@ -396,6 +537,22 @@
   [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) does
   ([\#621](https://github.com/popov-lab/bmm/issues/621)).
 
+#### Deprecated functions and arguments
+
+- mixture2p, mixture3p and imm: the location parameter `mu1` is now
+  called `mu`. Formulas that use `mu1` still work and warn until bmm
+  1.6.0 at the earliest; rename it to `mu`. Priors you set yourself on
+  the parameters of these models now take `dpar =` instead of `nlpar =`,
+  e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")`
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md):
+  passing `log` by position is deprecated, because `tau` now takes that
+  position. Until bmm 1.6.0 a logical value there is still read as
+  `log`, with a warning; write `log = TRUE` instead
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+
 #### Other changes
 
 - [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) now
@@ -438,6 +595,51 @@
   brms is on CRAN, or call `update(fit, recompile = TRUE)`.
   [`bmm_setup()`](https://venpopov.com/bmm/dev/reference/bmm_setup.md)
   now warns about this combination.
+- **mixture3p** no longer fixes the non-target weight `thetant` to zero
+  at set size 1 when a formula estimates one value per set size, and the
+  capacity versions leave `ptarget` free alike. With one item there is
+  nothing to swap to, so the data say nothing about that value.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns and
+  names every coefficient the other trials leave undetermined. Read them
+  as prior-only, or code set size as a factor without an intercept
+  (`0 + set_size`), so that only the set-size-1 coefficient is affected
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- **imm** no longer fixes the set-size-1 levels of `a` and `s` when a
+  formula estimates one value per set size. With one item there is no
+  non-target, so set size 1 says nothing about `s`, and about `a` only
+  through its sum with `c`;
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) now warns and
+  names the coefficients that depend on their priors. Give set size 1 a
+  level of its own in a factor, so that only its coefficients depend on
+  their priors, or let `c` take one value across set sizes
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- **mixture3p** and **imm** now accept an intercept together with
+  `set_size` as a predictor, e.g. `kappa ~ 1 + set_size`; they used to
+  require `0 + set_size`
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) now
+  use the exact sampler that
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  uses, so the same seed gives different draws than in bmm 1.4.0.
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  used to draw from a grid, which spread the draws too widely at high
+  precision. Rerun simulations that rely on particular draws
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- For developers:
+  [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md)
+  no longer adds the `LureIdx*` and `inv_ss` columns for **mixture3p**
+  and **imm**, whose likelihoods read the set size directly
+  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- [`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md)
+  and the help pages now show each model by its name only, such as
+  “Two-Parameter Mixture Model”, without the citation, which stays in
+  the `Citation` field of the help page. A model that fits several
+  tasks, such as
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), is listed
+  under each of them
+  ([\#554](https://github.com/popov-lab/bmm/issues/554)).
 
 #### Documentation
 

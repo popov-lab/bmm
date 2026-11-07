@@ -152,11 +152,13 @@ link and is therefore reported as `0.5`, and the `ezdm` and `cswald`
 diffusion constant `s` is fixed at `0` under a `log` link and is
 reported as `1`.
 
-Trial-level derived quantities, such as the response probabilities of
-the mixture models or the category probabilities of `m3`, are not
-returned; use
+Trial-level derived quantities, such as the category probabilities of
+`m3`, are not returned; use
 [`brms::posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
-for those.
+for those. The circular mixture models have no expected response, so
+their `posterior_epred()` stops; the probabilities of their response
+types follow from the returned parameters, as the section on mixture
+weights describes.
 
 The default grid contains the observed combinations of the predictors,
 not their full crossing, so cells that were never presented do not
@@ -165,38 +167,48 @@ observed value; supply `newdata` for such models.
 
 ## Circular location parameters
 
-The circular models sample their location parameter (`mu` for `sdm`,
-`mu1` for `mixture2p`, `mixture3p` and `imm`) through a `tan_half` link,
-and it is returned in radians in `(-pi, pi)` — a response bias relative
-to the target, since the response variable is the angular error. It is
-fixed to `0` unless the `bmmformula` predicts it explicitly, so an
-all-zero `mu1` means the model never estimated one.
+The circular models sample their location parameter `mu` through a
+`tan_half` link, and it is returned in radians in `(-pi, pi)` — a
+response bias relative to the target, since the response variable is the
+angular error. It is fixed to `0` unless the `bmmformula` predicts it
+explicitly, so an all-zero `mu` means the model never estimated one.
 
 The inverse link is `2 * atan()`, and the caveat above applies to it
-with particular force: `2 * atan(b_mu1_conditionB)` is neither the bias
-in condition B nor the difference between conditions. The bias in
-condition B is `2 * atan(b_mu1_Intercept + b_mu1_conditionB)`, and the
-difference between the conditions is that value minus
-`2 * atan(b_mu1_Intercept)`, taken draw by draw.
+with particular force: `2 * atan(b_conditionB)` is neither the bias in
+condition B nor the difference between conditions. The bias in condition
+B is `2 * atan(b_Intercept + b_conditionB)`, and the difference between
+the conditions is that value minus `2 * atan(b_Intercept)`, taken draw
+by draw.
 
 ## Mixture weights
 
+For `mixture2p`, `thetat` is the probability that a response comes from
+memory rather than from guessing.
+
 For `mixture3p` the returned `thetat` and `thetant` are probabilities
-but they **do not sum to 1**: `brms` holds the linear predictor of one
-mixture component at zero, and that component is the guessing
-distribution, so the remaining mass `1 - thetat - thetant` is the
-probability of a guess. `thetant` is the *total* probability of a
-non-target response, summed over the lures, not the probability per
-lure.
+but they **do not sum to 1**: the likelihood weighs both against the
+guessing distribution, whose weight is the fixed reference, so the
+remaining mass `1 - thetat - thetant` is the probability of a guess.
+`thetant` is the *total* probability of a non-target response, summed
+over the lures, not the probability per lure.
 
 At set sizes where no non-target was presented the model switches its
 non-target components off, so `thetant` is reported as exactly `0` and
 `thetat` as [`plogis()`](https://rdrr.io/r/stats/Logistic.html) of its
 linear predictor, rather than as the value the set-size regression
-extrapolates to. This correction reads the lure indicators out of the
-prediction grid; if you supply `newdata`, columns you do not supply are
-filled from the first row of the model data rather than recomputed, and
-`native_parameters()` warns when the two disagree.
+extrapolates to. This correction reads the set size from the prediction
+grid: if you supply `newdata` without the set-size variable, every row
+takes the set size of the first row of the model data.
+
+In the `"slot"` and `"slot_averaging"` versions of `mixture3p`,
+`ptarget` is a probability *given* that a response comes from memory.
+The probability of a memory response, `min(1, K / set_size)`, depends on
+the set size and is not returned. If the formula gives set size 1 a
+coefficient of its own, `ptarget` at set size 1 reflects only its prior,
+because a single item cannot be swapped.
+
+With `variable_precision = TRUE`, `tau` is returned on its native scale,
+and `kappa` is the concentration of the average trial.
 
 ## See also
 

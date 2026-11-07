@@ -85,7 +85,10 @@ type.</p></dd>
 
 <dt id="arg-nlpar">nlpar<a class="anchor" aria-label="anchor" href="#arg-nlpar"></a></dt>
 <dd><p>Character string. Explicit non-linear parameter name. If
-provided, takes precedence over <code>dpar</code>.</p></dd>
+provided, takes precedence over <code>dpar</code>. The parameters of <code><a href="mixture2p.html">mixture2p()</a></code>,
+<code><a href="mixture3p.html">mixture3p()</a></code> and <code><a href="imm.html">imm()</a></code> are distributional since bmm 1.5.0, so on their
+fits <code>nlpar = "kappa"</code> and <code>dpar = "mu1"</code>, the bmm 1.4 forms, are read as
+<code>dpar = "kappa"</code> and <code>dpar = "mu"</code>, with a deprecation warning.</p></dd>
 
 
 <dt id="arg-trms-xlev-grid">trms, xlev, grid<a class="anchor" aria-label="anchor" href="#arg-trms-xlev-grid"></a></dt>
@@ -100,9 +103,9 @@ values.</p>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>bmm models use two types of parameters internally in brms:</p><ul><li><p><strong>Distributional parameters (<code>dpar</code>)</strong>: Used in models with
-<code>custom_family(dpars = ...)</code> (e.g., SDM, EZDM)</p></li>
+<code>custom_family(dpars = ...)</code> (e.g., SDM, EZDM, mixture2p, mixture3p, IMM)</p></li>
 <li><p><strong>Non-linear parameters (<code>nlpar</code>)</strong>: Used in models with <code><a href="bmf2bf.html">bmf2bf()</a></code>
-+ <code>nlf()</code> (e.g., mixture2p, mixture3p, IMM, M3)</p></li>
++ <code>nlf()</code> (e.g., M3)</p></li>
 </ul><p>Users should not need to know this distinction. These methods intercept the
 <code>dpar</code> argument and, if the parameter is actually an nlpar, silently
 re-route it to <code>nlpar</code>.</p>

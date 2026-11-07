@@ -114,12 +114,13 @@ performed.</p>
 bridge sampling are undefined when any parameter has an improper prior.</p>
 <p>Parameters that exist only because the family machinery requires them are
 omitted: a fixed parameter the model does not declare (the <code>mu</code> brms
-forces on the custom families of the response-time models, or the <code>mu2</code>
-and <code>kappa2</code> of a two-component <code><a href="https://paulbuerkner.com/brms/reference/mixture.html" class="external-link">brms::mixture()</a></code> family), and the
-mixture-weight reference component <code>theta2</code>, which brms lists with a
-default prior although the sampler holds it at zero. Fixed parameters the
-model does declare are reported, since the user can estimate them: <code>mu</code>
-for <code><a href="sdm.html">sdm()</a></code>, <code>mu1</code> for the circular mixture models, <code>zr</code> for <code><a href="ddm.html">ddm()</a></code>.</p>
+forces on the custom families of the response-time models, or, in fits
+saved before bmm 1.5.0, the <code>mu2</code> and <code>kappa2</code> of a two-component
+<code><a href="https://paulbuerkner.com/brms/reference/mixture.html" class="external-link">brms::mixture()</a></code> family), and the mixture-weight reference component
+<code>theta2</code> of those fits, which brms lists with a default prior although the
+sampler holds it at zero. Fixed parameters the model does declare are
+reported, since the user can estimate them: <code>mu</code> for <code><a href="sdm.html">sdm()</a></code> and the
+circular mixture models, <code>zr</code> for <code><a href="ddm.html">ddm()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

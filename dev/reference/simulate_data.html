@@ -148,7 +148,7 @@ needs a generator written separately.</p>
 
 
 <p>The columns each model reads from <code>design</code>, under the names the model was
-specified with:</p><table class="table table"><tr><td>Model</td><td>Columns</td></tr><tr><td><code><a href="mixture2p.html">mixture2p()</a></code>, <code><a href="sdm.html">sdm()</a></code>, <code><a href="ddm.html">ddm()</a></code>, <code><a href="cswald.html">cswald()</a></code></td><td>none</td></tr><tr><td><code><a href="mixture3p.html">mixture3p()</a></code></td><td><code>set_size</code> (if it names a column), <code>nt_features</code>, of which a row's first <code>set_size - 1</code> are read</td></tr><tr><td><code><a href="imm.html">imm()</a></code></td><td>as <code><a href="mixture3p.html">mixture3p()</a></code>, plus <code>nt_distances</code> for the versions <code>"full"</code> and <code>"bsc"</code></td></tr><tr><td><code><a href="m3.html">m3()</a></code></td><td><code>n_trials</code>, the number of trials of each row; <code>num_options</code> when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators)</td></tr><tr><td><code><a href="mpt.html">mpt()</a></code></td><td><code>n_trials</code>; <code>tree_id</code> and <code>covariates</code> when the model has them</td></tr><tr><td><code><a href="ezdm.html">ezdm()</a></code></td><td><code>n_trials</code></td></tr><tr><td><code><a href="sdt_yn.html">sdt_yn()</a></code></td><td><code>stimulus</code>, <code>n_trials</code></td></tr><tr><td><code><a href="sdt_mafc.html">sdt_mafc()</a></code></td><td><code>n_trials</code>; <code>m</code> when it names a column</td></tr><tr><td><code><a href="sdt_ranking.html">sdt_ranking()</a></code></td><td><code>n_trials</code>; <code>m</code> when it names a column</td></tr><tr><td><code><a href="sdt_rating.html">sdt_rating()</a></code>, <code><a href="sdt_cdp.html">sdt_cdp()</a></code></td><td><code>stimulus</code>, <code>n_trials</code></td></tr></table><p>The simplex groups of <code><a href="mpt.html">mpt()</a></code> are given as probabilities that sum to 1 on
+specified with:</p><table class="table table"><tr><td>Model</td><td>Columns</td></tr><tr><td><code><a href="sdm.html">sdm()</a></code>, <code><a href="ddm.html">ddm()</a></code>, <code><a href="cswald.html">cswald()</a></code></td><td>none</td></tr><tr><td><code><a href="mixture2p.html">mixture2p()</a></code></td><td><code>set_size</code> (if it names a column) for the versions <code>"slot"</code> and <code>"slot_averaging"</code>; none for <code>"simple"</code></td></tr><tr><td><code><a href="mixture3p.html">mixture3p()</a></code></td><td><code>set_size</code> (if it names a column), <code>nt_features</code>, of which a row's first <code>set_size - 1</code> are read</td></tr><tr><td><code><a href="imm.html">imm()</a></code></td><td>as <code><a href="mixture3p.html">mixture3p()</a></code>, plus <code>nt_distances</code> for the versions <code>"full"</code> and <code>"bsc"</code></td></tr><tr><td><code><a href="m3.html">m3()</a></code></td><td><code>n_trials</code>, the number of trials of each row; <code>num_options</code> when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators)</td></tr><tr><td><code><a href="mpt.html">mpt()</a></code></td><td><code>n_trials</code>; <code>tree_id</code> and <code>covariates</code> when the model has them</td></tr><tr><td><code><a href="ezdm.html">ezdm()</a></code></td><td><code>n_trials</code></td></tr><tr><td><code><a href="sdt_yn.html">sdt_yn()</a></code></td><td><code>stimulus</code>, <code>n_trials</code></td></tr><tr><td><code><a href="sdt_mafc.html">sdt_mafc()</a></code></td><td><code>n_trials</code>; <code>m</code> when it names a column</td></tr><tr><td><code><a href="sdt_ranking.html">sdt_ranking()</a></code></td><td><code>n_trials</code>; <code>m</code> when it names a column</td></tr><tr><td><code><a href="sdt_rating.html">sdt_rating()</a></code>, <code><a href="sdt_cdp.html">sdt_cdp()</a></code></td><td><code>stimulus</code>, <code>n_trials</code></td></tr></table><p>The simplex groups of <code><a href="mpt.html">mpt()</a></code> are given as probabilities that sum to 1 on
 both scales.</p>
     </div>
 
@@ -159,16 +159,16 @@ both scales.</p>
 <span class="r-in"><span>  pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>kappa <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">8</span><span class="op">)</span>, thetat <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>, n_trials <span class="op">=</span> <span class="fl">100</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>             y</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 -1.07157459</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  0.09974140</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 -0.11089926</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 -0.39314121</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 -0.01845983</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  0.13389836</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              y</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  0.027702862</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2.872324381</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 -0.005503442</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 -0.663926479</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  0.602686109</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  3.086732360</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">data</span>, <span class="st">"simulate_pars"</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   mu1    kappa thetat</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1   0 2.079442    0.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   mu    kappa thetat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  0 2.079442    0.5</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># the same on the native scale: kappa as a precision, thetat as P(memory)</span></span></span>
 <span class="r-in"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu">bmm</span><span class="fu">::</span><span class="fu">simulate_data</span><span class="op">(</span><span class="fu"><a href="mixture2p.html">mixture2p</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">"y"</span><span class="op">)</span>,</span></span>
@@ -183,12 +183,12 @@ both scales.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   cond        rt response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 easy 0.3976410        0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 easy 0.3525345        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 easy 0.5632990        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 easy 0.4019846        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 easy 0.4056678        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 easy 0.4016709        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 easy 0.6943447        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 easy 0.7629890        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 easy 0.5331093        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 easy 0.4308235        0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 easy 0.4768945        0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 easy 0.4210446        1</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># counts: yes/no recognition, 50 trials per stimulus type</span></span></span>
 <span class="r-in"><span><span class="va">design</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, n_trials <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
@@ -196,8 +196,8 @@ both scales.</p>
 <span class="r-in"><span>  pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>, design <span class="op">=</span> <span class="va">design</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   stimulus n_trials n_old</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1        0       50    19</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2        1       50    40</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1        0       50    21</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2        1       50    43</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># categorical responses: memory measurement model, 100 trials per row</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="m3.html">m3</a></span><span class="op">(</span></span></span>
@@ -206,8 +206,8 @@ both scales.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu">simulate_data</span><span class="op">(</span><span class="va">model</span>, pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>c <span class="op">=</span> <span class="fl">2</span>, a <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>, design <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>n_trials <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">100</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   n_trials corr other npl</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1      100   42    27  31</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2      100   46    34  20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1      100   52    25  23</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2      100   54    25  21</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

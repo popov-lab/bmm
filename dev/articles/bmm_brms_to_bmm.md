@@ -541,12 +541,12 @@ default_prior(
   model = mixture2p(resp_error = "response_error")
 ) |>
   as.data.frame() |>
-  subset(nlpar %in% c("kappa", "thetat") & coef == "" & group == "",
-         select = c(nlpar, class, prior)) |>
+  subset(dpar %in% c("kappa", "thetat") & coef == "" & group == "",
+         select = c(dpar, class, prior)) |>
   knitr::kable(row.names = FALSE)
 ```
 
-| nlpar  | class | prior          |
+| dpar   | class | prior          |
 |:-------|:------|:---------------|
 | kappa  | sd    | exponential(1) |
 | kappa  | b     | normal(2, 1)   |

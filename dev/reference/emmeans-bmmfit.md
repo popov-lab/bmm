@@ -37,7 +37,13 @@ emm_basis(object, trms, xlev, grid, ..., dpar = NULL, nlpar = NULL)
 - nlpar:
 
   Character string. Explicit non-linear parameter name. If provided,
-  takes precedence over `dpar`.
+  takes precedence over `dpar`. The parameters of
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md),
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
+  and [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md) are
+  distributional since bmm 1.5.0, so on their fits `nlpar = "kappa"` and
+  `dpar = "mu1"`, the bmm 1.4 forms, are read as `dpar = "kappa"` and
+  `dpar = "mu"`, with a deprecation warning.
 
 - trms, xlev, grid:
 
@@ -56,11 +62,12 @@ for return values.
 bmm models use two types of parameters internally in brms:
 
 - **Distributional parameters (`dpar`)**: Used in models with
-  `custom_family(dpars = ...)` (e.g., SDM, EZDM)
+  `custom_family(dpars = ...)` (e.g., SDM, EZDM, mixture2p, mixture3p,
+  IMM)
 
 - **Non-linear parameters (`nlpar`)**: Used in models with
   [`bmf2bf()`](https://venpopov.com/bmm/dev/reference/bmf2bf.md) +
-  `nlf()` (e.g., mixture2p, mixture3p, IMM, M3)
+  `nlf()` (e.g., M3)
 
 Users should not need to know this distinction. These methods intercept
 the `dpar` argument and, if the parameter is actually an nlpar, silently

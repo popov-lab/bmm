@@ -70,6 +70,8 @@ generalization gradient <code>s</code>, and the precision of memory representati
 <span>  b <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  s <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  kappa <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  tau <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  vp_nodes <span class="op">=</span> <span class="fl">81L</span>,</span>
 <span>  log <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -103,7 +105,8 @@ generalization gradient <code>s</code>, and the precision of memory representati
 <span>  a <span class="op">=</span> <span class="fl">0.2</span>,</span>
 <span>  b <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  s <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  kappa <span class="op">=</span> <span class="fl">5</span></span>
+<span>  kappa <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  tau <span class="op">=</span> <span class="fl">0</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -140,11 +143,30 @@ generalization gradient <code>s</code>, and the precision of memory representati
 
 
 <dt id="arg-kappa">kappa<a class="anchor" aria-label="anchor" href="#arg-kappa"></a></dt>
-<dd><p>Vector of precision values</p></dd>
+<dd><p>Vector of precision values. With <code>tau &gt; 0</code> this is the
+concentration of the average trial, whose Fisher information <code>J(kappa)</code> is
+the mean of <code>J</code>.</p></dd>
+
+
+<dt id="arg-tau">tau<a class="anchor" aria-label="anchor" href="#arg-tau"></a></dt>
+<dd><p>Vector of scales for trial-to-trial variability in precision. The
+Fisher information <code>J</code> of a memory representation is drawn from
+<code>gamma(mean = J(kappa), scale = tau)</code>. <code>tau = 0</code>, the default, is constant
+precision. See <code><a href="imm.html">imm()</a></code>.</p></dd>
+
+
+<dt id="arg-vp-nodes">vp_nodes<a class="anchor" aria-label="anchor" href="#arg-vp-nodes"></a></dt>
+<dd><p>Number of quadrature nodes used when <code>tau &gt; 0</code>; must be an
+odd number of at least 41. See <code><a href="mixture2p.html">mixture2p()</a></code>. The random generation
+function needs no nodes: it draws <code>J</code> from its gamma distribution and then
+the response, which is exact.</p></dd>
 
 
 <dt id="arg-log">log<a class="anchor" aria-label="anchor" href="#arg-log"></a></dt>
-<dd><p>Logical; if <code>TRUE</code>, values are returned on the log scale.</p></dd>
+<dd><p>Logical; if <code>TRUE</code>, values are returned on the log scale. Pass
+it by name: in bmm 1.4 it was the ninth argument, which is now <code>tau</code>.
+Until bmm 1.6.0 a logical value in that position is still read as <code>log</code>,
+with a warning.</p></dd>
 
 
 <dt id="arg-q">q<a class="anchor" aria-label="anchor" href="#arg-q"></a></dt>
@@ -172,6 +194,9 @@ interference measurement model.</p>
     <p>Oberauer, K., Stoneking, C., Wabersich, D., &amp; Lin, H.-Y. (2017).
 Hierarchical Bayesian measurement models for continuous reproduction of
 visual features from working memory. Journal of Vision, 17(5), 11.</p>
+<p>van den Berg, R., Shin, H., Chou, W.-C., George, R., &amp; Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.</p>
     </div>
 
     <div class="section level2">

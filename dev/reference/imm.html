@@ -62,6 +62,9 @@ Please use <code>imm(version = 'full')</code>, <code>imm(version = 'bsc')</code>
 <span>  <span class="va">set_size</span>,</span>
 <span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  version <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"full"</span>, <span class="st">"bsc"</span>, <span class="st">"abc"</span><span class="op">)</span>,</span>
+<span>  variable_precision <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  vp_nodes <span class="op">=</span> <span class="fl">81L</span>,</span>
+<span>  links <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -115,6 +118,27 @@ columns in the dataset.</p></dd>
 <code>full</code>, <code>bsc</code>, or <code>abc</code>. The default is <code>full</code>.</p></dd>
 
 
+<dt id="arg-variable-precision">variable_precision<a class="anchor" aria-label="anchor" href="#arg-variable-precision"></a></dt>
+<dd><p>Logical; if <code>TRUE</code>, the precision of memory varies
+from trial to trial (van den Berg et al., 2012). This adds the parameter
+<code>tau</code>, and <code>kappa</code> then describes the average trial: it is the
+concentration whose Fisher information <code>J(kappa)</code> is the mean of <code>J</code>; see
+<code><a href="mixture2p.html">mixture2p()</a></code> for the parameterisation. The capacity models of Zhang and
+Luck (2008) do not apply to the IMM, which has no discrete slots – its
+bottleneck is the ratio of context to general activation – so variable
+precision is the only extension offered here.</p></dd>
+
+
+<dt id="arg-vp-nodes">vp_nodes<a class="anchor" aria-label="anchor" href="#arg-vp-nodes"></a></dt>
+<dd><p>Number of quadrature nodes used when
+<code>variable_precision = TRUE</code>; must be an odd number of at least 41, default
+81. See <code><a href="mixture2p.html">mixture2p()</a></code> for the accuracy this buys and the shapes it refuses.</p></dd>
+
+
+<dt id="arg-links">links<a class="anchor" aria-label="anchor" href="#arg-links"></a></dt>
+<dd><p>A named list of link functions for the model parameters.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>used internally for testing, ignore it</p></dd>
 
@@ -134,22 +158,22 @@ columns in the dataset.</p></dd>
 </ul><div class="section">
 <h3 id="version-full">Version: <code>full</code><a class="anchor" aria-label="anchor" href="#version-full"></a></h3>
 
-<ul><li><p><strong>Requirements:</strong></p><ul><li><p>The response vairable should be in radians and represent the angular error relative to the target</p></li>
+<ul><li><p><strong>Requirements:</strong></p><ul><li><p>The response variable should be in radians and represent the angular error relative to the target</p></li>
+<li><p>The non-target features should be in radians and be centered relative to the target</p></li>
 </ul></li>
-</ul><ul><li><p>The non-target features should be in radians and be centered relative to the target</p></li>
-</ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>mu1</code>: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.</p></li>
-<li><p><code>kappa</code>: Concentration parameter of the von Mises distribution</p></li>
+<li><p><strong>Parameters:</strong></p><ul><li><p><code>mu</code>: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.</p></li>
+<li><p><code>kappa</code>: Concentration of the von Mises distribution of memory responses</p></li>
 <li><p><code>a</code>: General activation of memory items</p></li>
 <li><p><code>c</code>: Context activation</p></li>
 <li><p><code>s</code>: Spatial similarity gradient</p></li>
+<li><p><code>b</code>: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.</p></li>
 </ul></li>
-<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>mu1</code> = 0</p></li>
-<li><p><code>mu2</code> = 0</p></li>
-<li><p><code>kappa2</code> = -100</p></li>
+<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>mu</code> = 0</p></li>
+<li><p><code>b</code> = 0</p></li>
 </ul></li>
-<li><p><strong>Default parameter links:</strong></p><ul><li><p>mu1 = tan_half; kappa = log; a = log; c = log; s = log</p></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>mu = tan_half; kappa = log; a = log; c = log; s = log; b = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
 <li><p><code>effects</code>: normal(0, 0.25)</p></li>
 <li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
@@ -166,6 +190,10 @@ columns in the dataset.</p></dd>
 <li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
 <li><p><code>s</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
+<li><p><code>b</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
 <li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
@@ -175,21 +203,21 @@ columns in the dataset.</p></dd>
 <div class="section">
 <h3 id="version-bsc">Version: <code>bsc</code><a class="anchor" aria-label="anchor" href="#version-bsc"></a></h3>
 
-<ul><li><p><strong>Requirements:</strong></p><ul><li><p>The response vairable should be in radians and represent the angular error relative to the target</p></li>
+<ul><li><p><strong>Requirements:</strong></p><ul><li><p>The response variable should be in radians and represent the angular error relative to the target</p></li>
+<li><p>The non-target features should be in radians and be centered relative to the target</p></li>
 </ul></li>
-</ul><ul><li><p>The non-target features should be in radians and be centered relative to the target</p></li>
-</ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>mu1</code>: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.</p></li>
-<li><p><code>kappa</code>: Concentration parameter of the von Mises distribution</p></li>
+<li><p><strong>Parameters:</strong></p><ul><li><p><code>mu</code>: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.</p></li>
+<li><p><code>kappa</code>: Concentration of the von Mises distribution of memory responses</p></li>
 <li><p><code>c</code>: Context activation</p></li>
 <li><p><code>s</code>: Spatial similarity gradient</p></li>
+<li><p><code>b</code>: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.</p></li>
 </ul></li>
-<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>mu1</code> = 0</p></li>
-<li><p><code>mu2</code> = 0</p></li>
-<li><p><code>kappa2</code> = -100</p></li>
+<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>mu</code> = 0</p></li>
+<li><p><code>b</code> = 0</p></li>
 </ul></li>
-<li><p><strong>Default parameter links:</strong></p><ul><li><p>mu1 = tan_half; kappa = log; c = log; s = log</p></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>mu = tan_half; kappa = log; c = log; s = log; b = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
 <li><p><code>effects</code>: normal(0, 0.25)</p></li>
 <li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
@@ -205,27 +233,31 @@ columns in the dataset.</p></dd>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
 <li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
+<li><p><code>b</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
+</ul></li>
 </ul></li>
 </ul></div>
 
 <div class="section">
 <h3 id="version-abc">Version: <code>abc</code><a class="anchor" aria-label="anchor" href="#version-abc"></a></h3>
 
-<ul><li><p><strong>Requirements:</strong></p><ul><li><p>The response vairable should be in radians and represent the angular error relative to the target</p></li>
+<ul><li><p><strong>Requirements:</strong></p><ul><li><p>The response variable should be in radians and represent the angular error relative to the target</p></li>
+<li><p>The non-target features should be in radians and be centered relative to the target</p></li>
 </ul></li>
-</ul><ul><li><p>The non-target features should be in radians and be centered relative to the target</p></li>
-</ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>mu1</code>: Location parameter of the von Mises distribution for memory responses (in radians). Fixed internally to 0 by default.</p></li>
-<li><p><code>kappa</code>: Concentration parameter of the von Mises distribution</p></li>
+<li><p><strong>Parameters:</strong></p><ul><li><p><code>mu</code>: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.</p></li>
+<li><p><code>kappa</code>: Concentration of the von Mises distribution of memory responses</p></li>
 <li><p><code>a</code>: General activation of memory items</p></li>
 <li><p><code>c</code>: Context activation</p></li>
+<li><p><code>b</code>: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.</p></li>
 </ul></li>
-<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>mu1</code> = 0</p></li>
-<li><p><code>mu2</code> = 0</p></li>
-<li><p><code>kappa2</code> = -100</p></li>
+<li><p><strong>Fixed parameters:</strong></p><ul><li><p><code>mu</code> = 0</p></li>
+<li><p><code>b</code> = 0</p></li>
 </ul></li>
-<li><p><strong>Default parameter links:</strong></p><ul><li><p>mu1 = tan_half; kappa = log; a = log; c = log</p></li>
+<li><p><strong>Default parameter links:</strong></p><ul><li><p>mu = tan_half; kappa = log; a = log; c = log; b = log</p></li>
 </ul></li>
-<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu1</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
+<li><p><strong>Default priors:</strong></p><ul><li><p><code>mu</code>:</p><ul><li><p><code>main</code>: normal(0, 0.5)</p></li>
 <li><p><code>effects</code>: normal(0, 0.25)</p></li>
 <li><p><code>sd</code>: exponential(4)</p></li>
 </ul></li>
@@ -241,12 +273,69 @@ columns in the dataset.</p></dd>
 <li><p><code>effects</code>: normal(0, 1)</p></li>
 <li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
+<li><p><code>b</code>:</p><ul><li><p><code>main</code>: normal(0, 1)</p></li>
+<li><p><code>effects</code>: normal(0, 1)</p></li>
+<li><p><code>sd</code>: exponential(1)</p></li>
 </ul></li>
-</ul><p>Additionally, all imm models have an internal parameter that is fixed to 0 to
-allow the model to be identifiable. This parameter is not estimated and is not
-included in the model formula. The parameter is:</p><ul><li><p>b = "Background activation (internally fixed to 0)"</p></li>
+</ul></li>
 </ul></div>
 
+    </div>
+    <div class="section level2">
+    <h2 id="priors-from-bmm-">Priors from bmm 1.4<a class="anchor" aria-label="anchor" href="#priors-from-bmm-"></a></h2>
+
+
+<p>Since bmm 1.5.0, the parameters of this model are distributional parameters
+(<code>dpar</code>) of a custom family, and the location <code>mu1</code> is called <code>mu</code>. Calls
+written for bmm 1.4 keep working until bmm 1.6.0 at the earliest: bmm translates their priors,
+formulas, <code>links</code> and <code>emmeans(nlpar = )</code>, and warns with the code to use
+instead.</p>
+<p></p><div class="sourceCode"><pre><code><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># an intercept prior</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">set_prior</span>(<span class="st">"normal(2, 1)"</span>, <span class="at">class =</span> <span class="st">"b"</span>, <span class="at">coef =</span> <span class="st">"Intercept"</span>, <span class="at">nlpar =</span> <span class="st">"kappa"</span>) <span class="co"># 1.4</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">set_prior</span>(<span class="st">"normal(2, 1)"</span>, <span class="at">class =</span> <span class="st">"Intercept"</span>, <span class="at">dpar =</span> <span class="st">"kappa"</span>)              <span class="co"># 1.5</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># a prior on all coefficients</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">set_prior</span>(<span class="st">"normal(0, 0.5)"</span>, <span class="at">class =</span> <span class="st">"b"</span>, <span class="at">nlpar =</span> <span class="st">"kappa"</span>)                   <span class="co"># 1.4</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="fu">set_prior</span>(<span class="st">"normal(0, 0.5)"</span>, <span class="at">class =</span> <span class="st">"Intercept"</span>, <span class="at">dpar =</span> <span class="st">"kappa"</span>) <span class="sc">+</span>          <span class="co"># 1.5</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">"normal(0, 0.5)"</span>, <span class="at">class =</span> <span class="st">"b"</span>, <span class="at">dpar =</span> <span class="st">"kappa"</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co"># a prior on the random-effect standard deviations</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">set_prior</span>(<span class="st">"exponential(2)"</span>, <span class="at">class =</span> <span class="st">"sd"</span>, <span class="at">nlpar =</span> <span class="st">"kappa"</span>)                  <span class="co"># 1.4</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="fu">set_prior</span>(<span class="st">"exponential(2)"</span>, <span class="at">class =</span> <span class="st">"sd"</span>, <span class="at">dpar =</span> <span class="st">"kappa"</span>)                   <span class="co"># 1.5</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co"># the location, and emmeans()</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="fu">bmf</span>(mu1 <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> cond, kappa <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> cond)                                      <span class="co"># 1.4</span></span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="fu">bmf</span>(mu <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> cond, kappa <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> cond)                                       <span class="co"># 1.5</span></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="fu">emmeans</span>(fit, <span class="sc">~</span> cond, <span class="at">nlpar =</span> <span class="st">"kappa"</span>)                                      <span class="co"># 1.4</span></span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a><span class="fu">emmeans</span>(fit, <span class="sc">~</span> cond, <span class="at">dpar =</span> <span class="st">"kappa"</span>)                                       <span class="co"># 1.5</span></span></code></pre><p></p></div>
+<p>In bmm 1.4 a <code>class = "b"</code> prior also covered the intercept, so it now
+becomes two priors with the same distribution, unless the intercept has a prior of
+its own. One prior changes its meaning.
+When a formula has an intercept and predictors, such as <code>kappa ~ 1 + cond</code>,
+brms centres the predictors of a distributional parameter, so an intercept
+prior applies at the average over the conditions, weighted by their number of
+trials, not at the reference condition. The slopes keep their meaning, and so
+do intercept-only formulas
+and formulas with one coefficient per condition (<code>kappa ~ 0 + cond</code>). If your
+intercept prior was meant for the reference condition, give it for the
+average instead.</p>
+<p>Two things are not translated. The draws of the location are named after
+<code>mu</code> (<code>b_Intercept</code> instead of <code>b_mu1_Intercept</code>), and calls that go straight
+to brms need <code>dpar =</code>: <code>posterior_linpred(fit, dpar = "kappa")</code>, not
+<code>nlpar = "kappa"</code>. Fits saved with bmm 1.4 work as before with <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>,
+<code><a href="prior_info.html">prior_info()</a></code>, <code>emmeans()</code>, <code><a href="native_parameters.html">native_parameters()</a></code> and <code><a href="conditional_effects.bmmfit.html">conditional_effects()</a></code>.
+<code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> samples them again under the custom family, translates their
+priors and says so in a message.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Oberauer, K., &amp; Lin, H.-Y. (2017). An interference model of
+visual working memory. Psychological Review, 124(1), 21-59.</p>
+<p>van den Berg, R., Shin, H., Chou, W.-C., George, R., &amp; Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.</p>
+<p>Zhang, W., &amp; Luck, S. J. (2008). Discrete fixed-resolution representations
+in visual working memory. Nature, 453(7192), 233-235.</p>
     </div>
 
     <div class="section level2">

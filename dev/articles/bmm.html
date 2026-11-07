@@ -173,9 +173,9 @@ The <a href="https://venpopov.com/bmm/articles/bmm_vwm_crt.html">continuous repr
 describes the task and compares the models.</p>
 <table class="table">
 <colgroup>
-<col width="10%">
-<col width="54%">
-<col width="35%">
+<col width="11%">
+<col width="47%">
+<col width="40%">
 </colgroup>
 <thead><tr class="header">
 <th align="left">Model</th>
@@ -189,7 +189,7 @@ describes the task and compares the models.</p>
 <td align="left">
 <code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>nt_distances</code>: distance of each non-target to the target, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
 <td align="left">
-<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>a</code>: General activation of memory items<br><code>c</code>: Context activation<br><code>s</code>: Spatial similarity gradient<br>Fixed by default: <code>mu1</code>
+<code>kappa</code>: Concentration of the von Mises distribution of memory responses<br><code>a</code>: General activation of memory items<br><code>c</code>: Context activation<br><code>s</code>: Spatial similarity gradient<br>Fixed by default: <code>mu</code>, <code>b</code>
 </td>
 </tr>
 <tr class="even">
@@ -198,7 +198,7 @@ describes the task and compares the models.</p>
 <td align="left">
 <code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>nt_distances</code>: distance of each non-target to the target, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
 <td align="left">
-<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>c</code>: Context activation<br><code>s</code>: Spatial similarity gradient<br>Fixed by default: <code>mu1</code>
+<code>kappa</code>: Concentration of the von Mises distribution of memory responses<br><code>c</code>: Context activation<br><code>s</code>: Spatial similarity gradient<br>Fixed by default: <code>mu</code>, <code>b</code>
 </td>
 </tr>
 <tr class="odd">
@@ -207,25 +207,61 @@ describes the task and compares the models.</p>
 <td align="left">
 <code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
 <td align="left">
-<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>a</code>: General activation of memory items<br><code>c</code>: Context activation<br>Fixed by default: <code>mu1</code>
+<code>kappa</code>: Concentration of the von Mises distribution of memory responses<br><code>a</code>: General activation of memory items<br><code>c</code>: Context activation<br>Fixed by default: <code>mu</code>, <code>b</code>
 </td>
 </tr>
 <tr class="even">
 <td align="left">
-<a href="https://venpopov.com/bmm/reference/mixture2p.html"><code>mixture2p()</code></a><br>Two-Parameter Mixture Model</td>
+<a href="https://venpopov.com/bmm/reference/mixture2p.html"><code>mixture2p()</code></a>, version <code>simple</code><br>Two-Parameter Mixture Model</td>
 <td align="left">
 <code>resp_error</code>: response error relative to the target, in radians</td>
 <td align="left">
-<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>thetat</code>: Mixture weight for target responses<br>Fixed by default: <code>mu1</code>
+<code>kappa</code>: Concentration of the von Mises distribution of memory responses<br><code>thetat</code>: Mixture weight for target responses, i.e<br>Fixed by default: <code>mu</code>
 </td>
 </tr>
 <tr class="odd">
 <td align="left">
-<a href="https://venpopov.com/bmm/reference/mixture3p.html"><code>mixture3p()</code></a><br>Three-Parameter Mixture Model</td>
+<a href="https://venpopov.com/bmm/reference/mixture2p.html"><code>mixture2p()</code></a>, version <code>slot</code><br>Two-Parameter Mixture Model</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration of the von Mises distribution of memory responses<br><code>K</code>: Capacity<br>Fixed by default: <code>mu</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://venpopov.com/bmm/reference/mixture2p.html"><code>mixture2p()</code></a>, version <code>slot_averaging</code><br>Two-Parameter Mixture Model</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration of the von Mises distribution for an item held in a single slot<br><code>K</code>: Capacity<br>Fixed by default: <code>mu</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://venpopov.com/bmm/reference/mixture3p.html"><code>mixture3p()</code></a>, version <code>simple</code><br>Three-Parameter Mixture Model</td>
 <td align="left">
 <code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
 <td align="left">
-<code>kappa</code>: Concentration parameter of the von Mises distribution<br><code>thetat</code>: Mixture weight for target responses<br><code>thetant</code>: Mixture weight for non-target responses<br>Fixed by default: <code>mu1</code>
+<code>kappa</code>: Concentration of the von Mises distribution of memory responses<br><code>thetat</code>: Mixture weight for target responses<br><code>thetant</code>: Mixture weight for non-target responses, summed over the non-targets, which share it equally<br>Fixed by default: <code>mu</code>
+</td>
+</tr>
+<tr class="even">
+<td align="left">
+<a href="https://venpopov.com/bmm/reference/mixture3p.html"><code>mixture3p()</code></a>, version <code>slot</code><br>Three-Parameter Mixture Model</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration of the von Mises distribution of memory responses<br><code>K</code>: Capacity<br><code>ptarget</code>: Probability that a response reports the target rather than a non-target, given that it comes from memory.<br>Fixed by default: <code>mu</code>
+</td>
+</tr>
+<tr class="odd">
+<td align="left">
+<a href="https://venpopov.com/bmm/reference/mixture3p.html"><code>mixture3p()</code></a>, version <code>slot_averaging</code><br>Three-Parameter Mixture Model</td>
+<td align="left">
+<code>resp_error</code>: response error relative to the target, in radians<br><code>nt_features</code>: non-target features relative to the target, in radians, one column per non-target<br><code>set_size</code>: set size (a column, or one number)</td>
+<td align="left">
+<code>kappa</code>: Concentration of the von Mises distribution for an item held in a single slot<br><code>K</code>: Capacity<br><code>ptarget</code>: Probability that a response reports the target rather than a non-target, given that it comes from memory.<br>Fixed by default: <code>mu</code>
 </td>
 </tr>
 <tr class="even">

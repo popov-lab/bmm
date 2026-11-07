@@ -185,10 +185,10 @@ estimated. Only, the internally fixed location of the target responses
 
 my_model <- mixture2p(resp_error = "error")
 names(my_model$fixed_parameters)
-#> [1] "mu1"    "mu2"    "kappa2"
+#> [1] "mu"
 
 names(my_model$parameters)
-#> [1] "mu1"    "kappa"  "thetat"
+#> [1] "mu"     "kappa"  "thetat"
 ```
 
 If you want to freely estimate an internally fixed parameters, then you

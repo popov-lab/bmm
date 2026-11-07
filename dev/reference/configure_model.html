@@ -9,7 +9,7 @@
 formula, with its family, and any stanvars for the model specified by the
 user. Default priors are not built here but by configure_prior() from the
 model's default_priors; a model that needs priors beyond those defines
-its own configure_prior.&amp;lt;model&amp;gt;() method (e.g. mixture3p, mpt). It
+its own configure_prior.&amp;lt;model&amp;gt;() method (e.g. mpt). It
 will call the appropriate configure_model.* functions based on the list of
 classes defined in the .model_* functions. Each model has one method, for
 its model class, or one per version class when the versions are configured
@@ -17,7 +17,7 @@ differently (e.g. imm, ezdm, cswald)."><meta property="og:description" content="
 formula, with its family, and any stanvars for the model specified by the
 user. Default priors are not built here but by configure_prior() from the
 model's default_priors; a model that needs priors beyond those defines
-its own configure_prior.&amp;lt;model&amp;gt;() method (e.g. mixture3p, mpt). It
+its own configure_prior.&amp;lt;model&amp;gt;() method (e.g. mpt). It
 will call the appropriate configure_model.* functions based on the list of
 classes defined in the .model_* functions. Each model has one method, for
 its model class, or one per version class when the versions are configured
@@ -64,7 +64,7 @@ differently (e.g. imm, ezdm, cswald)."><meta property="og:image" content="https:
 formula, with its family, and any stanvars for the model specified by the
 user. Default priors are not built here but by <code><a href="configure_prior.html">configure_prior()</a></code> from the
 model's <code>default_priors</code>; a model that needs priors beyond those defines
-its own <code>configure_prior.&lt;model&gt;()</code> method (e.g. <code>mixture3p</code>, <code>mpt</code>). It
+its own <code>configure_prior.&lt;model&gt;()</code> method (e.g. <code>mpt</code>). It
 will call the appropriate configure_model.* functions based on the list of
 classes defined in the .model_* functions. Each model has one method, for
 its model class, or one per version class when the versions are configured
@@ -126,40 +126,27 @@ See <code><a href="https://paulbuerkner.com/brms/reference/custom_family.html" c
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># identical(Sys.getenv("BMM_EXAMPLES"), "true")</span></span></span>
 <span class="r-in"><span><span class="va">configure_model.mixture3p</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">model</span>, <span class="va">data</span>, <span class="va">formula</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>  <span class="co"># retrieve arguments from the data check</span></span></span>
-<span class="r-in"><span>  <span class="va">max_set_size</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">data</span>, <span class="st">"max_set_size"</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="va">lure_idx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">data</span>, <span class="st">"lure_idx_vars"</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="va">nt_features</span> <span class="op">&lt;-</span> <span class="va">model</span><span class="op">$</span><span class="va">other_vars</span><span class="op">$</span><span class="va">nt_features</span></span></span>
-<span class="r-in"><span>  <span class="va">set_size_var</span> <span class="op">&lt;-</span> <span class="va">model</span><span class="op">$</span><span class="va">other_vars</span><span class="op">$</span><span class="va">set_size</span></span></span>
+<span class="r-in"><span>  <span class="co"># the number of non-target covariates the family needs is fixed by the data</span></span></span>
+<span class="r-in"><span>  <span class="va">n_nt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">data</span>, <span class="st">"max_set_size"</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>  <span class="co"># construct initial brms formula</span></span></span>
-<span class="r-in"><span>  <span class="va">formula</span> <span class="op">&lt;-</span> <span class="fu"><a href="bmf2bf.html">bmf2bf</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">formula</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>    <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsformula-helpers.html" class="external-link">lf</a></span><span class="op">(</span><span class="va">kappa2</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>    <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsformula-helpers.html" class="external-link">lf</a></span><span class="op">(</span><span class="va">mu2</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>    <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsformula-helpers.html" class="external-link">nlf</a></span><span class="op">(</span><span class="va">theta1</span> <span class="op">~</span> <span class="va">thetat</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>    <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsformula-helpers.html" class="external-link">nlf</a></span><span class="op">(</span><span class="va">kappa1</span> <span class="op">~</span> <span class="va">kappa</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">formula</span> <span class="op">&lt;-</span> <span class="fu"><a href="bmf2bf.html">bmf2bf</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">formula</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">formula</span><span class="op">$</span><span class="va">family</span> <span class="op">&lt;-</span> <span class="fu">.circmix_custom_family</span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="va">model</span>,</span></span>
+<span class="r-in"><span>    family <span class="op">=</span> <span class="st">"mixture3p_simple"</span>,</span></span>
+<span class="r-in"><span>    weight_parameters <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"thetat"</span>, <span class="st">"thetant"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    vint <span class="op">=</span> <span class="cn">TRUE</span>, n_vreal <span class="op">=</span> <span class="va">n_nt</span>,</span></span>
+<span class="r-in"><span>    log_lik <span class="op">=</span> <span class="va">log_lik_mixture3p_simple</span>,</span></span>
+<span class="r-in"><span>    posterior_predict <span class="op">=</span> <span class="va">posterior_predict_mixture3p_simple</span>,</span></span>
+<span class="r-in"><span>    posterior_epred <span class="op">=</span> <span class="va">posterior_epred_mixture3p_simple</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>  <span class="co"># additional internal terms for the mixture model formula</span></span></span>
-<span class="r-in"><span>  <span class="va">kappa_nts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"kappa"</span>, <span class="fl">3</span><span class="op">:</span><span class="op">(</span><span class="va">max_set_size</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="va">theta_nts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"theta"</span>, <span class="fl">3</span><span class="op">:</span><span class="op">(</span><span class="va">max_set_size</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="va">mu_nts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"mu"</span>, <span class="fl">3</span><span class="op">:</span><span class="op">(</span><span class="va">max_set_size</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>  <span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="op">(</span><span class="va">max_set_size</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>    <span class="va">formula</span> <span class="op">&lt;-</span> <span class="va">formula</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>      <span class="fu">glue_nlf</span><span class="op">(</span><span class="st">"{kappa_nts[i]} ~ kappa"</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>      <span class="fu">glue_nlf</span><span class="op">(</span></span></span>
-<span class="r-in"><span>        <span class="st">"{theta_nts[i]} ~ {lure_idx[i]} * (thetant + log(inv_ss)) + "</span>,</span></span>
-<span class="r-in"><span>        <span class="st">"(1 - {lure_idx[i]}) * (-100)"</span></span></span>
-<span class="r-in"><span>      <span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>      <span class="fu">glue_nlf</span><span class="op">(</span><span class="st">"{mu_nts[i]} ~ {nt_features[i]}"</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="op">}</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>  <span class="co"># define mixture family</span></span></span>
-<span class="r-in"><span>  <span class="va">vm_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="op">(</span><span class="va">max_set_size</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsfamily.html" class="external-link">von_mises</a></span><span class="op">(</span>link <span class="op">=</span> <span class="st">"identity"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="va">vm_list</span><span class="op">$</span><span class="va">order</span> <span class="op">&lt;-</span> <span class="st">"none"</span></span></span>
-<span class="r-in"><span>  <span class="va">formula</span><span class="op">$</span><span class="va">family</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/do_call.html" class="external-link">do_call</a></span><span class="op">(</span><span class="fu">brms</span><span class="fu">::</span><span class="va"><a href="https://paulbuerkner.com/brms/reference/mixture.html" class="external-link">mixture</a></span>, <span class="va">vm_list</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>  <span class="fu">nlist</span><span class="op">(</span><span class="va">formula</span>, <span class="va">data</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu">nlist</span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="va">formula</span>, <span class="va">data</span>,</span></span>
+<span class="r-in"><span>    stanvars <span class="op">=</span> <span class="fu">.circmix_model_stanvars</span><span class="op">(</span></span></span>
+<span class="r-in"><span>      <span class="va">model</span>, <span class="va">formula</span><span class="op">$</span><span class="va">family</span>, <span class="st">"mixture3p_functions.stan"</span>,</span></span>
+<span class="r-in"><span>      vint <span class="op">=</span> <span class="st">"ss"</span>, vreal <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>nt <span class="op">=</span> <span class="va">n_nt</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>

@@ -23,7 +23,7 @@ factors, intercepts and slopes alike) and replaces the
 `student_t(3, 0, 2.5)` default of `brms`. To override it, address the
 parameter with `dpar` or `nlpar` in
 [`brms::set_prior()`](https://paulbuerkner.com/brms/reference/set_prior.html),
-e.g. `set_prior("exponential(2)", class = "sd", nlpar = "kappa")`.
+e.g. `set_prior("exponential(2)", class = "sd", dpar = "kappa")`.
 
 Correlations among random effects belong to a grouping factor rather
 than to one parameter, so they get a single default for the whole model:

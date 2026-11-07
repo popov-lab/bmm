@@ -65,14 +65,14 @@ bridge sampling are undefined when any parameter has an improper prior.
 
 Parameters that exist only because the family machinery requires them
 are omitted: a fixed parameter the model does not declare (the `mu` brms
-forces on the custom families of the response-time models, or the `mu2`
-and `kappa2` of a two-component
+forces on the custom families of the response-time models, or, in fits
+saved before bmm 1.5.0, the `mu2` and `kappa2` of a two-component
 [`brms::mixture()`](https://paulbuerkner.com/brms/reference/mixture.html)
-family), and the mixture-weight reference component `theta2`, which brms
-lists with a default prior although the sampler holds it at zero. Fixed
-parameters the model does declare are reported, since the user can
-estimate them: `mu` for
-[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), `mu1` for the
+family), and the mixture-weight reference component `theta2` of those
+fits, which brms lists with a default prior although the sampler holds
+it at zero. Fixed parameters the model does declare are reported, since
+the user can estimate them: `mu` for
+[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) and the
 circular mixture models, `zr` for
 [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md).
 

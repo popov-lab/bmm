@@ -195,9 +195,11 @@ native value can differ from the value shown by <code><a href="parameter_info.ht
 relative starting point <code>zr</code> is fixed at <code>0</code> under a <code>logit</code> link and is
 therefore reported as <code>0.5</code>, and the <code>ezdm</code> and <code>cswald</code> diffusion constant <code>s</code>
 is fixed at <code>0</code> under a <code>log</code> link and is reported as <code>1</code>.</p>
-<p>Trial-level derived quantities, such as the response probabilities of the
-mixture models or the category probabilities of <code>m3</code>, are not returned; use
-<code><a href="https://mc-stan.org/rstantools/reference/posterior_epred.html" class="external-link">brms::posterior_epred()</a></code> for those.</p>
+<p>Trial-level derived quantities, such as the category probabilities of <code>m3</code>,
+are not returned; use <code><a href="https://mc-stan.org/rstantools/reference/posterior_epred.html" class="external-link">brms::posterior_epred()</a></code> for those. The circular
+mixture models have no expected response, so their <code>posterior_epred()</code> stops;
+the probabilities of their response types follow from the returned
+parameters, as the section on mixture weights describes.</p>
 <p>The default grid contains the observed combinations of the predictors, not
 their full crossing, so cells that were never presented do not appear. A
 continuous predictor therefore produces one grid cell per observed value;
@@ -205,34 +207,43 @@ supply <code>newdata</code> for such models.</p>
     </div>
     <div class="section level2">
     <h2 id="circular-location-parameters">Circular location parameters<a class="anchor" aria-label="anchor" href="#circular-location-parameters"></a></h2>
-    <p>The circular models sample their location parameter (<code>mu</code> for <code>sdm</code>, <code>mu1</code> for
-<code>mixture2p</code>, <code>mixture3p</code> and <code>imm</code>) through a <code>tan_half</code> link, and it is
+    <p>The circular models sample their location parameter <code>mu</code> through a
+<code>tan_half</code> link, and it is
 returned in radians in <code>(-pi, pi)</code> — a response bias relative to the target,
 since the response variable is the angular error. It is fixed to <code>0</code> unless
-the <code>bmmformula</code> predicts it explicitly, so an all-zero <code>mu1</code> means the model
+the <code>bmmformula</code> predicts it explicitly, so an all-zero <code>mu</code> means the model
 never estimated one.</p>
 <p>The inverse link is <code>2 * atan()</code>, and the caveat above applies to it with
-particular force: <code>2 * atan(b_mu1_conditionB)</code> is neither the bias in
+particular force: <code>2 * atan(b_conditionB)</code> is neither the bias in
 condition B nor the difference between conditions. The bias in condition B is
-<code>2 * atan(b_mu1_Intercept + b_mu1_conditionB)</code>, and the difference between the
-conditions is that value minus <code>2 * atan(b_mu1_Intercept)</code>, taken draw by
+<code>2 * atan(b_Intercept + b_conditionB)</code>, and the difference between the
+conditions is that value minus <code>2 * atan(b_Intercept)</code>, taken draw by
 draw.</p>
     </div>
     <div class="section level2">
     <h2 id="mixture-weights">Mixture weights<a class="anchor" aria-label="anchor" href="#mixture-weights"></a></h2>
-    <p>For <code>mixture3p</code> the returned <code>thetat</code> and <code>thetant</code> are probabilities but they
-<strong>do not sum to 1</strong>: <code>brms</code> holds the linear predictor of one mixture
-component at zero, and that component is the guessing distribution, so the
-remaining mass <code>1 - thetat - thetant</code> is the probability of a guess. <code>thetant</code>
-is the <em>total</em> probability of a non-target response, summed over the lures,
-not the probability per lure.</p>
+    <p>For <code>mixture2p</code>, <code>thetat</code> is the probability that a response comes from
+memory rather than from guessing.</p>
+<p>For <code>mixture3p</code> the returned <code>thetat</code> and <code>thetant</code> are probabilities but they
+<strong>do not sum to 1</strong>: the likelihood weighs both against the guessing
+distribution, whose weight is the fixed reference, so the remaining mass
+<code>1 - thetat - thetant</code> is the probability of a guess. <code>thetant</code> is the <em>total</em>
+probability of a non-target response, summed over the lures, not the
+probability per lure.</p>
 <p>At set sizes where no non-target was presented the model switches its
 non-target components off, so <code>thetant</code> is reported as exactly <code>0</code> and
 <code>thetat</code> as <code><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis()</a></code> of its linear predictor, rather than as the value the
-set-size regression extrapolates to. This correction reads the lure indicators
-out of the prediction grid; if you supply <code>newdata</code>, columns you do not supply
-are filled from the first row of the model data rather than recomputed, and
-<code>native_parameters()</code> warns when the two disagree.</p>
+set-size regression extrapolates to. This correction reads the set size from
+the prediction grid: if you supply <code>newdata</code> without the set-size variable,
+every row takes the set size of the first row of the model data.</p>
+<p>In the <code>"slot"</code> and <code>"slot_averaging"</code> versions of <code>mixture3p</code>, <code>ptarget</code> is a
+probability <em>given</em> that a response comes from memory. The probability of a
+memory response, <code>min(1, K / set_size)</code>, depends on the set size and is not
+returned. If the formula gives set size 1 a coefficient of its own, <code>ptarget</code>
+at set size 1 reflects only its prior, because a single item cannot be
+swapped.</p>
+<p>With <code>variable_precision = TRUE</code>, <code>tau</code> is returned on its native scale, and
+<code>kappa</code> is the concentration of the average trial.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

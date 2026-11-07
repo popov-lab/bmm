@@ -119,7 +119,8 @@ was specified with:
 |  |  |
 |----|----|
 | Model | Columns |
-| [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md), [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md), [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) | none |
+| [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), [`ddm()`](https://venpopov.com/bmm/dev/reference/ddm.md), [`cswald()`](https://venpopov.com/bmm/dev/reference/cswald.md) | none |
+| [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md) | `set_size` (if it names a column) for the versions `"slot"` and `"slot_averaging"`; none for `"simple"` |
 | [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md) | `set_size` (if it names a column), `nt_features`, of which a row's first `set_size - 1` are read |
 | [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md) | as [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md), plus `nt_distances` for the versions `"full"` and `"bsc"` |
 | [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) | `n_trials`, the number of trials of each row; `num_options` when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) |
@@ -142,16 +143,16 @@ data <- bmm::simulate_data(mixture2p(resp_error = "y"),
   pars = list(kappa = log(8), thetat = 0.5), n_trials = 100
 )
 head(data)
-#>             y
-#> 1 -1.07157459
-#> 2  0.09974140
-#> 3 -0.11089926
-#> 4 -0.39314121
-#> 5 -0.01845983
-#> 6  0.13389836
+#>              y
+#> 1  0.027702862
+#> 2  2.872324381
+#> 3 -0.005503442
+#> 4 -0.663926479
+#> 5  0.602686109
+#> 6  3.086732360
 attr(data, "simulate_pars")[1, ]
-#>   mu1    kappa thetat
-#> 1   0 2.079442    0.5
+#>   mu    kappa thetat
+#> 1  0 2.079442    0.5
 
 # the same on the native scale: kappa as a precision, thetat as P(memory)
 data <- bmm::simulate_data(mixture2p(resp_error = "y"),
@@ -166,12 +167,12 @@ data <- bmm::simulate_data(ddm(rt = "rt", response = "response"),
 )
 head(data)
 #>   cond        rt response
-#> 1 easy 0.3976410        0
-#> 2 easy 0.3525345        1
-#> 3 easy 0.5632990        1
-#> 4 easy 0.4019846        1
-#> 5 easy 0.4056678        1
-#> 6 easy 0.4016709        1
+#> 1 easy 0.6943447        1
+#> 2 easy 0.7629890        1
+#> 3 easy 0.5331093        1
+#> 4 easy 0.4308235        0
+#> 5 easy 0.4768945        0
+#> 6 easy 0.4210446        1
 
 # counts: yes/no recognition, 50 trials per stimulus type
 design <- data.frame(stimulus = c(0, 1), n_trials = 50)
@@ -179,8 +180,8 @@ bmm::simulate_data(sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = 
   pars = list(d = 1.5, criterion = 0.5), design = design
 )
 #>   stimulus n_trials n_old
-#> 1        0       50    19
-#> 2        1       50    40
+#> 1        0       50    21
+#> 2        1       50    43
 
 # categorical responses: memory measurement model, 100 trials per row
 model <- m3(
@@ -189,6 +190,6 @@ model <- m3(
 )
 bmm::simulate_data(model, pars = list(c = 2, a = 0.5), design = data.frame(n_trials = c(100, 100)))
 #>   n_trials corr other npl
-#> 1      100   42    27  31
-#> 2      100   46    34  20
+#> 1      100   52    25  23
+#> 2      100   54    25  21
 ```

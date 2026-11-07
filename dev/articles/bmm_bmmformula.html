@@ -170,10 +170,10 @@ margin-bottom: 1.5em ;
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">my_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mixture2p.html">mixture2p</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">"error"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">my_model</span><span class="op">$</span><span class="va">fixed_parameters</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "mu1"    "mu2"    "kappa2"</span></span>
+<span><span class="co">#&gt; [1] "mu"</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">my_model</span><span class="op">$</span><span class="va">parameters</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "mu1"    "kappa"  "thetat"</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] "mu"     "kappa"  "thetat"</span></span></code></pre></div>
 <p>If you want to freely estimate an internally fixed parameters, then you can freely estimate this parameter by providing a <code>bmmformula</code> for it. In the case of the above mentioned visual working memory models, you could for example be interested in seeing if subjects were biased (e.g., by distractors). If you want to estimate the overall bias in your data including variations between subjects indicated by <code>ID</code>, then you would additionally specify a <code>bmmformula</code> for <code>mu</code> in addition to the other formulas for the core mode parameters:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">my_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mixture2p.html">mixture2p</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">"error"</span><span class="op">)</span></span>

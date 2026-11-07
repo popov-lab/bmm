@@ -18,6 +18,8 @@ dimm(
   b = 1,
   s = 2,
   kappa = 5,
+  tau = 0,
+  vp_nodes = 81L,
   log = FALSE
 )
 
@@ -51,7 +53,8 @@ rimm(
   a = 0.2,
   b = 1,
   s = 2,
-  kappa = 5
+  kappa = 5,
+  tau = 0
 )
 ```
 
@@ -87,11 +90,32 @@ rimm(
 
 - kappa:
 
-  Vector of precision values
+  Vector of precision values. With `tau > 0` this is the concentration
+  of the average trial, whose Fisher information `J(kappa)` is the mean
+  of `J`.
+
+- tau:
+
+  Vector of scales for trial-to-trial variability in precision. The
+  Fisher information `J` of a memory representation is drawn from
+  `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is
+  constant precision. See
+  [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md).
+
+- vp_nodes:
+
+  Number of quadrature nodes used when `tau > 0`; must be an odd number
+  of at least 41. See
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md).
+  The random generation function needs no nodes: it draws `J` from its
+  gamma distribution and then the response, which is exact.
 
 - log:
 
-  Logical; if `TRUE`, values are returned on the log scale.
+  Logical; if `TRUE`, values are returned on the log scale. Pass it by
+  name: in bmm 1.4 it was the ninth argument, which is now `tau`. Until
+  bmm 1.6.0 a logical value in that position is still read as `log`,
+  with a warning.
 
 - q:
 
@@ -118,6 +142,10 @@ function for the interference measurement model.
 Oberauer, K., Stoneking, C., Wabersich, D., & Lin, H.-Y. (2017).
 Hierarchical Bayesian measurement models for continuous reproduction of
 visual features from working memory. Journal of Vision, 17(5), 11.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
 
 ## Examples
 

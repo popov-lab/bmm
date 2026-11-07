@@ -91,14 +91,14 @@ A `brms_conditional_effects` object (from brms), which can be:
 bmm models use two types of parameters internally:
 
 - **Non-linear parameters (`nlpar`)**: Model parameters that enter the
-  likelihood through a non-linear formula, like `kappa` and `thetat` of
-  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
-  or `c` and `a` of
+  likelihood through a non-linear formula, like `c` and `a` of
   [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md)
 
 - **Distributional parameters (`dpar`)**: Parameters of the response
   distribution itself, like `kappa` and `c` of
-  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) or `kappa`
+  and `thetat` of
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
 
 Users should not need to know this distinction -
 `conditional_effects.bmmfit()` automatically routes to the correct
@@ -201,7 +201,7 @@ plot(ce_kappa)
 ce_kappa_log <- conditional_effects(fit, par = "kappa", scale = "sampling")
 plot(ce_kappa_log)
 
-# Get effects for thetat (memory probability)
+# Get effects for thetat (probability of a target response)
 ce_thetat <- conditional_effects(fit, par = "thetat")
 plot(ce_thetat)
 

@@ -58,13 +58,33 @@ representations <code>kappa</code> and probability of recalling items from memor
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dmixture2p</span><span class="op">(</span><span class="va">x</span>, mu <span class="op">=</span> <span class="fl">0</span>, kappa <span class="op">=</span> <span class="fl">5</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span>, log <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dmixture2p</span><span class="op">(</span></span>
+<span>  <span class="va">x</span>,</span>
+<span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  kappa <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  p_mem <span class="op">=</span> <span class="fl">0.6</span>,</span>
+<span>  tau <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  set_size <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  version <span class="op">=</span> <span class="st">"simple"</span>,</span>
+<span>  vp_nodes <span class="op">=</span> <span class="fl">81L</span>,</span>
+<span>  log <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">pmixture2p</span><span class="op">(</span><span class="va">q</span>, mu <span class="op">=</span> <span class="fl">0</span>, kappa <span class="op">=</span> <span class="fl">7</span>, p_mem <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">qmixture2p</span><span class="op">(</span><span class="va">p</span>, mu <span class="op">=</span> <span class="fl">0</span>, kappa <span class="op">=</span> <span class="fl">5</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">rmixture2p</span><span class="op">(</span><span class="va">n</span>, mu <span class="op">=</span> <span class="fl">0</span>, kappa <span class="op">=</span> <span class="fl">5</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">rmixture2p</span><span class="op">(</span></span>
+<span>  <span class="va">n</span>,</span>
+<span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  kappa <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  p_mem <span class="op">=</span> <span class="fl">0.6</span>,</span>
+<span>  tau <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  set_size <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  version <span class="op">=</span> <span class="st">"simple"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -80,15 +100,54 @@ representations <code>kappa</code> and probability of recalling items from memor
 
 
 <dt id="arg-kappa">kappa<a class="anchor" aria-label="anchor" href="#arg-kappa"></a></dt>
-<dd><p>Vector of precision values</p></dd>
+<dd><p>Vector of precision values. With <code>tau &gt; 0</code> this is the
+concentration of the average trial, whose Fisher information <code>J(kappa)</code> is
+the mean of <code>J</code>.</p></dd>
 
 
 <dt id="arg-p-mem">p_mem<a class="anchor" aria-label="anchor" href="#arg-p-mem"></a></dt>
-<dd><p>Vector of probabilities for memory recall</p></dd>
+<dd><p>Vector of probabilities for memory recall, i.e. <code>thetat</code> of
+<code><a href="mixture2p.html">mixture2p()</a></code> on its native scale. Used by the <code>"simple"</code> version; the
+other versions derive it from <code>K</code> and <code>set_size</code>, and warn if <code>p_mem</code> is
+given.</p></dd>
+
+
+<dt id="arg-tau">tau<a class="anchor" aria-label="anchor" href="#arg-tau"></a></dt>
+<dd><p>Vector of scales for trial-to-trial variability in precision. The
+Fisher information <code>J</code> of a memory representation is drawn from
+<code>gamma(mean = J(kappa), scale = tau)</code>. <code>tau = 0</code>, the default, is constant
+precision.</p></dd>
+
+
+<dt id="arg-k">K<a class="anchor" aria-label="anchor" href="#arg-k"></a></dt>
+<dd><p>Vector of memory capacities. Used by the <code>"slot"</code> and
+<code>"slot_averaging"</code> versions; <code>"simple"</code> ignores it and warns if it is
+given.</p></dd>
+
+
+<dt id="arg-set-size">set_size<a class="anchor" aria-label="anchor" href="#arg-set-size"></a></dt>
+<dd><p>Vector of set sizes. Required by the <code>"slot"</code> and
+<code>"slot_averaging"</code> versions, which stop without it; <code>"simple"</code> ignores it
+and warns if it is given.</p></dd>
+
+
+<dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
+<dd><p>A character string selecting the storage model: <code>"simple"</code>,
+<code>"slot"</code> or <code>"slot_averaging"</code>. See <code><a href="mixture2p.html">mixture2p()</a></code>.</p></dd>
+
+
+<dt id="arg-vp-nodes">vp_nodes<a class="anchor" aria-label="anchor" href="#arg-vp-nodes"></a></dt>
+<dd><p>Number of quadrature nodes used when <code>tau &gt; 0</code>; must be an
+odd number of at least 41. See <code><a href="mixture2p.html">mixture2p()</a></code>. The random generation
+function needs no nodes: it draws <code>J</code> from its gamma distribution and then
+the response, which is exact.</p></dd>
 
 
 <dt id="arg-log">log<a class="anchor" aria-label="anchor" href="#arg-log"></a></dt>
-<dd><p>Logical; if <code>TRUE</code>, values are returned on the log scale.</p></dd>
+<dd><p>Logical; if <code>TRUE</code>, values are returned on the log scale. Pass
+it by name: in bmm 1.4 it was the fifth argument, which is now <code>tau</code>.
+Until bmm 1.6.0 a logical value in that position is still read as <code>log</code>,
+with a warning.</p></dd>
 
 
 <dt id="arg-q">q<a class="anchor" aria-label="anchor" href="#arg-q"></a></dt>
@@ -114,7 +173,10 @@ generation function for the two-parameter mixture model.</p>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>Zhang, W., &amp; Luck, S. J. (2008). Discrete fixed-resolution
-representations in visual working memory. Nature, 453.</p>
+representations in visual working memory. Nature, 453(7192), 233-235.</p>
+<p>van den Berg, R., Shin, H., Chou, W.-C., George, R., &amp; Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.</p>
     </div>
 
     <div class="section level2">
