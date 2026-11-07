@@ -752,6 +752,22 @@ test_that("the samplers refuse an n that is not a single positive whole number",
   }
 })
 
+test_that("dsdt_cdp() and rsdt_cdp() refuse a kcrit that is finite for some observations only", {
+  withr::local_seed(4444)
+  thr <- c(-0.5, 0.3, 1)
+  rk <- c(40, 5, 12, 30, 10, 18, 60)
+  rkg <- c(40, 5, 3, 1, 12, 30, 10, 18, 60, 2)
+  for (kcrit in list(c(0, NA), c(0, Inf), c(-Inf, 0.2))) {
+    expect_error(dsdt_cdp(rkg, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1),
+                 "kcrit mixes finite and non-finite values", info = format(kcrit))
+    expect_error(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1),
+                 "kcrit mixes finite and non-finite values", info = format(kcrit))
+  }
+  expect_equal(ncol(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, n_new = 1)), length(rk))
+  expect_equal(ncol(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1)), length(rkg))
+  expect_length(dsdt_cdp(rbind(rkg, rkg), 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1), 2)
+})
+
 test_that("rddm handles vector parameters correctly", {
   withr::local_seed(445)
   n <- 5

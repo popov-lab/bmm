@@ -4554,6 +4554,20 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 }
 
 
+# kcrit switches the Know/Guess split, and with it the number of response
+# categories, for the whole call, so it cannot be off for some observations
+.cdp_has_guess <- function(kcrit) {
+  finite <- is.finite(kcrit)
+  stopif(
+    any(finite) && !all(finite),
+    "kcrit mixes finite and non-finite values, but the Know/Guess split is on \\
+    or off for the whole call: pass a finite kcrit for every observation \\
+    (R/K/G) or kcrit = NULL (R/K)."
+  )
+  !is.null(kcrit) && all(finite)
+}
+
+
 #' @title Distribution functions for Continuous Dual-Process SDT (CDP)
 #' @description Density and random generation for the continuous dual-process
 #'   signal detection theory model (Wixted & Mickes, 2010). Two correlated
@@ -4629,7 +4643,7 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   K_full <- ncol(thr) + 1L
   if (is.null(n_new)) n_new <- K_full %/% 2L
   n_old <- K_full - n_new
-  has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
+  has_guess <- .cdp_has_guess(kcrit)
   expected <- n_new + (if (has_guess) 3L else 2L) * n_old
   stopif(ncol(counts) != expected, "counts must have {expected} columns")
   stopif(anyNA(counts), "counts must not contain NA")
@@ -4678,7 +4692,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   K_full <- ncol(thr) + 1L
   if (is.null(n_new)) n_new <- K_full %/% 2L
   n_old <- K_full - n_new
-  has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
+  has_guess <- .cdp_has_guess(kcrit)
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),
