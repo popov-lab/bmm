@@ -34,10 +34,12 @@ and combines them with a readable summary of:
   For all other models a row is one trial. With one row per trial
   ([`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
   [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)
-  without `n_trials`), only the first grouping variable of the formula,
-  taken as the participant, and any grouping variable that is also a
-  discrete predictor are crossed; the other grouping variables, such as
-  items, are counted per level
+  without `n_trials`,
+  [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) with
+  `response`), only the first grouping variable of the formula, taken as
+  the participant, and any grouping variable that is also a discrete
+  predictor are crossed; the other grouping variables, such as items,
+  are counted per level
 
 - model-specific diagnostics for common data mistakes (e.g. responses in
   degrees rather than radians for circular models, or misplaced `NA`

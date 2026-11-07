@@ -83,6 +83,7 @@ latent scale.</p>
 <span>  simplex <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  restrictions <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  links <span class="op">=</span> <span class="st">"logit"</span>,</span>
+<span>  response <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -178,6 +179,18 @@ to the other link, in the list or afterwards with
 Details).</p></dd>
 
 
+<dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
+<dd><p>Character. A single non-empty string naming the data column
+that holds, with one row per trial, the response category of each trial:
+a character or factor column whose values are branch names. The column
+cannot carry the name of a response category, the <code>tree_id</code> column or a
+covariate, nor of a column that <code><a href="bmm.html">bmm()</a></code> builds: <code>Y</code>, <code>nTrials</code>,
+<code>Idx_&lt;tree&gt;</code> when <code>tree_id</code> is set, and <code>Poss_&lt;category&gt;</code> for a category
+declared impossible in a tree.
+<code>NULL</code> (the default) declares aggregated data with one count column per
+response category. See Details.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>used internally for testing, ignore it</p></dd>
 
@@ -193,7 +206,8 @@ Details).</p></dd>
 <li><p><strong>Task:</strong> Categorical recall and n-AFC decisions; Detection, recognition and confidence judgments</p></li>
 <li><p><strong>Name:</strong> Multinomial Processing Tree (MPT) Model</p></li>
 <li><p><strong>Citation:</strong></p><ul><li><p>Batchelder, W. H., &amp; Riefer, D. M. (1999). Theoretical and empirical review of multinomial process tree modeling. Psychonomic Bulletin &amp; Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812</p></li>
-</ul><p>The data hold aggregated counts: one row per participant and tree (and
+</ul><p>The data hold aggregated counts, or one row per trial with <code>response</code>
+(below). Aggregated counts: one row per participant and tree (and
 per condition, if conditions are crossed with the trees), with one count
 column per response category. The count columns must be named exactly
 like the branch names given to <code><a href="mpt_tree.html">mpt_tree()</a></code> (<code>old</code> and <code>new</code> in the
@@ -202,7 +216,20 @@ variable is passed. The <code>tree_id</code> column names the tree of each row, 
 the counts of a row must come from trials of that tree. Wide tables with
 one column per category of an EQN file, as MPTinR and TreeBUGS take them,
 are reshaped with <code><a href="mpt_data_reshape.html">mpt_data_reshape()</a></code>.</p>
-<p>A separate tree is needed only when the <em>branch expressions</em> differ, that
+<p>With <code>response = "resp"</code>, each row is one trial, and the column <code>resp</code>
+names its response category (<code>"old"</code> or <code>"new"</code> in the example below).
+Trial rows allow item random effects, <code>D ~ 1 + (1 | id) + (1 | item)</code>,
+and covariates that change from trial to trial. A missing response is an
+error rather than a count of 0; remove those rows.</p><ul><li><p><strong>Requirements for one row per trial:</strong></p></li>
+</ul><ul><li><p>One tree per distinct branch structure, created with mpt_tree(); all trees share the same response categories</p></li>
+<li><p>One row per trial, with a column whose values name the response category of the trial (the branch names), declared via the response argument</p></li>
+<li><p>For multi-tree models, a column whose values name the tree each observation belongs to, declared via the tree_id argument</p></li>
+<li><p>Data columns used inside branch expressions must be declared via the covariates argument</p></li>
+</ul></li>
+<li><p><strong>Trial-level data:</strong> Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as <code>(1 | id) + (1 | item)</code> need trial rows, unless the counts are kept per participant and item.</p><ul><li><p><code>loo()</code> leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. <code>kfold(fit, group = "id")</code> leaves out whole participants with either layout.</p></li>
+<li><p><code>bmm(..., threads = n)</code> with <code>backend = "cmdstanr"</code> evaluates the likelihood on <code>n</code> threads per chain, which shortens trial-level fits on a machine with cores to spare.</p></li>
+<li><p><code>ppp(fit, participant = "id")</code> names the participant when the formula has more than one grouping variable, such as item terms.</p></li>
+</ul><p>A separate tree is needed only when the <em>branch expressions</em> differ, that
 is, when the trial determines which latent processes apply or which
 response categories are reachable (targets versus lures, a response set
 with or without distractors, inclusion versus exclusion instructions).
@@ -298,7 +325,8 @@ can pass while one tree holds only a few trials: 40 trials in an old/new
 test and 2 in a source test add up to 42. With the tree column in a
 formula, each tree is a cell of its own and is checked on its own;
 otherwise tabulate the trials per tree yourself when the trees differ in
-size.</p>
+size. With one row per trial, <code><a href="bmm_data_check.html">bmm_data_check()</a></code> counts the trials of
+each participant instead.</p>
 <p><strong>Reading the estimates.</strong> <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports intercepts and regression
 coefficients on the latent (logit or probit) scale. <code><a href="native_parameters.html">native_parameters()</a></code>
 returns the posterior draws of every parameter on the probability scale

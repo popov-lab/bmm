@@ -7,7 +7,9 @@ per participant and tree, a column naming the tree, and one count column
 per *shared* response category (see
 [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)).
 `mpt_data_reshape()` reshapes the first layout into the second for a
-given model.
+given model. Data with one row per trial are long already and need no
+reshaping: name their column of response categories in
+`mpt(response = )`.
 
 ## Usage
 

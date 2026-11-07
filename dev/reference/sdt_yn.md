@@ -199,9 +199,10 @@ An object of class `bmmodel`
   - `loo()` leaves out single trials on trial rows and whole cells on
     aggregated rows. These are different predictions, and the
     log-likelihoods of the trial rows sum to the cell's log-likelihood
-    less the log binomial coefficient, so ELPD values compare only fits
-    to the same layout. `kfold(fit, group = "id")` leaves out whole
-    participants with either layout.
+    less the log of the binomial (or multinomial) coefficient, so ELPD
+    values compare only fits to the same layout.
+    `kfold(fit, group = "id")` leaves out whole participants with either
+    layout.
 
   - `bmm(..., threads = n)` with `backend = "cmdstanr"` evaluates the
     likelihood on `n` threads per chain, which shortens trial-level fits

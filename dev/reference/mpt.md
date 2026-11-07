@@ -23,6 +23,7 @@ mpt(
   simplex = NULL,
   restrictions = NULL,
   links = "logit",
+  response = NULL,
   ...
 )
 ```
@@ -118,6 +119,19 @@ mpt(
   `model$links$D <- "probit"`, takes that link's default priors (see
   Details).
 
+- response:
+
+  Character. A single non-empty string naming the data column that
+  holds, with one row per trial, the response category of each trial: a
+  character or factor column whose values are branch names. The column
+  cannot carry the name of a response category, the `tree_id` column or
+  a covariate, nor of a column that
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) builds: `Y`,
+  `nTrials`, `Idx_<tree>` when `tree_id` is set, and `Poss_<category>`
+  for a category declared impossible in a tree. `NULL` (the default)
+  declares aggregated data with one count column per response category.
+  See Details.
+
 - ...:
 
   used internally for testing, ignore it
@@ -141,10 +155,11 @@ An object of class `bmmodel`
     review of multinomial process tree modeling. Psychonomic Bulletin &
     Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812
 
-  The data hold aggregated counts: one row per participant and tree (and
-  per condition, if conditions are crossed with the trees), with one
-  count column per response category. The count columns must be named
-  exactly like the branch names given to
+  The data hold aggregated counts, or one row per trial with `response`
+  (below). Aggregated counts: one row per participant and tree (and per
+  condition, if conditions are crossed with the trees), with one count
+  column per response category. The count columns must be named exactly
+  like the branch names given to
   [`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md)
   (`old` and `new` in the example below);
   [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) finds them by
@@ -153,6 +168,51 @@ An object of class `bmmodel`
   trials of that tree. Wide tables with one column per category of an
   EQN file, as MPTinR and TreeBUGS take them, are reshaped with
   [`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md).
+
+  With `response = "resp"`, each row is one trial, and the column `resp`
+  names its response category (`"old"` or `"new"` in the example below).
+  Trial rows allow item random effects, `D ~ 1 + (1 | id) + (1 | item)`,
+  and covariates that change from trial to trial. A missing response is
+  an error rather than a count of 0; remove those rows.
+
+  - **Requirements for one row per trial:**
+
+  &nbsp;
+
+  - One tree per distinct branch structure, created with mpt_tree(); all
+    trees share the same response categories
+
+  - One row per trial, with a column whose values name the response
+    category of the trial (the branch names), declared via the response
+    argument
+
+  - For multi-tree models, a column whose values name the tree each
+    observation belongs to, declared via the tree_id argument
+
+  - Data columns used inside branch expressions must be declared via the
+    covariates argument
+
+- **Trial-level data:** Without trial-level predictors or item terms,
+  trial rows give the same posterior as the counts aggregated from them,
+  which are sufficient statistics; the fit only takes longer, because
+  its cost grows with the number of rows. Crossed random effects such as
+  `(1 | id) + (1 | item)` need trial rows, unless the counts are kept
+  per participant and item.
+
+  - `loo()` leaves out single trials on trial rows and whole cells on
+    aggregated rows. These are different predictions, and the
+    log-likelihoods of the trial rows sum to the cell's log-likelihood
+    less the log of the binomial (or multinomial) coefficient, so ELPD
+    values compare only fits to the same layout.
+    `kfold(fit, group = "id")` leaves out whole participants with either
+    layout.
+
+  - `bmm(..., threads = n)` with `backend = "cmdstanr"` evaluates the
+    likelihood on `n` threads per chain, which shortens trial-level fits
+    on a machine with cores to spare.
+
+  - `ppp(fit, participant = "id")` names the participant when the
+    formula has more than one grouping variable, such as item terms.
 
   A separate tree is needed only when the *branch expressions* differ,
   that is, when the trial determines which latent processes apply or
@@ -275,7 +335,9 @@ An object of class `bmmodel`
   a few trials: 40 trials in an old/new test and 2 in a source test add
   up to 42. With the tree column in a formula, each tree is a cell of
   its own and is checked on its own; otherwise tabulate the trials per
-  tree yourself when the trees differ in size.
+  tree yourself when the trees differ in size. With one row per trial,
+  [`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+  counts the trials of each participant instead.
 
   **Reading the estimates.**
   [`summary()`](https://rdrr.io/r/base/summary.html) reports intercepts

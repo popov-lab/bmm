@@ -124,7 +124,7 @@ was specified with:
 | [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md) | `set_size` (if it names a column), `nt_features`, of which a row's first `set_size - 1` are read |
 | [`imm()`](https://venpopov.com/bmm/dev/reference/imm.md) | as [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md), plus `nt_distances` for the versions `"full"` and `"bsc"` |
 | [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) | `n_trials`, the number of trials of each row; `num_options` when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) |
-| [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) | `n_trials`; `tree_id` and `covariates` when the model has them |
+| [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) | `n_trials` (none with `response`, one row per trial); `tree_id` and `covariates` when the model has them |
 | [`ezdm()`](https://venpopov.com/bmm/dev/reference/ezdm.md) | `n_trials` |
 | [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) | `stimulus`, `n_trials` |
 | [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | `n_trials`; `m` when it names a column |

@@ -139,6 +139,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; Response:   resp_cats = old, new (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: D, g </span></span>
 <span><span class="co">#&gt; Links:      D = logit; g = logit </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('old', 'new') </span></span>
 <span><span class="co">#&gt; MPT tree 'target':</span></span>
 <span><span class="co">#&gt;   P(old) = D + (1 - D) * g</span></span>
 <span><span class="co">#&gt;   P(new) = (1 - D) * (1 - g)</span></span>
@@ -172,6 +173,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; Response:   resp_cats = old, new (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: Do, g, Dn </span></span>
 <span><span class="co">#&gt; Links:      Do = logit; g = logit; Dn = logit </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('old', 'new') </span></span>
 <span><span class="co">#&gt; MPT tree 'target':</span></span>
 <span><span class="co">#&gt;   P(old) = Do + (1 - Do) * g</span></span>
 <span><span class="co">#&gt;   P(new) = (1 - Do) * (1 - g)</span></span>
@@ -201,7 +203,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <h2 id="data-format-and-simulation">
 <span class="header-section-number">3</span> Data format and simulation<a class="anchor" aria-label="anchor" href="#data-format-and-simulation"></a>
 </h2>
-<p>The data contain one column of aggregated response counts per response category, named after the branch names of the trees, plus the <code>tree_id</code> column. Aggregated counts are sufficient whenever parameters and covariates are constant within participant and condition. Trial-level data (one row per trial with a 1 in the chosen category’s column) also work and are only needed when predictors vary from trial to trial.</p>
+<p>The data contain one column of aggregated response counts per response category, named after the branch names of the trees, plus the <code>tree_id</code> column. Aggregated counts are sufficient whenever parameters and covariates are constant within participant and condition. Data with one row per trial are needed for item effects and for predictors that vary from trial to trial; <a href="#trial-level-data-and-item-effects">Trial-level data and item effects</a> shows that layout.</p>
 <p>The distribution functions <code><a href="../reference/mptdist.html">dmpt()</a></code> and <code><a href="../reference/mptdist.html">rmpt()</a></code> provide the multinomial density and random generation for any <code><a href="../reference/mpt.html">mpt()</a></code> model. <code><a href="../reference/mptdist.html">rmpt()</a></code> draws the counts for one tree and one parameter vector; a short function around it simulates a hierarchical data set in the shape of TreeBUGS’ <code>genTraitMPT()</code>: population means on the probability scale, participant heterogeneity as standard deviations on the latent scale (here the logit scale; the <code>sigma</code> of <code>genTraitMPT()</code> is on the probit scale, see <a href="#default-priors">Default priors</a> for the conversion).</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">simulate_2htm</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">n_subj</span>, <span class="va">n_items</span>, <span class="va">mean</span>, <span class="va">sd</span><span class="op">)</span> <span class="op">{</span></span>
@@ -366,6 +368,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; Response:   resp_cats = old, new (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: Do, g </span></span>
 <span><span class="co">#&gt; Links:      Do = logit; g = logit </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('old', 'new') </span></span>
 <span><span class="co">#&gt; MPT tree 'target':</span></span>
 <span><span class="co">#&gt;   P(old) = Do + (1 - Do) * g</span></span>
 <span><span class="co">#&gt;   P(new) = (1 - Do) * (1 - g)</span></span>
@@ -471,6 +474,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; Response:   resp_cats = A, B, New (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: dA, dB, gA, gB, gNew, gAraw, gBraw </span></span>
 <span><span class="co">#&gt; Links:      dA = logit; dB = logit; gA = identity; gB = identity; gNew = identity; gAraw = identity; gBraw = identity </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('A', 'B', 'New') </span></span>
 <span><span class="co">#&gt; MPT tree 'sourceA':</span></span>
 <span><span class="co">#&gt;   P(A) = dA + (1 - dA) * gA</span></span>
 <span><span class="co">#&gt;   P(B) = (1 - dA) * gB</span></span>
@@ -523,6 +527,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; Response:   resp_cats = correct, other, npl (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: Pb, Pi </span></span>
 <span><span class="co">#&gt; Links:      Pb = logit; Pi = logit </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('correct', 'other', 'npl') </span></span>
 <span><span class="co">#&gt; MPT tree 'ss':</span></span>
 <span><span class="co">#&gt;   P(correct) = Pb + (1 - Pb) * Pi * GcorrPi + (1 - Pb) * (1 - Pi) * GcorrNoPi</span></span>
 <span><span class="co">#&gt;   P(other) = (1 - Pb) * Pi * (1 - GcorrPi) + (1 - Pb) * (1 - Pi) * (1 - GcorrNoPi) * GotherNoPi</span></span>
@@ -536,11 +541,113 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <p>Only <code>Pb</code> and <code>Pi</code> are latent parameters; the <code>Gcorr*</code> symbols must exist as numeric columns in the data (for example, <code>GcorrPi = 1 / rsizeList</code>). This mechanism goes beyond what classical MPT software supports, because the guessing rates can vary continuously across trials or conditions. When the data are checked, the branch sums are re-evaluated with the observed covariate values row by row, and <code><a href="../reference/bmm.html">bmm()</a></code> stops when covariate columns violate their joint constraints.</p>
 </div>
 <div class="section level2" number="8">
+<h2 id="trial-level-data-and-item-effects">
+<span class="header-section-number">8</span> Trial-level data and item effects<a class="anchor" aria-label="anchor" href="#trial-level-data-and-item-effects"></a>
+</h2>
+<p>Recognition experiments sample their items, and items differ in how well they are remembered. Counts aggregated per participant and tree average over the items, so the item differences end up in the person effects and in the residual misfit. With one row per trial, the items can get random effects of their own, crossed with the participants, as in a generalized linear mixed model.</p>
+<p><code><a href="../reference/mpt.html">mpt()</a></code> reads one row per trial when <code>response</code> names the column that holds the response category of each trial. The values of that column are the branch names, here <code>"old"</code> and <code>"new"</code>; everything else stays as before:</p>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">model_trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mpt.html">mpt</a></span><span class="op">(</span></span>
+<span>  trees <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">tree_target</span>, <span class="va">tree_lure</span><span class="op">)</span>,</span>
+<span>  tree_id <span class="op">=</span> <span class="st">"item_type"</span>,</span>
+<span>  response <span class="op">=</span> <span class="st">"resp"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The simulation draws a recognition test of 60 items for 30 participants. Two counterbalanced study lists make each item a target for half of the participants and a lure for the other half. Detection <code>D</code> varies over participants and items, the guessing rate <code>g</code> over participants. Each trial runs through the tree: the item is detected with probability <code>D</code>, and an undetected item is called old with probability <code>g</code>.</p>
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">simulate_trials</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">n_subj</span>, <span class="va">n_items</span>, <span class="va">mean</span>, <span class="va">sd</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">D_id</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_subj</span>, <span class="fl">0</span>, <span class="va">sd</span><span class="op">[[</span><span class="st">"D_id"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="va">D_item</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_items</span>, <span class="fl">0</span>, <span class="va">sd</span><span class="op">[[</span><span class="st">"D_item"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="va">g_id</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_subj</span>, <span class="fl">0</span>, <span class="va">sd</span><span class="op">[[</span><span class="st">"g_id"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="va">n_subj</span><span class="op">)</span>, item <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="va">n_items</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="co"># list 1 (odd participants) studies the odd items, list 2 the even items</span></span>
+<span>  <span class="va">studied</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">item</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">2</span> <span class="op">==</span> <span class="va">dat</span><span class="op">$</span><span class="va">id</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">2</span></span>
+<span>  <span class="va">dat</span><span class="op">$</span><span class="va">item_type</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">studied</span>, <span class="st">"target"</span>, <span class="st">"lure"</span><span class="op">)</span></span>
+<span>  <span class="va">D</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">qlogis</a></span><span class="op">(</span><span class="va">mean</span><span class="op">[[</span><span class="st">"D"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span> <span class="op">+</span> <span class="va">D_id</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">id</span><span class="op">]</span> <span class="op">+</span> <span class="va">D_item</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">item</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="va">g</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">qlogis</a></span><span class="op">(</span><span class="va">mean</span><span class="op">[[</span><span class="st">"g"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span> <span class="op">+</span> <span class="va">g_id</span><span class="op">[</span><span class="va">dat</span><span class="op">$</span><span class="va">id</span><span class="op">]</span><span class="op">)</span></span>
+<span>  <span class="va">detected</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span><span class="op">)</span> <span class="op">&lt;</span> <span class="va">D</span></span>
+<span>  <span class="va">dat</span><span class="op">$</span><span class="va">resp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">detected</span>, <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">studied</span>, <span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span>,</span>
+<span>                     <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span><span class="op">)</span> <span class="op">&lt;</span> <span class="va">g</span>, <span class="st">"old"</span>, <span class="st">"new"</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">dat</span><span class="op">$</span><span class="va">id</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">id</span><span class="op">)</span></span>
+<span>  <span class="va">dat</span><span class="op">$</span><span class="va">item</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">item</span><span class="op">)</span></span>
+<span>  <span class="va">dat</span></span>
+<span><span class="op">}</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">2613</span><span class="op">)</span></span>
+<span><span class="va">dat_trials</span> <span class="op">&lt;-</span> <span class="fu">simulate_trials</span><span class="op">(</span></span>
+<span>  n_subj <span class="op">=</span> <span class="fl">30</span>, n_items <span class="op">=</span> <span class="fl">60</span>,</span>
+<span>  mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>D <span class="op">=</span> <span class="fl">0.6</span>, g <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>, sd <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>D_id <span class="op">=</span> <span class="fl">0.5</span>, D_item <span class="op">=</span> <span class="fl">0.6</span>, g_id <span class="op">=</span> <span class="fl">0.4</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">dat_trials</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   id item item_type resp</span></span>
+<span><span class="co">#&gt; 1  1    1    target  old</span></span>
+<span><span class="co">#&gt; 2  2    1      lure  old</span></span>
+<span><span class="co">#&gt; 3  3    1    target  old</span></span>
+<span><span class="co">#&gt; 4  4    1      lure  new</span></span>
+<span><span class="co">#&gt; 5  5    1    target  old</span></span>
+<span><span class="co">#&gt; 6  6    1      lure  old</span></span></code></pre></div>
+<p>Item effects enter the formula like person effects. Here only <code>D</code> gets them, because guessing happens without any memory of the item:</p>
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit_trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
+<span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
+<span>    <span class="va">D</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span>,</span>
+<span>    <span class="va">g</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">dat_trials</span>,</span>
+<span>  model <span class="op">=</span> <span class="va">model_trials</span>,</span>
+<span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  file <span class="op">=</span> <span class="st">"fits/mpt_trial_item"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_trials</span><span class="op">)</span></span></code></pre></div>
+<pre class="fansi fansi-output"><code><span><span class="co">#&gt;   Model: mpt(trees = list(tree_target, tree_lure),</span></span>
+<span><span class="co">#&gt;              tree_id = "item_type",</span></span>
+<span><span class="co">#&gt;              response = "resp") </span></span>
+<span><span class="co">#&gt;   Links: D = logit; g = logit </span></span>
+<span><span class="co">#&gt; Formula: D ~ 1 + (1 | id) + (1 | item)</span></span>
+<span><span class="co">#&gt;          g ~ 1 + (1 | id) </span></span>
+<span><span class="co">#&gt;    Data: dat_trials (Number of observations: 1800)</span></span>
+<span><span class="co">#&gt;   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;</span></span>
+<span><span class="co">#&gt;          total post-warmup draws = 4000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Multilevel Hyperparameters:</span></span>
+<span><span class="co">#&gt; ~id (Number of levels: 30) </span></span>
+<span><span class="co">#&gt;                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
+<span><span class="co">#&gt; sd(D_Intercept)     0.68      0.15     0.42     0.99 1.00     1526     2115</span></span>
+<span><span class="co">#&gt; sd(g_Intercept)     0.27      0.17     0.01     0.63 1.01      791     1342</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ~item (Number of levels: 60) </span></span>
+<span><span class="co">#&gt;                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
+<span><span class="co">#&gt; sd(D_Intercept)     0.67      0.15     0.38     0.97 1.00     1637     2016</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Regression Coefficients:</span></span>
+<span><span class="co">#&gt;             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS</span></span>
+<span><span class="co">#&gt; D_Intercept     0.37      0.18     0.01     0.73 1.00     1538     2017</span></span>
+<span><span class="co">#&gt; g_Intercept     0.10      0.11    -0.11     0.31 1.00     3066     2599</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Draws were sampled using sample(hmc). For each parameter, Bulk_ESS</span></span>
+<span><span class="co">#&gt; and Tail_ESS are effective sample size measures, and Rhat is the potential</span></span>
+<span><span class="co">#&gt; scale reduction factor on split chains (at convergence, Rhat = 1).</span></span></code></pre>
+<p>The simulated standard deviations were 0.5 for <code>D</code> over participants, 0.6 for <code>D</code> over items and 0.4 for <code>g</code> over participants, all on the logit scale, and each lies inside its 95% interval in the summary. The data hold 1800 trials, so a fit to them takes longer than a fit to the 60 aggregated rows, because its cost grows with the number of rows.</p>
+<p><code><a href="../reference/bmm_data_check.html">bmm_data_check()</a></code> treats each participant as a cell and names participants with too few trials. The items it counts per level, as the minimum, median and maximum number of trials per item, and it names an item only when that item holds far fewer trials than the typical item. The argument <code>min_trials</code> in <code><a href="../reference/bmm_data_check.html">?bmm_data_check</a></code> gives the exact rule. <code><a href="../reference/ppp.html">ppp()</a></code> needs to be told which grouping variable identifies the participants, because the formula now has two:</p>
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/ppp.html">ppp</a></span><span class="op">(</span><span class="va">fit_trials</span>, participant <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Posterior predictive p-values (Klauer, 2010)</span></span>
+<span><span class="co">#&gt; Cells: 'item_type' (2 cells)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;  statistic observed replicated   ppp ndraws</span></span>
+<span><span class="co">#&gt;         T1     1.91       1.86 0.497   4000</span></span>
+<span><span class="co">#&gt;         T2    16.13       6.07 0.111   4000</span></span></code></pre></div>
+<p>The cells are the two trees, as for aggregated data: <code><a href="../reference/ppp.html">ppp()</a></code> sums the trial rows of each cell, for <span class="math inline">\(T_2\)</span> per participant, so both statistics compare counts aggregated over trials. The item effects enter through the expected counts.</p>
+<p>Neither TreeBUGS nor MPTinR can fit this model. Both take one row of category frequencies per participant (TreeBUGS 1.5.3, <code>traitMPT(data = )</code>; MPTinR 1.14.1, <code>fit.mpt(data = )</code>), and covariates in TreeBUGS describe participants, not trials. An item effect would have to be squeezed into the model as a separate tree per item, each with its own parameter, which gives fixed rather than random item effects, and a trial-level covariate as separate trees per value. In <code>bmm</code>, a covariate that changes from trial to trial goes into a branch expression as in <a href="#design-fixed-covariates-in-branch-expressions">Design-fixed covariates in branch expressions</a>, or into a parameter formula as a predictor, and the trial rows carry its value.</p>
+</div>
+<div class="section level2" number="9">
 <h2 id="fitting-real-data">
-<span class="header-section-number">8</span> Fitting real data<a class="anchor" aria-label="anchor" href="#fitting-real-data"></a>
+<span class="header-section-number">9</span> Fitting real data<a class="anchor" aria-label="anchor" href="#fitting-real-data"></a>
 </h2>
 <p>The <code>oberauer_lewandowsky_2019_e1</code> data set that the <a href="https://venpopov.com/bmm/articles/bmm_m3.html">m3 article</a> analyzes with activation-based measurement models can equally be described by a processing-tree model, which makes for an instructive real-data example. Participants recalled a list item from a set of candidates in three conditions: in the <code>new distractors</code> condition the response set additionally contained five distractors, while in the <code>old reordered</code> and <code>old same</code> conditions no distractors were present. Each row records how often a participant chose the correct item (<code>corr</code>, 1 candidate), another list item (<code>other</code>, 4 candidates), a distractor (<code>dist</code>, 5 or 0 candidates), or a not-presented lure (<code>npl</code>, 5 or 10 candidates). The participant column of this data set is called <code>ID</code>:</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data_ol</span> <span class="op">&lt;-</span> <span class="va">oberauer_lewandowsky_2019_e1</span></span>
 <span><span class="va">data_ol</span><span class="op">$</span><span class="va">cond</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span></span>
 <span>  <span class="va">data_ol</span><span class="op">$</span><span class="va">cond</span>,</span>
@@ -559,7 +666,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; 6     2 oldsame     64    23     8    NA</span></span></code></pre>
 <p>We describe the responses by three processes, ordered by how much they constrain the response. First, with probability <code>Pi</code>, the list items themselves are remembered. Given item memory, with probability <code>Pb</code> the item bound to the probed position is retrieved, yielding a correct response. If the binding is not available, distractor activation may still persist (probability <code>Pd</code>) and capture the response; this stage exists only in the distractor condition, otherwise the response is a guess among the five known list candidates. Without item memory, the response is a guess across the full response set of 15 candidates. This yields two tree structures, and illustrates a parameter that exists only in some conditions: <code>Pd</code> appears only in the branch expressions of the <code>newdist</code> tree, so it is estimated exclusively from that condition, without any indicator-variable bookkeeping.</p>
 <p>One response category is impossible in the no-distractor conditions: <code>dist</code> responses cannot occur there. Listing it in the <code>impossible</code> argument of <code><a href="../reference/mpt_tree.html">mpt_tree()</a></code> removes it from that tree’s branch list (the remaining branches then have to sum to 1 among themselves), and <code>bmm</code> gives the category a large negative linear predictor for the rows concerned. Because the model is estimated on the log scale and the multinomial family renormalizes across categories, this is an exact zero for practical purposes, and no probability has to be taken away from the other branches to compensate. Written with candidate-count fractions, which <code><a href="../reference/mpt_tree.html">mpt_tree()</a></code> folds into decimal literals, the trees are:</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tree_newdist</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mpt_tree.html">mpt_tree</a></span><span class="op">(</span><span class="st">"newdist"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  corr  <span class="op">=</span> <span class="st">"Pi * Pb + Pi * (1 - Pb) * (1 - Pd) * (1/5) + (1 - Pi) * (1/15)"</span>,</span>
 <span>  other <span class="op">=</span> <span class="st">"Pi * (1 - Pb) * (1 - Pd) * (4/5) + (1 - Pi) * (4/15)"</span>,</span>
@@ -580,15 +687,15 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="op">)</span></span></code></pre></div>
 <p>Note that <code>tree</code> is a coarser column than <code>cond</code>: three experimental conditions, two branch structures. Both no-distractor conditions get the same tree, and the difference between them is estimated where it belongs, in the parameter formulas (<code>Pi ~ 0 + cond</code> below). Writing the same branch list twice under two names would fit the same model but cost real work, because the category probabilities are built as a sum over all trees and every duplicate is evaluated for every row. If all conditions shared one structure, <code>tree_id</code> could be dropped altogether and a single tree given.</p>
 <p>The two tree structures:</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model_ol</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_mpt_files/figure-html/fig-tree-ol-1.jpeg" alt="" width="100%" style="display: block; margin: auto;"></p>
-<div class="section level3" number="8.1">
+<div class="section level3" number="9.1">
 <h3 id="condition-effects">
-<span class="header-section-number">8.1</span> Condition effects<a class="anchor" aria-label="anchor" href="#condition-effects"></a>
+<span class="header-section-number">9.1</span> Condition effects<a class="anchor" aria-label="anchor" href="#condition-effects"></a>
 </h3>
 <p><code>Pi</code> and <code>Pb</code> get one population parameter per condition (<code>0 + cond</code>) and, per participant, one uncorrelated random effect per condition (<code>||</code>); <code>Pd</code> exists in one condition only and takes a plain random intercept. Without a shared <code>|p|</code> label the three parameters’ person effects are also uncorrelated with each other. This keeps the model to standard deviations: correlating all seven person effects would add 21 correlations. Both fits in this section draw 3000 post-warmup samples per chain instead of the default 1000, which gives every parameter, the random effects included, a bulk effective sample size above 400:</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_ol</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
 <span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>    <span class="va">Pi</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">cond</span> <span class="op">+</span> <span class="op">(</span><span class="fl">0</span> <span class="op">+</span> <span class="va">cond</span> <span class="op">||</span> <span class="va">ID</span><span class="op">)</span>,</span>
@@ -604,7 +711,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  file <span class="op">=</span> <span class="st">"fits/mpt_ol"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/native_parameters.html">native_parameters</a></span><span class="op">(</span><span class="va">fit_ol</span>, re_formula <span class="op">=</span> <span class="cn">NA</span>, summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;       cond parameter  Estimate  Est.Error      Q2.5     Q97.5</span></span>
 <span><span class="co">#&gt; 1  newdist        Pi 0.9117517 0.01862053 0.8720270 0.9445917</span></span>
@@ -618,12 +725,12 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; 9  oldsame        Pd 0.4720325 0.01645649 0.4393141 0.5041746</span></span></code></pre></div>
 <p><code>Pd</code> has no predictor, so its single value is repeated for each condition; it is estimated from the <code>newdist</code> condition only. Item memory is high in all three conditions (not-presented lures are rarely chosen), while binding memory is clearly higher when the list is re-presented in its original order than in the other two conditions. When item memory succeeds but the binding is unavailable in the distractor condition, distractor activation captures the response about half of the time.</p>
 </div>
-<div class="section level3" number="8.2">
+<div class="section level3" number="9.2">
 <h3 id="testing-differences-between-conditions">
-<span class="header-section-number">8.2</span> Testing differences between conditions<a class="anchor" aria-label="anchor" href="#testing-differences-between-conditions"></a>
+<span class="header-section-number">9.2</span> Testing differences between conditions<a class="anchor" aria-label="anchor" href="#testing-differences-between-conditions"></a>
 </h3>
 <p><code><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">brms::hypothesis()</a></code> evaluates a contrast in every posterior draw. Parameters are addressed by their <strong>brms</strong> names without the <code>b_</code> prefix, that is, <code>&lt;parameter&gt;_&lt;coefficient&gt;</code>; <code>variables(fit_ol)</code> lists them. The contrast is evaluated on the latent scale, where the difference of two logits is a log odds ratio:</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit_ol</span>, <span class="st">"Pb_condoldsame &gt; Pb_condoldreord"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
 <span><span class="co">#&gt;                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio</span></span>
@@ -636,7 +743,7 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt; for two-sided hypotheses, the value tested against lies outside the 95%-CI.</span></span>
 <span><span class="co">#&gt; Posterior probabilities of point hypotheses assume equal prior probabilities.</span></span></code></pre></div>
 <p><code>Post.Prob</code> is the posterior probability that the difference is positive. The difference on the probability scale, if that is the quantity to report, is the difference of the probabilities in the two conditions, draw by draw:</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">Pb_draws</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/native_parameters.html">native_parameters</a></span><span class="op">(</span><span class="va">fit_ol</span>, pars <span class="op">=</span> <span class="st">"Pb"</span>, re_formula <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span></span>
 <span><span class="va">Pb_draws</span> <span class="op">&lt;-</span> <span class="va">Pb_draws</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="va">Pb_draws</span><span class="op">$</span><span class="va">cond</span>, <span class="va">Pb_draws</span><span class="op">$</span><span class="va">.draw</span><span class="op">)</span>, <span class="op">]</span></span>
 <span><span class="va">Pb_by_cond</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/split.html" class="external-link">split</a></span><span class="op">(</span><span class="va">Pb_draws</span><span class="op">$</span><span class="va">value</span>, <span class="va">Pb_draws</span><span class="op">$</span><span class="va">cond</span><span class="op">)</span></span>
@@ -644,57 +751,57 @@ P(\text{"new"} \mid \text{lure}) &amp;= D + (1 - D) \cdot (1 - g)
 <span><span class="co">#&gt;       Estimate  Est.Error      Q2.5    Q97.5</span></span>
 <span><span class="co">#&gt; [1,] 0.2618212 0.06255585 0.1352809 0.379597</span></span></code></pre></div>
 </div>
-<div class="section level3" number="8.3">
+<div class="section level3" number="9.3">
 <h3 id="posterior-predictive-check">
-<span class="header-section-number">8.3</span> Posterior predictive check<a class="anchor" aria-label="anchor" href="#posterior-predictive-check"></a>
+<span class="header-section-number">9.3</span> Posterior predictive check<a class="anchor" aria-label="anchor" href="#posterior-predictive-check"></a>
 </h3>
 <p>The posterior predictive distribution reproduces the response-category proportions within each condition, including the near-zero <code>dist</code> proportions where no distractors were shown:</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit_ol</span>, group <span class="op">=</span> <span class="st">"cond"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_mpt_files/figure-html/fig-ppc-ol-1.jpeg" alt="" width="100%" style="display: block; margin: auto;"></p>
 </div>
-<div class="section level3" number="8.4">
+<div class="section level3" number="9.4">
 <h3 id="goodness-of-fit-t1-and-t2">
-<span class="header-section-number">8.4</span> Goodness of fit: T1 and T2<a class="anchor" aria-label="anchor" href="#goodness-of-fit-t1-and-t2"></a>
+<span class="header-section-number">9.4</span> Goodness of fit: T1 and T2<a class="anchor" aria-label="anchor" href="#goodness-of-fit-t1-and-t2"></a>
 </h3>
 <p>The plot compares proportions by eye. A posterior predictive p-value (PPP) puts a number on it. <span class="citation">Klauer (2010)</span> proposed two statistics for hierarchical MPT models. <span class="math inline">\(T_1\)</span> compares the observed frequency of each response category in each cell of the design with the frequency the model expects:</p>
 <p><span class="math display">\[
 T_1 = \sum_{c,k} \frac{(n_{ck} - \hat{n}_{ck})^2}{\hat{n}_{ck}},
 \]</span></p>
 <p>summed over all categories <span class="math inline">\(k\)</span> of all cells <span class="math inline">\(c\)</span>, where <span class="math inline">\(n_{ck}\)</span> is the observed and <span class="math inline">\(\hat{n}_{ck}\)</span> the expected frequency. <span class="math inline">\(T_2\)</span> compares the covariances of the category frequencies across participants with the covariances the model expects, so it checks whether the model reproduces how participants differ, not only the average. Each statistic is computed once for the observed counts and once for counts simulated from the model, both against the expected counts of the same posterior draw. The PPP is the proportion of draws in which the simulated data deviate more than the observed data; a PPP near 0 flags misfit. <code><a href="../reference/ppp.html">ppp()</a></code> computes both:</p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ppp_ol</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ppp.html">ppp</a></span><span class="op">(</span><span class="va">fit_ol</span><span class="op">)</span></span>
 <span><span class="va">ppp_ol</span></span>
 <span><span class="co">#&gt; Posterior predictive p-values (Klauer, 2010)</span></span>
 <span><span class="co">#&gt; Cells: 'tree', 'cond' (3 cells)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  statistic observed replicated    ppp ndraws</span></span>
-<span><span class="co">#&gt;         T1     6.27        6.2 0.4977  12000</span></span>
-<span><span class="co">#&gt;         T2   284.68       93.0 0.0238  12000</span></span></code></pre></div>
+<span><span class="co">#&gt;         T1     6.27       6.33 0.5029  12000</span></span>
+<span><span class="co">#&gt;         T2   284.68      92.28 0.0217  12000</span></span></code></pre></div>
 <p>By default, a cell combines the tree column with the categorical predictors of the formula, here <code>tree</code> and <code>cond</code>, which gives the three conditions; the <code>by</code> argument changes this. The participants for <span class="math inline">\(T_2\)</span> come from the grouping variable of the random effects, <code>ID</code>. <code><a href="../reference/ppp.html">ppp()</a></code> sums the counts of a cell over participants, where <span class="citation">Klauer (2010)</span> and TreeBUGS average them; with the same number of participants in every cell, as here, both give the same PPP.</p>
-<p>The <span class="math inline">\(T_1\)</span> PPP of 0.5 shows that the model reproduces the category frequencies of each condition. The <span class="math inline">\(T_2\)</span> PPP of 0.024 is small: data simulated from the model rarely deviate from the expected covariances as much as the observed data do. The model keeps all person effects uncorrelated, so a participant with a high <code>Pi</code> in one condition is not expected to have a high <code>Pi</code> in the other conditions as well. Correlated person effects, <code>(0 + cond | ID)</code> or the <code>|p|</code> syntax described under <a href="#migrating-from-mptinr-or-treebugs">Migrating from MPTinR or TreeBUGS</a>, are the first extension to try.</p>
+<p>The <span class="math inline">\(T_1\)</span> PPP of 0.5 shows that the model reproduces the category frequencies of each condition. The <span class="math inline">\(T_2\)</span> PPP of 0.022 is small: data simulated from the model rarely deviate from the expected covariances as much as the observed data do. The model keeps all person effects uncorrelated, so a participant with a high <code>Pi</code> in one condition is not expected to have a high <code>Pi</code> in the other conditions as well. Correlated person effects, <code>(0 + cond | ID)</code> or the <code>|p|</code> syntax described under <a href="#migrating-from-mptinr-or-treebugs">Migrating from MPTinR or TreeBUGS</a>, are the first extension to try.</p>
 <p>With <code>level = "participant"</code>, <code><a href="../reference/ppp.html">ppp()</a></code> computes <span class="math inline">\(T_1\)</span> and its PPP for each participant separately, as TreeBUGS does, to find the participants the model fits poorly:</p>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ppp_ol_id</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ppp.html">ppp</a></span><span class="op">(</span><span class="va">fit_ol</span>, level <span class="op">=</span> <span class="st">"participant"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">ppp_ol_id</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Posterior predictive p-values (Klauer, 2010)</span></span>
 <span><span class="co">#&gt; Cells: 'tree', 'cond' (3 cells)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  participant statistic observed replicated   ppp ndraws</span></span>
-<span><span class="co">#&gt;            1        T1     6.51       7.03 0.537  12000</span></span>
-<span><span class="co">#&gt;            2        T1     5.99       6.95 0.584  12000</span></span>
-<span><span class="co">#&gt;            3        T1     6.18       7.02 0.572  12000</span></span>
-<span><span class="co">#&gt;            4        T1     5.95       7.01 0.582  12000</span></span>
-<span><span class="co">#&gt;            5        T1     6.16       6.96 0.572  12000</span></span>
-<span><span class="co">#&gt;            6        T1     6.60       6.96 0.537  12000</span></span></code></pre></div>
+<span><span class="co">#&gt;            1        T1     6.51       7.00 0.542  12000</span></span>
+<span><span class="co">#&gt;            2        T1     5.99       6.98 0.585  12000</span></span>
+<span><span class="co">#&gt;            3        T1     6.18       7.02 0.574  12000</span></span>
+<span><span class="co">#&gt;            4        T1     5.95       6.98 0.584  12000</span></span>
+<span><span class="co">#&gt;            5        T1     6.16       6.96 0.570  12000</span></span>
+<span><span class="co">#&gt;            6        T1     6.60       6.98 0.537  12000</span></span></code></pre></div>
 <p>The smallest of the 40 participant PPPs is 0.06.</p>
 </div>
-<div class="section level3" number="8.5">
+<div class="section level3" number="9.5">
 <h3 id="model-comparison">
-<span class="header-section-number">8.5</span> Model comparison<a class="anchor" aria-label="anchor" href="#model-comparison"></a>
+<span class="header-section-number">9.5</span> Model comparison<a class="anchor" aria-label="anchor" href="#model-comparison"></a>
 </h3>
 <p>Because a <code>bmm</code> fit is a <code>brmsfit</code>, the model-comparison tools of <strong>brms</strong> apply to it. Which of them can be trusted depends on the structure of the data: here each row aggregates all trials of one participant in one condition. As an example, take a model in which binding memory does not vary across conditions:</p>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_ol_pb1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
 <span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>    <span class="va">Pi</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">cond</span> <span class="op">+</span> <span class="op">(</span><span class="fl">0</span> <span class="op">+</span> <span class="va">cond</span> <span class="op">||</span> <span class="va">ID</span><span class="op">)</span>,</span>
@@ -710,7 +817,7 @@ T_1 = \sum_{c,k} \frac{(n_{ck} - \hat{n}_{ck})^2}{\hat{n}_{ck}},
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  file <span class="op">=</span> <span class="st">"fits/mpt_ol_pb1"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">loo_ol</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">fit_ol</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Warning: Found 119 observations with a pareto_k &gt; 0.7 in model 'fit_ol'. We</span></span>
 <span><span class="co">#&gt; recommend to set 'moment_match = TRUE' in order to perform moment matching for</span></span>
@@ -729,13 +836,13 @@ T_1 = \sum_{c,k} \frac{(n_{ck} - \hat{n}_{ck})^2}{\hat{n}_{ck}},
 <span><span class="co">#&gt; or https://mc-stan.org/loo/reference/loo-glossary.html.</span></span></code></pre></div>
 <p><code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> is a quick screen here, not a result. It flags 119 of the 120 rows of <code>fit_ol</code> and 107 of <code>fit_ol_pb1</code> with a Pareto-k above 0.7. That is expected with aggregated data: leaving out a row removes all trials of one participant in one condition, which shifts that participant’s random effects considerably, and the importance-sampling approximation breaks down. With this many flagged rows, neither the elpd differences nor their standard errors are trustworthy, and the output above should not be reported as evidence for or against the restriction. The hypothesis test above answers the same question directly.</p>
 <p>The prediction target that matches the data is a new participant, so cross-validation should leave out all rows of a participant at once. In <strong>brms</strong> this is <code>kfold(fit, folds = "grouped", group = "ID")</code>, and it runs on a <code>bmmfit</code> of an MPT model. It refits the model once per fold, so the call costs K full fits where <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> costs none. That is why <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> stays the cheap screen and grouped <code><a href="https://mc-stan.org/loo/reference/kfold-generic.html" class="external-link">kfold()</a></code> is the check to run when the screen flags many rows. The article renders from cached fits, so the call is shown but not evaluated:</p>
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">kfold_ol</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/loo/reference/kfold-generic.html" class="external-link">kfold</a></span><span class="op">(</span><span class="va">fit_ol</span>, folds <span class="op">=</span> <span class="st">"grouped"</span>, group <span class="op">=</span> <span class="st">"ID"</span>, K <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
 <p>Bayes factors between nested models, for example with and without person effects or with and without a condition effect, are available through <code><a href="https://rdrr.io/pkg/bridgesampling/man/bf.html" class="external-link">brms::bayes_factor()</a></code>, which runs bridge sampling <span class="citation">(Gronau et al. 2020)</span> on both fits. This needs two changes to the fitting call. First, <code>save_pars = save_pars(all = TRUE)</code>, because the sampler needs the draws of all parameters, including the person effects. Second, many more post-warmup draws than a posterior summary needs, so that the estimate is stable when repeated. The fits in this article were fitted without these settings, so the sampler cannot be run on them here. The <a href="https://venpopov.com/bmm/articles/bmm_hypothesis_testing.html">hypothesis testing article</a> shows the full workflow.</p>
 </div>
-<div class="section level3" number="8.6">
+<div class="section level3" number="9.6">
 <h3 id="relation-to-the-m3-model">
-<span class="header-section-number">8.6</span> Relation to the m3 model<a class="anchor" aria-label="anchor" href="#relation-to-the-m3-model"></a>
+<span class="header-section-number">9.6</span> Relation to the m3 model<a class="anchor" aria-label="anchor" href="#relation-to-the-m3-model"></a>
 </h3>
 <p>This MPT is not merely inspired by the <a href="https://venpopov.com/bmm/articles/bmm_m3.html">m3 analysis of the same data</a>: under the <code>simple</code> choice rule the two models are <em>the same likelihood</em> in different parameterizations. With the m3 activations <code>corr ~ b + a + c</code>, <code>other ~ b + a</code>, <code>dist ~ b + d</code>, <code>npl ~ b</code> (candidate counts 1, 4, 5, 5 and <span class="math inline">\(S = 15b + 5a + c + 5d\)</span>), the mapping is</p>
 <p><span class="math display">\[
@@ -746,12 +853,12 @@ P_d = \frac{d}{a + d},
 <p>and both parameter sets span exactly the same category probabilities (the identity is verified to machine precision in the package’s test suite). What remains different is where the priors and random effects live: on the log scale of activations in the m3, on the logit scale of the process probabilities here.</p>
 </div>
 </div>
-<div class="section level2" number="9">
+<div class="section level2" number="10">
 <h2 id="time-varying-and-other-non-linear-parameters">
-<span class="header-section-number">9</span> Time-varying and other non-linear parameters<a class="anchor" aria-label="anchor" href="#time-varying-and-other-non-linear-parameters"></a>
+<span class="header-section-number">10</span> Time-varying and other non-linear parameters<a class="anchor" aria-label="anchor" href="#time-varying-and-other-non-linear-parameters"></a>
 </h2>
 <p>Because MPT parameters are ordinary <code>bmm</code> parameters, they can be given non-linear predictor formulas. For example, a detection probability that grows exponentially with presentation time, given a numeric column <code>ptime</code> in the data:</p>
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_tv</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>    <span class="va">D</span> <span class="op">~</span> <span class="fu">inv_logit</span><span class="op">(</span><span class="va">Dmax</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="op">-</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">rate</span><span class="op">)</span> <span class="op">*</span> <span class="va">ptime</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -763,12 +870,12 @@ P_d = \frac{d}{a + d},
 <span><span class="op">)</span></span></code></pre></div>
 <p>When a parameter receives a non-linear formula, the automatic link transformation is switched off for it: the user-supplied expression is responsible for keeping the parameter within (0, 1). The sub-parameters of the expression (<code>Dmax</code> and <code>rate</code> above) are estimated on the identity scale with <code>normal(0, 1)</code> default priors. Tip: when the random-effect standard deviations of such sub-parameters are close to zero, the posterior can develop a funnel geometry, and increasing <code>adapt_delta</code> (for example to 0.95) helps.</p>
 </div>
-<div class="section level2" number="10">
+<div class="section level2" number="11">
 <h2 id="importing-existing-model-definitions">
-<span class="header-section-number">10</span> Importing existing model definitions<a class="anchor" aria-label="anchor" href="#importing-existing-model-definitions"></a>
+<span class="header-section-number">11</span> Importing existing model definitions<a class="anchor" aria-label="anchor" href="#importing-existing-model-definitions"></a>
 </h2>
 <p>Models written for other MPT software can be imported directly. <code><a href="../reference/mpt_from_eqn.html">mpt_from_eqn()</a></code> reads EQN files (used by multiTree, MPTinR and TreeBUGS). Each line holds the tree, the response category and one branch expression; lines that end in the same category are summed. Parameter names containing underscores, which are common in published EQN files but not allowed in <strong>brms</strong>, are sanitized automatically, with the complete renaming map reported and stored in the <code>mpt_renaming</code> attribute:</p>
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">eqn_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".eqn"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>  <span class="st">"6"</span>,</span>
@@ -796,6 +903,7 @@ P_d = \frac{d}{a + d},
 <span><span class="co">#&gt; Response:   resp_cats = old, new (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: Do, g, Dn </span></span>
 <span><span class="co">#&gt; Links:      Do = logit; g = logit; Dn = logit </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('old', 'new') </span></span>
 <span><span class="co">#&gt; MPT tree 'target':</span></span>
 <span><span class="co">#&gt;   P(old) = (Do) + ((1 - Do) * g)</span></span>
 <span><span class="co">#&gt;   P(new) = (1 - Do) * (1 - g)</span></span>
@@ -810,7 +918,7 @@ P_d = \frac{d}{a + d},
 <p>Note the <code>categories</code> argument: classical EQN files often label response categories per tree (<code>hit</code>/<code>miss</code> for targets, <code>fa</code>/<code>cr</code> for lures), while in <code>bmm</code> every tree shares the same response categories, the actual response options. The mapping states which tree-specific labels refer to the same response. Lines whose category carries a <code>&lt;tree&gt;_</code> prefix have the prefix removed automatically. Two more arguments cover the remaining differences between files: a tree that has no branch for some of the shared categories declares them with <code>impossible</code>, as in <code><a href="../reference/mpt_tree.html">mpt_tree()</a></code>, and numeric tree labels are renamed with <code>tree_names</code>, e.g. <code>tree_names = c("1" = "target", "2" = "lure")</code>, because <code>bmm</code> tree names start with a letter.</p>
 <p>The file above starts with the equation count, the first line of classical EQN files, which <code><a href="../reference/mpt_from_eqn.html">mpt_from_eqn()</a></code> skips. TreeBUGS and MPTinR skip the first line whatever it holds, while <code><a href="../reference/mpt_from_eqn.html">mpt_from_eqn()</a></code> reads any other first line as an equation. A file without the count line therefore gives <code>bmm</code> one equation more than those programs read; the details of <code><a href="../reference/mpt_from_eqn.html">?mpt_from_eqn</a></code> list the cases.</p>
 <p>Restrictions are written with the names used in the EQN file and renamed together with the parameters:</p>
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/mpt_from_eqn.html">mpt_from_eqn</a></span><span class="op">(</span></span>
 <span>  <span class="va">eqn_file</span>,</span>
 <span>  categories <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>target_hit <span class="op">=</span> <span class="st">"old"</span>, lure_fa <span class="op">=</span> <span class="st">"old"</span>,</span>
@@ -827,6 +935,7 @@ P_d = \frac{d}{a + d},
 <span><span class="co">#&gt; Response:   resp_cats = old, new (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: Do </span></span>
 <span><span class="co">#&gt; Links:      Do = logit </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('old', 'new') </span></span>
 <span><span class="co">#&gt; MPT tree 'target':</span></span>
 <span><span class="co">#&gt;   P(old) = (Do) + ((1 - Do) * 0.5)</span></span>
 <span><span class="co">#&gt;   P(new) = (1 - Do) * 0.5</span></span>
@@ -838,7 +947,7 @@ P_d = \frac{d}{a + d},
 <span><span class="co">#&gt;   Jacobian rank 1 of 1 at interior test values: locally identified.</span></span>
 <span><span class="co">#&gt; Use parameter_info() for parameter descriptions, links and fixed values.</span></span></code></pre>
 <p><code><a href="../reference/mpt_from_string.html">mpt_from_string()</a></code> reads MPTinR-style model definitions <span class="citation">(Singmann and Kellen 2013)</span>, where each line is a branch expression, blank lines separate trees, and inline comments name the response categories:</p>
-<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_string</span> <span class="op">&lt;-</span> <span class="st">"</span></span>
 <span><span class="st">D + (1 - D) * g        # old</span></span>
 <span><span class="st">(1 - D) * (1 - g)      # new</span></span>
@@ -855,6 +964,7 @@ P_d = \frac{d}{a + d},
 <span><span class="co">#&gt; Response:   resp_cats = old, new (counts per response category) </span></span>
 <span><span class="co">#&gt; Parameters: D, g </span></span>
 <span><span class="co">#&gt; Links:      D = logit; g = logit </span></span>
+<span><span class="co">#&gt; Data:       response counts in one column per category ('old', 'new') </span></span>
 <span><span class="co">#&gt; MPT tree 'target':</span></span>
 <span><span class="co">#&gt;   P(old) = D + (1 - D) * g</span></span>
 <span><span class="co">#&gt;   P(new) = (1 - D) * (1 - g)</span></span>
@@ -866,9 +976,9 @@ P_d = \frac{d}{a + d},
 <span><span class="co">#&gt; Use parameter_info() for parameter descriptions, links and fixed values.</span></span></code></pre>
 <p>As a real-world example, the 12- and 18-parameter hierarchical binding models of <span class="citation">Al Hadhrami et al. (2025)</span> (their unitization and hybrid models; 3 trees, 10 response categories, TreeBUGS latent-trait structure) can be imported from the model text in their Experiment 1 TreeBUGS scripts: saved to a file without its title line, it is in EQN layout for <code><a href="../reference/mpt_from_eqn.html">mpt_from_eqn()</a></code>. Fitting them took two steps beyond the import: the nine guessing probabilities that the design fixes went into <code>restrictions</code>, and the wide frequency table was reshaped as shown under <a href="#migrating-from-mptinr-or-treebugs">Migrating from MPTinR or TreeBUGS</a>. With <code>links = "probit"</code> and correlated random effects across all parameters, the posterior means of the 18-parameter model lay inside the paper’s 95% credible intervals for all 18 group-level estimates of Experiment 1 (Table 5). A re-run with the same settings (4 chains of 4000 iterations, 1000 of them warmup) had 50 divergent transitions among its 12000 post-warmup transitions (0.4%). Raising <code>adapt_delta</code> from 0.8 to 0.95 with the same seed did not remove them (56 divergent), and the posterior means of these two runs differed by at most 0.0022. The paper reports none for the 12-parameter model, whose posterior means lay inside the 95% intervals of a TreeBUGS fit of the same data.</p>
 </div>
-<div class="section level2" number="11">
+<div class="section level2" number="12">
 <h2 id="migrating-from-mptinr-or-treebugs">
-<span class="header-section-number">11</span> Migrating from MPTinR or TreeBUGS<a class="anchor" aria-label="anchor" href="#migrating-from-mptinr-or-treebugs"></a>
+<span class="header-section-number">12</span> Migrating from MPTinR or TreeBUGS<a class="anchor" aria-label="anchor" href="#migrating-from-mptinr-or-treebugs"></a>
 </h2>
 <p>Importing the model structure is the easy part; what usually needs translating is the hierarchical structure, the priors, and the reporting conventions. The table maps the functions and arguments of MPTinR <span class="citation">(Singmann and Kellen 2013)</span> and TreeBUGS <span class="citation">(Heck et al. 2018)</span> onto their <code>bmm</code> counterparts.</p>
 <table class="table">
@@ -892,81 +1002,85 @@ P_d = \frac{d}{a + d},
 <td>long data, one row per participant and tree, with a <code>tree_id</code> column and one count column per shared response category (<a href="#data-format-and-simulation">Data format and simulation</a>)</td>
 </tr>
 <tr class="odd">
+<td>frequencies per participant only; no item effects</td>
+<td>one row per trial with <code>response =</code> (in <code><a href="../reference/mpt.html">mpt()</a></code>, <code><a href="../reference/mpt_from_eqn.html">mpt_from_eqn()</a></code> and <code><a href="../reference/mpt_from_string.html">mpt_from_string()</a></code>), and item effects such as <code>(1 | item)</code> (<a href="#trial-level-data-and-item-effects">Trial-level data and item effects</a>)</td>
+</tr>
+<tr class="even">
 <td>reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, <code>check.mpt()$eqn.order.categories</code>)</td>
 <td>
 <code>mpt_data_reshape(wide, model)</code>, or <code>mpt_data_reshape(wide, model, columns = "mptinr")</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>restrictions = list("Dn = Do", "g = 0.5")</code> (TreeBUGS; MPTinR takes the same list, or a file name, as <code>restrictions.filename</code>)</td>
 <td>
 <code>mpt(..., restrictions = c("Dn = Do", "g = 0.5"))</code>; a fit-time constant is <code>bmf(g = 0.5)</code>. TreeBUGS’ <code>FE</code> has no restriction counterpart: leave the random effect out of that parameter’s formula</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>check.mpt()</code></td>
 <td>
 <code>print(model)</code>: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check (<a href="#specifying-an-mpt-model">Specifying an MPT model</a>)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>fit.mpt()</code>, <code>betaMPT()</code>, <code>traitMPT()</code>
 </td>
 <td>
 <code><a href="../reference/bmm.html">bmm()</a></code> with the random-effect structure written in the formula (see below)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>traitMPT(..., predStructure = )</code>, <code>covData</code>
 </td>
 <td>predictors in the parameter formulas, e.g. <code>D ~ 0 + cond + (1 | id)</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>transformedParameters</code></td>
 <td>
 <code><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">brms::hypothesis()</a></code>, or arithmetic on the posterior draws</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>getParam(fit, "theta")</code></td>
 <td><code>native_parameters(fit, pars = "D", summary = TRUE)</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>getParam(fit, "mean")</code></td>
 <td>
 <code>native_parameters(fit, re_formula = NA, summary = TRUE)</code>: the probability of the median participant, as in TreeBUGS (<a href="#population-level-probabilities">Population-level probabilities</a>)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>probitInverse()</code></td>
 <td>
 <code><a href="../reference/native_parameters.html">?native_parameters</a></code>, section “Group-level effects”</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>genTraitMPT()</code>, <code>genBetaMPT()</code>
 </td>
 <td>
 <code><a href="../reference/mptdist.html">rmpt()</a></code> inside a small simulation function (<a href="#data-format-and-simulation">Data format and simulation</a>)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>PPP()</code></td>
 <td>
 <code><a href="../reference/ppp.html">ppp()</a></code>: <span class="math inline">\(T_1\)</span> and <span class="math inline">\(T_2\)</span> with their posterior predictive p-values, and with <code>level = "participant"</code> the <span class="math inline">\(T_1\)</span> of each participant (<a href="#goodness-of-fit-t1-and-t2">Goodness of fit: T1 and T2</a>); <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> for the plot</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code><a href="https://paulbuerkner.com/brms/reference/waic.brmsfit.html" class="external-link">WAIC()</a></code>, <code>select.mpt()</code>
 </td>
 <td>
 <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code>, <code><a href="https://mc-stan.org/loo/reference/waic.html" class="external-link">waic()</a></code> and <code><a href="https://rdrr.io/pkg/bridgesampling/man/bf.html" class="external-link">bayes_factor()</a></code> from <strong>brms</strong>; for aggregated counts see <a href="#model-comparison">Model comparison</a> before using any of them</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>testHetChi()</code>, <code>testHetPerm()</code>
 </td>
 <td>these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In <code>bmm</code>, compare models with and without person effects (<a href="#model-comparison">Model comparison</a>)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>BayesFactorMPT()</code>, <code>BayesFactorSlope()</code>
 </td>
@@ -976,7 +1090,7 @@ P_d = \frac{d}{a + d},
 </tbody>
 </table>
 <p><strong>The data change from wide to long.</strong> A frame in the layout of <code>genTraitMPT()</code>’s <code>data</code>, one row per participant and one column per EQN category, becomes one row per participant and tree, with the counts under the shared response categories. <code><a href="../reference/mpt_data_reshape.html">mpt_data_reshape()</a></code> does the reshape for the imported model, matching the columns by the category labels of the EQN file; columns that are no counts, such as a between-participant factor, are carried to every row, and <code>id =</code> names the participant column (without it, the rows are numbered):</p>
-<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">wide</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>target_hit <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">40</span>, <span class="fl">35</span><span class="op">)</span>, target_miss <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">15</span><span class="op">)</span>,</span>
 <span>                   lure_fa <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">8</span>, <span class="fl">12</span><span class="op">)</span>, lure_cr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">42</span>, <span class="fl">38</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">long</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mpt_data_reshape.html">mpt_data_reshape</a></span><span class="op">(</span><span class="va">wide</span>, <span class="va">model_eqn</span><span class="op">)</span></span>
@@ -987,7 +1101,7 @@ P_d = \frac{d}{a + d},
 <span><span class="co">#&gt; 3  2    target  35  15</span></span>
 <span><span class="co">#&gt; 4  2      lure  12  38</span></span></code></pre></div>
 <p>MPTinR data for an EQN model are unnamed. Their columns are sorted by tree and then by category label, the order of <code>check.mpt()$eqn.order.categories</code>; <code>columns = "mptinr"</code> reads them in that order. The row sums are the trials per row, but they cannot show swapped columns, so compare one participant’s long rows with the wide row and run <code><a href="../reference/bmm_data_check.html">bmm_data_check()</a></code> before fitting (the identifiability warning it prints is the single-test 2HTM result discussed above):</p>
-<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb45"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">wide_mptinr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">wide</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"lure_cr"</span>, <span class="st">"lure_fa"</span>, <span class="st">"target_hit"</span>, <span class="st">"target_miss"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="../reference/mpt_data_reshape.html">mpt_data_reshape</a></span><span class="op">(</span><span class="va">wide_mptinr</span>, <span class="va">model_eqn</span>, columns <span class="op">=</span> <span class="st">"mptinr"</span><span class="op">)</span>, <span class="va">long</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span>

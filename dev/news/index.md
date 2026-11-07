@@ -110,6 +110,19 @@
   such as `id` in `(1 | id)`, as the participant. Aggregated counts with
   `n_trials` work as before
   ([\#646](https://github.com/popov-lab/bmm/issues/646)).
+- [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) now takes one
+  row per trial: name the column that holds each trial’s response
+  category in `response`, such as
+  `mpt(trees, tree_id = "tree", response = "resp")` with `resp` holding
+  `"old"` or `"new"`;
+  [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
+  and
+  [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
+  take `response` too. Trial rows allow item random effects, such as
+  `bmf(D ~ 1 + (1 | id) + (1 | item), g ~ 1 + (1 | id))`, and covariates
+  that change from trial to trial. A missing or unknown response
+  category stops with a message. Aggregated counts work as before
+  ([\#646](https://github.com/popov-lab/bmm/issues/646)).
 - [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md)
   gained `population_summary`. With `"mean"` it returns the mean and SD
   of each parameter across participants, with `"median"` the median and

@@ -22,7 +22,8 @@ mpt_from_string(
   covariates = NULL,
   simplex = NULL,
   links = "logit",
-  impossible = NULL
+  impossible = NULL,
+  response = NULL
 )
 ```
 
@@ -90,6 +91,14 @@ mpt_from_string(
   `tree_names` and by the category labels of the lines. Trees that are
   not listed have no impossible categories.
 
+- response:
+
+  Character. Name of the data column that holds the response category of
+  each trial, for data with one row per trial (see the `response`
+  argument of [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)).
+  Its values are the category labels of the lines. `NULL` (the default)
+  declares aggregated counts, one column per response category.
+
 ## Value
 
 An object of class `bmmodel` (see
@@ -133,12 +142,14 @@ describe the layout
 row per participant and tree, a tree column, one count column per
 response category, 0 for impossible categories) and the checks to run
 before fitting; they apply to models from this function as well, with
-the tree names of `tree_names` and the category labels of the lines. The
-data MPTinR fits to a model file in this format are wide and positional:
-one row per participant (or one vector for aggregated counts) and one
-unnamed column per line of the model file, in file order, because each
-line is one response category. (For EQN files MPTinR sorts the columns
-instead; see
+the tree names of `tree_names` and the category labels of the lines.
+With `response`, the data have one row per trial instead: the tree
+column and the column named by `response`, whose values are the category
+labels of the lines. The data MPTinR fits to a model file in this format
+are wide and positional: one row per participant (or one vector for
+aggregated counts) and one unnamed column per line of the model file, in
+file order, because each line is one response category. (For EQN files
+MPTinR sorts the columns instead; see
 [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md).)
 Name the columns `<tree>.<category>`;
 [`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md)
@@ -178,6 +189,7 @@ model
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: D, g 
 #> Links:      D = logit; g = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = D + (1 - D) * g
 #>   P(new) = (1 - D) * (1 - g)
@@ -199,6 +211,7 @@ mpt_from_string(
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: D 
 #> Links:      D = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = D + (1 - D) * 0.5
 #>   P(new) = (1 - D) * 0.5
@@ -235,6 +248,7 @@ mpt_from_string(
 #> Response:   resp_cats = E1, E2, E3, E4, F1, F2 (counts per response category) 
 #> Parameters: c, r, u 
 #> Links:      c = logit; r = logit; u = logit 
+#> Data:       response counts in one column per category ('E1', 'E2', 'E3', 'E4', 'F1', 'F2') 
 #> MPT tree 'pairs':
 #>   P(E1) = c * r
 #>   P(E2) = (1 - c) * u * u

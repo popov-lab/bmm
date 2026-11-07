@@ -21,7 +21,8 @@ mpt_from_eqn(
   simplex = NULL,
   links = "logit",
   impossible = NULL,
-  tree_names = NULL
+  tree_names = NULL,
+  response = NULL
 )
 ```
 
@@ -94,6 +95,15 @@ mpt_from_eqn(
   underscores, so files with numeric tree labels need this mapping.
   Labels not listed keep their name.
 
+- response:
+
+  Character. Name of the data column that holds the response category of
+  each trial, for data with one row per trial (see the `response`
+  argument of [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)).
+  Its values are the bmm names of the categories, which `print(model)`
+  lists under "Response". `NULL` (the default) declares aggregated
+  counts, one column per response category.
+
 ## Value
 
 An object of class `bmmodel` (see
@@ -161,14 +171,20 @@ tree names, and one count column per shared response category, named by
 `bmm_name` in the renaming map (see
 [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md)). A category
 that is `impossible` in a tree gets 0 (or `NA`) in the rows of that
-tree. TreeBUGS data are wide: one row per participant, one column per
-category label of the EQN file. MPTinR data for an EQN model are
-unnamed, and their columns do not follow the file: the trees and, within
-each tree, the category labels are sorted (alphabetically, or
-numerically when all labels in the file are numbers);
-`MPTinR::check.mpt("model.eqn")` returns the order in its elements
-`eqn.order.trees` and `eqn.order.categories`. (For MPTinR's own model
-format the columns follow the lines instead; see
+tree. With `response`,
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) instead expects
+one row per trial: the tree column and a column named by `response`
+whose values are the bmm names of the categories (`bmm_name` in the
+renaming map, listed by `print(model)` under "Response"), so a file
+label that `categories` maps is given by the name it maps onto. TreeBUGS
+data are wide: one row per participant, one column per category label of
+the EQN file. MPTinR data for an EQN model are unnamed, and their
+columns do not follow the file: the trees and, within each tree, the
+category labels are sorted (alphabetically, or numerically when all
+labels in the file are numbers); `MPTinR::check.mpt("model.eqn")`
+returns the order in its elements `eqn.order.trees` and
+`eqn.order.categories`. (For MPTinR's own model format the columns
+follow the lines instead; see
 [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md).)
 [`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md)
 reshapes both layouts with the renaming map, sums the labels that

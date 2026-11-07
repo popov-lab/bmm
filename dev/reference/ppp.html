@@ -7,15 +7,17 @@
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Posterior predictive p-values for count models — ppp"><meta name="description" content="Computes the goodness-of-fit statistics \(T_1\) and \(T_2\) of Klauer
 (2010) and their posterior predictive p-values (PPP) for the count models,
-whose rows are aggregated counts or, for sdt_yn() and sdt_mafc() without
-n_trials, single trials: mpt(), m3(), sdt_yn(), sdt_rating(),
-sdt_mafc(), sdt_ranking() and sdt_cdp(). TreeBUGS' PPP() reports the
-same two statistics; Details says where their values differ."><meta property="og:description" content="Computes the goodness-of-fit statistics \(T_1\) and \(T_2\) of Klauer
+whose rows are aggregated counts or single trials (sdt_yn() and
+sdt_mafc() without n_trials, mpt() with response): mpt(), m3(),
+sdt_yn(), sdt_rating(), sdt_mafc(), sdt_ranking() and sdt_cdp().
+TreeBUGS' PPP() reports the same two statistics; Details says where their
+values differ."><meta property="og:description" content="Computes the goodness-of-fit statistics \(T_1\) and \(T_2\) of Klauer
 (2010) and their posterior predictive p-values (PPP) for the count models,
-whose rows are aggregated counts or, for sdt_yn() and sdt_mafc() without
-n_trials, single trials: mpt(), m3(), sdt_yn(), sdt_rating(),
-sdt_mafc(), sdt_ranking() and sdt_cdp(). TreeBUGS' PPP() reports the
-same two statistics; Details says where their values differ."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+whose rows are aggregated counts or single trials (sdt_yn() and
+sdt_mafc() without n_trials, mpt() with response): mpt(), m3(),
+sdt_yn(), sdt_rating(), sdt_mafc(), sdt_ranking() and sdt_cdp().
+TreeBUGS' PPP() reports the same two statistics; Details says where their
+values differ."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -56,10 +58,11 @@ same two statistics; Details says where their values differ."><meta property="og
     <div class="ref-description section level2">
     <p>Computes the goodness-of-fit statistics \(T_1\) and \(T_2\) of Klauer
 (2010) and their posterior predictive p-values (PPP) for the count models,
-whose rows are aggregated counts or, for <code><a href="sdt_yn.html">sdt_yn()</a></code> and <code><a href="sdt_mafc.html">sdt_mafc()</a></code> without
-<code>n_trials</code>, single trials: <code><a href="mpt.html">mpt()</a></code>, <code><a href="m3.html">m3()</a></code>, <code><a href="sdt_yn.html">sdt_yn()</a></code>, <code><a href="sdt_rating.html">sdt_rating()</a></code>,
-<code><a href="sdt_mafc.html">sdt_mafc()</a></code>, <code><a href="sdt_ranking.html">sdt_ranking()</a></code> and <code><a href="sdt_cdp.html">sdt_cdp()</a></code>. TreeBUGS' <code>PPP()</code> reports the
-same two statistics; Details says where their values differ.</p>
+whose rows are aggregated counts or single trials (<code><a href="sdt_yn.html">sdt_yn()</a></code> and
+<code><a href="sdt_mafc.html">sdt_mafc()</a></code> without <code>n_trials</code>, <code><a href="mpt.html">mpt()</a></code> with <code>response</code>): <code><a href="mpt.html">mpt()</a></code>, <code><a href="m3.html">m3()</a></code>,
+<code><a href="sdt_yn.html">sdt_yn()</a></code>, <code><a href="sdt_rating.html">sdt_rating()</a></code>, <code><a href="sdt_mafc.html">sdt_mafc()</a></code>, <code><a href="sdt_ranking.html">sdt_ranking()</a></code> and <code><a href="sdt_cdp.html">sdt_cdp()</a></code>.
+TreeBUGS' <code>PPP()</code> reports the same two statistics; Details says where their
+values differ.</p>
     </div>
 
     <div class="section level2">

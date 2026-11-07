@@ -76,7 +76,8 @@ response category of a tree are summed.</p>
 <span>  simplex <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  links <span class="op">=</span> <span class="st">"logit"</span>,</span>
 <span>  impossible <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  tree_names <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  tree_names <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  response <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -144,6 +145,14 @@ names must start with a letter and contain only letters, digits, or
 underscores, so files with numeric tree labels need this mapping. Labels
 not listed keep their name.</p></dd>
 
+
+<dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
+<dd><p>Character. Name of the data column that holds the
+response category of each trial, for data with one row per trial (see
+the <code>response</code> argument of <code><a href="mpt.html">mpt()</a></code>). Its values are the bmm names of the
+categories, which <code>print(model)</code> lists under "Response". <code>NULL</code> (the
+default) declares aggregated counts, one column per response category.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -202,8 +211,13 @@ message.</p>
 and tree: a column named by <code>tree_id</code> holding the bmm tree names, and
 one count column per shared response category, named by <code>bmm_name</code> in
 the renaming map (see <code><a href="mpt.html">mpt()</a></code>). A category that is <code>impossible</code> in a
-tree gets 0 (or <code>NA</code>) in the rows of that tree. TreeBUGS data are wide:
-one row per participant, one column per category label of the EQN file.
+tree gets 0 (or <code>NA</code>) in the rows of that tree. With <code>response</code>, <code><a href="bmm.html">bmm()</a></code>
+instead expects one row per trial: the tree column and a column named by
+<code>response</code> whose values are the bmm names of the categories (<code>bmm_name</code>
+in the renaming map, listed by <code>print(model)</code> under "Response"), so a
+file label that <code>categories</code> maps is given by the name it maps onto.
+TreeBUGS data are wide: one row per participant, one column per category
+label of the EQN file.
 MPTinR data for an EQN model are unnamed, and their columns do not follow
 the file: the trees and, within each tree, the category labels are sorted
 (alphabetically, or numerically when all labels in the file are numbers);

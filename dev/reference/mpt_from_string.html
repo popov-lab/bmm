@@ -76,7 +76,8 @@ terminate in the same response category are summed.</p>
 <span>  covariates <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  simplex <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  links <span class="op">=</span> <span class="st">"logit"</span>,</span>
-<span>  impossible <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  impossible <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  response <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -140,6 +141,14 @@ occur in a tree, one element per such tree:
 i.e. by <code>tree_names</code> and by the category labels of the lines. Trees that
 are not listed have no impossible categories.</p></dd>
 
+
+<dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
+<dd><p>Character. Name of the data column that holds the
+response category of each trial, for data with one row per trial (see
+the <code>response</code> argument of <code><a href="mpt.html">mpt()</a></code>). Its values are the category labels
+of the lines. <code>NULL</code> (the default) declares aggregated counts, one
+column per response category.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -172,10 +181,13 @@ the layout <code><a href="bmm.html">bmm()</a></code> expects (one row per partic
 column, one count column per response category, 0 for impossible
 categories) and the checks to run before fitting; they apply to models
 from this function as well, with the tree names of <code>tree_names</code> and the
-category labels of the lines. The data MPTinR fits to a model file in
-this format are wide and positional: one row per participant (or one
-vector for aggregated counts) and one unnamed column per line of the
-model file, in file order, because each line is one response category.
+category labels of the lines. With <code>response</code>, the data have one row per
+trial instead: the tree column and the column named by <code>response</code>, whose
+values are the category labels of the lines. The data MPTinR fits to a
+model file in this format are wide and positional: one row per
+participant (or one vector for aggregated counts) and one unnamed column
+per line of the model file, in file order, because each line is one
+response category.
 (For EQN files MPTinR sorts the columns instead; see <code><a href="mpt_from_eqn.html">mpt_from_eqn()</a></code>.)
 Name the columns <code>&lt;tree&gt;.&lt;category&gt;</code>; <code><a href="mpt_data_reshape.html">mpt_data_reshape()</a></code> then stacks the
 trees and gives 0 to the categories a tree cannot produce (see Examples).</p>
@@ -209,6 +221,7 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Response:   resp_cats = old, new (counts per response category) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Parameters: D, g </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Links:      D = logit; g = logit </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Data:       response counts in one column per category ('old', 'new') </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'target':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = D + (1 - D) * g</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * (1 - g)</span>
@@ -230,6 +243,7 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Response:   resp_cats = old, new (counts per response category) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Parameters: D </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Links:      D = logit </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Data:       response counts in one column per category ('old', 'new') </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'target':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(old) = D + (1 - D) * 0.5</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(new) = (1 - D) * 0.5</span>
@@ -266,6 +280,7 @@ layout <code><a href="bmm.html">bmm()</a></code> expects.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Response:   resp_cats = E1, E2, E3, E4, F1, F2 (counts per response category) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Parameters: c, r, u </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Links:      c = logit; r = logit; u = logit </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Data:       response counts in one column per category ('E1', 'E2', 'E3', 'E4', 'F1', 'F2') </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MPT tree 'pairs':</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(E1) = c * r</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   P(E2) = (1 - c) * u * u</span>

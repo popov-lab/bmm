@@ -131,6 +131,7 @@ model_2htm
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: D, g 
 #> Links:      D = logit; g = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = D + (1 - D) * g
 #>   P(new) = (1 - D) * (1 - g)
@@ -214,6 +215,7 @@ model_2htm_sep
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: Do, g, Dn 
 #> Links:      Do = logit; g = logit; Dn = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = Do + (1 - Do) * g
 #>   P(new) = (1 - Do) * (1 - g)
@@ -269,9 +271,10 @@ model_2htm_probit <- mpt(
 The data contain one column of aggregated response counts per response
 category, named after the branch names of the trees, plus the `tree_id`
 column. Aggregated counts are sufficient whenever parameters and
-covariates are constant within participant and condition. Trial-level
-data (one row per trial with a 1 in the chosen category’s column) also
-work and are only needed when predictors vary from trial to trial.
+covariates are constant within participant and condition. Data with one
+row per trial are needed for item effects and for predictors that vary
+from trial to trial; [Trial-level data and item
+effects](#trial-level-data-and-item-effects) shows that layout.
 
 The distribution functions
 [`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) and
@@ -538,6 +541,7 @@ model_2htm_restricted
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: Do, g 
 #> Links:      Do = logit; g = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = Do + (1 - Do) * g
 #>   P(new) = (1 - Do) * (1 - g)
@@ -727,6 +731,7 @@ model_smm
 #> Response:   resp_cats = A, B, New (counts per response category) 
 #> Parameters: dA, dB, gA, gB, gNew, gAraw, gBraw 
 #> Links:      dA = logit; dB = logit; gA = identity; gB = identity; gNew = identity; gAraw = identity; gBraw = identity 
+#> Data:       response counts in one column per category ('A', 'B', 'New') 
 #> MPT tree 'sourceA':
 #>   P(A) = dA + (1 - dA) * gA
 #>   P(B) = (1 - dA) * gB
@@ -820,6 +825,7 @@ model_ss
 #> Response:   resp_cats = correct, other, npl (counts per response category) 
 #> Parameters: Pb, Pi 
 #> Links:      Pb = logit; Pi = logit 
+#> Data:       response counts in one column per category ('correct', 'other', 'npl') 
 #> MPT tree 'ss':
 #>   P(correct) = Pb + (1 - Pb) * Pi * GcorrPi + (1 - Pb) * (1 - Pi) * GcorrNoPi
 #>   P(other) = (1 - Pb) * Pi * (1 - GcorrPi) + (1 - Pb) * (1 - Pi) * (1 - GcorrNoPi) * GotherNoPi
@@ -841,7 +847,174 @@ are re-evaluated with the observed covariate values row by row, and
 [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) stops when
 covariate columns violate their joint constraints.
 
-## 8 Fitting real data
+## 8 Trial-level data and item effects
+
+Recognition experiments sample their items, and items differ in how well
+they are remembered. Counts aggregated per participant and tree average
+over the items, so the item differences end up in the person effects and
+in the residual misfit. With one row per trial, the items can get random
+effects of their own, crossed with the participants, as in a generalized
+linear mixed model.
+
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) reads one row
+per trial when `response` names the column that holds the response
+category of each trial. The values of that column are the branch names,
+here `"old"` and `"new"`; everything else stays as before:
+
+``` r
+
+model_trials <- mpt(
+  trees = list(tree_target, tree_lure),
+  tree_id = "item_type",
+  response = "resp"
+)
+```
+
+The simulation draws a recognition test of 60 items for 30 participants.
+Two counterbalanced study lists make each item a target for half of the
+participants and a lure for the other half. Detection `D` varies over
+participants and items, the guessing rate `g` over participants. Each
+trial runs through the tree: the item is detected with probability `D`,
+and an undetected item is called old with probability `g`.
+
+``` r
+
+simulate_trials <- function(n_subj, n_items, mean, sd) {
+  D_id <- rnorm(n_subj, 0, sd[["D_id"]])
+  D_item <- rnorm(n_items, 0, sd[["D_item"]])
+  g_id <- rnorm(n_subj, 0, sd[["g_id"]])
+  dat <- expand.grid(id = seq_len(n_subj), item = seq_len(n_items))
+  # list 1 (odd participants) studies the odd items, list 2 the even items
+  studied <- dat$item %% 2 == dat$id %% 2
+  dat$item_type <- ifelse(studied, "target", "lure")
+  D <- plogis(qlogis(mean[["D"]]) + D_id[dat$id] + D_item[dat$item])
+  g <- plogis(qlogis(mean[["g"]]) + g_id[dat$id])
+  detected <- runif(nrow(dat)) < D
+  dat$resp <- ifelse(detected, ifelse(studied, "old", "new"),
+                     ifelse(runif(nrow(dat)) < g, "old", "new"))
+  dat$id <- factor(dat$id)
+  dat$item <- factor(dat$item)
+  dat
+}
+
+set.seed(2613)
+dat_trials <- simulate_trials(
+  n_subj = 30, n_items = 60,
+  mean = c(D = 0.6, g = 0.5), sd = c(D_id = 0.5, D_item = 0.6, g_id = 0.4)
+)
+head(dat_trials)
+#>   id item item_type resp
+#> 1  1    1    target  old
+#> 2  2    1      lure  old
+#> 3  3    1    target  old
+#> 4  4    1      lure  new
+#> 5  5    1    target  old
+#> 6  6    1      lure  old
+```
+
+Item effects enter the formula like person effects. Here only `D` gets
+them, because guessing happens without any memory of the item:
+
+``` r
+
+fit_trials <- bmm(
+  formula = bmf(
+    D ~ 1 + (1 | id) + (1 | item),
+    g ~ 1 + (1 | id)
+  ),
+  data = dat_trials,
+  model = model_trials,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  file = "fits/mpt_trial_item"
+)
+```
+
+``` r
+
+summary(fit_trials)
+```
+
+``` fansi
+#>   Model: mpt(trees = list(tree_target, tree_lure),
+#>              tree_id = "item_type",
+#>              response = "resp") 
+#>   Links: D = logit; g = logit 
+#> Formula: D ~ 1 + (1 | id) + (1 | item)
+#>          g ~ 1 + (1 | id) 
+#>    Data: dat_trials (Number of observations: 1800)
+#>   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+#>          total post-warmup draws = 4000
+#> 
+#> Multilevel Hyperparameters:
+#> ~id (Number of levels: 30) 
+#>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> sd(D_Intercept)     0.68      0.15     0.42     0.99 1.00     1526     2115
+#> sd(g_Intercept)     0.27      0.17     0.01     0.63 1.01      791     1342
+#> 
+#> ~item (Number of levels: 60) 
+#>                 Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> sd(D_Intercept)     0.67      0.15     0.38     0.97 1.00     1637     2016
+#> 
+#> Regression Coefficients:
+#>             Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#> D_Intercept     0.37      0.18     0.01     0.73 1.00     1538     2017
+#> g_Intercept     0.10      0.11    -0.11     0.31 1.00     3066     2599
+#> 
+#> Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+#> and Tail_ESS are effective sample size measures, and Rhat is the potential
+#> scale reduction factor on split chains (at convergence, Rhat = 1).
+```
+
+The simulated standard deviations were 0.5 for `D` over participants,
+0.6 for `D` over items and 0.4 for `g` over participants, all on the
+logit scale, and each lies inside its 95% interval in the summary. The
+data hold 1800 trials, so a fit to them takes longer than a fit to the
+60 aggregated rows, because its cost grows with the number of rows.
+
+[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+treats each participant as a cell and names participants with too few
+trials. The items it counts per level, as the minimum, median and
+maximum number of trials per item, and it names an item only when that
+item holds far fewer trials than the typical item. The argument
+`min_trials` in
+[`?bmm_data_check`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
+gives the exact rule.
+[`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) needs to be
+told which grouping variable identifies the participants, because the
+formula now has two:
+
+``` r
+
+ppp(fit_trials, participant = "id")
+#> Posterior predictive p-values (Klauer, 2010)
+#> Cells: 'item_type' (2 cells)
+#> 
+#>  statistic observed replicated   ppp ndraws
+#>         T1     1.91       1.86 0.497   4000
+#>         T2    16.13       6.07 0.111   4000
+```
+
+The cells are the two trees, as for aggregated data:
+[`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md) sums the trial
+rows of each cell, for \\T_2\\ per participant, so both statistics
+compare counts aggregated over trials. The item effects enter through
+the expected counts.
+
+Neither TreeBUGS nor MPTinR can fit this model. Both take one row of
+category frequencies per participant (TreeBUGS 1.5.3,
+`traitMPT(data = )`; MPTinR 1.14.1, `fit.mpt(data = )`), and covariates
+in TreeBUGS describe participants, not trials. An item effect would have
+to be squeezed into the model as a separate tree per item, each with its
+own parameter, which gives fixed rather than random item effects, and a
+trial-level covariate as separate trees per value. In `bmm`, a covariate
+that changes from trial to trial goes into a branch expression as in
+[Design-fixed covariates in branch
+expressions](#design-fixed-covariates-in-branch-expressions), or into a
+parameter formula as a predictor, and the trial rows carry its value.
+
+## 9 Fitting real data
 
 The `oberauer_lewandowsky_2019_e1` data set that the [m3
 article](https://venpopov.com/bmm/articles/bmm_m3.html) analyzes with
@@ -948,7 +1121,7 @@ plot(model_ol)
 
 ![](bmm_mpt_files/figure-html/fig-tree-ol-1.jpeg)
 
-### 8.1 Condition effects
+### 9.1 Condition effects
 
 `Pi` and `Pb` get one population parameter per condition (`0 + cond`)
 and, per participant, one uncorrelated random effect per condition
@@ -1003,7 +1176,7 @@ When item memory succeeds but the binding is unavailable in the
 distractor condition, distractor activation captures the response about
 half of the time.
 
-### 8.2 Testing differences between conditions
+### 9.2 Testing differences between conditions
 
 [`brms::hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html)
 evaluates a contrast in every posterior draw. Parameters are addressed
@@ -1042,7 +1215,7 @@ brms::posterior_summary(Pb_by_cond$oldsame - Pb_by_cond$oldreord)
 #> [1,] 0.2618212 0.06255585 0.1352809 0.379597
 ```
 
-### 8.3 Posterior predictive check
+### 9.3 Posterior predictive check
 
 The posterior predictive distribution reproduces the response-category
 proportions within each condition, including the near-zero `dist`
@@ -1055,7 +1228,7 @@ pp_check(fit_ol, group = "cond")
 
 ![](bmm_mpt_files/figure-html/fig-ppc-ol-1.jpeg)
 
-### 8.4 Goodness of fit: T1 and T2
+### 9.4 Goodness of fit: T1 and T2
 
 The plot compares proportions by eye. A posterior predictive p-value
 (PPP) puts a number on it. Klauer (2010) proposed two statistics for
@@ -1085,8 +1258,8 @@ ppp_ol
 #> Cells: 'tree', 'cond' (3 cells)
 #> 
 #>  statistic observed replicated    ppp ndraws
-#>         T1     6.27        6.2 0.4977  12000
-#>         T2   284.68       93.0 0.0238  12000
+#>         T1     6.27       6.33 0.5029  12000
+#>         T2   284.68      92.28 0.0217  12000
 ```
 
 By default, a cell combines the tree column with the categorical
@@ -1099,7 +1272,7 @@ them; with the same number of participants in every cell, as here, both
 give the same PPP.
 
 The \\T_1\\ PPP of 0.5 shows that the model reproduces the category
-frequencies of each condition. The \\T_2\\ PPP of 0.024 is small: data
+frequencies of each condition. The \\T_2\\ PPP of 0.022 is small: data
 simulated from the model rarely deviate from the expected covariances as
 much as the observed data do. The model keeps all person effects
 uncorrelated, so a participant with a high `Pi` in one condition is not
@@ -1121,17 +1294,17 @@ head(ppp_ol_id)
 #> Cells: 'tree', 'cond' (3 cells)
 #> 
 #>  participant statistic observed replicated   ppp ndraws
-#>            1        T1     6.51       7.03 0.537  12000
-#>            2        T1     5.99       6.95 0.584  12000
-#>            3        T1     6.18       7.02 0.572  12000
-#>            4        T1     5.95       7.01 0.582  12000
-#>            5        T1     6.16       6.96 0.572  12000
-#>            6        T1     6.60       6.96 0.537  12000
+#>            1        T1     6.51       7.00 0.542  12000
+#>            2        T1     5.99       6.98 0.585  12000
+#>            3        T1     6.18       7.02 0.574  12000
+#>            4        T1     5.95       6.98 0.584  12000
+#>            5        T1     6.16       6.96 0.570  12000
+#>            6        T1     6.60       6.98 0.537  12000
 ```
 
 The smallest of the 40 participant PPPs is 0.06.
 
-### 8.5 Model comparison
+### 9.5 Model comparison
 
 Because a `bmm` fit is a `brmsfit`, the model-comparison tools of
 **brms** apply to it. Which of them can be trusted depends on the
@@ -1220,7 +1393,7 @@ these settings, so the sampler cannot be run on them here. The
 article](https://venpopov.com/bmm/articles/bmm_hypothesis_testing.html)
 shows the full workflow.
 
-### 8.6 Relation to the m3 model
+### 9.6 Relation to the m3 model
 
 This MPT is not merely inspired by the [m3 analysis of the same
 data](https://venpopov.com/bmm/articles/bmm_m3.html): under the `simple`
@@ -1238,7 +1411,7 @@ suite). What remains different is where the priors and random effects
 live: on the log scale of activations in the m3, on the logit scale of
 the process probabilities here.
 
-## 9 Time-varying and other non-linear parameters
+## 10 Time-varying and other non-linear parameters
 
 Because MPT parameters are ordinary `bmm` parameters, they can be given
 non-linear predictor formulas. For example, a detection probability that
@@ -1267,7 +1440,7 @@ random-effect standard deviations of such sub-parameters are close to
 zero, the posterior can develop a funnel geometry, and increasing
 `adapt_delta` (for example to 0.95) helps.
 
-## 10 Importing existing model definitions
+## 11 Importing existing model definitions
 
 Models written for other MPT software can be imported directly.
 [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md)
@@ -1310,6 +1483,7 @@ model_eqn
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: Do, g, Dn 
 #> Links:      Do = logit; g = logit; Dn = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = (Do) + ((1 - Do) * g)
 #>   P(new) = (1 - Do) * (1 - g)
@@ -1371,6 +1545,7 @@ mpt_from_eqn(
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: Do 
 #> Links:      Do = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = (Do) + ((1 - Do) * 0.5)
 #>   P(new) = (1 - Do) * 0.5
@@ -1409,6 +1584,7 @@ mpt_from_string(
 #> Response:   resp_cats = old, new (counts per response category) 
 #> Parameters: D, g 
 #> Links:      D = logit; g = logit 
+#> Data:       response counts in one column per category ('old', 'new') 
 #> MPT tree 'target':
 #>   P(old) = D + (1 - D) * g
 #>   P(new) = (1 - D) * (1 - g)
@@ -1442,7 +1618,7 @@ means of these two runs differed by at most 0.0022. The paper reports
 none for the 12-parameter model, whose posterior means lay inside the
 95% intervals of a TreeBUGS fit of the same data.
 
-## 11 Migrating from MPTinR or TreeBUGS
+## 12 Migrating from MPTinR or TreeBUGS
 
 Importing the model structure is the easy part; what usually needs
 translating is the hierarchical structure, the priors, and the reporting
@@ -1454,6 +1630,7 @@ conventions. The table maps the functions and arguments of MPTinR
 |----|----|
 | model file (EQN, MPTinR text) | [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md), [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md), or [`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md) + [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) |
 | wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation](#data-format-and-simulation)) |
+| frequencies per participant only; no item effects | one row per trial with `response =` (in [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md) and [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)), and item effects such as `(1 | item)` ([Trial-level data and item effects](#trial-level-data-and-item-effects)) |
 | reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_data_reshape(wide, model)`, or `mpt_data_reshape(wide, model, columns = "mptinr")` |
 | `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS’ `FE` has no restriction counterpart: leave the random effect out of that parameter’s formula |
 | `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model](#specifying-an-mpt-model)) |

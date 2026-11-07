@@ -2,11 +2,12 @@
 
 Computes the goodness-of-fit statistics \\T_1\\ and \\T_2\\ of Klauer
 (2010) and their posterior predictive p-values (PPP) for the count
-models, whose rows are aggregated counts or, for
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
+models, whose rows are aggregated counts or single trials
+([`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
 [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)
-without `n_trials`, single trials:
-[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md),
+without `n_trials`,
+[`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) with
+`response`): [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md),
 [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md),
 [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md),
 [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
