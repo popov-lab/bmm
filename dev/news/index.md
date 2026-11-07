@@ -2,6 +2,25 @@
 
 ## bmm (development version)
 
+#### New models
+
+- Add the **psychometric function**
+  ([`psychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function.md))
+  for detection and discrimination at varying stimulus intensity, from
+  0/1 responses per trial or counts per level. It estimates the
+  `midpoint` and `width` of a normal, logistic, Gumbel, Weibull,
+  log-normal or log-logistic sigmoid, and a guess and lapse rate; either
+  rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC.
+  [`psychometric_threshold()`](https://venpopov.com/bmm/dev/reference/psychometric_threshold.md)
+  returns thresholds and slopes at any target performance. Also adds
+  [`dpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md)
+  and
+  [`rpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md).
+  See
+  [`?psychometric_function`](https://venpopov.com/bmm/dev/reference/psychometric_function.md)
+  ([\#507](https://github.com/popov-lab/bmm/issues/507)). Thanks to
+  [@GidonFrischkorn](https://github.com/GidonFrischkorn)
+
 #### New features
 
 - bmm fits now work with the easystats packages

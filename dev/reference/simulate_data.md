@@ -130,6 +130,7 @@ was specified with:
 | [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | `n_trials`; `m` when it names a column |
 | [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md) | `n_trials`; `m` when it names a column |
 | [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md), [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) | `stimulus`, `n_trials` |
+| [`psychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function.md) | `intensity`; `n_trials` when it names a column (else each row is one 0/1 trial); `guess` and `lapse` when they name columns |
 
 The simplex groups of
 [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) are given as
@@ -143,13 +144,13 @@ data <- bmm::simulate_data(mixture2p(resp_error = "y"),
   pars = list(kappa = log(8), thetat = 0.5), n_trials = 100
 )
 head(data)
-#>              y
-#> 1  0.027702862
-#> 2  2.872324381
-#> 3 -0.005503442
-#> 4 -0.663926479
-#> 5  0.602686109
-#> 6  3.086732360
+#>             y
+#> 1  0.79624383
+#> 2  0.01005821
+#> 3 -0.24949631
+#> 4 -0.48835639
+#> 5 -2.38609265
+#> 6 -0.65857191
 attr(data, "simulate_pars")[1, ]
 #>   mu    kappa thetat
 #> 1  0 2.079442    0.5
@@ -167,12 +168,12 @@ data <- bmm::simulate_data(ddm(rt = "rt", response = "response"),
 )
 head(data)
 #>   cond        rt response
-#> 1 easy 0.6943447        1
-#> 2 easy 0.7629890        1
-#> 3 easy 0.5331093        1
-#> 4 easy 0.4308235        0
-#> 5 easy 0.4768945        0
-#> 6 easy 0.4210446        1
+#> 1 easy 0.3266617        1
+#> 2 easy 0.4780491        1
+#> 3 easy 0.3817034        1
+#> 4 easy 0.5858332        1
+#> 5 easy 0.3244656        1
+#> 6 easy 0.3514862        1
 
 # counts: yes/no recognition, 50 trials per stimulus type
 design <- data.frame(stimulus = c(0, 1), n_trials = 50)
@@ -180,8 +181,8 @@ bmm::simulate_data(sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = 
   pars = list(d = 1.5, criterion = 0.5), design = design
 )
 #>   stimulus n_trials n_old
-#> 1        0       50    21
-#> 2        1       50    43
+#> 1        0       50    18
+#> 2        1       50    42
 
 # categorical responses: memory measurement model, 100 trials per row
 model <- m3(
@@ -190,6 +191,6 @@ model <- m3(
 )
 bmm::simulate_data(model, pars = list(c = 2, a = 0.5), design = data.frame(n_trials = c(100, 100)))
 #>   n_trials corr other npl
-#> 1      100   52    25  23
-#> 2      100   54    25  21
+#> 1      100   57    23  20
+#> 2      100   43    31  26
 ```

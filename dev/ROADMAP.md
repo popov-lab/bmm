@@ -31,8 +31,8 @@ March 2027) teaches from.
 - [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) with a
   Laplace activation, peak and range scalings, and discrete response
   options.
-- `psychometric_function()`, a new model for detection and
-  discrimination data.
+- [`psychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function.md),
+  a new model for detection and discrimination data.
 - One row per trial for the signal detection and MPT models, so item
   random effects are possible.
 - The target confusability competition model `tcc()` and the EZ circular

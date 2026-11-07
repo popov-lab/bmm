@@ -352,9 +352,9 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <code><a href="../reference/sdt_cdp.html">sdt_cdp()</a></code>.</p>
 <table class="table">
 <colgroup>
-<col width="13%">
-<col width="45%">
-<col width="40%">
+<col width="11%">
+<col width="51%">
+<col width="36%">
 </colgroup>
 <thead><tr class="header">
 <th align="left">Model</th>
@@ -371,6 +371,14 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 </tr>
 <tr class="even">
 <td align="left">
+<a href="https://venpopov.com/bmm/reference/psychometric_function.html"><code>psychometric_function()</code></a><br>Psychometric Function</td>
+<td align="left">
+<code>response</code>: 0/1 response per trial, or the number of positive responses out of <code>n_trials</code><br><code>intensity</code>: stimulus intensity<br><code>n_trials</code>: number of trials (optional; omit for one binary response per row)<br><code>guess</code>: guess rate per row, e.g. 1 / m in m-AFC (optional; or one number, or estimated)<br><code>lapse</code>: lapse rate per row (optional; or one number, or estimated)</td>
+<td align="left">
+<code>midpoint</code>: Stimulus intensity at which the sigmoid F is 0.5, halfway between the asymptotes, in the units of the intensity<br><code>width</code>: Width of the sigmoid<br><code>guess</code>: Guess rate<br><code>lapse</code>: Lapse rate</td>
+</tr>
+<tr class="odd">
+<td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_cdp.html"><code>sdt_cdp()</code></a><br>Continuous Dual-Process Signal Detection Theory Model</td>
 <td align="left">
 <code>response</code>: prefix of the count columns <code>new&lt;k&gt;</code>, <code>know&lt;k&gt;</code>, <code>remember&lt;k&gt;</code> and optionally <code>guess&lt;k&gt;</code>, one per confidence level (default: no prefix)<br><code>stimulus</code>: stimulus type, 0 = new and 1 = old</td>
@@ -378,7 +386,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <code>dfam</code>: Familiarity sensitivity<br><code>drec</code>: Recollection sensitivity<br><code>criterion</code>: Response bias<br><code>spacing</code>: Threshold spacing<br><code>rcrit</code>: Remember criterion<br>Fixed by default: <code>sigmar</code>, <code>rho</code>, <code>kcrit</code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_mafc.html"><code>sdt_mafc()</code></a><br>m-Alternative Forced Choice Signal Detection Theory Model</td>
 <td align="left">
@@ -386,7 +394,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <code>d</code>: Sensitivity</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_ranking.html"><code>sdt_ranking()</code></a><br>Ranking Signal Detection Theory Model</td>
 <td align="left">
@@ -394,7 +402,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <td align="left">
 <code>d</code>: Sensitivity</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>, version <code>standard</code><br>Confidence Rating Signal Detection Theory Model</td>
 <td align="left">
@@ -403,7 +411,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <code>d</code>: Sensitivity<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units<br><code>bias</code>: Alternative to criterion<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>, version <code>dpsdt</code><br>Confidence Rating Signal Detection Theory Model</td>
 <td align="left">
@@ -412,7 +420,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <code>d</code>: Sensitivity<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units<br><code>bias</code>: Alternative to criterion<br><code>spacing</code>: Threshold spacing<br>Fixed by default: <code>sdratio</code>, <code>Ro</code>, <code>Rn</code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_rating.html"><code>sdt_rating()</code></a>, version <code>metad</code><br>Confidence Rating Signal Detection Theory Model</td>
 <td align="left">
@@ -421,7 +429,7 @@ through the <code>dpsdt</code> and <code>metad</code> versions of <code><a href=
 <code>d</code>: Sensitivity<br><code>criterion</code>: Decision criterion, measured from the mean of the noise distribution in noise-SD units<br><code>bias</code>: Alternative to criterion<br><code>spacing</code>: Threshold spacing<br><code>logmratio</code>: Log M-ratio, log(meta-d/d)<br>Fixed by default: <code>sdratio</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">
 <a href="https://venpopov.com/bmm/reference/sdt_yn.html"><code>sdt_yn()</code></a><br>Yes/No Signal Detection Theory Model</td>
 <td align="left">

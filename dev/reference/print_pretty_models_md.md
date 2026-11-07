@@ -44,6 +44,7 @@ print_pretty_models_md()
 #> **Detection, recognition and confidence judgments**
 #> 
 #> - [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial Processing Tree (MPT) Model
+#> - [`psychometric_function()`](https://venpopov.com/bmm/reference/psychometric_function.html): Psychometric Function
 #> - [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.html): Continuous Dual-Process Signal Detection Theory Model
 #> - [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.html): m-Alternative Forced Choice Signal Detection Theory Model
 #> - [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.html): Ranking Signal Detection Theory Model

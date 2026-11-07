@@ -49,6 +49,7 @@ bmm_models()
 #> Detection, recognition and confidence judgments
 #> 
 #> - mpt(): Multinomial Processing Tree (MPT) Model
+#> - psychometric_function(): Psychometric Function
 #> - sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model
 #> - sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model
 #> - sdt_ranking(): Ranking Signal Detection Theory Model

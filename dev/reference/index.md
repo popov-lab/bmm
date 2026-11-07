@@ -85,7 +85,7 @@ Main functions for model fitting
 ## Model evaluation & post-processing
 
 ROC/AUC, quantile-transformed ROC, and latent-distribution analysis for
-signal detection models
+signal detection models; thresholds and slopes of psychometric functions
 
 - [`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) :
   Model-implied ROC curve from a fitted SDT model
@@ -107,6 +107,8 @@ signal detection models
   : Plot the posterior AUC distribution from a fitted SDT model
 - [`plot(`*`<bmm_sdt_latent>`*`)`](https://venpopov.com/bmm/dev/reference/plot.bmm_sdt_latent.md)
   : Plot the latent decision-variable distributions of an SDT model
+- [`psychometric_threshold()`](https://venpopov.com/bmm/dev/reference/psychometric_threshold.md)
+  : Thresholds and slopes of a fitted psychometric function
 
 ## Extract model information
 
@@ -194,6 +196,8 @@ Functions for specifying which model to fit
 - [`plot(`*`<mpt_tree>`*`)`](https://venpopov.com/bmm/dev/reference/plot.mpt_tree.md)
   [`plot(`*`<mpt>`*`)`](https://venpopov.com/bmm/dev/reference/plot.mpt_tree.md)
   : Plot the structure of MPT trees
+- [`psychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function.md)
+  : Psychometric Function Model
 - [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md)
   [`sdmSimple()`](https://venpopov.com/bmm/dev/reference/sdm.md) :
   Signal Discrimination Model (SDM)
@@ -266,6 +270,10 @@ Functions for special distributions
 - [`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md)
   [`rmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) :
   Distribution functions for Multinomial Processing Tree (MPT) models
+
+- [`dpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md)
+  [`rpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md)
+  : Distribution functions for the psychometric function model
 
 - [`rejection_sampling()`](https://venpopov.com/bmm/dev/reference/rejection_sampling.md)
   : Rejection Sampling
