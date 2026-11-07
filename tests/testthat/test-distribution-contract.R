@@ -4,13 +4,17 @@
 # argument, value i from the i-th elements alone. Every r*() pairing test
 # interleaves parameter groups and compares each group with a reference
 # outside the function's own code (a closed form, quadrature, or the single-
-# trial density of the matching d*()). Mutants of the samplers (vector
-# reversed, recycling removed, one group shifted 10 %) were run against these
-# tests when they were written; a Monte Carlo test is not expected to see a
-# 10 % shift, so each sampler also gets a deterministic check with n not a
-# multiple of the parameter length. Non-multiple lengths recycle silently, as
-# rnorm() does; the cswald tests use multiples only until #406 lands. The
-# circular mixtures are circmix's (#434).
+# trial density of the matching d*()), and every per-draw argument is varied
+# in at least one of them. Mutants of the samplers (vector reversed,
+# recycling removed, one group shifted 10 %) were run against these tests
+# when they were written; a Monte Carlo test is not expected to see a 10 %
+# shift, so each sampler also gets a deterministic check: certain outcomes,
+# n = 7 and parameter lengths 2, 3 and 4. Recycled to 7, a vector of length 3
+# or 4 is chosen so that reversing it changes the expected draws; one of
+# length 2 reads the same reversed (a b a b a b a) and is caught only when
+# shifted. Non-multiple lengths recycle silently, as rnorm() does; the cswald
+# tests use multiples only until #406 lands. The circular mixtures are
+# circmix's (#434).
 
 pick <- function(x, i) {
   if (is.matrix(x)) x[(i - 1) %% nrow(x) + 1, ] else x[(i - 1) %% length(x) + 1]
@@ -201,31 +205,48 @@ test_that("rezdm() returns n draws, draw i from the i-th parameter elements", {
     m_rt <- ndt[k] + bound[k] / (2 * drift[k]) * tanh(bound[k] * drift[k] / (2 * s[k]^2))
     expect_mean_near(rows$mean_rt, m_rt, sd(rows$mean_rt) / sqrt(nrow(rows)))
   }
+  # n not a multiple of the parameter lengths: draw i takes element i, a
+  # strong drift decides every response and ndt sets the whole part of mean_rt
+  out <- NULL
+  expect_no_warning(out <- rezdm(7, c(30, 40, 50, 60), drift = c(20, 20, -20), bound = 2, ndt = c(0.1, 5)))
+  expect_equal(out$n_trials, c(30, 40, 50, 60, 30, 40, 50))
+  expect_equal(out$n_upper, c(30, 40, 0, 60, 30, 0, 50))
+  expect_equal(floor(out$mean_rt), c(0, 5, 0, 5, 0, 5, 0))
 })
 
-test_that("rezdm(version = '4par') pairs the start point and both boundary means per draw", {
+test_that("rezdm(version = '4par') pairs the start point, s and both boundary means per draw", {
   withr::local_seed(4444)
   drift <- c(0.5, 1, 0.8)
   bound <- c(1, 1.2, 1.5)
   ndt <- c(0.2, 0.3, 0.4)
   zr <- c(0.4, 0.5, 0.6)
+  s <- c(1, 1.3, 0.8)
   n_trials <- c(100, 150, 120)
   n <- 1500
   g <- group_of(n, 3)
-  out <- rezdm(n, n_trials, drift, bound, ndt, zr = zr, version = "4par")
+  out <- rezdm(n, n_trials, drift, bound, ndt, zr = zr, s = s, version = "4par")
   expect_equal(nrow(out), n)
   for (k in 1:3) {
     rows <- out[g == k, ]
     z <- zr[k] * bound[k]
-    p_up <- wiener_p_upper(drift[k], bound[k], z)
+    p_up <- wiener_p_upper(drift[k], bound[k], z, s[k])
     expect_mean_near(rows$n_upper / n_trials[k], p_up, se_prop(p_up, n_trials[k] * nrow(rows)))
     upper <- rows$mean_rt_upper
     lower <- rows$mean_rt_lower
-    expect_mean_near(upper[!is.na(upper)], ndt[k] + wiener_mean_dt_upper(drift[k], bound[k], z),
+    expect_mean_near(upper[!is.na(upper)], ndt[k] + wiener_mean_dt_upper(drift[k], bound[k], z, s[k]),
                      sd(upper, na.rm = TRUE) / sqrt(sum(!is.na(upper))))
-    expect_mean_near(lower[!is.na(lower)], ndt[k] + wiener_mean_dt_lower(drift[k], bound[k], z),
+    expect_mean_near(lower[!is.na(lower)], ndt[k] + wiener_mean_dt_lower(drift[k], bound[k], z, s[k]),
                      sd(lower, na.rm = TRUE) / sqrt(sum(!is.na(lower))))
   }
+  # n not a multiple of the parameter lengths: draw i takes element i, a
+  # strong drift sends every response to one boundary and ndt sets the whole
+  # part of that boundary's mean_rt
+  out <- NULL
+  expect_no_warning(out <- rezdm(7, c(30, 40, 50, 60), drift = c(20, 20, -20), bound = 2, ndt = c(0.1, 5),
+                                 version = "4par"))
+  expect_equal(out$n_upper, c(30, 40, 0, 60, 30, 0, 50))
+  upper <- out$n_upper > 0
+  expect_equal(floor(ifelse(upper, out$mean_rt_upper, out$mean_rt_lower)), c(0, 5, 0, 5, 0, 5, 0))
 })
 
 # --- SDT ----------------------------------------------------------------------
@@ -306,6 +327,12 @@ test_that("rsdt_mafc() pairs sensitivity and the number of alternatives per draw
     p_correct <- integrate(function(x) dnorm(x - d[k]) * pnorm(x)^(m[k] - 1), -Inf, Inf)$value
     expect_mean_near(n_correct[g == k] / n_trials[k], p_correct, se_prop(p_correct, n_trials[k] * sum(g == k)))
   }
+  # n not a multiple of the parameter lengths: draw i takes element i, and a
+  # sensitivity of +-15 makes every trial correct or every trial wrong, so m
+  # cannot change the draw and is left to the test above
+  n_correct <- NULL
+  expect_no_warning(n_correct <- rsdt_mafc(7, c(10, 20, 30, 40), m = c(2, 5), d = c(15, 15, -15)))
+  expect_equal(n_correct, c(10, 20, 0, 40, 10, 0, 30))
 })
 
 # category proportions of a group against the reference probabilities
@@ -342,16 +369,25 @@ test_that("rsdt_dpsdt() pairs recollection with the rating parameters per draw",
   stimulus <- c(0, 1, 1)
   Ro <- c(0.2, 0.5, 0.3)
   Rn <- c(0, 0.2, 0.1)
+  sdratio <- c(0.6, 1.5, 2)
   n_trials <- 100
   n <- 1500
   g <- group_of(n, 3)
-  counts <- rsdt_dpsdt(n, n_trials, stimulus, d, thresholds = thr3, Ro = Ro, Rn = Rn)
+  counts <- rsdt_dpsdt(n, n_trials, stimulus, d, thresholds = thr3, Ro = Ro, Rn = Rn, sdratio = sdratio)
   for (k in 1:3) {
-    p <- sdt_category_probs(d[k], thr3[k, ], stimulus[k])
+    p <- sdt_category_probs(d[k], thr3[k, ], stimulus[k], sdratio[k])
     # recollection loads the most confident category of the stimulus
     probs <- if (stimulus[k] == 1) (1 - Ro[k]) * p + Ro[k] * unit_counts(4, 4) else (1 - Rn[k]) * p + Rn[k] * unit_counts(1, 4)
     expect_category_props(counts[g == k, ], n_trials, probs)
   }
+  # n not a multiple of the parameter lengths: draw i takes element i;
+  # thresholds far above the familiarity put a response in category 1, far
+  # below in category 4, and recollection with probability 1 moves it to 4
+  counts <- NULL
+  expect_no_warning(counts <- rsdt_dpsdt(7, c(10, 20, 30, 40), 1, d = 1,
+                                         thresholds = rbind(c(20, 21, 22), c(-22, -21, -20)), Ro = c(0, 1, 0)))
+  expect_equal(max.col(counts), c(1L, 4L, 1L, 4L, 4L, 4L, 1L))
+  expect_equal(counts[cbind(1:7, max.col(counts))], c(10, 20, 30, 40, 10, 20, 30))
 })
 
 test_that("rsdt_metad() pairs metacognitive sensitivity with the rating parameters per draw", {
@@ -360,19 +396,29 @@ test_that("rsdt_metad() pairs metacognitive sensitivity with the rating paramete
   metad <- c(0.5, 1.5, 1)
   # not a palindrome, so a reversed pairing is visible
   stimulus <- c(0, 1, 1)
+  sdratio <- c(1.4, 1, 0.7)
   n_trials <- 100
   n <- 1500
   g <- group_of(n, 3)
-  counts <- rsdt_metad(n, n_trials, stimulus, d, thresholds = thr3, metad = metad)
+  counts <- rsdt_metad(n, n_trials, stimulus, d, thresholds = thr3, metad = metad, sdratio = sdratio)
   for (k in 1:3) {
     probs <- vapply(1:4, function(j) {
-      dsdt_metad(unit_counts(j, 4), stimulus[k], d[k], thr3[k, ], metad = metad[k])
+      dsdt_metad(unit_counts(j, 4), stimulus[k], d[k], thr3[k, ], metad = metad[k], sdratio = sdratio[k])
     }, numeric(1))
     expect_category_props(counts[g == k, ], n_trials, probs)
   }
+  # n not a multiple of the parameter lengths: draw i takes element i. With
+  # d = 20 and thresholds (-10, 10, 60), metad = 20 leaves the thresholds in
+  # place (signal in category 3, noise in 2); metad = 150 moves them up by
+  # (150 - 20) / 2 = 65 in the meta-d' space (signal in 4, noise in 1)
+  counts <- NULL
+  expect_no_warning(counts <- rsdt_metad(7, c(30, 50), stimulus = c(1, 1, 0, 1), d = 20, thresholds = c(-10, 10, 60),
+                                         metad = c(20, 150, 20)))
+  expect_equal(max.col(counts), c(3L, 4L, 2L, 3L, 4L, 3L, 2L))
+  expect_equal(counts[cbind(1:7, max.col(counts))], c(30, 50, 30, 50, 30, 50, 30))
 })
 
-test_that("rsdt_ranking() pairs sensitivity and set size per draw", {
+test_that("rsdt_ranking() pairs sensitivity, set size and variance ratio per draw", {
   withr::local_seed(4445)
   d <- c(0.8, 1.5, 1)
   m <- c(2, 4, 3)
@@ -390,27 +436,72 @@ test_that("rsdt_ranking() pairs sensitivity and set size per draw", {
     }, numeric(1))
     expect_category_props(counts[g == k, seq_len(m[k])], n_trials, probs)
   }
+  # the variance ratio acts under normal noise only; with two items the target
+  # is ranked first with probability pnorm(d / sqrt(2)) whatever the ratio
+  sdratio <- c(0.6, 1.5, 2)
+  counts <- rsdt_ranking(n, n_trials, m, d, sdratio = sdratio, dist = "normal")
+  p_first <- pnorm(d[1] / sqrt(2))
+  expect_mean_near(counts[g == 1, 1] / n_trials, p_first, se_prop(p_first, n_trials * sum(g == 1)))
+  for (k in 2:3) {
+    probs <- vapply(seq_len(m[k]), function(j) {
+      dsdt_ranking(unit_counts(j, m[k]), m[k], d[k], sdratio = sdratio[k], dist = "normal")
+    }, numeric(1))
+    expect_category_props(counts[g == k, seq_len(m[k])], n_trials, probs)
+  }
+  # n not a multiple of the parameter lengths: draw i takes element i, and a
+  # sensitivity of +-20 ranks the target first or last (rank m)
+  for (dist in c("gumbel_min", "normal")) {
+    counts <- NULL
+    expect_no_warning(counts <- rsdt_ranking(7, c(10, 20, 30, 40), m = c(2, 4), d = c(20, 20, -20), dist = dist))
+    expect_equal(max.col(counts), c(1L, 1L, 2L, 1L, 1L, 4L, 1L))
+    expect_equal(counts[cbind(1:7, max.col(counts))], c(10, 20, 30, 40, 10, 20, 30))
+  }
 })
 
-test_that("rsdt_cdp() pairs familiarity, recollection, criterion and thresholds per draw", {
+test_that("rsdt_cdp() pairs familiarity, recollection, criteria, correlation and thresholds per draw", {
   withr::local_seed(4445)
   dfam <- c(0.8, 1.2, 0.5)
   drec <- c(1, 0.5, 1.5)
   rcrit <- c(0.5, 0.3, 0.7)
+  kcrit <- c(0.3, -0.4, 0.8)
+  sigmar <- c(0.4, 0, -0.3)
+  rho <- c(0.5, 0, -0.4)
   # not a palindrome, so a reversed pairing is visible
   stimulus <- c(0, 1, 1)
   thr5 <- rbind(c(-1.1, -0.5, 0, 0.6, 1.3), c(-1, -0.4, 0.1, 0.7, 1.4), c(-1.2, -0.6, -0.1, 0.5, 1.2))
   n_trials <- 100
   n <- 900
   g <- group_of(n, 3)
-  counts <- rsdt_cdp(n, n_trials, stimulus, dfam, drec, thresholds = thr5, rcrit = rcrit, n_new = 3)
+  # remember/know, then remember/know/guess
+  counts <- rsdt_cdp(n, n_trials, stimulus, dfam, drec, thresholds = thr5, rcrit = rcrit, sigmar = sigmar,
+                     rho = rho, n_new = 3)
   expect_equal(dim(counts), c(n, 9))
   for (k in 1:3) {
     probs <- vapply(1:9, function(j) {
-      dsdt_cdp(unit_counts(j, 9), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], n_new = 3)
+      dsdt_cdp(unit_counts(j, 9), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], sigmar = sigmar[k],
+               rho = rho[k], n_new = 3)
     }, numeric(1))
     expect_category_props(counts[g == k, ], n_trials, probs)
   }
+  counts <- rsdt_cdp(n, n_trials, stimulus, dfam, drec, thresholds = thr5, rcrit = rcrit, kcrit = kcrit,
+                     sigmar = sigmar, rho = rho, n_new = 3)
+  expect_equal(dim(counts), c(n, 12))
+  for (k in 1:3) {
+    probs <- vapply(1:12, function(j) {
+      dsdt_cdp(unit_counts(j, 12), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], kcrit = kcrit[k],
+               sigmar = sigmar[k], rho = rho[k], n_new = 3)
+    }, numeric(1))
+    expect_category_props(counts[g == k, ], n_trials, probs)
+  }
+  # n not a multiple of the parameter lengths: draw i takes element i. Far low
+  # thresholds under a strong familiarity make every response the most
+  # confident "old": remember (column 12) at rcrit -20, else know (9) at
+  # kcrit 20 and guess (6) at kcrit 40
+  counts <- NULL
+  expect_no_warning(counts <- rsdt_cdp(7, c(30, 50), 1, dfam = 30, drec = 0, thresholds = c(-28, -27, -26, -25, -24),
+                                       rcrit = c(50, -20, 50), kcrit = c(20, 40, 40, 20), n_new = 3))
+  expect_equal(max.col(counts), c(9L, 12L, 6L, 9L, 12L, 6L, 6L))
+  expect_equal(counts[cbind(1:7, max.col(counts))], c(30, 50, 30, 50, 30, 50, 30))
 })
 
 # --- empty observations ---------------------------------------------------------
