@@ -94,6 +94,7 @@ specified with:\tabular{ll}{
    \code{\link[=sdt_mafc]{sdt_mafc()}} \tab \code{n_trials}; \code{m} when it names a column \cr
    \code{\link[=sdt_ranking]{sdt_ranking()}} \tab \code{n_trials}; \code{m} when it names a column \cr
    \code{\link[=sdt_rating]{sdt_rating()}}, \code{\link[=sdt_cdp]{sdt_cdp()}} \tab \code{stimulus}, \code{n_trials} \cr
+   \code{\link[=psychometric_function]{psychometric_function()}} \tab \code{intensity}; \code{n_trials} when it names a column (else each row is one 0/1 trial); \code{guess} and \code{lapse} when they name columns \cr
 }
 
 
