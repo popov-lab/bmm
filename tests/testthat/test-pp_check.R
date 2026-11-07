@@ -584,6 +584,7 @@ test_that("pp_check(group = ) takes a user predictor named n_* or Idx_* on a mul
 })
 
 test_that("pp_check(group = ) refuses every column bmm builds on a multinomial fit", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   built <- list(
     rating = list(fit = mock_rating_user_columns_fit(), columns = "nTrials"),
     mpt = list(
