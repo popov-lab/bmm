@@ -423,6 +423,82 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   vectorize.args = c("mu", "c", "kappa", "lower", "upper")
 )
 
+#' @title Distribution functions for the Signal Discrimination Model of change
+#'   detection (sdm_cd)
+#'
+#' @description Probability and random generation for single-probe change
+#'   detection when memory is the Signal Discrimination Model: the observer
+#'   retrieves a feature from the SDM density of [sdm()] and compares it with
+#'   the probe, following the decision rule of Lin and Oberauer (2022). See
+#'   [sdm_cd()].
+#'
+#' @name sdm_cd_dist
+#'
+#' @param response Vector of responses, 0 = "same" and 1 = "change"
+#' @param n Number of observations to generate data for
+#' @param probe Vector of probes in radians, relative to the target (the probe
+#'   minus the feature shown at the probed location)
+#' @param mu Vector of locations of memory relative to the target
+#' @param c Vector of memory strength values, in the "sqrtexp" parametrization
+#'   that [sdm()] and [sdm_cd()] use
+#' @param kappa Vector of precision values
+#' @param criterion Vector of decision criteria, on the scale of the model
+#'   parameter: 0, the default, is the unbiased observer, and other values are
+#'   kept inside each trial's range of evidence as in the model (see the
+#'   section "Decision criterion" of [sdm_cd()]).
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @details "Change" is the response when the retrieved feature falls outside
+#'   an arc around the probe, where the SDM density centred on the probe is
+#'   below `exp(-criterion) / (2 * pi)`. `dsdm_cd()` integrates the SDM density
+#'   over that arc. `rsdm_cd()` draws the remembered feature of every trial
+#'   with [rsdm()] and lets the observer decide on it, so it does not use
+#'   `dsdm_cd()`.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#'   Oberauer, K. (2023). Measurement models for visual working memory - A
+#'   factorial model comparison. Psychological Review, 130(3), 841-852.
+#'
+#' @return `dsdm_cd()` gives the probability of each response, and
+#'   `rsdm_cd()` random responses coded 0 ("same") and 1 ("change").
+#'
+#' @export
+#'
+#' @examples
+#' # P("change") grows with the distance of the probe from the target
+#' probe <- seq(0, pi, length.out = 50)
+#' plot(probe, dsdm_cd(1, probe, c = 5, kappa = 4), type = "l", ylab = "P(change)")
+#' mean(rsdm_cd(1000, probe = 1, c = 5, kappa = 4))
+dsdm_cd <- function(response, probe, mu = 0, c = 3, kappa = 3.5, criterion = 0,
+                    log = FALSE) {
+  .check_sdm_args(c, kappa, "sqrtexp")
+  stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
+  args <- .circmix_recycle(
+    response = response, probe = probe, mu = mu, c = c, kappa = kappa,
+    criterion = criterion
+  )
+  p_same <- .sdm_cd_psame(args$probe, args$mu, args$c, args$kappa, args$criterion)
+  out <- .cd_bernoulli_ld(args$response, p_same)
+  if (log) out else exp(out)
+}
+
+#' @rdname sdm_cd_dist
+#' @export
+rsdm_cd <- function(n, probe, mu = 0, c = 3, kappa = 3.5, criterion = 0) {
+  .check_sdm_args(c, kappa, "sqrtexp")
+  stopif(
+    length(n) != 1 || !is.numeric(n) || is.na(n) || n < 1 || n != round(n),
+    "n must be a single positive whole number."
+  )
+  recycle <- function(x) rep_len(x, n)
+  .sdm_cd_observe(recycle(probe), recycle(mu), recycle(c), recycle(kappa), recycle(criterion))
+}
+
 
 #' @title Distribution functions for the two-parameter mixture model (mixture2p)
 #'
