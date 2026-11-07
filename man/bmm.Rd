@@ -129,6 +129,7 @@ Continuous reproduction
 \item mixture2p(): Two-Parameter Mixture Model
 \item mixture3p(): Three-Parameter Mixture Model
 \item sdm(): Signal Discrimination Model (SDM)
+\item tcc(): Target Confusability Competition (TCC) model
 }
 
 Categorical recall and n-AFC decisions

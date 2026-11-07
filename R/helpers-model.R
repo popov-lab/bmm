@@ -502,6 +502,10 @@ response_annotations <- function(model) {
   if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
     return(list(response = "0/1 per trial; 1 = correct"))
   }
+  if (inherits(model, "tcc")) {
+    units <- model$other_vars$units %||% "radians"
+    return(list(resp_error = if (units == "bins") "option steps" else "radians in [-pi, pi]"))
+  }
   list()
 }
 
@@ -704,6 +708,10 @@ data_column_roles <- list(
     response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' response on one trial",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
     n_trials = "number of trials (left out for one row per trial)"
+  ),
+  tcc = c(
+    resp_error = "response error relative to the target, in radians or, with `units = \"bins\"`, in option steps",
+    similarity = NA
   )
 )
 
