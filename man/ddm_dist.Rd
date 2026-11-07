@@ -28,9 +28,34 @@ returned. From bmm 1.6.0 on the default is \code{FALSE}, as in base R
 and the other density functions of bmm. Pass \code{log} to get the same
 result in every version.}
 
-\item{n}{Number of random samples to generate}
+\item{n}{Number of random samples to generate. Until bmm 1.6.0, \code{n = 1}
+with parameter vectors still gives one draw per element, with a
+deprecation warning; pass the number of draws.}
 }
 \description{
 Density and random generation function for the Diffusion Decision Model.
 }
+\section{Vector arguments}{
+
+\itemize{
+\item \verb{r*(n, ...)} returns exactly \code{n} draws: a vector, or a data frame or matrix
+with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
+number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, or row \code{i} of a matrix. A
+shorter vector is repeated, also when \code{n} is not a multiple of its
+length.
+\item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
+\code{x} (its rows, when the observations are rows of counts) and the
+per-observation arguments, the others recycled to that length. Value \code{i}
+is what the call on the \code{i}-th elements alone returns. An empty vector
+of observations gives an empty result.
+\item A set of values that describes one observation, such as the \code{thresholds}
+of the rating models, is a vector when every observation shares it and a
+matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}.
+\item Configuration arguments such as \code{version}, \code{dist}, \code{log},
+\code{parametrization} and \code{n_new} are single values and are never recycled.
+}
+}
+
 \keyword{distribution}

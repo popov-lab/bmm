@@ -328,13 +328,13 @@ test_that("rsdm returns finite draws when the density peak overflows", {
   expect_lt(max(abs(y)), 0.05)
 })
 
-test_that("rejection_sampling takes arguments of length n per draw", {
+test_that(".rejection_sampling takes arguments of length n per draw", {
   withr::local_seed(445)
   n <- 20000
   group <- sample(rep(1:2, n / 2))
   shape <- c(1, 9)
   # Beta(shape, 1): density shape * x^(shape - 1) peaks at shape, mean shape / (shape + 1)
-  y <- rejection_sampling(
+  y <- .rejection_sampling(
     n,
     f = function(x, group, shape) shape[group] * x^(shape[group] - 1),
     max_f = shape[group],
@@ -348,7 +348,7 @@ test_that("rejection_sampling takes arguments of length n per draw", {
   }
 
   # with n = 1 every argument belongs to the single draw and is passed whole
-  expect_length(rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
+  expect_length(.rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
 })
 
 test_that("rejection_sampling validates n and max_f", {
@@ -366,8 +366,8 @@ test_that("rejection_sampling errors instead of looping forever", {
   withr::defer(setTimeLimit(elapsed = Inf))
   expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
   expect_error(rsdm(5, mu = NA), "NA")
-  expect_error(rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
-  expect_error(rejection_sampling(5, function(x) rep(1, length(x)), 1, function(n) rep(NA_real_, n)), "NA")
+  expect_error(.rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
+  expect_error(.rejection_sampling(5, function(x) rep(1, length(x)), 1, function(n) rep(NA_real_, n)), "NA")
 })
 
 test_that("conversion between sdm parametrizations works", {
