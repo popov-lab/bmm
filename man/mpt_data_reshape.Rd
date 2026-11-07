@@ -38,7 +38,9 @@ MPTinR and TreeBUGS take one row per participant and one column per
 response category of the EQN file. \code{\link[=bmm]{bmm()}} takes one row per participant
 and tree, a column naming the tree, and one count column per \emph{shared}
 response category (see \code{\link[=mpt]{mpt()}}). \code{mpt_data_reshape()} reshapes the first
-layout into the second for a given model.
+layout into the second for a given model. Data with one row per trial are
+long already and need no reshaping: name their column of response
+categories in \code{mpt(response = )}.
 }
 \details{
 \strong{Named columns (\code{columns = "names"}).} For a model from

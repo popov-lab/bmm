@@ -64,7 +64,7 @@
 #' | [mixture3p()] | `set_size` (if it names a column), `nt_features`, of which a row's first `set_size - 1` are read |
 #' | [imm()] | as [mixture3p()], plus `nt_distances` for the versions `"full"` and `"bsc"` |
 #' | [m3()] | `n_trials`, the number of trials of each row; `num_options` when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) |
-#' | [mpt()] | `n_trials`; `tree_id` and `covariates` when the model has them |
+#' | [mpt()] | `n_trials` (none with `response`, one row per trial); `tree_id` and `covariates` when the model has them |
 #' | [ezdm()] | `n_trials` |
 #' | [sdt_yn()] | `stimulus`, `n_trials` |
 #' | [sdt_mafc()] | `n_trials`; `m` when it names a column |
