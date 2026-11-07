@@ -53,8 +53,12 @@ test_that("model_spec() returns the contract fields for every model and version"
     expect_identical(names(spec$functions), c("density", "generator"), label = label)
 
     pars <- spec$parameters
+    # `link` is what bmmtools hands to link_transform(); a name-only check let
+    # a wrong link pass
     for (par in names(model$links)) {
       expect_identical(sum(pars$parameter == par), 1L, label = paste(label, par))
+      expect_identical(pars$link[pars$parameter == par], model$links[[par]],
+                       label = paste(label, par, "link"))
     }
     expect_identical(pars$parameter, names(model$parameters) %||% character(0), label = label)
     for (par in intersect(names(model$fixed_parameters), pars$parameter)) {
@@ -65,6 +69,15 @@ test_that("model_spec() returns the contract fields for every model and version"
     expect_true(all(is.na(pars$value[!pars$fixed])), label = label)
     expect_identical(spec$default_priors$parameter, names(model$default_priors) %||% character(0),
                      label = label)
+    # a reader joins init_ranges to parameters, so brms plumbing such as `mu`
+    # must not appear in one and not the other
+    expect_true(all(spec$init_ranges$parameter %in% pars$parameter),
+                label = paste(label, "init_ranges within parameters"))
+    # other_vars is "the arguments the model was created with"; constructor
+    # bookkeeping would become a contract item under ADR 0005
+    alias <- sub("^\\.model_", "", sub("\\(.*$", "", label))
+    expect_true(all(names(spec$other_vars) %in% names(formals(get(alias, envir = asNamespace("bmm"))))),
+                label = paste(label, "other_vars within the arguments of", alias))
 
     exports <- getNamespaceExports("bmm")
     for (fun in Filter(Negate(is.na), spec$functions)) {
@@ -87,6 +100,18 @@ test_that("model_spec() states each model's density and generator", {
                    c(density = "dezdm", generator = "rezdm"))
   expect_identical(functions(imm("y", "nt", "d", 4, version = "abc")),
                    c(density = "dimm", generator = "rimm"))
+})
+
+test_that("model_spec() gives the data columns of the version, not of the model", {
+  columns <- function(model) model_spec(model)$data_columns
+  expect_identical(columns(imm("y", "nt", "d", 4, version = "abc"))$argument,
+                   c("resp_error", "nt_features", "set_size"))
+  expect_identical(columns(imm("y", "nt", "d", 4, version = "full"))$argument,
+                   c("resp_error", "nt_features", "nt_distances", "set_size"))
+  ezdm_columns <- columns(ezdm("m", "v", "u", "n", version = "4par"))
+  expect_identical(ezdm_columns$argument, c("mean_rt", "var_rt", "n_upper", "n_trials"))
+  expect_identical(ezdm_columns$role[ezdm_columns$argument == "mean_rt"],
+                   "mean response time in seconds, one column per boundary (upper, lower)")
 })
 
 test_that("model_spec() round-trips through JSON", {
@@ -176,14 +201,34 @@ test_that("model_spec() returns empty tables where a model declares nothing", {
 })
 
 test_that("model_spec() of a fit adds the bmm version the fit was made with", {
-  # the fixture predates the `functions` field, which comes from the
-  # constructor of the current version
+  # the fixture predates the `functions` field and the #554 vocabulary; both
+  # are bmm's, not the fit's, so they come from the installed constructor,
+  # while the parameters stay what the fit was made with
   fit <- load_fixture_fit("bmmfit_mixture3p.rds")
   spec <- model_spec(fit)
   expect_identical(names(spec), c(spec_fields, "bmm_version"))
   expect_identical(spec$bmm_version, "1.4.1.9000")
+  expect_identical(spec$name, "Three-Parameter Mixture Model")
+  expect_identical(spec$domain, "Working memory")
+  expect_identical(spec$task, "Continuous reproduction")
   expect_identical(spec$functions, list(density = "dmixture3p", generator = "rmixture3p"))
   expect_identical(spec$parameters$parameter, c("mu1", "kappa", "thetat", "thetant"))
+})
+
+test_that("model_spec() lists only the constructor's arguments in other_vars", {
+  # mpt() stores its indicator matrices and the raw simplex next to its
+  # arguments; sdt_yn() a trial_level flag; sdt_cdp() integer codes of dist
+  # and threshold_type
+  expect_identical(names(model_spec(.model_mpt())$other_vars),
+                   c("tree_id", "covariates", "trees", "simplex", "restrictions"))
+  expect_identical(names(model_spec(sdt_yn("r", "s"))$other_vars), c("stimulus", "n_trials", "dist"))
+  expect_false(any(c("dist_int", "thresh_type_int") %in% names(model_spec(.model_sdt_cdp())$other_vars)))
+})
+
+test_that("model_spec() lists init ranges only for the parameters it declares", {
+  # ddm() draws an initial value for `mu` too, which parameters leaves out
+  # as brms plumbing
+  expect_identical(model_spec(ddm("rt", "resp"))$init_ranges$parameter, c("drift", "bound", "ndt", "zr"))
 })
 
 test_that("model_spec() gives the expressions of mpt() trees as strings", {

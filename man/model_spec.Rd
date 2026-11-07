@@ -36,7 +36,10 @@ parameter on the link scale, else \code{NA}), \code{alternative_group} (the
 parameters of which a formula may use only one, joined by \code{"|"}, such
 as \code{"criterion|bias"}, else \code{NA}) and \code{softmax} (\code{TRUE} for mixture
 weights that are transformed together through a softmax, whose
-\code{link} then does not apply on its own).}
+\code{link} then does not apply on its own). For \code{\link[=m3]{m3()}} with
+\code{version = "custom"} the formula defines the parameters, so the
+specification of the constructor lists \code{b} only and the
+specification of a fit lists them all.}
 \item{\code{default_priors}}{A data frame with the columns \code{parameter},
 \code{main}, \code{effects} and \code{sd}: the default prior on a parameter's
 intercept, on its other regression coefficients, and on its random
@@ -45,9 +48,12 @@ effect standard deviations, as Stan strings.}
 and \code{upper}: the range initial values are drawn from, on the native
 scale (softmax weights on the sampling scale). It has no rows for
 models that build their initial values otherwise (\code{\link[=m3]{m3()}}, \code{\link[=mpt]{mpt()}}).}
-\item{\code{resp_vars}, \code{other_vars}}{Named lists of the arguments the model
-was created with: the response variables, and the other variables
-and settings.}
+\item{\code{resp_vars}, \code{other_vars}}{Named lists of the arguments of the
+model's constructor, as the model was created with them: the
+response variables, and the other variables and settings. Values the
+constructor stores beyond its arguments are not listed. Expressions
+in them, such as the branches of \code{\link[=mpt]{mpt()}} trees, are given as
+strings.}
 \item{\code{data_columns}}{A data frame with the columns \code{argument} and
 \code{role}: what the data column named by each argument of the
 constructor must hold.}
@@ -58,11 +64,17 @@ constructor must hold.}
 until bmm 1.6.0 fixes it as \code{"1.0"}.}
 }
 For a \code{bmmfit} the list ends with one more element, \code{bmm_version}: the
-version of bmm the model was fitted with.
+version of bmm the model was fitted with. Its \code{name}, \code{domain} and \code{task}
+are those of the installed bmm (the vocabulary of \code{\link[=bmm_models]{bmm_models()}}); the
+rest is what the fit was built with.
 
 Every element is a character, logical or numeric vector, a data frame, or
-a list of these, so the list converts to JSON as it is, for example with
-\code{jsonlite::toJSON(spec, auto_unbox = TRUE)}.
+a list of these, so the list converts to JSON as it is. \code{citation},
+\code{domain}, \code{task} and the entries of \code{resp_vars} and \code{other_vars} are
+vectors, which \code{auto_unbox = TRUE} writes as a single value when they
+have one element and as an array otherwise. An \code{NA} in a data frame row
+drops the key unless \code{na = "null"} is given. Use
+\code{jsonlite::toJSON(spec, auto_unbox = TRUE, na = "null")}.
 }
 \description{
 \code{model_spec()} returns everything bmm states about a model in

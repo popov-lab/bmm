@@ -19,6 +19,7 @@
 <!-- Contract items that change in 1.5.0 (ADR 0005 announcement rule). Filled by the pull request that lands each change. -->
 <!-- `mu1` -> `mu` in mixture2p, mixture3p and imm (#434, #590) -->
 <!-- `pnt` -> `ptarget` = P(target | memory) in mixture3p and imm (#434, #590) -->
+* `model_spec()` is the model contract of ADR 0005, at contract version 0.9 (`"1.0"` in bmm 1.6.0). bmmtools and bmm-explorer read it from this release on. A later change to a field it returns is announced under this heading (#633).
 
 ### Deprecated functions and arguments
 <!-- Nothing deprecated in 1.5.0 yet. Announcements of removals scheduled for 1.6.0: -->

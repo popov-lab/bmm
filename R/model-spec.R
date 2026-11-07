@@ -28,7 +28,10 @@
 #'       parameters of which a formula may use only one, joined by `"|"`, such
 #'       as `"criterion|bias"`, else `NA`) and `softmax` (`TRUE` for mixture
 #'       weights that are transformed together through a softmax, whose
-#'       `link` then does not apply on its own).}
+#'       `link` then does not apply on its own). For [m3()] with
+#'       `version = "custom"` the formula defines the parameters, so the
+#'       specification of the constructor lists `b` only and the
+#'       specification of a fit lists them all.}
 #'     \item{`default_priors`}{A data frame with the columns `parameter`,
 #'       `main`, `effects` and `sd`: the default prior on a parameter's
 #'       intercept, on its other regression coefficients, and on its random
@@ -37,10 +40,12 @@
 #'       and `upper`: the range initial values are drawn from, on the native
 #'       scale (softmax weights on the sampling scale). It has no rows for
 #'       models that build their initial values otherwise ([m3()], [mpt()]).}
-#'     \item{`resp_vars`, `other_vars`}{Named lists of the arguments the model
-#'       was created with: the response variables, and the other variables
-#'       and settings. Expressions in them, such as the branches of [mpt()]
-#'       trees, are given as strings.}
+#'     \item{`resp_vars`, `other_vars`}{Named lists of the arguments of the
+#'       model's constructor, as the model was created with them: the
+#'       response variables, and the other variables and settings. Values the
+#'       constructor stores beyond its arguments are not listed. Expressions
+#'       in them, such as the branches of [mpt()] trees, are given as
+#'       strings.}
 #'     \item{`data_columns`}{A data frame with the columns `argument` and
 #'       `role`: what the data column named by each argument of the
 #'       constructor must hold.}
@@ -51,11 +56,17 @@
 #'       until bmm 1.6.0 fixes it as `"1.0"`.}
 #'   }
 #'   For a `bmmfit` the list ends with one more element, `bmm_version`: the
-#'   version of bmm the model was fitted with.
+#'   version of bmm the model was fitted with. Its `name`, `domain` and `task`
+#'   are those of the installed bmm (the vocabulary of [bmm_models()]); the
+#'   rest is what the fit was built with.
 #'
 #'   Every element is a character, logical or numeric vector, a data frame, or
-#'   a list of these, so the list converts to JSON as it is, for example with
-#'   `jsonlite::toJSON(spec, auto_unbox = TRUE)`.
+#'   a list of these, so the list converts to JSON as it is. `citation`,
+#'   `domain`, `task` and the entries of `resp_vars` and `other_vars` are
+#'   vectors, which `auto_unbox = TRUE` writes as a single value when they
+#'   have one element and as an array otherwise. An `NA` in a data frame row
+#'   drops the key unless `na = "null"` is given. Use
+#'   `jsonlite::toJSON(spec, auto_unbox = TRUE, na = "null")`.
 #'
 #' @section Stability: The specification is the stable surface of a bmm model
 #'   for other packages (decision record 0005, "The model contract for
@@ -95,9 +106,9 @@ model_spec.bmmodel <- function(x, ...) {
       citation = as.character(x$citation),
       parameters = spec_parameters(x),
       default_priors = spec_default_priors(x$default_priors),
-      init_ranges = spec_init_ranges(x$init_ranges),
+      init_ranges = spec_init_ranges(x$init_ranges, names(x$parameters)),
       resp_vars = plain_data(named_list(x$resp_vars)),
-      other_vars = plain_data(named_list(x$other_vars)),
+      other_vars = plain_data(named_list(spec_other_vars(x))),
       data_columns = spec_data_columns(x),
       functions = list(
         density = x$functions$density %||% NA_character_,
@@ -113,8 +124,13 @@ model_spec.bmmodel <- function(x, ...) {
 #' @export
 model_spec.bmmfit <- function(x, ...) {
   model <- restructure(x)$bmm$model
-  # fits made before bmm 1.5.0 carry a model object without `functions`
-  model$functions <- model$functions %||% current_constructor(model)$functions
+  current <- current_constructor(model)
+  # name, domain and task are bmm's vocabulary (#554), not a property of the
+  # fit; fits made before bmm 1.5.0 carry a model object without `functions`
+  if (!is.null(current)) {
+    model[c("name", "domain", "task")] <- current[c("name", "domain", "task")]
+  }
+  model$functions <- model$functions %||% current$functions
   spec <- model_spec(model)
   spec$bmm_version <- as.character(x$version$bmm)
   spec
@@ -165,7 +181,10 @@ spec_default_priors <- function(priors) {
   )
 }
 
-spec_init_ranges <- function(ranges) {
+# `mu` of the response-time models has an init range but is brms plumbing,
+# not a declared parameter
+spec_init_ranges <- function(ranges, pars) {
+  ranges <- ranges[intersect(names(ranges), pars)]
   data.frame(
     parameter = names(ranges) %||% character(0),
     lower = vapply(ranges, `[`, 0, 1, USE.NAMES = FALSE),
@@ -173,9 +192,26 @@ spec_init_ranges <- function(ranges) {
   )
 }
 
+# NA for a model registered by another package
+spec_model_name <- function(model) {
+  intersect(rev(class(model)), model_names())[1]
+}
+
+# constructors store bookkeeping next to their arguments (mpt() its indicators,
+# sdt_cdp() integer codes); only the arguments are contract items. A model of
+# another package has no constructor here, so its entries are kept as stored.
+spec_other_vars <- function(model) {
+  name <- spec_model_name(model)
+  if (is.na(name)) {
+    model$other_vars
+  } else {
+    model$other_vars[intersect(names(model$other_vars), names(formals(get_model2(name))))]
+  }
+}
+
 # a model registered by another package has no row in data_column_roles
 spec_data_columns <- function(model) {
-  name <- intersect(rev(class(model)), model_names())[1]
+  name <- spec_model_name(model)
   roles <- if (is.na(name)) NULL else column_roles(name, model$version)
   roles <- roles[!is.na(roles)]
   data.frame(argument = names(roles) %||% character(0), role = unname(roles) %||% character(0))
