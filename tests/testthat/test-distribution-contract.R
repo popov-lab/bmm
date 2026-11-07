@@ -4,11 +4,13 @@
 # argument, value i from the i-th elements alone. Every r*() pairing test
 # interleaves parameter groups and compares each group with a reference
 # outside the function's own code (a closed form, quadrature, or the single-
-# trial density of the matching d*()). The mutants in local/reviews/444a/
-# (vector reversed, recycling removed, one group shifted) record which of them
-# each test catches; a Monte Carlo test is not expected to see a 10 % shift.
-# Non-multiple lengths recycle silently, as rnorm() does; the cswald tests use
-# multiples only until #406 lands. The circular mixtures are circmix's (#434).
+# trial density of the matching d*()). Mutants of the samplers (vector
+# reversed, recycling removed, one group shifted 10 %) were run against these
+# tests when they were written; a Monte Carlo test is not expected to see a
+# 10 % shift, so each sampler also gets a deterministic check with n not a
+# multiple of the parameter length. Non-multiple lengths recycle silently, as
+# rnorm() does; the cswald tests use multiples only until #406 lands. The
+# circular mixtures are circmix's (#434).
 
 pick <- function(x, i) {
   if (is.matrix(x)) x[(i - 1) %% nrow(x) + 1, ] else x[(i - 1) %% length(x) + 1]
@@ -62,7 +64,6 @@ test_that("dsdm() recycles x and the parameters to the longest argument", {
 })
 
 test_that("rsdm() draws each observation from its own location, strength and precision", {
-  skip_on_cran()
   withr::local_seed(4441)
   mu <- c(-2, 0, 2)
   c_ <- c(2, 4, 3)
@@ -77,7 +78,11 @@ test_that("rsdm() draws each observation from its own location, strength and pre
     obs <- cos(x[g == k] - mu[k])
     expect_mean_near(obs, ref, sd(obs) / sqrt(length(obs)))
   }
-  expect_no_warning(expect_length(rsdm(5, mu = c(0, 1), c = 3, kappa = 3), 5))
+  # n not a multiple of the parameter length: draw i takes element i, and a
+  # sharp density puts every draw on its location's side of zero
+  x <- NULL
+  expect_no_warning(x <- rsdm(5, mu = c(-2, 2), c = 10, kappa = 500))
+  expect_equal(sign(x), rep_len(c(-1, 1), 5))
 })
 
 test_that("rejection_sampling() is deprecated and still samples", {
@@ -102,7 +107,6 @@ test_that("dddm() recycles the observations and the parameters to the longest ar
 })
 
 test_that("rddm() returns n draws, draw i from the i-th parameter elements", {
-  skip_on_cran()
   withr::local_seed(4442)
   drift <- c(0.5, 2, 1)
   bound <- c(1, 1.5, 2)
@@ -119,8 +123,10 @@ test_that("rddm() returns n draws, draw i from the i-th parameter elements", {
     expect_mean_near(rows$response, p_up, se_prop(p_up, nrow(rows)))
     expect_mean_near(rows$rt, ndt[k] + wiener_mean_dt(drift[k], bound[k], z), sd(rows$rt) / sqrt(nrow(rows)))
   }
-  expect_equal(nrow(rddm(5, drift = c(1, 2), bound = 1, ndt = 0.2)), 5)
   expect_equal(nrow(rddm(2, drift = c(1, 2, 3), bound = 1, ndt = 0.2)), 2)
+  # n not a multiple of the parameter length: draw i takes element i, and a
+  # strong drift decides the boundary
+  expect_equal(rddm(7, drift = c(8, -8, 8), bound = 1, ndt = 0.2)$response, rep_len(c(1, 0, 1), 7))
 })
 
 test_that("rddm(1, <vectors>) keeps one draw per element until 1.6.0, with a warning", {
@@ -141,7 +147,6 @@ test_that("dcswald() recycles the observations and the parameters to the longest
 })
 
 test_that("rcswald() returns n draws, draw i from the i-th parameter elements", {
-  skip_on_cran()
   withr::local_seed(4443)
   drift <- c(0.5, 2, 1)
   bound <- c(1, 1.5, 2)
@@ -177,7 +182,6 @@ test_that("dezdm() recycles the summary statistics and the parameters to the lon
 })
 
 test_that("rezdm() returns n draws, draw i from the i-th parameter elements", {
-  skip_on_cran()
   withr::local_seed(4444)
   drift <- c(1, 2, 0.5)
   bound <- c(1, 1.5, 2)
@@ -200,7 +204,6 @@ test_that("rezdm() returns n draws, draw i from the i-th parameter elements", {
 })
 
 test_that("rezdm(version = '4par') pairs the start point and both boundary means per draw", {
-  skip_on_cran()
   withr::local_seed(4444)
   drift <- c(0.5, 1, 0.8)
   bound <- c(1, 1.2, 1.5)
@@ -284,6 +287,10 @@ test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus p
     p_old <- pnorm((d[k] * sqrt((1 + sdratio[k]^2) / 2) * stimulus[k] - criterion[k]) / sdratio[k]^stimulus[k])
     expect_mean_near(n_old[g == k] / n_trials[k], p_old, se_prop(p_old, n_trials[k] * sum(g == k)))
   }
+  # n not a multiple of the parameter length: draw i takes element i, and a
+  # criterion far from the signal mean makes every response certain
+  expect_no_warning(n_old <- rsdt_yn(7, 100, 1, d = 10, criterion = c(-5, 15, -5)))
+  expect_equal(n_old, rep_len(c(100L, 0L, 100L), 7))
 })
 
 test_that("rsdt_mafc() pairs sensitivity and the number of alternatives per draw", {
@@ -322,6 +329,10 @@ test_that("rsdt_rating() pairs sensitivity, stimulus, thresholds and variance ra
   for (k in 1:3) {
     expect_category_props(counts[g == k, ], n_trials, sdt_category_probs(d[k], thr3[k, ], stimulus[k], sdratio[k]))
   }
+  # n not a multiple of the threshold rows: row i takes threshold row i, and
+  # thresholds far from the mean put every response in one category
+  counts <- rsdt_rating(7, 100, 1, d = 0, thresholds = rbind(c(-9, -8, -7), c(7, 8, 9), c(-9, 8, 9)))
+  expect_equal(max.col(counts), rep_len(c(4L, 1L, 2L), 7))
 })
 
 test_that("rsdt_dpsdt() pairs recollection with the rating parameters per draw", {
@@ -382,7 +393,6 @@ test_that("rsdt_ranking() pairs sensitivity and set size per draw", {
 })
 
 test_that("rsdt_cdp() pairs familiarity, recollection, criterion and thresholds per draw", {
-  skip_on_cran()
   withr::local_seed(4445)
   dfam <- c(0.8, 1.2, 0.5)
   drec <- c(1, 0.5, 1.5)

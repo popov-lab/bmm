@@ -16,8 +16,8 @@
 #' - `d*(x, ...)` returns one value per observation: as many as the longest of
 #'   `x` (its rows, when the observations are rows of counts) and the
 #'   per-observation arguments, the others recycled to that length. Value `i`
-#'   is what the call on the `i`-th elements alone returns. An empty `x`
-#'   gives an empty result.
+#'   is what the call on the `i`-th elements alone returns. An empty vector
+#'   of observations gives an empty result.
 #' - A set of values that describes one observation, such as the `thresholds`
 #'   of the rating models, is a vector when every observation shares it and a
 #'   matrix with one row per observation otherwise: row `i` belongs to
@@ -226,13 +226,18 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   .dsdm_numer <- .sdm_numer(parametrization)
 
   n <- .obs_length(x, mu, c, kappa)
+  if (n == 0L) return(numeric(0))
   x <- rep_len(x, n)
-  # scalar parameters keep the single normalising integral
+  # one normalising integral per distinct parameter set: a long x over a short
+  # parameter vector pays for the sets it cycles through, not for every element
   denom <- if (any(lengths(list(mu, c, kappa)) > 1)) {
     mu <- rep_len(mu, n)
     c <- rep_len(c, n)
     kappa <- rep_len(kappa, n)
-    .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
+    set <- sprintf("%.17g,%.17g,%.17g", mu, c, kappa)
+    first <- !duplicated(set)
+    .dsdm_integrate_numer_v(.dsdm_numer, mu[first], c[first], kappa[first],
+                            lower = mu[first], upper = mu[first] + pi)[match(set, set[first])]
   } else {
     .dsdm_integrate_numer(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
   }
@@ -290,7 +295,10 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @export
 rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   .check_sdm_args(c, kappa, parametrization)
-  stopif(length(n) > 1, "n must be a single integer")
+  stopif(
+    !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
+    "n must be a single positive whole number."
+  )
   .dsdm_numer <- .sdm_numer(parametrization)
 
   # compare to the peak on the log scale: the unnormalized density itself
@@ -1589,6 +1597,7 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
   )
 
   n <- .obs_length(rt, drift, bound, ndt, zr)
+  if (n == 0L) return(numeric(0))
   bound <- rep_len(bound, n)
   zr <- rep_len(zr, n)
   out <- rtdists::ddiffusion(
@@ -1606,7 +1615,7 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
 #' @name ddm_dist
 #' @export
 rddm <- function(n, drift, bound, ndt, zr = 0.5) {
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(length(n) != 1 || is.na(n) || n < 1, "n must be a single positive integer")
   max_len <- max(lengths(list(drift, bound, ndt, zr)))
   # until 1.6.0, n = 1 with parameter vectors still means one draw per element
   if (n == 1 && max_len > 1) {
@@ -3034,7 +3043,6 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
-  stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
   # %in% compares a factor as character, so the value check below passes and the
   # arithmetic in .sdt_eta() then returns a silent NA
   stopif(!is.numeric(stimulus) && !is.logical(stimulus),
@@ -3044,8 +3052,10 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
   n <- .obs_length(n_old, n_trials, stimulus, d, criterion, bias, sdratio)
+  if (n == 0L) return(numeric(0))
   n_old <- rep_len(n_old, n)
   n_trials <- rep_len(n_trials, n)
+  stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
   stimulus <- rep_len(stimulus, n)
   d <- rep_len(d, n)
   sdratio <- rep_len(sdratio, n)
@@ -3085,10 +3095,14 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  d <- rep_len(d, n)
+  sdratio <- rep_len(sdratio, n)
+  if (!is.null(criterion)) criterion <- rep_len(criterion, n)
+  if (!is.null(bias)) bias <- rep_len(bias, n)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)
 
-  eta <- .sdt_eta(d, criterion, stimulus, sdratio)
-  stats::rbinom(n, n_trials, exp(.sdt_log_p_old(eta, dist)))
+  eta <- .sdt_eta(d, criterion, rep_len(stimulus, n), sdratio)
+  stats::rbinom(n, rep_len(n_trials, n), exp(.sdt_log_p_old(eta, dist)))
 }
 
 
@@ -3338,6 +3352,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
 
   n <- .obs_length(counts, thr, stimulus, d, sdratio, Ro, Rn)
+  if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
@@ -3448,6 +3463,7 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
   stopif(any(counts < 0), "counts must be non-negative")
 
   n <- .obs_length(counts, thr, stimulus, d, metad, sdratio)
+  if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
@@ -3552,6 +3568,7 @@ dsdt_mafc <- function(n_correct, n_trials, m, d,
   stopif(any(m < 2), "m must be an integer >= 2")
 
   n <- .obs_length(n_correct, n_trials, m, d)
+  if (n == 0L) return(numeric(0))
   n_correct <- rep_len(n_correct, n)
   n_trials <- rep_len(n_trials, n)
 
@@ -3840,6 +3857,7 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
   stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
   n <- .obs_length(counts, m, d, sdratio)
+  if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stopif(anyNA(m), "m must not contain NA")
   m <- rep_len(as.integer(m), n)
@@ -4221,6 +4239,7 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
   stopif(any(counts < 0), "counts must be non-negative")
 
   n <- .obs_length(counts, thr, stimulus, d, sdratio)
+  if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
@@ -4652,6 +4671,7 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   stopif(any(counts < 0), "counts must be non-negative")
 
   n <- .obs_length(counts, thr, stimulus, dfam, drec, sigmar, rho, rcrit, kcrit)
+  if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),

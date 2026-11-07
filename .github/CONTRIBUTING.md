@@ -210,8 +210,9 @@ same way.
 
 ## Vector arguments of the distribution functions
 
-Every `d*()` and `r*()` function of a model follows one recycling contract,
-stated on the help page `?bmm_distributions` and inherited by each
+Every `d*()` and `r*()` function of a model follows one recycling contract
+(the cswald and circular-mixture functions adopt it with their open pull
+requests), stated on the help page `?bmm_distributions` and inherited by each
 distribution's page under "Vector arguments":
 
 1. `r*(n, ...)` returns exactly `n` draws (a vector, or `n` rows). Each

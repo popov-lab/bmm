@@ -22,8 +22,8 @@ length.
 \item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
 \code{x} (its rows, when the observations are rows of counts) and the
 per-observation arguments, the others recycled to that length. Value \code{i}
-is what the call on the \code{i}-th elements alone returns. An empty \code{x}
-gives an empty result.
+is what the call on the \code{i}-th elements alone returns. An empty vector
+of observations gives an empty result.
 \item A set of values that describes one observation, such as the \code{thresholds}
 of the rating models, is a vector when every observation shares it and a
 matrix with one row per observation otherwise: row \code{i} belongs to
