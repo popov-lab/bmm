@@ -89,9 +89,18 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   )
 
   object <- restructure(object)
+  # a mixture2p, mixture3p or imm fit from before bmm 1.5.0 is refitted under
+  # the custom family of the current version, from a model object rebuilt for it
+  old_family <- is_mixture_family_fit(object)
+  if (old_family) {
+    old_fit_model <- object$bmm$model
+    object <- upgrade_mixture_family_model(object)
+  }
 
   model <- object$bmm$model
-  old_user_formula <- object$bmm$user_formula
+  # the stored formula is not what the user typed in this call, so a mu1 in it
+  # is renamed without a warning
+  old_user_formula <- rename_deprecated_parameters(model, object$bmm$user_formula, warn = FALSE)
   olddata <- object$data
   old_file <- object$file
   configure_opts <- object$bmm$configure_opts
@@ -164,6 +173,12 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # carrying neither label
   stored_prior <- object$bmm$user_prior
   old_prior <- stored_prior %||% carried_prior(object$prior)
+  if (old_family) {
+    stored <- translate_stored_prior(old_fit_model, model, config_args$formula, old_prior,
+                                     fitted_with = object$version$bmm)
+    old_prior <- stored$prior
+    message2("{stored$message}")
+  }
   if (is.null(stored_prior) && length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
@@ -178,7 +193,13 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # must win over it, and the message naming the displaced rows is printed
   # there, exactly as for the prior of bmm() (#549). Combined afterwards, a
   # prior on a constrained coefficient would replace the constraint in silence
-  user_prior <- combine_prior(old_prior, dots$prior)
+  # a prior written for the parameters of bmm 1.4 is translated here, before it
+  # joins the carried rows: translated after, an old-form row and a new-form row
+  # on the same coefficient would both reach brms, and the stored prior would be
+  # translated, with a warning, at every later update()
+  user_prior <- combine_prior(
+    old_prior, translate_deprecated_priors(model, config_args$formula, dots$prior)
+  )
   prior <- brms::do_call(
     configure_prior,
     c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
@@ -412,19 +433,33 @@ revert_check_data.mpt <- function(model, data) {
 revert_check_data.non_targets <- function(model, data) {
   set_size <- model$other_vars$set_size
   # brms keeps the set_size column only when a formula predicts something with
-  # it; LureIdx1..n is the step function check_data() built from it, so its row
-  # sums give the set size of each row back, as .np_lure_free_rows() also does.
-  # The names come from nt_features rather than from a pattern match, because a
-  # user column called LureIdx9 that a formula kept would be summed in too and
-  # the set sizes it shifts are legal integers that nothing downstream rejects
+  # it. A circmix family reads the set size from vint(ss_numeric), so the frame
+  # holds it. Fits made on brms mixtures hold only LureIdx1..n, the step function
+  # check_data() built from it, whose row sums give the set size back. Those
+  # names come from nt_features rather than from a pattern match, because a user
+  # column called LureIdx9 that a formula kept would be summed in too and the set
+  # sizes it shifts are legal integers that nothing downstream rejects
   if (is.character(set_size) && not_in(set_size, colnames(data))) {
-    data[[set_size]] <- 1 + rowSums(
+    data[[set_size]] <- data[["ss_numeric"]] %||% (1 + rowSums(
       data[paste0("LureIdx", seq_along(model$other_vars$nt_features))]
-    )
+    ))
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
   # brms may have dropped the rows of the largest set size from the frame (#459)
   data <- carry_fit_bounds(model, data)
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.mixture2p <- function(model, data) {
+  set_size <- model$other_vars$set_size
+  # brms keeps the set_size column only when a formula predicts something with
+  # it; ss_numeric is check_data()'s numeric copy, kept for the vint() term
+  if (is.character(set_size) && not_in(set_size, colnames(data)) &&
+    "ss_numeric" %in% colnames(data)) {
+    data[[set_size]] <- data$ss_numeric
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
+  }
   NextMethod("revert_check_data")
 }
 
