@@ -25,6 +25,7 @@
 * `dmixture3p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))` (#585). It stopped with "number of items to replace is not a multiple of replacement length".
 * `dimm()` now returns one density per value when a parameter is a vector longer than `x`, as in `dimm(0.3, c = c(1, 5, 20))` (#586). It returned a single density, for the first value.
 * `dddm()`, `dsdm()`, `dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`, `dsdt_ranking()` and `dsdt_cdp()` now return one value per observation when a parameter vector is longer than the data, or when `thresholds` has one row per observation. Before, they returned too few values, stopped with "non-conformable arrays", or warned that the lengths were not multiples. The `d*()` and `r*()` functions of the sdm, ddm, ezdm and signal detection models now follow one recycling rule, as `dnorm()` and `rnorm()` do; see `?bmm_distributions`. `dcswald()` still warns when the lengths are not multiples (#444).
+* `rsdt_yn()`, `dsdt_yn()` and `dezdm(version = "4par")` returned wrong values when the lengths of their arguments were not multiples of each other: some values came from the parameters of another observation. For example, `rsdt_yn(7, c(10, 20, 30, 40), c(1, 1, 0), d = 10, criterion = c(5, -5))` gave `10 20 0 40 10 0 30` instead of `10 20 0 40 10 20 30`. `rsdt_yn()` and `dsdt_yn()` warned that the lengths were not multiples. Rerun simulations and densities computed with such vectors (#444).
 
 ### Deprecated functions and arguments
 * mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas and `links` that name `mu1` still work, with a warning, until bmm 1.6.0 at the earliest; rename it to `mu`. The draws of the location lose the name as well: `b_mu1_Intercept` is now `b_Intercept` (#434).
@@ -45,7 +46,7 @@
 <!-- `model_spec()` exported, also for fitted models (#633) -->
 
 ### Deprecated functions and arguments
-<!-- Nothing deprecated in 1.5.0 yet. Announcements of removals scheduled for 1.6.0: -->
+<!-- Announcements of removals scheduled for 1.6.0; what 1.5.0 deprecates is listed under the first "Deprecated functions and arguments" heading above. -->
 * The forms deprecated in bmm 0.4 and 1.0 (`fit_model()`, `IMMfull()`, `IMMabc()`, `IMMbsc()`, `sdmSimple()`, the `setsize` argument of `mixture3p()` and `imm()`, and the `parallel` argument of `bmm()`) will be removed in bmm 1.6.0. They keep working in every 1.5.x release and now warn with the replacement. Use `bmm()`, `imm()`, `imm(version = "abc")`, `imm(version = "bsc")`, `sdm()`, `set_size` and `cores` instead.
 
 ### Other changes
