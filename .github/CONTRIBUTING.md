@@ -210,10 +210,12 @@ same way.
 
 ## Vector arguments of the distribution functions
 
-Every `d*()` and `r*()` function of a model follows one recycling contract
-(the cswald and circular-mixture functions adopt it with their open pull
-requests), stated on the help page `?bmm_distributions` and inherited by each
-distribution's page under "Vector arguments":
+The `d*()` and `r*()` functions of the sdm, ddm, ezdm and signal detection
+models follow one recycling contract, stated on the help page
+`?bmm_distributions` and inherited by each distribution's page under "Vector
+arguments". The cswald and circular-mixture functions adopt it with their open
+pull requests; `dm3()`/`rm3()` and the MPT functions are not covered yet. A new
+distribution follows it from the start:
 
 1. `r*(n, ...)` returns exactly `n` draws (a vector, or `n` rows). Each
    per-observation argument is recycled to `n` with `rep_len()`, as `rnorm()`

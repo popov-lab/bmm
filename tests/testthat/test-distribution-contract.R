@@ -412,3 +412,22 @@ test_that("rsdt_cdp() pairs familiarity, recollection, criterion and thresholds 
     expect_category_props(counts[g == k, ], n_trials, probs)
   }
 })
+
+# --- empty observations ---------------------------------------------------------
+
+test_that("the d*() functions return an empty result for no observations", {
+  thr <- c(0.2, 0.7, 1.2)
+  expect_identical(dsdm(numeric(0), mu = c(0, 1)), numeric(0))
+  expect_identical(dddm(numeric(0), numeric(0), drift = 1:2, bound = 1, ndt = 0.2), numeric(0))
+  expect_identical(dezdm(numeric(0), numeric(0), numeric(0), 100, drift = 1:2, bound = 1, ndt = 0.3), numeric(0))
+  expect_identical(dezdm(matrix(0, 0, 2), matrix(0, 0, 2), numeric(0), 100, drift = 1, bound = 1, ndt = 0.3,
+                         zr = 0.5, version = "4par"), numeric(0))
+  expect_identical(dsdt_yn(integer(0), 10, 1, d = 1:2, criterion = 0), numeric(0))
+  expect_identical(dsdt_mafc(integer(0), 10, 4, d = 1:2), numeric(0))
+  expect_identical(dsdt_rating(matrix(0, 0, 4), 1, d = 1, thresholds = thr), numeric(0))
+  expect_identical(dsdt_dpsdt(matrix(0, 0, 4), 1, d = 1, thresholds = thr, Ro = 0.3), numeric(0))
+  expect_identical(dsdt_metad(matrix(0, 0, 4), 1, d = 1, thresholds = thr, metad = 1), numeric(0))
+  expect_identical(dsdt_ranking(matrix(0, 0, 4), m = 4, d = 1:2), numeric(0))
+  expect_identical(dsdt_cdp(matrix(0, 0, 9), 1, dfam = 0.8, drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
+                            rcrit = 0.5, n_new = 3), numeric(0))
+})

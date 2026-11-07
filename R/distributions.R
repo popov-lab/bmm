@@ -2154,6 +2154,9 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
     isTRUE(any(n_upper != round(n_upper) | n_trials != round(n_trials))),
     "n_upper and n_trials must be whole numbers"
   )
+  if (.obs_length(mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, zr, s) == 0L) {
+    return(numeric(0))
+  }
 
   if (version == "4par") {
     if (!is.matrix(mean_rt)) {
