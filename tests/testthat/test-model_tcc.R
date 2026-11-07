@@ -374,9 +374,11 @@ test_that("a tcc fit stores its post-processing functions and has no expected re
 
 # the kernels run in a fixed_param program over the stanvars bmm generates, as
 # the other parity tests do (expose_functions() fails inside the suite)
-tcc_stan_lp <- function(model, rows) {
+# `r_table` is the table passed from R (by default the quadrature table);
+# lp_r reads it row by row, for the tables of correlated or motor noise
+tcc_stan_lp <- function(model, rows, r_table = NULL) {
   stanvars <- bmm:::.tcc_stanvars(model, table = "stan")
-  r_table <- bmm:::.tcc_table(bmm:::.tcc_similarity(model), bmm:::.tcc_grid(model))
+  r_table <- r_table %||% bmm:::.tcc_table(bmm:::.tcc_similarity(model), bmm:::.tcc_grid(model))
   data_decl <- paste(vapply(stanvars, function(s) if (s$block == "data") s$scode else "", ""),
                      collapse = "\n")
   tdata <- paste(vapply(stanvars, function(s) if (s$block == "tdata") s$scode else "", ""),
@@ -393,8 +395,11 @@ tcc_stan_lp <- function(model, rows) {
     "  real lp_runs = tcc_lpmf(y | rep_vector(0, N), d, tcc_tab, tcc_grid_lo, tcc_grid_step);\n",
     "  real lp_runs_r = tcc_lpmf(y | rep_vector(0, N), d, r_tab, tcc_grid_lo, tcc_grid_step);\n",
     "  vector[N] lp;\n",
+    "  vector[N] lp_r;\n",
     "  for (i in 1:N) lp[i] = tcc_lpmf({y[i]} | rep_vector(0, 1), rep_vector(d[i], 1), tcc_tab,\n",
     "                                  tcc_grid_lo, tcc_grid_step);\n",
+    "  for (i in 1:N) lp_r[i] = tcc_lpmf({y[i]} | rep_vector(0, 1), rep_vector(d[i], 1), r_tab,\n",
+    "                                    tcc_grid_lo, tcc_grid_step);\n",
     "}\n"
   )
   sdata <- lapply(stanvars, function(s) s$sdata)
@@ -409,7 +414,11 @@ tcc_stan_lp <- function(model, rows) {
   prep <- epred_prep(list(d = matrix(rows$d, 1)), c(sdata, list(Y = rows$y)))
   list(table_diff = csv$table_diff, lp_runs = csv$lp_runs, lp_runs_r = csv$lp_runs_r,
        lp = as.numeric(csv[1, paste0("lp.", seq_len(nrow(rows)))]),
-       log_lik = vapply(seq_len(nrow(rows)), log_lik_tcc, numeric(1), prep = prep))
+       lp_r = as.numeric(csv[1, paste0("lp_r.", seq_len(nrow(rows)))]),
+       log_lik = vapply(seq_len(nrow(rows)), log_lik_tcc, numeric(1), prep = prep),
+       log_lik_r = bmm:::.tcc_interp(rows$d, abs(rows$y) + 1,
+                                     list(lo = sdata$tcc_grid_lo, step = sdata$tcc_grid_step,
+                                          tab = r_table)))
 }
 
 test_that("the Stan likelihood matches dtcc() on and off the d grid, from either table", {
@@ -456,6 +465,23 @@ test_that("beyond the d grid the Stan likelihood extends the table linearly, nev
   expected <- c(edge(0, -0.5, 0), val(6 + h, 0), edge(6 + h, 7.5, 180))
   expect_lt(max(abs(out$lp - expected)), 1e-9)
   expect_lt(max(abs(out$log_lik - out$lp)), 1e-9)
+})
+
+test_that("the Stan likelihood reads a correlated table from R as log_lik_tcc() does, beyond the grid too", {
+  skip_on_cran()
+  skip_unless_stan_tests()
+  model <- tcc_test_model(d_max = 6, correlation = exp(-(0:180) / 10), correlation_draws = 6000,
+                          motor_sd = deg2rad(2))
+  r_table <- bmm:::.tcc_noise_table(model, bmm:::.tcc_grid(model))$tab
+  rows <- data.frame(
+    d = c(rep(1.234, 3), 0.011, 2.345, 5.987, 6.01, 7.5, 7.5, 9),
+    y = c(0L, 7L, -180L, 3L, 45L, 1L, 0L, 0L, 180L, -90L)
+  )
+  out <- tcc_stan_lp(model, rows, r_table)
+  expect_lt(max(abs(out$lp_r - out$log_lik_r)), 1e-9)
+  expect_equal(out$lp_runs_r, sum(out$lp_r), tolerance = 1e-10)
+  # the correlated table is not the independent-noise one the program built
+  expect_gt(max(abs(out$lp_r - out$lp)), 0.1)
 })
 
 ############################################################################# !
@@ -631,6 +657,32 @@ test_that("adding Gumbel noise leaves the Gaussian Stan programs bit-identical",
                "5ee0c72d0d4ace4d2cff6816bd208014")
   expect_equal(md5_code(tcc("err", similarity = f), bmf(d ~ cond), threads = brms::threading(2)),
                "9a1c977823b5fe0979b495cb6514c182")
+})
+
+# md5 of the Gumbel and table-from-R programs at 566-tcc-options ef664176,
+# before correlated and motor noise were added; taken as above
+test_that("correlated and motor noise leave the Gumbel and table-from-R programs bit-identical", {
+  skip_on_cran()
+  skip_if_not(packageVersion("brms") == "2.23.0", "hashes taken under brms 2.23.0")
+  md5_code <- function(model, formula, ...) {
+    lines <- strsplit(brms::stancode(tcc_mock_fit(model, formula, ...)), "\n")[[1]]
+    path <- withr::local_tempfile(fileext = ".stan")
+    con <- file(path, "wb")
+    writeBin(charToRaw(paste(lines[!grepl("generated with brms", lines)], collapse = "\n")), con)
+    close(con)
+    unname(tools::md5sum(path))
+  }
+  f <- exp(-(0:180) / 20)
+  gumbel <- tcc("err", similarity = f, noise = "gumbel")
+  expect_equal(md5_code(gumbel, bmf(d ~ cond)), "9c11f0e60651bbbf79eb154023d59313")
+  expect_equal(md5_code(gumbel, bmf(d ~ cond), threads = brms::threading(2)),
+               "426e4125e03be789b7361e08b1415d74")
+  from_r <- tcc("err", similarity = f, d_max = 6)
+  from_r$other_vars$table <- "r"
+  expect_equal(md5_code(from_r, bmf(d ~ cond)), "4ce5b52728d80d7247b022de3ef8a2c6")
+  correlated <- tcc("err", similarity = f, d_max = 6, correlation = exp(-(0:180) / 10),
+                    correlation_draws = 6000, motor_sd = 0.03)
+  expect_equal(md5_code(correlated, bmf(d ~ cond)), "4ce5b52728d80d7247b022de3ef8a2c6")
 })
 
 test_that("a Gumbel fit is not checked against a table, whatever its draws", {

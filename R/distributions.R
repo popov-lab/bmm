@@ -4651,7 +4651,14 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   with mean `d * f(x)` plus independent noise, and the response is the
 #'   option with the strongest signal. The noise is normal with unit variance
 #'   or, with `noise = "gumbel"`, standard Gumbel, which makes the probability
-#'   of an option the softmax of `d * f(x)` over all options.
+#'   of an option the softmax of `d * f(x)` over all options. `rtcc()` also
+#'   simulates normal noise correlated across options (`correlation`), and
+#'   both functions take motor noise on the click (`motor_sd`); see the
+#'   sections Correlated noise and Motor noise of [tcc()].
+#'
+#' @details Under correlated noise the probabilities have no closed form, so
+#'   `dtcc()` does not take `correlation`: [tcc()] estimates them by Monte
+#'   Carlo for each fit, and `log_lik()` of such a fit reads that table.
 #'
 #' @name tcc_dist
 #'
@@ -4674,6 +4681,12 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   `2 * pi`, are one option), and each option must sit within a tenth of a
 #'   step of one of the `n_options` positions, onto which it is rounded;
 #'   values beyond `2 * pi` are refused as not in radians.
+#' @param motor_sd The SD of the motor noise on the click, in radians: the
+#'   response is the chosen option plus a normal error with this SD, rounded
+#'   to the nearest option. 0 (the default) for none.
+#' @param correlation `NULL` (the default) for independent noise, or the
+#'   correlation of the noise of two options at each distance 0, 1, ...,
+#'   `n_options / 2`, starting with 1, as in [tcc()].
 #'
 #' @return `dtcc()` returns the probability of the option each `x` falls on (a
 #'   probability mass, not a density: divide by `2 * pi / n_options` for the
@@ -4694,16 +4707,24 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' # a 4-AFC trial with options 90 degrees apart
 #' four <- c(0, 90, 180, -90) * pi / 180
 #' dtcc(four, d = 2, similarity = f, options = four)
+#' # correlated noise and 2 degrees of motor noise
+#' err <- rtcc(2000, d = 2, similarity = f, correlation = exp(-(0:180) / 10),
+#'             motor_sd = deg2rad(2))
 #' @export
 dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
-                 noise = c("gaussian", "gumbel"), options = NULL) {
+                 noise = c("gaussian", "gumbel"), options = NULL, motor_sd = 0) {
   noise <- match.arg(noise)
   .tcc_check_similarity(similarity, n_options)
+  .tcc_check_noise_args(similarity, n_options, noise, !is.null(options), NULL, motor_sd,
+                        fit = FALSE)
   if (!is.null(options)) {
     out <- .tcc_dist_options_logp(x, d, similarity, n_options, noise, options)
     return(if (log) out else exp(out))
   }
   logp <- .tcc_noise_logp(noise)
+  if (motor_sd > 0) {
+    logp <- .tcc_motor_logp(logp, motor_sd * n_options / (2 * pi))
+  }
   dist <- abs(.tcc_bin(x, n_options, "radians")) + 1
   n <- if (length(x) && length(d)) max(length(x), length(d)) else 0L
   dist <- rep_len(dist, n)
@@ -4719,10 +4740,16 @@ dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
 #' @rdname tcc_dist
 #' @export
 rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbel"),
-                 options = NULL) {
+                 options = NULL, correlation = NULL, motor_sd = 0) {
   noise <- match.arg(noise)
   .tcc_check_similarity(similarity, n_options)
+  .tcc_check_noise_args(similarity, n_options, noise, !is.null(options), correlation, motor_sd,
+                        fit = FALSE)
   d <- rep_len(d, n)
+  sd_steps <- motor_sd * n_options / (2 * pi)
+  if (!is.null(correlation)) {
+    return(2 * pi * .tcc_rnoise(d, similarity, correlation, sd_steps) / n_options)
+  }
   offsets <- if (is.null(options)) {
     seq(-n_options / 2 + 1, n_options / 2)
   } else {
@@ -4739,11 +4766,55 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
     prob <- exp(logp(value))
     out[rows] <- offsets[sample.int(length(offsets), length(rows), replace = TRUE, prob = prob)]
   }
+  if (sd_steps > 0) {
+    out <- .tcc_rmotor(out, sd_steps, n_options)
+  }
   2 * pi * out / n_options
 }
 
 .tcc_noise_logp <- function(noise) {
   if (noise == "gumbel") .tcc_gumbel_logp else .tcc_logp
+}
+
+# log P by distance with motor noise: the pmf of each option convolved with
+# the rounding kernel; symmetric, so the option at +k stands for its distance
+.tcc_motor_logp <- function(logp, sd_steps) {
+  force(logp)
+  kernel <- .tcc_motor_kernel(sd_steps)
+  function(value, similarity) {
+    n <- 2 * (length(similarity) - 1)
+    by_option <- logp(value, similarity)[pmin(0:(n - 1), n - 0:(n - 1)) + 1]
+    .tcc_convolve_log(matrix(by_option), kernel)[seq_along(similarity)]
+  }
+}
+
+# Signed offsets in option steps, simulated as the model generates them: the
+# argmax of d f + z with z ~ N(0, C) drawn by the circulant square root of C
+# (constant mode included), then motor noise. NA where d is NA. A chunk holds
+# about 2e6 normals, which several complex copies in the FFTs multiply: a
+# fixed 20,000 rows took 2.4 GB on 3,600 options
+.tcc_rnoise <- function(d, similarity, correlation, sd_steps) {
+  n <- 2 * (length(similarity) - 1)
+  f <- .tcc_circ_row(similarity)
+  root <- sqrt(pmax(Re(stats::fft(.tcc_circ_row(correlation))), 0))
+  out <- rep(NA_real_, length(d))
+  rows <- which(!is.na(d))
+  for (idx in split(rows, ceiling(seq_along(rows) / max(1, floor(2e6 / n))))) {
+    Z <- Re(stats::mvfft(stats::mvfft(matrix(stats::rnorm(n * length(idx)), n)) * root,
+                         inverse = TRUE)) / n
+    out[idx] <- max.col(t(Z + outer(f, d[idx])), ties.method = "first") - 1
+  }
+  .tcc_rmotor(out, sd_steps, n)
+}
+
+# The click moved by round(e), e ~ N(0, sd_steps^2), one normal per non-NA
+# offset, and wrapped onto the wheel, (-n / 2, n / 2]
+.tcc_rmotor <- function(offsets, sd_steps, n) {
+  if (sd_steps > 0) {
+    rows <- which(!is.na(offsets))
+    offsets[rows] <- offsets[rows] + round(stats::rnorm(length(rows), 0, sd_steps))
+  }
+  n / 2 - (n / 2 - offsets) %% n
 }
 
 # the offered options of a d or r call as offsets in steps, refused where

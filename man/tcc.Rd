@@ -13,6 +13,9 @@ tcc(
   d_max = 30,
   options = NULL,
   n_alternatives = NULL,
+  correlation = NULL,
+  motor_sd = 0,
+  correlation_draws = 1e+06,
   ...
 )
 }
@@ -51,6 +54,22 @@ against the option columns. Without \code{options}, a single number \code{m}: ea
 trial offers \code{m} options spaced equally around the wheel, the target
 among them; \code{n_options} must be a multiple of \code{m}.}
 
+\item{correlation}{\code{NULL} (the default) for independent noise, or the
+correlation of the noise of two options at each distance 0, 1, ...,
+\code{n_options / 2} options, a numeric vector laid out as \code{similarity} and
+starting with 1. See the section Correlated noise.}
+
+\item{motor_sd}{The SD of the motor noise that moves the click from the
+chosen option, in the unit of \code{resp_error} (radians, or option steps
+with \code{units = "bins"}); 0, the default, for none. See the section Motor
+noise.}
+
+\item{correlation_draws}{With \code{correlation}, the number of Monte Carlo
+draws for the likelihood table, at least 6000, rounded up to a multiple
+of 6; refused without \code{correlation}. The table is certified for a
+number of trials per estimate that grows in proportion; see the section
+Correlated noise.}
+
 \item{...}{used internally for testing, ignore it}
 }
 \value{
@@ -61,13 +80,18 @@ Continuous report as an \code{n_options}-alternative forced choice:
 every option on the response wheel produces a Gaussian memory-match
 signal with unit variance and mean \code{d * f(x)}, where \code{f(x)} is the
 psychophysical similarity of an option \code{x} options away from the target,
-and the response is the option with the strongest signal. This is the
-uncorrelated-noise model of Schurgin et al. (2020). The d' they report
-comes from a correlated-noise version and is larger: across the
+and the response is the option with the strongest signal. By default
+the noise is independent across options. The d' Schurgin et al. (2020)
+report comes from their correlated-noise model and is larger: across the
 subjects and set sizes of their Figure 3 data, the median ratio of their
-d' to this \code{d} was 1.60. With \code{noise = "gumbel"} the signals carry
-standard Gumbel noise instead, and the response probabilities become a
-softmax (see the section Noise).
+d' to the independent-noise \code{d} was 1.60. With \code{correlation}, the noise
+is correlated across options as in their model, and \code{d} is their d'.
+That model is the base of the TCC family: continuous report, forced
+choice and change detection are its marginals (see the section "One
+process, three formats"). Independent noise stays the default because its
+likelihood needs no Monte Carlo table. With \code{noise = "gumbel"} the
+signals carry standard Gumbel noise instead, and the response
+probabilities become a softmax (see the section Noise).
 }
 \details{
 \itemize{
@@ -126,8 +150,10 @@ estimates the width of the gradient from the responses is the \code{\link[=sdm]{
 \subsection{Noise}{
 
 \code{noise} sets the distribution of the noise on each option's signal.
-\code{"gaussian"}, the default, is the model of Schurgin et al. (2020), with
-normal noise of unit variance. Its response probabilities have no closed
+\code{"gaussian"}, the default, is normal noise of unit variance, as in
+Schurgin et al. (2020): independent across options by default, or
+correlated as in their model with \code{correlation} (see the section
+Correlated noise). Its response probabilities have no closed
 form, so on the full wheel the likelihood reads them from a table (see
 the section Grid limit on d); with \code{options} it integrates them per
 cell. With \code{"gumbel"} the noise follows the standard Gumbel (type I
@@ -155,8 +181,9 @@ same data unsorted it cost about 8 times as much, because the Gumbel
 likelihood sums over the options once for each run of rows that share
 \code{d} (see the section Speed). With \code{options} it is much cheaper (see the
 section Forced-choice option sets). It skips the table build before
-sampling and has no grid limit. Keep normal noise to stay with the model
-of Schurgin et al. (2020) and to compare \code{d} with their d'. The two \code{d} are not on one scale. The
+sampling and has no grid limit. Keep normal noise to stay with the
+models of Schurgin et al. (2020); to compare \code{d} with their d', also give
+their \code{correlation}. The normal and Gumbel \code{d} are not on one scale. The
 standard Gumbel distribution has an SD of \code{pi / sqrt(6)} = 1.28, but
 matching the response probabilities takes a larger factor: the Gumbel
 \code{d} with the smallest Kullback-Leibler divergence from the probabilities
@@ -176,17 +203,121 @@ option steps. On the full wheel, the model treats the response as a
 choice among \code{n_options} discrete options, so \code{n_options} should be the
 number of options the participant could choose from.
 
-On the full wheel, \code{n_options} is part of the model, not a resolution
-setting. Each option
+With independent noise on the full wheel, \code{n_options} is part of the
+model, not a resolution setting. Each option
 draws its own noise, and the more options lie near the target, the more
 often one of them wins: at \code{d = 2}, with the Laplace similarity of the
 examples built for each wheel (\code{tcc_similarity(..., n_options = n)}), the
 probability of choosing an option at most 10 degrees from the target is
-0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
-continuous limit, and values of \code{d} fitted with different \code{n_options} are
-not on one scale. With \code{options}, \code{n_options} only places the options:
+0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The
+independent-noise model has no continuous limit, and its values of \code{d}
+fitted with different \code{n_options} are not on one scale; with
+\code{correlation} they are (see the section "One process, three formats"). With \code{options}, \code{n_options} only places the options:
 the choice is among the offered options alone, and any even \code{n_options}
 of at least 4 that is a multiple of \code{m} spaces \code{m} options equally.
+}
+
+\subsection{One process, three formats}{
+
+With correlated noise the TCC is one process on the circle: a Gaussian
+process with mean \code{d * f(x)} and covariance \verb{correlation(|x - y|)}, read
+out by its maximum. Each test format is a marginal of that process.
+\itemize{
+\item Continuous report is the argmax over the circle, which \code{tcc()} takes
+over \code{n_options} discrete options. Under the correlation Schurgin et
+al. (2020) measured, the predicted response distribution no longer
+changes from 720 options on (within Monte Carlo error); on
+their 1-degree wheel of 360 options the probability of a response
+within 10 degrees of the target lies 0.015 above that limit at \code{d = 2}. Values of \code{d} fitted on different wheels are therefore on one
+scale, which they are not under independent noise (see the section
+Response).
+\item m-alternative forced choice is the argmax over the offered options,
+whose signals are jointly normal with the sub-matrix of the
+correlation for their distances. \code{tcc(options = )} fits forced choice
+with independent noise; with correlated noise it is planned for bmm
+1.6.0.
+\item Single-probe change detection compares one option's signal, normal
+with mean \code{d * f(x)} and SD 1, with a criterion. It needs no
+correlation, as it reads one signal.
+}
+
+A two-alternative choice between the target and the opposite option has
+d' = \code{d * (1 - f(180)) / sqrt(1 - correlation(180))}, with \code{f(180)} and
+\code{correlation(180)} the last values of \code{similarity} and \code{correlation}. When
+both are 0, as in the similarity and correlation Schurgin et al. measured,
+\code{d} is that d' (in simulations from their model with \code{d} of 2 and 1, it
+came out at 2.00 and 1.01, SE about 0.03). Independent noise is the
+member of the family whose correlation is 0 at every distance but 0. Its
+forced-choice and change-detection marginals share \code{d} as well, but its
+continuous report has no continuous limit: there \code{d} changes with
+\code{n_options} (see the section Response).
+}
+
+\subsection{Correlated noise}{
+
+\code{correlation} gives the correlation of the noise of two options as a
+function of their distance, one value per distance 0, 1, ...,
+\code{n_options / 2}, starting with 1, in the layout of \code{similarity}. The
+correlation Schurgin et al. (2020) used for their colour wheel falls
+from 0.96 at 1 degree to 0.35 at 15 degrees and is 0 from 90 degrees
+on. The values must define a valid correlation on the circle (a
+circulant matrix without negative eigenvalues), and the similarity must
+lie in the directions where that matrix has noise. A correlation that
+falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales:
+the measured one has five, and \code{exp(-(x / 15)^2)} for \code{x} in degrees
+has more. \code{tcc()} refuses such a correlation when more than 1e-6 of the
+similarity's variation lies on those scales, which a sharp peak puts
+there: Laplace shapes from \code{\link[=tcc_similarity]{tcc_similarity()}} are refused with smooth
+correlations, with the measured one from a \code{kappa} of about 2, while
+von Mises shapes are accepted unless very narrow (\code{kappa} in the
+hundreds). Mixing in a little independent noise, such as \code{0.999 * correlation + 0.001 * c(1, rep(0, n_options / 2))}, removes the zero
+eigenvalues. A correlation that falls off like \code{exp(-x / 10)} has none
+and is accepted with any similarity. Correlated noise needs \code{noise = "gaussian"} and the full wheel.
+
+The response probabilities have no closed form, so the likelihood reads
+them from a table that \code{bmm()} estimates by Monte Carlo before
+sampling, from \code{correlation_draws} draws of the noise (conditioning each
+draw on its component along the similarity). With the default of one
+million draws and the measured correlation, the build took 70.5 and
+70.7 s in two runs on one core of an Apple M3 Max laptop under other
+load. An earlier version of the estimator took 40 s on that laptop when
+it was otherwise idle; timed in turn with it, the current one was about
+7 \% faster. The table is kept in the R process that built it, so
+\code{update()}, \code{loo()} refits and \code{kfold()} in that process reuse it;
+parallel workers (\code{future}) each build their own. The table's seed
+follows from the model, so the same model always gets the same table
+and the user's random number stream is left as it was.
+
+A Monte Carlo table has its own error, which shifts an estimate a little
+with the seed. The shift grows with the number of trials an estimate
+pools, so each table is certified for a number of trials per estimate:
+up to that number, the shift that its seed causes in an estimate of \code{d}
+has an SD across seeds of at most 0.1 posterior SD. With the default draws and the measured
+correlation the table was certified for about 13,000 trials per estimate.
+The number grows in proportion to \code{correlation_draws}, and so does the
+build time. \code{summary()} reports it, and \code{bmm()} warns after the fit when
+the data hold more trials, naming a \code{correlation_draws} that would
+cover them. As the correlation weakens towards independence the table
+thins out: some far responses at a large \code{d} are then drawn too rarely
+for their probability to be estimated, or never, and \code{bmm()} warns when
+cells are never drawn below \code{d_max}. For independent noise,
+leave \code{correlation} out; the default table is then exact.
+}
+
+\subsection{Motor noise}{
+
+\code{motor_sd} adds the motor noise of Schurgin et al. (2020): the click
+lands at the chosen option plus a normal error with SD \code{motor_sd},
+rounded to the nearest option. Give it in the unit of \code{resp_error}:
+radians, or option steps with \code{units = "bins"}. Their 2 degrees are
+\code{deg2rad(2)}. The probabilities are those of the model without motor
+noise, convolved with that rounded normal, with or without
+\code{correlation}. The authors' code for the uncorrelated model samples the
+normal density at whole steps from -6 to 6 instead; the two kernels differ by up to 0.15 in log
+probability at a large \code{d}, where the response distribution is the
+kernel itself, and moved the estimates on their Figure 3 data by at most
+0.016. Motor noise needs \code{noise = "gaussian"} and the full wheel: a
+forced choice has no click to move.
 }
 
 \subsection{Grid limit on d}{
