@@ -114,10 +114,12 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 
 # The common length of a d*() call's per-observation arguments (contract in
 # ?bmm_distributions): the longest, counting a matrix by its rows, or 0 when
-# one of them is empty, as in dnorm(). .recycle_obs() then gives observation i
-# element i of a vector and row i of a matrix.
+# one of them is empty, as in dnorm(); an absent optional argument (NULL) does
+# not count. .recycle_obs() then gives observation i element i of a vector
+# and row i of a matrix.
 .obs_length <- function(...) {
-  lens <- vapply(list(...), function(a) if (is.matrix(a)) nrow(a) else length(a), integer(1))
+  args <- Filter(Negate(is.null), list(...))
+  lens <- vapply(args, function(a) if (is.matrix(a)) nrow(a) else length(a), integer(1))
   if (any(lens == 0L)) 0L else max(lens)
 }
 
@@ -3037,6 +3039,14 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  n <- .obs_length(n_old, n_trials, stimulus, d, criterion, bias, sdratio)
+  n_old <- rep_len(n_old, n)
+  n_trials <- rep_len(n_trials, n)
+  stimulus <- rep_len(stimulus, n)
+  d <- rep_len(d, n)
+  sdratio <- rep_len(sdratio, n)
+  if (!is.null(criterion)) criterion <- rep_len(criterion, n)
+  if (!is.null(bias)) bias <- rep_len(bias, n)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)
 
   eta <- .sdt_eta(d, criterion, stimulus, sdratio)
@@ -3322,11 +3332,8 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
   stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
 
-  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus),
-           length(Ro), length(Rn))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  n <- .obs_length(counts, thr, stimulus, d, sdratio, Ro, Rn)
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3434,11 +3441,8 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- max(nrow(counts), length(d), length(metad), length(sdratio),
-           length(stimulus))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  n <- .obs_length(counts, thr, stimulus, d, metad, sdratio)
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3540,7 +3544,7 @@ dsdt_mafc <- function(n_correct, n_trials, m, d,
   stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(m < 2), "m must be an integer >= 2")
 
-  n <- max(lengths(list(n_correct, n_trials, m, d)))
+  n <- .obs_length(n_correct, n_trials, m, d)
   n_correct <- rep_len(n_correct, n)
   n_trials <- rep_len(n_trials, n)
 
@@ -3827,7 +3831,8 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- rbind(counts)
-  n <- nrow(counts)
+  n <- .obs_length(counts, m, d, sdratio)
+  counts <- .recycle_obs(counts, n)
   stopif(anyNA(m), "m must not contain NA")
   m <- rep_len(as.integer(m), n)
   d <- rep_len(d, n)
@@ -4206,10 +4211,8 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  n <- .obs_length(counts, thr, stimulus, d, sdratio)
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -4638,11 +4641,8 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- max(nrow(counts), length(stimulus), length(dfam), length(drec),
-           length(sigmar), length(rho), length(rcrit))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  n <- .obs_length(counts, thr, stimulus, dfam, drec, sigmar, rho, rcrit, kcrit)
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")

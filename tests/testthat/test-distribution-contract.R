@@ -224,3 +224,176 @@ test_that("rezdm(version = '4par') pairs the start point and both boundary means
                      sd(lower, na.rm = TRUE) / sqrt(sum(!is.na(lower))))
   }
 })
+
+# --- SDT ----------------------------------------------------------------------
+
+thr3 <- rbind(c(0.2, 0.7, 1.2), c(0.3, 0.8, 1.3), c(0.4, 0.9, 1.4))
+counts2 <- rbind(c(2, 8, 20, 70), c(30, 40, 20, 10))
+
+test_that("the SDT d*() functions recycle counts, thresholds and parameters to the longest argument", {
+  expect_elementwise(dsdt_yn, list(n_old = c(50, 60), n_trials = 100, stimulus = c(1, 0, 1), d = 1:3,
+                                   criterion = c(0.5, 0.7)))
+  expect_elementwise(dsdt_yn, list(n_old = 50, n_trials = c(100, 80), stimulus = 1, d = c(1, 2),
+                                   bias = c(0.1, -0.1, 0.2), sdratio = c(1, 1.5)),
+                     fixed = list(dist = "logistic", log = TRUE))
+  expect_elementwise(dsdt_mafc, list(n_correct = c(50, 60), n_trials = c(100, 80, 90), m = c(2, 4), d = 1:3))
+  expect_elementwise(dsdt_rating, list(counts = counts2, stimulus = c(1, 0, 1), d = c(1, 1.5, 2),
+                                       thresholds = thr3, sdratio = c(1, 1.2)))
+  expect_elementwise(dsdt_rating, list(counts = rbind(c(2, 8, 20, 70)), stimulus = 1, d = 1.5, thresholds = thr3),
+                     fixed = list(log = TRUE))
+  # a vector of counts is one observation, scored under each row of thresholds
+  expect_equal(
+    dsdt_rating(c(2, 8, 20, 70), 1, d = 1.5, thresholds = thr3),
+    vapply(1:3, function(i) dsdt_rating(c(2, 8, 20, 70), 1, d = 1.5, thresholds = thr3[i, ]), numeric(1))
+  )
+  expect_elementwise(dsdt_dpsdt, list(counts = counts2, stimulus = c(1, 0, 1), d = c(1, 1.5, 2),
+                                      thresholds = thr3, Ro = c(0.2, 0.3, 0.4), Rn = c(0, 0.1)))
+  expect_elementwise(dsdt_metad, list(counts = counts2, stimulus = c(1, 0, 1), d = c(1, 1.5, 2),
+                                      thresholds = thr3, metad = c(0.8, 1, 1.2), sdratio = c(1, 1.2)))
+  expect_elementwise(dsdt_ranking, list(counts = rbind(c(50, 30, 15, 5), c(20, 30, 30, 20)), m = 4,
+                                        d = c(0.5, 1, 2), sdratio = c(1, 1.5)),
+                     fixed = list(dist = "normal"))
+  expect_elementwise(dsdt_ranking, list(counts = rbind(c(50, 30, 15, 5), c(60, 40, 0, 0)), m = c(4, 2),
+                                        d = c(0.5, 1, 2)))
+  thr5 <- rbind(c(-1.1, -0.5, 0, 0.6, 1.3), c(-1, -0.4, 0.1, 0.7, 1.4), c(-1.2, -0.6, -0.1, 0.5, 1.2))
+  counts_cdp <- rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2), c(30, 20, 10, 5, 5, 10, 2, 3, 15))
+  expect_elementwise(dsdt_cdp, list(counts = counts_cdp, stimulus = c(1, 0, 1), dfam = c(0.8, 1, 0.6),
+                                    drec = c(1, 0.8), thresholds = thr5, rcrit = c(0.5, 0.4, 0.6),
+                                    sigmar = c(0, 0.1), rho = c(0, 0.2, -0.1)),
+                     fixed = list(n_new = 3))
+  counts_cdp_k <- rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2, 1, 2, 1), c(30, 20, 10, 5, 5, 10, 2, 3, 15, 2, 1, 1))
+  expect_elementwise(dsdt_cdp, list(counts = counts_cdp_k, stimulus = 1, dfam = 0.8, drec = 1,
+                                    thresholds = rbind(c(-1.1, -0.5, 0, 0.6, 1.3)), rcrit = 0.5,
+                                    kcrit = c(0.3, 0.2, 0.4)),
+                     fixed = list(n_new = 3))
+})
+
+test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus per draw", {
+  withr::local_seed(4445)
+  d <- c(0.5, 1.5, 2.5)
+  criterion <- c(0.2, 0.8, 0.5)
+  stimulus <- c(1, 0, 1)
+  sdratio <- c(1, 1.5, 1)
+  n_trials <- c(50, 100, 80)
+  n <- 1500
+  g <- group_of(n, 3)
+  n_old <- rsdt_yn(n, n_trials, stimulus, d, criterion, sdratio = sdratio)
+  expect_length(n_old, n)
+  for (k in 1:3) {
+    p_old <- pnorm((d[k] * sqrt((1 + sdratio[k]^2) / 2) * stimulus[k] - criterion[k]) / sdratio[k]^stimulus[k])
+    expect_mean_near(n_old[g == k] / n_trials[k], p_old, se_prop(p_old, n_trials[k] * sum(g == k)))
+  }
+})
+
+test_that("rsdt_mafc() pairs sensitivity and the number of alternatives per draw", {
+  withr::local_seed(4445)
+  d <- c(0.5, 1.5, 1)
+  m <- c(2, 4, 3)
+  n_trials <- c(50, 100, 80)
+  n <- 1500
+  g <- group_of(n, 3)
+  n_correct <- rsdt_mafc(n, n_trials, m, d)
+  expect_length(n_correct, n)
+  for (k in 1:3) {
+    p_correct <- integrate(function(x) dnorm(x - d[k]) * pnorm(x)^(m[k] - 1), -Inf, Inf)$value
+    expect_mean_near(n_correct[g == k] / n_trials[k], p_correct, se_prop(p_correct, n_trials[k] * sum(g == k)))
+  }
+})
+
+# category proportions of a group against the reference probabilities
+expect_category_props <- function(counts, n_trials, probs) {
+  for (j in seq_along(probs)) {
+    expect_mean_near(counts[, j] / n_trials, probs[j], se_prop(probs[j], n_trials * nrow(counts)))
+  }
+}
+
+test_that("rsdt_rating() pairs sensitivity, stimulus, thresholds and variance ratio per draw", {
+  withr::local_seed(4445)
+  d <- c(0.5, 1.5, 1)
+  stimulus <- c(1, 0, 1)
+  sdratio <- c(1, 1.5, 1.2)
+  n_trials <- 100
+  n <- 1500
+  g <- group_of(n, 3)
+  counts <- rsdt_rating(n, n_trials, stimulus, d, thresholds = thr3, sdratio = sdratio)
+  expect_equal(dim(counts), c(n, 4))
+  for (k in 1:3) {
+    expect_category_props(counts[g == k, ], n_trials, sdt_category_probs(d[k], thr3[k, ], stimulus[k], sdratio[k]))
+  }
+})
+
+test_that("rsdt_dpsdt() pairs recollection with the rating parameters per draw", {
+  withr::local_seed(4445)
+  d <- c(0.5, 1.5, 1)
+  stimulus <- c(1, 0, 1)
+  Ro <- c(0.2, 0.5, 0.3)
+  Rn <- c(0, 0.2, 0.1)
+  n_trials <- 100
+  n <- 1500
+  g <- group_of(n, 3)
+  counts <- rsdt_dpsdt(n, n_trials, stimulus, d, thresholds = thr3, Ro = Ro, Rn = Rn)
+  for (k in 1:3) {
+    p <- sdt_category_probs(d[k], thr3[k, ], stimulus[k])
+    # recollection loads the most confident category of the stimulus
+    probs <- if (stimulus[k] == 1) (1 - Ro[k]) * p + Ro[k] * unit_counts(4, 4) else (1 - Rn[k]) * p + Rn[k] * unit_counts(1, 4)
+    expect_category_props(counts[g == k, ], n_trials, probs)
+  }
+})
+
+test_that("rsdt_metad() pairs metacognitive sensitivity with the rating parameters per draw", {
+  withr::local_seed(4445)
+  d <- c(1, 1, 1.5)
+  metad <- c(0.5, 1.5, 1)
+  stimulus <- c(1, 0, 1)
+  n_trials <- 100
+  n <- 1500
+  g <- group_of(n, 3)
+  counts <- rsdt_metad(n, n_trials, stimulus, d, thresholds = thr3, metad = metad)
+  for (k in 1:3) {
+    probs <- vapply(1:4, function(j) {
+      dsdt_metad(unit_counts(j, 4), stimulus[k], d[k], thr3[k, ], metad = metad[k])
+    }, numeric(1))
+    expect_category_props(counts[g == k, ], n_trials, probs)
+  }
+})
+
+test_that("rsdt_ranking() pairs sensitivity and set size per draw", {
+  withr::local_seed(4445)
+  d <- c(0.8, 1.5, 1)
+  m <- c(2, 4, 3)
+  n_trials <- 100
+  n <- 1500
+  g <- group_of(n, 3)
+  counts <- rsdt_ranking(n, n_trials, m, d)
+  expect_equal(dim(counts), c(n, 4))
+  expect_true(all(counts[g == 1, 3:4] == 0))
+  # Gumbel-min with two items: the target is ranked first with probability plogis(d)
+  expect_mean_near(counts[g == 1, 1] / n_trials, plogis(d[1]), se_prop(plogis(d[1]), n_trials * sum(g == 1)))
+  for (k in 2:3) {
+    probs <- vapply(seq_len(m[k]), function(j) {
+      dsdt_ranking(unit_counts(j, m[k]), m[k], d[k])
+    }, numeric(1))
+    expect_category_props(counts[g == k, seq_len(m[k])], n_trials, probs)
+  }
+})
+
+test_that("rsdt_cdp() pairs familiarity, recollection, criterion and thresholds per draw", {
+  skip_on_cran()
+  withr::local_seed(4445)
+  dfam <- c(0.8, 1.2, 0.5)
+  drec <- c(1, 0.5, 1.5)
+  rcrit <- c(0.5, 0.3, 0.7)
+  stimulus <- c(1, 0, 1)
+  thr5 <- rbind(c(-1.1, -0.5, 0, 0.6, 1.3), c(-1, -0.4, 0.1, 0.7, 1.4), c(-1.2, -0.6, -0.1, 0.5, 1.2))
+  n_trials <- 100
+  n <- 900
+  g <- group_of(n, 3)
+  counts <- rsdt_cdp(n, n_trials, stimulus, dfam, drec, thresholds = thr5, rcrit = rcrit, n_new = 3)
+  expect_equal(dim(counts), c(n, 9))
+  for (k in 1:3) {
+    probs <- vapply(1:9, function(j) {
+      dsdt_cdp(unit_counts(j, 9), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], n_new = 3)
+    }, numeric(1))
+    expect_category_props(counts[g == k, ], n_trials, probs)
+  }
+})
