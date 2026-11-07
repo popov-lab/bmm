@@ -589,7 +589,7 @@ test_that("the init list names every parameter of the Stan model and nothing els
         version = "slot_averaging", variable_precision = TRUE
       ),
       formula = bmf(
-        kappa ~ 1 + (1 | ID), tau ~ 1, K ~ 1 + (1 | ID), pnt ~ 1 + (1 | ID)
+        kappa ~ 1 + (1 | ID), tau ~ 1, K ~ 1 + (1 | ID), ptarget ~ 1 + (1 | ID)
       )
     ),
     # nothing pins the set-size-1 level of thetant any more, so b_thetant and its

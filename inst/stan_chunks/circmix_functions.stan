@@ -146,7 +146,8 @@
       reject("bmm: the variable-precision quadrature needs a gamma shape ",
              "J(kappa)/tau of at least 60 / vp_nodes = ", 60.0 / nodes,
              ", but got ", shape,
-             ". Raise vp_nodes, or use a more informative prior on tau.");
+             ". Raise vp_nodes above ", 60.0 / shape,
+             ", or use a more informative prior on tau.");
     }
     if (8 * sqrt(trigamma(shape)) < 1e-6) {
       return circmix_ld(cosd, logw, logw_guess, kappa);

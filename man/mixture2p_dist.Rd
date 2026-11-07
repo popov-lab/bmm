@@ -15,7 +15,7 @@ dmixture2p(
   p_mem = 0.6,
   tau = 0,
   K = 3,
-  set_size = 1,
+  set_size = NULL,
   version = "simple",
   vp_nodes = 81L,
   log = FALSE
@@ -32,7 +32,7 @@ rmixture2p(
   p_mem = 0.6,
   tau = 0,
   K = 3,
-  set_size = 1,
+  set_size = NULL,
   version = "simple"
 )
 }
@@ -41,11 +41,14 @@ rmixture2p(
 
 \item{mu}{Vector of locations}
 
-\item{kappa}{Vector of precision values. With \code{tau > 0} this is the mean
-precision rather than the precision itself.}
+\item{kappa}{Vector of precision values. With \code{tau > 0} this is the
+concentration of the average trial, whose Fisher information \code{J(kappa)} is
+the mean of \code{J}.}
 
-\item{p_mem}{Vector of probabilities for memory recall. Used by the
-\code{"simple"} version; the other versions derive it from \code{K} and \code{set_size}.}
+\item{p_mem}{Vector of probabilities for memory recall, i.e. \code{thetat} of
+\code{\link[=mixture2p]{mixture2p()}} on its native scale. Used by the \code{"simple"} version; the
+other versions derive it from \code{K} and \code{set_size}, and warn if \code{p_mem} is
+given.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
@@ -53,18 +56,25 @@ Fisher information \code{J} of a memory representation is drawn from
 precision.}
 
 \item{K}{Vector of memory capacities. Used by the \code{"slot"} and
-\code{"slot_averaging"} versions and ignored by \code{"simple"}.}
+\code{"slot_averaging"} versions; \code{"simple"} ignores it and warns if it is
+given.}
 
-\item{set_size}{Vector of set sizes. Used by the \code{"slot"} and
-\code{"slot_averaging"} versions and ignored by \code{"simple"}.}
+\item{set_size}{Vector of set sizes. Required by the \code{"slot"} and
+\code{"slot_averaging"} versions, which stop without it; \code{"simple"} ignores it
+and warns if it is given.}
 
 \item{version}{A character string selecting the storage model: \code{"simple"},
 \code{"slot"} or \code{"slot_averaging"}. See \code{\link[=mixture2p]{mixture2p()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
-odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
+function needs no nodes: it draws \code{J} from its gamma distribution and then
+the response, which is exact.}
 
-\item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
+\item{log}{Logical; if \code{TRUE}, values are returned on the log scale. Pass
+it by name: in bmm 1.4 it was the fifth argument, which is now \code{tau}.
+Until bmm 1.6.0 a logical value in that position is still read as \code{log},
+with a warning.}
 
 \item{q}{Vector of quantiles}
 
@@ -96,7 +106,7 @@ lines(x, d, type = "l", col = "red")
 }
 \references{
 Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
-representations in visual working memory. Nature, 453.
+representations in visual working memory. Nature, 453(7192), 233-235.
 
 van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 Variability in encoding precision accounts for visual short-term memory

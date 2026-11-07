@@ -256,14 +256,14 @@ test_that("a custom link set on a model reaches the brms family", {
   expect_equal(family$link_bound, "softplus")
 
   dat <- oberauer_lin_2017
-  ff <- bmmformula(kappa ~ 1, K ~ 1, pnt ~ 1)
+  ff <- bmmformula(kappa ~ 1, K ~ 1, ptarget ~ 1)
   model <- mixture3p("dev_rad",
     nt_features = paste0("col_nt", 1:7), set_size = "set_size", version = "slot",
-    links = list(kappa = "softplus", pnt = "probit")
+    links = list(kappa = "softplus", ptarget = "probit")
   )
   family <- configure_model(model, check_data(model, dat, ff), ff)$formula$family
   expect_equal(family$link_kappa, "softplus")
-  expect_equal(family$link_pnt, "probit")
+  expect_equal(family$link_ptarget, "probit")
   # the softmax weights of the simple version reach brms untransformed
   model <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
   ff <- bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1)

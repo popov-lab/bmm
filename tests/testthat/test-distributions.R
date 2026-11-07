@@ -2372,6 +2372,80 @@ test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.
   expect_equal(.ezdm_logit_pc(0.45, bound - 0.45, 30), 2 * 30 * 0.45)
 })
 
+# The expected values are what bmm 1.4 returned for these positional calls
+test_that("a logical in tau's position is read as log, with a deprecation warning", {
+  expect_warning(
+    m2 <- dmixture2p(0.3, 0, 5, 0.6, TRUE),
+    "`dmixture2p(x, mu, kappa, p_mem, TRUE)` is deprecated since bmm 1.5.0",
+    fixed = TRUE
+  )
+  expect_equal(m2, -0.7343545, tolerance = 1e-6)
+  expect_warning(
+    m3 <- dmixture3p(0.3, c(0, 2, -1.5), 5, 0.6, 0.2, TRUE),
+    "Use `dmixture3p(x, mu, kappa, p_mem, p_nt, log = TRUE)` instead",
+    fixed = TRUE
+  )
+  expect_equal(m3, -0.8018945, tolerance = 1e-6)
+  expect_warning(
+    im <- dimm(0.3, c(0, 2, -1.5), c(0, 0.5, 2), 5, 2, 1, 2, 5, TRUE),
+    "now holds `tau`"
+  )
+  expect_equal(im, -1.018699, tolerance = 1e-6)
+  expect_warning(dens <- dmixture2p(0.3, 0, 5, 0.6, FALSE), "deprecated")
+  expect_equal(dens, exp(-0.7343545), tolerance = 1e-6)
+})
+
+test_that("the positional log warning is the lifecycle policy's deprecation warning", {
+  policy <- function(fun, before) {
+    tryCatch(warn_deprecated(
+      what = glue("{fun}({before}, TRUE)"),
+      with = glue("{fun}({before}, log = TRUE)"),
+      since = "1.5.0",
+      details = "That position now holds `tau`, so pass `log` by name."
+    ), warning = conditionMessage)
+  }
+  expect_warning(
+    dmixture2p(0.3, 0, 5, 0.6, TRUE),
+    policy("dmixture2p", "x, mu, kappa, p_mem"), fixed = TRUE
+  )
+  expect_warning(
+    dmixture3p(0.3, c(0, 2, -1.5), 5, 0.6, 0.2, TRUE),
+    policy("dmixture3p", "x, mu, kappa, p_mem, p_nt"), fixed = TRUE
+  )
+  expect_warning(
+    dimm(0.3, c(0, 2, -1.5), c(0, 0.5, 2), 5, 2, 1, 2, 5, TRUE),
+    policy("dimm", "x, mu, dist, c, a, b, s, kappa"), fixed = TRUE
+  )
+})
+
+test_that("the capacity versions of dmixture2p() and rmixture2p() need set_size", {
+  withr::local_seed(445)
+  expect_error(
+    dmixture2p(0.3, K = 2, version = "slot"),
+    "set_size argument is required"
+  )
+  expect_error(
+    rmixture2p(5, K = 2, version = "slot_averaging"),
+    "set_size argument is required"
+  )
+  expect_silent(dmixture2p(0.3, set_size = 4, version = "slot"))
+})
+
+test_that("dmixture2p() and rmixture2p() warn about arguments the version ignores", {
+  withr::local_seed(445)
+  expect_warning(
+    dmixture2p(0.3, K = 2, set_size = 4),
+    "The 'simple' version of mixture2p ignores 'K', 'set_size'",
+    fixed = TRUE
+  )
+  expect_warning(
+    dmixture2p(0.3, p_mem = 0.5, set_size = 4, version = "slot"),
+    "ignores 'p_mem'"
+  )
+  expect_warning(rmixture2p(5, K = 2), "ignores 'K'")
+  expect_silent(dmixture2p(0.3, p_mem = 0.5))
+})
+
 test_that("dmpt and rmpt ignore parameters the selected tree does not use", {
   withr::local_seed(445)
   model <- mpt(list(

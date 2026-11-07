@@ -13,9 +13,10 @@
   s = "Spatial similarity gradient",
   b = glue(
     "Background activation, the reference against which the activations of \\
-    the target and the non-targets are weighed. Fixed internally to 1; \\
-    freeing it leaves the remaining activations unidentified, since only \\
-    their ratio to the background enters the likelihood."
+    the target and the non-targets are weighed. Fixed internally to 0 on its \\
+    log scale, i.e. to an activation of 1; freeing it leaves the remaining \\
+    activations unidentified, since only their ratio to the background enters \\
+    the likelihood."
   )
 )
 
@@ -83,11 +84,13 @@
         if (variable_precision) .circmix_vp_citation
       ),
       version = version,
-      requirements = glue(
-        "- The response vairable should be in radians and \\
-          represent the angular error relative to the target
-          - The non-target features should be in radians and be \\
-          centered relative to the target"
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the requirements in one list
+      requirements = paste0(
+        "- The response variable should be in radians and represent the ",
+        "angular error relative to the target\n",
+        "  - The non-target features should be in radians and be centered ",
+        "relative to the target"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -156,10 +159,12 @@ settable_links.imm <- function(model) {
 #'  `full`, `bsc`, or `abc`. The default is `full`.
 #' @param variable_precision Logical; if `TRUE`, the precision of memory varies
 #'   from trial to trial (van den Berg et al., 2012). This adds the parameter
-#'   `tau`; see [mixture2p()] for the parameterisation. The capacity models of
-#'   Zhang and Luck (2008) do not apply to the IMM, which has no discrete slots
-#'   -- its bottleneck is the ratio of context to general activation -- so
-#'   variable precision is the only additional version offered here.
+#'   `tau`, and `kappa` then describes the average trial: it is the
+#'   concentration whose Fisher information `J(kappa)` is the mean of `J`; see
+#'   [mixture2p()] for the parameterisation. The capacity models of Zhang and
+#'   Luck (2008) do not apply to the IMM, which has no discrete slots -- its
+#'   bottleneck is the ratio of context to general activation -- so variable
+#'   precision is the only extension offered here.
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41, default
 #'   81. See [mixture2p()] for the accuracy this buys and the shapes it refuses.
@@ -167,6 +172,15 @@ settable_links.imm <- function(model) {
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
+#' @references Oberauer, K., & Lin, H.-Y. (2017). An interference model of
+#'   visual working memory. Psychological Review, 124(1), 21-59.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
+#'
+#'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
+#'   in visual working memory. Nature, 453(7192), 233-235.
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # load data
 #' data <- oberauer_lin_2017

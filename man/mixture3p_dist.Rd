@@ -32,11 +32,21 @@ rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
 target item and any additional values indicate the location of non-target
 items.}
 
-\item{kappa}{Vector of precision values}
+\item{kappa}{Vector of precision values. With \code{tau > 0} this is the
+concentration of the average trial, whose Fisher information \code{J(kappa)} is
+the mean of \code{J}.}
 
-\item{p_mem}{Vector of probabilities for memory recall}
+\item{p_mem}{Vector of probabilities of a target response. For a
+\code{\link[=mixture3p]{mixture3p()}} fit these are \code{thetat} on its native scale (version
+\code{"simple"}, see \code{\link[=native_parameters]{native_parameters()}}) or \code{min(1, K / set_size) * ptarget}
+(versions \code{"slot"} and \code{"slot_averaging"}).}
 
-\item{p_nt}{Vector of probabilities for swap errors}
+\item{p_nt}{Vector of probabilities of a non-target response, summed over
+the non-targets, which share it equally. For a \code{\link[=mixture3p]{mixture3p()}} fit these are
+\code{thetant} on its native scale (version \code{"simple"}) or
+\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions). Unlike
+\code{ptarget}, \code{p_mem} and \code{p_nt} are not conditional on a response from
+memory.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
@@ -44,9 +54,14 @@ Fisher information \code{J} of a memory representation is drawn from
 precision. See \code{\link[=mixture3p]{mixture3p()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
-odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
+function needs no nodes: it draws \code{J} from its gamma distribution and then
+the response, which is exact.}
 
-\item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
+\item{log}{Logical; if \code{TRUE}, values are returned on the log scale. Pass
+it by name: in bmm 1.4 it was the sixth argument, which is now \code{tau}.
+Until bmm 1.6.0 a logical value in that position is still read as \code{log},
+with a warning.}
 
 \item{q}{Vector of quantiles}
 
@@ -57,15 +72,15 @@ odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
 \value{
 \code{dmixture3p} gives the density of the three-parameter mixture model,
 \code{pmixture3p} gives the cumulative distribution function of the
-two-parameter mixture model, \code{qmixture3p} gives the quantile function of
-the two-parameter mixture model, and \code{rmixture3p} gives the random
-generation function for the two-parameter mixture model.
+three-parameter mixture model, \code{qmixture3p} gives the quantile function of
+the three-parameter mixture model, and \code{rmixture3p} gives the random
+generation function for the three-parameter mixture model.
 }
 \description{
 Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of \code{mu}, precision of
-memory representations \code{kappa}, probability of recalling items from memory
-\code{p_mem}, and probability of recalling non-targets \code{p_nt}.
+memory representations \code{kappa}, probability of a target response \code{p_mem},
+and probability of a non-target response \code{p_nt}.
 }
 \examples{
 # generate random samples from the mixture3p model and overlay the density
@@ -79,6 +94,10 @@ lines(x, d, type = "l", col = "red")
 \references{
 Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
 precision of visual working memory is set by allocation of a shared
-resource. Journal of Vision, 9(10), 7.
+resource. Journal of Vision, 9(10), Article 7.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
 }
 \keyword{distribution}

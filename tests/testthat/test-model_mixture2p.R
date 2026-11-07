@@ -144,11 +144,12 @@ test_that("dmixture2p() and rmixture2p() refuse what the model refuses", {
       )
     }
   }
-  # the simple version ignores set_size, as the model does
-  expect_equal(
-    dmixture2p(0.1, kappa = 6, p_mem = 0.7, set_size = 0),
-    dmixture2p(0.1, kappa = 6, p_mem = 0.7)
+  # the simple version ignores set_size, as the model does, and says so
+  expect_warning(
+    ignored <- dmixture2p(0.1, kappa = 6, p_mem = 0.7, set_size = 0),
+    "'simple' version of mixture2p ignores 'set_size'"
   )
+  expect_equal(ignored, dmixture2p(0.1, kappa = 6, p_mem = 0.7))
   # 21 nodes miss the log density by about 1e-2 at a gamma shape near 3
   expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 21), "odd number of at least 41")
   expect_error(dmixture2p(0.1, tau = 1, vp_nodes = 42), "odd number of at least 41")
@@ -164,8 +165,10 @@ test_that("rmixture2p() is exact at high precision", {
   # 1e-4 is about six Monte Carlo standard errors of the SD at 2e5 draws
   withr::local_seed(434)
   for (version in c("simple", "slot", "slot_averaging")) {
-    draws <- rmixture2p(
-      2e5, mu = 0.0087, kappa = 1e4, p_mem = 1, K = 4, set_size = 4, version = version
+    version_args <- if (version == "simple") list(p_mem = 1) else list(K = 4, set_size = 4)
+    draws <- do.call(
+      rmixture2p,
+      c(list(2e5, mu = 0.0087, kappa = 1e4, version = version), version_args)
     )
     expect_lt(abs(sd(draws) - 0.01), 1e-4)
   }
@@ -188,9 +191,13 @@ test_that("posterior_predict() samples the density log_lik() evaluates, for ever
     for (version in c("simple", "slot", "slot_averaging")) {
       draws <- .mixture2p_posterior_predict(version)(1, prep)
       observed <- as.numeric(table(cut(draws, breaks))) / n
+      version_args <- if (version == "simple") list(p_mem = 0.7) else list(K = 3, set_size = 2)
       expected <- vapply(seq_len(20), function(i) {
         stats::integrate(function(x) {
-          dmixture2p(x, kappa = 6, p_mem = 0.7, K = 3, set_size = 2, tau = tau, version = version)
+          do.call(
+            dmixture2p,
+            c(list(x, kappa = 6, tau = tau, version = version), version_args)
+          )
         }, breaks[i], breaks[i + 1])$value
       }, numeric(1))
       expect_lt(max(abs(observed - expected)), 0.005)

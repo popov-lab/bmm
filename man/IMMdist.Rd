@@ -71,7 +71,9 @@ rimm(
 
 \item{s}{Vector of generalization gradients}
 
-\item{kappa}{Vector of precision values}
+\item{kappa}{Vector of precision values. With \code{tau > 0} this is the
+concentration of the average trial, whose Fisher information \code{J(kappa)} is
+the mean of \code{J}.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
@@ -79,9 +81,14 @@ Fisher information \code{J} of a memory representation is drawn from
 precision. See \code{\link[=imm]{imm()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
-odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}.}
+odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
+function needs no nodes: it draws \code{J} from its gamma distribution and then
+the response, which is exact.}
 
-\item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
+\item{log}{Logical; if \code{TRUE}, values are returned on the log scale. Pass
+it by name: in bmm 1.4 it was the ninth argument, which is now \code{tau}.
+Until bmm 1.6.0 a logical value in that position is still read as \code{log},
+with a warning.}
 
 \item{q}{Vector of quantiles}
 
@@ -122,5 +129,9 @@ lines(x, d, type = "l", col = "red")
 Oberauer, K., Stoneking, C., Wabersich, D., & Lin, H.-Y. (2017).
 Hierarchical Bayesian measurement models for continuous reproduction of
 visual features from working memory. Journal of Vision, 17(5), 11.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
 }
 \keyword{distribution}

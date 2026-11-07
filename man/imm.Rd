@@ -56,10 +56,12 @@ columns in the dataset.}
 
 \item{variable_precision}{Logical; if \code{TRUE}, the precision of memory varies
 from trial to trial (van den Berg et al., 2012). This adds the parameter
-\code{tau}; see \code{\link[=mixture2p]{mixture2p()}} for the parameterisation. The capacity models of
-Zhang and Luck (2008) do not apply to the IMM, which has no discrete slots
--- its bottleneck is the ratio of context to general activation -- so
-variable precision is the only additional version offered here.}
+\code{tau}, and \code{kappa} then describes the average trial: it is the
+concentration whose Fisher information \code{J(kappa)} is the mean of \code{J}; see
+\code{\link[=mixture2p]{mixture2p()}} for the parameterisation. The capacity models of Zhang and
+Luck (2008) do not apply to the IMM, which has no discrete slots -- its
+bottleneck is the ratio of context to general activation -- so variable
+precision is the only extension offered here.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
 \code{variable_precision = TRUE}; must be an odd number of at least 41, default
@@ -91,13 +93,9 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Requirements:}
 \itemize{
-\item The response vairable should be in radians and represent the angular error relative to the target
-}
-}
-\itemize{
+\item The response variable should be in radians and represent the angular error relative to the target
 \item The non-target features should be in radians and be centered relative to the target
 }
-\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
@@ -105,7 +103,7 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
-\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -162,20 +160,16 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Requirements:}
 \itemize{
-\item The response vairable should be in radians and represent the angular error relative to the target
-}
-}
-\itemize{
+\item The response variable should be in radians and represent the angular error relative to the target
 \item The non-target features should be in radians and be centered relative to the target
 }
-\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
 \item \code{kappa}: Concentration of the von Mises distribution of memory responses
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
-\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -226,20 +220,16 @@ Please use \code{imm(version = 'full')}, \code{imm(version = 'bsc')}, or \code{i
 \itemize{
 \item \strong{Requirements:}
 \itemize{
-\item The response vairable should be in radians and represent the angular error relative to the target
-}
-}
-\itemize{
+\item The response variable should be in radians and represent the angular error relative to the target
 \item The non-target features should be in radians and be centered relative to the target
 }
-\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
 \item \code{kappa}: Concentration of the von Mises distribution of memory responses
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
-\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
+\item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
 }
 \item \strong{Fixed parameters:}
 \itemize{
@@ -352,6 +342,17 @@ fit <- bmm(
   backend = "cmdstanr"
 )
 \dontshow{\}) # examplesIf}
+}
+\references{
+Oberauer, K., & Lin, H.-Y. (2017). An interference model of
+visual working memory. Psychological Review, 124(1), 21-59.
+
+van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+Variability in encoding precision accounts for visual short-term memory
+limitations. PNAS, 109(22), 8780-8785.
+
+Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
+in visual working memory. Nature, 453(7192), 233-235.
 }
 \keyword{bmmodel}
 \keyword{deprecated}

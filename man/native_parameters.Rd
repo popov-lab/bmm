@@ -119,9 +119,11 @@ relative starting point \code{zr} is fixed at \code{0} under a \code{logit} link
 therefore reported as \code{0.5}, and the \code{ezdm} and \code{cswald} diffusion constant \code{s}
 is fixed at \code{0} under a \code{log} link and is reported as \code{1}.
 
-Trial-level derived quantities, such as the response probabilities of the
-mixture models or the category probabilities of \code{m3}, are not returned; use
-\code{\link[brms:posterior_epred]{brms::posterior_epred()}} for those.
+Trial-level derived quantities, such as the category probabilities of \code{m3},
+are not returned; use \code{\link[brms:posterior_epred]{brms::posterior_epred()}} for those. The circular
+mixture models have no expected response, so their \code{posterior_epred()} stops;
+the probabilities of their response types follow from the returned
+parameters, as the section on mixture weights describes.
 
 The default grid contains the observed combinations of the predictors, not
 their full crossing, so cells that were never presented do not appear. A
@@ -146,20 +148,32 @@ draw.
 }
 
 \section{Mixture weights}{
+For \code{mixture2p}, \code{thetat} is the probability that a response comes from
+memory rather than from guessing.
+
 For \code{mixture3p} the returned \code{thetat} and \code{thetant} are probabilities but they
-\strong{do not sum to 1}: \code{brms} holds the linear predictor of one mixture
-component at zero, and that component is the guessing distribution, so the
-remaining mass \code{1 - thetat - thetant} is the probability of a guess. \code{thetant}
-is the \emph{total} probability of a non-target response, summed over the lures,
-not the probability per lure.
+\strong{do not sum to 1}: the likelihood weighs both against the guessing
+distribution, whose weight is the fixed reference, so the remaining mass
+\code{1 - thetat - thetant} is the probability of a guess. \code{thetant} is the \emph{total}
+probability of a non-target response, summed over the lures, not the
+probability per lure.
 
 At set sizes where no non-target was presented the model switches its
 non-target components off, so \code{thetant} is reported as exactly \code{0} and
 \code{thetat} as \code{plogis()} of its linear predictor, rather than as the value the
-set-size regression extrapolates to. This correction reads the lure indicators
-out of the prediction grid; if you supply \code{newdata}, columns you do not supply
-are filled from the first row of the model data rather than recomputed, and
-\code{native_parameters()} warns when the two disagree.
+set-size regression extrapolates to. This correction reads the set size from
+the prediction grid: if you supply \code{newdata} without the set-size variable,
+every row takes the set size of the first row of the model data.
+
+In the \code{"slot"} and \code{"slot_averaging"} versions of \code{mixture3p}, \code{ptarget} is a
+probability \emph{given} that a response comes from memory. The probability of a
+memory response, \code{min(1, K / set_size)}, depends on the set size and is not
+returned. If the formula gives set size 1 a coefficient of its own, \code{ptarget}
+at set size 1 reflects only its prior, because a single item cannot be
+swapped.
+
+With \code{variable_precision = TRUE}, \code{tau} is returned on its native scale, and
+\code{kappa} is the concentration of the average trial.
 }
 
 \examples{
