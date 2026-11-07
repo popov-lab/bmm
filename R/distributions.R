@@ -1089,6 +1089,187 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   )
 }
 
+#' @title Distribution functions for the interference measurement model of
+#'   change detection (imm_cd)
+#'
+#' @description Probability and random generation for single-probe change
+#'   detection when memory is the interference measurement model: the observer
+#'   retrieves a feature from the memory of [imm()] (the target, a non-target
+#'   or a guess, by their activations) and compares it with the probe,
+#'   following the decision rule of Lin and Oberauer (2022). See [imm_cd()].
+#'
+#' @name imm_cd_dist
+#'
+#' @param response Vector of responses, 0 = "same" and 1 = "change"
+#' @param n Number of observations to generate data for
+#' @param probe Vector of probes in radians, in the same frame as `mu`
+#' @param mu Vector of locations. The first value is the location of the
+#'   target item and any further values are the locations of the non-target
+#'   items, as in [dimm()].
+#' @param dist Vector of distances of the items to the cued location, the
+#'   target's (0) first, as in [dimm()]
+#' @param c Vector of strengths for cue-dependent activation
+#' @param a Vector of strengths for cue-independent activation
+#' @param b Vector of background activations
+#' @param s Vector of generalization gradients
+#' @param kappa Vector of precision values
+#' @param criterion Vector of decision criteria, on the scale of the model
+#'   parameter: 0, the default, is the unbiased observer, and other values are
+#'   kept inside each trial's range of evidence as in the model (see the
+#'   section "Decision criterion" of [imm_cd()]).
+#' @param variable_precision Must be `FALSE`; variable precision is planned
+#'   for bmm 1.6.0.
+#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#'
+#' @details "Change" is the response when the retrieved feature falls outside
+#'   an arc around the probe, whose half-width follows from `kappa`,
+#'   `criterion` and the observer's prior that the feature comes from the
+#'   probed item, here the probability of retrieving the target (Lin &
+#'   Oberauer, 2022, Appendix B). `dimm_cd()` integrates the retrieval mixture
+#'   over that arc. `rimm_cd()` draws the remembered feature of every trial and
+#'   lets the observer decide on it, so it does not use `dimm_cd()`. As for
+#'   [dimm()], these functions take the full model; the versions `"bsc"` and
+#'   `"abc"` of [imm_cd()] correspond to `a = 0` and to `s = Inf`.
+#'
+#' @keywords distribution
+#'
+#' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
+#'   visual working memory: Applications to the change detection task.
+#'   Cognitive Psychology, 133, 101463.
+#'
+#' @return `dimm_cd()` gives the probability of each response, and `rimm_cd()`
+#'   random responses coded 0 ("same") and 1 ("change").
+#'
+#' @export
+#'
+#' @examples
+#' # P("change") for a probe at the target, at a near and at a far non-target,
+#' # and far from every item
+#' dimm_cd(1,
+#'   probe = c(0, 2, -1.5, -2.6), mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
+#'   c = 4, a = 0.5, s = 2, kappa = 8
+#' )
+#' mean(rimm_cd(1000,
+#'   probe = 2, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
+#'   c = 4, a = 0.5, s = 2, kappa = 8
+#' ))
+dimm_cd <- function(response, probe, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
+                    c = 5, a = 2, b = 1, s = 2, kappa = 5, criterion = 0,
+                    variable_precision = FALSE, log = FALSE) {
+  .cd_check_variable_precision(variable_precision)
+  .check_imm_args(kappa, s, dist, 0, length(mu))
+  stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
+
+  args <- .circmix_recycle(
+    response = response, probe = probe, c = c, a = a, s = s, b = b,
+    kappa = kappa, criterion = criterion
+  )
+  n <- length(args$response)
+  weights <- .imm_item_weights(args$c, args$a, args$s, args$b, dist)
+  p_same <- .circmix_cd_psame(
+    args$probe - matrix(mu, nrow = n, ncol = length(mu), byrow = TRUE),
+    weights$logw, weights$logw_guess, args$kappa, args$criterion,
+    exp(weights$logw[, 1])
+  )
+  out <- .cd_bernoulli_ld(args$response, p_same)
+  if (log) out else exp(out)
+}
+
+#' @rdname imm_cd_dist
+#' @export
+rimm_cd <- function(n, probe, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
+                    c = 5, a = 2, b = 1, s = 2, kappa = 5, criterion = 0,
+                    variable_precision = FALSE) {
+  .cd_check_variable_precision(variable_precision)
+  .check_imm_args(kappa, s, dist, 0, length(mu))
+  set_size <- length(mu)
+  .imm_cd_observe(
+    probe = rep_len(probe, n) - mu[1], mu = 0,
+    nt = matrix(mu[-1] - mu[1], nrow = n, ncol = set_size - 1, byrow = TRUE),
+    dist = matrix(dist[-1], nrow = n, ncol = set_size - 1, byrow = TRUE),
+    set_size = set_size, kappa = kappa, c = c, a = a, s = s, b = b,
+    criterion = criterion, target_dist = dist[1]
+  )
+}
+
+# P("same") for one row per observation or posterior draw, at one set size
+# and one row of non-targets and distances; twin of the imm_cd_<version>_core
+# functions in imm_cd_functions.stan. The observer's prior p_s is the target's
+# retrieval weight.
+.imm_cd_psame <- function(probe, mu, kappa, c, a, s, b, criterion, set_size,
+                          nt, dist, version) {
+  args <- .circmix_recycle(
+    probe = probe, mu = mu, kappa = kappa, c = c, a = a %||% 1, s = s %||% 0,
+    b = b, criterion = criterion
+  )
+  weights <- .imm_log_weights(
+    args$c, args$a, args$s, args$b, set_size, dist, version
+  )
+  .circmix_cd_psame(
+    args$probe - .circmix_locations(args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$criterion,
+    exp(weights$logw[, 1])
+  )
+}
+
+# The observer of imm_cd, trial by trial: compute the activations of the
+# target (c + a at distance 0), of each non-target (c exp(-s dist) + a) and of
+# the background b, draw which of them wins and the remembered feature x, then
+# answer "change" when the log-likelihood ratio -log(1 - p_s + p_s 2 pi f(x))
+# exceeds the bounded criterion, f being the von Mises density of x around the
+# probe and p_s the target's share of the activation. It shares no code with
+# .imm_cd_psame(), which integrates over x, so the two check each other. One
+# row per trial: set_size may vary by row, nt and dist hold a row's
+# non-targets in their first set_size - 1 columns. a = NULL is the "bsc"
+# version (no cue-independent activation), s = NULL the "abc" version (no
+# cue-dependent activation of the non-targets).
+.imm_cd_observe <- function(probe, mu, nt, dist, set_size, kappa, c, a, s, b,
+                            criterion, target_dist = 0) {
+  n <- length(probe)
+  args <- lapply(
+    list(mu = mu, kappa = kappa, c = c, a = a %||% 0, b = b, criterion = criterion,
+         ss = set_size),
+    rep_len, length.out = n
+  )
+  ss <- args$ss
+  max_nt <- ncol(nt)
+  active <- col(nt) < ss
+  cue <- if (is.null(s)) 0 else args$c * exp(-rep_len(s, n) * dist)
+  nt_act <- matrix(cue + args$a, nrow = n, ncol = max_nt)
+  nt_act[!active] <- 0
+  target_act <- if (is.null(s)) args$c + args$a else args$c * exp(-rep_len(s, n) * target_dist) + args$a
+  act <- cbind(target_act, nt_act)
+  total <- rowSums(act) + args$b
+  p_s <- target_act / total
+
+  # the winner is the first item whose cumulative activation exceeds the draw;
+  # an inactive non-target adds nothing to the sum and can never win
+  draw <- stats::runif(n) * total
+  winner <- rowSums(matrixStats::rowCumsums(act) <= draw) + 1
+  remembered <- winner <= max_nt + 1
+  location <- args$mu
+  swapped <- which(remembered & winner > 1)
+  location[swapped] <- nt[cbind(swapped, winner[swapped] - 1)]
+  x <- stats::runif(n, -pi, pi)
+  x[remembered] <- location[remembered] +
+    brms::rvon_mises(sum(remembered), 0, args$kappa[remembered])
+
+  # 2 pi times a von Mises density, exp(kappa (cos d - 1)) / (I0(kappa) e^-kappa)
+  vm2pi <- function(cos_d) exp(args$kappa * (cos_d - 1)) / besselI(args$kappa, 0, expon.scaled = TRUE)
+  llr <- -log(1 - p_s + p_s * vm2pi(cos(x - probe)))
+  # the trial's range of evidence: the density is largest at the probe and
+  # smallest opposite it
+  llr_max <- -log(1 - p_s + p_s * vm2pi(-1))
+  llr_min <- -log(1 - p_s + p_s * vm2pi(1))
+  crit <- args$criterion
+  bounded <- crit
+  up <- crit > 0
+  bounded[up] <- llr_max[up] * tanh(crit[up] / llr_max[up])
+  down <- crit < 0
+  bounded[down] <- -llr_min[down] * tanh(crit[down] / -llr_min[down])
+  as.integer(llr > bounded)
+}
+
 #' @title Distribution functions for the Memory Measurement Model (M3)
 #'
 #' @description Density and random generation functions for the memory
