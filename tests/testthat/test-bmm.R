@@ -281,3 +281,20 @@ test_that("stancode() and default_prior() do not build the inits, which they do 
   expect_type(stancode(f, dat, sdm("y")), "character")
   expect_s3_class(default_prior(f, dat, sdm("y")), "brmsprior")
 })
+
+test_that("stanvars given to bmm() keep the model's own stanvars (#688)", {
+  withr::local_seed(445)
+  f <- bmf(kappa ~ 1, thetat ~ 1)
+  dat <- data.frame(y = rmixture2p(10))
+  sv <- brms::stanvar(scode = "real one() { return 1; }", block = "functions")
+  code <- stancode(f, dat, mixture2p("y"), stanvars = sv)
+  expect_match(code, "real one() { return 1; }", fixed = TRUE)
+  expect_match(code, "vector\\[[0-9]+\\] circmix_logk;")
+  expect_true("circmix_logk" %in% names(standata(f, dat, mixture2p("y"), stanvars = sv)))
+  fit <- bmm(f, dat, mixture2p("y"), stanvars = sv, backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_true(all(c("circmix_logk", "mixture2p_functions") %in% names(fit$stanvars)))
+  expect_error(
+    stancode(f, dat, mixture2p("y"), stanvars = brms::stanvar(x = 1, name = "circmix_logk")),
+    "already defines stanvars named 'circmix_logk'"
+  )
+})

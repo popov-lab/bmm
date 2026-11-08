@@ -154,14 +154,31 @@ glue_nlf <- function(..., env.frame = -1) {
 
 # args$prior is NULL by default or is the combined default and user-provided
 # prior; args$dots holds whatever the user passed to bmm() and so overwrites the
-# configured default for any argument (such as init) they named themselves
+# configured default for any argument (such as init) they named themselves.
+# stanvars are the exception: the model's carry part of its likelihood, so the
+# user's are added to them (#688)
 combine_args <- function(args) {
   config_args <- args$config_args
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
+  if (!is.null(dots$stanvars)) {
+    dots$stanvars <- combine_stanvars(config_args$stanvars, dots$stanvars)
+  }
   config_args[names(dots)] <- dots
   c(config_args, args$opts)
+}
+
+combine_stanvars <- function(model_stanvars, user_stanvars) {
+  if (is.null(model_stanvars)) {
+    return(user_stanvars)
+  }
+  clash <- intersect(setdiff(names(model_stanvars), ""), names(user_stanvars))
+  stopif(
+    length(clash) > 0,
+    "The model already defines stanvars named {collapse_comma(clash)}. Rename yours."
+  )
+  model_stanvars + user_stanvars
 }
 
 local_brms_threads <- function(dots) {
