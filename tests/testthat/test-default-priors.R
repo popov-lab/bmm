@@ -547,7 +547,11 @@ test_that("a parameter formula without coefficients gets no default main prior (
 
   pr <- default_prior(bmf(kappa ~ 1, thetat ~ 0), data, model)
   expect_false(any(pr$dpar == "thetat" & pr$source == "user"))
-  expect_match(stancode(bmf(kappa ~ 1, thetat ~ 0), data, model), "vector\\[N\\] thetat = rep_vector\\(0\\.0, N\\);")
+  # brms initialises every linear predictor at zero, so only the absence of an
+  # added term separates thetat ~ 0 from thetat ~ 1
+  sc <- stancode(bmf(kappa ~ 1, thetat ~ 0), data, model)
+  expect_match(sc, "thetat = inv_logit\\(thetat\\);")
+  expect_no_match(sc, "thetat \\+=")
 
   # random effects without coefficients still get their sd prior
   pr <- default_prior(bmf(kappa ~ 0 + offset(log_kappa) + (1 | ID), thetat ~ 1), data, model)
