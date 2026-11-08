@@ -283,6 +283,7 @@ test_that("stancode() and default_prior() do not build the inits, which they do 
 })
 
 test_that("stanvars given to bmm() keep the model's own stanvars (#688)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(445)
   f <- bmf(kappa ~ 1, thetat ~ 1)
   dat <- data.frame(y = rmixture2p(10))
