@@ -325,6 +325,9 @@ test_that("the SDT d*() functions recycle counts, thresholds and parameters to t
   )
   expect_elementwise(dsdt_dpsdt, list(counts = counts2, stimulus = c(1, 1, 0), d = c(1, 1.5, 2, 0.8),
                                       thresholds = thr3, Ro = c(0.2, 0.3, 0.4), Rn = c(0, 0.1)))
+  # Rn acts on noise trials only, so three of them take three different values
+  expect_elementwise(dsdt_dpsdt, list(counts = counts2, stimulus = c(0, 0, 1, 0), d = c(1, 1.5, 2, 0.8),
+                                      thresholds = thr3, Ro = c(0.2, 0.3, 0.4), Rn = c(0.05, 0.3, 0.1, 0.2)))
   expect_elementwise(dsdt_metad, list(counts = counts2, stimulus = c(1, 1, 0), d = c(1, 1.5, 2, 0.8),
                                       thresholds = thr3, metad = c(0.8, 1, 1.2), sdratio = c(1, 1.2)))
   expect_elementwise(dsdt_ranking, list(counts = rbind(c(50, 30, 15, 5), c(20, 30, 30, 20)), m = 4,
@@ -441,6 +444,12 @@ test_that("rsdt_dpsdt() pairs recollection with the rating parameters per draw",
                                          thresholds = rbind(c(20, 21, 22), c(-22, -21, -20)), Ro = c(0, 1, 0)))
   expect_equal(max.col(counts), c(1L, 4L, 1L, 4L, 4L, 4L, 1L))
   expect_equal(counts[cbind(1:7, max.col(counts))], c(10, 20, 30, 40, 10, 20, 30))
+  # the same for Rn, which acts on noise trials only: familiarity puts every
+  # response in category 4, recollection of a noise item moves it to 1
+  counts <- NULL
+  expect_no_warning(counts <- rsdt_dpsdt(7, 10, stimulus = c(0, 0, 1, 0), d = 1,
+                                         thresholds = c(-22, -21, -20), Ro = 0, Rn = c(1, 0, 0)))
+  expect_equal(max.col(counts), c(1L, 4L, 4L, 1L, 4L, 4L, 4L))
 })
 
 test_that("rsdt_metad() pairs metacognitive sensitivity with the rating parameters per draw", {
