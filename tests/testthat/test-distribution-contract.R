@@ -22,16 +22,28 @@ pick <- function(x, i) {
 obs_length <- function(x) if (is.matrix(x)) nrow(x) else length(x)
 
 # the vectorised call equals the calls on the i-th elements alone, without
-# recycling warnings
+# recycling warnings. A case can fail only if every varied argument changes
+# when reversed (a b a at n = 3 does not) and every reference value is finite
+# and non-zero (a density that underflows to 0 needs log = TRUE).
 expect_elementwise <- function(f, args, fixed = list()) {
   n <- max(vapply(args, obs_length, integer(1)))
+  palindromes <- Filter(function(a) {
+    rows <- lapply(seq_len(n), pick, x = args[[a]])
+    length(unique(rows)) > 1 && identical(rev(rows), rows)
+  }, names(args))
+  expect(length(palindromes) == 0,
+         paste("recycled to", n, "these read the same reversed:", toString(palindromes)))
   vec <- NULL
   expect_no_warning(vec <- do.call(f, c(args, fixed)))
   each <- vapply(seq_len(n), function(i) {
     do.call(f, c(lapply(args, pick, i = i), fixed))
   }, numeric(1))
   expect_length(vec, n)
-  expect_equal(vec, each)
+  expect(all(is.finite(each) & each != 0), "a reference value is zero or not finite")
+  # as ratios, so that each element is compared on its own scale:
+  # expect_equal(vec, each) scales its tolerance to the mean over the vector,
+  # and one large density hides an error of many orders in a small one
+  expect_equal(vec / each, rep(1, n))
 }
 
 # draw i belongs to group (i - 1) %% G + 1
@@ -61,9 +73,9 @@ unit_counts <- function(k, K) replace(numeric(K), k, 1)
 
 test_that("dsdm() recycles x and the parameters to the longest argument", {
   expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2), c = c(2, 3, 4, 5), kappa = 3))
-  expect_elementwise(dsdm, list(x = 0.3, mu = 0, c = c(2, 3), kappa = c(1, 5, 20)),
+  expect_elementwise(dsdm, list(x = 0.3, mu = 0, c = c(2, 3), kappa = c(1, 5, 20, 10)),
                      fixed = list(log = TRUE))
-  expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2), c = 3, kappa = 3),
+  expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2, -1), c = 3, kappa = 3),
                      fixed = list(parametrization = "bessel"))
 })
 
@@ -102,14 +114,14 @@ test_that("rejection_sampling() is deprecated and still samples", {
 # --- ddm ----------------------------------------------------------------------
 
 test_that("dddm() recycles the observations and the parameters to the longest argument", {
-  expect_elementwise(dddm, list(rt = c(0.6, 0.7), response = c(1, 0), drift = 1:3,
+  expect_elementwise(dddm, list(rt = c(0.6, 0.7), response = c(1, 0), drift = 1:4,
                                 bound = c(1, 1.5), ndt = 0.2, zr = c(0.4, 0.5, 0.6)))
   expect_elementwise(dddm, list(rt = 0.6, response = 1, drift = c(1, 2, 3), bound = 1, ndt = 0.2),
                      fixed = list(log = FALSE))
-  expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8), response = c("upper", "lower", "upper"),
+  expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8, 0.65), response = c("upper", "upper", "lower"),
                                 drift = 1, bound = c(1, 1.5), ndt = 0.2))
   expect_elementwise(dddm, list(rt = 0.6, response = c(1, 0), drift = 1, bound = 1, ndt = 0.2))
-  expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8), response = c("upper", "lower"),
+  expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8, 0.9), response = c("upper", "lower"),
                                 drift = c(1, 2), bound = 1, ndt = 0.2))
 })
 
@@ -148,7 +160,7 @@ test_that("rddm(1, <vectors>) keeps one draw per element until 1.6.0, with a war
 
 test_that("dcswald() recycles the observations and the parameters to the longest argument", {
   expect_elementwise(dcswald, list(rt = 0.6, response = 1, drift = c(1, 2, 3), bound = c(1.5, 1, 2), ndt = 0.2))
-  expect_elementwise(dcswald, list(rt = c(0.6, 0.7, 0.8), response = c(1, 0, 1), drift = c(1, 2, 3),
+  expect_elementwise(dcswald, list(rt = c(0.6, 0.7, 0.8), response = c(0, 1, 1), drift = c(1, 2, 3),
                                    bound = 1.5, ndt = c(0.2, 0.3, 0.1), zr = c(0.4, 0.5, 0.6), s = c(1, 1.2, 0.9)),
                      fixed = list(version = "crisk", log = FALSE))
 })
@@ -177,13 +189,13 @@ test_that("rcswald() returns n draws, draw i from the i-th parameter elements", 
 
 test_that("dezdm() recycles the summary statistics and the parameters to the longest argument", {
   expect_elementwise(dezdm, list(mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025), n_upper = c(80, 75),
-                                 n_trials = 100, drift = c(2, 1.5, 1), bound = 1.5, ndt = c(0.3, 0.25)))
+                                 n_trials = 100, drift = c(2, 1.5, 1, 1.8), bound = 1.5, ndt = c(0.3, 0.25)))
   expect_elementwise(dezdm, list(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100, drift = 2,
-                                 bound = c(1, 1.5, 2), ndt = 0.3, s = c(1, 1.2)),
+                                 bound = c(1, 1.5, 2), ndt = 0.3, s = c(1, 1.2, 0.9)),
                      fixed = list(log = FALSE))
   mean_rt <- rbind(c(0.45, 0.55), c(0.5, 0.6))
   var_rt <- rbind(c(0.018, 0.025), c(0.02, 0.03))
-  expect_elementwise(dezdm, list(mean_rt = mean_rt, var_rt = var_rt, n_upper = c(80, 60, 70), n_trials = 100,
+  expect_elementwise(dezdm, list(mean_rt = mean_rt, var_rt = var_rt, n_upper = c(80, 60, 70, 75), n_trials = 100,
                                  drift = c(2, 1.5, 1), bound = 1.5, ndt = 0.3, zr = c(0.55, 0.45)),
                      fixed = list(version = "4par"))
 })
@@ -199,6 +211,10 @@ test_that("dezdm() recycles parameters of non-multiple lengths to a longer set o
   expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62)), var_rt = rbind(c(0.03, 0.05)),
                                  n_upper = c(20, 22, 18, 21), n_trials = c(40, 42, 45), drift = 0.8,
                                  bound = c(1.2, 1.5, 1.8), ndt = 0.25, zr = c(0.4, 0.6)),
+                     fixed = list(version = "4par"))
+  expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62)), var_rt = rbind(c(0.03, 0.05)),
+                                 n_upper = c(20, 22, 18, 21), n_trials = 40, drift = 0.8, bound = 1.4,
+                                 ndt = 0.25, zr = 0.45, s = c(1, 1.3, 0.8)),
                      fixed = list(version = "4par"))
   expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62)), var_rt = rbind(c(0.03, 0.05), c(0.06, 0.02)),
                                  n_upper = 20, n_trials = 40, drift = 0.8, bound = 1.4, ndt = 0.25),
@@ -291,13 +307,14 @@ thr3 <- rbind(c(0.2, 0.7, 1.2), c(0.3, 0.8, 1.3), c(0.4, 0.9, 1.4))
 counts2 <- rbind(c(2, 8, 20, 70), c(30, 40, 20, 10))
 
 test_that("the SDT d*() functions recycle counts, thresholds and parameters to the longest argument", {
-  expect_elementwise(dsdt_yn, list(n_old = c(50, 60), n_trials = 100, stimulus = c(1, 0, 1), d = 1:3,
-                                   criterion = c(0.5, 0.7)))
+  expect_elementwise(dsdt_yn, list(n_old = c(50, 60), n_trials = 100, stimulus = c(1, 1, 0), d = c(1, 2, 3, 1.5),
+                                   criterion = c(0.4, 0.7, 0.5)))
   expect_elementwise(dsdt_yn, list(n_old = 50, n_trials = c(100, 80), stimulus = 1, d = c(1, 2),
-                                   bias = c(0.1, -0.1, 0.2), sdratio = c(1, 1.5)),
+                                   bias = c(0.1, -0.1, 0.2, 0), sdratio = c(1, 1.5)),
                      fixed = list(dist = "logistic", log = TRUE))
-  expect_elementwise(dsdt_mafc, list(n_correct = c(50, 60), n_trials = c(100, 80, 90), m = c(2, 4), d = 1:3))
-  expect_elementwise(dsdt_rating, list(counts = counts2, stimulus = c(1, 0, 1), d = c(1, 1.5, 2),
+  expect_elementwise(dsdt_mafc, list(n_correct = c(50, 60), n_trials = c(100, 80, 90), m = c(2, 4),
+                                     d = c(1, 2, 3, 1.5)))
+  expect_elementwise(dsdt_rating, list(counts = counts2, stimulus = c(1, 1, 0), d = c(1, 1.5, 2, 0.8),
                                        thresholds = thr3, sdratio = c(1, 1.2)))
   expect_elementwise(dsdt_rating, list(counts = rbind(c(2, 8, 20, 70)), stimulus = 1, d = 1.5, thresholds = thr3),
                      fixed = list(log = TRUE))
@@ -306,26 +323,26 @@ test_that("the SDT d*() functions recycle counts, thresholds and parameters to t
     dsdt_rating(c(2, 8, 20, 70), 1, d = 1.5, thresholds = thr3),
     vapply(1:3, function(i) dsdt_rating(c(2, 8, 20, 70), 1, d = 1.5, thresholds = thr3[i, ]), numeric(1))
   )
-  expect_elementwise(dsdt_dpsdt, list(counts = counts2, stimulus = c(1, 0, 1), d = c(1, 1.5, 2),
+  expect_elementwise(dsdt_dpsdt, list(counts = counts2, stimulus = c(1, 1, 0), d = c(1, 1.5, 2, 0.8),
                                       thresholds = thr3, Ro = c(0.2, 0.3, 0.4), Rn = c(0, 0.1)))
-  expect_elementwise(dsdt_metad, list(counts = counts2, stimulus = c(1, 0, 1), d = c(1, 1.5, 2),
+  expect_elementwise(dsdt_metad, list(counts = counts2, stimulus = c(1, 1, 0), d = c(1, 1.5, 2, 0.8),
                                       thresholds = thr3, metad = c(0.8, 1, 1.2), sdratio = c(1, 1.2)))
   expect_elementwise(dsdt_ranking, list(counts = rbind(c(50, 30, 15, 5), c(20, 30, 30, 20)), m = 4,
-                                        d = c(0.5, 1, 2), sdratio = c(1, 1.5)),
+                                        d = c(0.5, 1, 2, 1.5), sdratio = c(1, 1.5)),
                      fixed = list(dist = "normal"))
   expect_elementwise(dsdt_ranking, list(counts = rbind(c(50, 30, 15, 5), c(60, 40, 0, 0)), m = c(4, 2),
-                                        d = c(0.5, 1, 2)))
+                                        d = c(0.5, 1, 2, 1.5)))
   thr5 <- rbind(c(-1.1, -0.5, 0, 0.6, 1.3), c(-1, -0.4, 0.1, 0.7, 1.4), c(-1.2, -0.6, -0.1, 0.5, 1.2))
   counts_cdp <- rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2), c(30, 20, 10, 5, 5, 10, 2, 3, 15))
-  expect_elementwise(dsdt_cdp, list(counts = counts_cdp, stimulus = c(1, 0, 1), dfam = c(0.8, 1, 0.6),
+  expect_elementwise(dsdt_cdp, list(counts = counts_cdp, stimulus = c(1, 1, 0), dfam = c(0.8, 1, 0.6, 1.2),
                                     drec = c(1, 0.8), thresholds = thr5, rcrit = c(0.5, 0.4, 0.6),
                                     sigmar = c(0, 0.1), rho = c(0, 0.2, -0.1)),
                      fixed = list(n_new = 3))
   counts_cdp_k <- rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2, 1, 2, 1), c(30, 20, 10, 5, 5, 10, 2, 3, 15, 2, 1, 1))
   expect_elementwise(dsdt_cdp, list(counts = counts_cdp_k, stimulus = 1, dfam = 0.8, drec = 1,
                                     thresholds = rbind(c(-1.1, -0.5, 0, 0.6, 1.3)), rcrit = 0.5,
-                                    kcrit = c(0.3, 0.2, 0.4)),
-                     fixed = list(n_new = 3))
+                                    kcrit = c(0.3, 0.2, 0.4, 0.1)),
+                     fixed = list(n_new = 3, log = TRUE))
 })
 
 test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus per draw", {
@@ -334,7 +351,7 @@ test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus p
   criterion <- c(0.2, 0.8, 0.5)
   # not a palindrome, so a reversed pairing is visible
   stimulus <- c(0, 1, 1)
-  sdratio <- c(1, 1.5, 1)
+  sdratio <- c(1, 1.5, 0.6)
   n_trials <- c(50, 100, 80)
   n <- 1500
   g <- group_of(n, 3)
