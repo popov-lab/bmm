@@ -2217,7 +2217,14 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
 
   if (version == "4par") {
-    pair_or_matrix <- function(x) if (is.matrix(x)) ncol(x) == 2 else length(x) %in% c(0, 2)
+    empty_vector <- function(x) !is.matrix(x) && length(x) == 0
+    stopif(
+      empty_vector(mean_rt) || empty_vector(var_rt),
+      "mean_rt or var_rt is an empty vector, but a vector of the upper and lower \\
+      summaries is one observation. For no observations, pass matrices with zero \\
+      rows and 2 columns."
+    )
+    pair_or_matrix <- function(x) if (is.matrix(x)) ncol(x) == 2 else length(x) == 2
     stopif(
       !pair_or_matrix(mean_rt) || !pair_or_matrix(var_rt),
       "mean_rt and var_rt must be length 2 (one observation) or matrices with 2 columns"

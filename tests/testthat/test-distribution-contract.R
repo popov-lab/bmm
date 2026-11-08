@@ -584,3 +584,16 @@ test_that("the d*() functions return an empty result for no observations", {
   expect_identical(dsdt_cdp(matrix(0, 0, 9), 1, dfam = 0.8, drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
                             rcrit = 0.5, n_new = 3), numeric(0))
 })
+
+test_that("dezdm(version = '4par') refuses an empty mean_rt or var_rt vector", {
+  # a 4par vector is one observation, as a vector of counts is; a log_lik()
+  # that loses the boundary indicators passes empty vectors and must not
+  # return an empty log-likelihood
+  for (pair in list(list(numeric(0), numeric(0)), list(c(0.5, 0.6), numeric(0)),
+                    list(numeric(0), rbind(c(0.02, 0.03))))) {
+    expect_error(dezdm(pair[[1]], pair[[2]], 80, 100, drift = 1, bound = 1, ndt = 0.3, version = "4par"),
+                 "empty vector.*zero rows and 2 columns")
+  }
+  expect_error(dezdm(c(0.5, 0.6, 0.7), c(0.02, 0.03), 80, 100, drift = 1, bound = 1, ndt = 0.3, version = "4par"),
+               "must be length 2")
+})
