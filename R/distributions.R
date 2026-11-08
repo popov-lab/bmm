@@ -163,7 +163,9 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 }
 
 # the counts of the multinomial d*() functions as a matrix with one row per
-# observation; a vector is one observation, so an empty vector is refused
+# observation; a vector is one observation, so an empty vector is refused. A
+# data frame, such as count columns taken from the data, is read row by row as
+# a matrix (dsdt_ranking() accepted one before bmm 1.5.0)
 .counts_rows <- function(counts) {
   stopif(
     !is.matrix(counts) && length(counts) == 0,
@@ -171,7 +173,7 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
     For no observations, pass a matrix with zero rows and one column per \\
     response category."
   )
-  rbind(counts)
+  if (is.data.frame(counts)) as.matrix(counts) else rbind(counts)
 }
 
 # the result of the multinomial r*() samplers before the draws fill it
@@ -1663,7 +1665,7 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
   # rnorm() does; the other samplers stopped on it
   if (length(n) > 1) {
     warn_deprecated(
-      what = "rddm(<vector n>, ...)",
+      what = glue("rddm({deparse1(substitute(n))}, ...)"),
       with = glue("rddm({length(n)}, ...)"),
       since = "1.5.0",
       details = "`n` is the number of draws, a single number."
@@ -1676,9 +1678,13 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
   # draw per element, as before 1.5.0; a fraction such as 1.5 stopped then, so
   # it is read as rnorm() reads it, one draw
   if (n == 1 && max_len > 1) {
+    # the warning quotes the call with the vector arguments as they were typed
+    exprs <- list(drift = substitute(drift), bound = substitute(bound), ndt = substitute(ndt), zr = substitute(zr))
+    vectors <- lengths(list(drift, bound, ndt, zr)) > 1
+    args <- paste0(names(exprs)[vectors], " = ", vapply(exprs[vectors], deparse1, character(1)), collapse = ", ")
     warn_deprecated(
-      what = "rddm(1, <parameter vectors>)",
-      with = glue("rddm({max_len}, <parameter vectors>)"),
+      what = glue("rddm({deparse1(substitute(n))}, {args}, ...)"),
+      with = glue("rddm({max_len}, {args}, ...)"),
       since = "1.5.0",
       details = "`n` is the number of draws; the parameters are recycled to it."
     )

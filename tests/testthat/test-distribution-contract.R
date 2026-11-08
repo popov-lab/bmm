@@ -81,6 +81,8 @@ test_that("dsdm() recycles x and the parameters to the longest argument", {
                      fixed = list(log = TRUE))
   expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2, -1), c = 3, kappa = 3),
                      fixed = list(parametrization = "bessel"))
+  # parameter sets that agree in their first four digits get their own integral
+  expect_elementwise(dsdm, list(x = 0.3, mu = 0, c = c(3, 3.0001), kappa = 2))
 })
 
 test_that("rsdm() draws each observation from its own location, strength and precision", {
@@ -103,6 +105,9 @@ test_that("rsdm() draws each observation from its own location, strength and pre
   x <- NULL
   expect_no_warning(x <- rsdm(5, mu = c(-2, 2), c = 10, kappa = 500))
   expect_equal(sign(x), rep_len(c(-1, 1), 5))
+  # n = 2, as in posterior_predict(ndraws = 2), pairs as well
+  x <- replicate(10, rsdm(2, mu = c(-2, 2), c = 10, kappa = 500))
+  expect_equal(sign(x), matrix(c(-1, 1), 2, 10))
 })
 
 test_that("rejection_sampling() is deprecated and still samples", {
@@ -155,8 +160,12 @@ test_that("rddm() returns n draws, draw i from the i-th parameter elements", {
 test_that("rddm(1, <vectors>) keeps one draw per element until 1.6.0, with a warning", {
   withr::local_seed(4442)
   out <- NULL
-  expect_warning(out <- rddm(1, drift = c(1, 2, 3), bound = 1, ndt = 0.2), "deprecated since bmm 1.5.0")
+  expect_warning(out <- rddm(1, drift = c(1, 2, 3), bound = 1, ndt = 0.2),
+                 "`rddm(1, drift = c(1, 2, 3), ...)` is deprecated since bmm 1.5.0", fixed = TRUE)
   expect_equal(nrow(out), 3)
+  expect_warning(out <- rddm(1, drift = 1, bound = 1, ndt = 0.2, zr = c(0.4, 0.6)),
+                 "Use `rddm(2, zr = c(0.4, 0.6), ...)` instead", fixed = TRUE)
+  expect_equal(nrow(out), 2)
   expect_no_warning(expect_equal(nrow(rddm(1, drift = 1, bound = 1, ndt = 0.2)), 1))
 })
 
@@ -214,7 +223,7 @@ test_that("dezdm() recycles parameters of non-multiple lengths to a longer set o
                      fixed = list(zr = numeric(0)))
   expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62)), var_rt = rbind(c(0.03, 0.05)),
                                  n_upper = c(20, 22, 18, 21), n_trials = c(40, 42, 45), drift = 0.8,
-                                 bound = c(1.2, 1.5, 1.8), ndt = 0.25, zr = c(0.4, 0.6)),
+                                 bound = c(1.2, 1.5, 1.8), ndt = 0.25, zr = c(0.4, 0.6, 0.5)),
                      fixed = list(version = "4par"))
   expect_elementwise(dezdm, list(mean_rt = rbind(c(0.55, 0.62)), var_rt = rbind(c(0.03, 0.05)),
                                  n_upper = c(20, 22, 18, 21), n_trials = 40, drift = 0.8, bound = 1.4,
@@ -313,8 +322,8 @@ counts2 <- rbind(c(2, 8, 20, 70), c(30, 40, 20, 10))
 test_that("the binomial and rating SDT d*() functions recycle counts, thresholds and parameters", {
   expect_elementwise(dsdt_yn, list(n_old = c(50, 60), n_trials = 100, stimulus = c(1, 1, 0), d = c(1, 2, 3, 1.5),
                                    criterion = c(0.4, 0.7, 0.5)))
-  expect_elementwise(dsdt_yn, list(n_old = 50, n_trials = c(100, 80), stimulus = 1, d = c(1, 2),
-                                   bias = c(0.1, -0.1, 0.2, 0), sdratio = c(1, 1.5)),
+  expect_elementwise(dsdt_yn, list(n_old = 50, n_trials = c(100, 80, 90, 70), stimulus = 1, d = c(1, 2),
+                                   bias = c(0.1, -0.1, 0.2), sdratio = c(1, 1.5)),
                      fixed = list(dist = "logistic", log = TRUE))
   expect_elementwise(dsdt_mafc, list(n_correct = c(50, 60), n_trials = c(100, 80, 90), m = c(2, 4),
                                      d = c(1, 2, 3, 1.5)))
@@ -354,6 +363,89 @@ test_that("dsdt_ranking() and dsdt_cdp() recycle counts, thresholds and paramete
                                     thresholds = rbind(c(-1.1, -0.5, 0, 0.6, 1.3)), rcrit = 0.5,
                                     kcrit = c(0.3, 0.2, 0.4, 0.1)),
                      fixed = list(n_new = 3, log = TRUE))
+})
+
+test_that("each per-observation argument alone sets the length of a d*() result", {
+  # every argument of length 3 in turn, the others scalar (one-row matrices):
+  # an argument left out of the length gives fewer than 3 values
+  thr <- rbind(c(0.2, 0.7, 1.2))
+  thr5 <- rbind(c(-1.1, -0.5, 0, 0.6, 1.3))
+  c4 <- rbind(c(2, 8, 20, 70), c(30, 40, 20, 10), c(10, 20, 30, 40))
+  c9 <- rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2), c(30, 20, 10, 5, 5, 10, 2, 3, 15),
+              c(5, 5, 5, 20, 20, 20, 10, 10, 5))
+  rating <- list(counts = c4, stimulus = c(0, 1, 1), d = c(0.5, 1, 1.5),
+                 thresholds = rbind(thr, thr + 0.1, thr - 0.1), sdratio = c(1, 1.3, 0.8))
+  case <- function(f, base, long, fixed = list()) list(f = f, base = base, long = long, fixed = fixed)
+  cases <- list(
+    dsdm = case(dsdm, list(x = 0.3, mu = 0, c = 3, kappa = 3),
+                list(x = c(0.1, 0.3, -0.5), mu = c(0, 0.5, 1), c = c(2, 3, 4), kappa = c(1, 3, 8))),
+    dddm = case(dddm, list(rt = 0.6, response = 1, drift = 1, bound = 1, ndt = 0.2, zr = 0.5),
+                list(rt = c(0.5, 0.6, 0.8), response = c(0, 1, 1), drift = c(0.5, 1, 2), bound = c(1, 1.2, 1.5),
+                     ndt = c(0.2, 0.25, 0.3), zr = c(0.4, 0.5, 0.6))),
+    dezdm3 = case(dezdm, list(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100, drift = 2, bound = 1.5,
+                              ndt = 0.3, s = 1),
+                  list(mean_rt = c(0.45, 0.5, 0.55), var_rt = c(0.02, 0.025, 0.03), n_upper = c(70, 80, 75),
+                       n_trials = c(100, 110, 120), drift = c(1.5, 2, 2.5), bound = c(1.2, 1.5, 1.8),
+                       ndt = c(0.25, 0.3, 0.35), s = c(1, 1.1, 0.9))),
+    dezdm4 = case(dezdm, list(mean_rt = rbind(c(0.45, 0.55)), var_rt = rbind(c(0.02, 0.03)), n_upper = 80,
+                              n_trials = 100, drift = 1, bound = 1.5, ndt = 0.3, zr = 0.5, s = 1),
+                  list(mean_rt = rbind(c(0.45, 0.55), c(0.5, 0.6), c(0.48, 0.52)),
+                       var_rt = rbind(c(0.02, 0.03), c(0.025, 0.035), c(0.03, 0.02)), n_upper = c(70, 80, 75),
+                       n_trials = c(100, 110, 120), drift = c(0.5, 1, 1.5), bound = c(1.2, 1.5, 1.8),
+                       ndt = c(0.25, 0.3, 0.35), zr = c(0.4, 0.5, 0.6), s = c(1, 1.1, 0.9)),
+                  list(version = "4par")),
+    dsdt_yn = case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, criterion = 0.5, sdratio = 1),
+                   list(n_old = c(40, 50, 60), n_trials = c(100, 90, 80), stimulus = c(0, 1, 1), d = c(0.5, 1, 1.5),
+                        criterion = c(0.2, 0.5, 0.8), sdratio = c(1, 1.3, 0.8))),
+    dsdt_yn_bias = case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, bias = 0.1),
+                        list(bias = c(-0.2, 0.1, 0.3))),
+    dsdt_mafc = case(dsdt_mafc, list(n_correct = 50, n_trials = 100, m = 2, d = 1),
+                     list(n_correct = c(40, 50, 60), n_trials = c(100, 90, 80), m = c(2, 3, 4), d = c(0.5, 1, 1.5))),
+    dsdt_rating = case(dsdt_rating, list(counts = c4[1, , drop = FALSE], stimulus = 1, d = 1, thresholds = thr,
+                                         sdratio = 1),
+                       rating),
+    dsdt_dpsdt = case(dsdt_dpsdt, list(counts = c4[1, , drop = FALSE], stimulus = 0, d = 1, thresholds = thr,
+                                       Ro = 0.2, Rn = 0.1, sdratio = 1),
+                      c(rating, list(Ro = c(0.1, 0.2, 0.3), Rn = c(0.05, 0.1, 0.2)))),
+    dsdt_metad = case(dsdt_metad, list(counts = c4[1, , drop = FALSE], stimulus = 1, d = 1, thresholds = thr,
+                                       metad = 1, sdratio = 1),
+                      c(rating, list(metad = c(0.8, 1, 1.2)))),
+    dsdt_ranking = case(dsdt_ranking, list(counts = c4[1, , drop = FALSE], m = 4, d = 1, sdratio = 1),
+                        list(counts = c4, m = c(4, 4, 4), d = c(0.5, 1, 1.5), sdratio = c(1, 1.3, 0.8)),
+                        list(dist = "normal")),
+    dsdt_cdp = case(dsdt_cdp, list(counts = c9[1, , drop = FALSE], stimulus = 1, dfam = 0.8, drec = 1,
+                                   thresholds = thr5, rcrit = 0.5, sigmar = 0, rho = 0),
+                    list(counts = c9, stimulus = c(0, 1, 1), dfam = c(0.6, 0.8, 1), drec = c(0.8, 1, 1.2),
+                         thresholds = rbind(thr5, thr5 + 0.1, thr5 - 0.1), rcrit = c(0.4, 0.5, 0.6),
+                         sigmar = c(0, 0.1, -0.1), rho = c(0, 0.2, -0.2)),
+                    list(n_new = 3, log = TRUE)),
+    dsdt_cdp_kcrit = case(dsdt_cdp, list(counts = rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2, 1, 2, 1)), stimulus = 1,
+                                         dfam = 0.8, drec = 1, thresholds = thr5, rcrit = 0.5, kcrit = 0.3),
+                          list(kcrit = c(0.2, 0.3, 0.4)), list(n_new = 3, log = TRUE))
+  )
+  # two expectations over all 69 cases rather than expect_elementwise() for
+  # each, whose per-expectation overhead tripled the time of this test
+  vec <- each <- list()
+  expect_no_warning(for (nm in names(cases)) {
+    cs <- cases[[nm]]
+    for (a in names(cs$long)) {
+      args <- replace(cs$base, a, cs$long[a])
+      vec[[paste(nm, a)]] <- do.call(cs$f, c(args, cs$fixed))
+      each[[paste(nm, a)]] <- vapply(1:3, function(i) do.call(cs$f, c(lapply(args, pick, i = i), cs$fixed)), 0)
+    }
+  })
+  expect_identical(lengths(vec), setNames(rep(3L, 69), names(vec)))
+  expect_equal(unlist(vec) / unlist(each), rep(1, 3 * 69), ignore_attr = TRUE)
+})
+
+test_that("counts given as a data frame read as the matrix of its rows", {
+  counts <- rbind(c(50, 30, 15, 5), c(20, 30, 30, 20), c(40, 40, 10, 10))
+  thr <- c(0.2, 0.7, 1.2)
+  expect_equal(dsdt_ranking(as.data.frame(counts), m = 4, d = 1), dsdt_ranking(counts, m = 4, d = 1))
+  expect_equal(dsdt_ranking(as.data.frame(counts)[1, ], m = 4, d = c(0.5, 1)),
+               dsdt_ranking(counts[1, , drop = FALSE], m = 4, d = c(0.5, 1)))
+  expect_equal(dsdt_rating(as.data.frame(counts), 1, d = 1, thresholds = thr),
+               dsdt_rating(counts, 1, d = 1, thresholds = thr))
 })
 
 test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus per draw", {
@@ -402,11 +494,12 @@ test_that("rsdt_mafc() pairs sensitivity and the number of alternatives per draw
   expect_equal(n_correct, c(10, 20, 0, 40, 10, 0, 30))
 })
 
-# category proportions of a group against the reference probabilities
+# category proportions of a group against the reference probabilities, each
+# within 5 standard errors; one expectation for all categories keeps the
+# samplers' tests within the CRAN time per test
 expect_category_props <- function(counts, n_trials, probs) {
-  for (j in seq_along(probs)) {
-    expect_mean_near(counts[, j] / n_trials, probs[j], se_prop(probs[j], n_trials * nrow(counts)))
-  }
+  se <- se_prop(probs, n_trials * nrow(counts))
+  expect_lt(max(abs(colMeans(counts) / n_trials - probs) - 5 * se), 0)
 }
 
 test_that("rsdt_rating() pairs sensitivity, stimulus, thresholds and variance ratio per draw", {
@@ -545,27 +638,24 @@ test_that("rsdt_cdp() pairs familiarity, recollection, criteria, correlation and
   stimulus <- c(0, 1, 1)
   thr5 <- rbind(c(-1.1, -0.5, 0, 0.6, 1.3), c(-1, -0.4, 0.1, 0.7, 1.4), c(-1.2, -0.6, -0.1, 0.5, 1.2))
   n_trials <- 100
-  n <- 900
+  n <- 600
   g <- group_of(n, 3)
   # remember/know, then remember/know/guess
   counts <- rsdt_cdp(n, n_trials, stimulus, dfam, drec, thresholds = thr5, rcrit = rcrit, sigmar = sigmar,
                      rho = rho, n_new = 3)
   expect_equal(dim(counts), c(n, 9))
   for (k in 1:3) {
-    probs <- vapply(1:9, function(j) {
-      dsdt_cdp(unit_counts(j, 9), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], sigmar = sigmar[k],
-               rho = rho[k], n_new = 3)
-    }, numeric(1))
+    # one call scores the nine single-trial outcomes (rows of diag(9)) under group k
+    probs <- dsdt_cdp(diag(9), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], sigmar = sigmar[k],
+                      rho = rho[k], n_new = 3)
     expect_category_props(counts[g == k, ], n_trials, probs)
   }
   counts <- rsdt_cdp(n, n_trials, stimulus, dfam, drec, thresholds = thr5, rcrit = rcrit, kcrit = kcrit,
                      sigmar = sigmar, rho = rho, n_new = 3)
   expect_equal(dim(counts), c(n, 12))
   for (k in 1:3) {
-    probs <- vapply(1:12, function(j) {
-      dsdt_cdp(unit_counts(j, 12), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], kcrit = kcrit[k],
-               sigmar = sigmar[k], rho = rho[k], n_new = 3)
-    }, numeric(1))
+    probs <- dsdt_cdp(diag(12), stimulus[k], dfam[k], drec[k], thr5[k, ], rcrit = rcrit[k], kcrit = kcrit[k],
+                      sigmar = sigmar[k], rho = rho[k], n_new = 3)
     expect_category_props(counts[g == k, ], n_trials, probs)
   }
   # n not a multiple of the parameter lengths: draw i takes element i. Far low
