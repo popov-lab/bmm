@@ -2,21 +2,44 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-# Canonical response-category columns in the order the multinomial likelihood
-# expects: new(1..n_new), [guess], know, remember, with the old blocks on the
-# unified confidence scale n_new+1..K. Single source of truth shared by
-# check_data, aggregate_sdt_cdp_data(), and rsdt_cdp().
+# The response categories as judgment and confidence pairs, in the order the
+# multinomial likelihood expects: new(1..n_new), [guess], know, remember, with
+# the old blocks on the unified confidence scale n_new+1..K. Single source of
+# truth for the count columns (check_data, aggregate_sdt_cdp_data(),
+# rsdt_cdp()) and for the category of each trial row
+.sdt_cdp_category_table <- function(n_new, n_old, has_guess) {
+  blocks <- c(if (has_guess) "guess", "know", "remember")
+  data.frame(
+    judgment = c(rep("new", n_new), rep(blocks, each = n_old)),
+    confidence = c(seq_len(n_new), rep(n_new + seq_len(n_old), length(blocks)))
+  )
+}
+
 .sdt_cdp_response_cols <- function(n_new, n_old, has_guess, response = "") {
-  old_levels <- n_new + seq_len(n_old)
-  paste0(response, c(paste0("new", seq_len(n_new)),
-                     if (has_guess) paste0("guess", old_levels),
-                     paste0("know", old_levels),
-                     paste0("remember", old_levels)))
+  cats <- .sdt_cdp_category_table(n_new, n_old, has_guess)
+  paste0(response, cats$judgment, cats$confidence)
+}
+
+.sdt_cdp_judgments <- c("new", "remember", "know", "guess")
+
+.sdt_cdp_check_judgments <- function(judg) {
+  bad <- setdiff(unique(judg), .sdt_cdp_judgments)
+  stopif(length(bad) > 0,
+         "Judgment values {collapse_comma(bad)} not allowed; use \\
+         {collapse_comma(.sdt_cdp_judgments)}")
+}
+
+# the category of each trial, the row of its judgment and confidence in the
+# category table; NA for a pair off the scale
+.sdt_cdp_category_index <- function(judg, conf, n_new, n_old, has_guess) {
+  cats <- .sdt_cdp_category_table(n_new, n_old, has_guess)
+  match(paste(judg, conf), paste(cats$judgment, cats$confidence))
 }
 
 .model_sdt_cdp <- function(response = NULL, stimulus = NULL,
                            n_new = NULL, n_old = NULL, dist = "normal",
                            threshold_type = "parsimonious",
+                           judgment = NULL, confidence = NULL,
                            links = NULL, call = NULL, ...) {
   dist_int <- .sdt_dist_id(dist)
   thresh_type_int <- match(threshold_type, .sdt_threshold_types)
@@ -85,19 +108,33 @@
   # independent processes, no Know/Guess split) and freed through the formula.
   fixed_parameters <- list(sigmar = 0, rho = 0, kcrit = -100)
 
-  requirements <- paste0(
-    "Provide aggregated data with one row per cell (unique combination of ",
-    "predictors and stimulus class) and one integer count column per response ",
-    "category:", "\n\n",
-    "  - `new1` ... `new<n_new>` for 'new' judgments", "\n",
-    "  - `know<k>` and `remember<k>` (and optionally `guess<k>`) for 'old' ",
-    "judgments, with k on the unified confidence scale n_new+1 ... ",
-    "n_new+n_old", "\n",
-    "  - an optional common column prefix is set via `response`", "\n",
-    "  - stimulus: 0 = new/lure, 1 = old/target", "\n\n",
-    "Use aggregate_sdt_cdp_data() to build these columns from long-format ",
-    "(trial-level) data"
-  )
+  trial_level <- !is.null(judgment)
+  requirements <- if (trial_level) {
+    paste0(
+      "Provide one row per trial with the following columns:", "\n\n",
+      "  - judgment: 'new', 'know' or 'remember', and optionally 'guess'", "\n",
+      "  - confidence: a whole number on the unified confidence scale, ",
+      "1 ... n_new for 'new' judgments and n_new+1 ... n_new+n_old for the ",
+      "others", "\n",
+      "  - stimulus: 0 = new/lure, 1 = old/target", "\n\n",
+      "'guess' judgments in the data switch on the Know/Guess split, as ",
+      "`guess<k>` count columns do for aggregated data"
+    )
+  } else {
+    paste0(
+      "Provide aggregated data with one row per cell (unique combination of ",
+      "predictors and stimulus class) and one integer count column per response ",
+      "category:", "\n\n",
+      "  - `new1` ... `new<n_new>` for 'new' judgments", "\n",
+      "  - `know<k>` and `remember<k>` (and optionally `guess<k>`) for 'old' ",
+      "judgments, with k on the unified confidence scale n_new+1 ... ",
+      "n_new+n_old", "\n",
+      "  - an optional common column prefix is set via `response`", "\n",
+      "  - stimulus: 0 = new/lure, 1 = old/target", "\n\n",
+      "Use aggregate_sdt_cdp_data() to build these columns from long-format ",
+      "(trial-level) data"
+    )
+  }
 
   init_ranges <- list(
     dfam = c(0.3, 1.0), drec = c(0.3, 1.0), criterion = c(-0.3, 0.3),
@@ -110,9 +147,9 @@
 
   out <- structure(
     list(
-      resp_vars = nlist(response),
+      resp_vars = if (trial_level) nlist(judgment, confidence) else nlist(response),
       other_vars = nlist(stimulus, dist, dist_int, threshold_type,
-                         thresh_type_int, n_new, n_old),
+                         thresh_type_int, n_new, n_old, trial_level),
       domain = "Long-term memory",
       task = "Detection, recognition and confidence judgments",
       name = "Continuous Dual-Process Signal Detection Theory Model",
@@ -181,6 +218,13 @@ settable_link_functions.sdt_cdp <- function(model) {
 #' 1-new / 5-old scale of Rotello et al., 2005). Whether the Know/Guess split
 #' is modelled is **driven by the data**: include `guess<k>` columns to fit
 #' the three-way Remember/Know/Guess model.
+#'
+#' **One row per trial.** Name the columns holding each trial's judgment
+#' (`"new"`, `"know"`, `"remember"`, optionally `"guess"`) and its confidence
+#' on the unified scale in `judgment` and `confidence`; the model then needs no
+#' count columns, and `guess` judgments in the data switch on the Know/Guess
+#' split.
+#' `r model_docs(.model_sdt_cdp(n_new = 3, n_old = 3, judgment = "judgment", confidence = "confidence"), components = "trial_level")`
 #'
 #' **Variants via the formula.** By default `sigmar`, `rho`, and `kcrit` are
 #' fixed (equal recollection variance, independent F and R, no Know/Guess
@@ -268,6 +312,11 @@ settable_link_functions.sdt_cdp <- function(model) {
 #'   assume it. A positive-range link (`"log"`, `"softplus"`) on `criterion` or
 #'   `rcrit` states that the criterion is positive: the sampler then starts
 #'   next to 0 on the native scale and cannot reach negative values.
+#' @param judgment,confidence For one row per trial, the names of the columns
+#'   holding each trial's judgment (`"new"`, `"know"`, `"remember"`, or
+#'   `"guess"`) and its confidence on the unified scale (1 to `n_new` for
+#'   "new" judgments, `n_new + 1` to `n_new + n_old` for the others). Leave
+#'   both `NULL` for aggregated count columns.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -313,7 +362,7 @@ settable_link_functions.sdt_cdp <- function(model) {
 sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
                     threshold_type = c("parsimonious", "equidistant",
                                        "log_distance"),
-                    links = NULL, ...) {
+                    links = NULL, judgment = NULL, confidence = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...))
   stop_missing_args()
@@ -325,6 +374,21 @@ sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
          "response is a single prefix shared by the count columns (default \\
          ''), not a vector of column names: sdt_cdp() builds the names new1, \\
          know2, remember2, ... from n_new and n_old")
+  stopif(is.null(judgment) != is.null(confidence),
+         "judgment and confidence go together: name both columns for one row \\
+         per trial, or neither for count columns")
+  if (!is.null(judgment)) {
+    stopif(!is.character(judgment) || length(judgment) != 1 ||
+             !is.character(confidence) || length(confidence) != 1,
+           "judgment and confidence must each name one column of the data")
+    stopif(identical(judgment, confidence),
+           "judgment and confidence must name two different columns; both name \\
+           '{judgment}'")
+    stopif(!identical(response, ""),
+           "judgment and confidence declare one row per trial, which has no \\
+           count columns for the prefix response = '{response}' to name. Drop \\
+           response, or drop judgment and confidence for aggregated counts")
+  }
   stopif(!is.numeric(n_new) || length(n_new) != 1 || !is.finite(n_new) || n_new < 1,
          "n_new must be a single integer >= 1")
   stopif(!is.numeric(n_old) || length(n_old) != 1 || !is.finite(n_old) || n_old < 1,
@@ -341,6 +405,7 @@ sdt_cdp <- function(response = "", stimulus, n_new, n_old, dist = "normal",
 
   .model_sdt_cdp(response = response, stimulus = stimulus, n_new = n_new,
                  n_old = n_old, dist = dist, threshold_type = threshold_type,
+                 judgment = judgment, confidence = confidence,
                  links = links, call = call, ...)
 }
 
@@ -398,10 +463,7 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
          "Count variable '{count}' missing in the data")
 
   judg <- as.character(data[[judgment]])
-  allowed <- c("new", "remember", "know", "guess")
-  bad <- setdiff(unique(judg), allowed)
-  stopif(length(bad) > 0,
-         "Judgment values {collapse_comma(bad)} not allowed; use {collapse_comma(allowed)}")
+  .sdt_cdp_check_judgments(judg)
   stopif(!all(c("new", "remember", "know") %in% judg),
          "Judgment column must contain 'new', 'remember', and 'know' values")
   has_guess <- "guess" %in% judg
@@ -434,15 +496,7 @@ aggregate_sdt_cdp_data <- function(data, judgment, confidence, count = NULL,
     rep(1L, nrow(data))
   }
 
-  # the old blocks follow the new levels on one unified category index
-  block <- integer(nrow(data))
-  if (has_guess) {
-    block[judg == "know"] <- 1L
-    block[judg == "remember"] <- 2L
-  } else {
-    block[judg == "remember"] <- 1L
-  }
-  col_idx <- ifelse(is_new, conf, n_new + block * n_old + (conf - n_new))
+  col_idx <- .sdt_cdp_category_index(judg, conf, n_new, n_old, has_guess)
 
   cell_cols <- setdiff(colnames(data), c(judgment, confidence, count))
   cell_key <- do.call(paste, c(data[cell_cols], sep = "\r"))
@@ -473,6 +527,9 @@ built_data_columns.sdt_cdp <- function(model) {
 # the guess columns count only when all are there, as in check_data()
 #' @exportS3Method
 data_trials.sdt_cdp <- function(model, data) {
+  if (is_trial_level(model)) {
+    return(NULL)
+  }
   n_new <- model$other_vars$n_new
   n_old <- model$other_vars$n_old
   prefix <- model$resp_vars$response
@@ -488,49 +545,97 @@ check_data.sdt_cdp <- function(model, data, formula) {
 
   n_new <- model$other_vars$n_new
   n_old <- model$other_vars$n_old
-  prefix <- model$resp_vars$response
-  guess_cols <- paste0(prefix, "guess", n_new + seq_len(n_old))
-  n_guess_found <- sum(guess_cols %in% colnames(data))
-  stopif(n_guess_found > 0 && n_guess_found < n_old,
-         "Found only some of the 'guess' count columns \\
-         ({collapse_comma(guess_cols)}); provide all of them or none")
-  has_guess <- n_guess_found == n_old
+  if (is_trial_level(model)) {
+    resp_cols <- unlist(model$resp_vars, use.names = FALSE)
+    trials <- .sdt_cdp_trial_counts(data, model$resp_vars$judgment,
+                                    model$resp_vars$confidence, n_new, n_old,
+                                    attr(data, "fit_has_guess"))
+    Y <- trials$Y
+    has_guess <- trials$has_guess
+  } else {
+    prefix <- model$resp_vars$response
+    guess_cols <- paste0(prefix, "guess", n_new + seq_len(n_old))
+    n_guess_found <- sum(guess_cols %in% colnames(data))
+    stopif(n_guess_found > 0 && n_guess_found < n_old,
+           "Found only some of the 'guess' count columns \\
+           ({collapse_comma(guess_cols)}); provide all of them or none")
+    has_guess <- n_guess_found == n_old
 
-  resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess, prefix)
-  missing <- setdiff(resp_cols, colnames(data))
-  stopif(length(missing) > 0,
-         "Response columns {collapse_comma(missing)} missing in the data. \\
-         Use aggregate_sdt_cdp_data() to build them from long-format data")
-  # columns are derived from n_new/n_old, so a count column above the declared
-  # scale was never looked at and its trials silently left the fit
-  extra <- setdiff(
-    grep(paste0("^", prefix, "(new|guess|know|remember)[0-9]+$"),
-         colnames(data), value = TRUE),
-    resp_cols
-  )
-  stopif(length(extra) > 0,
-         "Column(s) {collapse_comma(extra)} look like response counts beyond \\
-         the n_new = {n_new} / n_old = {n_old} scale declared in sdt_cdp(): \\
-         raise n_new/n_old to match the data, or drop the columns")
+    resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess, prefix)
+    missing <- setdiff(resp_cols, colnames(data))
+    stopif(length(missing) > 0,
+           "Response columns {collapse_comma(missing)} missing in the data. \\
+           Use aggregate_sdt_cdp_data() to build them from long-format data")
+    # columns are derived from n_new/n_old, so a count column above the declared
+    # scale was never looked at and its trials silently left the fit
+    extra <- setdiff(
+      grep(paste0("^", prefix, "(new|guess|know|remember)[0-9]+$"),
+           colnames(data), value = TRUE),
+      resp_cols
+    )
+    stopif(length(extra) > 0,
+           "Column(s) {collapse_comma(extra)} look like response counts beyond \\
+           the n_new = {n_new} / n_old = {n_old} scale declared in sdt_cdp(): \\
+           raise n_new/n_old to match the data, or drop the columns")
 
-  .validate_sdt_count_cols(data, resp_cols)
+    .validate_sdt_count_cols(data, resp_cols)
 
-  Y <- as.matrix(data[resp_cols])
+    Y <- as.matrix(data[resp_cols])
+    stopif(anyNA(Y), "Response columns must not contain NA counts")
+  }
   colnames(Y) <- paste0("cdp", seq_len(ncol(Y)))
-  stopif(anyNA(Y), "Response columns must not contain NA counts")
   stopif(any(rowSums(Y) <= 0),
          "Row sums of response columns must be positive (no empty rows)")
 
-  reserved <- intersect(c("Y", "nTrials"), colnames(data))
+  # a judgment or confidence column that is itself called Y or nTrials is
+  # replaced, not overwritten
+  reserved <- intersect(c("Y", "nTrials"),
+                        if (is_trial_level(model)) setdiff(colnames(data), resp_cols) else colnames(data))
   warnif(length(reserved) > 0,
          "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
          {model$name} and will be overwritten")
   data <- data[!colnames(data) %in% resp_cols]
   data$Y <- Y
-  data$nTrials <- rowSums(Y)
+  data$nTrials <- if (is_trial_level(model)) 1L else rowSums(Y)
   attr(data, "has_guess") <- has_guess
+  attr(data, "fit_has_guess") <- NULL
 
   NextMethod("check_data")
+}
+
+# One row per trial: the judgment and confidence of each trial pick its
+# category in the table that also names the count columns. 'guess' judgments
+# switch the Know/Guess split on, as the guess count columns do. Data checked
+# against a fit take the split from the fit (carry_fit_bounds()), so a subset
+# without 'guess' judgments keeps the fit's categories
+.sdt_cdp_trial_counts <- function(data, judgment, confidence, n_new, n_old,
+                                  fit_has_guess = NULL) {
+  missing <- setdiff(c(judgment, confidence), colnames(data))
+  stopif(length(missing) > 0, "Variables {collapse_comma(missing)} missing in the data")
+  judg <- as.character(data[[judgment]])
+  conf <- data[[confidence]]
+  stopif(anyNA(judg) || anyNA(conf),
+         "The judgment column '{judgment}' and the confidence column \\
+         '{confidence}' must not contain NA")
+  .sdt_cdp_check_judgments(judg)
+  has_guess <- fit_has_guess %||% any(judg == "guess")
+  stopif(!has_guess && any(judg == "guess"),
+         "The data hold 'guess' judgments, but the model was fitted without \\
+         them, so it has no Guess categories to predict them with")
+  idx <- .sdt_cdp_category_index(judg, conf, n_new, n_old, has_guess)
+  bad <- unique(paste0("'", judg, "' with confidence ", conf)[is.na(idx)])
+  stopif(
+    length(bad) > 0,
+    "With one row per trial, '{judgment}' and '{confidence}' must name a \\
+    category of the scale declared in sdt_cdp(): 'new' with confidence 1 to \\
+    {n_new}, the other judgments with {n_new + 1} to {n_new + n_old}. Found: \\
+    {paste(utils::head(bad, 5), collapse = ', ')}{if (length(bad) > 5) ', ...' else ''}. \\
+    For counts aggregated over trials, construct the model without judgment and \\
+    confidence"
+  )
+  list(Y = .trial_rows_to_counts(idx, seq_len(n_new + (2L + has_guess) * n_old),
+                                 "the category of each trial"),
+       has_guess = has_guess)
 }
 
 
@@ -549,18 +654,20 @@ check_data.sdt_cdp <- function(model, data, formula) {
 check_formula.sdt_cdp <- function(model, data, formula) {
   has_guess <- isTRUE(attr(data, "has_guess"))
   kcrit_free <- "kcrit" %in% names(formula) && !is_constant(formula)[["kcrit"]]
+  guess_data <- if (is_trial_level(model)) "'guess' judgments" else "guess count columns"
+  add_guess <- if (is_trial_level(model)) "trials judged 'guess'" else "the guess<k> columns"
   stopif(
     has_guess && !kcrit_free,
-    "The data contain guess count columns, so the Know/Guess criterion kcrit \\
+    "The data contain {guess_data}, so the Know/Guess criterion kcrit \\
     must be estimated: add `kcrit ~ 1` (or `kcrit ~ <predictors>`) to the \\
     formula. With kcrit fixed, every Guess response has probability 0 and the \\
     fit converges to wrong estimates."
   )
   warnif(
     !has_guess && kcrit_free,
-    "kcrit is in the formula but the data have no guess count columns, so \\
+    "kcrit is in the formula but the data have no {guess_data}, so \\
     nothing identifies it: its posterior will equal its prior. Drop kcrit from \\
-    the formula, or add the guess<k> columns for the Remember/Know/Guess model."
+    the formula, or add {add_guess} for the Remember/Know/Guess model."
   )
   NextMethod("check_formula")
 }
@@ -598,9 +705,15 @@ check_formula.sdt_cdp <- function(model, data, formula) {
     (if (isTRUE(model$other_vars$has_guess)) 3L else 2L) * model$other_vars$n_old
 }
 
+# a fit's response matrix records whether the Know/Guess split was active only
+# in how many columns it has
+.sdt_cdp_has_guess_cols <- function(model, Y) {
+  ncol(Y) == model$other_vars$n_new + 3L * model$other_vars$n_old
+}
+
 #' @export
 bmf2bf.sdt_cdp <- function(model, formula) {
-  resp_cats <- paste0("cdp", seq_len(.sdt_cdp_n_cat(model)))
+  resp_cats <- .sdt_categories(model)
   args <- paste(.sdt_cdp_logmu_args(model), collapse = ", ")
 
   bform <- brms::bf(
@@ -626,7 +739,7 @@ configure_model.sdt_cdp <- function(model, data, formula) {
   # check_data; bridge it onto the model so bmf2bf can emit the right number
   # of categories.
   model$other_vars$has_guess <- attr(data, "has_guess")
-  resp_cats <- paste0("cdp", seq_len(.sdt_cdp_n_cat(model)))
+  resp_cats <- .sdt_categories(model)
 
   formula <- bmf2bf(model, formula)
   formula$family <- brms::multinomial(refcat = NA)
@@ -652,16 +765,25 @@ configure_model.sdt_cdp <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_cdp <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, vars$stimulus, trials = "n_trials")
+  trial_level <- is_trial_level(model)
+  design <- .design_or_n(model, design, vars$stimulus, trials = if (!trial_level) "n_trials")
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   deltas <- p[grep("^delta[0-9]+$", names(p))]
   thresholds <- .cdp_make_thresholds(p$criterion, p$spacing, vars$n_new, vars$n_old, vars$threshold_type,
                                      if (length(deltas)) do.call(cbind, deltas))
   kcrit <- if (!all(p$kcrit == model$fixed_parameters$kcrit)) p$kcrit
-  counts <- rsdt_cdp(nrow(design), design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
+  counts <- rsdt_cdp(nrow(design), if (trial_level) 1L else design$n_trials,
+                     .coerce_sdt_stimulus(design[[vars$stimulus]]),
                      dfam = p$dfam, drec = p$drec, thresholds = thresholds, rcrit = p$rcrit,
                      kcrit = kcrit, sigmar = p$sigmar, rho = p$rho, n_new = vars$n_new, dist = vars$dist)
+  if (trial_level) {
+    has_guess <- .sdt_cdp_has_guess_cols(model, counts)
+    cats <- .sdt_cdp_category_table(vars$n_new, vars$n_old, has_guess)[.sdt_trial_category(counts), ]
+    responses <- stats::setNames(list(cats$judgment, cats$confidence),
+                                 c(model$resp_vars$judgment, model$resp_vars$confidence))
+    return(.simulate_result(design, responses, sim))
+  }
   colnames(counts) <- paste0(model$resp_vars$response, colnames(counts))
   .simulate_result(design, as.data.frame(counts), sim)
 }

@@ -416,7 +416,12 @@ revert_check_data.m3 <- function(model, data) {
 #' @exportS3Method
 revert_check_data.mpt <- function(model, data) {
   resp_cats <- model$resp_vars$resp_cats
-  data[resp_cats] <- as.data.frame(unclass(data$Y)[, resp_cats, drop = FALSE])
+  counts <- unclass(data$Y)[, resp_cats, drop = FALSE]
+  if (is_trial_level(model)) {
+    data[[model$other_vars$response]] <- resp_cats[max.col(counts, ties.method = "first")]
+  } else {
+    data[resp_cats] <- as.data.frame(counts)
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   tree_id <- model$other_vars$tree_id
@@ -505,13 +510,20 @@ revert_check_data.sdt_mafc <- function(model, data) {
 revert_check_data.sdt_ranking <- function(model, data) {
   resp_cols <- model$resp_vars$response
   m <- model$other_vars$m
-  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  # trial rows get their rank back from the one-hot row
+  if (is_trial_level(model)) {
+    data[[resp_cols]] <- .sdt_trial_category(data$Y)
+  } else {
+    data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  }
   # max_rank is check_data()'s numeric copy of the set-size column, which brms
   # keeps only when a formula predicts something with it
   if (is.character(m) && not_in(m, colnames(data))) {
     data[[m]] <- data$max_rank
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), m)
   }
+  # a kfold() training fold can lack the fit's largest set size
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   data$max_rank <- NULL
@@ -521,7 +533,11 @@ revert_check_data.sdt_ranking <- function(model, data) {
 #' @exportS3Method
 revert_check_data.sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response
-  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  if (is_trial_level(model)) {
+    data[[resp_cols]] <- .sdt_trial_category(data$Y)
+  } else {
+    data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
@@ -531,13 +547,20 @@ revert_check_data.sdt_rating <- function(model, data) {
 revert_check_data.sdt_cdp <- function(model, data) {
   n_new <- model$other_vars$n_new
   n_old <- model$other_vars$n_old
-  # check_data() renamed the count columns cdp1 ... cdpK, and whether guess
-  # columns were present is recorded only in how many there are
+  # check_data() renamed the count columns cdp1 ... cdpK
   Y <- unclass(data$Y)
-  has_guess <- ncol(Y) == n_new + 3L * n_old
-  resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess,
-                                      model$resp_vars$response)
-  data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
+  has_guess <- .sdt_cdp_has_guess_cols(model, Y)
+  if (is_trial_level(model)) {
+    cats <- .sdt_cdp_category_table(n_new, n_old, has_guess)[.sdt_trial_category(Y), ]
+    data[[model$resp_vars$judgment]] <- cats$judgment
+    data[[model$resp_vars$confidence]] <- cats$confidence
+  } else {
+    resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess,
+                                        model$resp_vars$response)
+    data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
+  }
+  # a kfold() training fold can lack every 'guess' judgment of the fit
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
