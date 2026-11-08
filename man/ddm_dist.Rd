@@ -29,8 +29,9 @@ and the other density functions of bmm. Pass \code{log} to get the same
 result in every version.}
 
 \item{n}{Number of random samples to generate. Until bmm 1.6.0, \code{n = 1}
-with parameter vectors still gives one draw per element, with a
-deprecation warning; pass the number of draws.}
+with parameter vectors still gives one draw per element, and an \code{n} of
+length above 1 gives \code{length(n)} draws, each with a deprecation warning;
+pass the number of draws.}
 }
 \description{
 Density and random generation function for the Diffusion Decision Model.
@@ -44,6 +45,9 @@ number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_
 \code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, or row \code{i} of a matrix. A
 shorter vector is repeated, also when \code{n} is not a multiple of its
 length.
+\item \code{n} is a single number of at least 0, read as \code{\link[stats:rnorm]{stats::rnorm()}} reads it:
+a fraction is truncated, and \code{n = 0} gives an empty result with the
+columns of a non-empty one.
 \item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
 \code{x} (its rows, when the observations are rows of counts) and the
 per-observation arguments, the others recycled to that length. Value \code{i}

@@ -22,6 +22,9 @@
 #'   [stats::rnorm()]: draw `i` uses element `i`, or row `i` of a matrix. A
 #'   shorter vector is repeated, also when `n` is not a multiple of its
 #'   length.
+#' - `n` is a single number of at least 0, read as [stats::rnorm()] reads it:
+#'   a fraction is truncated, and `n = 0` gives an empty result with the
+#'   columns of a non-empty one.
 #' - `d*(x, ...)` returns one value per observation: as many as the longest of
 #'   `x` (its rows, when the observations are rows of counts) and the
 #'   per-observation arguments, the others recycled to that length. Value `i`
@@ -139,13 +142,33 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   if (is.matrix(x)) x[rep_len(seq_len(nrow(x)), n), , drop = FALSE] else rep_len(x, n)
 }
 
-# the n check of the exported r*() samplers, the same as in rsdm()
-.check_n_draws <- function(n) {
+# the n of the exported r*() samplers, read as rnorm() reads it: one value
+# that coerces to a number >= 0, with a fraction truncated
+.n_draws <- function(n) {
+  n_num <- if (length(n) == 1 && (is.numeric(n) || is.logical(n) || is.character(n))) {
+    suppressWarnings(as.numeric(n))
+  }
   stopif(
-    !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
-    "n must be a single positive whole number."
+    !isTRUE(is.finite(n_num) && n_num >= 0),
+    "n, the number of draws, must be a single number >= 0."
   )
+  trunc(n_num)
 }
+
+# the counts of the multinomial d*() functions as a matrix with one row per
+# observation; a vector is one observation, so an empty vector is refused
+.counts_rows <- function(counts) {
+  stopif(
+    !is.matrix(counts) && length(counts) == 0,
+    "counts is an empty vector, but a vector of counts is one observation. \\
+    For no observations, pass a matrix with zero rows and one column per \\
+    response category."
+  )
+  rbind(counts)
+}
+
+# the result of the multinomial r*() samplers before the draws fill it
+.count_matrix <- function(n, cols) matrix(0L, n, length(cols), dimnames = list(NULL, cols))
 
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
@@ -317,10 +340,7 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @export
 rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   .check_sdm_args(c, kappa, parametrization)
-  stopif(
-    !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
-    "n must be a single positive whole number."
-  )
+  n <- .n_draws(n)
   .dsdm_numer <- .sdm_numer(parametrization)
 
   # compare to the peak on the log scale: the unnormalized density itself
@@ -1578,8 +1598,9 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
 #' @param rt Vector of response times for which the density should be returned
 #' @param response Vector of responses for which the density should be returned
 #' @param n Number of random samples to generate. Until bmm 1.6.0, `n = 1`
-#'   with parameter vectors still gives one draw per element, with a
-#'   deprecation warning; pass the number of draws.
+#'   with parameter vectors still gives one draw per element, and an `n` of
+#'   length above 1 gives `length(n)` draws, each with a deprecation warning;
+#'   pass the number of draws.
 #' @param drift Drift rates of the ddm
 #' @param bound Boundary separation of the ddm
 #' @param ndt Non-decision time of the ddm
@@ -1631,7 +1652,18 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
 #' @name ddm_dist
 #' @export
 rddm <- function(n, drift, bound, ndt, zr = 0.5) {
-  .check_n_draws(n)
+  # before bmm 1.5.0 rtdists read an n of length above 1 as its length, as
+  # rnorm() does; the other samplers stopped on it
+  if (length(n) > 1) {
+    warn_deprecated(
+      what = "rddm(<vector n>, ...)",
+      with = glue("rddm({length(n)}, ...)"),
+      since = "1.5.0",
+      details = "`n` is the number of draws, a single number."
+    )
+    n <- length(n)
+  }
+  n <- .n_draws(n)
   max_len <- max(lengths(list(drift, bound, ndt, zr)))
   # until 1.6.0, n = 1 with parameter vectors still means one draw per element
   if (n == 1 && max_len > 1) {
@@ -1642,6 +1674,10 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
       details = "`n` is the number of draws; the parameters are recycled to it."
     )
     n <- max_len
+  }
+  # rtdists::rdiffusion() cannot draw zero samples
+  if (n == 0) {
+    return(data.frame(rt = numeric(0), response = numeric(0)))
   }
 
   bound <- rep_len(bound, n)
@@ -2174,6 +2210,11 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
     # recycles as one row beside a matrix
     mean_rt <- matrix(mean_rt, ncol = 2)
     var_rt <- matrix(var_rt, ncol = 2)
+  } else {
+    # one mean_rt and one var_rt per observation: a matrix is read element by
+    # element and the result is a plain vector, as before bmm 1.5.0
+    mean_rt <- as.vector(mean_rt)
+    var_rt <- as.vector(var_rt)
   }
 
   # zr is not a parameter of version "3par", so it does not set the length there
@@ -2221,7 +2262,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   version <- match.arg(version)
 
   .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
-  .check_n_draws(n)
+  n <- .n_draws(n)
 
   if (version == "4par") {
     .rezdm_4par(n, n_trials, drift, bound, ndt, zr, s)
@@ -3052,7 +3093,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
                     bias = NULL, sdratio = 1,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic")) {
   dist <- match.arg(dist)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(!is.numeric(stimulus) && !is.logical(stimulus),
          "stimulus must be numeric or logical, coded 0 (noise) or 1 (signal); \\
@@ -3305,7 +3346,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
                        log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
   thr <- rbind(thresholds)
@@ -3347,7 +3388,7 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
   dist <- match.arg(dist)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3355,6 +3396,10 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
+  counts <- .count_matrix(n, paste0("r", seq_len(ncol(rbind(thresholds)) + 1L)))
+  if (n == 0) {
+    return(counts)
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_dpsdt_category_probs(rbind(thresholds),
                                            rep_len(d, n),
@@ -3363,8 +3408,6 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
                                            stats::qlogis(rep_len(Ro, n)),
                                            stats::qlogis(rep_len(Rn, n))))
 
-  K <- ncol(probs)
-  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
@@ -3415,7 +3458,7 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
                        log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
   thr <- rbind(thresholds)
@@ -3456,7 +3499,7 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
   dist <- match.arg(dist)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3466,6 +3509,10 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
          boundary with confidence levels on either side, so an odd number \\
          of thresholds")
 
+  counts <- .count_matrix(n, paste0("r", seq_len(ncol(rbind(thresholds)) + 1L)))
+  if (n == 0) {
+    return(counts)
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_metad_category_probs(rbind(thresholds),
                                            rep_len(d, n),
@@ -3473,8 +3520,6 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
                                            rep_len(stimulus, n), dist,
                                            rep_len(metad, n)))
 
-  K <- ncol(probs)
-  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
@@ -3559,7 +3604,7 @@ rsdt_mafc <- function(n, n_trials, m, d,
                       dist = c("normal", "gumbel_min", "gumbel_max",
                                "logistic")) {
   dist <- match.arg(dist)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(n_trials < 1), "n_trials must be positive")
 
@@ -3820,7 +3865,7 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
                          log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   n <- .obs_length(counts, m, d, sdratio)
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
@@ -3860,18 +3905,21 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
 rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
                          dist = c("gumbel_min", "normal")) {
   dist <- match.arg(dist)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
+  # with no draws the columns follow the largest set size given
+  if (n == 0) {
+    return(.count_matrix(0, paste0("rank", seq_len(max(m)))))
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   m <- rep_len(as.integer(m), n)
   d <- rep_len(d, n)
   sdratio <- rep_len(sdratio, n)
 
-  counts <- matrix(0L, n, max(m),
-                   dimnames = list(NULL, paste0("rank", seq_len(max(m)))))
+  counts <- .count_matrix(n, paste0("rank", seq_len(max(m))))
   for (m_i in unique(m)) {
     idx <- which(m == m_i)
     probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
@@ -4194,7 +4242,7 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
                         log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
   thr <- rbind(thresholds)
@@ -4232,19 +4280,21 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
                         dist = c("normal", "gumbel_min", "gumbel_max",
                                  "logistic")) {
   dist <- match.arg(dist)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
+  counts <- .count_matrix(n, paste0("r", seq_len(ncol(rbind(thresholds)) + 1L)))
+  if (n == 0) {
+    return(counts)
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_category_probs(rbind(thresholds), rep_len(d, n),
                                      rep_len(sdratio, n),
                                      rep_len(stimulus, n), dist))
 
-  K <- ncol(probs)
-  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
@@ -4555,16 +4605,26 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 
 
 # kcrit switches the Know/Guess split, and with it the number of response
-# categories, for the whole call, so it cannot be off for some observations
+# categories, for the whole call. A kcrit finite for some observations only
+# gave R/K without a word before bmm 1.5.0; it still does, with a warning
 .cdp_has_guess <- function(kcrit) {
-  finite <- is.finite(kcrit)
+  if (is.null(kcrit)) {
+    return(FALSE)
+  }
   stopif(
-    any(finite) && !all(finite),
-    "kcrit mixes finite and non-finite values, but the Know/Guess split is on \\
-    or off for the whole call: pass a finite kcrit for every observation \\
-    (R/K/G) or kcrit = NULL (R/K)."
+    length(kcrit) == 0,
+    "kcrit is empty. Pass kcrit = NULL for the R/K model, or one value per \\
+    observation (or one for all) for the R/K/G model."
   )
-  !is.null(kcrit) && all(finite)
+  finite <- is.finite(kcrit)
+  if (any(finite) && !all(finite)) {
+    warning2(
+      "kcrit is finite for only some observations, so the Know/Guess split is \\
+      off for the whole call and the counts are R/K. Pass a finite kcrit for \\
+      every observation for R/K/G, or kcrit = NULL for R/K."
+    )
+  }
+  all(finite)
 }
 
 
@@ -4598,9 +4658,11 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #'   thresholds on the aggregate F+R axis, or a matrix with one row per
 #'   observation.
 #' @param rcrit Numeric vector. Remember criterion on the recollection axis.
-#' @param kcrit Know criterion on the familiarity axis. `NULL` (default) for
-#'   the R/K model; finite values enable the R/K/G model. Give a finite value
-#'   for every observation or `NULL`; a mix of the two is an error.
+#' @param kcrit Know criterion on the familiarity axis. `NULL` (default), or
+#'   a non-finite value for every observation, gives the R/K model; finite
+#'   values for every observation give the R/K/G model. A `kcrit` finite for
+#'   only some observations gives the R/K model for the whole call, with a
+#'   warning.
 #' @param sigmar Numeric vector. Log SD of the recollection target
 #'   distribution (0 = SD 1).
 #' @param rho Numeric vector. F-R correlation on the unconstrained scale;
@@ -4638,7 +4700,7 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
                      rcrit, kcrit = NULL, sigmar = 0, rho = 0,
                      n_new = NULL, dist = "normal", log = FALSE) {
   dist <- match.arg(dist)
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   thr <- rbind(thresholds)
   K_full <- ncol(thr) + 1L
@@ -4650,7 +4712,8 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- .obs_length(counts, thr, stimulus, dfam, drec, sigmar, rho, rcrit, kcrit)
+  # a kcrit that leaves the Know/Guess split off is not read
+  n <- .obs_length(counts, thr, stimulus, dfam, drec, sigmar, rho, rcrit, if (has_guess) kcrit)
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
@@ -4684,7 +4747,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
                      rcrit, kcrit = NULL, sigmar = 0, rho = 0,
                      n_new = NULL, dist = "normal") {
   dist <- match.arg(dist)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -4693,7 +4756,10 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   K_full <- ncol(thr) + 1L
   if (is.null(n_new)) n_new <- K_full %/% 2L
   n_old <- K_full - n_new
-  has_guess <- .cdp_has_guess(kcrit)
+  counts <- .count_matrix(n, .sdt_cdp_response_cols(n_new, n_old, .cdp_has_guess(kcrit)))
+  if (n == 0) {
+    return(counts)
+  }
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),
@@ -4701,8 +4767,6 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
                                          rep_len(sigmar, n), rep_len(rcrit, n),
                                          kcrit, rep_len(stimulus, n),
                                          n_new, n_old, dist, rep_len(rho, n)))
-  cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess)
-  counts <- matrix(0L, n, ncol(probs), dimnames = list(NULL, cols))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
@@ -4817,7 +4881,9 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @param sigmoid The sigmoid \eqn{F}; see [psychometric_function()].
 #' @param log Logical. If `TRUE`, returns the log-density (default `FALSE`).
 #' @param n Integer. Number of observations to generate. `intensity`,
-#'   `n_trials` and the parameters are recycled to this length.
+#'   `n_trials` and the parameters are recycled to this length. As in
+#'   [stats::rnorm()], a fraction is truncated and `n = 0` gives an empty
+#'   vector.
 #'
 #' @return `dpsychometric_function()` returns the (log-)density, a binomial probability.
 #'   `rpsychometric_function()` returns an integer vector with the number of positive
@@ -4882,7 +4948,7 @@ rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lap
                                                "gumbel_max", "weibull", "lognormal",
                                                "loglogistic")) {
   sigmoid <- match.arg(sigmoid)
-  .check_n_draws(n)
+  n <- .n_draws(n)
   stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(n_trials < 1), "n_trials must be positive")
   .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)

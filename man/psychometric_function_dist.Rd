@@ -61,7 +61,9 @@ does not attend and responds at the guess rate. The upper asymptote is
 \item{log}{Logical. If \code{TRUE}, returns the log-density (default \code{FALSE}).}
 
 \item{n}{Integer. Number of observations to generate. \code{intensity},
-\code{n_trials} and the parameters are recycled to this length.}
+\code{n_trials} and the parameters are recycled to this length. As in
+\code{\link[stats:rnorm]{stats::rnorm()}}, a fraction is truncated and \code{n = 0} gives an empty
+vector.}
 }
 \value{
 \code{dpsychometric_function()} returns the (log-)density, a binomial probability.

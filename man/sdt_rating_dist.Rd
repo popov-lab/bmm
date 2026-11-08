@@ -78,6 +78,9 @@ number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_
 \code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, or row \code{i} of a matrix. A
 shorter vector is repeated, also when \code{n} is not a multiple of its
 length.
+\item \code{n} is a single number of at least 0, read as \code{\link[stats:rnorm]{stats::rnorm()}} reads it:
+a fraction is truncated, and \code{n = 0} gives an empty result with the
+columns of a non-empty one.
 \item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
 \code{x} (its rows, when the observations are rows of counts) and the
 per-observation arguments, the others recycled to that length. Value \code{i}

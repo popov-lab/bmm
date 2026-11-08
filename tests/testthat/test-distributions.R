@@ -727,45 +727,96 @@ test_that("rddm returns data frame with correct structure", {
   expect_true(all(res$response %in% c(0, 1)))
 })
 
-test_that("the samplers refuse an n that is not a single positive whole number", {
+test_that("the samplers read n as rnorm() does", {
   withr::local_seed(4443)
+  thr <- c(-0.5, 0.3, 1)
   calls <- list(
     rddm = function(n) rddm(n, drift = 1, bound = 1, ndt = 0.2),
-    rezdm = function(n) rezdm(n, n_trials = 100, drift = 1, bound = 1, ndt = 0.2),
+    rezdm_3par = function(n) rezdm(n, n_trials = 100, drift = 1, bound = 1, ndt = 0.2),
+    rezdm_4par = function(n) rezdm(n, n_trials = 100, drift = 1, bound = 1, ndt = 0.2, zr = 0.4,
+                                   version = "4par"),
     rsdt_yn = function(n) rsdt_yn(n, 10, 1, 1, criterion = 0),
     rsdt_rating = function(n) rsdt_rating(n, 10, 1, 1, thresholds = c(-0.5, 0.5)),
     rsdt_dpsdt = function(n) rsdt_dpsdt(n, 10, 1, 1, thresholds = c(-0.5, 0.5), Ro = 0.2),
     rsdt_metad = function(n) rsdt_metad(n, 10, 1, 1, thresholds = c(-0.5, 0, 0.5), metad = 1),
     rsdt_mafc = function(n) rsdt_mafc(n, 10, m = 2, d = 1),
-    rsdt_ranking = function(n) rsdt_ranking(n, 10, m = 3, d = 1),
-    rsdt_cdp = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = c(-0.5, 0.5, 1),
-                                    rcrit = 0.5, n_new = 1),
-    rpsychometric_function = function(n) rpsychometric_function(n, 0, midpoint = 0, width = 1)
+    rsdt_ranking = function(n) rsdt_ranking(n, 10, m = c(3, 4), d = 1),
+    rsdt_cdp = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = thr, rcrit = 0.5, n_new = 1),
+    rsdt_cdp_rkg = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = thr, rcrit = 0.5,
+                                        kcrit = 0, n_new = 1),
+    rpsychometric_function = function(n) rpsychometric_function(n, 0, midpoint = 0, width = 1),
+    rsdm = function(n) rsdm(n, mu = 0, c = 3, kappa = 3)
   )
+  seeded <- function(f, n) withr::with_seed(7, f(n))
   for (name in names(calls)) {
-    for (bad in list(2.5, NA, NA_real_, 0, -1, c(2, 3), "3", numeric(0), Inf)) {
-      expect_error(calls[[name]](bad), "n must be a single positive whole number",
-                   info = paste(name, format(bad)))
+    f <- calls[[name]]
+    two <- seeded(f, 2)
+    expect_identical(seeded(f, 2.5), two, info = name)
+    expect_identical(seeded(f, 2L), two, info = name)
+    expect_identical(seeded(f, "3"), seeded(f, 3), info = name)
+    expect_identical(seeded(f, TRUE), seeded(f, 1), info = name)
+    # no draws: the type, columns and column names of a call with draws
+    empty <- if (is.null(dim(two))) two[0] else two[0, , drop = FALSE]
+    expect_identical(f(0), empty, info = name)
+    for (bad in list(NA, NA_real_, -1, -0.5, Inf, "a", numeric(0), c(2, 3), list(2))) {
+      if (name == "rddm" && length(bad) > 1) next
+      expect_error(f(bad), "n, the number of draws, must be a single number >= 0",
+                   fixed = TRUE, info = paste(name, format(bad)))
     }
-    out <- calls[[name]](2)
-    expect_equal(NROW(out), 2, info = name)
   }
 })
 
-test_that("dsdt_cdp() and rsdt_cdp() refuse a kcrit that is finite for some observations only", {
-  withr::local_seed(4444)
+test_that("rddm() with an n of length above 1 gives length(n) draws, with a deprecation warning", {
+  expect_warning(
+    out <- withr::with_seed(7, rddm(c(5, 6), drift = 1, bound = 1, ndt = 0.2)),
+    "rddm(2, ...)", fixed = TRUE
+  )
+  expect_identical(out, withr::with_seed(7, rddm(2, drift = 1, bound = 1, ndt = 0.2)))
+})
+
+test_that("a kcrit finite for some observations only gives R/K, with one warning", {
   thr <- c(-0.5, 0.3, 1)
   rk <- c(40, 5, 12, 30, 10, 18, 60)
   rkg <- c(40, 5, 3, 1, 12, 30, 10, 18, 60, 2)
-  for (kcrit in list(c(0, NA), c(0, Inf), c(-Inf, 0.2))) {
-    expect_error(dsdt_cdp(rkg, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1),
-                 "kcrit mixes finite and non-finite values", info = format(kcrit))
-    expect_error(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1),
-                 "kcrit mixes finite and non-finite values", info = format(kcrit))
+  count_warnings <- function(expr) {
+    n <- 0
+    value <- withCallingHandlers(expr, warning = function(w) {
+      expect_match(conditionMessage(w), "kcrit is finite for only some observations")
+      n <<- n + 1
+      invokeRestart("muffleWarning")
+    })
+    list(value = value, n = n)
   }
-  expect_equal(ncol(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, n_new = 1)), length(rk))
+  rk_draws <- withr::with_seed(7, rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, n_new = 1))
+  rk_dens <- dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, n_new = 1)
+  for (kcrit in list(c(0, NA), c(0, Inf), c(-Inf, 0.2))) {
+    r <- count_warnings(withr::with_seed(7, rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1)))
+    expect_identical(r$value, rk_draws, info = format(kcrit))
+    expect_equal(r$n, 1, info = format(kcrit))
+    # a kcrit that is not read does not set the number of observations
+    d <- count_warnings(dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1))
+    expect_identical(d$value, rk_dens, info = format(kcrit))
+    expect_equal(d$n, 1, info = format(kcrit))
+  }
+  expect_error(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
+  expect_error(dsdt_cdp(rkg, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
   expect_equal(ncol(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1)), length(rkg))
   expect_length(dsdt_cdp(rbind(rkg, rkg), 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1), 2)
+})
+
+test_that("an empty counts vector points to the matrix with zero rows", {
+  thr <- c(-0.5, 0.5)
+  calls <- list(
+    dsdt_rating = function(x) dsdt_rating(x, 1, 1, thr),
+    dsdt_dpsdt = function(x) dsdt_dpsdt(x, 1, 1, thr, Ro = 0.2),
+    dsdt_metad = function(x) dsdt_metad(x, 1, 1, c(-0.5, 0, 0.5), metad = 1),
+    dsdt_ranking = function(x) dsdt_ranking(x, m = 3, d = 1),
+    dsdt_cdp = function(x) dsdt_cdp(x, 1, 0.8, 1, c(-0.5, 0.3, 1), 0.7, n_new = 1)
+  )
+  for (name in names(calls)) {
+    expect_error(calls[[name]](numeric(0)), "pass a matrix with zero rows", info = name)
+  }
+  expect_identical(dsdt_rating(matrix(0, 0, 3), 1, 1, thr), numeric(0))
 })
 
 test_that("rddm handles vector parameters correctly", {
@@ -1571,7 +1622,7 @@ test_that("rezdm validates parameters correctly", {
   withr::local_seed(445)
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
-    "n must be a single positive whole number"
+    "n, the number of draws, must be a single number >= 0", fixed = TRUE
   )
 
   # n_trials must be larger than 2
@@ -1782,6 +1833,17 @@ test_that("dezdm 3par is vectorized over observations", {
   expect_length(ll_vec, 2)
   expect_equal(ll_vec[1], ll1)
   expect_equal(ll_vec[2], ll2)
+})
+
+test_that("dezdm 3par reads a matrix of summaries element by element and returns a plain vector", {
+  dat <- data.frame(mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025))
+  ll_vec <- dezdm(dat$mean_rt, dat$var_rt, 80, 100, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_identical(dezdm(as.matrix(dat["mean_rt"]), dat$var_rt, 80, 100, drift = 2, bound = 1.5, ndt = 0.3),
+                   ll_vec)
+  expect_identical(dezdm(as.matrix(dat["mean_rt"]), as.matrix(dat["var_rt"]), 80, 100,
+                         drift = 2, bound = 1.5, ndt = 0.3), ll_vec)
+  expect_identical(dezdm(as.matrix(dat), 0.02, 80, 100, drift = 2, bound = 1.5, ndt = 0.3),
+                   dezdm(c(0.5, 0.55, 0.02, 0.025), 0.02, 80, 100, drift = 2, bound = 1.5, ndt = 0.3))
 })
 
 test_that("dezdm 3par recycles parameters correctly", {

@@ -60,9 +60,11 @@ observation.}
 
 \item{rcrit}{Numeric vector. Remember criterion on the recollection axis.}
 
-\item{kcrit}{Know criterion on the familiarity axis. \code{NULL} (default) for
-the R/K model; finite values enable the R/K/G model. Give a finite value
-for every observation or \code{NULL}; a mix of the two is an error.}
+\item{kcrit}{Know criterion on the familiarity axis. \code{NULL} (default), or
+a non-finite value for every observation, gives the R/K model; finite
+values for every observation give the R/K/G model. A \code{kcrit} finite for
+only some observations gives the R/K model for the whole call, with a
+warning.}
 
 \item{sigmar}{Numeric vector. Log SD of the recollection target
 distribution (0 = SD 1).}
@@ -112,6 +114,9 @@ number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_
 \code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, or row \code{i} of a matrix. A
 shorter vector is repeated, also when \code{n} is not a multiple of its
 length.
+\item \code{n} is a single number of at least 0, read as \code{\link[stats:rnorm]{stats::rnorm()}} reads it:
+a fraction is truncated, and \code{n = 0} gives an empty result with the
+columns of a non-empty one.
 \item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
 \code{x} (its rows, when the observations are rows of counts) and the
 per-observation arguments, the others recycled to that length. Value \code{i}

@@ -501,7 +501,7 @@ test_that("every SDT d/r pair simulates the documented shape and refuses bad inp
       expect_equal(colnames(sim), row$cols, info = name)
       expect_true(all(rowSums(sim) == row$r_args$n_trials), info = name)
     }
-    expect_error(call_r(n = c(2, 3)), "single positive whole number", info = name)
+    expect_error(call_r(n = c(2, 3)), "must be a single number >= 0", info = name)
     for (bad in row$r_bad) {
       expect_error(do.call(call_r, bad$args), bad$msg, info = name)
     }
