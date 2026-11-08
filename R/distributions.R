@@ -28,11 +28,12 @@
 #' - `d*(x, ...)` returns one value per observation: as many as the longest of
 #'   `x` (its rows, when the observations are rows of counts) and the
 #'   per-observation arguments, the others recycled to that length. Value `i`
-#'   is what the call on the `i`-th elements alone returns. An empty vector
-#'   of observations gives an empty result. Where an observation is a vector
-#'   of counts (`dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`,
-#'   `dsdt_ranking()` and `dsdt_cdp()`), a vector is always one observation:
-#'   pass a matrix with zero rows for none.
+#'   is what the call on the `i`-th elements alone returns. When `x` or any
+#'   per-observation argument is empty, the result is empty, as in
+#'   [stats::dnorm()]. Where an observation is a vector of counts
+#'   (`dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`, `dsdt_ranking()` and
+#'   `dsdt_cdp()`), a vector is always one observation: pass a matrix with
+#'   zero rows for none.
 #' - A set of values that describes one observation, such as the `thresholds`
 #'   of the rating models, is a vector when every observation shares it and a
 #'   matrix with one row per observation otherwise: row `i` belongs to
@@ -2074,13 +2075,15 @@ times_nonzero <- function(count, log_prob) {
 #' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param mean_rt Observed mean reaction time(s) in seconds. For version
-#'   "3par", a numeric vector or single value. For version "4par", either a vector
-#'   of length 2 (c(mean_rt_upper, mean_rt_lower)) for single observation, or a matrix with 2
-#'   columns for multiple observations.
+#'   "3par", a numeric vector or single value. For version "4par", either a
+#'   vector of length 2, `c(mean_rt_upper, mean_rt_lower)`, for one
+#'   observation, or a matrix with 2 columns and one row per observation. A
+#'   vector is recycled as one observation, also when `var_rt` is a matrix.
 #' @param var_rt Observed variance of reaction times in seconds^2. For version
-#'   "3par", a numeric vector or single value. For version "4par", either a vector
-#'   of length 2 (c(var_rt_upper, var_rt_lower)) for single observation, or a matrix with 2
-#'   columns for multiple observations.
+#'   "3par", a numeric vector or single value. For version "4par", either a
+#'   vector of length 2, `c(var_rt_upper, var_rt_lower)`, for one observation,
+#'   or a matrix with 2 columns and one row per observation. A vector is
+#'   recycled as one observation, also when `mean_rt` is a matrix.
 #' @param n_upper Number of responses to the upper boundary
 #' @param n_trials Total number of trials
 #' @param drift Drift rate (evidence accumulation rate; can be positive or negative

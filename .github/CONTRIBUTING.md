@@ -224,9 +224,9 @@ new distribution follows it from the start:
    (row) `i`.
 2. `d*(x, ...)` returns as many values as the longest of `x` (its rows) and
    the per-observation arguments; value `i` equals the call on the `i`-th
-   elements alone. An empty `x` gives an empty result; where an observation
-   is a vector of counts, a vector is one observation and a 0-row matrix
-   gives the empty result.
+   elements alone. An empty `x` or an empty per-observation argument gives an
+   empty result, as in `dnorm()`; where an observation is a vector of counts,
+   a vector is one observation and a 0-row matrix gives the empty result.
 3. A set of values that describes one observation (thresholds, item
    locations) is a vector when every observation shares it and a matrix with
    one row per observation otherwise.
