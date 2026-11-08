@@ -569,3 +569,11 @@ test_that("a user stanvar with the name of a model stanvar stops with the name",
   dots <- list(stanvars = brms::stanvar(x = 2, name = "model_x"))
   expect_error(combine_args(nlist(config_args, dots)), "already defines stanvars named 'model_x'")
 })
+
+test_that("stanvars = NULL keeps the model's stanvars (#688)", {
+  model_sv <- brms::stanvar(x = 1, name = "model_x")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = NULL)))
+  expect_identical(out$stanvars, model_sv)
+  expect_named(out, c("formula", "stanvars"))
+})

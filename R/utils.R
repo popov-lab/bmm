@@ -156,13 +156,14 @@ glue_nlf <- function(..., env.frame = -1) {
 # prior; args$dots holds whatever the user passed to bmm() and so overwrites the
 # configured default for any argument (such as init) they named themselves.
 # stanvars are the exception: the model's carry part of its likelihood, so the
-# user's are added to them (#688)
+# user's are added to them (#688), and an explicit stanvars = NULL must not
+# erase them either
 combine_args <- function(args) {
   config_args <- args$config_args
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
-  if (!is.null(dots$stanvars)) {
+  if ("stanvars" %in% names(dots)) {
     dots$stanvars <- combine_stanvars(config_args$stanvars, dots$stanvars)
   }
   config_args[names(dots)] <- dots
