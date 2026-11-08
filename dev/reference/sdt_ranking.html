@@ -57,10 +57,12 @@
 
 
 <dl><dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
-<dd><p>A character vector of column names with the target rank-count
-columns, ordered from rank 1 (most likely target) to rank <code>m</code> (least).
-With a constant <code>m</code>, supply exactly <code>m</code> columns; with a varying set size,
-supply <code>max(m)</code> columns.</p></dd>
+<dd><p>For aggregated data, a character vector of column names
+with the target rank-count columns, ordered from rank 1 (most likely
+target) to rank <code>m</code> (least). With a constant <code>m</code>, supply exactly <code>m</code>
+columns; with a varying set size, supply <code>max(m)</code> columns. For one row per
+trial, the name of a single column holding the rank of the target on each
+trial, a whole number from 1 to that trial's set size.</p></dd>
 
 
 <dt id="arg-m">m<a class="anchor" aria-label="anchor" href="#arg-m"></a></dt>
@@ -106,9 +108,8 @@ keeps the identity link.</p></dd>
 <li><p><strong>Requirements:</strong></p>
 <p>Provide pre-aggregated ranking counts in wide format:</p></li>
 </ul><ul><li><p>Rank-count columns (response): one column per rank position, each giving the number of trials in which the target received that rank (column 1 = most likely target, column m = least)</p></li>
-<li><p>Set size (m): a constant or a column giving the number of ranked items per row; rows with fewer ranks leave the surplus columns at 0
-No stimulus column needed (all trials include exactly one target)</p></li>
-</ul><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>d</code>: Sensitivity: d' under equal variance (g' for gumbel_min). When sdratio is estimated, d is d_a, the distance between the target and lure distributions in units of their root-mean-square SD</p></li>
+<li><p>Set size (m): a constant or a column giving the number of ranked items per row; rows with fewer ranks leave the surplus columns at 0</p></li>
+</ul><p>No stimulus column needed (all trials include exactly one target)</p><ul><li><p><strong>Parameters:</strong></p><ul><li><p><code>d</code>: Sensitivity: d' under equal variance (g' for gumbel_min). When sdratio is estimated, d is d_a, the distance between the target and lure distributions in units of their root-mean-square SD</p></li>
 </ul></li>
 <li><p><strong>Fixed parameters:</strong></p></li>
 <li><p><strong>Default parameter links:</strong></p><ul><li><p>d = identity</p></li>
@@ -158,7 +159,21 @@ Add <code>sdratio ~ 1</code> to the formula for unequal-variance ranking.</p>
 <p>The set size <code>m</code> may be a constant or the name of a data column. Supply a
 column to fit trials with different set sizes in a single model: the response
 has <code>max(m)</code> columns, and rows with a smaller set size switch off the surplus
-rank categories (the multinomial then renormalizes over the valid ranks).</p>
+rank categories (the multinomial then renormalizes over the valid ranks).</p><div class="section">
+<h3 id="one-row-per-trial">One row per trial<a class="anchor" aria-label="anchor" href="#one-row-per-trial"></a></h3>
+
+
+<p>Name a single column in <code>response</code> that holds the rank the target received
+on each trial.</p><ul><li><p><strong>Requirements for one row per trial:</strong></p>
+<p>Provide one row per trial with the following columns:</p></li>
+</ul><ul><li><p>Rank (response): the rank the target received on the trial, a whole number from 1 = most likely target to the trial's set size</p></li>
+<li><p>Set size (m): a constant or a column giving the number of ranked items on each trial</p></li>
+</ul><p>No stimulus column needed (all trials include exactly one target)</p><ul><li><p><strong>Trial-level data:</strong> Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as <code>(1 | id) + (1 | item)</code> need trial rows, unless the counts are kept per participant and item.</p><ul><li><p><code>loo()</code> leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. <code>kfold(fit, group = "id")</code> leaves out whole participants with either layout.</p></li>
+<li><p><code>bmm(..., threads = n)</code> with <code>backend = "cmdstanr"</code> evaluates the likelihood on <code>n</code> threads per chain, which shortens trial-level fits on a machine with cores to spare.</p></li>
+<li><p><code>ppp(fit, participant = "id")</code> names the participant when the formula has more than one grouping variable, such as item terms.</p></li>
+</ul></li>
+</ul></div>
+
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

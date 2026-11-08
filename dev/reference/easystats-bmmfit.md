@@ -136,8 +136,13 @@ Each method reshapes what the fit already stores:
   from the formula (such as `ID:session` or `log(x)`), and with the
   response categories of a model fitted to counts (e.g.
   [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md)) as columns of
-  their own. The model frame stored in the fit is always the source;
-  `source` is ignored.
+  their own. Data with one row per trial come back with the response
+  columns you named, such as the `rating` column of
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+  or the `judgment` and `confidence` columns of
+  [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md). The
+  model frame stored in the fit is always the source; `source` is
+  ignored.
 
 - `find_parameters()` returns the names of the posterior draws in one
   element per model parameter (`<parameter>` for the population-level

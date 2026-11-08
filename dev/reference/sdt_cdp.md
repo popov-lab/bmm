@@ -13,6 +13,8 @@ sdt_cdp(
   dist = "normal",
   threshold_type = c("parsimonious", "equidistant", "log_distance"),
   links = NULL,
+  judgment = NULL,
+  confidence = NULL,
   ...
 )
 ```
@@ -68,6 +70,14 @@ sdt_cdp(
   positive-range link (`"log"`, `"softplus"`) on `criterion` or `rcrit`
   states that the criterion is positive: the sampler then starts next to
   0 on the native scale and cannot reach negative values.
+
+- judgment, confidence:
+
+  For one row per trial, the names of the columns holding each trial's
+  judgment (`"new"`, `"know"`, `"remember"`, or `"guess"`) and its
+  confidence on the unified scale (1 to `n_new` for "new" judgments,
+  `n_new + 1` to `n_new + n_old` for the others). Leave both `NULL` for
+  aggregated count columns.
 
 - ...:
 
@@ -245,6 +255,48 @@ levels need not be equal (e.g. the 1-new / 5-old scale of Rotello et
 al., 2005). Whether the Know/Guess split is modelled is **driven by the
 data**: include `guess<k>` columns to fit the three-way
 Remember/Know/Guess model.
+
+**One row per trial.** Name the columns holding each trial's judgment
+(`"new"`, `"know"`, `"remember"`, optionally `"guess"`) and its
+confidence on the unified scale in `judgment` and `confidence`; the
+model then needs no count columns, and `guess` judgments in the data
+switch on the Know/Guess split.
+
+- **Requirements for one row per trial:**
+
+  Provide one row per trial with the following columns:
+
+  - judgment: 'new', 'know' or 'remember', and optionally 'guess'
+
+  - confidence: a whole number on the unified confidence scale, 1 ...
+    n_new for 'new' judgments and n_new+1 ... n_new+n_old for the others
+
+  - stimulus: 0 = new/lure, 1 = old/target
+
+'guess' judgments in the data switch on the Know/Guess split, as
+`guess<k>` count columns do for aggregated data
+
+- **Trial-level data:** Without trial-level predictors or item terms,
+  trial rows give the same posterior as the counts aggregated from them,
+  which are sufficient statistics; the fit only takes longer, because
+  its cost grows with the number of rows. Crossed random effects such as
+  `(1 | id) + (1 | item)` need trial rows, unless the counts are kept
+  per participant and item.
+
+  - `loo()` leaves out single trials on trial rows and whole cells on
+    aggregated rows. These are different predictions, and the
+    log-likelihoods of the trial rows sum to the cell's log-likelihood
+    less the log of the binomial (or multinomial) coefficient, so ELPD
+    values compare only fits to the same layout.
+    `kfold(fit, group = "id")` leaves out whole participants with either
+    layout.
+
+  - `bmm(..., threads = n)` with `backend = "cmdstanr"` evaluates the
+    likelihood on `n` threads per chain, which shortens trial-level fits
+    on a machine with cores to spare.
+
+  - `ppp(fit, participant = "id")` names the participant when the
+    formula has more than one grouping variable, such as item terms.
 
 **Variants via the formula.** By default `sigmar`, `rho`, and `kcrit`
 are fixed (equal recollection variance, independent F and R, no

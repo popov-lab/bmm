@@ -12,10 +12,12 @@ sdt_ranking(response, m, dist = c("gumbel_min", "normal"), links = NULL, ...)
 
 - response:
 
-  A character vector of column names with the target rank-count columns,
-  ordered from rank 1 (most likely target) to rank `m` (least). With a
-  constant `m`, supply exactly `m` columns; with a varying set size,
-  supply `max(m)` columns.
+  For aggregated data, a character vector of column names with the
+  target rank-count columns, ordered from rank 1 (most likely target) to
+  rank `m` (least). With a constant `m`, supply exactly `m` columns;
+  with a varying set size, supply `max(m)` columns. For one row per
+  trial, the name of a single column holding the rank of the target on
+  each trial, a whole number from 1 to that trial's set size.
 
 - m:
 
@@ -77,10 +79,9 @@ An object of class `bmmodel`
   (column 1 = most likely target, column m = least)
 
 - Set size (m): a constant or a column giving the number of ranked items
-  per row; rows with fewer ranks leave the surplus columns at 0 No
-  stimulus column needed (all trials include exactly one target)
+  per row; rows with fewer ranks leave the surplus columns at 0
 
-&nbsp;
+No stimulus column needed (all trials include exactly one target)
 
 - **Parameters:**
 
@@ -154,6 +155,47 @@ a column to fit trials with different set sizes in a single model: the
 response has `max(m)` columns, and rows with a smaller set size switch
 off the surplus rank categories (the multinomial then renormalizes over
 the valid ranks).
+
+### One row per trial
+
+Name a single column in `response` that holds the rank the target
+received on each trial.
+
+- **Requirements for one row per trial:**
+
+  Provide one row per trial with the following columns:
+
+&nbsp;
+
+- Rank (response): the rank the target received on the trial, a whole
+  number from 1 = most likely target to the trial's set size
+
+- Set size (m): a constant or a column giving the number of ranked items
+  on each trial
+
+No stimulus column needed (all trials include exactly one target)
+
+- **Trial-level data:** Without trial-level predictors or item terms,
+  trial rows give the same posterior as the counts aggregated from them,
+  which are sufficient statistics; the fit only takes longer, because
+  its cost grows with the number of rows. Crossed random effects such as
+  `(1 | id) + (1 | item)` need trial rows, unless the counts are kept
+  per participant and item.
+
+  - `loo()` leaves out single trials on trial rows and whole cells on
+    aggregated rows. These are different predictions, and the
+    log-likelihoods of the trial rows sum to the cell's log-likelihood
+    less the log of the binomial (or multinomial) coefficient, so ELPD
+    values compare only fits to the same layout.
+    `kfold(fit, group = "id")` leaves out whole participants with either
+    layout.
+
+  - `bmm(..., threads = n)` with `backend = "cmdstanr"` evaluates the
+    likelihood on `n` threads per chain, which shortens trial-level fits
+    on a machine with cores to spare.
+
+  - `ppp(fit, participant = "id")` names the participant when the
+    formula has more than one grouping variable, such as item terms.
 
 ## References
 

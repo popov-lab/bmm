@@ -57,6 +57,8 @@
 <span>  dist <span class="op">=</span> <span class="st">"normal"</span>,</span>
 <span>  threshold_type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"parsimonious"</span>, <span class="st">"equidistant"</span>, <span class="st">"log_distance"</span><span class="op">)</span>,</span>
 <span>  links <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  judgment <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  confidence <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -107,6 +109,14 @@ their fixed values and the model's own transformations (<code><a href="https://r
 assume it. A positive-range link (<code>"log"</code>, <code>"softplus"</code>) on <code>criterion</code> or
 <code>rcrit</code> states that the criterion is positive: the sampler then starts
 next to 0 on the native scale and cannot reach negative values.</p></dd>
+
+
+<dt id="arg-judgment-confidence">judgment, confidence<a class="anchor" aria-label="anchor" href="#arg-judgment-confidence"></a></dt>
+<dd><p>For one row per trial, the names of the columns
+holding each trial's judgment (<code>"new"</code>, <code>"know"</code>, <code>"remember"</code>, or
+<code>"guess"</code>) and its confidence on the unified scale (1 to <code>n_new</code> for
+"new" judgments, <code>n_new + 1</code> to <code>n_new + n_old</code> for the others). Leave
+both <code>NULL</code> for aggregated count columns.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -199,7 +209,20 @@ numbers of "new" and "old" confidence levels need not be equal (e.g. the
 1-new / 5-old scale of Rotello et al., 2005). Whether the Know/Guess split
 is modelled is <strong>driven by the data</strong>: include <code>guess&lt;k&gt;</code> columns to fit
 the three-way Remember/Know/Guess model.</p>
-<p><strong>Variants via the formula.</strong> By default <code>sigmar</code>, <code>rho</code>, and <code>kcrit</code> are
+<p><strong>One row per trial.</strong> Name the columns holding each trial's judgment
+(<code>"new"</code>, <code>"know"</code>, <code>"remember"</code>, optionally <code>"guess"</code>) and its confidence
+on the unified scale in <code>judgment</code> and <code>confidence</code>; the model then needs no
+count columns, and <code>guess</code> judgments in the data switch on the Know/Guess
+split.</p><ul><li><p><strong>Requirements for one row per trial:</strong></p>
+<p>Provide one row per trial with the following columns:</p><ul><li><p>judgment: 'new', 'know' or 'remember', and optionally 'guess'</p></li>
+<li><p>confidence: a whole number on the unified confidence scale, 1 ... n_new for 'new' judgments and n_new+1 ... n_new+n_old for the others</p></li>
+<li><p>stimulus: 0 = new/lure, 1 = old/target</p></li>
+</ul></li>
+</ul><p>'guess' judgments in the data switch on the Know/Guess split, as <code>guess&lt;k&gt;</code> count columns do for aggregated data</p><ul><li><p><strong>Trial-level data:</strong> Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as <code>(1 | id) + (1 | item)</code> need trial rows, unless the counts are kept per participant and item.</p><ul><li><p><code>loo()</code> leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. <code>kfold(fit, group = "id")</code> leaves out whole participants with either layout.</p></li>
+<li><p><code>bmm(..., threads = n)</code> with <code>backend = "cmdstanr"</code> evaluates the likelihood on <code>n</code> threads per chain, which shortens trial-level fits on a machine with cores to spare.</p></li>
+<li><p><code>ppp(fit, participant = "id")</code> names the participant when the formula has more than one grouping variable, such as item terms.</p></li>
+</ul></li>
+</ul><p><strong>Variants via the formula.</strong> By default <code>sigmar</code>, <code>rho</code>, and <code>kcrit</code> are
 fixed (equal recollection variance, independent F and R, no Know/Guess
 split), recovering the classic independent-process CDP. Free them through the
 formula:</p><ul><li><p><code>sigmar ~ 1</code> estimates unequal recollection variance.</p></li>

@@ -193,7 +193,10 @@ counts as both a location and a distributional parameter, so each
 them: without the columns bmm adds for its own use or <span class="pkg">brms</span>
 computes from the formula (such as <code>ID:session</code> or <code>log(x)</code>), and with
 the response categories of a model fitted to counts (e.g. <code><a href="m3.html">m3()</a></code>) as
-columns of their own. The model frame stored in the fit is always the
+columns of their own. Data with one row per trial come back with the
+response columns you named, such as the <code>rating</code> column of
+<code><a href="sdt_rating.html">sdt_rating()</a></code> or the <code>judgment</code> and <code>confidence</code> columns of
+<code><a href="sdt_cdp.html">sdt_cdp()</a></code>. The model frame stored in the fit is always the
 source; <code>source</code> is ignored.</p></li>
 <li><p><code>find_parameters()</code> returns the names of the posterior draws in one
 element per model parameter (<code>&lt;parameter&gt;</code> for the population-level

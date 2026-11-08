@@ -35,6 +35,12 @@ and combines them with a readable summary of:
   ([`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
   [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)
   without `n_trials`,
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+  with `n_ratings`,
+  [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
+  with one rank column,
+  [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) with
+  `judgment` and `confidence`,
   [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) with
   `response`), only the first grouping variable of the formula, taken as
   the participant, and any grouping variable that is also a discrete

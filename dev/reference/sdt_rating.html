@@ -57,6 +57,7 @@
 <span>    <span class="st">"softmax"</span><span class="op">)</span>,</span>
 <span>  version <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"standard"</span>, <span class="st">"dpsdt"</span>, <span class="st">"metad"</span><span class="op">)</span>,</span>
 <span>  links <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  n_ratings <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -66,9 +67,11 @@
 
 
 <dl><dt id="arg-response">response<a class="anchor" aria-label="anchor" href="#arg-response"></a></dt>
-<dd><p>A character vector of K column names containing response
-counts per rating category, ordered from "definitely noise" to
-"definitely signal".</p></dd>
+<dd><p>For aggregated data, a character vector of K column names
+containing response counts per rating category, ordered from "definitely
+noise" to "definitely signal". For one row per trial, the name of a single
+column holding the rating of each trial, a whole number from 1 to
+<code>n_ratings</code>.</p></dd>
 
 
 <dt id="arg-stimulus">stimulus<a class="anchor" aria-label="anchor" href="#arg-stimulus"></a></dt>
@@ -127,6 +130,12 @@ and the threshold parameters keep their identity links, because the model
 reads each of them through <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> and fixes <code>sdratio</code> at 0 for equal
 variance. The same holds for <code>Ro</code> and <code>Rn</code>, read through <code>inv_logit()</code>
 and fixed off by default, and for <code>logmratio</code>, read through <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code>.</p></dd>
+
+
+<dt id="arg-n-ratings">n_ratings<a class="anchor" aria-label="anchor" href="#arg-n-ratings"></a></dt>
+<dd><p>The number of rating categories K when <code>response</code> names a
+single rating column, which declares one row per trial. Leave it <code>NULL</code>
+for aggregated data, whose count columns fix K.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -344,6 +353,22 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'<
 <li><p><code>sd</code>: exponential(2)</p></li>
 </ul></li>
 </ul></li>
+</ul></div>
+
+<div class="section">
+<h3 id="one-row-per-trial">One row per trial<a class="anchor" aria-label="anchor" href="#one-row-per-trial"></a></h3>
+
+
+<p>Name a single rating column in <code>response</code> and give the number of categories
+as <code>n_ratings</code>; every version takes this layout.</p><ul><li><p><strong>Requirements for one row per trial:</strong></p>
+<p>Provide one row per trial with the following columns:</p></li>
+</ul><ul><li><p>Rating (response): the category chosen on the trial, a whole number from 1 = 'definitely noise' to K = n_ratings = 'definitely signal'</p></li>
+<li><p>Stimulus type (stimulus): 0 = noise, 1 = signal</p></li>
+</ul><ul><li><p><strong>Trial-level data:</strong> Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as <code>(1 | id) + (1 | item)</code> need trial rows, unless the counts are kept per participant and item.</p><ul><li><p>With <code>criterion</code> (the default), an item's effect on <code>d</code> is informed only by the trials on which the item is the signal: on noise trials <code>d</code> does not enter the likelihood, so the item effects on <code>d</code> of items shown only as noise stay at their prior. With <code>bias</code>, <code>d</code> also moves the criterion and enters every trial.</p></li>
+<li><p><code>loo()</code> leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. <code>kfold(fit, group = "id")</code> leaves out whole participants with either layout.</p></li>
+<li><p><code>bmm(..., threads = n)</code> with <code>backend = "cmdstanr"</code> evaluates the likelihood on <code>n</code> threads per chain, which shortens trial-level fits on a machine with cores to spare.</p></li>
+<li><p><code>ppp(fit, participant = "id")</code> names the participant when the formula has more than one grouping variable, such as item terms.</p></li>
+</ul></li>
 </ul><p>By default, the model assumes equal variance (sdratio fixed to 0). To
 estimate unequal variance, add <code>sdratio ~ 1</code> (or <code>sdratio ~ predictors</code>)
 to the formula.</p>
@@ -474,6 +499,16 @@ ordinal response. <em>PsyArXiv</em>. <a href="https://doi.org/10.31234/osf.io/e7
 <span class="r-in"><span><span class="va">fit_md</span> <span class="op">&lt;-</span> <span class="fu"><a href="bmm.html">bmm</a></span><span class="op">(</span><span class="fu"><a href="bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">d</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">spacing</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">logmratio</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>, model <span class="op">=</span> <span class="va">model_md</span>, backend <span class="op">=</span> <span class="st">"cmdstanr"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="mratio.html">mratio</a></span><span class="op">(</span><span class="va">fit_md</span><span class="op">)</span> <span class="co"># posterior M-ratio (meta-d'/d')</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># One row per trial, with the rating 1 to 4 in one column and item effects</span></span></span>
+<span class="r-in"><span><span class="va">model_trial</span> <span class="op">&lt;-</span> <span class="fu">sdt_rating</span><span class="op">(</span><span class="st">"rating"</span>, <span class="st">"stimulus"</span>, n_ratings <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">20</span>, item <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">40</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">trials</span><span class="op">$</span><span class="va">stimulus</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="va">trials</span><span class="op">$</span><span class="va">item</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">2</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="simulate_data.html">simulate_data</a></span><span class="op">(</span><span class="va">model_trial</span>, design <span class="op">=</span> <span class="va">trials</span>,</span></span>
+<span class="r-in"><span>                        pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.5</span>, spacing <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">fit_trial</span> <span class="op">&lt;-</span> <span class="fu"><a href="bmm.html">bmm</a></span><span class="op">(</span><span class="fu"><a href="bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">d</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span>, <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                     <span class="va">spacing</span> <span class="op">~</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                 data <span class="op">=</span> <span class="va">trials</span>, model <span class="op">=</span> <span class="va">model_trial</span>, backend <span class="op">=</span> <span class="st">"cmdstanr"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

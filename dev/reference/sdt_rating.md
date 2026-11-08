@@ -13,6 +13,7 @@ sdt_rating(
     "softmax"),
   version = c("standard", "dpsdt", "metad"),
   links = NULL,
+  n_ratings = NULL,
   ...
 )
 ```
@@ -21,9 +22,11 @@ sdt_rating(
 
 - response:
 
-  A character vector of K column names containing response counts per
-  rating category, ordered from "definitely noise" to "definitely
-  signal".
+  For aggregated data, a character vector of K column names containing
+  response counts per rating category, ordered from "definitely noise"
+  to "definitely signal". For one row per trial, the name of a single
+  column holding the rating of each trial, a whole number from 1 to
+  `n_ratings`.
 
 - stimulus:
 
@@ -94,6 +97,12 @@ sdt_rating(
   for equal variance. The same holds for `Ro` and `Rn`, read through
   `inv_logit()` and fixed off by default, and for `logmratio`, read
   through [`exp()`](https://rdrr.io/r/base/Log.html).
+
+- n_ratings:
+
+  The number of rating categories K when `response` names a single
+  rating column, which declares one row per trial. Leave it `NULL` for
+  aggregated data, whose count columns fix K.
 
 - ...:
 
@@ -511,6 +520,52 @@ Extract the M-ratio posterior with
 
     - `sd`: exponential(2)
 
+### One row per trial
+
+Name a single rating column in `response` and give the number of
+categories as `n_ratings`; every version takes this layout.
+
+- **Requirements for one row per trial:**
+
+  Provide one row per trial with the following columns:
+
+&nbsp;
+
+- Rating (response): the category chosen on the trial, a whole number
+  from 1 = 'definitely noise' to K = n_ratings = 'definitely signal'
+
+- Stimulus type (stimulus): 0 = noise, 1 = signal
+
+&nbsp;
+
+- **Trial-level data:** Without trial-level predictors or item terms,
+  trial rows give the same posterior as the counts aggregated from them,
+  which are sufficient statistics; the fit only takes longer, because
+  its cost grows with the number of rows. Crossed random effects such as
+  `(1 | id) + (1 | item)` need trial rows, unless the counts are kept
+  per participant and item.
+
+  - With `criterion` (the default), an item's effect on `d` is informed
+    only by the trials on which the item is the signal: on noise trials
+    `d` does not enter the likelihood, so the item effects on `d` of
+    items shown only as noise stay at their prior. With `bias`, `d` also
+    moves the criterion and enters every trial.
+
+  - `loo()` leaves out single trials on trial rows and whole cells on
+    aggregated rows. These are different predictions, and the
+    log-likelihoods of the trial rows sum to the cell's log-likelihood
+    less the log of the binomial (or multinomial) coefficient, so ELPD
+    values compare only fits to the same layout.
+    `kfold(fit, group = "id")` leaves out whole participants with either
+    layout.
+
+  - `bmm(..., threads = n)` with `backend = "cmdstanr"` evaluates the
+    likelihood on `n` threads per chain, which shortens trial-level fits
+    on a machine with cores to spare.
+
+  - `ppp(fit, participant = "id")` names the participant when the
+    formula has more than one grouping variable, such as item terms.
+
 By default, the model assumes equal variance (sdratio fixed to 0). To
 estimate unequal variance, add `sdratio ~ 1` (or `sdratio ~ predictors`)
 to the formula.
@@ -659,5 +714,15 @@ model_md <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", version = "metad")
 fit_md <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
               data = dat, model = model_md, backend = "cmdstanr")
 mratio(fit_md) # posterior M-ratio (meta-d'/d')
+
+# One row per trial, with the rating 1 to 4 in one column and item effects
+model_trial <- sdt_rating("rating", "stimulus", n_ratings = 4)
+trials <- expand.grid(id = 1:20, item = 1:40)
+trials$stimulus <- as.integer(trials$item %% 2 == 0)
+trials <- simulate_data(model_trial, design = trials,
+                        pars = list(d = 1.5, criterion = 0.5, spacing = -0.5))
+fit_trial <- bmm(bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id),
+                     spacing ~ 1),
+                 data = trials, model = model_trial, backend = "cmdstanr")
 } # }
 ```

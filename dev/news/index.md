@@ -110,6 +110,19 @@
   such as `id` in `(1 | id)`, as the participant. Aggregated counts with
   `n_trials` work as before
   ([\#646](https://github.com/popov-lab/bmm/issues/646)).
+- [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
+  [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
+  and [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
+  now take one row per trial, so they also allow item random effects.
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+  reads the rating from one column given in `response`, with the number
+  of categories in the new argument `n_ratings`.
+  [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
+  reads the target’s rank from one column.
+  [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) reads
+  each trial’s judgment and confidence from the columns named in the new
+  arguments `judgment` and `confidence`. Count columns work as before
+  ([\#646](https://github.com/popov-lab/bmm/issues/646)).
 - [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) now takes one
   row per trial: name the column that holds each trial’s response
   category in `response`, such as
