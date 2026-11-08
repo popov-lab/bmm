@@ -215,18 +215,24 @@ models follow one recycling contract, stated on the help page
 `?bmm_distributions` and inherited by each distribution's page under "Vector
 arguments". The cswald and circular-mixture functions adopt it with their open
 pull requests; `dm3()`/`rm3()`, the MPT functions and
-`dpsychometric_function()`/`rpsychometric_function()` are not covered yet. A
-new distribution follows it from the start:
+`dpsychometric_function()` are not covered yet, and `rpsychometric_function()`
+follows only the rule for `n`. A new distribution follows it from the start:
 
-1. `r*(n, ...)` returns exactly `n` draws (a vector, or `n` rows). Each
+1. `r*(n, ...)` returns exactly `n` draws (a vector, or `n` rows). `n` is a
+   single number of at least 0, read with `.n_draws()`: a fraction is
+   truncated, as in `rnorm()`, but a vector `n` stops, where `rnorm()` takes
+   its length (`rddm()` still takes it, with a deprecation warning). Each
    per-observation argument is recycled to `n` with `rep_len()`, as `rnorm()`
    does, also when `n` is not a multiple of its length; draw `i` uses element
    (row) `i`.
 2. `d*(x, ...)` returns as many values as the longest of `x` (its rows) and
    the per-observation arguments; value `i` equals the call on the `i`-th
    elements alone. An empty `x` or an empty per-observation argument gives an
-   empty result, as in `dnorm()`; where an observation is a vector of counts,
-   a vector is one observation and a 0-row matrix gives the empty result.
+   empty result, as in `dnorm()`; where an observation is a vector of counts
+   (or a `mean_rt` or `var_rt` pair of `dezdm(version = "4par")`), a vector
+   is one observation, an empty vector stops and a 0-row matrix gives the
+   empty result. An empty `kcrit` of the cdp functions stops, as
+   `kcrit = NULL` selects the R/K model.
 3. A set of values that describes one observation (thresholds, item
    locations) is a vector when every observation shares it and a matrix with
    one row per observation otherwise.

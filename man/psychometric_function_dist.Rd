@@ -63,7 +63,7 @@ does not attend and responds at the guess rate. The upper asymptote is
 \item{n}{Integer. Number of observations to generate. \code{intensity},
 \code{n_trials} and the parameters are recycled to this length. As in
 \code{\link[stats:rnorm]{stats::rnorm()}}, a fraction is truncated and \code{n = 0} gives an empty
-vector.}
+vector; unlike \code{\link[stats:rnorm]{stats::rnorm()}}, a vector \code{n} stops.}
 }
 \value{
 \code{dpsychometric_function()} returns the (log-)density, a binomial probability.

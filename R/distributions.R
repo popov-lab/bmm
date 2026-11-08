@@ -12,8 +12,9 @@
 #'   The other distribution functions do not follow these rules yet:
 #'   [dcswald()] and [rcswald()], the circular mixtures ([dmixture2p()],
 #'   [dmixture3p()], [dimm()] and their `r*()` functions), [dm3()] and [rm3()],
-#'   [dmpt()] and [rmpt()], and [dpsychometric_function()] and
-#'   [rpsychometric_function()].
+#'   [dmpt()] and [rmpt()], and [dpsychometric_function()].
+#'   [rpsychometric_function()] reads `n` by the rule below but does not yet
+#'   recycle its other arguments by these rules.
 #'
 #' @section Vector arguments:
 #' - `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or matrix
@@ -22,9 +23,11 @@
 #'   [stats::rnorm()]: draw `i` uses element `i`, or row `i` of a matrix. A
 #'   shorter vector is repeated, also when `n` is not a multiple of its
 #'   length.
-#' - `n` is a single number of at least 0, read as [stats::rnorm()] reads it:
-#'   a fraction is truncated, and `n = 0` gives an empty result with the
-#'   columns of a non-empty one.
+#' - `n` is a single number of at least 0. A fraction is truncated, as in
+#'   [stats::rnorm()], and `n = 0` gives an empty vector, or a matrix or data
+#'   frame with zero rows and the usual columns. Unlike [stats::rnorm()],
+#'   which takes the length of a vector `n`, these functions stop on one;
+#'   [rddm()] still takes its length, with a deprecation warning.
 #' - `d*(x, ...)` returns one value per observation: as many as the longest of
 #'   `x` (its rows, when the observations are rows of counts) and the
 #'   per-observation arguments, the others recycled to that length. Value `i`
@@ -32,8 +35,11 @@
 #'   per-observation argument is empty, the result is empty, as in
 #'   [stats::dnorm()]. Where an observation is a vector of counts
 #'   (`dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`, `dsdt_ranking()` and
-#'   `dsdt_cdp()`), a vector is always one observation: pass a matrix with
-#'   zero rows for none.
+#'   `dsdt_cdp()`), or the pair of `mean_rt` or `var_rt` values of
+#'   `dezdm(version = "4par")`, a vector is always one observation: pass a
+#'   matrix with zero rows for none, as an empty vector stops. An empty
+#'   `kcrit` of `dsdt_cdp()` and `rsdt_cdp()` stops as well; `kcrit = NULL`
+#'   gives the R/K model.
 #' - A set of values that describes one observation, such as the `thresholds`
 #'   of the rating models, is a vector when every observation shares it and a
 #'   matrix with one row per observation otherwise: row `i` belongs to
@@ -2082,11 +2088,15 @@ times_nonzero <- function(count, log_prob) {
 #'   vector of length 2, `c(mean_rt_upper, mean_rt_lower)`, for one
 #'   observation, or a matrix with 2 columns and one row per observation. A
 #'   vector is recycled as one observation, also when `var_rt` is a matrix.
+#'   For no observations, pass a matrix with zero rows and 2 columns; an
+#'   empty vector stops.
 #' @param var_rt Observed variance of reaction times in seconds^2. For version
 #'   "3par", a numeric vector or single value. For version "4par", either a
 #'   vector of length 2, `c(var_rt_upper, var_rt_lower)`, for one observation,
 #'   or a matrix with 2 columns and one row per observation. A vector is
-#'   recycled as one observation, also when `mean_rt` is a matrix.
+#'   recycled as one observation, also when `mean_rt` is a matrix. For no
+#'   observations, pass a matrix with zero rows and 2 columns; an empty vector
+#'   stops.
 #' @param n_upper Number of responses to the upper boundary
 #' @param n_trials Total number of trials
 #' @param drift Drift rate (evidence accumulation rate; can be positive or negative
@@ -3847,9 +3857,10 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'
 #' @return `dsdt_ranking` returns the (log-)density (multinomial probability).
 #'   `rsdt_ranking` returns an integer matrix with one row per observation and
-#'   one rank-count column per rank position (`rank1` ... `rank max(m)`); rows
-#'   with a smaller set size have structural zeros in the surplus columns,
-#'   matching the wide format [sdt_ranking()] expects.
+#'   one rank-count column per rank position, `rank1` to `rank<M>`, where `M`
+#'   is the largest `m` of the draws; with `n = 0` it is the largest of all
+#'   `m` given. Rows with a smaller set size have structural zeros in the
+#'   surplus columns, matching the wide format [sdt_ranking()] expects.
 #'
 #' @section Parameter scales:
 #' These functions take `sdratio` as the ratio itself, while [sdt_ranking()]
@@ -4893,7 +4904,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #' @param n Integer. Number of observations to generate. `intensity`,
 #'   `n_trials` and the parameters are recycled to this length. As in
 #'   [stats::rnorm()], a fraction is truncated and `n = 0` gives an empty
-#'   vector.
+#'   vector; unlike [stats::rnorm()], a vector `n` stops.
 #'
 #' @return `dpsychometric_function()` returns the (log-)density, a binomial probability.
 #'   `rpsychometric_function()` returns an integer vector with the number of positive
