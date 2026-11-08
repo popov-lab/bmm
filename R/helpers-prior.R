@@ -707,8 +707,9 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     return(priors)
   }
 
-  # `0 + offset(x)` or `~ 0` leaves no coefficient for a main prior to sit on,
-  # and brms rejects a prior on a coefficient the model does not have (#689)
+  # the main prior describes an intercept or the levels of a fixed-effect
+  # predictor; offsets, `mo()`/`s()`/`gp()` and group-level terms keep brms's
+  # defaults, and brms rejects a prior on a coefficient the model lacks (#689)
   if (fixed_effects_count == 0 && interactions_count == 0) {
     return(priors)
   }
