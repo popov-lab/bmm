@@ -535,7 +535,7 @@ test_that("sdt_yn emits an sd prior only for parameters with random effects", {
   expect_false(any(fit$prior$class == "sd"))
 })
 
-test_that("a parameter formula without coefficients gets no default main prior (#689)", {
+test_that("an offset-only formula gets no default main prior on a distributional parameter (#689)", {
   data <- small_data()
   data$log_kappa <- log(5)
   model <- mixture2p("dev_rad")
@@ -544,6 +544,11 @@ test_that("a parameter formula without coefficients gets no default main prior (
   expect_false(any(pr$dpar == "kappa" & pr$class %in% c("b", "Intercept") & pr$source == "user"))
   expect_false(any(pr$coef == "NA"))
   expect_match(stancode(bmf(kappa ~ 0 + offset(log_kappa), thetat ~ 1), data, model), "offsets_kappa")
+})
+
+test_that("a parameter formula with no terms gets no default prior (#689)", {
+  data <- small_data()
+  model <- mixture2p("dev_rad")
 
   pr <- default_prior(bmf(kappa ~ 1, thetat ~ 0), data, model)
   expect_false(any(pr$dpar == "thetat" & pr$source == "user"))
@@ -552,14 +557,20 @@ test_that("a parameter formula without coefficients gets no default main prior (
   sc <- stancode(bmf(kappa ~ 1, thetat ~ 0), data, model)
   expect_match(sc, "thetat = inv_logit\\(thetat\\);")
   expect_no_match(sc, "thetat \\+=")
+})
 
-  # random effects without coefficients still get their sd prior
+test_that("an offset-only formula with group-level terms keeps its default sd prior (#689)", {
+  data <- small_data()
+  data$log_kappa <- log(5)
+  model <- mixture2p("dev_rad")
+
   pr <- default_prior(bmf(kappa ~ 0 + offset(log_kappa) + (1 | ID), thetat ~ 1), data, model)
   expect_equal(sd_rows(pr)$dpar, "kappa")
   expect_false(any(pr$coef == "NA"))
 })
 
 test_that("an offset-only formula gets no default main prior on a non-linear parameter (#689)", {
+  withr::local_seed(255)
   dat <- mpt_2htm_data(n_id = 2)
   dat$logit_D <- 0.5
   model <- mpt(mpt_2htm_trees(), "item_type")
