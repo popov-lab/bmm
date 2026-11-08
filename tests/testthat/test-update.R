@@ -865,4 +865,10 @@ test_that("stanvars given to update() keep the model's own stanvars (#688)", {
   ))
   expect_identical(names(new_fit$stanvars), names(fit$stanvars + sv))
   expect_match(brms::stancode(new_fit), "real one() { return 1; }", fixed = TRUE)
+
+  null_fit <- suppressMessages(update(fit, stanvars = NULL,
+    backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE
+  ))
+  expect_identical(names(null_fit$stanvars), names(fit$stanvars))
+  expect_true("sdm_run_count" %in% names(brms::standata(null_fit)))
 })
