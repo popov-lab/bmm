@@ -1664,9 +1664,11 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
     )
     n <- length(n)
   }
-  n <- .n_draws(n)
+  n_draws <- .n_draws(n)
   max_len <- max(lengths(list(drift, bound, ndt, zr)))
-  # until 1.6.0, n = 1 with parameter vectors still means one draw per element
+  # until 1.6.0, an n given as exactly 1 with parameter vectors still means one
+  # draw per element, as before 1.5.0; a fraction such as 1.5 stopped then, so
+  # it is read as rnorm() reads it, one draw
   if (n == 1 && max_len > 1) {
     warn_deprecated(
       what = "rddm(1, <parameter vectors>)",
@@ -1674,16 +1676,17 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
       since = "1.5.0",
       details = "`n` is the number of draws; the parameters are recycled to it."
     )
-    n <- max_len
+    n_draws <- max_len
   }
   # rtdists::rdiffusion() cannot draw zero samples
-  if (n == 0) {
+  if (n_draws == 0) {
     return(data.frame(rt = numeric(0), response = numeric(0)))
   }
 
-  bound <- rep_len(bound, n)
+  bound <- rep_len(bound, n_draws)
   sim_data <- rtdists::rdiffusion(
-    n = n, a = bound, v = rep_len(drift, n), t0 = rep_len(ndt, n), z = rep_len(zr, n) * bound
+    n = n_draws, a = bound, v = rep_len(drift, n_draws), t0 = rep_len(ndt, n_draws),
+    z = rep_len(zr, n_draws) * bound
   )
   sim_data$response <- ifelse(sim_data$response == "upper", 1, 0)
   sim_data
@@ -3610,6 +3613,10 @@ rsdt_mafc <- function(n, n_trials, m, d,
   n <- .n_draws(n)
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(n_trials < 1), "n_trials must be positive")
+  # the gumbel_min logit takes max(m) of the recycled m, which is empty here
+  if (n == 0) {
+    return(integer(0))
+  }
 
   # the logit is the scale dsdt_mafc() evaluates on, and plogis() cannot leave
   # [0, 1]; .mafc_pc_r() can, and does -- its gumbel_min lgamma difference has

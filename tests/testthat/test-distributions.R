@@ -774,6 +774,41 @@ test_that("rddm() with an n of length above 1 gives length(n) draws, with a depr
   expect_identical(out, withr::with_seed(7, rddm(2, drift = 1, bound = 1, ndt = 0.2)))
 })
 
+test_that("rddm() reads a fraction above 1 with parameter vectors as one draw", {
+  drift <- c(1, 2, 3)
+  one <- withr::with_seed(7, rddm(1, drift = 1, bound = 1, ndt = 0.2))
+  for (n in list(1.5, "1.5", 1.99)) {
+    out <- NULL
+    expect_no_warning(out <- withr::with_seed(7, rddm(n, drift = drift, bound = 1, ndt = 0.2)))
+    expect_identical(out, one, info = format(n))
+  }
+  # only an n of exactly 1 keeps the draw per element of before 1.5.0
+  for (n in list(1, 1L, "1", TRUE)) {
+    expect_warning(out <- rddm(n, drift = drift, bound = 1, ndt = 0.2), "deprecated since bmm 1.5.0")
+    expect_equal(nrow(out), 3, info = format(n))
+  }
+})
+
+test_that("the SDT samplers give no draws at n = 0 for every dist", {
+  # max(m) of an empty m stopped the gumbel_min logit of rsdt_mafc()
+  calls <- list(
+    rsdt_yn = function(n, dist) rsdt_yn(n, 10, 1, 1, criterion = 0, dist = dist),
+    rsdt_rating = function(n, dist) rsdt_rating(n, 10, 1, 1, thresholds = c(-0.5, 0.5), dist = dist),
+    rsdt_dpsdt = function(n, dist) rsdt_dpsdt(n, 10, 1, 1, thresholds = c(-0.5, 0.5), Ro = 0.2, dist = dist),
+    rsdt_metad = function(n, dist) rsdt_metad(n, 10, 1, 1, thresholds = c(-0.5, 0, 0.5), metad = 1, dist = dist),
+    rsdt_mafc = function(n, dist) rsdt_mafc(n, c(10, 20), m = c(2, 4), d = c(1, 2), dist = dist),
+    rsdt_ranking = function(n, dist) rsdt_ranking(n, 10, m = c(3, 4), d = 1, dist = dist)
+  )
+  for (name in names(calls)) {
+    for (dist in eval(formals(name)$dist)) {
+      # two draws, so that rsdt_ranking() reads both m and has max(m) columns
+      two <- withr::with_seed(7, calls[[name]](2, dist))
+      empty <- if (is.null(dim(two))) two[0] else two[0, , drop = FALSE]
+      expect_identical(calls[[name]](0, dist), empty, info = paste(name, dist))
+    }
+  }
+})
+
 test_that("a kcrit finite for some observations only gives R/K, with one warning", {
   thr <- c(-0.5, 0.3, 1)
   rk <- c(40, 5, 12, 30, 10, 18, 60)
