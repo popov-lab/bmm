@@ -24,9 +24,13 @@ test_that("sdt_mafc accepts m as a constant or a column name", {
   expect_identical(m_col$other_vars$m, "set_size")
 })
 
-test_that("sdt_mafc requires response, n_trials, and m", {
-  expect_error(sdt_mafc("n_correct", "n_trials"))
-  expect_error(sdt_mafc("n_correct", m = 4))
+test_that("sdt_mafc requires response and m, and reads trial rows without n_trials", {
+  expect_error(sdt_mafc("n_correct", "n_trials"), "missing in sdt_mafc\\(\\): m")
+  trial <- sdt_mafc("correct", m = 4)
+  expect_true(trial$other_vars$trial_level)
+  expect_null(trial$other_vars$n_trials)
+  expect_match(trial$requirements, "one row per trial")
+  expect_false(sdt_mafc("n_correct", "n_trials", m = 4)$other_vars$trial_level)
 })
 
 test_that("sdt_mafc rejects m < 2 and invalid distributions", {
@@ -74,10 +78,68 @@ test_that("sdt_mafc check_data resolves per-row set size from a data column", {
   expect_equal(result$m_afc, c(2L, 4L, 6L))
 })
 
+test_that("sdt_mafc requirements list the set-size column only when m names one", {
+  line <- "Number of alternatives (m): one integer >= 2 per row"
+  expect_match(sdt_mafc("c", m = "k")$requirements, line, fixed = TRUE)
+  expect_match(sdt_mafc("c", "n", m = "k")$requirements, line, fixed = TRUE)
+  expect_no_match(sdt_mafc("c", m = 4)$requirements, line, fixed = TRUE)
+})
+
 test_that("sdt_mafc check_data errors when the set-size column is missing", {
   model <- sdt_mafc("n_correct", "n_trials", m = "set_size")
   dat <- data.frame(n_correct = c(70, 65), n_trials = c(100, 100))
   expect_error(check_data(model, dat, bmf(d ~ 1)), "Set-size column")
+})
+
+test_that("trial-level sdt_mafc check_data() names the responses that are not 0 or 1", {
+  model <- sdt_mafc("correct", m = 4)
+  expect_error(
+    check_data(model, data.frame(correct = c(1, 0, 4, 0.5)), bmf(d ~ 1)),
+    "'correct' must hold one of '0', '1' in every row. Found: '4', '0.5'"
+  )
+  checked <- check_data(model, data.frame(correct = c(1, 0, 1)), bmf(d ~ 1))
+  expect_identical(checked$correct, c(1L, 0L, 1L))
+  expect_identical(checked$nTrials, c(1L, 1L, 1L))
+})
+
+test_that("trial rows and the cells aggregated from them give the same sdt_mafc Stan program", {
+  skip_on_cran()
+  # 2 participants x 20 trials (R3)
+  trials <- data.frame(
+    id = rep(1:2, each = 20),
+    correct = c(1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1,
+                1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0)
+  )
+  cells <- data.frame(id = 1:2, correct = c(15, 12), n_trials = 20)
+  mock <- function(data, model) suppressMessages(
+    bmm(bmf(d ~ 1 + (1 | id)), data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_fit <- mock(trials, sdt_mafc("correct", m = 4))
+  cell_fit <- mock(cells, sdt_mafc("correct", "n_trials", m = 4))
+  expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit))
+  trial_data <- brms::standata(trial_fit)
+  expect_equal(as.vector(trial_data$trials), rep(1, 40))
+  expect_equal(as.vector(tapply(trial_data$Y, trials$id, sum)), c(15, 12))
+})
+
+# the family's log_lik on the Stan data of trial rows sums to its log_lik on
+# the Stan data of the cell less log choose(n, y): 7 correct responses in 10
+# trials, choose(10, 7) = 120
+test_that("log_lik_sdt_mafc() on trial rows sums to the cell value less log choose(n, y)", {
+  skip_on_cran()
+  trials <- data.frame(correct = c(1, 1, 0, 1, 1, 0, 1, 1, 0, 1))
+  cells <- data.frame(correct = 7, n = 10)
+  mock <- function(data, model) suppressMessages(
+    bmm(bmf(d ~ 1), data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  ll <- function(fit) {
+    data <- brms::standata(fit)
+    prep <- epred_prep(list(d = matrix(1.1, 1, data$N)), data)
+    vapply(seq_len(data$N), function(i) log_lik_sdt_mafc(i, prep), numeric(1))
+  }
+  by_trial <- ll(mock(trials, sdt_mafc("correct", m = 4)))
+  by_cell <- ll(mock(cells, sdt_mafc("correct", "n", m = 4)))
+  expect_equal(sum(by_trial), by_cell - log(120), tolerance = 1e-10)
 })
 
 
@@ -202,10 +264,10 @@ test_that("sdt_mafc fits mixed set sizes through the pipeline (mock)", {
 
 test_that("the Stan quadrature tables are the R tables, digit for digit", {
   # .mafc_pc_r and mafc_pc() integrate with the same nodes and weights, but the
-  # 208 numbers are typed out twice. Nothing else in the suite reads the Stan
-  # chunk, so corrupting one digit of a weight would leave every test green
-  # while shifting every normal-noise and logistic m-AFC likelihood. Text-level,
-  # as in test-model_cswald.R, so it costs no compilation.
+  # 208 numbers are typed out twice. The Stan parity test below compares with
+  # dsdt_mafc() only to 1e-8, so a corrupted digit of a small weight could pass
+  # it while shifting every normal-noise and logistic m-AFC likelihood.
+  # Text-level, as in test-model_cswald.R, so it costs no compilation.
   sc_path <- system.file("stan_chunks", package = "bmm")
   tdata <- read_lines2(file.path(sc_path, "sdt_mafc_tdata.stan"))
   decls <- regmatches(
@@ -230,7 +292,7 @@ test_that("the Stan quadrature tables are the R tables, digit for digit", {
     expect_equal(stan_tab[[nm]], r_tab[[nm]], tolerance = 0, info = nm)
   }
 
-  # The family is loop = TRUE, so a table declared in mafc_pc() is rebuilt per
+  # mafc_logit_pc() runs once per row, so a table declared in it is rebuilt per
   # row per gradient: ~22% more time per leapfrog step.
   expect_false(grepl("to_vector({", read_lines2(file.path(sc_path, "sdt_mafc_functions.stan")),
                      fixed = TRUE))
@@ -288,6 +350,7 @@ test_that("the Stan mafc_logit_pc branches match the registry order", {
 
 
 test_that("the quadrature tables reach sdt_mafc_lpmf in its declared order", {
+  skip_on_cran() # four stancode() calls, over 0.4 s in CRAN mode (ADR 0004, R10)
   # The four tables are positional and each pair shares a Stan type, so a
   # transposed pair compiles and runs. Transposing gl_nodes and gl_weights is
   # silent: every logistic cell stays finite and moves, at m = 16 and d' = 0
@@ -306,10 +369,18 @@ test_that("the quadrature tables reach sdt_mafc_lpmf in its declared order", {
   dat <- data.frame(n_correct = c(70, 65, 80, 60), n_trials = rep(100, 4),
                     id = c(1, 1, 2, 2))
   model <- sdt_mafc("n_correct", "n_trials", m = 4)
-  for (threads in list(NULL, brms::threading(2))) {
-    code <- stancode(bmf(d ~ 1), data = dat, model = model, threads = threads)
-    call <- regmatches(code, regexpr("sdt_mafc_lpmf\\(Y\\[[^;]*?\\);", code))
-    expect_equal(tables(call), declared, info = paste("threads:", !is.null(threads)))
+  # the likelihood takes all rows at once, so m and the trials are sliced
+  # with the response exactly when brms slices it
+  rows <- list(serial = "(Y | mu, d, vint1, vint2[1], trials, ",
+               threaded = "(Y[start:end] | mu, d, vint1[start:end], vint2[1], trials[start:end], ",
+               force = "(Y | mu, d, vint1, vint2[1], trials, ")
+  threads <- list(serial = NULL, threaded = brms::threading(2),
+                  force = brms::threading(2, force = TRUE))
+  for (nm in names(threads)) {
+    code <- stancode(bmf(d ~ 1), data = dat, model = model, threads = threads[[nm]])
+    call <- regmatches(code, regexpr("sdt_mafc_lpmf\\(Y[^;]*?\\);", code))
+    expect_equal(tables(call), declared, info = nm)
+    expect_match(call, rows[[nm]], fixed = TRUE, info = nm)
   }
   # reduce_sum gives the partial log-likelihood its own scope, so the tables
   # have to arrive there in the same order too
@@ -320,6 +391,84 @@ test_that("the quadrature tables reach sdt_mafc_lpmf in its declared order", {
     expect_equal(tables(regmatches(code, regexpr(site, code))), declared,
                  info = site)
   }
+})
+
+test_that("the Stan sdt_mafc likelihood matches dsdt_mafc row by row and over blocks", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+  # The likelihood takes all rows at once, with m varying by row, and drops the
+  # rows whose logit is infinite before one binomial_logit_lpmf() call. One-row
+  # slices are compared with dsdt_mafc(); whole blocks with the sum of their
+  # rows, which a row read at another row's index would break. A row with an
+  # infinite logit adds 0 when its count is the one that logit forces, and makes
+  # the whole block -Inf otherwise
+  sc <- system.file("stan_chunks", package = "bmm")
+  tables <- "gh_nodes, gh_weights, gl_nodes, gl_weights"
+  program <- paste0(
+    "functions {\n", read_lines2(file.path(sc, "sdt_dist_functions.stan")), "\n",
+    read_lines2(file.path(sc, "sdt_mafc_functions.stan")), "\n}\n",
+    "data {\n  int N; int K; array[N] int y; array[N] int trials; array[N] int m;\n",
+    "  array[N] int dist; vector[N] d; array[K] int first; array[K] int last;\n",
+    "  int B; array[B] int bad;\n}\n",
+    "transformed data {\n", read_lines2(file.path(sc, "sdt_mafc_tdata.stan")), "\n}\n",
+    "generated quantities {\n  vector[N] row; vector[K] blk; vector[B] blk_bad;\n",
+    "  for (i in 1:N) row[i] = sdt_mafc_lpmf(y[i:i] | rep_vector(0, 1), d[i:i], m[i:i], ",
+    "dist[i], trials[i:i], ", tables, ");\n",
+    "  for (k in 1:K) {\n    int s = first[k];\n    int e = last[k];\n",
+    "    blk[k] = sdt_mafc_lpmf(y[s:e] | rep_vector(0, e - s + 1), d[s:e], m[s:e], dist[s], ",
+    "trials[s:e], ", tables, ");\n  }\n",
+    # each block again, with one row that contradicts its infinite logit added
+    "  for (b in 1:B) {\n    int k = dist[bad[b]];\n    int s = first[k];\n    int e = last[k];\n",
+    "    blk_bad[b] = sdt_mafc_lpmf(append_array(y[s:e], {y[bad[b]]}) | rep_vector(0, e - s + 2), ",
+    "append_row(d[s:e], d[bad[b]]), append_array(m[s:e], {m[bad[b]]}), dist[s], ",
+    "append_array(trials[s:e], {trials[bad[b]]}), ", tables, ");\n  }\n}\n"
+  )
+  grid <- expand.grid(m = c(2L, 3L, 4L, 8L), d = c(-1, 0.3, 1.5, 3), rep = 1:5,
+                      dist = seq_along(bmm:::.sdt_dists))
+  counts <- rbind(c(20L, 13L), c(20L, 0L), c(20L, 20L), c(1L, 0L), c(1L, 1L))
+  # counts drawn per row: crossed with every (m, d') cell, a block would sum the
+  # same logits once per count, and a permutation of its rows would not show
+  grid$cnt <- withr::with_seed(1, sample.int(nrow(counts), nrow(grid), replace = TRUE))
+  grid$trials <- counts[grid$cnt, 1]
+  grid$y <- counts[grid$cnt, 2]
+  # infinite logits: +Inf where every quadrature term rounds to certainty
+  # (normal and logistic at d' = 800), -Inf where exp(-d') overflows
+  # (gumbel_min at -800). `forced` rows have the count that logit forces,
+  # `contradicting` rows do not. Their trials appear nowhere else in the grid,
+  # so the forced count is checked against the row's own trials, not another
+  # row's
+  inf_d <- c(800, 800, -800)
+  inf_dist <- c(1L, 4L, 2L)
+  forced <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 7L, y = c(7L, 7L, 0L))
+  contradicting <- data.frame(m = 4L, d = inf_d, dist = inf_dist, trials = 9L, y = c(8L, 8L, 1L))
+  # forced rows lead their blocks: a likelihood that summed the first n_finite
+  # rows instead of the finite ones takes in the infinite logit only if it
+  # comes before a finite row
+  good <- rbind(forced, grid[names(forced)])
+  good <- good[order(good$dist), ]
+  grid <- rbind(good, contradicting)
+  ok <- seq_len(nrow(good))
+  N <- nrow(grid)
+  K <- length(bmm:::.sdt_dists)
+  fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
+    data = c(list(N = N, K = K, first = match(seq_len(K), good$dist),
+                  last = nrow(good) + 1L - match(seq_len(K), rev(good$dist)),
+                  B = nrow(contradicting), bad = nrow(good) + seq_len(nrow(contradicting))),
+             as.list(grid[c("y", "trials", "m", "dist", "d")])),
+    fixed_param = TRUE, chains = 1, iter_sampling = 1, iter_warmup = 0, refresh = 0,
+    show_messages = FALSE, sig_figs = 17
+  )
+  csv <- utils::read.csv(fit$output_files()[1], comment.char = "#", check.names = FALSE)
+  stan <- function(name, n) as.numeric(csv[1, paste0(name, ".", seq_len(n))])
+  row <- stan("row", N)
+  dist_names <- names(bmm:::.sdt_dists)[grid$dist]
+  r_row <- vapply(seq_len(N), function(i) with(grid[i, ], dsdt_mafc(
+    y, trials, m, d, dist = dist_names[i], log = TRUE)), numeric(1))
+  finite <- abs(grid$d) < 100
+  expect_equal(row[finite], r_row[finite], tolerance = 1e-8)
+  expect_identical(row[!finite], rep(c(0, -Inf), each = nrow(forced)))
+  expect_equal(stan("blk", K), as.vector(tapply(row[ok], good$dist, sum)), tolerance = 1e-12)
+  expect_identical(stan("blk_bad", nrow(contradicting)), rep(-Inf, nrow(contradicting)))
 })
 
 

@@ -30,3 +30,7 @@
 ^\.git$
 ^bmmtools$
 ^explorer$
+^test-timings\.csv$
+^cran-test-timings\.csv$
+^runner-hardware\.txt$
+^ROADMAP\.md$

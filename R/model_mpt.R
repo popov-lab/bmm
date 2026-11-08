@@ -237,7 +237,8 @@ print.mpt_tree <- function(x, ...) {
 .model_mpt <- function(trees = NULL, tree_id = NULL, covariates = NULL,
                        simplex = NULL, restrictions = NULL,
                        unrestricted_trees = NULL, links = "logit",
-                       default_priors = NULL, call = NULL, ...) {
+                       response = NULL, default_priors = NULL, call = NULL,
+                       ...) {
   # a named list sets single parameters on top of the model-wide default link
   parameter_links <- if (is.list(links)) links
   links <- if (is.list(links)) "logit" else links
@@ -259,21 +260,19 @@ print.mpt_tree <- function(x, ...) {
   raw_pars <- unname(simplex_raw)
   standard_pars <- setdiff(parameters, simplex_pars)
 
-  # generated data columns: one 0/1 indicator per tree, and one per response
-  # category that is impossible in some trees but not others
-  tree_indicators <- if (is.null(tree_id) || length(trees) == 0L) {
-    NULL
-  } else {
-    setNames(paste0("Idx_", names(trees)), names(trees))
-  }
-  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
-  possible_indicators <- if (length(guarded_cats) == 0L) {
-    NULL
-  } else {
-    setNames(paste0("Poss_", guarded_cats), guarded_cats)
-  }
-
   latent_prior <- .mpt_latent_prior(links)
+  trial_level <- !is.null(response)
+  layout <- if (trial_level) {
+    paste0(
+      "  - One row per trial, with a column whose values name the response ",
+      "category of the trial (the branch names), declared via the response argument\n"
+    )
+  } else {
+    paste0(
+      "  - The data contain one column with aggregated response counts per ",
+      "response category, named after the branch names\n"
+    )
+  }
 
   parameter_info <- c(
     # the scale is left out because the link of each parameter can be changed
@@ -317,10 +316,12 @@ print.mpt_tree <- function(x, ...) {
         covariates = covariates,
         trees = trees,
         unrestricted_trees = unrestricted_trees,
+        response = response,
+        trial_level = trial_level,
         simplex = simplex,
         restrictions = restrictions,
         link = links,
-        indicators = list(tree = tree_indicators, possible = possible_indicators),
+        indicators = .mpt_indicator_names(trees, tree_id),
         simplex_raw = simplex_raw
       ),
       domain = c("Long-term memory", "Reasoning", "Decision making"),
@@ -338,8 +339,7 @@ print.mpt_tree <- function(x, ...) {
       requirements = paste0(
         "- One tree per distinct branch structure, created with mpt_tree(); ",
         "all trees share the same response categories\n",
-        "  - The data contain one column with aggregated response counts per ",
-        "response category, named after the branch names\n",
+        layout,
         "  - For multi-tree models, a column whose values name the tree each ",
         "observation belongs to, declared via the tree_id argument\n",
         "  - Data columns used inside branch expressions must be declared via the covariates argument\n"
@@ -607,11 +607,21 @@ generated_parameters.mpt <- function(model) {
 #'   to the other link, in the list or afterwards with
 #'   `model$links$D <- "probit"`, takes that link's default priors (see
 #'   Details).
+#' @param response Character. A single non-empty string naming the data column
+#'   that holds, with one row per trial, the response category of each trial:
+#'   a character or factor column whose values are branch names. The column
+#'   cannot carry the name of a response category, the `tree_id` column or a
+#'   covariate, nor of a column that `bmm()` builds: `Y`, `nTrials`,
+#'   `Idx_<tree>` when `tree_id` is set, and `Poss_<category>` for a category
+#'   declared impossible in a tree.
+#'   `NULL` (the default) declares aggregated data with one count column per
+#'   response category. See Details.
 #' @param ... used internally for testing, ignore it
 #'
 #' @details `r model_docs(.model_mpt(), components = c('domain', 'task', 'name', 'citation'))`
 #'
-#'   The data hold aggregated counts: one row per participant and tree (and
+#'   The data hold aggregated counts, or one row per trial with `response`
+#'   (below). Aggregated counts: one row per participant and tree (and
 #'   per condition, if conditions are crossed with the trees), with one count
 #'   column per response category. The count columns must be named exactly
 #'   like the branch names given to [mpt_tree()] (`old` and `new` in the
@@ -620,6 +630,14 @@ generated_parameters.mpt <- function(model) {
 #'   the counts of a row must come from trials of that tree. Wide tables with
 #'   one column per category of an EQN file, as MPTinR and TreeBUGS take them,
 #'   are reshaped with [mpt_data_reshape()].
+#'
+#'   With `response = "resp"`, each row is one trial, and the column `resp`
+#'   names its response category (`"old"` or `"new"` in the example below).
+#'   Trial rows allow item random effects, `D ~ 1 + (1 | id) + (1 | item)`,
+#'   and covariates that change from trial to trial. A missing response is an
+#'   error rather than a count of 0; remove those rows.
+#'
+#'   `r model_docs(.model_mpt(response = "response"), components = "trial_level")`
 #'
 #'   A separate tree is needed only when the *branch expressions* differ, that
 #'   is, when the trial determines which latent processes apply or which
@@ -715,6 +733,17 @@ generated_parameters.mpt <- function(model) {
 #'   test give three free parameters and rank 2 of 3, so one combination of
 #'   `Do`, `Dn` and `g` cannot be estimated; a second condition that varies
 #'   the response bias identifies them.
+#'
+#'   **Sparse cells.** [bmm_data_check()] flags design cells with fewer than
+#'   `min_trials` trials, counting the trials of a row as the sum of its
+#'   response category columns. Each row holds one tree, so when no formula
+#'   uses the `tree_id` column, a design cell sums the rows of all trees and
+#'   can pass while one tree holds only a few trials: 40 trials in an old/new
+#'   test and 2 in a source test add up to 42. With the tree column in a
+#'   formula, each tree is a cell of its own and is checked on its own;
+#'   otherwise tabulate the trials per tree yourself when the trees differ in
+#'   size. With one row per trial, [bmm_data_check()] counts the trials of
+#'   each participant instead.
 #'
 #'   **Reading the estimates.** `summary()` reports intercepts and regression
 #'   coefficients on the latent (logit or probit) scale. [native_parameters()]
@@ -826,7 +855,7 @@ generated_parameters.mpt <- function(model) {
 #'
 #' @export
 mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
-                restrictions = NULL, links = "logit", ...) {
+                restrictions = NULL, links = "logit", response = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "default_priors")
   stop_missing_args()
@@ -908,6 +937,12 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     length(covariates) > 0L && !is.character(covariates),
     "The covariates argument must be a character vector of data column names."
   )
+  stopif(
+    !is.null(response) &&
+      (!is.character(response) || length(response) != 1L || is.na(response) || !nzchar(response)),
+    "The response argument must be a single character string naming the data \\
+    column that holds the response category of each trial."
+  )
 
   # plot() labels the restricted edges from the trees as written
   unrestricted_trees <- if (length(restrictions)) trees
@@ -950,11 +985,27 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
     "Covariate names collide with parameter or response category names: \\
     {collapse_comma(cov_collisions)}"
   )
-  reserved <- intersect(c(parameters, resp_cats, covariates), c("Y", "nTrials"))
+  reserved <- intersect(c(parameters, resp_cats, covariates, response), c("Y", "nTrials"))
   stopif(
     length(reserved) > 0,
     "The names 'Y' and 'nTrials' are reserved for the response matrix and \\
     trial counts. Please rename: {collapse_comma(reserved)}"
+  )
+  # check_data() replaces the response column by one count column per category
+  # and then adds the tree and possibility indicators, which revert_check_data()
+  # deletes again, so none of these names can be the response column
+  response_collision <- intersect(response, c(resp_cats, tree_id, covariates))
+  stopif(
+    length(response_collision) > 0,
+    "The response column '{response}' has the name of a response category, \\
+    the tree_id column or a covariate. With one row per trial it holds the \\
+    category of each trial, so please rename it."
+  )
+  built_columns <- unlist(.mpt_indicator_names(trees, tree_id), use.names = FALSE)
+  stopif(
+    length(intersect(response, built_columns)) > 0,
+    "The response column '{response}' collides with a column that bmm builds \\
+    from the model: {collapse_comma(built_columns)}. Please rename it."
   )
 
   simplex_pars <- unlist(simplex)
@@ -1011,7 +1062,8 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
   .model_mpt(
     trees = trees, tree_id = tree_id, covariates = covariates,
     simplex = simplex, restrictions = restrictions,
-    unrestricted_trees = unrestricted_trees, links = links, call = call, ...
+    unrestricted_trees = unrestricted_trees, links = links,
+    response = response, call = call, ...
   )
 }
 
@@ -1074,6 +1126,13 @@ mpt <- function(trees, tree_id = NULL, covariates = NULL, simplex = NULL,
 
 #' @export
 print_model_details.mpt <- function(model, ...) {
+  resp_cats <- collapse_comma(model$resp_vars$resp_cats)
+  cat(if (is_trial_level(model)) {
+    glue("Data:       one row per trial; column '{model$other_vars$response}' \\
+         names the response category ({resp_cats})")
+  } else {
+    glue("Data:       response counts in one column per category ({resp_cats})")
+  }, "\n")
   for (tree in model$other_vars$trees) {
     print(tree)
   }
@@ -1300,12 +1359,13 @@ check_model.mpt <- function(model, data = NULL, formula = NULL) {
     )
     # brms would refuse the circular dependency only after the identifiability
     # check has read the count column as a predictor
-    rhs_cats <- lapply(rhs_vars(formula, collapse = FALSE), intersect, resp_cats)
+    responses <- c(resp_cats, model$other_vars$response)
+    rhs_cats <- lapply(rhs_vars(formula, collapse = FALSE), intersect, responses)
     cat_predictor_formulas <- names(rhs_cats)[lengths(rhs_cats) > 0]
     stopif(
       length(cat_predictor_formulas) > 0,
-      "The response counts {collapse_comma(unique(unlist(rhs_cats)))} are what \\
-      the model predicts and cannot be predictors in a parameter formula. \\
+      "The response column(s) {collapse_comma(unique(unlist(rhs_cats)))} hold \\
+      what the model predicts and cannot be predictors in a parameter formula. \\
       Please remove them from the formula(s) for: \\
       {collapse_comma(cat_predictor_formulas)}"
     )
@@ -1509,36 +1569,26 @@ built_data_columns.mpt <- function(model) {
   )
 }
 
+#' @exportS3Method
+data_trials.mpt <- function(model, data) {
+  if (is_trial_level(model)) {
+    return(NULL)
+  }
+  .row_trials(data, model$resp_vars$resp_cats)
+}
+
 #' @export
 check_data.mpt <- function(model, data, formula) {
-  resp_cats <- model$resp_vars$resp_cats
-  col_names <- colnames(data)
-
-  missing_cats <- setdiff(resp_cats, col_names)
-  stopif(
-    length(missing_cats) > 0,
-    "The data must contain one column of response counts per response category,
-    named after the branch names of the trees.
-    Expected columns: {collapse_comma(resp_cats)}
-    Missing columns: {collapse_comma(missing_cats)}"
-  )
-
-  reserved_cols <- intersect(c("Y", "nTrials"), col_names)
-  stopif(
-    length(reserved_cols) > 0,
-    "The data column(s) {collapse_comma(reserved_cols)} would be overwritten by \\
-    the response matrix and trial counts that bmm builds. Please rename them."
-  )
-
-  resp_matrix <- as.matrix(data[resp_cats])
-  stopif(
-    !is.numeric(resp_matrix) || any(resp_matrix < 0, na.rm = TRUE),
-    "The response category columns must contain non-negative response counts."
-  )
+  if (is_trial_level(model)) {
+    resp_matrix <- .mpt_trial_counts(model, data)
+    data[[model$other_vars$response]] <- NULL
+  } else {
+    resp_matrix <- .mpt_cell_counts(model, data)
+    data <- data[!colnames(data) %in% model$resp_vars$resp_cats]
+  }
   missing_counts <- is.na(resp_matrix)
   resp_matrix[missing_counts] <- 0
   .mpt_stop_if_beyond_integer(rowSums(resp_matrix), "Row totals of the response counts")
-  data <- data[!col_names %in% resp_cats]
   # an integer column keeps conditional_effects() grids at a valid trial count
   data$nTrials <- as.integer(rowSums(resp_matrix))
   data$Y <- resp_matrix
@@ -1611,6 +1661,64 @@ check_data.mpt <- function(model, data, formula) {
   .mpt_check_observed_rank(model, data, formula)
 
   NextMethod("check_data")
+}
+
+# aggregated data: one count column per response category
+.mpt_cell_counts <- function(model, data) {
+  resp_cats <- model$resp_vars$resp_cats
+  missing_cats <- setdiff(resp_cats, colnames(data))
+  stopif(
+    length(missing_cats) > 0,
+    "The data must contain one column of response counts per response category,
+    named after the branch names of the trees.
+    Expected columns: {collapse_comma(resp_cats)}
+    Missing columns: {collapse_comma(missing_cats)}"
+  )
+  .mpt_stop_reserved_columns(data)
+  resp_matrix <- as.matrix(data[resp_cats])
+  stopif(
+    !is.numeric(resp_matrix) || any(resp_matrix < 0, na.rm = TRUE),
+    "The response category columns must contain non-negative response counts."
+  )
+  resp_matrix
+}
+
+# one row per trial: the response column names the category of each trial,
+# and becomes a one-hot row of counts with one trial
+.mpt_trial_counts <- function(model, data) {
+  response <- model$other_vars$response
+  resp_cats <- model$resp_vars$resp_cats
+  stopif(
+    not_in(response, colnames(data)),
+    "The response column '{response}' is not present in the data."
+  )
+  .mpt_stop_reserved_columns(data)
+  values <- data[[response]]
+  stopif(
+    !is.character(values) && !is.factor(values),
+    "The response column '{response}' must be a character or factor column \\
+    whose values name the response category of each trial. It is \\
+    {class(values)[1]}."
+  )
+  values <- as.character(values)
+  unmatched <- setdiff(unique(values[!is.na(values)]), resp_cats)
+  stopif(
+    length(unmatched) > 0,
+    "All values of the response column '{response}' must name a response category.
+    Response categories: {collapse_comma(resp_cats)}
+    Unmatched values: {collapse_comma(utils::head(unmatched, 10))}\\
+    {if (length(unmatched) > 10) ', ...' else ''}"
+  )
+  .trial_rows_to_counts(values, resp_cats, glue("the response column '{response}'"))
+}
+
+.mpt_stop_reserved_columns <- function(data) {
+  reserved_cols <- intersect(c("Y", "nTrials"), colnames(data))
+  stopif(
+    length(reserved_cols) > 0,
+    "The data column(s) {collapse_comma(reserved_cols)} would be overwritten by \\
+    the response matrix and trial counts that bmm builds. Please rename them."
+  )
 }
 
 # print() and check_model() take the rank at five synthetic values of each
@@ -1705,8 +1813,21 @@ check_data.mpt <- function(model, data, formula) {
 }
 
 # a missing count in a category that the row's tree cannot produce is a known
-# 0 (the OL2019 data record no distractor count where none was shown)
+# 0 (the OL2019 data record no distractor count where none was shown). A trial
+# without a response is no such zero: it holds no trial at all
 .mpt_warn_missing_counts <- function(model, data, missing_counts) {
+  if (is_trial_level(model)) {
+    rows <- which(rowSums(missing_counts) > 0)
+    stopif(
+      length(rows) > 0,
+      "The response column '{model$other_vars$response}' is missing in \\
+      {length(rows)} row(s) (first: row {rows[1]}). With one row per trial, a \\
+      missing response is not counted as 0 responses, as a missing count is \\
+      in aggregated data: the row holds no trial. Please remove these rows or \\
+      fill in the response."
+    )
+    return(invisible(NULL))
+  }
   poss_vars <- model$other_vars$indicators$possible
   for (resp_cat in names(poss_vars)) {
     missing_counts[data[[poss_vars[[resp_cat]]]] == 0L, resp_cat] <- FALSE
@@ -2119,6 +2240,44 @@ configure_model.mpt <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rmpt() takes one tree and one size per call, so rows are drawn in groups of
+# identical trees, trials, covariates and values. The simplex members are
+# probabilities on both scales
+#' @export
+simulate_data.mpt <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  trial_level <- is_trial_level(model)
+  design <- .design_or_n(model, design, c(vars$tree_id, vars$covariates),
+                         trials = if (!trial_level) "n_trials", ...)
+  trials <- if (trial_level) rep(1L, nrow(design)) else design$n_trials
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  for (group in vars$simplex) {
+    stopif(any(abs(Reduce(`+`, p[group]) - 1) > 1e-8),
+           "The simplex parameters {collapse_comma(group)} are probabilities that \\
+           must sum to 1 in every row.")
+  }
+  tree <- if (is.null(vars$tree_id)) rep(names(vars$trees)[1], nrow(design)) else
+    as.character(design[[vars$tree_id]])
+  cats <- model$resp_vars$resp_cats
+  counts <- matrix(0L, nrow(design), length(cats), dimnames = list(NULL, cats))
+  for (idx in .row_groups(data.frame(tree, trials, design[vars$covariates], p))) {
+    i <- idx[1]
+    counts[idx, ] <- rmpt(length(idx), trials[i], vapply(p, `[`, numeric(1), i), model,
+                          tree = tree[i], covariates = as.list(design[i, vars$covariates, drop = FALSE]))
+  }
+  responses <- if (trial_level) {
+    stats::setNames(list(cats[max.col(counts, ties.method = "first")]), vars$response)
+  } else {
+    as.data.frame(counts)
+  }
+  .simulate_result(design, responses, sim)
+}
+
+############################################################################# !
 # CONFIGURE_PRIOR S3 METHODS                                             ####
 ############################################################################# !
 
@@ -2152,6 +2311,21 @@ configure_prior.mpt <- function(model, data, formula, user_prior, ...) {
     return(list(trees))
   }
   trees
+}
+
+# the 0/1 data columns check_data() builds: one per tree when tree_id is given,
+# and one per response category that some trees cannot produce
+.mpt_indicator_names <- function(trees, tree_id) {
+  tree_names <- vapply(trees, `[[`, character(1), "name")
+  guarded_cats <- unique(unlist(lapply(trees, `[[`, "impossible")))
+  list(
+    tree = if (!is.null(tree_id) && length(trees)) {
+      setNames(paste0("Idx_", tree_names), tree_names)
+    },
+    possible = if (length(guarded_cats)) {
+      setNames(paste0("Poss_", guarded_cats), guarded_cats)
+    }
+  )
 }
 
 .mpt_as_simplex_list <- function(simplex) {

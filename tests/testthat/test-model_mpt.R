@@ -101,7 +101,7 @@ test_that("mpt_tree validates formula input", {
   expect_error(mpt_tree("t", list(a = "D", b = "1 - D"), "a"), "impossible argument has to be named")
   expect_error(
     mpt_tree("t", a ~ D, b ~ 1 - D, "c"),
-    "Cannot mix formulas.*impossible argument has to be named, impossible = \"c\""
+    "Cannot mix formulas.*impossible = \"c\""
   )
   expect_error(mpt_tree("t", list(a ~ D, b ~ 1 - D)), "separate arguments")
   expect_error(mpt_tree("t", a ~ D, b ~ 1 - D, impossible = "a"), "both impossible")
@@ -284,7 +284,7 @@ test_that("mpt refuses a zero branch and points to impossible categories", {
   # the hint reads as one sentence, not with the source's line breaks
   expect_error(
     mpt(mpt_tree("a", list(y = "D", z = "0 * D", w = "1 - D"))),
-    "undefined. Declare a response category that a tree cannot produce with mpt_tree(impossible = ) instead",
+    "a tree cannot produce with mpt_tree(impossible = )",
     fixed = TRUE
   )
   zero_padded <- list(
@@ -456,6 +456,16 @@ test_that("mpt() refuses a link for a parameter the restrictions removed", {
   expect_equal(model$links, list(Do = "probit", g = "logit"))
 })
 
+test_that("a per-parameter link reaches the Stan code of that parameter only", {
+  withr::local_seed(255)
+  code <- suppressMessages(stancode(
+    bmf(D ~ 1, g ~ 1), mpt_2htm_data(n_id = 2),
+    mpt(mpt_2htm_trees(), tree_id = "item_type", links = list(D = "probit"))
+  ))
+  expect_match(code, "Phi(nlp_D[n])", fixed = TRUE)
+  expect_match(code, "inv_logit(nlp_g[n])", fixed = TRUE)
+})
+
 test_that("a malformed links list is described for mpt(), not with another model's example", {
   trees <- mpt_2htm_trees()
   expect_error(
@@ -492,11 +502,7 @@ test_that("a simplex group takes no link of its own, whichever way the link arri
   for (target in c("gA", "gAraw", "gC")) {
     expect_error(
       mpt(tree, simplex = simplex, links = setNames(list("probit"), target)),
-      paste0(
-        "link target\\(s\\) '", target, "' belong to the simplex group\\(s\\) ",
-        "'gA', 'gB', 'gC': .*links = \"probit\" for the whole model and ",
-        "takes no link of its own"
-      )
+      paste0("link target\\(s\\) '", target, "' belong to the simplex group\\(s\\) 'gA', 'gB', 'gC'")
     )
   }
 
@@ -610,11 +616,11 @@ test_that("response categories are refused as predictors before brms sees them",
   dat <- mpt_2htm_data()
   expect_error(
     bmm(bmf(D ~ old, g ~ 1), dat, model, backend = "mock", mock_fit = 1, rename = FALSE),
-    "response counts 'old' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+    "response column\\(s\\) 'old' hold what the model predicts.*formula\\(s\\) for: 'D'"
   )
   expect_error(
     check_model(model, dat, bmf(D ~ inv_logit(k * new), k ~ 1, g ~ 1)),
-    "response counts 'new' .* cannot be predictors.*formula\\(s\\) for: 'D'"
+    "response column\\(s\\) 'new' hold what the model predicts.*formula\\(s\\) for: 'D'"
   )
 })
 
@@ -803,6 +809,7 @@ test_that("internal_parameters() lists the stick-breaking components of an mpt s
 })
 
 test_that("native_parameters() leaves the stick-breaking components out unless they are named", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   tree <- mpt_tree("t", list(
     A = "D + (1 - D) * gA", B = "(1 - D) * gB", C = "(1 - D) * gC"
   ))
@@ -1073,6 +1080,15 @@ test_that("restrictions are substituted into the trees before parameters are ide
     mpt(cov_tree, covariates = "gc", restrictions = "gc = 0.5"),
     "Covariates"
   )
+})
+
+test_that("a chain of equality restrictions resolves to its last parameter", {
+  # three links: one pass over the restrictions resolves only two
+  tree <- mpt_tree("t", list(
+    w = "a * b", x = "a * (1 - b)", y = "(1 - a) * c * d * e", z = "(1 - a) * (1 - c * d * e)"
+  ))
+  model <- mpt(tree, restrictions = c("b = c", "c = d", "d = e"))
+  expect_named(model$parameters, c("a", "e"), ignore.order = TRUE)
 })
 
 mpt_sep_trees <- function() {
@@ -1522,11 +1538,9 @@ test_that("check_data() warns when the covariate values in the data leave the mo
   expect_warning(
     check_data(model, layout(0.5), formula),
     paste0(
-      "The model is not identified with the covariate values in the data\\. ",
-      "Jacobian rank 2 of 3 at interior test values and the covariate values in the data: ",
-      "the combination of all free parameters is not identified by the branch expressions\\. ",
-      "'x' takes a single value within tree\\(s\\) 'old', 'new'\\. ",
-      "With 5 test values of the covariates the rank is 3"
+      "not identified with the covariate values in the data.*rank 2 of 3 .*",
+      "the combination of all free parameters is not identified.*",
+      "'x' takes a single value within tree\\(s\\) 'old', 'new'.*rank is 3"
     )
   )
   expect_warning(
@@ -1539,7 +1553,7 @@ test_that("check_data() warns when the covariate values in the data leave the mo
   with_predictor <- transform(layout(0.5), cond = c("a", "b", "a", "b"))
   expect_message(
     expect_no_warning(check_data(model, with_predictor, bmf(Do ~ cond, Dn ~ 1, g ~ 1))),
-    "With the covariate values in the data, the branch expressions alone do not identify all free parameters\\. 'x' takes a single value"
+    "alone do not identify all free parameters\\. 'x' takes a single value"
   )
 
   # bmm_data_check() reports the warning among its hard checks
@@ -2209,6 +2223,62 @@ test_that("mpt compiles with structurally impossible categories", {
     mpt_impossible_data(), mpt(mpt_impossible_trees(), tree_id = "tree"),
     backend = "mock", mock_fit = 1, rename = FALSE
   ))
+})
+
+# tests/local/test-mpt-likelihood.R compares a fit's lp__ with dmpt() once a
+# week; evaluating the compiled model at fixed points needs no sampling, so the
+# same comparison runs on every pull request. It takes about 15 s on a laptop,
+# nearly all of it compiling the brms program
+test_that("the Stan log density of an mpt model with an impossible category equals dmpt()", {
+  skip_unless_stan_tests()
+  skip_on_cran() # compiles a Stan program
+  withr::local_seed(21)
+  withr::local_options(bmm.sort_data = FALSE)
+
+  # the impossible category puts the -100 linear predictor of bmf2bf.mpt()
+  # into the comparison
+  dat <- mpt_impossible_data(n_id = 2)
+  dat$corr <- dat$corr + stats::rbinom(nrow(dat), 10, 0.5)
+  model <- mpt(mpt_impossible_trees(), "tree")
+  formula <- bmf(Pm ~ 1, Pb ~ 1)
+  dir <- withr::local_tempdir()
+  stan_model <- cmdstanr::cmdstan_model(
+    cmdstanr::write_stan_file(stancode(formula, dat, model), dir = dir), quiet = TRUE
+  )
+  cmdstanr::write_stan_json(unclass(standata(formula, dat, model)), file.path(dir, "data.json"))
+  # (b_Pm, b_Pb) per row, unequal and of both signs, so that swapped parameters
+  # or links do not cancel
+  points <- rbind(c(0.4, 1.1), c(-1.3, 0.2), c(2, -2.5))
+  cmdstanr::write_stan_json(list(params_r = points), file.path(dir, "pars.json"))
+  # tbb.dll on Windows, as in the log_prob test of test-model_ezdm.R
+  run_path <- if (.Platform$OS.type == "windows") {
+    c(
+      getFromNamespace("toolchain_PATH_env_var", "cmdstanr")(),
+      getFromNamespace("tbb_path", "cmdstanr")()
+    )
+  }
+  status <- withr::with_path(run_path, system2(stan_model$exe_file(), c(
+    "method=log_prob", paste0("unconstrained_params=", file.path(dir, "pars.json")), "jacobian=1",
+    "data", paste0("file=", file.path(dir, "data.json")),
+    "output", paste0("file=", file.path(dir, "out.csv")), "sig_figs=18"
+  ), stdout = FALSE, stderr = file.path(dir, "stderr.txt")))
+  expect_equal(status, 0, info = paste(
+    readLines(file.path(dir, "stderr.txt"), warn = FALSE), collapse = "\n"
+  ))
+  stan_lp <- utils::read.csv(file.path(dir, "out.csv"), comment.char = "#")$lp__
+
+  # lp__ as sampling reports it: the multinomial log-likelihood with its
+  # normalizing constant plus the logistic(0, 1) priors of the intercepts; the
+  # coefficients are unconstrained, so jacobian=1 adds nothing
+  counts <- as.matrix(dat[c("corr", "dist", "npl")])
+  r_lp <- apply(points, 1, function(b) {
+    pars <- c(Pm = stats::plogis(b[1]), Pb = stats::plogis(b[2]))
+    sum(vapply(seq_len(nrow(dat)), function(n) {
+      dmpt(counts[n, ], pars, model, tree = dat$tree[n])
+    }, numeric(1))) + sum(stats::dlogis(b, log = TRUE))
+  })
+  expect_length(stan_lp, nrow(points))
+  expect_lt(max(abs(stan_lp - r_lp)), 1e-10)
 })
 
 test_that("several levels of a factor can share one tree", {
@@ -2983,4 +3053,195 @@ test_that("mpt keeps the trees as given before the restrictions", {
   expect_equal(deparse(restricted$other_vars$trees$old$branches$old), "D + (1 - D) * 0.5")
   expect_equal(deparse(restricted$other_vars$trees$new$branches$new), "D + (1 - D) * 0.5")
   expect_null(mpt(trees, tree_id = "item_type")$other_vars$unrestricted_trees)
+})
+
+############################################################################# !
+# ONE ROW PER TRIAL: mpt(response = )                                    ####
+############################################################################# !
+
+test_that("mpt(response = ) declares trial rows and says so", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  expect_identical(model$other_vars$response, "resp")
+  expect_true(is_trial_level(model))
+  expect_match(model$requirements, "One row per trial", fixed = TRUE)
+  expect_false(grepl("aggregated response counts", model$requirements, fixed = TRUE))
+  expect_output(print(model), "one row per trial; column 'resp' names the response category")
+
+  aggregated <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  expect_false(is_trial_level(aggregated))
+  expect_null(aggregated$other_vars$response)
+  expect_match(aggregated$requirements, "aggregated response counts", fixed = TRUE)
+  expect_output(print(aggregated), "response counts in one column per category")
+})
+
+test_that("mpt(response = ) refuses a response column named like a category or a built column", {
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "old"),
+    "response column 'old' has the name of a response category"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "item_type"),
+    "response column 'item_type' has the name of a response category, the tree_id column"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Y"),
+    "names 'Y' and 'nTrials' are reserved.*Please rename: 'Y'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "nTrials"),
+    "Please rename: 'nTrials'"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = c("a", "b")),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = NA_character_),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = ""),
+    "response argument must be a single character string"
+  )
+  expect_error(
+    mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Idx_old"),
+    "column 'Idx_old' collides with a column that bmm builds.*model: 'Idx_old', 'Idx_new'\\."
+  )
+  expect_error(
+    mpt(mpt_impossible_trees(), tree_id = "tree", response = "Poss_dist"),
+    "column 'Poss_dist' collides .* bmm builds .*'Idx_withdist', 'Idx_nodist', 'Poss_dist'\\."
+  )
+  expect_true(is_trial_level(mpt(mpt_2htm_trees(), tree_id = "item_type", response = "Idx_foo")))
+})
+
+test_that("mpt(response = ) allows Idx_<tree> only when no tree_id column builds it", {
+  only <- mpt_tree("only", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))
+  model <- mpt(only, response = "Idx_only")
+  expect_true(is_trial_level(model))
+  checked <- check_data(
+    model, data.frame(Idx_only = c("old", "new", "old")), bmf(D ~ 1, g ~ 1)
+  )
+  expect_identical(names(checked), c("nTrials", "Y"))
+  expect_equal(unname(checked$Y[, "old"]), c(1, 0, 1))
+
+  expect_error(
+    mpt(only, tree_id = "tt", response = "Idx_only"),
+    "column 'Idx_only' collides with a column that bmm builds from the model: 'Idx_only'\\."
+  )
+  two_trees <- list(
+    mpt_tree("target", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)")),
+    mpt_tree("lure", list(old = "(1 - D) * g", new = "D + (1 - D) * (1 - g)"))
+  )
+  expect_error(
+    mpt(two_trees, tree_id = "item_type", response = "Idx_target"),
+    "column 'Idx_target' collides .* from the model: 'Idx_target', 'Idx_lure'\\."
+  )
+})
+
+test_that("revert_check_data() gives back a response column named like an indicator bmm does not build", {
+  only <- mpt_tree("only", list(old = "D + (1 - D) * g", new = "(1 - D) * (1 - g)"))
+  model <- mpt(only, response = "Idx_only")
+  checked <- check_data(model, data.frame(Idx_only = c("old", "new", "old")), bmf(D ~ 1, g ~ 1))
+  expect_identical(revert_check_data(model, checked)$Idx_only, c("old", "new", "old"))
+})
+
+test_that("check_data() on trial rows builds one-hot Y and drops the label column", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  dat <- mpt_trial_data()
+  checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
+  expect_false("resp" %in% names(checked))
+  expect_identical(colnames(checked$Y), c("old", "new"))
+  expect_equal(unname(checked$Y[, "old"]), as.numeric(dat$resp == "old"))
+  expect_identical(checked$nTrials, rep(1L, nrow(dat)))
+
+  dat$resp <- factor(dat$resp, levels = c("new", "old"))
+  from_factor <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
+  expect_identical(from_factor$Y, checked$Y)
+})
+
+test_that("check_data() on trial rows rejects unknown, missing and non-label responses", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  formula <- bmf(D ~ 1, g ~ 1)
+  dat <- mpt_trial_data()
+
+  unknown <- dat
+  unknown$resp[c(2, 7)] <- c("Old", "unsure")
+  expect_error(
+    check_data(model, unknown, formula),
+    paste0("All values of the response column 'resp' must name a response category.\n",
+           "Response categories: 'old', 'new'\nUnmatched values: 'Old', 'unsure'"),
+    fixed = TRUE
+  )
+
+  missing <- dat
+  missing$resp[c(4, 9)] <- NA
+  expect_error(
+    check_data(model, missing, formula),
+    "column 'resp' is missing in 2 row\\(s\\) \\(first: row 4\\).*not counted as 0 responses.*remove these rows"
+  )
+
+  numeric_resp <- dat
+  numeric_resp$resp <- as.integer(dat$resp == "old")
+  expect_error(
+    check_data(model, numeric_resp, formula),
+    "column 'resp' must be a character or factor column .* It is integer"
+  )
+
+  expect_error(
+    check_data(model, dat[names(dat) != "resp"], formula),
+    "The response column 'resp' is not present in the data."
+  )
+  dat$nTrials <- 1L
+  expect_error(check_data(model, dat, formula), "'nTrials' would be overwritten")
+})
+
+test_that("trial rows answered in a category their tree cannot produce are refused", {
+  model <- mpt(mpt_impossible_trees(), tree_id = "tree", response = "resp")
+  dat <- data.frame(
+    id = factor(rep(1:2, each = 4)),
+    tree = rep(c("withdist", "withdist", "nodist", "nodist"), 2),
+    resp = c("corr", "dist", "npl", "corr", "dist", "npl", "dist", "corr")
+  )
+  expect_error(
+    check_data(model, dat, bmf(Pm ~ 1, Pb ~ 1)),
+    "category 'dist' is declared impossible for 1 row\\(s\\).*first: row 7, count 1"
+  )
+})
+
+test_that("a trial-level formula cannot use the response column as a predictor", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  expect_error(
+    check_model(model, mpt_trial_data(), bmf(D ~ resp, g ~ 1)),
+    "response column\\(s\\) 'resp' hold what the model predicts.*formula\\(s\\) for: 'D'"
+  )
+})
+
+test_that("trial rows and the counts aggregated from them give the same Stan program", {
+  trial_model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  formula <- bmf(D ~ 1 + (1 | id), g ~ 1 + (1 | id))
+  trials <- mpt_trial_data()
+  cells <- aggregate(
+    cbind(old = trials$resp == "old", new = trials$resp == "new") ~ id + item_type,
+    trials, sum
+  )
+  expect_identical(stancode(formula, trials, trial_model), stancode(formula, cells, model))
+
+  data <- standata(formula, trials, trial_model)
+  expect_equal(unname(rowSums(data$Y)), rep(1, 20))
+  expect_identical(as.vector(data$trials), rep(1L, 20))
+})
+
+test_that("dmpt() of one-hot trial rows sums to the cell's log-pmf less the multinomial coefficient", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  pars <- c(D = 0.6, g = 0.5)
+  # tree old: P(old) = 0.6 + 0.4 * 0.5 = 0.8, P(new) = 0.2; 3 old, 2 new
+  trials <- list(c(old = 1, new = 0), c(old = 1, new = 0), c(old = 0, new = 1),
+                 c(old = 1, new = 0), c(old = 0, new = 1))
+  per_trial <- vapply(trials, function(x) dmpt(x, pars, model, tree = "old", log = TRUE),
+                      numeric(1))
+  expect_equal(sum(per_trial), 3 * log(0.8) + 2 * log(0.2))
+  cell <- dmpt(c(old = 3, new = 2), pars, model, tree = "old", log = TRUE)
+  # choose(5, 3) = 10
+  expect_equal(cell - log(10), sum(per_trial))
 })

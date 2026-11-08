@@ -216,6 +216,19 @@ configure_model.ddm <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+#############################################################################!
+# SIMULATE_DATA S3 METHODS                                               ####
+#############################################################################!
+
+#' @export
+simulate_data.ddm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  out <- rddm(nrow(design), drift = p$drift, bound = p$bound, ndt = p$ndt, zr = p$zr)
+  .simulate_result(design, .rt_response(model, out), sim)
+}
+
 log_lik_ddm <- function(i, prep) {
   dddm(
     rt = prep$data$Y[i],

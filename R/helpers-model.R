@@ -3,7 +3,7 @@
 #'   formula, with its family, and any stanvars for the model specified by the
 #'   user. Default priors are not built here but by [configure_prior()] from the
 #'   model's `default_priors`; a model that needs priors beyond those defines
-#'   its own `configure_prior.<model>()` method (e.g. `mixture3p`, `mpt`). It
+#'   its own `configure_prior.<model>()` method (e.g. `mpt`). It
 #'   will call the appropriate configure_model.* functions based on the list of
 #'   classes defined in the .model_* functions. Each model has one method, for
 #'   its model class, or one per version class when the versions are configured
@@ -41,44 +41,30 @@
 #'  ```
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' configure_model.mixture3p <- function(model, data, formula) {
-#'   # retrieve arguments from the data check
-#'   max_set_size <- attr(data, "max_set_size")
-#'   lure_idx <- attr(data, "lure_idx_vars")
-#'   nt_features <- model$other_vars$nt_features
-#'   set_size_var <- model$other_vars$set_size
+#'   # the number of non-target covariates the family needs is fixed by the data
+#'   n_nt <- attr(data, "max_set_size") - 1
 #'
-#'   # construct initial brms formula
-#'   formula <- bmf2bf(model, formula) +
-#'     brms::lf(kappa2 ~ 1) +
-#'     brms::lf(mu2 ~ 1) +
-#'     brms::nlf(theta1 ~ thetat) +
-#'     brms::nlf(kappa1 ~ kappa)
+#'   formula <- bmf2bf(model, formula)
+#'   formula$family <- .circmix_custom_family(
+#'     model,
+#'     family = "mixture3p_simple",
+#'     weight_parameters = c("thetat", "thetant"),
+#'     vint = TRUE, n_vreal = n_nt,
+#'     log_lik = log_lik_mixture3p_simple,
+#'     posterior_predict = posterior_predict_mixture3p_simple,
+#'     posterior_epred = posterior_epred_mixture3p_simple
+#'   )
 #'
-#'   # additional internal terms for the mixture model formula
-#'   kappa_nts <- paste0("kappa", 3:(max_set_size + 1))
-#'   theta_nts <- paste0("theta", 3:(max_set_size + 1))
-#'   mu_nts <- paste0("mu", 3:(max_set_size + 1))
-#'
-#'   for (i in 1:(max_set_size - 1)) {
-#'     formula <- formula +
-#'       glue_nlf("{kappa_nts[i]} ~ kappa") +
-#'       glue_nlf(
-#'         "{theta_nts[i]} ~ {lure_idx[i]} * (thetant + log(inv_ss)) + ",
-#'         "(1 - {lure_idx[i]}) * (-100)"
-#'       ) +
-#'       glue_nlf("{mu_nts[i]} ~ {nt_features[i]}")
-#'   }
-#'
-#'   # define mixture family
-#'   vm_list <- lapply(1:(max_set_size + 1), function(x) brms::von_mises(link = "identity"))
-#'   vm_list$order <- "none"
-#'   formula$family <- brms::do_call(brms::mixture, vm_list)
-#'
-#'   nlist(formula, data)
+#'   nlist(
+#'     formula, data,
+#'     stanvars = .circmix_model_stanvars(
+#'       model, formula$family, "mixture3p_functions.stan",
+#'       vint = "ss", vreal = list(nt = n_nt)
+#'     )
+#'   )
 #' }
-#'
-#' @export
 #' @keywords internal developer
+#' @export
 configure_model <- function(model, data, formula) {
   UseMethod("configure_model")
 }
@@ -212,11 +198,17 @@ replace_regex_variables <- function(model, data) {
 # model object; if they have predicted a parameter that is constant by default,
 # remove it from the model object
 update_model_fixed_parameters <- function(model, formula) {
-  constants <- names(formula)[is_constant(formula)]
-  free <- names(formula)[!is_constant(formula)]
+  # check_formula() renames deprecated parameters only after this step, so a
+  # formula for the old name has to free or fix the new one here
+  pars <- names(formula)
+  old <- pars %in% names(model$deprecated_parameters)
+  pars[old] <- unlist(model$deprecated_parameters[pars[old]], use.names = FALSE)
+  constants <- pars[is_constant(formula)]
+  free <- pars[!is_constant(formula)]
   # add new constants to the model object
   if (length(constants) > 0) {
-    model$fixed_parameters[constants] <- strip_attributes(formula[constants],
+    model$fixed_parameters[constants] <- strip_attributes(
+      formula[is_constant(formula)],
       protect = "names",
       recursive = TRUE
     )
@@ -357,6 +349,20 @@ validate_links <- function(links, model) {
     class(model)[2]
   )[1]
   given <- names(links)
+  # a link named after a parameter's old name goes to the new one
+  renames <- model$deprecated_parameters
+  old <- given %in% names(renames)
+  if (any(old)) {
+    new_names <- unlist(renames[given[old]], use.names = FALSE)
+    link_values <- unlist(links[old], use.names = FALSE)
+    warn_deprecated(
+      what = glue('links = list({given[old]} = "{link_values}")'),
+      with = glue('links = list({new_names} = "{link_values}")'),
+      since = model$dpar_since
+    )
+    given[old] <- new_names
+    names(links) <- given
+  }
 
   if (!is.null(settable)) {
     known <- unique(c(names(model$parameters), names(defaults)))
@@ -491,11 +497,41 @@ response_annotations.default <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
+  if (inherits(model, "mpt") && is_trial_level(model)) {
+    return(list(
+      resp_cats = glue("one per trial, named in column '{model$other_vars$response}'"),
+      response = "the response category of each trial"
+    ))
+  }
   if (inherits(model, "m3") || inherits(model, "mpt")) {
     return(list(resp_cats = "counts per response category"))
   }
+  if (inherits(model, "sdt_yn") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = 'old'/'signal'"))
+  }
   if (inherits(model, "sdt_yn")) {
     return(list(response = "count of 'old'/'signal' responses per cell"))
+  }
+  if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
+    return(list(response = "0/1 per trial; 1 = correct"))
+  }
+  if (inherits(model, "sdt_rating") && is_trial_level(model)) {
+    return(list(response = glue("rating per trial, 1 to {model$other_vars$n_ratings}")))
+  }
+  if (inherits(model, "sdt_ranking") && is_trial_level(model)) {
+    return(list(response = "rank of the target per trial; 1 = ranked first"))
+  }
+  if (inherits(model, "sdt_cdp") && is_trial_level(model)) {
+    return(list(judgment = "'new', 'know', 'remember' or 'guess' per trial",
+                confidence = "confidence per trial, on the unified scale"))
+  }
+  if (inherits(model, "psychometric_function")) {
+    response <- if (is.null(model$other_vars$n_trials)) {
+      "0/1 or logical per trial"
+    } else {
+      "count of positive responses per row"
+    }
+    return(list(response = response))
   }
   list()
 }
@@ -656,6 +692,14 @@ data_column_roles <- list(
   mixture2p = c(
     resp_error = "response error relative to the target, in radians"
   ),
+  mixture2p_slot = c(
+    resp_error = "response error relative to the target, in radians",
+    set_size = "set size (a column, or one number)"
+  ),
+  mixture2p_slot_averaging = c(
+    resp_error = "response error relative to the target, in radians",
+    set_size = "set size (a column, or one number)"
+  ),
   mixture3p = c(
     resp_error = "response error relative to the target, in radians",
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
@@ -669,6 +713,13 @@ data_column_roles <- list(
   sdm = c(
     resp_error = "response error relative to the target, in radians"
   ),
+  psychometric_function = c(
+    response = "0/1 response per trial, or the number of positive responses out of `n_trials`",
+    intensity = "stimulus intensity",
+    n_trials = "number of trials (optional; omit for one binary response per row)",
+    guess = "guess rate per row, e.g. 1 / m in m-AFC (optional; or one number, or estimated)",
+    lapse = "lapse rate per row (optional; or one number, or estimated)"
+  ),
   sdt_cdp = c(
     response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",
     stimulus = "stimulus type, 0 = new and 1 = old",
@@ -676,8 +727,8 @@ data_column_roles <- list(
     n_old = NA
   ),
   sdt_mafc = c(
-    response = "number of correct responses",
-    n_trials = "number of trials",
+    response = "number of correct responses, or 1/0 for a correct/incorrect response on one trial",
+    n_trials = "number of trials (left out for one row per trial)",
     m = "number of alternatives (a column, or one number)"
   ),
   sdt_ranking = c(
@@ -689,9 +740,9 @@ data_column_roles <- list(
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old"
   ),
   sdt_yn = c(
-    response = "number of 'old'/'signal' responses",
+    response = "number of 'old'/'signal' responses, or 1/0 for an 'old'/'new' response on one trial",
     stimulus = "stimulus type, 0 = noise/new and 1 = signal/old",
-    n_trials = "number of trials"
+    n_trials = "number of trials (left out for one row per trial)"
   )
 )
 
@@ -966,11 +1017,19 @@ model_docs.bmmodel <- function(model, components = "all") {
     parameters = paste0("* **Parameters:** \n\n  ", par_info, "\n"),
     fixed_parameters = paste0("* **Fixed parameters:** \n\n  ", fixed_par_info, "\n"),
     links = paste0("* **Default parameter links:** \n\n     - ", links_info, "\n\n"),
-    prior = paste0("* **Default priors:** \n\n", priors_info, "\n")
+    prior = paste0("* **Default priors:** \n\n", priors_info, "\n"),
+    trial_level = paste0(
+      "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
+      "* **Trial-level data:** ", trial_level_docs,
+      if ("bias" %in% names(model$parameters)) trial_level_stimulus_docs,
+      trial_level_notes_docs, "\n"
+    )
   )
 
+  # the trial-level part needs an instance constructed for trial rows, whose
+  # requirements it shows; a help page asks for it in a second call
   if (length(components) == 1 && components == "all") {
-    components <- names(info_all)
+    components <- setdiff(names(info_all), "trial_level")
   }
 
   if (model$version == "NA" || model$version == "") {
@@ -1085,8 +1144,11 @@ use_model_template <- function(model_name,
      #   tests; Stan-compiling tests open with `skip_unless_stan_tests()` and
      #   their sites are registered in test-conventions.R (a test requires it)
      # - `model_cases_{model_name}()` in tests/testthat/helper-model-{model_name}.R
-     #   with a `stored_frame`, `sd_default`, `init` and `links` case (a test
-     #   requires them; the case kinds are listed in helper-model-cases.R)
+     #   with a `stored_frame`, `sd_default`, `init`, `links` and `simulate` case
+     #   (a test requires them; the case kinds are listed in helper-model-cases.R)
+     # - the `simulate_data.{model_name}()` method below, after `configure_model()`,
+     #   drawing the responses with `r{model_name}()`; a test requires it and a
+     #   `simulate` case for every version
      # - a `revert_check_data.<model>()` method in R/update.R if `check_data()`
      #   consumes or creates columns
      # - a `built_data_columns()` method next to `check_data()` naming every
@@ -1454,6 +1516,28 @@ use_model_template <- function(model_name,
     .open = "<<", .close = ">>"
   )
 
+  simulate_data_header <- glue(
+    "#############################################################################!
+     # SIMULATE_DATA S3 METHODS                                               ####
+     #############################################################################!
+     # Draws data from the model given its parameters and a design. See
+     # ?simulate_data and simulate_data.ddm() in 'R/model_ddm.R'.\n\n\n"
+  )
+
+  simulate_data_method <- glue(
+    "#' @export
+    simulate_data.<<model_name>> <- function(model, pars, design = NULL, scale = c('link', 'native'), ...) {
+       # the design columns the model reads; add them to the Design section of ?simulate_data
+       design <- .design_or_n(model, design, character(0), ...)
+       sim <- .simulate_pars(model, pars, design, scale)
+       # draw one response per row of the design with r<<model_name>>() from the
+       # native values in sim$native and return them under the response names:
+       # .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_var1), sim)
+       stop2('simulate_data() is not yet implemented for <<model_name>>.')
+    }\n\n\n",
+    .open = "<<", .close = ">>"
+  )
+
   postprocess_brm_method <- glue(
     "#' @export
     postprocess_brm.<<model_name>> <- function(model, fit, ...) {
@@ -1475,6 +1559,8 @@ use_model_template <- function(model_name,
     bmf2bf_method,
     configure_model_header,
     configure_model_method,
+    simulate_data_header,
+    simulate_data_method,
     family_functions,
     postprocess_brm_header,
     postprocess_brm_method
@@ -1559,8 +1645,11 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
   if (until == "model") {
     return(nlist(config_args, model, user_formula))
   }
+  # a prior written for the parameters of bmm 1.4 is translated once, here, and
+  # bmm() stores the translation, so update() neither translates nor warns again
+  user_prior <- translate_deprecated_priors(model, config_args$formula, prior)
   prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, prior), frame_args)
+    configure_prior, c(list(model, data, config_args$formula, user_prior), frame_args)
   )
   # the prior decides which parameters exist, so the inits are built from it
   if (until == "init") {
@@ -1568,7 +1657,7 @@ configure_fit.bmmformula <- function(formula, data = NULL, model = NULL, prior =
       create_initfun, c(list(model, data, config_args$formula, prior), frame_args)
     )
   }
-  nlist(config_args, prior, model, user_formula)
+  nlist(config_args, prior, model, user_formula, user_prior)
 }
 
 #' @export
