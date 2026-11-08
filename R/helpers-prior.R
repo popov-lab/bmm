@@ -707,6 +707,12 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     return(priors)
   }
 
+  # `0 + offset(x)` or `~ 0` leaves no coefficient for a main prior to sit on,
+  # and brms rejects a prior on a coefficient the model does not have (#689)
+  if (fixed_effects_count == 0 && interactions_count == 0) {
+    return(priors)
+  }
+
   # priors when intercept is supressed and all levels are explicit
   if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
     levels_only_prior <- .build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)
