@@ -748,21 +748,25 @@ test_that("the samplers read n as rnorm() does", {
     rsdm = function(n) rsdm(n, mu = 0, c = 3, kappa = 3)
   )
   seeded <- function(f, n) withr::with_seed(7, f(n))
+  bad <- list(NA, NA_real_, -1, -0.5, Inf, "a", numeric(0), c(2, 3), list(2))
+  names(bad) <- vapply(bad, deparse1, character(1))
+  # one expectation per sampler and kind of n: the expectations, not the
+  # draws, are what this test spends its time on under CRAN
   for (name in names(calls)) {
     f <- calls[[name]]
     two <- seeded(f, 2)
-    expect_identical(seeded(f, 2.5), two, info = name)
-    expect_identical(seeded(f, 2L), two, info = name)
-    expect_identical(seeded(f, "3"), seeded(f, 3), info = name)
-    expect_identical(seeded(f, TRUE), seeded(f, 1), info = name)
+    expect_identical(list(seeded(f, 2.5), seeded(f, 2L), seeded(f, "2"), seeded(f, TRUE)),
+                     list(two, two, two, seeded(f, 1)), info = name)
     # no draws: the type, columns and column names of a call with draws
     empty <- if (is.null(dim(two))) two[0] else two[0, , drop = FALSE]
     expect_identical(f(0), empty, info = name)
-    for (bad in list(NA, NA_real_, -1, -0.5, Inf, "a", numeric(0), c(2, 3), list(2))) {
-      if (name == "rddm" && length(bad) > 1) next
-      expect_error(f(bad), "n, the number of draws, must be a single number >= 0",
-                   fixed = TRUE, info = paste(name, format(bad)))
-    }
+    tried <- if (name == "rddm") Filter(function(b) length(b) <= 1, bad) else bad
+    refusals <- vapply(tried, function(b) tryCatch({
+      f(b)
+      "no error"
+    }, error = conditionMessage), character(1))
+    expect_identical(refusals, setNames(rep("n, the number of draws, must be a single number >= 0.", length(tried)),
+                                        names(tried)), info = name)
   }
 })
 

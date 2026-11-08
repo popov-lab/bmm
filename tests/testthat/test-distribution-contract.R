@@ -4,10 +4,14 @@
 # argument, value i from the i-th elements alone. Every r*() pairing test
 # interleaves parameter groups and compares each group with a reference
 # outside the function's own code (a closed form, quadrature, or the single-
-# trial density of the matching d*()), and every per-draw argument is varied
-# in at least one of them. Mutants of the samplers (vector reversed,
-# recycling removed, one group shifted 10 %) were run against these tests
-# when they were written; a Monte Carlo test is not expected to see a 10 %
+# trial density of the matching d*()). Every per-observation argument of the
+# sdm, ddm, ezdm and SDT d*() and r*() functions is varied in at least one
+# test with a vector (matrix) whose recycled form reads differently reversed:
+# a mutant that reverses any one of them after recycling (119 mutants, the
+# rezdm() ones once per version) fails a test in this file or in
+# test-distributions.R. Mutants of the samplers (vector reversed, recycling
+# removed, one group shifted 10 %) were run against these tests when they
+# were written; a Monte Carlo test is not expected to see a 10 %
 # shift, so each sampler also gets a deterministic check: certain outcomes,
 # n = 7 and parameter lengths 2, 3 and 4. Recycled to 7, a vector of length 3
 # or 4 is chosen so that reversing it changes the expected draws; one of
@@ -115,7 +119,7 @@ test_that("rejection_sampling() is deprecated and still samples", {
 
 test_that("dddm() recycles the observations and the parameters to the longest argument", {
   expect_elementwise(dddm, list(rt = c(0.6, 0.7), response = c(1, 0), drift = 1:4,
-                                bound = c(1, 1.5), ndt = 0.2, zr = c(0.4, 0.5, 0.6)))
+                                bound = c(1, 1.5), ndt = c(0.2, 0.3, 0.25), zr = c(0.4, 0.5, 0.6)))
   expect_elementwise(dddm, list(rt = 0.6, response = 1, drift = c(1, 2, 3), bound = 1, ndt = 0.2),
                      fixed = list(log = FALSE))
   expect_elementwise(dddm, list(rt = c(0.6, 0.7, 0.8, 0.65), response = c("upper", "upper", "lower"),
@@ -306,7 +310,7 @@ test_that("rezdm(version = '4par') pairs the start point, s and both boundary me
 thr3 <- rbind(c(0.2, 0.7, 1.2), c(0.3, 0.8, 1.3), c(0.4, 0.9, 1.4))
 counts2 <- rbind(c(2, 8, 20, 70), c(30, 40, 20, 10))
 
-test_that("the SDT d*() functions recycle counts, thresholds and parameters to the longest argument", {
+test_that("the binomial and rating SDT d*() functions recycle counts, thresholds and parameters", {
   expect_elementwise(dsdt_yn, list(n_old = c(50, 60), n_trials = 100, stimulus = c(1, 1, 0), d = c(1, 2, 3, 1.5),
                                    criterion = c(0.4, 0.7, 0.5)))
   expect_elementwise(dsdt_yn, list(n_old = 50, n_trials = c(100, 80), stimulus = 1, d = c(1, 2),
@@ -324,12 +328,16 @@ test_that("the SDT d*() functions recycle counts, thresholds and parameters to t
     vapply(1:3, function(i) dsdt_rating(c(2, 8, 20, 70), 1, d = 1.5, thresholds = thr3[i, ]), numeric(1))
   )
   expect_elementwise(dsdt_dpsdt, list(counts = counts2, stimulus = c(1, 1, 0), d = c(1, 1.5, 2, 0.8),
-                                      thresholds = thr3, Ro = c(0.2, 0.3, 0.4), Rn = c(0, 0.1)))
+                                      thresholds = thr3, Ro = c(0.2, 0.3, 0.4), Rn = c(0, 0.1),
+                                      sdratio = c(1, 1.3, 0.8)))
   # Rn acts on noise trials only, so three of them take three different values
   expect_elementwise(dsdt_dpsdt, list(counts = counts2, stimulus = c(0, 0, 1, 0), d = c(1, 1.5, 2, 0.8),
                                       thresholds = thr3, Ro = c(0.2, 0.3, 0.4), Rn = c(0.05, 0.3, 0.1, 0.2)))
   expect_elementwise(dsdt_metad, list(counts = counts2, stimulus = c(1, 1, 0), d = c(1, 1.5, 2, 0.8),
                                       thresholds = thr3, metad = c(0.8, 1, 1.2), sdratio = c(1, 1.2)))
+})
+
+test_that("dsdt_ranking() and dsdt_cdp() recycle counts, thresholds and parameters", {
   expect_elementwise(dsdt_ranking, list(counts = rbind(c(50, 30, 15, 5), c(20, 30, 30, 20)), m = 4,
                                         d = c(0.5, 1, 2, 1.5), sdratio = c(1, 1.5)),
                      fixed = list(dist = "normal"))
@@ -367,6 +375,9 @@ test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus p
   # n not a multiple of the parameter length: draw i takes element i, and a
   # criterion far from the signal mean makes every response certain
   expect_no_warning(n_old <- rsdt_yn(7, 100, 1, d = 10, criterion = c(-5, 15, -5)))
+  expect_equal(n_old, rep_len(c(100L, 0L, 100L), 7))
+  # the same for bias, measured from the midpoint, which is d / 2 = 5 above the noise mean
+  expect_no_warning(n_old <- rsdt_yn(7, 100, 1, d = 10, bias = c(-10, 20, -10)))
   expect_equal(n_old, rep_len(c(100L, 0L, 100L), 7))
 })
 
@@ -412,10 +423,12 @@ test_that("rsdt_rating() pairs sensitivity, stimulus, thresholds and variance ra
   for (k in 1:3) {
     expect_category_props(counts[g == k, ], n_trials, sdt_category_probs(d[k], thr3[k, ], stimulus[k], sdratio[k]))
   }
-  # n not a multiple of the threshold rows: row i takes threshold row i, and
-  # thresholds far from the mean put every response in one category
-  counts <- rsdt_rating(7, 100, 1, d = 0, thresholds = rbind(c(-9, -8, -7), c(7, 8, 9), c(-9, 8, 9)))
+  # n not a multiple of the threshold rows or n_trials: row i takes threshold
+  # row i and n_trials element i, and thresholds far from the mean put every
+  # response in one category
+  counts <- rsdt_rating(7, c(10, 20, 30, 40), 1, d = 0, thresholds = rbind(c(-9, -8, -7), c(7, 8, 9), c(-9, 8, 9)))
   expect_equal(max.col(counts), rep_len(c(4L, 1L, 2L), 7))
+  expect_equal(counts[cbind(1:7, max.col(counts))], c(10, 20, 30, 40, 10, 20, 30))
 })
 
 test_that("rsdt_dpsdt() pairs recollection with the rating parameters per draw", {
@@ -474,10 +487,10 @@ test_that("rsdt_metad() pairs metacognitive sensitivity with the rating paramete
   # place (signal in category 3, noise in 2); metad = 150 moves them up by
   # (150 - 20) / 2 = 65 in the meta-d' space (signal in 4, noise in 1)
   counts <- NULL
-  expect_no_warning(counts <- rsdt_metad(7, c(30, 50), stimulus = c(1, 1, 0, 1), d = 20, thresholds = c(-10, 10, 60),
-                                         metad = c(20, 150, 20)))
+  expect_no_warning(counts <- rsdt_metad(7, c(30, 50, 40, 60), stimulus = c(1, 1, 0, 1), d = 20,
+                                         thresholds = c(-10, 10, 60), metad = c(20, 150, 20)))
   expect_equal(max.col(counts), c(3L, 4L, 2L, 3L, 4L, 3L, 2L))
-  expect_equal(counts[cbind(1:7, max.col(counts))], c(30, 50, 30, 50, 30, 50, 30))
+  expect_equal(counts[cbind(1:7, max.col(counts))], c(30, 50, 40, 60, 30, 50, 40))
 })
 
 test_that("rsdt_ranking() pairs sensitivity, set size and variance ratio per draw", {
@@ -560,10 +573,11 @@ test_that("rsdt_cdp() pairs familiarity, recollection, criteria, correlation and
   # confident "old": remember (column 12) at rcrit -20, else know (9) at
   # kcrit 20 and guess (6) at kcrit 40
   counts <- NULL
-  expect_no_warning(counts <- rsdt_cdp(7, c(30, 50), 1, dfam = 30, drec = 0, thresholds = c(-28, -27, -26, -25, -24),
-                                       rcrit = c(50, -20, 50), kcrit = c(20, 40, 40, 20), n_new = 3))
+  expect_no_warning(counts <- rsdt_cdp(7, c(30, 50, 40), 1, dfam = 30, drec = 0,
+                                       thresholds = c(-28, -27, -26, -25, -24), rcrit = c(50, -20, 50),
+                                       kcrit = c(20, 40, 40, 20), n_new = 3))
   expect_equal(max.col(counts), c(9L, 12L, 6L, 9L, 12L, 6L, 6L))
-  expect_equal(counts[cbind(1:7, max.col(counts))], c(30, 50, 30, 50, 30, 50, 30))
+  expect_equal(counts[cbind(1:7, max.col(counts))], c(30, 50, 40, 30, 50, 40, 30))
 })
 
 # --- empty observations ---------------------------------------------------------
