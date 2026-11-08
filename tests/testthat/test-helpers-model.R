@@ -31,6 +31,7 @@ test_that("model_registry() lists each model once per task it names, in the orde
   expect_equal(groups_of("imm"), "Continuous reproduction")
   expect_equal(groups_of("m3"), "Categorical recall and n-AFC decisions")
   expect_equal(groups_of("sdt_yn"), "Detection, recognition and confidence judgments")
+  expect_equal(groups_of("psychometric_function"), "Detection, recognition and confidence judgments")
   expect_equal(groups_of("ddm"), "Choices and response times")
   expect_equal(
     groups_of("mpt"),
@@ -175,7 +176,8 @@ test_that("model_versions() lists the versions a constructor accepts", {
   expect_equal(model_versions("imm"), c("full", "bsc", "abc"))
   expect_equal(model_versions("m3"), c("custom", "ss", "cs"))
   expect_equal(model_versions("ezdm"), c("3par", "4par"))
-  expect_equal(model_versions("mixture2p"), NA_character_)
+  expect_equal(model_versions("mixture2p"), c("simple", "slot", "slot_averaging"))
+  expect_equal(model_versions("mixture3p"), c("simple", "slot", "slot_averaging"))
 })
 
 test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
@@ -183,6 +185,7 @@ test_that("imm(), m3(), ezdm() and sdm() refuse an unknown version", {
   expect_error(imm("y", "x", "d", "s", version = "xyz"), "should be one of")
   expect_error(m3(c("corr", "other"), c(1, 4), version = "xyz"), "should be one of")
   expect_error(ezdm("m", "v", "n", "t", version = "xyz"), "should be one of")
+  expect_error(mixture3p("y", "x", "s", version = "xyz"), "should be one of")
 })
 
 test_that("parameter_label() keeps the name before the first separator", {
@@ -199,7 +202,7 @@ test_that("parameter_label() keeps the name before the first separator", {
 test_that("estimated parameter labels have balanced parentheses", {
   for (model in model_names()) {
     for (version in model_versions(model)) {
-      spec <- if (is.na(version)) get_model(model)() else get_model(model)(version = version)
+      spec <- model_specimen(model, version)
       estimated <- setdiff(names(spec$parameters), names(spec$fixed_parameters))
       labels <- parameter_label(vapply(spec$parameters[estimated], as.character, ""))
       open <- lengths(regmatches(labels, gregexpr("(", labels, fixed = TRUE)))
@@ -245,7 +248,10 @@ test_that("model_overview() has one row per version with its own columns and par
   expect_match(mpt_row$`Data columns`, "`covariates`:", fixed = TRUE)
 
   mixture2p <- overview[grepl("`mixture2p()`", overview$Model, fixed = TRUE), ]
-  expect_false(grepl("version", mixture2p$Model))
+  expect_equal(nrow(mixture2p), 3)
+  slot <- grepl("version `slot", mixture2p$Model, fixed = TRUE)
+  expect_true(all(grepl("set_size", mixture2p$`Data columns`[slot])))
+  expect_false(grepl("set_size", mixture2p$`Data columns`[!slot]))
 
   rt_models <- model_overview(group = "Choices and response times")
   registry <- model_registry()
@@ -260,7 +266,7 @@ test_that("check_model() refuses invalid models and accepts valid models", {
   okmodels <- model_names()
   for (model in okmodels) {
     if (model == "m3") next
-    model <- get_model(model)()
+    model <- model_specimen(model)
     expect_silent(check_model(model))
     expect_type(check_model(model), "list")
   }
@@ -396,6 +402,9 @@ test_that("use_model_template() generates a flat-defaults unversioned scaffold",
   expect_false(grepl("_version_table", out, fixed = TRUE))
   expect_false(grepl("match.arg", out, fixed = TRUE))
   expect_false(grepl("void_mu", out, fixed = TRUE))
+  expect_match(out, "simulate_data.tmpl_unver <- function(model, pars, design = NULL", fixed = TRUE)
+  expect_match(out, "sim <- .simulate_pars(model, pars, design, scale)", fixed = TRUE)
+  expect_match(out, "`simulate` case for every version", fixed = TRUE)
   expect_no_error(parse(text = out))
 })
 
@@ -514,15 +523,22 @@ test_that("model constructors and the template list their fields in the canonica
   canonical <- c(
     "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
     "requirements", "parameters", "links", "links_fixed", "fixed_parameters",
-    "alternative_parameters", "default_priors", "init_ranges"
+    "alternative_parameters", "default_priors", "init_ranges",
+    "deprecated_parameters", "dpar_since", "variable_precision", "vp_nodes"
   )
   # m3 builds its inits in create_initfun.m3() and drops an empty
   # default_priors; only models with interchangeable parameters declare
   # alternative_parameters; links_fixed lists the parameters whose links the
-  # model sets itself, which check_links() leaves alone (mpt simplex groups)
-  optional <- c("links_fixed", "alternative_parameters", "default_priors", "init_ranges")
+  # model sets itself, which check_links() leaves alone (mpt simplex groups);
+  # the last four belong to the circular mixture models only
+  optional <- c(
+    "links_fixed", "alternative_parameters", "default_priors", "init_ranges",
+    "deprecated_parameters", "dpar_since", "variable_precision", "vp_nodes"
+  )
   expect_canonical <- function(model, label) {
     fields <- names(model)
+    # the deprecation warnings of renamed parameters take their release from it
+    if ("deprecated_parameters" %in% fields) expect_true("dpar_since" %in% fields, label = label)
     expect_identical(fields, intersect(canonical, fields), label = label)
     expect_in(setdiff(canonical, fields), optional)
   }
@@ -633,4 +649,13 @@ test_that("update_model_fixed_parameters() works", {
   model2 <- update_model_fixed_parameters(model1, formula)
   expect_equal(model1$fixed_parameters, list(mu = 0))
   expect_equal(model2$fixed_parameters, list(kappa = 3))
+})
+
+test_that("model_docs() keeps the trial-level part out of 'all' and the stimulus bullet off sdt_mafc", {
+  docs <- function(model, ...) paste(model_docs(model, ...), collapse = "\n")
+  expect_no_match(docs(sdt_yn("r", "s")), "Requirements for one row per trial", fixed = TRUE)
+  expect_match(docs(sdt_yn("r", "s"), components = "trial_level"), "With `bias`", fixed = TRUE)
+  mafc <- docs(sdt_mafc("c", m = 4), components = "trial_level")
+  expect_match(mafc, "Requirements for one row per trial", fixed = TRUE)
+  expect_no_match(mafc, "criterion", fixed = TRUE)
 })

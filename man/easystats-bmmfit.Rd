@@ -113,7 +113,10 @@ counts as both a location and a distributional parameter, so each
 them: without the columns bmm adds for its own use or \pkg{brms}
 computes from the formula (such as \code{ID:session} or \code{log(x)}), and with
 the response categories of a model fitted to counts (e.g. \code{\link[=m3]{m3()}}) as
-columns of their own. The model frame stored in the fit is always the
+columns of their own. Data with one row per trial come back with the
+response columns you named, such as the \code{rating} column of
+\code{\link[=sdt_rating]{sdt_rating()}} or the \code{judgment} and \code{confidence} columns of
+\code{\link[=sdt_cdp]{sdt_cdp()}}. The model frame stored in the fit is always the
 source; \code{source} is ignored.
 \item \code{find_parameters()} returns the names of the posterior draws in one
 element per model parameter (\verb{<parameter>} for the population-level

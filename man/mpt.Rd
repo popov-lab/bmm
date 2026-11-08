@@ -11,6 +11,7 @@ mpt(
   simplex = NULL,
   restrictions = NULL,
   links = "logit",
+  response = NULL,
   ...
 )
 }
@@ -90,6 +91,16 @@ to the other link, in the list or afterwards with
 \code{model$links$D <- "probit"}, takes that link's default priors (see
 Details).}
 
+\item{response}{Character. A single non-empty string naming the data column
+that holds, with one row per trial, the response category of each trial:
+a character or factor column whose values are branch names. The column
+cannot carry the name of a response category, the \code{tree_id} column or a
+covariate, nor of a column that \code{bmm()} builds: \code{Y}, \code{nTrials},
+\verb{Idx_<tree>} when \code{tree_id} is set, and \verb{Poss_<category>} for a category
+declared impossible in a tree.
+\code{NULL} (the default) declares aggregated data with one count column per
+response category. See Details.}
+
 \item{...}{used internally for testing, ignore it}
 }
 \value{
@@ -117,7 +128,8 @@ latent scale.
 \item Batchelder, W. H., & Riefer, D. M. (1999). Theoretical and empirical review of multinomial process tree modeling. Psychonomic Bulletin & Review, 6(1), 57-86. https://doi.org/10.3758/BF03210812
 }
 
-The data hold aggregated counts: one row per participant and tree (and
+The data hold aggregated counts, or one row per trial with \code{response}
+(below). Aggregated counts: one row per participant and tree (and
 per condition, if conditions are crossed with the trees), with one count
 column per response category. The count columns must be named exactly
 like the branch names given to \code{\link[=mpt_tree]{mpt_tree()}} (\code{old} and \code{new} in the
@@ -126,6 +138,27 @@ variable is passed. The \code{tree_id} column names the tree of each row, and
 the counts of a row must come from trials of that tree. Wide tables with
 one column per category of an EQN file, as MPTinR and TreeBUGS take them,
 are reshaped with \code{\link[=mpt_data_reshape]{mpt_data_reshape()}}.
+
+With \code{response = "resp"}, each row is one trial, and the column \code{resp}
+names its response category (\code{"old"} or \code{"new"} in the example below).
+Trial rows allow item random effects, \code{D ~ 1 + (1 | id) + (1 | item)},
+and covariates that change from trial to trial. A missing response is an
+error rather than a count of 0; remove those rows.
+\itemize{
+\item \strong{Requirements for one row per trial:}
+}
+\itemize{
+\item One tree per distinct branch structure, created with mpt_tree(); all trees share the same response categories
+\item One row per trial, with a column whose values name the response category of the trial (the branch names), declared via the response argument
+\item For multi-tree models, a column whose values name the tree each observation belongs to, declared via the tree_id argument
+\item Data columns used inside branch expressions must be declared via the covariates argument
+}
+\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
+\itemize{
+\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
+\item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.
+\item \code{ppp(fit, participant = "id")} names the participant when the formula has more than one grouping variable, such as item terms.
+}
 
 A separate tree is needed only when the \emph{branch expressions} differ, that
 is, when the trial determines which latent processes apply or which
@@ -221,6 +254,17 @@ Example: separate detection parameters \code{Do} and \code{Dn} in a single old/n
 test give three free parameters and rank 2 of 3, so one combination of
 \code{Do}, \code{Dn} and \code{g} cannot be estimated; a second condition that varies
 the response bias identifies them.
+
+\strong{Sparse cells.} \code{\link[=bmm_data_check]{bmm_data_check()}} flags design cells with fewer than
+\code{min_trials} trials, counting the trials of a row as the sum of its
+response category columns. Each row holds one tree, so when no formula
+uses the \code{tree_id} column, a design cell sums the rows of all trees and
+can pass while one tree holds only a few trials: 40 trials in an old/new
+test and 2 in a source test add up to 42. With the tree column in a
+formula, each tree is a cell of its own and is checked on its own;
+otherwise tabulate the trials per tree yourself when the trees differ in
+size. With one row per trial, \code{\link[=bmm_data_check]{bmm_data_check()}} counts the trials of
+each participant instead.
 
 \strong{Reading the estimates.} \code{summary()} reports intercepts and regression
 coefficients on the latent (logit or probit) scale. \code{\link[=native_parameters]{native_parameters()}}

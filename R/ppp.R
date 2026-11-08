@@ -6,10 +6,12 @@
 #' Posterior predictive p-values for count models
 #'
 #' Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
-#' (2010) and their posterior predictive p-values (PPP) for models that fit
-#' aggregated response counts: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
-#' [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()]. TreeBUGS' `PPP()` reports the
-#' same two statistics; Details says where their values differ.
+#' (2010) and their posterior predictive p-values (PPP) for the count models,
+#' whose rows are aggregated counts or single trials ([sdt_yn()] and
+#' [sdt_mafc()] without `n_trials`, [mpt()] with `response`): [mpt()], [m3()],
+#' [sdt_yn()], [sdt_rating()], [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()].
+#' TreeBUGS' `PPP()` reports the same two statistics; Details says where their
+#' values differ.
 #'
 #' @details
 #' Both statistics are computed once per posterior draw, for the observed counts
@@ -224,7 +226,7 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 # the response column holds one category; the other is trials - Y
 .ppp_counts.sdt_yn <- function(model, fit, draw_ids) {
   response <- model$resp_vars$response
-  trials <- fit$data[[model$other_vars$n_trials]]
+  trials <- fit$data[[.sdt_trials_var(model)]]
   y <- fit$data[[response]]
   list(
     observed = matrix(c(y, trials - y), ncol = 2L,
@@ -310,11 +312,15 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
   candidates
 }
 
+# Cells numbered 1, 2, ... in lexical order of their values. Codes are combined
+# arithmetically, a column at a time: pasted labels coincide for (1, 5.2) and
+# (1.5, 2), pasted codes for (1, 12) and (11, 2)
 .ppp_index <- function(df) {
-  if (ncol(df) == 0L) {
-    return(rep(1L, nrow(df)))
-  }
-  as.integer(interaction(df, drop = TRUE, lex.order = TRUE))
+  Reduce(function(id, x) {
+    code <- if (is.factor(x)) as.integer(x) else match(x, sort(unique(x)))
+    key <- (id - 1) * max(code, 0L, na.rm = TRUE) + code
+    match(key, sort(unique(key)))
+  }, df, rep(1L, nrow(df)))
 }
 
 # sums the rows of a draws x rows x categories array within each group

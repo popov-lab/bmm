@@ -47,20 +47,34 @@
     init_ranges$sdratio <- c(-0.3, 0.3)
   }
 
-  requirements <- glue(
-    "Provide pre-aggregated ranking counts in wide format:", "\n\n",
-    "  - Rank-count columns (response): one column per rank position, each ",
-    "giving the number of trials in which the target received that rank ",
-    "(column 1 = most likely target, column m = least)", "\n",
-    "  - Set size (m): a constant or a column giving the number of ranked ",
-    "items per row; rows with fewer ranks leave the surplus columns at 0", "\n",
-    "  No stimulus column needed (all trials include exactly one target)"
-  )
+  # rank-count columns hold aggregated counts; a single rank column holds one
+  # trial per row
+  trial_level <- length(response) == 1L
+  requirements <- if (trial_level) {
+    glue(
+      "Provide one row per trial with the following columns:", "\n\n",
+      "  - Rank (response): the rank the target received on the trial, a whole ",
+      "number from 1 = most likely target to the trial's set size", "\n",
+      "  - Set size (m): a constant or a column giving the number of ranked ",
+      "items on each trial", "\n\n",
+      "  No stimulus column needed (all trials include exactly one target)"
+    )
+  } else {
+    glue(
+      "Provide pre-aggregated ranking counts in wide format:", "\n\n",
+      "  - Rank-count columns (response): one column per rank position, each ",
+      "giving the number of trials in which the target received that rank ",
+      "(column 1 = most likely target, column m = least)", "\n",
+      "  - Set size (m): a constant or a column giving the number of ranked ",
+      "items per row; rows with fewer ranks leave the surplus columns at 0", "\n\n",
+      "  No stimulus column needed (all trials include exactly one target)"
+    )
+  }
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(m, dist),
+      other_vars = nlist(m, dist, trial_level),
       domain = c("Perception", "Long-term memory"),
       task = "Detection, recognition and confidence judgments",
       name = "Ranking Signal Detection Theory Model",
@@ -160,10 +174,17 @@ settable_link_functions.sdt_ranking <- function(model) {
 #' column to fit trials with different set sizes in a single model: the response
 #' has `max(m)` columns, and rows with a smaller set size switch off the surplus
 #' rank categories (the multinomial then renormalizes over the valid ranks).
-#' @param response A character vector of column names with the target rank-count
-#'   columns, ordered from rank 1 (most likely target) to rank `m` (least).
-#'   With a constant `m`, supply exactly `m` columns; with a varying set size,
-#'   supply `max(m)` columns.
+#'
+#' #### One row per trial
+#' Name a single column in `response` that holds the rank the target received
+#' on each trial.
+#' `r model_docs(.model_sdt_ranking(response = "rank", m = 4), components = "trial_level")`
+#' @param response For aggregated data, a character vector of column names
+#'   with the target rank-count columns, ordered from rank 1 (most likely
+#'   target) to rank `m` (least). With a constant `m`, supply exactly `m`
+#'   columns; with a varying set size, supply `max(m)` columns. For one row per
+#'   trial, the name of a single column holding the rank of the target on each
+#'   trial, a whole number from 1 to that trial's set size.
 #' @param m Either a single integer >= 2 giving the number of ranked items
 #'   (constant across all rows), or a single string naming a data column that
 #'   gives the number of ranked items per row.
@@ -230,10 +251,14 @@ sdt_ranking <- function(response, m,
     m <- as.integer(m)
   }
 
-  stopif(length(response) < 2,
-         "response must name at least 2 rank-count columns")
-  stopif(is.numeric(m) && length(response) != m,
-         "With a constant m ({m}), response must name exactly m columns ({length(response)} supplied)")
+  # one column holds the rank of each trial; brms builds a parameter name from
+  # it and each rank number (mu<column><rank>)
+  stopif(length(response) == 1L && grepl("[._]", response),
+         "The rank column name must not contain '.' or '_', because brms builds \\
+         a parameter name from it. Rename {collapse_comma(response)}")
+  stopif(is.numeric(m) && length(response) > 1L && length(response) != m,
+         "With a constant m ({m}), response must name exactly m columns ({length(response)} supplied), \\
+         or a single column holding the rank of the target on each trial")
 
   .model_sdt_ranking(response = response, m = m, dist = dist,
                      links = links, call = call, ...)
@@ -249,25 +274,53 @@ built_data_columns.sdt_ranking <- function(model) {
   c("nTrials", "max_rank", NextMethod("built_data_columns"))
 }
 
+#' @exportS3Method
+data_trials.sdt_ranking <- function(model, data) {
+  if (is_trial_level(model)) {
+    return(NULL)
+  }
+  .row_trials(data, model$resp_vars$response)
+}
+
 #' @export
 check_data.sdt_ranking <- function(model, data, formula) {
   resp_cols <- model$resp_vars$response
-  .validate_sdt_count_cols(data, resp_cols)
-
   max_rank <- .sdt_resolve_set_size(model$other_vars$m, data)
   stopif(anyNA(max_rank),
          "Set-size column '{model$other_vars$m}' must not contain NA")
-  n_ranks <- length(resp_cols)
-  stopif(any(max_rank > n_ranks, na.rm = TRUE),
-         "Set size must not exceed the number of rank columns ({n_ranks})")
 
-  Y <- as.matrix(data[resp_cols])
-  # NAs are only allowed as structural blanks beyond a row's set size; an NA
-  # within the set size would silently shrink nTrials if zeroed.
-  stopif(anyNA(Y[col(Y) <= max_rank]),
-         "Response columns must not contain NA counts within the row's set \\
-         size (m); only rank columns beyond the set size may be NA")
-  Y[is.na(Y)] <- 0
+  # data checked against a fit keep its number of ranks (carry_fit_bounds()),
+  # which a subset without the largest set size would otherwise lower
+  n_ranks <- attr(data, "fit_n_ranks")
+  attr(data, "fit_n_ranks") <- NULL
+  if (is_trial_level(model)) {
+    n_ranks <- n_ranks %||% max(max_rank)
+    stopif(max(max_rank) > n_ranks,
+           "The data hold a set size of {max(max_rank)}, above the {n_ranks} \\
+           the model was fitted with.")
+    model$other_vars$n_ranks <- n_ranks
+    Y <- .sdt_trial_rows_to_counts(model, data, "rank",
+                                   "one rank-count column per rank position in response")
+    over <- which(.sdt_trial_category(Y) > max_rank)
+    stopif(length(over) > 0,
+           "The rank in column '{resp_cols}' must not exceed the trial's set size \\
+           (m). Found rank {collapse_comma(utils::head(data[[resp_cols]][over], 5))} \\
+           with set size {collapse_comma(utils::head(max_rank[over], 5))} in row(s) \\
+           {collapse_comma(utils::head(over, 5))}")
+  } else {
+    .validate_sdt_count_cols(data, resp_cols)
+    n_ranks <- length(resp_cols)
+    stopif(any(max_rank > n_ranks, na.rm = TRUE),
+           "Set size must not exceed the number of rank columns ({n_ranks})")
+
+    Y <- as.matrix(data[resp_cols])
+    # NAs are only allowed as structural blanks beyond a row's set size; an NA
+    # within the set size would silently shrink nTrials if zeroed.
+    stopif(anyNA(Y[col(Y) <= max_rank]),
+           "Response columns must not contain NA counts within the row's set \\
+           size (m); only rank columns beyond the set size may be NA")
+    Y[is.na(Y)] <- 0
+  }
   stopif(any(rowSums(Y) <= 0, na.rm = TRUE),
          "Row sums of response columns must be positive (no empty rows)")
 
@@ -277,13 +330,16 @@ check_data.sdt_ranking <- function(model, data, formula) {
   stopif(any(Y[surplus] != 0),
          "Rank columns beyond the row's set size (m) must be 0")
 
-  reserved <- intersect(c("Y", "nTrials", "max_rank"), colnames(data))
+  # a rank column that is itself called Y, nTrials or max_rank is replaced,
+  # not overwritten
+  reserved <- intersect(c("Y", "nTrials", "max_rank"),
+                        if (is_trial_level(model)) setdiff(colnames(data), resp_cols) else colnames(data))
   warnif(length(reserved) > 0,
          "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
          {model$name} and will be overwritten")
   data <- data[!colnames(data) %in% resp_cols]
   data$Y <- Y
-  data$nTrials <- rowSums(Y)
+  data$nTrials <- if (is_trial_level(model)) 1L else rowSums(Y)
   data$max_rank <- as.numeric(max_rank)
 
   free_sdratio <- "sdratio" %in% names(model$parameters) &&
@@ -316,7 +372,7 @@ check_data.sdt_ranking <- function(model, data, formula) {
 
 #' @export
 bmf2bf.sdt_ranking <- function(model, formula) {
-  resp_cats <- model$resp_vars$response
+  resp_cats <- .sdt_categories(model)
 
   # max_rank (per-row set size) travels as a covariate; sdratio is the
   # parameter for the normal distribution and the literal 0 for gumbel_min;
@@ -347,7 +403,11 @@ bmf2bf.sdt_ranking <- function(model, formula) {
 
 #' @export
 configure_model.sdt_ranking <- function(model, data, formula) {
-  resp_cats <- model$resp_vars$response
+  # a set-size column fixes the number of ranks of trial rows only in the data
+  if (is_trial_level(model)) {
+    model$other_vars$n_ranks <- ncol(data$Y)
+  }
+  resp_cats <- .sdt_categories(model)
 
   formula <- bmf2bf(model, formula)
   formula$family <- brms::multinomial(refcat = NA)
@@ -370,6 +430,32 @@ configure_model.sdt_ranking <- function(model, data, formula) {
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# sdratio is the log of the SD ratio by definition, behind an identity link;
+# rank columns beyond the largest set size hold no responses
+#' @export
+simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  trial_level <- is_trial_level(model)
+  design <- .design_or_n(model, design, trials = if (!trial_level) "n_trials",
+                         counts = if (is.character(vars$m)) vars$m)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  counts <- rsdt_ranking(nrow(design), if (trial_level) 1L else design$n_trials,
+                         .sdt_resolve_set_size(vars$m, design),
+                         d = p$d, sdratio = exp(p$sdratio %||% 0), dist = vars$dist)
+  if (trial_level) {
+    return(.simulate_result(design, .sdt_simulated_responses(model, counts), sim))
+  }
+  resp <- model$resp_vars$response
+  response <- matrix(0L, nrow(design), length(resp), dimnames = list(NULL, resp))
+  response[, seq_len(ncol(counts))] <- counts
+  .simulate_result(design, as.data.frame(response), sim)
 }
 
 
