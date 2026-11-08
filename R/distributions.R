@@ -22,7 +22,9 @@
 #'   number of trials) is recycled to length `n` with [rep_len()], as in
 #'   [stats::rnorm()]: draw `i` uses element `i`, or row `i` of a matrix. A
 #'   shorter vector is repeated, also when `n` is not a multiple of its
-#'   length.
+#'   length. Until bmm 1.6.0 at the earliest, [rddm()] with `n = 1` and
+#'   parameter vectors still returns one draw per element, with a deprecation
+#'   warning.
 #' - `n` is a single number of at least 0. A fraction is truncated, as in
 #'   [stats::rnorm()], and `n = 0` gives an empty vector, or a matrix or data
 #'   frame with zero rows and the usual columns. Unlike [stats::rnorm()],

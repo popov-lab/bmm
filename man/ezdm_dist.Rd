@@ -144,7 +144,9 @@ with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
 number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
 \code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, or row \code{i} of a matrix. A
 shorter vector is repeated, also when \code{n} is not a multiple of its
-length.
+length. Until bmm 1.6.0 at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and
+parameter vectors still returns one draw per element, with a deprecation
+warning.
 \item \code{n} is a single number of at least 0. A fraction is truncated, as in
 \code{\link[stats:rnorm]{stats::rnorm()}}, and \code{n = 0} gives an empty vector, or a matrix or data
 frame with zero rows and the usual columns. Unlike \code{\link[stats:rnorm]{stats::rnorm()}},
