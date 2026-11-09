@@ -335,17 +335,25 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   out <- .obs_template(n, x, mu, c, kappa)
   x <- rep_len(x, n)
   # one normalising integral per distinct parameter set: a long x over a short
-  # parameter vector pays for the sets it cycles through, not for every element
-  denom <- if (any(lengths(list(mu, c, kappa)) > 1)) {
+  # parameter vector pays for the sets it cycles through, not for every element.
+  # Sets repeat only when x is longer than every parameter; with as many
+  # parameter values as observations, as in log_lik(), the key costs and saves
+  # nothing
+  n_par <- max(lengths(list(mu, c, kappa)))
+  denom <- if (n_par > 1) {
     mu <- rep_len(mu, n)
     c <- rep_len(c, n)
     kappa <- rep_len(kappa, n)
-    # 17 significant digits round-trip a double, so two sets share a key only
-    # if their values are identical
-    set <- paste(format(mu, digits = 17), format(c, digits = 17), format(kappa, digits = 17))
-    first <- !duplicated(set)
-    .dsdm_integrate_numer_v(.dsdm_numer, mu[first], c[first], kappa[first],
-                            lower = mu[first], upper = mu[first] + pi)[match(set, set[first])]
+    if (n_par == n) {
+      .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
+    } else {
+      # 17 significant digits round-trip a double, so two sets share a key
+      # only if their values are identical
+      set <- paste(format(mu, digits = 17), format(c, digits = 17), format(kappa, digits = 17))
+      first <- !duplicated(set)
+      .dsdm_integrate_numer_v(.dsdm_numer, mu[first], c[first], kappa[first],
+                              lower = mu[first], upper = mu[first] + pi)[match(set, set[first])]
+    }
   } else {
     .dsdm_integrate_numer(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
   }
