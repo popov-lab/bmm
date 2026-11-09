@@ -239,8 +239,10 @@ follows only the rule for `n`. A new distribution follows it from the start:
 4. Configuration arguments (`version`, `dist`, `log`, `parametrization`,
    model objects) are single values, never recycled.
 
-In the code, `.obs_length()` gives the common length and `.recycle_obs()`
-recycles a vector or the rows of a matrix. A `posterior_predict_*()` function
+In the code, `.obs_length()` gives the common length, counting `NULL` as
+empty except in its `optional` list (arguments such as `criterion` whose
+`NULL` means not given), and `.recycle_obs()` recycles a vector or the rows
+of a matrix. A `posterior_predict_*()` function
 passes `n = prep$ndraws`. A new distribution adds its element-wise and
 pairing tests to `tests/testthat/test-distribution-contract.R`; a pairing
 test interleaves parameter groups and checks each group against a reference

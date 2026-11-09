@@ -97,11 +97,12 @@ value and raises no error, so exponentiate first.
 \item \verb{r*(n, ...)} returns exactly \code{n} draws: a vector, or a data frame or matrix
 with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
 number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
-\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, or row \code{i} of a matrix. A
-shorter vector is repeated, also when \code{n} is not a multiple of its
-length. Until bmm 1.6.0 at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and
-parameter vectors still returns one draw per element, with a deprecation
-warning.
+\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, and a matrix is read element
+by element; only a set of values per draw, such as \code{thresholds}, takes
+row \code{i} of a matrix (see below). A shorter vector is
+repeated, also when \code{n} is not a multiple of its length. Until bmm 1.6.0
+at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and parameter vectors still
+returns one draw per element, with a deprecation warning.
 \item \code{n} is a single number of at least 0. A fraction is truncated, as in
 \code{\link[stats:rnorm]{stats::rnorm()}}, and \code{n = 0} gives an empty vector, or a matrix or data
 frame with zero rows and the usual columns. Unlike \code{\link[stats:rnorm]{stats::rnorm()}},
@@ -114,7 +115,10 @@ is what the call on the \code{i}-th elements alone returns. A matrix in an
 argument that takes one number per observation, such as \code{x} or \code{d}, holds
 one observation per element, as in \code{\link[stats:dnorm]{stats::dnorm()}}. When \code{x} or any
 per-observation argument is empty, the result is empty, as in
-\code{\link[stats:dnorm]{stats::dnorm()}}. Where an observation is a vector of counts
+\code{\link[stats:dnorm]{stats::dnorm()}}. A \code{NULL} argument, such as a misspelt column of a data
+frame, counts as empty, except where the default is \code{NULL}, as for
+\code{criterion} or \code{kcrit}: there it means that the argument is not given.
+Where an observation is a vector of counts
 (\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()}, \code{dsdt_ranking()} and
 \code{dsdt_cdp()}), or the pair of \code{mean_rt} or \code{var_rt} values of
 \code{dezdm(version = "4par")}, a vector is always one observation: pass a
@@ -128,6 +132,8 @@ matrix with one row per observation otherwise: row \code{i} belongs to
 observation \code{i}, or to draw \code{i}.
 \item Configuration arguments such as \code{version}, \code{dist}, \code{log},
 \code{parametrization} and \code{n_new} are single values and are never recycled.
+An argument that a version does not use, such as \code{zr} of
+\code{dezdm(version = "3par")}, is ignored.
 }
 }
 

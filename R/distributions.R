@@ -20,11 +20,12 @@
 #' - `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or matrix
 #'   with `n` rows. Every per-observation argument (a parameter, a stimulus, a
 #'   number of trials) is recycled to length `n` with [rep_len()], as in
-#'   [stats::rnorm()]: draw `i` uses element `i`, or row `i` of a matrix. A
-#'   shorter vector is repeated, also when `n` is not a multiple of its
-#'   length. Until bmm 1.6.0 at the earliest, [rddm()] with `n = 1` and
-#'   parameter vectors still returns one draw per element, with a deprecation
-#'   warning.
+#'   [stats::rnorm()]: draw `i` uses element `i`, and a matrix is read element
+#'   by element; only a set of values per draw, such as `thresholds`, takes
+#'   row `i` of a matrix (see below). A shorter vector is
+#'   repeated, also when `n` is not a multiple of its length. Until bmm 1.6.0
+#'   at the earliest, [rddm()] with `n = 1` and parameter vectors still
+#'   returns one draw per element, with a deprecation warning.
 #' - `n` is a single number of at least 0. A fraction is truncated, as in
 #'   [stats::rnorm()], and `n = 0` gives an empty vector, or a matrix or data
 #'   frame with zero rows and the usual columns. Unlike [stats::rnorm()],
@@ -37,7 +38,10 @@
 #'   argument that takes one number per observation, such as `x` or `d`, holds
 #'   one observation per element, as in [stats::dnorm()]. When `x` or any
 #'   per-observation argument is empty, the result is empty, as in
-#'   [stats::dnorm()]. Where an observation is a vector of counts
+#'   [stats::dnorm()]. A `NULL` argument, such as a misspelt column of a data
+#'   frame, counts as empty, except where the default is `NULL`, as for
+#'   `criterion` or `kcrit`: there it means that the argument is not given.
+#'   Where an observation is a vector of counts
 #'   (`dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`, `dsdt_ranking()` and
 #'   `dsdt_cdp()`), or the pair of `mean_rt` or `var_rt` values of
 #'   `dezdm(version = "4par")`, a vector is always one observation: pass a
@@ -51,6 +55,8 @@
 #'   observation `i`, or to draw `i`.
 #' - Configuration arguments such as `version`, `dist`, `log`,
 #'   `parametrization` and `n_new` are single values and are never recycled.
+#'   An argument that a version does not use, such as `zr` of
+#'   `dezdm(version = "3par")`, is ignored.
 #'
 #' @name bmm_distributions
 #' @keywords distribution
@@ -141,24 +147,29 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 
 # The common length of a d*() call's per-observation arguments (contract in
 # ?bmm_distributions): the longest, or 0 when one of them is empty, as in
-# dnorm(); an absent optional argument (NULL) does not count. An argument in
-# `...` holds one number per observation, so a matrix there counts every
-# element, as dnorm() reads it; only the arguments whose observation is a row
-# (counts, thresholds, the dezdm() 4par pairs) go in `rows` and count rows.
-# .recycle_obs() then gives observation i row i of those.
-.obs_length <- function(..., rows = list()) {
-  lens <- c(lengths(Filter(Negate(is.null), list(...))), vapply(rows, NROW, integer(1)))
+# dnorm(). NULL is empty too, such as a misspelt data column, except in
+# `optional`, which holds the arguments whose NULL means not given or not read
+# (criterion, bias, the kcrit of the R/K model); those drop out when NULL. An
+# argument in `...` holds one number per observation, so a matrix there counts
+# every element, as dnorm() reads it; only the arguments whose observation is
+# a row (counts, thresholds, the dezdm() 4par pairs) go in `rows` and count
+# rows. .recycle_obs() then gives observation i row i of those.
+.obs_length <- function(..., rows = list(), optional = list()) {
+  lens <- c(
+    lengths(list(...)), lengths(Filter(Negate(is.null), optional)),
+    vapply(rows, NROW, integer(1))
+  )
   if (any(lens == 0L)) 0L else max(lens)
 }
 
-# a result of length n with the dim, dimnames and names of the first argument
-# of that length, the attributes dnorm() keeps; dsdm() and dsdt_yn() returned
-# them before bmm 1.5.0 (other d*() functions did not), and
-# `out[] <- values` keeps them
+# a result of length n with the attributes (dim, names, a ts or other class)
+# of the first argument of that length that has any, as dnorm() keeps those of
+# x; dsdm() and dsdt_yn() returned them before bmm 1.5.0 (other d*() functions
+# did not), and `out[] <- values` keeps them
 .obs_template <- function(n, ...) {
-  src <- Find(function(a) length(a) == n, list(...))
+  src <- Find(function(a) length(a) == n && !is.null(attributes(a)), list(...))
   out <- numeric(n)
-  attributes(out) <- attributes(src)[intersect(names(attributes(src)), c("dim", "dimnames", "names"))]
+  attributes(out) <- attributes(src)
   out
 }
 
@@ -190,7 +201,14 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
     For no observations, pass a matrix with zero rows and one column per \\
     response category."
   )
-  if (is.data.frame(counts)) as.matrix(counts) else rbind(counts)
+  if (!is.data.frame(counts)) return(rbind(counts))
+  non_numeric <- names(counts)[!vapply(counts, is.numeric, logical(1))]
+  stopif(
+    length(non_numeric) > 0,
+    "counts must be numbers; the data frame has non-numeric columns: \\
+    {collapse_comma(non_numeric)}"
+  )
+  as.matrix(counts)
 }
 
 # the result of the multinomial r*() samplers before the draws fill it
@@ -1721,12 +1739,13 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
   sim_data
 }
 
-# an argument as typed, for a deprecation warning: a value passed literally,
-# as do.call() passes it, is shown by its length, since its deparse can run to
-# thousands of characters and warning.length would cut the suggestion off
+# an argument as typed, for a deprecation warning: a long value passed
+# literally, as do.call() passes it, is shown by its length, since its deparse
+# can run to thousands of characters and warning.length would cut the
+# suggestion off; typed code stays as typed, so the suggestion still runs
 .call_text <- function(expr, value) {
   text <- gsub("\\s+", " ", deparse1(expr))
-  if (nchar(text) > 60) glue("<{length(value)} values>") else text
+  if (!is.language(expr) && nchar(text) > 60) glue("<{length(value)} values>") else text
 }
 
 #' @title Distribution functions for the censored shifted Wald model (`cswald`)
@@ -2272,10 +2291,11 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   }
 
   # zr is not a parameter of version "3par", so it does not set the length there
-  n <- .obs_length(
-    n_upper, n_trials, drift, bound, ndt, s, if (version == "4par") zr,
-    rows = list(mean_rt, var_rt)
-  )
+  n <- if (version == "4par") {
+    .obs_length(n_upper, n_trials, drift, bound, ndt, s, zr, rows = list(mean_rt, var_rt))
+  } else {
+    .obs_length(n_upper, n_trials, drift, bound, ndt, s, rows = list(mean_rt, var_rt))
+  }
   if (n == 0L) {
     return(numeric(0))
   }
@@ -3104,17 +3124,18 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
   # %in% compares a factor as character, so the value check below passes and the
-  # arithmetic in .sdt_eta() then returns a silent NA
-  stopif(!is.numeric(stimulus) && !is.logical(stimulus),
+  # arithmetic in .sdt_eta() then returns a silent NA; NULL is an empty argument
+  stopif(!is.null(stimulus) && !is.numeric(stimulus) && !is.logical(stimulus),
          "stimulus must be numeric or logical, coded 0 (noise) or 1 (signal); \\
          found {class(stimulus)[1]}")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  n <- .obs_length(n_old, n_trials, stimulus, d, criterion, bias, sdratio)
+  n <- .obs_length(n_old, n_trials, stimulus, d, sdratio, optional = list(criterion, bias))
   if (n == 0L) return(numeric(0))
-  # the counts carry the shape, the parameters do not, as before bmm 1.5.0
-  shape <- .obs_template(n, n_old, n_trials)
+  # the counts carry the shape, the parameters do not, and n_trials comes first,
+  # as before bmm 1.5.0
+  shape <- .obs_template(n, n_trials, n_old)
   n_old <- rep_len(n_old, n)
   n_trials <- rep_len(n_trials, n)
   stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
@@ -3158,8 +3179,9 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  d <- rep_len(d, n)
-  sdratio <- rep_len(sdratio, n)
+  # a NULL d or sdratio gave NA draws before bmm 1.5.0, as an empty one does
+  d <- rep_len(as.numeric(d), n)
+  sdratio <- rep_len(as.numeric(sdratio), n)
   if (!is.null(criterion)) criterion <- rep_len(criterion, n)
   if (!is.null(bias)) bias <- rep_len(bias, n)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)
@@ -4782,8 +4804,8 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   stopif(any(counts < 0), "counts must be non-negative")
 
   # a kcrit that leaves the Know/Guess split off is not read
-  n <- .obs_length(stimulus, dfam, drec, sigmar, rho, rcrit, if (has_guess) kcrit,
-                   rows = list(counts, thr))
+  n <- .obs_length(stimulus, dfam, drec, sigmar, rho, rcrit,
+                   rows = list(counts, thr), optional = list(if (has_guess) kcrit))
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)

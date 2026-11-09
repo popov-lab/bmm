@@ -7,13 +7,13 @@
 # trial density of the matching d*()). Every per-observation argument of the
 # sdm, ddm, ezdm and SDT d*() and r*() functions is varied in at least one
 # test with a vector (matrix) whose recycled form reads differently reversed:
-# a mutant that reverses any one of them after recycling (119 mutants, the
-# rezdm() ones once per version) fails a test in this file or in
-# test-distributions.R. Mutants of the samplers (vector reversed, recycling
-# removed, one group shifted 10 %) were run against these tests when they
-# were written; a Monte Carlo test is not expected to see a 10 %
-# shift, so each sampler also gets a deterministic check: certain outcomes,
-# n = 7 and parameter lengths 2, 3 and 4. Recycled to 7, a vector of length 3
+# a mutant that reverses any one of them after recycling (the rezdm() ones
+# once per version) fails a test in this file or in test-distributions.R.
+# Mutants of the samplers (vector reversed, recycling removed, one group
+# shifted 10 %) were run against these tests when they were written; a Monte
+# Carlo test is not expected to see a 10 % shift, so each sampler also gets a
+# deterministic check: certain outcomes, n = 7 and parameter lengths 2, 3
+# and 4. Recycled to 7, a vector of length 3
 # or 4 is chosen so that reversing it changes the expected draws; one of
 # length 2 reads the same reversed (a b a b a b a) and is caught only when
 # shifted. Non-multiple lengths recycle silently, as rnorm() does; the cswald
@@ -181,6 +181,26 @@ test_that("the rddm() deprecation warning shows a long literal argument by its l
   expect_warning(rddm(1, drift = sapply(1:2, function(i) {
     i
   }), bound = 1, ndt = 0.2), "rddm(1, drift = sapply(1:2, function(i) { i }), ...)", fixed = TRUE)
+  # a literal is shown whole up to 60 characters of its deparse (this one has
+  # 60) and by its length above (61)
+  expect_warning(do.call(rddm, list(n = 1, drift = c(1, 11:24), bound = 1, ndt = 0.2)),
+                 "Use `rddm(15, drift = c(1, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24), ...)`",
+                 fixed = TRUE)
+  expect_warning(do.call(rddm, list(n = 1, drift = c(10, 11:24), bound = 1, ndt = 0.2)),
+                 "Use `rddm(15, drift = <15 values>, ...)`", fixed = TRUE)
+})
+
+test_that("the rddm() deprecation warning shows long typed code as typed", {
+  withr::local_seed(4443)
+  expect_warning(
+    rddm(1, drift = c(0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.5), bound = 1, ndt = 0.2),
+    "Use `rddm(13, drift = c(0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.5), ...)` instead",
+    fixed = TRUE
+  )
+  expect_warning(rddm(c(0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.5), drift = 1, bound = 1,
+                      ndt = 0.2),
+                 "`rddm(c(0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.5), ...)` is deprecated",
+                 fixed = TRUE)
 })
 
 # --- cswald (tests only while #406 is open; multiples of each other) ----------
@@ -453,53 +473,80 @@ test_that("each per-observation argument alone sets the length of a d*() result"
 })
 
 test_that("a matrix in a one-number-per-observation argument gives one value per element", {
-  # only counts, thresholds and the dezdm() 4par pairs are read by rows; any
-  # other matrix holds one observation per element, in column-major order, as
-  # in dnorm() and as before bmm 1.5.0
+  # only counts, thresholds and the dezdm() 4par pairs are read by rows; every
+  # other argument of every d*() function, in turn a 2 x 2 matrix, holds one
+  # observation per element, in column-major order, as in dnorm() and as
+  # before bmm 1.5.0. Read by rows, it would give 2 values, not 4.
   thr <- c(0.2, 0.7, 1.2)
   thr5 <- c(-1.1, -0.5, 0, 0.6, 1.3)
-  case <- function(f, base, arg, value, fixed = list()) {
-    list(f = f, base = base, arg = arg, value = value, fixed = fixed)
-  }
+  rating_c <- c(2, 8, 20, 70)
+  case <- function(f, base, mats, fixed = list()) list(f = f, base = base, mats = mats, fixed = fixed)
+  stim <- c(1, 0, 1, 1)
+  sdr <- c(1, 1.3, 0.8, 1.1)
+  dee <- c(0.5, 1, 1.5, 0.8)
   cases <- list(
-    case(dsdm, list(x = 0.3, mu = 0, c = 3, kappa = 3), "x", matrix(c(0.1, 0.3, -0.5, 0.8), 2)),
-    case(dsdm, list(x = 0.3, mu = 0, c = 3, kappa = 3), "kappa", matrix(c(1, 3, 8, 2), 2)),
-    case(dddm, list(rt = 0.6, response = 1, drift = 1, bound = 1, ndt = 0.2), "rt",
-         matrix(c(0.5, 0.6, 0.8, 0.7), 2)),
-    case(dddm, list(rt = 0.6, response = 1, drift = 1, bound = 1, ndt = 0.2), "drift",
-         matrix(c(0.5, 1, 2, 1.5), 2)),
-    case(dezdm, list(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100, drift = 2, bound = 1.5,
-                     ndt = 0.3), "drift", matrix(c(1.5, 2, 2.5, 1.8), 2)),
-    case(dezdm, list(mean_rt = c(0.45, 0.55), var_rt = c(0.02, 0.03), n_upper = 80, n_trials = 100,
-                     drift = 1, bound = 1.5, ndt = 0.3), "drift", matrix(c(0.5, 1, 1.5, 0.8), 2),
-         list(version = "4par")),
-    case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, criterion = 0.5), "n_old",
-         matrix(c(40, 50, 60, 45), 2)),
-    case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, criterion = 0.5), "d",
-         matrix(c(0.5, 1, 1.5, 0.8), 2)),
-    case(dsdt_mafc, list(n_correct = 50, n_trials = 100, m = 3, d = 1), "d", matrix(c(0.5, 1, 1.5, 0.8), 2)),
-    case(dsdt_rating, list(counts = c(2, 8, 20, 70), stimulus = 1, d = 1, thresholds = thr), "d",
-         matrix(c(0.5, 1, 1.5, 0.8), 2), list(log = TRUE)),
-    case(dsdt_ranking, list(counts = c(30, 40, 20, 10), m = 4, d = 1), "d",
-         matrix(c(0.5, 1, 1.5, 0.8), 2), list(dist = "normal", log = TRUE)),
-    case(dsdt_cdp, list(counts = c(10, 20, 30, 10, 15, 5, 5, 3, 2), stimulus = 1, dfam = 0.8, drec = 1,
-                        thresholds = thr5, rcrit = 0.5), "dfam", matrix(c(0.6, 0.8, 1, 0.7), 2),
-         list(n_new = 3, log = TRUE))
+    dsdm = case(dsdm, list(x = 0.3, mu = 0, c = 3, kappa = 3),
+                list(x = c(0.1, 0.3, -0.5, 0.8), mu = c(0, 0.5, -0.4, 1), c = c(2, 3, 4, 2.5),
+                     kappa = c(1, 3, 8, 2))),
+    dddm = case(dddm, list(rt = 0.6, response = 1, drift = 1, bound = 1, ndt = 0.2, zr = 0.5),
+                list(rt = c(0.5, 0.6, 0.8, 0.7), response = stim, drift = dee, bound = c(1, 1.2, 1.5, 0.9),
+                     ndt = c(0.2, 0.25, 0.3, 0.15), zr = c(0.4, 0.5, 0.6, 0.45))),
+    dezdm3 = case(dezdm, list(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100, drift = 2,
+                              bound = 1.5, ndt = 0.3, s = 1),
+                  list(mean_rt = c(0.45, 0.5, 0.55, 0.48), var_rt = c(0.02, 0.025, 0.03, 0.022),
+                       n_upper = c(70, 80, 75, 85), n_trials = c(100, 110, 120, 95), drift = c(1.5, 2, 2.5, 1.8),
+                       bound = c(1.2, 1.5, 1.8, 1.4), ndt = c(0.25, 0.3, 0.35, 0.28), s = c(1, 1.1, 0.9, 1.05))),
+    dezdm4 = case(dezdm, list(mean_rt = c(0.45, 0.55), var_rt = c(0.02, 0.03), n_upper = 80, n_trials = 100,
+                              drift = 1, bound = 1.5, ndt = 0.3, zr = 0.5, s = 1),
+                  list(n_upper = c(70, 80, 75, 85), n_trials = c(100, 110, 120, 95), drift = dee,
+                       bound = c(1.2, 1.5, 1.8, 1.4), ndt = c(0.25, 0.3, 0.35, 0.28), zr = c(0.4, 0.5, 0.6, 0.45),
+                       s = c(1, 1.1, 0.9, 1.05)),
+                  list(version = "4par")),
+    dsdt_yn = case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, criterion = 0.5, sdratio = 1),
+                   list(n_old = c(40, 50, 60, 45), n_trials = c(100, 90, 80, 95), stimulus = stim, d = dee,
+                        criterion = c(0.2, 0.5, 0.8, 0.3), sdratio = sdr)),
+    dsdt_yn_bias = case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, bias = 0.1),
+                        list(bias = c(-0.2, 0.1, 0.3, 0.2))),
+    dsdt_mafc = case(dsdt_mafc, list(n_correct = 50, n_trials = 100, m = 3, d = 1),
+                     list(n_correct = c(40, 50, 60, 45), n_trials = c(100, 90, 80, 95), m = c(2, 3, 4, 5), d = dee)),
+    dsdt_rating = case(dsdt_rating, list(counts = rating_c, stimulus = 1, d = 1, thresholds = thr, sdratio = 1),
+                       list(stimulus = stim, d = dee, sdratio = sdr), list(log = TRUE)),
+    dsdt_dpsdt = case(dsdt_dpsdt, list(counts = rating_c, stimulus = 1, d = 1, thresholds = thr, Ro = 0.2,
+                                       Rn = 0.1, sdratio = 1),
+                      list(stimulus = stim, d = dee, sdratio = sdr, Ro = c(0.1, 0.2, 0.3, 0.15),
+                           Rn = c(0.05, 0.1, 0.2, 0.15)),
+                      list(log = TRUE)),
+    dsdt_metad = case(dsdt_metad, list(counts = rating_c, stimulus = 1, d = 1, thresholds = thr, metad = 1,
+                                       sdratio = 1),
+                      list(stimulus = stim, d = dee, metad = c(0.8, 1, 1.2, 0.9), sdratio = sdr), list(log = TRUE)),
+    dsdt_ranking = case(dsdt_ranking, list(counts = c(30, 40, 0, 0), m = 4, d = 1, sdratio = 1),
+                        list(m = c(2, 3, 4, 3), d = dee, sdratio = sdr), list(dist = "normal", log = TRUE)),
+    dsdt_cdp = case(dsdt_cdp, list(counts = c(10, 20, 30, 10, 15, 5, 5, 3, 2), stimulus = 1, dfam = 0.8,
+                                   drec = 1, thresholds = thr5, rcrit = 0.5, sigmar = 0, rho = 0),
+                    list(stimulus = stim, dfam = c(0.6, 0.8, 1, 0.7), drec = c(0.8, 1, 1.2, 0.9),
+                         rcrit = c(0.4, 0.5, 0.6, 0.45), sigmar = c(0, 0.1, -0.1, 0.05), rho = c(0, 0.2, -0.2, 0.1)),
+                    list(n_new = 3, log = TRUE)),
+    dsdt_cdp_kcrit = case(dsdt_cdp, list(counts = c(10, 20, 30, 10, 15, 5, 5, 3, 2, 1, 2, 1), stimulus = 1,
+                                         dfam = 0.8, drec = 1, thresholds = thr5, rcrit = 0.5, kcrit = 0.3),
+                          list(kcrit = c(0.2, 0.3, 0.4, 0.25)), list(n_new = 3, log = TRUE))
   )
   vec <- each <- list()
-  for (i in seq_along(cases)) {
-    cs <- cases[[i]]
-    vec[[i]] <- as.vector(do.call(cs$f, c(replace(cs$base, cs$arg, list(cs$value)), cs$fixed)))
-    each[[i]] <- vapply(cs$value, function(v) do.call(cs$f, c(replace(cs$base, cs$arg, v), cs$fixed)), 0)
+  for (nm in names(cases)) {
+    cs <- cases[[nm]]
+    for (a in names(cs$mats)) {
+      value <- matrix(cs$mats[[a]], 2)
+      vec[[paste(nm, a)]] <- as.vector(do.call(cs$f, c(replace(cs$base, a, list(value)), cs$fixed)))
+      each[[paste(nm, a)]] <- vapply(value, function(v) do.call(cs$f, c(replace(cs$base, a, v), cs$fixed)), 0)
+    }
   }
-  expect_identical(lengths(vec), rep(4L, 12))
+  expect_identical(lengths(vec), setNames(rep(4L, 58), names(vec)))
   expect(all(is.finite(unlist(each)) & unlist(each) != 0), "a reference value is zero or not finite")
-  expect_equal(unlist(vec) / unlist(each), rep(1, 4 * 12))
+  expect_equal(unlist(vec) / unlist(each), rep(1, 4 * 58), ignore_attr = TRUE)
 })
 
-test_that("dsdm() and dsdt_yn() keep the dim and names they returned before bmm 1.5.0", {
-  # dsdm() from any argument as long as the result, as dnorm(); dsdt_yn() from
-  # the counts only
+test_that("dsdm() and dsdt_yn() keep the dim, names and class they returned before bmm 1.5.0", {
+  # dsdm() from any argument as long as the result, x first, as dnorm();
+  # dsdt_yn() from the counts only, n_trials first
   x <- matrix(c(0.1, 0.3, -0.5, 0.8), 2, dimnames = list(c("a", "b"), NULL))
   out <- dsdm(x, mu = 0, c = 3, kappa = 3)
   expect_identical(dimnames(out), dimnames(x))
@@ -509,6 +556,13 @@ test_that("dsdm() and dsdt_yn() keep the dim and names they returned before bmm 
   expect_identical(dim(dsdt_yn(matrix(c(30, 10, 20, 5), 2), 50, 1, 1, 0.5)), c(2L, 2L))
   expect_identical(dim(dsdm(0.3, kappa = matrix(c(1, 3, 8, 2), 2))), c(2L, 2L))
   expect_null(dim(dsdt_yn(30, 50, 1, matrix(c(1, 2, 3, 4), 2), 0.5)))
+  expect_named(dsdt_yn(c(30, 10), c(a = 50, b = 60), 1, 1, 0.5), c("a", "b"))
+  expect_named(dsdt_yn(c(x = 30, y = 10), c(a = 50, b = 60), 1, 1, 0.5), c("a", "b"))
+  expect_named(dsdt_yn(c(x = 30, y = 10), c(50, 60), 1, 1, 0.5), c("x", "y"))
+  x_ts <- ts(c(0.1, 0.3, -0.5, 0.8), start = 2000)
+  expect_identical(tsp(dsdm(x_ts, mu = 0, c = 3, kappa = c(1, 3))), c(2000, 2003, 1))
+  expect_s3_class(dsdm(structure(c(0.1, 0.3), class = "foo"), mu = 0, c = 3, kappa = 3), "foo")
+  expect_identical(tsp(dsdt_yn(ts(c(30, 10, 20, 5), start = 2000), 50, 1, 1, 0.5)), c(2000, 2003, 1))
 })
 
 test_that("counts given as a data frame read as the matrix of its rows", {
@@ -519,6 +573,12 @@ test_that("counts given as a data frame read as the matrix of its rows", {
                dsdt_ranking(counts[1, , drop = FALSE], m = 4, d = c(0.5, 1)))
   expect_equal(dsdt_rating(as.data.frame(counts), 1, d = 1, thresholds = thr),
                dsdt_rating(counts, 1, d = 1, thresholds = thr))
+  # a count column read as text is refused, not converted
+  text_counts <- data.frame(a = c(2, 30), b = c(8, 40), c = c(20, 20), d = c("70", "10"))
+  expect_error(dsdt_rating(text_counts, 1, d = 1, thresholds = thr),
+               "counts must be numbers; the data frame has non-numeric columns: 'd'", fixed = TRUE)
+  text_counts$d <- factor(text_counts$d)
+  expect_error(dsdt_ranking(text_counts, m = 4, d = 1), "counts must be numbers")
 })
 
 test_that("rsdt_yn() pairs sensitivity, criterion, variance ratio and stimulus per draw", {
@@ -760,6 +820,64 @@ test_that("the d*() functions return an empty result for no observations", {
   expect_identical(dsdt_ranking(matrix(0, 0, 4), m = 4, d = 1:2), numeric(0))
   expect_identical(dsdt_cdp(matrix(0, 0, 9), 1, dfam = 0.8, drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
                             rcrit = 0.5, n_new = 3), numeric(0))
+})
+
+test_that("a NULL per-observation argument is empty, as a misspelt data column", {
+  # dsdm() returned numeric(0) for it before bmm 1.5.0; counts, thresholds and
+  # the 4par pairs are one observation as a vector and stop when empty
+  thr <- c(0.2, 0.7, 1.2)
+  case <- function(f, base, args) list(f = f, base = base, args = args)
+  cases <- list(
+    dsdm = case(dsdm, list(x = 0.3, mu = 0, c = 3, kappa = 3), c("x", "mu", "c", "kappa")),
+    dddm = case(dddm, list(rt = 0.6, response = 1, drift = 1, bound = 1, ndt = 0.2, zr = 0.5),
+                c("rt", "response", "drift", "bound", "ndt", "zr")),
+    dezdm3 = case(dezdm, list(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100, drift = 1, bound = 1,
+                              ndt = 0.3, s = 1),
+                  c("mean_rt", "var_rt", "n_upper", "n_trials", "drift", "bound", "ndt", "s")),
+    dezdm4 = case(dezdm, list(mean_rt = c(0.45, 0.55), var_rt = c(0.02, 0.03), n_upper = 80, n_trials = 100,
+                              drift = 1, bound = 1, ndt = 0.3, zr = 0.5, s = 1, version = "4par"),
+                  c("n_upper", "n_trials", "drift", "bound", "ndt", "zr", "s")),
+    dsdt_yn = case(dsdt_yn, list(n_old = 5, n_trials = 10, stimulus = 1, d = 1, criterion = 0, sdratio = 1),
+                   c("n_old", "n_trials", "stimulus", "d", "sdratio")),
+    dsdt_mafc = case(dsdt_mafc, list(n_correct = 5, n_trials = 10, m = 2, d = 1),
+                     c("n_correct", "n_trials", "m", "d")),
+    dsdt_rating = case(dsdt_rating, list(counts = c(2, 8, 20, 70), stimulus = 1, d = 1, thresholds = thr,
+                                         sdratio = 1),
+                       c("stimulus", "d", "sdratio")),
+    dsdt_dpsdt = case(dsdt_dpsdt, list(counts = c(2, 8, 20, 70), stimulus = 1, d = 1, thresholds = thr,
+                                       Ro = 0.2, Rn = 0.1, sdratio = 1),
+                      c("stimulus", "d", "Ro", "Rn", "sdratio")),
+    dsdt_metad = case(dsdt_metad, list(counts = c(2, 8, 20, 70), stimulus = 1, d = 1, thresholds = thr,
+                                       metad = 1, sdratio = 1),
+                      c("stimulus", "d", "metad", "sdratio")),
+    dsdt_ranking = case(dsdt_ranking, list(counts = c(30, 40, 20, 10), m = 4, d = 1, sdratio = 1),
+                        c("m", "d", "sdratio")),
+    dsdt_cdp = case(dsdt_cdp, list(counts = c(10, 20, 30, 10, 15, 5, 5, 3, 2), stimulus = 1, dfam = 0.8,
+                                   drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3), rcrit = 0.5, sigmar = 0,
+                                   rho = 0, n_new = 3),
+                    c("stimulus", "dfam", "drec", "rcrit", "sigmar", "rho"))
+  )
+  out <- list()
+  for (nm in names(cases)) {
+    cs <- cases[[nm]]
+    for (a in cs$args) out[[paste(nm, a)]] <- do.call(cs$f, replace(cs$base, a, list(NULL)))
+  }
+  expect_identical(out, setNames(rep(list(numeric(0)), 55), names(out)))
+})
+
+test_that("NULL in an optional argument means it is not given", {
+  thr5 <- c(-1.1, -0.5, 0, 0.6, 1.3)
+  expect_identical(dsdt_yn(c(5, 6), 10, 1, d = 1, criterion = NULL, bias = 0.2),
+                   dsdt_yn(c(5, 6), 10, 1, d = 1, bias = 0.2))
+  expect_length(dsdt_yn(c(5, 6), 10, 1, d = 1, criterion = 0.2, bias = NULL), 2)
+  counts <- rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2), c(5, 10, 20, 30, 10, 5, 5, 3, 2))
+  expect_length(dsdt_cdp(counts, 1, dfam = 0.8, drec = 1, thresholds = thr5, rcrit = 0.5, kcrit = NULL,
+                         n_new = 3), 2)
+  expect_identical(dezdm(0.5, 0.02, c(80, 70), 100, drift = 1, bound = 1, ndt = 0.3, zr = NULL),
+                   dezdm(0.5, 0.02, c(80, 70), 100, drift = 1, bound = 1, ndt = 0.3))
+  # rsdt_yn() gave NA draws for a NULL d before bmm 1.5.0, as rnorm() does for an empty mean
+  expect_warning(draws <- rsdt_yn(3, 10, 1, d = NULL, criterion = 0), "NAs produced")
+  expect_identical(draws, rep(NA_integer_, 3))
 })
 
 test_that("dezdm(version = '4par') refuses an empty mean_rt or var_rt vector", {
