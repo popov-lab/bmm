@@ -36,17 +36,17 @@ rezdm(
 "3par", a numeric vector or single value. For version "4par", either a
 vector of length 2, \code{c(mean_rt_upper, mean_rt_lower)}, for one
 observation, or a matrix with 2 columns and one row per observation. A
-vector is recycled as one observation, also when \code{var_rt} is a matrix.
-For no observations, pass a matrix with zero rows and 2 columns; an
-empty vector stops.}
+vector is recycled as one observation, also when \code{var_rt} is a matrix. A
+data frame is read as the matrix of its rows. For no observations, pass
+a matrix with zero rows and 2 columns; an empty vector stops.}
 
 \item{var_rt}{Observed variance of reaction times in seconds^2. For version
 "3par", a numeric vector or single value. For version "4par", either a
 vector of length 2, \code{c(var_rt_upper, var_rt_lower)}, for one observation,
 or a matrix with 2 columns and one row per observation. A vector is
-recycled as one observation, also when \code{mean_rt} is a matrix. For no
-observations, pass a matrix with zero rows and 2 columns; an empty vector
-stops.}
+recycled as one observation, also when \code{mean_rt} is a matrix. A data
+frame is read as the matrix of its rows. For no observations, pass a
+matrix with zero rows and 2 columns; an empty vector stops.}
 
 \item{n_upper}{Number of responses to the upper boundary}
 

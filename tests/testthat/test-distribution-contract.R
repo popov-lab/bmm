@@ -938,7 +938,31 @@ test_that("dezdm(version = '4par') refuses an empty mean_rt or var_rt vector", {
   }
   expect_error(dezdm(c(0.5, 0.6, 0.7), c(0.02, 0.03), 80, 100, drift = 1, bound = 1, ndt = 0.3, version = "4par"),
                "must be length 2")
-  expect_error(dezdm(data.frame(a = c(0.5, 0.52), b = c(0.6, 0.62)), rbind(c(0.05, 0.06), c(0.05, 0.07)),
-                     c(80, 70), 100, 1, 1, 0.2, version = "4par"),
-               "mean_rt and var_rt must be length 2")
+})
+
+test_that("dezdm(version = '4par') reads the pair shapes that bmm 1.4 read", {
+  # reference values from bmm 1.4 (develop c13dd2c5)
+  expect_equal(dezdm(c(0.5, 0.6), matrix(c(0.02, 0.03), 2, 1), 60, 100, 1, 1, 0.2, version = "4par"),
+               -41.8388675903824, tolerance = 1e-10)
+  expect_equal(dezdm(matrix(c(0.5, 0.55, 0.6, 0.62), 2), data.frame(u = c(0.02, 0.025), l = c(0.03, 0.035)),
+                     c(60, 55), 100, 1, 1, 0.2, version = "4par"),
+               c(-41.8388675903824, -69.1887379676426), tolerance = 1e-10)
+  # a data-frame mean_rt is read as the same matrix; bmm 1.4 stopped
+  expect_equal(dezdm(data.frame(u = c(0.5, 0.55), l = c(0.6, 0.62)), matrix(c(0.02, 0.025, 0.03, 0.035), 2),
+                     c(60, 55), 100, 1, 1, 0.2, version = "4par"),
+               c(-41.8388675903824, -69.1887379676426), tolerance = 1e-10)
+})
+
+test_that("dezdm(version = '4par') refuses a mean_rt or var_rt that is no pair and no 2-column matrix", {
+  # bmm 1.4 refused these too; read as pairs they would be reshaped into rows
+  refused <- list(
+    list(matrix(c(0.5, 0.6, 0.55, 0.62, 0.52, 0.61), 2, 3), rbind(c(0.03, 0.05), c(0.04, 0.06))),
+    list(c(0.5, 0.6), matrix(c(0.02, 0.03, 0.025, 0.035), 1, 4)),
+    list(rbind(c(0.5, 0.6), c(0.55, 0.62)), matrix(c(0.02, 0.03, 0.025, 0.035), 4, 1)),
+    list(c(0.5, 0.6), data.frame(v = c(0.02, 0.03, 0.025)))
+  )
+  for (pair in refused) {
+    expect_error(dezdm(pair[[1]], pair[[2]], 20, 40, drift = 0.8, bound = 1.4, ndt = 0.25, version = "4par"),
+                 "must be length 2 (one observation) or matrices with 2 columns", fixed = TRUE)
+  }
 })

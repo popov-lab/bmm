@@ -2149,16 +2149,16 @@ times_nonzero <- function(count, log_prob) {
 #'   "3par", a numeric vector or single value. For version "4par", either a
 #'   vector of length 2, `c(mean_rt_upper, mean_rt_lower)`, for one
 #'   observation, or a matrix with 2 columns and one row per observation. A
-#'   vector is recycled as one observation, also when `var_rt` is a matrix.
-#'   For no observations, pass a matrix with zero rows and 2 columns; an
-#'   empty vector stops.
+#'   vector is recycled as one observation, also when `var_rt` is a matrix. A
+#'   data frame is read as the matrix of its rows. For no observations, pass
+#'   a matrix with zero rows and 2 columns; an empty vector stops.
 #' @param var_rt Observed variance of reaction times in seconds^2. For version
 #'   "3par", a numeric vector or single value. For version "4par", either a
 #'   vector of length 2, `c(var_rt_upper, var_rt_lower)`, for one observation,
 #'   or a matrix with 2 columns and one row per observation. A vector is
-#'   recycled as one observation, also when `mean_rt` is a matrix. For no
-#'   observations, pass a matrix with zero rows and 2 columns; an empty vector
-#'   stops.
+#'   recycled as one observation, also when `mean_rt` is a matrix. A data
+#'   frame is read as the matrix of its rows. For no observations, pass a
+#'   matrix with zero rows and 2 columns; an empty vector stops.
 #' @param n_upper Number of responses to the upper boundary
 #' @param n_trials Total number of trials
 #' @param drift Drift rate (evidence accumulation rate; can be positive or negative
@@ -2286,17 +2286,21 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
       summaries is one observation. For no observations, pass matrices with zero \\
       rows and 2 columns."
     )
-    # a data frame with 2 columns is not a pair; refused here, as before bmm
-    # 1.5.0, it does not reach the arithmetic as a list
-    pair_or_matrix <- function(x) if (is.matrix(x)) ncol(x) == 2 else !is.data.frame(x) && length(x) == 2
+    # any other object of length 2 is one observation; a 2 x 1 var_rt beside
+    # a vector mean_rt ran so before bmm 1.5.0
+    is_pair <- function(x) (is.matrix(x) && ncol(x) == 2) || length(x) == 2
     stopif(
-      !pair_or_matrix(mean_rt) || !pair_or_matrix(var_rt),
+      !is_pair(mean_rt) || !is_pair(var_rt),
       "mean_rt and var_rt must be length 2 (one observation) or matrices with 2 columns"
     )
     # a vector holds the upper and lower summaries of one observation, so it
     # recycles as one row beside a matrix
     mean_rt <- matrix(mean_rt, ncol = 2)
     var_rt <- matrix(var_rt, ncol = 2)
+    # a data frame is read as the matrix of its rows, as counts are; a
+    # data-frame var_rt beside a matrix mean_rt ran so before bmm 1.5.0
+    if (is.data.frame(mean_rt)) mean_rt <- as.matrix(mean_rt)
+    if (is.data.frame(var_rt)) var_rt <- as.matrix(var_rt)
   } else {
     # one mean_rt and one var_rt per observation: a matrix is read element by
     # element and the result is a plain vector, as before bmm 1.5.0
