@@ -164,10 +164,12 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 
 # a result of length n with the attributes (dim, names, a ts or other class)
 # of the first argument of that length that has any, as dnorm() keeps those of
-# x; dsdm() and dsdt_yn() returned them before bmm 1.5.0 (other d*() functions
-# did not), and `out[] <- values` keeps them
+# x, and `out[] <- values` keeps them. dsdm() and dsdt_yn() returned such
+# attributes before bmm 1.5.0 (other d*() functions did not); each caller
+# passes only the arguments whose attributes it returned then. A factor is
+# skipped: its class does not fit a numeric result
 .obs_template <- function(n, ...) {
-  src <- Find(function(a) length(a) == n && !is.null(attributes(a)), list(...))
+  src <- Find(function(a) length(a) == n && !is.null(attributes(a)) && !is.factor(a), list(...))
   out <- numeric(n)
   attributes(out) <- attributes(src)
   out
@@ -312,10 +314,22 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   .check_sdm_args(c, kappa, parametrization)
   .dsdm_numer <- .sdm_numer(parametrization)
 
+  # arithmetic on a data frame x returned a data frame of densities before bmm
+  # 1.5.0, its elements, column by column, paired with the parameters, and
+  # parameters longer than x cut to its size
+  if (is.data.frame(x)) {
+    out <- as.data.frame(x)
+    values <- unlist(out, use.names = FALSE)
+    dens <- dsdm(values, mu, c, kappa, log, parametrization)[seq_along(values)]
+    out[] <- as.data.frame(matrix(dens, nrow(out), ncol(out)))
+    return(out)
+  }
   n <- .obs_length(x, mu, c, kappa)
   if (n == 0L) return(numeric(0))
   out <- .obs_template(n, x, mu, c, kappa)
-  x <- rep_len(x, n)
+  # rep() keeps a factor a factor, so it gives NA with a warning, as before bmm
+  # 1.5.0, rather than the densities of its integer codes
+  x <- rep(x, length.out = n)
   # one normalising integral per distinct parameter set: a long x over a short
   # parameter vector pays for the sets it cycles through, not for every element
   denom <- if (any(lengths(list(mu, c, kappa)) > 1)) {
@@ -2274,7 +2288,9 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
       summaries is one observation. For no observations, pass matrices with zero \\
       rows and 2 columns."
     )
-    pair_or_matrix <- function(x) if (is.matrix(x)) ncol(x) == 2 else length(x) == 2
+    # a data frame with 2 columns is not a pair; refused here, as before bmm
+    # 1.5.0, it does not reach the arithmetic as a list
+    pair_or_matrix <- function(x) if (is.matrix(x)) ncol(x) == 2 else !is.data.frame(x) && length(x) == 2
     stopif(
       !pair_or_matrix(mean_rt) || !pair_or_matrix(var_rt),
       "mean_rt and var_rt must be length 2 (one observation) or matrices with 2 columns"
@@ -3133,9 +3149,10 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   stopif(any(sdratio <= 0), "sdratio must be positive")
   n <- .obs_length(n_old, n_trials, stimulus, d, sdratio, optional = list(criterion, bias))
   if (n == 0L) return(numeric(0))
-  # the counts carry the shape, the parameters do not, and n_trials comes first,
-  # as before bmm 1.5.0
-  shape <- .obs_template(n, n_trials, n_old)
+  # the counts carry the shape, the parameters do not: lchoose(n_trials, n_old)
+  # gave the result those of n_trials, or of n_old when it was longer, before
+  # bmm 1.5.0
+  shape <- .obs_template(n, n_trials, if (length(n_old) > length(n_trials)) n_old)
   n_old <- rep_len(n_old, n)
   n_trials <- rep_len(n_trials, n)
   stopif(any(n_old > n_trials), "n_old must not exceed n_trials")

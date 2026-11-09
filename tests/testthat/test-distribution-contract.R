@@ -546,7 +546,7 @@ test_that("a matrix in a one-number-per-observation argument gives one value per
 
 test_that("dsdm() and dsdt_yn() keep the dim, names and class they returned before bmm 1.5.0", {
   # dsdm() from any argument as long as the result, x first, as dnorm();
-  # dsdt_yn() from the counts only, n_trials first
+  # dsdt_yn() from n_trials, or from n_old when it is longer, as lchoose() did
   x <- matrix(c(0.1, 0.3, -0.5, 0.8), 2, dimnames = list(c("a", "b"), NULL))
   out <- dsdm(x, mu = 0, c = 3, kappa = 3)
   expect_identical(dimnames(out), dimnames(x))
@@ -558,11 +558,36 @@ test_that("dsdm() and dsdt_yn() keep the dim, names and class they returned befo
   expect_null(dim(dsdt_yn(30, 50, 1, matrix(c(1, 2, 3, 4), 2), 0.5)))
   expect_named(dsdt_yn(c(30, 10), c(a = 50, b = 60), 1, 1, 0.5), c("a", "b"))
   expect_named(dsdt_yn(c(x = 30, y = 10), c(a = 50, b = 60), 1, 1, 0.5), c("a", "b"))
-  expect_named(dsdt_yn(c(x = 30, y = 10), c(50, 60), 1, 1, 0.5), c("x", "y"))
+  expect_null(names(dsdt_yn(c(x = 30, y = 10), c(50, 60), 1, 1, 0.5)))
+  expect_null(dim(dsdt_yn(matrix(c(7, 3), 2, 1), c(10, 11), c(1, 0), 1, 0.2)))
+  expect_null(attributes(dsdt_yn(ts(c(7, 3)), c(10, 11), c(1, 0), 1, 0.2)))
   x_ts <- ts(c(0.1, 0.3, -0.5, 0.8), start = 2000)
   expect_identical(tsp(dsdm(x_ts, mu = 0, c = 3, kappa = c(1, 3))), c(2000, 2003, 1))
   expect_s3_class(dsdm(structure(c(0.1, 0.3), class = "foo"), mu = 0, c = 3, kappa = 3), "foo")
   expect_identical(tsp(dsdt_yn(ts(c(30, 10, 20, 5), start = 2000), 50, 1, 1, 0.5)), c(2000, 2003, 1))
+})
+
+test_that("dsdm() returns a data frame of densities for a data-frame x, as before bmm 1.5.0", {
+  # reference values from bmm 1.4 (develop c13dd2c5), where the arithmetic on
+  # the data frame paired its elements, column by column, with the parameters
+  expect_equal(dsdm(data.frame(v = c(0.1, 0.2))), data.frame(v = c(0.6255801, 0.5592532)), tolerance = 1e-6)
+  expect_equal(dsdm(data.frame(v = c(0.1, 0.2)), log = TRUE), data.frame(v = c(-0.4690759, -0.5811530)),
+               tolerance = 1e-6)
+  x <- data.frame(v = c(0.1, 0.2), w = c(0.3, -0.4), row.names = c("r1", "r2"))
+  expect_equal(dsdm(x, kappa = c(2, 5, 7)),
+               data.frame(v = c(0.4205239, 0.6845533), w = c(0.5156991, 0.3339982), row.names = c("r1", "r2")),
+               tolerance = 1e-6)
+  expect_equal(dsdm(x, kappa = c(2, 5, 7, 1.5, 9)),
+               data.frame(v = c(0.4205239, 0.6845533), w = c(0.5156991, 0.3009992), row.names = c("r1", "r2")),
+               tolerance = 1e-6)
+  expect_identical(dsdm(data.frame(v = numeric(0))), data.frame(v = numeric(0)))
+})
+
+test_that("dsdm() gives NA with a warning for a factor x, as before bmm 1.5.0", {
+  expect_warning(out <- dsdm(factor(1)), "not meaningful for factors")
+  expect_identical(out, NA_real_)
+  expect_warning(out <- dsdm(factor(c(1, 2)), kappa = c(a = 2, b = 5)), "not meaningful for factors")
+  expect_identical(out, c(a = NA_real_, b = NA_real_))
 })
 
 test_that("counts given as a data frame read as the matrix of its rows", {
@@ -891,4 +916,7 @@ test_that("dezdm(version = '4par') refuses an empty mean_rt or var_rt vector", {
   }
   expect_error(dezdm(c(0.5, 0.6, 0.7), c(0.02, 0.03), 80, 100, drift = 1, bound = 1, ndt = 0.3, version = "4par"),
                "must be length 2")
+  expect_error(dezdm(data.frame(a = c(0.5, 0.52), b = c(0.6, 0.62)), rbind(c(0.05, 0.06), c(0.05, 0.07)),
+                     c(80, 70), 100, 1, 1, 0.2, version = "4par"),
+               "mean_rt and var_rt must be length 2")
 })
