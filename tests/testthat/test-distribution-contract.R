@@ -552,6 +552,7 @@ test_that("dsdm() and dsdt_yn() keep the dim, names and class they returned befo
   expect_identical(dimnames(out), dimnames(x))
   expect_equal(as.vector(out), dsdm(c(0.1, 0.3, -0.5, 0.8), mu = 0, c = 3, kappa = 3))
   expect_named(dsdm(c(a = 0.1, b = 0.3), mu = 0, c = 3, kappa = c(1, 3)), c("a", "b"))
+  expect_named(dsdm(c(x = 0.1, y = 0.2), mu = c(a = 0, b = 1)), c("x", "y"))
   expect_named(dsdt_yn(c(a = 30, b = 10), 50, c(1, 0), 1, 0.5), c("a", "b"))
   expect_identical(dim(dsdt_yn(matrix(c(30, 10, 20, 5), 2), 50, 1, 1, 0.5)), c(2L, 2L))
   expect_identical(dim(dsdm(0.3, kappa = matrix(c(1, 3, 8, 2), 2))), c(2L, 2L))
@@ -588,6 +589,25 @@ test_that("dsdm() gives NA with a warning for a factor x, as before bmm 1.5.0", 
   expect_identical(out, NA_real_)
   expect_warning(out <- dsdm(factor(c(1, 2)), kappa = c(a = 2, b = 5)), "not meaningful for factors")
   expect_identical(out, c(a = NA_real_, b = NA_real_))
+})
+
+test_that("dsdm() normalises each observation by its own parameter set when sets repeat", {
+  # repeated, non-periodic (mu, kappa) sets; references by quadrature of the
+  # sqrtexp numerator, not by dsdm()
+  expect_equal(dsdm(c(0.1, 0.2, 0.3), mu = c(0, 1), kappa = c(2, 2, 2, 5)),
+               c(0.4205238558571, 0.1980586275388, 0.3700701487885, 0.0909177778413), tolerance = 1e-8)
+})
+
+test_that("dsdt_yn() refuses n_old above n_trials, also after recycling", {
+  expect_error(dsdt_yn(c(5, 15), c(20, 10), 1, d = 1, criterion = 0), "n_old must not exceed n_trials")
+  expect_error(dsdt_yn(15, c(20, 10, 30), 1, d = 1, criterion = 0), "n_old must not exceed n_trials")
+})
+
+test_that("non-multiple lengths recycle without a warning in dsdm(), rsdt_yn() and rddm()", {
+  withr::local_seed(316)
+  expect_no_warning(dsdm(c(0.1, -0.5), mu = c(0, 1, 2), c = 3, kappa = 3))
+  expect_no_warning(rsdt_yn(7, c(10, 20, 30), stimulus = c(1, 0), d = 1, criterion = 0.2))
+  expect_no_warning(rddm(7, drift = 1, bound = 1, ndt = 0.2, zr = c(0.4, 0.6)))
 })
 
 test_that("counts given as a data frame read as the matrix of its rows", {
@@ -902,6 +922,8 @@ test_that("NULL in an optional argument means it is not given", {
                    dezdm(0.5, 0.02, c(80, 70), 100, drift = 1, bound = 1, ndt = 0.3))
   # rsdt_yn() gave NA draws for a NULL d before bmm 1.5.0, as rnorm() does for an empty mean
   expect_warning(draws <- rsdt_yn(3, 10, 1, d = NULL, criterion = 0), "NAs produced")
+  expect_identical(draws, rep(NA_integer_, 3))
+  expect_warning(draws <- rsdt_yn(3, 10, 1, d = 1, criterion = 0, sdratio = NULL), "NAs produced")
   expect_identical(draws, rep(NA_integer_, 3))
 })
 
