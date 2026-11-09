@@ -336,9 +336,9 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
     mu <- rep_len(mu, n)
     c <- rep_len(c, n)
     kappa <- rep_len(kappa, n)
-    # sprintf rather than glue: 17 significant digits round-trip a double, so
-    # two sets share a key only if their values are identical
-    set <- sprintf("%.17g,%.17g,%.17g", mu, c, kappa)
+    # 17 significant digits round-trip a double, so two sets share a key only
+    # if their values are identical
+    set <- paste(format(mu, digits = 17), format(c, digits = 17), format(kappa, digits = 17))
     first <- !duplicated(set)
     .dsdm_integrate_numer_v(.dsdm_numer, mu[first], c[first], kappa[first],
                             lower = mu[first], upper = mu[first] + pi)[match(set, set[first])]
