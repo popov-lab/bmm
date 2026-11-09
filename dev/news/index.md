@@ -231,6 +231,18 @@
   `x`, as in `dimm(0.3, c = c(1, 5, 20))`
   ([\#586](https://github.com/popov-lab/bmm/issues/586)). It returned a
   single density, for the first value.
+- A parameter whose formula has no population-level coefficients (no
+  intercept and no predictor), such as `K ~ 0 + offset(lK)` or
+  `thetat ~ 0`, no longer stops
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and
+  [`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
+  with “The following priors do not correspond to any model parameter”
+  ([\#689](https://github.com/popov-lab/bmm/issues/689)). Such a
+  parameter now gets no default prior on population-level effects, while
+  a group-level term such as `(1 | ID)` keeps its default prior. An
+  offset can now fix a parameter per observation, and
+  [`update()`](https://rdrr.io/r/stats/update.html) with `newdata`
+  holding new offset values reuses the compiled model.
 
 #### Deprecated functions and arguments
 
