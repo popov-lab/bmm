@@ -48,7 +48,10 @@
 #'   matrix with zero rows for none, as an empty vector stops. An empty
 #'   `kcrit` of `dsdt_cdp()` and `rsdt_cdp()` stops as well; `kcrit = NULL`
 #'   gives the R/K model. Counts in a data frame, a tibble included, are read
-#'   as the matrix of its rows.
+#'   as the matrix of its rows, and so are `mean_rt` and `var_rt` of
+#'   `dezdm(version = "4par")`. [dsdm()] with a data frame `x` is the
+#'   exception: it returns a data frame of the same shape, one density per
+#'   cell, and cuts longer parameters to the number of cells.
 #' - A set of values that describes one observation, such as the `thresholds`
 #'   of the rating models, is a vector when every observation shares it and a
 #'   matrix with one row per observation otherwise: row `i` belongs to
@@ -1666,10 +1669,10 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
 #' @inheritSection bmm_distributions Vector arguments
 #' @param rt Vector of response times for which the density should be returned
 #' @param response Vector of responses for which the density should be returned
-#' @param n Number of random samples to generate. Until bmm 1.6.0, `n = 1`
-#'   with parameter vectors still gives one draw per element, and an `n` of
-#'   length above 1 gives `length(n)` draws, each with a deprecation warning;
-#'   pass the number of draws.
+#' @param n Number of random samples to generate. Until bmm 1.6.0 at the
+#'   earliest, `n = 1` with parameter vectors still gives one draw per
+#'   element, and an `n` of length above 1 gives `length(n)` draws, each with
+#'   a deprecation warning; pass the number of draws.
 #' @param drift Drift rates of the ddm
 #' @param bound Boundary separation of the ddm
 #' @param ndt Non-decision time of the ddm
@@ -2294,6 +2297,10 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
   .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
 
   if (version == "4par") {
+    # a data frame is read as the matrix of its rows, as counts are; a
+    # data-frame var_rt beside a matrix mean_rt ran so before bmm 1.5.0
+    if (is.data.frame(mean_rt)) mean_rt <- as.matrix(mean_rt)
+    if (is.data.frame(var_rt)) var_rt <- as.matrix(var_rt)
     empty_vector <- function(x) !is.matrix(x) && length(x) == 0
     stopif(
       empty_vector(mean_rt) || empty_vector(var_rt),
@@ -2312,10 +2319,6 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
     # recycles as one row beside a matrix
     mean_rt <- matrix(mean_rt, ncol = 2)
     var_rt <- matrix(var_rt, ncol = 2)
-    # a data frame is read as the matrix of its rows, as counts are; a
-    # data-frame var_rt beside a matrix mean_rt ran so before bmm 1.5.0
-    if (is.data.frame(mean_rt)) mean_rt <- as.matrix(mean_rt)
-    if (is.data.frame(var_rt)) var_rt <- as.matrix(var_rt)
   } else {
     # one mean_rt and one var_rt per observation: a matrix is read element by
     # element and the result is a plain vector, as before bmm 1.5.0
@@ -4787,7 +4790,9 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #'   a non-finite value for every observation, gives the R/K model; finite
 #'   values for every observation give the R/K/G model. A `kcrit` finite for
 #'   only some observations gives the R/K model for the whole call, with a
-#'   warning.
+#'   warning. The length of `kcrit` sets the number of observations only when
+#'   every element is finite (the R/K/G model): with one row of `counts`,
+#'   `kcrit = c(0.2, 0.3)` gives two values and `kcrit = c(0.2, Inf)` one.
 #' @param sigmar Numeric vector. Log SD of the recollection target
 #'   distribution (0 = SD 1).
 #' @param rho Numeric vector. F-R correlation on the unconstrained scale;

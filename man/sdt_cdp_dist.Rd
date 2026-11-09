@@ -65,7 +65,9 @@ observation.}
 a non-finite value for every observation, gives the R/K model; finite
 values for every observation give the R/K/G model. A \code{kcrit} finite for
 only some observations gives the R/K model for the whole call, with a
-warning.}
+warning. The length of \code{kcrit} sets the number of observations only when
+every element is finite (the R/K/G model): with one row of \code{counts},
+\code{kcrit = c(0.2, 0.3)} gives two values and \code{kcrit = c(0.2, Inf)} one.}
 
 \item{sigmar}{Numeric vector. Log SD of the recollection target
 distribution (0 = SD 1).}
@@ -140,7 +142,10 @@ Where an observation is a vector of counts
 matrix with zero rows for none, as an empty vector stops. An empty
 \code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
 gives the R/K model. Counts in a data frame, a tibble included, are read
-as the matrix of its rows.
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
 \item A set of values that describes one observation, such as the \code{thresholds}
 of the rating models, is a vector when every observation shares it and a
 matrix with one row per observation otherwise: row \code{i} belongs to

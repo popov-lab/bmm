@@ -54,7 +54,10 @@ Where an observation is a vector of counts
 matrix with zero rows for none, as an empty vector stops. An empty
 \code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
 gives the R/K model. Counts in a data frame, a tibble included, are read
-as the matrix of its rows.
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
 \item A set of values that describes one observation, such as the \code{thresholds}
 of the rating models, is a vector when every observation shares it and a
 matrix with one row per observation otherwise: row \code{i} belongs to

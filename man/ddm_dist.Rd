@@ -28,10 +28,10 @@ returned. From bmm 1.6.0 on the default is \code{FALSE}, as in base R
 and the other density functions of bmm. Pass \code{log} to get the same
 result in every version.}
 
-\item{n}{Number of random samples to generate. Until bmm 1.6.0, \code{n = 1}
-with parameter vectors still gives one draw per element, and an \code{n} of
-length above 1 gives \code{length(n)} draws, each with a deprecation warning;
-pass the number of draws.}
+\item{n}{Number of random samples to generate. Until bmm 1.6.0 at the
+earliest, \code{n = 1} with parameter vectors still gives one draw per
+element, and an \code{n} of length above 1 gives \code{length(n)} draws, each with
+a deprecation warning; pass the number of draws.}
 }
 \description{
 Density and random generation function for the Diffusion Decision Model.
@@ -70,7 +70,10 @@ Where an observation is a vector of counts
 matrix with zero rows for none, as an empty vector stops. An empty
 \code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
 gives the R/K model. Counts in a data frame, a tibble included, are read
-as the matrix of its rows.
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
 \item A set of values that describes one observation, such as the \code{thresholds}
 of the rating models, is a vector when every observation shares it and a
 matrix with one row per observation otherwise: row \code{i} belongs to
