@@ -1680,7 +1680,7 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
   # rnorm() does; the other samplers stopped on it
   if (length(n) > 1) {
     warn_deprecated(
-      what = glue("rddm({deparse1(substitute(n))}, ...)"),
+      what = glue("rddm({.call_text(substitute(n), n)}, ...)"),
       with = glue("rddm({length(n)}, ...)"),
       since = "1.5.0",
       details = "`n` is the number of draws, a single number."
@@ -1696,9 +1696,10 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
     # the warning quotes the call with the vector arguments as they were typed
     exprs <- list(drift = substitute(drift), bound = substitute(bound), ndt = substitute(ndt), zr = substitute(zr))
     vectors <- lengths(list(drift, bound, ndt, zr)) > 1
-    args <- paste0(names(exprs)[vectors], " = ", vapply(exprs[vectors], deparse1, character(1)), collapse = ", ")
+    texts <- mapply(.call_text, exprs[vectors], list(drift, bound, ndt, zr)[vectors])
+    args <- paste0(names(exprs)[vectors], " = ", texts, collapse = ", ")
     warn_deprecated(
-      what = glue("rddm({deparse1(substitute(n))}, {args}, ...)"),
+      what = glue("rddm({.call_text(substitute(n), n)}, {args}, ...)"),
       with = glue("rddm({max_len}, {args}, ...)"),
       since = "1.5.0",
       details = "`n` is the number of draws; the parameters are recycled to it."
@@ -1717,6 +1718,14 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
   )
   sim_data$response <- ifelse(sim_data$response == "upper", 1, 0)
   sim_data
+}
+
+# an argument as typed, for a deprecation warning: a value passed literally,
+# as do.call() passes it, is shown by its length, since its deparse can run to
+# thousands of characters and warning.length would cut the suggestion off
+.call_text <- function(expr, value) {
+  text <- gsub("\\s+", " ", deparse1(expr))
+  if (nchar(text) > 60) glue("<{length(value)} values>") else text
 }
 
 #' @title Distribution functions for the censored shifted Wald model (`cswald`)

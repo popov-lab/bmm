@@ -169,6 +169,20 @@ test_that("rddm(1, <vectors>) keeps one draw per element until 1.6.0, with a war
   expect_no_warning(expect_equal(nrow(rddm(1, drift = 1, bound = 1, ndt = 0.2)), 1))
 })
 
+test_that("the rddm() deprecation warning shows a long literal argument by its length", {
+  # do.call() passes values, not the code that made them; deparsed whole, 2000
+  # drifts outran warning.length and cut off the suggested call (100 here keep
+  # the test fast)
+  withr::local_seed(4443)
+  expect_warning(do.call(rddm, list(n = 1, drift = seq(0.1, 3, length.out = 100), bound = 1, ndt = 0.2)),
+                 "Use `rddm(100, drift = <100 values>, ...)` instead", fixed = TRUE)
+  expect_warning(do.call(rddm, list(n = seq(0.1, 1, length.out = 50), drift = 1, bound = 1, ndt = 0.2)),
+                 "`rddm(<50 values>, ...)` is deprecated since bmm 1.5.0", fixed = TRUE)
+  expect_warning(rddm(1, drift = sapply(1:2, function(i) {
+    i
+  }), bound = 1, ndt = 0.2), "rddm(1, drift = sapply(1:2, function(i) { i }), ...)", fixed = TRUE)
+})
+
 # --- cswald (tests only while #406 is open; multiples of each other) ----------
 
 test_that("dcswald() recycles the observations and the parameters to the longest argument", {
