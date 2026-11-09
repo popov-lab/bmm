@@ -4669,8 +4669,7 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 
 
 # kcrit switches the Know/Guess split, and with it the number of response
-# categories, for the whole call. A kcrit finite for some observations only
-# gave R/K without a word before bmm 1.5.0; it still does, with a warning
+# categories, for the whole call
 .cdp_has_guess <- function(kcrit) {
   if (is.null(kcrit)) {
     return(FALSE)
@@ -4680,15 +4679,20 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
     "kcrit is empty. Pass kcrit = NULL for the R/K model, or one value per \\
     observation (or one for all) for the R/K/G model."
   )
-  finite <- is.finite(kcrit)
-  if (any(finite) && !all(finite)) {
+  all(is.finite(kcrit))
+}
+
+# A kcrit finite for some observations only gave R/K without a word before bmm
+# 1.5.0; it still does, with a warning. Only an observation that asks for the
+# split counts: elements past the n observations are read by none of them
+.warn_cdp_kcrit_mixed <- function(kcrit, n) {
+  if (!is.null(kcrit) && !.cdp_has_guess(kcrit) && any(is.finite(rep_len(kcrit, n)))) {
     warning2(
       "kcrit is finite for only some observations, so the Know/Guess split is \\
       off for the whole call and the counts are R/K. Pass a finite kcrit for \\
       every observation for R/K/G, or kcrit = NULL for R/K."
     )
   }
-  all(finite)
 }
 
 
@@ -4785,6 +4789,7 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
+  .warn_cdp_kcrit_mixed(kcrit, n)
 
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),
                                          rep_len(drec, n),
@@ -4826,6 +4831,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   if (n == 0) {
     return(counts)
   }
+  .warn_cdp_kcrit_mixed(kcrit, n)
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),

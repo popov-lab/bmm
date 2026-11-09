@@ -830,7 +830,8 @@ test_that("a kcrit finite for some observations only gives R/K, with one warning
   }
   rk_draws <- withr::with_seed(7, rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, n_new = 1))
   rk_dens <- dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, n_new = 1)
-  for (kcrit in list(c(0, NA), c(0, Inf), c(-Inf, 0.2))) {
+  # the single observation of the dsdt_cdp() calls reads kcrit[1], finite here
+  for (kcrit in list(c(0, NA), c(0, Inf), c(0.2, -Inf))) {
     r <- count_warnings(withr::with_seed(7, rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1)))
     expect_identical(r$value, rk_draws, info = format(kcrit))
     expect_equal(r$n, 1, info = format(kcrit))
@@ -839,6 +840,11 @@ test_that("a kcrit finite for some observations only gives R/K, with one warning
     expect_identical(d$value, rk_dens, info = format(kcrit))
     expect_equal(d$n, 1, info = format(kcrit))
   }
+  # the one observation reads only kcrit[1]; the finite kcrit[2] asks for nothing
+  r <- count_warnings(withr::with_seed(7, rsdt_cdp(1, 10, 1, 0.8, 1, thr, 0.7, kcrit = c(NA, 0.3), n_new = 1)))
+  expect_identical(r, list(value = rk_draws[1, , drop = FALSE], n = 0))
+  d <- count_warnings(dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, kcrit = c(NA, 0.3), n_new = 1))
+  expect_identical(d, list(value = rk_dens, n = 0))
   expect_error(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
   expect_error(dsdt_cdp(rkg, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
   expect_equal(ncol(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1)), length(rkg))
