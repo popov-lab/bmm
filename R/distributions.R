@@ -226,7 +226,11 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @name SDMdist
 #' @inheritSection bmm_distributions Vector arguments
 #'
-#' @param x Vector of quantiles
+#' @param x Vector of quantiles, or a data frame of them. For a data frame,
+#'   `dsdm()` returns a data frame of the same shape with one density per
+#'   cell, its cells taken column by column; parameters longer than the
+#'   number of cells are cut to it, and an empty parameter gives the data
+#'   frame with no rows.
 #' @param q Vector of quantiles
 #' @param p Vector of probabilities
 #' @param n Number of observations to sample
@@ -320,8 +324,10 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   if (is.data.frame(x)) {
     out <- as.data.frame(x)
     values <- unlist(out, use.names = FALSE)
-    dens <- dsdm(values, mu, c, kappa, log, parametrization)[seq_along(values)]
-    out[] <- as.data.frame(matrix(dens, nrow(out), ncol(out)))
+    dens <- dsdm(values, mu, c, kappa, log, parametrization)
+    # an empty parameter gives no values, as for an empty x: the frame with no rows
+    if (length(dens) < length(values)) return(out[0, , drop = FALSE])
+    out[] <- as.data.frame(matrix(dens[seq_along(values)], nrow(out), ncol(out)))
     return(out)
   }
   n <- .obs_length(x, mu, c, kappa)

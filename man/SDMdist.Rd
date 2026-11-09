@@ -35,7 +35,11 @@ qsdm(
 rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 }
 \arguments{
-\item{x}{Vector of quantiles}
+\item{x}{Vector of quantiles, or a data frame of them. For a data frame,
+\code{dsdm()} returns a data frame of the same shape with one density per
+cell, its cells taken column by column; parameters longer than the
+number of cells are cut to it, and an empty parameter gives the data
+frame with no rows.}
 
 \item{mu}{Vector of location values in radians}
 
