@@ -847,3 +847,28 @@ test_that("a new fit without a stored user prior updates as a fit saved before (
     source = c("user", "user", "user")
   ))
 })
+
+test_that("stanvars given to update() keep the model's own stanvars (#688)", {
+  skip_on_cran() # mock bmm() plus mock update(), as above (ADR 0004, R10)
+  skip_if_not_installed("rstan")
+  withr::local_seed(445)
+  stub <- methods::new("stanfit", sim = list(
+    iter = 10L, warmup = 5L, chains = 1L, thin = 1L,
+    samples = list(structure(list(), args = list(control = list())))
+  ))
+  fit <- suppressMessages(bmm(bmf(c ~ 1, kappa ~ 1), data.frame(y = rsdm(60, kappa = 5)), sdm("y"),
+    backend = "mock", mock_fit = stub, rename = FALSE
+  ))
+  sv <- brms::stanvar(scode = "real one() { return 1; }", block = "functions")
+  new_fit <- suppressMessages(update(fit, stanvars = sv,
+    backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE
+  ))
+  expect_identical(names(new_fit$stanvars), names(fit$stanvars + sv))
+  expect_match(brms::stancode(new_fit), "real one() { return 1; }", fixed = TRUE)
+
+  null_fit <- suppressMessages(update(fit, stanvars = NULL,
+    backend = "mock", mock_fit = stub, rename = FALSE, recompile = TRUE
+  ))
+  expect_identical(names(null_fit$stanvars), names(fit$stanvars))
+  expect_true("sdm_run_count" %in% names(brms::standata(null_fit)))
+})
