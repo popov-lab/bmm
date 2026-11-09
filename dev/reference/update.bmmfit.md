@@ -68,7 +68,10 @@ update(
 - ...:
 
   Further arguments passed to
-  [`brms::update.brmsfit()`](https://paulbuerkner.com/brms/reference/update.brmsfit.html)
+  [`brms::update.brmsfit()`](https://paulbuerkner.com/brms/reference/update.brmsfit.html).
+  `stanvars` are added to the ones the model sets up. The `stanvars` you
+  gave the original fit are not carried over, so pass them again, as in
+  `update(fit, newdata = d, stanvars = sv)`.
 
 ## Value
 

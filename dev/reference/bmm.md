@@ -152,7 +152,8 @@ fit_model(
   more details. Unless `control` names a `step_size` (`stepsize` for the
   rstan backend), bmm adds the starting step size set in
   [`bmm_options()`](https://venpopov.com/bmm/dev/reference/bmm_options.md)
-  to it; the other entries of `control` are kept.
+  to it; the other entries of `control` are kept. `stanvars` are added
+  to the ones the model sets up, so pass only your own.
 
 ## Value
 

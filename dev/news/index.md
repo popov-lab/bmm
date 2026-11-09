@@ -231,6 +231,22 @@
   `x`, as in `dimm(0.3, c = c(1, 5, 20))`
   ([\#586](https://github.com/popov-lab/bmm/issues/586)). It returned a
   single density, for the first value.
+- `stanvars` passed to
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md),
+  [`update()`](https://rdrr.io/r/stats/update.html),
+  [`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md),
+  [`standata()`](https://venpopov.com/bmm/dev/reference/standata.bmmformula.md)
+  or
+  [`default_prior()`](https://venpopov.com/bmm/dev/reference/default_prior.bmmformula.md)
+  are now added to the Stan code and data the model sets up instead of
+  replacing them ([\#688](https://github.com/popov-lab/bmm/issues/688)).
+  Before, any stanvar of your own, a data one included, could make the
+  Stan program fail to compile with errors like
+  `Identifier "circmix_logk" not in scope`. A stanvar that repeats one
+  of the model’s now stops with a message: pass only your own stanvars,
+  not `fit$stanvars`, and rename any that share a name.
+  [`update()`](https://rdrr.io/r/stats/update.html) does not carry over
+  the stanvars of the original fit; pass them again.
 - A parameter whose formula has no population-level coefficients (no
   intercept and no predictor), such as `K ~ 0 + offset(lK)` or
   `thetat ~ 0`, no longer stops

@@ -107,7 +107,10 @@ model object.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Further arguments passed to <code><a href="https://paulbuerkner.com/brms/reference/update.brmsfit.html" class="external-link">brms::update.brmsfit()</a></code></p></dd>
+<dd><p>Further arguments passed to <code><a href="https://paulbuerkner.com/brms/reference/update.brmsfit.html" class="external-link">brms::update.brmsfit()</a></code>.
+<code>stanvars</code> are added to the ones the model sets up. The <code>stanvars</code> you
+gave the original fit are not carried over, so pass them again, as in
+<code>update(fit, newdata = d, stanvars = sv)</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
