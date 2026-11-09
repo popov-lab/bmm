@@ -224,10 +224,13 @@ follows only the rule for `n`. A new distribution follows it from the start:
    its length (`rddm()` still takes it, with a deprecation warning). Each
    per-observation argument is recycled to `n` with `rep_len()`, as `rnorm()`
    does, also when `n` is not a multiple of its length; draw `i` uses element
-   (row) `i`.
-2. `d*(x, ...)` returns as many values as the longest of `x` (its rows) and
-   the per-observation arguments; value `i` equals the call on the `i`-th
-   elements alone. An empty `x` or an empty per-observation argument gives an
+   `i`. A matrix is read element by element, as `rnorm()` reads it; only
+   counts, thresholds and the `mean_rt` and `var_rt` pairs of
+   `dezdm(version = "4par")` hold one observation per row, so draw or value
+   `i` uses their row `i`.
+2. `d*(x, ...)` returns as many values as the longest of `x` (its rows, for
+   counts) and the per-observation arguments; value `i` equals the call on
+   the `i`-th elements (or rows) alone. An empty `x` or an empty per-observation argument gives an
    empty result, as in `dnorm()`; where an observation is a vector of counts
    (or a `mean_rt` or `var_rt` pair of `dezdm(version = "4par")`), a vector
    is one observation, an empty vector stops and a 0-row matrix gives the
