@@ -1739,7 +1739,8 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
   # it is read as rnorm() reads it, one draw
   if (n == 1 && max_len > 1) {
     # the warning quotes the call with the vector arguments as they were typed
-    exprs <- list(drift = substitute(drift), bound = substitute(bound), ndt = substitute(ndt), zr = substitute(zr))
+    exprs <- list(drift = substitute(drift), bound = substitute(bound),
+                  ndt = substitute(ndt), zr = substitute(zr))
     vectors <- lengths(list(drift, bound, ndt, zr)) > 1
     texts <- mapply(.call_text, exprs[vectors], list(drift, bound, ndt, zr)[vectors])
     args <- paste0(names(exprs)[vectors], " = ", texts, collapse = ", ")
@@ -4740,8 +4741,8 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 # A kcrit finite for some observations only gave R/K without a word before bmm
 # 1.5.0; it still does, with a warning. Only an observation that asks for the
 # split counts: elements past the n observations are read by none of them
-.warn_cdp_kcrit_mixed <- function(kcrit, n) {
-  if (!is.null(kcrit) && !.cdp_has_guess(kcrit) && any(is.finite(rep_len(kcrit, n)))) {
+.warn_cdp_kcrit_mixed <- function(kcrit, has_guess, n) {
+  if (!is.null(kcrit) && !has_guess && any(is.finite(rep_len(kcrit, n)))) {
     warning2(
       "kcrit is finite for only some observations, so the Know/Guess split is \\
       off for the whole call and the counts are R/K. Pass a finite kcrit for \\
@@ -4844,7 +4845,7 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
-  .warn_cdp_kcrit_mixed(kcrit, n)
+  .warn_cdp_kcrit_mixed(kcrit, has_guess, n)
 
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),
                                          rep_len(drec, n),
@@ -4882,11 +4883,12 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   K_full <- ncol(thr) + 1L
   if (is.null(n_new)) n_new <- K_full %/% 2L
   n_old <- K_full - n_new
-  counts <- .count_matrix(n, .sdt_cdp_response_cols(n_new, n_old, .cdp_has_guess(kcrit)))
+  has_guess <- .cdp_has_guess(kcrit)
+  counts <- .count_matrix(n, .sdt_cdp_response_cols(n_new, n_old, has_guess))
   if (n == 0) {
     return(counts)
   }
-  .warn_cdp_kcrit_mixed(kcrit, n)
+  .warn_cdp_kcrit_mixed(kcrit, has_guess, n)
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),
