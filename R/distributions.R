@@ -327,9 +327,7 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   n <- .obs_length(x, mu, c, kappa)
   if (n == 0L) return(numeric(0))
   out <- .obs_template(n, x, mu, c, kappa)
-  # rep() keeps a factor a factor, so it gives NA with a warning, as before bmm
-  # 1.5.0, rather than the densities of its integer codes
-  x <- rep(x, length.out = n)
+  x <- rep_len(x, n)
   # one normalising integral per distinct parameter set: a long x over a short
   # parameter vector pays for the sets it cycles through, not for every element
   denom <- if (any(lengths(list(mu, c, kappa)) > 1)) {
