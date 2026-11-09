@@ -761,10 +761,12 @@ test_that("the samplers read n as rnorm() does", {
     empty <- if (is.null(dim(two))) two[0] else two[0, , drop = FALSE]
     expect_identical(f(0), empty, info = name)
     tried <- if (name == "rddm") Filter(function(b) length(b) <= 1, bad) else bad
+    # a warning before the refusal, such as a coercion warning for "a", shows
+    # up as a refusal that differs from the expected message
     refusals <- vapply(tried, function(b) tryCatch({
       f(b)
       "no error"
-    }, error = conditionMessage), character(1))
+    }, warning = function(w) paste("warning:", conditionMessage(w)), error = conditionMessage), character(1))
     expect_identical(refusals, setNames(rep("n, the number of draws, must be a single number >= 0.", length(tried)),
                                         names(tried)), info = name)
   }
