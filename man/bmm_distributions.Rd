@@ -39,7 +39,9 @@ which takes the length of a vector \code{n}, these functions stop on one;
 \item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
 \code{x} (its rows, when the observations are rows of counts) and the
 per-observation arguments, the others recycled to that length. Value \code{i}
-is what the call on the \code{i}-th elements alone returns. When \code{x} or any
+is what the call on the \code{i}-th elements alone returns. A matrix in an
+argument that takes one number per observation, such as \code{x} or \code{d}, holds
+one observation per element, as in \code{\link[stats:dnorm]{stats::dnorm()}}. When \code{x} or any
 per-observation argument is empty, the result is empty, as in
 \code{\link[stats:dnorm]{stats::dnorm()}}. Where an observation is a vector of counts
 (\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()}, \code{dsdt_ranking()} and

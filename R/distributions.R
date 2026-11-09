@@ -33,7 +33,9 @@
 #' - `d*(x, ...)` returns one value per observation: as many as the longest of
 #'   `x` (its rows, when the observations are rows of counts) and the
 #'   per-observation arguments, the others recycled to that length. Value `i`
-#'   is what the call on the `i`-th elements alone returns. When `x` or any
+#'   is what the call on the `i`-th elements alone returns. A matrix in an
+#'   argument that takes one number per observation, such as `x` or `d`, holds
+#'   one observation per element, as in [stats::dnorm()]. When `x` or any
 #'   per-observation argument is empty, the result is empty, as in
 #'   [stats::dnorm()]. Where an observation is a vector of counts
 #'   (`dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`, `dsdt_ranking()` and
@@ -137,14 +139,26 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 .recycle_draws <- function(x, n) if (length(x) == 1) x else rep_len(x, n)
 
 # The common length of a d*() call's per-observation arguments (contract in
-# ?bmm_distributions): the longest, counting a matrix by its rows, or 0 when
-# one of them is empty, as in dnorm(); an absent optional argument (NULL) does
-# not count. .recycle_obs() then gives observation i element i of a vector
-# and row i of a matrix.
-.obs_length <- function(...) {
-  args <- Filter(Negate(is.null), list(...))
-  lens <- vapply(args, function(a) if (is.matrix(a)) nrow(a) else length(a), integer(1))
+# ?bmm_distributions): the longest, or 0 when one of them is empty, as in
+# dnorm(); an absent optional argument (NULL) does not count. An argument in
+# `...` holds one number per observation, so a matrix there counts every
+# element, as dnorm() reads it; only the arguments whose observation is a row
+# (counts, thresholds, the dezdm() 4par pairs) go in `rows` and count rows.
+# .recycle_obs() then gives observation i row i of those.
+.obs_length <- function(..., rows = list()) {
+  lens <- c(lengths(Filter(Negate(is.null), list(...))), vapply(rows, NROW, integer(1)))
   if (any(lens == 0L)) 0L else max(lens)
+}
+
+# a result of length n with the dim, dimnames and names of the first argument
+# of that length, the attributes dnorm() keeps; dsdm() and dsdt_yn() returned
+# them before bmm 1.5.0 (other d*() functions did not), and
+# `out[] <- values` keeps them
+.obs_template <- function(n, ...) {
+  src <- Find(function(a) length(a) == n, list(...))
+  out <- numeric(n)
+  attributes(out) <- attributes(src)[intersect(names(attributes(src)), c("dim", "dimnames", "names"))]
+  out
 }
 
 .recycle_obs <- function(x, n) {
@@ -281,6 +295,7 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
 
   n <- .obs_length(x, mu, c, kappa)
   if (n == 0L) return(numeric(0))
+  out <- .obs_template(n, x, mu, c, kappa)
   x <- rep_len(x, n)
   # one normalising integral per distinct parameter set: a long x over a short
   # parameter vector pays for the sets it cycles through, not for every element
@@ -301,10 +316,8 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
 
   denom <- 2 * denom
 
-  if (!log) {
-    return(exp(lnumerator) / denom)
-  }
-  lnumerator - log(denom)
+  out[] <- if (log) lnumerator - log(denom) else exp(lnumerator) / denom
+  out
 }
 
 #' @rdname SDMdist
@@ -2250,8 +2263,8 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
 
   # zr is not a parameter of version "3par", so it does not set the length there
   n <- .obs_length(
-    mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, s,
-    if (version == "4par") zr
+    n_upper, n_trials, drift, bound, ndt, s, if (version == "4par") zr,
+    rows = list(mean_rt, var_rt)
   )
   if (n == 0L) {
     return(numeric(0))
@@ -3090,6 +3103,8 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   stopif(any(sdratio <= 0), "sdratio must be positive")
   n <- .obs_length(n_old, n_trials, stimulus, d, criterion, bias, sdratio)
   if (n == 0L) return(numeric(0))
+  # the counts carry the shape, the parameters do not, as before bmm 1.5.0
+  shape <- .obs_template(n, n_old, n_trials)
   n_old <- rep_len(n_old, n)
   n_trials <- rep_len(n_trials, n)
   stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
@@ -3107,7 +3122,8 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   out <- lchoose(n_trials, n_old) +
     times_nonzero(n_old, .sdt_log_p_old(eta, dist)) +
     times_nonzero(n_trials - n_old, .sdt_log_p_new(eta, dist))
-  if (log) out else exp(out)
+  shape[] <- if (log) out else exp(out)
+  shape
 }
 
 
@@ -3388,7 +3404,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
   stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
 
-  n <- .obs_length(counts, thr, stimulus, d, sdratio, Ro, Rn)
+  n <- .obs_length(stimulus, d, sdratio, Ro, Rn, rows = list(counts, thr))
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
@@ -3501,7 +3517,7 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- .obs_length(counts, thr, stimulus, d, metad, sdratio)
+  n <- .obs_length(stimulus, d, metad, sdratio, rows = list(counts, thr))
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
@@ -3902,7 +3918,7 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
   counts <- .counts_rows(counts)
-  n <- .obs_length(counts, m, d, sdratio)
+  n <- .obs_length(m, d, sdratio, rows = list(counts))
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stopif(anyNA(m), "m must not contain NA")
@@ -4287,7 +4303,7 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- .obs_length(counts, thr, stimulus, d, sdratio)
+  n <- .obs_length(stimulus, d, sdratio, rows = list(counts, thr))
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
@@ -4749,7 +4765,8 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
   stopif(any(counts < 0), "counts must be non-negative")
 
   # a kcrit that leaves the Know/Guess split off is not read
-  n <- .obs_length(counts, thr, stimulus, dfam, drec, sigmar, rho, rcrit, if (has_guess) kcrit)
+  n <- .obs_length(stimulus, dfam, drec, sigmar, rho, rcrit, if (has_guess) kcrit,
+                   rows = list(counts, thr))
   if (n == 0L) return(numeric(0))
   counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)

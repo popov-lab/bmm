@@ -438,6 +438,65 @@ test_that("each per-observation argument alone sets the length of a d*() result"
   expect_equal(unlist(vec) / unlist(each), rep(1, 3 * 69), ignore_attr = TRUE)
 })
 
+test_that("a matrix in a one-number-per-observation argument gives one value per element", {
+  # only counts, thresholds and the dezdm() 4par pairs are read by rows; any
+  # other matrix holds one observation per element, in column-major order, as
+  # in dnorm() and as before bmm 1.5.0
+  thr <- c(0.2, 0.7, 1.2)
+  thr5 <- c(-1.1, -0.5, 0, 0.6, 1.3)
+  case <- function(f, base, arg, value, fixed = list()) {
+    list(f = f, base = base, arg = arg, value = value, fixed = fixed)
+  }
+  cases <- list(
+    case(dsdm, list(x = 0.3, mu = 0, c = 3, kappa = 3), "x", matrix(c(0.1, 0.3, -0.5, 0.8), 2)),
+    case(dsdm, list(x = 0.3, mu = 0, c = 3, kappa = 3), "kappa", matrix(c(1, 3, 8, 2), 2)),
+    case(dddm, list(rt = 0.6, response = 1, drift = 1, bound = 1, ndt = 0.2), "rt",
+         matrix(c(0.5, 0.6, 0.8, 0.7), 2)),
+    case(dddm, list(rt = 0.6, response = 1, drift = 1, bound = 1, ndt = 0.2), "drift",
+         matrix(c(0.5, 1, 2, 1.5), 2)),
+    case(dezdm, list(mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100, drift = 2, bound = 1.5,
+                     ndt = 0.3), "drift", matrix(c(1.5, 2, 2.5, 1.8), 2)),
+    case(dezdm, list(mean_rt = c(0.45, 0.55), var_rt = c(0.02, 0.03), n_upper = 80, n_trials = 100,
+                     drift = 1, bound = 1.5, ndt = 0.3), "drift", matrix(c(0.5, 1, 1.5, 0.8), 2),
+         list(version = "4par")),
+    case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, criterion = 0.5), "n_old",
+         matrix(c(40, 50, 60, 45), 2)),
+    case(dsdt_yn, list(n_old = 50, n_trials = 100, stimulus = 1, d = 1, criterion = 0.5), "d",
+         matrix(c(0.5, 1, 1.5, 0.8), 2)),
+    case(dsdt_mafc, list(n_correct = 50, n_trials = 100, m = 3, d = 1), "d", matrix(c(0.5, 1, 1.5, 0.8), 2)),
+    case(dsdt_rating, list(counts = c(2, 8, 20, 70), stimulus = 1, d = 1, thresholds = thr), "d",
+         matrix(c(0.5, 1, 1.5, 0.8), 2), list(log = TRUE)),
+    case(dsdt_ranking, list(counts = c(30, 40, 20, 10), m = 4, d = 1), "d",
+         matrix(c(0.5, 1, 1.5, 0.8), 2), list(dist = "normal", log = TRUE)),
+    case(dsdt_cdp, list(counts = c(10, 20, 30, 10, 15, 5, 5, 3, 2), stimulus = 1, dfam = 0.8, drec = 1,
+                        thresholds = thr5, rcrit = 0.5), "dfam", matrix(c(0.6, 0.8, 1, 0.7), 2),
+         list(n_new = 3, log = TRUE))
+  )
+  vec <- each <- list()
+  for (i in seq_along(cases)) {
+    cs <- cases[[i]]
+    vec[[i]] <- as.vector(do.call(cs$f, c(replace(cs$base, cs$arg, list(cs$value)), cs$fixed)))
+    each[[i]] <- vapply(cs$value, function(v) do.call(cs$f, c(replace(cs$base, cs$arg, v), cs$fixed)), 0)
+  }
+  expect_identical(lengths(vec), rep(4L, 12))
+  expect(all(is.finite(unlist(each)) & unlist(each) != 0), "a reference value is zero or not finite")
+  expect_equal(unlist(vec) / unlist(each), rep(1, 4 * 12))
+})
+
+test_that("dsdm() and dsdt_yn() keep the dim and names they returned before bmm 1.5.0", {
+  # dsdm() from any argument as long as the result, as dnorm(); dsdt_yn() from
+  # the counts only
+  x <- matrix(c(0.1, 0.3, -0.5, 0.8), 2, dimnames = list(c("a", "b"), NULL))
+  out <- dsdm(x, mu = 0, c = 3, kappa = 3)
+  expect_identical(dimnames(out), dimnames(x))
+  expect_equal(as.vector(out), dsdm(c(0.1, 0.3, -0.5, 0.8), mu = 0, c = 3, kappa = 3))
+  expect_named(dsdm(c(a = 0.1, b = 0.3), mu = 0, c = 3, kappa = c(1, 3)), c("a", "b"))
+  expect_named(dsdt_yn(c(a = 30, b = 10), 50, c(1, 0), 1, 0.5), c("a", "b"))
+  expect_identical(dim(dsdt_yn(matrix(c(30, 10, 20, 5), 2), 50, 1, 1, 0.5)), c(2L, 2L))
+  expect_identical(dim(dsdm(0.3, kappa = matrix(c(1, 3, 8, 2), 2))), c(2L, 2L))
+  expect_null(dim(dsdt_yn(30, 50, 1, matrix(c(1, 2, 3, 4), 2), 0.5)))
+})
+
 test_that("counts given as a data frame read as the matrix of its rows", {
   counts <- rbind(c(50, 30, 15, 5), c(20, 30, 30, 20), c(40, 40, 10, 10))
   thr <- c(0.2, 0.7, 1.2)
