@@ -43,7 +43,8 @@
 #'   `dezdm(version = "4par")`, a vector is always one observation: pass a
 #'   matrix with zero rows for none, as an empty vector stops. An empty
 #'   `kcrit` of `dsdt_cdp()` and `rsdt_cdp()` stops as well; `kcrit = NULL`
-#'   gives the R/K model.
+#'   gives the R/K model. Counts in a data frame, a tibble included, are read
+#'   as the matrix of its rows.
 #' - A set of values that describes one observation, such as the `thresholds`
 #'   of the rating models, is a vector when every observation shares it and a
 #'   matrix with one row per observation otherwise: row `i` belongs to
@@ -3875,7 +3876,8 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'
 #' @param counts Integer matrix with one row per observation and one rank-count
 #'   column per rank position (1 = most likely target), or a vector for a
-#'   single observation. Columns beyond a row's set size `m` must be 0.
+#'   single observation. A data frame is read as the matrix of its rows.
+#'   Columns beyond a row's set size `m` must be 0.
 #' @param d Numeric vector. Sensitivity: the distance between the target and
 #'   lure distributions. It is \eqn{d'} when `sdratio` is 1 and, for
 #'   `dist = "gumbel_min"`, the \eqn{g'} of Meyer-Grant et al. (2026). With
@@ -4255,7 +4257,8 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 #'
 #' @param counts Integer matrix with one row per observation and one column
 #'   per rating category, ordered from "definitely noise" (1) to "definitely
-#'   signal" (K), or a vector for a single observation.
+#'   signal" (K), or a vector for a single observation. A data frame is read
+#'   as the matrix of its rows.
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
 #' @param d Numeric vector. Sensitivity: \eqn{d'} when `sdratio` is 1, and
 #'   otherwise the balanced index \eqn{d_a} (see [sdt_yn()]). The separation
@@ -4704,8 +4707,9 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #' @param counts Integer matrix with one row per observation and one column per
 #'   response category in the canonical order `new`, `[guess]`, `know`,
 #'   `remember` (each block ordered by confidence; see [sdt_cdp()]), or a
-#'   vector for a single observation. `n_new + 2 * n_old` columns (R/K) or
-#'   `n_new + 3 * n_old` (R/K/G).
+#'   vector for a single observation. A data frame is read as the matrix of
+#'   its rows. `n_new + 2 * n_old` columns (R/K) or `n_new + 3 * n_old`
+#'   (R/K/G).
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = new/lure,
 #'   1 = old/target.
 #' @param dfam,drec Numeric vectors. Familiarity and recollection

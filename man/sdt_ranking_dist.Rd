@@ -20,7 +20,8 @@ rsdt_ranking(n, n_trials, m, d, sdratio = 1, dist = c("gumbel_min", "normal"))
 \arguments{
 \item{counts}{Integer matrix with one row per observation and one rank-count
 column per rank position (1 = most likely target), or a vector for a
-single observation. Columns beyond a row's set size \code{m} must be 0.}
+single observation. A data frame is read as the matrix of its rows.
+Columns beyond a row's set size \code{m} must be 0.}
 
 \item{m}{Integer vector. Number of ranked items per observation. Must be
 at least 2 and no larger than the number of count columns.}
@@ -101,7 +102,8 @@ per-observation argument is empty, the result is empty, as in
 \code{dezdm(version = "4par")}, a vector is always one observation: pass a
 matrix with zero rows for none, as an empty vector stops. An empty
 \code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
-gives the R/K model.
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows.
 \item A set of values that describes one observation, such as the \code{thresholds}
 of the rating models, is a vector when every observation shares it and a
 matrix with one row per observation otherwise: row \code{i} belongs to

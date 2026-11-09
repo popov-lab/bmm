@@ -33,7 +33,8 @@ rsdt_dpsdt(
 \arguments{
 \item{counts}{Integer matrix with one row per observation and one column
 per rating category, ordered from "definitely noise" (1) to "definitely
-signal" (K), or a vector for a single observation.}
+signal" (K), or a vector for a single observation. A data frame is read
+as the matrix of its rows.}
 
 \item{stimulus}{Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.}
 
@@ -113,7 +114,8 @@ per-observation argument is empty, the result is empty, as in
 \code{dezdm(version = "4par")}, a vector is always one observation: pass a
 matrix with zero rows for none, as an empty vector stops. An empty
 \code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
-gives the R/K model.
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows.
 \item A set of values that describes one observation, such as the \code{thresholds}
 of the rating models, is a vector when every observation shares it and a
 matrix with one row per observation otherwise: row \code{i} belongs to
