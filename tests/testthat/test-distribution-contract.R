@@ -554,6 +554,7 @@ test_that("dsdm() and dsdt_yn() keep the dim, names and class they returned befo
   expect_equal(as.vector(out), dsdm(c(0.1, 0.3, -0.5, 0.8), mu = 0, c = 3, kappa = 3))
   expect_named(dsdm(c(a = 0.1, b = 0.3), mu = 0, c = 3, kappa = c(1, 3)), c("a", "b"))
   expect_named(dsdm(c(x = 0.1, y = 0.2), mu = c(a = 0, b = 1)), c("x", "y"))
+  expect_named(dsdm(c(0.1, 0.2), mu = c(a = 0, b = 1), c = 2, kappa = 3), c("a", "b"))
   expect_null(names(dsdm(c(0.1, 0.2), mu = c(a = 0), kappa = c(1, 2))))
   expect_named(dsdt_yn(c(a = 30, b = 10), 50, c(1, 0), 1, 0.5), c("a", "b"))
   expect_identical(dim(dsdt_yn(matrix(c(30, 10, 20, 5), 2), 50, 1, 1, 0.5)), c(2L, 2L))
@@ -580,7 +581,9 @@ test_that("dsdm() returns a data frame of densities for a data-frame x, as befor
   expect_equal(dsdm(x, kappa = c(2, 5, 7)),
                data.frame(v = c(0.4205239, 0.6845533), w = c(0.5156991, 0.3339982), row.names = c("r1", "r2")),
                tolerance = 1e-6)
-  expect_equal(dsdm(x, kappa = c(2, 5, 7, 1.5, 9)),
+  # the parameter longer than the cells is cut without a warning
+  expect_no_warning(out <- dsdm(x, kappa = c(2, 5, 7, 1.5, 9)))
+  expect_equal(out,
                data.frame(v = c(0.4205239, 0.6845533), w = c(0.5156991, 0.3009992), row.names = c("r1", "r2")),
                tolerance = 1e-6)
   expect_identical(dsdm(data.frame(v = numeric(0))), data.frame(v = numeric(0)))
