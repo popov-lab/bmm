@@ -599,6 +599,16 @@ test_that("dsdm() gives NA with a warning for a factor x, as before bmm 1.5.0", 
   expect_identical(out, c(a = NA_real_, b = NA_real_))
 })
 
+test_that("dsdm() keeps the outcomes of bmm 1.4 for data-frame columns that are not numbers", {
+  # reference values from bmm 1.4 (develop c13dd2c5): a factor column beside a
+  # numeric one gives NA with a warning, not densities at its level codes
+  x <- data.frame(a = c(0.1, 0.2), b = factor(c(0.3, 0.4)))
+  expect_warning(out <- dsdm(x), "not meaningful for factors")
+  expect_equal(out, data.frame(a = c(0.6255800913, 0.5592531962), b = c(NA_real_, NA_real_)), tolerance = 1e-9)
+  # bmm 1.4 stopped on a date column, which must not run as day numbers
+  expect_error(dsdm(data.frame(a = c(0.1, 0.2), b = as.Date(c("2020-01-01", "2020-01-03")))), "must be numeric")
+})
+
 test_that("dsdm() normalises each observation by its own parameter set when sets repeat", {
   # x longer than every parameter, so that sets repeat and are looked up by
   # key; references by quadrature of the sqrtexp numerator, not by dsdm().

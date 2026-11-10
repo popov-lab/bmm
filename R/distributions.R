@@ -326,7 +326,13 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   # parameters longer than x cut to its size
   if (is.data.frame(x)) {
     out <- as.data.frame(x)
-    values <- unlist(out, use.names = FALSE)
+    # the frame arithmetic of bmm 1.4 keeps its outcomes: a factor column gives
+    # NA with base R's warning, a character or list column stops, and a date
+    # column, which survives the subtraction, stops as cos() refused it
+    shifted <- out - 0
+    stopif(!all(vapply(shifted, function(col) is.numeric(col) || is.logical(col), logical(1))),
+           "The columns of a data frame x must be numeric.")
+    values <- unlist(shifted, use.names = FALSE)
     dens <- dsdm(values, mu, c, kappa, log, parametrization)
     # an empty parameter gives no values, as for an empty x: the frame with no rows
     if (length(dens) < length(values)) return(out[0, , drop = FALSE])
