@@ -615,6 +615,12 @@ test_that("dsdm() keeps the outcomes of bmm 1.4 for data-frame columns that are 
                           m.1 = c(0.6255800912855, 0.5592531962204),
                           m.2 = c(0.4703425690427, 0.3787859868264)),
                tolerance = 1e-9)
+  # a matrix column kept by I() keeps its shape, and the column beside it its own cells
+  x <- data.frame(a = I(matrix(c(0.1, 0.2, 0.3, 0.4), 2)), b = c(-1, 1))
+  expect_equal(dsdm(x),
+               data.frame(a = I(matrix(c(0.6255800912855, 0.5592531962204, 0.4703425690427, 0.3787859868264), 2)),
+                          b = c(0.1084691396508, 0.1084691396508)),
+               tolerance = 1e-9)
   expect_equal(dsdm(data.frame(a = complex(real = c(0.1, 0.2), imaginary = 0))),
                data.frame(a = complex(real = c(0.6255800912855, 0.5592531962204), imaginary = 0)),
                tolerance = 1e-9)

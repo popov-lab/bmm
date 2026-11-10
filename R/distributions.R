@@ -336,8 +336,10 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
     values <- unlist(out, use.names = FALSE)
     dens <- dsdm(values, mu, c, kappa, log, parametrization)
     # an empty parameter gives no values, as for an empty x: the frame with no rows
-    if (length(dens) < length(values)) return(out[0, , drop = FALSE])
-    out[] <- as.data.frame(matrix(dens[seq_along(values)], nrow(out), ncol(out)))
+    if (!length(values) || length(dens) < length(values)) return(out[0, , drop = FALSE])
+    # filled column by column, so that a matrix column kept by I() keeps its cells
+    dens <- split(dens[seq_along(values)], rep(seq_along(out), lengths(out)))
+    for (j in seq_along(out)) out[[j]][] <- dens[[j]]
     return(out)
   }
   n <- .obs_length(x, mu, c, kappa)
