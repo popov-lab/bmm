@@ -3216,9 +3216,10 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  # a NULL d or sdratio gave NA draws before bmm 1.5.0, as an empty one does
-  d <- rep_len(as.numeric(d), n)
-  sdratio <- rep_len(as.numeric(sdratio), n)
+  # a NULL d or sdratio gave NA draws before bmm 1.5.0, as an empty one does;
+  # rep_len() keeps a factor a factor, so that it still gives NA draws
+  d <- rep_len(if (is.null(d)) NA_real_ else d, n)
+  sdratio <- rep_len(if (is.null(sdratio)) NA_real_ else sdratio, n)
   if (!is.null(criterion)) criterion <- rep_len(criterion, n)
   if (!is.null(bias)) bias <- rep_len(bias, n)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)

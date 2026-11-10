@@ -931,6 +931,37 @@ test_that("NULL in an optional argument means it is not given", {
   expect_identical(draws, rep(NA_integer_, 3))
 })
 
+test_that("rsdt_yn() gives NA draws with a warning for a factor d, as before bmm 1.5.0", {
+  # not draws from the level codes 1, 2
+  warnings <- character()
+  draws <- withCallingHandlers(
+    rsdt_yn(6, 100, 1, d = factor(c(0.5, 3)), criterion = 0),
+    warning = function(w) {
+      warnings <<- c(warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_identical(draws, rep(NA_integer_, 6))
+  expect_match(warnings, "not meaningful for factors", all = FALSE)
+  expect_error(rsdt_yn(3, 100, 1, d = c("1", "2"), criterion = 0), "non-numeric argument")
+})
+
+test_that("the rsdt_*() samplers return integer counts, as before bmm 1.5.0", {
+  withr::local_seed(4447)
+  thr <- c(-0.5, 0.3, 1)
+  draws <- list(
+    yn = rsdt_yn(2, 100, 1, d = 1, criterion = 0),
+    mafc = rsdt_mafc(2, 100, m = 3, d = 1),
+    rating = rsdt_rating(2, 100, 1, d = 1, thresholds = thr),
+    dpsdt = rsdt_dpsdt(2, 100, 1, d = 1, thresholds = thr, Ro = 0.2),
+    metad = rsdt_metad(2, 100, 1, d = 1, thresholds = thr, metad = 0.8),
+    ranking = rsdt_ranking(2, 100, m = 3, d = 1),
+    cdp = rsdt_cdp(2, 100, 1, 0.8, 1, thr, 0.7, n_new = 1),
+    cdp_guess = rsdt_cdp(2, 100, 1, 0.8, 1, thr, 0.7, kcrit = 0.2, n_new = 1)
+  )
+  expect_identical(vapply(draws, typeof, character(1)), setNames(rep("integer", 8), names(draws)))
+})
+
 test_that("dezdm(version = '4par') refuses an empty mean_rt or var_rt vector", {
   # a 4par vector is one observation, as a vector of counts is; a log_lik()
   # that loses the boundary indicators passes empty vectors and must not
