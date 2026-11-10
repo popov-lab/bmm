@@ -622,6 +622,13 @@ test_that("dsdm() normalises each observation by its own parameter set when sets
   # normalised by kappa = 2, the second value would be 0.4003006905
   expect_equal(dsdm(c(0.1, 0.2, 0.3), mu = 0, kappa = c(2, 2.0001)),
                c(0.4205238558571, 0.4002974625841, 0.3700701487885), tolerance = 1e-8)
+  # sets 1 2 3 2 1 4 again, but mu differs between positions 4 and 6, so an
+  # integral bounded by the mu at a position, not at the set's first
+  # appearance, gives a wrong value
+  expect_equal(dsdm(seq(0.1, 0.6, 0.1), mu = c(0, 0, 1), kappa = c(1, 2)),
+               c(0.2799925229630, 0.4002857123791, 0.2191874724561, 0.3339982008881,
+                 0.2453847761430, 0.3339982008881),
+               tolerance = 1e-8)
 })
 
 test_that("dsdt_yn() refuses n_old above n_trials, also after recycling", {
@@ -1008,6 +1015,9 @@ test_that("dezdm(version = '4par') reads the pair shapes that bmm 1.4 read", {
   expect_equal(dezdm(data.frame(u = c(0.5, 0.55), l = c(0.6, 0.62)), matrix(c(0.02, 0.025, 0.03, 0.035), 2),
                      c(60, 55), 100, 1, 1, 0.2, version = "4par"),
                c(-41.8388675903824, -69.1887379676426), tolerance = 1e-10)
+  # s != 1 scales the drift in the logit of the accuracy pair by s^2
+  expect_equal(dezdm(c(0.5, 0.6), c(0.02, 0.03), 60, 100, 1, 1, 0.2, zr = 0.4, s = 1.3, version = "4par"),
+               -244.004534245268, tolerance = 1e-10)
 })
 
 test_that("dezdm(version = '4par') refuses a mean_rt or var_rt that is no pair and no 2-column matrix", {
