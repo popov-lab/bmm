@@ -589,7 +589,7 @@ test_that("dsdm() returns a data frame of densities for a data-frame x, as befor
   expect_identical(dsdm(data.frame(v = numeric(0))), data.frame(v = numeric(0)))
   # an empty parameter empties the result, as an empty x does; bmm 1.4 stopped
   expect_identical(dsdm(data.frame(v = c(0.1, 0.2)), mu = numeric(0)), data.frame(v = numeric(0)))
-  expect_identical(dsdm(data.frame(v = c(0.1, 0.2), w = 3:4), mu = NULL), data.frame(v = numeric(0), w = integer(0)))
+  expect_identical(dsdm(data.frame(v = c(0.1, 0.2), w = 3:4), mu = NULL), data.frame(v = numeric(0), w = numeric(0)))
 })
 
 test_that("dsdm() gives NA with a warning for a factor x, as before bmm 1.5.0", {
@@ -607,6 +607,17 @@ test_that("dsdm() keeps the outcomes of bmm 1.4 for data-frame columns that are 
   expect_equal(out, data.frame(a = c(0.6255800913, 0.5592531962), b = c(NA_real_, NA_real_)), tolerance = 1e-9)
   # bmm 1.4 stopped on a date column, which must not run as day numbers
   expect_error(dsdm(data.frame(a = c(0.1, 0.2), b = as.Date(c("2020-01-01", "2020-01-03")))), "must be numeric")
+  # a matrix column spreads into one column per cell, and a complex column runs
+  x <- data.frame(id = 1:2)
+  x$m <- matrix(c(0.1, 0.2, 0.3, 0.4), 2)
+  expect_equal(dsdm(x),
+               data.frame(id = c(0.1084691396508, 0.0703997091249),
+                          m.1 = c(0.6255800912855, 0.5592531962204),
+                          m.2 = c(0.4703425690427, 0.3787859868264)),
+               tolerance = 1e-9)
+  expect_equal(dsdm(data.frame(a = complex(real = c(0.1, 0.2), imaginary = 0))),
+               data.frame(a = complex(real = c(0.6255800912855, 0.5592531962204), imaginary = 0)),
+               tolerance = 1e-9)
 })
 
 test_that("dsdm() normalises each observation by its own parameter set when sets repeat", {
