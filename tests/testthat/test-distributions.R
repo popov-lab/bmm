@@ -822,7 +822,7 @@ test_that("a kcrit finite for some observations only gives R/K, with one warning
   count_warnings <- function(expr) {
     n <- 0
     value <- withCallingHandlers(expr, warning = function(w) {
-      expect_match(conditionMessage(w), "kcrit is finite for only some observations")
+      expect_match(conditionMessage(w), "Some kcrit values are not finite")
       n <<- n + 1
       invokeRestart("muffleWarning")
     })
@@ -845,6 +845,10 @@ test_that("a kcrit finite for some observations only gives R/K, with one warning
   expect_identical(r, list(value = rk_draws[1, , drop = FALSE], n = 0))
   d <- count_warnings(dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, kcrit = c(NA, 0.3), n_new = 1))
   expect_identical(d, list(value = rk_dens, n = 0))
+  # with two observations the second reads the finite kcrit[2] and asks for the split
+  d <- count_warnings(dsdt_cdp(rbind(rk, rk), 1, 0.8, 1, thr, 0.7, kcrit = c(NA, 0.3), n_new = 1))
+  expect_equal(d$value, rep(rk_dens, 2))
+  expect_equal(d$n, 1)
   expect_error(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
   expect_error(dsdt_cdp(rkg, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
   expect_equal(ncol(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1)), length(rkg))

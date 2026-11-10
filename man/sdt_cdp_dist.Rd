@@ -63,9 +63,12 @@ observation.}
 
 \item{kcrit}{Know criterion on the familiarity axis. \code{NULL} (default), or
 a non-finite value for every observation, gives the R/K model; finite
-values for every observation give the R/K/G model. A \code{kcrit} finite for
-only some observations gives the R/K model for the whole call, with a
-warning. The length of \code{kcrit} sets the number of observations only when
+values for every observation give the R/K/G model. A \code{kcrit} with any
+non-finite element gives the R/K model for the whole call, also for the
+observations whose \code{kcrit} is finite, and warns when there are such
+observations. Every element counts, also one past the last observation:
+with one draw, \code{kcrit = c(0.2, Inf)} gives R/K and a warning. The length
+of \code{kcrit} sets the number of observations only when
 every element is finite (the R/K/G model): with one row of \code{counts},
 \code{kcrit = c(0.2, 0.3)} gives two values and \code{kcrit = c(0.2, Inf)} one.}
 

@@ -4742,15 +4742,17 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   all(is.finite(kcrit))
 }
 
-# A kcrit finite for some observations only gave R/K without a word before bmm
-# 1.5.0; it still does, with a warning. Only an observation that asks for the
-# split counts: elements past the n observations are read by none of them
+# A kcrit with any non-finite element gave R/K without a word before bmm 1.5.0,
+# also an element past the n observations; it still does, with a warning. The
+# warning needs an observation that asks for the split, one whose own kcrit is
+# finite, but the split is decided from every element, read or not
 .warn_cdp_kcrit_mixed <- function(kcrit, has_guess, n) {
   if (!is.null(kcrit) && !has_guess && any(is.finite(rep_len(kcrit, n)))) {
     warning2(
-      "kcrit is finite for only some observations, so the Know/Guess split is \\
-      off for the whole call and the counts are R/K. Pass a finite kcrit for \\
-      every observation for R/K/G, or kcrit = NULL for R/K."
+      "Some kcrit values are not finite, so the Know/Guess split is off for \\
+      the whole call and the counts are R/K, also where kcrit is finite. Every \\
+      element of kcrit counts, also one that no observation reads. Pass only \\
+      finite kcrit values for R/K/G, or kcrit = NULL for R/K."
     )
   }
 }
@@ -4789,9 +4791,12 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #' @param rcrit Numeric vector. Remember criterion on the recollection axis.
 #' @param kcrit Know criterion on the familiarity axis. `NULL` (default), or
 #'   a non-finite value for every observation, gives the R/K model; finite
-#'   values for every observation give the R/K/G model. A `kcrit` finite for
-#'   only some observations gives the R/K model for the whole call, with a
-#'   warning. The length of `kcrit` sets the number of observations only when
+#'   values for every observation give the R/K/G model. A `kcrit` with any
+#'   non-finite element gives the R/K model for the whole call, also for the
+#'   observations whose `kcrit` is finite, and warns when there are such
+#'   observations. Every element counts, also one past the last observation:
+#'   with one draw, `kcrit = c(0.2, Inf)` gives R/K and a warning. The length
+#'   of `kcrit` sets the number of observations only when
 #'   every element is finite (the R/K/G model): with one row of `counts`,
 #'   `kcrit = c(0.2, 0.3)` gives two values and `kcrit = c(0.2, Inf)` one.
 #' @param sigmar Numeric vector. Log SD of the recollection target
