@@ -81,8 +81,9 @@ test_that("dsdm() recycles x and the parameters to the longest argument", {
                      fixed = list(log = TRUE))
   expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2, -1), c = 3, kappa = 3),
                      fixed = list(parametrization = "bessel"))
-  # parameter sets that agree in their first four digits get their own integral
-  expect_elementwise(dsdm, list(x = 0.3, mu = 0, c = c(3, 3.0001), kappa = 2))
+  # parameter sets that agree in their first four digits get their own integral;
+  # x longer than c, so that sets repeat and dsdm() looks them up by key
+  expect_elementwise(dsdm, list(x = c(0.1, 0.2, 0.3, 0.4), mu = 0, c = c(3, 3.0001), kappa = 2))
 })
 
 test_that("rsdm() draws each observation from its own location, strength and precision", {
@@ -596,10 +597,18 @@ test_that("dsdm() gives NA with a warning for a factor x, as before bmm 1.5.0", 
 })
 
 test_that("dsdm() normalises each observation by its own parameter set when sets repeat", {
-  # repeated, non-periodic (mu, kappa) sets; references by quadrature of the
-  # sqrtexp numerator, not by dsdm()
-  expect_equal(dsdm(c(0.1, 0.2, 0.3), mu = c(0, 1), kappa = c(2, 2, 2, 5)),
-               c(0.4205238558571, 0.1980586275388, 0.3700701487885, 0.0909177778413), tolerance = 1e-8)
+  # x longer than every parameter, so that sets repeat and are looked up by
+  # key; references by quadrature of the sqrtexp numerator, not by dsdm().
+  # The (mu, kappa) sets of the first period are 1 2 3 2 1 4: not periodic
+  # in the order of their first appearance
+  expect_equal(dsdm(seq(-0.7, 0.7, length.out = 8), mu = c(0, 1), kappa = c(1, 1, 2)),
+               c(0.2191874724561, 0.1365186194367, 0.3700701487885, 0.1701868481098,
+                 0.2799925229630, 0.2266224266039, 0.2453847761430, 0.2673206318095),
+               tolerance = 1e-8)
+  # kappa values that agree in their first four digits get their own integral;
+  # normalised by kappa = 2, the second value would be 0.4003006905
+  expect_equal(dsdm(c(0.1, 0.2, 0.3), mu = 0, kappa = c(2, 2.0001)),
+               c(0.4205238558571, 0.4002974625841, 0.3700701487885), tolerance = 1e-8)
 })
 
 test_that("dsdt_yn() refuses n_old above n_trials, also after recycling", {
