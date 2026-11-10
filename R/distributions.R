@@ -4756,9 +4756,10 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
   if (!is.null(kcrit) && !has_guess && any(is.finite(rep_len(kcrit, n)))) {
     warning2(
       "Some kcrit values are not finite, so the Know/Guess split is off for \\
-      the whole call and every count is R/K, even where kcrit is finite. This \\
-      includes kcrit values beyond the last observation. Pass only finite \\
-      kcrit values for R/K/G, or kcrit = NULL for R/K."
+      the whole call: every observation uses the remember/know (R/K) model, \\
+      also those whose kcrit is finite. Values past the last observation \\
+      count as well. Pass only finite kcrit values for R/K/G, or kcrit = NULL \\
+      for R/K."
     )
   }
 }
