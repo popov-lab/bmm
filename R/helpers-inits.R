@@ -65,10 +65,40 @@ init_stan_param <- function(spar, spec, model, standata_list) {
   if (anyNA(dim)) {
     return(NULL)
   }
+  bounds <- c(
+    resolve_stan_bound(spec$bounds$lower, standata_list, -Inf),
+    resolve_stan_bound(spec$bounds$upper, standata_list, Inf)
+  )
   init_ranef_param(spar, spec$types, dim, model, standata_list) %||%
-    init_special_coef_param(spar, spec$types, dim, model, standata_list) %||%
-    init_fixef_param(spar, spec$types, dim, model, standata_list) %||%
+    init_special_coef_param(spar, spec$types, dim, model, standata_list, bounds) %||%
+    init_fixef_param(spar, spec$types, dim, model, standata_list, bounds) %||%
     init_default_param(spec, dim, standata_list)
+}
+
+# Stan takes a bounded parameter to the unconstrained scale through
+# log(value - lower) and log(upper - value), so it rejects a start past a bound
+# and puts one on the bound at -Inf. Coefficients a constant target does not
+# need solve to zero up to rounding error, on either side of it, and the special
+# coefficients are drawn around zero, so a bound at zero (lb = 0 for a monotonic
+# effect, #694) rejects most starts. A start closer to a bound than 0.01 moves
+# inside the nearer bound by 0.01 to 0.1, the size of the special coefficients'
+# draws, and no further than halfway to the other bound; both are shrunk as the
+# coefficient's draws are. A bound that did not resolve to a number counts as
+# none
+into_bounds <- function(values, bounds, shrink) {
+  bounds[is.na(bounds)] <- c(-Inf, Inf)[is.na(bounds)]
+  if (!any(is.finite(bounds))) {
+    return(values)
+  }
+  shrink <- rep_len(shrink, length(values))
+  half <- diff(bounds) / 2
+  step <- pmin(runif(length(values), min = 0.01, max = 0.1) * shrink, half)
+  margin <- pmin(0.01 * shrink, half)
+  below <- values < bounds[1] + margin
+  above <- values > bounds[2] - margin
+  values[below] <- bounds[1] + step[below]
+  values[above] <- bounds[2] - step[above]
+  values
 }
 
 
@@ -191,7 +221,7 @@ ranef_column_owners <- function(id, model, standata_list) {
 # of each of its variables, and by any covariate it interacts with (Csp); the
 # Stan data do not say which variables belong to which coefficient, so every
 # coefficient is shrunk by all of them together, which can only shrink it more
-init_special_coef_param <- function(spar, types, dim, model, standata_list) {
+init_special_coef_param <- function(spar, types, dim, model, standata_list, bounds = c(-Inf, Inf)) {
   if (!grepl("^bsp?(_|$)", spar)) {
     return(NULL)
   }
@@ -209,7 +239,8 @@ init_special_coef_param <- function(spar, types, dim, model, standata_list) {
       apply(as.matrix(columns), 2, function(column) coef_shrink(parameter, column, model))
     }
   }
-  init_array(runif(prod(dim), min = -0.1, max = 0.1) * rep_len(shrink, prod(dim)), types, dim)
+  shrink <- rep_len(shrink, prod(dim))
+  init_array(into_bounds(runif(prod(dim), min = -0.1, max = 0.1) * shrink, bounds, shrink), types, dim)
 }
 
 # A matrix declaration names its size once; gr(by = ) declares an array of
@@ -226,8 +257,9 @@ init_identity <- function(types, dim) {
 # brms names the coefficients of a parameter b_<par> (b for the main dpar) and
 # replaces them by per-coefficient scalars par_b_<par>_<index> when a constant
 # holds some of them fixed; a scalar gets the value its position in the vector
-# would get
-init_fixef_param <- function(spar, types, dim, model, standata_list) {
+# would get. A start the solve puts on or past a bound the user set on the
+# class moves inside it by a step shrunk by the coefficient's own column
+init_fixef_param <- function(spar, types, dim, model, standata_list, bounds = c(-Inf, Inf)) {
   index <- if (grepl("^par_b_", spar)) as.integer(sub(".*_", "", spar))
   stan_par <- if (is.null(index)) spar else sub("^par_(.*)_[0-9]+$", "\\1", spar)
   parameter <- match_stan_to_model_par(stan_par, names(model$parameters))
@@ -238,7 +270,7 @@ init_fixef_param <- function(spar, types, dim, model, standata_list) {
   }
   from_range <- function(n) link_transform(runif(n, min = init_range[1], max = init_range[2]), link)
   if (startsWith(stan_par, "Intercept")) {
-    return(from_range(1))
+    return(into_bounds(from_range(1), bounds, coef_shrink(parameter, NULL, model)))
   }
   if (!grepl("^b(_|$)", stan_par)) {
     return(NULL)
@@ -248,10 +280,12 @@ init_fixef_param <- function(spar, types, dim, model, standata_list) {
     return(NULL)
   }
 
-  values <- range_coefficients(
-    X, from_range(1), centered = !is.null(standata_list[[sub("^b", "Kc", stan_par)]])
-  )
-  init_array(if (is.null(index)) values else values[index], types, dim)
+  centered <- !is.null(standata_list[[sub("^b", "Kc", stan_par)]])
+  values <- range_coefficients(X, from_range(1), centered = centered)
+  columns <- if (centered) X[, -1, drop = FALSE] else X
+  shrink <- apply(as.matrix(columns), 2, function(column) coef_shrink(parameter, column, model))
+  keep <- if (is.null(index)) seq_along(values) else index
+  init_array(into_bounds(values[keep], bounds, shrink[keep]), types, dim)
 }
 
 # The coefficients that put the linear predictor at `target` on every row of

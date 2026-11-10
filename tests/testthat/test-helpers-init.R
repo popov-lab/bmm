@@ -17,12 +17,12 @@ test_that("create_initfun returns function for sdm", {
 
 
 # the init function bmm() builds: the prior decides which parameters exist
-configured_initfun <- function(model, formula, data) {
+configured_initfun <- function(model, formula, data, user_prior = NULL) {
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
   config_args <- configure_model(model, data, formula)
-  prior <- configure_prior(model, data, config_args$formula, NULL)
+  prior <- configure_prior(model, data, config_args$formula, user_prior)
   create_initfun(model, data, config_args$formula, prior)
 }
 
@@ -1307,4 +1307,67 @@ test_that("unit columns on a range wider than 1 keep the SD draws they had befor
       expect_equal(as.vector(inits[[sd]]), case$sd[[sd]], tolerance = 1e-6, label = paste(name, sd))
     }
   }
+})
+
+# =============================================================================
+# BOUNDS THE USER SETS ON COEFFICIENTS (#694)
+# =============================================================================
+
+# Stan rejects a start on or past a bound, and puts one a rounding error inside
+# it at the far end of the unconstrained scale
+inside <- function(x, lower = -Inf, upper = Inf) all(x >= lower + 1e-3 & x <= upper - 1e-3)
+
+eta_model <- list(
+  parameters = list(eta = ""), init_ranges = list(eta = c(2, 3)), links = list(eta = "identity")
+)
+eta_data <- list(X_eta = stats::model.matrix(~ 1 + x, data.frame(x = factor(1:3))))
+
+test_that("solved coefficients start inside a bound set on the class (#694)", {
+  withr::local_seed(694)
+  draw <- function(bounds) init_fixef_param("b_eta", "vector", 3, eta_model, eta_data, bounds)
+  lower <- replicate(200, draw(c(0, Inf)))
+  upper <- replicate(200, draw(c(-Inf, 0)))
+  narrow <- replicate(200, draw(c(-1e-4, 1e-4)))
+  # the effects the constant target does not need solve to zero
+  expect_true(inside(lower[2:3, ], lower = 0))
+  expect_true(all(lower[2:3, ] <= 0.1))
+  expect_true(all(upper < 0))
+  expect_true(all(narrow > -1e-4 & narrow < 1e-4))
+  # an intercept above the bound keeps its start in range
+  expect_true(all(lower[1, ] >= 2 & lower[1, ] <= 3))
+})
+
+test_that("a start well inside the bounds is the start without them (#694)", {
+  unbounded <- withr::with_seed(1, init_fixef_param("b_eta", "vector", 3, eta_model, eta_data))
+  bounded <- withr::with_seed(1, init_fixef_param("b_eta", "vector", 3, eta_model, eta_data, c(1, Inf)))
+  expect_equal(bounded[1], unbounded[1])
+})
+
+test_that("an intercept and a per-coefficient scalar start inside their bounds (#694)", {
+  withr::local_seed(694)
+  intercept <- replicate(200, init_fixef_param("Intercept_eta", "real", 1, eta_model, list(), c(5, Inf)))
+  effect <- replicate(200, init_fixef_param("par_b_eta_3", "real", 1, eta_model, eta_data, c(0, Inf)))
+  expect_true(inside(intercept, lower = 5))
+  expect_true(inside(effect, lower = 0))
+})
+
+test_that("mo() coefficients start inside a bound set on the class (#694)", {
+  withr::local_seed(694)
+  model <- list(parameters = list(kappa = ""), init_ranges = list(kappa = c(1, 2)), links = list(kappa = "log"))
+  sdata <- list(Jmo_kappa = 3L)
+  bsp <- replicate(200, init_special_coef_param("bsp_kappa", "vector", 2, model, sdata, c(0, Inf)))
+  expect_true(inside(bsp, lower = 0))
+})
+
+test_that("the inits of a fit with lb = 0 on b respect the bound (#694)", {
+  withr::local_seed(694)
+  init_fun <- configured_initfun(
+    mixture2p(resp_error = "response_error"),
+    bmf(kappa ~ 1 + setsize, thetat ~ 1 + setsize),
+    zhang_luck_2008,
+    user_prior = brms::prior(normal(0, 1), class = b, dpar = kappa, lb = 0)
+  )
+  inits <- lapply(1:50, function(i) init_fun())
+  expect_true(inside(unlist(lapply(inits, `[[`, "b_kappa")), lower = 0))
+  expect_true(all(is.finite(unlist(inits))))
 })
