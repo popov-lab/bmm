@@ -639,7 +639,7 @@ circmix_stan_values <- function(data) {
                                    tau_far[i], nodes, logk, dlogk, logJ_min, dlogJ);
       }
       for (i in 1:NTAU) {
-        out_shape[i] = circmix_vp_shape(kappa_vp, tau[i], nodes);
+        out_shape[i] = circmix_vp_shape(kappa_vp, tau[i]);
       }
       out_branches = circmix_slot_averaging_branches(K_slots, ss_slots, kappa_vp,
                                                      logk, dlogk, logJ_min, dlogJ);
@@ -871,4 +871,61 @@ test_that("Stan matches R at small gamma shapes and either side of the tail swit
     }, numeric(1)),
     tolerance = 1e-10
   )
+})
+
+test_that("the Stan gradient of the variable-precision density is right below shape 2", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  # below kappa = 0.00447, J(kappa) < J0 / 10 and Stan Math's reverse-mode
+  # gamma_p() drops its derivative as flat, which it is not at small shapes;
+  # kappa 10 at shape 0.5 is an ordinary cell of the same branch
+  tab <- .circmix_kappa_table()
+  cells <- rbind(
+    expand.grid(y = c(0, 1, pi), shape = c(0.1, 1.5), kappa = c(0.0044, 0.001)),
+    data.frame(y = c(0, 1), shape = 0.5, kappa = 10)
+  )
+  cells$tau <- .circmix_J(cells$kappa) / cells$shape
+  n <- nrow(cells)
+  code <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
+    "\n}\n",
+    "data { int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ; int N; vector[N] y; }
+    parameters { vector[N] log_kappa; vector[N] log_tau; }
+    model {
+      for (i in 1:N) {
+        target += circmix_vp_ld([cos(y[i])]', [0.0]', negative_infinity(), exp(log_kappa[i]),
+                                exp(log_tau[i]), 81, logk, dlogk, logJ_min, dlogJ);
+      }
+    }"
+  )
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+  utils::capture.output(diagnosis <- model$diagnose(
+    data = list(
+      NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+      logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, N = n, y = cells$y
+    ),
+    init = list(list(log_kappa = log(cells$kappa), log_tau = log(cells$tau))),
+    error = 1e6
+  ))
+
+  ld <- function(kappa, tau) {
+    .circmix_vp_ld(matrix(cos(cells$y)), matrix(0, n), rep(-Inf, n), kappa, tau, 81L)
+  }
+  h <- 1e-5
+  up <- exp(h)
+  down <- exp(-h)
+  slope <- c(
+    ld(cells$kappa * up, cells$tau) - ld(cells$kappa * down, cells$tau),
+    ld(cells$kappa, cells$tau * up) - ld(cells$kappa, cells$tau * down)
+  ) / (2 * h)
+  # relative, because diagnose() reports six significant digits
+  expect_lt(max(abs(diagnosis$gradients()$model - slope) / pmax(abs(slope), 1e-3)), 1e-4)
+})
+
+test_that(".circmix_vp_ld() integrates below the shape where trigamma() is NaN, as Stan does", {
+  # at shape 1e-200 nearly all precision mass sits at J ~ 0, so the response is uniform
+  tau <- .circmix_J(10) / 1e-200
+  expect_equal(.circmix_vp_ld(matrix(cos(1)), matrix(0), -Inf, 10, tau), -log(2 * pi), tolerance = 1e-10)
 })

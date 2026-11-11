@@ -156,7 +156,7 @@
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
-  vp <- .circmix_vp_rows(kappa, tau, nodes)
+  vp <- .circmix_vp_rows(kappa, tau)
   if (!length(vp$rows)) {
     return(out)
   }
@@ -175,10 +175,11 @@
 # with kappa = 0 (shape 0, an infinitely wide grid), or one whose grid would be
 # narrower than 1e-6, is constant precision; this is the R twin of
 # circmix_vp_shape(), which signals those rows with +Inf.
-.circmix_vp_rows <- function(kappa, tau, nodes) {
+.circmix_vp_rows <- function(kappa, tau) {
   shape <- .circmix_J(kappa) / tau
-  half_width <- 8 * sqrt(trigamma(shape))
-  rows <- which(tau > 0 & is.finite(half_width) & half_width >= 1e-6)
+  # trigamma() is NaN below shape 1e-153, where Stan's is +Inf; the floor at
+  # 1 changes no decision, the grid is far wider than 1e-6 there
+  rows <- which(tau > 0 & kappa > 0 & 8 * sqrt(trigamma(pmax(shape, 1))) >= 1e-6)
   list(rows = rows, shape = shape[rows])
 }
 

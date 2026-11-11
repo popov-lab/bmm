@@ -73,7 +73,7 @@
   }
 
   // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0, kappa = 0, or a grid narrower than 1e-6); any positive shape is integrable, see circmix_vp_component()
-  real circmix_vp_shape(real kappa, real tau, int nodes) {
+  real circmix_vp_shape(real kappa, real tau) {
     // kappa = 0 has J = 0: the gamma on J is a point mass there, as in R
     if (tau <= 0 || kappa <= 0) {
       return positive_infinity();
@@ -122,15 +122,15 @@
                                  data vector logk, data vector dlogk,
                                  data real logJ_min, data real dlogJ) {
     real J0 = 1e-4;
-    real z = J0 / tau;
-    real tail = gamma_p(shape, z)
-                + c * sqrt(2 * tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * gamma_p(shape + 0.5, z)
-                + (square(c) - 0.5) * shape * tau * gamma_p(shape + 1, z);
+    real rate = inv(tau);
+    // not gamma_p(): its reverse mode drops the derivative once J0 / tau > 10 shape
+    real tail = exp(gamma_lcdf(J0 | shape, rate))
+                + c * sqrt(2 * tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * exp(gamma_lcdf(J0 | shape + 0.5, rate))
+                + (square(c) - 0.5) * shape * tau * exp(gamma_lcdf(J0 | shape + 1, rate));
     real lo = log(J0);
     real hi = fmax(log(tau * fmax(shape * (1 - inv(9 * shape) + 8.5 / (3 * sqrt(shape)))^3, 40)),
                    lo + 1);
     real step = (hi - lo) / (nodes - 1);
-    real rate = inv(tau);
     vector[nodes] lp;
     for (i in 1:nodes) {
       real ti = lo + (i - 1) * step;
@@ -184,7 +184,7 @@
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
-    real shape = circmix_vp_shape(kappa, tau, nodes);
+    real shape = circmix_vp_shape(kappa, tau);
     if (is_inf(shape)) {
       return circmix_ld(cosd, logw, logw_guess, kappa);
     }
