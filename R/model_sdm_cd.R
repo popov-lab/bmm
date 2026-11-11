@@ -99,6 +99,12 @@ settable_links.sdm_cd <- function(model) {
 #' directly comparable with Lin and Oberauer's unbounded criterion. bmm prints
 #' a message saying so when the criterion is estimated.
 #'
+#' @section Fitting:
+#' As for [sdm()], the normalising constant of the SDM density is computed
+#' once for every run of trials with the same predictor values, so sorting the
+#' data by the predictors speeds up the fit; bmm says so when they are not
+#' sorted. Within-chain threading (the `threads` argument) is not supported.
+#'
 #' @param response The name of the variable in the data containing the
 #'   change-detection response, coded 0 ("same") and 1 ("change"). A logical
 #'   variable is accepted and coded `TRUE` = "change".
@@ -148,6 +154,19 @@ sdm_cd <- function(response, probe, target, version = "simple", ...) {
 }
 
 ############################################################################# !
+# CHECK_DATA METHODS                                                     ####
+############################################################################# !
+
+# Runs of rows with equal predictor values share one normalising constant, as
+# in sdm(); sorted data make the runs as long as they can be
+#' @export
+check_data.sdm_cd <- function(model, data, formula) {
+  data <- order_data_query(model, data, formula)
+  attr(data, "sdm_run_metadata") <- sdm_run_metadata(data, formula, model)
+  NextMethod("check_data")
+}
+
+############################################################################# !
 # CONFIGURE_MODEL METHODS                                                ####
 ############################################################################# !
 
@@ -156,26 +175,47 @@ bmf2bf.sdm_cd <- function(model, formula) {
   brms::bf(.circmix_aterm(model$resp_vars$response, vreal = "probe_centered"))
 }
 
-# The core's family puts the model's own dpars between kappa and criterion
-# (mu, kappa, c, criterion); c is not a mixture weight, but it is the one
-# dpar the circmix layout has no slot for. With loop = TRUE, log Z is computed
-# per row rather than once per run of predictor values as in sdm(), and in
-# exchange the likelihood can be threaded.
+# Not the core's family: log Z costs up to 28 panels of 32 nodes, so it is
+# computed once per run of predictor values rather than per row, which makes
+# a gradient about 4 times cheaper (#136). The vectorised likelihood needs
+# loop = FALSE. Threading is refused: brms slices Y and the dpars per thread
+# but passes vreal1 and the run metadata whole, and sdm()'s threaded route
+# does not port, because log Z sits inside P("same") and the arc's half-width
+# rather than in a term of its own.
 #' @export
 configure_model.sdm_cd <- function(model, data, formula) {
+  stopif(
+    brms_slices_likelihood(),
+    "sdm_cd() does not support within-chain threading yet. Fit it without \\
+    the 'threads' argument (and without options(brms.threads))."
+  )
+  runs <- attr(data, "sdm_run_metadata") %||% sdm_run_metadata(data, formula, model)
+  dpars <- c("mu", "c", "kappa", "criterion")
+  bounds <- .circmix_bounds(model$links[dpars])
   formula <- bmf2bf(model, formula)
-  formula$family <- .cd_custom_family(
-    model, paste0("sdm_cd_", model$version),
-    weight_parameters = "c",
+  formula$family <- brms::custom_family(
+    paste0("sdm_cd_", model$version),
+    dpars = dpars,
+    links = unlist(model$links[dpars], use.names = FALSE),
+    lb = bounds$lb, ub = bounds$ub,
+    type = "int",
+    vars = c("vreal1", "G_sdm_runs", "sdm_run_start", "sdm_run_count", "cd_gl_x", "cd_gl_w"),
+    loop = FALSE,
     log_lik = log_lik_sdm_cd_simple,
     posterior_predict = posterior_predict_sdm_cd_simple,
     posterior_epred = posterior_epred_sdm_cd_simple
   )
 
-  nlist(
-    formula, data,
-    stanvars = .cd_model_stanvars(model, formula$family, "sdm_cd_functions.stan")
-  )
+  tdata <- read_lines2(system.file("stan_chunks", "sdm_simple_tdata.stan", package = "bmm"))
+  stanvars <- .circmix_chunk_stanvar("circmix_functions.stan") +
+    .cd_stanvars() +
+    .circmix_chunk_stanvar("sdm_cd_functions.stan") +
+    brms::stanvar(scode = tdata, block = "tdata") +
+    brms::stanvar(x = runs$G_sdm_runs, name = "G_sdm_runs") +
+    sdm_stanvar_int_array(runs$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
+    sdm_stanvar_int_array(runs$sdm_run_count, "sdm_run_count", "G_sdm_runs")
+
+  nlist(formula, data, stanvars)
 }
 
 ############################################################################# !
@@ -256,7 +296,9 @@ simulate_data.sdm_cd <- function(model, pars, design = NULL, scale = c("link", "
 # The normalising constant uses the same rule (decided for #136 when sdm()'s
 # Chebyshev rule erred by up to 7.5 in log Z): against integrate() it errs by
 # at most 1.6e-6 in log Z for log c <= 5 and kappa <= 300, at the corner cells
-# (log c 5, kappa 200), and by at most 3.3e-10 for kappa <= 30.
+# (log c 5, kappa 200), and by at most 3.3e-10 for kappa <= 30. It is the
+# costliest step of the likelihood, which therefore takes it once per run of
+# predictor values (check_data.sdm_cd()).
 
 .sdm_cd_log_peak <- function(c, kappa) {
   log(c) + 0.5 * log(kappa / (2 * pi))
@@ -317,8 +359,9 @@ simulate_data.sdm_cd <- function(model, pars, design = NULL, scale = c("link", "
   out
 }
 
-# P("same") for one row per observation or posterior draw; twin of
-# sdm_cd_simple_core() in sdm_cd_functions.stan
+# P("same") for one row per observation or posterior draw; twin of the row
+# loop of sdm_cd_simple_lpmf() in sdm_cd_functions.stan, with log Z per row
+# where Stan takes it once per run of rows that share c and kappa
 .sdm_cd_psame <- function(probe, mu, c, kappa, criterion) {
   args <- .circmix_recycle(probe = probe, mu = mu, c = c, kappa = kappa, criterion = criterion)
   log_z <- .sdm_cd_log_int(-pi, pi, 0, args$c, args$kappa)

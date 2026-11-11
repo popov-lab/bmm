@@ -134,6 +134,14 @@ directly comparable with Lin and Oberauer's unbounded criterion. bmm prints
 a message saying so when the criterion is estimated.
 }
 
+\section{Fitting}{
+
+As for \code{\link[=sdm]{sdm()}}, the normalising constant of the SDM density is computed
+once for every run of trials with the same predictor values, so sorting the
+data by the predictors speeds up the fit; bmm says so when they are not
+sorted. Within-chain threading (the \code{threads} argument) is not supported.
+}
+
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 # half of the trials probe the target itself, the others a random colour

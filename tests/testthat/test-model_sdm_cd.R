@@ -170,12 +170,64 @@ test_that("an estimated criterion is announced with the bound", {
   expect_no_message(check_formula(model, data, fixed), message = "criterion is estimated")
 })
 
-test_that("the likelihood passes the probe as a real and c through its log link", {
+test_that("the likelihood is one call over the runs, with c through its log link", {
   code <- stancode(bmf(c ~ 1, kappa ~ 1), sdm_cd_data(), sdm_cd("change", "probe", "target"))
-  expect_match(code, "sdm_cd_simple_lpmf(Y[n] | mu[n], kappa[n], c[n], criterion[n], vreal1[n]",
-               fixed = TRUE)
+  expect_match(
+    code,
+    paste0("sdm_cd_simple_lpmf(Y | mu, c, kappa, criterion, vreal1, G_sdm_runs, ",
+           "sdm_run_start, sdm_run_count, cd_gl_x, cd_gl_w)"),
+    fixed = TRUE
+  )
   expect_match(code, "c = exp(c);", fixed = TRUE)
   expect_match(code, "Intercept_criterion = 0", fixed = TRUE)
+  expect_match(code, "sdm_run_total != N", fixed = TRUE)
+})
+
+test_that("the runs are the cells of every predictor, criterion's included", {
+  data <- data.frame(
+    change = rep(c(0L, 1L, 1L), 10), target = 0, probe = rep(c(0, 1.5, -2), 10),
+    cond = rep(c("a", "b", "c"), c(12, 10, 8))
+  )
+  model <- sdm_cd("change", "probe", "target")
+  runs <- function(formula, data) {
+    sdata <- suppressMessages(standata(formula, data, model))
+    c(G = sdata$G_sdm_runs, start = sdata$sdm_run_start, count = sdata$sdm_run_count)
+  }
+  expect_equal(runs(bmf(c ~ 1, kappa ~ 1), data), c(G = 1, start = 1, count = 30))
+  expect_equal(
+    runs(bmf(c ~ cond, kappa ~ 1), data),
+    c(G = 3, start1 = 1, start2 = 13, start3 = 23, count1 = 12, count2 = 10, count3 = 8)
+  )
+  expect_equal(
+    runs(bmf(c ~ 1, kappa ~ 1, criterion ~ cond), data),
+    c(G = 3, start1 = 1, start2 = 13, start3 = 23, count1 = 12, count2 = 10, count3 = 8)
+  )
+  # unsorted data are fitted as they are, one run per block of equal values,
+  # and the user is told that sorting would be faster
+  interleaved <- data[c(1:6, 13:18, 7:12, 19:30), ]
+  messages <- capture_messages(check_data(model, interleaved, bmf(c ~ cond, kappa ~ 1)))
+  expect_match(paste(messages, collapse = ""), "not ordered by predictors")
+  expect_equal(
+    runs(bmf(c ~ cond, kappa ~ 1), interleaved),
+    c(G = 5, start1 = 1, start2 = 7, start3 = 13, start4 = 19, start5 = 23,
+      count1 = 6, count2 = 6, count3 = 6, count4 = 4, count5 = 8)
+  )
+})
+
+test_that("within-chain threading is refused", {
+  # brms would slice Y and the dpars per thread but pass the runs whole
+  model <- sdm_cd("change", "probe", "target")
+  formula <- bmf(c ~ 1, kappa ~ 1)
+  expect_error(
+    bmm(formula, sdm_cd_data(), model, backend = "mock", mock_fit = 1,
+        threads = brms::threading(2)),
+    "does not support within-chain threading"
+  )
+  withr::local_options(brms.threads = 2)
+  expect_error(
+    bmm(formula, sdm_cd_data(), model, backend = "mock", mock_fit = 1),
+    "does not support within-chain threading"
+  )
 })
 
 test_that("log_lik(), posterior_predict() and posterior_epred() evaluate the same P('same')", {
@@ -208,65 +260,70 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   expect_error(simulate_data(model, list(c = 1.5, kappa = 1), n_trials = 5), "probe")
 })
 
-test_that("the generated likelihood passes each parameter to its place in the core, and Stan matches R", {
+test_that("the likelihood computes log Z once per run and matches R row by row", {
   skip_unless_stan_tests()
   skip_on_cran()
-  data <- sdm_cd_data()
-  model <- sdm_cd("change", "probe", "target")
-  formula <- bmf(c ~ 1, kappa ~ 1, criterion ~ 1)
-  configured <- suppressMessages(configure_model(model, check_data(model, data, formula), formula))
-  wrapper <- configured$stanvars[["sdm_cd_simple_lpmf"]]$scode
-  signature <- sub(".*_lpmf\\((.*?)\\).*", "\\1", strsplit(wrapper, "\n")[[1]][1])
-  arg_names <- sub(".* ", "", strsplit(signature, ", ")[[1]])
-  # a distinct value per parameter, so a swapped slot changes the result; a
-  # moderate memory, a flat one with a wide arc, a sharp one with a negative
-  # criterion and the corner of E5 at the unbiased criterion
+  # three runs of lengths 3, 1 and 2, c and kappa constant within a run and
+  # distinct between runs, as check_data() lays them out. Every parameter
+  # takes distinct values, so swapping c and kappa, or mu and criterion, in
+  # the signature changes every row. Within run 1 the rows differ in mu,
+  # criterion and probe, which share no log Z with c and kappa. The length-1
+  # run 2 sits between runs whose c and kappa differ from its own, so log Z
+  # read from a run start off by one, or an inner loop one row too short or
+  # too long, changes run 2 (and run 1 or 3). Run 3 holds the corner of E5
+  # (log c 5, kappa 200).
   cases <- data.frame(
-    y = c(0, 1, 0, 1), mu = c(0.1, -0.2, 0.05, 0), kappa = c(6, 1, 100, 200),
-    c = c(3.5, 0.5, 40, exp(5)), criterion = c(0.35, 0.4, -0.3, 0), probe = c(0.9, 2.8, 0.02, 0.15)
+    y = c(0, 1, 1, 0, 1, 0),
+    mu = c(0.1, -0.2, 0.3, 0.05, 0, -0.1),
+    c = c(3.5, 3.5, 3.5, 0.5, exp(5), exp(5)),
+    kappa = c(6, 6, 6, 1, 200, 200),
+    criterion = c(0.35, -0.25, 0, 0.4, 0, -0.3),
+    probe = c(0.9, 2.8, -0.4, 1.7, 0.15, 0.02)
   )
-  calls <- vapply(seq_len(nrow(cases)), function(i) {
-    values <- unlist(cases[i, ])
-    formatted <- vapply(values, format, "", digits = 17)
-    arg_values <- ifelse(arg_names %in% names(values), formatted[arg_names], arg_names)
-    glue::glue("out[{i}] = sdm_cd_simple_lpmf({arg_values[1]} | {paste(arg_values[-1], collapse = ', ')});")
-  }, "")
+  runs <- list(G = 3L, start = c(1L, 4L, 5L), count = c(3L, 1L, 2L))
   chunks <- c("circmix_functions.stan", "cd_functions.stan", "circmix_cd_functions.stan",
               "sdm_cd_functions.stan")
   program <- paste0(
     "functions {\n",
     paste(vapply(chunks, function(f) read_lines2(system.file("stan_chunks", f, package = "bmm")), ""),
           collapse = "\n"),
-    "\n", wrapper, "}\n",
-    "data { int NK; vector[NK] circmix_logk; vector[NK] circmix_dlogk;",
-    " real circmix_logJ_min; real circmix_dlogJ; vector[32] cd_gl_x; vector[32] cd_gl_w; }\n",
-    "generated quantities { vector[", nrow(cases), "] out;\n",
-    paste(calls, collapse = "\n"), "\n}\n"
+    "}\n",
+    "data { int N; array[N] int y; vector[N] mu; vector[N] c; vector[N] kappa;",
+    " vector[N] criterion; array[N] real probe; int G; array[G] int run_start;",
+    " array[G] int run_count; vector[32] gl_x; vector[32] gl_w; }\n",
+    "generated quantities {\n",
+    "  real total = sdm_cd_simple_lpmf(y | mu, c, kappa, criterion, probe, G, run_start,",
+    " run_count, gl_x, gl_w);\n",
+    "  vector[G] per_run;\n",
+    "  vector[G] log_z;\n",
+    "  for (g in 1:G) {\n",
+    "    int s = run_start[g];\n",
+    "    int e = s + run_count[g] - 1;\n",
+    "    per_run[g] = sdm_cd_simple_lpmf(y[s:e] | mu[s:e], c[s:e], kappa[s:e], criterion[s:e],",
+    " probe[s:e], 1, {1}, {run_count[g]}, gl_x, gl_w);\n",
+    "    log_z[g] = sdm_cd_log_int(-pi(), pi(), 0, c[s], kappa[s], gl_x, gl_w);\n",
+    "  }\n",
+    "}\n"
   )
-  tab <- .circmix_kappa_table()
   gl <- .cd_gl_rule()
   fit <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(program))$sample(
-    data = list(
-      NK = length(tab$logkappa), circmix_logk = tab$logkappa, circmix_dlogk = tab$dlogkappa,
-      circmix_logJ_min = tab$logJ_min, circmix_dlogJ = tab$dlogJ, cd_gl_x = gl$x, cd_gl_w = gl$w
+    data = c(
+      list(N = nrow(cases), G = runs$G, run_start = runs$start, run_count = runs$count,
+           gl_x = gl$x, gl_w = gl$w),
+      as.list(cases)
     ),
     fixed_param = TRUE, iter_sampling = 1, chains = 1, refresh = 0,
     show_messages = FALSE, sig_figs = 18
   )
-  stan_side <- as.numeric(fit$draws("out"))
-  r_side <- with(cases, dsdm_cd(y, probe, mu, c, kappa, criterion, log = TRUE))
-  expect_equal(stan_side, r_side, tolerance = 1e-10)
-  expect_identical(length(unique(round(stan_side, 6))), nrow(cases))
-})
-
-test_that("the threaded program parses", {
-  skip_unless_stan_tests()
-  skip_on_cran()
-  code <- suppressMessages(stancode(
-    bmf(c ~ 1, kappa ~ 1, criterion ~ 1), sdm_cd_data(), sdm_cd("change", "probe", "target"),
-    threads = brms::threading(2)
-  ))
-  expect_match(code, "partial_log_lik", fixed = TRUE)
-  stan_model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
-  expect_true(stan_model$check_syntax(quiet = TRUE))
+  r_rows <- with(cases, dsdm_cd(y, probe, mu, c, kappa, criterion, log = TRUE))
+  r_runs <- vapply(seq_len(runs$G), function(g) {
+    sum(r_rows[runs$start[g] + seq_len(runs$count[g]) - 1])
+  }, numeric(1))
+  expect_equal(as.numeric(fit$draws("total")), sum(r_rows), tolerance = 1e-10)
+  expect_equal(as.numeric(fit$draws("per_run")), r_runs, tolerance = 1e-10)
+  expect_equal(
+    as.numeric(fit$draws("log_z")),
+    .sdm_cd_log_int(-pi, pi, 0, cases$c[runs$start], cases$kappa[runs$start]),
+    tolerance = 1e-10
+  )
 })

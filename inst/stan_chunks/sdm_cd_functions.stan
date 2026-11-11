@@ -66,18 +66,27 @@
     return acos(fmin(fmax(1 + (log_thresh - log_peak) * inv(kappa), -1), 1));
   }
 
-  // one trial; rich and the kappa(J) table are the core's interface, which a single precision state does not use
-  real sdm_cd_simple_core(int y, real mu, real kappa, real c, real criterion, real probe,
-                          int rich, data vector logk, data vector dlogk, data real logJ_min,
-                          data real dlogJ, data vector gl_x, data vector gl_w) {
-    real log_z = sdm_cd_log_int(-pi(), pi(), 0, c, kappa, gl_x, gl_w);
-    real hw = sdm_cd_crit_angle(c, kappa, sdm_cd_bounded_criterion(criterion, c, kappa, log_z),
-                                log_z);
-    real p_same = 1;
-    if (hw <= 0) {
-      p_same = 0;
-    } else if (hw < pi()) {
-      p_same = exp(sdm_cd_log_int(probe - hw, probe + hw, mu, c, kappa, gl_x, gl_w) - log_z);
+  // the likelihood over all rows, which check_data() lays out in runs of equal predictor values: c and kappa, and so
+  // log Z, are constant within a run, while mu, the criterion and the probe may vary from row to row
+  real sdm_cd_simple_lpmf(array[] int y, vector mu, vector c, vector kappa, vector criterion,
+                          data array[] real probe, int G_runs, data array[] int run_start,
+                          data array[] int run_count, data vector gl_x, data vector gl_w) {
+    real out = 0;
+    for (g in 1:G_runs) {
+      int s = run_start[g];
+      real log_z = sdm_cd_log_int(-pi(), pi(), 0, c[s], kappa[s], gl_x, gl_w);
+      for (n in s:(s + run_count[g] - 1)) {
+        real hw = sdm_cd_crit_angle(c[n], kappa[n],
+                                    sdm_cd_bounded_criterion(criterion[n], c[n], kappa[n], log_z), log_z);
+        real p_same = 1;
+        if (hw <= 0) {
+          p_same = 0;
+        } else if (hw < pi()) {
+          p_same = exp(sdm_cd_log_int(probe[n] - hw, probe[n] + hw, mu[n], c[n], kappa[n], gl_x, gl_w)
+                       - log_z);
+        }
+        out += cd_bernoulli_lpmf(y[n] | p_same);
+      }
     }
-    return cd_bernoulli_lpmf(y | p_same);
+    return out;
   }
