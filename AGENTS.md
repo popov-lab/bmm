@@ -22,7 +22,7 @@ testthat::test_file()     # Run single test file
 ### Package Requirements
 - Must pass R CMD CHECK for CRAN (enforced by CI on every commit/PR)
 - CI runs on every push and PR to `master`, `develop` and `dev-*`: R CMD check on three OS, and on Ubuntu `tests-source` (the suite from the source tree, with the time budget) and `test-coverage` (covr). On PRs, `file-size` also fails when any commit in the PR adds a file over 1 MB, even if a later commit removes it.
-- All code changes require corresponding tests in `tests/testthat/`
+- A behaviour change (new or changed output, error, warning, Stan code, prior) comes with a test in `tests/testthat/`; a refactor that keeps behaviour adds none
 - Documentation generated from roxygen comments (never edit `man/` or `docs/` directly)
 
 ## Code Conventions
@@ -51,8 +51,9 @@ These functions:
 - **Pure functions**: Always write functions that preserve the global state
 - NEVER use a `seed` argument and `set.seed` inside of functions
 - **Self-documenting code**: Write clear, descriptive names for functions and variables; refactor unclear code rather than adding explanatory comments
-- **Single-responsibility functions**: Extract complex logic into well-named helper functions
-- **Early returns**: Use early returns to simplify conditional flow and reduce nesting
+- **Comments say why, not what**: a comment that restates the next line, or narrates steps (`# Compute log-likelihood`), is deleted. No banner blocks (`####...!` lines around a title): a file that needs sections is split, and a short `# ---- title ----` line is the most a section gets
+- **Helpers are extracted only with two callers or a dispatch target** (S3 method, registered callback, `do.call` name). A single-use helper is inlined at its call site; a long single-use block gets a one-line comment, not a function. A helper of four lines or fewer exists only when it has three or more callers
+- **Early returns**: Use early returns to simplify conditional flow and reduce nesting; `return()` appears only in an early return, never as the last expression
 
 ```r
 # Bad - never do this
@@ -91,6 +92,11 @@ Exported functions must:
    - `@keywords transform` - for transformation utilities
    - `@keywords dataset` - for included datasets
    - `@keywords developer` - for internal/developer functions
+
+Internal functions (not exported, not S3 methods) get no roxygen block: no `@param`, `@return`, `@noRd` or `@keywords internal`. What a reader needs is a plain `#` comment of one to three lines above the definition saying why the function exists and what it assumes; the argument names and the body say the rest. The exception is a developer-facing generic that model authors implement (`pp_observables()`, `native_transform()`): it is exported with `@keywords developer` and documented in full.
+
+### NEWS
+A NEWS entry is written for a user: the symptom they saw or the feature they get, what changed in their call or output, and what to do, in under 100 words. It names only exported functions and arguments; a non-exported name (dot-prefixed, or absent from `NAMESPACE`), a Stan chunk, a stanvar or how the fix works does not appear. A change that only a model author or contributor notices goes under `### Developer-facing changes`, one line, with the PR number.
 
 ## Model Development Pattern
 
@@ -132,7 +138,7 @@ Each model needs a `configure_model.*` S3 method (one per version class when the
 1. **Preprocess data** (extract attributes from data checks)
 2. **Build formula** using `bmf2bf()` to convert bmmformula → brmsformula
 3. **Define family** and attach it to the formula (`formula$family <- ...`; a brms family such as `brms::mixture()` or `brms::multinomial()`, or a `brms::custom_family()`)
-4. **Return** `nlist(formula, data)`, plus `stanvars` when the model adds Stan code (a custom family, or Stan functions called from the formula, as in `sdt_rating` and `mpt`): `nlist(formula, data, stanvars)`. The list is passed on to `brms::brm()`; default priors do not belong here, `configure_prior()` builds them from the model's `default_priors`. Priors beyond the defaults go in the model's own `configure_prior.<model>()` method, as in `R/model_mixture3p.R` and `R/model_mpt.R`.
+4. **Return** `nlist(formula, data)`, plus `stanvars` when the model adds Stan code (a custom family, or Stan functions called from the formula, as in `sdt_rating` and `mpt`): `nlist(formula, data, stanvars)`. The list is passed on to `brms::brm()`; default priors do not belong here, `configure_prior()` builds them from the model's `default_priors`. Priors beyond the defaults go in the model's own `configure_prior.<model>()` method, as in `R/model_mpt.R`.
 
 `use_model_template()` generates this skeleton.
 
@@ -143,7 +149,7 @@ Stan code snippets go in `inst/stan_chunks/*.stan` - these are injected into brm
 
 ## Testing Requirements
 
-**Always add/update tests** for code changes - even if not explicitly requested.
+**Always add/update tests** for a behaviour change - even if not explicitly requested. A refactor, a rename or an extracted helper adds no test: the tests that covered the behaviour before still cover it.
 
 Test tiers (ADR 0004, the architecture decision record `.dev/decisions/0004-test-tiers-and-budget.md`):
 - `tests/testthat/` - unit tests, mock-backend pipeline tests, fixture tests and Stan compile tests. R CMD check runs them on every PR and push with four parallel workers (`Config/testthat/parallel` in DESCRIPTION). It tests the built package, which lacks the fixtures: `tests/testthat/assets/` is build-ignored (listed in `.Rbuildignore`, so not in the built package), and the fixture tests skip there. The `tests-source` workflow runs the suite from the source tree on Ubuntu, fixtures included, and enforces the time budget.
@@ -158,7 +164,7 @@ Test tiers (ADR 0004, the architecture decision record `.dev/decisions/0004-test
 Rules, with the ADR's rule ids. `tests/testthat/test-conventions.R` checks R1, R2, R4, R7, R8, the file-level part of R10 and part of R5 (size, draws, listed in `make-fixtures.R`) and runs with the rest of the suite; a violation fails with the file name and the rule. The `tests-source` budget job checks R6, and R3 only indirectly; its CRAN budget step (`.github/scripts/cran-budget.R`) checks the cap of R10. R9 and the rest of R5 are checked in review.
 - R1: No sampling in `tests/testthat/`. `cmdstan_model()`, `$sample()` and `backend = "cmdstanr"` appear only at registered sites: files whose count of each pattern is written as a literal in `test-conventions.R`. A new site opens with `skip_unless_stan_tests()` and updates that count in the same PR. A model's parity test lives in its `test-model_<name>.R` (R7).
 - R2: The tier gates are `skip_unless_stan_tests()` and `skip_unless_fixtures()`; `skip_on_cran()` is the CRAN gate. `skip_on_ci()` is not a gate.
-- R3: A mock fit (`backend = "mock", mock_fit = 1`) uses at most two participants or 200 rows unless the test is about data size.
+- R3: A mock fit (`backend = "mock", mock_fit = 1`, spelled out: `mock = 1` reaches brms only by partial matching) uses at most two participants or 200 rows unless the test is about data size. A model file has one block that runs every version through `bmm()`; a mock fit whose only expectation is `expect_silent()`/`expect_no_error()` is not added for a single version.
 - R4: Cross-model behaviours (default priors, inits, stored frame and `update()`, `pp_check()`, `pp_observables()`, `conditional_effects()`, report extraction, links) loop over the model-cases registry, never over a hand-typed list of models: `model_test_cases(kind)` in `helper-model-cases.R` reads one provider per model, `model_cases_<name>()` in `helper-model-<name>.R`. Every provider has a `stored_frame`, `sd_default`, `init` and `links` case (checked); `check_data`, `observables` and `fixture` cases where they apply. The header of `helper-model-cases.R` lists what each kind holds.
 - R5: A fixture has one chain, at most 300 KB and 200 draws, and is generated by `tests/local/make-fixtures.R` (seed and versions stored in the object). A new test loads it through `load_fixture_fit()`.
 - R6: The budget job fails when a test takes over 0.033 or a file over 0.23 of the summed time of all tests, or the suite over 1000 s of wall time, all measured on the 4-vCPU Ubuntu runner with four workers; no test has a cap of its own. A new test that takes more than a few seconds says in a comment why it needs the time. Run `devtools::test(reporter = "slow")` before opening a PR. The shares are read from the CI run; a local run on another machine gives different shares (`test-conditional_effects.R` 0.082 locally, 0.150 on CI), so the local run spots slow tests but does not check the caps.
@@ -166,6 +172,7 @@ Rules, with the ADR's rule ids. `tests/testthat/test-conventions.R` checks R1, R
 - R8: A test file seeds through `withr::local_seed()`, never `set.seed()`; a script such as `tests/local/make-fixtures.R` may.
 - R9: A new model adds a recovery plan `tests/recovery/<model>.R` (bmmtools `validation_plan()`; `.github/CONTRIBUTING.md`), `test-model_<name>.R`, a `helper-model-<name>.R` provider (R4), a fixture only when post-processing needs one (then also a `fixture` case and a block in `make-fixtures.R`), and stays inside the budget (R6).
 - R10: CRAN tier. The three cross-model contract files (`test-conditional_effects.R`, `test-default-priors.R`, `test-helpers-init.R`) open with a file-level `skip_on_cran()`, the only file-level ones (count pinned in `test-conventions.R`). A test that takes more than 0.4 s in CRAN mode on a developer machine (the installed tarball's tests, `NOT_CRAN` unset, one worker) opens with `skip_on_cran()`. `cran-budget.R` runs the tests CRAN runs, fails on a failing test or when the wall time exceeds its cap, and writes `cran-test-timings.csv` to find slow tests.
+- R11: A test reaches code through an exported function, an S3 generic or the mock pipeline (`backend = "mock", mock_fit = 1`). An internal function is called directly only when it is a numerical or parsing unit that the exported surface cannot drive in a few lines (a density, a bound, an expression parser), and then the test names the behaviour, not the function (`test_that("the softmax bound is tight", ...)`, not `test_that(".circmix_bounds() returns ...", ...)`). A new test file is named after the behaviour or model it covers, not after the R file it reads, and no test exists only because a helper exists.
 
 Test patterns from codebase:
 ```r
@@ -233,7 +240,7 @@ configuration. This file is git-ignored, so each developer maintains their own c
 
 1. **Never edit** `man/` or `docs/` directly - regenerated from roxygen/pkgdown
 2. **Namespace all imports** - don't assume packages are loaded
-3. **Test coverage** - add tests for all new code paths
+3. **Test coverage** - add tests for new behaviour, through the exported surface (R11); not for every helper
 4. **Implicit returns** - avoid explicit `return()` statements
 5. **devtools::load_all()** - never use `library(bmm)` during development
 6. **Git branching** - feature branches → PR to `develop`, or to the release's `dev-*` integration branch for features planned for a later release (see `.dev/decisions/0002-release-integration-branches.md`); never commit directly to `develop`, `dev-*` or `master`
