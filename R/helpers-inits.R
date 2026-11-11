@@ -58,21 +58,22 @@ new_initfun <- function(stanpars_list, standata_list, model) {
   }
 }
 
-# A parameter whose size cannot be resolved from the Stan data is left to the
-# sampler, so that the rest of the list still reaches it
+# A parameter whose size or bounds cannot be resolved from the Stan data is
+# left to the sampler, so that the rest of the list still reaches it; a start
+# that ignored a bound it cannot read could lie past it
 init_stan_param <- function(spar, spec, model, standata_list) {
   dim <- resolve_stan_dim(spec$dims, standata_list)
-  if (anyNA(dim)) {
-    return(NULL)
-  }
   bounds <- c(
     resolve_stan_bound(spec$bounds$lower, standata_list, -Inf),
     resolve_stan_bound(spec$bounds$upper, standata_list, Inf)
   )
+  if (anyNA(dim) || anyNA(bounds)) {
+    return(NULL)
+  }
   init_ranef_param(spar, spec$types, dim, model, standata_list) %||%
     init_special_coef_param(spar, spec$types, dim, model, standata_list, bounds) %||%
     init_fixef_param(spar, spec$types, dim, model, standata_list, bounds) %||%
-    init_default_param(spec, dim, standata_list)
+    init_default_param(spec, dim, bounds)
 }
 
 # Stan takes a bounded parameter to the unconstrained scale through
@@ -83,21 +84,20 @@ init_stan_param <- function(spar, spec, model, standata_list) {
 # effect, #694) rejects most starts. A start closer to a bound than 0.01 moves
 # inside the nearer bound by 0.01 to 0.1, the size of the special coefficients'
 # draws, and no further than halfway to the other bound; both are shrunk as the
-# coefficient's draws are. A bound that did not resolve to a number counts as
-# none
+# coefficient's draws are. Only the starts that move draw a step, so a bound
+# that never binds leaves the seeded starts of every later parameter as they
+# were without it
 into_bounds <- function(values, bounds, shrink) {
-  bounds[is.na(bounds)] <- c(-Inf, Inf)[is.na(bounds)]
   if (!any(is.finite(bounds))) {
     return(values)
   }
   shrink <- rep_len(shrink, length(values))
   half <- diff(bounds) / 2
-  step <- pmin(runif(length(values), min = 0.01, max = 0.1) * shrink, half)
   margin <- pmin(0.01 * shrink, half)
   below <- values < bounds[1] + margin
-  above <- values > bounds[2] - margin
-  values[below] <- bounds[1] + step[below]
-  values[above] <- bounds[2] - step[above]
+  moved <- below | values > bounds[2] - margin
+  step <- pmin(runif(sum(moved), min = 0.01, max = 0.1) * shrink[moved], half)
+  values[moved] <- ifelse(below[moved], bounds[1] + step, bounds[2] - step)
   values
 }
 
@@ -221,7 +221,7 @@ ranef_column_owners <- function(id, model, standata_list) {
 # of each of its variables, and by any covariate it interacts with (Csp); the
 # Stan data do not say which variables belong to which coefficient, so every
 # coefficient is shrunk by all of them together, which can only shrink it more
-init_special_coef_param <- function(spar, types, dim, model, standata_list, bounds = c(-Inf, Inf)) {
+init_special_coef_param <- function(spar, types, dim, model, standata_list, bounds) {
   if (!grepl("^bsp?(_|$)", spar)) {
     return(NULL)
   }
@@ -259,7 +259,7 @@ init_identity <- function(types, dim) {
 # holds some of them fixed; a scalar gets the value its position in the vector
 # would get. A start the solve puts on or past a bound the user set on the
 # class moves inside it by a step shrunk by the coefficient's own column
-init_fixef_param <- function(spar, types, dim, model, standata_list, bounds = c(-Inf, Inf)) {
+init_fixef_param <- function(spar, types, dim, model, standata_list, bounds) {
   index <- if (grepl("^par_b_", spar)) as.integer(sub(".*_", "", spar))
   stan_par <- if (is.null(index)) spar else sub("^par_(.*)_[0-9]+$", "\\1", spar)
   parameter <- match_stan_to_model_par(stan_par, names(model$parameters))
@@ -282,10 +282,14 @@ init_fixef_param <- function(spar, types, dim, model, standata_list, bounds = c(
 
   centered <- !is.null(standata_list[[sub("^b", "Kc", stan_par)]])
   values <- range_coefficients(X, from_range(1), centered = centered)
-  columns <- if (centered) X[, -1, drop = FALSE] else X
-  shrink <- apply(as.matrix(columns), 2, function(column) coef_shrink(parameter, column, model))
   keep <- if (is.null(index)) seq_along(values) else index
-  init_array(into_bounds(values[keep], bounds, shrink[keep]), types, dim)
+  if (!any(is.finite(bounds))) {
+    return(init_array(values[keep], types, dim))
+  }
+  # the intercept of a centred design is solved apart from X, whose first
+  # column it replaces, so value k belongs to column k + 1
+  shrink <- apply(X[, keep + centered, drop = FALSE], 2, function(column) coef_shrink(parameter, column, model))
+  init_array(into_bounds(values[keep], bounds, shrink), types, dim)
 }
 
 # The coefficients that put the linear predictor at `target` on every row of
@@ -341,21 +345,17 @@ representable_range <- function(init_range, link) {
 # Stan draws initial values uniformly on the unconstrained scale and maps them
 # through the parameter's declared bounds; with a radius of 1 this is exactly
 # what brm(init = 1) does. Returns NULL for the types whose transform is not
-# reimplemented here (ordered, unit_vector, ...) and for bounds that cannot be
-# resolved to a number, leaving those parameters to the sampler
-init_default_param <- function(spec, dim, standata_list) {
+# reimplemented here (ordered, unit_vector, ...), leaving those parameters to
+# the sampler
+init_default_param <- function(spec, dim, bounds) {
   if (identical(spec$type, "simplex")) {
     return(init_array(init_simplex(runif(dim - 1, min = -1, max = 1), dim), spec$types, dim))
   }
   if (!spec$type %in% c("real", "vector", "row_vector", "matrix")) {
     return(NULL)
   }
-  lower <- resolve_stan_bound(spec$bounds$lower, standata_list, -Inf)
-  upper <- resolve_stan_bound(spec$bounds$upper, standata_list, Inf)
-  if (is.na(lower) || is.na(upper)) {
-    return(NULL)
-  }
-
+  lower <- bounds[1]
+  upper <- bounds[2]
   raw <- runif(prod(dim), min = -1, max = 1)
   value <- if (is.infinite(lower) && is.infinite(upper)) {
     raw
