@@ -226,6 +226,16 @@ test_that("the threshold terms that change what the model is are named", {
   expect_message(check_formula(ld, lc_check(ld, dat),
                                bmf(activation ~ 0 + item, delta1 ~ 1 + (1 | id))),
                  "Johnson \\(2003\\)")
+  # an item grouping term is no person term
+  notes <- function(model, formula) {
+    capture_messages(check_formula(model, lc_check(model, dat), formula))
+  }
+  item_spacing <- notes(pars, bmf(activation ~ 0 + item, spacing ~ 1 + (1 | item)))
+  expect_false(any(grepl("person term", item_spacing)))
+  expect_true(any(grepl("item-specific threshold spread", item_spacing)))
+  expect_false(any(grepl("Johnson", notes(ld, bmf(activation ~ 0 + item, delta1 ~ 1 + (1 | item))))))
+  expect_true(any(grepl("scaled threshold model",
+                        notes(pars, bmf(activation ~ 0 + item, spacing ~ 1 + (1 | id:item))))))
 })
 
 
@@ -495,7 +505,9 @@ test_that("the generated Stan likelihood matches its R twin in both tails", {
   }, numeric(1))
 
   expect_true(all(is.finite(stan)))
-  expect_equal(stan, r, tolerance = 1e-10)
+  # per element: expect_equal()'s tolerance is a mean relative difference,
+  # which the tail values (|log p| up to 6e4) dilute
+  expect_lt(max(abs(stan - r) / pmax(1, abs(r))), 1e-10)
 })
 
 test_that("update() rebuilds item and keying when the formula kept neither", {

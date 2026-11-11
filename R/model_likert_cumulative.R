@@ -520,7 +520,8 @@ check_formula.likert_cumulative <- function(model, data, formula) {
 # its own name, or into one that is easily misread
 .likert_threshold_notes <- function(model, formula) {
   item <- model$resp_vars$item
-  has_group <- function(f) any(grepl("|", deparse(f), fixed = TRUE))
+  # (1 | item) groups by item; any other grouping variable is taken as the person
+  has_person <- function(f) length(setdiff(re_group_vars(list(f)), item)) > 0
   type <- model$other_vars$threshold_type
   spacing <- formula$spacing
   if (!is.null(spacing) && item %in% rhs_vars(spacing)) {
@@ -528,13 +529,13 @@ check_formula.likert_cumulative <- function(model, data, formula) {
              location-scale model; Tutz, 2022). Discrimination in Samejima's sense \\
              multiplies the trait and is not fitted by this model")
   }
-  if (!is.null(spacing) && type %in% c("parsimonious", "equidistant") && has_group(spacing)) {
+  if (!is.null(spacing) && type %in% c("parsimonious", "equidistant") && has_person(spacing)) {
     message2("spacing with a person term is the scaled threshold model with shared \\
              thresholds (Lubbe & Schuster, 2020); item discrimination is fixed at 1")
   }
   deltas <- formula[grepl("^delta[0-9]+$", names(formula))]
   free_width <- type %in% c("log_distance", "log_ratio")
-  if (free_width && any(vapply(deltas, has_group, logical(1)))) {
+  if (free_width && any(vapply(deltas, has_person, logical(1)))) {
     message2("delta with a person term gives person-specific interval widths after \\
              Johnson (2003), without his symmetry constraint")
   }
