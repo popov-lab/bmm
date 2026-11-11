@@ -151,7 +151,7 @@
 # component's integrand. Below 2, sd(log J) grows like 1 / shape, so a grid of
 # fixed size cannot follow it; there the part of the integral below J = 1e-4 is
 # analytic and the grid covers the rest (.circmix_vp_component_tail()). With 81
-# nodes and kappa up to 1000 each scheme holds the log density to 3e-7 at the
+# nodes and kappa up to 1000 each scheme holds the log density to 4e-7 at the
 # switch, and the step between them there is below 4e-7. The tail grid spans
 # [log J0, log J_hi], so its step grows with log tau: at kappa 1e4 the tail
 # scheme and the step reach 2e-6.
@@ -174,14 +174,16 @@
 }
 
 # The rows whose precision varies, with their gamma shapes. A row with tau = 0,
-# with kappa = 0 (shape 0, an infinitely wide grid), or one whose grid would be
-# narrower than 1e-6, is constant precision; this is the R twin of
-# circmix_vp_shape(), which signals those rows with +Inf.
+# with shape 0 (kappa = 0 or tau = Inf, an infinitely wide grid), or one whose
+# grid would be narrower than 1e-6, is constant precision; this is the R twin
+# of circmix_vp_shape(), which signals those rows with +Inf.
 .circmix_vp_rows <- function(kappa, tau) {
   shape <- .circmix_J(kappa) / tau
   # trigamma() is NaN below shape 1e-153, where Stan's is +Inf; the floor at
   # 1 changes no decision, the grid is far wider than 1e-6 there
-  rows <- which(tau > 0 & kappa > 0 & 8 * sqrt(trigamma(pmax(shape, 1))) >= 1e-6)
+  rows <- which(
+    tau > 0 & shape > 0 & 8 * sqrt(trigamma(pmax(shape, 1))) >= 1e-6
+  )
   list(rows = rows, shape = shape[rows])
 }
 

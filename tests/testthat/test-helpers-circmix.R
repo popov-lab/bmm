@@ -73,6 +73,16 @@ test_that(".circmix_vp_ld() returns the constant-precision density when tau is z
     .circmix_vp_ld(cosd, logw, guess, rep(10, length(y)), rep(0, length(y))),
     .circmix_ld(cosd, logw, guess, rep(10, length(y)))
   )
+  # kappa = 0 gives J = 0, and tau = Inf a gamma shape of 0: neither has a
+  # gamma to integrate over
+  expect_equal(
+    .circmix_vp_ld(cosd, logw, guess, rep(0, length(y)), rep(0.5, length(y))),
+    .circmix_ld(cosd, logw, guess, rep(0, length(y)))
+  )
+  expect_equal(
+    .circmix_vp_ld(cosd, logw, guess, rep(10, length(y)), rep(Inf, length(y))),
+    .circmix_ld(cosd, logw, guess, rep(10, length(y)))
+  )
 })
 
 test_that(".circmix_vp_ld() is a normalised density on the circle", {
@@ -197,6 +207,7 @@ test_that(".circmix_vp_ld() holds its accuracy below shape 2 at 41 and 121 nodes
 # from the target, whose integrand peaks many prior SDs below E[log J]: the
 # capacity versions once an item holds a slot.
 test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
+  skip_on_cran()
   y <- c(0, 1, 2, pi)
   expect_lt(max(abs(vp_errors(y, kappa = 200, shape = 10, p_mem = 1))), 1e-8)
   expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 100, p_mem = 1))), 1e-8)
@@ -226,7 +237,7 @@ test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
 # the grid starts at 1e-4; above it the grid follows the integrand. With
 # intercept-only kappa and tau every row crosses at once, so the step between
 # the two schemes at shape 2 is a step in the whole log likelihood. Measured at
-# y = 0, 1, pi: 1.2e-8 to 1.8e-8 at 81 nodes for kappa 1 to 100 (3.3e-7 at
+# y = 0, 1, pi: 1.2e-8 to 1.8e-8 at 81 nodes for kappa 1 to 100 (2.7e-7 at
 # kappa 1000), and at 41 nodes 3.6e-5, 1.8e-4 and 5.8e-4 at kappa 1, 10 and
 # 100. The bounds hold each step to about five times its size, so a change to
 # either scheme shows up.
@@ -520,6 +531,7 @@ test_that(".circmix_check_variable_precision() rejects unusable node counts", {
   expect_error(.circmix_check_variable_precision(FALSE, 41.5), "at least 41")
   expect_error(.circmix_check_variable_precision(FALSE, NA), "at least 41")
   expect_error(.circmix_check_variable_precision(FALSE, c(41, 43)), "at least 41")
+  expect_silent(.circmix_check_variable_precision(TRUE, 41L))
   expect_silent(.circmix_check_variable_precision(TRUE, 81L))
   expect_silent(.circmix_check_variable_precision(TRUE, 43))
 })

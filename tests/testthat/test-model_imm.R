@@ -19,7 +19,7 @@ test_that("imm() exposes the parameters each version implies", {
 
 test_that("imm() and dimm() default to 81 quadrature nodes", {
   # 41 nodes hold the log likelihood to about 1e-3 and step by as much where
-  # the gamma shape crosses 2; 81 hold it to 3e-7 for kappa up to 1000 (#695)
+  # the gamma shape crosses 2; 81 hold it to 4e-7 for kappa up to 1000 (#695)
   expect_equal(imm_model(variable_precision = TRUE)$vp_nodes, 81L)
   expect_equal(formals(imm)$vp_nodes, 81L)
   expect_equal(formals(dimm)$vp_nodes, 81L)
