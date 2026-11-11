@@ -238,3 +238,52 @@ test_that("every model constructor with ... reports arguments it does not use (#
     }
   }
 })
+
+test_that("distribution validators share one name and run first (#564)", {
+  ns <- asNamespace("bmm")
+  fns <- ls(ns, all.names = TRUE)
+  exports <- getNamespaceExports("bmm")
+
+  losing <- grep("^validate_.+_parameters$|^\\.check_.+_pars$", fns, value = TRUE)
+  expect_identical(losing, character(0),
+                   info = "name a family validator .check_<family>_args()")
+
+  # a family is whatever has a validator; the version helpers of mixture2p
+  # (.check_mixture2p_version_args) have no d/p/q/r members and drop out
+  families <- sub("^\\.check_(.+)_args$", "\\1", grep("^\\.check_.+_args$", fns, value = TRUE))
+  validator_of <- character()
+  for (f in families) {
+    found <- grep(paste0("^[dpqr]", f, "$"), exports, value = TRUE)
+    validator_of <- c(validator_of, stats::setNames(rep(paste0(".check_", f, "_args"), length(found)), found))
+  }
+  expect_gt(length(validator_of), 10)
+
+  call_heads <- function(expr) {
+    if (!is.call(expr)) return(character())
+    head <- if (is.name(expr[[1]])) as.character(expr[[1]]) else character()
+    c(head, unlist(lapply(as.list(expr)[-1], function(e) {
+      if (identical(e, quote(expr = ))) character() else call_heads(e)
+    })))
+  }
+  preamble <- c("{", "<-", "=", "if", "||", "isTRUE", "isFALSE", "match.arg",
+                ".warn_positional_log", "names")
+  is_stub <- function(body) {
+    stmts <- as.list(body)[-1]
+    length(stmts) == 1 && identical(stmts[[1]], quote(.NotYetImplemented()))
+  }
+
+  for (name in names(validator_of)) {
+    body <- body(get(name, envir = ns))
+    if (is_stub(body)) next
+    stmts <- as.list(body)[-1]
+    at <- which(vapply(stmts, function(s) {
+      is.call(s) && identical(s[[1]], as.name(validator_of[[name]]))
+    }, logical(1)))
+    expect_gte(length(at), 1L, label = paste0(name, " calls ", validator_of[[name]], "() at top level"))
+    if (length(at)) {
+      before <- as.character(unlist(lapply(stmts[seq_len(at[[1]] - 1)], call_heads)))
+      expect_identical(setdiff(before, preamble), character(0), label = name,
+                       info = "the validator runs before anything but match.arg() and the positional-log shim")
+    }
+  }
+})
