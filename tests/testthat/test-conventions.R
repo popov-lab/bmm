@@ -296,11 +296,17 @@ test_that("distribution validators share one name and run first (#564)", {
   # covr (CI test-coverage) rewrites each statement as
   # if (TRUE) { covr:::count(<id>); <statement> }, which hides every top-level
   # call; a user-written if never opens with a covr count and is kept
+  # compared by parts: a literal covr:::count in test code makes R CMD check
+  # report an undeclared dependency on covr
+  is_covr_count <- function(expr) {
+    h <- if (is.call(expr)) expr[[1]]
+    is.call(h) && identical(h[[1]], as.name(":::")) &&
+      identical(as.character(h[[2]]), "covr") && identical(as.character(h[[3]]), "count")
+  }
   is_covr_wrapper <- function(expr) {
     is.call(expr) && identical(expr[[1]], as.name("if")) && length(expr) == 3 &&
       isTRUE(expr[[2]]) && is.call(expr[[3]]) && identical(expr[[3]][[1]], as.name("{")) &&
-      length(expr[[3]]) == 3 && is.call(expr[[3]][[2]]) &&
-      identical(expr[[3]][[2]][[1]], quote(covr:::count))
+      length(expr[[3]]) == 3 && is_covr_count(expr[[3]][[2]])
   }
   uncovr <- function(expr) {
     if (!is.call(expr)) return(expr)
