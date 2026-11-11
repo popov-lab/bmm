@@ -437,32 +437,42 @@ test_that(".cd_check_binary_response() accepts 0/1 and logical responses only", 
 
 cd_stub_model <- function() {
   structure(
-    list(resp_vars = list(response = "r", probe = "p", target = "t"), other_vars = list()),
+    list(resp_vars = list(response = "r", probe = "p"), other_vars = list()),
     class = c("bmmodel", "change_detection", "cd_stub")
   )
 }
 
-test_that("check_data.change_detection() centres the probe on the target", {
-  dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
+test_that("check_data.change_detection() reads the probe relative to the target", {
+  dat <- data.frame(r = c(0, 1, 1), p = c(0, 3, -3))
   out <- check_data(cd_stub_model(), dat, bmf(kappa ~ 1))
-  expect_equal(out$probe_centered, wrap(dat$p - dat$t))
-  expect_error(check_data(cd_stub_model(), dat[c("r", "p")], bmf(kappa ~ 1)), "'t'")
+  expect_identical(out$p, dat$p)
+  expect_error(check_data(cd_stub_model(), dat["r"], bmf(kappa ~ 1)), "'p'")
   expect_warning(
     check_data(cd_stub_model(), transform(dat, p = p * 100), bmf(kappa ~ 1)),
     "degrees"
   )
+  # a difference left unwrapped is brought into [-pi, pi]; the rest stays
+  unwrapped <- transform(dat, p = c(0, 4, -4))
+  expect_equal(
+    check_data(cd_stub_model(), unwrapped, bmf(kappa ~ 1))$p,
+    c(0, 4 - 2 * pi, 2 * pi - 4)
+  )
 })
 
-test_that("check_data.change_detection() refuses a missing probe or target", {
-  dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
-  for (column in c("p", "t")) {
-    holed <- dat
-    holed[[column]][2] <- NA
-    expect_error(
-      check_data(cd_stub_model(), holed, bmf(kappa ~ 1)),
-      glue::glue("'{column}' contains missing values")
-    )
-  }
+test_that("check_data.change_detection() warns when no trial has a probe of 0", {
+  dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3))
+  expect_warning(check_data(cd_stub_model(), dat, bmf(kappa ~ 1)), "No trial has a probe of 0")
+  expect_no_warning(check_data(cd_stub_model(), transform(dat, p = c(1e-9, 3, -3)), bmf(kappa ~ 1)))
+  attr(dat, "prediction_newdata") <- TRUE
+  expect_no_warning(check_data(cd_stub_model(), dat, bmf(kappa ~ 1)))
+})
+
+test_that("check_data.change_detection() refuses a missing probe or response", {
+  dat <- data.frame(r = c(0, 1, 1), p = c(0, 3, -3))
+  expect_error(
+    check_data(cd_stub_model(), transform(dat, p = c(0, NA, -3)), bmf(kappa ~ 1)),
+    "'p' contains missing values"
+  )
   expect_error(
     check_data(cd_stub_model(), transform(dat, r = c(0, NA, 1)), bmf(kappa ~ 1)),
     "missing"
@@ -470,12 +480,12 @@ test_that("check_data.change_detection() refuses a missing probe or target", {
 })
 
 test_that("prediction newdata may leave the response unknown", {
-  dat <- data.frame(r = c(0, NA, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
+  dat <- data.frame(r = c(0, NA, 1), p = c(0, 3, -3))
   attr(dat, "prediction_newdata") <- TRUE
   expect_identical(check_data(cd_stub_model(), dat, bmf(kappa ~ 1))$r, dat$r)
   attr(dat, "prediction_newdata") <- NULL
   expect_error(check_data(cd_stub_model(), dat, bmf(kappa ~ 1)), "missing")
-  unknown <- data.frame(r = NA, p = 0.5, t = 0.2)
+  unknown <- data.frame(r = NA, p = 0.5)
   attr(unknown, "prediction_newdata") <- TRUE
   expect_silent(check_data(cd_stub_model(), unknown, bmf(kappa ~ 1)))
 })
@@ -497,52 +507,36 @@ test_that("standata() builds newdata with an unknown response, as posterior_pred
                     data real dlogJ, data vector gl_x, data vector gl_w) {
     return 0;
   }", block = "functions", name = "demo_cd_core")
-  dat <- data.frame(r = c(0L, 1L, 1L), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
+  dat <- data.frame(r = c(0L, 1L, 1L), p = c(0, 3, -3))
   fit <- suppressWarnings(brms::brm(
-    brms::bf(r | vreal(probe_centered) ~ 1, kappa ~ 1, thetat ~ 1, criterion ~ 1, family = family),
+    brms::bf(r | vreal(p) ~ 1, kappa ~ 1, thetat ~ 1, criterion ~ 1, family = family),
     check_data(cd_stub_model(), dat, bmf(kappa ~ 1)),
     stanvars = .cd_model_stanvars(model, family, character(0)) + core,
     prior = brms::prior(constant(0), class = "Intercept", dpar = "criterion"),
     backend = "mock", mock_fit = 1, rename = FALSE
   ))
   # a bmmfit of the current version, which restructure() leaves as it is;
-  # standata.bmmfit() rebuilds probe_centered from newdata in the user's layout
+  # standata.bmmfit() checks newdata in the user's layout
   fit$bmm <- list(model = cd_stub_model(), user_formula = bmf(kappa ~ 1))
   fit$version$bmm <- utils::packageVersion("bmm")
   class(fit) <- c("bmmfit", class(fit))
   standata <- brms::standata(
-    fit, newdata = data.frame(r = NA, p = c(1, -1), t = 0),
+    fit, newdata = data.frame(r = NA, p = c(1, -1)),
     check_response = FALSE, internal = TRUE
   )
   expect_equal(as.numeric(standata$vreal1), c(1, -1))
   expect_true(all(is.na(standata$Y)))
 })
 
-test_that("check_data.change_detection() declares the column it builds", {
+test_that("check_data.change_detection() builds no column", {
   model <- cd_stub_model()
-  dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
-  built <- setdiff(names(check_data(model, dat, bmf(kappa ~ 1))), names(dat))
-  expect_identical(built_data_columns(model), built)
-})
-
-test_that("revert_check_data.change_detection() rebuilds what check_data() needs", {
-  model <- cd_stub_model()
-  dat <- data.frame(r = c(0, 1, 1), p = c(0.5, 3, -3), t = c(0.2, -3, 3))
-  checked <- check_data(model, dat, bmf(kappa ~ 1))
-  for (keep in list(c("r", "probe_centered"), c("r", "probe_centered", "t"),
-                    c("r", "probe_centered", "p"))) {
-    stored <- revert_check_data(model, as.data.frame(checked)[keep])
-    expect_setequal(attr(stored, "rebuilt"), setdiff(c("p", "t"), keep))
-    expect_equal(
-      check_data(model, stored, bmf(kappa ~ 1))$probe_centered,
-      checked$probe_centered,
-      tolerance = 1e-14
-    )
-  }
+  dat <- data.frame(r = c(0, 1, 1), p = c(0, 3, -3))
+  expect_identical(names(check_data(model, dat, bmf(kappa ~ 1))), names(dat))
+  expect_identical(built_data_columns(model), character(0))
 })
 
 test_that("change-detection models print their response units", {
-  expect_named(response_annotations(cd_stub_model()), c("response", "probe", "target"))
+  expect_named(response_annotations(cd_stub_model()), c("response", "probe"))
 })
 
 test_that(".cd_custom_family() appends criterion and declares an integer response", {
@@ -578,7 +572,7 @@ test_that("the observer a family was built with is read back at prediction", {
       posterior_epred = posterior_epred_undefined("demo")
     )
     # prepare_predictions() takes the family from brmsterms() of the stored formula
-    terms <- brms::brmsterms(brms::bf(r | vreal(probe_centered) ~ 1, family = family))
+    terms <- brms::brmsterms(brms::bf(r | vreal(probe) ~ 1, family = family))
     expect_identical(.cd_prep_rich(list(family = terms$family)), knowledge == "rich")
   }
 })
@@ -655,8 +649,8 @@ test_that("a change-detection family built from the helpers reaches brms and par
     model, family, character(0),
     vint = "ss", vreal = list(probe = 1, nt = 1)
   ) + core
-  dat <- data.frame(r = c(0L, 1L, 1L), probe_centered = c(0.1, 2, -1), nt1 = 1, ss = 2L)
-  formula <- brms::bf(r | vint(ss) + vreal(probe_centered, nt1) ~ 1, kappa ~ 1,
+  dat <- data.frame(r = c(0L, 1L, 1L), probe = c(0.1, 2, -1), nt1 = 1, ss = 2L)
+  formula <- brms::bf(r | vint(ss) + vreal(probe, nt1) ~ 1, kappa ~ 1,
     thetat ~ 1, criterion ~ 1,
     family = family
   )
@@ -668,7 +662,7 @@ test_that("a change-detection family built from the helpers reaches brms and par
   expect_match(code, "Intercept_criterion = 0")
   standata <- brms::standata(formula, dat, stanvars = stanvars)
   expect_length(standata$cd_gl_x, 32)
-  expect_equal(as.numeric(standata$vreal1), dat$probe_centered)
+  expect_equal(as.numeric(standata$vreal1), dat$probe)
   stan_model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code), compile = FALSE)
   expect_silent(stan_model$check_syntax(quiet = TRUE))
 })
@@ -1102,5 +1096,50 @@ test_that(".cd_check_variable_precision() refuses variable precision, naming 1.6
   expect_error(.cd_check_variable_precision(TRUE), "planned for bmm 1.6.0")
   for (bad in list(NA, c(TRUE, FALSE), "yes", 1, NULL)) {
     expect_error(.cd_check_variable_precision(bad), "either TRUE or FALSE")
+  }
+})
+
+
+test_that("the refusal of variable precision gives no advice a change-detection data set cannot follow", {
+  expect_error(.cd_check_variable_precision(TRUE), "Use variable_precision = FALSE\\.$")
+})
+
+test_that("the shared parameters are described by the retrieved feature, not by a response", {
+  specs <- c(
+    .mixture2p_version_table, .mixture3p_version_table,
+    lapply(c(full = "full", bsc = "bsc", abc = "abc"), .imm_version_spec),
+    list(sdm = list(parameters = .model_sdm()$parameters))
+  )
+  for (spec in specs) {
+    texts <- .cd_add_criterion(spec)$parameters
+    noise <- " Unlike in continuous reproduction, it holds no response noise."
+    expect_match(texts$kappa, noise, fixed = TRUE)
+    memory <- sub(noise, "", unlist(texts[setdiff(names(texts), "criterion")]), fixed = TRUE)
+    expect_false(any(grepl("respon", memory)), info = paste(memory[grepl("respon", memory)], collapse = " | "))
+  }
+})
+
+test_that("no change-detection model lets the link of criterion be set", {
+  model <- structure(
+    list(links = list(kappa = "log", criterion = "identity")),
+    class = c("bmmodel", "change_detection", "cd_stub")
+  )
+  expect_identical(settable_links(model), "kappa")
+})
+
+test_that("knowledge = 'rich' warns where precision does not vary", {
+  expect_warning(.cd_warn_inert_knowledge("rich", "slot", acts = FALSE), "no effect in the 'slot' version")
+  expect_no_warning(.cd_warn_inert_knowledge("rich", "slot_averaging", acts = TRUE))
+  expect_no_warning(.cd_warn_inert_knowledge("limited", "slot", acts = FALSE))
+})
+
+test_that("a logical criterion is refused as a misplaced log, and n is one whole number", {
+  expect_error(.cd_check_criterion(TRUE, has_log = TRUE), "Did you mean log = TRUE")
+  expect_error(.cd_check_criterion(FALSE), "criterion must be numeric\\.$")
+  expect_silent(.cd_check_criterion(c(0, 0.3)))
+  expect_silent(.cd_check_criterion(NA))
+  expect_silent(.cd_check_n(3))
+  for (bad in list(2.5, c(2, 3), 0, -1, NA, "3")) {
+    expect_error(.cd_check_n(bad), "single positive whole number")
   }
 })

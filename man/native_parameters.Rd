@@ -174,6 +174,10 @@ swapped.
 
 With \code{variable_precision = TRUE}, \code{tau} is returned on its native scale, and
 \code{kappa} is the concentration of the average trial.
+
+For the change-detection models, \code{criterion} is returned as estimated. The
+criterion a trial applies is that value compressed into the trial's range of
+evidence (see the section "Decision criterion" of the model's help page).
 }
 
 \examples{
