@@ -399,12 +399,16 @@ psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
                  activation = c("vonmises", "laplace"), scaling = NULL) {
   activation <- match.arg(activation)
   .check_sdm_args(c, kappa, parametrization, activation, scaling)
+  # c* pairs c and kappa per observation, so both are recycled before it is formed
+  n <- .obs_length(q, mu, c, kappa, lower.bound)
+  c <- rep_len(c, n)
+  kappa <- rep_len(kappa, n)
   amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
   # mapply() refuses a zero-length q next to scalar parameters
   out <- if (length(q) == 0) {
     numeric(0)
   } else {
-    as.numeric(mapply(.psdm_one, q, mu, amp, kappa, lower.bound,
+    as.numeric(mapply(.psdm_one, rep_len(q, n), rep_len(mu, n), amp, kappa, rep_len(lower.bound, n),
       MoreArgs = list(activation = activation)
     ))
   }
@@ -425,6 +429,10 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
                  activation = c("vonmises", "laplace"), scaling = NULL) {
   activation <- match.arg(activation)
   .check_sdm_args(c, kappa, parametrization, activation, scaling)
+  # c* pairs c and kappa per observation, so both are recycled before it is formed
+  n <- .obs_length(p, mu, c, kappa, lower.bound)
+  c <- rep_len(c, n)
+  kappa <- rep_len(kappa, n)
   amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
   if (length(p) == 0) {
     numeric(0)
@@ -432,7 +440,7 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
     p <- if (log.p) exp(p) else p
     p <- if (lower.tail) p else 1 - p
     warnif(any(p < 0 | p > 1, na.rm = TRUE), "NaNs produced")
-    as.numeric(mapply(.qsdm_root, p, mu, amp, kappa, lower.bound,
+    as.numeric(mapply(.qsdm_root, rep_len(p, n), rep_len(mu, n), amp, kappa, rep_len(lower.bound, n),
       MoreArgs = list(activation = activation)
     ))
   }
