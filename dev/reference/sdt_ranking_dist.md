@@ -47,8 +47,9 @@ rsdt_ranking(n, n_trials, m, d, sdratio = 1, dist = c("gumbel_min", "normal"))
 - sdratio:
 
   Numeric vector. Ratio of signal to noise standard deviations (default
-  1, i.e., equal variance). Must be positive. Only used when
-  `dist = "normal"`.
+  1, i.e., equal variance). Must be positive. Read only with
+  `dist = "normal"`; with `dist = "gumbel_min"` any value other than 1
+  stops.
 
 - dist:
 

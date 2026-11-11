@@ -260,6 +260,13 @@
   ignored `m = 2` and returned one value. Give one row of counts per set
   size, with 0 beyond `m`
   ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`dsdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking_dist.md)
+  and
+  [`rsdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking_dist.md)
+  now stop when `sdratio` is not 1 with `dist = "gumbel_min"` (the
+  default); before, the value was ignored and the result was that of
+  equal variance. Use `dist = "normal"` for an unequal-variance ranking
+  ([\#697](https://github.com/popov-lab/bmm/issues/697)).
 - [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md),
   [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md),
   [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md),

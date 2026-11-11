@@ -6,32 +6,28 @@
     }
   };
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Vector arguments of the distribution functions — bmm_distributions"><meta name="description" content="The density (d*()) and random generation (r*()) functions
-of the sdm, ddm and ezdm models and of the signal detection models
+of the sdm, ddm and ezdm models, of the signal detection models
 (sdt_yn, sdt_mafc, sdt_rating, sdt_dpsdt, sdt_metad,
-sdt_ranking and sdt_cdp) take their per-observation arguments as
-vectors, or as matrices with one row per observation, and recycle them as
-stats::dnorm() and stats::rnorm() do. This page states the rules; the
-help page of each of these distributions repeats them under &quot;Vector
-arguments&quot;.
+sdt_ranking and sdt_cdp) and of the psychometric function take their
+per-observation arguments as vectors, or as matrices with one row per
+observation, and recycle them as stats::dnorm() and stats::rnorm()
+do. This page states the rules; the help page of each of these
+distributions repeats them under &quot;Vector arguments&quot;.
 The other distribution functions do not follow these rules yet:
 dcswald() and rcswald(), the circular mixtures (dmixture2p(),
 dmixture3p(), dimm() and their r*() functions), dm3() and rm3(),
-dmpt() and rmpt(), and dpsychometric_function().
-rpsychometric_function() reads n by the rule below but does not yet
-recycle its other arguments by these rules."><meta property="og:description" content="The density (d*()) and random generation (r*()) functions
-of the sdm, ddm and ezdm models and of the signal detection models
+and dmpt() and rmpt()."><meta property="og:description" content="The density (d*()) and random generation (r*()) functions
+of the sdm, ddm and ezdm models, of the signal detection models
 (sdt_yn, sdt_mafc, sdt_rating, sdt_dpsdt, sdt_metad,
-sdt_ranking and sdt_cdp) take their per-observation arguments as
-vectors, or as matrices with one row per observation, and recycle them as
-stats::dnorm() and stats::rnorm() do. This page states the rules; the
-help page of each of these distributions repeats them under &quot;Vector
-arguments&quot;.
+sdt_ranking and sdt_cdp) and of the psychometric function take their
+per-observation arguments as vectors, or as matrices with one row per
+observation, and recycle them as stats::dnorm() and stats::rnorm()
+do. This page states the rules; the help page of each of these
+distributions repeats them under &quot;Vector arguments&quot;.
 The other distribution functions do not follow these rules yet:
 dcswald() and rcswald(), the circular mixtures (dmixture2p(),
 dmixture3p(), dimm() and their r*() functions), dm3() and rm3(),
-dmpt() and rmpt(), and dpsychometric_function().
-rpsychometric_function() reads n by the rule below but does not yet
-recycle its other arguments by these rules."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+and dmpt() and rmpt()."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -71,19 +67,17 @@ recycle its other arguments by these rules."><meta property="og:image" content="
 
     <div class="ref-description section level2">
     <p>The density (<code>d*()</code>) and random generation (<code>r*()</code>) functions
-of the sdm, ddm and ezdm models and of the signal detection models
+of the sdm, ddm and ezdm models, of the signal detection models
 (<code>sdt_yn</code>, <code>sdt_mafc</code>, <code>sdt_rating</code>, <code>sdt_dpsdt</code>, <code>sdt_metad</code>,
-<code>sdt_ranking</code> and <code>sdt_cdp</code>) take their per-observation arguments as
-vectors, or as matrices with one row per observation, and recycle them as
-<code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::dnorm()</a></code> and <code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code> do. This page states the rules; the
-help page of each of these distributions repeats them under "Vector
-arguments".</p>
+<code>sdt_ranking</code> and <code>sdt_cdp</code>) and of the psychometric function take their
+per-observation arguments as vectors, or as matrices with one row per
+observation, and recycle them as <code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::dnorm()</a></code> and <code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code>
+do. This page states the rules; the help page of each of these
+distributions repeats them under "Vector arguments".</p>
 <p>The other distribution functions do not follow these rules yet:
 <code><a href="cswald_dist.html">dcswald()</a></code> and <code><a href="cswald_dist.html">rcswald()</a></code>, the circular mixtures (<code><a href="mixture2p_dist.html">dmixture2p()</a></code>,
 <code><a href="mixture3p_dist.html">dmixture3p()</a></code>, <code><a href="IMMdist.html">dimm()</a></code> and their <code>r*()</code> functions), <code><a href="m3dist.html">dm3()</a></code> and <code><a href="m3dist.html">rm3()</a></code>,
-<code><a href="mptdist.html">dmpt()</a></code> and <code><a href="mptdist.html">rmpt()</a></code>, and <code><a href="psychometric_function_dist.html">dpsychometric_function()</a></code>.
-<code><a href="psychometric_function_dist.html">rpsychometric_function()</a></code> reads <code>n</code> by the rule below but does not yet
-recycle its other arguments by these rules.</p>
+and <code><a href="mptdist.html">dmpt()</a></code> and <code><a href="mptdist.html">rmpt()</a></code>.</p>
     </div>
 
 

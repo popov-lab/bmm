@@ -1,14 +1,14 @@
 # Vector arguments of the distribution functions
 
 The density (`d*()`) and random generation (`r*()`) functions of the
-sdm, ddm and ezdm models and of the signal detection models (`sdt_yn`,
+sdm, ddm and ezdm models, of the signal detection models (`sdt_yn`,
 `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`, `sdt_ranking` and
-`sdt_cdp`) take their per-observation arguments as vectors, or as
-matrices with one row per observation, and recycle them as
-[`stats::dnorm()`](https://rdrr.io/r/stats/Normal.html) and
-[`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html) do. This page
-states the rules; the help page of each of these distributions repeats
-them under "Vector arguments".
+`sdt_cdp`) and of the psychometric function take their per-observation
+arguments as vectors, or as matrices with one row per observation, and
+recycle them as [`stats::dnorm()`](https://rdrr.io/r/stats/Normal.html)
+and [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html) do. This
+page states the rules; the help page of each of these distributions
+repeats them under "Vector arguments".
 
 The other distribution functions do not follow these rules yet:
 [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) and
@@ -19,13 +19,9 @@ the circular mixtures
 [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) and their
 `r*()` functions),
 [`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md) and
-[`rm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md),
+[`rm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md), and
 [`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) and
-[`rmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md), and
-[`dpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md).
-[`rpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md)
-reads `n` by the rule below but does not yet recycle its other arguments
-by these rules.
+[`rmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md).
 
 ## Vector arguments
 
