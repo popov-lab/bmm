@@ -53,11 +53,6 @@ built_data_columns.default <- function(model) {
 }
 
 #' @exportS3Method
-built_data_columns.change_detection <- function(model) {
-  c("probe_centered", NextMethod("built_data_columns"))
-}
-
-#' @exportS3Method
 built_data_columns.non_targets <- function(model) {
   c("ss_numeric", NextMethod("built_data_columns"))
 }
@@ -96,12 +91,13 @@ check_data.circular <- function(model, data, formula) {
   NextMethod("check_data")
 }
 
-# Change-detection models respond 0/1 to a probe. probe and target are in
-# radians, and the likelihood takes the probe relative to the target, the
-# frame in which the target is at mu = 0 and the non-targets are given.
+# Change-detection models respond 0/1 to a probe. The probe is given relative
+# to the target, the frame of the response error and the non-targets of the
+# reproduction models, so it is 0 on a "same" trial and the likelihood reads
+# the column as it is.
 #' @export
 check_data.change_detection <- function(model, data, formula) {
-  vars <- model$resp_vars[c("response", "probe", "target")]
+  vars <- model$resp_vars[c("response", "probe")]
   missing_vars <- unlist(vars)[!unlist(vars) %in% colnames(data)]
   stopif(
     length(missing_vars) > 0,
@@ -109,19 +105,28 @@ check_data.change_detection <- function(model, data, formula) {
     {collapse_comma(missing_vars)}"
   )
   data <- .cd_check_binary_response(data, vars$response)
-  for (angle in c(vars$probe, vars$target)) {
-    stopif(
-      anyNA(data[[angle]]),
-      "The variable '{angle}' contains missing values. Remove the trials \\
-      without a probe or a target before fitting."
-    )
-    warnif(
-      max(abs(data[[angle]]), na.rm = TRUE) > 2 * pi,
-      "It appears the variable '{angle}' is in degrees. The model requires \\
-      the probe and the target in radians."
-    )
-  }
-  data$probe_centered <- wrap(data[[vars$probe]] - data[[vars$target]])
+  probe <- data[[vars$probe]]
+  stopif(
+    anyNA(probe),
+    "The variable '{vars$probe}' contains missing values. Remove the trials \\
+    without a probe before fitting."
+  )
+  warnif(
+    max(abs(probe)) > 2 * pi,
+    "It appears the variable '{vars$probe}' is in degrees. The model requires \\
+    the probe in radians, relative to the target."
+  )
+  # a probe that is the feature as shown has no reason to be 0 anywhere
+  warnif(
+    !isTRUE(attr(data, "prediction_newdata")) && !any(abs(probe) < 1e-6),
+    "No trial has a probe of 0 in '{vars$probe}'. The probe is read relative to \\
+    the target (the feature shown at test minus the feature shown at the \\
+    probed location), so it is 0 on every 'same' trial. Check that \\
+    '{vars$probe}' is not the feature as shown."
+  )
+  # the arc rules take the probe in [-pi, pi]; values inside it stay as given
+  outside <- abs(probe) > pi
+  data[[vars$probe]][outside] <- wrap(probe[outside])
 
   NextMethod("check_data")
 }

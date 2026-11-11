@@ -604,6 +604,10 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' With `variable_precision = TRUE`, `tau` is returned on its native scale, and
 #' `kappa` is the concentration of the average trial.
 #'
+#' For the change-detection models, `criterion` is returned as estimated. The
+#' criterion a trial applies is that value compressed into the trial's range of
+#' evidence (see the section "Decision criterion" of the model's help page).
+#'
 #' @seealso [parameter_info()], [native_transform()], [conditional_effects.bmmfit()]
 #' @keywords extract_info
 #' @export

@@ -354,6 +354,7 @@
 # criterion == 0 rather than taking a flag. Placed after the weight parameters,
 # because it is the last distributional parameter of the family.
 .cd_add_criterion <- function(spec) {
+  spec$parameters <- .cd_retrieval_texts(spec$parameters)
   spec$parameters$criterion <- glue(
     "Decision criterion, Lin and Oberauer's (2022) bias beta on the \\
     log-likelihood ratio of 'change' against 'same'; positive values favour \\
@@ -371,10 +372,54 @@
   spec
 }
 
+# The reproduction models describe their parameters by the response they
+# predict. Here the response is "same" or "change", so the shared parameters
+# are described by the feature the observer retrieves; names, links and priors
+# stay those of the reproduction model.
+.cd_retrieval_texts <- function(parameters) {
+  phrases <- c(
+    "of memory responses" = "of the retrieved feature",
+    "for target responses" = "for retrieving the target",
+    "for non-target responses" = "for retrieving a non-target",
+    "the probability that a response comes from memory rather than from guessing" =
+      "the probability that the feature is retrieved from memory rather than guessed",
+    "the probability that a response comes from memory" =
+      "the probability that the feature is retrieved from memory",
+    "the probability of a memory response" =
+      "the probability that the feature is retrieved from memory",
+    "the probability of a target response" = "the probability of retrieving the target",
+    "Probability that a response reports the target rather than a non-target" =
+      "Probability that the retrieved feature is the target's rather than a non-target's"
+  )
+  for (phrase in names(phrases)) {
+    parameters <- lapply(parameters, gsub, pattern = phrase, replacement = phrases[[phrase]], fixed = TRUE)
+  }
+  if (!is.null(parameters$kappa)) {
+    parameters$kappa <- paste0(
+      sub("\\.$", "", parameters$kappa),
+      ". Unlike in continuous reproduction, it holds no response noise."
+    )
+  }
+  parameters
+}
+
+.cd_citation <- paste(
+  "Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual working",
+  "memory: Applications to the change detection task. Cognitive Psychology,",
+  "133, 101463. https://doi.org/10.1016/j.cogpsych.2022.101463"
+)
+
+# criterion is fixed to 0 on its identity link, and the bound of an estimated
+# one is written for that scale, so no change-detection model lets it be set
+#' @exportS3Method
+settable_links.change_detection <- function(model) {
+  setdiff(NextMethod("settable_links"), "criterion")
+}
+
 # Variable precision for change detection waits for an accuracy measurement of
 # the arc mass over precision states (#136, decided for 1.5.0). The *_cd
-# constructors and their d*/r* functions keep the argument for parity with the
-# reproduction models and refuse TRUE through this one check.
+# constructors keep the argument of the reproduction models and refuse TRUE
+# through this one check.
 .cd_check_variable_precision <- function(variable_precision) {
   stopif(
     !isTRUE(variable_precision) && !isFALSE(variable_precision),
@@ -383,8 +428,37 @@
   stopif(
     variable_precision,
     "Variable precision is not available for change-detection models yet; it \\
-    is planned for bmm 1.6.0. Use variable_precision = FALSE, or fit the \\
-    continuous-reproduction model if your task has one."
+    is planned for bmm 1.6.0. Use variable_precision = FALSE."
+  )
+}
+
+# knowledge sets the decision boundary where precision varies across trials; a
+# version with one precision state predicts the same with either value
+.cd_warn_inert_knowledge <- function(knowledge, version, acts) {
+  warnif(
+    knowledge == "rich" && !acts,
+    "knowledge = 'rich' has no effect in the '{version}' version until \\
+    variable precision arrives in bmm 1.6.0."
+  )
+}
+
+# A logical here is `log` passed by position, the habit of base R's density
+# functions, and would be read as a criterion of 0 or 1. NA stays NA.
+.cd_check_criterion <- function(criterion, has_log = FALSE) {
+  stopif(
+    is.logical(criterion) && !all(is.na(criterion)),
+    if (has_log) {
+      "criterion must be numeric. Did you mean log = {criterion[1]}?"
+    } else {
+      "criterion must be numeric."
+    }
+  )
+}
+
+.cd_check_n <- function(n) {
+  stopif(
+    length(n) != 1 || !is.numeric(n) || is.na(n) || n < 1 || n != round(n),
+    "n must be a single positive whole number."
   )
 }
 
@@ -488,7 +562,7 @@ check_formula.change_detection <- function(model, data, formula) {
 }
 
 # chunks are the model's own Stan files, in dependency order. vreal must list
-# the probe first, because bmf2bf() puts probe_centered first in vreal().
+# the probe first, because bmf2bf() puts the probe column first in vreal().
 .cd_model_stanvars <- function(model, family, chunks, vint = NULL,
                                vreal = list(probe = 1)) {
   out <- .circmix_stanvars() + .cd_stanvars()
