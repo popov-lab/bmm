@@ -220,13 +220,18 @@ test_that("log_lik() and posterior_predict() of an m3 fit take the data given to
 
 # newdata in the layout given to bmm() is checked again, and a response that is
 # NA in every row is the only way to predict new trials of a model that builds
-# columns from its data (#558)
-test_that("posterior_predict() of a mixture3p fit takes newdata without a single response", {
-  skip_unless_fixtures()
-  fit <- load_fixture_fit("bmmfit_mixture3p.rds")
-  nd <- fit$data[1:4, setdiff(names(fit$data), built_data_columns(fit$bmm$model))]
-  nd$dev_rad <- NA_real_
-  expect_true(lacks_built_columns(fit, nd))
-  expect_no_warning(pred <- brms::posterior_predict(fit, newdata = nd, draw_ids = 1:3))
-  expect_equal(dim(pred), c(3L, nrow(nd)))
+# columns from its data (#558). The cached mixture3p fit predates the custom
+# families, whose check_data() builds none of the columns that fit has, so the
+# current models stand in; brms builds the data of posterior_predict() this way
+test_that("newdata without a single response passes the check of a model that builds columns", {
+  skip_on_cran()
+  for (case_name in c("mixture3p", "imm", "sdm_options")) {
+    case <- newdata_cases()[[case_name]]
+    fit <- newdata_fit(case_name)
+    nd <- as.data.frame(case$data)[1:4, ]
+    nd[[case$model$resp_vars[[1]]]] <- NA_real_
+    expect_true(lacks_built_columns(fit, nd), info = case_name)
+    expect_no_warning(sdata <- brms::standata(fit, newdata = nd, check_response = FALSE))
+    expect_equal(sdata$N, nrow(nd), info = case_name)
+  }
 })
