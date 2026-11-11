@@ -11,9 +11,8 @@ test_that("mixture2p() validates its arguments", {
 })
 
 test_that("mixture2p() and dmixture2p() default to 81 quadrature nodes", {
-  # 41 nodes put the reject threshold inside a real-data posterior: slot
-  # averaging + VP on three subjects of zhang_luck_2008 diverged on 143 of 200
-  # transitions at 41 nodes and on none at 81 (#398)
+  # 41 nodes hold the log likelihood to about 1e-3 and step by as much where
+  # the gamma shape crosses 2; 81 hold it to 3e-7 for kappa up to 1000 (#695)
   expect_equal(mixture2p("y", variable_precision = TRUE)$vp_nodes, 81L)
   expect_equal(formals(mixture2p)$vp_nodes, 81L)
   expect_equal(formals(dmixture2p)$vp_nodes, 81L)

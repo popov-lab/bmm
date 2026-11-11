@@ -65,7 +65,7 @@ precision is the only extension offered here.}
 
 \item{vp_nodes}{Number of quadrature nodes used when
 \code{variable_precision = TRUE}; must be an odd number of at least 41, default
-81. See \code{\link[=mixture2p]{mixture2p()}} for the accuracy this buys.}
+81. See \code{\link[=mixture2p]{mixture2p()}} for the accuracy this gives.}
 
 \item{links}{A named list of link functions for the model parameters.}
 

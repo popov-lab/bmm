@@ -151,8 +151,10 @@
 # component's integrand. Below 2, sd(log J) grows like 1 / shape, so a grid of
 # fixed size cannot follow it; there the part of the integral below J = 1e-4 is
 # analytic and the grid covers the rest (.circmix_vp_component_tail()). With 81
-# nodes each scheme holds the log density to about 1e-7 at the switch, and the
-# step between them there is below 1e-6.
+# nodes and kappa up to 1000 each scheme holds the log density to 3e-7 at the
+# switch, and the step between them there is below 4e-7. The tail grid spans
+# [log J0, log J_hi], so its step grows with log tau: at kappa 1e4 the tail
+# scheme and the step reach 2e-6.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
@@ -200,7 +202,7 @@
 # The grid is centred on the mode of the integrand, found by a fixed number of
 # damped Newton steps from the large-kappa mode (shape + 1/2) / (1/tau + 1 -
 # cos_d); a fixed count keeps the grid a smooth function of the parameters, and
-# four steps reach the mode to 1e-4 of the window scale from shape 0.5 to 1e6
+# four steps reach the mode to 1e-4 of the window scale from shape 2 to 1e6
 # and kappa 0.01 to 1e4 (the start alone is within 0.4 of it there, which the
 # window absorbs, so the steps guard parameters outside that range). The grid
 # spans -12 to +6 times the integrand's curvature scale, wider below because

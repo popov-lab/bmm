@@ -3,9 +3,8 @@ nt_model <- function(...) {
 }
 
 test_that("mixture3p() and dmixture3p() default to 81 quadrature nodes", {
-  # 41 nodes put the reject threshold inside a real-data posterior: slot
-  # averaging + VP on three subjects of oberauer_lin_2017 diverged on 165 of
-  # 200 transitions at 41 nodes (#398)
+  # 41 nodes hold the log likelihood to about 1e-3 and step by as much where
+  # the gamma shape crosses 2; 81 hold it to 3e-7 for kappa up to 1000 (#695)
   expect_equal(nt_model(variable_precision = TRUE)$vp_nodes, 81L)
   expect_equal(formals(mixture3p)$vp_nodes, 81L)
   expect_equal(formals(dmixture3p)$vp_nodes, 81L)
