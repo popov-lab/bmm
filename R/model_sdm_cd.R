@@ -8,7 +8,7 @@
 # single precision state, so the knowledge-limited and knowledge-rich
 # observers of the circular mixtures coincide and sdm_cd() takes no knowledge
 # argument.
-.model_sdm_cd <- function(response = NULL, probe = NULL, target = NULL,
+.model_sdm_cd <- function(response = NULL, probe = NULL,
                           links = NULL, version = "simple", call = NULL, ...) {
   de <- .model_sdm()
   spec <- .cd_add_criterion(list(
@@ -20,24 +20,23 @@
   ))
   out <- structure(
     list(
-      resp_vars = nlist(response, probe, target),
+      resp_vars = nlist(response, probe),
       other_vars = nlist(),
       domain = "Working memory",
       task = "Detection, recognition and confidence judgments",
       name = "Signal Discrimination Model (SDM) for Change Detection",
       citation = c(
         de$citation,
-        glue(
-          "Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual \\
-          working memory: Applications to the change detection task. Cognitive \\
-          Psychology, 133, 101463. https://doi.org/10.1016/j.cogpsych.2022.101463"
-        )
+        .cd_citation
       ),
       version = version,
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the requirements in one list
       requirements = paste0(
         "- The response variable should be coded 0 ('same') and 1 ('change')\n",
-        "- The probe and the target should be in radians: the feature shown at test ",
-        "and the feature shown at the probed location in the memory array"
+        "  - The probe should be in radians and relative to the target: the ",
+        "feature shown at test minus the feature shown at the probed location, ",
+        "which is 0 on a 'same' trial"
       ),
       parameters = spec$parameters,
       links = spec$links,
@@ -61,6 +60,8 @@ settable_links.sdm_cd <- function(model) {
 # user facing alias
 
 #' @title `r .model_sdm_cd()$name`
+#' @description Fits the Signal Discrimination Model of [sdm()] to the "same"
+#'   or "change" responses of a single-probe change-detection task.
 #' @details `r model_docs(.model_sdm_cd())`
 #'
 #' @section The observer:
@@ -108,11 +109,10 @@ settable_links.sdm_cd <- function(model) {
 #' @param response The name of the variable in the data containing the
 #'   change-detection response, coded 0 ("same") and 1 ("change"). A logical
 #'   variable is accepted and coded `TRUE` = "change".
-#' @param probe The name of the variable containing the feature shown at test,
-#'   in radians.
-#' @param target The name of the variable containing the feature shown at the
-#'   probed location in the memory array, in radians. On "same" trials it
-#'   equals the probe.
+#' @param probe The name of the variable containing the probe in radians,
+#'   relative to the target: the feature shown at test minus the feature shown
+#'   at the probed location in the memory array, as [wrap()] returns it. It is 0
+#'   on "same" trials.
 #' @param version Character. The version of the model to use. Currently only
 #'   "simple" is supported, as for [sdm()].
 #' @param ... used internally for testing, ignore it
@@ -128,9 +128,10 @@ settable_links.sdm_cd <- function(model) {
 #'   working memory: Applications to the change detection task. Cognitive
 #'   Psychology, 133, 101463. \doi{10.1016/j.cogpsych.2022.101463}
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
-#' # half of the trials probe the target itself, the others a random colour
-#' design <- data.frame(target = 0, probe = c(rep(0, 1000), runif(1000, -pi, pi)))
-#' model <- sdm_cd(response = "change", probe = "probe", target = "target")
+#' # the probe is relative to the target: half of the trials show the target
+#' # itself (a probe of 0), the others a random colour
+#' design <- data.frame(probe = c(rep(0, 1000), runif(1000, -pi, pi)))
+#' model <- sdm_cd(response = "change", probe = "probe")
 #' dat <- simulate_data(model, pars = list(c = 1.5, kappa = 2), design = design)
 #'
 #' fit <- bmm(
@@ -141,14 +142,17 @@ settable_links.sdm_cd <- function(model) {
 #'   iter = 500,
 #'   backend = "cmdstanr"
 #' )
+#'
+#' # criterion is estimated once it has a formula
+#' criterion_formula <- bmmformula(c ~ 1, kappa ~ 1, criterion ~ 1)
 #' @export
-sdm_cd <- function(response, probe, target, version = "simple", ...) {
+sdm_cd <- function(response, probe, version = "simple", ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   version <- match.arg(version)
   .model_sdm_cd(
-    response = response, probe = probe, target = target, version = version,
+    response = response, probe = probe, version = version,
     call = call, ...
   )
 }
@@ -172,7 +176,7 @@ check_data.sdm_cd <- function(model, data, formula) {
 
 #' @export
 bmf2bf.sdm_cd <- function(model, formula) {
-  brms::bf(.circmix_aterm(model$resp_vars$response, vreal = "probe_centered"))
+  brms::bf(.circmix_aterm(model$resp_vars$response, vreal = model$resp_vars$probe))
 }
 
 # Not the core's family: log Z costs up to 28 panels of 32 nodes, so it is
@@ -267,11 +271,11 @@ posterior_epred_sdm_cd_simple <- function(prep) {
 #' @export
 simulate_data.sdm_cd <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$resp_vars
-  design <- .design_or_n(model, design, c(vars$probe, vars$target), ...)
+  design <- .design_or_n(model, design, vars$probe, ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   y <- .sdm_cd_observe(
-    probe = wrap(design[[vars$probe]] - design[[vars$target]]),
+    probe = wrap(design[[vars$probe]]),
     mu = p$mu, c = p$c, kappa = p$kappa, criterion = p$criterion
   )
   .simulate_result(design, stats::setNames(list(y), vars$response), sim)
@@ -375,6 +379,8 @@ simulate_data.sdm_cd <- function(model, pars, design = NULL, scale = c("link", "
       args$c[arc], args$kappa[arc]
     ) - log_z[arc])
   }
+  # the arc integral of an unknown arc is empty, which would read as P("same") 0
+  out[is.na(args$probe) | is.na(args$mu)] <- NA
   out
 }
 

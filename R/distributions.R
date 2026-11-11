@@ -477,6 +477,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 dsdm_cd <- function(response, probe, mu = 0, c = 3, kappa = 3.5, criterion = 0,
                     log = FALSE) {
   .check_sdm_args(c, kappa, "sqrtexp")
+  .cd_check_criterion(criterion, has_log = TRUE)
   stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
   args <- .circmix_recycle(
     response = response, probe = probe, mu = mu, c = c, kappa = kappa,
@@ -490,11 +491,9 @@ dsdm_cd <- function(response, probe, mu = 0, c = 3, kappa = 3.5, criterion = 0,
 #' @rdname sdm_cd_dist
 #' @export
 rsdm_cd <- function(n, probe, mu = 0, c = 3, kappa = 3.5, criterion = 0) {
+  .cd_check_n(n)
   .check_sdm_args(c, kappa, "sqrtexp")
-  stopif(
-    length(n) != 1 || !is.numeric(n) || is.na(n) || n < 1 || n != round(n),
-    "n must be a single positive whole number."
-  )
+  .cd_check_criterion(criterion)
   recycle <- function(x) rep_len(x, n)
   .sdm_cd_observe(recycle(probe), recycle(mu), recycle(c), recycle(kappa), recycle(criterion))
 }

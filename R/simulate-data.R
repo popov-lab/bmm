@@ -51,7 +51,10 @@
 #' The data are drawn with the model's `r*()` function, such as [rmixture2p()]
 #' or [rsdt_rating()]. They are not independent of the model's density
 #' functions: a recovery study that has to rule out an error shared by the two
-#' needs a generator written separately.
+#' needs a generator written separately. The change-detection models (`*_cd`)
+#' are the exception: their data come from an observer that retrieves a feature
+#' on every trial and applies the decision rule to it, which shares no code with
+#' the response probabilities the likelihood integrates.
 #'
 #' @section Design:
 #' The columns each model reads from `design`, under the names the model was
@@ -60,6 +63,7 @@
 #' | Model | Columns |
 #' |:--|:--|
 #' | [sdm()], [ddm()], [cswald()] | none |
+#' | [sdm_cd()] | `probe`, relative to the target |
 #' | [mixture2p()] | `set_size` (if it names a column) for the versions `"slot"` and `"slot_averaging"`; none for `"simple"` |
 #' | [mixture3p()] | `set_size` (if it names a column), `nt_features`, of which a row's first `set_size - 1` are read |
 #' | [imm()] | as [mixture3p()], plus `nt_distances` for the versions `"full"` and `"bsc"` |

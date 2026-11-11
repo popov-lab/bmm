@@ -34,16 +34,16 @@ sdm_cd_reference <- function(probe, mu, c, kappa, criterion) {
 }
 
 test_that("sdm_cd() validates its arguments", {
-  expect_error(sdm_cd("r", "p"), "target")
-  expect_error(sdm_cd("r", "p", "t", version = "full"), "should be")
-  expect_error(sdm_cd("r", "p", "t", links = list(c = "identity")), "cannot be changed")
+  expect_error(sdm_cd("r"), "probe")
+  expect_error(sdm_cd("r", "p", version = "full"), "should be")
+  expect_error(sdm_cd("r", "p", links = list(c = "identity")), "cannot be changed")
   # arguments copied from the circular mixtures are reported, not silently dropped
-  expect_warning(sdm_cd("r", "p", "t", knowledge = "rich"), "knowledge")
-  expect_warning(sdm_cd("r", "p", "t", variable_precision = TRUE), "variable_precision")
+  expect_warning(sdm_cd("r", "p", knowledge = "rich"), "knowledge")
+  expect_warning(sdm_cd("r", "p", variable_precision = TRUE), "variable_precision")
 })
 
 test_that("sdm_cd() takes sdm's parameters, priors, links and inits, plus criterion", {
-  cd <- sdm_cd("r", "p", "t")
+  cd <- sdm_cd("r", "p")
   de <- sdm("y")
   # a joint fit of both tasks relies on the shared names
   expect_identical(names(cd$parameters), c(names(de$parameters), "criterion"))
@@ -62,7 +62,7 @@ test_that("sdm_cd() takes sdm's parameters, priors, links and inits, plus criter
 test_that("criterion's init range starts on the linear part of its bound", {
   # at the corners of the inits of c and kappa, the ends of criterion's init
   # range keep more than half of their value
-  init <- sdm_cd("r", "p", "t")$init_ranges
+  init <- sdm_cd("r", "p")$init_ranges
   corners <- expand.grid(c = init$c, kappa = init$kappa, criterion = init$criterion)
   log_z <- .sdm_cd_log_int(-pi, pi, 0, corners$c, corners$kappa)
   bounded <- .sdm_cd_bounded_criterion(corners$criterion, corners$c, corners$kappa, log_z)
@@ -148,30 +148,30 @@ test_that("rsdm_cd() draws the observer that dsdm_cd() integrates", {
 
 test_that("check_data() refuses missing values in every column the model reads", {
   data <- sdm_cd_data()
-  model <- sdm_cd("change", "probe", "target")
+  model <- sdm_cd("change", "probe")
   formula <- bmf(c ~ 1, kappa ~ 1)
-  for (column in c("change", "probe", "target")) {
+  for (column in c("change", "probe")) {
     broken <- data
     broken[[column]][3] <- NA
     expect_error(check_data(model, broken, formula), "missing", label = column)
   }
   checked <- check_data(model, data, formula)
-  expect_equal(checked$probe_centered, wrap(data$probe - data$target))
-  expect_identical(built_data_columns(model), "probe_centered")
+  expect_identical(checked$probe, data$probe)
+  expect_identical(built_data_columns(model), character(0))
 })
 
 test_that("an estimated criterion is announced with the bound", {
   data <- sdm_cd_data()
   formula <- bmf(c ~ 1, kappa ~ 1, criterion ~ 1)
-  model <- check_model(sdm_cd("change", "probe", "target"), data, formula)
+  model <- check_model(sdm_cd("change", "probe"), data, formula)
   expect_message(check_formula(model, data, formula), "Decision criterion")
   fixed <- bmf(c ~ 1, kappa ~ 1)
-  model <- check_model(sdm_cd("change", "probe", "target"), data, fixed)
+  model <- check_model(sdm_cd("change", "probe"), data, fixed)
   expect_no_message(check_formula(model, data, fixed), message = "criterion is estimated")
 })
 
 test_that("the likelihood is one call over the runs, with c through its log link", {
-  code <- stancode(bmf(c ~ 1, kappa ~ 1), sdm_cd_data(), sdm_cd("change", "probe", "target"))
+  code <- stancode(bmf(c ~ 1, kappa ~ 1), sdm_cd_data(), sdm_cd("change", "probe"))
   expect_match(
     code,
     paste0("sdm_cd_simple_lpmf(Y | mu, c, kappa, criterion, vreal1, G_sdm_runs, ",
@@ -185,10 +185,10 @@ test_that("the likelihood is one call over the runs, with c through its log link
 
 test_that("the runs are the cells of every predictor, criterion's included", {
   data <- data.frame(
-    change = rep(c(0L, 1L, 1L), 10), target = 0, probe = rep(c(0, 1.5, -2), 10),
+    change = rep(c(0L, 1L, 1L), 10), probe = rep(c(0, 1.5, -2), 10),
     cond = rep(c("a", "b", "c"), c(12, 10, 8))
   )
-  model <- sdm_cd("change", "probe", "target")
+  model <- sdm_cd("change", "probe")
   runs <- function(formula, data) {
     sdata <- suppressMessages(standata(formula, data, model))
     c(G = sdata$G_sdm_runs, start = sdata$sdm_run_start, count = sdata$sdm_run_count)
@@ -216,7 +216,7 @@ test_that("the runs are the cells of every predictor, criterion's included", {
 
 test_that("within-chain threading is refused", {
   # brms would slice Y and the dpars per thread but pass the runs whole
-  model <- sdm_cd("change", "probe", "target")
+  model <- sdm_cd("change", "probe")
   formula <- bmf(c ~ 1, kappa ~ 1)
   expect_error(
     bmm(formula, sdm_cd_data(), model, backend = "mock", mock_fit = 1,
@@ -252,8 +252,8 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   withr::local_seed(649)
   # c e^1.5, kappa e, the probe 1 from the target: P("change") from the
   # integrate() reference
-  design <- data.frame(target = 2, probe = 3)[rep(1, 1e5), ]
-  model <- sdm_cd("change", "probe", "target")
+  design <- data.frame(probe = rep(1, 1e5))
+  model <- sdm_cd("change", "probe")
   data <- simulate_data(model, list(c = 1.5, kappa = 1), design)
   expected <- 1 - sdm_cd_reference(1, 0, exp(1.5), exp(1), 0)
   expect_lt(abs(mean(data$change) - expected), 5 * sqrt(0.25 / nrow(data)))
@@ -326,4 +326,18 @@ test_that("the likelihood computes log Z once per run and matches R row by row",
     .sdm_cd_log_int(-pi, pi, 0, cases$c[runs$start], cases$kappa[runs$start]),
     tolerance = 1e-10
   )
+})
+
+test_that("dsdm_cd() returns NA for a missing probe or location, as dsdm() does", {
+  expect_true(all(is.na(dsdm_cd(c(0, 1), probe = NA))))
+  expect_identical(is.na(dsdm_cd(1, probe = c(0.5, NA, 2))), c(FALSE, TRUE, FALSE))
+  expect_true(is.na(dsdm_cd(1, 1, mu = NA)))
+})
+
+test_that("a logical criterion is refused as a misplaced log, and n is one whole number", {
+  expect_error(dsdm_cd(1, 0.5, 0, 3, 3.5, TRUE), "Did you mean log = TRUE")
+  expect_error(rsdm_cd(5, 0.5, criterion = TRUE), "criterion must be numeric")
+  for (n in list(2.5, c(2, 3), 0, "3")) {
+    expect_error(rsdm_cd(n, 0.5), "single positive whole number")
+  }
 })

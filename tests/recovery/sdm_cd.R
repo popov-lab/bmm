@@ -44,13 +44,14 @@ sdm_cd_generator <- function(pars, n_trials, model) {
     0
   }
 
-  out <- data.frame(as.integer(llr > bounded), probe, target)
-  names(out) <- unlist(model$resp_vars[c("response", "probe", "target")], use.names = FALSE)
+  # the model reads the probe relative to the target, in [-pi, pi)
+  out <- data.frame(as.integer(llr > bounded), (probe - target + pi) %% (2 * pi) - pi)
+  names(out) <- unlist(model$resp_vars[c("response", "probe")], use.names = FALSE)
   out
 }
 
 bmmtools::validation_plan(
-  bmm::sdm_cd(response = "change", probe = "probe", target = "target"),
+  bmm::sdm_cd(response = "change", probe = "probe"),
   # log scale: c e^1.2 = 3.3 and kappa e^2.5 = 12.2, away from the centres of
   # the default priors (log c 2, log kappa 1.75)
   pars = c(c = 1.2, kappa = 2.5),

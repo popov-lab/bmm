@@ -4,19 +4,17 @@
 \alias{sdm_cd}
 \title{Signal Discrimination Model (SDM) for Change Detection}
 \usage{
-sdm_cd(response, probe, target, version = "simple", ...)
+sdm_cd(response, probe, version = "simple", ...)
 }
 \arguments{
 \item{response}{The name of the variable in the data containing the
 change-detection response, coded 0 ("same") and 1 ("change"). A logical
 variable is accepted and coded \code{TRUE} = "change".}
 
-\item{probe}{The name of the variable containing the feature shown at test,
-in radians.}
-
-\item{target}{The name of the variable containing the feature shown at the
-probed location in the memory array, in radians. On "same" trials it
-equals the probe.}
+\item{probe}{The name of the variable containing the probe in radians,
+relative to the target: the feature shown at test minus the feature shown
+at the probed location in the memory array, as \code{\link[=wrap]{wrap()}} returns it. It is 0
+on "same" trials.}
 
 \item{version}{Character. The version of the model to use. Currently only
 "simple" is supported, as for \code{\link[=sdm]{sdm()}}.}
@@ -27,7 +25,8 @@ equals the probe.}
 An object of class \code{bmmodel}
 }
 \description{
-Signal Discrimination Model (SDM) for Change Detection
+Fits the Signal Discrimination Model of \code{\link[=sdm]{sdm()}} to the "same"
+or "change" responses of a single-probe change-detection task.
 }
 \details{
 \itemize{
@@ -43,17 +42,13 @@ Signal Discrimination Model (SDM) for Change Detection
 \item \strong{Requirements:}
 \itemize{
 \item The response variable should be coded 0 ('same') and 1 ('change')
+\item The probe should be in radians and relative to the target: the feature shown at test minus the feature shown at the probed location, which is 0 on a 'same' trial
 }
-}
-\itemize{
-\item The probe and the target should be in radians: the feature shown at test and the feature shown at the probed location in the memory array
-}
-\itemize{
 \item \strong{Parameters:}
 \itemize{
 \item \code{mu}: Location parameter of the SDM distribution (in radians; by default fixed internally to 0)
 \item \code{c}: Memory strength parameter of the SDM distribution
-\item \code{kappa}: Precision parameter of the SDM distribution
+\item \code{kappa}: Precision parameter of the SDM distribution. Unlike in continuous reproduction, it holds no response noise.
 \item \code{criterion}: Decision criterion, Lin and Oberauer's (2022) bias beta on the log-likelihood ratio of 'change' against 'same'; positive values favour 'same' responses. Fixed to 0, the unbiased observer, by default. When estimated, it is kept inside the range of evidence each trial can produce (it equals Lin and Oberauer's criterion near 0 and is compressed toward that range's ends), so both responses stay possible on every trial.
 }
 \item \strong{Fixed parameters:}
@@ -144,9 +139,10 @@ sorted. Within-chain threading (the \code{threads} argument) is not supported.
 
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
-# half of the trials probe the target itself, the others a random colour
-design <- data.frame(target = 0, probe = c(rep(0, 1000), runif(1000, -pi, pi)))
-model <- sdm_cd(response = "change", probe = "probe", target = "target")
+# the probe is relative to the target: half of the trials show the target
+# itself (a probe of 0), the others a random colour
+design <- data.frame(probe = c(rep(0, 1000), runif(1000, -pi, pi)))
+model <- sdm_cd(response = "change", probe = "probe")
 dat <- simulate_data(model, pars = list(c = 1.5, kappa = 2), design = design)
 
 fit <- bmm(
@@ -157,6 +153,9 @@ fit <- bmm(
   iter = 500,
   backend = "cmdstanr"
 )
+
+# criterion is estimated once it has a formula
+criterion_formula <- bmmformula(c ~ 1, kappa ~ 1, criterion ~ 1)
 \dontshow{\}) # examplesIf}
 }
 \references{
