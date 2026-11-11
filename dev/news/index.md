@@ -259,6 +259,14 @@
   offset can now fix a parameter per observation, and
   [`update()`](https://rdrr.io/r/stats/update.html) with `newdata`
   holding new offset values reuses the compiled model.
+- A model with a bound on its regression coefficients, such as
+  `prior(normal(0, 1), class = b, dpar = kappa, lb = 0)` for a monotonic
+  effect, now starts sampling
+  ([\#694](https://github.com/popov-lab/bmm/issues/694)). Before, chains
+  stopped with “Rejecting initial value” and “Lower bounded variable …
+  must be greater than or equal to 0”, and passing your own `init` was
+  the only way around it. Bounds on an intercept or on a group-level
+  standard deviation (`class = sd`) are respected too.
 
 #### Deprecated functions and arguments
 
