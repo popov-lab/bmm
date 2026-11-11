@@ -293,9 +293,25 @@ test_that("distribution validators share one name and run first (#564)", {
     stmts <- statements(body)
     length(stmts) == 1 && identical(stmts[[1]], quote(.NotYetImplemented()))
   }
+  # covr (CI test-coverage) rewrites each statement as
+  # if (TRUE) { covr:::count(<id>); <statement> }, which hides every top-level
+  # call; a user-written if never opens with a covr count and is kept
+  is_covr_wrapper <- function(expr) {
+    is.call(expr) && identical(expr[[1]], as.name("if")) && length(expr) == 3 &&
+      isTRUE(expr[[2]]) && is.call(expr[[3]]) && identical(expr[[3]][[1]], as.name("{")) &&
+      length(expr[[3]]) == 3 && is.call(expr[[3]][[2]]) &&
+      identical(expr[[3]][[2]][[1]], quote(covr:::count))
+  }
+  uncovr <- function(expr) {
+    if (!is.call(expr)) return(expr)
+    if (is_covr_wrapper(expr)) return(uncovr(expr[[3]][[3]]))
+    as.call(lapply(as.list(expr), function(e) {
+      if (identical(e, quote(expr = ))) e else uncovr(e)
+    }))
+  }
 
   for (name in names(validator_of)) {
-    body <- body(get(name, envir = ns))
+    body <- uncovr(body(get(name, envir = ns)))
     if (is_stub(body)) next
     stmts <- statements(body)
     at <- which(vapply(stmts, function(s) {
