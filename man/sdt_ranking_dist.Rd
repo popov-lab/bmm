@@ -33,8 +33,9 @@ another \code{sdratio} it is the balanced index \eqn{d_a} that \code{\link[=sdt_
 reports (in root-mean-square SD units).}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance). Must be positive. Only used when
-\code{dist = "normal"}.}
+(default 1, i.e., equal variance). Must be positive. Read only with
+\code{dist = "normal"}; with \code{dist = "gumbel_min"} any value other than 1
+stops.}
 
 \item{dist}{Character. The distribution assumed for the latent evidence:
 "gumbel_min" (default), the smallest extreme value distribution with

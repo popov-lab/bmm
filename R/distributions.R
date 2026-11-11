@@ -3903,8 +3903,9 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #' @param m Integer vector. Number of ranked items per observation. Must be
 #'   at least 2 and no larger than the number of count columns.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). Must be positive. Only used when
-#'   `dist = "normal"`.
+#'   (default 1, i.e., equal variance). Must be positive. Read only with
+#'   `dist = "normal"`; with `dist = "gumbel_min"` any value other than 1
+#'   stops.
 #' @param dist Character. The distribution assumed for the latent evidence:
 #'   "gumbel_min" (default), the smallest extreme value distribution with
 #'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
@@ -3945,6 +3946,9 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
                          log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  stopif(dist == "gumbel_min" && any(sdratio != 1),
+         "sdratio is read only with dist = \"normal\"; with dist = \"gumbel_min\" \\
+         it must be 1. Use dist = \"normal\" for unequal-variance ranking.")
   counts <- .counts_rows(counts)
   n <- .obs_length(m, d, sdratio, rows = list(counts))
   if (n == 0L) return(numeric(0))
@@ -3989,6 +3993,9 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  stopif(dist == "gumbel_min" && any(sdratio != 1),
+         "sdratio is read only with dist = \"normal\"; with dist = \"gumbel_min\" \\
+         it must be 1. Use dist = \"normal\" for unequal-variance ranking.")
 
   # with no draws the columns follow the largest set size given
   if (n == 0) {
