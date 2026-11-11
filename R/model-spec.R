@@ -51,7 +51,11 @@
 #'       constructor must hold.}
 #'     \item{`functions`}{A list with the names of the model's exported
 #'       `density` and `generator` (random generation) functions, such as
-#'       `"dsdm"` and `"rsdm"`; `NA` where a model has none.}
+#'       `"dsdm"` and `"rsdm"`; `NA` where a model has none. They are the
+#'       model's exported d/r pair and may not cover every version:
+#'       `dmixture3p()` and `rmixture3p()` do not express the item-wise
+#'       precision of [mixture3p()] `version = "slot_averaging"` above
+#'       `K = set_size`.}
 #'     \item{`contract_version`}{The version of this specification, `"0.9"`
 #'       until bmm 1.6.0 fixes it as `"1.0"`.}
 #'   }

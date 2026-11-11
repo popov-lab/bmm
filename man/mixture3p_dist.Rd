@@ -39,14 +39,17 @@ the mean of \code{J}.}
 \item{p_mem}{Vector of probabilities of a target response. For a
 \code{\link[=mixture3p]{mixture3p()}} fit these are \code{thetat} on its native scale (version
 \code{"simple"}, see \code{\link[=native_parameters]{native_parameters()}}) or \code{min(1, K / set_size) * ptarget}
-(versions \code{"slot"} and \code{"slot_averaging"}).}
+(versions \code{"slot"} and \code{"slot_averaging"}). The mapping is exact for
+\code{"slot"} and for \code{"slot_averaging"} up to \code{K = set_size}. Above capacity,
+slot averaging gives an item several slots and raises its precision,
+which these functions do not model.}
 
 \item{p_nt}{Vector of probabilities of a non-target response, summed over
 the non-targets, which share it equally. For a \code{\link[=mixture3p]{mixture3p()}} fit these are
 \code{thetant} on its native scale (version \code{"simple"}) or
-\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions). Unlike
-\code{ptarget}, \code{p_mem} and \code{p_nt} are not conditional on a response from
-memory.}
+\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions, with the limit
+for \code{"slot_averaging"} given under \code{p_mem}). Unlike \code{ptarget}, \code{p_mem} and
+\code{p_nt} are not conditional on a response from memory.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
