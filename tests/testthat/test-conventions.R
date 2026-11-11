@@ -244,38 +244,60 @@ test_that("distribution validators share one name and run first (#564)", {
   fns <- ls(ns, all.names = TRUE)
   exports <- getNamespaceExports("bmm")
 
-  losing <- grep("^validate_.+_parameters$|^\\.check_.+_pars$", fns, value = TRUE)
-  expect_identical(losing, character(0),
-                   info = "name a family validator .check_<family>_args()")
+  expect_identical(
+    grep("^\\.?validate_.+_parameters$|^\\.check_.+_(pars|params|arguments|parameters)$", fns, value = TRUE),
+    character(0),
+    info = "name a family validator .check_<family>_args()"
+  )
 
   # a family is whatever has a validator; the version helpers of mixture2p
-  # (.check_mixture2p_version_args) have no d/p/q/r members and drop out
+  # (.check_mixture2p_version_args) have no d/p/q/r members and drop out.
+  # The test is opt-in by name: a family that never adopts .check_<family>_args
+  # is not inspected, and the .validate_* helpers (.validate_sdt_rates) are out
+  # of scope.
   families <- sub("^\\.check_(.+)_args$", "\\1", grep("^\\.check_.+_args$", fns, value = TRUE))
   validator_of <- character()
+  inspected <- character()
   for (f in families) {
     found <- grep(paste0("^[dpqr]", f, "$"), exports, value = TRUE)
+    if (length(found)) inspected <- c(inspected, f)
     validator_of <- c(validator_of, stats::setNames(rep(paste0(".check_", f, "_args"), length(found)), found))
   }
   expect_gt(length(validator_of), 10)
+  # a validator renamed away from this scheme drops its family from the loop
+  # below without any other failure; a count floor catches that without a list
+  expect_gte(length(inspected), 6L,
+             label = paste0("families inspected (", paste(inspected, collapse = ", "), ")"))
 
   call_heads <- function(expr) {
     if (!is.call(expr)) return(character())
-    head <- if (is.name(expr[[1]])) as.character(expr[[1]]) else character()
-    c(head, unlist(lapply(as.list(expr)[-1], function(e) {
+    fn <- expr[[1]]
+    callee <- if (is.name(fn)) {
+      as.character(fn)
+    } else if (is.call(fn) && is.name(fn[[1]]) && as.character(fn[[1]]) %in% c("::", ":::")) {
+      # base::log() must not slip past the allow-list as an anonymous head
+      as.character(fn[[3]])
+    } else {
+      call_heads(fn)
+    }
+    c(callee, unlist(lapply(as.list(expr)[-1], function(e) {
       if (identical(e, quote(expr = ))) character() else call_heads(e)
     })))
   }
   preamble <- c("{", "<-", "=", "if", "||", "isTRUE", "isFALSE", "match.arg",
-                ".warn_positional_log", "names")
+                ".warn_positional_log", "names", "stop_missing_args")
+  statements <- function(body) {
+    if (is.call(body) && identical(body[[1]], as.name("{"))) as.list(body)[-1] else list(body)
+  }
   is_stub <- function(body) {
-    stmts <- as.list(body)[-1]
+    stmts <- statements(body)
     length(stmts) == 1 && identical(stmts[[1]], quote(.NotYetImplemented()))
   }
 
   for (name in names(validator_of)) {
     body <- body(get(name, envir = ns))
     if (is_stub(body)) next
-    stmts <- as.list(body)[-1]
+    stmts <- statements(body)
     at <- which(vapply(stmts, function(s) {
       is.call(s) && identical(s[[1]], as.name(validator_of[[name]]))
     }, logical(1)))
@@ -283,7 +305,7 @@ test_that("distribution validators share one name and run first (#564)", {
     if (length(at)) {
       before <- as.character(unlist(lapply(stmts[seq_len(at[[1]] - 1)], call_heads)))
       expect_identical(setdiff(before, preamble), character(0), label = name,
-                       info = "the validator runs before anything but match.arg() and the positional-log shim")
+                       info = "the validator runs before anything but match.arg(), stop_missing_args() and the positional-log shim")
     }
   }
 })
