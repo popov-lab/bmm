@@ -72,20 +72,13 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
-  // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0, kappa = 0, or a grid narrower than 1e-6)
+  // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0, kappa = 0, or a grid narrower than 1e-6); any positive shape is integrable, see circmix_vp_component()
   real circmix_vp_shape(real kappa, real tau, int nodes) {
     // kappa = 0 has J = 0: the gamma on J is a point mass there, as in R
     if (tau <= 0 || kappa <= 0) {
       return positive_infinity();
     }
     real shape = circmix_J(kappa) / tau;
-    if (shape < 60.0 / nodes) {
-      reject("bmm: the variable-precision quadrature needs a gamma shape ",
-             "J(kappa)/tau of at least 60 / vp_nodes = ", 60.0 / nodes,
-             ", but got ", shape,
-             ". Raise vp_nodes above ", 60.0 / shape,
-             ", or use a more informative prior on tau.");
-    }
     if (8 * sqrt(trigamma(shape)) < 1e-6) {
       return positive_infinity();
     }
@@ -118,10 +111,44 @@
             + (c - A) * dA * (1 + square(A)) * dkappa / square(one_minus_A2)]';
   }
 
-  // log integral over J ~ gamma(shape, scale = tau) of one von Mises with c = cos(y - mu); grid centred on the integrand's mode, see .circmix_vp_component()
+  // circmix_vp_component() below a gamma shape of 2, where sd(log J) ~ 1 / shape outgrows any fixed grid; see .circmix_vp_component_tail()
+  // Below J0 = 1e-4, kappa = sqrt(2 J) (1 + J / 8) and 2 pi times the von Mises density is
+  // 1 + sqrt(2 J) c + J (c^2 - 1/2) + O(J^(3/2)), so that part of the integral is three incomplete
+  // gamma moments, accurate to J0^(3/2) = 1e-6 of its mass, and positive since the c terms move it
+  // by at most sqrt(2 J0) + J0 / 2. The Simpson grid covers [J0, J_hi] in log J, J_hi the
+  // Wilson-Hilferty quantile at z = 8.5, at least 40 tau; a J_hi below J0 (tau < 2.5e-6, under
+  // 1e-15 of the mass above J0) spans [J0, e J0] instead.
+  real circmix_vp_component_tail(real c, real shape, real tau, int nodes,
+                                 data vector logk, data vector dlogk,
+                                 data real logJ_min, data real dlogJ) {
+    real J0 = 1e-4;
+    real z = J0 / tau;
+    real tail = gamma_p(shape, z)
+                + c * sqrt(2 * tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * gamma_p(shape + 0.5, z)
+                + (square(c) - 0.5) * shape * tau * gamma_p(shape + 1, z);
+    real lo = log(J0);
+    real hi = fmax(log(tau * fmax(shape * (1 - inv(9 * shape) + 8.5 / (3 * sqrt(shape)))^3, 40)),
+                   lo + 1);
+    real step = (hi - lo) / (nodes - 1);
+    real rate = inv(tau);
+    vector[nodes] lp;
+    for (i in 1:nodes) {
+      real ti = lo + (i - 1) * step;
+      real J = exp(ti);
+      real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
+      lp[i] = circmix_simpson_lw(i, nodes) + ti + gamma_lpdf(J | shape, rate)
+              + kappa * c - log_modified_bessel_first_kind(0, kappa);
+    }
+    return log_sum_exp(log_sum_exp(lp) + log(step / 3), log(tail)) - log(2 * pi());
+  }
+
+  // log integral over J ~ gamma(shape, scale = tau) of one von Mises with c = cos(y - mu); grid centred on the integrand's mode, see .circmix_vp_component_mode(); below shape 2 the analytic tail of circmix_vp_component_tail()
   real circmix_vp_component(real c, real shape, real tau, int nodes,
                             data vector logk, data vector dlogk,
                             data real logJ_min, data real dlogJ) {
+    if (shape < 2) {
+      return circmix_vp_component_tail(c, shape, tau, nodes, logk, dlogk, logJ_min, dlogJ);
+    }
     real rate = inv(tau);
     real t = log((shape + 0.5) / (rate + 1 - c));
     for (i in 1:4) {

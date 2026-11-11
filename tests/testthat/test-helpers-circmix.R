@@ -94,7 +94,7 @@ test_that(".circmix_vp_ld() is a normalised density on the circle", {
 # error that depends on the shape alone acts as a log prior on tau: an offset of
 # 2.5e-4 moved the maximum-likelihood estimate of log tau by 0.13 standard
 # errors at N = 5000.
-test_that(".circmix_vp_ld() is a normalised density from the shape threshold up", {
+test_that(".circmix_vp_ld() is a normalised density at every shape", {
   total <- function(shape) {
     tau <- .circmix_J(10) / shape
     stats::integrate(
@@ -109,13 +109,19 @@ test_that(".circmix_vp_ld() is a normalised density from the shape threshold up"
       rel.tol = 1e-12
     )$value
   }
+  expect_lt(abs(total(0.05) - 1), 1e-6)
+  expect_lt(abs(total(0.3) - 1), 1e-6)
   expect_lt(abs(total(0.75) - 1), 1e-5)
   expect_lt(abs(total(1) - 1), 1e-6)
 })
 
-# Integrates in log J from J = 1e-12 rather than from a gamma quantile: for a
+# Integrates in log J from J = 1e-30 rather than from a gamma quantile: for a
 # response far from the target the integrand peaks far below the prior's bulk,
-# where a quantile bound cuts it off (and returns -Inf at large kappa).
+# where a quantile bound cuts it off (and returns -Inf at large kappa). Below
+# 1e-30 the von Mises is uniform to sqrt(2e-30) = 1.4e-15, so that mass enters
+# as uniform; at kappa 10 it is 92% of the prior at shape 0.001 and 22% at
+# shape 0.02. With 600 pieces instead of 300, or the cut at 1e-60, the value
+# moves by at most 2e-13 at shapes 0.001 to 1.9.
 vp_reference <- function(y, kappa, tau, p_mem, mu = 0, w = 1) {
   shape <- .circmix_J(kappa) / tau
   integrand <- function(t) {
@@ -125,9 +131,10 @@ vp_reference <- function(y, kappa, tau, p_mem, mu = 0, w = 1) {
     density <- (p_mem * memory + (1 - p_mem)) / (2 * pi)
     density * stats::dgamma(J, shape = shape, scale = tau) * J
   }
+  uniform <- stats::pgamma(1e-30, shape, scale = tau) * (p_mem * sum(w) + 1 - p_mem) / (2 * pi)
   upper <- log(stats::qgamma(1e-20, shape, scale = tau, lower.tail = FALSE))
-  breaks <- seq(log(1e-12), upper, length.out = 300)
-  log(sum(vapply(seq_len(length(breaks) - 1), function(i) {
+  breaks <- seq(log(1e-30), upper, length.out = 300)
+  log(uniform + sum(vapply(seq_len(length(breaks) - 1), function(i) {
     stats::integrate(integrand, breaks[i], breaks[i + 1],
       rel.tol = 1e-12, abs.tol = 0, subdivisions = 2000L
     )$value
@@ -143,13 +150,15 @@ vp_errors <- function(y, kappa, shape, p_mem, ...) {
   ) - vapply(y, vp_reference, numeric(1), kappa = kappa, tau = tau, p_mem = p_mem)
 }
 
-test_that(".circmix_vp_ld() matches adaptive integration from the shape threshold up", {
+test_that(".circmix_vp_ld() matches adaptive integration at every shape", {
   y <- c(0, 0.3, 1.5, pi)
-  tolerances <- c(`0.75` = 2e-5, `1` = 2e-6, `2` = 1e-7)
-  for (shape in c(0.75, 1, 2)) {
+  shapes <- c(0.001, 0.02, 0.1, 0.3, 0.74, 1, 1.9, 2, 2.1, 10)
+  tolerances <- c(rep(1e-6, 7), 1e-7, 1e-7, 1e-7)
+  for (i in seq_along(shapes)) {
     expect_lt(
-      max(abs(vp_errors(y, kappa = 10, shape = shape, p_mem = 0.8))),
-      tolerances[[as.character(shape)]]
+      max(abs(vp_errors(y, kappa = 10, shape = shapes[i], p_mem = 0.8))),
+      tolerances[i],
+      label = paste("shape", shapes[i])
     )
   }
 })
@@ -162,6 +171,8 @@ test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
   expect_lt(max(abs(vp_errors(y, kappa = 200, shape = 10, p_mem = 1))), 1e-8)
   expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 100, p_mem = 1))), 1e-8)
   expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.75, p_mem = 1))), 2e-5)
+  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.3, p_mem = 1))), 1e-6)
+  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.05, p_mem = 1))), 1e-6)
 
   # each component needs its own window when the components sit apart
   tau <- .circmix_J(100) / 20
@@ -180,14 +191,28 @@ test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
   )
 })
 
-test_that(".circmix_vp_ld() refuses shapes below 60 / nodes", {
+test_that(".circmix_vp_ld() accepts any gamma shape", {
   at_shape <- function(shape, ...) {
     .circmix_vp_ld(matrix(cos(0.3)), matrix(log(0.8)), log(0.2), 10, .circmix_J(10) / shape, ...)
   }
-  expect_error(at_shape(0.7), "gamma shape")
-  expect_silent(at_shape(0.75))
-  expect_error(at_shape(0.36, nodes = 161L), "gamma shape")
-  expect_silent(at_shape(0.38, nodes = 161L))
+  expect_silent(at_shape(0.1))
+  expect_silent(at_shape(0.1, nodes = 41L))
+})
+
+# Below a gamma shape of 2 the J < 1e-4 part of the integral is analytic and
+# the grid starts at 1e-4; above it the grid follows the integrand. Both reach
+# about 1e-7 at 81 nodes, so the switch must not step the log density by more:
+# with intercept-only kappa and tau every row crosses at once.
+test_that(".circmix_vp_ld() is continuous across the switch at shape 2", {
+  at_shape <- function(y, kappa, shape) {
+    .circmix_vp_ld(matrix(cos(y)), matrix(0, nrow = length(y)), rep(-Inf, length(y)),
+                   rep(kappa, length(y)), rep(.circmix_J(kappa) / shape, length(y)))
+  }
+  y <- c(0, 1, pi)
+  for (kappa in c(1, 10, 100)) {
+    jump <- at_shape(y, kappa, 2 + 1e-9) - at_shape(y, kappa, 2 - 1e-9)
+    expect_lt(max(abs(jump)), 1e-6, label = paste("kappa", kappa))
+  }
 })
 
 test_that(".circmix_slots() gives a slot distribution that is continuous in K", {
@@ -230,6 +255,17 @@ test_that(".circmix_slot_averaging_ld() is accurate for far responses under vari
         vapply(y, vp_reference, numeric(1), kappa = three_slots, tau = 2, p_mem = 1)
     )),
     1e-8
+  )
+  # one slot at gamma shape 0.2, so the three the item holds sit at 0.6, below
+  # the switch at 2 and below the old bound 0.74
+  tau <- .circmix_J(5) / 0.2
+  three_slots <- .circmix_kappa(3 * .circmix_J(5))
+  expect_lt(
+    max(abs(
+      slot_averaging_density(y, K = 3, set_size = 1, kappa = 5, tau = tau) -
+        vapply(y, vp_reference, numeric(1), kappa = three_slots, tau = tau, p_mem = 1)
+    )),
+    1e-6
   )
 })
 
@@ -845,40 +881,59 @@ test_that("variable precision says what kappa means, in every model and version"
   expect_no_match(mixture2p("y")$parameters$kappa, "variable precision")
 })
 
-test_that("the variable-precision quadrature names the node count it needs", {
-  # J(1) / 20 = 0.0223, and 2689 is the smallest odd count with 60 / nodes below it
-  expect_error(
-    dmixture2p(0.3, kappa = 1, tau = 20),
-    "smallest value here is 0.0223. Raise vp_nodes to at least 2689",
-    fixed = TRUE
-  )
-  expect_no_error(dmixture2p(0.3, kappa = 1, tau = 20, vp_nodes = 2689))
-  expect_error(dmixture2p(0.3, kappa = 1, tau = 20, vp_nodes = 2687), "at least 2689")
+test_that("the variable-precision density takes a small gamma shape at the default nodes", {
+  # J(1) / 20 = 0.0223, which needed 2689 nodes before the tail was analytic
+  expect_no_error(dmixture2p(0.3, kappa = 1, tau = 20))
 })
 
-test_that("Stan rejects the same shapes as R, below 60 / nodes", {
+test_that("Stan matches R below the old shape bound", {
   skip_unless_stan_tests()
   skip_on_cran()
 
-  # shape 0.73 sits just under 60 / 81 = 0.741; the agreement test above runs
-  # the passing twin at 0.75. A reject in generated quantities under
-  # fixed_param leaves NaN in the draw instead of stopping the run.
+  # 0.73 sits under the old bound 60 / 81 = 0.741, which Stan rejected; 1.9 and
+  # 2.1 sit either side of the switch to the analytic tail
   tab <- .circmix_kappa_table()
   cosd <- cos(0.4 - c(0, 1.2))
-  tau <- .circmix_J(10) / 0.73
+  logw <- log(c(0.5, 0.3))
+  shapes <- c(0.05, 0.3, 0.73, 1.9, 2.1)
+  tau <- .circmix_J(10) / shapes
+  tau_far <- .circmix_J(200) / c(0.05, 0.3, 1.9)
+  cosd_far <- cos(2.9 - c(0, 1.2))
+  logw_far <- log(c(0.7, 0.3))
   stan <- circmix_stan_values(list(
     NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
     logJ_min = tab$logJ_min, dlogJ = tab$dlogJ,
-    NC = 2L, cosd = cosd, logw = log(c(0.5, 0.3)), logw_guess = log(0.2),
+    NC = 2L, cosd = cosd, logw = logw, logw_guess = log(0.2),
     kappa_het = c(3, 12), NKAP = 1L, kappa = array(2), NJ = 1L, Jtest = array(0.5),
-    NTAU = 1L, tau = array(tau), NI0 = 1L, kappa_i0 = array(1),
+    NTAU = length(tau), tau = tau, NI0 = 1L, kappa_i0 = array(1),
     kappa_vp = 10, nodes = 81L, K_slots = 1.5, ss_slots = 2L, ss_empty = 4L,
-    cosd_far = cosd, logw_far = log(c(0.7, 0.3)), kappa_far = 200,
-    NFAR = 1L, tau_far = array(.circmix_J(200) / 10),
+    cosd_far = cosd_far, logw_far = logw_far, kappa_far = 200,
+    NFAR = length(tau_far), tau_far = tau_far,
     nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2)
   ))
 
-  expect_error(.circmix_vp_ld(matrix(cosd, nrow = 1), matrix(log(c(0.5, 0.3)), nrow = 1),
-                              log(0.2), 10, tau, 81L), "60 / vp_nodes")
-  expect_true(is.nan(stan("out_vp")))
+  expect_equal(stan("out_shape"), shapes, tolerance = 1e-12)
+  expect_equal(
+    stan("out_vp"),
+    vapply(tau, function(c_tau) {
+      .circmix_vp_ld(matrix(cosd, nrow = 1), matrix(logw, nrow = 1), log(0.2), 10, c_tau)
+    }, numeric(1)),
+    tolerance = 1e-10
+  )
+  expect_equal(
+    stan("out_far"),
+    vapply(tau_far, function(c_tau) {
+      .circmix_vp_ld(matrix(cosd_far, nrow = 1), matrix(logw_far, nrow = 1), -Inf, 200, c_tau)
+    }, numeric(1)),
+    tolerance = 1e-10
+  )
+  expect_equal(
+    stan("out_sa"),
+    vapply(tau, function(c_tau) {
+      .circmix_slot_averaging_ld(
+        matrix(cosd, nrow = 1), matrix(logw, nrow = 1), 1.5, 2L, 10, c_tau, 81L
+      )
+    }, numeric(1)),
+    tolerance = 1e-10
+  )
 })

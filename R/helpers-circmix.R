@@ -147,9 +147,12 @@
 # far from a component, which peaks many prior SDs below E[log J]; without a
 # guess weight to mask it, that underestimated the log density by up to 233
 # nats (kappa 500, shape 100, y = pi).
-# Below a shape of 60 / nodes the left tail of log J is too heavy for the grid:
-# with 81 nodes the log density holds to about 1e-5 from that threshold (0.74)
-# up, to 2e-6 from shape 1, and to 1e-9 from shape 10.
+# Two schemes split at a gamma shape of 2. From 2 up the grid follows each
+# component's integrand. Below 2, sd(log J) grows like 1 / shape, so a grid of
+# fixed size cannot follow it; there the part of the integral below J = 1e-4 is
+# analytic and the grid covers the rest (.circmix_vp_component_tail()). With 81
+# nodes each scheme holds the log density to about 1e-7 at the switch, and the
+# step between them there is below 1e-6.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
@@ -176,14 +179,19 @@
   shape <- .circmix_J(kappa) / tau
   half_width <- 8 * sqrt(trigamma(shape))
   rows <- which(tau > 0 & is.finite(half_width) & half_width >= 1e-6)
-  stopif(
-    any(shape[rows] < 60 / nodes),
-    "The variable-precision quadrature needs a gamma shape J(kappa)/tau of at \\
-    least 60 / vp_nodes = {signif(60 / nodes, 3)}, but the smallest value here is \\
-    {signif(min(shape[rows]), 3)}. Raise vp_nodes to at least \\
-    {2 * ceiling((60 / min(shape[rows]) - 1) / 2) + 1}."
-  )
   list(rows = rows, shape = shape[rows])
+}
+
+.circmix_vp_component <- function(cos_d, shape, tau, nodes, tab) {
+  out <- numeric(length(shape))
+  small <- shape < 2
+  if (any(small)) {
+    out[small] <- .circmix_vp_component_tail(cos_d[small], shape[small], tau[small], nodes, tab)
+  }
+  if (!all(small)) {
+    out[!small] <- .circmix_vp_component_mode(cos_d[!small], shape[!small], tau[!small], nodes, tab)
+  }
+  out
 }
 
 # log of the integral over J ~ gamma(shape, scale = tau) of one von Mises
@@ -198,7 +206,7 @@
 # log J is left-skewed, and never less than sd(log J) = sqrt(trigamma(shape)).
 # The weights are not renormalised: the grid follows the integrand, not the
 # prior, so their sum is not an approximation of the prior's mass.
-.circmix_vp_component <- function(cos_d, shape, tau, nodes, tab) {
+.circmix_vp_component_mode <- function(cos_d, shape, tau, nodes, tab) {
   t <- log((shape + 0.5) / (1 / tau + 1 - cos_d))
   for (i in 1:4) {
     slopes <- .circmix_vp_slopes(t, cos_d, shape, tau, tab)
@@ -216,6 +224,42 @@
   simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
   matrixStats::rowLogSumExps(log_integrand + rep(simpson, each = n)) +
     log(6 * scale / (nodes - 1))
+}
+
+# The integral of .circmix_vp_component_mode() for a gamma shape below 2, whose
+# left tail in log J is too long for a grid of fixed size. Below J0 = 1e-4, kappa(J) =
+# sqrt(2 J) (1 + J / 8) and the von Mises density times 2 pi expands to
+# 1 + kappa cos_d + kappa^2 (cos_d^2 - 1/2) / 2 + O(kappa^3)
+#   = 1 + sqrt(2 J) cos_d + J (cos_d^2 - 1/2) + O(J^(3/2)),
+# so that part of the integral is a sum of three incomplete gamma moments,
+# accurate to O(J0^(3/2)) = 1e-6 times its mass, and much better once the
+# mass sits well below J0. The cos_d terms cannot make it negative: given
+# J < J0 they move it by at most sqrt(2 J0) + J0 / 2 = 1.4e-2. A smaller J0
+# would leave more of the long left tail of log J to the grid. The grid covers
+# [J0, J_hi] in log J, J_hi the Wilson-Hilferty gamma quantile at z = 8.5, at
+# least 40 tau, which leaves at most 4e-18 of the mass above it. A J_hi below
+# J0 (tau < 2.5e-6) leaves less than 1e-15 of the mass above J0, so the grid
+# then spans [J0, e J0] only to stay well defined.
+.circmix_vp_component_tail <- function(cos_d, shape, tau, nodes, tab) {
+  J0 <- 1e-4
+  z <- J0 / tau
+  tail <- stats::pgamma(z, shape) +
+    cos_d * sqrt(2 * tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * stats::pgamma(z, shape + 0.5) +
+    (cos_d^2 - 0.5) * shape * tau * stats::pgamma(z, shape + 1)
+  lo <- log(J0)
+  hi <- pmax(log(tau * pmax(shape * (1 - 1 / (9 * shape) + 8.5 / (3 * sqrt(shape)))^3, 40)), lo + 1)
+  step <- (hi - lo) / (nodes - 1)
+
+  n <- length(shape)
+  grid <- lo + outer(step, seq_len(nodes) - 1)
+  log_integrand <- matrix(.circmix_vp_log_integrand(
+    as.vector(grid), rep(cos_d, nodes), rep(shape, nodes), rep(tau, nodes), tab
+  ), nrow = n)
+  simpson <- log(c(1, rep(c(4, 2), length.out = nodes - 2), 1))
+  matrixStats::rowLogSumExps(cbind(
+    matrixStats::rowLogSumExps(log_integrand + rep(simpson, each = n)) + log(step / 3),
+    log(tail) - log(2 * pi)
+  ))
 }
 
 .circmix_vp_log_integrand <- function(t, cos_d, shape, tau, tab) {
