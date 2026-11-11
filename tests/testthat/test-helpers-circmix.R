@@ -923,14 +923,24 @@ test_that("Stan matches R at small gamma shapes and either side of the tail swit
     }, numeric(1)),
     tolerance = 1e-10
   )
-  # tau below 2.5e-6: the gamma quantile that ends the tail grid lies below J0,
-  # so the grid takes its fallback span
-  stan_small_tau <- circmix_stan_values(
-    utils::modifyList(data, list(kappa_vp = 0.001, NTAU = 1L, tau = array(1e-6)))
+  # two edges of the tail grid's span. With tau below 2.5e-6 the gamma quantile
+  # that ends the grid lies below J0, so the grid takes its fallback span. At
+  # shape 0.001 the floor of 40 tau ends it; a response at the target sees the
+  # floor (a floor of 10 tau moves its log density by 2e-6), one at 0.4 barely
+  # does (1e-10)
+  tau_floor <- .circmix_J(10) / 0.001
+  stan_edges <- circmix_stan_values(utils::modifyList(data, list(
+    kappa_vp = 0.001, NTAU = 1L, tau = array(1e-6),
+    cosd_far = cos(c(0, -1.2)), kappa_far = 10, NFAR = 1L, tau_far = array(tau_floor)
+  )))
+  expect_equal(
+    stan_edges("out_vp"),
+    .circmix_vp_ld(matrix(cosd, nrow = 1), matrix(logw, nrow = 1), log(0.2), 0.001, 1e-6),
+    tolerance = 1e-10
   )
   expect_equal(
-    stan_small_tau("out_vp"),
-    .circmix_vp_ld(matrix(cosd, nrow = 1), matrix(logw, nrow = 1), log(0.2), 0.001, 1e-6),
+    stan_edges("out_far"),
+    .circmix_vp_ld(matrix(cos(c(0, -1.2)), nrow = 1), matrix(logw_far, nrow = 1), -Inf, 10, tau_floor),
     tolerance = 1e-10
   )
   expect_equal(
