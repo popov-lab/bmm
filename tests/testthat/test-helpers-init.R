@@ -1400,3 +1400,44 @@ test_that("the inits of a fit with lb = 0 on b respect the bound (#694)", {
   expect_true(inside(unlist(lapply(inits, `[[`, "b_kappa")), lower = 0))
   expect_true(all(is.finite(unlist(inits))))
 })
+
+# SDs start at 0.05 to 0.1 when the columns and the init range leave the shrink
+# at 1, so a bound on either side of that interval binds every draw
+sd_starts <- function(formula, user_prior, sd_name, data = zhang_luck_2008) {
+  init_fun <- configured_initfun(mixture2p(resp_error = "response_error"), formula, data, user_prior)
+  unlist(lapply(1:20, function(i) init_fun()[[sd_name]]))
+}
+
+test_that("group-level SDs start inside an upper bound set on the class (#694)", {
+  withr::local_seed(694)
+  starts <- sd_starts(
+    bmf(kappa ~ 1 + (1 | subID), thetat ~ 1),
+    brms::prior(normal(0, 1), class = sd, dpar = kappa, ub = 0.02),
+    "sd_1"
+  )
+  expect_true(inside(starts, lower = 0, upper = 0.02))
+})
+
+test_that("group-level SDs start inside a lower bound set on the class (#694)", {
+  withr::local_seed(694)
+  starts <- sd_starts(
+    bmf(kappa ~ 1 + (1 | subID), thetat ~ 1),
+    brms::prior(normal(0, 1), class = sd, dpar = kappa, lb = 0.5),
+    "sd_1"
+  )
+  expect_true(inside(starts, lower = 0.5))
+  expect_true(all(starts <= 0.6))
+})
+
+test_that("the SDs of an s() term start inside a bound set on the class (#694)", {
+  withr::local_seed(694)
+  dat <- zhang_luck_2008
+  dat$z <- dat$trial / 100
+  starts <- sd_starts(
+    bmf(kappa ~ 1 + s(z, k = 4), thetat ~ 1),
+    brms::prior(normal(0, 1), class = sds, dpar = kappa, ub = 0.02),
+    "sds_kappa_1",
+    dat
+  )
+  expect_true(inside(starts, lower = 0, upper = 0.02))
+})

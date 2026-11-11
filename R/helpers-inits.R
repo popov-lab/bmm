@@ -70,7 +70,7 @@ init_stan_param <- function(spar, spec, model, standata_list) {
   if (anyNA(dim) || anyNA(bounds)) {
     return(NULL)
   }
-  init_ranef_param(spar, spec$types, dim, model, standata_list) %||%
+  init_ranef_param(spar, spec$types, dim, model, standata_list, bounds) %||%
     init_special_coef_param(spar, spec$types, dim, model, standata_list, bounds) %||%
     init_fixef_param(spar, spec$types, dim, model, standata_list, bounds) %||%
     init_default_param(spec, dim, bounds)
@@ -125,8 +125,10 @@ match_stan_to_model_par <- function(spar, model_pars) {
 # brms names the random-effects parameters by their role, not by the model
 # parameter; a constant on one coefficient makes brms replace a vector by
 # per-coefficient scalars named par_<vector>_<index>. The penalized part of an
-# s() term is a random effect too (sds_*, zs_*)
-init_ranef_param <- function(spar, types, dim, model, standata_list) {
+# s() term is a random effect too (sds_*, zs_*). An SD starts at least 0.05
+# times its shrink above the lower bound of zero every SD carries, beyond the
+# margin of into_bounds(), so only a bound the user sets on the class moves it
+init_ranef_param <- function(spar, types, dim, model, standata_list, bounds) {
   if (any(types %in% c("cholesky_factor_corr", "cholesky_factor_cov", "cov_matrix", "corr_matrix"))) {
     return(init_identity(types, dim))
   }
@@ -135,7 +137,8 @@ init_ranef_param <- function(spar, types, dim, model, standata_list) {
     if (length(shrink) != dim[1]) {
       shrink <- 1
     }
-    return(init_array(runif(prod(dim), min = 0.05, max = 0.1) * rep_len(shrink, prod(dim)), types, dim))
+    shrink <- rep_len(shrink, prod(dim))
+    return(init_array(into_bounds(runif(prod(dim), min = 0.05, max = 0.1) * shrink, bounds, shrink), types, dim))
   }
   if (grepl("^zs?_", spar)) {
     return(init_array(runif(prod(dim), min = -0.5, max = 0.5), types, dim))
