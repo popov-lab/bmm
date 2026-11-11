@@ -15,7 +15,6 @@ dmixture3p_cd(
   p_mem = 0.6,
   p_nt = 0.2,
   criterion = 0,
-  variable_precision = FALSE,
   log = FALSE
 )
 
@@ -26,8 +25,7 @@ rmixture3p_cd(
   kappa = 5,
   p_mem = 0.6,
   p_nt = 0.2,
-  criterion = 0,
-  variable_precision = FALSE
+  criterion = 0
 )
 }
 \arguments{
@@ -51,9 +49,6 @@ the target.}
 parameter: 0, the default, is the unbiased observer, and other values are
 kept inside each trial's range of evidence as in the model (see the
 section "Decision criterion" of \code{\link[=mixture3p_cd]{mixture3p_cd()}}).}
-
-\item{variable_precision}{Must be \code{FALSE}; variable precision is planned
-for bmm 1.6.0.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 

@@ -76,7 +76,10 @@ applied on both scales.
 The data are drawn with the model's \verb{r*()} function, such as \code{\link[=rmixture2p]{rmixture2p()}}
 or \code{\link[=rsdt_rating]{rsdt_rating()}}. They are not independent of the model's density
 functions: a recovery study that has to rule out an error shared by the two
-needs a generator written separately.
+needs a generator written separately. The change-detection models (\verb{*_cd})
+are the exception: their data come from an observer that retrieves a feature
+on every trial and applies the decision rule to it, which shares no code with
+the response probabilities the likelihood integrates.
 }
 \section{Design}{
 
@@ -86,6 +89,7 @@ specified with:\tabular{ll}{
    \code{\link[=sdm]{sdm()}}, \code{\link[=ddm]{ddm()}}, \code{\link[=cswald]{cswald()}} \tab none \cr
    \code{\link[=mixture2p]{mixture2p()}} \tab \code{set_size} (if it names a column) for the versions \code{"slot"} and \code{"slot_averaging"}; none for \code{"simple"} \cr
    \code{\link[=mixture3p]{mixture3p()}} \tab \code{set_size} (if it names a column), \code{nt_features}, of which a row's first \code{set_size - 1} are read \cr
+   \code{\link[=mixture3p_cd]{mixture3p_cd()}} \tab \code{probe}, relative to the target; \code{set_size} and \code{nt_features} as \code{\link[=mixture3p]{mixture3p()}} \cr
    \code{\link[=imm]{imm()}} \tab as \code{\link[=mixture3p]{mixture3p()}}, plus \code{nt_distances} for the versions \code{"full"} and \code{"bsc"} \cr
    \code{\link[=m3]{m3()}} \tab \code{n_trials}, the number of trials of each row; \code{num_options} when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) \cr
    \code{\link[=mpt]{mpt()}} \tab \code{n_trials}; \code{tree_id} and \code{covariates} when the model has them \cr

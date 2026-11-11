@@ -8,7 +8,9 @@
 
 # models whose stored frame check_data() accepts as it is, so that update() has
 # nothing to route
-frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
+frame_is_user_layout <- c(
+  "cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "mixture3p_cd_slot_averaging", "sdm"
+)
 
 for (case_name in names(stored_frame_cases())) {
   test_that(paste0("only a slice of a fit's model frame counts as stored data (", case_name, ")"), {

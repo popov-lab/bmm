@@ -1,5 +1,5 @@
 cd3p_model <- function(version = "simple", ...) {
-  mixture3p_cd("change", "probe", "target", nt_features = paste0("col_nt", 1:7),
+  mixture3p_cd("change", "probe", nt_features = paste0("col_nt", 1:7),
                set_size = "set_size", version = version, ...)
 }
 
@@ -19,7 +19,7 @@ vm_mass <- function(lo, hi, mu, kappa) {
 }
 
 test_that("mixture3p_cd() validates its arguments", {
-  expect_error(mixture3p_cd("r", "p", "t"), "nt_features")
+  expect_error(mixture3p_cd("r", "p"), "nt_features")
   expect_error(cd3p_model(version = "full"), "should be one of")
   expect_error(cd3p_model(knowledge = "partial"), "should be one of")
   expect_error(cd3p_model(variable_precision = TRUE), "planned for bmm 1.6.0")
@@ -43,7 +43,7 @@ test_that("mixture3p_cd() takes mixture3p's parameters, priors, links and inits,
       exact = TRUE
     )
   }
-  expect_identical(cd3p_model(knowledge = "rich")$knowledge, "rich")
+  expect_identical(cd3p_model("slot_averaging", knowledge = "rich")$knowledge, "rich")
   expect_identical(cd3p_model()$knowledge, "limited")
   expect_identical(cd3p_model()$task, "Detection, recognition and confidence judgments")
   expect_identical(cd3p_model()$domain, "Working memory")
@@ -52,9 +52,19 @@ test_that("mixture3p_cd() takes mixture3p's parameters, priors, links and inits,
   # order; knowledge sits after variable_precision, before links (CD-D1 F1)
   expect_identical(
     names(formals(mixture3p_cd)),
-    c("response", "probe", "target", "nt_features", "set_size", "regex", "version",
+    c("response", "probe", "nt_features", "set_size", "regex", "version",
       "variable_precision", "knowledge", "links", "...")
   )
+})
+
+test_that("knowledge = 'rich' warns in the versions with one precision state", {
+  expect_warning(cd3p_model(knowledge = "rich"), "no effect in the 'simple' version")
+  expect_warning(cd3p_model("slot", knowledge = "rich"), "no effect in the 'slot' version")
+  expect_no_warning(cd3p_model("slot_averaging", knowledge = "rich"))
+})
+
+test_that("the link of criterion cannot be set", {
+  expect_error(cd3p_model(links = list(criterion = "log")), "'criterion' cannot be changed")
 })
 
 test_that("criterion's init range starts on the linear part of its bound", {
@@ -81,9 +91,13 @@ test_that("criterion's init range starts on the linear part of its bound", {
 })
 
 test_that("dmixture3p_cd() and rmixture3p_cd() refuse what they cannot evaluate", {
-  expect_error(dmixture3p_cd(1, 0.5, variable_precision = TRUE), "planned for bmm 1.6.0")
-  expect_error(rmixture3p_cd(5, 0.5, variable_precision = TRUE), "planned for bmm 1.6.0")
-  expect_error(dmixture3p_cd(1, 0.5, variable_precision = NA), "TRUE or FALSE")
+  # `log` passed by position, after the memory parameters, lands on criterion
+  expect_error(dmixture3p_cd(1, 0.5, c(0, 2, -1.5), 5, 0.6, 0.2, TRUE), "Did you mean log = TRUE")
+  expect_error(rmixture3p_cd(5, 0.5, criterion = TRUE), "criterion must be numeric")
+  expect_true(is.na(dmixture3p_cd(1, 0.5, criterion = NA)))
+  for (n in list(2.5, c(2, 3), 0, "3")) {
+    expect_error(rmixture3p_cd(n, 0.5), "single positive whole number")
+  }
   expect_error(dmixture3p_cd(2, 0.5), "response must be 0")
   expect_error(dmixture3p_cd(NA, 0.5), "response must be 0")
   expect_error(dmixture3p_cd(1, 0.5, kappa = -1), "non-negative")
@@ -213,7 +227,7 @@ test_that("check_data() refuses a missing set size and warns where K cannot be t
   expect_error(check_data(cd3p_model("slot"), missing_ss, formula), "contains missing values")
   one_ss <- data[data$set_size == 4, ]
   four <- function(version) {
-    mixture3p_cd("change", "probe", "target", nt_features = paste0("col_nt", 1:3),
+    mixture3p_cd("change", "probe", nt_features = paste0("col_nt", 1:3),
                  set_size = "set_size", version = version)
   }
   expect_warning(check_data(four("slot"), one_ss, formula), "does not vary")
@@ -291,8 +305,8 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   # two items, the probe on the non-target: P("change") by integrate() over
   # the unbiased arc, with thetat = thetant = 0 (a third each)
   n <- 6e4
-  design <- data.frame(target = 0.5, probe = 2.5, nt1 = 2, set_size = 2)[rep(1, n), ]
-  model <- mixture3p_cd("change", "probe", "target", nt_features = "nt1", set_size = "set_size")
+  design <- data.frame(probe = 2, nt1 = 2, set_size = 2)[rep(1, n), ]
+  model <- mixture3p_cd("change", "probe", nt_features = "nt1", set_size = "set_size")
   data <- simulate_data(model, list(kappa = log(6), thetat = 0, thetant = 0), design)
   hw <- acos(log(besselI(6, 0)) / 6)
   p_same <- (vm_mass(2 - hw, 2 + hw, 0, 6) + vm_mass(2 - hw, 2 + hw, 2, 6) + hw / pi) / 3
@@ -306,7 +320,7 @@ test_that("the generated likelihood passes each parameter to its place in the co
   data <- mixture3p_cd_data()
   data <- data[as.numeric(as.character(data$set_size)) <= 3, ]
   model_for <- function(version, knowledge) {
-    mixture3p_cd("change", "probe", "target", nt_features = c("col_nt1", "col_nt2"),
+    mixture3p_cd("change", "probe", nt_features = c("col_nt1", "col_nt2"),
                  set_size = "set_size", version = version, knowledge = knowledge)
   }
   # one item and three; nothing held (K / ss < 1) and a fractional slot held

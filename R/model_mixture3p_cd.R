@@ -2,16 +2,10 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.mixture3p_cd_citation <- paste(
-  "Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual working",
-  "memory: Applications to the change detection task. Cognitive Psychology,",
-  "133, Article 101463. https://doi.org/10.1016/j.cogpsych.2022.101463"
-)
-
 # The retrieval side is mixture3p's version table, so the two models share
 # their parameter names, links, priors and inits; a joint fit of both tasks
 # relies on that. Only criterion is added.
-.model_mixture3p_cd <- function(response = NULL, probe = NULL, target = NULL,
+.model_mixture3p_cd <- function(response = NULL, probe = NULL,
                                 nt_features = NULL, set_size = NULL,
                                 regex = FALSE, links = NULL, version = "simple",
                                 variable_precision = FALSE,
@@ -20,7 +14,7 @@
 
   out <- structure(
     list(
-      resp_vars = nlist(response, probe, target),
+      resp_vars = nlist(response, probe),
       other_vars = nlist(nt_features, set_size),
       domain = "Working memory",
       task = "Detection, recognition and confidence judgments",
@@ -28,16 +22,16 @@
       citation = c(
         .mixture3p_citation,
         if (version != "simple") .mixture3p_capacity_citation,
-        .mixture3p_cd_citation
+        .cd_citation
       ),
       version = version,
       # paste0() rather than glue(), which would trim the indent that keeps
       # the requirements in one list
       requirements = paste0(
         "- The response variable should be coded 0 ('same') and 1 ('change')\n",
-        "  - The probe and the target should be in radians: the feature shown ",
-        "at test, and the feature shown at the probed location in the memory ",
-        "array\n",
+        "  - The probe should be in radians and relative to the target: the ",
+        "feature shown at test minus the feature shown at the probed location, ",
+        "which is 0 on a 'same' trial\n",
         "  - The non-target features should be in radians and be centered ",
         "relative to the target\n",
         "  - In the 'slot' and 'slot_averaging' versions, the set size should ",
@@ -73,6 +67,8 @@ settable_links.mixture3p_cd <- function(model) {
 
 #' @title `r .model_mixture3p_cd()$name`
 #' @name mixture3p_cd
+#' @description Fits the three-parameter mixture model of [mixture3p()] to the
+#'   "same" or "change" responses of a single-probe change-detection task.
 #' @details `r model_docs(.model_mixture3p_cd(version = "slot"), components = c('domain', 'task', 'name', 'citation', 'requirements'))`
 #' #### Version: `simple`
 #' `r model_docs(.model_mixture3p_cd(version = "simple"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
@@ -134,11 +130,10 @@ settable_links.mixture3p_cd <- function(model) {
 #' @param response The name of the variable in the dataset containing the
 #'   change-detection response, coded 0 ("same") and 1 ("change"). A logical
 #'   variable is accepted and coded `TRUE` = "change".
-#' @param probe The name of the variable containing the feature shown at test,
-#'   in radians.
-#' @param target The name of the variable containing the feature shown at the
-#'   probed location in the memory array, in radians. On "same" trials it
-#'   equals the probe.
+#' @param probe The name of the variable containing the probe in radians,
+#'   relative to the target: the feature shown at test minus the feature shown
+#'   at the probed location in the memory array, as [wrap()] returns it. It is 0
+#'   on "same" trials.
 #' @param nt_features A character vector with the names of the non-target
 #'   feature values. The non-target feature values should be in radians and
 #'   centered relative to the target. Alternatively, if `regex = TRUE`, a
@@ -167,10 +162,13 @@ settable_links.mixture3p_cd <- function(model) {
 #'   `knowledge` changes the predictions of that version only. Lin and Oberauer
 #'   (2022) found the limited observer described their data better under
 #'   variable precision; for slot averaging they varied a different knowledge,
-#'   whether the item is stored, which this argument does not model.
-#' @param links A named list of link functions for the model parameters. The
-#'   links of `thetat` and `thetant` cannot be changed, because the softmax over
-#'   them is part of the likelihood.
+#'   whether the item is stored, which this argument does not model. `"rich"`
+#'   warns in the versions where it has no effect.
+#' @param links A named list of link functions for the model parameters, e.g.
+#'   `list(kappa = "softplus")`. The links of `thetat` and `thetant` cannot be
+#'   changed, because the softmax over them is part of the likelihood, nor that
+#'   of `criterion`, because its fixed value and its bound are written for the
+#'   identity scale.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -187,35 +185,44 @@ settable_links.mixture3p_cd <- function(model) {
 #'   working memory: Applications to the change detection task. Cognitive
 #'   Psychology, 133, 101463. \doi{10.1016/j.cogpsych.2022.101463}
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
-#' # three items; a third of the probes show the target, a third a non-target
-#' # and a third a new colour
+#' # three items, every feature relative to the target: a third of the probes
+#' # show the target (a probe of 0), a third the first non-target and a third a
+#' # new colour
 #' n <- 1500
-#' dat <- data.frame(
-#'   target = 0, nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi),
+#' design <- data.frame(
+#'   nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi), set_size = 3,
 #'   type = rep(c("same", "intrusion", "new"), length.out = n)
 #' )
-#' dat$probe <- ifelse(dat$type == "same", 0,
-#'   ifelse(dat$type == "intrusion", dat$nt1, runif(n, -pi, pi))
+#' design$probe <- ifelse(design$type == "same", 0,
+#'   ifelse(design$type == "intrusion", design$nt1, runif(n, -pi, pi))
 #' )
-#' dat$change <- vapply(seq_len(n), function(i) {
-#'   rmixture3p_cd(1, dat$probe[i],
-#'     mu = c(0, dat$nt1[i], dat$nt2[i]), kappa = 8, p_mem = 0.7, p_nt = 0.1
-#'   )
-#' }, numeric(1))
+#' model <- mixture3p_cd(
+#'   response = "change", probe = "probe",
+#'   nt_features = c("nt1", "nt2"), set_size = "set_size"
+#' )
+#' dat <- simulate_data(model,
+#'   pars = list(kappa = 2, thetat = 1, thetant = -0.5), design = design
+#' )
 #'
 #' fit <- bmm(
 #'   formula = bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1),
 #'   data = dat,
-#'   model = mixture3p_cd(
-#'     response = "change", probe = "probe", target = "target",
-#'     nt_features = c("nt1", "nt2"), set_size = 3
-#'   ),
+#'   model = model,
 #'   cores = 4,
 #'   iter = 500,
 #'   backend = "cmdstanr"
 #' )
+#'
+#' # the capacity versions estimate K and ptarget instead of the two weights;
+#' # criterion is estimated once it has a formula
+#' slot <- mixture3p_cd("change", "probe", c("nt1", "nt2"), "set_size", version = "slot")
+#' slot_averaging <- mixture3p_cd(
+#'   "change", "probe", c("nt1", "nt2"), "set_size",
+#'   version = "slot_averaging", knowledge = "rich"
+#' )
+#' capacity_formula <- bmmformula(kappa ~ 1, K ~ 1, ptarget ~ 1, criterion ~ 1)
 #' @export
-mixture3p_cd <- function(response, probe, target, nt_features, set_size,
+mixture3p_cd <- function(response, probe, nt_features, set_size,
                          regex = FALSE,
                          version = c("simple", "slot", "slot_averaging"),
                          variable_precision = FALSE,
@@ -226,9 +233,10 @@ mixture3p_cd <- function(response, probe, target, nt_features, set_size,
   version <- match.arg(version)
   knowledge <- match.arg(knowledge)
   .cd_check_variable_precision(variable_precision)
+  .cd_warn_inert_knowledge(knowledge, version, acts = version == "slot_averaging")
 
   .model_mixture3p_cd(
-    response = response, probe = probe, target = target,
+    response = response, probe = probe,
     nt_features = nt_features, set_size = set_size, regex = regex,
     version = version, variable_precision = variable_precision,
     knowledge = knowledge, links = links, call = call, ...
@@ -248,7 +256,7 @@ check_data.mixture3p_cd <- function(model, data, formula) {
   stopif(
     anyNA(ss),
     "The set size variable '{model$other_vars$set_size}' contains missing \\
-    values."
+    values. Remove the trials without a set size before fitting."
   )
   for_prediction <- isTRUE(attr(data, "prediction_newdata"))
   set_sizes <- unique(ss)
@@ -275,14 +283,14 @@ check_formula.mixture3p_cd <- function(model, data, formula) {
 # CONFIGURE_MODEL METHODS                                                ####
 ############################################################################# !
 
-# probe_centered comes first, so the wrapper receives it as vreal1 and the
+# the probe comes first, so the wrapper receives it as vreal1 and the
 # non-targets after it
 #' @export
 bmf2bf.mixture3p_cd <- function(model, formula) {
   brms::bf(.circmix_aterm(
     model$resp_vars$response,
     vint = "ss_numeric",
-    vreal = c("probe_centered", model$other_vars$nt_features)
+    vreal = c(model$resp_vars$probe, model$other_vars$nt_features)
   ))
 }
 
@@ -394,7 +402,7 @@ simulate_data.mixture3p_cd <- function(model, pars, design = NULL,
   vars <- model$resp_vars
   nt_features <- model$other_vars$nt_features
   design <- .design_or_n(
-    model, design, c(vars$probe, vars$target, .set_size_column(model)),
+    model, design, c(vars$probe, .set_size_column(model)),
     ragged = nt_features
   )
   sim <- .simulate_pars(model, pars, design, scale)
@@ -404,7 +412,7 @@ simulate_data.mixture3p_cd <- function(model, pars, design = NULL,
   nt <- unname(as.matrix(design[nt_features]))
   capacity <- model$version != "simple"
   y <- .mixture3p_cd_observe(
-    probe = wrap(design[[vars$probe]] - design[[vars$target]]),
+    probe = wrap(design[[vars$probe]]),
     mu = p$mu, nt = nt, set_size = set_size, kappa = p$kappa,
     w1 = if (capacity) p$K else sim$link$thetat,
     w2 = if (capacity) p$ptarget else sim$link$thetant,

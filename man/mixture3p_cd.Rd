@@ -7,7 +7,6 @@
 mixture3p_cd(
   response,
   probe,
-  target,
   nt_features,
   set_size,
   regex = FALSE,
@@ -23,12 +22,10 @@ mixture3p_cd(
 change-detection response, coded 0 ("same") and 1 ("change"). A logical
 variable is accepted and coded \code{TRUE} = "change".}
 
-\item{probe}{The name of the variable containing the feature shown at test,
-in radians.}
-
-\item{target}{The name of the variable containing the feature shown at the
-probed location in the memory array, in radians. On "same" trials it
-equals the probe.}
+\item{probe}{The name of the variable containing the probe in radians,
+relative to the target: the feature shown at test minus the feature shown
+at the probed location in the memory array, as \code{\link[=wrap]{wrap()}} returns it. It is 0
+on "same" trials.}
 
 \item{nt_features}{A character vector with the names of the non-target
 feature values. The non-target feature values should be in radians and
@@ -62,11 +59,14 @@ variable precision, precision varies only under \code{version = "slot_averaging"
 \code{knowledge} changes the predictions of that version only. Lin and Oberauer
 (2022) found the limited observer described their data better under
 variable precision; for slot averaging they varied a different knowledge,
-whether the item is stored, which this argument does not model.}
+whether the item is stored, which this argument does not model. \code{"rich"}
+warns in the versions where it has no effect.}
 
-\item{links}{A named list of link functions for the model parameters. The
-links of \code{thetat} and \code{thetant} cannot be changed, because the softmax over
-them is part of the likelihood.}
+\item{links}{A named list of link functions for the model parameters, e.g.
+\code{list(kappa = "softplus")}. The links of \code{thetat} and \code{thetant} cannot be
+changed, because the softmax over them is part of the likelihood, nor that
+of \code{criterion}, because its fixed value and its bound are written for the
+identity scale.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -74,7 +74,8 @@ them is part of the likelihood.}
 An object of class \code{bmmodel}
 }
 \description{
-Three-Parameter Mixture Model for Change Detection
+Fits the three-parameter mixture model of \code{\link[=mixture3p]{mixture3p()}} to the
+"same" or "change" responses of a single-probe change-detection task.
 }
 \details{
 \itemize{
@@ -85,12 +86,12 @@ Three-Parameter Mixture Model for Change Detection
 \itemize{
 \item Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of visual working memory is set by allocation of a shared resource. Journal of Vision, 9(10), Article 7. https://doi.org/10.1167/9.10.7
 \item Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations in visual working memory. Nature, 453(7192), 233-235. https://doi.org/10.1038/nature06860
-\item Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual working memory: Applications to the change detection task. Cognitive Psychology, 133, Article 101463. https://doi.org/10.1016/j.cogpsych.2022.101463
+\item Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual working memory: Applications to the change detection task. Cognitive Psychology, 133, 101463. https://doi.org/10.1016/j.cogpsych.2022.101463
 }
 \item \strong{Requirements:}
 \itemize{
 \item The response variable should be coded 0 ('same') and 1 ('change')
-\item The probe and the target should be in radians: the feature shown at test, and the feature shown at the probed location in the memory array
+\item The probe should be in radians and relative to the target: the feature shown at test minus the feature shown at the probed location, which is 0 on a 'same' trial
 \item The non-target features should be in radians and be centered relative to the target
 \item In the 'slot' and 'slot_averaging' versions, the set size should vary for the capacity rule to be testable
 }
@@ -99,10 +100,10 @@ Three-Parameter Mixture Model for Change Detection
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
-\item \code{thetat}: Mixture weight for target responses. The weights of the target, the non-targets and guessing are normalised across the components present on a trial, with guessing as the reference, so thetat maps to the probability of a target response only jointly with thetant.
-\item \code{thetant}: Mixture weight for non-target responses, summed over the non-targets, which share it equally. Like thetat, it is weighed against guessing.
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of the retrieved feature. Unlike in continuous reproduction, it holds no response noise.
+\item \code{thetat}: Mixture weight for retrieving the target. The weights of the target, the non-targets and guessing are normalised across the components present on a trial, with guessing as the reference, so thetat maps to the probability of retrieving the target only jointly with thetant.
+\item \code{thetant}: Mixture weight for retrieving a non-target, summed over the non-targets, which share it equally. Like thetat, it is weighed against guessing.
 \item \code{criterion}: Decision criterion, Lin and Oberauer's (2022) bias beta on the log-likelihood ratio of 'change' against 'same'; positive values favour 'same' responses. Fixed to 0, the unbiased observer, by default. When estimated, it is kept inside the range of evidence each trial can produce (it equals Lin and Oberauer's criterion near 0 and is compressed toward that range's ends), so both responses stay possible on every trial.
 }
 \item \strong{Fixed parameters:}
@@ -154,10 +155,10 @@ Three-Parameter Mixture Model for Change Detection
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
-\item \code{K}: Capacity: the number of items that can be held in memory. An item is either held at full precision or not held at all, so the probability that a response comes from memory is min(1, K / set_size).
-\item \code{ptarget}: Probability that a response reports the target rather than a non-target, given that it comes from memory.
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of the retrieved feature. Unlike in continuous reproduction, it holds no response noise.
+\item \code{K}: Capacity: the number of items that can be held in memory. An item is either held at full precision or not held at all, so the probability that the feature is retrieved from memory is min(1, K / set_size).
+\item \code{ptarget}: Probability that the retrieved feature is the target's rather than a non-target's, given that it comes from memory.
 \item \code{criterion}: Decision criterion, Lin and Oberauer's (2022) bias beta on the log-likelihood ratio of 'change' against 'same'; positive values favour 'same' responses. Fixed to 0, the unbiased observer, by default. When estimated, it is kept inside the range of evidence each trial can produce (it equals Lin and Oberauer's criterion near 0 and is compressed toward that range's ends), so both responses stay possible on every trial.
 }
 \item \strong{Fixed parameters:}
@@ -209,10 +210,10 @@ Three-Parameter Mixture Model for Change Detection
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution for an item held in a single slot. An item holding several slots is more precise, because averaging independent samples adds their Fisher information.
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution for an item held in a single slot. An item holding several slots is more precise, because averaging independent samples adds their Fisher information. Unlike in continuous reproduction, it holds no response noise.
 \item \code{K}: Capacity: the number of memory slots distributed over the items in the array. An item receives floor(K / set_size) or one more slot, and an item that receives none is guessed.
-\item \code{ptarget}: Probability that a response reports the target rather than a non-target, given that it comes from memory.
+\item \code{ptarget}: Probability that the retrieved feature is the target's rather than a non-target's, given that it comes from memory.
 \item \code{criterion}: Decision criterion, Lin and Oberauer's (2022) bias beta on the log-likelihood ratio of 'change' against 'same'; positive values favour 'same' responses. Fixed to 0, the unbiased observer, by default. When estimated, it is kept inside the range of evidence each trial can produce (it equals Lin and Oberauer's criterion near 0 and is compressed toward that range's ends), so both responses stay possible on every trial.
 }
 \item \strong{Fixed parameters:}
@@ -316,33 +317,42 @@ criterion; bmm prints a message when the criterion is estimated.
 
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
-# three items; a third of the probes show the target, a third a non-target
-# and a third a new colour
+# three items, every feature relative to the target: a third of the probes
+# show the target (a probe of 0), a third the first non-target and a third a
+# new colour
 n <- 1500
-dat <- data.frame(
-  target = 0, nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi),
+design <- data.frame(
+  nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi), set_size = 3,
   type = rep(c("same", "intrusion", "new"), length.out = n)
 )
-dat$probe <- ifelse(dat$type == "same", 0,
-  ifelse(dat$type == "intrusion", dat$nt1, runif(n, -pi, pi))
+design$probe <- ifelse(design$type == "same", 0,
+  ifelse(design$type == "intrusion", design$nt1, runif(n, -pi, pi))
 )
-dat$change <- vapply(seq_len(n), function(i) {
-  rmixture3p_cd(1, dat$probe[i],
-    mu = c(0, dat$nt1[i], dat$nt2[i]), kappa = 8, p_mem = 0.7, p_nt = 0.1
-  )
-}, numeric(1))
+model <- mixture3p_cd(
+  response = "change", probe = "probe",
+  nt_features = c("nt1", "nt2"), set_size = "set_size"
+)
+dat <- simulate_data(model,
+  pars = list(kappa = 2, thetat = 1, thetant = -0.5), design = design
+)
 
 fit <- bmm(
   formula = bmmformula(kappa ~ 1, thetat ~ 1, thetant ~ 1),
   data = dat,
-  model = mixture3p_cd(
-    response = "change", probe = "probe", target = "target",
-    nt_features = c("nt1", "nt2"), set_size = 3
-  ),
+  model = model,
   cores = 4,
   iter = 500,
   backend = "cmdstanr"
 )
+
+# the capacity versions estimate K and ptarget instead of the two weights;
+# criterion is estimated once it has a formula
+slot <- mixture3p_cd("change", "probe", c("nt1", "nt2"), "set_size", version = "slot")
+slot_averaging <- mixture3p_cd(
+  "change", "probe", c("nt1", "nt2"), "set_size",
+  version = "slot_averaging", knowledge = "rich"
+)
+capacity_formula <- bmmformula(kappa ~ 1, K ~ 1, ptarget ~ 1, criterion ~ 1)
 \dontshow{\}) # examplesIf}
 }
 \references{

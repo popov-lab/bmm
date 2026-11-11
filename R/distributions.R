@@ -908,8 +908,6 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   parameter: 0, the default, is the unbiased observer, and other values are
 #'   kept inside each trial's range of evidence as in the model (see the
 #'   section "Decision criterion" of [mixture3p_cd()]).
-#' @param variable_precision Must be `FALSE`; variable precision is planned
-#'   for bmm 1.6.0.
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
 #' @details "Change" is the response when the retrieved feature falls outside
@@ -946,9 +944,8 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   p_mem = 0.7, p_nt = 0.1
 #' ))
 dmixture3p_cd <- function(response, probe, mu = c(0, 2, -1.5), kappa = 5,
-                          p_mem = 0.6, p_nt = 0.2, criterion = 0,
-                          variable_precision = FALSE, log = FALSE) {
-  .cd_check_variable_precision(variable_precision)
+                          p_mem = 0.6, p_nt = 0.2, criterion = 0, log = FALSE) {
+  .cd_check_criterion(criterion, has_log = TRUE)
   .check_mixture3p_cd_args(mu, kappa, p_mem, p_nt)
   stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
 
@@ -970,8 +967,9 @@ dmixture3p_cd <- function(response, probe, mu = c(0, 2, -1.5), kappa = 5,
 #' @rdname mixture3p_cd_dist
 #' @export
 rmixture3p_cd <- function(n, probe, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6,
-                          p_nt = 0.2, criterion = 0, variable_precision = FALSE) {
-  .cd_check_variable_precision(variable_precision)
+                          p_nt = 0.2, criterion = 0) {
+  .cd_check_n(n)
+  .cd_check_criterion(criterion)
   .check_mixture3p_cd_args(mu, kappa, p_mem, p_nt)
   set_size <- length(mu)
   .mixture3p_cd_observe(

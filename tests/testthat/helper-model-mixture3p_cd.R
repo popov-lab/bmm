@@ -5,11 +5,10 @@
 # trial has one (an intrusion probe) and a new colour
 mixture3p_cd_data <- function() {
   data <- small_data()
-  data$target <- data$dev_rad
   type <- rep_len(1:3, nrow(data))
   intrusion <- type == 2 & as.numeric(as.character(data$set_size)) > 1
   offset <- ifelse(intrusion, data$col_nt1, c(0, 0, 1.5)[type])
-  data$probe <- wrap(data$target + offset)
+  data$probe <- offset
   data$change <- rep_len(c(0L, 1L, 1L, 0L, 1L), nrow(data))
   data
 }
@@ -17,7 +16,7 @@ mixture3p_cd_data <- function() {
 model_cases_mixture3p_cd <- function() {
   nt <- paste0("col_nt", 1:7)
   cd3p <- function(version = "simple") {
-    mixture3p_cd("change", "probe", "target", nt_features = nt, set_size = "set_size",
+    mixture3p_cd("change", "probe", nt_features = nt, set_size = "set_size",
                  version = version)
   }
   model <- cd3p()
@@ -25,13 +24,13 @@ model_cases_mixture3p_cd <- function() {
                     criterion ~ 1 + (1 | ID))
   capacity_formula <- bmf(kappa ~ 1 + (1 | ID), K ~ 1 + (1 | ID), ptarget ~ 1 + (1 | ID),
                           criterion ~ 1 + (1 | ID))
-  # one row per trial: displays of set size 1 to 3, the probe and the target
+  # one row per trial: displays of set size 1 to 3, and the probe relative to
+  # the target
   design <- nt_display_design()
-  design$target <- rep_len(c(0, 1), nrow(design))
-  design$probe <- rep_len(c(0, 1, 2.5, -1), nrow(design))
+  design$probe <- rep_len(c(0, 0, 2.5, -2), nrow(design))
   simulate_case <- function(version, pars, formula) {
     list(
-      model = mixture3p_cd("change", "probe", "target", nt_features = c("nt1", "nt2"),
+      model = mixture3p_cd("change", "probe", nt_features = c("nt1", "nt2"),
                            set_size = "set_size", version = version),
       pars = pars, design = design, formula = formula,
       simulate_pars = c(list(mu = 0), pars, if (is.null(pars$criterion)) list(criterion = 0))
@@ -70,9 +69,9 @@ model_cases_mixture3p_cd <- function() {
       )
     ),
     links = list(
-      mixture3p_cd = list(model = model, settable = c("mu", "kappa", "criterion")),
+      mixture3p_cd = list(model = model, settable = c("mu", "kappa")),
       mixture3p_cd_slot = list(
-        model = cd3p("slot"), settable = c("mu", "kappa", "K", "ptarget", "criterion")
+        model = cd3p("slot"), settable = c("mu", "kappa", "K", "ptarget")
       )
     ),
     simulate = list(
