@@ -109,10 +109,10 @@ test_that(".circmix_vp_ld() is a normalised density at every shape", {
       rel.tol = 1e-12
     )$value
   }
-  expect_lt(abs(total(0.05) - 1), 1e-6)
-  expect_lt(abs(total(0.3) - 1), 1e-6)
-  expect_lt(abs(total(0.75) - 1), 1e-5)
-  expect_lt(abs(total(1) - 1), 1e-6)
+  # below shape 2 the totals miss 1 by 2.5e-11 to 1.7e-9
+  for (shape in c(0.05, 0.3, 0.75, 1)) {
+    expect_lt(abs(total(shape) - 1), 1e-8, label = paste("shape", shape))
+  }
 })
 
 # Integrates in log J from J = 1e-30 rather than from a gamma quantile: for a
@@ -150,15 +150,45 @@ vp_errors <- function(y, kappa, shape, p_mem, ...) {
   ) - vapply(y, vp_reference, numeric(1), kappa = kappa, tau = tau, p_mem = p_mem)
 }
 
+# Below shape 2 the errors at these cells are 2e-10 to 4e-9, so 1e-7 leaves a
+# margin of 25 and still catches a slip of 0.1% in one term of the analytic
+# tail. At kappa 0.001 and tau 1e-6 the gamma quantile that ends the tail grid
+# lies below J0 = 1e-4, so the grid takes its fallback span; that cell is held
+# to 1e-9 (error 5e-11).
 test_that(".circmix_vp_ld() matches adaptive integration at every shape", {
+  skip_on_cran()
   y <- c(0, 0.3, 1.5, pi)
   shapes <- c(0.001, 0.02, 0.1, 0.3, 0.74, 1, 1.9, 2, 2.1, 10)
-  tolerances <- c(rep(1e-6, 7), 1e-7, 1e-7, 1e-7)
-  for (i in seq_along(shapes)) {
+  for (shape in shapes) {
     expect_lt(
-      max(abs(vp_errors(y, kappa = 10, shape = shapes[i], p_mem = 0.8))),
-      tolerances[i],
-      label = paste("shape", shapes[i])
+      max(abs(vp_errors(y, kappa = 10, shape = shape, p_mem = 0.8))),
+      1e-7,
+      label = paste("shape", shape)
+    )
+  }
+  expect_lt(
+    max(abs(vp_errors(y, kappa = 0.001, shape = .circmix_J(0.001) / 1e-6, p_mem = 0.8))),
+    1e-9
+  )
+})
+
+# The tail grid's step depends on the node count, which 81 nodes alone cannot
+# pin. Errors at kappa 10: 41 nodes 2.8e-5 (shape 0.02) and 5.7e-5 (shape 1.5),
+# 121 nodes 5.5e-10 and 1e-12; each bound leaves a margin of at least 5.
+test_that(".circmix_vp_ld() holds its accuracy below shape 2 at 41 and 121 nodes", {
+  skip_on_cran()
+  y <- c(0, 0.3, 1.5, pi)
+  cases <- list(
+    list(nodes = 41L, shape = 0.02, bound = 1.5e-4),
+    list(nodes = 41L, shape = 1.5, bound = 3e-4),
+    list(nodes = 121L, shape = 0.02, bound = 5e-9),
+    list(nodes = 121L, shape = 1.5, bound = 5e-9)
+  )
+  for (case in cases) {
+    expect_lt(
+      max(abs(vp_errors(y, kappa = 10, shape = case$shape, p_mem = 0.8, nodes = case$nodes))),
+      case$bound,
+      label = paste("nodes", case$nodes, "shape", case$shape)
     )
   }
 })
@@ -170,9 +200,10 @@ test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
   y <- c(0, 1, 2, pi)
   expect_lt(max(abs(vp_errors(y, kappa = 200, shape = 10, p_mem = 1))), 1e-8)
   expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 100, p_mem = 1))), 1e-8)
-  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.75, p_mem = 1))), 2e-5)
-  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.3, p_mem = 1))), 1e-6)
-  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.05, p_mem = 1))), 1e-6)
+  # errors 1.1e-8, 1.5e-8 and 4.2e-9
+  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.75, p_mem = 1))), 1e-7)
+  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.3, p_mem = 1))), 1e-7)
+  expect_lt(max(abs(vp_errors(y, kappa = 50, shape = 0.05, p_mem = 1))), 1e-7)
 
   # each component needs its own window when the components sit apart
   tau <- .circmix_J(100) / 20
@@ -191,28 +222,50 @@ test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
   )
 })
 
-test_that(".circmix_vp_ld() accepts any gamma shape", {
-  at_shape <- function(shape, ...) {
-    .circmix_vp_ld(matrix(cos(0.3)), matrix(log(0.8)), log(0.2), 10, .circmix_J(10) / shape, ...)
+# Below a gamma shape of 2 the J < 1e-4 part of the integral is analytic and
+# the grid starts at 1e-4; above it the grid follows the integrand. With
+# intercept-only kappa and tau every row crosses at once, so the step between
+# the two schemes at shape 2 is a step in the whole log likelihood. Measured at
+# y = 0, 1, pi: 1.2e-8 to 1.8e-8 at 81 nodes for kappa 1 to 100 (3.3e-7 at
+# kappa 1000), and at 41 nodes 3.6e-5, 1.8e-4 and 5.8e-4 at kappa 1, 10 and
+# 100. The bounds hold each step to about five times its size, so a change to
+# either scheme shows up.
+test_that("the two variable-precision schemes meet at shape 2", {
+  tab <- .circmix_kappa_table()
+  cos_d <- cos(c(0, 1, pi))
+  cases <- list(
+    list(nodes = 81L, kappa = 1, bound = 1e-7),
+    list(nodes = 81L, kappa = 10, bound = 1e-7),
+    list(nodes = 81L, kappa = 100, bound = 1e-7),
+    list(nodes = 41L, kappa = 1, bound = 2e-4),
+    list(nodes = 41L, kappa = 10, bound = 1e-3),
+    list(nodes = 41L, kappa = 100, bound = 3e-3)
+  )
+  for (case in cases) {
+    shape <- rep(2, 3)
+    tau <- rep(.circmix_J(case$kappa) / 2, 3)
+    jump <- .circmix_vp_component_tail(cos_d, shape, tau, case$nodes, tab) -
+      .circmix_vp_component_mode(cos_d, shape, tau, case$nodes, tab)
+    expect_lt(max(abs(jump)), case$bound, label = paste("nodes", case$nodes, "kappa", case$kappa))
   }
-  expect_silent(at_shape(0.1))
-  expect_silent(at_shape(0.1, nodes = 41L))
 })
 
-# Below a gamma shape of 2 the J < 1e-4 part of the integral is analytic and
-# the grid starts at 1e-4; above it the grid follows the integrand. Both reach
-# about 1e-7 at 81 nodes, so the switch must not step the log density by more:
-# with intercept-only kappa and tau every row crosses at once.
-test_that(".circmix_vp_ld() is continuous across the switch at shape 2", {
-  at_shape <- function(y, kappa, shape) {
-    .circmix_vp_ld(matrix(cos(y)), matrix(0, nrow = length(y)), rep(-Inf, length(y)),
-                   rep(kappa, length(y)), rep(.circmix_J(kappa) / shape, length(y)))
-  }
-  y <- c(0, 1, pi)
-  for (kappa in c(1, 10, 100)) {
-    jump <- at_shape(y, kappa, 2 + 1e-9) - at_shape(y, kappa, 2 - 1e-9)
-    expect_lt(max(abs(jump)), 1e-6, label = paste("kappa", kappa))
-  }
+# From shape 2 up the likelihood stays the mode-centred one, so that existing
+# fits keep their values; shapes 3 and 20 catch the switch moving up, 2 - 1e-9
+# and 1.5 catch it moving down.
+test_that(".circmix_vp_component() takes the tail scheme below shape 2 and the mode scheme from 2", {
+  tab <- .circmix_kappa_table()
+  shape <- c(0.3, 1.5, 2 - 1e-9, 2, 2 + 1e-9, 3, 20)
+  cos_d <- cos(seq(0, pi, length.out = length(shape)))
+  tau <- .circmix_J(10) / shape
+  below <- shape < 2
+  expect_identical(
+    .circmix_vp_component(cos_d, shape, tau, 81L, tab),
+    c(
+      .circmix_vp_component_tail(cos_d[below], shape[below], tau[below], 81L, tab),
+      .circmix_vp_component_mode(cos_d[!below], shape[!below], tau[!below], 81L, tab)
+    )
+  )
 })
 
 test_that(".circmix_slots() gives a slot distribution that is continuous in K", {
@@ -257,7 +310,8 @@ test_that(".circmix_slot_averaging_ld() is accurate for far responses under vari
     1e-8
   )
   # one slot at gamma shape 0.2, so the three the item holds sit at 0.6, below
-  # the switch at 2 and below the old bound 0.74
+  # the switch at 2 and below 0.74, where the mode-centred grid alone loses
+  # 1e-5; the error is 9.7e-9
   tau <- .circmix_J(5) / 0.2
   three_slots <- .circmix_kappa(3 * .circmix_J(5))
   expect_lt(
@@ -265,7 +319,7 @@ test_that(".circmix_slot_averaging_ld() is accurate for far responses under vari
       slot_averaging_density(y, K = 3, set_size = 1, kappa = 5, tau = tau) -
         vapply(y, vp_reference, numeric(1), kappa = three_slots, tau = tau, p_mem = 1)
     )),
-    1e-6
+    1e-7
   )
 })
 
@@ -816,26 +870,32 @@ test_that("variable precision says what kappa means, in every model and version"
   expect_no_match(mixture2p("y")$parameters$kappa, "variable precision")
 })
 
-test_that("the variable-precision density takes a small gamma shape at the default nodes", {
-  # J(1) / 20 = 0.0223, which needed 2689 nodes before the tail was analytic
-  expect_no_error(dmixture2p(0.3, kappa = 1, tau = 20))
+test_that("dmixture2p() is accurate at a small gamma shape at the default nodes", {
+  # gamma shape J(1) / 20 = 0.0223, where most of the prior mass of J lies
+  # below the grid; the error is 3.9e-10
+  expect_lt(
+    abs(dmixture2p(0.3, kappa = 1, tau = 20, log = TRUE) -
+      vp_reference(0.3, kappa = 1, tau = 20, p_mem = 0.6)),
+    1e-8
+  )
 })
 
 test_that("Stan matches R at small gamma shapes and either side of the tail switch", {
   skip_unless_stan_tests()
   skip_on_cran()
 
-  # 0.73 sits under 0.741, the smallest shape Stan accepted at 81 nodes before
-  # the tail was analytic; 1.9 and 2.1 sit either side of the switch to it
+  # 0.73 sits below 0.74, where the mode-centred grid alone loses 1e-5; 1.999
+  # and 2.001 sit either side of the switch to the analytic tail, 1.9 and 2.1
+  # further out; at 0.001 the floor of 40 tau ends the tail grid
   tab <- .circmix_kappa_table()
   cosd <- cos(0.4 - c(0, 1.2))
   logw <- log(c(0.5, 0.3))
-  shapes <- c(0.05, 0.3, 0.73, 1.9, 2.1)
+  shapes <- c(0.001, 0.05, 0.3, 0.73, 1.9, 1.999, 2.001, 2.1)
   tau <- .circmix_J(10) / shapes
   tau_far <- .circmix_J(200) / c(0.05, 0.3, 1.9)
   cosd_far <- cos(2.9 - c(0, 1.2))
   logw_far <- log(c(0.7, 0.3))
-  stan <- circmix_stan_values(list(
+  data <- list(
     NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
     logJ_min = tab$logJ_min, dlogJ = tab$dlogJ,
     NC = 2L, cosd = cosd, logw = logw, logw_guess = log(0.2),
@@ -845,7 +905,8 @@ test_that("Stan matches R at small gamma shapes and either side of the tail swit
     cosd_far = cosd_far, logw_far = logw_far, kappa_far = 200,
     NFAR = length(tau_far), tau_far = tau_far,
     nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2)
-  ))
+  )
+  stan <- circmix_stan_values(data)
 
   expect_equal(stan("out_shape"), shapes, tolerance = 1e-12)
   expect_equal(
@@ -860,6 +921,16 @@ test_that("Stan matches R at small gamma shapes and either side of the tail swit
     vapply(tau_far, function(c_tau) {
       .circmix_vp_ld(matrix(cosd_far, nrow = 1), matrix(logw_far, nrow = 1), -Inf, 200, c_tau)
     }, numeric(1)),
+    tolerance = 1e-10
+  )
+  # tau below 2.5e-6: the gamma quantile that ends the tail grid lies below J0,
+  # so the grid takes its fallback span
+  stan_small_tau <- circmix_stan_values(
+    utils::modifyList(data, list(kappa_vp = 0.001, NTAU = 1L, tau = array(1e-6)))
+  )
+  expect_equal(
+    stan_small_tau("out_vp"),
+    .circmix_vp_ld(matrix(cosd, nrow = 1), matrix(logw, nrow = 1), log(0.2), 0.001, 1e-6),
     tolerance = 1e-10
   )
   expect_equal(

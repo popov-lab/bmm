@@ -474,15 +474,17 @@ test_that("the Stan and R likelihoods agree for every version", {
     }"
   )
 
-  y <- c(-2.5, -0.8, 0, 0.4, 1.9, 3.0)
-  kappa <- c(0.5, 2, 6, 6, 20, 80)
-  tau <- c(0, 0, 0, 1, 0.5, 2)
-  thetat <- c(-1, 0, 0.8, 1.5, 2, 0.3)
-  thetant <- c(-2, -1, -0.5, 0, 0.5, -1.5)
-  K <- c(1.2, 2.5, 3, 3.5, 6, 8)
-  ptarget <- c(0.95, 0.85, 0.75, 0.6, 0.9, 0.5)
-  ss <- c(1L, 2L, 3L, 4L, 6L, 8L)
-  nt <- matrix(seq(-3, 3, length.out = 6 * 7), nrow = 6)
+  # the last row has gamma shape J(6) / 20 = 0.27, below the switch to the
+  # analytic tail at 2, so Stan's tail grid is checked at 41 nodes
+  y <- c(-2.5, -0.8, 0, 0.4, 1.9, 3.0, 1.2)
+  kappa <- c(0.5, 2, 6, 6, 20, 80, 6)
+  tau <- c(0, 0, 0, 1, 0.5, 2, 20)
+  thetat <- c(-1, 0, 0.8, 1.5, 2, 0.3, 1)
+  thetant <- c(-2, -1, -0.5, 0, 0.5, -1.5, -0.5)
+  K <- c(1.2, 2.5, 3, 3.5, 6, 8, 2)
+  ptarget <- c(0.95, 0.85, 0.75, 0.6, 0.9, 0.5, 0.8)
+  ss <- c(1L, 2L, 3L, 4L, 6L, 8L, 3L)
+  nt <- rbind(matrix(seq(-3, 3, length.out = 6 * 7), nrow = 6), seq(-2.7, 2.7, length.out = 7))
 
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
   fit <- model$sample(
