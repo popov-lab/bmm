@@ -12,6 +12,8 @@ sdt_cdp(
   dist = "normal",
   threshold_type = c("parsimonious", "equidistant", "log_distance"),
   links = NULL,
+  judgment = NULL,
+  confidence = NULL,
   ...
 )
 }
@@ -47,6 +49,12 @@ their fixed values and the model's own transformations (\code{exp()}, \code{tanh
 assume it. A positive-range link (\code{"log"}, \code{"softplus"}) on \code{criterion} or
 \code{rcrit} states that the criterion is positive: the sampler then starts
 next to 0 on the native scale and cannot reach negative values.}
+
+\item{judgment, confidence}{For one row per trial, the names of the columns
+holding each trial's judgment (\code{"new"}, \code{"know"}, \code{"remember"}, or
+\code{"guess"}) and its confidence on the unified scale (1 to \code{n_new} for
+"new" judgments, \code{n_new + 1} to \code{n_new + n_old} for the others). Leave
+both \code{NULL} for aggregated count columns.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -173,6 +181,32 @@ numbers of "new" and "old" confidence levels need not be equal (e.g. the
 1-new / 5-old scale of Rotello et al., 2005). Whether the Know/Guess split
 is modelled is \strong{driven by the data}: include \verb{guess<k>} columns to fit
 the three-way Remember/Know/Guess model.
+
+\strong{One row per trial.} Name the columns holding each trial's judgment
+(\code{"new"}, \code{"know"}, \code{"remember"}, optionally \code{"guess"}) and its confidence
+on the unified scale in \code{judgment} and \code{confidence}; the model then needs no
+count columns, and \code{guess} judgments in the data switch on the Know/Guess
+split.
+\itemize{
+\item \strong{Requirements for one row per trial:}
+
+Provide one row per trial with the following columns:
+\itemize{
+\item judgment: 'new', 'know' or 'remember', and optionally 'guess'
+\item confidence: a whole number on the unified confidence scale, 1 ... n_new for 'new' judgments and n_new+1 ... n_new+n_old for the others
+\item stimulus: 0 = new/lure, 1 = old/target
+}
+}
+
+'guess' judgments in the data switch on the Know/Guess split, as \verb{guess<k>} count columns do for aggregated data
+\itemize{
+\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
+\itemize{
+\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
+\item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.
+\item \code{ppp(fit, participant = "id")} names the participant when the formula has more than one grouping variable, such as item terms.
+}
+}
 
 \strong{Variants via the formula.} By default \code{sigmar}, \code{rho}, and \code{kcrit} are
 fixed (equal recollection variance, independent F and R, no Know/Guess
