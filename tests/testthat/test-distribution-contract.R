@@ -949,7 +949,7 @@ test_that("dpsychometric_function() recycles the counts, the intensities and the
                                                   n_trials = c(10, 12, 11, 10)))
   expect_elementwise(dpsychometric_function, list(x = c(3, 7, 9, 5), intensity = c(0.5, 2), midpoint = c(1, 1.2, 0.8),
                                                   width = c(1.5, 0.8, 2), guess = c(0.5, 0.25), lapse = c(0.1, 0, 0.05),
-                                                  n_trials = c(10, 12)),
+                                                  n_trials = c(10, 12, 11)),
                      fixed = list(sigmoid = "weibull", log = TRUE))
   # the case of #697: three counts against five midpoints gave five values
   expect_elementwise(dpsychometric_function, list(x = c(10, 20, 30), intensity = c(0.1, 0.5, 0.9),
