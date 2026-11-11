@@ -98,8 +98,8 @@ bmm::print_pretty_models_md(group = "Choices and response times")
 **Questionnaire and rating-scale responses.** Participants answer items on an
 ordered scale, such as a five-point Likert scale, with one row per person and
 item. Item locations and person traits go into the model's formula, and
-person-specific threshold spread captures extreme and midpoint response
-styles. See
+person-specific threshold spread and interval widths capture extreme and
+midpoint response styles. See
 [`?likert_cumulative`](https://venpopov.com/bmm/reference/likert_cumulative.html).
 
 ```{r, results = "asis", echo = FALSE}

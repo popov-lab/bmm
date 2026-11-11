@@ -523,8 +523,11 @@ check_formula.likert_cumulative <- function(model, data, formula) {
 # its own name, or into one that is easily misread
 .likert_threshold_notes <- function(model, formula) {
   item <- model$resp_vars$item
-  # (1 | item) groups by item; any other grouping variable is taken as the person
-  has_person <- function(f) length(setdiff(re_group_vars(list(f)), item)) > 0
+  # (1 | item) groups by item, and keying is constant within item; any other
+  # grouping variable is taken as the person
+  has_person <- function(f) {
+    length(setdiff(re_group_vars(list(f)), c(item, model$resp_vars$keying))) > 0
+  }
   type <- model$other_vars$threshold_type
   spacing <- formula$spacing
   if (!is.null(spacing) && item %in% rhs_vars(spacing)) {
@@ -534,14 +537,19 @@ check_formula.likert_cumulative <- function(model, data, formula) {
   }
   deltas <- formula[grepl("^delta[0-9]+$", names(formula))]
   has_item <- function(f) item %in% rhs_vars(f)
-  # softmax scales its whole threshold set by exp(spacing), so item-specific
-  # widths under a person spacing are the scaled model's item-specific thresholds
+  # softmax scales its whole threshold set by exp(spacing): item-specific deltas
+  # and an item term on spacing give the scaled model's item-specific thresholds;
+  # without the spacing term the items share one span
   if (!is.null(spacing) && type %in% c("parsimonious", "equidistant", "softmax") &&
         has_person(spacing)) {
-    item_widths <- type == "softmax" && any(vapply(deltas, has_item, logical(1)))
-    message2("spacing with a person term is the scaled threshold model with \\
-             {if (item_widths) 'item-specific' else 'shared'} thresholds (Lubbe & \\
-             Schuster, 2020); item discrimination is fixed at 1")
+    thresholds <- if (type == "softmax" && any(vapply(deltas, has_item, logical(1)))) {
+      if (has_item(spacing)) "item-specific thresholds" else
+        "item-specific interval proportions under a shared span"
+    } else {
+      "shared thresholds"
+    }
+    message2("spacing with a person term is the scaled threshold model with {thresholds} \\
+             (Lubbe & Schuster, 2020); item discrimination is fixed at 1")
   }
   free_width <- type %in% c("log_distance", "log_ratio")
   if (free_width && any(vapply(deltas, has_person, logical(1)))) {

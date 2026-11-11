@@ -244,6 +244,14 @@ test_that("the threshold terms that change what the model is are named", {
   expect_true(any(grepl("scaled threshold model with item-specific thresholds",
                         notes(sm, bmf(activation ~ 0 + item, spacing ~ 0 + item + (1 | id),
                                       delta1 ~ 0 + item, delta2 ~ 0 + item)))))
+  # without an item term on spacing the items share one span
+  shared_span <- notes(sm, bmf(activation ~ 0 + item, spacing ~ 1 + (1 | id), delta1 ~ 0 + item))
+  expect_false(any(grepl("with item-specific thresholds", shared_span)))
+  expect_true(any(grepl("item-specific interval proportions", shared_span)))
+  # keying is constant within item, so grouping by it is no person term
+  keyed <- likert_cumulative("y", "item", n_categories = 5, keying = "keying")
+  expect_false(any(grepl("Johnson", notes(keyed, bmf(activation ~ 0 + item,
+                                                     delta1 ~ 1 + (1 | item:keying))))))
 })
 
 

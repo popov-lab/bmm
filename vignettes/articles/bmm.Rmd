@@ -218,8 +218,8 @@ knitr::kable(bmm:::model_overview(group = "Choices and response times"))
 Participants answer items on an ordered scale, such as a five-point Likert
 scale, and the data hold one row per person and item. `likert_cumulative()`
 is the cumulative model: item locations and person traits go into the formula
-for `activation`, and person-specific threshold spread captures extreme and
-midpoint response styles. `?likert_cumulative` explains the threshold types and
+for `activation`, and person-specific threshold spread and interval widths
+capture extreme and midpoint response styles. `?likert_cumulative` explains the threshold types and
 how the model relates to `brms::cumulative()`.
 
 ```{r, echo = FALSE}
