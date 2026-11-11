@@ -103,10 +103,13 @@ test_that("newdata at one set size matches the same rows of the model frame", {
   }
 })
 
+# only the non-target models have a largest set size: one non-target column
+# per item beyond the first. mixture2p's capacity rule takes any set size
 test_that("newdata with a set size above the fit's maximum is refused", {
   skip_on_cran()
   cases <- Filter(
-    function(case) is_data_var(case$model$other_vars$set_size, case$data),
+    function(case) inherits(case$model, "non_targets") &&
+      is_data_var(case$model$other_vars$set_size, case$data),
     newdata_cases()
   )
   expect_gt(length(cases), 0)
@@ -122,6 +125,66 @@ test_that("newdata with a set size above the fit's maximum is refused", {
       paste0("set size of ", above, ", above the ", above - 1), fixed = TRUE
     )
   }
+})
+
+# trial rows of sdt_ranking() with a set-size column, and of sdt_cdp(), learn
+# the number of categories from the data; newdata without the largest set size
+# or without a 'guess' judgment must keep the fit's, or brms refuses the
+# narrower Y
+test_that("trial-level newdata without the largest category keeps the fit's categories", {
+  skip_on_cran()
+  subsets <- list(
+    sdt_ranking_trial_level = function(user) user$set_size == 3,
+    sdt_cdp_trial_level = function(user) user$judgment != "guess"
+  )
+  for (case_name in names(subsets)) {
+    fit <- newdata_fit(case_name)
+    user <- as.data.frame(newdata_cases()[[case_name]]$data)
+    rows <- subsets[[case_name]](user)
+    from_user <- brms::standata(fit, newdata = user[rows, , drop = FALSE])
+    expect_identical(ncol(from_user$Y), ncol(fit$data$Y), info = case_name)
+    expect_equal(
+      from_user, brms::standata(fit, newdata = fit$data[rows, , drop = FALSE]),
+      info = case_name
+    )
+  }
+})
+
+test_that("check_newdata() leaves no mark on the data it hands to brms", {
+  skip_on_cran()
+  # any attribute beyond those of the same rows checked on their own is a mark
+  # that outlived the check
+  for (case_name in names(newdata_cases())) {
+    case <- newdata_cases()[[case_name]]
+    fit <- newdata_fit(case_name)
+    user <- as.data.frame(case$data)
+    own <- suppressWarnings(suppressMessages(check_data(fit$bmm$model, user, fit$bmm$user_formula)))
+    checked <- suppressWarnings(check_newdata(fit, user))
+    expect_identical(
+      setdiff(names(attributes(checked)), names(attributes(own))), character(0),
+      label = case_name
+    )
+  }
+})
+
+test_that("trial-level newdata beyond the fit's categories is refused", {
+  skip_on_cran()
+  user <- as.data.frame(newdata_cases()$sdt_ranking_trial_level$data)
+  user$set_size[1] <- 5
+  expect_error(
+    brms::standata(newdata_fit("sdt_ranking_trial_level"), newdata = user),
+    "set size of 5, above the 4 the model was fitted with", fixed = TRUE
+  )
+})
+
+test_that("newdata for mixture2p's capacity versions may hold a larger set size", {
+  skip_on_cran()
+  fit <- newdata_fit("mixture2p_slot")
+  user <- as.data.frame(newdata_cases()$mixture2p_slot$data)
+  user$set_size <- as.numeric(as.character(user$set_size))
+  user$set_size[1] <- max(user$set_size) + 3
+  sdata <- suppressWarnings(brms::standata(fit, newdata = user))
+  expect_equal(sdata$vint1[1], user$set_size[1])
 })
 
 test_that("newdata without a column check_data() needs stops with its message", {

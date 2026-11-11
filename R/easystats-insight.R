@@ -31,7 +31,10 @@
 #'     them: without the columns bmm adds for its own use or \pkg{brms}
 #'     computes from the formula (such as `ID:session` or `log(x)`), and with
 #'     the response categories of a model fitted to counts (e.g. [m3()]) as
-#'     columns of their own. The model frame stored in the fit is always the
+#'     columns of their own. Data with one row per trial come back with the
+#'     response columns you named, such as the `rating` column of
+#'     [sdt_rating()] or the `judgment` and `confidence` columns of
+#'     [sdt_cdp()]. The model frame stored in the fit is always the
 #'     source; `source` is ignored.
 #'   \item `find_parameters()` returns the names of the posterior draws in one
 #'     element per model parameter (`<parameter>` for the population-level
@@ -131,8 +134,11 @@ find_predictors.bmmfit <- function(x, effects = "fixed", component = "all",
 #' @exportS3Method insight::find_response
 find_response.bmmfit <- function(x, combine = TRUE, ...) {
   # a model fitted to counts names the columns of its response matrix, which
-  # need not be its resp_vars (sdt_cdp() stores a column prefix there)
-  response <- x$data[[all.vars(brms::brmsterms(x$formula)$respform)[1]]]
+  # need not be its resp_vars (sdt_cdp() stores a column prefix there); on
+  # trial rows that matrix is one-hot and get_data() gives the user's columns
+  response <- if (!is_trial_level(x$bmm$model)) {
+    x$data[[all.vars(brms::brmsterms(x$formula)$respform)[1]]]
+  }
   colnames(response) %||% unlist(x$bmm$model$resp_vars, use.names = FALSE)
 }
 
@@ -141,9 +147,11 @@ find_response.bmmfit <- function(x, combine = TRUE, ...) {
 #' @exportS3Method insight::get_data
 get_data.bmmfit <- function(x, effects = "all", component = "all",
                             source = "frame", verbose = FALSE, ...) {
-  data <- x$data[setdiff(names(x$data), built_data_columns(x$bmm$model))]
+  model <- x$bmm$model
+  data <- .insight_trial_frame(x)
+  data <- data[setdiff(names(data), built_data_columns(model))]
   # the zero-column frame keeps the rows when every column of the frame was built
-  data <- do.call(cbind, c(list(x$data[0]), lapply(names(data), function(col) {
+  data <- do.call(cbind, c(list(data[0]), lapply(names(data), function(col) {
     if (is.matrix(data[[col]])) as.data.frame(data[[col]]) else data[col]
   })))
   # a model whose brms response is a column check_data() built (tcc's binned
@@ -154,7 +162,6 @@ get_data.bmmfit <- function(x, effects = "all", component = "all",
   }
   # brms adds the columns it computes from the formula, such as ID:session
   # or log(x), to the model frame
-  model <- x$bmm$model
   variables <- c(find_response.bmmfit(x), unlist(c(model$resp_vars, model$other_vars)),
                  unlist(lapply(x$bmm$user_formula, all.vars)))
   data <- data[names(data) %in% variables]
@@ -236,6 +243,24 @@ link_inverse.bmmfit <- function(x, ...) {
   function(eta) link_transform(eta, link, inverse = TRUE)
 }
 
+
+# The model frame, with the trial rows of a multinomial model (sdt_rating(),
+# sdt_ranking(), sdt_cdp()) turned from their one-hot response matrix back
+# into the user's response columns, which lead as the response leads the frame.
+# The trial rows of the binomial models keep the user's column in the frame.
+# mpt() trial rows keep their one-hot category columns: its resp_vars name the
+# categories, which find_response() reports, not the user's response column
+.insight_trial_frame <- function(x) {
+  model <- x$bmm$model
+  response <- all.vars(brms::brmsterms(x$formula)$respform)[1]
+  if (!inherits(model, c("sdt_rating", "sdt_ranking", "sdt_cdp")) ||
+      !is_trial_level(model) || !is.matrix(x$data[[response]])) {
+    return(x$data)
+  }
+  data <- revert_check_data(model, x$data)
+  resp_cols <- unlist(model$resp_vars, use.names = FALSE)
+  data[c(resp_cols, setdiff(names(data), resp_cols))]
+}
 
 # insight's methods return NULL for an empty selection, flattened or not
 .insight_elements <- function(elements, flatten) {

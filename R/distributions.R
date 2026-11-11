@@ -485,14 +485,42 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
 #' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
-#' @param kappa Vector of precision values
-#' @param p_mem Vector of probabilities for memory recall
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
+#' @param p_mem Vector of probabilities for memory recall, i.e. `thetat` of
+#'   [mixture2p()] on its native scale. Used by the `"simple"` version; the
+#'   other versions derive it from `K` and `set_size`, and warn if `p_mem` is
+#'   given.
+#' @param tau Vector of scales for trial-to-trial variability in precision. The
+#'   Fisher information `J` of a memory representation is drawn from
+#'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
+#'   precision.
+#' @param K Vector of memory capacities. Used by the `"slot"` and
+#'   `"slot_averaging"` versions; `"simple"` ignores it and warns if it is
+#'   given.
+#' @param set_size Vector of set sizes. Required by the `"slot"` and
+#'   `"slot_averaging"` versions, which stop without it; `"simple"` ignores it
+#'   and warns if it is given.
+#' @param version A character string selecting the storage model: `"simple"`,
+#'   `"slot"` or `"slot_averaging"`. See [mixture2p()].
+#' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the fifth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
 #' @references Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
-#'   representations in visual working memory. Nature, 453.
+#'   representations in visual working memory. Nature, 453(7192), 233-235.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture2p` gives the density of the two-parameter mixture model,
 #'   `pmixture2p` gives the cumulative distribution function of the
@@ -510,23 +538,127 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 #'
-dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, log = FALSE) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
+dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
+                       set_size = NULL, version = "simple", vp_nodes = 81L,
+                       log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dmixture2p", "x, mu, kappa, p_mem", tau)
+    log <- tau
+    tau <- 0
+  }
+  version <- match.arg(version, names(.mixture2p_version_table))
+  .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
+  .circmix_check_variable_precision(FALSE, vp_nodes)
+  .check_mixture2p_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
 
-  density <- matrix(data = NaN, nrow = length(x), ncol = 2)
-
-  density[, 1] <- log(p_mem) + brms::dvon_mises(x = x, mu = mu, kappa = kappa, log = T)
-  density[, 2] <- log(1 - p_mem) + brms::dvon_mises(x = x, mu = 0, kappa = 0, log = T)
-
-  density <- matrixStats::rowLogSumExps(density)
+  density <- switch(version,
+    simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
+    slot = .dmixture2p_slot(x, mu, kappa, K, set_size, tau, vp_nodes),
+    slot_averaging = .dmixture2p_slot_averaging(x, mu, kappa, K, set_size, tau, vp_nodes)
+  )
 
   if (!log) {
     return(exp(density))
   }
 
   density
+}
+
+.check_mixture2p_args <- function(kappa, p_mem, tau, K, set_size, version) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
+  if (version == "simple") {
+    stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
+    stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
+    return(invisible())
+  }
+  stopif(isTRUE(any(K <= 0)), "K must be positive.")
+  stopif(
+    isTRUE(any(set_size < 1 | set_size %% 1 != 0)),
+    "set_size must contain positive whole numbers."
+  )
+}
+
+# set_size has no default: at a set size of 1 every capacity version remembers
+# everything, whatever K is, so a forgotten set size would go unnoticed
+.check_mixture2p_version_args <- function(version, set_size, supplied) {
+  needs_set_size <- .mixture2p_version_table[[version]]$needs_set_size
+  stopif(
+    needs_set_size && is.null(set_size),
+    "The '{version}' version of mixture2p predicts the probability of a memory \\
+    response from the set size, so the set_size argument is required."
+  )
+  unused <- if (needs_set_size) "p_mem" else c("K", "set_size")
+  ignored <- intersect(unused, names(supplied)[supplied])
+  warnif(
+    length(ignored) > 0,
+    "The '{version}' version of mixture2p ignores {collapse_comma(ignored)}."
+  )
+}
+
+# 1.4 took log where tau now is, so a logical there is a 1.4 call; the form
+# stays readable until 1.6.0
+.warn_positional_log <- function(fun, before, log) {
+  warn_deprecated(
+    what = glue("{fun}({before}, {log})"),
+    with = glue("{fun}({before}, log = {log})"),
+    since = "1.5.0",
+    details = "That position now holds `tau`, so pass `log` by name."
+  )
+}
+
+# R twin of mixture2p_simple_logw(): the target, then guessing
+.mixture2p_weights <- function(p_mem) {
+  list(logw = matrix(log(p_mem)), logw_guess = log1p(-p_mem))
+}
+
+.dmixture2p_simple <- function(x, mu, kappa, p_mem, tau, nodes) {
+  args <- .circmix_recycle(x = x, mu = mu, kappa = kappa, p_mem = p_mem, tau = tau)
+  weights <- .mixture2p_weights(args$p_mem)
+  .circmix_vp_ld(
+    matrix(cos(args$x - args$mu)), weights$logw, weights$logw_guess,
+    args$kappa, args$tau, nodes
+  )
+}
+
+# R twin of mixture2p_slot_core(). Below capacity nothing is guessed, and that
+# boundary value p_mem = 1 is what a softmax over mixture weights cannot reach,
+# which is why the slot model needs its own family rather than brms::mixture()
+.dmixture2p_slot <- function(x, mu, kappa, K, set_size, tau, nodes) {
+  args <- .circmix_recycle(x = x, K = K, set_size = set_size)
+  .dmixture2p_simple(
+    args$x, mu, kappa, pmin(1, args$K / args$set_size), tau, nodes
+  )
+}
+
+.dmixture2p_slot_averaging <- function(x, mu, kappa, K, set_size, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
+  )
+  .circmix_slot_averaging_ld(
+    matrix(cos(args$x - args$mu)), matrix(0, nrow = length(args$x)),
+    args$K, args$set_size, args$kappa, args$tau, nodes
+  )
+}
+
+.rmixture2p_simple <- function(mu, kappa, p_mem, tau) {
+  args <- .circmix_recycle(mu = mu, kappa = kappa, p_mem = p_mem, tau = tau)
+  weights <- .mixture2p_weights(args$p_mem)
+  .rcircmix(
+    matrix(args$mu), weights$logw, weights$logw_guess, args$kappa, args$tau
+  )
+}
+
+.rmixture2p_slot_averaging <- function(mu, kappa, K, set_size, tau) {
+  args <- .circmix_recycle(
+    mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
+  )
+  .rcircmix_slot_averaging(
+    matrix(args$mu), matrix(0, nrow = length(args$mu)),
+    args$K, args$set_size, args$kappa, args$tau
+  )
 }
 
 #' @rdname mixture2p_dist
@@ -543,18 +675,26 @@ qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
 
 #' @rdname mixture2p_dist
 #' @export
-rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_mem > 1)), "p_mem must be smaller than one.")
+rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
+                       set_size = NULL, version = "simple") {
+  version <- match.arg(version, names(.mixture2p_version_table))
+  .check_mixture2p_args(kappa, p_mem, tau, K, set_size, version)
+  .check_mixture2p_version_args(version, set_size, c(
+    p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
+  ))
 
-  # the density peaks at x = mu; x of length n gives one bound per draw
-  rejection_sampling(
-    n = n,
-    f = dmixture2p,
-    max_f = dmixture2p(rep_len(mu, n), rep_len(mu, n), .recycle_draws(kappa, n), .recycle_draws(p_mem, n)),
-    proposal_fun = function(n) stats::runif(n, -pi, pi),
-    mu = .recycle_draws(mu, n), kappa = .recycle_draws(kappa, n), p_mem = .recycle_draws(p_mem, n)
+  recycle <- function(x) rep_len(x, n)
+  switch(version,
+    simple = .rmixture2p_simple(
+      recycle(mu), recycle(kappa), recycle(p_mem), recycle(tau)
+    ),
+    slot = .rmixture2p_simple(
+      recycle(mu), recycle(kappa),
+      pmin(1, recycle(K) / recycle(set_size)), recycle(tau)
+    ),
+    slot_averaging = .rmixture2p_slot_averaging(
+      recycle(mu), recycle(kappa), recycle(K), recycle(set_size), recycle(tau)
+    )
   )
 }
 
@@ -562,8 +702,8 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #'
 #' @description Density, distribution, and random generation functions for the
 #'   three-parameter mixture model with the location of `mu`, precision of
-#'   memory representations `kappa`, probability of recalling items from memory
-#'   `p_mem`, and probability of recalling non-targets `p_nt`.
+#'   memory representations `kappa`, probability of a target response `p_mem`,
+#'   and probability of a non-target response `p_nt`.
 #'
 #' @name mixture3p_dist
 #'
@@ -574,22 +714,47 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #' @param mu Vector of locations. First value represents the location of the
 #'   target item and any additional values indicate the location of non-target
 #'   items.
-#' @param kappa Vector of precision values
-#' @param p_mem Vector of probabilities for memory recall
-#' @param p_nt Vector of probabilities for swap errors
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
+#' @param p_mem Vector of probabilities of a target response. For a
+#'   [mixture3p()] fit these are `thetat` on its native scale (version
+#'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
+#'   (versions `"slot"` and `"slot_averaging"`).
+#' @param p_nt Vector of probabilities of a non-target response, summed over
+#'   the non-targets, which share it equally. For a [mixture3p()] fit these are
+#'   `thetant` on its native scale (version `"simple"`) or
+#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions). Unlike
+#'   `ptarget`, `p_mem` and `p_nt` are not conditional on a response from
+#'   memory.
+#' @param tau Vector of scales for trial-to-trial variability in precision. The
+#'   Fisher information `J` of a memory representation is drawn from
+#'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
+#'   precision. See [mixture3p()].
+#' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the sixth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
 #' @references Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The
 #'   precision of visual working memory is set by allocation of a shared
-#'   resource. Journal of Vision, 9(10), 7.
+#'   resource. Journal of Vision, 9(10), Article 7.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
 #'   `pmixture3p` gives the cumulative distribution function of the
-#'   two-parameter mixture model, `qmixture3p` gives the quantile function of
-#'   the two-parameter mixture model, and `rmixture3p` gives the random
-#'   generation function for the two-parameter mixture model.
+#'   three-parameter mixture model, `qmixture3p` gives the quantile function of
+#'   the three-parameter mixture model, and `rmixture3p` gives the random
+#'   generation function for the three-parameter mixture model.
 #'
 #' @export
 #'
@@ -601,34 +766,141 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6) {
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 #'
-dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, log = FALSE) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
-  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
-
-  density <- matrix(data = NaN, nrow = length(x), ncol = length(mu) + 1)
-  probs <- c(
-    p_mem,
-    rep(p_nt / (length(mu) - 1), each = length(mu) - 1),
-    (1 - p_mem - p_nt)
-  )
-
-  for (i in 1:(length(mu))) {
-    density[, i] <- log(probs[i]) +
-      brms::dvon_mises(x = x, mu = mu[i], kappa = kappa, log = T)
+dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
+                       tau = 0, vp_nodes = 81L, log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dmixture3p", "x, mu, kappa, p_mem, p_nt", tau)
+    log <- tau
+    tau <- 0
   }
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  .circmix_check_variable_precision(FALSE, vp_nodes)
 
-  density[, length(mu) + 1] <- log(probs[length(mu) + 1]) +
-    stats::dunif(x = x, -pi, pi, log = T)
-
-  density <- matrixStats::rowLogSumExps(density)
+  args <- .circmix_recycle(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau)
+  set_size <- length(mu)
+  weights <- .mixture3p_marginal_weights(args$p_mem, args$p_nt, set_size, length(args$x))
+  density <- .circmix_vp_ld(
+    .circmix_cos(args$x, mu[1], mu[-1], set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
+  )
 
   if (!log) {
     return(exp(density))
   }
 
   density
+}
+
+.check_mixture3p_args <- function(kappa, p_mem, p_nt, tau) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
+  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
+  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
+  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+}
+
+# the weights the exported functions take: marginal probabilities of a target
+# and of a non-target response, with guessing taking the rest
+.mixture3p_marginal_weights <- function(p_mem, p_nt, set_size, n) {
+  p_mem <- rep_len(p_mem, n)
+  p_nt <- rep_len(p_nt, n)
+  logw <- matrix(log(p_mem), nrow = n)
+  if (set_size > 1) {
+    logw <- cbind(logw, matrix(log(p_nt) - log(set_size - 1), nrow = n, ncol = set_size - 1))
+  }
+  list(logw = logw, logw_guess = log1p(-p_mem - p_nt))
+}
+
+# the "simple" version fits a softmax over the components a trial actually has,
+# with guessing as the reference category
+.mixture3p_softmax_weights <- function(thetat, thetant, set_size) {
+  n <- length(thetat)
+  logw <- matrix(thetat, nrow = n)
+  if (set_size > 1) {
+    logw <- cbind(logw, matrix(thetant - log(set_size - 1), nrow = n, ncol = set_size - 1))
+  }
+  total <- matrixStats::rowLogSumExps(cbind(logw, 0))
+  list(logw = logw - total, logw_guess = -total)
+}
+
+# which stored item is reported: the target with p_target and each non-target
+# with an equal share of 1 - p_target; at set size 1 there is nothing to swap to
+.mixture3p_swap_weights <- function(p_target, set_size) {
+  n <- length(p_target)
+  if (set_size == 1) {
+    return(matrix(0, nrow = n))
+  }
+  cbind(
+    log(p_target),
+    matrix(log1p(-p_target) - log(set_size - 1), nrow = n, ncol = set_size - 1)
+  )
+}
+
+# the capacity versions separate storage from swapping: p_mem says how often a
+# response comes from memory and p_target how often that memory is the target
+.mixture3p_nested_weights <- function(p_mem, p_target, set_size) {
+  list(
+    logw = log(p_mem) + .mixture3p_swap_weights(p_target, set_size),
+    logw_guess = log1p(-p_mem)
+  )
+}
+
+# R twins of the mixture3p_*_core functions in mixture3p_functions.stan. nt holds the
+# non-target locations padded to max_set_size - 1 and only the first
+# set_size - 1 are read, so a trial never pays for components its set size does
+# not have. At set size 1 there is no non-target component, which is why no
+# constant prior has to pin the non-target weight there.
+.dmixture3p_simple <- function(x, mu, kappa, thetat, thetant, set_size, nt, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, thetat = thetat, thetant = thetant, tau = tau
+  )
+  weights <- .mixture3p_softmax_weights(args$thetat, args$thetant, set_size)
+  .circmix_vp_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, nodes
+  )
+}
+
+.dmixture3p_slot <- function(x, mu, kappa, K, p_target, set_size, nt, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau
+  )
+  weights <- .mixture3p_nested_weights(
+    pmin(1, args$K / set_size), args$p_target, set_size
+  )
+  .circmix_vp_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, nodes
+  )
+}
+
+# Which item is reported and how many slots it holds are independent, so the
+# swap weights serve both slot counts and only the concentration differs.
+.dmixture3p_slot_averaging <- function(x, mu, kappa, K, p_target, set_size, nt, tau, nodes) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau
+  )
+  .circmix_slot_averaging_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    .mixture3p_swap_weights(args$p_target, set_size),
+    args$K, set_size, args$kappa, args$tau, nodes
+  )
+}
+
+.rmixture3p <- function(mu, nt, set_size, weights, kappa, tau) {
+  .rcircmix(
+    .circmix_locations(mu, nt, set_size), weights$logw, weights$logw_guess,
+    kappa, tau
+  )
+}
+
+.rmixture3p_slot_averaging <- function(mu, nt, set_size, kappa, K, p_target, tau) {
+  args <- .circmix_recycle(mu = mu, kappa = kappa, K = K, p_target = p_target, tau = tau)
+  .rcircmix_slot_averaging(
+    .circmix_locations(args$mu, nt, set_size),
+    .mixture3p_swap_weights(args$p_target, set_size),
+    args$K, set_size, args$kappa, args$tau
+  )
 }
 
 #' @rdname mixture3p_dist
@@ -645,20 +917,15 @@ qmixture3p <- function(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 
 #' @rdname mixture3p_dist
 #' @export
-rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
-  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
+                       tau = 0) {
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
 
-  xm <- seq(-pi, pi, length.out = 361)
-  max_y <- max(dmixture3p(xm, mu, kappa, p_mem, p_nt))
-
-  rejection_sampling(
-    n = n,
-    f = function(x) dmixture3p(x, mu, kappa, p_mem, p_nt),
-    max_f = max_y,
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+  set_size <- length(mu)
+  .rmixture3p(
+    rep_len(mu[1], n), mu[-1], set_size,
+    .mixture3p_marginal_weights(p_mem, p_nt, set_size, n),
+    rep_len(kappa, n), rep_len(tau, n)
   )
 }
 
@@ -678,18 +945,35 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
 #' @param dist Vector of distances of the item locations to the cued location
-#' @param kappa Vector of precision values
+#' @param kappa Vector of precision values. With `tau > 0` this is the
+#'   concentration of the average trial, whose Fisher information `J(kappa)` is
+#'   the mean of `J`.
 #' @param c Vector of strengths for cue-dependent activation
 #' @param a Vector of strengths for cue-independent activation
 #' @param s Vector of generalization gradients
 #' @param b Vector of baseline activation
-#' @param log Logical; if `TRUE`, values are returned on the log scale.
+#' @param tau Vector of scales for trial-to-trial variability in precision. The
+#'   Fisher information `J` of a memory representation is drawn from
+#'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
+#'   precision. See [imm()].
+#' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
+#'   odd number of at least 41. See [mixture2p()]. The random generation
+#'   function needs no nodes: it draws `J` from its gamma distribution and then
+#'   the response, which is exact.
+#' @param log Logical; if `TRUE`, values are returned on the log scale. Pass
+#'   it by name: in bmm 1.4 it was the ninth argument, which is now `tau`.
+#'   Until bmm 1.6.0 a logical value in that position is still read as `log`,
+#'   with a warning.
 #'
 #' @keywords distribution
 #'
 #' @references Oberauer, K., Stoneking, C., Wabersich, D., & Lin, H.-Y. (2017).
 #'   Hierarchical Bayesian measurement models for continuous reproduction of
 #'   visual features from working memory. Journal of Vision, 17(5), 11.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dimm` gives the density of the interference measurement model,
 #'   `pimm` gives the cumulative distribution function of the interference
@@ -714,41 +998,113 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' lines(x, d, type = "l", col = "red")
 #'
 dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 5, a = 2, b = 1, s = 2, kappa = 5, log = FALSE) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  len_mu <- length(mu)
-  stopif(
-    len_mu != length(dist),
-    "The number of items does not match the distances provided from the cued location."
-  )
-  stopif(isTRUE(any(s < 0)), "s must be non-negative")
-  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
-
-  # compute activation for all items
-  weights <- rep(c, len_mu) * exp(-s * dist) + rep(a, len_mu)
-
-  # add activation of background noise
-  weights <- c(weights, b)
-
-  # compute probability for responding stemming from each distribution
-  probs <- weights / sum(weights)
-  density <- matrix(data = NaN, nrow = length(x), ncol = len_mu + 1)
-
-  for (i in seq_along(mu)) {
-    density[, i] <- log(probs[i]) +
-      brms::dvon_mises(x, mu = mu[i], kappa = kappa, log = T)
+                 c = 5, a = 2, b = 1, s = 2, kappa = 5, tau = 0,
+                 vp_nodes = 81L, log = FALSE) {
+  if (isTRUE(tau) || isFALSE(tau)) {
+    .warn_positional_log("dimm", "x, mu, dist, c, a, b, s, kappa", tau)
+    log <- tau
+    tau <- 0
   }
+  .check_imm_args(kappa, s, dist, tau, length(mu))
+  .circmix_check_variable_precision(FALSE, vp_nodes)
 
-  density[, len_mu + 1] <- log(probs[len_mu + 1]) +
-    stats::dunif(x = x, -pi, pi, log = T)
-
-  density <- matrixStats::rowLogSumExps(density)
+  args <- .circmix_recycle(x = x, c = c, a = a, s = s, b = b, kappa = kappa, tau = tau)
+  weights <- .imm_item_weights(args$c, args$a, args$s, args$b, dist)
+  density <- .circmix_vp_ld(
+    .circmix_cos(args$x, mu[1], mu[-1], length(mu)),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
+  )
 
   if (!log) {
     return(exp(density))
   }
 
   density
+}
+
+.check_imm_args <- function(kappa, s, dist, tau, n_items) {
+  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
+  stopif(
+    n_items != length(dist),
+    "The number of items does not match the distances provided from the cued location."
+  )
+  stopif(isTRUE(any(s < 0)), "s must be non-negative")
+  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
+  stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
+}
+
+.log_sum2 <- function(x, y) {
+  pmax(x, y) + log1p(exp(-abs(x - y)))
+}
+
+# Activation of every item, including the target at distance zero, weighed
+# against the background. Assembled on the log scale, which is the same
+# quantity as c * exp(-s * d) + a without the intermediate exponentials.
+.imm_item_weights <- function(c, a, s, b, dist) {
+  n <- length(c)
+  logw <- vapply(dist, function(d) .log_sum2(log(c) - s * d, log(a)), numeric(n))
+  logw <- matrix(logw, nrow = n)
+  total <- matrixStats::rowLogSumExps(cbind(logw, log(b)))
+  list(logw = logw - total, logw_guess = log(b) - total)
+}
+
+# As .imm_item_weights(), but for the reduced versions and with the non-target
+# distances padded to max_set_size - 1. "abc" has no distance gradient at all,
+# and "bsc" no cue-independent activation. Twin of the imm_*_core() functions in
+# inst/stan_chunks/imm_functions.stan. The weights are a Luce choice over the
+# activations of the target, the set_size - 1 active non-targets and the
+# background b; that choice rule is the theory rather than a link, so the
+# versions keep it and gain only variable precision. c, a, s and b reach the
+# Stan likelihood on their natural scale, because brms applies the inverse link
+# before calling it.
+.imm_log_weights <- function(c, a, s, b, set_size, dist, version) {
+  n <- length(c)
+  log_c <- log(c)
+  log_a <- log(a)
+
+  logw <- matrix(
+    if (version == "bsc") log_c else .log_sum2(log_c, log_a),
+    nrow = n
+  )
+  for (j in seq_len(set_size - 1)) {
+    logw <- cbind(logw, switch(version,
+      abc = log_a,
+      bsc = log_c - s * dist[j],
+      .log_sum2(log_c - s * dist[j], log_a)
+    ))
+  }
+
+  total <- matrixStats::rowLogSumExps(cbind(logw, log(b)))
+  list(logw = logw - total, logw_guess = log(b) - total)
+}
+
+.dimm_version <- function(x, mu, kappa, c, a, s, b, set_size, nt, dist, tau,
+                          nodes, version) {
+  args <- .circmix_recycle(
+    x = x, mu = mu, kappa = kappa, c = c, a = a %||% 1, s = s %||% 0,
+    b = b, tau = tau
+  )
+  weights <- .imm_log_weights(
+    args$c, args$a, args$s, args$b, set_size, dist, version
+  )
+  .circmix_vp_ld(
+    .circmix_cos(args$x, args$mu, nt, set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, nodes
+  )
+}
+
+.rimm_version <- function(mu, kappa, c, a, s, b, set_size, nt, dist, tau,
+                          version) {
+  args <- .circmix_recycle(
+    mu = mu, kappa = kappa, c = c, a = a %||% 1, s = s %||% 0, b = b, tau = tau
+  )
+  weights <- .imm_log_weights(
+    args$c, args$a, args$s, args$b, set_size, dist, version
+  )
+  .rcircmix(
+    .circmix_locations(args$mu, nt, set_size), weights$logw, weights$logw_guess,
+    args$kappa, args$tau
+  )
 }
 
 #' @rdname IMMdist
@@ -768,23 +1124,15 @@ qimm <- function(p, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' @rdname IMMdist
 #' @export
 rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 1, s = 2, kappa = 5) {
-  stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(isTRUE(any(s < 0)), "s must be non-negative")
-  stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
-  stopif(
-    length(mu) != length(dist),
-    "The number of items does not match the distances provided from the cued location."
+                 c = 1, a = 0.2, b = 1, s = 2, kappa = 5, tau = 0) {
+  .check_imm_args(kappa, s, dist, tau, length(mu))
+
+  weights <- .imm_item_weights(
+    rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
   )
-
-  xm <- seq(-pi, pi, length.out = 361)
-  max_y <- max(dimm(xm, mu, dist, c, a, b, s, kappa))
-
-  rejection_sampling(
-    n = n,
-    f = function(x) dimm(x, mu, dist, c, a, b, s, kappa),
-    max_f = max_y,
-    proposal_fun = function(n) stats::runif(n, -pi, pi)
+  .rcircmix(
+    matrix(mu, nrow = n, ncol = length(mu), byrow = TRUE),
+    weights$logw, weights$logw_guess, rep_len(kappa, n), rep_len(tau, n)
   )
 }
 
@@ -4341,4 +4689,186 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
   counts
+}
+
+
+############################################################################# !
+# PSYCHOMETRIC FUNCTION DISTRIBUTION FUNCTIONS                            ####
+############################################################################# !
+
+# Each sigmoid is a standard CDF from .sdt_dists read on the linear or on the
+# log stimulus axis; weibull is gumbel_min on log intensity, as in MATLAB
+# psignifit 4 (Python psignifit's weibull is its gumbel on the linear axis and
+# leaves the log transform of the intensities to the user).
+# The order is the order of the `sigmoid` argument, normal first as its default.
+.psychometric_sigmoids <- list(
+  normal      = list(dist = "normal",     log_x = FALSE),
+  logistic    = list(dist = "logistic",   log_x = FALSE),
+  gumbel_min  = list(dist = "gumbel_min", log_x = FALSE),
+  gumbel_max  = list(dist = "gumbel_max", log_x = FALSE),
+  weibull     = list(dist = "gumbel_min", log_x = TRUE),
+  lognormal   = list(dist = "normal",     log_x = TRUE),
+  loglogistic = list(dist = "logistic",   log_x = TRUE)
+)
+
+# Standard-axis location of the midpoint (F = 0.5) and the standard-axis span
+# from F = 0.05 to F = 0.95, which `width` covers on the stimulus axis
+.psychometric_z_constants <- function(sigmoid) {
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  c(zmid = qf(0.5), zspan = qf(0.95) - qf(0.05))
+}
+
+.psychometric_z <- function(intensity, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  dx <- if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    log(intensity) - log(midpoint)
+  } else {
+    intensity - midpoint
+  }
+  k[["zmid"]] + k[["zspan"]] * dx / width
+}
+
+# Stimulus intensity at which the sigmoid F reaches f, the inverse of
+# .psychometric_z() followed by F
+.psychometric_x_at <- function(f, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  dx <- (qf(f) - k[["zmid"]]) * width / k[["zspan"]]
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) midpoint * exp(dx) else midpoint + dx
+}
+
+# log P(1) and log P(0) on the log scale, as in psychometric_function_log_lik() in
+# inst/stan_chunks/psychometric_function_functions.stan:
+#   psi     = guess + (1 - guess) (1 - lapse) F(z)
+#   1 - psi = (1 - guess) (lapse + (1 - lapse) (1 - F(z)))
+# The probability scale rounds psi to 0 or 1 in the tails, where Stan stays
+# finite, and a guess or lapse of exactly 0 must give log(0) = -Inf, not NaN.
+.psychometric_log_probs <- function(intensity, midpoint, width, guess, lapse,
+                                    sigmoid) {
+  dist <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]
+  z <- .psychometric_z(intensity, midpoint, width, sigmoid)
+  list(
+    one = log_sum_exp(log(guess), log1p(-guess) + log1p(-lapse) + dist$lcdf(z)),
+    zero = log1p(-guess) + log_sum_exp(log(lapse), log1p(-lapse) + dist$lccdf(z))
+  )
+}
+
+.psychometric_check_pars <- function(intensity, midpoint, width, guess, lapse,
+                                     sigmoid) {
+  stopif(anyNA(c(intensity, midpoint, width, guess, lapse)),
+         "intensity, midpoint, width, guess and lapse must not contain NA")
+  stopif(any(width <= 0), "width must be positive")
+  stopif(any(guess < 0 | guess >= 1), "guess must be in [0, 1)")
+  stopif(any(lapse < 0 | lapse >= 1), "lapse must be in [0, 1)")
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    stopif(any(intensity <= 0),
+           "intensity must be positive for sigmoid = '{sigmoid}', which reads \\
+           it on the log scale")
+    stopif(any(midpoint <= 0),
+           "midpoint must be positive for sigmoid = '{sigmoid}'")
+  }
+}
+
+#' @title Distribution functions for the psychometric function model
+#'
+#' @description Density and random generation for the [psychometric_function()] model:
+#'   the number of positive responses ("yes", "correct", "longer") out of
+#'   `n_trials` at a stimulus intensity, a binomial with probability
+#'   \deqn{\psi(x) = \gamma + (1 - \gamma)(1 - \lambda) F(x),}{psi(x) = guess + (1 - guess) * (1 - lapse) * F(x),}
+#'   where \eqn{F} is the sigmoid with its midpoint and width.
+#'
+#' @name psychometric_function_dist
+#'
+#' @param x Integer vector. Number of positive responses, between 0 and
+#'   `n_trials`.
+#' @param intensity Numeric vector. Stimulus intensity. Must be positive for the
+#'   sigmoids that read it on the log scale (`"weibull"`, `"lognormal"`,
+#'   `"loglogistic"`).
+#' @param midpoint Numeric. Intensity at which the sigmoid \eqn{F} is 0.5, in
+#'   the units of `intensity`. Positive for the log-scale sigmoids.
+#' @param width Numeric, positive. Distance on the intensity axis between the
+#'   points where \eqn{F} is 0.05 and 0.95; for the log-scale sigmoids, in log
+#'   units of intensity.
+#' @param guess Numeric in \[0, 1). Guess rate, the lower asymptote: 0.5 in
+#'   2AFC, `1 / m` in m-AFC.
+#' @param lapse Numeric in \[0, 1). Proportion of trials on which the observer
+#'   does not attend and responds at the guess rate. The upper asymptote is
+#'   `1 - lapse * (1 - guess)`.
+#' @param n_trials Integer vector. Number of trials per observation (default
+#'   1, a single binary response).
+#' @param sigmoid The sigmoid \eqn{F}; see [psychometric_function()].
+#' @param log Logical. If `TRUE`, returns the log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `intensity`,
+#'   `n_trials` and the parameters are recycled to this length.
+#'
+#' @return `dpsychometric_function()` returns the (log-)density, a binomial probability.
+#'   `rpsychometric_function()` returns an integer vector with the number of positive
+#'   responses per observation.
+#'
+#' @section Parameter scales:
+#' These functions take every argument on the **natural** scale, while
+#' [psychometric_function()] *estimates* `width` on the log scale and `guess` and `lapse`
+#' on the logit scale (and `midpoint` on the log scale for the log-scale
+#' sigmoids). Transform a fitted value back before passing it here.
+#'
+#' @references
+#' Schütt, H. H., Harmeling, S., Macke, J. H., & Wichmann, F. A. (2016).
+#'   Painfree and accurate Bayesian estimation of psychometric functions for
+#'   (potentially) overdispersed data. \emph{Vision Research}, \emph{122},
+#'   105--123. \doi{10.1016/j.visres.2016.02.002}
+#'
+#' Wichmann, F. A., & Hill, N. J. (2001). The psychometric function: I.
+#'   Fitting, sampling, and goodness of fit. \emph{Perception & Psychophysics},
+#'   \emph{63}(8), 1293--1313. \doi{10.3758/BF03194544}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Probability of 7 correct out of 10 2AFC trials at the midpoint
+#' dpsychometric_function(7, intensity = 1, midpoint = 1, width = 2, guess = 0.5,
+#'                        n_trials = 10)
+#'
+#' # Simulate a method-of-constant-stimuli experiment with a Weibull observer
+#' dat <- data.frame(contrast = rep(c(0.01, 0.02, 0.04, 0.08, 0.16), 4))
+#' dat$n_correct <- rpsychometric_function(nrow(dat), dat$contrast, midpoint = 0.04,
+#'                                         width = 2, guess = 0.5, lapse = 0.02,
+#'                                         n_trials = 40, sigmoid = "weibull")
+#' head(dat)
+dpsychometric_function <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic"),
+                                   log = FALSE) {
+  sigmoid <- match.arg(sigmoid)
+  stopif(anyNA(x), "x must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
+  stopif(any(x < 0), "x must be non-negative")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  stopif(any(x > n_trials), "x must not exceed n_trials")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+
+  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
+  out <- lchoose(n_trials, x) +
+    times_nonzero(x, lp$one) +
+    times_nonzero(n_trials - x, lp$zero)
+  if (log) out else exp(out)
+}
+
+
+#' @rdname psychometric_function_dist
+#' @export
+rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic")) {
+  sigmoid <- match.arg(sigmoid)
+  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+
+  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
+  stats::rbinom(n, rep_len(n_trials, n), rep_len(exp(lp$one), n))
 }

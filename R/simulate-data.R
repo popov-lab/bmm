@@ -59,17 +59,19 @@
 #'
 #' | Model | Columns |
 #' |:--|:--|
-#' | [mixture2p()], [ddm()], [cswald()] | none |
+#' | [ddm()], [cswald()] | none |
 #' | [sdm()] | the `options` columns and the `n_alternatives` column, where they name columns; none otherwise |
+#' | [mixture2p()] | `set_size` (if it names a column) for the versions `"slot"` and `"slot_averaging"`; none for `"simple"` |
 #' | [mixture3p()] | `set_size` (if it names a column), `nt_features`, of which a row's first `set_size - 1` are read |
 #' | [imm()] | as [mixture3p()], plus `nt_distances` for the versions `"full"` and `"bsc"` |
 #' | [m3()] | `n_trials`, the number of trials of each row; `num_options` when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) |
-#' | [mpt()] | `n_trials`; `tree_id` and `covariates` when the model has them |
+#' | [mpt()] | `n_trials` (none with `response`, one row per trial); `tree_id` and `covariates` when the model has them |
 #' | [ezdm()] | `n_trials` |
 #' | [sdt_yn()] | `stimulus`, `n_trials` |
 #' | [sdt_mafc()] | `n_trials`; `m` when it names a column |
 #' | [sdt_ranking()] | `n_trials`; `m` when it names a column |
 #' | [sdt_rating()], [sdt_cdp()] | `stimulus`, `n_trials` |
+#' | [psychometric_function()] | `intensity`; `n_trials` when it names a column (else each row is one 0/1 trial); `guess` and `lapse` when they name columns |
 #'
 #' The simplex groups of [mpt()] are given as probabilities that sum to 1 on
 #' both scales.

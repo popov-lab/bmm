@@ -2,9 +2,72 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
+.imm_parameters <- list(
+  mu = glue(
+    "Location of the von Mises distribution of memory responses (in radians). \\
+    Fixed internally to 0 by default."
+  ),
+  kappa = "Concentration of the von Mises distribution of memory responses",
+  a = "General activation of memory items",
+  c = "Context activation",
+  s = "Spatial similarity gradient",
+  b = glue(
+    "Background activation, the reference against which the activations of \\
+    the target and the non-targets are weighed. Fixed internally to 0 on its \\
+    log scale, i.e. to an activation of 1; freeing it leaves the remaining \\
+    activations unidentified, since only their ratio to the background enters \\
+    the likelihood."
+  )
+)
+
+.imm_priors <- list(
+  mu = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
+  kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  a = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  c = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  s = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
+  b = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
+)
+
+.imm_links <- list(
+  mu = "tan_half", kappa = "log", a = "log", c = "log", s = "log", b = "log"
+)
+
+# central 50% of the main default prior on the native scale
+.imm_init_ranges <- list(
+  mu = c(-0.65, 0.65), kappa = c(3.8, 15), a = c(0.51, 2), c = c(0.51, 2),
+  s = c(0.51, 2), b = c(0.51, 2)
+)
+
+.imm_version_spec <- function(version) {
+  kept <- switch(version,
+    full = c("mu", "kappa", "a", "c", "s", "b"),
+    bsc = c("mu", "kappa", "c", "s", "b"),
+    abc = c("mu", "kappa", "a", "c", "b")
+  )
+  list(
+    weight_parameters = switch(version,
+      full = c("c", "a", "s", "b"),
+      bsc = c("c", "s", "b"),
+      abc = c("c", "a", "b")
+    ),
+    needs_distances = version %in% c("full", "bsc"),
+    parameters = .imm_parameters[kept],
+    links = .imm_links[kept],
+    priors = .imm_priors[kept],
+    init_ranges = .imm_init_ranges[kept]
+  )
+}
+
 .model_imm <- function(resp_error = NULL, nt_features = NULL, nt_distances = NULL,
                        set_size = NULL, regex = FALSE, version = "full", links = NULL,
+                       variable_precision = FALSE, vp_nodes = 81L,
                        call = NULL, ...) {
+  spec <- .imm_version_spec(version)
+  if (variable_precision) {
+    spec <- .circmix_add_variable_precision(spec)
+  }
+
   out <- structure(
     list(
       resp_vars = nlist(resp_error),
@@ -12,83 +75,50 @@
       domain = "Working memory",
       task = "Continuous reproduction",
       name = "Interference Measurement Model",
-      citation = glue(
-        "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
+      citation = c(
+        glue(
+          "Oberauer, K., & Lin, H.-Y. (2017). An interference model \\
           of visual working memory. Psychological Review, 124(1), 21-59. \\
           https://doi.org/10.1037/rev0000044"
+        ),
+        if (variable_precision) .circmix_vp_citation
       ),
       version = version,
-      requirements = glue(
-        "- The response vairable should be in radians and \\
-          represent the angular error relative to the target
-          - The non-target features should be in radians and be \\
-          centered relative to the target"
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the requirements in one list
+      requirements = paste0(
+        "- The response variable should be in radians and represent the ",
+        "angular error relative to the target\n",
+        "  - The non-target features should be in radians and be centered ",
+        "relative to the target"
       ),
-      parameters = list(
-        mu1 = glue(
-          "Location parameter of the von Mises distribution for memory \\
-            responses (in radians). Fixed internally to 0 by default."
-        ),
-        kappa = "Concentration parameter of the von Mises distribution",
-        a = "General activation of memory items",
-        c = "Context activation",
-        s = "Spatial similarity gradient"
-      ),
-      links = list(
-        mu1 = "tan_half",
-        kappa = "log",
-        a = "log",
-        c = "log",
-        s = "log"
-      ),
-      fixed_parameters = list(mu1 = 0, mu2 = 0, kappa2 = -100),
-      default_priors = list(
-        mu1 = list(main = "normal(0, 0.5)", effects = "normal(0, 0.25)", sd = "exponential(4)"),
-        kappa = list(main = "normal(2, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        a = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        c = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)"),
-        s = list(main = "normal(0, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
-      ),
-      # central 50% of the main default prior on the native scale
-      init_ranges = list(
-        mu1 = c(-0.65, 0.65),
-        kappa = c(3.8, 15),
-        a = c(0.51, 2),
-        c = c(0.51, 2),
-        s = c(0.51, 2)
-      )
+      parameters = spec$parameters,
+      links = spec$links,
+      fixed_parameters = list(mu = 0, b = 0),
+      default_priors = spec$priors,
+      init_ranges = spec$init_ranges,
+      deprecated_parameters = list(mu1 = "mu"),
+      dpar_since = "1.5.0",
+      variable_precision = variable_precision,
+      vp_nodes = as.integer(vp_nodes)
     ),
     # attributes
     regex = regex,
-    regex_vars = c("nt_features", "nt_distances"),
+    regex_vars = if (version == "abc") "nt_features" else c("nt_features", "nt_distances"),
     class = c("bmmodel", "circular", "non_targets", "imm", paste0("imm_", version)),
     call = call
   )
-
-  # add version specific information
-  if (version == "abc") {
-    out$parameters$s <- NULL
-    out$links$s <- NULL
-    out$default_priors$s <- NULL
-    out$init_ranges$s <- NULL
-    attributes(out)$regex_vars <- c("nt_features")
-  } else if (version == "bsc") {
-    out$parameters$a <- NULL
-    out$links$a <- NULL
-    out$default_priors$a <- NULL
-    out$init_ranges$a <- NULL
-  }
 
   out <- set_links(out, links)
   out
 }
 
-# the mixture weights are built from exp(c), exp(a) and exp(-s * d) in the
-# non-linear formulas of configure_model.imm_*, and mu1/kappa from the von
-# Mises components, so none of the links in this list is read at fit time
+# b is fixed to 0 on its log link, the background of 1 that the other
+# activations are weighed against; on another link that fixed value would be
+# another background, so its link stays
 #' @exportS3Method
 settable_links.imm <- function(model) {
-  character(0)
+  setdiff(names(model$links), "b")
 }
 
 # user facing alias
@@ -107,12 +137,8 @@ settable_links.imm <- function(model) {
 #' #### Version: `abc`
 #' `r model_docs(.model_imm(version = "abc"), components =c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
 #'
-#' Additionally, all imm models have an internal parameter that is fixed to 0 to
-#' allow the model to be identifiable. This parameter is not estimated and is not
-#' included in the model formula. The parameter is:
-#'
-#'   - b = "Background activation (internally fixed to 0)"
-#'
+#' @section Priors from bmm 1.4:
+#' `r .circmix_prior_migration_doc()`
 #' @param resp_error The name of the variable in the provided dataset containing
 #'   the response error. The response Error should code the response relative to
 #'   the to-be-recalled target in radians. You can transform the response error
@@ -134,9 +160,30 @@ settable_links.imm <- function(model) {
 #'   columns in the dataset.
 #' @param version Character. The version of the IMM model to use. Can be one of
 #'  `full`, `bsc`, or `abc`. The default is `full`.
+#' @param variable_precision Logical; if `TRUE`, the precision of memory varies
+#'   from trial to trial (van den Berg et al., 2012). This adds the parameter
+#'   `tau`, and `kappa` then describes the average trial: it is the
+#'   concentration whose Fisher information `J(kappa)` is the mean of `J`; see
+#'   [mixture2p()] for the parameterisation. The capacity models of Zhang and
+#'   Luck (2008) do not apply to the IMM, which has no discrete slots -- its
+#'   bottleneck is the ratio of context to general activation -- so variable
+#'   precision is the only extension offered here.
+#' @param vp_nodes Number of quadrature nodes used when
+#'   `variable_precision = TRUE`; must be an odd number of at least 41, default
+#'   81. See [mixture2p()] for the accuracy this buys and the shapes it refuses.
+#' @param links A named list of link functions for the model parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
+#' @references Oberauer, K., & Lin, H.-Y. (2017). An interference model of
+#'   visual working memory. Psychological Review, 124(1), 21-59.
+#'
+#'   van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
+#'   Variability in encoding precision accounts for visual short-term memory
+#'   limitations. PNAS, 109(22), 8780-8785.
+#'
+#'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution representations
+#'   in visual working memory. Nature, 453(7192), 233-235.
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
 #' # load data
 #' data <- oberauer_lin_2017
@@ -203,9 +250,10 @@ settable_links.imm <- function(model) {
 #' )
 #' @export
 imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
-                version = c("full", "bsc", "abc"), ...) {
+                version = c("full", "bsc", "abc"), variable_precision = FALSE, vp_nodes = 81L,
+                links = NULL, ...) {
   call <- match.call()
-  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
+  .check_constructor_dots(list(...), deprecated = "setsize")
   version <- match.arg(version)
   dots <- list(...)
   if ("setsize" %in% names(dots)) {
@@ -214,11 +262,13 @@ imm <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE,
   }
   if (version == "abc") nt_distances <- NULL
   stop_missing_args()
+  .circmix_check_variable_precision(variable_precision, vp_nodes)
 
   .model_imm(
     resp_error = resp_error, nt_features = nt_features,
     nt_distances = nt_distances, set_size = set_size, regex = regex,
-    version = version, call = call, ...
+    version = version, variable_precision = variable_precision,
+    vp_nodes = vp_nodes, links = links, call = call, ...
   )
 }
 
@@ -264,159 +314,164 @@ check_data.imm_full <- function(model, data, formula) {
 }
 
 ############################################################################# !
+# CHECK_FORMULA METHODS                                                  ####
+############################################################################# !
+
+#' @export
+check_formula.imm <- function(model, data, formula) {
+  .imm_warn_set_size_one(model, data, formula)
+  NextMethod("check_formula")
+}
+
+# A trial with one item has no non-target, so s is absent from its likelihood
+# and a enters only through the target's activation c + a. The previous mixture
+# implementation hid this by pinning the set-size-1 levels of a and s to a
+# constant, which it had to do anyway to switch off the sentinel weight.
+.imm_warn_set_size_one <- function(model, data, formula) {
+  if (!isTRUE(any(data[["ss_numeric"]] == 1))) {
+    return(invisible())
+  }
+  pars <- names(model$parameters)
+  if ("s" %in% pars) {
+    .warn_set_size_one(
+      .set_size_one_undetermined("s", formula, data), "s",
+      reason = "say nothing about 's'"
+    )
+  }
+  if ("a" %in% pars) {
+    .warn_set_size_one(
+      .set_size_one_undetermined(c("a", "c"), formula, data, summed = TRUE), c("a", "c"),
+      reason = "inform 'a' and 'c' only through their sum"
+    )
+  }
+}
+
+############################################################################# !
 # CONFIGURE_MODEL METHODS                                                ####
 ############################################################################# !
 # Each model should have a corresponding configure_model.* function. See
 # ?configure_model for more information.
 
-.base_imm_formula <- function(model, formula) {
-  bmf2bf(model, formula) +
-    brms::lf(kappa2 ~ 1) +
-    brms::lf(mu2 ~ 1) +
-    brms::nlf(kappa1 ~ kappa)
-}
-
-.add_imm_mixture_terms <- function(formula, max_set_size, lure_idx, nt_features, theta_exprs) {
-  kappa_nts <- paste0("kappa", 3:(max_set_size + 1))
-  theta_nts <- paste0("theta", 3:(max_set_size + 1))
-  mu_nts <- paste0("mu", 3:(max_set_size + 1))
-
-  for (i in 1:(max_set_size - 1)) {
-    formula <- formula +
-      glue_nlf("{kappa_nts[i]} ~ kappa") +
-      glue_nlf("{theta_nts[i]} ~ {theta_exprs[i]}") +
-      glue_nlf("{mu_nts[i]} ~ {nt_features[i]}")
+#' @export
+bmf2bf.imm <- function(model, formula) {
+  spec <- .imm_version_spec(model$version)
+  covariates <- model$other_vars$nt_features
+  if (spec$needs_distances) {
+    covariates <- c(covariates, model$other_vars$nt_distances)
   }
-
-  formula
+  brms::bf(.circmix_aterm(
+    model$resp_vars$resp_error,
+    vint = "ss_numeric", vreal = covariates
+  ))
 }
 
-.imm_mixture_family <- function(max_set_size) {
-  brms::mixture(
-    brms::von_mises("tan_half"), brms::von_mises("identity"),
-    nmix = c(1, max_set_size),
-    order = "none"
+#' @export
+configure_model.imm <- function(model, data, formula) {
+  spec <- .imm_version_spec(model$version)
+  n_nt <- attr(data, "max_set_size") - 1
+  groups <- if (spec$needs_distances) list(nt = n_nt, dist = n_nt) else list(nt = n_nt)
+
+  formula <- bmf2bf(model, formula)
+  formula$family <- .circmix_custom_family(
+    model,
+    family = paste0("imm_", model$version),
+    weight_parameters = spec$weight_parameters,
+    vint = TRUE, n_vreal = sum(unlist(groups)),
+    log_lik = .imm_log_lik(model$version),
+    posterior_predict = .imm_posterior_predict(model$version),
+    posterior_epred = .imm_posterior_epred(model$version)
+  )
+
+  nlist(
+    formula, data,
+    stanvars = .circmix_model_stanvars(model, formula$family, "imm_functions.stan",
+      vint = "ss", vreal = groups
+    )
   )
 }
 
-#' @export
-configure_model.imm_abc <- function(model, data, formula) {
-  # retrieve arguments from the data check
-  max_set_size <- attr(data, "max_set_size")
-  lure_idx <- attr(data, "lure_idx_vars")
-  nt_features <- model$other_vars$nt_features
-
-  formula <- .base_imm_formula(model, formula) +
-    brms::nlf(theta1 ~ log(exp(c) + exp(a)))
-
-  theta_exprs <- glue("{lure_idx} * a + (1 - {lure_idx}) * (-100)")
-  formula <- .add_imm_mixture_terms(formula, max_set_size, lure_idx, nt_features, theta_exprs)
-  formula$family <- .imm_mixture_family(max_set_size)
-
-  nlist(formula, data)
-}
-
-#' @export
-configure_model.imm_bsc <- function(model, data, formula) {
-  # retrieve arguments from the data check
-  max_set_size <- attr(data, "max_set_size")
-  lure_idx <- attr(data, "lure_idx_vars")
-  nt_features <- model$other_vars$nt_features
-  nt_distances <- model$other_vars$nt_distances
-
-  formula <- .base_imm_formula(model, formula) +
-    brms::nlf(theta1 ~ c) +
-    brms::nlf(expS ~ exp(s))
-
-  theta_exprs <- glue("{lure_idx} * (-expS*{nt_distances} + c) + (1 - {lure_idx}) * (-100)")
-  formula <- .add_imm_mixture_terms(formula, max_set_size, lure_idx, nt_features, theta_exprs)
-  formula$family <- .imm_mixture_family(max_set_size)
-
-  nlist(formula, data)
-}
-
-#' @export
-configure_model.imm_full <- function(model, data, formula) {
-  # retrieve arguments from the data check
-  max_set_size <- attr(data, "max_set_size")
-  lure_idx <- attr(data, "lure_idx_vars")
-  nt_features <- model$other_vars$nt_features
-  nt_distances <- model$other_vars$nt_distances
-
-  formula <- .base_imm_formula(model, formula) +
-    brms::nlf(theta1 ~ log(exp(c) + exp(a))) +
-    brms::nlf(expS ~ exp(s))
-
-  theta_exprs <- glue("{lure_idx} * log(exp(c-expS*{nt_distances}) + exp(a)) + (1 - {lure_idx}) * (-100)")
-  formula <- .add_imm_mixture_terms(formula, max_set_size, lure_idx, nt_features, theta_exprs)
-  formula$family <- .imm_mixture_family(max_set_size)
-
-  nlist(formula, data)
-}
-
 ############################################################################# !
-# SIMULATE_DATA S3 METHODS                                               ####
+# POSTPROCESS METHODS                                                    ####
 ############################################################################# !
 
-# rimm() takes one display per call and ignores per-row values, so rows are
-# drawn in groups of identical displays and values. The guessing activation b
-# is the reference, exp(0) = 1. bsc has no cue-independent activation (a = 0);
-# abc has no generalization gradient, which infinite distances with s = 1 give
-#' @export
-simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
-  vars <- model$other_vars
-  design <- .design_or_n(model, design, .set_size_column(model),
-                        ragged = c(vars$nt_features, vars$nt_distances))
-  sim <- .simulate_pars(model, pars, design, scale)
-  p <- sim$native
-  n_obs <- nrow(design)
-  a <- p$a %||% rep(0, n_obs)
-  s <- p$s %||% rep(1, n_obs)
-  set_size <- check_var_set_size(vars$set_size, design)$ss_numeric
-  .check_nt_na(design, vars$nt_features, set_size)
-  .check_nt_na(design, vars$nt_distances, set_size)
-  nt <- unname(as.matrix(design[vars$nt_features]))
-  dist <- if (is.null(vars$nt_distances)) nt * 0 + Inf else unname(as.matrix(design[vars$nt_distances]))
-  y <- .simulate_by_group(data.frame(set_size, nt, dist, p), function(i, n) {
-    k <- seq_len(set_size[i] - 1)
-    rimm(n, mu = c(p$mu1[i], nt[i, k]), dist = c(0, dist[i, k]), c = p$c[i], a = a[i], b = 1,
-         s = s[i], kappa = p$kappa[i])
-  })
-  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
+.imm_log_lik <- function(version) {
+  switch(version,
+    full = log_lik_imm_full, bsc = log_lik_imm_bsc, abc = log_lik_imm_abc
+  )
 }
 
-############################################################################# !
-# CONFIGURE_PRIOR METHODS                                                ####
-############################################################################# !
-
-#' @export
-configure_prior.imm_abc <- function(model, data, formula, user_prior, ...) {
-  .configure_prior_imm(model, data, formula, nlpars = "a")
+.imm_posterior_predict <- function(version) {
+  switch(version,
+    full = posterior_predict_imm_full, bsc = posterior_predict_imm_bsc,
+    abc = posterior_predict_imm_abc
+  )
 }
 
-#' @export
-configure_prior.imm_bsc <- function(model, data, formula, user_prior, ...) {
-  .configure_prior_imm(model, data, formula, nlpars = "s")
+.imm_posterior_epred <- function(version) {
+  switch(version,
+    full = posterior_epred_imm_full, bsc = posterior_epred_imm_bsc,
+    abc = posterior_epred_imm_abc
+  )
 }
 
-#' @export
-configure_prior.imm_full <- function(model, data, formula, user_prior, ...) {
-  .configure_prior_imm(model, data, formula, nlpars = c("a", "s"))
-}
+# add_posterior_epred() looks these up by family name for fits saved without
+# them
+posterior_epred_imm_full <- posterior_epred_undefined("imm")
+posterior_epred_imm_bsc <- posterior_epred_undefined("imm")
+posterior_epred_imm_abc <- posterior_epred_undefined("imm")
 
-.configure_prior_imm <- function(model, data, formula, nlpars, ...) {
-  prior <- brms::empty_prior()
-  set_size_var <- model$other_vars$set_size
-
-  # Models with non-target errors need constant priors on set-size 1 factors
-  set_size_is_factor_with_level1 <- any(data$ss_numeric == 1) && !is.numeric(data[[set_size_var]])
-  if (!set_size_is_factor_with_level1) {
-    return(prior)
+# the non-target features come first in the vreal block, the distances after
+.imm_covariates <- function(prep, i, with_distances) {
+  covariates <- .circmix_prep_nt(prep, i)
+  if (!with_distances) {
+    return(list(nt = covariates, dist = NULL))
   }
+  half <- length(covariates) / 2
+  list(nt = covariates[seq_len(half)], dist = covariates[half + seq_len(half)])
+}
 
-  prior +
-    constrain_set_size1_fixef(formula, nlpars, set_size_var, "constant(0)") +
-    constrain_set_size1_ranef(formula, nlpars, set_size_var, "constant(1e-8)")
+# the density takes the response and the node count on top of what the
+# sampler needs
+.imm_args <- function(i, prep, version, density = TRUE) {
+  covariates <- .imm_covariates(prep, i, version %in% c("full", "bsc"))
+  c(
+    if (density) list(x = prep$data$Y[i]),
+    list(
+      mu = brms::get_dpar(prep, "mu", i = i),
+      kappa = brms::get_dpar(prep, "kappa", i = i),
+      c = brms::get_dpar(prep, "c", i = i),
+      a = if (version != "bsc") brms::get_dpar(prep, "a", i = i),
+      s = if (version != "abc") brms::get_dpar(prep, "s", i = i),
+      b = brms::get_dpar(prep, "b", i = i),
+      set_size = prep$data$vint1[i], nt = covariates$nt, dist = covariates$dist,
+      tau = .circmix_prep_tau(prep, i), version = version
+    ),
+    if (density) list(nodes = .circmix_prep_nodes(prep))
+  )
+}
+
+log_lik_imm_full <- function(i, prep) {
+  brms::do_call(.dimm_version, .imm_args(i, prep, "full"))
+}
+
+log_lik_imm_bsc <- function(i, prep) {
+  brms::do_call(.dimm_version, .imm_args(i, prep, "bsc"))
+}
+
+log_lik_imm_abc <- function(i, prep) {
+  brms::do_call(.dimm_version, .imm_args(i, prep, "abc"))
+}
+
+posterior_predict_imm_full <- function(i, prep, ...) {
+  brms::do_call(.rimm_version, .imm_args(i, prep, "full", density = FALSE))
+}
+
+posterior_predict_imm_bsc <- function(i, prep, ...) {
+  brms::do_call(.rimm_version, .imm_args(i, prep, "bsc", density = FALSE))
+}
+
+posterior_predict_imm_abc <- function(i, prep, ...) {
+  brms::do_call(.rimm_version, .imm_args(i, prep, "abc", density = FALSE))
 }
 
 # ---- deprecated calls for specific versions ----
@@ -426,7 +481,7 @@ configure_prior.imm_full <- function(model, data, formula, user_prior, ...) {
 #' @export
 IMMfull <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, ...) {
   call <- match.call()
-  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
+  .check_constructor_dots(list(...), known = c("links", "variable_precision", "vp_nodes"), deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMfull()` is deprecated. Please use `imm(version = 'full')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -446,7 +501,7 @@ IMMfull <- function(resp_error, nt_features, nt_distances, set_size, regex = FAL
 #' @export
 IMMbsc <- function(resp_error, nt_features, nt_distances, set_size, regex = FALSE, ...) {
   call <- match.call()
-  .check_constructor_dots(list(...), known = "links", deprecated = "setsize")
+  .check_constructor_dots(list(...), known = c("links", "variable_precision", "vp_nodes"), deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMbsc()` is deprecated. Please use `imm(version = 'bsc')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -466,7 +521,8 @@ IMMbsc <- function(resp_error, nt_features, nt_distances, set_size, regex = FALS
 #' @export
 IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
   call <- match.call()
-  .check_constructor_dots(list(...), known = c("nt_distances", "links"), deprecated = "setsize")
+  .check_constructor_dots(list(...), known = c("nt_distances", "links", "variable_precision", "vp_nodes"),
+                          deprecated = "setsize")
   dots <- list(...)
   warning2("The function `IMMabc()` is deprecated. Please use `imm(version = 'abc')` instead.")
   if ("setsize" %in% names(dots)) {
@@ -478,4 +534,37 @@ IMMabc <- function(resp_error, nt_features, set_size, regex = FALSE, ...) {
     resp_error = resp_error, nt_features = nt_features, set_size = set_size,
     regex = regex, version = "abc", call = call, ...
   )
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# The trial-wise generator of posterior_predict() takes one display per call
+# and each row's own values, so rows are drawn in groups of identical set size,
+# non-target locations and distances. The fixed background b comes from the
+# model as in the fit; a version without a or s gets NULL for it, as there,
+# and .rimm_version() fills in a value that version's weights never read.
+#' @export
+simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  .circmix_refuse_1_4_model(model)
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, .set_size_column(model),
+                         ragged = c(vars$nt_features, vars$nt_distances))
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  tau <- p$tau %||% rep(0, nrow(design))
+  set_size <- check_var_set_size(vars$set_size, design)$ss_numeric
+  .check_nt_na(design, vars$nt_features, set_size)
+  .check_nt_na(design, vars$nt_distances, set_size)
+  nt <- unname(as.matrix(design[vars$nt_features]))
+  dist <- if (length(vars$nt_distances)) unname(as.matrix(design[vars$nt_distances]))
+  y <- numeric(nrow(design))
+  for (idx in .row_groups(as.data.frame(cbind(set_size, nt, dist)))) {
+    y[idx] <- .rimm_version(
+      p$mu[idx], p$kappa[idx], p$c[idx], p$a[idx], p$s[idx], p$b[idx],
+      set_size[idx[1]], nt[idx[1], ], dist[idx[1], ], tau[idx], model$version
+    )
+  }
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }

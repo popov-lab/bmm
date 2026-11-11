@@ -63,7 +63,7 @@ test_that("the simulate_pars attribute holds the link values whatever the scale"
                         design, scale = "native")
   expect_identical(data$cond, design$cond)
   expect_equal(attr(data, "simulate_pars"), data.frame(
-    mu1 = c(0, 0), kappa = c(1, 1), thetat = log(c(0.6, 0.5) / c(0.2, 0.3)),
+    mu = c(0, 0), kappa = c(1, 1), thetat = log(c(0.6, 0.5) / c(0.2, 0.3)),
     thetant = log(0.2 / c(0.2, 0.3))
   ))
   expect_identical(attr(data, "simulate_call"), list(model = class(model), scale = "native"))
@@ -236,6 +236,25 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), circular_mean_cos(function(x) dmixture2p(x, 0, 7.389056, 0.5986877)),
                    "mixture2p")
 
+  # the capacity versions and variable precision, against E[cos] from
+  # A = I1 / I0 and J(kappa) = kappa A(kappa): a j-slot item has J = j J(kappa),
+  # variable precision draws J from gamma(J / tau, tau), integrated here
+  slot <- data.frame(set_size = rep(4, n_sim))
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot"),
+                     list(kappa = exp(2), K = 2), slot, scale = "native")$y
+  expect_within_mc(cos(y), 0.4648183, "mixture2p slot")
+  pair <- data.frame(set_size = rep(2, n_sim))
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot_averaging"),
+                     list(kappa = exp(1), K = 3), pair, scale = "native")$y
+  expect_within_mc(cos(y), 0.8378172, "mixture2p slot_averaging")
+  # constant precision gives 0.7081129 and 0.8378172 at these values
+  y <- simulate_data(mixture2p("y", variable_precision = TRUE),
+                     list(kappa = exp(1), thetat = 0.9, tau = 1), n_trials = n_sim, scale = "native")$y
+  expect_within_mc(cos(y), 0.6498559, "mixture2p variable precision")
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot_averaging", variable_precision = TRUE),
+                     list(kappa = exp(1), K = 3, tau = 1), pair, scale = "native")$y
+  expect_within_mc(cos(y), 0.7917740, "mixture2p slot_averaging variable precision")
+
   y <- simulate_data(sdm("y"), list(c = 2, kappa = 1.75), n_trials = n_sim)$y
   expect_within_mc(cos(y), circular_mean_cos(function(x) dsdm(x, 0, 7.389056, 5.754603)), "sdm")
 
@@ -270,6 +289,29 @@ test_that("simulated statistics of the circular models match their densities", {
     dmixture3p(x, c(0, 1.5, -2), 7.389056, p_mem = 0.5064804, p_nt = 0.1863237)
   }), "mixture3p")
 
+  # the capacity versions, set size 1 and variable precision, against E[cos] from
+  # A = I1 / I0 and J(kappa) = kappa A(kappa): from memory the target is reported
+  # with ptarget and each non-target with (1 - ptarget) / 2; a j-slot item has J = j J(kappa)
+  nt <- c("nt1", "nt2")
+  y <- simulate_data(mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot"),
+                     list(kappa = exp(2), K = 2, ptarget = 0.7), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.4017199, "mixture3p slot")
+  averaging <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging")
+  y <- simulate_data(averaging, list(kappa = exp(1), K = 4, ptarget = 0.7), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.5320389, "mixture3p slot_averaging")
+  # at set size 1 the softmax runs over the target and guessing only
+  single <- data.frame(set_size = rep(1, n_sim), nt1 = NA, nt2 = NA)
+  y <- simulate_data(model, list(kappa = exp(2), thetat = 0.5, thetant = 0.2), single, scale = "native")$y
+  expect_within_mc(cos(y), 0.5810229, "mixture3p set size 1")
+  # constant precision gives 0.6158454 and 0.5320389 at these values
+  y <- simulate_data(mixture3p("y", nt_features = nt, set_size = "set_size", variable_precision = TRUE),
+                     list(kappa = exp(1), thetat = 0.8, thetant = 0.1, tau = 1), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.5651793, "mixture3p variable precision")
+  averaging_vp <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging",
+                            variable_precision = TRUE)
+  y <- simulate_data(averaging_vp, list(kappa = exp(1), K = 4, ptarget = 0.7, tau = 1), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.4981567, "mixture3p slot_averaging variable precision")
+
   model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
                set_size = "set_size", version = "full")
   y <- simulate_data(model, list(kappa = 2, a = 0, c = 0.5, s = 0), display)$y
@@ -290,6 +332,24 @@ test_that("simulated statistics of the circular models match their densities", {
   y <- simulate_data(model, list(kappa = 2, c = 0.5, a = -0.5), display)$y
   expect_within_mc(cos(y), 0.9296366 * (2.255252 + 0.6065307 * (cos(1.5) + cos(-2))) / 4.468313,
                    "imm abc")
+
+  # full, set size 1 and variable precision, against E[cos] from the Luce choice
+  # over target c + a, non-target j c exp(-s d_j) + a and the background b = 1,
+  # A = I1 / I0 and J(kappa) = kappa A(kappa), computed outside the package
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "full")
+  full_pars <- list(kappa = exp(2), c = 2, a = 0.5, s = 1)
+  y <- simulate_data(model, full_pars, display, scale = "native")$y
+  expect_within_mc(cos(y), 0.3826816, "imm full")
+  single <- data.frame(set_size = rep(1, n_sim), nt1 = NA, nt2 = NA, d1 = NA, d2 = NA)
+  y <- simulate_data(model, full_pars, single, scale = "native")$y
+  expect_within_mc(cos(y), 0.6640262, "imm set size 1")
+  # constant precision gives 0.3238802 at these values
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "full", variable_precision = TRUE)
+  y <- simulate_data(model, list(kappa = exp(1), c = 2, a = 0.5, s = 1, tau = 1), display,
+                     scale = "native")$y
+  expect_within_mc(cos(y), 0.2972343, "imm variable precision")
 })
 
 test_that("simulated decisions of the RT models match the closed forms", {

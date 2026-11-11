@@ -222,12 +222,10 @@ test_that("built_data_columns() names what each model's check_data() builds", {
   declared <- function(name) built_data_columns(cases[[name]]$model)
 
   expect_setequal(declared("mixture2p"), character(0))
+  expect_setequal(declared("mixture2p_slot"), "ss_numeric")
   expect_setequal(declared("sdm"), character(0))
-  expect_setequal(
-    declared("mixture3p"),
-    c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric")
-  )
-  expect_setequal(declared("imm"), c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric"))
+  expect_setequal(declared("mixture3p"), "ss_numeric")
+  expect_setequal(declared("imm"), "ss_numeric")
   expect_setequal(declared("sdt_yn"), "dist_type")
   expect_setequal(declared("sdt_mafc"), c("m_afc", "dist_type"))
   expect_setequal(declared("sdt_ranking"), c("nTrials", "max_rank"))
@@ -243,6 +241,13 @@ test_that("built_data_columns() names what each model's check_data() builds", {
     c("nTrials", paste0("Idx_", c("corr", "other", "dist", "npl")),
       paste0("n_opt_", c("corr", "other", "dist", "npl")))
   )
+
+  expect_setequal(
+    declared("psychometric_function"),
+    c("psy_trials", "psy_guess", "psy_lapse", "psy_dist", "psy_logx")
+  )
+  # counts in n_trials and a guess column: only the lapse slot is built
+  expect_setequal(declared("psychometric_function_counts"), c("psy_lapse", "psy_dist", "psy_logx"))
 
   ezdm_4par <- model_test_cases("check_data")$ezdm_4par$model
   expect_setequal(built_data_columns(ezdm_4par), c("rt_used_upper", "rt_used_lower"))
