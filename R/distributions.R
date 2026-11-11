@@ -434,8 +434,6 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @name mixture2p_dist
 #'
 #' @param x Vector of observed responses
-#' @param q Vector of quantiles
-#' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
 #' @param kappa Vector of precision values. With `tau > 0` this is the
@@ -476,10 +474,8 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture2p` gives the density of the two-parameter mixture model,
-#'   `pmixture2p` gives the cumulative distribution function of the
-#'   two-parameter mixture model, `qmixture2p` gives the quantile function of
-#'   the two-parameter mixture model, and `rmixture2p` gives the random
-#'   generation function for the two-parameter mixture model.
+#'   and `rmixture2p` gives the random generation function for the
+#'   two-parameter mixture model.
 #'
 #' @export
 #'
@@ -616,18 +612,6 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 
 #' @rdname mixture2p_dist
 #' @export
-pmixture2p <- function(q, mu = 0, kappa = 7, p_mem = 0.8) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture2p_dist
-#' @export
-qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture2p_dist
-#' @export
 rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
                        set_size = NULL, version = "simple") {
   version <- match.arg(version, names(.mixture2p_version_table))
@@ -661,8 +645,6 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @name mixture3p_dist
 #'
 #' @param x Vector of observed responses
-#' @param q Vector of quantiles
-#' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations. First value represents the location of the
 #'   target item and any additional values indicate the location of non-target
@@ -704,10 +686,8 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
-#'   `pmixture3p` gives the cumulative distribution function of the
-#'   three-parameter mixture model, `qmixture3p` gives the quantile function of
-#'   the three-parameter mixture model, and `rmixture3p` gives the random
-#'   generation function for the three-parameter mixture model.
+#'   and `rmixture3p` gives the random generation function for the
+#'   three-parameter mixture model.
 #'
 #' @export
 #'
@@ -858,18 +838,6 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 
 #' @rdname mixture3p_dist
 #' @export
-pmixture3p <- function(q, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture3p_dist
-#' @export
-qmixture3p <- function(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture3p_dist
-#' @export
 rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
                        tau = 0) {
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
@@ -893,8 +861,6 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @name IMMdist
 #'
 #' @param x Vector of observed responses
-#' @param q Vector of quantiles
-#' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
 #' @param dist Vector of distances of the item locations to the cued location
@@ -929,10 +895,8 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dimm` gives the density of the interference measurement model,
-#'   `pimm` gives the cumulative distribution function of the interference
-#'   measurement model, `qimm` gives the quantile function of the interference
-#'   measurement model, and `rimm` gives the random generation function for the
-#'   interference measurement model.
+#'   and `rimm` gives the random generation function for the interference
+#'   measurement model.
 #'
 #' @export
 #'
@@ -1058,20 +1022,6 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
     .circmix_locations(args$mu, nt, set_size), weights$logw, weights$logw_guess,
     args$kappa, args$tau
   )
-}
-
-#' @rdname IMMdist
-#' @export
-pimm <- function(q, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5) {
-  .NotYetImplemented()
-}
-
-#' @rdname IMMdist
-#' @export
-qimm <- function(p, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5) {
-  .NotYetImplemented()
 }
 
 #' @rdname IMMdist
