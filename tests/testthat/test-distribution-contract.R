@@ -106,6 +106,28 @@ test_that("dsdm() recycles alike for every activation and scaling", {
   }
 })
 
+test_that("psdm() and qsdm() pair c and kappa per observation in every cell where c* depends on kappa", {
+  # c and kappa of non-multiple lengths: a c* formed before recycling to the
+  # length of q pairs element i with the wrong c. The peak scaling, c* = c,
+  # cannot mispair. qsdm() solves each element with the same root finder alone
+  # and in the vector, so its values agree to the last digit as well
+  q <- c(0.3, -1.2, 2.9, -3)
+  p <- c(0.2, 0.4, 0.65, 0.9)
+  pars <- list(list(c = c(2.5, 7), kappa = c(1.5, 4, 12)), list(c = c(2.5, 7, 4), kappa = c(1.5, 12)))
+  cells <- expand.grid(activation = c("vonmises", "laplace"), scaling = c("density", "range"),
+                       stringsAsFactors = FALSE)
+  for (i in seq_len(nrow(cells))) {
+    cell <- as.list(cells[i, ])
+    for (par in pars) {
+      expect_elementwise(psdm, c(list(q = q, mu = 0), par), fixed = cell)
+      expect_elementwise(qsdm, c(list(p = p, mu = 0), par), fixed = cell)
+    }
+    # mu of a length that does not divide that of q, recycled silently like the parameters
+    expect_elementwise(psdm, list(q = q, mu = c(0, 1, -1), c = c(2.5, 7), kappa = c(1.5, 4, 12)), fixed = cell)
+    expect_elementwise(qsdm, list(p = p, mu = c(0, 1, -1), c = c(2.5, 7), kappa = c(1.5, 4, 12)), fixed = cell)
+  }
+})
+
 test_that("rsdm() draws each observation from its own location, strength and precision", {
   withr::local_seed(4441)
   mu <- c(-2, 0, 2)
