@@ -1327,10 +1327,11 @@ test_that("unit columns on a range wider than 1 keep the SD draws they had befor
 # it at the far end of the unconstrained scale. A start keeps 0.01 times its
 # coefficient's shrink from the bound, or a twentieth of the interval between
 # two bounds where that is less. The shrink is 1 for a column reaching at most 1
-# under an init range at least 1 wide on the link scale, as in eta_model
+# under an init range at least 1 wide on the link scale, as in eta_model. A start
+# at -Inf or Inf clears a margin from an infinite bound but is no start at all
 inside <- function(x, lower = -Inf, upper = Inf, shrink = 1) {
   margin <- min(0.01 * shrink, (upper - lower) / 20)
-  all(x >= lower + margin & x <= upper - margin)
+  all(is.finite(x) & x >= lower + margin & x <= upper - margin)
 }
 
 eta_model <- list(
@@ -1347,7 +1348,7 @@ test_that("solved coefficients start inside a bound set on the class (#694)", {
   # the effects the constant target does not need solve to zero
   expect_true(inside(lower[2:3, ], lower = 0))
   expect_true(all(lower[2:3, ] <= 0.1))
-  expect_true(all(upper < 0))
+  expect_true(inside(upper, upper = 0))
   expect_true(all(narrow > -1e-4 & narrow < 1e-4))
   # an intercept above the bound keeps its start in range
   expect_true(all(lower[1, ] >= 2 & lower[1, ] <= 3))
@@ -1368,7 +1369,8 @@ test_that("starts between close bounds spread strictly inside them (#694)", {
   expect_true(inside(close, lower = 0, upper = 0.02))
   expect_gt(length(unique(close[1, ])), 1)
   expect_gt(length(unique(close[2, ])), 1)
-  # four doubles apart, most steps fall below the spacing of the doubles
+  # four doubles apart, some steps fall below half the spacing of the doubles
+  # and round onto the bound
   tiny <- c(1, 1 + 4 * .Machine$double.eps)
   starts <- replicate(200, into_bounds(c(0, 2), tiny, 1))
   expect_true(all(starts > tiny[1] & starts < tiny[2]))
@@ -1401,7 +1403,17 @@ test_that("an intercept and a per-coefficient scalar start inside their bounds (
   intercept <- replicate(200, init_fixef_param("Intercept_eta", "real", 1, eta_model, list(), c(5, Inf)))
   effect <- replicate(200, init_fixef_param("par_b_eta_3", "real", 1, eta_model, eta_data, c(0, Inf)))
   expect_true(inside(intercept, lower = 5))
+  # replicate() would fold a vector returned for the scalar into a matrix
+  expect_length(effect, 200)
   expect_true(inside(effect, lower = 0))
+})
+
+test_that("an intercept on a narrow init range moves by a step that range shrinks (#694)", {
+  withr::local_seed(694)
+  # the shrink is the 0.006 width of the range, which no column widens
+  model <- list(parameters = list(ndt = ""), init_ranges = list(ndt = c(0.012, 0.018)), links = list(ndt = "identity"))
+  intercept <- replicate(200, init_fixef_param("Intercept_ndt", "real", 1, model, list(), c(0.05, Inf)))
+  expect_true(inside(intercept, lower = 0.05, shrink = 0.006) && all(intercept <= 0.05 + 0.1 * 0.006))
 })
 
 test_that("mo() coefficients start inside a bound set on the class (#694)", {

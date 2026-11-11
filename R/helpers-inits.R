@@ -83,12 +83,15 @@ init_stan_param <- function(spar, spec, model, standata_list) {
 # coefficients are drawn around zero, so a bound at zero (lb = 0 for a monotonic
 # effect, #694) rejects most starts. A start closer to a bound than 0.01 moves
 # inside the nearer bound by 0.01 to 0.1, the size of the special coefficients'
-# draws; both are shrunk as the coefficient's draws are. Bounds closer together
-# than 0.2 shrink it further, until the largest step reaches the midpoint, so
-# that the chains still start apart and none crosses to the other bound. Only
-# the starts that move draw a step, so a bound that never binds leaves the
-# seeded starts of every later parameter as they were without it
+# draws; both are shrunk as the coefficient's draws are. Where the bounds lie
+# closer together than 0.2 times that shrink, the step shrinks further, until
+# the largest step reaches the midpoint, so that the chains still start apart
+# and none crosses to the other bound. Only the starts that move draw a step, so
+# a bound that never binds leaves the seeded starts of every later parameter as
+# they were without it
 into_bounds <- function(values, bounds, shrink) {
+  # a parameter without a bound keeps its starts as they come; the code below
+  # stops on an NA start or shrink
   if (!any(is.finite(bounds))) {
     return(values)
   }
@@ -297,8 +300,12 @@ init_fixef_param <- function(spar, types, dim, model, standata_list, bounds) {
   }
   # the intercept of a centred design is solved apart from X, whose first
   # column it replaces, so value k belongs to column k + 1
-  shrink <- apply(X[, keep + centered, drop = FALSE], 2, function(column) coef_shrink(parameter, column, model))
-  init_array(into_bounds(values[keep], bounds, shrink), types, dim)
+  init_array(
+    into_bounds(values[keep], bounds, apply(X[, keep + centered, drop = FALSE], 2, function(column) {
+      coef_shrink(parameter, column, model)
+    })),
+    types, dim
+  )
 }
 
 # The coefficients that put the linear predictor at `target` on every row of
