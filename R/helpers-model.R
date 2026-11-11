@@ -676,19 +676,16 @@ data_column_roles <- list(
   ),
   mixture2p_cd = c(
     response = "0 = 'same', 1 = 'change'",
-    probe = "feature shown at test, in radians",
-    target = "feature shown at the probed location, in radians"
+    probe = "probe relative to the target, in radians (0 on a 'same' trial)"
   ),
   mixture2p_cd_slot = c(
     response = "0 = 'same', 1 = 'change'",
-    probe = "feature shown at test, in radians",
-    target = "feature shown at the probed location, in radians",
+    probe = "probe relative to the target, in radians (0 on a 'same' trial)",
     set_size = "set size (a column, or one number)"
   ),
   mixture2p_cd_slot_averaging = c(
     response = "0 = 'same', 1 = 'change'",
-    probe = "feature shown at test, in radians",
-    target = "feature shown at the probed location, in radians",
+    probe = "probe relative to the target, in radians (0 on a 'same' trial)",
     set_size = "set size (a column, or one number)"
   ),
   mixture3p = c(

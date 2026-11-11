@@ -7,7 +7,6 @@
 mixture2p_cd(
   response,
   probe,
-  target,
   set_size = NULL,
   version = c("simple", "slot", "slot_averaging"),
   variable_precision = FALSE,
@@ -21,12 +20,10 @@ mixture2p_cd(
 change-detection response, coded 0 ("same") and 1 ("change"). A logical
 variable is accepted and coded \code{TRUE} = "change".}
 
-\item{probe}{The name of the variable containing the feature shown at test,
-in radians.}
-
-\item{target}{The name of the variable containing the feature shown at the
-probed location in the memory array, in radians. On "same" trials it
-equals the probe.}
+\item{probe}{The name of the variable containing the probe in radians,
+relative to the target: the feature shown at test minus the feature shown
+at the probed location in the memory array, as \code{\link[=wrap]{wrap()}} returns it. It is 0
+on "same" trials.}
 
 \item{set_size}{Name of the variable in the data containing the set size,
 or a single number if the set size is constant. Required by the \code{"slot"}
@@ -37,8 +34,8 @@ the responses at that set size, and only below it.}
 \item{version}{Which storage model to use: \code{"simple"} (default), \code{"slot"}
 or \code{"slot_averaging"}, the versions of \code{\link[=mixture2p]{mixture2p()}}.}
 
-\item{variable_precision}{Must be \code{FALSE}. Variable precision is planned for
-change detection in bmm 1.6.0; \code{TRUE} stops with an error.}
+\item{variable_precision}{Must be \code{FALSE}. Variable precision is not
+available for change detection yet; it is planned for bmm 1.6.0.}
 
 \item{knowledge}{What the observer knows about the precision of the
 current trial when it varies across trials: \code{"limited"} (default) or
@@ -50,11 +47,12 @@ one decision boundary for all trials; the rich observer knows the slot
 count of the trial and sets the boundary from it. Lin and Oberauer (2022)
 found the limited observer fit better under variable precision; for slot
 averaging they varied whether the observer knows that the item is stored,
-which this argument does not model.}
+which this argument does not model. \code{"rich"} warns in the versions where
+it has no effect.}
 
 \item{links}{A named list of link functions for the model parameters, e.g.
-\code{list(kappa = "softplus")}. Defaults are \code{"log"} for \code{kappa} and \code{K},
-\code{"logit"} for \code{thetat} and \code{"identity"} for \code{criterion}.}
+\code{list(kappa = "softplus")}. The link of \code{criterion} cannot be changed,
+because its fixed value and its bound are written for the identity scale.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -62,7 +60,8 @@ which this argument does not model.}
 An object of class \code{bmmodel}
 }
 \description{
-Two-Parameter Mixture Model for Change Detection
+Fits the two-parameter mixture model of \code{\link[=mixture2p]{mixture2p()}} to the
+"same" or "change" responses of a single-probe change-detection task.
 }
 \details{
 \itemize{
@@ -77,11 +76,7 @@ Two-Parameter Mixture Model for Change Detection
 \item \strong{Requirements:}
 \itemize{
 \item The response variable should be coded 0 ('same') and 1 ('change')
-}
-}
-\itemize{
-\item The probe and the target should be in radians: the feature shown at test and the feature shown at the probed location in the memory array
-\itemize{
+\item The probe should be in radians and relative to the target: the feature shown at test minus the feature shown at the probed location, which is 0 on a 'same' trial
 \item The 'slot' and 'slot_averaging' versions additionally require a set_size variable, which should vary for the capacity rule to be testable
 }
 }
@@ -89,9 +84,9 @@ Two-Parameter Mixture Model for Change Detection
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
-\item \code{thetat}: Mixture weight for target responses, i.e. the probability that a response comes from memory rather than from guessing.
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of the retrieved feature. Unlike in continuous reproduction, it holds no response noise.
+\item \code{thetat}: Mixture weight for retrieving the target, i.e. the probability that the feature is retrieved from memory rather than guessed.
 \item \code{criterion}: Decision criterion, Lin and Oberauer's (2022) bias beta on the log-likelihood ratio of 'change' against 'same'; positive values favour 'same' responses. Fixed to 0, the unbiased observer, by default. When estimated, it is kept inside the range of evidence each trial can produce (it equals Lin and Oberauer's criterion near 0 and is compressed toward that range's ends), so both responses stay possible on every trial.
 }
 \item \strong{Fixed parameters:}
@@ -137,9 +132,9 @@ Two-Parameter Mixture Model for Change Detection
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
-\item \code{K}: Capacity: the number of items that can be held in memory. An item is either held at full precision or not held at all, so the probability of a memory response is min(1, K / set_size).
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of the retrieved feature. Unlike in continuous reproduction, it holds no response noise.
+\item \code{K}: Capacity: the number of items that can be held in memory. An item is either held at full precision or not held at all, so the probability that the feature is retrieved from memory is min(1, K / set_size).
 \item \code{criterion}: Decision criterion, Lin and Oberauer's (2022) bias beta on the log-likelihood ratio of 'change' against 'same'; positive values favour 'same' responses. Fixed to 0, the unbiased observer, by default. When estimated, it is kept inside the range of evidence each trial can produce (it equals Lin and Oberauer's criterion near 0 and is compressed toward that range's ends), so both responses stay possible on every trial.
 }
 \item \strong{Fixed parameters:}
@@ -185,8 +180,8 @@ Two-Parameter Mixture Model for Change Detection
 \itemize{
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution for an item held in a single slot. An item holding several slots is more precise, because averaging independent samples adds their Fisher information.
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution for an item held in a single slot. An item holding several slots is more precise, because averaging independent samples adds their Fisher information. Unlike in continuous reproduction, it holds no response noise.
 \item \code{K}: Capacity: the number of memory slots distributed over the items in the array. An item receives floor(K / set_size) or one more slot, and an item that receives none is guessed.
 \item \code{criterion}: Decision criterion, Lin and Oberauer's (2022) bias beta on the log-likelihood ratio of 'change' against 'same'; positive values favour 'same' responses. Fixed to 0, the unbiased observer, by default. When estimated, it is kept inside the range of evidence each trial can produce (it equals Lin and Oberauer's criterion near 0 and is compressed toward that range's ends), so both responses stay possible on every trial.
 }
@@ -267,9 +262,10 @@ the criterion is estimated.
 
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
-# half of the trials probe the target itself, the others a random colour
-design <- data.frame(target = 0, probe = c(rep(0, 1000), runif(1000, -pi, pi)))
-model <- mixture2p_cd(response = "change", probe = "probe", target = "target")
+# the probe is relative to the target: half of the trials show the target
+# itself (a probe of 0), the others a random colour
+design <- data.frame(probe = c(rep(0, 1000), runif(1000, -pi, pi)))
+model <- mixture2p_cd(response = "change", probe = "probe")
 dat <- simulate_data(model, pars = list(kappa = 2, thetat = 1), design = design)
 
 fit <- bmm(
@@ -280,6 +276,15 @@ fit <- bmm(
   iter = 500,
   backend = "cmdstanr"
 )
+
+# the capacity versions read the set size and estimate K instead of thetat;
+# criterion is estimated once it has a formula
+slot <- mixture2p_cd("change", "probe", set_size = "set_size", version = "slot")
+slot_averaging <- mixture2p_cd(
+  "change", "probe",
+  set_size = "set_size", version = "slot_averaging", knowledge = "rich"
+)
+capacity_formula <- bmmformula(kappa ~ 1, K ~ 1, criterion ~ 1)
 \dontshow{\}) # examplesIf}
 }
 \references{

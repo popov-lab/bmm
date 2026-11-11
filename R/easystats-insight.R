@@ -134,8 +134,8 @@ find_response.bmmfit <- function(x, combine = TRUE, ...) {
   # need not be its resp_vars (sdt_cdp() stores a column prefix there)
   response <- x$data[[all.vars(brms::brmsterms(x$formula)$respform)[1]]]
   resp_vars <- x$bmm$model$resp_vars
-  # a change-detection model checks its probe and target with the response,
-  # but they are the stimuli of the trial, and brms keeps only their difference
+  # a change-detection model checks its probe with the response, but the
+  # probe is the stimulus of the trial
   if (inherits(x$bmm$model, "change_detection")) resp_vars <- resp_vars["response"]
   colnames(response) %||% unlist(resp_vars, use.names = FALSE)
 }

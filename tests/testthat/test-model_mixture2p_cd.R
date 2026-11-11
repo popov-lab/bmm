@@ -1,19 +1,38 @@
 test_that("mixture2p_cd() validates its arguments", {
-  expect_error(mixture2p_cd("r", "p"), "target")
-  expect_error(mixture2p_cd("r", "p", "t", version = "full"), "should be one of")
-  expect_error(mixture2p_cd("r", "p", "t", knowledge = "partial"), "should be one of")
-  expect_error(mixture2p_cd("r", "p", "t", version = "slot"), "set_size argument is required")
-  expect_error(mixture2p_cd("r", "p", "t", version = "slot_averaging"), "set_size argument is required")
-  expect_error(mixture2p_cd("r", "p", "t", variable_precision = TRUE), "planned for bmm 1.6.0")
-  expect_error(mixture2p_cd("r", "p", "t", variable_precision = NA), "TRUE or FALSE")
+  expect_error(mixture2p_cd("r"), "probe")
+  expect_error(mixture2p_cd("r", "p", version = "full"), "should be one of")
+  expect_error(mixture2p_cd("r", "p", knowledge = "partial"), "should be one of")
+  expect_error(mixture2p_cd("r", "p", version = "slot"), "set_size argument is required")
+  expect_error(mixture2p_cd("r", "p", version = "slot_averaging"), "set_size argument is required")
+  expect_error(mixture2p_cd("r", "p", variable_precision = TRUE), "planned for bmm 1.6.0")
+  expect_error(mixture2p_cd("r", "p", variable_precision = NA), "TRUE or FALSE")
   # a vp_nodes copied from mixture2p() is reported, not silently dropped
-  expect_warning(mixture2p_cd("r", "p", "t", vp_nodes = 81L), "vp_nodes")
+  expect_warning(mixture2p_cd("r", "p", vp_nodes = 81L), "vp_nodes")
+  # the argument of the first drafts of this model
+  expect_warning(mixture2p_cd("r", "p", target = "t"), "`target` is not an argument")
+  expect_error(mixture2p_cd("r", "p", links = list(criterion = "log")), "'criterion' cannot be changed")
+})
+
+test_that("knowledge = 'rich' warns in the versions with one precision state", {
+  expect_warning(mixture2p_cd("r", "p", knowledge = "rich"), "no effect in the 'simple' version")
+  expect_warning(
+    mixture2p_cd("r", "p", set_size = "s", version = "slot", knowledge = "rich"),
+    "no effect in the 'slot' version"
+  )
+  expect_no_warning(
+    mixture2p_cd("r", "p", set_size = "s", version = "slot_averaging", knowledge = "rich")
+  )
+  expect_warning(
+    dmixture2p_cd(1, 0.5, K = 2, set_size = 4, version = "slot", knowledge = "rich"),
+    "no effect in the 'slot' version"
+  )
+  expect_warning(rmixture2p_cd(5, 0.5, knowledge = "rich"), "no effect in the 'simple' version")
 })
 
 test_that("mixture2p_cd() takes mixture2p's parameters, priors, links and inits, plus criterion", {
   for (version in c("simple", "slot", "slot_averaging")) {
     set_size <- if (version != "simple") "ss"
-    cd <- mixture2p_cd("r", "p", "t", set_size = set_size, version = version)
+    cd <- mixture2p_cd("r", "p", set_size = set_size, version = version)
     de <- mixture2p("y", set_size = set_size, version = version)
     expect_identical(names(cd$parameters), c(names(de$parameters), "criterion"), label = version)
     for (field in c("links", "default_priors", "init_ranges")) {
@@ -24,7 +43,7 @@ test_that("mixture2p_cd() takes mixture2p's parameters, priors, links and inits,
     expect_s3_class(cd, c("bmmodel", "change_detection", "mixture2p_cd", paste0("mixture2p_cd_", version)),
                     exact = TRUE)
   }
-  model <- mixture2p_cd("r", "p", "t", knowledge = "rich")
+  model <- mixture2p_cd("r", "p", set_size = "s", version = "slot_averaging", knowledge = "rich")
   expect_identical(model$knowledge, "rich")
   expect_identical(model$task, "Detection, recognition and confidence judgments")
   expect_identical(model$domain, "Working memory")
@@ -45,8 +64,13 @@ test_that("criterion's init range starts on the linear part of its bound", {
 test_that("dmixture2p_cd() refuses what the constructor refuses", {
   expect_error(dmixture2p_cd(1, 0.5, version = "slot"), "set_size argument is required")
   expect_error(rmixture2p_cd(5, 0.5, version = "slot_averaging"), "set_size argument is required")
-  expect_error(dmixture2p_cd(1, 0.5, variable_precision = TRUE), "planned for bmm 1.6.0")
-  expect_error(rmixture2p_cd(5, 0.5, variable_precision = TRUE), "planned for bmm 1.6.0")
+  # `log` passed by position, after the memory parameters, lands on criterion
+  expect_error(dmixture2p_cd(1, 0.5, 0, 5, 0.6, TRUE), "Did you mean log = TRUE")
+  expect_error(rmixture2p_cd(5, 0.5, criterion = TRUE), "criterion must be numeric")
+  expect_true(is.na(dmixture2p_cd(1, 0.5, criterion = NA)))
+  for (n in list(2.5, c(2, 3), 0, "3")) {
+    expect_error(rmixture2p_cd(n, 0.5), "single positive whole number")
+  }
   expect_error(dmixture2p_cd(1, 0.5, knowledge = "partial"), "should be one of")
   expect_error(dmixture2p_cd(1, 0.5, version = "full"), "should be one of")
   expect_error(dmixture2p_cd(2, 0.5), "response must be 0")
@@ -89,11 +113,8 @@ test_that("knowledge changes the predictions of slot averaging only", {
     args <- list(response = 0, probe = probe, kappa = 4, criterion = 0.4, K = 2.6, set_size = 2,
                  version = version)
     if (version == "simple") args[c("K", "set_size")] <- NULL
-    expect_identical(
-      do.call(dmixture2p_cd, c(args, knowledge = "limited")),
-      do.call(dmixture2p_cd, c(args, knowledge = "rich")),
-      label = version
-    )
+    expect_warning(rich <- do.call(dmixture2p_cd, c(args, knowledge = "rich")), "no effect")
+    expect_identical(do.call(dmixture2p_cd, c(args, knowledge = "limited")), rich, label = version)
   }
   # 2.6 slots over 2 items: one or two slots per item, two precision states
   limited <- dmixture2p_cd(0, probe, kappa = 4, K = 2.6, set_size = 2, version = "slot_averaging")
@@ -112,6 +133,9 @@ test_that("rmixture2p_cd() draws the observer that dmixture2p_cd() integrates", 
     version = c("simple", "slot", "slot_averaging"), knowledge = c("limited", "rich"),
     criterion = c(0, 0.6, -0.4), set_size = c(5, 2, 1), stringsAsFactors = FALSE
   )
+  # the rich observer differs, and is accepted without a warning, only where
+  # precision varies
+  cells <- subset(cells, knowledge == "limited" | version == "slot_averaging")
   for (i in seq_len(nrow(cells))) {
     cell <- cells[i, ]
     args <- list(probe = 0.9, mu = 0.1, kappa = 5, criterion = cell$criterion,
@@ -125,9 +149,9 @@ test_that("rmixture2p_cd() draws the observer that dmixture2p_cd() integrates", 
 
 test_that("check_data() refuses missing values and reads the set size as mixture2p does", {
   data <- mixture2p_cd_data()
-  model <- mixture2p_cd("change", "probe", "target", set_size = "set_size", version = "slot")
+  model <- mixture2p_cd("change", "probe", set_size = "set_size", version = "slot")
   formula <- bmf(kappa ~ 1, K ~ 1)
-  for (column in c("change", "probe", "target", "set_size")) {
+  for (column in c("change", "probe", "set_size")) {
     broken <- data
     broken[[column]][3] <- NA
     expect_error(check_data(model, broken, formula), "missing|NA", label = column)
@@ -136,8 +160,8 @@ test_that("check_data() refuses missing values and reads the set size as mixture
   expect_error(check_data(model, fractional, formula), "whole")
   checked <- check_data(model, data, formula)
   expect_identical(checked$ss_numeric, as.numeric(as.character(data$set_size)))
-  expect_setequal(built_data_columns(model), c("ss_numeric", "probe_centered"))
-  expect_identical(built_data_columns(mixture2p_cd("change", "probe", "target")), "probe_centered")
+  expect_identical(built_data_columns(model), "ss_numeric")
+  expect_identical(built_data_columns(mixture2p_cd("change", "probe")), character(0))
 
   single <- subset(data, set_size == 4)
   expect_warning(check_data(model, single, formula), "cannot test the capacity rule")
@@ -148,19 +172,19 @@ test_that("check_data() refuses missing values and reads the set size as mixture
 test_that("an estimated criterion is announced with the bound", {
   data <- mixture2p_cd_data()
   formula <- bmf(kappa ~ 1, thetat ~ 1, criterion ~ 1)
-  model <- check_model(mixture2p_cd("change", "probe", "target"), data, formula)
+  model <- check_model(mixture2p_cd("change", "probe"), data, formula)
   expect_message(check_formula(model, data, formula), "Decision criterion")
   fixed <- bmf(kappa ~ 1, thetat ~ 1)
-  model <- check_model(mixture2p_cd("change", "probe", "target"), data, fixed)
+  model <- check_model(mixture2p_cd("change", "probe"), data, fixed)
   expect_no_message(check_formula(model, data, fixed), message = "criterion is estimated")
 })
 
 test_that("the capacity versions pass the set size as an integer and the probe as a real", {
   data <- mixture2p_cd_data()
-  code <- stancode(bmf(kappa ~ 1, thetat ~ 1), data, mixture2p_cd("change", "probe", "target"))
+  code <- stancode(bmf(kappa ~ 1, thetat ~ 1), data, mixture2p_cd("change", "probe"))
   expect_match(code, "mixture2p_cd_simple_lpmf(Y[n] | mu[n], kappa[n], thetat[n], criterion[n], vreal1[n]",
                fixed = TRUE)
-  model <- mixture2p_cd("change", "probe", "target", set_size = "set_size", version = "slot_averaging",
+  model <- mixture2p_cd("change", "probe", set_size = "set_size", version = "slot_averaging",
                         knowledge = "rich")
   code <- stancode(bmf(kappa ~ 1, K ~ 1), data, model)
   expect_match(code, "array[N] int vint1", fixed = TRUE)
@@ -177,15 +201,16 @@ test_that("log_lik(), posterior_predict() and posterior_epred() evaluate the sam
   draws <- list(mu = 0.1, kappa = c(4, 7), thetat = c(0.6, 0.8), K = c(2.2, 3.4), criterion = c(0, 0.3))
   for (version in c("simple", "slot", "slot_averaging")) {
     weight <- if (version == "simple") "thetat" else "K"
+    knowledge <- if (version == "slot_averaging") "rich" else "limited"
     dpars <- lapply(draws[c("mu", "kappa", weight, "criterion")], function(x) matrix(rep_len(x, n), n, 1))
     prep <- structure(
       list(dpars = dpars, data = list(Y = 1L, vint1 = 3L, vreal1 = 0.8), ndraws = n, nobs = 1,
-           family = list(knowledge = "rich")),
+           family = list(knowledge = knowledge)),
       class = "brmsprep"
     )
     weight_args <- if (version == "simple") list(p_mem = c(0.6, 0.8)) else list(K = c(2.2, 3.4), set_size = 3)
     p_change <- do.call(dmixture2p_cd, c(
-      list(1, 0.8, mu = 0.1, kappa = c(4, 7), criterion = c(0, 0.3), version = version, knowledge = "rich"),
+      list(1, 0.8, mu = 0.1, kappa = c(4, 7), criterion = c(0, 0.3), version = version, knowledge = knowledge),
       weight_args
     ))
     expect_equal(.mixture2p_cd_log_lik(version)(1, prep)[1:2], log(p_change), tolerance = 1e-12)
@@ -200,10 +225,10 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   withr::local_seed(649)
   # kappa e, P(memory) 0.5, the probe 1 from the target: P("change") by
   # integrate() over the unbiased arc
-  design <- data.frame(target = 2, probe = 3)[rep(1, 1e5), ]
-  data <- simulate_data(mixture2p_cd("change", "probe", "target"), list(kappa = 1, thetat = 0), design)
+  design <- data.frame(probe = rep(1, 1e5))
+  data <- simulate_data(mixture2p_cd("change", "probe"), list(kappa = 1, thetat = 0), design)
   expect_lt(abs(mean(data$change) - 0.571702760207019), 5 * sqrt(0.25 / nrow(data)))
-  expect_error(simulate_data(mixture2p_cd("change", "probe", "target"), list(kappa = 1, thetat = 0),
+  expect_error(simulate_data(mixture2p_cd("change", "probe"), list(kappa = 1, thetat = 0),
                              n_trials = 5), "probe")
 })
 
@@ -228,7 +253,7 @@ test_that("the generated likelihood passes each parameter to its place in the co
   for (name in names(cases)) {
     case <- cases[[name]]
     knowledge <- case$knowledge %||% "limited"
-    model <- mixture2p_cd("change", "probe", "target",
+    model <- mixture2p_cd("change", "probe",
       set_size = if (case$version != "simple") "set_size", version = case$version, knowledge = knowledge
     )
     family <- paste0("mixture2p_cd_", case$version)
@@ -287,7 +312,7 @@ test_that("the threaded program of every version parses", {
   skip_on_cran()
   data <- mixture2p_cd_data()
   for (version in c("simple", "slot", "slot_averaging")) {
-    model <- mixture2p_cd("change", "probe", "target",
+    model <- mixture2p_cd("change", "probe",
       set_size = if (version != "simple") "set_size", version = version
     )
     formula <- if (version == "simple") bmf(kappa ~ 1, thetat ~ 1) else bmf(kappa ~ 1, K ~ 1)

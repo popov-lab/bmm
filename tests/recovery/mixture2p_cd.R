@@ -71,14 +71,15 @@ mixture2p_cd_generator <- function(pars, n_trials, model) {
     0
   }
 
-  out <- data.frame(as.integer(llr > bounded), probe, target)
-  names(out) <- unlist(model$resp_vars[c("response", "probe", "target")], use.names = FALSE)
+  # the model reads the probe relative to the target, in [-pi, pi)
+  out <- data.frame(as.integer(llr > bounded), (probe - target + pi) %% (2 * pi) - pi)
+  names(out) <- unlist(model$resp_vars[c("response", "probe")], use.names = FALSE)
   if (version != "simple") out[[model$other_vars$set_size]] <- set_size
   out
 }
 
 bmmtools::validation_plan(
-  bmm::mixture2p_cd(response = "change", probe = "probe", target = "target"),
+  bmm::mixture2p_cd(response = "change", probe = "probe"),
   # link scale: kappa e^1.4 = 4.1 and P(memory) 0.73, both away from the
   # centres of the default priors (log kappa 2, logit thetat 0)
   pars = c(kappa = 1.4, thetat = 1),

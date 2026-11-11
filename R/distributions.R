@@ -681,12 +681,10 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   `"slot_averaging"` versions.
 #' @param version `"simple"`, `"slot"` or `"slot_averaging"`. See
 #'   [mixture2p_cd()].
-#' @param variable_precision Must be `FALSE`; variable precision is planned
-#'   for bmm 1.6.0.
 #' @param knowledge `"limited"` (default) or `"rich"`: whether the observer
 #'   knows only the distribution of precision or the precision of the current
-#'   trial. Changes the result only under `"slot_averaging"`. See
-#'   [mixture2p_cd()].
+#'   trial. Changes the result only under `"slot_averaging"`; `"rich"` warns
+#'   under the other versions. See [mixture2p_cd()].
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
 #' @details "Change" is the response when the retrieved feature falls outside
@@ -716,11 +714,12 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' mean(rmixture2p_cd(1000, probe = 0, kappa = 8, p_mem = 0.8))
 dmixture2p_cd <- function(response, probe, mu = 0, kappa = 5, p_mem = 0.6,
                           criterion = 0, K = 3, set_size = NULL,
-                          version = "simple", variable_precision = FALSE,
+                          version = "simple",
                           knowledge = c("limited", "rich"), log = FALSE) {
   version <- match.arg(version, names(.mixture2p_version_table))
   knowledge <- match.arg(knowledge)
-  .cd_check_variable_precision(variable_precision)
+  .cd_check_criterion(criterion, has_log = TRUE)
+  .cd_warn_inert_knowledge(knowledge, version, acts = version == "slot_averaging")
   .check_mixture2p_args(kappa, p_mem, 0, K, set_size, version)
   .mixture2p_cd_check_version_args(version, set_size, c(
     p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
@@ -743,11 +742,13 @@ dmixture2p_cd <- function(response, probe, mu = 0, kappa = 5, p_mem = 0.6,
 #' @export
 rmixture2p_cd <- function(n, probe, mu = 0, kappa = 5, p_mem = 0.6,
                           criterion = 0, K = 3, set_size = NULL,
-                          version = "simple", variable_precision = FALSE,
+                          version = "simple",
                           knowledge = c("limited", "rich")) {
+  .cd_check_n(n)
   version <- match.arg(version, names(.mixture2p_version_table))
   knowledge <- match.arg(knowledge)
-  .cd_check_variable_precision(variable_precision)
+  .cd_check_criterion(criterion)
+  .cd_warn_inert_knowledge(knowledge, version, acts = version == "slot_averaging")
   .check_mixture2p_args(kappa, p_mem, 0, K, set_size, version)
   .mixture2p_cd_check_version_args(version, set_size, c(
     p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)

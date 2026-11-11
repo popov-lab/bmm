@@ -5,7 +5,7 @@
 # The retrieval side is mixture2p's version table, so the two models share
 # their parameter names, priors, links and inits; a joint fit of both tasks
 # relies on that.
-.model_mixture2p_cd <- function(response = NULL, probe = NULL, target = NULL,
+.model_mixture2p_cd <- function(response = NULL, probe = NULL,
                                 set_size = NULL, links = NULL, version = "simple",
                                 variable_precision = FALSE, knowledge = "limited",
                                 call = NULL, ...) {
@@ -13,7 +13,7 @@
 
   out <- structure(
     list(
-      resp_vars = nlist(response, probe, target),
+      resp_vars = nlist(response, probe),
       other_vars = nlist(set_size),
       domain = "Working memory",
       task = "Detection, recognition and confidence judgments",
@@ -24,17 +24,16 @@
           representations in visual working memory. Nature, 453(7192), 233-235. \\
           https://doi.org/10.1038/nature06860"
         ),
-        glue(
-          "Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual \\
-          working memory: Applications to the change detection task. Cognitive \\
-          Psychology, 133, 101463. https://doi.org/10.1016/j.cogpsych.2022.101463"
-        )
+        .cd_citation
       ),
       version = version,
+      # paste0() rather than glue(), which would trim the indent that keeps
+      # the requirements in one list
       requirements = paste0(
         "- The response variable should be coded 0 ('same') and 1 ('change')\n",
-        "- The probe and the target should be in radians: the feature shown at test ",
-        "and the feature shown at the probed location in the memory array\n",
+        "  - The probe should be in radians and relative to the target: the ",
+        "feature shown at test minus the feature shown at the probed location, ",
+        "which is 0 on a 'same' trial\n",
         "  - The 'slot' and 'slot_averaging' versions additionally require a ",
         "set_size variable, which should vary for the capacity rule to be testable"
       ),
@@ -58,6 +57,8 @@
 # user facing alias
 
 #' @title `r .model_mixture2p_cd()$name`
+#' @description Fits the two-parameter mixture model of [mixture2p()] to the
+#'   "same" or "change" responses of a single-probe change-detection task.
 #' @details `r model_docs(.model_mixture2p_cd(), components = c('domain', 'task', 'name', 'citation', 'requirements'))`
 #' #### Version: `simple`
 #' `r model_docs(.model_mixture2p_cd(version = "simple"), components = c('parameters', 'fixed_parameters', 'links', 'prior'))`
@@ -101,11 +102,10 @@
 #' @param response The name of the variable in the data containing the
 #'   change-detection response, coded 0 ("same") and 1 ("change"). A logical
 #'   variable is accepted and coded `TRUE` = "change".
-#' @param probe The name of the variable containing the feature shown at test,
-#'   in radians.
-#' @param target The name of the variable containing the feature shown at the
-#'   probed location in the memory array, in radians. On "same" trials it
-#'   equals the probe.
+#' @param probe The name of the variable containing the probe in radians,
+#'   relative to the target: the feature shown at test minus the feature shown
+#'   at the probed location in the memory array, as [wrap()] returns it. It is 0
+#'   on "same" trials.
 #' @param set_size Name of the variable in the data containing the set size,
 #'   or a single number if the set size is constant. Required by the `"slot"`
 #'   and `"slot_averaging"` versions and ignored by `"simple"`. With a single
@@ -113,8 +113,8 @@
 #'   the responses at that set size, and only below it.
 #' @param version Which storage model to use: `"simple"` (default), `"slot"`
 #'   or `"slot_averaging"`, the versions of [mixture2p()].
-#' @param variable_precision Must be `FALSE`. Variable precision is planned for
-#'   change detection in bmm 1.6.0; `TRUE` stops with an error.
+#' @param variable_precision Must be `FALSE`. Variable precision is not
+#'   available for change detection yet; it is planned for bmm 1.6.0.
 #' @param knowledge What the observer knows about the precision of the
 #'   current trial when it varies across trials: `"limited"` (default) or
 #'   `"rich"`. In this version of bmm precision varies only under
@@ -125,10 +125,11 @@
 #'   count of the trial and sets the boundary from it. Lin and Oberauer (2022)
 #'   found the limited observer fit better under variable precision; for slot
 #'   averaging they varied whether the observer knows that the item is stored,
-#'   which this argument does not model.
+#'   which this argument does not model. `"rich"` warns in the versions where
+#'   it has no effect.
 #' @param links A named list of link functions for the model parameters, e.g.
-#'   `list(kappa = "softplus")`. Defaults are `"log"` for `kappa` and `K`,
-#'   `"logit"` for `thetat` and `"identity"` for `criterion`.
+#'   `list(kappa = "softplus")`. The link of `criterion` cannot be changed,
+#'   because its fixed value and its bound are written for the identity scale.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @seealso [mixture2p()] for continuous reproduction, [mixture2p_cd_dist] for
@@ -141,9 +142,10 @@
 #'   working memory: Applications to the change detection task. Cognitive
 #'   Psychology, 133, 101463. \doi{10.1016/j.cogpsych.2022.101463}
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
-#' # half of the trials probe the target itself, the others a random colour
-#' design <- data.frame(target = 0, probe = c(rep(0, 1000), runif(1000, -pi, pi)))
-#' model <- mixture2p_cd(response = "change", probe = "probe", target = "target")
+#' # the probe is relative to the target: half of the trials show the target
+#' # itself (a probe of 0), the others a random colour
+#' design <- data.frame(probe = c(rep(0, 1000), runif(1000, -pi, pi)))
+#' model <- mixture2p_cd(response = "change", probe = "probe")
 #' dat <- simulate_data(model, pars = list(kappa = 2, thetat = 1), design = design)
 #'
 #' fit <- bmm(
@@ -154,8 +156,17 @@
 #'   iter = 500,
 #'   backend = "cmdstanr"
 #' )
+#'
+#' # the capacity versions read the set size and estimate K instead of thetat;
+#' # criterion is estimated once it has a formula
+#' slot <- mixture2p_cd("change", "probe", set_size = "set_size", version = "slot")
+#' slot_averaging <- mixture2p_cd(
+#'   "change", "probe",
+#'   set_size = "set_size", version = "slot_averaging", knowledge = "rich"
+#' )
+#' capacity_formula <- bmmformula(kappa ~ 1, K ~ 1, criterion ~ 1)
 #' @export
-mixture2p_cd <- function(response, probe, target, set_size = NULL,
+mixture2p_cd <- function(response, probe, set_size = NULL,
                          version = c("simple", "slot", "slot_averaging"),
                          variable_precision = FALSE,
                          knowledge = c("limited", "rich"), links = NULL, ...) {
@@ -166,9 +177,10 @@ mixture2p_cd <- function(response, probe, target, set_size = NULL,
   knowledge <- match.arg(knowledge)
   .cd_check_variable_precision(variable_precision)
   .mixture2p_cd_check_version_args(version, set_size)
+  .cd_warn_inert_knowledge(knowledge, version, acts = version == "slot_averaging")
 
   .model_mixture2p_cd(
-    response = response, probe = probe, target = target, set_size = set_size,
+    response = response, probe = probe, set_size = set_size,
     version = version, variable_precision = variable_precision,
     knowledge = knowledge, links = links, call = call, ...
   )
@@ -237,7 +249,7 @@ bmf2bf.mixture2p_cd <- function(model, formula) {
   brms::bf(.circmix_aterm(
     model$resp_vars$response,
     vint = if (needs_set_size) "ss_numeric",
-    vreal = "probe_centered"
+    vreal = model$resp_vars$probe
   ))
 }
 
@@ -368,12 +380,12 @@ simulate_data.mixture2p_cd <- function(model, pars, design = NULL, scale = c("li
   capacity <- .mixture2p_version_table[[model$version]]$needs_set_size
   vars <- model$resp_vars
   design <- .design_or_n(model, design, c(
-    vars$probe, vars$target, if (capacity) .set_size_column(model)
+    vars$probe, if (capacity) .set_size_column(model)
   ), ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   y <- .mixture2p_cd_observe(
-    probe = wrap(design[[vars$probe]] - design[[vars$target]]),
+    probe = wrap(design[[vars$probe]]),
     mu = p$mu, kappa = p$kappa,
     p_mem = if (!capacity) p$thetat else 1,
     criterion = p$criterion,

@@ -17,7 +17,6 @@ dmixture2p_cd(
   K = 3,
   set_size = NULL,
   version = "simple",
-  variable_precision = FALSE,
   knowledge = c("limited", "rich"),
   log = FALSE
 )
@@ -32,7 +31,6 @@ rmixture2p_cd(
   K = 3,
   set_size = NULL,
   version = "simple",
-  variable_precision = FALSE,
   knowledge = c("limited", "rich")
 )
 }
@@ -64,13 +62,10 @@ section "Decision criterion" of \code{\link[=mixture2p_cd]{mixture2p_cd()}}).}
 \item{version}{\code{"simple"}, \code{"slot"} or \code{"slot_averaging"}. See
 \code{\link[=mixture2p_cd]{mixture2p_cd()}}.}
 
-\item{variable_precision}{Must be \code{FALSE}; variable precision is planned
-for bmm 1.6.0.}
-
 \item{knowledge}{\code{"limited"} (default) or \code{"rich"}: whether the observer
 knows only the distribution of precision or the precision of the current
-trial. Changes the result only under \code{"slot_averaging"}. See
-\code{\link[=mixture2p_cd]{mixture2p_cd()}}.}
+trial. Changes the result only under \code{"slot_averaging"}; \code{"rich"} warns
+under the other versions. See \code{\link[=mixture2p_cd]{mixture2p_cd()}}.}
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 

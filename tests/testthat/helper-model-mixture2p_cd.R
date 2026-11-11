@@ -1,31 +1,29 @@
 # the cases the shared tests run for mixture2p_cd; see helper-model-cases.R
 
 # two participants of oberauer_lin_2017 as change-detection trials: half the
-# trials probe the target, the others an angle away from it
+# trials probe the target (a probe of 0), the others an angle away from it
 mixture2p_cd_data <- function() {
   data <- small_data()
-  data$target <- data$dev_rad
-  data$probe <- wrap(data$target + rep(c(0, 1.5, 0, -2), length.out = nrow(data)))
+  data$probe <- rep(c(0, 1.5, 0, -2), length.out = nrow(data))
   data$change <- rep(c(0L, 1L, 1L, 0L), length.out = nrow(data))
   data
 }
 
 model_cases_mixture2p_cd <- function() {
-  model <- mixture2p_cd("change", "probe", "target")
+  model <- mixture2p_cd("change", "probe")
   capacity <- function(version) {
-    mixture2p_cd("change", "probe", "target", set_size = "set_size", version = version)
+    mixture2p_cd("change", "probe", set_size = "set_size", version = version)
   }
   re_formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + (1 | ID), criterion ~ 1 + (1 | ID))
   capacity_formula <- bmf(kappa ~ 1 + (1 | ID), K ~ 1 + (1 | ID), criterion ~ 1 + (1 | ID))
-  # one row per trial: the probe and the target each trial shows, and a set
-  # size for the capacity versions
+  # one row per trial: the probe relative to the target, and a set size for
+  # the capacity versions
   design <- data.frame(
-    ID = rep(1:2, 50), target = rep(c(0, 1), 50),
-    probe = rep(c(0, 1, 2.5, -1), 25), set_size = rep(c(2, 4), each = 50)
+    ID = rep(1:2, 50),
+    probe = rep(c(0, 0, 2.5, -2), 25), set_size = rep(c(2, 4), each = 50)
   )
   list(
-    # the capacity versions consume set_size and the response the probe and
-    # the target, which brms has no reason to keep
+    # the capacity versions consume set_size, which brms has no reason to keep
     stored_frame = list(
       mixture2p_cd = list(
         model = model, formula = bmf(kappa ~ 1, thetat ~ 1, criterion ~ 1),
@@ -57,9 +55,9 @@ model_cases_mixture2p_cd <- function() {
       )
     ),
     links = list(
-      mixture2p_cd = list(model = model, settable = c("mu", "kappa", "thetat", "criterion")),
+      mixture2p_cd = list(model = model, settable = c("mu", "kappa", "thetat")),
       mixture2p_cd_slot = list(
-        model = capacity("slot"), settable = c("mu", "kappa", "K", "criterion")
+        model = capacity("slot"), settable = c("mu", "kappa", "K")
       )
     ),
     simulate = list(
