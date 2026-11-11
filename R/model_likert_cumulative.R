@@ -175,10 +175,13 @@ settable_links.likert_cumulative <- function(model) {
 #' threshold set, which with `dist = "logistic"` is the graded response model
 #' with unit discrimination (Bürkner, 2021).
 #'
-#' Lubbe and Schuster's (2020) scaled threshold model with item-specific
-#' thresholds, a person scaling factor on item-specific interval widths, is not
-#' fitted: the free-width types carry no `spacing` to scale them. With shared
-#' thresholds it is fitted, see "Response styles".
+#' With `threshold_type = "softmax"`, `spacing` scales the whole threshold set
+#' by one factor, so `spacing ~ 0 + item + (1 | id)` together with
+#' `delta<i> ~ 0 + item` gives each item its own interval widths and each
+#' person a scaling factor on them: Lubbe and Schuster's (2020) scaled
+#' threshold model with item-specific thresholds. `"log_distance"` and
+#' `"log_ratio"` carry no `spacing`, so on them this model is not available.
+#' With shared thresholds, see "Response styles".
 #'
 #' @section Person and item terms:
 #' Every person and item term goes into `activation`. With items as fixed
@@ -194,8 +197,8 @@ settable_links.likert_cumulative <- function(model) {
 #' `0 + item` applies to every item location.
 #'
 #' @section Response styles:
-#' `spacing ~ 1 + (1 | id)` (with `"parsimonious"` or `"equidistant"`
-#' thresholds) gives each person their own threshold dispersion: wide
+#' `spacing ~ 1 + (1 | id)` (with `"parsimonious"`, `"equidistant"` or
+#' `"softmax"` thresholds) gives each person their own threshold dispersion: wide
 #' thresholds pull responses to the middle categories, narrow ones push them
 #' to the extremes. This is the proportional thresholds structure of Johnson
 #' (2003) and the scaled threshold model of Lubbe and Schuster (2020) with
@@ -529,18 +532,23 @@ check_formula.likert_cumulative <- function(model, data, formula) {
              location-scale model; Tutz, 2022). Discrimination in Samejima's sense \\
              multiplies the trait and is not fitted by this model")
   }
-  if (!is.null(spacing) && type %in% c("parsimonious", "equidistant") && has_person(spacing)) {
-    message2("spacing with a person term is the scaled threshold model with shared \\
-             thresholds (Lubbe & Schuster, 2020); item discrimination is fixed at 1")
-  }
   deltas <- formula[grepl("^delta[0-9]+$", names(formula))]
+  has_item <- function(f) item %in% rhs_vars(f)
+  # softmax scales its whole threshold set by exp(spacing), so item-specific
+  # widths under a person spacing are the scaled model's item-specific thresholds
+  if (!is.null(spacing) && type %in% c("parsimonious", "equidistant", "softmax") &&
+        has_person(spacing)) {
+    item_widths <- type == "softmax" && any(vapply(deltas, has_item, logical(1)))
+    message2("spacing with a person term is the scaled threshold model with \\
+             {if (item_widths) 'item-specific' else 'shared'} thresholds (Lubbe & \\
+             Schuster, 2020); item discrimination is fixed at 1")
+  }
   free_width <- type %in% c("log_distance", "log_ratio")
   if (free_width && any(vapply(deltas, has_person, logical(1)))) {
     message2("delta with a person term gives person-specific interval widths after \\
              Johnson (2003), without his symmetry constraint")
   }
-  if (model$other_vars$dist != "logistic" &&
-        any(vapply(deltas, function(f) item %in% rhs_vars(f), logical(1)))) {
+  if (model$other_vars$dist != "logistic" && any(vapply(deltas, has_item, logical(1)))) {
     message2("item-specific thresholds on a {.likert_kernels[[model$other_vars$dist]]} \\
              kernel; with dist = 'logistic' this is the graded response model")
   }

@@ -152,10 +152,13 @@ multiplies the person's trait; this model fits no discrimination parameter.
 threshold set, which with \code{dist = "logistic"} is the graded response model
 with unit discrimination (Bürkner, 2021).
 
-Lubbe and Schuster's (2020) scaled threshold model with item-specific
-thresholds, a person scaling factor on item-specific interval widths, is not
-fitted: the free-width types carry no \code{spacing} to scale them. With shared
-thresholds it is fitted, see "Response styles".
+With \code{threshold_type = "softmax"}, \code{spacing} scales the whole threshold set
+by one factor, so \code{spacing ~ 0 + item + (1 | id)} together with
+\verb{delta<i> ~ 0 + item} gives each item its own interval widths and each
+person a scaling factor on them: Lubbe and Schuster's (2020) scaled
+threshold model with item-specific thresholds. \code{"log_distance"} and
+\code{"log_ratio"} carry no \code{spacing}, so on them this model is not available.
+With shared thresholds, see "Response styles".
 }
 
 \section{Person and item terms}{
@@ -175,8 +178,8 @@ this. The default prior on \code{activation} is \code{normal(0, 1)}, which with
 
 \section{Response styles}{
 
-\code{spacing ~ 1 + (1 | id)} (with \code{"parsimonious"} or \code{"equidistant"}
-thresholds) gives each person their own threshold dispersion: wide
+\code{spacing ~ 1 + (1 | id)} (with \code{"parsimonious"}, \code{"equidistant"} or
+\code{"softmax"} thresholds) gives each person their own threshold dispersion: wide
 thresholds pull responses to the middle categories, narrow ones push them
 to the extremes. This is the proportional thresholds structure of Johnson
 (2003) and the scaled threshold model of Lubbe and Schuster (2020) with

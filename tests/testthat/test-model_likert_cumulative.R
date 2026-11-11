@@ -236,6 +236,14 @@ test_that("the threshold terms that change what the model is are named", {
   expect_false(any(grepl("Johnson", notes(ld, bmf(activation ~ 0 + item, delta1 ~ 1 + (1 | item))))))
   expect_true(any(grepl("scaled threshold model",
                         notes(pars, bmf(activation ~ 0 + item, spacing ~ 1 + (1 | id:item))))))
+  # softmax scales its whole threshold set by exp(spacing): with item-specific
+  # widths this is Lubbe and Schuster's model with item-specific thresholds
+  sm <- likert_cumulative("y", "item", n_categories = 5, threshold_type = "softmax")
+  expect_true(any(grepl("scaled threshold model with shared thresholds",
+                        notes(sm, bmf(activation ~ 0 + item, spacing ~ 1 + (1 | id))))))
+  expect_true(any(grepl("scaled threshold model with item-specific thresholds",
+                        notes(sm, bmf(activation ~ 0 + item, spacing ~ 0 + item + (1 | id),
+                                      delta1 ~ 0 + item, delta2 ~ 0 + item)))))
 })
 
 
