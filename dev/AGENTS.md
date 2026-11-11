@@ -39,7 +39,11 @@ development.
   source tree, with the time budget) and `test-coverage` (covr). On PRs,
   `file-size` also fails when any commit in the PR adds a file over 1
   MB, even if a later commit removes it.
-- All code changes require corresponding tests in `tests/testthat/`
+- A behaviour change (new or changed output, error, warning, message,
+  Stan code, prior) comes with a test in `tests/testthat/`; a refactor
+  that keeps behaviour adds none, and a test that called a helper the
+  refactor removes is rewritten against the function that now holds the
+  code
 - Documentation generated from roxygen comments (never edit `man/` or
   `docs/` directly)
 
@@ -64,8 +68,8 @@ messages - Support glue syntax without explicit `glue()` calls - Accept
 
 ### Function Style
 
-- **Implicit returns**: Last expression is returned (no explicit
-  [`return()`](https://rdrr.io/r/base/function.html))
+- **Implicit returns**: Last expression is returned (no
+  [`return()`](https://rdrr.io/r/base/function.html) at the end)
 - **Vectorized operations**: Prefer vector operations over loops
 - **Functional patterns**: Use functional programming where possible
 - **Explicit namespacing**: Always use `package::function()` (e.g.,
@@ -78,10 +82,27 @@ messages - Support glue syntax without explicit `glue()` calls - Accept
 - **Self-documenting code**: Write clear, descriptive names for
   functions and variables; refactor unclear code rather than adding
   explanatory comments
-- **Single-responsibility functions**: Extract complex logic into
-  well-named helper functions
+- **Comments say why, not what**: a comment that restates the next line,
+  or narrates steps (`# Compute log-likelihood`), is deleted. No banner
+  blocks (`####...!` lines around a title): a file that needs sections
+  is split, and a short `# ---- title ----` line is the most a section
+  gets
+- **Helpers are extracted only with two callers or a dispatch target**
+  (S3 method, registered callback, a name looked up at run time with
+  [`do.call()`](https://rdrr.io/r/base/do.call.html) or
+  [`get()`](https://rdrr.io/r/base/get.html) such as the `.model_*()`
+  constructors, or a probe of the machine or session that tests replace
+  with `local_mocked_bindings()`, such as the `probe_*()` functions in
+  `R/bmm_setup.R`). A single-use helper is inlined at its call site; a
+  long single-use block stays inline, and a comment above it, if any,
+  says why the block is there, not what it computes. A helper of four
+  lines or fewer that is not a dispatch target exists only when it has
+  three or more callers. Callers are counted in `R/`, tests excluded; a
+  numerical or parsing unit that R11 lets tests call directly (a
+  density, a bound, an expression parser) may have one caller
 - **Early returns**: Use early returns to simplify conditional flow and
-  reduce nesting
+  reduce nesting; [`return()`](https://rdrr.io/r/base/function.html)
+  appears only in an early return, never as the last expression
 
 ``` r
 
@@ -127,6 +148,36 @@ keywords: - `@keywords extract_info` - for info extraction utilities -
 `@keywords transform` - for transformation utilities -
 `@keywords dataset` - for included datasets - `@keywords developer` -
 for internal/developer functions
+
+Internal functions (not exported, not S3 methods) get no roxygen block:
+no `@param`, `@return`, `@noRd` or `@keywords internal`. What a reader
+needs is a plain `#` comment of one to three lines above the definition
+saying why the function exists and what it assumes; the argument names
+and the body say the rest. The exception is a generic with a page in the
+developer section of the reference, exported or not
+([`check_model()`](https://venpopov.com/bmm/dev/reference/check_model.md),
+[`check_formula()`](https://venpopov.com/bmm/dev/reference/check_formula.md),
+[`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md),
+[`native_transform()`](https://venpopov.com/bmm/dev/reference/native_transform.md)):
+it keeps its full roxygen block tagged `@keywords developer` or
+`@keywords internal developer`. An internal generic without such a page,
+even one with methods in the model files (`settable_links()`,
+`built_data_columns()`), follows the rule above.
+
+### NEWS
+
+A NEWS entry is written for a user: the symptom they saw or the feature
+they get, what changed in their call or output, and what to do, in under
+100 words. Of bmm’s functions it names only exported ones (listed in
+`NAMESPACE`), or ones the entry records as deprecated or removed; model
+parameters, links, arguments and data columns are named as the user
+writes them. Any other dot-prefixed or unexported function, a Stan
+chunk, a stanvar or how the fix works does not appear, except inside an
+error message quoted as the user saw it. A change that only a model
+author or contributor notices goes under `### Developer-facing changes`,
+one line, with the PR number; that line may also name a generic with a
+page in the developer section of the reference, such as
+[`check_model()`](https://venpopov.com/bmm/dev/reference/check_model.md).
 
 ## Model Development Pattern
 
@@ -203,10 +254,11 @@ in `R/helpers-model.R`:
     [`configure_prior()`](https://venpopov.com/bmm/dev/reference/configure_prior.md)
     builds them from the model’s `default_priors`. Priors beyond the
     defaults go in the model’s own `configure_prior.<model>()` method,
-    as in `R/model_mixture3p.R` and `R/model_mpt.R`.
+    as in `R/model_mpt.R`.
 
 [`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)
-generates this skeleton.
+generates this skeleton; until the comment pass updates it, delete the
+banner blocks it writes.
 
 Find more details about the typical model code structure in the
 [developer notes](https://venpopov.com/bmm/dev-notes/).
@@ -219,8 +271,11 @@ functions called from the formula.
 
 ## Testing Requirements
 
-**Always add/update tests** for code changes - even if not explicitly
-requested.
+**Always add/update tests** for a behaviour change - even if not
+explicitly requested. A refactor, a rename, or an extracted or inlined
+helper adds no test: the tests that covered the behaviour before still
+cover it, and a test that called a removed helper is rewritten against
+the function that now holds the code.
 
 Test tiers (ADR 0004, the architecture decision record
 `.dev/decisions/0004-test-tiers-and-budget.md`): - `tests/testthat/` -
@@ -259,9 +314,12 @@ checks R1, R2, R4, R7, R8, the file-level part of R10 and part of R5
 (size, draws, listed in `make-fixtures.R`) and runs with the rest of the
 suite; a violation fails with the file name and the rule. The
 `tests-source` budget job checks R6, and R3 only indirectly; its CRAN
-budget step (`.github/scripts/cran-budget.R`) checks the cap of R10. R9
-and the rest of R5 are checked in review. - R1: No sampling in
-`tests/testthat/`. `cmdstan_model()`, `$sample()` and
+budget step (`.github/scripts/cran-budget.R`) checks the cap of R10. R9,
+R11, the second half of R3 and the rest of R5 and R7 are checked in
+review. R11, the second half of R3 and the
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) block in R7
+were added on 2026-11-11 (#699) and are not in ADR 0004. - R1: No
+sampling in `tests/testthat/`. `cmdstan_model()`, `$sample()` and
 `backend = "cmdstanr"` appear only at registered sites: files whose
 count of each pattern is written as a literal in `test-conventions.R`. A
 new site opens with `skip_unless_stan_tests()` and updates that count in
@@ -269,9 +327,14 @@ the same PR. A model’s parity test lives in its `test-model_<name>.R`
 (R7). - R2: The tier gates are `skip_unless_stan_tests()` and
 `skip_unless_fixtures()`; `skip_on_cran()` is the CRAN gate.
 `skip_on_ci()` is not a gate. - R3: A mock fit
-(`backend = "mock", mock_fit = 1`) uses at most two participants or 200
-rows unless the test is about data size. - R4: Cross-model behaviours
-(default priors, inits, stored frame and
+(`backend = "mock", mock_fit = 1`, spelled out: `mock = 1` reaches brms
+only by partial matching) uses at most two participants or 200 rows
+unless the test is about data size. A new `test-model_<name>.R` file has
+one block that runs every version through
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md); a mock fit
+whose only expectation is `expect_silent()`/`expect_no_error()` is not
+added for a single version. - R4: Cross-model behaviours (default
+priors, inits, stored frame and
 [`update()`](https://rdrr.io/r/stats/update.html),
 [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md),
 [`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md),
@@ -298,6 +361,8 @@ not check the caps. - R7: A `test-model_<name>.R` file tests that
 model’s contract only: constructor validation,
 [`check_data()`](https://venpopov.com/bmm/dev/reference/check_data.md),
 [`configure_model()`](https://venpopov.com/bmm/dev/reference/configure_model.md),
+the every-version
+[`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) block of R3,
 [`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
 content (never `nchar(code) > 0`), its d/r functions, Stan parity. - R8:
 A test file seeds through
@@ -316,7 +381,17 @@ The three cross-model contract files (`test-conditional_effects.R`,
 a developer machine (the installed tarball’s tests, `NOT_CRAN` unset,
 one worker) opens with `skip_on_cran()`. `cran-budget.R` runs the tests
 CRAN runs, fails on a failing test or when the wall time exceeds its
-cap, and writes `cran-test-timings.csv` to find slow tests.
+cap, and writes `cran-test-timings.csv` to find slow tests. - R11: A
+test reaches code through an exported function, an S3 generic or the
+mock pipeline (`backend = "mock", mock_fit = 1`). An internal function
+is called directly only when it is a numerical or parsing unit that the
+exported surface cannot drive in a few lines (a density, a bound, an
+expression parser), and then the test names the behaviour, not the
+function (`test_that("each link sets the natural-scale bounds", ...)`,
+not `test_that(".circmix_bounds() returns ...", ...)`). A new test file
+is named after the behaviour or model it covers, not after the R file it
+reads, and no test exists only because a helper exists. R11 binds new
+test files only.
 
 Test patterns from codebase:
 
@@ -392,9 +467,11 @@ developer maintains their own copy.
 1.  **Never edit** `man/` or `docs/` directly - regenerated from
     roxygen/pkgdown
 2.  **Namespace all imports** - don’t assume packages are loaded
-3.  **Test coverage** - add tests for all new code paths
-4.  **Implicit returns** - avoid explicit
-    [`return()`](https://rdrr.io/r/base/function.html) statements
+3.  **Test coverage** - add tests for new behaviour, not for every
+    helper; a new test file follows R11
+4.  **Implicit returns** -
+    [`return()`](https://rdrr.io/r/base/function.html) only in an early
+    return
 5.  **devtools::load_all()** - never use
     [`library(bmm)`](https://github.com/popov-lab/bmm) during
     development
