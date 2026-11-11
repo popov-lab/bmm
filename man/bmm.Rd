@@ -108,7 +108,8 @@ interactive prompt differently than last time forces a refit.}
 \item{...}{Further arguments passed to \code{\link[brms:brm]{brms::brm()}} or Stan. See the
 description of \code{\link[brms:brm]{brms::brm()}} for more details. Unless \code{control} names a
 \code{step_size} (\code{stepsize} for the rstan backend), bmm adds the starting step
-size set in \code{\link[=bmm_options]{bmm_options()}} to it; the other entries of \code{control} are kept.}
+size set in \code{\link[=bmm_options]{bmm_options()}} to it; the other entries of \code{control} are kept.
+\code{stanvars} are added to the ones the model sets up, so pass only your own.}
 }
 \value{
 An object of class brmsfit which contains the posterior draws along
@@ -140,6 +141,7 @@ Categorical recall and n-AFC decisions
 Detection, recognition and confidence judgments
 \itemize{
 \item mpt(): Multinomial Processing Tree (MPT) Model
+\item psychometric_function(): Psychometric Function
 \item sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model
 \item sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model
 \item sdt_ranking(): Ranking Signal Detection Theory Model

@@ -100,6 +100,50 @@ test_that("model_spec() states each model's density and generator", {
                    c(density = "dezdm", generator = "rezdm"))
   expect_identical(functions(imm("y", "nt", "d", 4, version = "abc")),
                    c(density = "dimm", generator = "rimm"))
+  expect_identical(functions(mixture3p("y", "nt", 4, version = "slot_averaging")),
+                   c(density = "dmixture3p", generator = "rmixture3p"))
+  expect_identical(functions(psychometric_function("r", "x", n_trials = "n")),
+                   c(density = "dpsychometric_function", generator = "rpsychometric_function"))
+})
+
+test_that("model_spec() follows the capacity versions and variable precision", {
+  pars <- function(spec) spec$parameters[c("parameter", "link", "fixed", "softmax")]
+
+  slot <- model_spec(mixture2p("y", set_size = "ss", version = "slot"))
+  expect_identical(slot$version, "slot")
+  expect_identical(pars(slot), data.frame(
+    parameter = c("mu", "kappa", "K"),
+    link = c("tan_half", "log", "log"),
+    fixed = c(TRUE, FALSE, FALSE),
+    softmax = FALSE
+  ))
+  expect_identical(slot$init_ranges, data.frame(
+    parameter = c("mu", "kappa", "K"),
+    lower = c(-0.65, 3.8, 1.9),
+    upper = c(0.65, 15, 3.8)
+  ))
+  expect_identical(slot$data_columns$argument, c("resp_error", "set_size"))
+
+  vp <- model_spec(mixture2p("y", set_size = "ss", version = "slot_averaging", variable_precision = TRUE))
+  expect_identical(pars(vp)$parameter, c("mu", "kappa", "tau", "K"))
+  expect_identical(pars(vp)$link, c("tan_half", "log", "log", "log"))
+  expect_identical(vp$init_ranges$lower[vp$init_ranges$parameter == "tau"], 0.2)
+  expect_identical(vp$init_ranges$upper[vp$init_ranges$parameter == "tau"], 1)
+  expect_identical(vp$default_priors$main[vp$default_priors$parameter == "tau"], "normal(0, 1)")
+
+  # the capacity versions replace the softmax pair by K and a logit ptarget
+  m3_slot <- model_spec(mixture3p("y", "nt", "ss", version = "slot"))
+  expect_identical(pars(m3_slot), data.frame(
+    parameter = c("mu", "kappa", "K", "ptarget"),
+    link = c("tan_half", "log", "log", "logit"),
+    fixed = c(TRUE, FALSE, FALSE, FALSE),
+    softmax = FALSE
+  ))
+  expect_identical(m3_slot$data_columns$argument, c("resp_error", "nt_features", "set_size"))
+
+  imm_vp <- model_spec(imm("y", "nt", "d", 4, version = "bsc", variable_precision = TRUE))
+  expect_identical(pars(imm_vp)$parameter, c("mu", "kappa", "tau", "c", "s", "b"))
+  expect_identical(imm_vp$parameters$value, c(0, NA, NA, NA, NA, 0))
 })
 
 test_that("model_spec() gives the data columns of the version, not of the model", {
@@ -134,7 +178,7 @@ test_that("model_spec() of mixture2p() is the documented specification", {
   expect_identical(unclass(spec), list(
     name = "Two-Parameter Mixture Model",
     package = "bmm",
-    version = NA_character_,
+    version = "simple",
     domain = "Working memory",
     task = "Continuous reproduction",
     citation = paste(
@@ -143,14 +187,17 @@ test_that("model_spec() of mixture2p() is the documented specification", {
       "https://doi.org/10.1038/nature06860"
     ),
     parameters = data.frame(
-      parameter = c("mu1", "kappa", "thetat"),
+      parameter = c("mu", "kappa", "thetat"),
       description = c(
         paste(
-          "Location parameter of the von Mises distribution for memory responses",
+          "Location of the von Mises distribution of memory responses",
           "(in radians). Fixed internally to 0 by default."
         ),
-        "Concentration parameter of the von Mises distribution",
-        "Mixture weight for target responses"
+        "Concentration of the von Mises distribution of memory responses",
+        paste(
+          "Mixture weight for target responses, i.e. the probability that a",
+          "response comes from memory rather than from guessing."
+        )
       ),
       link = c("tan_half", "log", "logit"),
       fixed = c(TRUE, FALSE, FALSE),
@@ -159,18 +206,19 @@ test_that("model_spec() of mixture2p() is the documented specification", {
       softmax = FALSE
     ),
     default_priors = data.frame(
-      parameter = c("mu1", "kappa", "thetat"),
+      parameter = c("mu", "kappa", "thetat"),
       main = c("normal(0, 0.5)", "normal(2, 1)", "logistic(0, 1)"),
       effects = c("normal(0, 0.25)", "normal(0, 1)", "normal(0, 2.5)"),
       sd = c("exponential(4)", "exponential(1)", "exponential(1)")
     ),
     init_ranges = data.frame(
-      parameter = c("mu1", "kappa", "thetat"),
+      parameter = c("mu", "kappa", "thetat"),
       lower = c(-0.65, 3.8, 0.25),
       upper = c(0.65, 15, 0.75)
     ),
     resp_vars = list(resp_error = "y"),
-    other_vars = setNames(list(), character(0)),
+    # set_size is an argument since the capacity versions; NULL when not given
+    other_vars = list(set_size = NULL),
     data_columns = data.frame(
       argument = "resp_error",
       role = "response error relative to the target, in radians"
@@ -220,7 +268,7 @@ test_that("model_spec() lists only the constructor's arguments in other_vars", {
   # arguments; sdt_yn() a trial_level flag; sdt_cdp() integer codes of dist
   # and threshold_type
   expect_identical(names(model_spec(.model_mpt())$other_vars),
-                   c("tree_id", "covariates", "trees", "simplex", "restrictions"))
+                   c("tree_id", "covariates", "trees", "response", "simplex", "restrictions"))
   expect_identical(names(model_spec(sdt_yn("r", "s"))$other_vars), c("stimulus", "n_trials", "dist"))
   expect_false(any(c("dist_int", "thresh_type_int") %in% names(model_spec(.model_sdt_cdp())$other_vars)))
 })

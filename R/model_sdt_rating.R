@@ -215,12 +215,15 @@
 )
 
 .model_sdt_rating <- function(response = NULL, stimulus = NULL,
+                              n_ratings = NULL,
                               dist = "normal",
                               threshold_type = "parsimonious",
                               version = "standard",
                               links = NULL, call = NULL, ...) {
-  # one count column per category, so the columns fix the number of categories
-  n_ratings <- length(response)
+  # aggregated rows have one count column per category, so the columns fix the
+  # number of categories; trial rows hold the rating in one column and need it
+  trial_level <- !is.null(n_ratings)
+  n_ratings <- n_ratings %||% length(response)
 
   parameters <- list(
     d = paste0(
@@ -287,18 +290,27 @@
   init_ranges <- c(init_ranges, variant$init_ranges)
   fixed_parameters <- c(list(sdratio = 0), variant$fixed_parameters)
 
-  requirements <- glue(
-    "Provide pre-aggregated data with the following columns:", "\n\n",
-    "  - Response counts: one column per rating category (K columns)", "\n",
-    "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
-    "  Categories should be ordered: 1 = 'definitely noise' to ",
-    "K = 'definitely signal'"
-  )
+  requirements <- if (trial_level) {
+    glue(
+      "Provide one row per trial with the following columns:", "\n\n",
+      "  - Rating (response): the category chosen on the trial, a whole number ",
+      "from 1 = 'definitely noise' to K = n_ratings = 'definitely signal'", "\n",
+      "  - Stimulus type (stimulus): 0 = noise, 1 = signal"
+    )
+  } else {
+    glue(
+      "Provide pre-aggregated data with the following columns:", "\n\n",
+      "  - Response counts: one column per rating category (K columns)", "\n",
+      "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
+      "  Categories should be ordered: 1 = 'definitely noise' to ",
+      "K = 'definitely signal'"
+    )
+  }
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(stimulus, dist, n_ratings, threshold_type),
+      other_vars = nlist(stimulus, dist, n_ratings, threshold_type, trial_level),
       domain = c("Perception", "Long-term memory"),
       task = "Detection, recognition and confidence judgments",
       name = "Confidence Rating Signal Detection Theory Model",
@@ -399,6 +411,11 @@ settable_link_functions.sdt_rating <- function(model) {
 #' Extract the M-ratio posterior with [mratio()].
 #' `r model_docs(.model_sdt_rating(version = "metad"))`
 #'
+#' #### One row per trial
+#' Name a single rating column in `response` and give the number of categories
+#' as `n_ratings`; every version takes this layout.
+#' `r model_docs(.model_sdt_rating(response = "rating", n_ratings = 6), components = "trial_level")`
+#'
 #' By default, the model assumes equal variance (sdratio fixed to 0). To
 #' estimate unequal variance, add `sdratio ~ 1` (or `sdratio ~ predictors`)
 #' to the formula.
@@ -451,9 +468,11 @@ settable_link_functions.sdt_rating <- function(model) {
 #' identified from K = 3 categories, where it uses every degree of freedom
 #' (the fit is saturated), and leaves the zROC testable from K = 4; the
 #' identification caveats on the [sdt_yn()] page do not carry over.
-#' @param response A character vector of K column names containing response
-#'   counts per rating category, ordered from "definitely noise" to
-#'   "definitely signal".
+#' @param response For aggregated data, a character vector of K column names
+#'   containing response counts per rating category, ordered from "definitely
+#'   noise" to "definitely signal". For one row per trial, the name of a single
+#'   column holding the rating of each trial, a whole number from 1 to
+#'   `n_ratings`.
 #' @param stimulus The name of the variable coding the stimulus type.
 #'   Must be coded as 0 (noise/new) and 1 (signal/old).
 #' @param dist The distribution assumed for the latent evidence, given here by
@@ -501,6 +520,9 @@ settable_link_functions.sdt_rating <- function(model) {
 #'   reads each of them through `exp()` and fixes `sdratio` at 0 for equal
 #'   variance. The same holds for `Ro` and `Rn`, read through `inv_logit()`
 #'   and fixed off by default, and for `logmratio`, read through `exp()`.
+#' @param n_ratings The number of rating categories K when `response` names a
+#'   single rating column, which declares one row per trial. Leave it `NULL`
+#'   for aggregated data, whose count columns fix K.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -578,6 +600,16 @@ settable_link_functions.sdt_rating <- function(model) {
 #' fit_md <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
 #'               data = dat, model = model_md, backend = "cmdstanr")
 #' mratio(fit_md) # posterior M-ratio (meta-d'/d')
+#'
+#' # One row per trial, with the rating 1 to 4 in one column and item effects
+#' model_trial <- sdt_rating("rating", "stimulus", n_ratings = 4)
+#' trials <- expand.grid(id = 1:20, item = 1:40)
+#' trials$stimulus <- as.integer(trials$item %% 2 == 0)
+#' trials <- simulate_data(model_trial, design = trials,
+#'                         pars = list(d = 1.5, criterion = 0.5, spacing = -0.5))
+#' fit_trial <- bmm(bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id),
+#'                      spacing ~ 1),
+#'                  data = trials, model = model_trial, backend = "cmdstanr")
 #' }
 sdt_rating <- function(response, stimulus,
                        dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
@@ -585,7 +617,7 @@ sdt_rating <- function(response, stimulus,
                                           "log_distance", "log_ratio",
                                           "softmax"),
                        version = c("standard", "dpsdt", "metad"),
-                       links = NULL, ...) {
+                       links = NULL, n_ratings = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...))
   stop_missing_args()
@@ -593,22 +625,43 @@ sdt_rating <- function(response, stimulus,
   threshold_type <- match.arg(threshold_type)
   version <- match.arg(version)
 
-  stopif(length(response) <= 2,
-         "response must name more than 2 rating-count columns, one per category")
-  # each column name becomes part of a brms parameter name (mu<column>)
+  if (length(response) == 1L) {
+    stopif(is.null(n_ratings),
+           "response names one column, which declares one row per trial with \\
+           the rating in that column: give the number of rating categories as \\
+           n_ratings. For counts aggregated over trials, name one count column \\
+           per category in response")
+    stopif(!is.numeric(n_ratings) || length(n_ratings) != 1 || !is.finite(n_ratings) ||
+             n_ratings %% 1 != 0 || n_ratings <= 2,
+           "n_ratings must be a single whole number above 2, the number of \\
+           rating categories")
+    n_ratings <- as.integer(n_ratings)
+  } else {
+    stopif(!is.null(n_ratings),
+           "response names {length(response)} count columns, one per rating \\
+           category, which declares aggregated counts with {length(response)} \\
+           categories. n_ratings is only for one row per trial with the rating \\
+           in a single column: drop n_ratings, or name that column in response")
+    stopif(length(response) <= 2,
+           "response must name more than 2 rating-count columns, one per category")
+  }
+  n_categories <- n_ratings %||% length(response)
+  # each column name becomes part of a brms parameter name (mu<column>, or
+  # mu<column><k> for the categories of a rating column)
   unusable <- response[grepl("[._]", response)]
   stopif(length(unusable) > 0,
          "Response column names must not contain '.' or '_', because brms \\
          builds a parameter name from each of them. Rename {collapse_comma(unusable)}")
-  stopif(threshold_type == "log_ratio" && length(response) < 4,
+  stopif(threshold_type == "log_ratio" && n_categories < 4,
          "log_ratio thresholds require at least 4 rating categories (the anchor ratio needs an interval above the criterion)")
-  stopif(version == "metad" && length(response) %% 2L != 0L,
+  stopif(version == "metad" && n_categories %% 2L != 0L,
          "version = 'metad' needs an even number of rating categories: \\
          meta-d' splits the scale at the old/new boundary, which an odd \\
          number of categories does not have (the middle category straddles \\
-         it). response names {length(response)} columns")
+         it). The scale has {n_categories} categories")
 
   .model_sdt_rating(response = response, stimulus = stimulus,
+                    n_ratings = n_ratings,
                     dist = dist, threshold_type = threshold_type,
                     version = version,
                     links = links, call = call, ...)
@@ -626,6 +679,9 @@ built_data_columns.sdt_rating <- function(model) {
 
 #' @exportS3Method
 data_trials.sdt_rating <- function(model, data) {
+  if (is_trial_level(model)) {
+    return(NULL)
+  }
   .row_trials(data, model$resp_vars$response)
 }
 
@@ -635,20 +691,27 @@ check_data.sdt_rating <- function(model, data, formula) {
   data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
   resp_cols <- model$resp_vars$response
-  .validate_sdt_count_cols(data, resp_cols)
-
-  Y <- as.matrix(data[resp_cols])
-  stopif(anyNA(Y), "Response columns must not contain NA counts")
+  if (is_trial_level(model)) {
+    Y <- .sdt_trial_rows_to_counts(model, data, "rating",
+                                   "one count column per category in response, without n_ratings")
+  } else {
+    .validate_sdt_count_cols(data, resp_cols)
+    Y <- as.matrix(data[resp_cols])
+    stopif(anyNA(Y), "Response columns must not contain NA counts")
+  }
   stopif(any(rowSums(Y) <= 0),
          "Row sums of response columns must be positive (no empty rows)")
 
-  reserved <- intersect(c("Y", "nTrials"), colnames(data))
+  # a rating column that is itself called Y or nTrials is replaced, not
+  # overwritten
+  reserved <- intersect(c("Y", "nTrials"),
+                        if (is_trial_level(model)) setdiff(colnames(data), resp_cols) else colnames(data))
   warnif(length(reserved) > 0,
          "Column(s) {collapse_comma(reserved)} in your data are reserved by \\
          {model$name} and will be overwritten")
   data <- data[!colnames(data) %in% resp_cols]
   data$Y <- Y
-  data$nTrials <- rowSums(Y)
+  data$nTrials <- if (is_trial_level(model)) 1L else rowSums(Y)
 
   NextMethod("check_data")
 }
@@ -739,7 +802,7 @@ check_data.sdt_rating <- function(model, data, formula) {
 # by bmf2bf.bmmodel, so they are deliberately not added here.
 #' @export
 bmf2bf.sdt_rating <- function(model, formula) {
-  resp_cats <- model$resp_vars$response
+  resp_cats <- .sdt_categories(model)
   fun <- .sdt_rating_variant(model)$logmu_fun
   args <- paste(.sdt_rating_logmu_args(model, .sdt_anchor_parameter(formula)),
                 collapse = ", ")
@@ -763,7 +826,7 @@ bmf2bf.sdt_rating <- function(model, formula) {
 
 #' @export
 configure_model.sdt_rating <- function(model, data, formula) {
-  resp_cats <- model$resp_vars$response
+  resp_cats <- .sdt_categories(model)
 
   formula <- bmf2bf(model, formula)
   formula$family <- brms::multinomial(refcat = NA)
@@ -794,7 +857,8 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, vars$stimulus, trials = "n_trials")
+  trial_level <- is_trial_level(model)
+  design <- .design_or_n(model, design, vars$stimulus, trials = if (!trial_level) "n_trials")
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   sdratio <- exp(p$sdratio)
@@ -802,15 +866,14 @@ simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link
   deltas <- p[grep("^delta[0-9]+$", names(p))]
   thresholds <- .sdt_make_thresholds(criterion, vars$n_ratings, vars$threshold_type, p$spacing,
                                      if (length(deltas)) do.call(cbind, deltas))
-  args <- list(nrow(design), design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
+  args <- list(nrow(design), if (trial_level) 1L else design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
                d = p$d, thresholds = thresholds, sdratio = sdratio, dist = vars$dist)
   counts <- switch(model$version,
     standard = do.call(rsdt_rating, args),
     dpsdt = do.call(rsdt_dpsdt, c(args, list(Ro = stats::plogis(p$Ro), Rn = stats::plogis(p$Rn)))),
     metad = do.call(rsdt_metad, c(args, list(metad = exp(p$logmratio) * p$d)))
   )
-  colnames(counts) <- model$resp_vars$response
-  .simulate_result(design, as.data.frame(counts), sim)
+  .simulate_result(design, .sdt_simulated_responses(model, counts), sim)
 }
 
 
