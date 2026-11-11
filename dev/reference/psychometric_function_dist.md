@@ -88,7 +88,11 @@ rpsychometric_function(
 - n:
 
   Integer. Number of observations to generate. `intensity`, `n_trials`
-  and the parameters are recycled to this length.
+  and the parameters are recycled to this length. As in
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html), a fraction is
+  truncated and `n = 0` gives an empty vector; unlike
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html), a vector `n`
+  stops.
 
 ## Value
 

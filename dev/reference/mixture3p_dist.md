@@ -19,10 +19,6 @@ dmixture3p(
   log = FALSE
 )
 
-pmixture3p(q, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
-
-qmixture3p(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
-
 rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
 ```
 
@@ -86,25 +82,15 @@ rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
   bmm 1.6.0 a logical value in that position is still read as `log`,
   with a warning.
 
-- q:
-
-  Vector of quantiles
-
-- p:
-
-  Vector of probability
-
 - n:
 
   Number of observations to generate data for
 
 ## Value
 
-`dmixture3p` gives the density of the three-parameter mixture model,
-`pmixture3p` gives the cumulative distribution function of the
-three-parameter mixture model, `qmixture3p` gives the quantile function
-of the three-parameter mixture model, and `rmixture3p` gives the random
-generation function for the three-parameter mixture model.
+`dmixture3p` gives the density of the three-parameter mixture model, and
+`rmixture3p` gives the random generation function for the
+three-parameter mixture model.
 
 ## References
 

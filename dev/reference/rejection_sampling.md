@@ -1,9 +1,13 @@
-# Rejection Sampling
+# Deprecated: rejection sampling
 
-Performs rejection sampling to generate samples from a target
-distribution. Each draw can come from its own target: draw `i` is
-sampled from `f` evaluated at the `i`-th element of every per-draw
-argument in `...`, under the envelope `max_f[i]`.
+`rejection_sampling()` is deprecated since bmm 1.5.0 and will be removed
+in bmm 1.6.0 at the earliest. It was the sampler behind
+[`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), which no
+longer needs the export; nothing replaces it. It still performs
+rejection sampling from a target distribution, with a warning. Each draw
+can come from its own target: draw `i` is sampled from `f` evaluated at
+the `i`-th element of every per-draw argument in `...`, under the
+envelope `max_f[i]`.
 
 ## Usage
 
@@ -55,18 +59,6 @@ distribution.
 ``` r
 target_density <- function(x) brms::dvon_mises(x, mu = 0, kappa = 10)
 proposal <- function(n) runif(n, min = -pi, max = pi)
-samples <- rejection_sampling(10000, target_density, max_f = target_density(0), proposal)
-hist(samples, freq = FALSE)
-curve(target_density, col = "red", add = TRUE)
-
-
-# one location per draw
-mu <- rep(c(0, 2), 5000)
-samples <- rejection_sampling(
-  10000, brms::dvon_mises, max_f = brms::dvon_mises(0, 0, 10), proposal,
-  mu = mu, kappa = 10
-)
-tapply(samples, mu, mean)
-#>           0           2 
-#> 0.003685737 1.997622251 
+samples <- rejection_sampling(1000, target_density, max_f = target_density(0), proposal)
+#> Warning: `rejection_sampling()` is deprecated since bmm 1.5.0 and will be removed in bmm 1.6.0 at the earliest.
 ```

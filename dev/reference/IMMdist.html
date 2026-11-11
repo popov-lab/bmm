@@ -75,28 +75,6 @@ generalization gradient <code>s</code>, and the precision of memory representati
 <span>  log <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">pimm</span><span class="op">(</span></span>
-<span>  <span class="va">q</span>,</span>
-<span>  mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>,</span>
-<span>  dist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.5</span>, <span class="fl">2</span><span class="op">)</span>,</span>
-<span>  c <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  a <span class="op">=</span> <span class="fl">0.2</span>,</span>
-<span>  b <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  s <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  kappa <span class="op">=</span> <span class="fl">5</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu">qimm</span><span class="op">(</span></span>
-<span>  <span class="va">p</span>,</span>
-<span>  mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>,</span>
-<span>  dist <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.5</span>, <span class="fl">2</span><span class="op">)</span>,</span>
-<span>  c <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  a <span class="op">=</span> <span class="fl">0.2</span>,</span>
-<span>  b <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  s <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>  kappa <span class="op">=</span> <span class="fl">5</span></span>
-<span><span class="op">)</span></span>
-<span></span>
 <span><span class="fu">rimm</span><span class="op">(</span></span>
 <span>  <span class="va">n</span>,</span>
 <span>  mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>,</span>
@@ -169,14 +147,6 @@ Until bmm 1.6.0 a logical value in that position is still read as <code>log</cod
 with a warning.</p></dd>
 
 
-<dt id="arg-q">q<a class="anchor" aria-label="anchor" href="#arg-q"></a></dt>
-<dd><p>Vector of quantiles</p></dd>
-
-
-<dt id="arg-p">p<a class="anchor" aria-label="anchor" href="#arg-p"></a></dt>
-<dd><p>Vector of probability</p></dd>
-
-
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
 <dd><p>Number of observations to generate data for</p></dd>
 
@@ -184,10 +154,8 @@ with a warning.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p><code>dimm</code> gives the density of the interference measurement model,
-<code>pimm</code> gives the cumulative distribution function of the interference
-measurement model, <code>qimm</code> gives the quantile function of the interference
-measurement model, and <code>rimm</code> gives the random generation function for the
-interference measurement model.</p>
+and <code>rimm</code> gives the random generation function for the interference
+measurement model.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

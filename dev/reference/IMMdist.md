@@ -23,28 +23,6 @@ dimm(
   log = FALSE
 )
 
-pimm(
-  q,
-  mu = c(0, 2, -1.5),
-  dist = c(0, 0.5, 2),
-  c = 1,
-  a = 0.2,
-  b = 0,
-  s = 2,
-  kappa = 5
-)
-
-qimm(
-  p,
-  mu = c(0, 2, -1.5),
-  dist = c(0, 0.5, 2),
-  c = 1,
-  a = 0.2,
-  b = 0,
-  s = 2,
-  kappa = 5
-)
-
 rimm(
   n,
   mu = c(0, 2, -1.5),
@@ -117,25 +95,15 @@ rimm(
   bmm 1.6.0 a logical value in that position is still read as `log`,
   with a warning.
 
-- q:
-
-  Vector of quantiles
-
-- p:
-
-  Vector of probability
-
 - n:
 
   Number of observations to generate data for
 
 ## Value
 
-`dimm` gives the density of the interference measurement model, `pimm`
-gives the cumulative distribution function of the interference
-measurement model, `qimm` gives the quantile function of the
-interference measurement model, and `rimm` gives the random generation
-function for the interference measurement model.
+`dimm` gives the density of the interference measurement model, and
+`rimm` gives the random generation function for the interference
+measurement model.
 
 ## References
 

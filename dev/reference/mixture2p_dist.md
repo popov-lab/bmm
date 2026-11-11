@@ -21,10 +21,6 @@ dmixture2p(
   log = FALSE
 )
 
-pmixture2p(q, mu = 0, kappa = 7, p_mem = 0.8)
-
-qmixture2p(p, mu = 0, kappa = 5, p_mem = 0.6)
-
 rmixture2p(
   n,
   mu = 0,
@@ -101,25 +97,15 @@ rmixture2p(
   bmm 1.6.0 a logical value in that position is still read as `log`,
   with a warning.
 
-- q:
-
-  Vector of quantiles
-
-- p:
-
-  Vector of probability
-
 - n:
 
   Number of observations to generate data for
 
 ## Value
 
-`dmixture2p` gives the density of the two-parameter mixture model,
-`pmixture2p` gives the cumulative distribution function of the
-two-parameter mixture model, `qmixture2p` gives the quantile function of
-the two-parameter mixture model, and `rmixture2p` gives the random
-generation function for the two-parameter mixture model.
+`dmixture2p` gives the density of the two-parameter mixture model, and
+`rmixture2p` gives the random generation function for the two-parameter
+mixture model.
 
 ## References
 

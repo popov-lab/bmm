@@ -231,6 +231,109 @@
   `x`, as in `dimm(0.3, c = c(1, 5, 20))`
   ([\#586](https://github.com/popov-lab/bmm/issues/586)). It returned a
   single density, for the first value.
+- The `d*()` and `r*()` functions of the sdm, ddm, ezdm and signal
+  detection models now follow one recycling rule, as
+  [`dnorm()`](https://rdrr.io/r/stats/Normal.html) and
+  [`rnorm()`](https://rdrr.io/r/stats/Normal.html) do; see
+  [`?bmm_distributions`](https://venpopov.com/bmm/dev/reference/bmm_distributions.md)
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+  [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md),
+  [`dsdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking_dist.md)
+  and
+  [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
+  returned too few values for a parameter longer than the data, as did
+  `dezdm(version = "4par")` for a longer `var_rt`:
+  `dddm(c(0.5, 0.6), c(1, 1), drift = 1:3, bound = 1, ndt = 0.2)`
+  gave 2.
+  [`dsdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating_dist.md),
+  [`dsdt_dpsdt()`](https://venpopov.com/bmm/dev/reference/sdt_dpsdt_dist.md),
+  [`dsdt_metad()`](https://venpopov.com/bmm/dev/reference/sdt_metad_dist.md)
+  and
+  [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
+  stopped with “non-conformable arrays” for more `thresholds` rows than
+  `counts`.
+  [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
+  still warns for non-multiples.
+- [`dsdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking_dist.md)
+  now stops when a longer `m` gives a row of counts more ranks than its
+  set size: `dsdt_ranking(c(30, 40, 20, 10), m = c(4, 2), d = 1)`
+  ignored `m = 2` and returned one value. Give one row of counts per set
+  size, with 0 beyond `m`
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`rsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md),
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md),
+  [`dsdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn_dist.md),
+  [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+  [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) and
+  `dezdm(version = "4par")` could return wrong values, taken from
+  another observation, when three or more arguments (`n` included) had
+  different lengths, two of them not multiples of each other. For
+  example,
+  `rsdt_yn(7, c(10, 20, 30, 40), c(1, 1, 0), d = 10, criterion = c(5, -5))`
+  gave `10 20 0 40 10 0 30` instead of `10 20 0 40 10 20 30`. Most of
+  these calls warned; some now stop because a count exceeds its number
+  of trials. Rerun simulations and densities computed with such vectors
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) with a
+  data frame `x` that holds a matrix column now pairs a vector parameter
+  with the cells column by column, as it does for every other data
+  frame; it paired them by the matrix’s rows
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`dddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) now
+  accepts `rt` and `response` of different lengths and recycles them
+  like its other arguments; it stopped with “Different number of RTs and
+  responses” ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`dsdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating_dist.md),
+  [`dsdt_dpsdt()`](https://venpopov.com/bmm/dev/reference/sdt_dpsdt_dist.md),
+  [`dsdt_metad()`](https://venpopov.com/bmm/dev/reference/sdt_metad_dist.md)
+  and
+  [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
+  now accept `counts` as a data frame, as
+  [`dsdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking_dist.md)
+  does, and read it like the matrix of its rows; they stopped with
+  “invalid ‘dimnames’ given for data frame”
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
+  and
+  [`rsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
+  now warn when an observation’s `kcrit` is finite but another `kcrit`
+  value is not: the Know/Guess split is then off for the whole call, as
+  before, and that observation uses the R/K model. Give a finite `kcrit`
+  for every observation for the R/K/G model, or `kcrit = NULL` for the
+  R/K model ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- `dezdm(version = "4par")` now accepts a length-2 vector in `mean_rt`
+  or `var_rt` beside a 2-column matrix in the other, and reads the
+  vector as one observation for every row of the matrix; it stopped. A
+  data frame in `mean_rt` is now read as the matrix of its rows, as one
+  in `var_rt` was
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md),
+  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md),
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), the
+  `rsdt_*()` samplers and
+  [`rpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md)
+  now read a single `n` as
+  [`rnorm()`](https://rdrr.io/r/stats/Normal.html) does: a number of at
+  least 0, with a fraction truncated. `n = 0` gives an empty vector,
+  matrix or data frame with the usual columns; all but
+  [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md)
+  stopped on it. An `n` that is `NA`, negative or not a number, such as
+  `n = "a"`, stops with one clear message instead of messages such as
+  “missing value where TRUE/FALSE needed”. Unlike
+  [`rnorm()`](https://rdrr.io/r/stats/Normal.html), a vector `n` still
+  stops, except in
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md)
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- The `d*()` functions of the sdm, ddm, ezdm and signal detection models
+  now return `numeric(0)` when the data or any per-observation argument
+  is empty or `NULL`, such as `counts` with zero rows, `d = numeric(0)`
+  or a misspelt data column, as
+  [`dnorm()`](https://rdrr.io/r/stats/Normal.html) does for an empty
+  one. Most of them returned `NA` or stopped; `dezdm(version = "4par")`
+  returned a number for zero rows. An empty `kcrit`, and an empty
+  `mean_rt` or `var_rt` vector in `dezdm(version = "4par")`, stop: pass
+  `kcrit = NULL`, or matrices with zero rows and 2 columns
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
 - `stanvars` passed to
   [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md),
   [`update()`](https://rdrr.io/r/stats/update.html),
@@ -291,6 +394,19 @@
   straight to brms, such as `posterior_linpred(fit, nlpar = "kappa")`,
   are not translated and need `dpar =`
   ([\#434](https://github.com/popov-lab/bmm/issues/434)).
+- `rddm(n, ...)` now returns `n` draws with the parameters recycled to
+  `n`, as [`rnorm()`](https://rdrr.io/r/stats/Normal.html) does; before,
+  with parameter vectors `n` had to be 1 or the length of the longest
+  one. Until bmm 1.6.0 at the earliest, `rddm(1, <vectors>)` still gives
+  one draw per element and an `n` of length above 1 still gives
+  `length(n)` draws, each with a warning: pass the number of draws
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
+- [`rejection_sampling()`](https://venpopov.com/bmm/dev/reference/rejection_sampling.md)
+  is deprecated and will be removed in bmm 1.6.0 at the earliest. It was
+  the sampler behind
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), which
+  no longer needs it; it still works, with a warning
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
 - [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
   [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
   and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md):
@@ -298,6 +414,10 @@
   position. Until bmm 1.6.0 a logical value there is still read as
   `log`, with a warning; write `log = TRUE` instead
   ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- `pmixture2p()`, `qmixture2p()`, `pmixture3p()`, `qmixture3p()`,
+  `pimm()` and `qimm()` are removed. They were never implemented and
+  always stopped with an error
+  ([\#556](https://github.com/popov-lab/bmm/issues/556)).
 
 #### Changes to default priors
 

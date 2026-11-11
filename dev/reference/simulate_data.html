@@ -160,12 +160,12 @@ both scales.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             y</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  0.79624383</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  0.01005821</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 -0.24949631</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 -0.48835639</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 -2.38609265</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 -0.65857191</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  0.55736215</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 -0.50792284</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  0.36035066</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0.27127972</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 -0.06787571</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 -0.35931991</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">data</span>, <span class="st">"simulate_pars"</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu    kappa thetat</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  0 2.079442    0.5</span>
@@ -183,12 +183,12 @@ both scales.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   cond        rt response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 easy 0.3266617        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 easy 0.4780491        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 easy 0.3817034        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 easy 0.5858332        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 easy 0.3244656        1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 easy 0.3514862        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 easy 0.3394879        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 easy 0.2731111        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 easy 0.3965125        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 easy 0.4204438        1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 easy 0.2694648        0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 easy 0.4030829        1</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># counts: yes/no recognition, 50 trials per stimulus type</span></span></span>
 <span class="r-in"><span><span class="va">design</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>stimulus <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, n_trials <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
@@ -196,8 +196,8 @@ both scales.</p>
 <span class="r-in"><span>  pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>d <span class="op">=</span> <span class="fl">1.5</span>, criterion <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>, design <span class="op">=</span> <span class="va">design</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   stimulus n_trials n_old</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1        0       50    18</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2        1       50    42</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1        0       50    16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2        1       50    39</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># categorical responses: memory measurement model, 100 trials per row</span></span></span>
 <span class="r-in"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="m3.html">m3</a></span><span class="op">(</span></span></span>
@@ -206,8 +206,8 @@ both scales.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">bmm</span><span class="fu">::</span><span class="fu">simulate_data</span><span class="op">(</span><span class="va">model</span>, pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>c <span class="op">=</span> <span class="fl">2</span>, a <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>, design <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>n_trials <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">100</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   n_trials corr other npl</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1      100   57    23  20</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2      100   43    31  26</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1      100   48    29  23</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2      100   55    27  18</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

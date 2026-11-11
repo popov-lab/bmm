@@ -55,8 +55,9 @@ rsdt_cdp(
   response category in the canonical order `new`, `[guess]`, `know`,
   `remember` (each block ordered by confidence; see
   [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)), or
-  a vector for a single observation. `n_new + 2 * n_old` columns (R/K)
-  or `n_new + 3 * n_old` (R/K/G).
+  a vector for a single observation. A data frame is read as the matrix
+  of its rows. `n_new + 2 * n_old` columns (R/K) or `n_new + 3 * n_old`
+  (R/K/G).
 
 - stimulus:
 
@@ -83,8 +84,17 @@ rsdt_cdp(
 
 - kcrit:
 
-  Know criterion on the familiarity axis. `NULL` (default) for the R/K
-  model; finite values enable the R/K/G model.
+  Know criterion on the familiarity axis. `NULL` (default), or a
+  non-finite value for every observation, gives the R/K model; finite
+  values for every observation give the R/K/G model. A `kcrit` with any
+  non-finite element gives the R/K model for the whole call, also for
+  the observations whose `kcrit` is finite, and warns when there are
+  such observations. Every element counts, also one past the last
+  observation: with one draw, `kcrit = c(0.2, Inf)` gives R/K and a
+  warning. The length of `kcrit` sets the number of observations only
+  when every element is finite (the R/K/G model): with one row of
+  `counts`, `kcrit = c(0.2, 0.3)` gives two values and
+  `kcrit = c(0.2, Inf)` one.
 
 - sigmar:
 
@@ -129,6 +139,69 @@ the canonical response count columns (`new1`, ..., `remember<K>`) that
 – [`cbind()`](https://rdrr.io/r/base/cbind.html) it to a design data
 frame for a ready-to-fit data set.
 
+## Vector arguments
+
+- `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or
+  matrix with `n` rows. Every per-observation argument (a parameter, a
+  stimulus, a number of trials) is recycled to length `n` with
+  [`rep_len()`](https://rdrr.io/r/base/rep.html), as in
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html): draw `i` uses
+  element `i`, and a matrix is read element by element; only a set of
+  values per draw, such as `thresholds`, takes row `i` of a matrix (see
+  below). A shorter vector is repeated, also when `n` is not a multiple
+  of its length. Until bmm 1.6.0 at the earliest,
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) with
+  `n = 1` and parameter vectors still returns one draw per element, with
+  a deprecation warning.
+
+- `n` is a single number of at least 0. A fraction is truncated, as in
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html), and `n = 0`
+  gives an empty vector, or a matrix or data frame with zero rows and
+  the usual columns. Unlike
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html), which takes
+  the length of a vector `n`, these functions stop on one;
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) still
+  takes its length, with a deprecation warning.
+
+- `d*(x, ...)` returns one value per observation: as many as the longest
+  of `x` (its rows, when the observations are rows of counts) and the
+  per-observation arguments, the others recycled to that length. Value
+  `i` is what the call on the `i`-th elements alone returns. A matrix in
+  an argument that takes one number per observation, such as `x` or `d`,
+  holds one observation per element, as in
+  [`stats::dnorm()`](https://rdrr.io/r/stats/Normal.html). When `x` or
+  any per-observation argument is empty, the result is empty, as in
+  [`stats::dnorm()`](https://rdrr.io/r/stats/Normal.html). A `NULL`
+  argument, such as a misspelt column of a data frame, counts as empty,
+  except where the default is `NULL`, as for `criterion` or `kcrit`:
+  there it means that the argument is not given. Where an observation is
+  a vector of counts
+  ([`dsdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating_dist.md),
+  [`dsdt_dpsdt()`](https://venpopov.com/bmm/dev/reference/sdt_dpsdt_dist.md),
+  [`dsdt_metad()`](https://venpopov.com/bmm/dev/reference/sdt_metad_dist.md),
+  [`dsdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking_dist.md)
+  and `dsdt_cdp()`), or the pair of `mean_rt` or `var_rt` values of
+  `dezdm(version = "4par")`, a vector is always one observation: pass a
+  matrix with zero rows for none, as an empty vector stops. An empty
+  `kcrit` of `dsdt_cdp()` and `rsdt_cdp()` stops as well; `kcrit = NULL`
+  gives the R/K model. Counts in a data frame, a tibble included, are
+  read as the matrix of its rows, and so are `mean_rt` and `var_rt` of
+  `dezdm(version = "4par")`.
+  [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) with a
+  data frame `x` is the exception: it returns a data frame of the same
+  shape, one density per cell, and cuts longer parameters to the number
+  of cells.
+
+- A set of values that describes one observation, such as the
+  `thresholds` of the rating models, is a vector when every observation
+  shares it and a matrix with one row per observation otherwise: row `i`
+  belongs to observation `i`, or to draw `i`.
+
+- Configuration arguments such as `version`, `dist`, `log`,
+  `parametrization` and `n_new` are single values and are never
+  recycled. An argument that a version does not use, such as `zr` of
+  `dezdm(version = "3par")`, is ignored.
+
 ## References
 
 Wixted, J. T., & Mickes, L. (2010). A continuous dual-process model of
@@ -154,10 +227,10 @@ dat <- cbind(dat, rsdt_cdp(nrow(dat), 100, dat$stimulus,
                            rcrit = 0.5, n_new = 3))
 head(dat)
 #>   id stimulus new1 new2 new3 know4 know5 know6 remember4 remember5 remember6
-#> 1  1        0   22   13   13    12     9     3         3         6        19
-#> 2  2        0   20   22   12     6     9     6         5        14         6
-#> 3  3        0   24   11   13    14     7     3         8        10        10
-#> 4  4        0   23   16   10    11     8     5        11         5        11
-#> 5  5        0   24   15    9    11     6     3         4        11        17
-#> 6  6        0   25    8   12    10    11     8         5        10        11
+#> 1  1        0   13   16   14    16     5     5         8         9        14
+#> 2  2        0   16   13   10    16     5     8         7        14        11
+#> 3  3        0   26   17   14     8    11     1         1        11        11
+#> 4  4        0   18   18   11    11     9     3         3         8        19
+#> 5  5        0   19   11   12    16     9     5         6        11        11
+#> 6  6        0   18    9   22    13    10     6         2         6        14
 ```

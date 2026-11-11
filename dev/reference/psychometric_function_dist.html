@@ -139,7 +139,9 @@ does not attend and responds at the guess rate. The upper asymptote is
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
 <dd><p>Integer. Number of observations to generate. <code>intensity</code>,
-<code>n_trials</code> and the parameters are recycled to this length.</p></dd>
+<code>n_trials</code> and the parameters are recycled to this length. As in
+<code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code>, a fraction is truncated and <code>n = 0</code> gives an empty
+vector; unlike <code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code>, a vector <code>n</code> stops.</p></dd>
 
 </dl></div>
     <div class="section level2">

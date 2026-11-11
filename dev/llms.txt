@@ -447,8 +447,6 @@ Functions for specifying which model to fit
 Functions for special distributions
 
 - [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
-  [`pimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
-  [`qimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
   [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) :
   Distribution functions for the Interference Measurement Model (IMM)
 
@@ -462,6 +460,9 @@ Functions for special distributions
   [`sdt_criterion()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
   [`sdt_bias()`](https://venpopov.com/bmm/dev/reference/SDTdist.md) :
   Utility functions for Signal Detection Theory
+
+- [`bmm_distributions`](https://venpopov.com/bmm/dev/reference/bmm_distributions.md)
+  : Vector arguments of the distribution functions
 
 - [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
   [`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md)
@@ -484,15 +485,11 @@ Functions for special distributions
   Distribution functions for the Memory Measurement Model (M3)
 
 - [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
-  [`pmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
-  [`qmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
   [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
   : Distribution functions for the two-parameter mixture model
   (mixture2p)
 
 - [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  [`pmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  [`qmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
   [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
   : Distribution functions for the three-parameter mixture model
   (mixture3p)
@@ -506,7 +503,7 @@ Functions for special distributions
   : Distribution functions for the psychometric function model
 
 - [`rejection_sampling()`](https://venpopov.com/bmm/dev/reference/rejection_sampling.md)
-  : Rejection Sampling
+  : Deprecated: rejection sampling
 
 - [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
   [`rsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)

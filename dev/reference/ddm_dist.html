@@ -90,9 +90,60 @@ result in every version.</p></dd>
 
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
-<dd><p>Number of random samples to generate</p></dd>
+<dd><p>Number of random samples to generate. Until bmm 1.6.0 at the
+earliest, <code>n = 1</code> with parameter vectors still gives one draw per
+element, and an <code>n</code> of length above 1 gives <code>length(n)</code> draws, each with
+a deprecation warning; pass the number of draws.</p></dd>
 
 </dl></div>
+    <div class="section level2">
+    <h2 id="vector-arguments">Vector arguments<a class="anchor" aria-label="anchor" href="#vector-arguments"></a></h2>
+
+
+<ul><li><p><code>r*(n, ...)</code> returns exactly <code>n</code> draws: a vector, or a data frame or matrix
+with <code>n</code> rows. Every per-observation argument (a parameter, a stimulus, a
+number of trials) is recycled to length <code>n</code> with <code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep_len()</a></code>, as in
+<code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code>: draw <code>i</code> uses element <code>i</code>, and a matrix is read element
+by element; only a set of values per draw, such as <code>thresholds</code>, takes
+row <code>i</code> of a matrix (see below). A shorter vector is
+repeated, also when <code>n</code> is not a multiple of its length. Until bmm 1.6.0
+at the earliest, <code>rddm()</code> with <code>n = 1</code> and parameter vectors still
+returns one draw per element, with a deprecation warning.</p></li>
+<li><p><code>n</code> is a single number of at least 0. A fraction is truncated, as in
+<code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code>, and <code>n = 0</code> gives an empty vector, or a matrix or data
+frame with zero rows and the usual columns. Unlike <code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code>,
+which takes the length of a vector <code>n</code>, these functions stop on one;
+<code>rddm()</code> still takes its length, with a deprecation warning.</p></li>
+<li><p><code>d*(x, ...)</code> returns one value per observation: as many as the longest of
+<code>x</code> (its rows, when the observations are rows of counts) and the
+per-observation arguments, the others recycled to that length. Value <code>i</code>
+is what the call on the <code>i</code>-th elements alone returns. A matrix in an
+argument that takes one number per observation, such as <code>x</code> or <code>d</code>, holds
+one observation per element, as in <code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::dnorm()</a></code>. When <code>x</code> or any
+per-observation argument is empty, the result is empty, as in
+<code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::dnorm()</a></code>. A <code>NULL</code> argument, such as a misspelt column of a data
+frame, counts as empty, except where the default is <code>NULL</code>, as for
+<code>criterion</code> or <code>kcrit</code>: there it means that the argument is not given.
+Where an observation is a vector of counts
+(<code><a href="sdt_rating_dist.html">dsdt_rating()</a></code>, <code><a href="sdt_dpsdt_dist.html">dsdt_dpsdt()</a></code>, <code><a href="sdt_metad_dist.html">dsdt_metad()</a></code>, <code><a href="sdt_ranking_dist.html">dsdt_ranking()</a></code> and
+<code><a href="sdt_cdp_dist.html">dsdt_cdp()</a></code>), or the pair of <code>mean_rt</code> or <code>var_rt</code> values of
+<code>dezdm(version = "4par")</code>, a vector is always one observation: pass a
+matrix with zero rows for none, as an empty vector stops. An empty
+<code>kcrit</code> of <code><a href="sdt_cdp_dist.html">dsdt_cdp()</a></code> and <code><a href="sdt_cdp_dist.html">rsdt_cdp()</a></code> stops as well; <code>kcrit = NULL</code>
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows, and so are <code>mean_rt</code> and <code>var_rt</code> of
+<code>dezdm(version = "4par")</code>. <code><a href="SDMdist.html">dsdm()</a></code> with a data frame <code>x</code> is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.</p></li>
+<li><p>A set of values that describes one observation, such as the <code>thresholds</code>
+of the rating models, is a vector when every observation shares it and a
+matrix with one row per observation otherwise: row <code>i</code> belongs to
+observation <code>i</code>, or to draw <code>i</code>.</p></li>
+<li><p>Configuration arguments such as <code>version</code>, <code>dist</code>, <code>log</code>,
+<code>parametrization</code> and <code>n_new</code> are single values and are never recycled.
+An argument that a version does not use, such as <code>zr</code> of
+<code>dezdm(version = "3par")</code>, is ignored.</p></li>
+</ul></div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
