@@ -396,7 +396,7 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
   cell <- .sdm_prep_cell(prep)
-  rsdm(length(mu), mu, c, kappa, activation = cell$activation, scaling = cell$scaling)
+  rsdm(prep$ndraws, mu, c, kappa, activation = cell$activation, scaling = cell$scaling)
 }
 
 sdm_run_metadata <- function(data, formula, model) {
