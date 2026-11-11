@@ -480,7 +480,7 @@ response_annotations <- function(model) {
   if (inherits(model, "change_detection")) {
     return(list(
       response = "0/1 or logical; 1 = 'change'",
-      probe = "radians", target = "radians"
+      probe = "radians, relative to the target"
     ))
   }
   if (inherits(model, "ddm") || inherits(model, "cswald")) {
