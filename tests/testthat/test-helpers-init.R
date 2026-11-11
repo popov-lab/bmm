@@ -1363,6 +1363,13 @@ test_that("a bounded coefficient on a wide column moves by a step its column shr
   expect_true(inside(b[2, ], lower = 0, shrink = 1 / 40) && all(b[2, ] <= 0.1 / 40))
 })
 
+test_that("a start that moves takes its own shrink when another start stays (#694)", {
+  withr::local_seed(694)
+  starts <- replicate(200, into_bounds(c(0.5, -1e-17), c(0, Inf), c(1, 1 / 40)))
+  expect_true(all(starts[1, ] == 0.5))
+  expect_true(inside(starts[2, ], lower = 0, shrink = 1 / 40) && all(starts[2, ] <= 0.1 / 40))
+})
+
 test_that("starts between close bounds spread strictly inside them (#694)", {
   withr::local_seed(694)
   close <- replicate(200, into_bounds(c(-1, 1), c(0, 0.02), 1))
@@ -1406,6 +1413,8 @@ test_that("an intercept and a per-coefficient scalar start inside their bounds (
   # replicate() would fold a vector returned for the scalar into a matrix
   expect_length(effect, 200)
   expect_true(inside(effect, lower = 0))
+  below <- replicate(200, init_fixef_param("Intercept_eta", "real", 1, eta_model, list(), c(-Inf, 0)))
+  expect_true(inside(below, upper = 0) && all(below >= -0.1))
 })
 
 test_that("an intercept on a narrow init range moves by a step that range shrinks (#694)", {
@@ -1424,6 +1433,8 @@ test_that("mo() coefficients start inside a bound set on the class (#694)", {
   # the range is log(2) wide on the log scale, and mo() reaches Jmo = 3
   shrink <- log(2) / 3
   expect_true(inside(bsp, lower = 0, shrink = shrink) && all(bsp <= 0.1 * shrink))
+  below <- replicate(200, init_special_coef_param("bsp_kappa", "vector", 2, model, sdata, c(-Inf, 0)))
+  expect_true(inside(below, upper = 0, shrink = shrink) && all(below >= -0.1 * shrink))
 })
 
 test_that("the inits of a fit with lb = 0 on b respect the bound (#694)", {
