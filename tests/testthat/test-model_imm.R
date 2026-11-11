@@ -18,8 +18,7 @@ test_that("imm() exposes the parameters each version implies", {
 })
 
 test_that("imm() and dimm() default to 81 quadrature nodes", {
-  # the core refuses gamma shapes below 60 / vp_nodes, which at 41 nodes is 1.46
-  # and reaches into real-data posteriors of mixture2p and mixture3p (#398)
+  # 41 nodes hold the log likelihood to about 5e-4, 81 to about 1e-8 (#695)
   expect_equal(imm_model(variable_precision = TRUE)$vp_nodes, 81L)
   expect_equal(formals(imm)$vp_nodes, 81L)
   expect_equal(formals(dimm)$vp_nodes, 81L)

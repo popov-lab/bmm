@@ -470,71 +470,6 @@ test_that(".circmix_check_variable_precision() rejects unusable node counts", {
   expect_silent(.circmix_check_variable_precision(TRUE, 43))
 })
 
-test_that("a diverging VP fit piled against the shape bound is told to raise vp_nodes", {
-  storm <- c(rep(0.75, 50), rep(0.9, 50))
-  expect_warning(
-    .circmix_warn_vp_bound(storm, divergent = 153, nodes = 81L),
-    "153 transitions.*50% of the posterior draws.*0\\.741.*vp_nodes = 121.*0\\.496"
-  )
-  expect_warning(
-    .circmix_warn_vp_bound(storm, divergent = 3, nodes = 41L),
-    "vp_nodes = 61"
-  )
-})
-
-test_that("the shape-bound warning stays silent without divergences or without a pile at the bound", {
-  expect_no_warning(.circmix_warn_vp_bound(rep(0.75, 100), divergent = 0, nodes = 81L))
-  # the 121-node refit of the diverging fit: 4 divergences, 1% of draws near 0.496
-  expect_no_warning(
-    .circmix_warn_vp_bound(c(0.52, 0.53, rep(0.78, 198)), divergent = 4, nodes = 121L)
-  )
-})
-
-test_that("a variable-precision fit reaches the shape-bound warning after sampling", {
-  model <- structure(list(variable_precision = TRUE, vp_nodes = 81L), class = "circular")
-  fit <- list(algorithm = "sampling")
-  local_mocked_bindings(
-    has_draws = function(fit) TRUE,
-    .circmix_vp_shape_min = function(fit) c(rep(0.75, 50), rep(0.9, 50))
-  )
-  local_mocked_bindings(
-    nuts_params = function(...) data.frame(Value = c(rep(1, 153), rep(0, 47))),
-    ndraws = function(...) 200L,
-    .package = "brms"
-  )
-  expect_warning(postprocess_brm(model, fit), "153 transitions.*vp_nodes = 121")
-  model$variable_precision <- FALSE
-  expect_no_warning(postprocess_brm(model, fit))
-})
-
-# a stanfit can hold no draws (iter = warmup), and prepare_predictions() then fails
-test_that("the shape-bound check after sampling skips a fit without draws", {
-  model <- structure(list(variable_precision = TRUE, vp_nodes = 81L), class = "circular")
-  local_mocked_bindings(
-    has_draws = function(fit) TRUE,
-    .circmix_vp_shape_min = function(fit) stop("the draws were read")
-  )
-  local_mocked_bindings(ndraws = function(...) 0L, .package = "brms")
-  expect_no_error(postprocess_brm(model, list(algorithm = "sampling")))
-  # what brms 2.23.0 returns for a cmdstanr fit with iter = warmup
-  local_mocked_bindings(ndraws = function(...) NA_integer_, .package = "brms")
-  expect_no_error(postprocess_brm(model, list(algorithm = "sampling")))
-})
-
-test_that(".circmix_vp_shape_min() takes the minimum over every block of observations", {
-  kappa <- matrix(20, nrow = 2, ncol = 1500)
-  kappa[1, 1200] <- 2
-  kappa[2, 10] <- 3
-  local_mocked_bindings(
-    prepare_predictions = function(fit) list(ndraws = 2L, nobs = 1500L),
-    get_dpar = function(prep, dpar, i) {
-      if (dpar == "kappa") kappa[, i, drop = FALSE] else matrix(0.5, 2, length(i))
-    },
-    .package = "brms"
-  )
-  expect_equal(.circmix_vp_shape_min(NULL), .circmix_J(c(2, 3)) / 0.5)
-})
-
 test_that(".circmix_prep_nt() returns the covariates in numeric order", {
   prep <- list(data = list(
     Y = 1:3, vreal10 = c(10, 0, 0), vreal2 = c(2, 0, 0), vreal1 = c(1, 0, 0)
@@ -886,12 +821,12 @@ test_that("the variable-precision density takes a small gamma shape at the defau
   expect_no_error(dmixture2p(0.3, kappa = 1, tau = 20))
 })
 
-test_that("Stan matches R below the old shape bound", {
+test_that("Stan matches R at small gamma shapes and either side of the tail switch", {
   skip_unless_stan_tests()
   skip_on_cran()
 
-  # 0.73 sits under the old bound 60 / 81 = 0.741, which Stan rejected; 1.9 and
-  # 2.1 sit either side of the switch to the analytic tail
+  # 0.73 sits under 0.741, the smallest shape Stan accepted at 81 nodes before
+  # the tail was analytic; 1.9 and 2.1 sit either side of the switch to it
   tab <- .circmix_kappa_table()
   cosd <- cos(0.4 - c(0, 1.2))
   logw <- log(c(0.5, 0.3))

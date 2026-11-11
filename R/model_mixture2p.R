@@ -194,11 +194,9 @@
 #'   in small designs.
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41. With the
-#'   default of 81, the log likelihood holds to about 1e-5 as long as the
-#'   implied gamma shape `J(kappa) / tau` stays above `60 / vp_nodes` (0.74 at
-#'   the default), and to about 2e-6 above a shape of 1. Below that threshold
-#'   the model rejects rather than returning a biased likelihood, and asks for
-#'   more nodes; 121 nodes reach a shape of about 0.5, and 241 about 0.25.
+#'   default of 81, the log likelihood holds to about 1e-8 at every implied
+#'   gamma shape `J(kappa) / tau`, small or large; 41 nodes hold it to about
+#'   5e-4, and 121 nodes add nothing a fit would notice.
 #' @param links A named list of link functions for the model parameters, e.g.
 #'   `list(kappa = "softplus")`. Defaults are `"log"` for `kappa`, `K` and
 #'   `tau`, and `"logit"` for `thetat`.
