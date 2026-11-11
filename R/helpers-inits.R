@@ -83,21 +83,27 @@ init_stan_param <- function(spar, spec, model, standata_list) {
 # coefficients are drawn around zero, so a bound at zero (lb = 0 for a monotonic
 # effect, #694) rejects most starts. A start closer to a bound than 0.01 moves
 # inside the nearer bound by 0.01 to 0.1, the size of the special coefficients'
-# draws, and no further than halfway to the other bound; both are shrunk as the
-# coefficient's draws are. Only the starts that move draw a step, so a bound
-# that never binds leaves the seeded starts of every later parameter as they
-# were without it
+# draws; both are shrunk as the coefficient's draws are. Bounds closer together
+# than 0.2 shrink it further, until the largest step reaches the midpoint, so
+# that the chains still start apart and none crosses to the other bound. Only
+# the starts that move draw a step, so a bound that never binds leaves the
+# seeded starts of every later parameter as they were without it
 into_bounds <- function(values, bounds, shrink) {
   if (!any(is.finite(bounds))) {
     return(values)
   }
-  shrink <- rep_len(shrink, length(values))
   half <- diff(bounds) / 2
-  margin <- pmin(0.01 * shrink, half)
+  shrink <- pmin(rep_len(shrink, length(values)), 10 * half)
+  margin <- 0.01 * shrink
   below <- values < bounds[1] + margin
   moved <- below | values > bounds[2] - margin
-  step <- pmin(runif(sum(moved), min = 0.01, max = 0.1) * shrink[moved], half)
+  step <- runif(sum(moved), min = 0.01, max = 0.1) * shrink[moved]
   values[moved] <- ifelse(below[moved], bounds[1] + step, bounds[2] - step)
+  if (is.finite(half)) {
+    # bounds a few doubles apart leave the step below their spacing, and it
+    # rounds onto the bound
+    values[values <= bounds[1] | values >= bounds[2]] <- bounds[1] + half
+  }
   values
 }
 

@@ -709,28 +709,28 @@ test_that("imm versions carry ranges for exactly their parameters", {
 # =============================================================================
 
 test_that("init_default_param() maps the draw through the declared bounds", {
-  spec <- function(type, bounds, dims = "K", types = type) nlist(type, types, bounds, dims)
-  unbounded <- init_default_param(spec("vector", NULL), 20, c(-Inf, Inf))
-  lower <- init_default_param(spec("vector", list(lower = "2")), 20, c(2, Inf))
-  upper <- init_default_param(spec("vector", list(upper = "-3")), 20, c(-Inf, -3))
-  both <- init_default_param(spec("vector", list(lower = "0", upper = "4")), 20, c(0, 4))
+  spec <- function(type, dims = "K", types = type) nlist(type, types, dims)
+  unbounded <- init_default_param(spec("vector"), 20, c(-Inf, Inf))
+  lower <- init_default_param(spec("vector"), 20, c(2, Inf))
+  upper <- init_default_param(spec("vector"), 20, c(-Inf, -3))
+  both <- init_default_param(spec("vector"), 20, c(0, 4))
 
   expect_true(all(abs(unbounded) <= 1))
   expect_true(all(lower > 2))
   expect_true(all(upper < -3))
   expect_true(all(both > 0 & both < 4))
-  expect_equal(dim(init_default_param(spec("matrix", NULL), c(2, 3), c(-Inf, Inf))), c(2, 3))
+  expect_equal(dim(init_default_param(spec("matrix"), c(2, 3), c(-Inf, Inf))), c(2, 3))
   # a size-1 vector must stay an array so that it is written as [x], not x
-  expect_equal(dim(init_default_param(spec("vector", NULL), 1, c(-Inf, Inf))), 1)
-  expect_null(dim(init_default_param(spec("real", NULL, dims = "1"), 1, c(-Inf, Inf))))
+  expect_equal(dim(init_default_param(spec("vector"), 1, c(-Inf, Inf))), 1)
+  expect_null(dim(init_default_param(spec("real", dims = "1"), 1, c(-Inf, Inf))))
   # the same holds for an array of reals, which the parser gives a trailing 1
-  real_array <- spec("real", NULL, dims = c("K", "1"), types = c("array", "real"))
+  real_array <- spec("real", dims = c("K", "1"), types = c("array", "real"))
   expect_equal(dim(init_default_param(real_array, c(1, 1), c(-Inf, Inf))), 1)
 })
 
 test_that("init_default_param() leaves unsupported declarations to the sampler", {
-  spec <- function(type, bounds) nlist(type, types = type, bounds, dims = "K")
-  expect_null(init_default_param(spec("ordered", NULL), 3, c(-Inf, Inf)))
+  spec <- list(type = "ordered", types = "ordered", dims = "K")
+  expect_null(init_default_param(spec, 3, c(-Inf, Inf)))
 })
 
 test_that("a simplex starts from Stan's stick-breaking draw", {
@@ -1325,9 +1325,13 @@ test_that("unit columns on a range wider than 1 keep the SD draws they had befor
 
 # Stan rejects a start on or past a bound, and puts one a rounding error inside
 # it at the far end of the unconstrained scale. A start keeps 0.01 times its
-# coefficient's shrink from the bound, and the shrink is 1 for a column reaching
-# at most 1 under an init range at least 1 wide on the link scale
-inside <- function(x, lower = -Inf, upper = Inf, margin = 0.01) all(x >= lower + margin & x <= upper - margin)
+# coefficient's shrink from the bound, or a twentieth of the interval between
+# two bounds where that is less. The shrink is 1 for a column reaching at most 1
+# under an init range at least 1 wide on the link scale, as in eta_model
+inside <- function(x, lower = -Inf, upper = Inf, shrink = 1) {
+  margin <- min(0.01 * shrink, (upper - lower) / 20)
+  all(x >= lower + margin & x <= upper - margin)
+}
 
 eta_model <- list(
   parameters = list(eta = ""), init_ranges = list(eta = c(2, 3)), links = list(eta = "identity")
@@ -1347,6 +1351,27 @@ test_that("solved coefficients start inside a bound set on the class (#694)", {
   expect_true(all(narrow > -1e-4 & narrow < 1e-4))
   # an intercept above the bound keeps its start in range
   expect_true(all(lower[1, ] >= 2 & lower[1, ] <= 3))
+})
+
+test_that("a bounded coefficient on a wide column moves by a step its column shrinks (#694)", {
+  withr::local_seed(694)
+  # a centred design (Kc_eta): coefficient k belongs to column k + 1 of X
+  sdata <- list(X_eta = cbind(Intercept = 1, small = rep(0:1, 20), wide = 1:40), Kc_eta = 2L)
+  b <- replicate(200, init_fixef_param("b_eta", "vector", 2, eta_model, sdata, c(0, Inf)))
+  expect_true(inside(b[1, ], lower = 0) && all(b[1, ] <= 0.1))
+  expect_true(inside(b[2, ], lower = 0, shrink = 1 / 40) && all(b[2, ] <= 0.1 / 40))
+})
+
+test_that("starts between close bounds spread strictly inside them (#694)", {
+  withr::local_seed(694)
+  close <- replicate(200, into_bounds(c(-1, 1), c(0, 0.02), 1))
+  expect_true(inside(close, lower = 0, upper = 0.02))
+  expect_gt(length(unique(close[1, ])), 1)
+  expect_gt(length(unique(close[2, ])), 1)
+  # four doubles apart, most steps fall below the spacing of the doubles
+  tiny <- c(1, 1 + 4 * .Machine$double.eps)
+  starts <- replicate(200, into_bounds(c(0, 2), tiny, 1))
+  expect_true(all(starts > tiny[1] & starts < tiny[2]))
 })
 
 test_that("a start well inside the bounds is the start without them (#694)", {
@@ -1385,7 +1410,8 @@ test_that("mo() coefficients start inside a bound set on the class (#694)", {
   sdata <- list(Jmo_kappa = 3L)
   bsp <- replicate(200, init_special_coef_param("bsp_kappa", "vector", 2, model, sdata, c(0, Inf)))
   # the range is log(2) wide on the log scale, and mo() reaches Jmo = 3
-  expect_true(inside(bsp, lower = 0, margin = 0.01 * log(2) / 3))
+  shrink <- log(2) / 3
+  expect_true(inside(bsp, lower = 0, shrink = shrink) && all(bsp <= 0.1 * shrink))
 })
 
 test_that("the inits of a fit with lb = 0 on b respect the bound (#694)", {
@@ -1397,47 +1423,60 @@ test_that("the inits of a fit with lb = 0 on b respect the bound (#694)", {
     user_prior = brms::prior(normal(0, 1), class = b, dpar = kappa, lb = 0)
   )
   inits <- lapply(1:50, function(i) init_fun())
-  expect_true(inside(unlist(lapply(inits, `[[`, "b_kappa")), lower = 0))
+  env <- environment(init_fun)
+  # the coefficients belong to every column of the centred design but the first
+  shrink <- apply(env$standata_list$X_kappa[, -1, drop = FALSE], 2, function(column) {
+    coef_shrink("kappa", column, env$model)
+  })
+  expect_true(inside(unlist(lapply(inits, `[[`, "b_kappa")), lower = 0, shrink = min(shrink)))
   expect_true(all(is.finite(unlist(inits))))
 })
 
-# SDs start at 0.05 to 0.1 when the columns and the init range leave the shrink
-# at 1, so a bound on either side of that interval binds every draw
+# SDs start at 0.05 to 0.1 times their shrink, so a bound on either side of
+# that interval binds every draw
 sd_starts <- function(formula, user_prior, sd_name, data = zhang_luck_2008) {
   init_fun <- configured_initfun(mixture2p(resp_error = "response_error"), formula, data, user_prior)
-  unlist(lapply(1:20, function(i) init_fun()[[sd_name]]))
+  env <- environment(init_fun)
+  list(
+    starts = unlist(lapply(1:20, function(i) init_fun()[[sd_name]])),
+    shrink = min(sd_entry_shrink(sd_name, env$model, env$standata_list))
+  )
 }
 
-test_that("group-level SDs start inside an upper bound set on the class (#694)", {
+test_that("group-level SDs start apart inside an upper bound set on the class (#694)", {
   withr::local_seed(694)
-  starts <- sd_starts(
-    bmf(kappa ~ 1 + (1 | subID), thetat ~ 1),
-    brms::prior(normal(0, 1), class = sd, dpar = kappa, ub = 0.02),
-    "sd_1"
-  )
-  expect_true(inside(starts, lower = 0, upper = 0.02))
+  for (ub in c(0.02, 0.04)) {
+    sd <- sd_starts(
+      bmf(kappa ~ 1 + (1 | subID), thetat ~ 1),
+      brms::set_prior("normal(0, 1)", class = "sd", dpar = "kappa", ub = ub),
+      "sd_1"
+    )
+    expect_true(inside(sd$starts, lower = 0, upper = ub, shrink = sd$shrink))
+    expect_gt(length(unique(sd$starts)), 1)
+  }
 })
 
 test_that("group-level SDs start inside a lower bound set on the class (#694)", {
   withr::local_seed(694)
-  starts <- sd_starts(
+  sd <- sd_starts(
     bmf(kappa ~ 1 + (1 | subID), thetat ~ 1),
     brms::prior(normal(0, 1), class = sd, dpar = kappa, lb = 0.5),
     "sd_1"
   )
-  expect_true(inside(starts, lower = 0.5))
-  expect_true(all(starts <= 0.6))
+  expect_true(inside(sd$starts, lower = 0.5, shrink = sd$shrink))
+  expect_true(all(sd$starts <= 0.5 + 0.1 * sd$shrink))
 })
 
 test_that("the SDs of an s() term start inside a bound set on the class (#694)", {
   withr::local_seed(694)
   dat <- zhang_luck_2008
   dat$z <- dat$trial / 100
-  starts <- sd_starts(
+  sds <- sd_starts(
     bmf(kappa ~ 1 + s(z, k = 4), thetat ~ 1),
     brms::prior(normal(0, 1), class = sds, dpar = kappa, ub = 0.02),
     "sds_kappa_1",
     dat
   )
-  expect_true(inside(starts, lower = 0, upper = 0.02))
+  expect_true(inside(sds$starts, lower = 0, upper = 0.02, shrink = sds$shrink))
+  expect_gt(length(unique(sds$starts)), 1)
 })
