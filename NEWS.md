@@ -35,6 +35,7 @@
 * mixture2p, mixture3p and imm: their parameters are now distributional, so priors take `dpar =` instead of `nlpar =`, and an intercept prior takes `class = "Intercept"`, e.g. `set_prior("normal(2, 1)", class = "Intercept", dpar = "kappa")`. Priors written for bmm 1.4 still work until bmm 1.6.0 at the earliest, and the warning prints the new code. Under an intercept and predictors, an intercept prior now applies at the mean of the predictors. See "Priors from bmm 1.4" in `?mixture2p` (#434).
 * `emmeans()` on mixture2p, mixture3p and imm fits: `nlpar = "kappa"` and `dpar = "mu1"` still work, with a warning, until bmm 1.6.0 at the earliest; write `dpar = "kappa"` and `dpar = "mu"`. Calls that go straight to brms, such as `posterior_linpred(fit, nlpar = "kappa")`, are not translated and need `dpar =` (#434).
 * `dmixture2p()`, `dmixture3p()` and `dimm()`: passing `log` by position is deprecated, because `tau` now takes that position. Until bmm 1.6.0 a logical value there is still read as `log`, with a warning; write `log = TRUE` instead (#398).
+* `pmixture2p()`, `qmixture2p()`, `pmixture3p()`, `qmixture3p()`, `pimm()` and `qimm()` are removed. They were never implemented and always stopped with an error (#556).
 
 ### Changes to default priors
 <!-- From 1.5.0 every change to a default prior is listed here (ADR 0008 § D4); defaults do not change inside a minor line. -->
