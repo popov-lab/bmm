@@ -2,16 +2,10 @@
 # MODELS                                                                 ####
 ############################################################################# !
 
-.imm_cd_citation <- paste(
-  "Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual working",
-  "memory: Applications to the change detection task. Cognitive Psychology,",
-  "133, Article 101463. https://doi.org/10.1016/j.cogpsych.2022.101463"
-)
-
 # The retrieval side is imm's version table, so the two models share their
 # parameter names, links, priors and inits; a joint fit of both tasks relies on
 # that. Only criterion is added.
-.model_imm_cd <- function(response = NULL, probe = NULL, target = NULL,
+.model_imm_cd <- function(response = NULL, probe = NULL,
                           nt_features = NULL, nt_distances = NULL,
                           set_size = NULL, regex = FALSE, version = "full",
                           variable_precision = FALSE, knowledge = "limited",
@@ -22,7 +16,7 @@
 
   out <- structure(
     list(
-      resp_vars = nlist(response, probe, target),
+      resp_vars = nlist(response, probe),
       other_vars = nlist(nt_features, nt_distances, set_size),
       domain = "Working memory",
       task = "Detection, recognition and confidence judgments",
@@ -33,16 +27,16 @@
           of visual working memory. Psychological Review, 124(1), 21-59. \\
           https://doi.org/10.1037/rev0000044"
         ),
-        .imm_cd_citation
+        .cd_citation
       ),
       version = version,
       # paste0() rather than glue(), which would trim the indent that keeps
       # the requirements in one list
       requirements = paste0(
         "- The response variable should be coded 0 ('same') and 1 ('change')\n",
-        "  - The probe and the target should be in radians: the feature shown ",
-        "at test, and the feature shown at the probed location in the memory ",
-        "array\n",
+        "  - The probe should be in radians and relative to the target: the ",
+        "feature shown at test minus the feature shown at the probed location, ",
+        "which is 0 on a 'same' trial\n",
         "  - The non-target features should be in radians and be centered ",
         "relative to the target",
         if (version != "abc") {
@@ -82,6 +76,8 @@ settable_links.imm_cd <- function(model) {
 
 #' @title `r .model_imm_cd()$name`
 #' @name imm_cd
+#' @description Fits the interference measurement model of [imm()] to the
+#'   "same" or "change" responses of a single-probe change-detection task.
 #' @details `r model_docs(.model_imm_cd(), components = c('domain', 'task', 'name', 'citation'))`
 #' #### Version: `full`
 #' `r model_docs(.model_imm_cd(version = "full"), components = c('requirements', 'parameters', 'fixed_parameters', 'links', 'prior'))`
@@ -140,11 +136,10 @@ settable_links.imm_cd <- function(model) {
 #' @param response The name of the variable in the dataset containing the
 #'   change-detection response, coded 0 ("same") and 1 ("change"). A logical
 #'   variable is accepted and coded `TRUE` = "change".
-#' @param probe The name of the variable containing the feature shown at test,
-#'   in radians.
-#' @param target The name of the variable containing the feature shown at the
-#'   probed location in the memory array, in radians. On "same" trials it
-#'   equals the probe.
+#' @param probe The name of the variable containing the probe in radians,
+#'   relative to the target: the feature shown at test minus the feature shown
+#'   at the probed location in the memory array, as [wrap()] returns it. It is 0
+#'   on "same" trials.
 #' @param nt_features A character vector with the names of the non-target
 #'   feature values. The non-target feature values should be in radians and
 #'   centered relative to the target. Alternatively, if `regex = TRUE`, a
@@ -176,8 +171,11 @@ settable_links.imm_cd <- function(model) {
 #'   under variable precision; their comparison for the interference model
 #'   concerned a different knowledge, whether the target is in the focus of
 #'   attention, which [imm()] does not model, and favoured the rich observer.
-#' @param links A named list of link functions for the model parameters. The
-#'   link of `b` cannot be changed, because `b` is fixed on its log scale.
+#'   `"rich"` warns, because it has no effect in any version yet.
+#' @param links A named list of link functions for the model parameters, e.g.
+#'   `list(kappa = "softplus")`. The link of `b` cannot be changed, because `b`
+#'   is fixed on its log scale, nor that of `criterion`, because its fixed value
+#'   and its bound are written for the identity scale.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @keywords bmmodel
@@ -190,38 +188,45 @@ settable_links.imm_cd <- function(model) {
 #'   working memory: Applications to the change detection task. Cognitive
 #'   Psychology, 133, 101463. \doi{10.1016/j.cogpsych.2022.101463}
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
-#' # three items at random distances from the target; a third of the probes
-#' # show the target, a third the first non-target and a third a new colour
+#' # three items at random distances from the target, every feature relative
+#' # to the target: a third of the probes show the target (a probe of 0), a
+#' # third the first non-target and a third a new colour
 #' n <- 1500
-#' dat <- data.frame(
-#'   target = 0, nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi),
-#'   dist1 = runif(n, 0.3, 2), dist2 = runif(n, 0.3, 2),
+#' design <- data.frame(
+#'   nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi),
+#'   dist1 = runif(n, 0.3, 2), dist2 = runif(n, 0.3, 2), set_size = 3,
 #'   type = rep(c("same", "intrusion", "new"), length.out = n)
 #' )
-#' dat$probe <- ifelse(dat$type == "same", 0,
-#'   ifelse(dat$type == "intrusion", dat$nt1, runif(n, -pi, pi))
+#' design$probe <- ifelse(design$type == "same", 0,
+#'   ifelse(design$type == "intrusion", design$nt1, runif(n, -pi, pi))
 #' )
-#' dat$change <- vapply(seq_len(n), function(i) {
-#'   rimm_cd(1, dat$probe[i],
-#'     mu = c(0, dat$nt1[i], dat$nt2[i]), dist = c(0, dat$dist1[i], dat$dist2[i]),
-#'     c = 4, a = 0.5, b = 1, s = 2, kappa = 8
-#'   )
-#' }, numeric(1))
+#' model <- imm_cd(
+#'   response = "change", probe = "probe",
+#'   nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
+#'   set_size = "set_size"
+#' )
+#' dat <- simulate_data(model,
+#'   pars = list(kappa = 2, c = 1.4, a = -0.7, s = 0.7), design = design
+#' )
 #'
 #' fit <- bmm(
 #'   formula = bmmformula(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1),
 #'   data = dat,
-#'   model = imm_cd(
-#'     response = "change", probe = "probe", target = "target",
-#'     nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
-#'     set_size = 3
-#'   ),
+#'   model = model,
 #'   cores = 4,
 #'   iter = 500,
 #'   backend = "cmdstanr"
 #' )
+#'
+#' # "bsc" has no `a` and "abc" no `s`, nor distances; criterion is estimated
+#' # once it has a formula
+#' bsc <- imm_cd("change", "probe", c("nt1", "nt2"), c("dist1", "dist2"), "set_size",
+#'   version = "bsc"
+#' )
+#' abc <- imm_cd("change", "probe", c("nt1", "nt2"), set_size = "set_size", version = "abc")
+#' abc_formula <- bmmformula(kappa ~ 1, c ~ 1, a ~ 1, criterion ~ 1)
 #' @export
-imm_cd <- function(response, probe, target, nt_features, nt_distances, set_size,
+imm_cd <- function(response, probe, nt_features, nt_distances, set_size,
                    regex = FALSE, version = c("full", "bsc", "abc"),
                    variable_precision = FALSE, knowledge = c("limited", "rich"),
                    links = NULL, ...) {
@@ -232,9 +237,10 @@ imm_cd <- function(response, probe, target, nt_features, nt_distances, set_size,
   if (version == "abc") nt_distances <- NULL
   stop_missing_args()
   .cd_check_variable_precision(variable_precision)
+  .cd_warn_inert_knowledge(knowledge, version, acts = FALSE)
 
   .model_imm_cd(
-    response = response, probe = probe, target = target,
+    response = response, probe = probe,
     nt_features = nt_features, nt_distances = nt_distances,
     set_size = set_size, regex = regex, version = version,
     variable_precision = variable_precision, knowledge = knowledge,
@@ -252,7 +258,7 @@ check_data.imm_cd <- function(model, data, formula) {
   stopif(
     anyNA(data$ss_numeric),
     "The set size variable '{model$other_vars$set_size}' contains missing \\
-    values."
+    values. Remove the trials without a set size before fitting."
   )
   NextMethod("check_data")
 }
@@ -283,11 +289,11 @@ check_formula.imm_cd <- function(model, data, formula) {
 # CONFIGURE_MODEL METHODS                                                ####
 ############################################################################# !
 
-# probe_centered comes first, so the wrapper receives it as vreal1; the
-# non-target features and distances follow as for imm()
+# the probe comes first, so the wrapper receives it as vreal1; the non-target
+# features and distances follow as for imm()
 #' @export
 bmf2bf.imm_cd <- function(model, formula) {
-  covariates <- c("probe_centered", model$other_vars$nt_features)
+  covariates <- c(model$resp_vars$probe, model$other_vars$nt_features)
   if (.imm_version_spec(model$version)$needs_distances) {
     covariates <- c(covariates, model$other_vars$nt_distances)
   }
@@ -405,7 +411,7 @@ simulate_data.imm_cd <- function(model, pars, design = NULL,
   vars <- model$resp_vars
   other <- model$other_vars
   design <- .design_or_n(
-    model, design, c(vars$probe, vars$target, .set_size_column(model)),
+    model, design, c(vars$probe, .set_size_column(model)),
     ragged = c(other$nt_features, other$nt_distances)
   )
   sim <- .simulate_pars(model, pars, design, scale)
@@ -414,7 +420,7 @@ simulate_data.imm_cd <- function(model, pars, design = NULL,
   .check_nt_na(design, other$nt_features, set_size)
   .check_nt_na(design, other$nt_distances, set_size)
   y <- .imm_cd_observe(
-    probe = wrap(design[[vars$probe]] - design[[vars$target]]),
+    probe = wrap(design[[vars$probe]]),
     mu = p$mu, nt = unname(as.matrix(design[other$nt_features])),
     dist = if (length(other$nt_distances)) unname(as.matrix(design[other$nt_distances])),
     set_size = set_size, kappa = p$kappa, c = p$c, a = p$a, s = p$s, b = p$b,

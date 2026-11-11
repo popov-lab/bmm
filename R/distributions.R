@@ -1117,8 +1117,6 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   parameter: 0, the default, is the unbiased observer, and other values are
 #'   kept inside each trial's range of evidence as in the model (see the
 #'   section "Decision criterion" of [imm_cd()]).
-#' @param variable_precision Must be `FALSE`; variable precision is planned
-#'   for bmm 1.6.0.
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
 #'
 #' @details "Change" is the response when the retrieved feature falls outside
@@ -1129,7 +1127,8 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #'   over that arc. `rimm_cd()` draws the remembered feature of every trial and
 #'   lets the observer decide on it, so it does not use `dimm_cd()`. As for
 #'   [dimm()], these functions take the full model; the versions `"bsc"` and
-#'   `"abc"` of [imm_cd()] correspond to `a = 0` and to `s = Inf`.
+#'   `"abc"` of [imm_cd()] correspond to `a = 0` and to the limit of a large
+#'   `s` (for example `s = 1e3`; `Inf` itself is not evaluated).
 #'
 #' @keywords distribution
 #'
@@ -1155,8 +1154,8 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' ))
 dimm_cd <- function(response, probe, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                     c = 5, a = 2, b = 1, s = 2, kappa = 5, criterion = 0,
-                    variable_precision = FALSE, log = FALSE) {
-  .cd_check_variable_precision(variable_precision)
+                    log = FALSE) {
+  .cd_check_criterion(criterion, has_log = TRUE)
   .check_imm_args(kappa, s, dist, 0, length(mu))
   stopif(!all(response %in% c(0, 1)), "response must be 0 ('same') or 1 ('change').")
 
@@ -1178,9 +1177,9 @@ dimm_cd <- function(response, probe, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' @rdname imm_cd_dist
 #' @export
 rimm_cd <- function(n, probe, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                    c = 5, a = 2, b = 1, s = 2, kappa = 5, criterion = 0,
-                    variable_precision = FALSE) {
-  .cd_check_variable_precision(variable_precision)
+                    c = 5, a = 2, b = 1, s = 2, kappa = 5, criterion = 0) {
+  .cd_check_n(n)
+  .cd_check_criterion(criterion)
   .check_imm_args(kappa, s, dist, 0, length(mu))
   set_size <- length(mu)
   .imm_cd_observe(

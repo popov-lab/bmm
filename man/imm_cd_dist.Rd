@@ -18,7 +18,6 @@ dimm_cd(
   s = 2,
   kappa = 5,
   criterion = 0,
-  variable_precision = FALSE,
   log = FALSE
 )
 
@@ -32,8 +31,7 @@ rimm_cd(
   b = 1,
   s = 2,
   kappa = 5,
-  criterion = 0,
-  variable_precision = FALSE
+  criterion = 0
 )
 }
 \arguments{
@@ -63,9 +61,6 @@ parameter: 0, the default, is the unbiased observer, and other values are
 kept inside each trial's range of evidence as in the model (see the
 section "Decision criterion" of \code{\link[=imm_cd]{imm_cd()}}).}
 
-\item{variable_precision}{Must be \code{FALSE}; variable precision is planned
-for bmm 1.6.0.}
-
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
 \item{n}{Number of observations to generate data for}
@@ -90,7 +85,8 @@ Oberauer, 2022, Appendix B). \code{dimm_cd()} integrates the retrieval mixture
 over that arc. \code{rimm_cd()} draws the remembered feature of every trial and
 lets the observer decide on it, so it does not use \code{dimm_cd()}. As for
 \code{\link[=dimm]{dimm()}}, these functions take the full model; the versions \code{"bsc"} and
-\code{"abc"} of \code{\link[=imm_cd]{imm_cd()}} correspond to \code{a = 0} and to \code{s = Inf}.
+\code{"abc"} of \code{\link[=imm_cd]{imm_cd()}} correspond to \code{a = 0} and to the limit of a large
+\code{s} (for example \code{s = 1e3}; \code{Inf} itself is not evaluated).
 }
 \examples{
 # P("change") for a probe at the target, at a near and at a far non-target,

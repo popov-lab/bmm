@@ -1,5 +1,5 @@
 cdimm_model <- function(version = "full", ...) {
-  imm_cd("change", "probe", "target", nt_features = paste0("col_nt", 1:7),
+  imm_cd("change", "probe", nt_features = paste0("col_nt", 1:7),
          nt_distances = paste0("dist_nt", 1:7), set_size = "set_size", version = version, ...)
 }
 
@@ -19,8 +19,8 @@ vm_mass <- function(lo, hi, mu, kappa) {
 }
 
 test_that("imm_cd() validates its arguments", {
-  expect_error(imm_cd("r", "p", "t", nt_features = "nt", set_size = 2), "nt_distances")
-  expect_no_error(imm_cd("r", "p", "t", nt_features = "nt", set_size = 2, version = "abc"))
+  expect_error(imm_cd("r", "p", nt_features = "nt", set_size = 2), "nt_distances")
+  expect_no_error(imm_cd("r", "p", nt_features = "nt", set_size = 2, version = "abc"))
   expect_error(cdimm_model(version = "slot"), "should be one of")
   expect_error(cdimm_model(knowledge = "partial"), "should be one of")
   expect_error(cdimm_model(variable_precision = TRUE), "planned for bmm 1.6.0")
@@ -48,7 +48,10 @@ test_that("imm_cd() takes imm's parameters, priors, links and inits, plus criter
       exact = TRUE
     )
   }
-  expect_identical(cdimm_model(knowledge = "rich")$knowledge, "rich")
+  # one precision state in every version, so the rich observer is announced
+  # as having no effect
+  expect_warning(rich <- cdimm_model(knowledge = "rich"), "no effect in the 'full' version")
+  expect_identical(rich$knowledge, "rich")
   expect_identical(cdimm_model()$knowledge, "limited")
   expect_identical(cdimm_model()$task, "Detection, recognition and confidence judgments")
   expect_identical(cdimm_model()$domain, "Working memory")
@@ -57,7 +60,7 @@ test_that("imm_cd() takes imm's parameters, priors, links and inits, plus criter
   # order; knowledge sits after variable_precision, before links (CD-D1 F1)
   expect_identical(
     names(formals(imm_cd)),
-    c("response", "probe", "target", "nt_features", "nt_distances", "set_size", "regex",
+    c("response", "probe", "nt_features", "nt_distances", "set_size", "regex",
       "version", "variable_precision", "knowledge", "links", "...")
   )
 })
@@ -83,9 +86,17 @@ test_that("criterion's init range starts on the linear part of its bound", {
 })
 
 test_that("dimm_cd() and rimm_cd() refuse what they cannot evaluate", {
-  expect_error(dimm_cd(1, 0.5, variable_precision = TRUE), "planned for bmm 1.6.0")
-  expect_error(rimm_cd(5, 0.5, variable_precision = TRUE), "planned for bmm 1.6.0")
-  expect_error(dimm_cd(1, 0.5, variable_precision = NA), "TRUE or FALSE")
+  # `log` passed by position, after the memory parameters, lands on criterion
+  expect_error(
+    dimm_cd(1, 0.5, c(0, 2, -1.5), c(0, 0.5, 2), 5, 2, 1, 2, 5, TRUE),
+    "Did you mean log = TRUE"
+  )
+  expect_error(rimm_cd(5, 0.5, criterion = TRUE), "criterion must be numeric")
+  expect_true(is.na(dimm_cd(1, 0.5, criterion = NA)))
+  for (n in list(2.5, c(2, 3), 0, "3")) {
+    expect_error(rimm_cd(n, 0.5), "single positive whole number")
+  }
+  expect_error(cdimm_model(links = list(criterion = "log")), "'criterion' cannot be changed")
   expect_error(dimm_cd(2, 0.5), "response must be 0")
   expect_error(dimm_cd(NA, 0.5), "response must be 0")
   expect_error(dimm_cd(1, 0.5, kappa = -1), "non-negative")
@@ -192,7 +203,7 @@ test_that("check_data() refuses a missing set size and checks the distances as i
   negative <- data
   negative$dist_nt1[negative$set_size > 1][1] <- -1
   expect_error(check_data(cdimm_model(), negative, cdimm_formulas$full), "postive")
-  few <- imm_cd("change", "probe", "target", nt_features = paste0("col_nt", 1:7),
+  few <- imm_cd("change", "probe", nt_features = paste0("col_nt", 1:7),
                 nt_distances = paste0("dist_nt", 1:6), set_size = "set_size")
   expect_error(check_data(few, data, cdimm_formulas$full), "max\\(set_size\\)-1")
   # abc reads no distances
@@ -242,7 +253,8 @@ test_that("the generated program passes the set size as an integer, the probe, n
            "to_vector({dist1, dist2, dist3, dist4, dist5, dist6, dist7}), 0, circmix_logk"),
     fixed = TRUE
   )
-  code <- stancode(cdimm_formulas$abc, data, cdimm_model("abc", knowledge = "rich"))
+  expect_warning(rich <- cdimm_model("abc", knowledge = "rich"), "no effect")
+  code <- stancode(cdimm_formulas$abc, data, rich)
   expect_match(code, "ss, probe, to_vector({nt1, nt2, nt3, nt4, nt5, nt6, nt7}), 1, circmix_logk",
                fixed = TRUE)
 })
@@ -284,8 +296,8 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   # two items, the probe on the non-target: P("change") by integrate() over
   # the unbiased arc, with c = 2, a = 0.5, s = 1 at distance 0.7 and b = 1
   n <- 6e4
-  design <- data.frame(target = 0.5, probe = 2.5, nt1 = 2, dist1 = 0.7, set_size = 2)[rep(1, n), ]
-  model <- imm_cd("change", "probe", "target", nt_features = "nt1", nt_distances = "dist1",
+  design <- data.frame(probe = 2, nt1 = 2, dist1 = 0.7, set_size = 2)[rep(1, n), ]
+  model <- imm_cd("change", "probe", nt_features = "nt1", nt_distances = "dist1",
                   set_size = "set_size")
   data <- simulate_data(model, list(kappa = log(6), c = log(2), a = log(0.5), s = 0), design)
   activation <- c(2.5, 2 * exp(-0.7) + 0.5)
@@ -303,7 +315,7 @@ test_that("the generated likelihood passes each parameter to its place in the co
   data <- imm_cd_data()
   data <- data[as.numeric(as.character(data$set_size)) <= 3, ]
   model_for <- function(version, knowledge) {
-    imm_cd("change", "probe", "target", nt_features = c("col_nt1", "col_nt2"),
+    imm_cd("change", "probe", nt_features = c("col_nt1", "col_nt2"),
            nt_distances = c("dist_nt1", "dist_nt2"), set_size = "set_size", version = version,
            knowledge = knowledge)
   }
@@ -325,7 +337,8 @@ test_that("the generated likelihood passes each parameter to its place in the co
   for (name in names(cases)) {
     case <- cases[[name]]
     knowledge <- case$knowledge %||% "limited"
-    model <- model_for(case$version, knowledge)
+    # the rich case warns that it has no effect, which is what it is here for
+    model <- suppressWarnings(model_for(case$version, knowledge))
     formula <- cdimm_formulas[[case$version]]
     family <- paste0("imm_cd_", case$version)
     configured <- suppressWarnings(configure_model(model, check_data(model, data, formula), formula))

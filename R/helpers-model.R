@@ -653,16 +653,14 @@ data_column_roles <- list(
   ),
   imm_cd = c(
     response = "0 = 'same', 1 = 'change'",
-    probe = "feature shown at test, in radians",
-    target = "feature shown at the probed location, in radians",
+    probe = "probe relative to the target, in radians (0 on a 'same' trial)",
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     nt_distances = "distance of each non-target to the target, one column per non-target",
     set_size = "set size (a column, or one number)"
   ),
   imm_cd_abc = c(
     response = "0 = 'same', 1 = 'change'",
-    probe = "feature shown at test, in radians",
-    target = "feature shown at the probed location, in radians",
+    probe = "probe relative to the target, in radians (0 on a 'same' trial)",
     nt_features = "non-target features relative to the target, in radians, one column per non-target",
     nt_distances = NA,
     set_size = "set size (a column, or one number)"

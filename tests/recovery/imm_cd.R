@@ -66,8 +66,9 @@ imm_cd_generator <- function(pars, n_trials, model) {
     rep(0, n_trials)
   }
 
-  out <- data.frame(as.integer(llr > bounded), wrap(probe), wrap(target))
-  names(out) <- unlist(model$resp_vars[c("response", "probe", "target")], use.names = FALSE)
+  # the model reads every feature relative to the target
+  out <- data.frame(as.integer(llr > bounded), wrap(probe - target))
+  names(out) <- unlist(model$resp_vars[c("response", "probe")], use.names = FALSE)
   out[nt_names] <- wrap(nt_abs - target)
   out[dist_names] <- distance
   out[[model$other_vars$set_size]] <- set_size
@@ -76,7 +77,7 @@ imm_cd_generator <- function(pars, n_trials, model) {
 
 bmmtools::validation_plan(
   bmm::imm_cd(
-    response = "change", probe = "probe", target = "target",
+    response = "change", probe = "probe",
     nt_features = c("nt1", "nt2", "nt3"), nt_distances = c("dist1", "dist2", "dist3"),
     set_size = "set_size"
   ),

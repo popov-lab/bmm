@@ -7,7 +7,6 @@
 imm_cd(
   response,
   probe,
-  target,
   nt_features,
   nt_distances,
   set_size,
@@ -24,12 +23,10 @@ imm_cd(
 change-detection response, coded 0 ("same") and 1 ("change"). A logical
 variable is accepted and coded \code{TRUE} = "change".}
 
-\item{probe}{The name of the variable containing the feature shown at test,
-in radians.}
-
-\item{target}{The name of the variable containing the feature shown at the
-probed location in the memory array, in radians. On "same" trials it
-equals the probe.}
+\item{probe}{The name of the variable containing the probe in radians,
+relative to the target: the feature shown at test minus the feature shown
+at the probed location in the memory array, as \code{\link[=wrap]{wrap()}} returns it. It is 0
+on "same" trials.}
 
 \item{nt_features}{A character vector with the names of the non-target
 feature values. The non-target feature values should be in radians and
@@ -67,10 +64,13 @@ precision, so until then \code{knowledge} does not change its predictions. Lin
 and Oberauer (2022) found the limited observer described their data better
 under variable precision; their comparison for the interference model
 concerned a different knowledge, whether the target is in the focus of
-attention, which \code{\link[=imm]{imm()}} does not model, and favoured the rich observer.}
+attention, which \code{\link[=imm]{imm()}} does not model, and favoured the rich observer.
+\code{"rich"} warns, because it has no effect in any version yet.}
 
-\item{links}{A named list of link functions for the model parameters. The
-link of \code{b} cannot be changed, because \code{b} is fixed on its log scale.}
+\item{links}{A named list of link functions for the model parameters, e.g.
+\code{list(kappa = "softplus")}. The link of \code{b} cannot be changed, because \code{b}
+is fixed on its log scale, nor that of \code{criterion}, because its fixed value
+and its bound are written for the identity scale.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -78,7 +78,8 @@ link of \code{b} cannot be changed, because \code{b} is fixed on its log scale.}
 An object of class \code{bmmodel}
 }
 \description{
-Interference Measurement Model for Change Detection
+Fits the interference measurement model of \code{\link[=imm]{imm()}} to the
+"same" or "change" responses of a single-probe change-detection task.
 }
 \details{
 \itemize{
@@ -88,7 +89,7 @@ Interference Measurement Model for Change Detection
 \item \strong{Citation:}
 \itemize{
 \item Oberauer, K., & Lin, H.-Y. (2017). An interference model of visual working memory. Psychological Review, 124(1), 21-59. https://doi.org/10.1037/rev0000044
-\item Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual working memory: Applications to the change detection task. Cognitive Psychology, 133, Article 101463. https://doi.org/10.1016/j.cogpsych.2022.101463
+\item Lin, H.-Y., & Oberauer, K. (2022). An interference model for visual working memory: Applications to the change detection task. Cognitive Psychology, 133, 101463. https://doi.org/10.1016/j.cogpsych.2022.101463
 }
 }
 \subsection{Version: \code{full}}{
@@ -96,14 +97,14 @@ Interference Measurement Model for Change Detection
 \item \strong{Requirements:}
 \itemize{
 \item The response variable should be coded 0 ('same') and 1 ('change')
-\item The probe and the target should be in radians: the feature shown at test, and the feature shown at the probed location in the memory array
+\item The probe should be in radians and relative to the target: the feature shown at test minus the feature shown at the probed location, which is 0 on a 'same' trial
 \item The non-target features should be in radians and be centered relative to the target
 \item The non-target distances should be positive, in the unit the spatial gradient \code{s} is to be read in
 }
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of the retrieved feature. Unlike in continuous reproduction, it holds no response noise.
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
@@ -173,14 +174,14 @@ Interference Measurement Model for Change Detection
 \item \strong{Requirements:}
 \itemize{
 \item The response variable should be coded 0 ('same') and 1 ('change')
-\item The probe and the target should be in radians: the feature shown at test, and the feature shown at the probed location in the memory array
+\item The probe should be in radians and relative to the target: the feature shown at test minus the feature shown at the probed location, which is 0 on a 'same' trial
 \item The non-target features should be in radians and be centered relative to the target
 \item The non-target distances should be positive, in the unit the spatial gradient \code{s} is to be read in
 }
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of the retrieved feature. Unlike in continuous reproduction, it holds no response noise.
 \item \code{c}: Context activation
 \item \code{s}: Spatial similarity gradient
 \item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
@@ -243,13 +244,13 @@ Interference Measurement Model for Change Detection
 \item \strong{Requirements:}
 \itemize{
 \item The response variable should be coded 0 ('same') and 1 ('change')
-\item The probe and the target should be in radians: the feature shown at test, and the feature shown at the probed location in the memory array
+\item The probe should be in radians and relative to the target: the feature shown at test minus the feature shown at the probed location, which is 0 on a 'same' trial
 \item The non-target features should be in radians and be centered relative to the target
 }
 \item \strong{Parameters:}
 \itemize{
-\item \code{mu}: Location of the von Mises distribution of memory responses (in radians). Fixed internally to 0 by default.
-\item \code{kappa}: Concentration of the von Mises distribution of memory responses
+\item \code{mu}: Location of the von Mises distribution of the retrieved feature (in radians). Fixed internally to 0 by default.
+\item \code{kappa}: Concentration of the von Mises distribution of the retrieved feature. Unlike in continuous reproduction, it holds no response noise.
 \item \code{a}: General activation of memory items
 \item \code{c}: Context activation
 \item \code{b}: Background activation, the reference against which the activations of the target and the non-targets are weighed. Fixed internally to 0 on its log scale, i.e. to an activation of 1; freeing it leaves the remaining activations unidentified, since only their ratio to the background enters the likelihood.
@@ -360,36 +361,43 @@ criterion; bmm prints a message when the criterion is estimated.
 
 \examples{
 \dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
-# three items at random distances from the target; a third of the probes
-# show the target, a third the first non-target and a third a new colour
+# three items at random distances from the target, every feature relative
+# to the target: a third of the probes show the target (a probe of 0), a
+# third the first non-target and a third a new colour
 n <- 1500
-dat <- data.frame(
-  target = 0, nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi),
-  dist1 = runif(n, 0.3, 2), dist2 = runif(n, 0.3, 2),
+design <- data.frame(
+  nt1 = runif(n, -pi, pi), nt2 = runif(n, -pi, pi),
+  dist1 = runif(n, 0.3, 2), dist2 = runif(n, 0.3, 2), set_size = 3,
   type = rep(c("same", "intrusion", "new"), length.out = n)
 )
-dat$probe <- ifelse(dat$type == "same", 0,
-  ifelse(dat$type == "intrusion", dat$nt1, runif(n, -pi, pi))
+design$probe <- ifelse(design$type == "same", 0,
+  ifelse(design$type == "intrusion", design$nt1, runif(n, -pi, pi))
 )
-dat$change <- vapply(seq_len(n), function(i) {
-  rimm_cd(1, dat$probe[i],
-    mu = c(0, dat$nt1[i], dat$nt2[i]), dist = c(0, dat$dist1[i], dat$dist2[i]),
-    c = 4, a = 0.5, b = 1, s = 2, kappa = 8
-  )
-}, numeric(1))
+model <- imm_cd(
+  response = "change", probe = "probe",
+  nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
+  set_size = "set_size"
+)
+dat <- simulate_data(model,
+  pars = list(kappa = 2, c = 1.4, a = -0.7, s = 0.7), design = design
+)
 
 fit <- bmm(
   formula = bmmformula(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1),
   data = dat,
-  model = imm_cd(
-    response = "change", probe = "probe", target = "target",
-    nt_features = c("nt1", "nt2"), nt_distances = c("dist1", "dist2"),
-    set_size = 3
-  ),
+  model = model,
   cores = 4,
   iter = 500,
   backend = "cmdstanr"
 )
+
+# "bsc" has no `a` and "abc" no `s`, nor distances; criterion is estimated
+# once it has a formula
+bsc <- imm_cd("change", "probe", c("nt1", "nt2"), c("dist1", "dist2"), "set_size",
+  version = "bsc"
+)
+abc <- imm_cd("change", "probe", c("nt1", "nt2"), set_size = "set_size", version = "abc")
+abc_formula <- bmmformula(kappa ~ 1, c ~ 1, a ~ 1, criterion ~ 1)
 \dontshow{\}) # examplesIf}
 }
 \references{

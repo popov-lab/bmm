@@ -5,33 +5,32 @@
 # trial has one (an intrusion probe) and a new colour
 imm_cd_data <- function() {
   data <- small_data()
-  data$target <- data$dev_rad
   type <- rep_len(1:3, nrow(data))
   intrusion <- type == 2 & as.numeric(as.character(data$set_size)) > 1
   offset <- ifelse(intrusion, data$col_nt1, c(0, 0, 1.5)[type])
-  data$probe <- wrap(data$target + offset)
+  data$probe <- offset
   data$change <- rep_len(c(0L, 1L, 1L, 0L, 1L), nrow(data))
   data
 }
 
 model_cases_imm_cd <- function() {
   cdimm <- function(version = "full") {
-    imm_cd("change", "probe", "target", nt_features = paste0("col_nt", 1:7),
+    imm_cd("change", "probe", nt_features = paste0("col_nt", 1:7),
            nt_distances = paste0("dist_nt", 1:7), set_size = "set_size", version = version)
   }
   model <- cdimm()
   re_formula <- bmf(kappa ~ 1 + (1 | ID), c ~ 1 + (1 | ID), a ~ 1 + (1 | ID), s ~ 1 + (1 | ID),
                     criterion ~ 1 + (1 | ID))
   abc_formula <- bmf(kappa ~ 1 + (1 | ID), c ~ 1 + (1 | ID), a ~ 1 + (1 | ID))
-  # one row per trial: displays of set size 1 to 3, the probe and the target
+  # one row per trial: displays of set size 1 to 3, and the probe relative to
+  # the target
   design <- nt_display_design()
-  design$target <- rep_len(c(0, 1), nrow(design))
-  design$probe <- rep_len(c(0, 1, 2.5, -1), nrow(design))
+  design$probe <- rep_len(c(0, 0, 2.5, -2), nrow(design))
   # b is fixed to 0 on its log link, so it reaches simulate_pars as 0
   simulate_case <- function(version, pars, formula) {
     distances <- if (version != "abc") c("dist1", "dist2")
     list(
-      model = imm_cd("change", "probe", "target", nt_features = c("nt1", "nt2"),
+      model = imm_cd("change", "probe", nt_features = c("nt1", "nt2"),
                      nt_distances = distances, set_size = "set_size", version = version),
       pars = pars, design = if (version == "abc") design[setdiff(names(design), c("dist1", "dist2"))] else design,
       formula = formula,
@@ -69,8 +68,8 @@ model_cases_imm_cd <- function() {
                         data = imm_cd_data())
     ),
     links = list(
-      imm_cd = list(model = model, settable = c("mu", "kappa", "a", "c", "s", "criterion")),
-      imm_cd_bsc = list(model = cdimm("bsc"), settable = c("mu", "kappa", "c", "s", "criterion"))
+      imm_cd = list(model = model, settable = c("mu", "kappa", "a", "c", "s")),
+      imm_cd_bsc = list(model = cdimm("bsc"), settable = c("mu", "kappa", "c", "s"))
     ),
     simulate = list(
       imm_cd_full = simulate_case(
