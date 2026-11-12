@@ -100,7 +100,8 @@
         criterion = c(0, 1),
         bias      = c(-0.5, 0.5),
         sdratio   = c(0.75, 1.35)
-      )
+      ),
+      functions = list(density = "dsdt_yn", generator = "rsdt_yn")
     ),
     class = c("bmmodel", "sdt", "sdt_yn"),
     call = call

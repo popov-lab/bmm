@@ -232,6 +232,7 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'   parameter and columns: \code{parameter}, \code{description},
 #'   \code{fixed}, \code{value}, and \code{link}.
 #'
+#' @family model information
 #' @keywords extract_info
 #' @export
 #' @examples

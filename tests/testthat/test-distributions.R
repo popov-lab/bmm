@@ -426,6 +426,39 @@ test_that("dmixture3p recycles its parameters to the longest argument", {
   )
 })
 
+# model_spec() names dmixture3p() as the density of every mixture3p version, but
+# one kappa cannot give the per-item precision of slot averaging above
+# capacity. A version-aware dmixture3p() makes the last expectation fail on
+# purpose: flip it and remove the caveat from the `functions` item of
+# model_spec() and from the p_mem/p_nt parameters of mixture3p_dist.
+test_that("dmixture3p matches mixture3p slot averaging up to capacity and not above", {
+  x <- seq(-pi, pi, length.out = 7)
+  mu <- c(0, 2, -1.5, 1)
+  set_size <- length(mu)
+  ptarget <- 0.7
+  log_dens <- function(K, tau) {
+    capacity <- min(1, K / set_size)
+    list(
+      exported = dmixture3p(
+        x, mu = mu, kappa = 8, p_mem = capacity * ptarget,
+        p_nt = capacity * (1 - ptarget), tau = tau, log = TRUE
+      ),
+      slot_averaging = .dmixture3p_slot_averaging(
+        x, mu[1], 8, K, ptarget, set_size, mu[-1], tau, 81L
+      )
+    )
+  }
+
+  for (tau in c(0, 1)) {
+    for (K in c(set_size / 2, set_size)) {
+      dens <- log_dens(K, tau)
+      expect_equal(dens$exported, dens$slot_averaging, tolerance = 1e-8)
+    }
+    above <- log_dens(2 * set_size, tau)
+    expect_gt(max(abs(above$exported - above$slot_averaging)), 0.1)
+  }
+})
+
 test_that("dimm integrates to 1", {
   withr::local_seed(445)
   expect_equal(integrate(dimm, -pi, pi,

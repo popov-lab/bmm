@@ -91,7 +91,8 @@
       links = param_links,
       fixed_parameters = fixed_pars,
       default_priors = default_priors,
-      init_ranges = init_ranges
+      init_ranges = init_ranges,
+      functions = list(density = "dsdt_ranking", generator = "rsdt_ranking")
     ),
     class = c("bmmodel", "sdt", "sdt_ranking"),
     call = call

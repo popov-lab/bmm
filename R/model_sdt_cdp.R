@@ -164,7 +164,8 @@
       links = param_links,
       fixed_parameters = fixed_parameters,
       default_priors = default_priors,
-      init_ranges = init_ranges
+      init_ranges = init_ranges,
+      functions = list(density = "dsdt_cdp", generator = "rsdt_cdp")
     ),
     class = c("bmmodel", "sdt", "sdt_cdp"),
     call = call
