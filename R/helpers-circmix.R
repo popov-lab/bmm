@@ -31,15 +31,18 @@
 }
 
 # log(I0(kappa) e^-kappa). Stan has no scaled Bessel function, and there
-# log I0(kappa) - kappa loses up to 1e-13 below kappa 1e3, 8e-13 below 1e4 and
-# 8e-12 below 1e5, while the three-term series is accurate to 5e-15 from kappa
-# 2000 on; R switches at the same kappa so that the twins agree.
+# log I0(kappa) - kappa loses up to 2.2e-13 below kappa 2000, 1.6e-12 below 1e4
+# and 1.4e-11 below 1e5, while the three-term series is accurate to 7.1e-15
+# from kappa 2000 on (both against a 40-term asymptotic series); R switches at
+# the same kappa so that the twins agree. log(kappa) is taken apart from
+# log(2 pi) because 2 pi kappa overflows above kappa 2.9e307, which the tail
+# grid reaches once tau passes 7e305.
 .circmix_log_besselI0_scaled <- function(kappa) {
   out <- log(besselI(kappa, 0, expon.scaled = TRUE))
   large <- which(kappa >= 2000)
   if (length(large)) {
     k <- kappa[large]
-    out[large] <- -0.5 * log(2 * pi * k) +
+    out[large] <- -0.5 * (log(2 * pi) + log(k)) +
       log1p(1 / (8 * k) + 9 / (128 * k^2) + 225 / (3072 * k^3))
   }
   out
@@ -158,7 +161,8 @@
 # which is why tau is the parameter variable_precision frees. The other limit,
 # tau -> Inf at fixed kappa, sends the shape to 0 with the mean fixed: all but
 # a vanishing mass of J sits at 0, so memory is uniform, and rows with
-# tau = Inf take the constant-precision density at kappa = 0. The density is
+# tau = Inf, or close enough to that limit (.circmix_vp_uniform()), take the
+# constant-precision density at kappa = 0. The density is
 # linear in the components, sum_k w_k I_k(y) + w_guess / (2 pi), and each I_k
 # is integrated on its own grid (.circmix_vp_component()). A grid shared by the
 # components and centred on the gamma prior misses the integrand of a response
@@ -172,11 +176,13 @@
 # nodes and kappa up to 1000 each scheme holds the log density to 4e-7 at the
 # switch, and the step between them there is below 4e-7. The tail grid spans
 # [log J0, log J_hi], so its step grows with log tau: at kappa 1e4 the tail
-# scheme and the step reach 2e-6.
+# scheme and the step reach 2e-6. Above kappa ~1e5 both keep growing with
+# log tau; the step at shape 2 is 1.3e-5 at kappa 1e5, 1.7e-3 at 1e12, 0.03 at
+# 1e20 and 1.2 nats at 1e100.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
-  # pmin() recycles where kappa[tau == Inf] <- 0 would pad a scalar kappa with NA
-  kappa <- pmin(kappa, ifelse(tau %in% Inf, 0, Inf))
+  # pmin() recycles a scalar kappa over tau, and an NA tau makes its row NA
+  kappa <- pmin(kappa, ifelse(tau %in% Inf | .circmix_vp_uniform(.circmix_J(kappa), tau), 0, Inf))
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
   vp <- .circmix_vp_rows(kappa, tau)
   if (!length(vp$rows)) {
@@ -194,20 +200,29 @@
 }
 
 # The rows whose precision varies, with their gamma shapes. A row with tau = 0,
-# with shape 0, or one whose grid would be narrower than 1e-6, is constant
-# precision; this is the R twin of circmix_vp_shape(), which signals those rows
-# with +Inf. Shape 0 comes from J(kappa) = 0, at kappa = 0 or where J underflows
-# (below kappa ~1e-102 in R, where besselI() returns 0, and ~3e-162 in Stan; the
-# von Mises is uniform to within kappa there), or from tau = Inf, which
-# .circmix_vp_ld() has by then sent to kappa = 0.
+# or one whose grid would be narrower than 1e-6, is constant precision, and a
+# row that .circmix_vp_uniform() calls uniform needs no grid either; this is the
+# R twin of circmix_vp_shape(), which signals all of those rows with +Inf.
+# .circmix_vp_ld() has by then sent the uniform rows to kappa = 0, J(kappa) = 0.
 .circmix_vp_rows <- function(kappa, tau) {
-  shape <- .circmix_J(kappa) / tau
+  J <- .circmix_J(kappa)
+  shape <- J / tau
   # trigamma() is NaN below shape 1e-153, where Stan's is +Inf; the floor at
   # 1 changes no decision, the grid is far wider than 1e-6 there
   rows <- which(
-    tau > 0 & shape > 0 & 8 * sqrt(trigamma(pmax(shape, 1))) >= 1e-6
+    tau > 0 & !.circmix_vp_uniform(J, tau) & 8 * sqrt(trigamma(pmax(shape, 1))) >= 1e-6
   )
   list(rows = rows, shape = shape[rows])
+}
+
+# Memory is uniform to double precision once J(kappa) / sqrt(tau) < 1e-17. The
+# memory density exceeds 1 / (2 pi) by at most pi sqrt(2) J(kappa) / sqrt(tau),
+# its limit at large tau, so by 4.4e-17 there, below half an ulp of log(2 pi).
+# Those rows go to kappa = 0 because integrating them fails: Stan's
+# gamma_lpdf() is NaN at a subnormal shape, which tau = 1 reaches below kappa
+# 2e-154 and kappa 0.01 at tau 1e305.
+.circmix_vp_uniform <- function(J, tau) {
+  J < 1e-17 * sqrt(tau)
 }
 
 .circmix_vp_component <- function(cos_d, shape, tau, nodes, tab) {
@@ -267,15 +282,19 @@
 # [J0, J_hi] in log J, J_hi the Wilson-Hilferty gamma quantile at z = 8.5, at
 # least 40 tau, which leaves at most 4e-18 of the mass above it. A J_hi below
 # J0 (tau < 2.5e-6) leaves less than 1e-15 of the mass above J0, so the grid
-# then spans [J0, e J0] only to stay well defined.
+# then spans [J0, e J0] only to stay well defined. J_hi is also capped at e^709,
+# below the largest double, and tau enters as log(tau) and sqrt(tau): 40 tau
+# and 2 tau overflow past tau 4.5e306 and 9e307. The cap binds only past
+# tau 2e306, where memory is uniform (.circmix_vp_uniform()) unless
+# kappa > 1e136.
 .circmix_vp_component_tail <- function(cos_d, shape, tau, nodes, tab) {
   J0 <- 1e-4
   z <- J0 / tau
   tail <- stats::pgamma(z, shape) +
-    cos_d * sqrt(2 * tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * stats::pgamma(z, shape + 0.5) +
+    cos_d * sqrt(2) * sqrt(tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * stats::pgamma(z, shape + 0.5) +
     (cos_d^2 - 0.5) * shape * tau * stats::pgamma(z, shape + 1)
   lo <- log(J0)
-  hi <- pmax(log(tau * pmax(shape * (1 - 1 / (9 * shape) + 8.5 / (3 * sqrt(shape)))^3, 40)), lo + 1)
+  hi <- pmax(pmin(log(tau) + log(pmax(shape * (1 - 1 / (9 * shape) + 8.5 / (3 * sqrt(shape)))^3, 40)), 709), lo + 1)
   step <- (hi - lo) / (nodes - 1)
 
   n <- length(shape)

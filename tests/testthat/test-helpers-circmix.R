@@ -111,6 +111,48 @@ test_that(".circmix_vp_ld() has uniform memory components when tau is infinite",
   )
 })
 
+# Near the tau = Inf limit the memory density exceeds 1 / (2 pi) by
+# pi sqrt(2) J(kappa) / sqrt(tau) at most, so below 1e-17 of that ratio it is
+# uniform to double precision. Integrating there failed: past tau 7e305 the
+# tail grid's 2 pi kappa overflowed (NA), and past 4.5e306 its end, 40 tau, did.
+test_that(".circmix_vp_ld() is uniform, not NA, as tau nears the limit of a double", {
+  y <- c(0, 1, pi)
+  cells <- expand.grid(y = y, tau = c(1e306, 4e306, 5e306, 1e308))
+  n <- nrow(cells)
+  expect_identical(
+    .circmix_vp_ld(matrix(cos(cells$y)), matrix(log(0.8), n), rep(log(0.2), n), 5, cells$tau),
+    rep(-log(2 * pi), n)
+  )
+  # J(kappa) / sqrt(tau) = 1e-10 is integrated, and the excess is the bound;
+  # just below 1e-17 the fallback takes over
+  J <- .circmix_J(5)
+  ratio <- c(1e-10, 0.99e-17)
+  ld <- .circmix_vp_ld(matrix(1, 2), matrix(0, 2), rep(-Inf, 2), 5, (J / ratio)^2)
+  expect_equal((ld[1] + log(2 * pi)) / ratio[1], pi * sqrt(2), tolerance = 1e-2)
+  expect_identical(ld[2], -log(2 * pi))
+  # kappa 1e140 is integrated: at tau 1e306 the grid reaches kappa 4e307, and
+  # at tau 1e308 it would end past the largest double
+  cells <- expand.grid(y = y, tau = c(1e306, 1e308))
+  expect_equal(
+    .circmix_vp_ld(matrix(cos(cells$y)), matrix(0, 6), rep(-Inf, 6), 1e140, cells$tau),
+    rep(-log(2 * pi), 6),
+    tolerance = 1e-10
+  )
+  expect_equal(
+    .circmix_log_besselI0_scaled(c(1e300, 1e308)),
+    -0.5 * (log(2 * pi) + log(c(1e300, 1e308))),
+    tolerance = 1e-14
+  )
+})
+
+test_that(".circmix_vp_ld() is NA where tau is NA, as it is where kappa is", {
+  y <- c(0, 1, pi)
+  ld <- .circmix_vp_ld(matrix(cos(y)), matrix(log(0.8), 3), rep(log(0.2), 3), 5, c(NA, 2, NaN))
+  expect_true(all(is.na(ld[c(1, 3)])))
+  expect_equal(ld[2], .circmix_vp_ld(matrix(cos(1)), matrix(log(0.8)), log(0.2), 5, 2))
+  expect_true(is.na(.circmix_vp_ld(matrix(1), matrix(0), -Inf, NA, 2)))
+})
+
 test_that(".circmix_vp_ld() is a normalised density on the circle", {
   total <- stats::integrate(
     function(y) {
@@ -704,8 +746,14 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 # cmdstanr::expose_functions(), which links against RcppParallel's libtbb and so
 # fails on toolchains where that disagrees with the one cmdstan was built with.
 # sig_figs is raised because cmdstan writes only 6 significant digits by default,
-# which alone accounts for differences of ~1e-7.
+# which alone accounts for differences of ~1e-7. The cells *_e are one-component
+# variable-precision rows with their own kappa and tau; a call without them
+# passes none.
 circmix_stan_values <- function(data) {
+  data <- utils::modifyList(list(
+    NE = 0L, y_e = numeric(0), logw_e = numeric(0), logw_guess_e = numeric(0),
+    kappa_e = numeric(0), tau_e = numeric(0)
+  ), data)
   chunks <- c("circmix_functions.stan", "mixture2p_functions.stan", "mixture3p_functions.stan", "imm_functions.stan")
   code <- paste0(
     "functions {\n",
@@ -723,6 +771,8 @@ circmix_stan_values <- function(data) {
       real K_slots; int ss_slots; int ss_empty;
       vector[2] cosd_far; vector[2] logw_far; real kappa_far; int NFAR; vector[NFAR] tau_far;
       vector[3] nt_loc; int ss_loc; vector[2] dist_w;
+      int NE; vector[NE] y_e; vector[NE] logw_e; vector[NE] logw_guess_e;
+      vector[NE] kappa_e; vector[NE] tau_e;
     }
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
@@ -734,6 +784,7 @@ circmix_stan_values <- function(data) {
       vector[4] out_w3_slot; vector[3] out_w3_sa; vector[4] out_imm_abc;
       vector[4] out_imm_bsc; vector[4] out_imm_full; vector[2] out_w2_full;
       vector[2] out_w3_slot1; vector[1] out_w3_sa1;
+      vector[NE] out_e_shape; vector[NE] out_e_vp; vector[NE] out_e_sa;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -779,6 +830,14 @@ circmix_stan_values <- function(data) {
       out_w2_full = mixture2p_slot_logw(3.5, 3);
       out_w3_slot1 = mixture3p_slot_logw(0.6, 0.8, 1);
       out_w3_sa1 = mixture3p_slot_averaging_logw(0.8, 1);
+      for (i in 1:NE) {
+        out_e_shape[i] = circmix_vp_shape(kappa_e[i], tau_e[i]);
+        out_e_vp[i] = circmix_vp_ld([cos(y_e[i])]', [logw_e[i]]', logw_guess_e[i], kappa_e[i],
+                                    tau_e[i], nodes, logk, dlogk, logJ_min, dlogJ);
+        out_e_sa[i] = circmix_slot_averaging_ld([cos(y_e[i])]', [0.0]', K_slots, ss_slots,
+                                                kappa_e[i], tau_e[i], nodes,
+                                                logk, dlogk, logJ_min, dlogJ);
+      }
     }"
   )
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
@@ -1021,52 +1080,44 @@ test_that("Stan matches R at small gamma shapes and either side of the tail swit
   )
 })
 
-# tau = Inf and a J that underflows to 0 both give a gamma shape of 0, where
-# the tail's gamma_lcdf() throws; memory is uniform in either limit
-test_that("Stan matches R at a gamma shape of 0", {
+# Memory is uniform at tau = Inf, where J that underflows to 0, and wherever
+# J(kappa) / sqrt(tau) < 1e-17 (.circmix_vp_uniform()). Integrating there gave
+# NaN at a subnormal gamma shape (kappa 1e-155 at tau 1, 0.01 at 1e305) and NaN
+# or +Inf once the tail grid overflowed (tau 1e306 on). kappa 1e140 is still
+# integrated: at tau 1e306 on a grid that reaches kappa 4e307, and at 1e308 on
+# one capped below the largest double.
+test_that("Stan matches R where memory is uniform and near that limit", {
   skip_unless_stan_tests()
   skip_on_cran()
 
   tab <- .circmix_kappa_table()
-  cells <- expand.grid(y = c(0, 1, pi), p_mem = c(1, 0.8))
-  cells <- rbind(cbind(cells, kappa = 5, tau = Inf), cbind(cells, kappa = 1e-170, tau = 1))
+  limits <- data.frame(
+    kappa = c(5, 1e-170, 1e-155, 0.01, 5, 5, 5),
+    tau = c(Inf, 1, 1, 1e305, 1e306, 5e306, 1e308)
+  )
+  cells <- merge(expand.grid(y = c(0, 1, pi), p_mem = c(1, 0.8)), limits)
+  cells <- rbind(cells, expand.grid(y = c(0, pi), p_mem = 1, kappa = 1e140, tau = c(1e306, 1e308)))
   n <- nrow(cells)
-  code <- paste0(
-    "functions {\n",
-    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
-    "\n}\n",
-    "data {
-      int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
-      int N; vector[N] y; vector[N] logw; vector[N] logw_guess; vector[N] kappa; vector[N] tau;
-    }
-    generated quantities {
-      vector[N] out_shape; vector[N] out_vp; vector[N] out_sa;
-      for (i in 1:N) {
-        out_shape[i] = circmix_vp_shape(kappa[i], tau[i]);
-        out_vp[i] = circmix_vp_ld([cos(y[i])]', [logw[i]]', logw_guess[i], kappa[i], tau[i],
-                                  81, logk, dlogk, logJ_min, dlogJ);
-        out_sa[i] = circmix_slot_averaging_ld([cos(y[i])]', [0.0]', 1.5, 2, kappa[i], tau[i],
-                                              81, logk, dlogk, logJ_min, dlogJ);
-      }
-    }"
-  )
-  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
-  fit <- model$sample(
-    data = list(
-      NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
-      logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, N = n, y = cells$y,
-      logw = log(cells$p_mem), logw_guess = log1p(-cells$p_mem),
-      kappa = cells$kappa, tau = cells$tau
-    ),
-    fixed_param = TRUE, iter_sampling = 1, chains = 1,
-    refresh = 0, show_messages = FALSE, sig_figs = 18
-  )
-  stan <- function(variable) as.numeric(fit$draws(variable))
+  uniform <- seq_len(n - 4)
+  stan <- circmix_stan_values(list(
+    NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+    logJ_min = tab$logJ_min, dlogJ = tab$dlogJ,
+    NC = 1L, cosd = array(1), logw = array(0), logw_guess = -Inf,
+    kappa_het = array(3), NKAP = 1L, kappa = array(2), NJ = 1L, Jtest = array(0.5),
+    NTAU = 1L, tau = array(1), NI0 = 1L, kappa_i0 = array(1),
+    kappa_vp = 5, nodes = 81L, K_slots = 1.5, ss_slots = 2L, ss_empty = 4L,
+    cosd_far = c(1, 1), logw_far = log(c(0.7, 0.3)), kappa_far = 5,
+    NFAR = 1L, tau_far = array(1),
+    nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2),
+    NE = n, y_e = cells$y, logw_e = log(cells$p_mem), logw_guess_e = log1p(-cells$p_mem),
+    kappa_e = cells$kappa, tau_e = cells$tau
+  ))
 
-  expect_equal(stan("out_shape"), rep(Inf, n))
-  expect_equal(stan("out_vp"), rep(-log(2 * pi), n), tolerance = 1e-12)
+  expect_equal(stan("out_e_shape")[uniform], rep(Inf, length(uniform)))
+  expect_equal(stan("out_e_vp"), rep(-log(2 * pi), n), tolerance = 1e-10)
+  expect_equal(stan("out_e_vp")[uniform], rep(-log(2 * pi), length(uniform)), tolerance = 1e-15)
   expect_equal(
-    stan("out_vp"),
+    stan("out_e_vp"),
     .circmix_vp_ld(
       matrix(cos(cells$y)), matrix(log(cells$p_mem)), log1p(-cells$p_mem),
       cells$kappa, cells$tau
@@ -1074,7 +1125,7 @@ test_that("Stan matches R at a gamma shape of 0", {
     tolerance = 1e-12
   )
   expect_equal(
-    stan("out_sa"),
+    stan("out_e_sa"),
     .circmix_slot_averaging_ld(
       matrix(cos(cells$y)), matrix(0, n), rep(1.5, n), rep(2L, n),
       cells$kappa, cells$tau, 81L

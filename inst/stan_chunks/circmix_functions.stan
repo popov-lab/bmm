@@ -45,12 +45,12 @@
                           + (s3 - s2) * dlogk[i + 1]));
   }
 
-  // log(I0(kappa) e^-kappa), as .circmix_log_besselI0_scaled(): log I0(kappa) - kappa loses up to 8e-13 below kappa 1e4, the series 5e-15 from 2000 on
+  // log(I0(kappa) e^-kappa), as .circmix_log_besselI0_scaled(): log I0(kappa) - kappa loses up to 2.2e-13 below kappa 2000 and 1.6e-12 below 1e4, the series 7.1e-15 from 2000 on; log(2 pi kappa) would overflow above kappa 2.9e307
   real circmix_log_besselI0_scaled(real kappa) {
     if (kappa < 2000) {
       return log_modified_bessel_first_kind(0, kappa) - kappa;
     }
-    return -0.5 * log(2 * pi() * kappa)
+    return -0.5 * (log(2 * pi()) + log(kappa))
            + log1p(inv(8 * kappa) + 9 / (128 * square(kappa)) + 225 / (3072 * kappa^3));
   }
 
@@ -81,14 +81,22 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
-  // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0, shape 0, or a grid narrower than 1e-6), as .circmix_vp_rows(); any positive shape is integrable, see circmix_vp_component()
+  // 1 when memory is uniform to double precision, J(kappa) / sqrt(tau) < 1e-17; see .circmix_vp_uniform()
+  int circmix_vp_uniform(real J, real tau) {
+    return J < 1e-17 * sqrt(tau);
+  }
+
+  // gamma shape J(kappa) / tau of the precision distribution; +Inf when no grid is needed: constant precision (tau = 0 or a grid narrower than 1e-6) or uniform memory (circmix_vp_uniform()), as .circmix_vp_rows(); any other positive shape is integrable, see circmix_vp_component()
   real circmix_vp_shape(real kappa, real tau) {
     if (tau <= 0) {
       return positive_infinity();
     }
-    // J(kappa) is 0 at kappa = 0 and underflows to 0 below kappa ~ 3e-162, where the von Mises is already uniform
-    real shape = circmix_J(kappa) / tau;
-    if (shape <= 0 || 8 * sqrt(trigamma(shape)) < 1e-6) {
+    real J = circmix_J(kappa);
+    if (circmix_vp_uniform(J, tau)) {
+      return positive_infinity();
+    }
+    real shape = J / tau;
+    if (8 * sqrt(trigamma(shape)) < 1e-6) {
       return positive_infinity();
     }
     return shape;
@@ -126,7 +134,8 @@
   // gamma moments, accurate to J0^(3/2) = 1e-6 of its mass, and positive since the c terms move it
   // by at most sqrt(2 J0) + J0 / 2. The Simpson grid covers [J0, J_hi] in log J, J_hi the
   // Wilson-Hilferty quantile at z = 8.5, at least 40 tau; a J_hi below J0 (tau < 2.5e-6, under
-  // 1e-15 of the mass above J0) spans [J0, e J0] instead.
+  // 1e-15 of the mass above J0) spans [J0, e J0] instead. J_hi is capped at e^709 and tau enters as
+  // log(tau) and sqrt(tau), because 40 tau and 2 tau overflow past tau 4.5e306 and 9e307.
   real circmix_vp_component_tail(real c, real shape, real tau, int nodes,
                                  data vector logk, data vector dlogk,
                                  data real logJ_min, data real dlogJ) {
@@ -134,10 +143,10 @@
     real rate = inv(tau);
     // not gamma_p(): its reverse mode drops the derivative once J0 / tau > 10 shape
     real tail = exp(gamma_lcdf(J0 | shape, rate))
-                + c * sqrt(2 * tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * exp(gamma_lcdf(J0 | shape + 0.5, rate))
+                + c * sqrt(2) * sqrt(tau) * exp(lgamma(shape + 0.5) - lgamma(shape)) * exp(gamma_lcdf(J0 | shape + 0.5, rate))
                 + (square(c) - 0.5) * shape * tau * exp(gamma_lcdf(J0 | shape + 1, rate));
     real lo = log(J0);
-    real hi = fmax(log(tau * fmax(shape * (1 - inv(9 * shape) + 8.5 / (3 * sqrt(shape)))^3, 40)),
+    real hi = fmax(fmin(log(tau) + log(fmax(shape * (1 - inv(9 * shape) + 8.5 / (3 * sqrt(shape)))^3, 40)), 709),
                    lo + 1);
     real step = (hi - lo) / (nodes - 1);
     vector[nodes] lp;
@@ -194,8 +203,8 @@
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
-    // tau -> Inf sends the shape to 0 with the mean fixed, leaving J at 0: memory is uniform, as in .circmix_vp_ld()
-    if (tau == positive_infinity()) {
+    // tau -> Inf sends the shape to 0 with the mean fixed, leaving J at 0: memory is uniform, as in .circmix_vp_ld(), and close to that limit integrating would hit a subnormal shape
+    if (tau == positive_infinity() || circmix_vp_uniform(circmix_J(kappa), tau)) {
       return circmix_ld(cosd, logw, logw_guess, 0);
     }
     real shape = circmix_vp_shape(kappa, tau);
