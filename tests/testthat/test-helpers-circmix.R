@@ -768,8 +768,9 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 # fails on toolchains where that disagrees with the one cmdstan was built with.
 # sig_figs is raised because cmdstan writes only 6 significant digits by default,
 # which alone accounts for differences of ~1e-7. The cells *_e are one-component
-# variable-precision rows with their own kappa and tau; a call without them
-# passes none.
+# variable-precision rows with their own kappa and tau, and the cells *_s are
+# points at which circmix_vp_slopes() is evaluated; a call without them passes
+# none.
 circmix_stan_values <- function(data) {
   data <- utils::modifyList(list(
     NE = 0L, y_e = numeric(0), logw_e = numeric(0), logw_guess_e = numeric(0),
@@ -1110,7 +1111,7 @@ test_that("Stan matches R at small gamma shapes and either side of the tail swit
   )
 })
 
-# Memory is uniform at tau = Inf, where J that underflows to 0, and wherever
+# Memory is uniform at tau = Inf, where J underflows to 0, and wherever
 # J(kappa) / sqrt(tau) < 1e-17 (.circmix_vp_uniform()). Integrating there gave
 # NaN at a subnormal gamma shape (kappa 1e-155 at tau 1, 0.01 at 1e305) and NaN
 # or +Inf once the tail grid overflowed (tau 1e306 on). kappa 1e140 is still
@@ -1287,7 +1288,15 @@ test_that("the Stan gradient of the variable-precision density is right below sh
 })
 
 test_that(".circmix_vp_ld() integrates below the shape where trigamma() is NaN, as Stan does", {
-  # at shape 1e-200 nearly all precision mass sits at J ~ 0, so the response is uniform
-  tau <- .circmix_J(10) / 1e-200
-  expect_equal(.circmix_vp_ld(matrix(cos(1)), matrix(0), -Inf, 10, tau), -log(2 * pi), tolerance = 1e-10)
+  # kappa 1e140 at tau 1e306 is shape ~1e-166, under the 1e-153 where R's
+  # trigamma() is NaN, but J / sqrt(tau) ~1e-13 is above the uniform cut, so the
+  # row is integrated; its excess over the uniform is below J / sqrt(2 tau)
+  expect_length(.circmix_vp_rows(1e140, 1e306)$rows, 1)
+  expect_equal(.circmix_vp_ld(matrix(cos(1)), matrix(0), -Inf, 1e140, 1e306), -log(2 * pi), tolerance = 1e-12)
+})
+
+test_that("the uniform cut of variable precision sits at J / sqrt(tau) = 1e-17", {
+  J <- .circmix_J(1e100)
+  tau <- (J / c(2e-17, 5e-18))^2
+  expect_equal(.circmix_vp_rows(c(1e100, 1e100), tau)$rows, 1L)
 })

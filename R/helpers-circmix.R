@@ -183,8 +183,8 @@
 # switch, and the step between them there is below 4e-7. The tail grid spans
 # [log J0, log J_hi], so its step grows with log tau: at kappa 1e4 the tail
 # scheme and the step reach 2e-6. Above kappa ~1e5 both keep growing with
-# log tau; the step at shape 2 is 1.3e-5 at kappa 1e5, 1.7e-3 at 1e12, 0.03 at
-# 1e20 and 1.2 nats at 1e100.
+# log tau; the step at shape 2, maximised over y, is 1.4e-5 at kappa 1e5,
+# 2.9e-3 at 1e12, 0.03 at 1e20 and 1.3 nats at 1e100.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
   # pmin() recycles a scalar kappa over tau, and an NA tau makes its row NA
