@@ -45,7 +45,8 @@
       default_priors = list(
         d = list(main = "normal(0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
-      init_ranges = list(d = c(1, 2))
+      init_ranges = list(d = c(1, 2)),
+      functions = list(density = "dtcc", generator = "rtcc")
     ),
     class = c("bmmodel", "tcc"),
     call = call
