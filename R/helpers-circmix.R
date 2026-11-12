@@ -8,15 +8,21 @@
 # functions rather than against a second R implementation.
 
 # I1(kappa) / I0(kappa). besselI() underflows to zero above kappa ~ 1e5, while
-# the asymptotic series is already accurate to 2e-13 at kappa = 1e3.
+# the asymptotic series is accurate to 2e-17 from kappa = 1e3 on. Three terms
+# left a step of 2e-13 in J(kappa) there, which Stan's circmix_J() shares.
 .circmix_A <- function(kappa) {
   out <- besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
   large <- which(!is.finite(out) | kappa > 1e3)
   if (length(large)) {
-    k <- kappa[large]
-    out[large] <- 1 - 1 / (2 * k) - 1 / (8 * k^2) - 1 / (8 * k^3)
+    out[large] <- 1 - .circmix_one_minus_A(kappa[large])
   }
   out
+}
+
+# the series of 1 - A in 1 / kappa
+.circmix_one_minus_A <- function(kappa) {
+  u <- 1 / kappa
+  u * (1 / 2 + u * (1 / 8 + u * (1 / 8 + u * (25 / 128 + u * 13 / 32))))
 }
 
 .circmix_log_besselI0 <- function(kappa) {
@@ -324,32 +330,38 @@
 
 # First and second derivatives of .circmix_vp_log_integrand() in t, from
 # d kappa / d log J = A / (1 - A^2) and dA / d kappa = 1 - A / kappa - A^2.
+# cos_d - A is (cos_d - 1) + (1 - A): A rounds to 1 from kappa ~1e16, which
+# took the drift (1 - A) d kappa = A / (1 + A) at cos_d = 1 to 0. The second
+# derivative is written in dA / d kappa / (1 - A)^2, which stays in [0.5, 2.1]:
+# dA / d kappa and (1 - A)^2 both underflow past kappa ~1e154, where their
+# quotient was 0/0.
 .circmix_vp_slopes <- function(t, cos_d, shape, tau, tab) {
   J <- exp(t)
   a <- .circmix_A_terms(.circmix_kappa(J, tab))
-  one_minus_A2 <- a$one_minus * (1 + a$A)
-  dkappa <- a$A / one_minus_A2
+  drift <- ((cos_d - 1) + a$one_minus) * a$A / (a$one_minus * (1 + a$A))
   list(
-    d1 = shape - J / tau + (cos_d - a$A) * dkappa,
-    d2 = -J / tau - a$slope * dkappa^2 +
-      (cos_d - a$A) * a$slope * (1 + a$A^2) * dkappa / one_minus_A2^2
+    d1 = shape - J / tau + drift,
+    d2 = -J / tau - a$curvature * (a$A / (1 + a$A))^2 +
+      drift * a$curvature * (1 + a$A^2) / (1 + a$A)^2
   )
 }
 
-# A, 1 - A and dA / d kappa. Above kappa = 1e3, where .circmix_A() switches to
-# its series, the last two come from that series too, because computing them
-# from A cancels.
+# A, 1 - A and (dA / d kappa) / (1 - A)^2. Above kappa = 1e3, where
+# .circmix_A() switches to its series, the last two come from that series too,
+# because computing them from A cancels.
 .circmix_A_terms <- function(kappa) {
   A <- .circmix_A(kappa)
   one_minus <- 1 - A
-  slope <- 1 - A / kappa - A^2
+  curvature <- (1 - A / kappa - A^2) / one_minus^2
   large <- which(kappa > 1e3)
   if (length(large)) {
     k <- kappa[large]
-    one_minus[large] <- 1 / (2 * k) + 1 / (8 * k^2) + 1 / (8 * k^3)
-    slope[large] <- 1 / (2 * k^2) + 1 / (4 * k^3) + 3 / (8 * k^4)
+    u <- 1 / k
+    one_minus[large] <- .circmix_one_minus_A(k)
+    curvature[large] <- (1 / 2 + u * (1 / 4 + u * (3 / 8 + u * (25 / 32 + u * 65 / 32)))) /
+      (k * one_minus[large])^2
   }
-  nlist(A, one_minus, slope)
+  nlist(A, one_minus, curvature)
 }
 
 # Draws from the mixture by picking a component and then sampling from it, which

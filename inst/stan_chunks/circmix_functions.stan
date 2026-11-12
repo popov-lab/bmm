@@ -1,9 +1,18 @@
   // Shared numerics for mixture2p, mixture3p and imm; derivations sit by the R twins in R/helpers-circmix.R
 
-  // Fisher information of a von Mises about its location
+  // 1 - I1(kappa) / I0(kappa) above kappa 1e3, the series of .circmix_one_minus_A()
+  real circmix_one_minus_A(real kappa) {
+    real u = inv(kappa);
+    return u * (0.5 + u * (0.125 + u * (0.125 + u * (25.0 / 128 + u * 13.0 / 32))));
+  }
+
+  // Fisher information of a von Mises about its location; above kappa 1e3 from the series, as .circmix_J(), because the reverse-mode derivative of the Bessel ratio cancels: dJ / d kappa was off by 4e-9 at kappa 1e8, erratic from 1e15 (doubled at 5e15) and 0 from 1e17
   real circmix_J(real kappa) {
     if (kappa <= 0) {
       return 0;
+    }
+    if (kappa > 1e3) {
+      return kappa * (1 - circmix_one_minus_A(kappa));
     }
     return kappa * exp(log_modified_bessel_first_kind(1, kappa)
                        - log_modified_bessel_first_kind(0, kappa));
@@ -102,7 +111,7 @@
     return shape;
   }
 
-  // first and second derivative in t = log J of the log integrand in circmix_vp_component(), as .circmix_vp_slopes()
+  // first and second derivative in t = log J of the log integrand in circmix_vp_component(), as .circmix_vp_slopes(): c - A as (c - 1) + (1 - A), and curvature = dA / d kappa / (1 - A)^2, so that neither cancels nor underflows at a huge kappa
   vector circmix_vp_slopes(real t, real c, real shape, real tau,
                            data vector logk, data vector dlogk,
                            data real logJ_min, data real dlogJ) {
@@ -110,22 +119,23 @@
     real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
     real A;
     real one_minus_A;
-    real dA;
+    real curvature;
     if (kappa > 1e3) {
-      one_minus_A = inv(2 * kappa) + inv(8 * square(kappa)) + inv(8 * kappa^3);
+      real u = inv(kappa);
+      one_minus_A = circmix_one_minus_A(kappa);
       A = 1 - one_minus_A;
-      dA = inv(2 * square(kappa)) + inv(4 * kappa^3) + 3 * inv(8 * kappa^4);
+      curvature = (0.5 + u * (0.25 + u * (0.375 + u * (25.0 / 32 + u * 65.0 / 32))))
+                  / square(kappa * one_minus_A);
     } else {
       A = exp(log_modified_bessel_first_kind(1, kappa)
               - log_modified_bessel_first_kind(0, kappa));
       one_minus_A = 1 - A;
-      dA = 1 - A / kappa - square(A);
+      curvature = (1 - A / kappa - square(A)) / square(one_minus_A);
     }
-    real one_minus_A2 = one_minus_A * (1 + A);
-    real dkappa = A / one_minus_A2;
-    return [shape - J / tau + (c - A) * dkappa,
-            -J / tau - dA * square(dkappa)
-            + (c - A) * dA * (1 + square(A)) * dkappa / square(one_minus_A2)]';
+    real drift = ((c - 1) + one_minus_A) * A / (one_minus_A * (1 + A));
+    return [shape - J / tau + drift,
+            -J / tau - curvature * square(A / (1 + A))
+            + drift * curvature * (1 + square(A)) / square(1 + A)]';
   }
 
   // circmix_vp_component() below a gamma shape of 2, where sd(log J) ~ 1 / shape outgrows any fixed grid; see .circmix_vp_component_tail()

@@ -34,6 +34,14 @@ test_that(".circmix_J() reproduces the limits of kappa * I1/I0", {
   expect_equal(.circmix_J(1e-4), 1e-8 / 2, tolerance = 1e-6)
   expect_equal(.circmix_J(1e4), 1e4 - 0.5, tolerance = 1e-6)
   expect_equal(.circmix_J(0), 0)
+  # the series that takes over above kappa 1e3, as in Stan's circmix_J(), has
+  # no step there that its gradient would see; three terms left 2e-13
+  kappa <- 1e3 * (1 + 1e-12)
+  expect_equal(
+    .circmix_J(kappa),
+    kappa * besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE),
+    tolerance = 1e-14
+  )
 })
 
 test_that(".circmix_ld() is a normalised density on the circle", {
@@ -318,16 +326,29 @@ test_that(".circmix_vp_ld() is accurate at a huge kappa or tau for a response on
   )
 
   # past kappa ~1e16, 1 / tau + 1 - cos_d rounds to 0 at cos_d = 1 unless the
-  # mode scheme's start groups (1 - cos_d) first
-  cells <- expand.grid(kappa = c(1e12, 1e15, 1e17, 1e100), shape = c(2, 5, 100))
+  # mode scheme's start groups (1 - cos_d) first; past kappa ~1e154 the
+  # slopes were 0/0
+  cells <- expand.grid(kappa = c(1e12, 1e15, 1e17, 1e100, 1e200, 1e300), shape = c(2, 5, 100))
   tau <- .circmix_J(cells$kappa) / cells$shape
   expect_lt(
     max(abs(
-      .circmix_vp_ld(matrix(1, 12), matrix(0, 12), rep(-Inf, 12), cells$kappa, tau) -
+      .circmix_vp_ld(matrix(1, 18), matrix(0, 18), rep(-Inf, 18), cells$kappa, tau) -
         (0.5 * log(tau / (2 * pi)) + lgamma(cells$shape + 0.5) - lgamma(cells$shape))
     )),
     1e-9
   )
+})
+
+# For a response on the item and tau = J, the first slope is
+# shape - 1 + (1 - A) d kappa / d log J = shape - 1 + A / (1 + A) and the second
+# tends to -1. A rounds to 1 from kappa ~1e16, which took the drift to 0 when it
+# was computed as (cos_d - A), and past kappa ~1e154 dA / d kappa and (1 - A)^2
+# both underflow, which made the second slope 0/0.
+test_that(".circmix_vp_slopes() holds at a huge kappa for a response on the item", {
+  J <- 10^c(12, 16, 50, 155, 300)
+  slopes <- .circmix_vp_slopes(log(J), 1, 2, J, .circmix_kappa_table())
+  expect_equal(slopes$d1, rep(1.5, 5), tolerance = 1e-12)
+  expect_equal(slopes$d2, rep(-1, 5), tolerance = 1e-12)
 })
 
 # Below a gamma shape of 2 the J < 1e-4 part of the integral is analytic and
@@ -1184,17 +1205,21 @@ test_that("Stan matches R at a huge kappa or tau for a response on the item", {
   }
 })
 
-test_that("the Stan gradient of the variable-precision density is right below shape 2", {
+test_that("the Stan gradient of the variable-precision density is right below shape 2 and at a huge kappa", {
   skip_unless_stan_tests()
   skip_on_cran()
 
   # below kappa = 0.00447, J(kappa) < J0 / 10 and Stan Math's reverse-mode
   # gamma_p() drops its derivative as flat, which it is not at small shapes;
-  # kappa 10 at shape 0.5 is an ordinary cell of the same branch
+  # kappa 10 at shape 0.5 is an ordinary cell of the same branch. At kappa 1e15
+  # the slope in log kappa was off by 4% to 11% and at 1e50 it was 0, in both
+  # schemes, because the reverse-mode derivative of a Bessel-ratio J(kappa) is
+  # erratic from kappa ~1e15 and 0 from 1e17.
   tab <- .circmix_kappa_table()
   cells <- rbind(
     expand.grid(y = c(0, 1, pi), shape = c(0.1, 1.5), kappa = c(0.0044, 0.001)),
-    data.frame(y = c(0, 1), shape = 0.5, kappa = 10)
+    data.frame(y = c(0, 1), shape = 0.5, kappa = 10),
+    expand.grid(y = c(0, 1), shape = c(0.5, 5), kappa = c(1e15, 1e50))
   )
   cells$tau <- .circmix_J(cells$kappa) / cells$shape
   n <- nrow(cells)
