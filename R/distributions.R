@@ -5119,8 +5119,9 @@ rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lap
 #' @export
 dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
                  noise = c("gaussian", "gumbel")) {
-  logp <- .tcc_noise_logp(match.arg(noise))
+  noise <- match.arg(noise)
   .check_tcc_args(similarity, n_options)
+  logp <- .tcc_noise_logp(noise)
   dist <- abs(.tcc_bin(x, n_options, "radians")) + 1
   n <- if (length(x) && length(d)) max(length(x), length(d)) else 0L
   dist <- rep_len(dist, n)
@@ -5136,9 +5137,10 @@ dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
 #' @rdname tcc_dist
 #' @export
 rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbel")) {
-  logp <- .tcc_noise_logp(match.arg(noise))
+  noise <- match.arg(noise)
   .check_tcc_args(similarity, n_options)
   n <- .n_draws(n)
+  logp <- .tcc_noise_logp(noise)
   d <- rep_len(d, n)
   offsets <- seq(-n_options / 2 + 1, n_options / 2)
   out <- rep(NA_real_, n)
