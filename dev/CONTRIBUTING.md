@@ -180,7 +180,7 @@ on, three rules apply:
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data
 layout a model expects. From the release that adds or exports them,
-`model_spec()`,
+[`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md),
 [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
 and
 [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
@@ -311,11 +311,13 @@ Packages that define their own bmm models (#442) will join them. All of
 them rely on one contract, described in [ADR
 0005](https://venpopov.com/bmm/.dev/decisions/0005-model-contract-for-companions-and-extensions.md):
 
-- what `model_spec()` returns for a model: its name, package, version,
-  domain and task, its parameters with their links, fixed values and
-  alternative groups, its default priors and init ranges, its response
-  and other variables, the role of each data column, the names of its
-  density and generator functions, and the contract version;
+- what
+  [`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
+  returns for a model: its name, package, version, domain and task, its
+  parameters with their links, fixed values and alternative groups, its
+  default priors and init ranges, its response and other variables, the
+  role of each data column, the names of its density and generator
+  functions, and the contract version;
 - the simulation generic
   [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
   and every model’s method for it;
@@ -328,11 +330,13 @@ them.
 [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
 and the export of
 [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
-are on `develop` for 1.5.0; `model_spec()` is being added for 1.5.0 and
-also accepts a fitted model (`model_spec(fit)` reads the model the fit
-stores). Each item is covered from the release that contains it. Until
-the 1.6.0 release pins contract version 1.0, the contract may still
-change, and the announcement rule below applies to every such change.
+are on `develop` for 1.5.0;
+[`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
+is being added for 1.5.0 and also accepts a fitted model
+(`model_spec(fit)` reads the model the fit stores). Each item is covered
+from the release that contains it. Until the 1.6.0 release pins contract
+version 1.0, the contract may still change, and the announcement rule
+below applies to every such change.
 
 ### When your PR changes the contract
 
@@ -356,7 +360,9 @@ the contract:
     apply as well.
 
 A new model has to meet the contract too: once the accessor and the
-generic are in bmm, it needs a complete `model_spec()` and a
+generic are in bmm, it needs a complete
+[`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
+and a
 [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
 method.
 [`use_model_template()`](https://venpopov.com/bmm/dev/reference/use_model_template.md)

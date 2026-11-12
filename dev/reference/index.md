@@ -12,6 +12,9 @@ These pages provide a summary of the functionality available in bmm
 
   Measurement models available in `bmm`
 
+- [`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
+  : The specification of a measurement model
+
 - [`bmm_options()`](https://venpopov.com/bmm/dev/reference/bmm_options.md)
   : View or change global bmm options
 

@@ -98,6 +98,15 @@
   `attr(, "simulate_pars")`. Packages that validate bmm models no longer
   need an adapter for each model
   ([\#634](https://github.com/popov-lab/bmm/issues/634)).
+- New
+  [`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
+  returns a model’s specification in one documented list: its parameters
+  with their links and fixed values, the default priors, the initial
+  value ranges, the data columns it reads and the names of its density
+  and generator functions. It also takes a fitted model. Packages that
+  build on bmm should read this list instead of the fields of the model
+  object, which can change in any release
+  ([\#633](https://github.com/popov-lab/bmm/issues/633)).
 - [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
   [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) now
   take one row per trial: leave out `n_trials` and code `response` as 0
@@ -435,6 +444,12 @@
   older analyses can be reproduced.
 
 #### Companion packages
+
+- [`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
+  is the model contract of ADR 0005, at contract version 0.9 (`"1.0"` in
+  bmm 1.6.0). bmmtools and bmm-explorer read it from this release on. A
+  later change to a field it returns is announced under this heading
+  ([\#633](https://github.com/popov-lab/bmm/issues/633)).
 
 #### Deprecated functions and arguments
 

@@ -49,7 +49,7 @@
 <h2 id="what-ships-when">What ships when<a class="anchor" aria-label="anchor" href="#what-ships-when"></a></h2>
 <p><strong>bmm 1.4.2</strong> is on CRAN (6 November 2026). It fixes wrong <code><a href="reference/sdm.html">sdm()</a></code> estimates in some designs and a handful of smaller bugs; install it with <code>install.packages("bmm")</code>.</p>
 <p><strong>bmm 1.5.0</strong>, CRAN submission 1 February 2027, on CRAN by mid-February. This is the release the TeaP 2027 pre-conference workshop (Mannheim, 21 March 2027) teaches from.</p>
-<ul><li>A documented description of every model, <code>model_spec()</code>, and <code><a href="reference/simulate_data.html">simulate_data()</a></code> to simulate data from any model, so that packages built on bmm (bmmtools, the model explorer) no longer read bmm’s internals.</li>
+<ul><li>A documented description of every model, <code><a href="reference/model_spec.html">model_spec()</a></code>, and <code><a href="reference/simulate_data.html">simulate_data()</a></code> to simulate data from any model, so that packages built on bmm (bmmtools, the model explorer) no longer read bmm’s internals.</li>
 <li>The circular mixture models (<code><a href="reference/mixture2p.html">mixture2p()</a></code>, <code><a href="reference/mixture3p.html">mixture3p()</a></code>, <code><a href="reference/imm.html">imm()</a></code>) rebuilt as custom families, with variable-precision and capacity versions. Your 1.4 code and fits keep working; two parameter names change (<code>mu1</code> becomes <code>mu</code>, <code>pnt</code> becomes <code>ptarget</code>) and the old names warn.</li>
 <li>
 <code><a href="reference/sdm.html">sdm()</a></code> with a Laplace activation, peak and range scalings, and discrete response options.</li>

@@ -96,16 +96,19 @@ the mean of <code>J</code>.</p></dd>
 <dd><p>Vector of probabilities of a target response. For a
 <code><a href="mixture3p.html">mixture3p()</a></code> fit these are <code>thetat</code> on its native scale (version
 <code>"simple"</code>, see <code><a href="native_parameters.html">native_parameters()</a></code>) or <code>min(1, K / set_size) * ptarget</code>
-(versions <code>"slot"</code> and <code>"slot_averaging"</code>).</p></dd>
+(versions <code>"slot"</code> and <code>"slot_averaging"</code>). The mapping is exact for
+<code>"slot"</code> and for <code>"slot_averaging"</code> up to <code>K = set_size</code>. Above capacity,
+slot averaging gives an item several slots and raises its precision,
+which these functions do not model.</p></dd>
 
 
 <dt id="arg-p-nt">p_nt<a class="anchor" aria-label="anchor" href="#arg-p-nt"></a></dt>
 <dd><p>Vector of probabilities of a non-target response, summed over
 the non-targets, which share it equally. For a <code><a href="mixture3p.html">mixture3p()</a></code> fit these are
 <code>thetant</code> on its native scale (version <code>"simple"</code>) or
-<code>min(1, K / set_size) * (1 - ptarget)</code> (capacity versions). Unlike
-<code>ptarget</code>, <code>p_mem</code> and <code>p_nt</code> are not conditional on a response from
-memory.</p></dd>
+<code>min(1, K / set_size) * (1 - ptarget)</code> (capacity versions, with the limit
+for <code>"slot_averaging"</code> given under <code>p_mem</code>). Unlike <code>ptarget</code>, <code>p_mem</code> and
+<code>p_nt</code> are not conditional on a response from memory.</p></dd>
 
 
 <dt id="arg-tau">tau<a class="anchor" aria-label="anchor" href="#arg-tau"></a></dt>

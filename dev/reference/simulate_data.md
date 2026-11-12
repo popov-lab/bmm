@@ -136,6 +136,13 @@ The simplex groups of
 [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) are given as
 probabilities that sum to 1 on both scales.
 
+## See also
+
+Other model information:
+[`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md),
+[`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md),
+[`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md)
+
 ## Examples
 
 ``` r

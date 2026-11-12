@@ -47,7 +47,10 @@ rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
   fit these are `thetat` on its native scale (version `"simple"`, see
   [`native_parameters()`](https://venpopov.com/bmm/dev/reference/native_parameters.md))
   or `min(1, K / set_size) * ptarget` (versions `"slot"` and
-  `"slot_averaging"`).
+  `"slot_averaging"`). The mapping is exact for `"slot"` and for
+  `"slot_averaging"` up to `K = set_size`. Above capacity, slot
+  averaging gives an item several slots and raises its precision, which
+  these functions do not model.
 
 - p_nt:
 
@@ -55,9 +58,9 @@ rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
   non-targets, which share it equally. For a
   [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   fit these are `thetant` on its native scale (version `"simple"`) or
-  `min(1, K / set_size) * (1 - ptarget)` (capacity versions). Unlike
-  `ptarget`, `p_mem` and `p_nt` are not conditional on a response from
-  memory.
+  `min(1, K / set_size) * (1 - ptarget)` (capacity versions, with the
+  limit for `"slot_averaging"` given under `p_mem`). Unlike `ptarget`,
+  `p_mem` and `p_nt` are not conditional on a response from memory.
 
 - tau:
 

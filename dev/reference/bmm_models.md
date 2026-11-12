@@ -28,6 +28,13 @@ under each. Type `?modelname` (for example
 [`?imm`](https://venpopov.com/bmm/dev/reference/imm.md)) for the
 arguments of a model.
 
+## See also
+
+Other model information:
+[`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md),
+[`parameter_info()`](https://venpopov.com/bmm/dev/reference/parameter_info.md),
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+
 ## Examples
 
 ``` r

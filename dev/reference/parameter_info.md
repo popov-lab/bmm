@@ -43,6 +43,13 @@ parameter_info(x, ...)
 A data frame of class `bmm_parameters` with one row per parameter and
 columns: `parameter`, `description`, `fixed`, `value`, and `link`.
 
+## See also
+
+Other model information:
+[`bmm_models()`](https://venpopov.com/bmm/dev/reference/bmm_models.md),
+[`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md),
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+
 ## Examples
 
 ``` r

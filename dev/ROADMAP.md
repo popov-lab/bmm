@@ -17,7 +17,9 @@ some designs and a handful of smaller bugs; install it with
 This is the release the TeaP 2027 pre-conference workshop (Mannheim, 21
 March 2027) teaches from.
 
-- A documented description of every model, `model_spec()`, and
+- A documented description of every model,
+  [`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md),
+  and
   [`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
   to simulate data from any model, so that packages built on bmm
   (bmmtools, the model explorer) no longer read bmm’s internals.
