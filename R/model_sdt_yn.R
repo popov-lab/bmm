@@ -657,10 +657,12 @@ configure_model.sdt_yn <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_yn <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
+  trial_level <- is_trial_level(model)
   design <- .design_or_n(model, design, vars$stimulus, trials = vars$n_trials)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
-  response <- rsdt_yn(nrow(design), design[[vars$n_trials]], .coerce_sdt_stimulus(design[[vars$stimulus]]),
+  response <- rsdt_yn(nrow(design), if (trial_level) 1L else design[[vars$n_trials]],
+                      .coerce_sdt_stimulus(design[[vars$stimulus]]),
                       d = p$d, criterion = p$criterion, bias = p$bias, sdratio = p$sdratio,
                       dist = vars$dist)
   .simulate_result(design, stats::setNames(list(response), model$resp_vars$response), sim)
