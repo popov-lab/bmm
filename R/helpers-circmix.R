@@ -175,7 +175,8 @@
 # scheme and the step reach 2e-6.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
-  kappa[tau == Inf] <- 0
+  # pmin() recycles where kappa[tau == Inf] <- 0 would pad a scalar kappa with NA
+  kappa <- pmin(kappa, ifelse(tau %in% Inf, 0, Inf))
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
   vp <- .circmix_vp_rows(kappa, tau)
   if (!length(vp$rows)) {

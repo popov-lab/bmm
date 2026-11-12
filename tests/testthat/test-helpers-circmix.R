@@ -103,6 +103,12 @@ test_that(".circmix_vp_ld() has uniform memory components when tau is infinite",
   expect_equal(mixed[1], -log(2 * pi))
   expect_equal(mixed[2], .circmix_vp_ld(matrix(cos(1)), matrix(0), -Inf, 5, 2))
   expect_equal(mixed[3], .circmix_ld(matrix(cos(pi)), matrix(0), -Inf, 5))
+  # a scalar kappa recycles over the tau vector, with or without an Inf in it
+  expect_equal(.circmix_vp_ld(matrix(cos(y)), matrix(0, n), rep(-Inf, n), 5, c(Inf, 2, 0)), mixed)
+  expect_equal(
+    .circmix_vp_ld(matrix(cos(y)), matrix(0, n), rep(-Inf, n), 5, c(2, 2, 0)),
+    .circmix_vp_ld(matrix(cos(y)), matrix(0, n), rep(-Inf, n), rep(5, n), c(2, 2, 0))
+  )
 })
 
 test_that(".circmix_vp_ld() is a normalised density on the circle", {
