@@ -39,11 +39,13 @@ development.
   source tree, with the time budget) and `test-coverage` (covr). On PRs,
   `file-size` also fails when any commit in the PR adds a file over 1
   MB, even if a later commit removes it.
-- A behaviour change (new or changed output, error, warning, message,
-  Stan code, prior) comes with a test in `tests/testthat/`; a refactor
-  that keeps behaviour adds none, and a test that called a helper the
-  refactor removes is rewritten against the function that now holds the
-  code
+- A behaviour change (new or changed output or prior, or a change in
+  what the emitted Stan code computes, which deleting an unused Stan
+  function is not; a new error, warning or message, or a change in when
+  one is raised or in its condition class) comes with a test in
+  `tests/testthat/`; a reworded message or a refactor that keeps
+  behaviour adds none, and a test that called a helper the refactor
+  removes is rewritten against the function that now holds the code
 - Documentation generated from roxygen comments (never edit `man/` or
   `docs/` directly)
 
@@ -80,8 +82,9 @@ messages - Support glue syntax without explicit `glue()` calls - Accept
   state
 - NEVER use a `seed` argument and `set.seed` inside of functions
 - **Self-documenting code**: Write clear, descriptive names for
-  functions and variables; refactor unclear code rather than adding
-  explanatory comments
+  functions and variables; refactor unclear code (better names, a
+  flatter structure; extraction only under the helper rule below) rather
+  than adding explanatory comments
 - **Comments say why, not what**: a comment that restates the next line,
   or narrates steps (`# Compute log-likelihood`), is deleted. No banner
   blocks (`####...!` lines around a title): a file that needs sections
@@ -97,12 +100,28 @@ messages - Support glue syntax without explicit `glue()` calls - Accept
   long single-use block stays inline, and a comment above it, if any,
   says why the block is there, not what it computes. A helper of four
   lines or fewer that is not a dispatch target exists only when it has
-  three or more callers. Callers are counted in `R/`, tests excluded; a
-  numerical or parsing unit that R11 lets tests call directly (a
+  three or more callers. Callers are call sites in `R/` (two calls from
+  one function count as two), tests excluded, and a helper’s length is
+  its non-blank, non-comment lines from `function` to the closing brace;
+  a numerical or parsing unit that R11 lets tests call directly (a
   density, a bound, an expression parser) may have one caller
 - **Early returns**: Use early returns to simplify conditional flow and
   reduce nesting; [`return()`](https://rdrr.io/r/base/function.html)
   appears only in an early return, never as the last expression
+- **Scope**: the comment, helper and
+  [`return()`](https://rdrr.io/r/base/function.html) rules above and the
+  rule on internal functions under Documentation Requirements bind the
+  lines a pull request adds or changes; editing lines inside an existing
+  function does not oblige the pull request to strip that function’s
+  roxygen block or to inline it, and a block it keeps stays in step with
+  the function (a new argument gets its `@param`). Banners, roxygen
+  blocks on internal functions and single-use helpers elsewhere stay
+  until the work tracked in \#699 removes them after 1.5.0; removing
+  them by hand on an open branch conflicts with every other branch that
+  edits the same file. A pull request opened on or before 11 November
+  2026 is not reworked to these rules or to the test rules added that
+  day (R11, the second half of R3), including commits it gains later;
+  once it has merged, its lines are left to that same work
 
 ``` r
 
@@ -190,17 +209,20 @@ user-facing aliases:
 
 ``` r
 
-.model_mixture3p <- function(resp_error, nt_features, set_size, ...) {
+.model_mixture3p <- function(resp_error = NULL, nt_features = NULL, set_size = NULL,
+                             version = "simple", call = NULL, ...) {
   structure(
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(nt_features, set_size),
-      parameters = list(kappa = "...", thetat = "..."),
-      links = list(kappa = "log", thetat = "identity"),
-      fixed_parameters = list(mu1 = 0),
-      default_priors = list(...)
+      parameters = list(mu = "...", kappa = "...", thetat = "...", thetant = "..."),
+      links = list(mu = "tan_half", kappa = "log", thetat = "softmax", thetant = "softmax"),
+      fixed_parameters = list(mu = 0),
+      default_priors = list(...),
+      version = version
     ),
-    class = c("bmmodel", "circular", "non_targets", "mixture3p")
+    class = c("bmmodel", "circular", "non_targets", "mixture3p", paste0("mixture3p_", version)),
+    call = call
   )
 }
 ```
@@ -211,7 +233,15 @@ user-facing aliases:
 
 #' @keywords bmmodel
 #' @export
-mixture3p <- function(...) { .model_mixture3p(...) }
+mixture3p <- function(resp_error, nt_features, set_size,
+                      version = c("simple", "slot", "slot_averaging"), ...) {
+  call <- match.call()
+  .check_constructor_dots(list(...))
+  stop_missing_args()
+  version <- match.arg(version)
+  .model_mixture3p(resp_error = resp_error, nt_features = nt_features,
+                   set_size = set_size, version = version, call = call, ...)
+}
 ```
 
 ### One Constructor per Response Type
@@ -230,7 +260,7 @@ the response format and branches throughout the pipeline
 ### Model Configuration Pipeline
 
 Each model needs a `configure_model.*` S3 method (one per version class
-when the versions are configured differently, as for `imm`, `ezdm` and
+when the versions are configured differently, as for `ezdm` and
 `cswald`), in the model’s own file (`R/model_<name>.R`); the generic is
 in `R/helpers-model.R`:
 
@@ -271,11 +301,13 @@ functions called from the formula.
 
 ## Testing Requirements
 
-**Always add/update tests** for a behaviour change - even if not
-explicitly requested. A refactor, a rename, or an extracted or inlined
-helper adds no test: the tests that covered the behaviour before still
-cover it, and a test that called a removed helper is rewritten against
-the function that now holds the code.
+**Always add/update tests** for a behaviour change (as defined under
+Package Requirements) - even if not explicitly requested. A refactor, a
+rename of an internal function, or an extracted or inlined helper adds
+no test: the tests that covered the behaviour before still cover it, and
+a test that called a removed helper is rewritten against the function
+that now holds the code. A reworded message adds no test either; a test
+that matched the old wording is updated to the new one.
 
 Test tiers (ADR 0004, the architecture decision record
 `.dev/decisions/0004-test-tiers-and-budget.md`): - `tests/testthat/` -
@@ -339,22 +371,25 @@ priors, inits, stored frame and
 [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md),
 [`pp_observables()`](https://venpopov.com/bmm/dev/reference/pp_observables.md),
 [`conditional_effects()`](https://venpopov.com/bmm/dev/reference/conditional_effects.bmmfit.md),
-report extraction, links) loop over the model-cases registry, never over
-a hand-typed list of models: `model_test_cases(kind)` in
-`helper-model-cases.R` reads one provider per model,
-`model_cases_<name>()` in `helper-model-<name>.R`. Every provider has a
-`stored_frame`, `sd_default`, `init` and `links` case (checked);
-`check_data`, `observables` and `fixture` cases where they apply. The
-header of `helper-model-cases.R` lists what each kind holds. - R5: A
-fixture has one chain, at most 300 KB and 200 draws, and is generated by
-`tests/local/make-fixtures.R` (seed and versions stored in the object).
-A new test loads it through `load_fixture_fit()`. - R6: The budget job
-fails when a test takes over 0.033 or a file over 0.23 of the summed
-time of all tests, or the suite over 1000 s of wall time, all measured
-on the 4-vCPU Ubuntu runner with four workers; no test has a cap of its
-own. A new test that takes more than a few seconds says in a comment why
-it needs the time. Run `devtools::test(reporter = "slow")` before
-opening a PR. The shares are read from the CI run; a local run on
+report extraction, links,
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md))
+loop over the model-cases registry, never over a hand-typed list of
+models: `model_test_cases(kind)` in `helper-model-cases.R` reads one
+provider per model, `model_cases_<name>()` in `helper-model-<name>.R`.
+Every provider has a `stored_frame`, `sd_default`, `init` and `links`
+case, and a `simulate` case per version for the model’s
+[`simulate_data()`](https://venpopov.com/bmm/dev/reference/simulate_data.md)
+method (checked); `check_data`, `observables` and `fixture` cases where
+they apply. The header of `helper-model-cases.R` lists what each kind
+holds. - R5: A fixture has one chain, at most 300 KB and 200 draws, and
+is generated by `tests/local/make-fixtures.R` (seed and versions stored
+in the object). A new test loads it through `load_fixture_fit()`. - R6:
+The budget job fails when a test takes over 0.033 or a file over 0.23 of
+the summed time of all tests, or the suite over 1000 s of wall time, all
+measured on the 4-vCPU Ubuntu runner with four workers; no test has a
+cap of its own. A new test that takes more than a few seconds says in a
+comment why it needs the time. Run `devtools::test(reporter = "slow")`
+before opening a PR. The shares are read from the CI run; a local run on
 another machine gives different shares (`test-conditional_effects.R`
 0.082 locally, 0.150 on CI), so the local run spots slow tests but does
 not check the caps. - R7: A `test-model_<name>.R` file tests that
@@ -397,13 +432,13 @@ Test patterns from codebase:
 
 ``` r
 
-test_that("check_data() produces expected errors", {
+test_that("a response column missing from the data stops the fit", {
+  model <- mixture2p(resp_error = "y")
+  formula <- bmf(thetat ~ 1, kappa ~ 1)
   expect_error(
-    check_data(model, data, formula),
-    "expected error message regex"
+    check_data(model, data.frame(x = 1), formula),
+    "not present in the data"
   )
-  expect_warning(..., "expected warning")
-  expect_silent(...) # for valid input
 })
 ```
 
