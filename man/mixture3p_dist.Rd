@@ -3,8 +3,6 @@
 \name{mixture3p_dist}
 \alias{mixture3p_dist}
 \alias{dmixture3p}
-\alias{pmixture3p}
-\alias{qmixture3p}
 \alias{rmixture3p}
 \title{Distribution functions for the three-parameter mixture model (mixture3p)}
 \usage{
@@ -18,10 +16,6 @@ dmixture3p(
   vp_nodes = 81L,
   log = FALSE
 )
-
-pmixture3p(q, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
-
-qmixture3p(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
 
 rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
 }
@@ -39,14 +33,17 @@ the mean of \code{J}.}
 \item{p_mem}{Vector of probabilities of a target response. For a
 \code{\link[=mixture3p]{mixture3p()}} fit these are \code{thetat} on its native scale (version
 \code{"simple"}, see \code{\link[=native_parameters]{native_parameters()}}) or \code{min(1, K / set_size) * ptarget}
-(versions \code{"slot"} and \code{"slot_averaging"}).}
+(versions \code{"slot"} and \code{"slot_averaging"}). The mapping is exact for
+\code{"slot"} and for \code{"slot_averaging"} up to \code{K = set_size}. Above capacity,
+slot averaging gives an item several slots and raises its precision,
+which these functions do not model.}
 
 \item{p_nt}{Vector of probabilities of a non-target response, summed over
 the non-targets, which share it equally. For a \code{\link[=mixture3p]{mixture3p()}} fit these are
 \code{thetant} on its native scale (version \code{"simple"}) or
-\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions). Unlike
-\code{ptarget}, \code{p_mem} and \code{p_nt} are not conditional on a response from
-memory.}
+\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions, with the limit
+for \code{"slot_averaging"} given under \code{p_mem}). Unlike \code{ptarget}, \code{p_mem} and
+\code{p_nt} are not conditional on a response from memory.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
@@ -63,18 +60,12 @@ it by name: in bmm 1.4 it was the sixth argument, which is now \code{tau}.
 Until bmm 1.6.0 a logical value in that position is still read as \code{log},
 with a warning.}
 
-\item{q}{Vector of quantiles}
-
-\item{p}{Vector of probability}
-
 \item{n}{Number of observations to generate data for}
 }
 \value{
 \code{dmixture3p} gives the density of the three-parameter mixture model,
-\code{pmixture3p} gives the cumulative distribution function of the
-three-parameter mixture model, \code{qmixture3p} gives the quantile function of
-the three-parameter mixture model, and \code{rmixture3p} gives the random
-generation function for the three-parameter mixture model.
+and \code{rmixture3p} gives the random generation function for the
+three-parameter mixture model.
 }
 \description{
 Density, distribution, and random generation functions for the

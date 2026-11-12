@@ -51,6 +51,7 @@ Suggests:
     ggplot2,
     ggthemes,
     insight (>= 1.6.0),
+    jsonlite,
     knitr,
     loo (>= 2.10.0),
     marginaleffects,
