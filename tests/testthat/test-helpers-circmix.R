@@ -253,6 +253,33 @@ test_that(".circmix_vp_ld() is accurate for far responses without guessing", {
   )
 })
 
+# Summing kappa cos_d - log I0(kappa) cancels the gamma weight of a grid node
+# away once kappa there nears 1e17 (kappa 1e12 already costs 2e-5), which moved the log
+# density of a response on the item up by 2.4 nats at tau 1e20 and 5.5 at 1e200.
+# At a huge tau nearly all precision mass sits at J ~ 0, so that response is
+# uniform to within 1e-7 here. At a huge kappa, kappa(J) = J + 1/2 and the
+# von Mises density at its mean is sqrt(kappa / (2 pi)) (1 + O(1 / kappa)), so
+# the density is E[sqrt(J / (2 pi))] to within 1e-9 from kappa 1e12 on.
+test_that(".circmix_vp_ld() is accurate at a huge kappa or tau for a response on the item", {
+  tau <- c(1e20, 1e200, 1e20, 1e200)
+  kappa <- c(5, 5, 50, 50)
+  expect_equal(
+    .circmix_vp_ld(matrix(1, 4), matrix(0, 4), rep(-Inf, 4), kappa, tau),
+    rep(-log(2 * pi), 4),
+    tolerance = 1e-7
+  )
+
+  cells <- expand.grid(kappa = c(1e12, 1e15), shape = c(2, 5, 100))
+  tau <- .circmix_J(cells$kappa) / cells$shape
+  expect_lt(
+    max(abs(
+      .circmix_vp_ld(matrix(1, 6), matrix(0, 6), rep(-Inf, 6), cells$kappa, tau) -
+        (0.5 * log(tau / (2 * pi)) + lgamma(cells$shape + 0.5) - lgamma(cells$shape))
+    )),
+    1e-9
+  )
+})
+
 # Below a gamma shape of 2 the J < 1e-4 part of the integral is analytic and
 # the grid starts at 1e-4; above it the grid follows the integrand. With
 # intercept-only kappa and tau every row crosses at once, so the step between
@@ -1045,6 +1072,53 @@ test_that("Stan matches R at a gamma shape of 0", {
       cells$kappa, cells$tau, 81L
     ),
     tolerance = 1e-12
+  )
+})
+
+# the R twin of this check is ".circmix_vp_ld() is accurate at a huge kappa or
+# tau for a response on the item"; at tau 1e17 the tail grid reaches kappa 1e17
+test_that("Stan matches R at a huge kappa or tau for a response on the item", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  tab <- .circmix_kappa_table()
+  cosd <- cos(c(0, 1.2))
+  logw <- log(c(0.5, 0.3))
+  tau <- c(1e17, 1e20, 1e200)
+  data <- list(
+    NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+    logJ_min = tab$logJ_min, dlogJ = tab$dlogJ,
+    NC = 2L, cosd = cosd, logw = logw, logw_guess = log(0.2),
+    kappa_het = c(3, 12), NKAP = 1L, kappa = array(2), NJ = 1L, Jtest = array(0.5),
+    NTAU = length(tau), tau = tau, NI0 = 1L, kappa_i0 = array(1),
+    kappa_vp = 50, nodes = 81L, K_slots = 1.5, ss_slots = 2L, ss_empty = 4L,
+    cosd_far = c(1, 1), logw_far = log(c(0.7, 0.3)), kappa_far = 5,
+    NFAR = length(tau), tau_far = tau,
+    nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2)
+  )
+  stan <- circmix_stan_values(data)
+
+  expect_equal(
+    stan("out_vp"),
+    vapply(tau, function(c_tau) {
+      .circmix_vp_ld(matrix(cosd, nrow = 1), matrix(logw, nrow = 1), log(0.2), 50, c_tau)
+    }, numeric(1)),
+    tolerance = 1e-10
+  )
+  expect_equal(
+    stan("out_far"),
+    .circmix_vp_ld(matrix(1, 3), matrix(0, 3), rep(-Inf, 3), 5, tau),
+    tolerance = 1e-10
+  )
+  expect_equal(stan("out_far"), rep(-log(2 * pi), 3), tolerance = 1e-7)
+
+  # the mode-centred scheme at a huge kappa
+  tau_mode <- .circmix_J(1e15) / c(2, 5, 100)
+  stan_mode <- circmix_stan_values(utils::modifyList(data, list(kappa_far = 1e15, tau_far = tau_mode)))
+  expect_equal(
+    stan_mode("out_far"),
+    .circmix_vp_ld(matrix(1, 3), matrix(0, 3), rep(-Inf, 3), 1e15, tau_mode),
+    tolerance = 1e-10
   )
 })
 

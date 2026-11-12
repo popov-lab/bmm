@@ -30,6 +30,21 @@
   out
 }
 
+# log(I0(kappa) e^-kappa). Stan has no scaled Bessel function, and there
+# log I0(kappa) - kappa loses up to 1e-13 below kappa 1e3, 8e-13 below 1e4 and
+# 8e-12 below 1e5, while the three-term series is accurate to 5e-15 from kappa
+# 2000 on; R switches at the same kappa so that the twins agree.
+.circmix_log_besselI0_scaled <- function(kappa) {
+  out <- log(besselI(kappa, 0, expon.scaled = TRUE))
+  large <- which(kappa >= 2000)
+  if (length(large)) {
+    k <- kappa[large]
+    out[large] <- -0.5 * log(2 * pi * k) +
+      log1p(1 / (8 * k) + 9 / (128 * k^2) + 225 / (3072 * k^3))
+  }
+  out
+}
+
 # Fisher information of a von Mises about its location
 .circmix_J <- function(kappa) {
   kappa * .circmix_A(kappa)
@@ -274,11 +289,17 @@
   ))
 }
 
+# The von Mises part is kappa (cos_d - 1) - log(I0(kappa) e^-kappa) rather than
+# kappa cos_d - log I0(kappa). The tail grid reaches J = 40 tau, and a huge
+# kappa puts the mode grid out there too; once kappa there nears 1e17 the term
+# kappa cos_d absorbs the gamma weight and - log I0(kappa) cancels the sum to
+# zero. At cos_d = 1 (a response on the item) that moved the log density by up
+# to 5.8 nats, and kappa 1e12 already lost 2e-5.
 .circmix_vp_log_integrand <- function(t, cos_d, shape, tau, tab) {
   J <- exp(t)
   kappa <- .circmix_kappa(J, tab)
   t + stats::dgamma(J, shape = shape, scale = tau, log = TRUE) +
-    kappa * cos_d - .circmix_log_besselI0(kappa) - log(2 * pi)
+    kappa * (cos_d - 1) - .circmix_log_besselI0_scaled(kappa) - log(2 * pi)
 }
 
 # First and second derivatives of .circmix_vp_log_integrand() in t, from

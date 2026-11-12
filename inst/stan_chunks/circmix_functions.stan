@@ -45,6 +45,15 @@
                           + (s3 - s2) * dlogk[i + 1]));
   }
 
+  // log(I0(kappa) e^-kappa), as .circmix_log_besselI0_scaled(): log I0(kappa) - kappa loses up to 8e-13 below kappa 1e4, the series 5e-15 from 2000 on
+  real circmix_log_besselI0_scaled(real kappa) {
+    if (kappa < 2000) {
+      return log_modified_bessel_first_kind(0, kappa) - kappa;
+    }
+    return -0.5 * log(2 * pi() * kappa)
+           + log1p(inv(8 * kappa) + 9 / (128 * square(kappa)) + 225 / (3072 * kappa^3));
+  }
+
   // von Mises mixture sharing one kappa plus uniform guessing; normalised log weights, cosd = cos(y - mu_k)
   real circmix_ld(vector cosd, vector logw, real logw_guess, real kappa) {
     return log_sum_exp(log_sum_exp(logw + kappa * cosd)
@@ -136,8 +145,9 @@
       real ti = lo + (i - 1) * step;
       real J = exp(ti);
       real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
+      // kappa c - log I0(kappa) would cancel the gamma weight away once kappa nears 1e17, see .circmix_vp_log_integrand()
       lp[i] = circmix_simpson_lw(i, nodes) + ti + gamma_lpdf(J | shape, rate)
-              + kappa * c - log_modified_bessel_first_kind(0, kappa);
+              + kappa * (c - 1) - circmix_log_besselI0_scaled(kappa);
     }
     return log_sum_exp(log_sum_exp(lp) + log(step / 3), log(tail)) - log(2 * pi());
   }
@@ -174,7 +184,7 @@
       real J = exp(ti);
       real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
       lp[i] = circmix_simpson_lw(i, nodes) + ti + gamma_lpdf(J | shape, rate)
-              + kappa * c - log_modified_bessel_first_kind(0, kappa);
+              + kappa * (c - 1) - circmix_log_besselI0_scaled(kappa);
     }
     return log_sum_exp(lp) + log(step / 3) - log(2 * pi());
   }
