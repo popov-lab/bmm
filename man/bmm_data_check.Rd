@@ -64,7 +64,7 @@ are summed: the \code{n_trials} column of \code{sdt_yn()}, \code{sdt_mafc()} and
 models a row is one trial. With one row per trial
 (\code{sdt_yn()} and \code{sdt_mafc()} without \code{n_trials}, \code{sdt_rating()} with
 \code{n_ratings}, \code{sdt_ranking()} with one rank column, \code{sdt_cdp()} with
-\code{judgment} and \code{confidence}), only the first
+\code{judgment} and \code{confidence}, \code{mpt()} with \code{response}), only the first
 grouping variable of the formula, taken as the participant, and any
 grouping variable that is also a discrete predictor are crossed; the
 other grouping variables, such as items, are counted per level

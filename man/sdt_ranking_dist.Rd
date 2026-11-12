@@ -20,7 +20,8 @@ rsdt_ranking(n, n_trials, m, d, sdratio = 1, dist = c("gumbel_min", "normal"))
 \arguments{
 \item{counts}{Integer matrix with one row per observation and one rank-count
 column per rank position (1 = most likely target), or a vector for a
-single observation. Columns beyond a row's set size \code{m} must be 0.}
+single observation. A data frame is read as the matrix of its rows.
+Columns beyond a row's set size \code{m} must be 0.}
 
 \item{m}{Integer vector. Number of ranked items per observation. Must be
 at least 2 and no larger than the number of count columns.}
@@ -32,8 +33,9 @@ another \code{sdratio} it is the balanced index \eqn{d_a} that \code{\link[=sdt_
 reports (in root-mean-square SD units).}
 
 \item{sdratio}{Numeric vector. Ratio of signal to noise standard deviations
-(default 1, i.e., equal variance). Must be positive. Only used when
-\code{dist = "normal"}.}
+(default 1, i.e., equal variance). Must be positive. Read only with
+\code{dist = "normal"}; with \code{dist = "gumbel_min"} any value other than 1
+stops.}
 
 \item{dist}{Character. The distribution assumed for the latent evidence:
 "gumbel_min" (default), the smallest extreme value distribution with
@@ -50,9 +52,10 @@ closed form; or "normal", Gaussian UV-SDT by numerical integration.}
 \value{
 \code{dsdt_ranking} returns the (log-)density (multinomial probability).
 \code{rsdt_ranking} returns an integer matrix with one row per observation and
-one rank-count column per rank position (\code{rank1} ... \verb{rank max(m)}); rows
-with a smaller set size have structural zeros in the surplus columns,
-matching the wide format \code{\link[=sdt_ranking]{sdt_ranking()}} expects.
+one rank-count column per rank position, \code{rank1} to \verb{rank<M>}, where \code{M}
+is the largest \code{m} of the draws; with \code{n = 0} it is the largest of all
+\code{m} given. Rows with a smaller set size have structural zeros in the
+surplus columns, matching the wide format \code{\link[=sdt_ranking]{sdt_ranking()}} expects.
 }
 \description{
 Density and random generation for ranking signal detection
@@ -69,6 +72,55 @@ a ratio of \code{exp(0.375) = 1.455}, and passing \code{0.375} here instead asks
 signal distribution 2.7 times narrower than the noise. That is a legal
 value and raises no error, so exponentiate first. \code{d} carries across
 unchanged.
+}
+
+\section{Vector arguments}{
+
+\itemize{
+\item \verb{r*(n, ...)} returns exactly \code{n} draws: a vector, or a data frame or matrix
+with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
+number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, and a matrix is read element
+by element; only a set of values per draw, such as \code{thresholds}, takes
+row \code{i} of a matrix (see below). A shorter vector is
+repeated, also when \code{n} is not a multiple of its length. Until bmm 1.6.0
+at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and parameter vectors still
+returns one draw per element, with a deprecation warning.
+\item \code{n} is a single number of at least 0. A fraction is truncated, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}, and \code{n = 0} gives an empty vector, or a matrix or data
+frame with zero rows and the usual columns. Unlike \code{\link[stats:rnorm]{stats::rnorm()}},
+which takes the length of a vector \code{n}, these functions stop on one;
+\code{\link[=rddm]{rddm()}} still takes its length, with a deprecation warning.
+\item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
+\code{x} (its rows, when the observations are rows of counts) and the
+per-observation arguments, the others recycled to that length. Value \code{i}
+is what the call on the \code{i}-th elements alone returns. A matrix in an
+argument that takes one number per observation, such as \code{x} or \code{d}, holds
+one observation per element, as in \code{\link[stats:dnorm]{stats::dnorm()}}. When \code{x} or any
+per-observation argument is empty, the result is empty, as in
+\code{\link[stats:dnorm]{stats::dnorm()}}. A \code{NULL} argument, such as a misspelt column of a data
+frame, counts as empty, except where the default is \code{NULL}, as for
+\code{criterion} or \code{kcrit}: there it means that the argument is not given.
+Where an observation is a vector of counts
+(\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()}, \code{dsdt_ranking()} and
+\code{dsdt_cdp()}), or the pair of \code{mean_rt} or \code{var_rt} values of
+\code{dezdm(version = "4par")}, a vector is always one observation: pass a
+matrix with zero rows for none, as an empty vector stops. An empty
+\code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
+\item A set of values that describes one observation, such as the \code{thresholds}
+of the rating models, is a vector when every observation shares it and a
+matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}.
+\item Configuration arguments such as \code{version}, \code{dist}, \code{log},
+\code{parametrization} and \code{n_new} are single values and are never recycled.
+An argument that a version does not use, such as \code{zr} of
+\code{dezdm(version = "3par")}, is ignored.
+}
 }
 
 \examples{

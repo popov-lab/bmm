@@ -19,7 +19,10 @@
 #' @param file_compress Logical or a character string, specifying one of the
 #'   compression algorithms supported by [saveRDS] when saving the updated
 #'   model object.
-#' @param ... Further arguments passed to [brms::update.brmsfit()]
+#' @param ... Further arguments passed to [brms::update.brmsfit()].
+#'   `stanvars` are added to the ones the model sets up. The `stanvars` you
+#'   gave the original fit are not carried over, so pass them again, as in
+#'   `update(fit, newdata = d, stanvars = sv)`.
 #' @return An updated `bmmfit` object refit to the new data and/or formula. If
 #'   `file` is given, it names the newly written file. If not, the `file` field
 #'   is carried over from the original fit, so the updated object still points
@@ -143,12 +146,14 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     logical(1)
   )]
 
+  notice_data <- NULL
   if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
     data <- check_stored_data(model, newdata %||% olddata, user_formula)
     from_stored_frame <- !missing(formula.)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
+    notice_data <- newdata
     from_stored_frame <- FALSE
     attr(data, "data_name") <- substitute_name(newdata)
   }
@@ -204,6 +209,15 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     configure_prior,
     c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
   )
+  if (!is.null(notice_data) && missing(formula.)) {
+    update_data_notice(model, notice_data, user_formula, prior, function() {
+      rechecked <- check_model(model, notice_data, user_formula)
+      suppressWarnings(suppressMessages(brms::do_call(
+        configure_prior,
+        c(list(rechecked, data, config_args$formula, user_prior), fit_frame_args(object, dots))
+      )))
+    })
+  }
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 
@@ -405,7 +419,12 @@ revert_check_data.m3 <- function(model, data) {
 #' @exportS3Method
 revert_check_data.mpt <- function(model, data) {
   resp_cats <- model$resp_vars$resp_cats
-  data[resp_cats] <- as.data.frame(unclass(data$Y)[, resp_cats, drop = FALSE])
+  counts <- unclass(data$Y)[, resp_cats, drop = FALSE]
+  if (is_trial_level(model)) {
+    data[[model$other_vars$response]] <- resp_cats[max.col(counts, ties.method = "first")]
+  } else {
+    data[resp_cats] <- as.data.frame(counts)
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   tree_id <- model$other_vars$tree_id
@@ -464,6 +483,12 @@ revert_check_data.sdt_yn <- function(model, data) {
   if (is_trial_level(model)) {
     data$nTrials <- NULL
   }
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.psychometric_function <- function(model, data) {
+  data[intersect(.psychometric_reserved_cols, colnames(data))] <- NULL
   NextMethod("revert_check_data")
 }
 
@@ -598,4 +623,19 @@ is_same_run <- function(object, dots) {
   !is.null(object$backend) && !is.null(object$algorithm) &&
     identical(dots$backend %||% object$backend, object$backend) &&
     identical(dots$algorithm %||% object$algorithm, object$algorithm)
+}
+
+# a model whose check_model() fits its default priors to the data keeps those
+# priors when update() gets new data under the old formula; its method says so
+# when the new data would have given other priors. `prior` is the prior the
+# update uses, and `rechecked_prior()` builds the one a model re-checked on the
+# new data would use: a function, so that only a method that compares them
+# pays for the second check_model() and configure_prior()
+update_data_notice <- function(model, data, formula, prior, rechecked_prior) {
+  UseMethod("update_data_notice")
+}
+
+#' @exportS3Method
+update_data_notice.default <- function(model, data, formula, prior, rechecked_prior) {
+  invisible()
 }

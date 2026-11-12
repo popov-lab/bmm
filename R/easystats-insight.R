@@ -240,11 +240,14 @@ link_inverse.bmmfit <- function(x, ...) {
 # The model frame, with the trial rows of a multinomial model (sdt_rating(),
 # sdt_ranking(), sdt_cdp()) turned from their one-hot response matrix back
 # into the user's response columns, which lead as the response leads the frame.
-# The trial rows of the binomial models keep the user's column in the frame
+# The trial rows of the binomial models keep the user's column in the frame.
+# mpt() trial rows keep their one-hot category columns: its resp_vars name the
+# categories, which find_response() reports, not the user's response column
 .insight_trial_frame <- function(x) {
   model <- x$bmm$model
   response <- all.vars(brms::brmsterms(x$formula)$respform)[1]
-  if (!is_trial_level(model) || !is.matrix(x$data[[response]])) {
+  if (!inherits(model, c("sdt_rating", "sdt_ranking", "sdt_cdp")) ||
+      !is_trial_level(model) || !is.matrix(x$data[[response]])) {
     return(x$data)
   }
   data <- revert_check_data(model, x$data)

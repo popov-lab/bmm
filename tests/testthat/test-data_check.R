@@ -493,6 +493,28 @@ test_that("data_check_finding rejects an unrecognized severity", {
   expect_equal(data_check_finding("note", "text")$severity, "note")
 })
 
+test_that("the trial-level mpt report counts trials per participant, not category columns", {
+  # 4 subjects x 10 items, subject 4 saw only 5 items; data_trials() would read
+  # NA from the missing count columns and check no cell at all
+  dat <- expand.grid(id = 1:4, item = 1:10)
+  dat <- dat[!(dat$id == 4 & dat$item > 5), ]
+  dat$item_type <- ifelse(dat$item %% 2 == 0, "old", "new")
+  dat$resp <- ifelse((dat$id + dat$item) %% 3 == 0, "old", "new")
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  res <- bmm_data_check(bmf(D ~ 1 + (1 | id) + (1 | item), g ~ 1 + (1 | id)), dat, model)
+  expect_null(res$pipeline$error)
+  expect_null(data_trials(model, dat))
+  expect_identical(res$cells$unit, "observations")
+  expect_null(res$n_trials)
+  expect_equal(res$cells$group_vars, "id")
+  expect_equal(
+    finding_messages(res),
+    "1 design cell(s) have fewer than 10 observations: id=4 (n=5)"
+  )
+  expect_identical(res$response$variable, "resp")
+  expect_false(any(grepl("not present", finding_messages(res))))
+})
+
 test_that("the trial-level report crosses only the participant variable and counts items per level", {
   # 4 subjects x 10 items, subject 4 saw only 5 items
   dat <- expand.grid(id = 1:4, item = 1:10)

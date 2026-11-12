@@ -713,6 +713,13 @@ construct_default_priors_list <- function(par, bterms, default_priors, data) {
     return(priors)
   }
 
+  # the main prior belongs to an intercept or to the levels of a fixed-effect
+  # predictor; with neither it has no coefficient to attach to, and brms
+  # rejects a prior on a coefficient the model lacks (#689)
+  if (fixed_effects_count == 0 && interactions_count == 0) {
+    return(priors)
+  }
+
   # priors when intercept is supressed and all levels are explicit
   if ((fixed_effects_count == 1 && interactions_count == 0) || interaction_only) {
     levels_only_prior <- .build_prior(prior_desc[[1]], "b", par = par, bterms = bterms)

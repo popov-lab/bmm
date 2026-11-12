@@ -341,6 +341,29 @@ test_that("ppp() rebuilds the tree column of an mpt fit that no formula kept", {
   expect_identical(.ppp_data(fit$bmm$model, fit)$item_type, fit$data$item_type)
 })
 
+test_that("ppp() rebuilds the tree column and counts of a trial-level mpt frame", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type", response = "resp")
+  trials <- mpt_trial_data()
+  checked <- check_data(model, trials, bmf(D ~ 1 + (1 | id), g ~ 1))
+  # brms keeps only the formula's columns: no tree column, no label column
+  fit <- list(data = checked[c("id", "nTrials", "Idx_old", "Idx_new")])
+  fit$data$Y <- checked$Y
+  data <- .ppp_data(model, fit)
+  expect_identical(as.character(data$item_type), trials$item_type)
+  expect_identical(.ppp_default_by(model, list(bmm = list(user_formula = bmf(D ~ 1))), data),
+                   "item_type")
+
+  local_mocked_bindings(posterior_predict = function(...) array(0, c(2, 20, 2)),
+                        posterior_epred = function(...) array(0.5, c(2, 20, 2)),
+                        .package = "brms")
+  counts <- .ppp_counts(model, fit, draw_ids = 1:2)
+  expect_equal(unname(counts$observed[, "old"]), as.numeric(trials$resp == "old"))
+  # one cell per tree: the trial rows sum to the counts of an aggregated frame
+  cells <- .ppp_rowsum(array(counts$observed, c(1, 20, 2)), .ppp_index(data["item_type"]))
+  # cells in the order of the trees (factor levels old, new); columns old, new
+  expect_equal(cells[1, , ], rbind(c(8, 2), c(2, 8)), ignore_attr = TRUE)
+})
+
 test_that("ppp() checks 'by' before it computes any counts", {
   fit <- ppp_toy_fit(data.frame(item_type = c("old", "new")))
   local_mocked_bindings(
