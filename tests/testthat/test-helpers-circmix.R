@@ -275,11 +275,13 @@ test_that(".circmix_vp_ld() is accurate at a huge kappa or tau for a response on
     tolerance = 1e-7
   )
 
-  cells <- expand.grid(kappa = c(1e12, 1e15), shape = c(2, 5, 100))
+  # past kappa ~1e16, 1 / tau + 1 - cos_d rounds to 0 at cos_d = 1 unless the
+  # mode scheme's start groups (1 - cos_d) first
+  cells <- expand.grid(kappa = c(1e12, 1e15, 1e17, 1e100), shape = c(2, 5, 100))
   tau <- .circmix_J(cells$kappa) / cells$shape
   expect_lt(
     max(abs(
-      .circmix_vp_ld(matrix(1, 6), matrix(0, 6), rep(-Inf, 6), cells$kappa, tau) -
+      .circmix_vp_ld(matrix(1, 12), matrix(0, 12), rep(-Inf, 12), cells$kappa, tau) -
         (0.5 * log(tau / (2 * pi)) + lgamma(cells$shape + 0.5) - lgamma(cells$shape))
     )),
     1e-9
@@ -1118,14 +1120,17 @@ test_that("Stan matches R at a huge kappa or tau for a response on the item", {
   )
   expect_equal(stan("out_far"), rep(-log(2 * pi), 3), tolerance = 1e-7)
 
-  # the mode-centred scheme at a huge kappa
-  tau_mode <- .circmix_J(1e15) / c(2, 5, 100)
-  stan_mode <- circmix_stan_values(utils::modifyList(data, list(kappa_far = 1e15, tau_far = tau_mode)))
-  expect_equal(
-    stan_mode("out_far"),
-    .circmix_vp_ld(matrix(1, 3), matrix(0, 3), rep(-Inf, 3), 1e15, tau_mode),
-    tolerance = 1e-10
-  )
+  # the mode-centred scheme at a huge kappa, past the kappa ~1e16 where the
+  # start's rate + 1 - c rounds to 0 unless (1 - c) is grouped first
+  for (kappa_mode in c(1e17, 1e100)) {
+    tau_mode <- .circmix_J(kappa_mode) / c(2, 5, 100)
+    stan_mode <- circmix_stan_values(utils::modifyList(data, list(kappa_far = kappa_mode, tau_far = tau_mode)))
+    expect_equal(
+      stan_mode("out_far"),
+      .circmix_vp_ld(matrix(1, 3), matrix(0, 3), rep(-Inf, 3), kappa_mode, tau_mode),
+      tolerance = 1e-10
+    )
+  }
 })
 
 test_that("the Stan gradient of the variable-precision density is right below shape 2", {

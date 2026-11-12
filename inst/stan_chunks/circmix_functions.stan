@@ -160,7 +160,7 @@
       return circmix_vp_component_tail(c, shape, tau, nodes, logk, dlogk, logJ_min, dlogJ);
     }
     real rate = inv(tau);
-    real t = log((shape + 0.5) / (rate + 1 - c));
+    real t = log((shape + 0.5) / (rate + (1 - c)));
     for (i in 1:4) {
       vector[2] d = circmix_vp_slopes(t, c, shape, tau, logk, dlogk, logJ_min, dlogJ);
       real newton;

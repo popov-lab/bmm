@@ -235,7 +235,7 @@
 # The weights are not renormalised: the grid follows the integrand, not the
 # prior, so their sum is not an approximation of the prior's mass.
 .circmix_vp_component_mode <- function(cos_d, shape, tau, nodes, tab) {
-  t <- log((shape + 0.5) / (1 / tau + 1 - cos_d))
+  t <- log((shape + 0.5) / (1 / tau + (1 - cos_d)))
   for (i in 1:4) {
     slopes <- .circmix_vp_slopes(t, cos_d, shape, tau, tab)
     step <- ifelse(slopes$d2 < 0, -slopes$d1 / slopes$d2, ifelse(slopes$d1 > 0, 1, -1))
