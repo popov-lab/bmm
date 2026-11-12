@@ -40,6 +40,7 @@
 * `stanvars` passed to `bmm()`, `update()`, `stancode()`, `standata()` or `default_prior()` are now added to the Stan code and data the model sets up instead of replacing them (#688). Before, any stanvar of your own, a data one included, could make the Stan program fail to compile with errors like `Identifier "circmix_logk" not in scope`. A stanvar that repeats one of the model's now stops with a message: pass only your own stanvars, not `fit$stanvars`, and rename any that share a name. `update()` does not carry over the stanvars of the original fit; pass them again.
 * A parameter whose formula has no population-level coefficients (no intercept and no predictor), such as `K ~ 0 + offset(lK)` or `thetat ~ 0`, no longer stops `bmm()` and `stancode()` with "The following priors do not correspond to any model parameter" (#689). Such a parameter now gets no default prior on population-level effects, while a group-level term such as `(1 | ID)` keeps its default prior. An offset can now fix a parameter per observation, and `update()` with `newdata` holding new offset values reuses the compiled model.
 * A model with a bound on its regression coefficients, such as `prior(normal(0, 1), class = b, dpar = kappa, lb = 0)` for a monotonic effect, now starts sampling (#694). Before, chains stopped with "Rejecting initial value" and "Lower bounded variable ... must be greater than or equal to 0", and passing your own `init` was the only way around it. Bounds on an intercept or on a group-level standard deviation (`class = sd`) are respected too.
+* `dsdm()`, and so `log_lik()` and `loo()` on `sdm()` fits, stopped with "non-finite function value" for large `c` and `kappa` (`dsdm(0, 0, 150, 200)`). It now returns the density there, and is accurate to about 1e-12 on the log scale elsewhere (#558).
 
 ### Deprecated functions and arguments
 * mixture2p, mixture3p and imm: the location parameter `mu1` is now called `mu`. Formulas and `links` that name `mu1` still work, with a warning, until bmm 1.6.0 at the earliest; rename it to `mu`. The draws of the location lose the name as well: `b_mu1_Intercept` is now `b_Intercept` (#434).
@@ -49,6 +50,7 @@
 * `rejection_sampling()` is deprecated and will be removed in bmm 1.6.0 at the earliest. It was the sampler behind `rsdm()`, which no longer needs it; it still works, with a warning (#444).
 * `dmixture2p()`, `dmixture3p()` and `dimm()`: passing `log` by position is deprecated, because `tau` now takes that position. Until bmm 1.6.0 a logical value there is still read as `log`, with a warning; write `log = TRUE` instead (#398).
 * `pmixture2p()`, `qmixture2p()`, `pmixture3p()`, `qmixture3p()`, `pimm()` and `qimm()` are removed. They were never implemented and always stopped with an error (#556).
+* `parametrization` of `dsdm()`, `psdm()`, `qsdm()` and `rsdm()` is deprecated and will be removed in bmm 1.6.0 at the earliest. Replace `parametrization = "sqrtexp"` with `scaling = "density"`, or drop it, as it is the default. For `parametrization = "bessel"`, convert `c` with `c_bessel2sqrtexp(c, kappa)` (#558).
 
 ### Changes to default priors
 <!-- From 1.5.0 every change to a default prior is listed here (ADR 0008 § D4); defaults do not change inside a minor line. -->
@@ -104,7 +106,6 @@
 * `ddm()` and `cswald()` now check response times and responses alike (#557). A factor or date-time response time now stops with a message asking for a number. Before, a factor stopped `cswald()` with "missing value where TRUE/FALSE needed"; a date-time, and a factor in `ddm()`, failed later in brms. A response time of 0 now stops too. In `ddm()`, `cswald(version = "crisk")` and for correct responses in `cswald()`, such a fit failed as sampling started; an error response at 0 in `cswald()` was ignored. Remove these rows. `ddm()` accepts a factor response labelled "upper" and "lower".
 * `sdm()` fits overestimated the likelihood when `c` and `kappa` were both large, without a warning, and pulled the estimates there toward larger `c` and `kappa`. On simulated data the estimates drifted far above the true values. The likelihood is now accurate across the parameter range, and fits take about as long as before. Refit `sdm()` models whose estimates reach large `c` and `kappa`. Fits such as the one in the SDM article change no more than sampling noise (#615).
 * Fits with a random slope on a predictor such as a trial number, an identity link with random effects, or `mo()` or `s()` terms no longer stop with "Rejecting initial value" when your data bound a parameter, such as `ndt`, which must stay below your fastest response time. `ddm()` now starts `ndt` below your fastest response time, as `cswald()` does (#621).
-* `dsdm()`, and so `log_lik()` and `loo()` on `sdm()` fits, stopped with "non-finite function value" for large `c` and `kappa` (`dsdm(0, 0, 150, 200)`). It now returns the density there, and is accurate to about 1e-12 on the log scale elsewhere (#558).
 
 ### Other changes
 * `cswald()` now warns when the prior for `ndt` puts most of its mass at or above your fastest response time, which `ndt` must stay below. Such a fit can fail to start. The warning suggests a prior with a lower location; filtering out anticipations helps too (#548).
@@ -112,9 +113,6 @@
 * `cswald()` now drops rows with a missing response time or response and warns, as `ddm()` does. It stopped and asked you to remove them (#557).
 * In bmm 1.6.0 the default of `log` in `dm3()`, `dmpt()`, `dddm()`, `dcswald()` and `dezdm()` changes from `TRUE` to `FALSE`, as in base R and the other density functions of bmm. A call without `log` then returns the density, not the log density. Nothing changes in 1.4.2 or 1.5.0. Pass `log = TRUE` to keep the log density (#553).
 * bmm works with CmdStanR 1.0. With CmdStanR 1.0 and brms 2.23.0 or older, `update()` can fail on a fit saved with an older CmdStanR, with `argument "show_progress_bar" is missing`. Install brms from GitHub with `remotes::install_github("paul-buerkner/brms")` until a newer brms is on CRAN, or call `update(fit, recompile = TRUE)`. `bmm_setup()` now warns about this combination.
-
-### Deprecated functions and arguments
-* `parametrization` of `dsdm()`, `psdm()`, `qsdm()` and `rsdm()` is deprecated and will be removed in bmm 1.6.0 at the earliest. Replace `parametrization = "sqrtexp"` with `scaling = "density"`, or drop it, as it is the default. For `parametrization = "bessel"`, convert `c` with `c_bessel2sqrtexp(c, kappa)` (#558).
 
 ### Documentation
 * `citation("bmm")` and `?bmm` now cite the bmm tutorial as published in Behavior Research Methods, with its volume, issue and article number; `?bmm` cited the 2023 preprint (#432).
