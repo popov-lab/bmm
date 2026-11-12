@@ -1,7 +1,7 @@
 #' @title Vector arguments of the distribution functions
 #'
 #' @description The density (`d*()`) and random generation (`r*()`) functions
-#'   of the sdm, ddm and ezdm models, of the signal detection models
+#'   of the sdm, ddm, ezdm and ezcdm models, of the signal detection models
 #'   (`sdt_yn`, `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`,
 #'   `sdt_ranking` and `sdt_cdp`) and of the psychometric function take their
 #'   per-observation arguments as vectors, or as matrices with one row per
@@ -2792,6 +2792,8 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #'
 #' @name ezcdm_dist
 #'
+#' @inheritSection bmm_distributions Vector arguments
+#'
 #' @param mean_angle Observed circular mean of the response angles, in radians.
 #' @param var_angle Observed circular variance of the response angles (one
 #'   minus the mean resultant length), in \eqn{[0, 1]}.
@@ -2919,11 +2921,8 @@ dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
   stopif(isTRUE(any(var_angle < 0 | var_angle > 1)), "var_angle must be between 0 and 1")
   stopif(isTRUE(any(var_rt <= 0)), "var_rt must be positive")
 
-  n <- max(
-    length(mean_angle), length(var_angle), length(mean_rt), length(var_rt),
-    length(n_trials), length(drift), length(bound), length(ndt),
-    length(driftangle)
-  )
+  n <- .obs_length(mean_angle, var_angle, mean_rt, var_rt, n_trials, drift, bound, ndt, driftangle)
+  if (n == 0L) return(numeric(0))
   mean_angle <- rep_len(mean_angle, n)
   var_angle <- rep_len(var_angle, n)
   mean_rt <- rep_len(mean_rt, n)
@@ -2947,8 +2946,8 @@ dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
 #' @rdname ezcdm_dist
 #' @export
 rezcdm <- function(n, n_trials, drift, bound, ndt, driftangle = 0) {
-  stopif(length(n) != 1 || n < 1 || n %% 1 != 0, "n must be a single positive integer")
   .check_ezcdm_pars(drift, bound, ndt, n_trials)
+  n <- .n_draws(n)
   stopif(anyNA(n_trials), "n_trials must not contain missing values")
 
   n_trials <- rep_len(n_trials, n)

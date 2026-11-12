@@ -5,7 +5,7 @@
 # interleaves parameter groups and compares each group with a reference
 # outside the function's own code (a closed form, quadrature, or the single-
 # trial density of the matching d*()). Every per-observation argument of the
-# sdm, ddm, ezdm, SDT and psychometric d*() and r*() functions is varied in at least one
+# sdm, ddm, ezdm, ezcdm, SDT and psychometric d*() and r*() functions is varied in at least one
 # test with a vector (matrix) whose recycled form reads differently reversed:
 # a mutant that reverses any one of them after recycling (the rezdm() ones
 # once per version) fails a test in this file or in test-distributions.R.
@@ -1012,6 +1012,44 @@ test_that("rpsychometric_function() pairs intensity, midpoint, width, rates and 
   expect_equal(y, c(0, 0, 50, 0, 0, 50, 50))
 })
 
+# --- ezcdm --------------------------------------------------------------------
+
+test_that("dezcdm() recycles the summary statistics and the parameters to the longest argument", {
+  expect_elementwise(dezcdm, list(mean_angle = c(0.1, -0.2, 0.3), var_angle = c(0.2, 0.3), mean_rt = c(0.9, 1, 0.8, 1.1),
+                                  var_rt = c(0.1, 0.12, 0.08), n_trials = c(100, 80), drift = c(2, 1.5, 2.5, 1.8),
+                                  bound = c(1.5, 1.2, 1.8), ndt = c(0.3, 0.25), driftangle = c(0, 0.1, -0.1)),
+                     fixed = list(log = TRUE))
+  expect_elementwise(dezcdm, list(mean_angle = c(0.1, -0.2, 0.3, 0.05, -0.1), var_angle = 0.2, mean_rt = 0.9,
+                                  var_rt = c(0.1, 0.12, 0.08, 0.11), n_trials = 100, drift = c(2, 1.5, 2.5), bound = 1.5, ndt = 0.3))
+})
+
+test_that("rezcdm() pairs trials, drift, bound, non-decision time and drift angle per draw", {
+  withr::local_seed(4449)
+  n_trials <- c(50, 100, 200)
+  drift <- c(1, 2, 3)
+  bound <- c(1.5, 1, 2)
+  ndt <- c(0.2, 0.5, 0.3)
+  n <- 1500
+  g <- group_of(n, 3)
+  sim <- rezcdm(n, n_trials, drift, bound, ndt)
+  expect_identical(nrow(sim), as.integer(n))
+  expect_identical(sim$n_trials, rep_len(n_trials, n))
+  for (k in 1:3) {
+    # the mean response time of the circular diffusion with sigma = 1,
+    # ndt + (a / v) I1(av) / I0(av) (Smith, 2016)
+    kappa <- bound[k] * drift[k]
+    mrt <- ndt[k] + bound[k] / drift[k] * besselI(kappa, 1) / besselI(kappa, 0)
+    obs <- sim$mean_rt[g == k]
+    expect_mean_near(obs, mrt, sd(obs) / sqrt(length(obs)))
+  }
+  # n not a multiple of the length of driftangle: draw i takes element i, and
+  # a concentration of 100 over 50 trials puts each circular mean within
+  # about 0.015 of its drift angle
+  sim <- NULL
+  expect_no_warning(sim <- rezcdm(7, n_trials = 50, drift = 10, bound = 10, ndt = 0.3, driftangle = c(-2, 0, 2, 1)))
+  expect_lt(max(abs(sim$mean_angle - rep_len(c(-2, 0, 2, 1), 7))), 0.2)
+})
+
 # --- empty observations ---------------------------------------------------------
 
 test_that("the d*() functions return an empty result for no observations", {
@@ -1030,6 +1068,7 @@ test_that("the d*() functions return an empty result for no observations", {
   expect_identical(dsdt_cdp(matrix(0, 0, 9), 1, dfam = 0.8, drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
                             rcrit = 0.5, n_new = 3), numeric(0))
   expect_identical(dpsychometric_function(numeric(0), 1, midpoint = 1:2, width = 1), numeric(0))
+  expect_identical(dezcdm(numeric(0), 0.2, 0.9, 0.1, 100, drift = 1:2, bound = 1, ndt = 0.3), numeric(0))
 })
 
 test_that("a NULL per-observation argument is empty, as a misspelt data column", {
@@ -1068,14 +1107,17 @@ test_that("a NULL per-observation argument is empty, as a misspelt data column",
                     c("stimulus", "dfam", "drec", "rcrit", "sigmar", "rho")),
     dpsychometric = case(dpsychometric_function, list(x = 5, intensity = 1, midpoint = 1, width = 1, guess = 0.1,
                                                       lapse = 0.05, n_trials = 10),
-                         c("x", "intensity", "midpoint", "width", "guess", "lapse", "n_trials"))
+                         c("x", "intensity", "midpoint", "width", "guess", "lapse", "n_trials")),
+    dezcdm = case(dezcdm, list(mean_angle = 0.1, var_angle = 0.2, mean_rt = 0.9, var_rt = 0.1, n_trials = 100,
+                               drift = 2, bound = 1.5, ndt = 0.3, driftangle = 0),
+                  c("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials", "drift", "bound", "ndt", "driftangle"))
   )
   out <- list()
   for (nm in names(cases)) {
     cs <- cases[[nm]]
     for (a in cs$args) out[[paste(nm, a)]] <- do.call(cs$f, replace(cs$base, a, list(NULL)))
   }
-  expect_identical(out, setNames(rep(list(numeric(0)), 62), names(out)))
+  expect_identical(out, setNames(rep(list(numeric(0)), 71), names(out)))
 })
 
 test_that("NULL in an optional argument means it is not given", {

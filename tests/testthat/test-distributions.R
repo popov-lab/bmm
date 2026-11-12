@@ -778,7 +778,8 @@ test_that("the samplers read n as rnorm() does", {
     rsdt_cdp_rkg = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = thr, rcrit = 0.5,
                                         kcrit = 0, n_new = 1),
     rpsychometric_function = function(n) rpsychometric_function(n, 0, midpoint = 0, width = 1),
-    rsdm = function(n) rsdm(n, mu = 0, c = 3, kappa = 3)
+    rsdm = function(n) rsdm(n, mu = 0, c = 3, kappa = 3),
+    rezcdm = function(n) rezcdm(n, n_trials = 100, drift = 1, bound = 1, ndt = 0.2)
   )
   seeded <- function(f, n) withr::with_seed(7, f(n))
   bad <- list(NA, NA_real_, -1, -0.5, Inf, "a", numeric(0), c(2, 3), list(2))
@@ -2593,7 +2594,7 @@ test_that("rezcdm returns NA summaries for NA parameters", {
 })
 
 test_that("rezcdm validates parameters", {
-  expect_error(rezcdm(n = c(1, 2), n_trials = 10, drift = 1, bound = 1, ndt = 0.3), "n must be")
+  expect_error(rezcdm(n = c(1, 2), n_trials = 10, drift = 1, bound = 1, ndt = 0.3), "number of draws")
   expect_error(rezcdm(n = 5, n_trials = 2, drift = 1, bound = 1, ndt = 0.3), "n_trials must be larger than 2")
   expect_error(rezcdm(n = 5, n_trials = 10.5, drift = 1, bound = 1, ndt = 0.3), "whole numbers")
   expect_error(rezcdm(n = 2, n_trials = c(10, NA), drift = 1, bound = 1, ndt = 0.3), "missing values")

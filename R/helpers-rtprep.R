@@ -520,7 +520,7 @@ adjust_ezdm_accuracy <- function(n_upper, n_trials, contaminant_prop,
 # method = "simple" on data without contaminants.
 .circular_summary <- function(angles, group = rep_len(1L, length(angles)),
                               weights = rep_len(1, length(angles))) {
-  sums <- rowsum(weights * cbind(1, cos(angles), sin(angles)), group)
+  sums <- rowsum(cbind(weights, weights * cos(angles), weights * sin(angles)), group)
   mean_cos <- as.vector(sums[, 2] / sums[, 1])
   mean_sin <- as.vector(sums[, 3] / sums[, 1])
   data.frame(
