@@ -28,3 +28,10 @@ arguments of a model.
 bmm_models()
 "imm" \%in\% bmm_models()
 }
+\seealso{
+Other model information:
+\code{\link[=model_spec]{model_spec()}},
+\code{\link[=parameter_info]{parameter_info()}},
+\code{\link[=simulate_data]{simulate_data()}}
+}
+\concept{model information}

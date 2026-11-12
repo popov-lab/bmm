@@ -31,6 +31,7 @@ test_that("model_registry() lists each model once per task it names, in the orde
   expect_equal(groups_of("imm"), "Continuous reproduction")
   expect_equal(groups_of("m3"), "Categorical recall and n-AFC decisions")
   expect_equal(groups_of("sdt_yn"), "Detection, recognition and confidence judgments")
+  expect_equal(groups_of("psychometric_function"), "Detection, recognition and confidence judgments")
   expect_equal(groups_of("ddm"), "Choices and response times")
   expect_equal(
     groups_of("mpt"),
@@ -520,7 +521,7 @@ test_that("model constructors and the template list their fields in the canonica
   canonical <- c(
     "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
     "requirements", "parameters", "links", "links_fixed", "fixed_parameters",
-    "alternative_parameters", "default_priors", "init_ranges",
+    "alternative_parameters", "default_priors", "init_ranges", "functions",
     "deprecated_parameters", "dpar_since", "variable_precision", "vp_nodes"
   )
   # m3 builds its inits in create_initfun.m3() and drops an empty

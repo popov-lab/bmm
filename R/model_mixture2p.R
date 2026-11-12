@@ -122,6 +122,7 @@
       fixed_parameters = spec$fixed_parameters,
       default_priors = spec$priors,
       init_ranges = spec$init_ranges,
+      functions = list(density = "dmixture2p", generator = "rmixture2p"),
       deprecated_parameters = list(mu1 = "mu"),
       dpar_since = "1.5.0",
       variable_precision = variable_precision,
