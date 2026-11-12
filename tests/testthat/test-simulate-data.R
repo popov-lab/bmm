@@ -373,7 +373,7 @@ test_that("one simulated trial per row of sdt_yn and sdt_mafc is 0 or 1 with the
   skip_on_cran()
   withr::local_seed(6)
   # pnorm(1 - 0.5), pnorm(-0.5); P(correct) of 2, 3 and 4 alternatives at d = 1, from
-  # integrate(dnorm(x - 1) * pnorm(x)^(m - 1)) (see the reference script of #664)
+  # integrate(dnorm(x - 1) * pnorm(x)^(m - 1))
   design <- data.frame(stimulus = rep(0:1, each = n_sim))
   y <- simulate_data(sdt_yn("y", "stimulus"), list(d = 1, criterion = 0.5), design)$y
   expect_in(y, c(0, 1))
