@@ -1290,7 +1290,8 @@ test_that("the Stan gradient of the variable-precision density is right below sh
 test_that(".circmix_vp_ld() integrates below the shape where trigamma() is NaN, as Stan does", {
   # kappa 1e140 at tau 1e306 is shape ~1e-166, under the 1e-153 where R's
   # trigamma() is NaN, but J / sqrt(tau) ~1e-13 is above the uniform cut, so the
-  # row is integrated; its excess over the uniform is below J / sqrt(2 tau)
+  # row is integrated; its excess over the uniform is below
+  # pi sqrt(2) J / sqrt(tau) = 4.4e-13
   expect_length(.circmix_vp_rows(1e140, 1e306)$rows, 1)
   expect_equal(.circmix_vp_ld(matrix(cos(1)), matrix(0), -Inf, 1e140, 1e306), -log(2 * pi), tolerance = 1e-12)
 })
