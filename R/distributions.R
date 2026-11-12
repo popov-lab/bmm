@@ -5112,7 +5112,7 @@ rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lap
 #' hist(rtcc(2000, d = 2, similarity = f), breaks = 60)
 #' @export
 dtcc <- function(x, d, similarity, n_options = 360, log = FALSE) {
-  .tcc_check_similarity(similarity, n_options)
+  .check_tcc_args(similarity, n_options)
   dist <- abs(.tcc_bin(x, n_options, "radians")) + 1
   n <- if (length(x) && length(d)) max(length(x), length(d)) else 0L
   dist <- rep_len(dist, n)
@@ -5128,7 +5128,7 @@ dtcc <- function(x, d, similarity, n_options = 360, log = FALSE) {
 #' @rdname tcc_dist
 #' @export
 rtcc <- function(n, d, similarity, n_options = 360) {
-  .tcc_check_similarity(similarity, n_options)
+  .check_tcc_args(similarity, n_options)
   n <- .n_draws(n)
   d <- rep_len(d, n)
   offsets <- seq(-n_options / 2 + 1, n_options / 2)

@@ -192,7 +192,7 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   units <- match.arg(units)
-  .tcc_check_similarity(similarity, n_options)
+  .check_tcc_args(similarity, n_options)
   stopif(!is.numeric(d_max) || length(d_max) != 1 || !isTRUE(d_max > 0),
          "`d_max` must be a single positive number.")
   .model_tcc(resp_error = resp_error, similarity = similarity, n_options = n_options,
@@ -205,7 +205,7 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
          "`n_options` must be an even number of at least 4.")
 }
 
-.tcc_check_similarity <- function(similarity, n_options) {
+.check_tcc_args <- function(similarity, n_options) {
   .tcc_check_n_options(n_options)
   n_values <- n_options / 2 + 1
   stopif(!is.numeric(similarity),
