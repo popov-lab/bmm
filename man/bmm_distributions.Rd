@@ -5,7 +5,7 @@
 \title{Vector arguments of the distribution functions}
 \description{
 The density (\verb{d*()}) and random generation (\verb{r*()}) functions
-of the sdm, ddm and ezdm models, of the signal detection models
+of the sdm, ddm, ezdm and tcc models, of the signal detection models
 (\code{sdt_yn}, \code{sdt_mafc}, \code{sdt_rating}, \code{sdt_dpsdt}, \code{sdt_metad},
 \code{sdt_ranking} and \code{sdt_cdp}) and of the psychometric function take their
 per-observation arguments as vectors, or as matrices with one row per

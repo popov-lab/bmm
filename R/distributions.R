@@ -1,7 +1,7 @@
 #' @title Vector arguments of the distribution functions
 #'
 #' @description The density (`d*()`) and random generation (`r*()`) functions
-#'   of the sdm, ddm and ezdm models, of the signal detection models
+#'   of the sdm, ddm, ezdm and tcc models, of the signal detection models
 #'   (`sdt_yn`, `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`,
 #'   `sdt_ranking` and `sdt_cdp`) and of the psychometric function take their
 #'   per-observation arguments as vectors, or as matrices with one row per
@@ -5085,6 +5085,8 @@ rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lap
 #'
 #' @name tcc_dist
 #'
+#' @inheritSection bmm_distributions Vector arguments
+#'
 #' @param x Vector of response errors in radians; each is binned to the
 #'   nearest option, as [tcc()] does with `units = "radians"`.
 #' @param n Number of observations to generate.
@@ -5127,6 +5129,7 @@ dtcc <- function(x, d, similarity, n_options = 360, log = FALSE) {
 #' @export
 rtcc <- function(n, d, similarity, n_options = 360) {
   .tcc_check_similarity(similarity, n_options)
+  n <- .n_draws(n)
   d <- rep_len(d, n)
   offsets <- seq(-n_options / 2 + 1, n_options / 2)
   out <- rep(NA_real_, n)
