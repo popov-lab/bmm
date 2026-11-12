@@ -39,7 +39,11 @@ weights that are transformed together through a softmax, whose
 \code{link} then does not apply on its own). For \code{\link[=m3]{m3()}} with
 \code{version = "custom"} the formula defines the parameters, so the
 specification of the constructor lists \code{b} only and the
-specification of a fit lists them all.}
+specification of a fit lists them all. A model with variable
+precision (\code{\link[=mixture2p]{mixture2p()}}, \code{\link[=mixture3p]{mixture3p()}} or \code{\link[=imm]{imm()}} with
+\code{variable_precision = TRUE}) is recognised by \code{tau} among its
+parameters; \code{variable_precision} and \code{vp_nodes} are not items of the
+specification.}
 \item{\code{default_priors}}{A data frame with the columns \code{parameter},
 \code{main}, \code{effects} and \code{sd}: the default prior on a parameter's
 intercept, on its other regression coefficients, and on its random

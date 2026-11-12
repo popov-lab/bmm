@@ -31,7 +31,11 @@
 #'       `link` then does not apply on its own). For [m3()] with
 #'       `version = "custom"` the formula defines the parameters, so the
 #'       specification of the constructor lists `b` only and the
-#'       specification of a fit lists them all.}
+#'       specification of a fit lists them all. A model with variable
+#'       precision ([mixture2p()], [mixture3p()] or [imm()] with
+#'       `variable_precision = TRUE`) is recognised by `tau` among its
+#'       parameters; `variable_precision` and `vp_nodes` are not items of the
+#'       specification.}
 #'     \item{`default_priors`}{A data frame with the columns `parameter`,
 #'       `main`, `effects` and `sd`: the default prior on a parameter's
 #'       intercept, on its other regression coefficients, and on its random
