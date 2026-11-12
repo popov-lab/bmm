@@ -19,7 +19,10 @@
 #' @param file_compress Logical or a character string, specifying one of the
 #'   compression algorithms supported by [saveRDS] when saving the updated
 #'   model object.
-#' @param ... Further arguments passed to [brms::update.brmsfit()]
+#' @param ... Further arguments passed to [brms::update.brmsfit()].
+#'   `stanvars` are added to the ones the model sets up. The `stanvars` you
+#'   gave the original fit are not carried over, so pass them again, as in
+#'   `update(fit, newdata = d, stanvars = sv)`.
 #' @return An updated `bmmfit` object refit to the new data and/or formula. If
 #'   `file` is given, it names the newly written file. If not, the `file` field
 #'   is carried over from the original fit, so the updated object still points
@@ -89,9 +92,18 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   )
 
   object <- restructure(object)
+  # a mixture2p, mixture3p or imm fit from before bmm 1.5.0 is refitted under
+  # the custom family of the current version, from a model object rebuilt for it
+  old_family <- is_mixture_family_fit(object)
+  if (old_family) {
+    old_fit_model <- object$bmm$model
+    object <- upgrade_mixture_family_model(object)
+  }
 
   model <- object$bmm$model
-  old_user_formula <- object$bmm$user_formula
+  # the stored formula is not what the user typed in this call, so a mu1 in it
+  # is renamed without a warning
+  old_user_formula <- rename_deprecated_parameters(model, object$bmm$user_formula, warn = FALSE)
   olddata <- object$data
   old_file <- object$file
   configure_opts <- object$bmm$configure_opts
@@ -134,26 +146,45 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     logical(1)
   )]
 
+  notice_data <- NULL
   if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
     data <- check_stored_data(model, newdata %||% olddata, user_formula)
+    from_stored_frame <- !missing(formula.)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
+    notice_data <- newdata
+    from_stored_frame <- FALSE
     attr(data, "data_name") <- substitute_name(newdata)
   }
 
   # standard bmm checks and transformations
   formula <- check_formula(model, data, user_formula)
   config_args <- configure_model(model, data, formula)
+  # checked on the configured formula, because only there does brms say which
+  # of its symbols are variables
+  if (from_stored_frame) {
+    stop_unstored_variables(config_args, fit_frame_args(object, dots)$data2)
+  }
 
-  # configure_prior() treats every row of the old fit's prior as a user prior, so
-  # for a parameter whose constant changed each of those rows would override the
-  # freshly configured one -- the stale constant() of a freed or re-valued
-  # parameter and the stale free prior of a newly fixed one alike. brms stores
-  # the main dpar without a `dpar` label, so its rows are the ones carrying
-  # neither label
-  old_prior <- carried_prior(object$prior)
-  if (length(changed_pars) > 0) {
+  # bmm() stores the prior the user gave it, and configure_prior() rebuilds the
+  # defaults around it for the new formula and data as bmm() would (#538). A fit
+  # saved before that has only its whole prior, in which brms marks bmm's
+  # defaults for the old formula as user rows; configure_prior() treats each of
+  # those rows as a user prior, so for a parameter whose constant changed each
+  # would override the freshly configured one -- the stale constant() of a freed
+  # or re-valued parameter and the stale free prior of a newly fixed one alike.
+  # brms stores the main dpar without a `dpar` label, so its rows are the ones
+  # carrying neither label
+  stored_prior <- object$bmm$user_prior
+  old_prior <- stored_prior %||% carried_prior(object$prior)
+  if (old_family) {
+    stored <- translate_stored_prior(old_fit_model, model, config_args$formula, old_prior,
+                                     fitted_with = object$version$bmm)
+    old_prior <- stored$prior
+    message2("{stored$message}")
+  }
+  if (is.null(stored_prior) && length(changed_pars) > 0) {
     main_dpar <- names(brms::brmsterms(config_args$formula)$dpars)[1]
     is_main_dpar_row <- !nzchar(old_prior$dpar) & !nzchar(old_prior$nlpar)
     stale <- old_prior$dpar %in% changed_pars |
@@ -162,10 +193,31 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
          old_prior$class %in% c("Intercept", "b") & is_main_dpar_row)
     old_prior <- old_prior[!stale, ]
   }
-  prior <- brms::do_call(
-    configure_prior, c(list(model, data, config_args$formula, old_prior), fit_frame_args(object, dots))
+  # the prior of this call joins the carried rows before configure_prior() runs,
+  # not after: the constraints a model sets in its own configure_prior method
+  # must win over it, and the message naming the displaced rows is printed
+  # there, exactly as for the prior of bmm() (#549). Combined afterwards, a
+  # prior on a constrained coefficient would replace the constraint in silence
+  # a prior written for the parameters of bmm 1.4 is translated here, before it
+  # joins the carried rows: translated after, an old-form row and a new-form row
+  # on the same coefficient would both reach brms, and the stored prior would be
+  # translated, with a warning, at every later update()
+  user_prior <- combine_prior(
+    old_prior, translate_deprecated_priors(model, config_args$formula, dots$prior)
   )
-  prior <- combine_prior(prior, dots$prior)
+  prior <- brms::do_call(
+    configure_prior,
+    c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
+  )
+  if (!is.null(notice_data) && missing(formula.)) {
+    update_data_notice(model, notice_data, user_formula, prior, function() {
+      rechecked <- check_model(model, notice_data, user_formula)
+      suppressWarnings(suppressMessages(brms::do_call(
+        configure_prior,
+        c(list(rechecked, data, config_args$formula, user_prior), fit_frame_args(object, dots))
+      )))
+    })
+  }
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 
@@ -191,9 +243,34 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   # lazy argument of that call surfaces as "promise already under evaluation"
   # rather than as itself
   attr(prior, "allow_invalid_prior") <- TRUE
-  init <- if ("init" %in% names(dots)) dots$init else brms::do_call(
+  # brms::brm() samples with the deprecated `inits` whenever it is given
+  init <- dots$inits %||% if ("init" %in% names(dots)) dots$init else brms::do_call(
     create_initfun, c(list(model, data, config_args$formula, prior), fit_frame_args(object, dots))
   )
+
+  # brms::update.brmsfit() resolves abbreviations such as algorithm = "samp"
+  # with match.arg() before it decides whether the run is the fit's, so the
+  # control carried over and stored here must be decided on the resolved value,
+  # and brms is handed that value. The choices are those of brms's internal
+  # algorithm_choices() and backend_choices(), which it does not export
+  dots$backend <- match.arg(dots$backend %||% object$backend %||% "rstan",
+                            c("rstan", "cmdstanr", "mock"))
+  dots$algorithm <- match.arg(
+    dots$algorithm %||% object$algorithm %||% "sampling",
+    c("sampling", "meanfield", "fullrank", "pathfinder", "laplace", "fixed_param")
+  )
+  control <- sampler_control(object, dots, configure_control(
+    carried_control(object, dots), dots$backend, dots$algorithm
+  ))
+
+  # brms::update.brmsfit() adds back every row of the old prior marked "user"
+  # that the new prior does not restate, and brms marks bmm's defaults so: the
+  # old default of a coefficient the new formula keeps would replace the new
+  # one, and the stored L row of a correlation would duplicate the new cor row.
+  # The user's own rows are in the stored prior already (#538)
+  if (!is.null(stored_prior)) {
+    object$prior$source[] <- "default"
+  }
 
   # pass back to brms::update.brmsfit; stanvars must be the freshly configured
   # ones — brms otherwise reuses object$stanvars, whose data values (e.g. the
@@ -202,17 +279,20 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
   object <- NextMethod("update", object,
     newdata = newdata,
     prior = prior, recompile = recompile,
-    stanvars = new_fit_args$stanvars, init = init,
-    control = configure_control(
-      carried_control(object, dots),
-      dots$backend %||% object$backend %||% "rstan",
-      dots$algorithm %||% object$algorithm %||% "sampling"
-    ), ...
+    stanvars = new_fit_args$stanvars, init = init, control = control,
+    backend = dots$backend, algorithm = dots$algorithm, ...
   )
+  # without a recompile brms samples with `init` and `control` but keeps the old
+  # fit's stan_args, and a chained update() would carry the control from before
+  # this one. Single brackets, because `init = NULL` must keep its slot
+  object$stan_args[c("init", "control")] <- list(init, control)
 
-  # bmm postprocessing
+  # bmm postprocessing. A fit saved before bmm stored the user's prior stays
+  # without one: its user rows cannot be told from the defaults, and storing the
+  # prior of this call alone would drop them at the next update()
   object <- postprocess_brm(model, object,
     fit_args = new_fit_args, user_formula = user_formula,
+    user_prior = if (!is.null(stored_prior)) user_prior,
     configure_opts = configure_opts
   )
 
@@ -240,8 +320,8 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
 # the configure_prior methods of the non-target models, which read it to decide
 # whether set size 1 needs a constant prior. That is inert only because a column
 # gets rebuilt exactly when the fitted formula does not name it, and the
-# constraint helpers then return NULL; a new formula. that names it fails in
-# brms, because the column is no longer in the data
+# constraint helpers then return NULL; a new formula. that names it is refused
+# by stop_unstored_variables(), because the column is no longer in the data
 check_stored_data <- function(model, data, formula) {
   stored <- revert_check_data(model, data)
   rebuilt <- attr(stored, "rebuilt")
@@ -251,6 +331,27 @@ check_stored_data <- function(model, data, formula) {
     data[[var]] <- NULL
   }
   data
+}
+
+# A new formula can only use the columns the fit's model frame kept, which are
+# those its own formula used, and none of the ones check_stored_data() rebuilt
+# and dropped again. brms refuses the others only after bmm has configured the
+# prior, with a message that does not say where the data come from
+stop_unstored_variables <- function(config_args, data2) {
+  # the variables brms::validate_data() looks up, by its own rule: allvars
+  # leaves out the correlation ID p of (1 | p | id), cov matrices and non-linear
+  # parameters, and Intercept is a column brms adds itself
+  unstored <- setdiff(
+    all.vars(brms::brmsterms(config_args$formula)$allvars),
+    c(colnames(config_args$data), names(data2), "Intercept")
+  )
+  stopif(
+    length(unstored) > 0,
+    "The model frame of this fit does not hold {collapse_comma(unstored)}. It keeps \\
+    only the columns the fitted formula used, and none that bmm rebuilds for its \\
+    checks, such as the tree column of `mpt()`. Pass the data you gave `bmm()` as \\
+    `newdata` to use {if (length(unstored) > 1) 'them' else 'it'} in the new formula."
+  )
 }
 
 # brms::kfold() and reloo() hand update() slices of the fit's own model frame,
@@ -318,7 +419,12 @@ revert_check_data.m3 <- function(model, data) {
 #' @exportS3Method
 revert_check_data.mpt <- function(model, data) {
   resp_cats <- model$resp_vars$resp_cats
-  data[resp_cats] <- as.data.frame(unclass(data$Y)[, resp_cats, drop = FALSE])
+  counts <- unclass(data$Y)[, resp_cats, drop = FALSE]
+  if (is_trial_level(model)) {
+    data[[model$other_vars$response]] <- resp_cats[max.col(counts, ties.method = "first")]
+  } else {
+    data[resp_cats] <- as.data.frame(counts)
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   tree_id <- model$other_vars$tree_id
@@ -341,28 +447,48 @@ revert_check_data.mpt <- function(model, data) {
 revert_check_data.non_targets <- function(model, data) {
   set_size <- model$other_vars$set_size
   # brms keeps the set_size column only when a formula predicts something with
-  # it; LureIdx1..n is the step function check_data() built from it, so its row
-  # sums give the set size of each row back, as .np_lure_free_rows() also does.
-  # The names come from nt_features rather than from a pattern match, because a
-  # user column called LureIdx9 that a formula kept would be summed in too and
-  # the set sizes it shifts are legal integers that nothing downstream rejects
+  # it. A circmix family reads the set size from vint(ss_numeric), so the frame
+  # holds it. Fits made on brms mixtures hold only LureIdx1..n, the step function
+  # check_data() built from it, whose row sums give the set size back. Those
+  # names come from nt_features rather than from a pattern match, because a user
+  # column called LureIdx9 that a formula kept would be summed in too and the set
+  # sizes it shifts are legal integers that nothing downstream rejects
   if (is.character(set_size) && not_in(set_size, colnames(data))) {
-    data[[set_size]] <- 1 + rowSums(
+    data[[set_size]] <- data[["ss_numeric"]] %||% (1 + rowSums(
       data[paste0("LureIdx", seq_along(model$other_vars$nt_features))]
-    )
+    ))
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
   }
-  # nt_features passed the check when the fit was made, so the fit's largest set
-  # size is one more than their number, even when brms dropped the rows of that
-  # set size from the frame (#459). Derived rather than stored on the fit, so fits
-  # saved before this fix are covered too
-  attr(data, "fit_max_set_size") <- length(model$other_vars$nt_features) + 1
+  # brms may have dropped the rows of the largest set size from the frame (#459)
+  data <- carry_fit_bounds(model, data)
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.mixture2p <- function(model, data) {
+  set_size <- model$other_vars$set_size
+  # brms keeps the set_size column only when a formula predicts something with
+  # it; ss_numeric is check_data()'s numeric copy, kept for the vint() term
+  if (is.character(set_size) && not_in(set_size, colnames(data)) &&
+    "ss_numeric" %in% colnames(data)) {
+    data[[set_size]] <- data$ss_numeric
+    attr(data, "rebuilt") <- c(attr(data, "rebuilt"), set_size)
+  }
   NextMethod("revert_check_data")
 }
 
 #' @exportS3Method
 revert_check_data.sdt_yn <- function(model, data) {
   data$dist_type <- NULL
+  if (is_trial_level(model)) {
+    data$nTrials <- NULL
+  }
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
+revert_check_data.psychometric_function <- function(model, data) {
+  data[intersect(.psychometric_reserved_cols, colnames(data))] <- NULL
   NextMethod("revert_check_data")
 }
 
@@ -377,6 +503,9 @@ revert_check_data.sdt_mafc <- function(model, data) {
   }
   data$m_afc <- NULL
   data$dist_type <- NULL
+  if (is_trial_level(model)) {
+    data$nTrials <- NULL
+  }
   NextMethod("revert_check_data")
 }
 
@@ -384,13 +513,20 @@ revert_check_data.sdt_mafc <- function(model, data) {
 revert_check_data.sdt_ranking <- function(model, data) {
   resp_cols <- model$resp_vars$response
   m <- model$other_vars$m
-  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  # trial rows get their rank back from the one-hot row
+  if (is_trial_level(model)) {
+    data[[resp_cols]] <- .sdt_trial_category(data$Y)
+  } else {
+    data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  }
   # max_rank is check_data()'s numeric copy of the set-size column, which brms
   # keeps only when a formula predicts something with it
   if (is.character(m) && not_in(m, colnames(data))) {
     data[[m]] <- data$max_rank
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), m)
   }
+  # a kfold() training fold can lack the fit's largest set size
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   data$max_rank <- NULL
@@ -400,7 +536,11 @@ revert_check_data.sdt_ranking <- function(model, data) {
 #' @exportS3Method
 revert_check_data.sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response
-  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  if (is_trial_level(model)) {
+    data[[resp_cols]] <- .sdt_trial_category(data$Y)
+  } else {
+    data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
@@ -410,13 +550,20 @@ revert_check_data.sdt_rating <- function(model, data) {
 revert_check_data.sdt_cdp <- function(model, data) {
   n_new <- model$other_vars$n_new
   n_old <- model$other_vars$n_old
-  # check_data() renamed the count columns cdp1 ... cdpK, and whether guess
-  # columns were present is recorded only in how many there are
+  # check_data() renamed the count columns cdp1 ... cdpK
   Y <- unclass(data$Y)
-  has_guess <- ncol(Y) == n_new + 3L * n_old
-  resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess,
-                                      model$resp_vars$response)
-  data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
+  has_guess <- .sdt_cdp_has_guess_cols(model, Y)
+  if (is_trial_level(model)) {
+    cats <- .sdt_cdp_category_table(n_new, n_old, has_guess)[.sdt_trial_category(Y), ]
+    data[[model$resp_vars$judgment]] <- cats$judgment
+    data[[model$resp_vars$confidence]] <- cats$confidence
+  } else {
+    resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess,
+                                        model$resp_vars$response)
+    data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
+  }
+  # a kfold() training fold can lack every 'guess' judgment of the fit
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
@@ -431,21 +578,17 @@ carried_prior <- function(prior) {
   prior[which(prior$source != "default"), ]
 }
 
-# brms::update.brmsfit() merges the fit's stored control key by key with the one
-# the call names, and keeps none of it when backend or algorithm changes.
-# update.bmmfit() always names a control, so the rule is applied here. rstan fits
-# also get the rest of the old sampler's control from brms itself; cmdstanr fits
-# store it nowhere else. A fit without a backend or algorithm field counts as
-# changed, because brms resolves the missing field to its first choice and then
-# finds it different. step_size and stepsize are one argument under two
-# spellings, so a call naming either replaces whichever the fit stored; merged
-# by name they would survive as two keys and configure_control() would then
-# resolve the duplicate in the fit's favour
+# On the same backend and algorithm brms::update.brmsfit() carries a fit's
+# stored control only when the call names none, and update.bmmfit() always names
+# one, so the stored control is merged here, key by key under the call's. It is
+# the control the fit was sampled with, also after an update() that did not
+# recompile, because update.bmmfit() writes it back.
+# step_size and stepsize are one argument under two spellings, so a call naming
+# either replaces whichever the fit stored; merged by name they would survive as
+# two keys and configure_control() would then resolve the duplicate in the fit's
+# favour
 carried_control <- function(object, dots) {
-  same_run <- !is.null(object$backend) && !is.null(object$algorithm) &&
-    identical(dots$backend %||% object$backend, object$backend) &&
-    identical(dots$algorithm %||% object$algorithm, object$algorithm)
-  if (!same_run) {
+  if (!is_same_run(object, dots)) {
     return(dots$control)
   }
   stored <- object$stan_args$control %||% list()
@@ -453,4 +596,42 @@ carried_control <- function(object, dots) {
     stored <- stored[not_in(names(stored), c("step_size", "stepsize"))]
   }
   utils::modifyList(stored, dots$control %||% list())
+}
+
+# On the same run brms::update.brmsfit() fills the keys the control leaves out
+# from the old rstan sampler's own arguments (cmdstanr fits keep none there),
+# after configure_control() has set the step size. Filled in here instead, brms
+# has nothing left to add, so the control update.bmmfit() stores is the one it
+# hands the sampler, as brms stores it when it recompiles. update.bmmfit()
+# resolves abbreviated backends and algorithms first, as brms compares the
+# resolved values
+sampler_control <- function(object, dots, control) {
+  if (!is_same_run(object, dots)) {
+    return(control)
+  }
+  sampler <- attr(object$fit@sim$samples[[1]], "args")$control
+  c(control, sampler[not_in(names(sampler), names(control))])
+}
+
+# A fit without a backend or algorithm field counts as changed, because brms
+# resolves the missing field to its first choice and then finds it different
+is_same_run <- function(object, dots) {
+  !is.null(object$backend) && !is.null(object$algorithm) &&
+    identical(dots$backend %||% object$backend, object$backend) &&
+    identical(dots$algorithm %||% object$algorithm, object$algorithm)
+}
+
+# a model whose check_model() fits its default priors to the data keeps those
+# priors when update() gets new data under the old formula; its method says so
+# when the new data would have given other priors. `prior` is the prior the
+# update uses, and `rechecked_prior()` builds the one a model re-checked on the
+# new data would use: a function, so that only a method that compares them
+# pays for the second check_model() and configure_prior()
+update_data_notice <- function(model, data, formula, prior, rechecked_prior) {
+  UseMethod("update_data_notice")
+}
+
+#' @exportS3Method
+update_data_notice.default <- function(model, data, formula, prior, rechecked_prior) {
+  invisible()
 }

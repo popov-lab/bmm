@@ -64,23 +64,93 @@ c_bessel2sqrtexp <- function(c, kappa) {
   c / (besselI(kappa, 0, expon.scaled = TRUE) * sqrt(2 * pi * kappa))
 }
 
-#' @title Transform values from the native to parameter scale or vice versa according to a link function
+#' Transform values between the native and the parameter scale of a link
 #'
 #' @description
-#' This function transforms a vector of values from the native scale to the parameter scale,
-#' according to the specified link function. The function is mainly used internally, to ensure proper
-#' initial values
+#' `link_transform()` applies one of the links bmm uses for model parameters to
+#' a numeric vector. With `inverse = FALSE` it maps values from the native
+#' scale of a parameter, the scale of the model equations, to the parameter
+#' scale, the scale on which `bmm()` samples the intercept and coefficients of
+#' the parameter's formula. With `inverse = TRUE` it maps values from the
+#' parameter scale back to the native scale.
 #'
-#' @param values A numerical vector of values the transformation should be applied to
-#' @param link A character specifying the link to be applied.
-#' Available options are: "identity", "log", "softplus", "log1p", "logm1", "inverse", "sqrt", "logit", "probit", "tan_half", and "cloglog".
-#' @param inverse A Boolean value indicating if values should be transformed from the native to
-#' the parameter scale (FALSE), or from the parameter scale to the native scale (TRUE)
+#' @param values A numeric vector, matrix or array. With `inverse = FALSE` the
+#'   values are on the native scale, with `inverse = TRUE` on the parameter
+#'   scale. `NA` stays `NA` at its position.
+#' @param link A single string naming the link: `"identity"`, `"log"`,
+#'   `"softplus"`, `"log1p"`, `"logm1"`, `"inverse"`, `"sqrt"`, `"logit"`,
+#'   `"probit"`, `"tan_half"`, `"loglog"` or `"cloglog"`. A `NULL` link is read
+#'   as the identity link, as for a model parameter that declares no link.
+#' @param inverse Logical. `FALSE` (the default) transforms from the native to
+#'   the parameter scale; `TRUE` transforms from the parameter scale to the
+#'   native scale.
 #'
-#' @noRd
+#' @details
+#' The links, with the native values each accepts. `x` is a value on the native
+#' scale, `eta` one on the parameter scale.
+#'
+#' | `link` | `inverse = FALSE`: `eta` from `x` | `inverse = TRUE`: `x` from `eta` | Native values `x` |
+#' |:--|:--|:--|:--|
+#' | `"identity"` | `x` | `eta` | all real numbers |
+#' | `"log"` | `log(x)` | `exp(eta)` | `x > 0` |
+#' | `"softplus"` | `log(exp(x) - 1)` | `log(1 + exp(eta))` | `x > 0` |
+#' | `"log1p"` | `log(1 + x)` | `exp(eta) - 1` | `x > -1` |
+#' | `"logm1"` | `log(x - 1)` | `exp(eta) + 1` | `x > 1` |
+#' | `"inverse"` | `1 / x` | `1 / eta` | `x != 0` |
+#' | `"sqrt"` | `sqrt(x)` | `eta^2` | `x >= 0` |
+#' | `"logit"` | `log(x / (1 - x))` | `1 / (1 + exp(-eta))` | `0 < x < 1` |
+#' | `"probit"` | `qnorm(x)` | `pnorm(eta)` | `0 < x < 1` |
+#' | `"tan_half"` | `tan(x / 2)` | `2 * atan(eta)` | `-pi < x < pi` |
+#' | `"loglog"` | `log(-log(x))` | `exp(-exp(eta))` | `0 < x < 1` |
+#' | `"cloglog"` | `log(-log(1 - x))` | `1 - exp(-exp(eta))` | `0 < x < 1` |
+#'
+#' Values outside these ranges are not checked. For the links other than
+#' `"tan_half"`, a value at an edge the range excludes, such as `0` for `"log"`
+#' and `"inverse"` or `1` for `"logit"`, gives `-Inf` or `Inf` without a
+#' warning, and a value beyond it gives `NaN` (`NA` for `"softplus"`) with a
+#' warning. `"tan_half"` reads `x` as an angle: a value
+#' outside `-pi` to `pi` gives the `eta` of the same angle inside that range,
+#' and returns that angle on the way back. `"sqrt"` squares on the way back, so
+#' a negative `eta` comes back as its absolute value: `-3` gives `9`, and `9`
+#' gives `3`.
+#'
+#' The table holds the links that transform one value at a time. It does not
+#' include `"softmax"`, the link of the mixture weights of models such as
+#' [mixture3p()]: a softmax needs all weights of a group at once and a
+#' reference position, so `link_transform()` stops for it, as for any other
+#' name that is not in the table. [parameter_info()] shows the link of each
+#' parameter of a model in its `link` column; a parameter with `"softmax"`
+#' there is not covered by `link_transform()`. For the weights on the native
+#' scale, use [native_parameters()]. How the weights of a softmax group combine
+#' depends on the model, for [mixture3p()] on the set size (at set size 1 the
+#' non-target weight is zero), and [native_parameters()] applies that.
+#'
+#' @return The transformed values, with the length and dimensions of `values`
+#'   (a matrix stays a matrix).
+#'
+#' @seealso [parameter_info()] for the link of each parameter of a model, and
+#'   [native_parameters()] for the parameters of a fitted model on their native
+#'   scale.
+#'
+#' @keywords transform
+#' @export
+#'
+#' @examples
+#' # a probability on the parameter scale of a logit link, and back
+#' eta <- link_transform(c(0.2, 0.5, 0.8), "logit")
+#' eta
+#' link_transform(eta, "logit", inverse = TRUE)
+#'
+#' # the native value of a parameter with a log link, from its parameter scale
+#' link_transform(c(-1, 0, 1), "log", inverse = TRUE)
+#'
+#' # the link of each parameter of a model
+#' parameter_info(sdm(resp_error = "y"))$link
 link_transform <- function(values, link, inverse = FALSE) {
-  # Handle NULL or missing link as identity (no transformation)
+  # NULL is what model$links[[par]] returns for a parameter without a link
   if (is.null(link)) link <- "identity"
+  # switch() would pick the alternative at position `link` for a number
+  stopif(!is.character(link) || length(link) != 1, "`link` must be a single string, such as 'log'.")
 
   if(inverse) {
     switch(
@@ -96,7 +166,7 @@ link_transform <- function(values, link, inverse = FALSE) {
       probit = pnorm(values),
       tan_half = 2 * atan(values),
       loglog = exp(-exp(values)),
-      cloglog = 1 - exp(-exp(values)),
+      cloglog = -expm1(-exp(values)),
       stop2("Link '{link}' not recognized.")
     )
   } else {
@@ -162,6 +232,7 @@ link_transform <- function(values, link, inverse = FALSE) {
 #'   parameter and columns: \code{parameter}, \code{description},
 #'   \code{fixed}, \code{value}, and \code{link}.
 #'
+#' @family model information
 #' @keywords extract_info
 #' @export
 #' @examples
@@ -406,20 +477,30 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #'   constant. This filters the output only; parameters transformed jointly are
 #'   always computed together.
 #' @param re_formula Which group-level effects to include, as in
-#'   [brms::posterior_linpred()]. See Details.
+#'   [brms::posterior_linpred()]. With `population_summary`, the group-level
+#'   effects to integrate over. See Details.
+#' @param population_summary `"none"` (the default) returns the parameters at
+#'   the group levels in the grid. `"mean"` returns, for every draw and grid
+#'   cell, the mean and SD of the parameter across the levels of the grouping
+#'   factors, e.g. across participants; `"median"` returns their median and
+#'   quartiles. See *Population summaries*.
 #' @param scale Either `"native"` (the default) to apply the model's inverse link
 #'   functions, or `"sampling"` to return the untransformed linear predictor.
 #' @param ndraws Number of posterior draws to use. If `NULL` (the default), all
 #'   draws are used. The same draws are used for every parameter.
 #' @param draw_ids Indices of the draws to use. Overrides `ndraws` and makes the
 #'   result reproducible.
+#' @param ndraws_population Number of group levels simulated per posterior draw
+#'   for the population summaries that are computed by Monte Carlo. See
+#'   *Population summaries*.
 #' @param summary Logical. If `FALSE` (the default), return draws. If `TRUE`,
 #'   return posterior summaries computed *after* the transformation.
 #' @param prob Probability mass of the credible interval when `summary = TRUE`.
 #' @param robust Logical. If `TRUE`, `summary = TRUE` reports the median and
 #'   median absolute deviation instead of the mean and standard deviation.
 #' @param ... Further arguments passed to [brms::posterior_linpred()], such as
-#'   `allow_new_levels` and `sample_new_levels`.
+#'   `allow_new_levels` and `sample_new_levels`. These two cannot be combined
+#'   with `population_summary`.
 #'
 #' @return If `summary = FALSE`, a `data.frame` with one row per draw, grid cell
 #'   and parameter, with columns `.chain`, `.iteration`, `.draw`, the grid
@@ -427,6 +508,13 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #'   `x`, so they can be joined with the output of `posterior::as_draws_df(x)`.
 #'   If `summary = TRUE`, a `data.frame` with one row per grid cell and
 #'   parameter, with columns `Estimate`, `Est.Error` and the interval bounds.
+#'
+#'   With `population_summary`, both formats have a `statistic` column after
+#'   `parameter`, and one row per statistic. The attribute `"population_method"`
+#'   is a `data.frame` with one row per parameter and statistic: the `link`, the
+#'   `method` (`"closed form"`, `"Gauss-Hermite"`, `"root search"`,
+#'   `"Monte Carlo"` or `"no group-level effects"`), `n` (the quadrature nodes
+#'   or the simulated levels per draw) and the `groups` integrated over.
 #'
 #' @details
 #' # Transform first, then summarise
@@ -455,19 +543,91 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' # Group-level effects
 #'
 #' `re_formula = NULL` (the default) returns subject-specific parameters and adds
-#' the grouping variables to the grid. `re_formula = NA` sets all group-level
-#' effects to zero, which under a non-identity link gives the *median* subject,
-#' not the population mean. The population mean requires marginalising over the
-#' distribution of group-level effects, which is done by predicting for a new
-#' level:
+#' the grouping variables to the grid. For a group-level summary, three
+#' quantities are easily confused under a non-identity link:
 #'
-#' ```r
-#' native_parameters(fit, newdata = transform(nd, id = "new"),
-#'                   allow_new_levels = TRUE, sample_new_levels = "gaussian")
-#' ```
+#' 1. **The median subject.** `re_formula = NA` sets all group-level effects to
+#'    zero. Because the inverse link is monotone, this is the parameter of the
+#'    *median* subject, not the mean across subjects.
+#' 2. **The population mean.** `population_summary = "mean"` averages the
+#'    parameter over the distribution of the group-level effects, separately
+#'    for every posterior draw. Its credible interval describes the uncertainty
+#'    about the population mean, and the `sd` statistic is the spread across
+#'    subjects on the native scale.
+#' 3. **A new subject.** Predicting for a new level,
+#'    ```r
+#'    native_parameters(fit, newdata = transform(nd, id = "new"),
+#'                      allow_new_levels = TRUE, sample_new_levels = "gaussian")
+#'    ```
+#'    draws one new subject per posterior draw. Its interval mixes the
+#'    posterior uncertainty with the variability between subjects: it predicts
+#'    where one more subject would fall. It is *not* a credible interval for
+#'    the population mean.
 #'
-#' These three quantities differ substantially at between-subject standard
-#' deviations typical for working memory data.
+#' The three differ substantially at between-subject standard deviations
+#' typical for working memory data. `population_summary = "median"` returns (1)
+#' together with the quartiles across subjects.
+#'
+#' # Population summaries
+#'
+#' With `population_summary = "mean"` or `"median"`, each parameter is
+#' integrated, for every posterior draw and grid cell, over the distribution of
+#' the group-level effects that `re_formula` selects: all of them for `NULL`,
+#' the terms it lists for a formula (with the same meaning as in
+#' [brms::posterior_linpred()]), and none for `NA`, which returns the median
+#' subject with zero spread. Grouping variables never span the grid, and values
+#' given for them in `newdata` are ignored.
+#'
+#' `"mean"` returns the statistics `mean` and `sd`, `"median"` the statistics
+#' `median`, `q25` and `q75`. They are computed per posterior draw and
+#' summarised only afterwards, so `summary = TRUE` reports, for example, the
+#' posterior mean and credible interval of the population mean. Two summaries
+#' are therefore involved: `population_summary` summarises *across subjects*
+#' within a draw, `robust` *across draws*. A difference between two conditions
+#' is the difference of their population means, taken draw by draw.
+#'
+#' **Computation.** A parameter is computed exactly or by quadrature when its
+#' `brms` formula is linear, its group-level terms are plain terms such as
+#' `(1 + x | id)`, `(1 + x || id)`, `(1 | id:condition)` or terms of several
+#' grouping factors, and its native value is the inverse link of its own linear
+#' predictor. Its linear predictor is then normal across subjects, with mean
+#' `eta` (the median subject) and standard deviation `s = sqrt(z' Sigma z)`,
+#' where `z` is the group-level design of the grid cell and `Sigma` the
+#' covariance matrix of the group-level effects in that draw, summed over
+#' independent terms. Then:
+#'
+#' * identity link: `eta` and `s`;
+#' * log link: `exp(eta + s^2 / 2)` and that value times `sqrt(exp(s^2) - 1)`;
+#' * probit link: the mean is `pnorm(eta / sqrt(1 + s^2))`;
+#' * all other links, and the SD under the probit link: Gauss-Hermite
+#'   quadrature with 100 nodes, which for the logit and probit links is
+#'   accurate to better than `1e-6` up to `s = 3`;
+#' * the median and quartiles are exact for every link: the inverse link of
+#'   `eta` and of `eta -/+ 0.674 * s`.
+#'
+#' All other parameters are computed by Monte Carlo. These include mixture
+#' weights transformed through a softmax, parameters defined by non-linear
+#' formulas, parameters whose transformation depends on the design, and terms
+#' such as `mm()`, `cs()` or `gr(by = )`. For every draw, `brms` simulates
+#' `ndraws_population` new levels of each grouping factor from that draw's
+#' covariance matrix. The same simulated levels enter every parameter and every
+#' grid cell, and the parameters are transformed jointly. The Monte Carlo error
+#' of a population mean is about `sd / sqrt(ndraws_population)` within a draw,
+#' and it widens the posterior SD of the summary. `native_parameters()` warns
+#' when it widens by more than 2% and names the `ndraws_population` needed. This
+#' path uses the random number generator, so set a seed before the call for
+#' reproducible output.
+#'
+#' **Circular location parameters** (`tan_half` link): `"mean"` returns the
+#' circular mean direction and the circular SD `sqrt(-2 * log(rho))`, where
+#' `rho` is the mean resultant length, both by Gauss-Hermite quadrature with 200
+#' nodes, whose error is at most `2e-7` up to `s = 1.5` and grows to `1.3e-5`
+#' at `s = 2`, `3.8e-4` at `s = 3` and `6.1e-3` at `s = 5`. A between-participant
+#' SD above about `1.5` on the `tan(theta / 2)` scale is rare. `"median"`
+#' returns the circular median, the direction with the
+#' smallest expected arc distance to the parameter, without quartiles. Once
+#' enough mass wraps around `pi` the circular median is no longer
+#' `2 * atan(eta)`.
 #'
 #' # What is returned
 #'
@@ -478,9 +638,11 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #' therefore reported as `0.5`, and the `ezdm` and `cswald` diffusion constant `s`
 #' is fixed at `0` under a `log` link and is reported as `1`.
 #'
-#' Trial-level derived quantities, such as the response probabilities of the
-#' mixture models or the category probabilities of `m3`, are not returned; use
-#' [brms::posterior_epred()] for those.
+#' Trial-level derived quantities, such as the category probabilities of `m3`,
+#' are not returned; use [brms::posterior_epred()] for those. The circular
+#' mixture models have no expected response, so their `posterior_epred()` stops;
+#' the probabilities of their response types follow from the returned
+#' parameters, as the section on mixture weights describes.
 #'
 #' The default grid contains the observed combinations of the predictors, not
 #' their full crossing, so cells that were never presented do not appear. A
@@ -489,36 +651,48 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #'
 #' # Circular location parameters
 #'
-#' The circular models sample their location parameter (`mu` for `sdm`, `mu1` for
-#' `mixture2p`, `mixture3p` and `imm`) through a `tan_half` link, and it is
+#' The circular models sample their location parameter `mu` through a
+#' `tan_half` link, and it is
 #' returned in radians in `(-pi, pi)` — a response bias relative to the target,
 #' since the response variable is the angular error. It is fixed to `0` unless
-#' the `bmmformula` predicts it explicitly, so an all-zero `mu1` means the model
+#' the `bmmformula` predicts it explicitly, so an all-zero `mu` means the model
 #' never estimated one.
 #'
 #' The inverse link is `2 * atan()`, and the caveat above applies to it with
-#' particular force: `2 * atan(b_mu1_conditionB)` is neither the bias in
+#' particular force: `2 * atan(b_conditionB)` is neither the bias in
 #' condition B nor the difference between conditions. The bias in condition B is
-#' `2 * atan(b_mu1_Intercept + b_mu1_conditionB)`, and the difference between the
-#' conditions is that value minus `2 * atan(b_mu1_Intercept)`, taken draw by
+#' `2 * atan(b_Intercept + b_conditionB)`, and the difference between the
+#' conditions is that value minus `2 * atan(b_Intercept)`, taken draw by
 #' draw.
 #'
 #' # Mixture weights
 #'
+#' For `mixture2p`, `thetat` is the probability that a response comes from
+#' memory rather than from guessing.
+#'
 #' For `mixture3p` the returned `thetat` and `thetant` are probabilities but they
-#' **do not sum to 1**: `brms` holds the linear predictor of one mixture
-#' component at zero, and that component is the guessing distribution, so the
-#' remaining mass `1 - thetat - thetant` is the probability of a guess. `thetant`
-#' is the *total* probability of a non-target response, summed over the lures,
-#' not the probability per lure.
+#' **do not sum to 1**: the likelihood weighs both against the guessing
+#' distribution, whose weight is the fixed reference, so the remaining mass
+#' `1 - thetat - thetant` is the probability of a guess. `thetant` is the *total*
+#' probability of a non-target response, summed over the lures, not the
+#' probability per lure.
 #'
 #' At set sizes where no non-target was presented the model switches its
 #' non-target components off, so `thetant` is reported as exactly `0` and
 #' `thetat` as `plogis()` of its linear predictor, rather than as the value the
-#' set-size regression extrapolates to. This correction reads the lure indicators
-#' out of the prediction grid; if you supply `newdata`, columns you do not supply
-#' are filled from the first row of the model data rather than recomputed, and
-#' `native_parameters()` warns when the two disagree.
+#' set-size regression extrapolates to. This correction reads the set size from
+#' the prediction grid: if you supply `newdata` without the set-size variable,
+#' every row takes the set size of the first row of the model data.
+#'
+#' In the `"slot"` and `"slot_averaging"` versions of `mixture3p`, `ptarget` is a
+#' probability *given* that a response comes from memory. The probability of a
+#' memory response, `min(1, K / set_size)`, depends on the set size and is not
+#' returned. If the formula gives set size 1 a coefficient of its own, `ptarget`
+#' at set size 1 reflects only its prior, because a single item cannot be
+#' swapped.
+#'
+#' With `variable_precision = TRUE`, `tau` is returned on its native scale, and
+#' `kappa` is the concentration of the average trial.
 #'
 #' @seealso [parameter_info()], [native_transform()], [conditional_effects.bmmfit()]
 #' @keywords extract_info
@@ -543,10 +717,20 @@ print.bmm_parameters <- function(x, max_desc_width = 50, ...) {
 #'
 #' # posterior summaries of the transformed draws
 #' native_parameters(fit, re_formula = NA, summary = TRUE)
+#'
+#' # with group-level effects: the mean and SD across subjects of kappa
+#' fit_re <- bmm(
+#'   bmf(c ~ 0 + set_size, kappa ~ 1 + (1 | ID)),
+#'   data = oberauer_lin_2017,
+#'   model = sdm(resp_error = "dev_rad")
+#' )
+#' native_parameters(fit_re, pars = "kappa", population_summary = "mean",
+#'                   summary = TRUE)
 native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
+                              population_summary = c("none", "mean", "median"),
                               scale = c("native", "sampling"), ndraws = NULL,
-                              draw_ids = NULL, summary = FALSE, prob = 0.95,
-                              robust = FALSE, ...) {
+                              draw_ids = NULL, ndraws_population = 1000,
+                              summary = FALSE, prob = 0.95, robust = FALSE, ...) {
   stopif(
     !is_bmmfit(x),
     "native_parameters() requires a bmmfit object, not an object of class \\
@@ -554,13 +738,24 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   )
   x <- restructure(x)
   scale <- match.arg(scale)
-
-  model_pars <- setdiff(
-    names(x$bmm$model$parameters),
-    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  population_summary <- match.arg(population_summary)
+  population <- population_summary != "none"
+  new_level_args <- intersect(names(list(...)), c("allow_new_levels", "sample_new_levels"))
+  stopif(
+    population && length(new_level_args) > 0,
+    "'population_summary' integrates over the group-level effects itself, so \\
+    {collapse_comma(new_level_args)} cannot be used with it."
   )
+  stopif(
+    population &&
+      (!is.numeric(ndraws_population) || length(ndraws_population) != 1L ||
+        is.na(ndraws_population) || ndraws_population < 2),
+    "'ndraws_population' must be a single number of at least 2."
+  )
+
+  model_pars <- .np_model_pars(x)
   stopif(length(model_pars) == 0, "This model has no parameters defined.")
-  pars <- pars %||% model_pars
+  pars <- pars %||% setdiff(model_pars, internal_parameters(x$bmm$model))
   unknown <- pars[not_in(pars, model_pars)]
   stopif(
     length(unknown) > 0,
@@ -579,6 +774,69 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
     "'ndraws' must be a single number between 1 and {brms::ndraws(x)}."
   )
 
+  native <- .native_draw_matrices(
+    x, newdata, pars, re_formula, scale, ndraws, draw_ids, list(...),
+    population_summary, ndraws_population
+  )
+  values <- native$draws
+  grid <- native$newdata[, native$grid_vars, drop = FALSE]
+  row.names(grid) <- NULL
+
+  clash <- intersect(names(grid), .np_reserved_names(summary, prob, population))
+  stopif(
+    length(clash) > 0,
+    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
+    output. Rename them in the data, or pass 'newdata' with different names."
+  )
+
+  out <- if (summary) {
+    .np_summary(values, grid, prob, robust, native$statistic)
+  } else {
+    warnif(
+      length(values) * nrow(grid) * length(native$draw_ids) > 1e6,
+      "This will return \\
+      {length(values) * nrow(grid) * length(native$draw_ids)} rows. Supply 'newdata' \\
+      with the grid cells you need, or set 'ndraws', to return fewer."
+    )
+    .np_long(values, grid, .np_draw_index(x, native$draw_ids), native$statistic)
+  }
+  if (population) {
+    attr(out, "population_method") <- native$method
+  }
+  out
+}
+
+
+#' Native-scale draws of model parameters as matrices
+#'
+#' @description
+#' The computation behind [native_parameters()], without its reshaping, so that
+#' callers that need one matrix per parameter, such as the \pkg{insight} and
+#' \pkg{marginaleffects} methods, take the same draws.
+#'
+#' @param x A bmmfit object, restructured
+#' @param newdata User supplied prediction data, or `NULL` for the default grid
+#' @param pars Character vector of the requested parameters, all of them among
+#'   [.np_model_pars()]
+#' @param re_formula Passed to [brms::posterior_linpred()]
+#' @param scale `"native"` or `"sampling"`
+#' @param ndraws,draw_ids The draws to use, as in [native_parameters()]
+#' @param dots Further arguments for [brms::posterior_linpred()]
+#' @param population_summary,ndraws_population As in [native_parameters()]
+#' @return A list with `draws`, a named list of draws x grid cell matrices of
+#'   the requested parameters, `newdata`, the completed prediction data,
+#'   `grid_vars`, the variables spanning the grid, and `draw_ids`, sorted. With
+#'   a population summary, `draws` has one matrix per parameter and statistic,
+#'   named by parameter, and the list also holds `statistic`, one element per
+#'   matrix, and `method`, the data frame described in `.np_population()`.
+#'
+#' @keywords internal
+#' @noRd
+.native_draw_matrices <- function(x, newdata, pars, re_formula, scale = "native",
+                                  ndraws = NULL, draw_ids = NULL, dots = list(),
+                                  population_summary = "none",
+                                  ndraws_population = 1000) {
+  model_pars <- .np_model_pars(x)
   if (is.null(draw_ids)) {
     draw_ids <- if (is.null(ndraws)) {
       seq_len(brms::ndraws(x))
@@ -591,48 +849,80 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
   # be built from the same ordering or every row is labelled with another draw
   draw_ids <- sort(draw_ids)
 
-  grid_vars <- .np_grid_vars(x, model_pars, re_formula)
+  population <- population_summary != "none"
+  # a population summary integrates the grouping factors out, so they never
+  # span the grid
+  grid_vars <- .np_grid_vars(x, model_pars, if (population) NA else re_formula)
+  if (population && !is.null(newdata)) {
+    # the result does not depend on the level, but brms leaves the coefficients
+    # of a sampled new level unnamed, so the user's values are replaced by the
+    # ones of the model data
+    newdata <- newdata[not_in(names(newdata), setdiff(.np_group_vars(x), grid_vars))]
+  }
   newdata <- .np_newdata(x, grid_vars, newdata)
+  out <- list(newdata = newdata, grid_vars = grid_vars, draw_ids = draw_ids)
 
-  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, list(...))
+  if (population) {
+    result <- .np_population(
+      x, model_pars, pars, newdata, grid_vars, re_formula, draw_ids,
+      population_summary, scale, ndraws_population, dots
+    )
+    return(c(out, list(
+      draws = stats::setNames(result$values, result$parameter),
+      statistic = result$statistic, method = result$method
+    )))
+  }
+
+  linpred <- .np_linpred(x, model_pars, pars, newdata, re_formula, draw_ids, dots)
   if (scale == "native") {
-    transformed <- native_transform(x$bmm$model, linpred, newdata)
-    stopif(
-      !setequal(names(transformed), names(linpred)),
-      "The native_transform() method for model '{x$bmm$model$name}' must return \\
-      one element per parameter it was given."
-    )
-    transformed <- transformed[names(linpred)]
-    stopif(
-      !identical(lapply(transformed, dim), lapply(linpred, dim)),
-      "The native_transform() method for model '{x$bmm$model$name}' must preserve \\
-      the dimensions of the draws it was given."
-    )
-    linpred <- transformed
+    linpred <- .np_transform_checked(x, linpred, newdata)
   }
-  linpred <- linpred[names(linpred) %in% pars]
+  c(out, list(draws = linpred[names(linpred) %in% pars]))
+}
 
-  grid <- newdata[, grid_vars, drop = FALSE]
-  row.names(grid) <- NULL
 
-  clash <- intersect(names(grid), .np_reserved_names(summary, prob))
+#' Apply native_transform() and check the method's contract
+#'
+#' @param x A bmmfit object
+#' @param linpred Named list of draws x grid cell matrices on the sampling scale
+#' @param newdata The prediction grid
+#' @return The named list on the native scale, in the order of `linpred`
+#'
+#' @keywords internal
+#' @noRd
+.np_transform_checked <- function(x, linpred, newdata) {
+  transformed <- native_transform(x$bmm$model, linpred, newdata)
   stopif(
-    length(clash) > 0,
-    "Predictor(s) {collapse_comma(clash)} share a name with a column of the \\
-    output. Rename them in the data, or pass 'newdata' with different names."
+    !setequal(names(transformed), names(linpred)),
+    "The native_transform() method for model '{x$bmm$model$name}' must return \\
+    one element per parameter it was given."
   )
+  transformed <- transformed[names(linpred)]
+  stopif(
+    !identical(lapply(transformed, dim), lapply(linpred, dim)),
+    "The native_transform() method for model '{x$bmm$model$name}' must preserve \\
+    the dimensions of the draws it was given."
+  )
+  transformed
+}
 
-  if (summary) {
-    .np_summary(linpred, grid, prob, robust)
-  } else {
-    warnif(
-      length(linpred) * nrow(grid) * length(draw_ids) > 1e6,
-      "This will return \\
-      {length(linpred) * nrow(grid) * length(draw_ids)} rows. Supply 'newdata' \\
-      with the grid cells you need, or set 'ndraws', to return fewer."
-    )
-    .np_long(linpred, grid, .np_draw_index(x, draw_ids))
-  }
+
+#' The parameters a fit can predict
+#'
+#' @description
+#' The model's parameters without the alternatives its formula left out, such
+#' as `bias` in a fit that estimates `criterion`.
+#'
+#' @param x A bmmfit object
+#' @return Character vector of parameter names
+#'
+#' @keywords internal
+#' @noRd
+.np_model_pars <- function(x) {
+  setdiff(
+    names(x$bmm$model$parameters),
+    unused_alternative_parameters(x$bmm$model, x$bmm$user_formula)
+  )
 }
 
 
@@ -645,15 +935,17 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
 #'
 #' @param summary Whether the summary or the draws format is returned
 #' @param prob Probability mass of the credible interval
+#' @param population Whether the output has a `statistic` column
 #' @return Character vector of reserved column names
 #'
 #' @keywords internal
 #' @noRd
-.np_reserved_names <- function(summary, prob) {
+.np_reserved_names <- function(summary, prob, population = FALSE) {
+  statistic <- if (population) "statistic"
   if (!summary) {
-    return(c(".chain", ".iteration", ".draw", "parameter", "value"))
+    return(c(".chain", ".iteration", ".draw", "parameter", statistic, "value"))
   }
-  c("parameter", "Estimate", "Est.Error", .np_interval_names(prob))
+  c("parameter", statistic, "Estimate", "Est.Error", .np_interval_names(prob))
 }
 
 
@@ -693,15 +985,14 @@ native_parameters <- function(x, newdata = NULL, pars = NULL, re_formula = NULL,
 #'   columns. These are [brms::posterior_linpred()] output, so they are on the
 #'   *link* scale for distributional parameters and are the raw value for
 #'   non-linear parameters. For `bmm`'s `nlpar`-based models the link is a
-#'   fiction maintained by the model's own `nlf()` expression — `imm` declares
-#'   `c = "log"` because `configure_model.imm_abc()` writes `exp(c)` into the
-#'   formula, not because `brms` applies a link — so a model that declares a link
-#'   it does not actually apply in its `nlf()` will get silently wrong output
-#'   here.
+#'   fiction maintained by the model's own `nlf()` expression, which has to
+#'   apply the inverse of the declared link itself, so a model that declares a
+#'   link it does not actually apply in its `nlf()` will get silently wrong
+#'   output here.
 #' @param data The prediction grid the draws were computed on, with one row per
 #'   column of the `linpred` matrices. These are rows of the fitted model's own
 #'   data, so they carry the `bmm`-internal columns a design-dependent
-#'   transformation keys on (`LureIdx*`, `inv_ss`, `Idx_*`, matrix columns).
+#'   transformation keys on (`ss_numeric`, `Idx_*`, matrix columns).
 #'   `native_transform.non_targets()` is the worked example.
 #' @param ... Currently unused.
 #'
@@ -779,9 +1070,8 @@ native_transform.default <- function(model, linpred, data, ...) {
 #' @rdname native_transform
 #' @export
 native_transform.non_targets <- function(model, linpred, data, ...) {
-  # configure_model.mixture3p() gates each non-target component on its LureIdx, so
-  # where no lure was presented the likelihood holds it at -100 and the weight is
-  # zero rather than whatever the set-size regression extrapolates to
+  # at set size 1 the likelihood has no non-target component, so the weight
+  # there is zero rather than whatever the set-size regression extrapolates to
   non_target <- intersect(.np_softmax_pars(model, names(linpred)), "thetant")
   if (length(non_target) == 0) {
     return(NextMethod())
@@ -794,10 +1084,10 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 #' Grid cells in which no non-target was presented
 #'
 #' @description
-#' The non-target mixture components are switched off in the likelihood wherever
-#' every `LureIdx` is zero (`check_data.non_targets()` sets them from the set
-#' size), so on those rows the model's non-target weight is exactly zero rather
-#' than the value its regression coefficient extrapolates to.
+#' The likelihood has no non-target component on trials with set size 1, so on
+#' those rows the model's non-target weight is exactly zero rather than the
+#' value its regression coefficient extrapolates to. The `LureIdx` columns are
+#' read only from grids of fits made on the earlier `brms::mixture()` families.
 #'
 #' @param model A bmmodel object
 #' @param data The prediction grid
@@ -1020,11 +1310,15 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 #' @param re_formula Passed to [brms::posterior_linpred()]
 #' @param draw_ids Indices of the draws to use, identical across parameters
 #' @param dots Further arguments for [brms::posterior_linpred()]
+#' @param replay_seed Whether every parameter's call starts from the same random
+#'   number state, so that new levels sampled by `brms` are the same levels for
+#'   every parameter. The state is left advanced by one call.
 #' @return A named list of draws x grid cell matrices on the link scale
 #'
 #' @keywords internal
 #' @noRd
-.np_linpred <- function(x, pars, requested, newdata, re_formula, draw_ids, dots) {
+.np_linpred <- function(x, pars, requested, newdata, re_formula, draw_ids, dots,
+                        replay_seed = FALSE) {
   bterms <- brms::brmsterms(x$formula)
   types <- ifelse(
     pars %in% names(bterms$dpars), "dpar",
@@ -1049,13 +1343,20 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
     pars <- pars[not_in(pars, unresolved)]
   }
 
-  linpred <- lapply(pars, function(par) {
+  if (replay_seed && !exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+    stats::runif(1)
+  }
+  linpred <- lapply(seq_along(pars), function(i) {
     args <- c(
       nlist(object = x, newdata, re_formula, draw_ids),
-      stats::setNames(list(par), types[[par]]),
+      stats::setNames(list(pars[[i]]), types[[pars[[i]]]]),
       dots
     )
-    brms::do_call(brms::posterior_linpred, args)
+    if (replay_seed && i < length(pars)) {
+      withr::with_preserve_seed(brms::do_call(brms::posterior_linpred, args))
+    } else {
+      brms::do_call(brms::posterior_linpred, args)
+    }
   })
   stats::setNames(linpred, pars)
 }
@@ -1090,23 +1391,29 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 #' @param linpred Named list of draws x grid cell matrices
 #' @param grid Data frame of grid cells, one row per column of the matrices
 #' @param draws Data frame of `.chain`, `.iteration` and `.draw`
+#' @param statistic `NULL`, or a character vector with one element per matrix,
+#'   which adds a `statistic` column after `parameter`
 #' @return A long data frame, one row per draw, cell and parameter
 #'
 #' @keywords internal
 #' @noRd
-.np_long <- function(linpred, grid, draws) {
+.np_long <- function(linpred, grid, draws, statistic = NULL) {
   n_draws <- nrow(draws)
   n_cells <- nrow(grid)
   n_pars <- length(linpred)
 
-  data.frame(
+  out <- data.frame(
     draws[rep(seq_len(n_draws), times = n_cells * n_pars), , drop = FALSE],
     grid[rep(rep(seq_len(n_cells), each = n_draws), times = n_pars), , drop = FALSE],
     parameter = rep(names(linpred), each = n_draws * n_cells),
-    value = unlist(lapply(linpred, as.vector), use.names = FALSE),
     row.names = NULL,
     stringsAsFactors = FALSE
   )
+  if (!is.null(statistic)) {
+    out$statistic <- rep(statistic, each = n_draws * n_cells)
+  }
+  out$value <- unlist(lapply(linpred, as.vector), use.names = FALSE)
+  out
 }
 
 
@@ -1119,7 +1426,7 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
 #'
 #' @keywords internal
 #' @noRd
-.np_summary <- function(linpred, grid, prob, robust) {
+.np_summary <- function(linpred, grid, prob, robust, statistic = NULL) {
   summaries <- lapply(linpred, .ce_summarize_draws, prob = prob, robust = robust)
   pull <- function(element) {
     unlist(lapply(summaries, `[[`, element), use.names = FALSE)
@@ -1128,13 +1435,18 @@ native_transform.non_targets <- function(model, linpred, data, ...) {
   out <- data.frame(
     grid[rep(seq_len(nrow(grid)), times = length(linpred)), , drop = FALSE],
     parameter = rep(names(linpred), each = nrow(grid)),
-    Estimate = pull("estimate"),
-    Est.Error = pull("se"),
-    lower = pull("lower"),
-    upper = pull("upper"),
     row.names = NULL,
     stringsAsFactors = FALSE
   )
-  names(out)[names(out) %in% c("lower", "upper")] <- .np_interval_names(prob)
-  out
+  if (!is.null(statistic)) {
+    out$statistic <- rep(statistic, each = nrow(grid))
+  }
+  estimates <- data.frame(
+    Estimate = pull("estimate"),
+    Est.Error = pull("se"),
+    lower = pull("lower"),
+    upper = pull("upper")
+  )
+  names(estimates)[3:4] <- .np_interval_names(prob)
+  cbind(out, estimates)
 }

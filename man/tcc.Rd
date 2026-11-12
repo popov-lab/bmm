@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_tcc.R
 \name{tcc}
 \alias{tcc}
-\title{Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)}
+\title{Target Confusability Competition (TCC) model}
 \usage{
 tcc(
   resp_error,
@@ -51,9 +51,9 @@ d' to this \code{d} was 1.60.
 }
 \details{
 \itemize{
-\item \strong{Domain:} Visual working memory
+\item \strong{Domain:} Working memory
 \item \strong{Task:} Continuous reproduction
-\item \strong{Name:} Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)
+\item \strong{Name:} Target Confusability Competition (TCC) model
 \item \strong{Citation:}
 \itemize{
 \item Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical scaling reveals a unified theory of visual memory strength. Nature Human Behaviour, 4(11), 1156-1172. https://doi.org/10.1038/s41562-020-00938-0
@@ -96,7 +96,10 @@ option opposite the target. The model assumes the similarity depends only
 on the distance, the same for every target and on both sides of it. The
 values are fixed, not estimated; Schurgin et al. (2020) measured them in
 a separate perceptual matching task. With 360 options in 1-degree steps,
-\code{similarity[k + 1]} is the similarity at \code{k} degrees.
+\code{similarity[k + 1]} is the similarity at \code{k} degrees. Without a measured
+similarity, \code{\link[=tcc_similarity]{tcc_similarity()}} returns a von Mises or Laplace shape for a
+chosen \code{kappa}; the fit is then a TCC with that shape fixed. A model that
+estimates the width of the gradient from the responses is the \code{\link[=sdm]{sdm()}}.
 }
 
 \subsection{Response}{
@@ -108,6 +111,15 @@ With \code{units = "bins"}, it is the chosen option's offset from the target in
 option steps. The model treats the response as a choice among
 \code{n_options} discrete options, so \code{n_options} should be the number of
 options the participant could choose from.
+
+\code{n_options} is part of the model, not a resolution setting. Each option
+draws its own noise, and the more options lie near the target, the more
+often one of them wins: at \code{d = 2}, with the Laplace similarity of the
+examples built for each wheel (\code{tcc_similarity(..., n_options = n)}), the
+probability of choosing an option at most 10 degrees from the target is
+0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
+continuous limit, and values of \code{d} fitted with different \code{n_options} are
+not on one scale.
 }
 
 \subsection{Grid limit on d}{
@@ -179,8 +191,7 @@ Continuous predictors of \code{d} are supported at the per-trial cost.
 }
 \examples{
 \dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
-f <- exp(-(0:180) / 20)
-f <- (f - min(f)) / (1 - min(f))
+f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
 dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
 \dontshow{\}) # examplesIf}

@@ -108,12 +108,14 @@ interactive prompt differently than last time forces a refit.}
 \item{...}{Further arguments passed to \code{\link[brms:brm]{brms::brm()}} or Stan. See the
 description of \code{\link[brms:brm]{brms::brm()}} for more details. Unless \code{control} names a
 \code{step_size} (\code{stepsize} for the rstan backend), bmm adds the starting step
-size set in \code{\link[=bmm_options]{bmm_options()}} to it; the other entries of \code{control} are kept.}
+size set in \code{\link[=bmm_options]{bmm_options()}} to it; the other entries of \code{control} are kept.
+\code{stanvars} are added to the ones the model sets up, so pass only your own.}
 }
 \value{
 An object of class brmsfit which contains the posterior draws along
 with many other useful information about the model. Use methods(class =
-"brmsfit") for an overview on available methods.
+"brmsfit") for an overview on available methods. Their \code{newdata} argument
+takes data in the layout you gave to \code{bmm()} (see \code{\link[=standata.bmmfit]{standata.bmmfit()}}).
 }
 \description{
 Fit a Bayesian measurement model using \strong{brms} as a
@@ -124,31 +126,28 @@ The following models are supported:
 
 Continuous reproduction
 \itemize{
-\item imm(): Interference measurement model by Oberauer and Lin (2017)
-\item mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)
-\item mixture3p(): Three-parameter mixture model by Bays et al (2009)
-\item sdm(): Signal Discrimination Model (SDM) by Oberauer (2023)
-\item tcc(): Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)
+\item imm(): Interference Measurement Model
+\item mixture2p(): Two-Parameter Mixture Model
+\item mixture3p(): Three-Parameter Mixture Model
+\item sdm(): Signal Discrimination Model (SDM)
+\item tcc(): Target Confusability Competition (TCC) model
 }
 
 Categorical recall and n-AFC decisions
 \itemize{
-\item m3(): The Multinomial / Memory Measurement Model
-}
-
-Processing-tree models
-\itemize{
-\item mpt(): Multinomial Processing Tree (MPT) models
+\item m3(): Memory Measurement Model
+\item mpt(): Multinomial Processing Tree (MPT) Model
 }
 
 Detection, recognition and confidence judgments
 \itemize{
-\item sdt_cdp(): Continuous Dual-Process Signal Detection Theory (CDP)
-\item sdt_mafc(): Signal Detection Theory (m-AFC)
-\item sdt_ranking(): Signal Detection Theory (Ranking)
-\item sdt_rating(): Signal Detection Theory (Confidence Rating)
-\item sdt_yn(): Signal Detection Theory (Yes/No)
-\item tcc_cd(): Target Confusability Competition (TCC) model for single-probe change detection
+\item mpt(): Multinomial Processing Tree (MPT) Model
+\item psychometric_function(): Psychometric Function
+\item sdt_cdp(): Continuous Dual-Process Signal Detection Theory Model
+\item sdt_mafc(): m-Alternative Forced Choice Signal Detection Theory Model
+\item sdt_ranking(): Ranking Signal Detection Theory Model
+\item sdt_rating(): Confidence Rating Signal Detection Theory Model
+\item sdt_yn(): Yes/No Signal Detection Theory Model
 }
 
 Choices and response times
@@ -156,6 +155,11 @@ Choices and response times
 \item cswald(): Censored-Shifted Wald Model
 \item ddm(): Diffusion Decision Model
 \item ezdm(): EZ-Diffusion Model
+}
+
+Change detection
+\itemize{
+\item tcc_cd(): Target Confusability Competition (TCC) model for single-probe change detection
 }
 
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
@@ -196,10 +200,11 @@ fit <- bmm(
 \dontshow{\}) # examplesIf}
 }
 \references{
-Frischkorn, G. T., & Popov, V. (2023). A tutorial for estimating
-mixture models for visual working memory tasks in brms: Introducing the
-Bayesian Measurement Modeling  (bmm) package for R.
-https://doi.org/10.31234/osf.io/umt57
+Frischkorn, G. T., & Popov, V. (2025). A tutorial for estimating
+Bayesian hierarchical mixture models for visual working memory tasks:
+Introducing the Bayesian Measurement Modeling (bmm) package for R.
+\emph{Behavior Research Methods}, \emph{57}(5), Article 144.
+https://doi.org/10.3758/s13428-025-02643-0
 }
 \seealso{
 \code{\link[=bmm_models]{bmm_models()}}, \code{\link[brms:brm]{brms::brm()}}, \link[=default_prior.bmmformula]{default_prior()}, \code{\link[=bmmformula]{bmmformula()}}, \link[=stancode.bmmformula]{stancode()}, \link[=standata.bmmformula]{standata()}

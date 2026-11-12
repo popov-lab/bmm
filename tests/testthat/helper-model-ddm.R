@@ -13,6 +13,7 @@ model_cases_ddm <- function() {
       )
     ),
     init = list(ddm = list(model = model, formula = re_formula, data = toy_rt_data())),
+    rt_data = list(ddm = list(model = model, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1))),
     links = list(ddm = list(model = model, settable = c("drift", "bound", "ndt", "zr"))),
     fixture = list(ddm = list(file = "bmmfit_ddm_ppcheck.rds")),
     observables = list(
@@ -20,6 +21,13 @@ model_cases_ddm <- function() {
         model = model,
         data = withr::with_seed(1, rddm(20, drift = 1, bound = 1.5, ndt = 0.3)),
         formula = bmf(drift ~ 1)
+      )
+    ),
+    simulate = list(
+      ddm = list(
+        model = ddm("rt", "response"), pars = list(drift = 1, bound = 0, ndt = -1.2),
+        design = data.frame(id = rep(1:2, 50)), formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+        simulate_pars = list(drift = 1, bound = 0, ndt = -1.2, zr = 0)
       )
     )
   )

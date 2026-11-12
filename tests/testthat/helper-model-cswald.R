@@ -25,6 +25,10 @@ model_cases_cswald <- function() {
         model = crisk, formula = re_formula + bmf(zr ~ 1), data = toy_rt_data()
       )
     ),
+    rt_data = list(
+      cswald = list(model = simple, formula = rt_formula),
+      cswald_crisk = list(model = crisk, formula = rt_formula)
+    ),
     links = list(
       cswald = list(model = simple, settable = c("drift", "bound", "ndt", "s")),
       cswald_crisk = list(model = crisk, settable = c("drift", "bound", "ndt", "zr", "s"))
@@ -40,6 +44,19 @@ model_cases_cswald <- function() {
         model = cswald(rt = "rt", response = "response", version = "crisk"),
         data = withr::with_seed(1, rcswald(20, drift = 2, bound = 1, ndt = 0.3)),
         formula = bmf(drift ~ 1)
+      )
+    ),
+    simulate = list(
+      # few errors, which the simple version assumes
+      cswald_simple = list(
+        model = cswald("rt", "response", version = "simple"), pars = list(drift = 1.1, bound = 0, ndt = -1.2),
+        design = data.frame(id = rep(1:2, 50)), formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+        simulate_pars = list(drift = 1.1, bound = 0, ndt = -1.2, s = 0)
+      ),
+      cswald_crisk = list(
+        model = cswald("rt", "response", version = "crisk"), pars = list(drift = 1, bound = 0, ndt = -1.2),
+        design = data.frame(id = rep(1:2, 50)), formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+        simulate_pars = list(drift = 1, bound = 0, ndt = -1.2, zr = 0, s = 0)
       )
     )
   )

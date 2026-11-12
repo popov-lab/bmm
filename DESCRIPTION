@@ -1,6 +1,6 @@
 Package: bmm
 Title: Easy and Accessible Bayesian Measurement Models Using 'brms'
-Version: 1.4.1.9000
+Version: 1.4.2.9000
 Authors@R: c(
     person("Vencislav", "Popov", , "vencislav.popov@gmail.com", role = c("aut", "cph"),
            comment = c(ORCID = "0000-0002-8073-4199")),
@@ -40,20 +40,29 @@ Imports:
     stats,
     withr
 Suggests:
+    bayestestR,
     bookdown,
     cmdstanr (>= 0.7.0),
     cowplot,
+    data.table,
     dplyr,
     emmeans (>= 1.8.0),
     fansi,
     ggplot2,
     ggthemes,
+    insight (>= 1.6.0),
+    jsonlite,
     knitr,
     loo (>= 2.10.0),
+    marginaleffects,
     mixtur,
+    modelbased,
     MPTinR,
+    parameters,
+    performance (>= 0.18.2),
     pkgbuild,
     remotes,
+    report (>= 0.6.4),
     rmarkdown,
     roxygen2,
     rstan,
@@ -68,9 +77,9 @@ Suggests:
 Additional_repositories: https://stan-dev.r-universe.dev
 Config/testthat/edition: 3
 Config/testthat/parallel: true
-Config/testthat/start-first: conditional_effects, update, model_sdt_rating, model_sdt_cdp, default-priors, model_m3, model_cswald, helpers-init, model_ezdm, pp_check
+Config/testthat/start-first: conditional_effects, update-stored-frame, update, update-newdata, model_sdt_rating, model_sdt_cdp, default-priors, model_m3, model_cswald, helpers-init, newdata, model_ezdm, pp_check
 Config/Needs/website: rmarkdown
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-Config/roxygen2/version: 8.1.0
+Config/roxygen2/version: 8.1.1

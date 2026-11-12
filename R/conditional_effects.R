@@ -49,10 +49,10 @@
 #' bmm models use two types of parameters internally:
 #' \itemize{
 #'   \item **Non-linear parameters (`nlpar`)**: Model parameters that enter the
-#'     likelihood through a non-linear formula, like `kappa` and `thetat` of
-#'     [mixture3p()] or `c` and `a` of [m3()]
+#'     likelihood through a non-linear formula, like `c` and `a` of [m3()]
 #'   \item **Distributional parameters (`dpar`)**: Parameters of the response
-#'     distribution itself, like `kappa` and `c` of [sdm()]
+#'     distribution itself, like `kappa` and `c` of [sdm()] or `kappa` and
+#'     `thetat` of [mixture2p()]
 #' }
 #'
 #' Users should not need to know this distinction - `conditional_effects.bmmfit()`
@@ -134,7 +134,7 @@
 #' ce_kappa_log <- conditional_effects(fit, par = "kappa", scale = "sampling")
 #' plot(ce_kappa_log)
 #'
-#' # Get effects for thetat (memory probability)
+#' # Get effects for thetat (probability of a target response)
 #' ce_thetat <- conditional_effects(fit, par = "thetat")
 #' plot(ce_thetat)
 #'
@@ -302,9 +302,10 @@ conditional_effects.bmmfit <- function(x,
 #' Filter internal variables from conditional_effects results
 #'
 #' @description
-#' Removes conditional effects plots for internal model variables
-#' (like LureIdx, Idx_*, inv_ss, etc.) that are created during data
-#' preprocessing but are not part of the user's formula.
+#' Removes conditional effects plots for the columns bmm builds during data
+#' preprocessing (see `built_data_columns()`) and for a model's non-target
+#' features and distances, together with every interaction that involves one of
+#' them. A user predictor that merely resembles those names is kept.
 #'
 #' @param ce_result A brms_conditional_effects object
 #' @param bmmfit A bmmfit object
@@ -314,37 +315,15 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .filter_internal_effects <- function(ce_result, bmmfit) {
-  internal_patterns <- c(
-    "^LureIdx",
-    "^Idx_",
-    "^inv_ss$",
-    "^Item[0-9]+_",
-    "^expS$"
-  )
-  
   model <- bmmfit$bmm$model
-  if (!is.null(model$other_vars$nt_features)) {
-    nt_features <- model$other_vars$nt_features
-    escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_features)
-    internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
-  }
-  if (!is.null(model$other_vars$nt_distances)) {
-    nt_distances <- model$other_vars$nt_distances
-    escaped <- gsub("([][(){}^$*+?.|\\\\])", "\\\\\\1", nt_distances)
-    internal_patterns <- c(internal_patterns, paste0("^", escaped, "$"))
-  }
-  if (length(model$other_vars$indicators$possible) > 0) {
-    internal_patterns <- c(
-      internal_patterns,
-      paste0("^", unlist(model$other_vars$indicators$possible, use.names = FALSE), "$")
-    )
-  }
-  
-  effect_names <- names(ce_result)
-  combined_pattern <- paste(internal_patterns, collapse = "|")
-  keep_effects <- !vapply(effect_names, function(name) {
-    vars <- strsplit(name, ":")[[1]]
-    any(grepl(combined_pattern, vars))
+  internal_vars <- c(
+    fit_built_columns(bmmfit),
+    model$other_vars$nt_features,
+    model$other_vars$nt_distances
+  )
+
+  keep_effects <- !vapply(strsplit(names(ce_result), ":"), function(vars) {
+    any(vars %in% internal_vars)
   }, logical(1))
 
   if (any(keep_effects)) {
@@ -512,7 +491,7 @@ conditional_effects.bmmfit <- function(x,
 #' @description
 #' For mixture models with multinomial logit (softmax), manually computes
 #' the softmax transformation by extracting conditional effects for all
-#' relevant nlpars and applying the softmax formula.
+#' relevant dpars and applying the softmax formula.
 #'
 #' @param bmmfit A bmmfit object
 #' @param par Character string. Parameter name to return (thetat or thetant)
@@ -523,7 +502,9 @@ conditional_effects.bmmfit <- function(x,
 #' @keywords internal
 #' @noRd
 .compute_softmax_conditional_effects <- function(bmmfit, par, ...) {
-  if (!"mixture3p" %in% class(bmmfit$bmm$model)) {
+  # only the simple version normalises its weights by a softmax; the
+  # capacity-limited versions parameterise them directly
+  if (!"mixture3p_simple" %in% class(bmmfit$bmm$model)) {
     NULL
   } else {
     .compute_softmax_ce_inner(bmmfit, par, ...)
@@ -533,12 +514,19 @@ conditional_effects.bmmfit <- function(x,
 
 .compute_softmax_ce_inner <- function(bmmfit, par, ...) {
   args <- .ce_split_args(...)
-  grid <- do.call(.brms_conditional_effects, c(list(bmmfit, nlpar = par), args$grid),
+  grid <- do.call(.brms_conditional_effects, c(list(bmmfit, dpar = par), args$grid),
                   quote = TRUE)
+  set_size_var <- bmmfit$bmm$model$other_vars$set_size
 
-  softmax <- function(linpred) {
+  softmax <- function(linpred, newdata) {
     draws_t <- linpred("thetat")
     draws_nt <- linpred("thetant")
+    # The non-target components share the weight exp(thetant) between them, so
+    # their total is exp(thetant) whatever the set size -- except at set size 1,
+    # where the likelihood has no non-target component at all.
+    if (set_size_var %in% names(newdata)) {
+      draws_nt[, as_numeric_vector(newdata[[set_size_var]]) <= 1] <- -Inf
+    }
     # numerically stable softmax: subtract max before exponentiating
     shift <- pmax(draws_t, draws_nt, 0)
     exp_t <- exp(draws_t - shift)
@@ -547,7 +535,8 @@ conditional_effects.bmmfit <- function(x,
     if (par == "thetat") exp_t / denom else exp_nt / denom
   }
   structure(
-    .ce_summarise_grid(bmmfit, grid, args, robust = FALSE, draws_of = softmax),
+    .ce_summarise_grid(bmmfit, grid, args, robust = FALSE, draws_of = softmax,
+                       type = "dpar"),
     class = class(grid)
   )
 }
@@ -779,26 +768,28 @@ conditional_effects.bmmfit <- function(x,
 #' @param grid A `brms_conditional_effects` object, the conditions grid
 #' @param args The list of `.ce_split_args()`
 #' @param robust Default of `robust` on this route
-#' @param draws_of Function of `linpred`, a function of the name of an `nlpar`
-#'   that returns its draws on the grid element, returning the draws of the
-#'   parameter
+#' @param draws_of Function of `linpred` and `newdata`, returning the draws of
+#'   the parameter. `linpred` is a function of the name of a parameter that
+#'   returns its draws on the grid element, `newdata` the element's data.
+#' @param type Character string. The argument of [brms::posterior_linpred()]
+#'   that names the parameter: `"nlpar"` or `"dpar"`.
 #'
 #' @return Named list with one element per element of `grid`
 #'
 #' @keywords internal
 #' @noRd
-.ce_summarise_grid <- function(x, grid, args, robust, draws_of) {
+.ce_summarise_grid <- function(x, grid, args, robust, draws_of, type = "nlpar") {
   linpred_args <- c(
     args$linpred, list(draw_ids = .ce_resolve_draw_ids(x, args$draws))
   )
   lapply(grid, function(ce) {
     newdata <- .ce_cond_data(ce)
-    draws <- draws_of(function(nlpar) {
+    linpred <- function(par) {
       do.call(brms::posterior_linpred, c(
-        list(x, newdata = newdata, nlpar = nlpar), linpred_args
+        list(x, newdata = newdata), stats::setNames(list(par), type), linpred_args
       ), quote = TRUE)
-    })
-    .ce_set_summary(ce, draws, args$summary, robust)
+    }
+    .ce_set_summary(ce, draws_of(linpred, newdata), args$summary, robust)
   })
 }
 
@@ -848,7 +839,7 @@ conditional_effects.bmmfit <- function(x,
   structure(
     lapply(
       .ce_summarise_grid(x, grid, args, robust = TRUE,
-                         draws_of = function(linpred) linpred(par)),
+                         draws_of = function(linpred, ...) linpred(par)),
       function(ce) {
         attr(ce, "response") <- par
         # a parameter has no observed response, but plot(points = TRUE) needs a

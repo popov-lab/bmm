@@ -10,9 +10,9 @@
       # table = "r" passes the d table from R instead of building it in Stan;
       # an internal switch for table transforms (correlated or motor noise)
       other_vars = nlist(similarity, n_options, units, d_max, table = "stan"),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Target Confusability Competition (TCC) model by Schurgin, Wixted & Brady (2020)",
+      name = "Target Confusability Competition (TCC) model",
       citation = glue(
         "Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical \\
         scaling reveals a unified theory of visual memory strength. Nature Human \\
@@ -45,7 +45,8 @@
       default_priors = list(
         d = list(main = "normal(0.5, 1)", effects = "normal(0, 1)", sd = "exponential(1)")
       ),
-      init_ranges = list(d = c(1, 2))
+      init_ranges = list(d = c(1, 2)),
+      functions = list(density = "dtcc", generator = "rtcc")
     ),
     class = c("bmmodel", "tcc"),
     call = call
@@ -76,7 +77,10 @@
 #'   on the distance, the same for every target and on both sides of it. The
 #'   values are fixed, not estimated; Schurgin et al. (2020) measured them in
 #'   a separate perceptual matching task. With 360 options in 1-degree steps,
-#'   `similarity[k + 1]` is the similarity at `k` degrees.
+#'   `similarity[k + 1]` is the similarity at `k` degrees. Without a measured
+#'   similarity, [tcc_similarity()] returns a von Mises or Laplace shape for a
+#'   chosen `kappa`; the fit is then a TCC with that shape fixed. A model that
+#'   estimates the width of the gradient from the responses is the [sdm()].
 #'
 #' ## Response
 #'
@@ -87,6 +91,15 @@
 #'   option steps. The model treats the response as a choice among
 #'   `n_options` discrete options, so `n_options` should be the number of
 #'   options the participant could choose from.
+#'
+#'   `n_options` is part of the model, not a resolution setting. Each option
+#'   draws its own noise, and the more options lie near the target, the more
+#'   often one of them wins: at `d = 2`, with the Laplace similarity of the
+#'   examples built for each wheel (`tcc_similarity(..., n_options = n)`), the
+#'   probability of choosing an option at most 10 degrees from the target is
+#'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
+#'   continuous limit, and values of `d` fitted with different `n_options` are
+#'   not on one scale.
 #'
 #' ## Grid limit on d
 #'
@@ -171,28 +184,34 @@
 #' @keywords bmmodel
 #' @export
 #' @examplesIf isTRUE(Sys.getenv("BMM_EXAMPLES"))
-#' f <- exp(-(0:180) / 20)
-#' f <- (f - min(f)) / (1 - min(f))
+#' f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
 #' dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 #' fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
 tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "bins"),
                 d_max = 30, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   units <- match.arg(units)
-  .tcc_check_similarity(similarity, n_options)
+  .check_tcc_args(similarity, n_options)
   stopif(!is.numeric(d_max) || length(d_max) != 1 || !isTRUE(d_max > 0),
          "`d_max` must be a single positive number.")
   .model_tcc(resp_error = resp_error, similarity = similarity, n_options = n_options,
              units = units, d_max = d_max, call = call, ...)
 }
 
-.tcc_check_similarity <- function(similarity, n_options) {
-  stopif(!is.numeric(n_options) || length(n_options) != 1 || !isTRUE(n_options >= 4) ||
-           n_options %% 2 != 0,
+.tcc_check_n_options <- function(n_options) {
+  stopif(!is.numeric(n_options) || length(n_options) != 1 || !isTRUE(is.finite(n_options)) ||
+           !isTRUE(n_options >= 4) || n_options %% 2 != 0,
          "`n_options` must be an even number of at least 4.")
+}
+
+.check_tcc_args <- function(similarity, n_options) {
+  .tcc_check_n_options(n_options)
   n_values <- n_options / 2 + 1
-  stopif(!is.numeric(similarity), "`similarity` must be a numeric vector.")
+  stopif(!is.numeric(similarity),
+         "`similarity` must be a numeric vector. For a von Mises or Laplace shape, use \\
+         tcc_similarity(); to estimate its width, use sdm().")
   stopif(length(similarity) != n_values,
          "`similarity` must hold {n_values} values, one for each distance from 0 to \\
          {n_options / 2} options, but it holds {length(similarity)}.")
@@ -202,9 +221,73 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
          "`similarity` must be 1 at distance 0 (the target), as d is the target's signal.")
 }
 
+#' @title A parametric similarity for [tcc()]
+#' @description Returns the similarity vector that [tcc()] takes, from a von
+#'   Mises or Laplace shape with a given `kappa`, for when no measured
+#'   similarity is at hand.
+#' @details The shapes are `exp(kappa * (cos(x) - 1))` for `"vonmises"`, the
+#'   activation function of [sdm()], and `exp(-kappa * |x|)` for `"laplace"`,
+#'   with `x` the distance from the target in radians and `kappa` the
+#'   concentration or the rate (Oberauer, 2023). Each is scaled to 1
+#'   at the target and 0 at the opposite option, as Schurgin et al. (2020)
+#'   scaled their measured similarity.
+#'
+#'   `kappa` is fixed here, so a fit with this vector is still the TCC: the
+#'   similarity enters the model as known. Schurgin et al. (2020) measured
+#'   theirs in a separate perceptual task, and a measured similarity is the
+#'   model as its authors intended it. To estimate `kappa` from the responses,
+#'   fit [sdm()] instead, which estimates it for the von Mises shape.
+#' @param shape `"vonmises"` or `"laplace"`.
+#' @param kappa The concentration (von Mises) or rate (Laplace) of the shape, a
+#'   single positive finite number, for distances in radians: a Laplace
+#'   similarity that falls by a factor e over 20 degrees has `kappa = 1 /
+#'   deg2rad(20)`.
+#' @param n_options The number of response options on the wheel, an even
+#'   number, as in [tcc()].
+#' @return A numeric vector of `n_options / 2 + 1` similarities, at the
+#'   distances 0, 1, ..., `n_options / 2` options from the target.
+#' @references Oberauer, K. (2023). Measurement models for visual working
+#'   memory - A factorial model comparison. *Psychological Review, 130*(3),
+#'   841-852. https://doi.org/10.1037/rev0000328
+#'
+#'   Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical
+#'   scaling reveals a unified theory of visual memory strength. *Nature Human
+#'   Behaviour, 4*(11), 1156-1172. https://doi.org/10.1038/s41562-020-00938-0
+#' @keywords transform
+#' @export
+#' @examples
+#' f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
+#' plot(0:180, f, type = "l", xlab = "Distance from the target (degrees)",
+#'      ylab = "Similarity")
+#' lines(0:180, tcc_similarity("vonmises", kappa = 8), lty = 2)
+tcc_similarity <- function(shape = c("vonmises", "laplace"), kappa, n_options = 360) {
+  stop_missing_args()
+  shape <- match.arg(shape)
+  stopif(!is.numeric(kappa) || length(kappa) != 1 || !isTRUE(is.finite(kappa) && kappa > 0),
+         "`kappa` must be a single positive finite number.")
+  .tcc_check_n_options(n_options)
+  .tcc_shape_similarity(shape, kappa, seq(0, pi, length.out = n_options / 2 + 1))
+}
+
+# expm1() and 1 - cos(x) = 2 sin(x / 2)^2 keep the scaled shapes exact where
+# they tend to a straight line (Laplace) or a raised cosine (von Mises), at a
+# small kappa
+.tcc_shape_similarity <- function(shape, kappa, delta) {
+  if (shape == "laplace") {
+    return(exp(-kappa * delta) * expm1(-kappa * (pi - delta)) / expm1(-kappa * pi))
+  }
+  s <- sin(delta / 2)^2
+  exp(-2 * kappa * s) * expm1(-2 * kappa * (1 - s)) / expm1(-2 * kappa)
+}
+
 ############################################################################# !
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
+
+#' @exportS3Method
+built_data_columns.tcc <- function(model) {
+  c("tcc_bin", NextMethod("built_data_columns"))
+}
 
 #' @export
 check_data.tcc <- function(model, data, formula) {
@@ -270,7 +353,7 @@ configure_model.tcc <- function(model, data, formula) {
   grid <- .tcc_grid(model)
   similarity <- .tcc_similarity(model)
   sc_path <- system.file("stan_chunks", package = "bmm")
-  out <- brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_funs.stan")),
+  out <- brms::stanvar(scode = read_lines2(file.path(sc_path, "tcc_functions.stan")),
                        block = "functions") +
     brms::stanvar(x = grid$lo, name = "tcc_grid_lo") +
     brms::stanvar(x = grid$step, name = "tcc_grid_step")
@@ -332,7 +415,7 @@ configure_model.tcc <- function(model, data, formula) {
 # peaks halfway between its own mean and m, so the window reaches down to
 # (min(d f) + m) / 2 - 6 as well (1.5e-4 off in log P at d = 12 with a 1-degree
 # Laplace similarity before, 1e-13 after; TCC 2-D table spike, 2026-10).
-# tcc_logp_by_distance() in tcc_funs.stan is the Stan twin
+# tcc_logp_by_distance() in tcc_functions.stan is the Stan twin
 .tcc_logp <- function(d, similarity) {
   n_dist <- length(similarity)
   mult <- c(1, rep(2, n_dist - 2), 1)
@@ -501,6 +584,21 @@ pp_observables.tcc <- function(model) {
 pp_simulate.tcc <- function(model, prep) {
   bins <- .tcc_rbins(.pp_dpar_vector(prep, "d"), .tcc_prep_table(prep), model$other_vars$n_options)
   list(error = matrix(bins, nrow = prep$ndraws))
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.tcc <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  n_options <- model$other_vars$n_options
+  y <- rtcc(nrow(design), d = sim$native$d, similarity = model$other_vars$similarity,
+            n_options = n_options)
+  if (model$other_vars$units == "bins") y <- .tcc_bin(y, n_options, "radians")
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }
 
 ############################################################################# !

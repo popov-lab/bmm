@@ -463,29 +463,74 @@ test_that(".has_category_dpars agrees with brms's conv_cats_dpars for the famili
 # Tier 1: Unit tests — .filter_internal_effects()
 # ===========================================================================
 
-test_that(".filter_internal_effects removes internal variables", {
-  # Build a mock bmmfit with minimal structure
-  mock_bmmfit <- list(
-    bmm = list(
-      model = structure(
-        list(other_vars = list()),
-        class = c("sdm", "bmmodel")
-      )
-    )
+test_that(".filter_internal_effects removes the columns a model builds", {
+  model <- mixture3p(
+    "dev_rad", nt_features = c("nt1", "nt2"), set_size = "set_size"
   )
+  mock_bmmfit <- list(bmm = list(model = model))
 
+  # the circular mixture likelihoods index their own covariates instead of
+  # switching components off with LureIdx* indicators, so ss_numeric is the one
+  # column mixture3p builds
   ce <- mock_ce(
     set_size = mock_ce_df(1:3, 0:2, 2:4),
-    LureIdx1 = mock_ce_df(1:3, 0:2, 2:4),
-    Idx_corr = mock_ce_df(1:3, 0:2, 2:4),
-    inv_ss = mock_ce_df(1:3, 0:2, 2:4),
-    Item1_Col_rad = mock_ce_df(1:3, 0:2, 2:4),
-    expS = mock_ce_df(1:3, 0:2, 2:4)
+    ss_numeric = mock_ce_df(1:3, 0:2, 2:4),
+    nt1 = mock_ce_df(1:3, 0:2, 2:4),
+    `set_size:ss_numeric` = mock_ce_df(1:3, 0:2, 2:4)
   )
 
   result <- .filter_internal_effects(ce, mock_bmmfit)
   expect_named(result, "set_size")
   expect_s3_class(result, "brms_conditional_effects")
+})
+
+test_that(".filter_internal_effects keeps user predictors that share a prefix with a built column", {
+  mixture2p_fit <- list(bmm = list(model = mixture2p("dev_rad")))
+  ce <- mock_ce(
+    n_items = mock_ce_df(1:3, 0:2, 2:4),
+    Idx_user = mock_ce_df(1:3, 0:2, 2:4),
+    cond = mock_ce_df(1:3, 0:2, 2:4),
+    `n_items:Idx_user` = mock_ce_df(1:3, 0:2, 2:4),
+    `Idx_user:cond` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+  expect_named(
+    .filter_internal_effects(ce, mixture2p_fit),
+    c("n_items", "Idx_user", "cond", "n_items:Idx_user", "Idx_user:cond")
+  )
+
+  # nothing creates Item<k>_* or expS columns, so a user column with those
+  # names is a predictor like any other
+  sdm_fit <- list(bmm = list(model = sdm("dev_rad")))
+  ce <- mock_ce(
+    Item1_Col_rad = mock_ce_df(1:3, 0:2, 2:4),
+    expS = mock_ce_df(1:3, 0:2, 2:4)
+  )
+  expect_named(.filter_internal_effects(ce, sdm_fit), c("Item1_Col_rad", "expS"))
+})
+
+test_that(".filter_internal_effects keeps user columns named like the ones a non-targets model builds", {
+  dat <- small_data()
+  dat$LureIdx_user <- rep_len(c(0, 1), nrow(dat))
+  dat$inv_ss2 <- rep_len(c(1, 2, 3), nrow(dat))
+  fit <- suppressMessages(mock_bmm(
+    bmf(kappa ~ 1, thetat ~ 1 + LureIdx_user, thetant ~ 1 + inv_ss2),
+    dat,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
+  ))
+  expect_true(all(c("LureIdx_user", "inv_ss2") %in% names(fit$data)))
+
+  # ss_numeric is the one column mixture3p builds
+  ce <- mock_ce(
+    LureIdx_user = mock_ce_df(1:3, 0:2, 2:4),
+    inv_ss2 = mock_ce_df(1:3, 0:2, 2:4),
+    `LureIdx_user:inv_ss2` = mock_ce_df(1:3, 0:2, 2:4),
+    ss_numeric = mock_ce_df(1:3, 0:2, 2:4),
+    `ss_numeric:inv_ss2` = mock_ce_df(1:3, 0:2, 2:4)
+  )
+  expect_named(
+    .filter_internal_effects(ce, fit),
+    c("LureIdx_user", "inv_ss2", "LureIdx_user:inv_ss2")
+  )
 })
 
 test_that(".filter_internal_effects keeps all user vars", {
@@ -879,7 +924,7 @@ test_that("brms's conditional_effects arguments reach the grid call, not posteri
   for (seen in list(seen_rating, seen_softmax)) {
     expect_gt(length(seen$linpred), 0)
     for (args in seen$linpred) {
-      expect_setequal(setdiff(names(args), c("object", "newdata", "nlpar")),
+      expect_setequal(setdiff(names(args), c("object", "newdata", "nlpar", "dpar")),
                       c("re_formula", "draw_ids", "allow_new_levels"))
     }
     for (name in names(ce_argument_values)) {
@@ -1631,12 +1676,16 @@ test_that(".np_grid_vars skips a parameter fixed to a constant (#512)", {
 # Tier 1: Unit tests — mixture3p softmax route
 # ===========================================================================
 
-# The softmax of the nlpars is a function of their draws on the brms grid, so
+# The softmax of the dpars is a function of their draws on the brms grid, so
 # every argument that shapes those draws must reach brms as the user gave it.
+# The grid starts at set size 2: at set size 1 the route drops the non-targets
+# (tested on its own below).
 softmax_ce <- function(par, draws_t, draws_nt, spaghetti = FALSE, ...) {
+  grid <- stub_grid("set_size", n = ncol(draws_t), spaghetti = spaghetti)
+  grid$set_size$set_size <- grid$set_size$set_size + 1L
   seen <- stub_category_route(
-    stub_grid("set_size", n = ncol(draws_t), spaghetti = spaghetti),
-    function(args) if (args$nlpar == "thetat") draws_t else draws_nt
+    grid,
+    function(args) if (args$dpar == "thetat") draws_t else draws_nt
   )
   out <- conditional_effects(mock_mixture3p_fit(), par = par,
                              effects = "set_size", spaghetti = spaghetti, ...)
@@ -1651,9 +1700,45 @@ test_that("mixture3p softmax route asks brms for the grid of the parameter it re
   draws <- matrix(0, 3, 2)
   for (par in c("thetat", "thetant")) {
     res <- softmax_ce(par, draws, draws)
-    expect_equal(res$seen$grid[[1]]$nlpar, par)
-    expect_equal(vapply(res$seen$linpred, `[[`, "", "nlpar"), c("thetat", "thetant"))
+    expect_equal(res$seen$grid[[1]]$dpar, par)
+    expect_equal(vapply(res$seen$linpred, `[[`, "", "dpar"), c("thetat", "thetant"))
   }
+})
+
+# the weights are dpars of mixture3p's custom family, and brms refuses a dpar
+# requested as an nlpar ("Invalid argument 'nlpar'"), which the stub would not
+test_that("mixture3p softmax route asks brms for dpars, never for nlpars (#434)", {
+  draws <- matrix(0, 3, 2)
+  for (par in c("thetat", "thetant")) {
+    res <- softmax_ce(par, draws, draws)
+    expect_false("nlpar" %in% names(res$seen$grid[[1]]))
+    expect_length(res$seen$linpred, 2)
+    for (args in res$seen$linpred) {
+      expect_true("dpar" %in% names(args))
+      expect_false("nlpar" %in% names(args))
+    }
+  }
+})
+
+test_that("mixture3p softmax route gives no weight to non-targets at set size 1 (#434)", {
+  draws_t <- cbind(c(0.2, 1.1, -0.4, 2.3), c(0.2, 1.1, -0.4, 2.3))
+  draws_nt <- cbind(c(0.5, -0.3, 2, 0.1), c(0.5, -0.3, 2, 0.1))
+  # the stub grid holds set sizes 1 and 2
+  stub_category_route(
+    stub_grid("set_size", n = 2, spaghetti = TRUE),
+    function(args) if (args$dpar == "thetat") draws_t else draws_nt
+  )
+  fit <- mock_mixture3p_fit()
+
+  thetant <- conditional_effects(fit, par = "thetant", effects = "set_size",
+                                 spaghetti = TRUE)[[1]]
+  expect_equal(thetant$estimate__, c(0, mean(softmax_of(draws_nt[, 2], draws_t[, 2]))))
+  spaghetti <- attr(thetant, "spaghetti")
+  expect_true(all(spaghetti$estimate__[spaghetti$set_size == 1] == 0))
+
+  thetat <- conditional_effects(fit, par = "thetat", effects = "set_size")[[1]]
+  at_one <- exp(draws_t[, 1]) / (exp(draws_t[, 1]) + 1)
+  expect_equal(thetat$estimate__, c(mean(at_one), mean(softmax_of(draws_t[, 2], draws_nt[, 2]))))
 })
 
 # conditional_effects() re-classes the route's result only when an effect
@@ -1733,7 +1818,7 @@ test_that("mixture3p softmax route puts the spaghetti lines on the probability s
     res <- softmax_ce(par, draws_t, draws_nt, spaghetti = TRUE)$out
     spaghetti <- attr(res, "spaghetti")
     expect_equal(spaghetti$estimate__, as.numeric(t(p)))
-    expect_equal(spaghetti$set_size, rep(1:2, times = 4))
+    expect_equal(spaghetti$set_size, rep(2:3, times = 4))
     expect_equal(spaghetti$sample__, factor(rep(1:4, each = 2)))
   }
 

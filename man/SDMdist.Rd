@@ -21,12 +21,25 @@ psdm(
   parametrization = "sqrtexp"
 )
 
-qsdm(p, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
+qsdm(
+  p,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  lower.tail = TRUE,
+  log.p = FALSE,
+  lower.bound = -pi,
+  parametrization = "sqrtexp"
+)
 
 rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 }
 \arguments{
-\item{x}{Vector of quantiles}
+\item{x}{Vector of quantiles, or a data frame of them. For a data frame,
+\code{dsdm()} returns a data frame of the same shape with one density per
+cell, its cells taken column by column; parameters longer than the
+number of cells are cut to it, and an empty parameter gives the data
+frame with no rows.}
 
 \item{mu}{Vector of location values in radians}
 
@@ -57,9 +70,8 @@ distribution}
 }
 \value{
 \code{dsdm} gives the density, \code{psdm} gives the distribution
-function, \code{qsdm} gives the quantile function, \code{rsdm} generates
-random deviates, and \code{.dsdm_integrate} is a helper function for
-calculating the density of the SDM distribution.
+function, \code{qsdm} gives the quantile function, and \code{rsdm} generates
+random deviates.
 }
 \description{
 Density, distribution function, and random generation for the
@@ -81,12 +93,69 @@ the functions \code{c_bessel2sqrtexp()} and \code{c_sqrtexp2bessel()}.
 Since responses are on the circle, the cumulative distribution function
 requires you to choose a lower bound of integration. The default is
 \eqn{-\pi}, as for the brms::pvon_mises() function but you can choose any
-value in the argument \code{lower_bound} of \code{psdm}. Another useful
+value in the argument \code{lower.bound} of \code{psdm} and \code{qsdm}. Another useful
 choice is the mean of the response distribution minus \eqn{\pi}, e.g.
-\code{lower_bound = mu-pi}. This is the default in
+\code{lower.bound = mu-pi}. This is the default in
 \code{circular::pvonmises()}, and it ensures that 50\% of the cumulative
 probability mass is below the mean of the response distribution.
+
+\code{psdm} is 0 at \code{lower.bound} and 1 at \code{lower.bound + 2 * pi}; a \code{q} outside
+this range is wrapped around the circle. \code{qsdm} inverts \code{psdm} by root
+finding and returns values between \code{lower.bound} and \code{lower.bound + 2 * pi}.
+Values of \code{p} outside [0, 1] give \code{NaN} with a warning. Missing values
+give \code{NA}; \code{NaN}, infinite values and positions (\code{q}, \code{mu}, \code{lower.bound})
+beyond 1e8 in absolute value give \code{NaN}, as does the bessel
+parametrization for \code{kappa} above 1e5.
 }
+\section{Vector arguments}{
+
+\itemize{
+\item \verb{r*(n, ...)} returns exactly \code{n} draws: a vector, or a data frame or matrix
+with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
+number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, and a matrix is read element
+by element; only a set of values per draw, such as \code{thresholds}, takes
+row \code{i} of a matrix (see below). A shorter vector is
+repeated, also when \code{n} is not a multiple of its length. Until bmm 1.6.0
+at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and parameter vectors still
+returns one draw per element, with a deprecation warning.
+\item \code{n} is a single number of at least 0. A fraction is truncated, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}, and \code{n = 0} gives an empty vector, or a matrix or data
+frame with zero rows and the usual columns. Unlike \code{\link[stats:rnorm]{stats::rnorm()}},
+which takes the length of a vector \code{n}, these functions stop on one;
+\code{\link[=rddm]{rddm()}} still takes its length, with a deprecation warning.
+\item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
+\code{x} (its rows, when the observations are rows of counts) and the
+per-observation arguments, the others recycled to that length. Value \code{i}
+is what the call on the \code{i}-th elements alone returns. A matrix in an
+argument that takes one number per observation, such as \code{x} or \code{d}, holds
+one observation per element, as in \code{\link[stats:dnorm]{stats::dnorm()}}. When \code{x} or any
+per-observation argument is empty, the result is empty, as in
+\code{\link[stats:dnorm]{stats::dnorm()}}. A \code{NULL} argument, such as a misspelt column of a data
+frame, counts as empty, except where the default is \code{NULL}, as for
+\code{criterion} or \code{kcrit}: there it means that the argument is not given.
+Where an observation is a vector of counts
+(\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()}, \code{dsdt_ranking()} and
+\code{dsdt_cdp()}), or the pair of \code{mean_rt} or \code{var_rt} values of
+\code{dezdm(version = "4par")}, a vector is always one observation: pass a
+matrix with zero rows for none, as an empty vector stops. An empty
+\code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
+\item A set of values that describes one observation, such as the \code{thresholds}
+of the rating models, is a vector when every observation shares it and a
+matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}.
+\item Configuration arguments such as \code{version}, \code{dist}, \code{log},
+\code{parametrization} and \code{n_new} are single values and are never recycled.
+An argument that a version does not use, such as \code{zr} of
+\code{dezdm(version = "3par")}, is ignored.
+}
+}
+
 \examples{
 # plot the density of the SDM distribution
 x <- seq(-pi, pi, length.out = 10000)

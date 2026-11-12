@@ -23,6 +23,16 @@ model_cases_tcc <- function() {
       tcc_bins = list(
         model = bins, data = data.frame(bin = c(0, 3, -7, 90, 181, 12)), formula = bmf(d ~ 1)
       )
+    ),
+    simulate = list(
+      tcc = list(
+        model = model, pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_bins = list(
+        model = bins, pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      )
     )
   )
 }

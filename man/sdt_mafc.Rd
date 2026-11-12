@@ -6,7 +6,7 @@
 \usage{
 sdt_mafc(
   response,
-  n_trials,
+  n_trials = NULL,
   m,
   dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
   links = NULL,
@@ -15,10 +15,12 @@ sdt_mafc(
 }
 \arguments{
 \item{response}{A single string naming the column with counts of correct
-responses.}
+responses, or, with one row per trial (\code{n_trials = NULL}), 1 for a correct
+and 0 for an incorrect response.}
 
 \item{n_trials}{The name of the variable containing the total number of
-trials per cell.}
+trials per cell. \code{NULL} (the default) declares one row per trial: the
+column named by \code{response} then holds 0 or 1 in every row.}
 
 \item{m}{Either a single integer >= 2 giving the number of alternatives
 (constant across all rows), or a single string naming a data column that
@@ -48,9 +50,9 @@ m-Alternative Forced Choice Signal Detection Theory Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} m-Alternative Forced Choice
-\item \strong{Name:} Signal Detection Theory (m-AFC)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} m-Alternative Forced Choice Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
@@ -58,13 +60,14 @@ m-Alternative Forced Choice Signal Detection Theory Model
 }
 \item \strong{Requirements:}
 
-Provide pre-aggregated accuracy data with the following columns:
+Provide aggregated accuracy data, one row per cell, with the following columns:
 }
 \itemize{
 \item Response counts (response): number of correct responses
 \item Number of trials (n_trials): total trials per cell
-No stimulus column needed (each trial has exactly one signal alternative)
 }
+
+No stimulus column is needed: each trial has exactly one signal alternative.
 \itemize{
 \item \strong{Parameters:}
 \itemize{
@@ -83,6 +86,22 @@ No stimulus column needed (each trial has exactly one signal alternative)
 \item \code{effects}: normal(0, 0.5)
 \item \code{sd}: exponential(1)
 }
+}
+\item \strong{Requirements for one row per trial:}
+
+Provide one row per trial with the following column:
+}
+\itemize{
+\item Response (response): 1 = correct, 0 = incorrect
+}
+
+No stimulus column is needed: each trial has exactly one signal alternative.
+\itemize{
+\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
+\itemize{
+\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
+\item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.
+\item \code{ppp(fit, participant = "id")} names the participant when the formula has more than one grouping variable, such as item terms.
 }
 }
 

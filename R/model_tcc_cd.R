@@ -203,7 +203,7 @@ tcc_cd <- function(response, distance, similarity, units = c("radians", "bins"),
 .tcc_cd_check_similarity <- function(similarity) {
   stopif(length(similarity) < 3,
          "`similarity` must hold at least 3 values, one for each distance from 0 to n / 2 steps.")
-  .tcc_check_similarity(similarity, .tcc_cd_n_steps(similarity))
+  .check_tcc_args(similarity, .tcc_cd_n_steps(similarity))
 }
 
 .tcc_cd_n_steps <- function(similarity) {

@@ -294,7 +294,7 @@ test_that("check_data() marks unused 4par boundaries and fills them with -1", {
   expect_identical(
     dezdm(c(d1$mean_rt_upper[4], 0.58), c(d1$var_rt_upper[4], 0.028),
           n_upper = 5, n_trials = 50, drift = 1, bound = 1.5, ndt = 0.25,
-          zr = 0.5, version = "4par"),
+          zr = 0.5, version = "4par", log = TRUE),
     -Inf
   )
 })
@@ -717,7 +717,7 @@ test_that("ezdm_3par_lpdf in Stan matches dezdm() in R", {
   r_lpdf <- dezdm(
     mean_rt = grid$mean_rt, var_rt = grid$var_rt, n_upper = grid$n_upper,
     n_trials = grid$n_trials, drift = grid$drift, bound = grid$bound,
-    ndt = grid$ndt, s = grid$s, version = "3par"
+    ndt = grid$ndt, s = grid$s, version = "3par", log = TRUE
   )
   stan_lpdf <- ezdm_stan_lpdf("3par", c(
     list(N = nrow(grid)),
@@ -759,7 +759,7 @@ test_that("ezdm_4par_lpdf in Stan matches dezdm() in R", {
     var_rt = as.matrix(grid[c("var_rt_upper", "var_rt_lower")]),
     n_upper = grid$n_upper, n_trials = grid$n_trials, drift = grid$drift,
     bound = grid$bound, ndt = grid$ndt, zr = grid$zr, s = grid$s,
-    version = "4par"
+    version = "4par", log = TRUE
   )
   stan_lpdf <- ezdm_stan_lpdf("4par", c(
     list(N = nrow(grid)),
@@ -824,7 +824,7 @@ dezdm_4par_grid <- function(grid) {
     var_rt = as.matrix(grid[c("var_rt_upper", "var_rt_lower")]),
     n_upper = grid$n_upper, n_trials = grid$n_trials, drift = grid$drift,
     bound = grid$bound, ndt = grid$ndt, zr = grid$zr, s = grid$s,
-    version = "4par"
+    version = "4par", log = TRUE
   )
 }
 
@@ -929,7 +929,7 @@ test_that("a placeholder read as data gives no finite ezdm 4par density", {
   var_rt <- c(moments$vrt_upper, moments$vrt_lower)
   lpdf <- function(mean_rt, var_rt) {
     dezdm(mean_rt, var_rt, n_upper = 20, n_trials = 30, drift = 1,
-          bound = 1.5, ndt = 0.25, zr = 0.5, version = "4par")
+          bound = 1.5, ndt = 0.25, zr = 0.5, version = "4par", log = TRUE)
   }
   expect_identical(lpdf(c(-1, mean_rt[2]), c(-1, var_rt[2])), -Inf)
   expect_identical(lpdf(c(mean_rt[1], -1), c(var_rt[1], -1)), -Inf)
@@ -1074,7 +1074,7 @@ test_that("ezdm_4par_lpdf has the right gradient at and around zero drift", {
     point <- list(drift = drift, bound = 1.5, zr = 0.3, s = 1)
     point[[par]] <- point[[par]] + step
     dezdm(mrt, vrt, n_upper = 12, n_trials = 60, drift = point$drift, bound = point$bound,
-          ndt = 0.25, zr = point$zr, s = point$s, version = "4par")
+          ndt = 0.25, zr = point$zr, s = point$s, version = "4par", log = TRUE)
   }
   # Richardson-extrapolated central difference: a plain one at a step small
   # enough for its truncation error is too noisy for the tolerance below
@@ -1168,7 +1168,7 @@ test_that("log_lik() of an ezdm 4par fit never reads a placeholder", {
       ndt = brms::get_dpar(prep, "ndt", i = i),
       zr = brms::get_dpar(prep, "zr", i = i),
       s = brms::get_dpar(prep, "s", i = i),
-      version = "4par"
+      version = "4par", log = TRUE
     )
     expect_equal(new_ll[[1]][, i], reference, info = paste("row", i))
   }

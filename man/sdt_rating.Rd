@@ -12,13 +12,16 @@ sdt_rating(
     "softmax"),
   version = c("standard", "dpsdt", "metad"),
   links = NULL,
+  n_ratings = NULL,
   ...
 )
 }
 \arguments{
-\item{response}{A character vector of K column names containing response
-counts per rating category, ordered from "definitely noise" to
-"definitely signal".}
+\item{response}{For aggregated data, a character vector of K column names
+containing response counts per rating category, ordered from "definitely
+noise" to "definitely signal". For one row per trial, the name of a single
+column holding the rating of each trial, a whole number from 1 to
+\code{n_ratings}.}
 
 \item{stimulus}{The name of the variable coding the stimulus type.
 Must be coded as 0 (noise/new) and 1 (signal/old).}
@@ -72,6 +75,10 @@ reads each of them through \code{exp()} and fixes \code{sdratio} at 0 for equal
 variance. The same holds for \code{Ro} and \code{Rn}, read through \code{inv_logit()}
 and fixed off by default, and for \code{logmratio}, read through \code{exp()}.}
 
+\item{n_ratings}{The number of rating categories K when \code{response} names a
+single rating column, which declares one row per trial. Leave it \code{NULL}
+for aggregated data, whose count columns fix K.}
+
 \item{...}{used internally for testing, ignore it}
 }
 \value{
@@ -85,9 +92,9 @@ Three versions share the confidence-rating response interface,
 selected with \code{version}:
 \subsection{Version: \code{standard} (default)}{
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Signal/Noise or Old/New Recognition
-\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Confidence Rating Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Green, D. M., & Swets, J. A. (1966). Signal detection theory and psychophysics. Wiley.
@@ -180,9 +187,9 @@ its prior: on the probability scale the interval cannot include 0, so the
 test of "no recollection" is a comparison with the fit that leaves the
 parameter fixed off, not the interval.
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Signal/Noise or Old/New Recognition
-\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Confidence Rating Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Yonelinas, A. P. (1994). Receiver-operating characteristics in recognition memory: Evidence for a dual-process model. Journal of Experimental Psychology: Learning, Memory, and Cognition, 20(6), 1341-1354. https://doi.org/10.1037/0278-7393.20.6.1341
@@ -295,9 +302,9 @@ Lau, 2014), so its estimates differ from bmm's when the criterion is far
 from the midpoint.
 Extract the M-ratio posterior with \code{\link[=mratio]{mratio()}}.
 \itemize{
-\item \strong{Domain:} Perception & Recognition Memory
-\item \strong{Task:} Signal/Noise or Old/New Recognition
-\item \strong{Name:} Signal Detection Theory (Confidence Rating)
+\item \strong{Domain:} Perception, Long-term memory
+\item \strong{Task:} Detection, recognition and confidence judgments
+\item \strong{Name:} Confidence Rating Signal Detection Theory Model
 \item \strong{Citation:}
 \itemize{
 \item Maniscalco, B., & Lau, H. (2012). A signal detection theoretic approach for estimating metacognitive sensitivity from confidence ratings. Consciousness and Cognition, 21(1), 422-430. https://doi.org/10.1016/j.concog.2011.09.021
@@ -368,6 +375,30 @@ Categories should be ordered: 1 = 'definitely noise' to K = 'definitely signal'
 \item \code{effects}: normal(0, 0.3)
 \item \code{sd}: exponential(2)
 }
+}
+}
+}
+
+\subsection{One row per trial}{
+
+Name a single rating column in \code{response} and give the number of categories
+as \code{n_ratings}; every version takes this layout.
+\itemize{
+\item \strong{Requirements for one row per trial:}
+
+Provide one row per trial with the following columns:
+}
+\itemize{
+\item Rating (response): the category chosen on the trial, a whole number from 1 = 'definitely noise' to K = n_ratings = 'definitely signal'
+\item Stimulus type (stimulus): 0 = noise, 1 = signal
+}
+\itemize{
+\item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
+\itemize{
+\item With \code{criterion} (the default), an item's effect on \code{d} is informed only by the trials on which the item is the signal: on noise trials \code{d} does not enter the likelihood, so the item effects on \code{d} of items shown only as noise stay at their prior. With \code{bias}, \code{d} also moves the criterion and enters every trial.
+\item \code{loo()} leaves out single trials on trial rows and whole cells on aggregated rows. These are different predictions, and the log-likelihoods of the trial rows sum to the cell's log-likelihood less the log of the binomial (or multinomial) coefficient, so ELPD values compare only fits to the same layout. \code{kfold(fit, group = "id")} leaves out whole participants with either layout.
+\item \code{bmm(..., threads = n)} with \code{backend = "cmdstanr"} evaluates the likelihood on \code{n} threads per chain, which shortens trial-level fits on a machine with cores to spare.
+\item \code{ppp(fit, participant = "id")} names the participant when the formula has more than one grouping variable, such as item terms.
 }
 }
 
@@ -470,6 +501,16 @@ model_md <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus", version = "metad")
 fit_md <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
               data = dat, model = model_md, backend = "cmdstanr")
 mratio(fit_md) # posterior M-ratio (meta-d'/d')
+
+# One row per trial, with the rating 1 to 4 in one column and item effects
+model_trial <- sdt_rating("rating", "stimulus", n_ratings = 4)
+trials <- expand.grid(id = 1:20, item = 1:40)
+trials$stimulus <- as.integer(trials$item \%\% 2 == 0)
+trials <- simulate_data(model_trial, design = trials,
+                        pars = list(d = 1.5, criterion = 0.5, spacing = -0.5))
+fit_trial <- bmm(bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id),
+                     spacing ~ 1),
+                 data = trials, model = model_trial, backend = "cmdstanr")
 }
 }
 \references{

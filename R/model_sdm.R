@@ -7,9 +7,9 @@
     list(
       resp_vars = nlist(resp_error),
       other_vars = nlist(),
-      domain = "Visual working memory",
+      domain = "Working memory",
       task = "Continuous reproduction",
-      name = "Signal Discrimination Model (SDM) by Oberauer (2023)",
+      name = "Signal Discrimination Model (SDM)",
       citation = glue(
         "Oberauer, K. (2023). Measurement models for visual working \\
         memory\u2014A factorial model comparison. Psychological Review, \\
@@ -41,7 +41,8 @@
         mu = c(-0.5,0.5),
         kappa = c(2.5,3.5),
         c = c(4,6)
-      )
+      ),
+      functions = list(density = "dsdm", generator = "rsdm")
     ),
     class = c("bmmodel", "circular", "sdm", paste0("sdm_", version)),
     call = call
@@ -95,6 +96,7 @@ settable_links.sdm <- function(model) {
 #' )
 sdm <- function(resp_error, version = "simple", ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   version <- match.arg(version)
   .model_sdm(resp_error = resp_error, version = version, call = call, ...)
@@ -106,6 +108,7 @@ sdm <- function(resp_error, version = "simple", ...) {
 sdmSimple <- function(resp_error, version = "simple", ...) {
   warning2("The function `sdmSimple()` is deprecated. Please use `sdm()` instead.")
   call <- match.call()
+  .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
   .model_sdm(resp_error = resp_error, version = version, call = call, ...)
 }
@@ -145,7 +148,7 @@ configure_model.sdm <- function(model, data, formula) {
 
   # prepare initial stanvars to pass to brms, model formula and priors
   sc_path <- system.file("stan_chunks", package = "bmm")
-  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_funs.stan"))
+  stan_funs <- read_lines2(paste0(sc_path, "/sdm_simple_functions.stan"))
   stan_tdata <- read_lines2(paste0(sc_path, "/sdm_simple_tdata.stan"))
   likelihood_file <- if (brms_slices_likelihood()) {
     "sdm_simple_likelihood_threaded.stan"
@@ -153,16 +156,24 @@ configure_model.sdm <- function(model, data, formula) {
     "sdm_simple_likelihood.stan"
   }
   stan_likelihood <- read_lines2(paste0(sc_path, "/", likelihood_file))
-  stan_tdata_pll_args <- if (brms_slices_likelihood()) {
-    "data matrix COSN"
-  }
   run_metadata <- attr(data, "sdm_run_metadata")
   if (is.null(run_metadata)) {
     # Guard direct configure_model.sdm() calls that bypass check_data.sdm().
     run_metadata <- sdm_run_metadata(data, formula, model)
   }
+  # 16 nodes per panel and the 32-node wide rule keep log Z within 4e-12
+  # where it is below 1e4 and, above it, within 5e-10 to log c = 12 and
+  # kappa = 3000 and within 3 ulps beyond; where sdm_simple_ldenom()
+  # switches between them they differ by 4e-14 (#615).
+  # test-model_sdm-stan.R holds the bar
+  gl <- .gl_rule(16L)
+  wide <- .sdm_wide_rule()
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions") +
-    brms::stanvar(scode = stan_tdata, block = "tdata", pll_args = stan_tdata_pll_args) +
+    brms::stanvar(scode = stan_tdata, block = "tdata") +
+    brms::stanvar(x = gl$nodes, name = "sdm_gl_x") +
+    brms::stanvar(x = gl$weights, name = "sdm_gl_w") +
+    brms::stanvar(x = wide$cosm1, name = "sdm_wide_cosm1") +
+    brms::stanvar(x = wide$weights, name = "sdm_wide_w") +
     brms::stanvar(x = run_metadata$G_sdm_runs, name = "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_start, "sdm_run_start", "G_sdm_runs") +
     sdm_stanvar_int_array(run_metadata$sdm_run_count, "sdm_run_count", "G_sdm_runs") +
@@ -173,6 +184,21 @@ configure_model.sdm <- function(model, data, formula) {
   formula$family <- sdm_simple
 
   nlist(formula, data, stanvars)
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# bmm's Stan code is the sqrtexp form, so the parametrization is given, not
+# left to the generator's default
+#' @export
+simulate_data.sdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  y <- rsdm(nrow(design), mu = p$mu, c = p$c, kappa = p$kappa, parametrization = "sqrtexp")
+  .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }
 
 ############################################################################# !
@@ -208,7 +234,7 @@ posterior_predict_sdm_simple <- function(i, prep, ...) {
   mu <- brms::get_dpar(prep, "mu", i = i)
   c <- brms::get_dpar(prep, "c", i = i)
   kappa <- brms::get_dpar(prep, "kappa", i = i)
-  rsdm(length(mu), mu, c, kappa)
+  rsdm(prep$ndraws, mu, c, kappa)
 }
 
 sdm_run_metadata <- function(data, formula, model) {
@@ -228,14 +254,33 @@ sdm_run_metadata <- function(data, formula, model) {
     ))
   }
 
-  run_id <- interaction(data[predictors], drop = TRUE, lex.order = TRUE)
-  run_start <- c(1L, which(run_id[-1] != run_id[-length(run_id)]) + 1L)
+  # values, not interaction() labels: pasted with ".", the cells (1, 5.2) and
+  # (1.5, 2) would share one run and its first row's normalising constant.
+  # The rows are complete cases here, so no comparison is NA
+  changed <- Reduce(`|`, lapply(data[predictors], function(x) x[-1] != x[-length(x)]))
+  run_start <- c(1L, which(changed) + 1L)
   run_count <- diff(c(run_start, nrow(data) + 1L))
   list(
     G_sdm_runs = length(run_start),
     sdm_run_start = as.integer(run_start),
     sdm_run_count = as.integer(run_count)
   )
+}
+
+# The midpoint rule on [0, pi] after mapping t to t - 0.55 sin(t) three times.
+# The map fixes 0 and pi and keeps the integrand smooth and periodic, so the
+# rule keeps converging geometrically, and it crowds the nodes toward the
+# spike at u = 0, where they are 11 times denser than without it. cos(u) - 1
+# is formed as -2 sin(u / 2)^2, which does not cancel near the spike.
+.sdm_wide_rule <- function() {
+  n <- 32L
+  u <- (seq_len(n) - 0.5) * pi / n
+  weights <- rep(pi / n, n)
+  for (i in 1:3) {
+    weights <- weights * (1 - 0.55 * cos(u))
+    u <- u - 0.55 * sin(u)
+  }
+  list(cosm1 = -2 * sin(u / 2)^2, weights = weights)
 }
 
 sdm_stanvar_int_array <- function(x, name, size) {

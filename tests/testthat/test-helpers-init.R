@@ -17,12 +17,12 @@ test_that("create_initfun returns function for sdm", {
 
 
 # the init function bmm() builds: the prior decides which parameters exist
-configured_initfun <- function(model, formula, data) {
+configured_initfun <- function(model, formula, data, user_prior = NULL) {
   model <- check_model(model, data, formula)
   data <- check_data(model, data, formula)
   formula <- check_formula(model, data, formula)
   config_args <- configure_model(model, data, formula)
-  prior <- configure_prior(model, data, config_args$formula, NULL)
+  prior <- configure_prior(model, data, config_args$formula, user_prior)
   create_initfun(model, data, config_args$formula, prior)
 }
 
@@ -67,6 +67,26 @@ test_that("create_initfun returns a function with random-effects inits for mixtu
     thetat ~ 0 + set_size + (0 + set_size | ID)
   )
   expect_re_inits(configured_initfun(model, formula, dat)())
+
+  # the init ranges are on the native scale and reach Stan on the link scale
+  inits <- init_fun()
+  expect_true(exp(inits$Intercept_kappa) >= 3.8 && exp(inits$Intercept_kappa) <= 15)
+  expect_true(
+    stats::plogis(inits$Intercept_thetat) >= 0.25 &&
+      stats::plogis(inits$Intercept_thetat) <= 0.75
+  )
+})
+
+test_that("create_initfun keeps the variable-precision gamma shape integrable", {
+  dat <- oberauer_lin_2017
+  model <- mixture2p(resp_error = "dev_rad", variable_precision = TRUE)
+  init_fun <- configured_initfun(model, bmf(thetat ~ 1, kappa ~ 1, tau ~ 1), dat)
+
+  shapes <- replicate(50, {
+    inits <- init_fun()
+    .circmix_J(exp(inits$Intercept_kappa)) / exp(inits$Intercept_tau)
+  })
+  expect_true(all(shapes > 60 / model$vp_nodes))
 })
 
 test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {
@@ -549,7 +569,8 @@ test_that("imm and mixture3p get random-effects inits", {
     kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 1,
     thetant ~ 0 + set_size + (0 + set_size | ID)
   )
-  expect_re_inits(configured_initfun(mix3p_model, slopes, dat)())
+  # set size 1 has no non-target, which mixture3p warns about for thetant
+  expect_re_inits(suppressWarnings(configured_initfun(mix3p_model, slopes, dat))())
 })
 
 test_that("the init list names every parameter of the Stan model and nothing else", {
@@ -562,8 +583,17 @@ test_that("the init list names every parameter of the Stan model and nothing els
         thetat ~ 0 + set_size + (0 + set_size | ID)
       )
     ),
-    # set size 1 pins thetant and its sd to constants, which brms implements by
-    # replacing the vectors b_thetant and sd_3 with per-coefficient scalars
+    list(
+      model = mixture3p("dev_rad",
+        nt_features = paste0("col_nt", 1:7), set_size = "set_size",
+        version = "slot_averaging", variable_precision = TRUE
+      ),
+      formula = bmf(
+        kappa ~ 1 + (1 | ID), tau ~ 1, K ~ 1 + (1 | ID), ptarget ~ 1 + (1 | ID)
+      )
+    ),
+    # nothing pins the set-size-1 level of thetant any more, so b_thetant and its
+    # sd stay vectors rather than per-coefficient scalars
     list(
       model = mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
       formula = bmf(
@@ -573,18 +603,17 @@ test_that("the init list names every parameter of the Stan model and nothing els
       )
     )
   )
-  for (case in cases) {
+  # set size 1 has no non-target, which mixture3p warns about for thetant
+  for (case in cases) suppressWarnings({
     spars <- stan_parameter_names(case$model, case$formula, dat)
     inits <- configured_initfun(case$model, case$formula, dat)()
     expect_setequal(names(inits), spars)
-  }
-  expect_true(any(grepl("^par_b_thetant_", spars)))
-  par_sd <- unlist(inits[grep("^par_sd_", names(inits))])
-  expect_gt(length(par_sd), 0)
-  expect_true(all(par_sd >= 0.05 & par_sd <= 0.1))
-  par_b <- unlist(inits[grep("^par_b_thetant_", names(inits))])
-  expect_true(all(abs(par_b) <= 1.1))
-  sdata <- standata(cases[[2]]$formula, dat, cases[[2]]$model)
+  })
+  expect_false(any(grepl("^par_b_thetant_", spars)))
+  expect_length(inits$b_thetant, 8)
+  # the softmax weights take their init range on the sampling scale
+  expect_true(all(abs(inits$b_thetant) <= 1.1))
+  sdata <- suppressWarnings(standata(cases[[3]]$formula, dat, cases[[3]]$model))
   expect_length(inits$b_kappa, sdata$K_kappa)
   expect_equal(dim(inits$z_1), c(sdata$M_1, sdata$N_1))
 })
@@ -623,19 +652,21 @@ test_that("mixture2p starts inside the central 50% of its default priors", {
   model <- mixture2p("dev_rad")
   ranges <- model$init_ranges
   expect_equal(ranges$kappa, central_range(2, 1, exp))
-  expect_equal(ranges$mu1, central_range(0, 0.5, function(x) 2 * atan(x)))
+  expect_equal(ranges$mu, central_range(0, 0.5, function(x) 2 * atan(x)))
   expect_equal(ranges$thetat, signif(stats::plogis(c(-1, 1) * stats::qlogis(0.75)), 2))
 
-  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + set_size, mu1 ~ 1)
+  formula <- bmf(kappa ~ 1 + (1 | ID), thetat ~ 1 + set_size, mu ~ 1)
   init_fun <- configured_initfun(model, formula, dat)
   for (i in 1:20) {
     inits <- init_fun()
-    # nlpars carry their intercept in the first coefficient
-    expect_true(inits$b_kappa[1] >= log(ranges$kappa[1]) && inits$b_kappa[1] <= log(ranges$kappa[2]))
-    expect_true(inits$b_thetat[1] >= stats::qlogis(ranges$thetat[1]) &&
-      inits$b_thetat[1] <= stats::qlogis(ranges$thetat[2]))
-    expect_true(all(abs(inits$b_thetat[-1]) <= 0.1))
-    expect_true(abs(inits$Intercept_mu1) <= tan(ranges$mu1[2] / 2))
+    # dpars carry their intercept separately from the coefficients
+    expect_true(inits$Intercept_kappa >= log(ranges$kappa[1]) &&
+      inits$Intercept_kappa <= log(ranges$kappa[2]))
+    expect_true(inits$Intercept_thetat >= stats::qlogis(ranges$thetat[1]) &&
+      inits$Intercept_thetat <= stats::qlogis(ranges$thetat[2]))
+    expect_true(all(abs(inits$b_thetat) <= 0.1))
+    # brms names the intercept of the custom family's first parameter, mu, plainly
+    expect_true(abs(inits$Intercept) <= tan(ranges$mu[2] / 2))
   }
 })
 
@@ -647,8 +678,8 @@ test_that("mixture3p softmax weights start inside their range on the sampling sc
   init_fun <- configured_initfun(model, formula, small_data())
   for (i in 1:20) {
     inits <- init_fun()
-    expect_true(abs(inits$b_thetat[1]) <= 1.1)
-    expect_true(abs(inits$b_thetant[1]) <= 1.1)
+    expect_true(abs(inits$Intercept_thetat) <= 1.1)
+    expect_true(abs(inits$Intercept_thetant) <= 1.1)
   }
 })
 
@@ -657,7 +688,7 @@ test_that("imm versions carry ranges for exactly their parameters", {
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
   )$init_ranges
-  expect_setequal(names(ranges), c("mu1", "kappa", "a", "c", "s"))
+  expect_setequal(names(ranges), c("mu", "kappa", "a", "c", "s", "b"))
   expect_equal(ranges$a, central_range(0, 1, exp))
   expect_equal(ranges$c, ranges$a)
   expect_equal(ranges$s, ranges$a)
@@ -665,12 +696,12 @@ test_that("imm versions carry ranges for exactly their parameters", {
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     set_size = "set_size", version = "abc"
   )$init_ranges
-  expect_setequal(names(abc), c("mu1", "kappa", "a", "c"))
+  expect_setequal(names(abc), c("mu", "kappa", "a", "c", "b"))
   bsc <- imm(
     resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
     nt_distances = paste0("dist_nt", 1:7), set_size = "set_size", version = "bsc"
   )$init_ranges
-  expect_setequal(names(bsc), c("mu1", "kappa", "c", "s"))
+  expect_setequal(names(bsc), c("mu", "kappa", "c", "s", "b"))
 })
 
 # =============================================================================
@@ -678,37 +709,34 @@ test_that("imm versions carry ranges for exactly their parameters", {
 # =============================================================================
 
 test_that("init_default_param() maps the draw through the declared bounds", {
-  spec <- function(type, bounds, dims = "K", types = type) nlist(type, types, bounds, dims)
-  unbounded <- init_default_param(spec("vector", NULL), 20, list())
-  lower <- init_default_param(spec("vector", list(lower = "2")), 20, list())
-  upper <- init_default_param(spec("vector", list(upper = "-3")), 20, list())
-  both <- init_default_param(
-    spec("vector", list(lower = "0", upper = "min_Y")), 20, list(min_Y = 4)
-  )
+  spec <- function(type, dims = "K", types = type) nlist(type, types, dims)
+  unbounded <- init_default_param(spec("vector"), 20, c(-Inf, Inf))
+  lower <- init_default_param(spec("vector"), 20, c(2, Inf))
+  upper <- init_default_param(spec("vector"), 20, c(-Inf, -3))
+  both <- init_default_param(spec("vector"), 20, c(0, 4))
 
   expect_true(all(abs(unbounded) <= 1))
   expect_true(all(lower > 2))
   expect_true(all(upper < -3))
   expect_true(all(both > 0 & both < 4))
-  expect_equal(dim(init_default_param(spec("matrix", NULL), c(2, 3), list())), c(2, 3))
+  expect_equal(dim(init_default_param(spec("matrix"), c(2, 3), c(-Inf, Inf))), c(2, 3))
   # a size-1 vector must stay an array so that it is written as [x], not x
-  expect_equal(dim(init_default_param(spec("vector", NULL), 1, list())), 1)
-  expect_null(dim(init_default_param(spec("real", NULL, dims = "1"), 1, list())))
+  expect_equal(dim(init_default_param(spec("vector"), 1, c(-Inf, Inf))), 1)
+  expect_null(dim(init_default_param(spec("real", dims = "1"), 1, c(-Inf, Inf))))
   # the same holds for an array of reals, which the parser gives a trailing 1
-  real_array <- spec("real", NULL, dims = c("K", "1"), types = c("array", "real"))
-  expect_equal(dim(init_default_param(real_array, c(1, 1), list())), 1)
+  real_array <- spec("real", dims = c("K", "1"), types = c("array", "real"))
+  expect_equal(dim(init_default_param(real_array, c(1, 1), c(-Inf, Inf))), 1)
 })
 
 test_that("init_default_param() leaves unsupported declarations to the sampler", {
-  spec <- function(type, bounds) nlist(type, types = type, bounds, dims = "K")
-  expect_null(init_default_param(spec("ordered", NULL), 3, list()))
-  expect_null(init_default_param(spec("real", list(lower = "unknown_var")), 1, list()))
+  spec <- list(type = "ordered", types = "ordered", dims = "K")
+  expect_null(init_default_param(spec, 3, c(-Inf, Inf)))
 })
 
 test_that("a simplex starts from Stan's stick-breaking draw", {
   spec <- list(type = "simplex", types = "simplex", bounds = NULL, dims = "K")
   for (i in 1:20) {
-    s <- init_default_param(spec, 4, list())
+    s <- init_default_param(spec, 4, c(-Inf, Inf))
     expect_equal(dim(s), 4)
     expect_true(all(s > 0))
     expect_equal(sum(s), 1)
@@ -723,6 +751,19 @@ test_that("a parameter whose size does not resolve is left to the sampler", {
   expect_null(init_stan_param("zs_kappa_1_1", spec, model, list()))
   spec$dims <- "K"
   expect_length(init_stan_param("zs_kappa_1_1", spec, model, list(K = 3L)), 3)
+})
+
+test_that("a parameter whose bounds do not resolve is left to the sampler", {
+  withr::local_seed(694)
+  model <- list(parameters = list(kappa = ""), init_ranges = list(kappa = c(1, 2)), links = list(kappa = "log"))
+  sdata <- list(K = 2L, X_kappa = matrix(1, 3, 2), min_Y = 4, Y = c(1, 4, 2))
+  sigma <- list(type = "real", types = "real", bounds = list(lower = "0", upper = "Y"), dims = "1")
+  b <- list(type = "vector", types = "vector", bounds = list(lower = "unknown_var"), dims = "K")
+  expect_null(init_stan_param("sigma", sigma, model, sdata))
+  expect_null(init_stan_param("b_kappa", b, model, sdata))
+  sigma$bounds$upper <- "min_Y"
+  sigmas <- replicate(50, init_stan_param("sigma", sigma, model, sdata))
+  expect_true(all(sigmas > 0 & sigmas < 4))
 })
 
 test_that("a declaration the parser cannot type is left to the sampler", {
@@ -804,7 +845,7 @@ test_that("the intercept of a non-linear parameter starts in range (#362)", {
     parameters = list(eta = ""), init_ranges = list(eta = c(2, 3)), links = list(eta = "identity")
   )
   X <- stats::model.matrix(~ 1, data.frame(y = 1:3))
-  inits <- init_fixef_param("b_eta", "vector", 1, model, list(X_eta = X))
+  inits <- init_fixef_param("b_eta", "vector", 1, model, list(X_eta = X), c(-Inf, Inf))
   expect_equal(dim(inits), 1)
   expect_true(inits >= 2 && inits <= 3)
 })
@@ -815,8 +856,8 @@ test_that("a per-coefficient scalar starts where its position in the vector woul
   )
   X <- stats::model.matrix(~ 1 + x, data.frame(x = factor(1:3)))
   sdata <- list(X_eta = X)
-  intercept <- init_fixef_param("par_b_eta_1", "real", 1, model, sdata)
-  effect <- init_fixef_param("par_b_eta_3", "real", 1, model, sdata)
+  intercept <- init_fixef_param("par_b_eta_1", "real", 1, model, sdata, c(-Inf, Inf))
+  effect <- init_fixef_param("par_b_eta_3", "real", 1, model, sdata, c(-Inf, Inf))
   expect_null(dim(intercept))
   expect_true(intercept >= 2 && intercept <= 3)
   expect_true(abs(effect) <= 0.1)
@@ -856,10 +897,11 @@ test_that("every init has the shape its Stan declaration asks for", {
   mix3p <- mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size")
   # size-1 coefficient vectors, which rstan cannot read from a bare number
   expect_stan_shapes(mixture2p("dev_rad"), bmf(kappa ~ 1, thetat ~ 1 + set_size), dat)
-  # per-coefficient scalars and uncorrelated random effects
-  expect_stan_shapes(mix3p, bmf(
+  # uncorrelated random effects; set size 1 has no non-target, which
+  # mixture3p warns about for thetant
+  suppressWarnings(expect_stan_shapes(mix3p, bmf(
     kappa ~ 1, thetat ~ 0 + set_size + (0 + set_size || ID), thetant ~ 0 + set_size
-  ), dat)
+  ), dat))
   # the main dpar's coefficients and a Stan intercept
   expect_stan_shapes(sdm("dev_rad"), bmf(mu ~ 0 + set_size, c ~ 1 + set_size, kappa ~ 1), dat)
   # one correlation matrix per level of a gr(by = ) variable
@@ -1023,7 +1065,7 @@ softplus_criterion <- list(
 test_that("an intercept starts inside the part of its range the link can represent", {
   withr::local_seed(460)
   inits <- unlist(lapply(1:200, function(i) {
-    init_fixef_param("Intercept_criterion", "real", 1, softplus_criterion, list())
+    init_fixef_param("Intercept_criterion", "real", 1, softplus_criterion, list(), c(-Inf, Inf))
   }))
   expect_true(is.numeric(inits) && all(is.finite(inits)))
   native <- link_transform(inits, "softplus", inverse = TRUE)
@@ -1035,7 +1077,7 @@ test_that("coefficients start inside the part of the range the link can represen
   X <- stats::model.matrix(~ 1 + x, data.frame(x = factor(c(1, 2, 2))))
   expect_no_warning(
     b <- lapply(1:200, function(i) {
-      init_fixef_param("b_criterion", "vector", 2, softplus_criterion, list(X_criterion = X))
+      init_fixef_param("b_criterion", "vector", 2, softplus_criterion, list(X_criterion = X), c(-Inf, Inf))
     })
   )
   native <- link_transform(unlist(lapply(b, function(x) X %*% x)), "softplus", inverse = TRUE)
@@ -1071,7 +1113,7 @@ test_that("a softmax range stays on the sampling scale and a single point is not
     parameters = list(thetat = ""), init_ranges = list(thetat = c(-2, -1)),
     links = list(thetat = "softmax")
   )
-  init <- init_fixef_param("Intercept_thetat", "real", 1, model, list())
+  init <- init_fixef_param("Intercept_thetat", "real", 1, model, list(), c(-Inf, Inf))
   expect_true(init >= -2 && init <= -1)
   # log(0) is -Inf: the one point log cannot represent leaves nothing to draw from
   expect_null(representable_range(c(-1, 0), "log"))
@@ -1105,4 +1147,359 @@ test_that("an init function carries no data column the model does not use", {
   # check_data() keeps the 18 columns this model does not read, and a copy of
   # the data in the closure would make every saved fit grow with them
   expect_equal(serialized_size(oberauer_lin_2017), serialized_size(oberauer_lin_2017["dev_rad"]))
+})
+
+# =============================================================================
+# PARAMETERS THE DATA BOUND (#621)
+# =============================================================================
+
+# 80 trials of two participants whose fastest response is 0.03 s, so that the
+# ndt of cswald starts from c(0.012, 0.018): log(0.018 / 0.012) = 0.4055 wide on
+# the log link, 0.006 on the identity link. trial runs to 40
+bounded_ndt_data <- function() {
+  data <- expand.grid(trial = 1:40, id = factor(1:2))
+  data$rt <- 0.03 + rep(c(0, 0.2, 0.45, 0.7), length.out = 80)
+  data$response <- rep(c(1, 0, 1, 1, 0), length.out = 80)
+  data$setsize <- factor(rep(c(2, 4, 6), length.out = 80), ordered = TRUE)
+  data$id2 <- factor(rep(c(2, 1, 1, 2, 2), length.out = 80))
+  data$g <- factor(ifelse(data$id == 1, "a", "b"))
+  data
+}
+
+bounded_ndt_inits <- function(formula, links = NULL, n = 50) {
+  # check_data() warns about responses below 0.1 s and about the identity link
+  init_fun <- suppressWarnings(
+    configured_initfun(cswald("rt", "response", links = links), formula, bounded_ndt_data())
+  )
+  replicate(n, init_fun(), simplify = FALSE)
+}
+
+draws_of <- function(inits, name, index = NULL) {
+  unlist(lapply(inits, function(x) if (is.null(index)) x[[name]] else x[[name]][index]))
+}
+
+test_that("a random slope on trial number starts with an SD scaled to the predictor and the range (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ trial + (1 + trial | id)))
+  slope_sd <- draws_of(inits, "sd_1", 2)
+  expect_lte(max(slope_sd), 0.1 * 0.4055 / 40)
+  expect_gte(min(slope_sd), 0.05 * 0.4054 / 40)
+  intercept_sd <- draws_of(inits, "sd_1", 1)
+  expect_lte(max(intercept_sd), 0.1 * 0.4055)
+  expect_gte(min(intercept_sd), 0.05 * 0.4054)
+})
+
+test_that("a random intercept on an identity link starts with an SD scaled to the range (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + (1 | id)), links = list(ndt = "identity"))
+  sd <- draws_of(inits, "sd_1")
+  expect_lte(max(sd), 0.1 * 0.006 + 1e-12)
+  expect_gte(min(sd), 0.05 * 0.006 - 1e-12)
+  expect_true(all(abs(draws_of(inits, "z_1")) <= 0.5))
+})
+
+test_that("the SDs of one group term across parameters each follow their own parameter and column (#621)", {
+  withr::local_seed(621)
+  # drift (log link, c(1, 2)) is log(2) = 0.6931 wide, bound (log, c(1.5, 2))
+  # log(4 / 3) = 0.2877; the columns are 1 except trial, which reaches 40
+  inits <- bounded_ndt_inits(bmf(
+    drift ~ 1 + (1 + trial | p | id), bound ~ 1 + (1 | id), ndt ~ trial + (1 + trial | p | id)
+  ))
+  upper <- c(0.6931, 0.6931 / 40, 0.4055, 0.4055 / 40)
+  for (k in 1:4) {
+    sd <- draws_of(inits, "sd_1", k)
+    expect_lte(max(sd), 0.1 * upper[k] + 1e-6, label = paste("sd_1 entry", k))
+    expect_gte(min(sd), 0.05 * upper[k] - 1e-6, label = paste("sd_1 entry", k))
+  }
+  expect_lte(max(draws_of(inits, "sd_2")), 0.1 * 0.2877 + 1e-6)
+  expect_gte(min(draws_of(inits, "sd_2")), 0.05 * 0.2877 - 1e-6)
+})
+
+test_that("an mm() term reads its membership suffix as a member, not as an entry (#621)", {
+  withr::local_seed(621)
+  # brms names its columns Z_1_drift_<entry>_<member>
+  inits <- bounded_ndt_inits(bmf(drift ~ 1 + (1 + trial | mm(id, id2)), bound ~ 1, ndt ~ 1))
+  intercept_sd <- draws_of(inits, "sd_1", 1)
+  expect_gte(min(intercept_sd), 0.05 * 0.6931 - 1e-6)
+  expect_lte(max(intercept_sd), 0.1 * 0.6931 + 1e-6)
+  expect_lte(max(draws_of(inits, "sd_1", 2)), 0.1 * 0.6931 / 40 + 1e-6)
+})
+
+test_that("a gr(by = ) term shrinks each row of its SD matrix by that row's column (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + (1 + trial | gr(id, by = g))))
+  expect_equal(dim(inits[[1]]$sd_1), c(2, 2))
+  slope_sd <- unlist(lapply(inits, function(x) x$sd_1[2, ]))
+  expect_lte(max(slope_sd), 0.1 * 0.4055 / 40)
+  intercept_sd <- unlist(lapply(inits, function(x) x$sd_1[1, ]))
+  expect_gte(min(intercept_sd), 0.05 * 0.4054)
+})
+
+test_that("an s() term starts its spline near zero (#621)", {
+  withr::local_seed(621)
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + s(trial, k = 5)))
+  # the s(trial) columns brms builds stay within -1 and 1, so only the range shrinks
+  sds <- draws_of(inits, "sds_ndt_1")
+  expect_lte(max(sds), 0.1 * 0.4055)
+  expect_gte(min(sds), 0.05 * 0.4054)
+  expect_true(all(abs(draws_of(inits, "zs_ndt_1_1")) <= 0.5))
+  bs <- draws_of(inits, "bs_ndt")
+  expect_lte(max(abs(bs)), 0.1 * 0.4055)
+  expect_gt(max(abs(bs)), 0)
+})
+
+test_that("a mo() coefficient starts near zero, divided by the categories it spans (#621)", {
+  withr::local_seed(621)
+  # setsize has three levels, so mo() multiplies its coefficient by up to 2
+  inits <- bounded_ndt_inits(bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + mo(setsize)))
+  bsp <- draws_of(inits, "bsp_ndt")
+  expect_lte(max(abs(bsp)), 0.1 * 0.4055 / 2)
+  expect_gt(max(abs(bsp)), 0.05 * 0.4054 / 2)
+  simo <- draws_of(inits, "simo_ndt_1")
+  expect_true(all(simo > 0 & simo < 1))
+})
+
+test_that("unit columns on a range wider than 1 keep the SD draws they had before #621", {
+  dat <- small_data()
+  # written from the base of #621 with the same seed: the shrink factor is 1
+  # for every entry here, so the draws must not move
+  cases <- list(
+    mixture2p = list(
+      model = mixture2p("dev_rad"),
+      formula = bmf(kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 0 + set_size + (0 + set_size | ID)),
+      data = dat,
+      sd = list(
+        sd_1 = c(0.05957906, 0.06431895, 0.09658438, 0.0689548, 0.06884546, 0.0503031, 0.05774589, 0.09981795),
+        sd_2 = c(0.0915609, 0.09422463, 0.09371997, 0.05057796, 0.05859956, 0.08822028, 0.09902488, 0.08486954)
+      )
+    ),
+    m3 = list(
+      model = m3(
+        resp_cats = c("corr", "other", "npl"), num_options = c("n_corr", "n_other", "n_npl"),
+        choice_rule = "softmax", version = "ss"
+      ),
+      formula = bmf(c ~ 1 + cond + (1 + cond | ID), a ~ 1 + cond + (1 + cond | ID)),
+      data = oberauer_lewandowsky_2019_e1,
+      sd = list(sd_1 = c(0.06884546, 0.0503031, 0.05774589), sd_2 = c(0.06797572, 0.05016843, 0.09157917))
+    ),
+    imm = list(
+      model = imm(
+        resp_error = "dev_rad", nt_features = paste0("col_nt", 1:7),
+        nt_distances = paste0("dist_nt", 1:7), set_size = "set_size"
+      ),
+      formula = bmf(c ~ 0 + set_size + (0 + set_size | ID), a ~ 1 + (1 | ID), s ~ 1, kappa ~ 1),
+      data = dat,
+      sd = list(
+        sd_1 = 0.09658438,
+        sd_2 = c(0.0503031, 0.05774589, 0.09981795, 0.06557165, 0.07012099, 0.05040553, 0.08198434, 0.080004)
+      )
+    ),
+    mixture3p = list(
+      model = mixture3p("dev_rad", nt_features = paste0("col_nt", 1:7), set_size = "set_size"),
+      formula = bmf(
+        kappa ~ 0 + set_size + (0 + set_size | ID), thetat ~ 0 + set_size + (0 + set_size | ID),
+        thetant ~ 0 + set_size + (0 + set_size | ID)
+      ),
+      data = dat,
+      sd = list(
+        sd_1 = c(0.06431895, 0.09658438, 0.0689548, 0.06884546, 0.0503031, 0.05774589, 0.09981795, 0.06557165),
+        sd_2 = c(0.09422463, 0.09371997, 0.05057796, 0.05859956, 0.08822028, 0.09902488, 0.08486954, 0.0583179),
+        sd_3 = c(0.07510217, 0.07860099, 0.08637935, 0.06904934, 0.05220266, 0.07224673, 0.06396304, 0.06847676)
+      )
+    )
+  )
+  for (name in names(cases)) {
+    case <- cases[[name]]
+    # set size 1 has no non-target, which mixture3p warns about for thetant
+    init_fun <- suppressWarnings(configured_initfun(case$model, case$formula, case$data))
+    inits <- withr::with_seed(621, init_fun())
+    for (sd in names(case$sd)) {
+      expect_equal(as.vector(inits[[sd]]), case$sd[[sd]], tolerance = 1e-6, label = paste(name, sd))
+    }
+  }
+})
+
+# =============================================================================
+# BOUNDS THE USER SETS ON COEFFICIENTS (#694)
+# =============================================================================
+
+# Stan rejects a start on or past a bound, and puts one a rounding error inside
+# it at the far end of the unconstrained scale. A start keeps 0.01 times its
+# coefficient's shrink from the bound, or a twentieth of the interval between
+# two bounds where that is less. The shrink is 1 for a column reaching at most 1
+# under an init range at least 1 wide on the link scale, as in eta_model. A start
+# at -Inf or Inf clears a margin from an infinite bound but is no start at all
+inside <- function(x, lower = -Inf, upper = Inf, shrink = 1) {
+  margin <- min(0.01 * shrink, (upper - lower) / 20)
+  all(is.finite(x) & x >= lower + margin & x <= upper - margin)
+}
+
+eta_model <- list(
+  parameters = list(eta = ""), init_ranges = list(eta = c(2, 3)), links = list(eta = "identity")
+)
+eta_data <- list(X_eta = stats::model.matrix(~ 1 + x, data.frame(x = factor(1:3))))
+
+test_that("solved coefficients start inside a bound set on the class (#694)", {
+  withr::local_seed(694)
+  draw <- function(bounds) init_fixef_param("b_eta", "vector", 3, eta_model, eta_data, bounds)
+  lower <- replicate(200, draw(c(0, Inf)))
+  upper <- replicate(200, draw(c(-Inf, 0)))
+  narrow <- replicate(200, draw(c(-1e-4, 1e-4)))
+  # the effects the constant target does not need solve to zero
+  expect_true(inside(lower[2:3, ], lower = 0))
+  expect_true(all(lower[2:3, ] <= 0.1))
+  expect_true(inside(upper, upper = 0))
+  expect_true(all(narrow > -1e-4 & narrow < 1e-4))
+  # an intercept above the bound keeps its start in range
+  expect_true(all(lower[1, ] >= 2 & lower[1, ] <= 3))
+})
+
+test_that("a bounded coefficient on a wide column moves by a step its column shrinks (#694)", {
+  withr::local_seed(694)
+  # a centred design (Kc_eta): coefficient k belongs to column k + 1 of X
+  sdata <- list(X_eta = cbind(Intercept = 1, small = rep(0:1, 20), wide = 1:40), Kc_eta = 2L)
+  b <- replicate(200, init_fixef_param("b_eta", "vector", 2, eta_model, sdata, c(0, Inf)))
+  expect_true(inside(b[1, ], lower = 0) && all(b[1, ] <= 0.1))
+  expect_true(inside(b[2, ], lower = 0, shrink = 1 / 40) && all(b[2, ] <= 0.1 / 40))
+})
+
+test_that("a start that moves takes its own shrink when another start stays (#694)", {
+  withr::local_seed(694)
+  starts <- replicate(200, into_bounds(c(0.5, -1e-17), c(0, Inf), c(1, 1 / 40)))
+  expect_true(all(starts[1, ] == 0.5))
+  expect_true(inside(starts[2, ], lower = 0, shrink = 1 / 40) && all(starts[2, ] <= 0.1 / 40))
+})
+
+test_that("starts between close bounds spread strictly inside them (#694)", {
+  withr::local_seed(694)
+  close <- replicate(200, into_bounds(c(-1, 1), c(0, 0.02), 1))
+  expect_true(inside(close, lower = 0, upper = 0.02))
+  expect_gt(length(unique(close[1, ])), 1)
+  expect_gt(length(unique(close[2, ])), 1)
+  # four doubles apart, some steps fall below half the spacing of the doubles
+  # and round onto the bound
+  tiny <- c(1, 1 + 4 * .Machine$double.eps)
+  starts <- replicate(200, into_bounds(c(0, 2), tiny, 1))
+  expect_true(all(starts > tiny[1] & starts < tiny[2]))
+})
+
+test_that("a start well inside the bounds is the start without them (#694)", {
+  # the intercept starts in 2-3 and the effects solve to zero
+  draw <- function(bounds) withr::with_seed(1, init_fixef_param("b_eta", "vector", 3, eta_model, eta_data, bounds))
+  expect_equal(draw(c(-1, 4)), draw(c(-Inf, Inf)))
+})
+
+test_that("a bound that never binds leaves every seeded start as it was (#694)", {
+  inits <- function(user_prior) {
+    init_fun <- configured_initfun(
+      mixture2p(resp_error = "response_error"),
+      bmf(kappa ~ 1 + setsize + (1 | subID), thetat ~ 1 + setsize),
+      zhang_luck_2008,
+      user_prior = user_prior
+    )
+    withr::with_seed(5, init_fun())
+  }
+  expect_identical(
+    inits(brms::prior(normal(0, 1), class = b, dpar = kappa, lb = -5)),
+    inits(brms::prior(normal(0, 1), class = b, dpar = kappa))
+  )
+})
+
+test_that("an intercept and a per-coefficient scalar start inside their bounds (#694)", {
+  withr::local_seed(694)
+  intercept <- replicate(200, init_fixef_param("Intercept_eta", "real", 1, eta_model, list(), c(5, Inf)))
+  effect <- replicate(200, init_fixef_param("par_b_eta_3", "real", 1, eta_model, eta_data, c(0, Inf)))
+  expect_true(inside(intercept, lower = 5))
+  # replicate() would fold a vector returned for the scalar into a matrix
+  expect_length(effect, 200)
+  expect_true(inside(effect, lower = 0))
+  below <- replicate(200, init_fixef_param("Intercept_eta", "real", 1, eta_model, list(), c(-Inf, 0)))
+  expect_true(inside(below, upper = 0) && all(below >= -0.1))
+})
+
+test_that("an intercept on a narrow init range moves by a step that range shrinks (#694)", {
+  withr::local_seed(694)
+  # the shrink is the 0.006 width of the range, which no column widens
+  model <- list(parameters = list(ndt = ""), init_ranges = list(ndt = c(0.012, 0.018)), links = list(ndt = "identity"))
+  intercept <- replicate(200, init_fixef_param("Intercept_ndt", "real", 1, model, list(), c(0.05, Inf)))
+  expect_true(inside(intercept, lower = 0.05, shrink = 0.006) && all(intercept <= 0.05 + 0.1 * 0.006))
+})
+
+test_that("mo() coefficients start inside a bound set on the class (#694)", {
+  withr::local_seed(694)
+  model <- list(parameters = list(kappa = ""), init_ranges = list(kappa = c(1, 2)), links = list(kappa = "log"))
+  sdata <- list(Jmo_kappa = 3L)
+  bsp <- replicate(200, init_special_coef_param("bsp_kappa", "vector", 2, model, sdata, c(0, Inf)))
+  # the range is log(2) wide on the log scale, and mo() reaches Jmo = 3
+  shrink <- log(2) / 3
+  expect_true(inside(bsp, lower = 0, shrink = shrink) && all(bsp <= 0.1 * shrink))
+  below <- replicate(200, init_special_coef_param("bsp_kappa", "vector", 2, model, sdata, c(-Inf, 0)))
+  expect_true(inside(below, upper = 0, shrink = shrink) && all(below >= -0.1 * shrink))
+})
+
+test_that("the inits of a fit with lb = 0 on b respect the bound (#694)", {
+  withr::local_seed(694)
+  init_fun <- configured_initfun(
+    mixture2p(resp_error = "response_error"),
+    bmf(kappa ~ 1 + setsize, thetat ~ 1 + setsize),
+    zhang_luck_2008,
+    user_prior = brms::prior(normal(0, 1), class = b, dpar = kappa, lb = 0)
+  )
+  inits <- lapply(1:50, function(i) init_fun())
+  env <- environment(init_fun)
+  # the coefficients belong to every column of the centred design but the first
+  shrink <- apply(env$standata_list$X_kappa[, -1, drop = FALSE], 2, function(column) {
+    coef_shrink("kappa", column, env$model)
+  })
+  expect_true(inside(unlist(lapply(inits, `[[`, "b_kappa")), lower = 0, shrink = min(shrink)))
+  expect_true(all(is.finite(unlist(inits))))
+})
+
+# SDs start at 0.05 to 0.1 times their shrink, so a bound on either side of
+# that interval binds every draw
+sd_starts <- function(formula, user_prior, sd_name, data = zhang_luck_2008) {
+  init_fun <- configured_initfun(mixture2p(resp_error = "response_error"), formula, data, user_prior)
+  env <- environment(init_fun)
+  list(
+    starts = unlist(lapply(1:20, function(i) init_fun()[[sd_name]])),
+    shrink = min(sd_entry_shrink(sd_name, env$model, env$standata_list))
+  )
+}
+
+test_that("group-level SDs start apart inside an upper bound set on the class (#694)", {
+  withr::local_seed(694)
+  for (ub in c(0.02, 0.04)) {
+    sd <- sd_starts(
+      bmf(kappa ~ 1 + (1 | subID), thetat ~ 1),
+      brms::set_prior("normal(0, 1)", class = "sd", dpar = "kappa", ub = ub),
+      "sd_1"
+    )
+    expect_true(inside(sd$starts, lower = 0, upper = ub, shrink = sd$shrink))
+    expect_gt(length(unique(sd$starts)), 1)
+  }
+})
+
+test_that("group-level SDs start inside a lower bound set on the class (#694)", {
+  withr::local_seed(694)
+  sd <- sd_starts(
+    bmf(kappa ~ 1 + (1 | subID), thetat ~ 1),
+    brms::prior(normal(0, 1), class = sd, dpar = kappa, lb = 0.5),
+    "sd_1"
+  )
+  expect_true(inside(sd$starts, lower = 0.5, shrink = sd$shrink))
+  expect_true(all(sd$starts <= 0.5 + 0.1 * sd$shrink))
+})
+
+test_that("the SDs of an s() term start inside a bound set on the class (#694)", {
+  withr::local_seed(694)
+  dat <- zhang_luck_2008
+  dat$z <- dat$trial / 100
+  sds <- sd_starts(
+    bmf(kappa ~ 1 + s(z, k = 4), thetat ~ 1),
+    brms::prior(normal(0, 1), class = sds, dpar = kappa, ub = 0.02),
+    "sds_kappa_1",
+    dat
+  )
+  expect_true(inside(sds$starts, lower = 0, upper = 0.02, shrink = sds$shrink))
+  expect_gt(length(unique(sds$starts)), 1)
 })

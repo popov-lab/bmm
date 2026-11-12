@@ -51,26 +51,39 @@ Your PR also needs:
   [ADR 0004](../.dev/decisions/0004-test-tiers-and-budget.md); short form in
   [AGENTS.md](../AGENTS.md), "Testing Requirements").
 - **A NEWS bullet** for anything users can see, under the development heading of
-  the branch you target: `# bmm (development version)` on `develop`,
-  `# bmm 1.6.0 (development)` on `dev-1.6.0`. Keep it short: what changes for the
-  user and what they should do. Do not describe how the fix works.
+  the branch you target. Both `develop` and `dev-1.6.0` keep the one heading
+  `# bmm (development version)`; on `dev-1.6.0` open your bullet with `[1.6.0]`,
+  so the release can split the bullets by that tag
+  ([ADR 0008](../.dev/decisions/0008-roadmap-to-2027-03.md) § D15). Keep it
+  short: what changes for the user and what they should do. Do not describe how
+  the fix works.
 - **Documentation** for new or changed exported functions (roxygen).
 - **For a new model:** read the
   [developer notes](https://venpopov.com/bmm/dev-notes/) and follow the
-  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Show
-  parameter recovery in the PR description (see below).
+  one-constructor-per-response-type rule in [AGENTS.md](../AGENTS.md). Add a
+  recovery plan, `tests/recovery/<model>.R` (see below).
 
 ### Recovery evidence for new models
 
-Until we have a `tests/recovery/` folder, the PR description shows the result
-of a parameter recovery for the new model:
+Recovery evidence is a validation plan for the
+[bmmtools](https://github.com/GidonFrischkorn/bmmtools) package. Commit the plan
+as `tests/recovery/<model>.R`, a script that builds it with
+`bmmtools::validation_plan()` (see `tests/recovery/README.md`). The plan must
+cover:
 
-- true against recovered values, as a table or a plot;
+- true against recovered values;
 - a hierarchical recovery with several subjects whose parameters vary;
 - data simulated with an independent generator, not the model's own `r*`
   function, so that a bug in the density cannot cancel out.
 
-Attach the script as a gist or in a collapsed block in the PR.
+You run the plan locally (see `tests/recovery/README.md`); it takes hours of
+sampling. Until a card site exists, attach the rendered card.html (zipped) to
+the PR.
+
+Always pass `generator =` and, for a model bmmtools has no defaults for, the
+model object and `pars` instead of its name; `tests/recovery/README.md` has the
+details and the install line for bmmtools. The plan is not run by `R CMD check`
+or CI.
 
 ### Model fits for the website articles
 
@@ -143,7 +156,10 @@ three rules apply:
 
 The rules cover what users type or read: exported functions and their
 arguments, model parameter names, documented defaults, and the data layout a
-model expects. Internal functions are not covered. Fits saved by an earlier
+model expects. From the release that adds or exports them, `model_spec()`,
+`simulate_data()` and `link_transform()` are covered too
+([ADR 0005](../.dev/decisions/0005-model-contract-for-companions-and-extensions.md)).
+Internal functions are not covered. Fits saved by an earlier
 release are covered: they keep working with `update()` and the extraction
 functions, through `restructure()` where they need converting, or the NEWS
 bullet says they must be refitted.
@@ -152,6 +168,14 @@ A changed default has no old form to warn about. Announce it as a breaking
 change (rule 3) and say in NEWS how to get the old default back. For a changed
 data layout, accept both layouts for the window and give the old and the new
 column names as `what` and `with`.
+
+Default priors follow their own rule
+([ADR 0008](../.dev/decisions/0008-roadmap-to-2027-03.md) § D4): a default
+prior changes only in a minor release, never in a patch release, and every
+change is listed under the heading `### Changes to default priors` in the
+section of its release, on a PR labelled `prior-change`. From bmm 1.6.0 a fit
+records the prior set it used and `bmm_options(prior_version = )` reproduces
+an older set.
 
 If your PR deprecates something:
 
@@ -184,6 +208,132 @@ announce it in an issue before that release (rule 3). Forms deprecated before
 1.5.0 may be removed in any later release once the removal is announced the
 same way.
 
+## Vector arguments of the distribution functions
+
+The `d*()` and `r*()` functions of the sdm, ddm, ezdm and signal detection
+models follow one recycling contract, stated on the help page
+`?bmm_distributions` and inherited by each distribution's page under "Vector
+arguments". The cswald and circular-mixture functions adopt it with their open
+pull requests; `dm3()`/`rm3()`, the MPT functions and
+`dpsychometric_function()` are not covered yet, and `rpsychometric_function()`
+follows only the rule for `n`. A new distribution follows it from the start:
+
+1. `r*(n, ...)` returns exactly `n` draws (a vector, or `n` rows). `n` is a
+   single number of at least 0, read with `.n_draws()`: a fraction is
+   truncated, as in `rnorm()`, but a vector `n` stops, where `rnorm()` takes
+   its length (`rddm()` still takes it, with a deprecation warning). Each
+   per-observation argument is recycled to `n` with `rep_len()`, as `rnorm()`
+   does, also when `n` is not a multiple of its length; draw `i` uses element
+   `i`. A matrix is read element by element, as `rnorm()` reads it; only
+   counts, thresholds and the `mean_rt` and `var_rt` pairs of
+   `dezdm(version = "4par")` hold one observation per row, so draw or value
+   `i` uses their row `i`.
+2. `d*(x, ...)` returns as many values as the longest of `x` (its rows, for
+   counts) and the per-observation arguments; value `i` equals the call on
+   the `i`-th elements (or rows) alone. An empty `x` or an empty per-observation argument gives an
+   empty result, as in `dnorm()`; where an observation is a vector of counts
+   (or a `mean_rt` or `var_rt` pair of `dezdm(version = "4par")`), a vector
+   is one observation, an empty vector stops and a 0-row matrix gives the
+   empty result. An empty `kcrit` of the cdp functions stops, as
+   `kcrit = NULL` selects the R/K model.
+3. A set of values that describes one observation (thresholds, item
+   locations) is a vector when every observation shares it and a matrix with
+   one row per observation otherwise.
+4. Configuration arguments (`version`, `dist`, `log`, `parametrization`,
+   model objects) are single values, never recycled.
+
+In the code, `.obs_length()` gives the common length, counting `NULL` as
+empty except in its `optional` list (arguments such as `criterion` whose
+`NULL` means not given), and `.recycle_obs()` recycles a vector or the rows
+of a matrix. A `posterior_predict_*()` function
+passes `n = prep$ndraws`. A new distribution adds its element-wise and
+pairing tests to `tests/testthat/test-distribution-contract.R`; a pairing
+test interleaves parameter groups and checks each group against a reference
+outside the function's own code (a closed form, quadrature, or the matching
+`d*()` on single-trial counts), so that draws paired with the wrong
+parameters fail it.
+
+## Companion packages and extensions
+
+Other packages build on bmm's models. [bmmtools](https://github.com/GidonFrischkorn/bmmtools)
+simulates from them and checks parameter recovery, and the
+[model explorer](https://github.com/GidonFrischkorn/bmm-explorer) draws them.
+Packages that define their own bmm models (#442) will join them. All of them
+rely on one contract, described in
+[ADR 0005](../.dev/decisions/0005-model-contract-for-companions-and-extensions.md):
+
+- what `model_spec()` returns for a model: its name, package, version, domain
+  and task, its parameters with their links, fixed values and alternative
+  groups, its default priors and init ranges, its response and other
+  variables, the role of each data column, the names of its density and
+  generator functions, and the contract version;
+- the simulation generic `simulate_data()` and every model's method for it;
+- the exported density and generator functions, and `link_transform()`.
+
+Reading a model object with `$`, its attributes, and internal functions are
+not part of the contract. Code in other packages should not rely on them.
+`simulate_data()` and the export of `link_transform()` are on `develop` for
+1.5.0; `model_spec()` is being added for 1.5.0 and also accepts a fitted model
+(`model_spec(fit)` reads the model the fit stores). Each item is covered from
+the release that contains it. Until the 1.6.0 release pins contract
+version 1.0, the contract may still change, and the announcement rule below
+applies to every such change.
+
+### When your PR changes the contract
+
+A change to any item above is announced, whether or not it breaks a script.
+This extends rule 3 of "Deprecating and removing features" to the contract:
+
+1. Add a NEWS bullet under the heading `### Companion packages` in the section
+   of your release. Name the item and give the old and the new form.
+2. Before the release, a maintainer copies the body of the "Companion package
+   change" template
+   ([`companion_change.md`](ISSUE_TEMPLATE/companion_change.md); open the raw
+   file, because the rendered view hides its instructions) into a new issue in
+   [bmmtools](https://github.com/GidonFrischkorn/bmmtools/issues) and into one
+   in [bmm-explorer](https://github.com/GidonFrischkorn/bmm-explorer/issues),
+   one issue per repository, and links both in the PR.
+3. If the change also breaks user scripts, the deprecation rules above apply
+   as well.
+
+A new model has to meet the contract too: once the accessor and the generic
+are in bmm, it needs a complete `model_spec()` and a `simulate_data()` method.
+`use_model_template()` will scaffold the `simulate_data()` method, and a
+convention test will fail until the model has both.
+
+### The companion packages job
+
+The workflow "Companion packages" (`.github/workflows/companions.yaml`) runs
+the tests of bmmtools and the model explorer's fixture checks against bmm as
+pushed. It runs on every push to `develop` and the `dev-*` branches, once a
+week and on demand, not on pull requests. It never blocks a merge. Both jobs
+are switched off until the other maintainer has agreed to the workflow. The
+pull request that switches them on needs that maintainer's approval; the
+comment at the top of the file says how to switch them on.
+
+A failure does not turn the run red, and nothing sends a notification. Look
+at the run page: a warning annotation names the step that failed, and
+the job's summary table lists the checkout, setup and test steps with their
+outcomes.
+
+When a job has failed:
+
+- Read the warning and the summary table, which also shows the companion
+  commit that was tested, and decide where the cause is.
+- If the failure follows from a contract change that was announced, the
+  companion issue already covers it. Nothing to do in bmm.
+- If it follows from a contract change that was not announced, announce it
+  now (steps 1 and 2 above), or revert the change if it was not intended.
+- If bmm broke something it should not have, open a bug in bmm and fix it
+  there.
+- If the companion itself is at fault, open an issue in its repository.
+
+Once the jobs are switched on, run them by hand with:
+
+```sh
+gh workflow run companions.yaml --repo popov-lab/bmm --ref develop
+```
+
 ## Review and merging
 
 How many reviews a PR needs depends on what it touches.
@@ -196,7 +346,7 @@ How many reviews a PR needs depends on what it touches.
 
 A **new model** is a standard PR with one addition: the reviewer works through
 the reviewer block in the PR template. They read the likelihood against the
-cited source, run or inspect the recovery, and check the default priors on the
+cited source, read the recovery plan and inspect its card, and check the default priors on the
 natural scale.
 
 Three rules apply to all tiers:
@@ -208,6 +358,8 @@ Three rules apply to all tiers:
   pushes afterwards, you can still re-request changes.
 - We may decline a PR that conflicts with the principles of the package. Talk
   to us early, especially if your change touches many files.
+- A `review/<branch>` branch that holds review fixes for a PR is deleted once
+  that PR merges.
 
 ### While there is one active maintainer
 
@@ -216,8 +368,10 @@ stuck, the maintainer may merge their own PR without a GitHub approval when
 all of the following hold:
 
 - CI is green.
-- An independent review was done, and the PR says what was checked and what
-  changed after it.
+- An independent review was done, and the maintainer has posted a comment on
+  the PR that says what was reviewed, what changed after the review and what
+  was decided. This holds for every PR an AI agent wrote
+  ([ADR 0008](../.dev/decisions/0008-roadmap-to-2027-03.md) § D6).
 - For the pipeline or exported API tier, the PR stays open for at least 72
   hours with that summary posted, so others can object.
 
@@ -245,6 +399,8 @@ belongs, ask.
 
 You may use AI tools. You are responsible for every line you submit and must be
 able to explain it in review. Tell us in the PR if a large share was generated.
+A PR written largely by an agent merges only after a maintainer has posted the
+summary comment described under "While there is one active maintainer".
 
 ## Licence
 

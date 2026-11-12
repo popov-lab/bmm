@@ -6,10 +6,12 @@
 #' Posterior predictive p-values for count models
 #'
 #' Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
-#' (2010) and their posterior predictive p-values (PPP) for models that fit
-#' aggregated response counts: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
-#' [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()]. TreeBUGS' `PPP()` reports the
-#' same two statistics; Details says where their values differ.
+#' (2010) and their posterior predictive p-values (PPP) for the count models,
+#' whose rows are aggregated counts or single trials ([sdt_yn()] and
+#' [sdt_mafc()] without `n_trials`, [mpt()] with `response`): [mpt()], [m3()],
+#' [sdt_yn()], [sdt_rating()], [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()].
+#' TreeBUGS' `PPP()` reports the same two statistics; Details says where their
+#' values differ.
 #'
 #' @details
 #' Both statistics are computed once per posterior draw, for the observed counts
@@ -148,14 +150,11 @@ ppp.bmmfit <- function(fit, statistic = c("T1", "T2"), by = NULL, ndraws = NULL,
               ndraws < 1 || ndraws > brms::ndraws(fit)),
          "'ndraws' must be a whole number between 1 and {brms::ndraws(fit)}.")
 
-  # one set of draws for posterior_predict() and posterior_epred(), so that
-  # each replicated data set is compared with its own expectation
-  draw_ids <- if (!is.null(ndraws)) sample.int(brms::ndraws(fit), ndraws)
-  counts <- .ppp_counts(model, fit, draw_ids)
-  by <- by %||% .ppp_default_by(model, fit, counts$data)
-  stopif(!is.character(by) || !all(by %in% names(counts$data)),
+  data <- .ppp_data(model, fit)
+  by <- by %||% .ppp_default_by(model, fit, data)
+  stopif(!is.character(by) || !all(by %in% names(data)),
          "'by' must name columns of the model data. Available: \\
-          {collapse_comma(setdiff(names(counts$data), 'Y'))}.")
+          {collapse_comma(setdiff(names(data), 'Y'))}.")
 
   needs_participant <- level == "participant" || "T2" %in% statistic
   participant <- participant %||% if (needs_participant) .ppp_participant(fit)
@@ -172,9 +171,13 @@ ppp.bmmfit <- function(fit, statistic = c("T1", "T2"), by = NULL, ndraws = NULL,
               variables of the formula.")
     statistic <- "T1"
   }
-  person <- if (length(participant) == 1L) as.factor(counts$data[[participant]])
+  person <- if (length(participant) == 1L) as.factor(data[[participant]])
 
-  cell <- .ppp_index(counts$data[by])
+  # one set of draws for posterior_predict() and posterior_epred(), so that
+  # each replicated data set is compared with its own expectation
+  draw_ids <- if (!is.null(ndraws)) sample.int(brms::ndraws(fit), ndraws)
+  counts <- .ppp_counts(model, fit, draw_ids)
+  cell <- .ppp_index(data[by])
   out <- if (level == "participant") {
     .ppp_by_participant(counts, cell, person)
   } else {
@@ -207,7 +210,7 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 ############################################################################# !
 
 # observed: rows x categories; replicated and expected: draws x rows x
-# categories, on the count scale; data: the model data the cells come from
+# categories, on the count scale
 .ppp_counts <- function(model, fit, draw_ids) {
   UseMethod(".ppp_counts")
 }
@@ -216,15 +219,14 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
   list(
     observed = unclass(fit$data$Y),
     replicated = brms::posterior_predict(fit, draw_ids = draw_ids),
-    expected = brms::posterior_epred(fit, draw_ids = draw_ids),
-    data = fit$data
+    expected = brms::posterior_epred(fit, draw_ids = draw_ids)
   )
 }
 
 # the response column holds one category; the other is trials - Y
 .ppp_counts.sdt_yn <- function(model, fit, draw_ids) {
   response <- model$resp_vars$response
-  trials <- fit$data[[model$other_vars$n_trials]]
+  trials <- fit$data[[.sdt_trials_var(model)]]
   y <- fit$data[[response]]
   list(
     observed = matrix(c(y, trials - y), ncol = 2L,
@@ -232,8 +234,7 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
     replicated = .ppp_complement(brms::posterior_predict(fit, draw_ids = draw_ids),
                                  trials),
     expected = .ppp_complement(brms::posterior_epred(fit, draw_ids = draw_ids),
-                               trials),
-    data = fit$data
+                               trials)
   )
 }
 
@@ -244,18 +245,28 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 
 .ppp_counts.sdt_mafc <- .ppp_counts.sdt_yn
 
+# the model data the cells come from; read before any draws are computed, so
+# that a wrong argument is reported before posterior_predict() runs
+.ppp_data <- function(model, fit) {
+  UseMethod(".ppp_data")
+}
+
+.ppp_data.default <- function(model, fit) {
+  fit$data
+}
+
 # the tree column enters no formula, so brms leaves it out of the model data;
 # the tree indicators that do enter it identify the tree of each row
-.ppp_counts.mpt <- function(model, fit, draw_ids) {
-  out <- NextMethod()
+.ppp_data.mpt <- function(model, fit) {
+  data <- fit$data
   indicators <- model$other_vars$indicators$tree
   tree_id <- model$other_vars$tree_id
-  if (is.null(indicators) || tree_id %in% names(out$data)) {
-    return(out)
+  if (is.null(indicators) || tree_id %in% names(data)) {
+    return(data)
   }
-  tree <- max.col(as.matrix(out$data[indicators]), ties.method = "first")
-  out$data[[tree_id]] <- factor(names(indicators)[tree], levels = names(indicators))
-  out
+  tree <- max.col(as.matrix(data[indicators]), ties.method = "first")
+  data[[tree_id]] <- factor(names(indicators)[tree], levels = names(indicators))
+  data
 }
 
 
@@ -301,11 +312,15 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
   candidates
 }
 
+# Cells numbered 1, 2, ... in lexical order of their values. Codes are combined
+# arithmetically, a column at a time: pasted labels coincide for (1, 5.2) and
+# (1.5, 2), pasted codes for (1, 12) and (11, 2)
 .ppp_index <- function(df) {
-  if (ncol(df) == 0L) {
-    return(rep(1L, nrow(df)))
-  }
-  as.integer(interaction(df, drop = TRUE, lex.order = TRUE))
+  Reduce(function(id, x) {
+    code <- if (is.factor(x)) as.integer(x) else match(x, sort(unique(x)))
+    key <- (id - 1) * max(code, 0L, na.rm = TRUE) + code
+    match(key, sort(unique(key)))
+  }, df, rep(1L, nrow(df)))
 }
 
 # sums the rows of a draws x rows x categories array within each group

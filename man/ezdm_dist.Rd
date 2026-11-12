@@ -33,14 +33,20 @@ rezdm(
 }
 \arguments{
 \item{mean_rt}{Observed mean reaction time(s) in seconds. For version
-"3par", a numeric vector or single value. For version "4par", either a vector
-of length 2 (c(mean_rt_upper, mean_rt_lower)) for single observation, or a matrix with 2
-columns for multiple observations.}
+"3par", a numeric vector or single value. For version "4par", either a
+vector of length 2, \code{c(mean_rt_upper, mean_rt_lower)}, for one
+observation, or a matrix with 2 columns and one row per observation. A
+vector is recycled as one observation, also when \code{var_rt} is a matrix. A
+data frame is read as the matrix of its rows. For no observations, pass
+a matrix with zero rows and 2 columns; an empty vector stops.}
 
 \item{var_rt}{Observed variance of reaction times in seconds^2. For version
-"3par", a numeric vector or single value. For version "4par", either a vector
-of length 2 (c(var_rt_upper, var_rt_lower)) for single observation, or a matrix with 2
-columns for multiple observations.}
+"3par", a numeric vector or single value. For version "4par", either a
+vector of length 2, \code{c(var_rt_upper, var_rt_lower)}, for one observation,
+or a matrix with 2 columns and one row per observation. A vector is
+recycled as one observation, also when \code{mean_rt} is a matrix. A data
+frame is read as the matrix of its rows. For no observations, pass a
+matrix with zero rows and 2 columns; an empty vector stops.}
 
 \item{n_upper}{Number of responses to the upper boundary}
 
@@ -59,7 +65,10 @@ for below-chance performance).}
 
 \item{version}{Character; either "3par" (default) or "4par"}
 
-\item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
+\item{log}{Logical; if \code{TRUE} (default until bmm 1.6.0), values are returned on
+the log scale. From bmm 1.6.0 on the default is \code{FALSE}, as in base R
+and the other density functions of bmm. Pass \code{log} to get the same
+result in every version.}
 
 \item{n}{Number of samples to generate}
 }
@@ -123,28 +132,78 @@ chance, so the ratio grows with the number of cells.
 Simulated \code{mean_rt} is not truncated at \code{ndt}. When a summary rests on few
 responses (a handful of trials in version \code{"3par"}, or a rarely reached
 boundary in version \code{"4par"}, whatever \code{n_trials} is), \code{rezdm()} can
-return \code{mean_rt} below \code{ndt} or even \code{mean_rt <= 0}, which \code{bmm()}
-rejects; drop those rows before fitting.
+return \code{mean_rt} below \code{ndt} or even \code{mean_rt <= 0}. \code{bmm()} rejects
+only the non-positive mean RTs; drop those rows before fitting. Values
+below \code{ndt} are valid draws.
 }
+\section{Vector arguments}{
+
+\itemize{
+\item \verb{r*(n, ...)} returns exactly \code{n} draws: a vector, or a data frame or matrix
+with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
+number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, and a matrix is read element
+by element; only a set of values per draw, such as \code{thresholds}, takes
+row \code{i} of a matrix (see below). A shorter vector is
+repeated, also when \code{n} is not a multiple of its length. Until bmm 1.6.0
+at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and parameter vectors still
+returns one draw per element, with a deprecation warning.
+\item \code{n} is a single number of at least 0. A fraction is truncated, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}, and \code{n = 0} gives an empty vector, or a matrix or data
+frame with zero rows and the usual columns. Unlike \code{\link[stats:rnorm]{stats::rnorm()}},
+which takes the length of a vector \code{n}, these functions stop on one;
+\code{\link[=rddm]{rddm()}} still takes its length, with a deprecation warning.
+\item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
+\code{x} (its rows, when the observations are rows of counts) and the
+per-observation arguments, the others recycled to that length. Value \code{i}
+is what the call on the \code{i}-th elements alone returns. A matrix in an
+argument that takes one number per observation, such as \code{x} or \code{d}, holds
+one observation per element, as in \code{\link[stats:dnorm]{stats::dnorm()}}. When \code{x} or any
+per-observation argument is empty, the result is empty, as in
+\code{\link[stats:dnorm]{stats::dnorm()}}. A \code{NULL} argument, such as a misspelt column of a data
+frame, counts as empty, except where the default is \code{NULL}, as for
+\code{criterion} or \code{kcrit}: there it means that the argument is not given.
+Where an observation is a vector of counts
+(\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()}, \code{dsdt_ranking()} and
+\code{dsdt_cdp()}), or the pair of \code{mean_rt} or \code{var_rt} values of
+\code{dezdm(version = "4par")}, a vector is always one observation: pass a
+matrix with zero rows for none, as an empty vector stops. An empty
+\code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
+\item A set of values that describes one observation, such as the \code{thresholds}
+of the rating models, is a vector when every observation shares it and a
+matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}.
+\item Configuration arguments such as \code{version}, \code{dist}, \code{log},
+\code{parametrization} and \code{n_new} are single values and are never recycled.
+An argument that a version does not use, such as \code{zr} of
+\code{dezdm(version = "3par")}, is ignored.
+}
+}
+
 \examples{
 # 3-parameter version (single observation)
 dezdm(
   mean_rt = 0.5, var_rt = 0.02, n_upper = 80, n_trials = 100,
-  drift = 2, bound = 1.5, ndt = 0.3
+  drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 )
 
 # 3-parameter version (vectorized)
 dezdm(
   mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025),
   n_upper = c(80, 75), n_trials = c(100, 100),
-  drift = 2, bound = 1.5, ndt = 0.3
+  drift = 2, bound = 1.5, ndt = 0.3, log = TRUE
 )
 
 # 4-parameter version (single observation)
 dezdm(
   mean_rt = c(0.45, 0.55), var_rt = c(0.018, 0.025),
   n_upper = 80, n_trials = 100,
-  drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par"
+  drift = 2, bound = 1.5, ndt = 0.3, zr = 0.55, version = "4par", log = TRUE
 )
 
 # generate random summary statistics

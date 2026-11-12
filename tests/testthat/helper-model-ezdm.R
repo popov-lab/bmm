@@ -23,6 +23,11 @@ model_cases_ezdm <- function() {
       ezdm_4par = list(model = four, formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1),
                        data = four_data)
     ),
+    # the 4par check_data() adds the rt_used_* indicators; no shared test needs
+    # a mock fit of it, so the case is a check_data one (test-helpers-data.R)
+    check_data = list(
+      ezdm_4par = list(model = four, data = four_data)
+    ),
     links = list(
       ezdm = list(model = three, settable = c("drift", "bound", "ndt", "s")),
       ezdm_4par = list(model = four, settable = c("drift", "bound", "ndt", "zr", "s"))
@@ -39,6 +44,18 @@ model_cases_ezdm <- function() {
         formula = bmf(drift ~ 1)
       ),
       ezdm_4par = list(model = four, data = four_data, formula = bmf(drift ~ 1))
+    ),
+    simulate = list(
+      ezdm_3par = list(
+        model = three, pars = list(drift = 1, bound = 0, ndt = -1.2), design = data.frame(n_trials = rep(100, 20)),
+        formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+        simulate_pars = list(drift = 1, bound = 0, ndt = -1.2, s = 0)
+      ),
+      ezdm_4par = list(
+        model = four, pars = list(drift = 1, bound = 0, ndt = -1.2, zr = 0.2),
+        design = data.frame(n_trials = rep(100, 20)), formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1, zr ~ 1),
+        simulate_pars = list(drift = 1, bound = 0, ndt = -1.2, zr = 0.2, s = 0)
+      )
     )
   )
 }

@@ -32,17 +32,19 @@ postprocess_brm.bmmodel <- function(model, fit, ...) {
   class(fit) <- c("bmmfit", "brmsfit")
   fit <- add_bmm_fit_info(
     fit,
-    nlist(model, user_formula = dots$user_formula, configure_opts = dots$configure_opts),
+    nlist(model, user_formula = dots$user_formula, user_prior = dots$user_prior,
+          configure_opts = dots$configure_opts),
     dots$fit_args
   )
   reset_env(NextMethod("postprocess_brm"))
 }
 
-# the bookkeeping every bmm fit carries: the package version, the information
-# the bmmfit methods dispatch on, the name of the user's data, and the bmm
-# version stamp in the Stan code
+# the bookkeeping every bmm fit carries: the versions of bmm and of R (which
+# brms does not store), the information the bmmfit methods dispatch on, the
+# name of the user's data, and the bmm version stamp in the Stan code
 add_bmm_fit_info <- function(fit, info, fit_args) {
   fit$version$bmm <- utils::packageVersion("bmm")
+  fit$version$R <- getRversion()
   fit$bmm <- info
   attr(fit$data, "data_name") <- attr(fit_args$data, "data_name")
   fit$model <- add_bmm_version_to_stancode(fit$model)
@@ -110,7 +112,8 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #'   | `ezdm()`, version `"4par"` | Mean response time of the cell's upper-boundary responses |
 #'   | `sdt_yn()` | Number of "old"/"signal" responses, the number of trials times their probability |
 #'   | `sdt_mafc()` | Number of correct responses, the number of trials times their probability |
-#'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, from the multinomial family of \pkg{brms} |
+#'   | `psychometric_function()` | Number of positive responses, the number of trials (1 for 0/1 data) times the psychometric function at the row's intensity |
+#'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, from the multinomial family of \pkg{brms}; on one row per trial these are the category probabilities |
 #'   | `sdm()`, `mixture2p()`, `mixture3p()`, `imm()` | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
 #'
 #'   With `dpar` or `nlpar`, `posterior_epred()` returns draws of that model
