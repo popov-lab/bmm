@@ -1054,6 +1054,16 @@ test_that("dtcc() and rtcc() with an option set pair x and d per observation", {
   expect_identical(is.na(x), rep_len(c(TRUE, FALSE, FALSE, FALSE), 7))
 })
 
+test_that("rtcc() with correlated noise draws each observation from its own d", {
+  # no closed form under correlated noise; a missing d gives a missing draw,
+  # which places each draw's d at n = 7
+  f <- tcc_similarity("vonmises", 2)
+  x <- NULL
+  expect_no_warning(x <- withr::with_seed(4448, rtcc(7, d = c(NA, 2, 2, 2), similarity = f,
+                                                     correlation = exp(-(0:180) / 10))))
+  expect_identical(is.na(x), rep_len(c(TRUE, FALSE, FALSE, FALSE), 7))
+})
+
 # --- empty observations ---------------------------------------------------------
 
 test_that("the d*() functions return an empty result for no observations", {
