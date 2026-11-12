@@ -57,7 +57,8 @@
       links = .ezcdm_links,
       fixed_parameters = if (version == "3par") list(mu = 0, driftangle = 0) else list(mu = 0),
       default_priors = .ezcdm_priors,
-      init_ranges = .ezcdm_init_ranges
+      init_ranges = .ezcdm_init_ranges,
+      functions = list(density = "dezcdm", generator = "rezcdm")
     ),
     class = c("bmmodel", "ezcdm", paste0("ezcdm_", version)),
     call = call
