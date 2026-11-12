@@ -54,7 +54,8 @@
       links = .ddm_defaults[["links"]],
       fixed_parameters = .ddm_defaults[["fixed_parameters"]],
       default_priors = .ddm_defaults[["priors"]],
-      init_ranges = .ddm_defaults[["init_ranges"]]
+      init_ranges = .ddm_defaults[["init_ranges"]],
+      functions = list(density = "dddm", generator = "rddm")
     ),
     class = c("bmmodel", "ddm"),
     call = call
@@ -243,7 +244,7 @@ log_lik_ddm <- function(i, prep) {
 
 posterior_predict_ddm <- function(i, prep, ...) {
   out <- rddm(
-    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n = prep$ndraws,
     drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
     ndt = brms::get_dpar(prep, "ndt", i = i),

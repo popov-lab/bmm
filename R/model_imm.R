@@ -97,6 +97,7 @@
       fixed_parameters = list(mu = 0, b = 0),
       default_priors = spec$priors,
       init_ranges = spec$init_ranges,
+      functions = list(density = "dimm", generator = "rimm"),
       deprecated_parameters = list(mu1 = "mu"),
       dpar_since = "1.5.0",
       variable_precision = variable_precision,

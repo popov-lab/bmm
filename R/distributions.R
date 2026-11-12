@@ -1,9 +1,77 @@
-#' Rejection Sampling
+#' @title Vector arguments of the distribution functions
 #'
-#' Performs rejection sampling to generate samples from a target distribution.
-#' Each draw can come from its own target: draw `i` is sampled from `f`
-#' evaluated at the `i`-th element of every per-draw argument in `...`, under
-#' the envelope `max_f[i]`.
+#' @description The density (`d*()`) and random generation (`r*()`) functions
+#'   of the sdm, ddm, ezdm and tcc models, of the signal detection models
+#'   (`sdt_yn`, `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`,
+#'   `sdt_ranking` and `sdt_cdp`) and of the psychometric function take their
+#'   per-observation arguments as vectors, or as matrices with one row per
+#'   observation, and recycle them as [stats::dnorm()] and [stats::rnorm()]
+#'   do. This page states the rules; the help page of each of these
+#'   distributions repeats them under "Vector arguments".
+#'
+#'   The other distribution functions do not follow these rules yet:
+#'   [dcswald()] and [rcswald()], the circular mixtures ([dmixture2p()],
+#'   [dmixture3p()], [dimm()] and their `r*()` functions), [dm3()] and [rm3()],
+#'   and [dmpt()] and [rmpt()].
+#'
+#' @section Vector arguments:
+#' - `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or matrix
+#'   with `n` rows. Every per-observation argument (a parameter, a stimulus, a
+#'   number of trials) is recycled to length `n` with [rep_len()], as in
+#'   [stats::rnorm()]: draw `i` uses element `i`, and a matrix is read element
+#'   by element; only a set of values per draw, such as `thresholds`, takes
+#'   row `i` of a matrix (see below). A shorter vector is
+#'   repeated, also when `n` is not a multiple of its length. Until bmm 1.6.0
+#'   at the earliest, [rddm()] with `n = 1` and parameter vectors still
+#'   returns one draw per element, with a deprecation warning.
+#' - `n` is a single number of at least 0. A fraction is truncated, as in
+#'   [stats::rnorm()], and `n = 0` gives an empty vector, or a matrix or data
+#'   frame with zero rows and the usual columns. Unlike [stats::rnorm()],
+#'   which takes the length of a vector `n`, these functions stop on one;
+#'   [rddm()] still takes its length, with a deprecation warning.
+#' - `d*(x, ...)` returns one value per observation: as many as the longest of
+#'   `x` (its rows, when the observations are rows of counts) and the
+#'   per-observation arguments, the others recycled to that length. Value `i`
+#'   is what the call on the `i`-th elements alone returns. A matrix in an
+#'   argument that takes one number per observation, such as `x` or `d`, holds
+#'   one observation per element, as in [stats::dnorm()]. When `x` or any
+#'   per-observation argument is empty, the result is empty, as in
+#'   [stats::dnorm()]. A `NULL` argument, such as a misspelt column of a data
+#'   frame, counts as empty, except where the default is `NULL`, as for
+#'   `criterion` or `kcrit`: there it means that the argument is not given.
+#'   Where an observation is a vector of counts
+#'   (`dsdt_rating()`, `dsdt_dpsdt()`, `dsdt_metad()`, `dsdt_ranking()` and
+#'   `dsdt_cdp()`), or the pair of `mean_rt` or `var_rt` values of
+#'   `dezdm(version = "4par")`, a vector is always one observation: pass a
+#'   matrix with zero rows for none, as an empty vector stops. An empty
+#'   `kcrit` of `dsdt_cdp()` and `rsdt_cdp()` stops as well; `kcrit = NULL`
+#'   gives the R/K model. Counts in a data frame, a tibble included, are read
+#'   as the matrix of its rows, and so are `mean_rt` and `var_rt` of
+#'   `dezdm(version = "4par")`. [dsdm()] with a data frame `x` is the
+#'   exception: it returns a data frame of the same shape, one density per
+#'   cell, and cuts longer parameters to the number of cells.
+#' - A set of values that describes one observation, such as the `thresholds`
+#'   of the rating models, is a vector when every observation shares it and a
+#'   matrix with one row per observation otherwise: row `i` belongs to
+#'   observation `i`, or to draw `i`.
+#' - Configuration arguments such as `version`, `dist`, `log`,
+#'   `parametrization` and `n_new` are single values and are never recycled.
+#'   An argument that a version does not use, such as `zr` of
+#'   `dezdm(version = "3par")`, is ignored.
+#'
+#' @name bmm_distributions
+#' @keywords distribution
+NULL
+
+#' @title Deprecated: rejection sampling
+#'
+#' @description `rejection_sampling()` is deprecated since bmm 1.5.0 and will
+#'   be removed in bmm 1.6.0 at the earliest. It was the sampler behind
+#'   [rsdm()], which no longer needs the export; nothing replaces it. It still
+#'   performs rejection sampling from a target distribution, with a warning.
+#'   Each draw can come from its own target: draw `i` is sampled from `f`
+#'   evaluated at the `i`-th element of every per-draw argument in `...`, under
+#'   the envelope `max_f[i]`.
 #'
 #' @param n Integer. The number of samples to generate.
 #' @param f Function. The target density divided by the proposal density, up to
@@ -23,22 +91,12 @@
 #'
 #' @return A numeric vector of length `n` containing samples from the target distribution.
 #' @export
-#' @keywords distribution
+#' @keywords distribution deprecated
 #'
 #' @examples
 #' target_density <- function(x) brms::dvon_mises(x, mu = 0, kappa = 10)
 #' proposal <- function(n) runif(n, min = -pi, max = pi)
-#' samples <- rejection_sampling(10000, target_density, max_f = target_density(0), proposal)
-#' hist(samples, freq = FALSE)
-#' curve(target_density, col = "red", add = TRUE)
-#'
-#' # one location per draw
-#' mu <- rep(c(0, 2), 5000)
-#' samples <- rejection_sampling(
-#'   10000, brms::dvon_mises, max_f = brms::dvon_mises(0, 0, 10), proposal,
-#'   mu = mu, kappa = 10
-#' )
-#' tapply(samples, mu, mean)
+#' samples <- rejection_sampling(1000, target_density, max_f = target_density(0), proposal)
 rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   stopif(
     !is.numeric(n) || length(n) != 1 || !isTRUE(n >= 1 && n %% 1 == 0),
@@ -48,7 +106,17 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
     !is.numeric(max_f) || !length(max_f) %in% c(1, n) || !all(is.finite(max_f) & max_f > 0),
     "max_f must be finite and positive, with one value or one value per draw."
   )
+  warn_deprecated("rejection_sampling()", NULL, since = "1.5.0")
+  .rejection_sampling(n, f, max_f, proposal_fun, ...)
+}
 
+# Draw i is sampled from f at the i-th element of every length-n argument in
+# ..., under the envelope max_f[i]; arguments of any other length are passed
+# whole to f (the callers recycle what they want per draw). f takes a vector
+# of proposals, generally not of length n, and must be vectorized over it and
+# over the per-draw arguments. max_f has one value or one per draw, and a
+# bound below the maximum of f biases the draws without a warning.
+.rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   dots <- list(...)
   per_draw <- n > 1 & lengths(dots) == n
   max_f <- rep_len(max_f, n)
@@ -74,9 +142,80 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
   out
 }
 
-# a single value is passed to rejection_sampling() whole rather than repeated
+# a single value is passed to .rejection_sampling() whole rather than repeated
 # for every draw, so that f computes what depends on it (e.g. besselI) once
 .recycle_draws <- function(x, n) if (length(x) == 1) x else rep_len(x, n)
+
+# The common length of a d*() call's per-observation arguments (contract in
+# ?bmm_distributions): the longest, or 0 when one of them is empty, as in
+# dnorm(). NULL is empty too, such as a misspelt data column, except in
+# `optional`, which holds the arguments whose NULL means not given or not read
+# (criterion, bias, the kcrit of the R/K model); those drop out when NULL. An
+# argument in `...` holds one number per observation, so a matrix there counts
+# every element, as dnorm() reads it; only the arguments whose observation is
+# a row (counts, thresholds, the dezdm() 4par pairs) go in `rows` and count
+# rows. .recycle_obs() then gives observation i row i of those.
+.obs_length <- function(..., rows = list(), optional = list()) {
+  lens <- c(
+    lengths(list(...)), lengths(Filter(Negate(is.null), optional)),
+    vapply(rows, NROW, integer(1))
+  )
+  if (any(lens == 0L)) 0L else max(lens)
+}
+
+# a result of length n with the attributes (dim, names, a ts or other class)
+# of the first argument of that length that has any, as dnorm() keeps those of
+# x, and `out[] <- values` keeps them. dsdm() and dsdt_yn() returned such
+# attributes before bmm 1.5.0 (other d*() functions did not); each caller
+# passes only the arguments whose attributes it returned then. A factor is
+# skipped: its class does not fit a numeric result
+.obs_template <- function(n, ...) {
+  src <- Find(function(a) length(a) == n && !is.null(attributes(a)) && !is.factor(a), list(...))
+  out <- numeric(n)
+  attributes(out) <- attributes(src)
+  out
+}
+
+.recycle_obs <- function(x, n) {
+  if (is.matrix(x)) x[rep_len(seq_len(nrow(x)), n), , drop = FALSE] else rep_len(x, n)
+}
+
+# the n of the exported r*() samplers, read as rnorm() reads it: one value
+# that coerces to a number >= 0, with a fraction truncated
+.n_draws <- function(n) {
+  n_num <- if (length(n) == 1 && (is.numeric(n) || is.logical(n) || is.character(n))) {
+    suppressWarnings(as.numeric(n))
+  }
+  stopif(
+    !isTRUE(is.finite(n_num) && n_num >= 0),
+    "n, the number of draws, must be a single number >= 0."
+  )
+  trunc(n_num)
+}
+
+# the counts of the multinomial d*() functions as a matrix with one row per
+# observation; a vector is one observation, so an empty vector is refused. A
+# data frame, such as count columns taken from the data, is read row by row as
+# a matrix (dsdt_ranking() accepted one before bmm 1.5.0)
+.counts_rows <- function(counts) {
+  stopif(
+    !is.matrix(counts) && length(counts) == 0,
+    "counts is an empty vector, but a vector of counts is one observation. \\
+    For no observations, pass a matrix with zero rows and one column per \\
+    response category."
+  )
+  if (!is.data.frame(counts)) return(rbind(counts))
+  non_numeric <- names(counts)[!vapply(counts, is.numeric, logical(1))]
+  stopif(
+    length(non_numeric) > 0,
+    "counts must be numbers; the data frame has non-numeric columns: \\
+    {collapse_comma(non_numeric)}"
+  )
+  as.matrix(counts)
+}
+
+# the result of the multinomial r*() samplers before the draws fill it
+.count_matrix <- function(n, cols) matrix(0L, n, length(cols), dimnames = list(NULL, cols))
 
 #' @title Distribution functions for the Signal Discrimination Model (SDM)
 #'
@@ -86,8 +225,13 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'   single activation source is supported.
 #'
 #' @name SDMdist
+#' @inheritSection bmm_distributions Vector arguments
 #'
-#' @param x Vector of quantiles
+#' @param x Vector of quantiles, or a data frame of them. For a data frame,
+#'   `dsdm()` returns a data frame of the same shape with one density per
+#'   cell, its cells taken column by column; parameters longer than the
+#'   number of cells are cut to it, and an empty parameter gives the data
+#'   frame with no rows.
 #' @param q Vector of quantiles
 #' @param p Vector of probabilities
 #' @param n Number of observations to sample
@@ -175,20 +319,60 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   .check_sdm_args(c, kappa, parametrization)
   .dsdm_numer <- .sdm_numer(parametrization)
 
-  lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
-
-  denom <- if (any(length(mu) > 1, length(c) > 1, length(kappa) > 1)) {
-    .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
+  # arithmetic on a data frame x returned a data frame of densities before bmm
+  # 1.5.0, its elements, column by column, paired with the parameters, and
+  # parameters longer than x cut to its size
+  if (is.data.frame(x)) {
+    # the frame arithmetic of bmm 1.4 keeps its outcomes and its shape: a matrix
+    # column spreads into one column per cell, a factor column gives NA with
+    # base R's warning, a character or list column stops, and a date column,
+    # which survives the subtraction, stops as cos() refused it
+    out <- as.data.frame(x) - 0
+    stopif(!all(vapply(out, function(col) is.numeric(col) || is.logical(col) || is.complex(col),
+                       logical(1))),
+           "The columns of a data frame x must be numeric.")
+    values <- unlist(out, use.names = FALSE)
+    dens <- dsdm(values, mu, c, kappa, log, parametrization)
+    # an empty parameter gives no values, as for an empty x: the frame with no rows
+    if (!length(values) || length(dens) < length(values)) return(out[0, , drop = FALSE])
+    # filled column by column, so that a matrix column kept by I() keeps its cells
+    dens <- split(dens[seq_along(values)], rep(seq_along(out), lengths(out)))
+    for (j in seq_along(out)) out[[j]][] <- dens[[j]]
+    return(out)
+  }
+  n <- .obs_length(x, mu, c, kappa)
+  if (n == 0L) return(numeric(0))
+  out <- .obs_template(n, x, mu, c, kappa)
+  x <- rep_len(x, n)
+  # one normalising integral per distinct parameter set: a long x over a short
+  # parameter vector pays for the sets it cycles through, not for every element.
+  # Sets repeat only when x is longer than every parameter; with as many
+  # parameter values as observations, as in log_lik(), the key costs and saves
+  # nothing
+  n_par <- max(lengths(list(mu, c, kappa)))
+  denom <- if (n_par > 1) {
+    mu <- rep_len(mu, n)
+    c <- rep_len(c, n)
+    kappa <- rep_len(kappa, n)
+    if (n_par == n) {
+      .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
+    } else {
+      # 17 significant digits round-trip a double, so two sets share a key
+      # only if their values are identical
+      set <- paste(format(mu, digits = 17), format(c, digits = 17), format(kappa, digits = 17))
+      first <- !duplicated(set)
+      .dsdm_integrate_numer_v(.dsdm_numer, mu[first], c[first], kappa[first],
+                              lower = mu[first], upper = mu[first] + pi)[match(set, set[first])]
+    }
   } else {
     .dsdm_integrate_numer(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
   }
+  lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
 
   denom <- 2 * denom
 
-  if (!log) {
-    return(exp(lnumerator) / denom)
-  }
-  lnumerator - log(denom)
+  out[] <- if (log) lnumerator - log(denom) else exp(lnumerator) / denom
+  out
 }
 
 #' @rdname SDMdist
@@ -235,12 +419,12 @@ qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @export
 rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   .check_sdm_args(c, kappa, parametrization)
-  stopif(length(n) > 1, "n must be a single integer")
+  n <- .n_draws(n)
   .dsdm_numer <- .sdm_numer(parametrization)
 
   # compare to the peak on the log scale: the unnormalized density itself
   # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
-  rejection_sampling(
+  .rejection_sampling(
     n = n,
     f = function(x, mu, c, kappa) {
       exp(.dsdm_numer(x, mu, c, kappa, log = TRUE) - .dsdm_numer(mu, mu, c, kappa, log = TRUE))
@@ -434,8 +618,6 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #' @name mixture2p_dist
 #'
 #' @param x Vector of observed responses
-#' @param q Vector of quantiles
-#' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
 #' @param kappa Vector of precision values. With `tau > 0` this is the
@@ -476,10 +658,8 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture2p` gives the density of the two-parameter mixture model,
-#'   `pmixture2p` gives the cumulative distribution function of the
-#'   two-parameter mixture model, `qmixture2p` gives the quantile function of
-#'   the two-parameter mixture model, and `rmixture2p` gives the random
-#'   generation function for the two-parameter mixture model.
+#'   and `rmixture2p` gives the random generation function for the
+#'   two-parameter mixture model.
 #'
 #' @export
 #'
@@ -616,18 +796,6 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 
 #' @rdname mixture2p_dist
 #' @export
-pmixture2p <- function(q, mu = 0, kappa = 7, p_mem = 0.8) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture2p_dist
-#' @export
-qmixture2p <- function(p, mu = 0, kappa = 5, p_mem = 0.6) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture2p_dist
-#' @export
 rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
                        set_size = NULL, version = "simple") {
   version <- match.arg(version, names(.mixture2p_version_table))
@@ -661,8 +829,6 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @name mixture3p_dist
 #'
 #' @param x Vector of observed responses
-#' @param q Vector of quantiles
-#' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations. First value represents the location of the
 #'   target item and any additional values indicate the location of non-target
@@ -673,13 +839,16 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param p_mem Vector of probabilities of a target response. For a
 #'   [mixture3p()] fit these are `thetat` on its native scale (version
 #'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
-#'   (versions `"slot"` and `"slot_averaging"`).
+#'   (versions `"slot"` and `"slot_averaging"`). The mapping is exact for
+#'   `"slot"` and for `"slot_averaging"` up to `K = set_size`. Above capacity,
+#'   slot averaging gives an item several slots and raises its precision,
+#'   which these functions do not model.
 #' @param p_nt Vector of probabilities of a non-target response, summed over
 #'   the non-targets, which share it equally. For a [mixture3p()] fit these are
 #'   `thetant` on its native scale (version `"simple"`) or
-#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions). Unlike
-#'   `ptarget`, `p_mem` and `p_nt` are not conditional on a response from
-#'   memory.
+#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions, with the limit
+#'   for `"slot_averaging"` given under `p_mem`). Unlike `ptarget`, `p_mem` and
+#'   `p_nt` are not conditional on a response from memory.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
@@ -704,10 +873,8 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
-#'   `pmixture3p` gives the cumulative distribution function of the
-#'   three-parameter mixture model, `qmixture3p` gives the quantile function of
-#'   the three-parameter mixture model, and `rmixture3p` gives the random
-#'   generation function for the three-parameter mixture model.
+#'   and `rmixture3p` gives the random generation function for the
+#'   three-parameter mixture model.
 #'
 #' @export
 #'
@@ -858,18 +1025,6 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 
 #' @rdname mixture3p_dist
 #' @export
-pmixture3p <- function(q, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture3p_dist
-#' @export
-qmixture3p <- function(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2) {
-  .NotYetImplemented()
-}
-
-#' @rdname mixture3p_dist
-#' @export
 rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
                        tau = 0) {
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
@@ -893,8 +1048,6 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @name IMMdist
 #'
 #' @param x Vector of observed responses
-#' @param q Vector of quantiles
-#' @param p Vector of probability
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations
 #' @param dist Vector of distances of the item locations to the cued location
@@ -929,10 +1082,8 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
 #' @return `dimm` gives the density of the interference measurement model,
-#'   `pimm` gives the cumulative distribution function of the interference
-#'   measurement model, `qimm` gives the quantile function of the interference
-#'   measurement model, and `rimm` gives the random generation function for the
-#'   interference measurement model.
+#'   and `rimm` gives the random generation function for the interference
+#'   measurement model.
 #'
 #' @export
 #'
@@ -1058,20 +1209,6 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
     .circmix_locations(args$mu, nt, set_size), weights$logw, weights$logw_guess,
     args$kappa, args$tau
   )
-}
-
-#' @rdname IMMdist
-#' @export
-pimm <- function(q, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5) {
-  .NotYetImplemented()
-}
-
-#' @rdname IMMdist
-#' @export
-qimm <- function(p, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
-                 c = 1, a = 0.2, b = 0, s = 2, kappa = 5) {
-  .NotYetImplemented()
 }
 
 #' @rdname IMMdist
@@ -1489,9 +1626,13 @@ rmpt <- function(n, size, pars, mpt_model, tree = NULL, unpack = FALSE,
 #'
 #' @name ddm_dist
 #'
+#' @inheritSection bmm_distributions Vector arguments
 #' @param rt Vector of response times for which the density should be returned
 #' @param response Vector of responses for which the density should be returned
-#' @param n Number of random samples to generate
+#' @param n Number of random samples to generate. Until bmm 1.6.0 at the
+#'   earliest, `n = 1` with parameter vectors still gives one draw per
+#'   element, and an `n` of length above 1 gives `length(n)` draws, each with
+#'   a deprecation warning; pass the number of draws.
 #' @param drift Drift rates of the ddm
 #' @param bound Boundary separation of the ddm
 #' @param ndt Non-decision time of the ddm
@@ -1524,27 +1665,16 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
     vector with 'upper' and 'lower'."
   )
 
-  stopif(
-    length(rt) != length(response),
-    "Different number of RTs and responses passed to dddm. \\
-    Please pass vectors of equal length."
-  )
-
-  # recycle rt/response to match parameter length for log_lik (one observation,
-  # multiple posterior draws)
-  max_len <- max(lengths(list(drift, bound, ndt, zr)))
-
-  if (length(rt) == 1 && max_len > 1) {
-    rt <- rep(rt, max_len)
-    response <- rep(response, max_len)
-  }
-
+  n <- .obs_length(rt, response, drift, bound, ndt, zr)
+  if (n == 0L) return(numeric(0))
+  bound <- rep_len(bound, n)
+  zr <- rep_len(zr, n)
   out <- rtdists::ddiffusion(
-    rt = rt,
-    response = response,
+    rt = rep_len(rt, n),
+    response = rep_len(response, n),
     a = bound,
-    v = drift,
-    t0 = ndt,
+    v = rep_len(drift, n),
+    t0 = rep_len(ndt, n),
     z = zr * bound
   )
 
@@ -1554,18 +1684,58 @@ dddm <- function(rt, response, drift, bound, ndt, zr = 0.5, log = TRUE) {
 #' @name ddm_dist
 #' @export
 rddm <- function(n, drift, bound, ndt, zr = 0.5) {
+  # before bmm 1.5.0 rtdists read an n of length above 1 as its length, as
+  # rnorm() does; the other samplers stopped on it
+  if (length(n) > 1) {
+    warn_deprecated(
+      what = glue("rddm({.call_text(substitute(n), n)}, ...)"),
+      with = glue("rddm({length(n)}, ...)"),
+      since = "1.5.0",
+      details = "`n` is the number of draws, a single number."
+    )
+    n <- length(n)
+  }
+  n_draws <- .n_draws(n)
   max_len <- max(lengths(list(drift, bound, ndt, zr)))
-
-  if (max_len > 1L) {
-    if (!n %in% c(1, max_len)) {
-      stop2("Can only sample exactly once for each condition.")
-    }
-    n <- max_len
+  # until 1.6.0, an n given as exactly 1 with parameter vectors still means one
+  # draw per element, as before 1.5.0; a fraction such as 1.5 stopped then, so
+  # it is read as rnorm() reads it, one draw
+  if (n == 1 && max_len > 1) {
+    # the warning quotes the call with the vector arguments as they were typed
+    exprs <- list(drift = substitute(drift), bound = substitute(bound),
+                  ndt = substitute(ndt), zr = substitute(zr))
+    vectors <- lengths(list(drift, bound, ndt, zr)) > 1
+    texts <- mapply(.call_text, exprs[vectors], list(drift, bound, ndt, zr)[vectors])
+    args <- paste0(names(exprs)[vectors], " = ", texts, collapse = ", ")
+    warn_deprecated(
+      what = glue("rddm({.call_text(substitute(n), n)}, {args}, ...)"),
+      with = glue("rddm({max_len}, {args}, ...)"),
+      since = "1.5.0",
+      details = "`n` is the number of draws; the parameters are recycled to it."
+    )
+    n_draws <- max_len
+  }
+  # rtdists::rdiffusion() cannot draw zero samples
+  if (n_draws == 0) {
+    return(data.frame(rt = numeric(0), response = numeric(0)))
   }
 
-  sim_data <- rtdists::rdiffusion(n = n, a = bound, v = drift, t0 = ndt, z = zr * bound)
-  sim_data$response <- ifelse(sim_data$response == "upper",1,0)
+  bound <- rep_len(bound, n_draws)
+  sim_data <- rtdists::rdiffusion(
+    n = n_draws, a = bound, v = rep_len(drift, n_draws), t0 = rep_len(ndt, n_draws),
+    z = rep_len(zr, n_draws) * bound
+  )
+  sim_data$response <- ifelse(sim_data$response == "upper", 1, 0)
   sim_data
+}
+
+# an argument as typed, for a deprecation warning: a long value passed
+# literally, as do.call() passes it, is shown by its length, since its deparse
+# can run to thousands of characters and warning.length would cut the
+# suggestion off; typed code stays as typed, so the suggestion still runs
+.call_text <- function(expr, value) {
+  text <- gsub("\\s+", " ", deparse1(expr))
+  if (!is.language(expr) && nchar(text) > 60) glue("<{length(value)} values>") else text
 }
 
 #' @title Distribution functions for the censored shifted Wald model (`cswald`)
@@ -1621,7 +1791,7 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #' @export
 dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = c("simple", "crisk"), log = TRUE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   version <- match.arg(version)
 
   stopif(
@@ -1669,7 +1839,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 #' @rdname cswald_dist
 #' @export
 rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   .rcswald(n, drift, bound, ndt, zr, s)
 }
 
@@ -1708,7 +1878,7 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
 #' @export
 pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   q_shifted <- q - ndt
   p <- numeric(length(q))
 
@@ -1766,7 +1936,7 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
 #' @export
 qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
 
   if (log.p) {
     p <- exp(p)
@@ -1834,7 +2004,7 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
   q
 }
 
-validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
+.check_cswald_args <- function(drift, bound, ndt, zr, s) {
   stopif(
     any(bound <= 0),
     "Values for the boundary separation 'bound' must be positive."
@@ -1951,15 +2121,22 @@ times_nonzero <- function(count, log_prob) {
 #'   upper boundary.
 #'
 #' @name ezdm_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param mean_rt Observed mean reaction time(s) in seconds. For version
-#'   "3par", a numeric vector or single value. For version "4par", either a vector
-#'   of length 2 (c(mean_rt_upper, mean_rt_lower)) for single observation, or a matrix with 2
-#'   columns for multiple observations.
+#'   "3par", a numeric vector or single value. For version "4par", either a
+#'   vector of length 2, `c(mean_rt_upper, mean_rt_lower)`, for one
+#'   observation, or a matrix with 2 columns and one row per observation. A
+#'   vector is recycled as one observation, also when `var_rt` is a matrix. A
+#'   data frame is read as the matrix of its rows. For no observations, pass
+#'   a matrix with zero rows and 2 columns; an empty vector stops.
 #' @param var_rt Observed variance of reaction times in seconds^2. For version
-#'   "3par", a numeric vector or single value. For version "4par", either a vector
-#'   of length 2 (c(var_rt_upper, var_rt_lower)) for single observation, or a matrix with 2
-#'   columns for multiple observations.
+#'   "3par", a numeric vector or single value. For version "4par", either a
+#'   vector of length 2, `c(var_rt_upper, var_rt_lower)`, for one observation,
+#'   or a matrix with 2 columns and one row per observation. A vector is
+#'   recycled as one observation, also when `mean_rt` is a matrix. A data
+#'   frame is read as the matrix of its rows. For no observations, pass a
+#'   matrix with zero rows and 2 columns; an empty vector stops.
 #' @param n_upper Number of responses to the upper boundary
 #' @param n_trials Total number of trials
 #' @param drift Drift rate (evidence accumulation rate; can be positive or negative
@@ -2079,6 +2256,50 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
 
   .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
 
+  if (version == "4par") {
+    # a data frame is read as the matrix of its rows, as counts are; a
+    # data-frame var_rt beside a matrix mean_rt ran so before bmm 1.5.0
+    if (is.data.frame(mean_rt)) mean_rt <- as.matrix(mean_rt)
+    if (is.data.frame(var_rt)) var_rt <- as.matrix(var_rt)
+    empty_vector <- function(x) !is.matrix(x) && length(x) == 0
+    stopif(
+      empty_vector(mean_rt) || empty_vector(var_rt),
+      "mean_rt or var_rt is an empty vector, but a vector of the upper and lower \\
+      summaries is one observation. For no observations, pass matrices with zero \\
+      rows and 2 columns."
+    )
+    # any other object of length 2 is one observation; a 2 x 1 var_rt beside
+    # a vector mean_rt ran so before bmm 1.5.0
+    is_pair <- function(x) (is.matrix(x) && ncol(x) == 2) || length(x) == 2
+    stopif(
+      !is_pair(mean_rt) || !is_pair(var_rt),
+      "mean_rt and var_rt must be length 2 (one observation) or matrices with 2 columns"
+    )
+    # a vector holds the upper and lower summaries of one observation, so it
+    # recycles as one row beside a matrix
+    mean_rt <- matrix(mean_rt, ncol = 2)
+    var_rt <- matrix(var_rt, ncol = 2)
+  } else {
+    # one mean_rt and one var_rt per observation: a matrix is read element by
+    # element and the result is a plain vector, as before bmm 1.5.0
+    mean_rt <- as.vector(mean_rt)
+    var_rt <- as.vector(var_rt)
+  }
+
+  # zr is not a parameter of version "3par", so it does not set the length there
+  n <- if (version == "4par") {
+    .obs_length(n_upper, n_trials, drift, bound, ndt, s, zr, rows = list(mean_rt, var_rt))
+  } else {
+    .obs_length(n_upper, n_trials, drift, bound, ndt, s, rows = list(mean_rt, var_rt))
+  }
+  if (n == 0L) {
+    return(numeric(0))
+  }
+
+  # the count checks compare recycled vectors, so that lengths that are not
+  # multiples of each other recycle silently, as the contract requires
+  n_upper <- rep_len(n_upper, n)
+  n_trials <- rep_len(n_trials, n)
   stopif(isTRUE(any(n_upper < 0)), "n_upper cannot be negative")
   stopif(isTRUE(any(n_upper > n_trials)), "n_upper cannot exceed n_trials")
   stopif(
@@ -2086,25 +2307,16 @@ dezdm <- function(mean_rt, var_rt, n_upper, n_trials,
     "n_upper and n_trials must be whole numbers"
   )
 
-  if (version == "4par") {
-    if (!is.matrix(mean_rt)) {
-      stopif(
-        length(mean_rt) != 2 || length(var_rt) != 2,
-        "mean_rt and var_rt must be length 2 or matrices with 2 cols"
-      )
-    } else {
-      stopif(ncol(mean_rt) != 2, "mean_rt matrix must have 2 columns")
-      stopif(ncol(var_rt) != 2, "var_rt matrix must have 2 columns")
-    }
-    ll <- .dezdm_4par(
-      mean_rt, var_rt, n_upper, n_trials,
-      drift, bound, ndt, zr, s
-    )
+  mean_rt <- .recycle_obs(mean_rt, n)
+  var_rt <- .recycle_obs(var_rt, n)
+  drift <- rep_len(drift, n)
+  bound <- rep_len(bound, n)
+  ndt <- rep_len(ndt, n)
+  s <- rep_len(s, n)
+  ll <- if (version == "4par") {
+    .dezdm_4par(mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, rep_len(zr, n), s)
   } else {
-    ll <- .dezdm_3par(
-      mean_rt, var_rt, n_upper, n_trials,
-      drift, bound, ndt, s
-    )
+    .dezdm_3par(mean_rt, var_rt, n_upper, n_trials, drift, bound, ndt, s)
   }
 
   if (!log) {
@@ -2120,7 +2332,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   version <- match.arg(version)
 
   .check_ezdm_args(bound, ndt, s, zr, n_trials, version)
-  stopif(length(n) > 1, "n must be a single integer")
+  n <- .n_draws(n)
 
   if (version == "4par") {
     .rezdm_4par(n, n_trials, drift, bound, ndt, zr, s)
@@ -2140,29 +2352,9 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   )
 }
 
-# Internal: 3par density - vectorized
-# Handles both: (1) vector observations with scalar parameters, and
-#               (2) scalar observations with vector parameters (for log_lik)
+# Internal: 3par density; dezdm() has recycled every argument to one length
 .dezdm_3par <- function(mean_rt, var_rt, n_upper, n_trials,
                         drift, bound, ndt, s) {
-  # determine common length from observations AND parameters
-  # this allows log_lik to work (scalar obs, vector params)
-  n <- max(
-    length(mean_rt), length(var_rt), length(n_upper),
-    length(n_trials), length(drift), length(bound),
-    length(ndt), length(s)
-  )
-
-  # recycle all inputs to common length
-  mean_rt <- rep_len(mean_rt, n)
-  var_rt <- rep_len(var_rt, n)
-  n_upper <- rep_len(n_upper, n)
-  n_trials <- rep_len(n_trials, n)
-  ndt <- rep_len(ndt, n)
-  drift <- rep_len(drift, n)
-  bound <- rep_len(bound, n)
-  s <- rep_len(s, n)
-
   # a symmetric start point makes the decision time independent of the boundary
   # hit, so all n_trials responses inform one set of cumulants
   moments <- .ezdm_moments_3par(drift, bound, s)
@@ -2177,67 +2369,20 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
     )
 }
 
-# Internal: 4par density - vectorized
-# Handles both: (1) vector observations with scalar parameters, and
-#               (2) scalar observations with vector parameters (for log_lik)
-# mean_rt, var_rt: matrices with 2 columns (upper, lower) and n rows
-#                  OR vectors of length 2 for single observation
-# n_upper, n_trials: vectors of length n (or scalars for single obs)
-# drift, bound, ndt, zr, s: scalars or vectors (recycled)
+# Internal: 4par density; dezdm() has recycled every argument to one length,
+# mean_rt and var_rt to matrices with the upper and lower summaries as columns
 .dezdm_4par <- function(mean_rt, var_rt, n_upper, n_trials,
                         drift, bound, ndt, zr, s) {
-  # handle single observation (vectors) vs multiple (matrices)
-  if (is.matrix(mean_rt)) {
-    n_obs <- nrow(mean_rt)
-    mean_rt_upper <- mean_rt[, 1]
-    mean_rt_lower <- mean_rt[, 2]
-    var_rt_upper <- var_rt[, 1]
-    var_rt_lower <- var_rt[, 2]
-  } else {
-    # single observation - length 2 vectors
-    n_obs <- 1
-    mean_rt_upper <- mean_rt[1]
-    mean_rt_lower <- mean_rt[2]
-    var_rt_upper <- var_rt[1]
-    var_rt_lower <- var_rt[2]
-  }
-
-  # determine common length from observations AND parameters
-
-  # this allows log_lik to work (scalar obs, vector params)
-  n <- max(
-    n_obs, length(n_upper), length(n_trials),
-    length(drift), length(bound), length(ndt),
-    length(zr), length(s)
-  )
-
-  # recycle observation values to common length
-  mean_rt_upper <- rep_len(mean_rt_upper, n)
-  mean_rt_lower <- rep_len(mean_rt_lower, n)
-  var_rt_upper <- rep_len(var_rt_upper, n)
-  var_rt_lower <- rep_len(var_rt_lower, n)
-  n_upper <- rep_len(n_upper, n)
-  n_trials <- rep_len(n_trials, n)
+  mean_rt_upper <- mean_rt[, 1]
+  mean_rt_lower <- mean_rt[, 2]
+  var_rt_upper <- var_rt[, 1]
+  var_rt_lower <- var_rt[, 2]
 
   n_lower <- n_trials - n_upper
   moments <- .ezdm_moments_4par(drift, bound, zr, s)
-
-  # recycle moments and ndt to common length
-  mdt_upper <- rep_len(moments$mdt_upper, n)
-  mdt_lower <- rep_len(moments$mdt_lower, n)
-  vrt_upper <- rep_len(moments$vrt_upper, n)
-  vrt_lower <- rep_len(moments$vrt_lower, n)
-  k3_upper <- rep_len(moments$k3_upper, n)
-  k3_lower <- rep_len(moments$k3_lower, n)
-  k4_upper <- rep_len(moments$k4_upper, n)
-  k4_lower <- rep_len(moments$k4_lower, n)
-  ndt <- rep_len(ndt, n)
-
-  b_upper <- rep_len(zr * bound, n)
-  b_lower <- rep_len((1 - zr) * bound, n)
   ll <- .ez_binomial_logit(
     n_upper, n_trials,
-    .ezdm_logit_pc(b_upper, b_lower, rep_len(drift / s^2, n))
+    .ezdm_logit_pc(zr * bound, (1 - zr) * bound, drift / s^2)
   )
 
   # a boundary with fewer than two responses has no sample variance, and one
@@ -2256,7 +2401,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   if (any(upper_valid)) {
     ll[upper_valid] <- ll[upper_valid] + boundary_ll(
       upper_valid, mean_rt_upper, var_rt_upper, n_upper,
-      mdt_upper, vrt_upper, k3_upper, k4_upper
+      moments$mdt_upper, moments$vrt_upper, moments$k3_upper, moments$k4_upper
     )
   }
 
@@ -2264,7 +2409,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
   if (any(lower_valid)) {
     ll[lower_valid] <- ll[lower_valid] + boundary_ll(
       lower_valid, mean_rt_lower, var_rt_lower, n_lower,
-      mdt_lower, vrt_lower, k3_lower, k4_lower
+      moments$mdt_lower, moments$vrt_lower, moments$k3_lower, moments$k4_lower
     )
   }
 
@@ -2904,6 +3049,7 @@ sdt_bias <- function(hit_rate, fa_rate,
 #'   out of a fixed number of trials (a binomial likelihood).
 #'
 #' @name sdt_yn_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param n_old Integer vector. Number of "old"/"signal" responses.
 #' @param n_trials Integer vector. Total number of trials per cell.
@@ -2973,15 +3119,28 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(n_old < 0), "n_old must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
-  stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
   # %in% compares a factor as character, so the value check below passes and the
-  # arithmetic in .sdt_eta() then returns a silent NA
-  stopif(!is.numeric(stimulus) && !is.logical(stimulus),
+  # arithmetic in .sdt_eta() then returns a silent NA; NULL is an empty argument
+  stopif(!is.null(stimulus) && !is.numeric(stimulus) && !is.logical(stimulus),
          "stimulus must be numeric or logical, coded 0 (noise) or 1 (signal); \\
          found {class(stimulus)[1]}")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  n <- .obs_length(n_old, n_trials, stimulus, d, sdratio, optional = list(criterion, bias))
+  if (n == 0L) return(numeric(0))
+  # the counts carry the shape, the parameters do not: lchoose(n_trials, n_old)
+  # gave the result those of n_trials, or of n_old when it was longer, before
+  # bmm 1.5.0
+  shape <- .obs_template(n, n_trials, if (length(n_old) > length(n_trials)) n_old)
+  n_old <- rep_len(n_old, n)
+  n_trials <- rep_len(n_trials, n)
+  stopif(any(n_old > n_trials), "n_old must not exceed n_trials")
+  stimulus <- rep_len(stimulus, n)
+  d <- rep_len(d, n)
+  sdratio <- rep_len(sdratio, n)
+  if (!is.null(criterion)) criterion <- rep_len(criterion, n)
+  if (!is.null(bias)) bias <- rep_len(bias, n)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)
 
   eta <- .sdt_eta(d, criterion, stimulus, sdratio)
@@ -2991,7 +3150,8 @@ dsdt_yn <- function(n_old, n_trials, stimulus, d, criterion = NULL,
   out <- lchoose(n_trials, n_old) +
     times_nonzero(n_old, .sdt_log_p_old(eta, dist)) +
     times_nonzero(n_trials - n_old, .sdt_log_p_new(eta, dist))
-  if (log) out else exp(out)
+  shape[] <- if (log) out else exp(out)
+  shape
 }
 
 
@@ -3008,7 +3168,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
                     bias = NULL, sdratio = 1,
                     dist = c("normal", "gumbel_min", "gumbel_max", "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(!is.numeric(stimulus) && !is.logical(stimulus),
          "stimulus must be numeric or logical, coded 0 (noise) or 1 (signal); \\
@@ -3016,10 +3176,16 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  # a NULL d or sdratio gave NA draws before bmm 1.5.0, as an empty one does;
+  # rep_len() keeps a factor a factor, so that it still gives NA draws
+  d <- rep_len(if (is.null(d)) NA_real_ else d, n)
+  sdratio <- rep_len(if (is.null(sdratio)) NA_real_ else sdratio, n)
+  if (!is.null(criterion)) criterion <- rep_len(criterion, n)
+  if (!is.null(bias)) bias <- rep_len(bias, n)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, sdratio)
 
-  eta <- .sdt_eta(d, criterion, stimulus, sdratio)
-  stats::rbinom(n, n_trials, exp(.sdt_log_p_old(eta, dist)))
+  eta <- .sdt_eta(d, criterion, rep_len(stimulus, n), sdratio)
+  stats::rbinom(n, rep_len(n_trials, n), exp(.sdt_log_p_old(eta, dist)))
 }
 
 
@@ -3219,6 +3385,7 @@ rsdt_yn <- function(n, n_trials, stimulus, d, criterion = NULL,
 #'   here `Ro`/`Rn` are supplied directly as probabilities in `[0, 1]`.
 #'
 #' @name sdt_dpsdt_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @inheritParams sdt_rating_dist
 #' @param Ro Numeric vector in `[0, 1]`. Recollection probability for old
@@ -3256,7 +3423,7 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
                        log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
   thr <- rbind(thresholds)
@@ -3267,11 +3434,9 @@ dsdt_dpsdt <- function(counts, stimulus, d, thresholds, Ro, Rn = 0,
   stopif(any(Ro < 0 | Ro > 1), "Ro must be a probability in [0, 1]")
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
 
-  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus),
-           length(Ro), length(Rn))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  n <- .obs_length(stimulus, d, sdratio, Ro, Rn, rows = list(counts, thr))
+  if (n == 0L) return(numeric(0))
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3300,7 +3465,7 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3308,6 +3473,10 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
   stopif(any(Rn < 0 | Rn > 1), "Rn must be a probability in [0, 1]")
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
+  counts <- .count_matrix(n, paste0("r", seq_len(ncol(rbind(thresholds)) + 1L)))
+  if (n == 0) {
+    return(counts)
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_dpsdt_category_probs(rbind(thresholds),
                                            rep_len(d, n),
@@ -3316,8 +3485,6 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
                                            stats::qlogis(rep_len(Ro, n)),
                                            stats::qlogis(rep_len(Rn, n))))
 
-  K <- ncol(probs)
-  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
@@ -3336,6 +3503,7 @@ rsdt_dpsdt <- function(n, n_trials, stimulus, d, thresholds, Ro, Rn = 0,
 #'   be even (an odd number of `thresholds`).
 #'
 #' @name sdt_metad_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @inheritParams sdt_rating_dist
 #' @param metad Numeric vector. Metacognitive sensitivity (type-2 sensitivity),
@@ -3367,7 +3535,7 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
                        log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
   thr <- rbind(thresholds)
@@ -3379,11 +3547,9 @@ dsdt_metad <- function(counts, stimulus, d, thresholds, metad,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- max(nrow(counts), length(d), length(metad), length(sdratio),
-           length(stimulus))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  n <- .obs_length(stimulus, d, metad, sdratio, rows = list(counts, thr))
+  if (n == 0L) return(numeric(0))
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3410,7 +3576,7 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
                        dist = c("normal", "gumbel_min", "gumbel_max",
                                 "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -3420,6 +3586,10 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
          boundary with confidence levels on either side, so an odd number \\
          of thresholds")
 
+  counts <- .count_matrix(n, paste0("r", seq_len(ncol(rbind(thresholds)) + 1L)))
+  if (n == 0) {
+    return(counts)
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_metad_category_probs(rbind(thresholds),
                                            rep_len(d, n),
@@ -3427,8 +3597,6 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
                                            rep_len(stimulus, n), dist,
                                            rep_len(metad, n)))
 
-  K <- ncol(probs)
-  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
@@ -3446,6 +3614,7 @@ rsdt_metad <- function(n, n_trials, stimulus, d, thresholds, metad,
 #'   generates (or evaluates) one observation per element.
 #'
 #' @name sdt_mafc_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param n_correct Integer vector. Number of correct responses.
 #' @param n_trials Integer vector. Total number of trials per observation.
@@ -3485,7 +3654,8 @@ dsdt_mafc <- function(n_correct, n_trials, m, d,
   stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(m < 2), "m must be an integer >= 2")
 
-  n <- max(lengths(list(n_correct, n_trials, m, d)))
+  n <- .obs_length(n_correct, n_trials, m, d)
+  if (n == 0L) return(numeric(0))
   n_correct <- rep_len(n_correct, n)
   n_trials <- rep_len(n_trials, n)
 
@@ -3511,9 +3681,13 @@ rsdt_mafc <- function(n, n_trials, m, d,
                       dist = c("normal", "gumbel_min", "gumbel_max",
                                "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  n <- .n_draws(n)
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(n_trials < 1), "n_trials must be positive")
+  # the gumbel_min logit takes max(m) of the recycled m, which is empty here
+  if (n == 0) {
+    return(integer(0))
+  }
 
   # the logit is the scale dsdt_mafc() evaluates on, and plogis() cannot leave
   # [0, 1]; .mafc_pc_r() can, and does -- its gumbel_min lgamma difference has
@@ -3718,10 +3892,12 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'   (numerical integration).
 #'
 #' @name sdt_ranking_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param counts Integer matrix with one row per observation and one rank-count
 #'   column per rank position (1 = most likely target), or a vector for a
-#'   single observation. Columns beyond a row's set size `m` must be 0.
+#'   single observation. A data frame is read as the matrix of its rows.
+#'   Columns beyond a row's set size `m` must be 0.
 #' @param d Numeric vector. Sensitivity: the distance between the target and
 #'   lure distributions. It is \eqn{d'} when `sdratio` is 1 and, for
 #'   `dist = "gumbel_min"`, the \eqn{g'} of Meyer-Grant et al. (2026). With
@@ -3730,8 +3906,9 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #' @param m Integer vector. Number of ranked items per observation. Must be
 #'   at least 2 and no larger than the number of count columns.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). Must be positive. Only used when
-#'   `dist = "normal"`.
+#'   (default 1, i.e., equal variance). Must be positive. Read only with
+#'   `dist = "normal"`; with `dist = "gumbel_min"` any value other than 1
+#'   stops.
 #' @param dist Character. The distribution assumed for the latent evidence:
 #'   "gumbel_min" (default), the smallest extreme value distribution with
 #'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
@@ -3743,9 +3920,10 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #'
 #' @return `dsdt_ranking` returns the (log-)density (multinomial probability).
 #'   `rsdt_ranking` returns an integer matrix with one row per observation and
-#'   one rank-count column per rank position (`rank1` ... `rank max(m)`); rows
-#'   with a smaller set size have structural zeros in the surplus columns,
-#'   matching the wide format [sdt_ranking()] expects.
+#'   one rank-count column per rank position, `rank1` to `rank<M>`, where `M`
+#'   is the largest `m` of the draws; with `n = 0` it is the largest of all
+#'   `m` given. Rows with a smaller set size have structural zeros in the
+#'   surplus columns, matching the wide format [sdt_ranking()] expects.
 #'
 #' @section Parameter scales:
 #' These functions take `sdratio` as the ratio itself, while [sdt_ranking()]
@@ -3771,8 +3949,13 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
                          log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
-  n <- nrow(counts)
+  stopif(dist == "gumbel_min" && any(sdratio != 1),
+         "sdratio is read only with dist = \"normal\"; with dist = \"gumbel_min\" \\
+         it must be 1. Use dist = \"normal\" for unequal-variance ranking.")
+  counts <- .counts_rows(counts)
+  n <- .obs_length(m, d, sdratio, rows = list(counts))
+  if (n == 0L) return(numeric(0))
+  counts <- .recycle_obs(counts, n)
   stopif(anyNA(m), "m must not contain NA")
   m <- rep_len(as.integer(m), n)
   d <- rep_len(d, n)
@@ -3809,18 +3992,24 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
 rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
                          dist = c("gumbel_min", "normal")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  stopif(dist == "gumbel_min" && any(sdratio != 1),
+         "sdratio is read only with dist = \"normal\"; with dist = \"gumbel_min\" \\
+         it must be 1. Use dist = \"normal\" for unequal-variance ranking.")
 
+  # with no draws the columns follow the largest set size given
+  if (n == 0) {
+    return(.count_matrix(0, paste0("rank", seq_len(max(m)))))
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   m <- rep_len(as.integer(m), n)
   d <- rep_len(d, n)
   sdratio <- rep_len(sdratio, n)
 
-  counts <- matrix(0L, n, max(m),
-                   dimnames = list(NULL, paste0("rank", seq_len(max(m)))))
+  counts <- .count_matrix(n, paste0("rank", seq_len(max(m))))
   for (m_i in unique(m)) {
     idx <- which(m == m_i)
     probs <- rbind(.ranking_all_probs_r(d[idx], m_i, dist,
@@ -4091,10 +4280,12 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
 #'   ordered rating categories (multinomial likelihood).
 #'
 #' @name sdt_rating_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param counts Integer matrix with one row per observation and one column
 #'   per rating category, ordered from "definitely noise" (1) to "definitely
-#'   signal" (K), or a vector for a single observation.
+#'   signal" (K), or a vector for a single observation. A data frame is read
+#'   as the matrix of its rows.
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = noise, 1 = signal.
 #' @param d Numeric vector. Sensitivity: \eqn{d'} when `sdratio` is 1, and
 #'   otherwise the balanced index \eqn{d_a} (see [sdt_yn()]). The separation
@@ -4142,7 +4333,7 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
                         log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   K <- ncol(counts)
   thr <- rbind(thresholds)
@@ -4151,10 +4342,9 @@ dsdt_rating <- function(counts, stimulus, d, thresholds,
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- max(nrow(counts), length(d), length(sdratio), length(stimulus))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  n <- .obs_length(stimulus, d, sdratio, rows = list(counts, thr))
+  if (n == 0L) return(numeric(0))
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -4181,19 +4371,21 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
                         dist = c("normal", "gumbel_min", "gumbel_max",
                                  "logistic")) {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
   stopif(any(sdratio <= 0), "sdratio must be positive")
 
+  counts <- .count_matrix(n, paste0("r", seq_len(ncol(rbind(thresholds)) + 1L)))
+  if (n == 0) {
+    return(counts)
+  }
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_category_probs(rbind(thresholds), rep_len(d, n),
                                      rep_len(sdratio, n),
                                      rep_len(stimulus, n), dist))
 
-  K <- ncol(probs)
-  counts <- matrix(0L, n, K, dimnames = list(NULL, paste0("r", seq_len(K))))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
@@ -4503,6 +4695,37 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 }
 
 
+# kcrit switches the Know/Guess split, and with it the number of response
+# categories, for the whole call
+.cdp_has_guess <- function(kcrit) {
+  if (is.null(kcrit)) {
+    return(FALSE)
+  }
+  stopif(
+    length(kcrit) == 0,
+    "kcrit is empty. Pass kcrit = NULL for the R/K model, or one value per \\
+    observation (or one for all) for the R/K/G model."
+  )
+  all(is.finite(kcrit))
+}
+
+# A kcrit with any non-finite element gave R/K without a word before bmm 1.5.0,
+# also an element past the n observations; it still does, with a warning. The
+# warning needs an observation that asks for the split, one whose own kcrit is
+# finite, but the split is decided from every element, read or not
+.warn_cdp_kcrit_mixed <- function(kcrit, has_guess, n) {
+  if (!is.null(kcrit) && !has_guess && any(is.finite(rep_len(kcrit, n)))) {
+    warning2(
+      "Some kcrit values are not finite, so the Know/Guess split is off for \\
+      the whole call: every observation uses the remember/know (R/K) model, \\
+      also those whose kcrit is finite. Values past the last observation \\
+      count as well. Pass only finite kcrit values for R/K/G, or kcrit = NULL \\
+      for R/K."
+    )
+  }
+}
+
+
 #' @title Distribution functions for Continuous Dual-Process SDT (CDP)
 #' @description Density and random generation for the continuous dual-process
 #'   signal detection theory model (Wixted & Mickes, 2010). Two correlated
@@ -4514,11 +4737,13 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #'   [sdt_cdp()] for the model and [sdt_rating()] when no R/K split is
 #'   available.
 #' @name sdt_cdp_dist
+#' @inheritSection bmm_distributions Vector arguments
 #' @param counts Integer matrix with one row per observation and one column per
 #'   response category in the canonical order `new`, `[guess]`, `know`,
 #'   `remember` (each block ordered by confidence; see [sdt_cdp()]), or a
-#'   vector for a single observation. `n_new + 2 * n_old` columns (R/K) or
-#'   `n_new + 3 * n_old` (R/K/G).
+#'   vector for a single observation. A data frame is read as the matrix of
+#'   its rows. `n_new + 2 * n_old` columns (R/K) or `n_new + 3 * n_old`
+#'   (R/K/G).
 #' @param stimulus Integer vector (0/1). Stimulus type: 0 = new/lure,
 #'   1 = old/target.
 #' @param dfam,drec Numeric vectors. Familiarity and recollection
@@ -4532,8 +4757,16 @@ rsdt_rating <- function(n, n_trials, stimulus, d, thresholds,
 #'   thresholds on the aggregate F+R axis, or a matrix with one row per
 #'   observation.
 #' @param rcrit Numeric vector. Remember criterion on the recollection axis.
-#' @param kcrit Know criterion on the familiarity axis. `NULL` (default) for
-#'   the R/K model; finite values enable the R/K/G model.
+#' @param kcrit Know criterion on the familiarity axis. `NULL` (default), or
+#'   a non-finite value for every observation, gives the R/K model; finite
+#'   values for every observation give the R/K/G model. A `kcrit` with any
+#'   non-finite element gives the R/K model for the whole call, also for the
+#'   observations whose `kcrit` is finite, and warns when there are such
+#'   observations. Every element counts, also one past the last observation:
+#'   with one draw, `kcrit = c(0.2, Inf)` gives R/K and a warning. The length
+#'   of `kcrit` sets the number of observations only when
+#'   every element is finite (the R/K/G model): with one row of `counts`,
+#'   `kcrit = c(0.2, 0.3)` gives two values and `kcrit = c(0.2, Inf)` one.
 #' @param sigmar Numeric vector. Log SD of the recollection target
 #'   distribution (0 = SD 1).
 #' @param rho Numeric vector. F-R correlation on the unconstrained scale;
@@ -4571,26 +4804,27 @@ dsdt_cdp <- function(counts, stimulus, dfam, drec, thresholds,
                      rcrit, kcrit = NULL, sigmar = 0, rho = 0,
                      n_new = NULL, dist = "normal", log = FALSE) {
   dist <- match.arg(dist)
-  counts <- rbind(counts)
+  counts <- .counts_rows(counts)
   dimnames(counts) <- NULL
   thr <- rbind(thresholds)
   K_full <- ncol(thr) + 1L
   if (is.null(n_new)) n_new <- K_full %/% 2L
   n_old <- K_full - n_new
-  has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
+  has_guess <- .cdp_has_guess(kcrit)
   expected <- n_new + (if (has_guess) 3L else 2L) * n_old
   stopif(ncol(counts) != expected, "counts must have {expected} columns")
   stopif(anyNA(counts), "counts must not contain NA")
   stopif(any(counts < 0), "counts must be non-negative")
 
-  n <- max(nrow(counts), length(stimulus), length(dfam), length(drec),
-           length(sigmar), length(rho), length(rcrit))
-  if (nrow(counts) != n) {
-    counts <- counts[rep_len(seq_len(nrow(counts)), n), , drop = FALSE]
-  }
+  # a kcrit that leaves the Know/Guess split off is not read
+  n <- .obs_length(stimulus, dfam, drec, sigmar, rho, rcrit,
+                   rows = list(counts, thr), optional = list(if (has_guess) kcrit))
+  if (n == 0L) return(numeric(0))
+  counts <- .recycle_obs(counts, n)
   stimulus <- rep_len(stimulus, n)
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
+  .warn_cdp_kcrit_mixed(kcrit, has_guess, n)
 
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),
                                          rep_len(drec, n),
@@ -4619,7 +4853,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
                      rcrit, kcrit = NULL, sigmar = 0, rho = 0,
                      n_new = NULL, dist = "normal") {
   dist <- match.arg(dist)
-  stopif(length(n) != 1 || n < 1, "n must be a single positive integer")
+  n <- .n_draws(n)
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(!stimulus %in% c(0L, 1L)),
          "stimulus must be 0 (noise) or 1 (signal)")
@@ -4628,7 +4862,12 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
   K_full <- ncol(thr) + 1L
   if (is.null(n_new)) n_new <- K_full %/% 2L
   n_old <- K_full - n_new
-  has_guess <- !is.null(kcrit) && all(is.finite(kcrit))
+  has_guess <- .cdp_has_guess(kcrit)
+  counts <- .count_matrix(n, .sdt_cdp_response_cols(n_new, n_old, has_guess))
+  if (n == 0) {
+    return(counts)
+  }
+  .warn_cdp_kcrit_mixed(kcrit, has_guess, n)
 
   n_trials <- rep_len(as.integer(n_trials), n)
   probs <- rbind(.sdt_cdp_category_probs(thr, rep_len(dfam, n),
@@ -4636,12 +4875,205 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
                                          rep_len(sigmar, n), rep_len(rcrit, n),
                                          kcrit, rep_len(stimulus, n),
                                          n_new, n_old, dist, rep_len(rho, n)))
-  cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess)
-  counts <- matrix(0L, n, ncol(probs), dimnames = list(NULL, cols))
   for (i in seq_len(n)) {
     counts[i, ] <- as.integer(stats::rmultinom(1, n_trials[i], probs[i, ]))
   }
   counts
+}
+
+
+############################################################################# !
+# PSYCHOMETRIC FUNCTION DISTRIBUTION FUNCTIONS                            ####
+############################################################################# !
+
+# Each sigmoid is a standard CDF from .sdt_dists read on the linear or on the
+# log stimulus axis; weibull is gumbel_min on log intensity, as in MATLAB
+# psignifit 4 (Python psignifit's weibull is its gumbel on the linear axis and
+# leaves the log transform of the intensities to the user).
+# The order is the order of the `sigmoid` argument, normal first as its default.
+.psychometric_sigmoids <- list(
+  normal      = list(dist = "normal",     log_x = FALSE),
+  logistic    = list(dist = "logistic",   log_x = FALSE),
+  gumbel_min  = list(dist = "gumbel_min", log_x = FALSE),
+  gumbel_max  = list(dist = "gumbel_max", log_x = FALSE),
+  weibull     = list(dist = "gumbel_min", log_x = TRUE),
+  lognormal   = list(dist = "normal",     log_x = TRUE),
+  loglogistic = list(dist = "logistic",   log_x = TRUE)
+)
+
+# Standard-axis location of the midpoint (F = 0.5) and the standard-axis span
+# from F = 0.05 to F = 0.95, which `width` covers on the stimulus axis
+.psychometric_z_constants <- function(sigmoid) {
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  c(zmid = qf(0.5), zspan = qf(0.95) - qf(0.05))
+}
+
+.psychometric_z <- function(intensity, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  dx <- if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    log(intensity) - log(midpoint)
+  } else {
+    intensity - midpoint
+  }
+  k[["zmid"]] + k[["zspan"]] * dx / width
+}
+
+# Stimulus intensity at which the sigmoid F reaches f, the inverse of
+# .psychometric_z() followed by F
+.psychometric_x_at <- function(f, midpoint, width, sigmoid) {
+  k <- .psychometric_z_constants(sigmoid)
+  qf <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]$qf
+  dx <- (qf(f) - k[["zmid"]]) * width / k[["zspan"]]
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) midpoint * exp(dx) else midpoint + dx
+}
+
+# log P(1) and log P(0) on the log scale, as in psychometric_function_log_lik() in
+# inst/stan_chunks/psychometric_function_functions.stan:
+#   psi     = guess + (1 - guess) (1 - lapse) F(z)
+#   1 - psi = (1 - guess) (lapse + (1 - lapse) (1 - F(z)))
+# The probability scale rounds psi to 0 or 1 in the tails, where Stan stays
+# finite, and a guess or lapse of exactly 0 must give log(0) = -Inf, not NaN.
+.psychometric_log_probs <- function(intensity, midpoint, width, guess, lapse,
+                                    sigmoid) {
+  dist <- .sdt_dists[[.psychometric_sigmoids[[sigmoid]]$dist]]
+  z <- .psychometric_z(intensity, midpoint, width, sigmoid)
+  list(
+    one = log_sum_exp(log(guess), log1p(-guess) + log1p(-lapse) + dist$lcdf(z)),
+    zero = log1p(-guess) + log_sum_exp(log(lapse), log1p(-lapse) + dist$lccdf(z))
+  )
+}
+
+.psychometric_check_pars <- function(intensity, midpoint, width, guess, lapse,
+                                     sigmoid) {
+  stopif(anyNA(c(intensity, midpoint, width, guess, lapse)),
+         "intensity, midpoint, width, guess and lapse must not contain NA")
+  stopif(any(width <= 0), "width must be positive")
+  stopif(any(guess < 0 | guess >= 1), "guess must be in [0, 1)")
+  stopif(any(lapse < 0 | lapse >= 1), "lapse must be in [0, 1)")
+  if (.psychometric_sigmoids[[sigmoid]]$log_x) {
+    stopif(any(intensity <= 0),
+           "intensity must be positive for sigmoid = '{sigmoid}', which reads \\
+           it on the log scale")
+    stopif(any(midpoint <= 0),
+           "midpoint must be positive for sigmoid = '{sigmoid}'")
+  }
+}
+
+#' @title Distribution functions for the psychometric function model
+#'
+#' @description Density and random generation for the [psychometric_function()] model:
+#'   the number of positive responses ("yes", "correct", "longer") out of
+#'   `n_trials` at a stimulus intensity, a binomial with probability
+#'   \deqn{\psi(x) = \gamma + (1 - \gamma)(1 - \lambda) F(x),}{psi(x) = guess + (1 - guess) * (1 - lapse) * F(x),}
+#'   where \eqn{F} is the sigmoid with its midpoint and width.
+#'
+#' @name psychometric_function_dist
+#' @inheritSection bmm_distributions Vector arguments
+#'
+#' @param x Integer vector. Number of positive responses, between 0 and
+#'   `n_trials`.
+#' @param intensity Numeric vector. Stimulus intensity. Must be positive for the
+#'   sigmoids that read it on the log scale (`"weibull"`, `"lognormal"`,
+#'   `"loglogistic"`).
+#' @param midpoint Numeric. Intensity at which the sigmoid \eqn{F} is 0.5, in
+#'   the units of `intensity`. Positive for the log-scale sigmoids.
+#' @param width Numeric, positive. Distance on the intensity axis between the
+#'   points where \eqn{F} is 0.05 and 0.95; for the log-scale sigmoids, in log
+#'   units of intensity.
+#' @param guess Numeric in \[0, 1). Guess rate, the lower asymptote: 0.5 in
+#'   2AFC, `1 / m` in m-AFC.
+#' @param lapse Numeric in \[0, 1). Proportion of trials on which the observer
+#'   does not attend and responds at the guess rate. The upper asymptote is
+#'   `1 - lapse * (1 - guess)`.
+#' @param n_trials Integer vector. Number of trials per observation (default
+#'   1, a single binary response).
+#' @param sigmoid The sigmoid \eqn{F}; see [psychometric_function()].
+#' @param log Logical. If `TRUE`, returns the log-density (default `FALSE`).
+#' @param n Integer. Number of observations to generate. `intensity`,
+#'   `n_trials` and the parameters are recycled to this length. As in
+#'   [stats::rnorm()], a fraction is truncated and `n = 0` gives an empty
+#'   vector; unlike [stats::rnorm()], a vector `n` stops.
+#'
+#' @return `dpsychometric_function()` returns the (log-)density, a binomial probability.
+#'   `rpsychometric_function()` returns an integer vector with the number of positive
+#'   responses per observation.
+#'
+#' @section Parameter scales:
+#' These functions take every argument on the **natural** scale, while
+#' [psychometric_function()] *estimates* `width` on the log scale and `guess` and `lapse`
+#' on the logit scale (and `midpoint` on the log scale for the log-scale
+#' sigmoids). Transform a fitted value back before passing it here.
+#'
+#' @references
+#' Schütt, H. H., Harmeling, S., Macke, J. H., & Wichmann, F. A. (2016).
+#'   Painfree and accurate Bayesian estimation of psychometric functions for
+#'   (potentially) overdispersed data. \emph{Vision Research}, \emph{122},
+#'   105--123. \doi{10.1016/j.visres.2016.02.002}
+#'
+#' Wichmann, F. A., & Hill, N. J. (2001). The psychometric function: I.
+#'   Fitting, sampling, and goodness of fit. \emph{Perception & Psychophysics},
+#'   \emph{63}(8), 1293--1313. \doi{10.3758/BF03194544}
+#'
+#' @keywords distribution
+#' @export
+#' @examples
+#' # Probability of 7 correct out of 10 2AFC trials at the midpoint
+#' dpsychometric_function(7, intensity = 1, midpoint = 1, width = 2, guess = 0.5,
+#'                        n_trials = 10)
+#'
+#' # Simulate a method-of-constant-stimuli experiment with a Weibull observer
+#' dat <- data.frame(contrast = rep(c(0.01, 0.02, 0.04, 0.08, 0.16), 4))
+#' dat$n_correct <- rpsychometric_function(nrow(dat), dat$contrast, midpoint = 0.04,
+#'                                         width = 2, guess = 0.5, lapse = 0.02,
+#'                                         n_trials = 40, sigmoid = "weibull")
+#' head(dat)
+dpsychometric_function <- function(x, intensity, midpoint, width, guess = 0, lapse = 0,
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic"),
+                                   log = FALSE) {
+  sigmoid <- match.arg(sigmoid)
+  stopif(anyNA(x), "x must not contain NA")
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
+  stopif(any(x < 0), "x must be non-negative")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+  n <- .obs_length(x, intensity, midpoint, width, guess, lapse, n_trials)
+  if (n == 0L) return(numeric(0))
+  x <- rep_len(x, n)
+  n_trials <- rep_len(n_trials, n)
+  stopif(any(x > n_trials), "x must not exceed n_trials")
+
+  lp <- .psychometric_log_probs(
+    rep_len(intensity, n), rep_len(midpoint, n), rep_len(width, n),
+    rep_len(guess, n), rep_len(lapse, n), sigmoid
+  )
+  out <- lchoose(n_trials, x) +
+    times_nonzero(x, lp$one) +
+    times_nonzero(n_trials - x, lp$zero)
+  if (log) out else exp(out)
+}
+
+
+#' @rdname psychometric_function_dist
+#' @export
+rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lapse = 0,
+                                   n_trials = 1,
+                                   sigmoid = c("normal", "logistic", "gumbel_min",
+                                               "gumbel_max", "weibull", "lognormal",
+                                               "loglogistic")) {
+  sigmoid <- match.arg(sigmoid)
+  n <- .n_draws(n)
+  stopif(anyNA(n_trials), "n_trials must not contain NA")
+  stopif(any(n_trials < 1), "n_trials must be positive")
+  .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+
+  lp <- .psychometric_log_probs(
+    rep_len(intensity, n), rep_len(midpoint, n), rep_len(width, n),
+    rep_len(guess, n), rep_len(lapse, n), sigmoid
+  )
+  stats::rbinom(n, rep_len(n_trials, n), exp(lp$one))
 }
 
 #' @title Distribution functions for the target confusability competition model
@@ -4654,6 +5086,8 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   of an option the softmax of `d * f(x)` over all options.
 #'
 #' @name tcc_dist
+#'
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param x Vector of response errors in radians; each is binned to the
 #'   nearest option, as [tcc()] does with `units = "radians"`.
@@ -4698,7 +5132,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
                  noise = c("gaussian", "gumbel"), options = NULL) {
   noise <- match.arg(noise)
-  .tcc_check_similarity(similarity, n_options)
+  .check_tcc_args(similarity, n_options)
   if (!is.null(options)) {
     out <- .tcc_dist_options_logp(x, d, similarity, n_options, noise, options)
     return(if (log) out else exp(out))
@@ -4721,7 +5155,8 @@ dtcc <- function(x, d, similarity, n_options = 360, log = FALSE,
 rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbel"),
                  options = NULL) {
   noise <- match.arg(noise)
-  .tcc_check_similarity(similarity, n_options)
+  .check_tcc_args(similarity, n_options)
+  n <- .n_draws(n)
   d <- rep_len(d, n)
   offsets <- if (is.null(options)) {
     seq(-n_options / 2 + 1, n_options / 2)
