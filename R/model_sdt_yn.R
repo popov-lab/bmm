@@ -100,7 +100,8 @@
         criterion = c(0, 1),
         bias      = c(-0.5, 0.5),
         sdratio   = c(0.75, 1.35)
-      )
+      ),
+      functions = list(density = "dsdt_yn", generator = "rsdt_yn")
     ),
     class = c("bmmodel", "sdt", "sdt_yn"),
     call = call
@@ -687,7 +688,7 @@ posterior_predict_sdt_yn <- function(i, prep, ...) {
   criterion <- .sdt_criterion_dpar(prep, d, sdratio, i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  rsdt_yn(length(d), prep$data$trials[i], prep$data$vint1[i],
+  rsdt_yn(prep$ndraws, prep$data$trials[i], prep$data$vint1[i],
               d, criterion, sdratio = sdratio, dist = dist)
 }
 

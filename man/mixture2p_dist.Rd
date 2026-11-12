@@ -3,8 +3,6 @@
 \name{mixture2p_dist}
 \alias{mixture2p_dist}
 \alias{dmixture2p}
-\alias{pmixture2p}
-\alias{qmixture2p}
 \alias{rmixture2p}
 \title{Distribution functions for the two-parameter mixture model (mixture2p)}
 \usage{
@@ -20,10 +18,6 @@ dmixture2p(
   vp_nodes = 81L,
   log = FALSE
 )
-
-pmixture2p(q, mu = 0, kappa = 7, p_mem = 0.8)
-
-qmixture2p(p, mu = 0, kappa = 5, p_mem = 0.6)
 
 rmixture2p(
   n,
@@ -76,18 +70,12 @@ it by name: in bmm 1.4 it was the fifth argument, which is now \code{tau}.
 Until bmm 1.6.0 a logical value in that position is still read as \code{log},
 with a warning.}
 
-\item{q}{Vector of quantiles}
-
-\item{p}{Vector of probability}
-
 \item{n}{Number of observations to generate data for}
 }
 \value{
 \code{dmixture2p} gives the density of the two-parameter mixture model,
-\code{pmixture2p} gives the cumulative distribution function of the
-two-parameter mixture model, \code{qmixture2p} gives the quantile function of
-the two-parameter mixture model, and \code{rmixture2p} gives the random
-generation function for the two-parameter mixture model.
+and \code{rmixture2p} gives the random generation function for the
+two-parameter mixture model.
 }
 \description{
 Density, distribution, and random generation functions for the

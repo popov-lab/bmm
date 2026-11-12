@@ -13,7 +13,36 @@ test_that("sdt_rating takes the number of categories from the response columns",
 
 test_that("sdt_rating model rejects fewer than 3 response columns", {
   expect_error(sdt_rating(c("r1", "r2"), "stimulus"), "more than 2")
-  expect_error(sdt_rating("rating", "stimulus"), "more than 2")
+})
+
+test_that("one rating column with n_ratings declares one row per trial", {
+  trial <- sdt_rating("rating", "stimulus", n_ratings = 6)
+  expect_true(trial$other_vars$trial_level)
+  expect_identical(trial$other_vars$n_ratings, 6L)
+  expect_match(trial$requirements, "one row per trial")
+  expect_identical(.sdt_categories(trial), c("rating1", "rating2", "rating3", "rating4", "rating5", "rating6"))
+  cells <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  expect_false(cells$other_vars$trial_level)
+  expect_identical(.sdt_categories(cells), c("r1", "r2", "r3", "r4"))
+  # the thresholds follow K whichever layout gives it
+  expect_identical(
+    names(sdt_rating("rating", "stimulus", n_ratings = 5, threshold_type = "log_distance")$parameters),
+    names(sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = "log_distance")$parameters)
+  )
+})
+
+test_that("sdt_rating names the layout it recognised when n_ratings does not fit it", {
+  expect_error(sdt_rating("rating", "stimulus"),
+               "response names one column, which declares one row per trial")
+  expect_error(sdt_rating(c("r1", "r2", "r3"), "stimulus", n_ratings = 3),
+               "response names 3 count columns, one per rating category")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 2), "single whole number above 2")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 4.5), "single whole number above 2")
+  expect_error(sdt_rating("conf_rating", "stimulus", n_ratings = 4), "'conf_rating'")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 3, threshold_type = "log_ratio"),
+               "at least 4 rating categories")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 5, version = "metad"),
+               "The scale has 5 categories")
 })
 
 test_that("sdt_rating refuses column names brms cannot turn into parameters", {
@@ -562,4 +591,110 @@ test_that("a rating formula with bias passes anchor 2 and the bias parameter", {
   bf_crit <- bmm:::bmf2bf(model, bmf(d ~ 1, criterion ~ 1, spacing ~ 1))
   expect_match(deparse1(bf_crit$formula), "sdt_rating_logmu(1, 4, 1, 1, 1, d, criterion,",
                fixed = TRUE)
+})
+
+
+############################################################################# !
+# TRIAL-LEVEL DATA                                                       ####
+############################################################################# !
+
+# 2 participants x 2 stimulus types x 6 trials, ratings 1..4
+rating_trials <- function() {
+  data.frame(
+    id = rep(1:2, each = 12), stimulus = rep(rep(0:1, each = 6), 2),
+    rating = c(1, 2, 1, 3, 2, 1,  3, 4, 4, 2, 4, 3,
+               2, 1, 1, 1, 4, 2,  4, 3, 4, 4, 2, 4)
+  )
+}
+
+test_that("trial-level check_data() names the ratings outside 1..n_ratings", {
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  dat <- rating_trials()
+  dat$rating[c(2, 5)] <- c(0, 2.5)
+  expect_error(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+               "the rating column 'rating' must hold one of '1', '2', '3', '4' in every row. Found: '0', '2.5'")
+  dat <- rating_trials()
+  dat$rating[3] <- NA
+  expect_error(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+               "'rating' must not contain NA")
+})
+
+# match() reads TRUE as category 1; the rank column goes through the same helper
+test_that("trial-level check_data() refuses a logical rating or rank column", {
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  dat <- rating_trials()
+  dat$rating <- TRUE
+  expect_error(check_data(model, dat, formula),
+               "The rating column 'rating' is logical (TRUE/FALSE), but it must hold whole numbers from 1 to 4.",
+               fixed = TRUE)
+  dat$rating <- rep(c(TRUE, FALSE), 12)
+  expect_error(check_data(model, dat, formula), "'rating' is logical", fixed = TRUE)
+  ranks <- data.frame(id = 1:4, rank = c(TRUE, FALSE, TRUE, TRUE))
+  expect_error(check_data(sdt_ranking("rank", m = 3), ranks, bmf(d ~ 1)),
+               "The rank column 'rank' is logical (TRUE/FALSE), but it must hold whole numbers from 1 to 3.",
+               fixed = TRUE)
+})
+
+test_that("trial-level check_data() builds a one-hot Y of one trial per row", {
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  checked <- check_data(model, rating_trials(), bmf(d ~ 1, criterion ~ 1, spacing ~ 1))
+  expect_identical(colnames(checked$Y), c("rating1", "rating2", "rating3", "rating4"))
+  expect_identical(unname(checked$Y[1:3, ]), matrix(c(1L, 0L, 1L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L), 3))
+  expect_identical(checked$nTrials, rep(1L, 24))
+  expect_false("rating" %in% names(checked))
+  expect_null(data_trials(model, rating_trials()))
+})
+
+test_that("rating trial rows and the cells aggregated from them give the same Stan program", {
+  skip_on_cran()
+  trials <- rating_trials()
+  cells <- data.frame(id = rep(1:2, each = 2), stimulus = rep(0:1, 2),
+                      rating1 = c(3, 0, 3, 0), rating2 = c(2, 1, 2, 1),
+                      rating3 = c(1, 2, 0, 1), rating4 = c(0, 3, 1, 4))
+  formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1)
+  mock <- function(data, model) suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_fit <- mock(trials, sdt_rating("rating", "stimulus", n_ratings = 4))
+  cell_fit <- mock(cells, sdt_rating(paste0("rating", 1:4), "stimulus"))
+  expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit))
+  expect_match(brms::stancode(trial_fit), "murating4", fixed = TRUE)
+  trial_data <- brms::standata(trial_fit)
+  expect_equal(as.vector(rowSums(trial_data$Y)), rep(1, 24))
+  expect_equal(as.vector(trial_data$trials), rep(1, 24))
+  expect_equal(unname(rowsum(trial_data$Y, paste(trials$id, trials$stimulus))),
+               unname(as.matrix(cells[paste0("rating", 1:4)])))
+})
+
+# one-hot rows carry no multinomial coefficient: 6! / (2! 1! 0! 3!) = 60
+# orderings of the cell's 6 trials
+test_that("rating trial rows sum to the cell log-likelihood less the log multinomial coefficient", {
+  ratings <- c(4, 1, 4, 2, 1, 4)
+  one_hot <- diag(4)[ratings, ]
+  thresholds <- c(-0.4, 0.3, 1.1)
+  for (stim in c(0, 1)) {
+    expect_equal(
+      sum(dsdt_rating(one_hot, stim, d = 1.3, thresholds = thresholds, log = TRUE)),
+      dsdt_rating(c(2, 1, 0, 3), stim, d = 1.3, thresholds = thresholds, log = TRUE) - log(60),
+      tolerance = 1e-10
+    )
+    expect_equal(
+      sum(dsdt_rating(one_hot, stim, d = 0.6, thresholds = thresholds, sdratio = 1.4,
+                      dist = "gumbel_min", log = TRUE)),
+      dsdt_rating(c(2, 1, 0, 3), stim, d = 0.6, thresholds = thresholds, sdratio = 1.4,
+                  dist = "gumbel_min", log = TRUE) - log(60),
+      tolerance = 1e-10
+    )
+  }
+})
+
+test_that("revert_check_data() gives trial rows their rating back from the one-hot row", {
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  checked <- check_data(model, rating_trials(), formula)
+  reverted <- revert_check_data(model, checked)
+  expect_equal(reverted$rating, rating_trials()$rating)
+  expect_false(any(c("Y", "nTrials") %in% names(reverted)))
+  expect_identical(check_data(model, reverted, formula)$Y, checked$Y)
 })

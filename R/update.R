@@ -19,7 +19,10 @@
 #' @param file_compress Logical or a character string, specifying one of the
 #'   compression algorithms supported by [saveRDS] when saving the updated
 #'   model object.
-#' @param ... Further arguments passed to [brms::update.brmsfit()]
+#' @param ... Further arguments passed to [brms::update.brmsfit()].
+#'   `stanvars` are added to the ones the model sets up. The `stanvars` you
+#'   gave the original fit are not carried over, so pass them again, as in
+#'   `update(fit, newdata = d, stanvars = sv)`.
 #' @return An updated `bmmfit` object refit to the new data and/or formula. If
 #'   `file` is given, it names the newly written file. If not, the `file` field
 #'   is carried over from the original fit, so the updated object still points
@@ -143,12 +146,14 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     logical(1)
   )]
 
+  notice_data <- NULL
   if (is.null(newdata) || is_stored_frame(model, olddata, newdata)) {
     data <- check_stored_data(model, newdata %||% olddata, user_formula)
     from_stored_frame <- !missing(formula.)
     attr(data, "data_name") <- attr(olddata, "data_name")
   } else {
     data <- check_data(model, newdata, user_formula)
+    notice_data <- newdata
     from_stored_frame <- FALSE
     attr(data, "data_name") <- substitute_name(newdata)
   }
@@ -204,6 +209,15 @@ update.bmmfit <- function(object, formula., newdata = NULL, recompile = NULL,
     configure_prior,
     c(list(model, data, config_args$formula, user_prior), fit_frame_args(object, dots))
   )
+  if (!is.null(notice_data) && missing(formula.)) {
+    update_data_notice(model, notice_data, user_formula, prior, function() {
+      rechecked <- check_model(model, notice_data, user_formula)
+      suppressWarnings(suppressMessages(brms::do_call(
+        configure_prior,
+        c(list(rechecked, data, config_args$formula, user_prior), fit_frame_args(object, dots))
+      )))
+    })
+  }
   dots$prior <- NULL
   new_fit_args <- combine_args(nlist(config_args, dots, prior))
 
@@ -405,7 +419,12 @@ revert_check_data.m3 <- function(model, data) {
 #' @exportS3Method
 revert_check_data.mpt <- function(model, data) {
   resp_cats <- model$resp_vars$resp_cats
-  data[resp_cats] <- as.data.frame(unclass(data$Y)[, resp_cats, drop = FALSE])
+  counts <- unclass(data$Y)[, resp_cats, drop = FALSE]
+  if (is_trial_level(model)) {
+    data[[model$other_vars$response]] <- resp_cats[max.col(counts, ties.method = "first")]
+  } else {
+    data[resp_cats] <- as.data.frame(counts)
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   tree_id <- model$other_vars$tree_id
@@ -468,6 +487,12 @@ revert_check_data.sdt_yn <- function(model, data) {
 }
 
 #' @exportS3Method
+revert_check_data.psychometric_function <- function(model, data) {
+  data[intersect(.psychometric_reserved_cols, colnames(data))] <- NULL
+  NextMethod("revert_check_data")
+}
+
+#' @exportS3Method
 revert_check_data.sdt_mafc <- function(model, data) {
   m <- model$other_vars$m
   # brms keeps a set-size column named by `m` only when a formula predicts
@@ -488,13 +513,20 @@ revert_check_data.sdt_mafc <- function(model, data) {
 revert_check_data.sdt_ranking <- function(model, data) {
   resp_cols <- model$resp_vars$response
   m <- model$other_vars$m
-  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  # trial rows get their rank back from the one-hot row
+  if (is_trial_level(model)) {
+    data[[resp_cols]] <- .sdt_trial_category(data$Y)
+  } else {
+    data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  }
   # max_rank is check_data()'s numeric copy of the set-size column, which brms
   # keeps only when a formula predicts something with it
   if (is.character(m) && not_in(m, colnames(data))) {
     data[[m]] <- data$max_rank
     attr(data, "rebuilt") <- c(attr(data, "rebuilt"), m)
   }
+  # a kfold() training fold can lack the fit's largest set size
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   data$max_rank <- NULL
@@ -504,7 +536,11 @@ revert_check_data.sdt_ranking <- function(model, data) {
 #' @exportS3Method
 revert_check_data.sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response
-  data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  if (is_trial_level(model)) {
+    data[[resp_cols]] <- .sdt_trial_category(data$Y)
+  } else {
+    data[resp_cols] <- as.data.frame(unclass(data$Y)[, resp_cols, drop = FALSE])
+  }
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
@@ -514,13 +550,20 @@ revert_check_data.sdt_rating <- function(model, data) {
 revert_check_data.sdt_cdp <- function(model, data) {
   n_new <- model$other_vars$n_new
   n_old <- model$other_vars$n_old
-  # check_data() renamed the count columns cdp1 ... cdpK, and whether guess
-  # columns were present is recorded only in how many there are
+  # check_data() renamed the count columns cdp1 ... cdpK
   Y <- unclass(data$Y)
-  has_guess <- ncol(Y) == n_new + 3L * n_old
-  resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess,
-                                      model$resp_vars$response)
-  data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
+  has_guess <- .sdt_cdp_has_guess_cols(model, Y)
+  if (is_trial_level(model)) {
+    cats <- .sdt_cdp_category_table(n_new, n_old, has_guess)[.sdt_trial_category(Y), ]
+    data[[model$resp_vars$judgment]] <- cats$judgment
+    data[[model$resp_vars$confidence]] <- cats$confidence
+  } else {
+    resp_cols <- .sdt_cdp_response_cols(n_new, n_old, has_guess,
+                                        model$resp_vars$response)
+    data[resp_cols] <- as.data.frame(Y, col.names = resp_cols)
+  }
+  # a kfold() training fold can lack every 'guess' judgment of the fit
+  data <- carry_fit_bounds(model, data)
   data$Y <- NULL
   data$nTrials <- NULL
   NextMethod("revert_check_data")
@@ -576,4 +619,19 @@ is_same_run <- function(object, dots) {
   !is.null(object$backend) && !is.null(object$algorithm) &&
     identical(dots$backend %||% object$backend, object$backend) &&
     identical(dots$algorithm %||% object$algorithm, object$algorithm)
+}
+
+# a model whose check_model() fits its default priors to the data keeps those
+# priors when update() gets new data under the old formula; its method says so
+# when the new data would have given other priors. `prior` is the prior the
+# update uses, and `rechecked_prior()` builds the one a model re-checked on the
+# new data would use: a function, so that only a method that compares them
+# pays for the second check_model() and configure_prior()
+update_data_notice <- function(model, data, formula, prior, rechecked_prior) {
+  UseMethod("update_data_notice")
+}
+
+#' @exportS3Method
+update_data_notice.default <- function(model, data, formula, prior, rechecked_prior) {
+  invisible()
 }

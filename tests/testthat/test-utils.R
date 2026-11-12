@@ -546,3 +546,64 @@ test_that("bmm does not change how message conditions print", {
   cnd <- tryCatch(message("hi"), message = identity)
   expect_output(print(cnd), "simpleMessage")
 })
+
+test_that("user stanvars are added to the model's stanvars, not replacing them (#688)", {
+  model_sv <- brms::stanvar(x = 1, name = "model_x") +
+    brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  user_sv <- brms::stanvar(scode = "real user_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", data = "d", stanvars = model_sv, init = 1)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = user_sv)))
+  expect_identical(out$stanvars, model_sv + user_sv)
+  expect_named(out, c("formula", "data", "stanvars", "init"))
+})
+
+test_that("user stanvars are passed on as they are when the model has none", {
+  user_sv <- brms::stanvar(x = 1, name = "user_x")
+  config_args <- list(formula = "a", data = "d", init = 1)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = user_sv)))
+  expect_identical(out$stanvars, user_sv)
+})
+
+test_that("a user stanvar with the name of a model stanvar stops with the name", {
+  config_args <- list(formula = "a", stanvars = brms::stanvar(x = 1, name = "model_x"))
+  dots <- list(stanvars = brms::stanvar(x = 2, name = "model_x"))
+  expect_error(combine_args(nlist(config_args, dots)), "already defines stanvars named 'model_x'")
+})
+
+test_that("a fit's stanvars passed back stop and say to pass only your own (#688)", {
+  model_sv <- brms::stanvar(x = 1, name = "model_x") +
+    brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  user_sv <- brms::stanvar(scode = "real user_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  dots <- list(stanvars = model_sv + user_sv)
+  expect_error(
+    combine_args(nlist(config_args, dots)),
+    "named 'model_x'\\..*pass only yours \\(not those of a fit, `fit\\$stanvars`\\)"
+  )
+})
+
+test_that("unnamed model Stan code passed back stops instead of being declared twice (#688)", {
+  model_sv <- brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  dots <- list(stanvars = model_sv)
+  expect_error(
+    combine_args(nlist(config_args, dots)),
+    "Stan code the model adds itself.*`fit\\$stanvars`.*Pass only your own"
+  )
+})
+
+test_that("unnamed user Stan code that differs from the model's is added to it (#688)", {
+  model_sv <- brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  user_sv <- brms::stanvar(scode = "real user_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = user_sv)))
+  expect_identical(out$stanvars, model_sv + user_sv)
+})
+
+test_that("stanvars = NULL keeps the model's stanvars (#688)", {
+  model_sv <- brms::stanvar(x = 1, name = "model_x")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = NULL)))
+  expect_identical(out$stanvars, model_sv)
+  expect_named(out, c("formula", "stanvars"))
+})

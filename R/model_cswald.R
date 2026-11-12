@@ -103,7 +103,8 @@
       links = .cswald_version_table[[version]][["links"]],
       fixed_parameters = .cswald_version_table[[version]][["fixed_parameters"]],
       default_priors = .cswald_version_table[[version]][["priors"]],
-      init_ranges = .cswald_version_table[[version]][["init_ranges"]]
+      init_ranges = .cswald_version_table[[version]][["init_ranges"]],
+      functions = list(density = "dcswald", generator = "rcswald")
     ),
     class = c("bmmodel", "cswald", paste0("cswald_", version)),
     call = call
