@@ -140,7 +140,10 @@
 # Marginalises the Fisher information of the memory components over
 # J ~ gamma(shape = J(kappa) / tau, scale = tau). tau = 0 is the point mass at
 # J(kappa), so rows with tau = 0 fall back to the constant-precision density,
-# which is why tau is the parameter variable_precision frees. The density is
+# which is why tau is the parameter variable_precision frees. The other limit,
+# tau -> Inf at fixed kappa, sends the shape to 0 with the mean fixed: all but
+# a vanishing mass of J sits at 0, so memory is uniform, and rows with
+# tau = Inf take the constant-precision density at kappa = 0. The density is
 # linear in the components, sum_k w_k I_k(y) + w_guess / (2 pi), and each I_k
 # is integrated on its own grid (.circmix_vp_component()). A grid shared by the
 # components and centred on the gamma prior misses the integrand of a response
@@ -157,6 +160,7 @@
 # scheme and the step reach 2e-6.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
+  kappa[tau == Inf] <- 0
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)
   vp <- .circmix_vp_rows(kappa, tau)
   if (!length(vp$rows)) {
@@ -174,9 +178,12 @@
 }
 
 # The rows whose precision varies, with their gamma shapes. A row with tau = 0,
-# with shape 0 (kappa = 0 or tau = Inf, an infinitely wide grid), or one whose
-# grid would be narrower than 1e-6, is constant precision; this is the R twin
-# of circmix_vp_shape(), which signals those rows with +Inf.
+# with shape 0, or one whose grid would be narrower than 1e-6, is constant
+# precision; this is the R twin of circmix_vp_shape(), which signals those rows
+# with +Inf. Shape 0 comes from J(kappa) = 0, at kappa = 0 or where J underflows
+# (below kappa ~1e-102 in R, where besselI() returns 0, and ~3e-162 in Stan; the
+# von Mises is uniform to within kappa there), or from tau = Inf, which
+# .circmix_vp_ld() has by then sent to kappa = 0.
 .circmix_vp_rows <- function(kappa, tau) {
   shape <- .circmix_J(kappa) / tau
   # trigamma() is NaN below shape 1e-153, where Stan's is +Inf; the floor at

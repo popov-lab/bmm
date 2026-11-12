@@ -73,16 +73,36 @@ test_that(".circmix_vp_ld() returns the constant-precision density when tau is z
     .circmix_vp_ld(cosd, logw, guess, rep(10, length(y)), rep(0, length(y))),
     .circmix_ld(cosd, logw, guess, rep(10, length(y)))
   )
-  # kappa = 0 gives J = 0, and tau = Inf a gamma shape of 0: neither has a
-  # gamma to integrate over
+  # kappa = 0 gives J = 0: no gamma to integrate over
   expect_equal(
     .circmix_vp_ld(cosd, logw, guess, rep(0, length(y)), rep(0.5, length(y))),
     .circmix_ld(cosd, logw, guess, rep(0, length(y)))
   )
+})
+
+# tau -> Inf at fixed kappa leaves the mean of J at J(kappa) but sends the
+# shape to 0, so the mass of J collapses onto 0 and memory becomes uniform.
+# vM(kappa) is the opposite limit, tau -> 0.
+test_that(".circmix_vp_ld() has uniform memory components when tau is infinite", {
+  y <- c(0, 1, pi)
+  n <- length(y)
+  for (p_mem in c(1, 0.8)) {
+    expect_equal(
+      .circmix_vp_ld(matrix(cos(y)), matrix(log(p_mem), n), rep(log1p(-p_mem), n), rep(5, n), rep(Inf, n)),
+      rep(-log(2 * pi), n),
+      label = paste("p_mem", p_mem)
+    )
+  }
+  # J underflows to 0 at kappa 1e-170, a von Mises that is uniform to 1e-170
   expect_equal(
-    .circmix_vp_ld(cosd, logw, guess, rep(10, length(y)), rep(Inf, length(y))),
-    .circmix_ld(cosd, logw, guess, rep(10, length(y)))
+    .circmix_vp_ld(matrix(cos(y)), matrix(0, n), rep(-Inf, n), rep(1e-170, n), rep(1, n)),
+    rep(-log(2 * pi), n)
   )
+  # rows with and without tau = Inf in one call keep their own densities
+  mixed <- .circmix_vp_ld(matrix(cos(y)), matrix(0, n), rep(-Inf, n), rep(5, n), c(Inf, 2, 0))
+  expect_equal(mixed[1], -log(2 * pi))
+  expect_equal(mixed[2], .circmix_vp_ld(matrix(cos(1)), matrix(0), -Inf, 5, 2))
+  expect_equal(mixed[3], .circmix_ld(matrix(cos(pi)), matrix(0), -Inf, 5))
 })
 
 test_that(".circmix_vp_ld() is a normalised density on the circle", {
@@ -963,6 +983,68 @@ test_that("Stan matches R at small gamma shapes and either side of the tail swit
       )
     }, numeric(1)),
     tolerance = 1e-10
+  )
+})
+
+# tau = Inf and a J that underflows to 0 both give a gamma shape of 0, where
+# the tail's gamma_lcdf() throws; memory is uniform in either limit
+test_that("Stan matches R at a gamma shape of 0", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  tab <- .circmix_kappa_table()
+  cells <- expand.grid(y = c(0, 1, pi), p_mem = c(1, 0.8))
+  cells <- rbind(cbind(cells, kappa = 5, tau = Inf), cbind(cells, kappa = 1e-170, tau = 1))
+  n <- nrow(cells)
+  code <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
+    "\n}\n",
+    "data {
+      int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ;
+      int N; vector[N] y; vector[N] logw; vector[N] logw_guess; vector[N] kappa; vector[N] tau;
+    }
+    generated quantities {
+      vector[N] out_shape; vector[N] out_vp; vector[N] out_sa;
+      for (i in 1:N) {
+        out_shape[i] = circmix_vp_shape(kappa[i], tau[i]);
+        out_vp[i] = circmix_vp_ld([cos(y[i])]', [logw[i]]', logw_guess[i], kappa[i], tau[i],
+                                  81, logk, dlogk, logJ_min, dlogJ);
+        out_sa[i] = circmix_slot_averaging_ld([cos(y[i])]', [0.0]', 1.5, 2, kappa[i], tau[i],
+                                              81, logk, dlogk, logJ_min, dlogJ);
+      }
+    }"
+  )
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+  fit <- model$sample(
+    data = list(
+      NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+      logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, N = n, y = cells$y,
+      logw = log(cells$p_mem), logw_guess = log1p(-cells$p_mem),
+      kappa = cells$kappa, tau = cells$tau
+    ),
+    fixed_param = TRUE, iter_sampling = 1, chains = 1,
+    refresh = 0, show_messages = FALSE, sig_figs = 18
+  )
+  stan <- function(variable) as.numeric(fit$draws(variable))
+
+  expect_equal(stan("out_shape"), rep(Inf, n))
+  expect_equal(stan("out_vp"), rep(-log(2 * pi), n), tolerance = 1e-12)
+  expect_equal(
+    stan("out_vp"),
+    .circmix_vp_ld(
+      matrix(cos(cells$y)), matrix(log(cells$p_mem)), log1p(-cells$p_mem),
+      cells$kappa, cells$tau
+    ),
+    tolerance = 1e-12
+  )
+  expect_equal(
+    stan("out_sa"),
+    .circmix_slot_averaging_ld(
+      matrix(cos(cells$y)), matrix(0, n), rep(1.5, n), rep(2L, n),
+      cells$kappa, cells$tau, 81L
+    ),
+    tolerance = 1e-12
   )
 })
 

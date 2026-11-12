@@ -72,14 +72,14 @@
     return i % 2 == 0 ? log(4) : log(2);
   }
 
-  // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0, kappa = 0, or a grid narrower than 1e-6); any positive shape is integrable, see circmix_vp_component()
+  // gamma shape J(kappa) / tau of the precision distribution; +Inf when precision is constant (tau = 0, shape 0, or a grid narrower than 1e-6), as .circmix_vp_rows(); any positive shape is integrable, see circmix_vp_component()
   real circmix_vp_shape(real kappa, real tau) {
-    // kappa = 0 has J = 0: the gamma on J is a point mass there, as in R
-    if (tau <= 0 || kappa <= 0) {
+    if (tau <= 0) {
       return positive_infinity();
     }
+    // J(kappa) is 0 at kappa = 0 and underflows to 0 below kappa ~ 3e-162, where the von Mises is already uniform
     real shape = circmix_J(kappa) / tau;
-    if (8 * sqrt(trigamma(shape)) < 1e-6) {
+    if (shape <= 0 || 8 * sqrt(trigamma(shape)) < 1e-6) {
       return positive_infinity();
     }
     return shape;
@@ -184,6 +184,10 @@
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
+    // tau -> Inf sends the shape to 0 with the mean fixed, leaving J at 0: memory is uniform, as in .circmix_vp_ld()
+    if (tau == positive_infinity()) {
+      return circmix_ld(cosd, logw, logw_guess, 0);
+    }
     real shape = circmix_vp_shape(kappa, tau);
     if (is_inf(shape)) {
       return circmix_ld(cosd, logw, logw_guess, kappa);
