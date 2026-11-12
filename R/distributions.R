@@ -2917,7 +2917,7 @@ rezdm <- function(n, n_trials, drift, bound, ndt, zr = 0.5, s = 1,
 #'
 dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
                    drift, bound, ndt, driftangle = 0, log = FALSE) {
-  .check_ezcdm_pars(drift, bound, ndt, n_trials)
+  .check_ezcdm_args(drift, bound, ndt, n_trials)
   stopif(isTRUE(any(var_angle < 0 | var_angle > 1)), "var_angle must be between 0 and 1")
   stopif(isTRUE(any(var_rt <= 0)), "var_rt must be positive")
 
@@ -2946,7 +2946,7 @@ dezcdm <- function(mean_angle, var_angle, mean_rt, var_rt, n_trials,
 #' @rdname ezcdm_dist
 #' @export
 rezcdm <- function(n, n_trials, drift, bound, ndt, driftangle = 0) {
-  .check_ezcdm_pars(drift, bound, ndt, n_trials)
+  .check_ezcdm_args(drift, bound, ndt, n_trials)
   n <- .n_draws(n)
   stopif(anyNA(n_trials), "n_trials must not contain missing values")
 
@@ -2973,7 +2973,7 @@ rezcdm <- function(n, n_trials, drift, bound, ndt, driftangle = 0) {
 
 # Parameter checks shared by dezcdm() and rezcdm(). isTRUE(any()) lets NA
 # parameters through, as in dezdm(); they propagate as NA.
-.check_ezcdm_pars <- function(drift, bound, ndt, n_trials) {
+.check_ezcdm_args <- function(drift, bound, ndt, n_trials) {
   stopif(isTRUE(any(drift <= 0)), "drift must be positive")
   stopif(isTRUE(any(bound <= 0)), "bound must be positive")
   stopif(isTRUE(any(ndt <= 0)), "ndt must be positive")
