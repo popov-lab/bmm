@@ -3,8 +3,6 @@
 \name{mixture3p_dist}
 \alias{mixture3p_dist}
 \alias{dmixture3p}
-\alias{pmixture3p}
-\alias{qmixture3p}
 \alias{rmixture3p}
 \title{Distribution functions for the three-parameter mixture model (mixture3p)}
 \usage{
@@ -18,10 +16,6 @@ dmixture3p(
   vp_nodes = 81L,
   log = FALSE
 )
-
-pmixture3p(q, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
-
-qmixture3p(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
 
 rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
 }
@@ -66,18 +60,12 @@ it by name: in bmm 1.4 it was the sixth argument, which is now \code{tau}.
 Until bmm 1.6.0 a logical value in that position is still read as \code{log},
 with a warning.}
 
-\item{q}{Vector of quantiles}
-
-\item{p}{Vector of probability}
-
 \item{n}{Number of observations to generate data for}
 }
 \value{
 \code{dmixture3p} gives the density of the three-parameter mixture model,
-\code{pmixture3p} gives the cumulative distribution function of the
-three-parameter mixture model, \code{qmixture3p} gives the quantile function of
-the three-parameter mixture model, and \code{rmixture3p} gives the random
-generation function for the three-parameter mixture model.
+and \code{rmixture3p} gives the random generation function for the
+three-parameter mixture model.
 }
 \description{
 Density, distribution, and random generation functions for the

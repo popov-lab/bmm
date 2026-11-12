@@ -459,7 +459,7 @@ log_lik_ezdm_3par <- function(i, prep) {
 # pp_check(fit, resp_var = ...) instead (#401)
 posterior_predict_ezdm_3par <- function(i, prep, ...) {
   rezdm(
-    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n = prep$ndraws,
     n_trials = prep$data$trials[i],
     drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
@@ -562,7 +562,7 @@ log_lik_ezdm_4par <- function(i, prep) {
 # no dv argument: see posterior_predict_ezdm_3par()
 posterior_predict_ezdm_4par <- function(i, prep, ...) {
   rezdm(
-    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n = prep$ndraws,
     n_trials = prep$data$vint2[i],
     drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),

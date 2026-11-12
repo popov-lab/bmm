@@ -244,7 +244,7 @@ log_lik_ddm <- function(i, prep) {
 
 posterior_predict_ddm <- function(i, prep, ...) {
   out <- rddm(
-    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n = prep$ndraws,
     drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
     ndt = brms::get_dpar(prep, "ndt", i = i),

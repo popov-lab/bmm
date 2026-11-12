@@ -305,7 +305,7 @@ posterior_predict_sdt_mafc <- function(i, prep, ...) {
   d <- brms::get_dpar(prep, "d", i = i)
   dist <- .sdt_dist_names[prep$data$vint2[i]]
 
-  rsdt_mafc(length(d), prep$data$trials[i], prep$data$vint1[i],
+  rsdt_mafc(prep$ndraws, prep$data$trials[i], prep$data$vint1[i],
             d, dist = dist)
 }
 
