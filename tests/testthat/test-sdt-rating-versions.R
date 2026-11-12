@@ -574,3 +574,33 @@ test_that("latent_sdt reports the response-process parameters as an attribute", 
   expect_setequal(extra$parameter, c("Ro", "Rn"))
   expect_equal(extra$mean[extra$parameter == "Ro"], 0.4, tolerance = 1e-6)
 })
+
+# Ro, Rn and logmratio enter the category log-probabilities, not the
+# categories, so each version builds its aggregated program from trial rows
+test_that("the dpsdt and metad versions build on one row per trial", {
+  skip_on_cran()
+  trials <- data.frame(
+    id = rep(1:2, each = 8), stimulus = rep(rep(0:1, each = 4), 2),
+    r = c(1, 2, 1, 3, 4, 3, 4, 2, 2, 1, 1, 3, 4, 4, 2, 4)
+  )
+  cells <- data.frame(id = rep(1:2, each = 2), stimulus = rep(0:1, 2),
+                      r1 = c(2, 0, 2, 0), r2 = c(1, 1, 1, 1),
+                      r3 = c(1, 1, 1, 0), r4 = c(0, 2, 0, 3))
+  formulas <- list(
+    dpsdt = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),
+    metad = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, logmratio ~ 1)
+  )
+  for (version in names(formulas)) {
+    mock <- function(data, model) suppressMessages(
+      bmm(formulas[[version]], data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+    )
+    trial_model <- sdt_rating("r", "stimulus", n_ratings = 4, version = version)
+    trial_fit <- mock(trials, trial_model)
+    cell_fit <- mock(cells, sdt_rating(paste0("r", 1:4), "stimulus", version = version))
+    expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit), info = version)
+    expect_equal(unname(rowsum(brms::standata(trial_fit)$Y, paste(trials$id, trials$stimulus))),
+                 unname(as.matrix(cells[paste0("r", 1:4)])), info = version)
+    expect_identical(names(trial_model$parameters),
+                     names(sdt_rating(paste0("r", 1:4), "stimulus", version = version)$parameters))
+  }
+})

@@ -490,6 +490,12 @@ response_annotations <- function(model) {
       n_upper = "count of upper-boundary responses"
     ))
   }
+  if (inherits(model, "mpt") && is_trial_level(model)) {
+    return(list(
+      resp_cats = glue("one per trial, named in column '{model$other_vars$response}'"),
+      response = "the response category of each trial"
+    ))
+  }
   if (inherits(model, "ezcdm")) {
     return(list(
       mean_angle = "circular mean, radians",
@@ -509,6 +515,24 @@ response_annotations <- function(model) {
   }
   if (inherits(model, "sdt_mafc") && is_trial_level(model)) {
     return(list(response = "0/1 per trial; 1 = correct"))
+  }
+  if (inherits(model, "sdt_rating") && is_trial_level(model)) {
+    return(list(response = glue("rating per trial, 1 to {model$other_vars$n_ratings}")))
+  }
+  if (inherits(model, "sdt_ranking") && is_trial_level(model)) {
+    return(list(response = "rank of the target per trial; 1 = ranked first"))
+  }
+  if (inherits(model, "sdt_cdp") && is_trial_level(model)) {
+    return(list(judgment = "'new', 'know', 'remember' or 'guess' per trial",
+                confidence = "confidence per trial, on the unified scale"))
+  }
+  if (inherits(model, "psychometric_function")) {
+    response <- if (is.null(model$other_vars$n_trials)) {
+      "0/1 or logical per trial"
+    } else {
+      "count of positive responses per row"
+    }
+    return(list(response = response))
   }
   list()
 }
@@ -696,6 +720,13 @@ data_column_roles <- list(
   sdm = c(
     resp_error = "response error relative to the target, in radians"
   ),
+  psychometric_function = c(
+    response = "0/1 response per trial, or the number of positive responses out of `n_trials`",
+    intensity = "stimulus intensity",
+    n_trials = "number of trials (optional; omit for one binary response per row)",
+    guess = "guess rate per row, e.g. 1 / m in m-AFC (optional; or one number, or estimated)",
+    lapse = "lapse rate per row (optional; or one number, or estimated)"
+  ),
   sdt_cdp = c(
     response = "prefix of the count columns `new<k>`, `know<k>`, `remember<k>` and optionally `guess<k>`, one per confidence level (default: no prefix)",
     stimulus = "stimulus type, 0 = new and 1 = old",
@@ -797,6 +828,7 @@ model_overview <- function(group = NULL) {
 #'   response times. A model that fits several tasks, such as `mpt()`, is
 #'   listed under each. Type `?modelname` (for example `?imm`) for the
 #'   arguments of a model.
+#' @family model information
 #' @return A character vector of model names with class `bmm_models`, which
 #'   prints as the grouped list. Use it as a character vector in base R or
 #'   dplyr, e.g. `"imm" %in% bmm_models()`; `as.character()` gives a plain one
@@ -978,7 +1010,7 @@ model_docs.bmmodel <- function(model, components = "all") {
     trial_level = paste0(
       "* **Requirements for one row per trial:** \n\n  ", model$requirements, "\n\n",
       "* **Trial-level data:** ", trial_level_docs,
-      if ("stimulus" %in% names(model$other_vars)) trial_level_stimulus_docs,
+      if ("bias" %in% names(model$parameters)) trial_level_stimulus_docs,
       trial_level_notes_docs, "\n"
     )
   )
@@ -1112,6 +1144,14 @@ use_model_template <- function(model_name,
      #   (a test requires it)
      # - `response_annotations()` in R/helpers-model.R, if the response columns
      #   need a unit or a coding note in the console output
+     # - the exported density and generator, d{model_name}() and r{model_name}(),
+     #   that the `functions` field of the constructor below names (a test
+     #   requires them)
+     #
+     # `model_spec()` (R/model-spec.R) returns what companion packages may rely
+     # on: every field it reads must be filled in the constructor, and a
+     # `data_column_roles` entry gives its `data_columns` (a test checks every
+     # model and version)
      #
      # In this file, `domain` and `task` take one or more values of `model_domains`
      # and `model_tasks` in R/helpers-model.R, and `task` decides the group
@@ -1226,7 +1266,8 @@ use_model_template <- function(model_name,
             links = .<<model_name>>_version_table[[version]][["links"]],
             fixed_parameters = .<<model_name>>_version_table[[version]][["fixed_parameters"]],
             default_priors = .<<model_name>>_version_table[[version]][["priors"]],
-            init_ranges = .<<model_name>>_version_table[[version]][["init_ranges"]]
+            init_ranges = .<<model_name>>_version_table[[version]][["init_ranges"]],
+            functions = list(density = "d<<model_name>>", generator = "r<<model_name>>")
           ),
           class = c("bmmodel", "<<model_name>>", paste0("<<model_name>>_", version)),
           call = call
@@ -1260,7 +1301,8 @@ use_model_template <- function(model_name,
             links = .<<model_name>>_defaults[["links"]],
             fixed_parameters = .<<model_name>>_defaults[["fixed_parameters"]],
             default_priors = .<<model_name>>_defaults[["priors"]],
-            init_ranges = .<<model_name>>_defaults[["init_ranges"]]
+            init_ranges = .<<model_name>>_defaults[["init_ranges"]],
+            functions = list(density = "d<<model_name>>", generator = "r<<model_name>>")
           ),
           class = c("bmmodel", "<<model_name>>"),
           call = call

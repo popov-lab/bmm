@@ -46,4 +46,11 @@ parameter_info(m3(
   version = "ss"
 ))
 }
+\seealso{
+Other model information:
+\code{\link[=bmm_models]{bmm_models()}},
+\code{\link[=model_spec]{model_spec()}},
+\code{\link[=simulate_data]{simulate_data()}}
+}
+\concept{model information}
 \keyword{extract_info}

@@ -35,7 +35,8 @@ simulates for it. What that is depends on the model:\tabular{ll}{
    \code{ezdm()}, version \code{"4par"} \tab Mean response time of the cell's upper-boundary responses \cr
    \code{sdt_yn()} \tab Number of "old"/"signal" responses, the number of trials times their probability \cr
    \code{sdt_mafc()} \tab Number of correct responses, the number of trials times their probability \cr
-   \code{m3()}, \code{sdt_rating()}, \code{sdt_ranking()}, \code{sdt_cdp()} \tab Expected count of each response category, from the multinomial family of \pkg{brms} \cr
+   \code{psychometric_function()} \tab Number of positive responses, the number of trials (1 for 0/1 data) times the psychometric function at the row's intensity \cr
+   \code{m3()}, \code{sdt_rating()}, \code{sdt_ranking()}, \code{sdt_cdp()} \tab Expected count of each response category, from the multinomial family of \pkg{brms}; on one row per trial these are the category probabilities \cr
    \code{sdm()}, \code{mixture2p()}, \code{mixture3p()}, \code{imm()} \tab Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error \cr
    \code{ezcdm()} \tab Not defined, as for the circular models: the response is the circular mean of the response angles \cr
 }

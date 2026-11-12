@@ -3,8 +3,6 @@
 \name{IMMdist}
 \alias{IMMdist}
 \alias{dimm}
-\alias{pimm}
-\alias{qimm}
 \alias{rimm}
 \title{Distribution functions for the Interference Measurement Model (IMM)}
 \usage{
@@ -20,28 +18,6 @@ dimm(
   tau = 0,
   vp_nodes = 81L,
   log = FALSE
-)
-
-pimm(
-  q,
-  mu = c(0, 2, -1.5),
-  dist = c(0, 0.5, 2),
-  c = 1,
-  a = 0.2,
-  b = 0,
-  s = 2,
-  kappa = 5
-)
-
-qimm(
-  p,
-  mu = c(0, 2, -1.5),
-  dist = c(0, 0.5, 2),
-  c = 1,
-  a = 0.2,
-  b = 0,
-  s = 2,
-  kappa = 5
 )
 
 rimm(
@@ -90,18 +66,12 @@ it by name: in bmm 1.4 it was the ninth argument, which is now \code{tau}.
 Until bmm 1.6.0 a logical value in that position is still read as \code{log},
 with a warning.}
 
-\item{q}{Vector of quantiles}
-
-\item{p}{Vector of probability}
-
 \item{n}{Number of observations to generate data for}
 }
 \value{
 \code{dimm} gives the density of the interference measurement model,
-\code{pimm} gives the cumulative distribution function of the interference
-measurement model, \code{qimm} gives the quantile function of the interference
-measurement model, and \code{rimm} gives the random generation function for the
-interference measurement model.
+and \code{rimm} gives the random generation function for the interference
+measurement model.
 }
 \description{
 Density, distribution, and random generation functions for the

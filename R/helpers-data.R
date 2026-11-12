@@ -473,7 +473,7 @@ lacks_built_columns <- function(object, newdata) {
 # nothing is estimated from these data; it lives only for this check_data() call
 check_newdata <- function(object, newdata) {
   withr::local_options(bmm.sort_data = FALSE)
-  newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata))
+  newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata), object$data)
   attr(newdata, "prediction_newdata") <- TRUE
   checked <- check_data(object$bmm$model, newdata, object$bmm$user_formula)
   attr(checked, "prediction_newdata") <- NULL
@@ -487,13 +487,15 @@ check_newdata <- function(object, newdata) {
 
 # Data checked against a fit rather than on its own: the fit's stored frame in
 # update() and newdata for a prediction. Both can lack the largest set size
-# the fit was made with, which check_data() would then take from the data
-carry_fit_bounds <- function(model, data) {
+# the fit was made with, which check_data() would then take from the data.
+# `frame` is the fit's model frame, which is `data` itself on the stored-frame
+# path
+carry_fit_bounds <- function(model, data, frame = data) {
   UseMethod("carry_fit_bounds")
 }
 
 #' @exportS3Method
-carry_fit_bounds.default <- function(model, data) {
+carry_fit_bounds.default <- function(model, data, frame = data) {
   data
 }
 
@@ -501,8 +503,30 @@ carry_fit_bounds.default <- function(model, data) {
 # size is one more than their number. Derived rather than stored on the fit, so
 # fits saved before #459 was fixed are covered too
 #' @exportS3Method
-carry_fit_bounds.non_targets <- function(model, data) {
+carry_fit_bounds.non_targets <- function(model, data, frame = data) {
   attr(data, "fit_max_set_size") <- length(model$other_vars$nt_features) + 1
+  data
+}
+
+# Trial rows of sdt_ranking() with a set-size column learn the number of ranks
+# from the data, and those of sdt_cdp() learn from them whether there are guess
+# categories. A subset without the largest set size or without a 'guess'
+# judgment would then give Y fewer columns than the fit has, which brms refuses.
+# Read from the fit's Y rather than stored on the model, so every fit made with
+# trial rows is covered
+#' @exportS3Method
+carry_fit_bounds.sdt_ranking <- function(model, data, frame = data) {
+  if (is_trial_level(model)) {
+    attr(data, "fit_n_ranks") <- ncol(frame$Y)
+  }
+  data
+}
+
+#' @exportS3Method
+carry_fit_bounds.sdt_cdp <- function(model, data, frame = data) {
+  if (is_trial_level(model)) {
+    attr(data, "fit_has_guess") <- .sdt_cdp_has_guess_cols(model, frame$Y)
+  }
   data
 }
 

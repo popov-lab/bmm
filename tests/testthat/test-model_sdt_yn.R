@@ -600,7 +600,7 @@ uv_prep <- function(ndraws = 50L) {
     criterion = rep(0.0, ndraws),
     sdratio   = seq(1.1, 1.9, length.out = ndraws)
   )
-  prep <- list(data = list(
+  prep <- list(ndraws = ndraws, data = list(
     vint1  = c(0L, 1L),      # stimulus: noise, signal
     vint2  = c(1L, 1L),      # dist_type: normal
     trials = c(100L, 100L),
