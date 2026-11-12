@@ -839,13 +839,16 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param p_mem Vector of probabilities of a target response. For a
 #'   [mixture3p()] fit these are `thetat` on its native scale (version
 #'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
-#'   (versions `"slot"` and `"slot_averaging"`).
+#'   (versions `"slot"` and `"slot_averaging"`). The mapping is exact for
+#'   `"slot"` and for `"slot_averaging"` up to `K = set_size`. Above capacity,
+#'   slot averaging gives an item several slots and raises its precision,
+#'   which these functions do not model.
 #' @param p_nt Vector of probabilities of a non-target response, summed over
 #'   the non-targets, which share it equally. For a [mixture3p()] fit these are
 #'   `thetant` on its native scale (version `"simple"`) or
-#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions). Unlike
-#'   `ptarget`, `p_mem` and `p_nt` are not conditional on a response from
-#'   memory.
+#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions, with the limit
+#'   for `"slot_averaging"` given under `p_mem`). Unlike `ptarget`, `p_mem` and
+#'   `p_nt` are not conditional on a response from memory.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
@@ -1788,7 +1791,7 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #' @export
 dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = c("simple", "crisk"), log = TRUE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   version <- match.arg(version)
 
   stopif(
@@ -1836,7 +1839,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 #' @rdname cswald_dist
 #' @export
 rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   .rcswald(n, drift, bound, ndt, zr, s)
 }
 
@@ -1875,7 +1878,7 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
 #' @export
 pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   q_shifted <- q - ndt
   p <- numeric(length(q))
 
@@ -1933,7 +1936,7 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
 #' @export
 qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
 
   if (log.p) {
     p <- exp(p)
@@ -2001,7 +2004,7 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
   q
 }
 
-validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
+.check_cswald_args <- function(drift, bound, ndt, zr, s) {
   stopif(
     any(bound <= 0),
     "Values for the boundary separation 'bound' must be positive."

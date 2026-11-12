@@ -89,7 +89,8 @@
       init_ranges = c(
         .psychometric_shape_inits(c(0, 1), log_x),
         list(guess = c(0.02, 0.1), lapse = c(0.01, 0.05))
-      )[names(parameters)]
+      )[names(parameters)],
+      functions = list(density = "dpsychometric_function", generator = "rpsychometric_function")
     ),
     class = c("bmmodel", "psychometric_function"),
     call = call
