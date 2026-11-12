@@ -773,7 +773,8 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 circmix_stan_values <- function(data) {
   data <- utils::modifyList(list(
     NE = 0L, y_e = numeric(0), logw_e = numeric(0), logw_guess_e = numeric(0),
-    kappa_e = numeric(0), tau_e = numeric(0)
+    kappa_e = numeric(0), tau_e = numeric(0),
+    NS = 0L, t_s = numeric(0), c_s = numeric(0), shape_s = numeric(0), tau_s = numeric(0)
   ), data)
   chunks <- c("circmix_functions.stan", "mixture2p_functions.stan", "mixture3p_functions.stan", "imm_functions.stan")
   code <- paste0(
@@ -794,6 +795,7 @@ circmix_stan_values <- function(data) {
       vector[3] nt_loc; int ss_loc; vector[2] dist_w;
       int NE; vector[NE] y_e; vector[NE] logw_e; vector[NE] logw_guess_e;
       vector[NE] kappa_e; vector[NE] tau_e;
+      int NS; vector[NS] t_s; vector[NS] c_s; vector[NS] shape_s; vector[NS] tau_s;
     }
     generated quantities {
       vector[NKAP] out_J; vector[NKAP] out_ld; vector[NJ] out_kappa;
@@ -806,6 +808,7 @@ circmix_stan_values <- function(data) {
       vector[4] out_imm_bsc; vector[4] out_imm_full; vector[2] out_w2_full;
       vector[2] out_w3_slot1; vector[1] out_w3_sa1;
       vector[NE] out_e_shape; vector[NE] out_e_vp; vector[NE] out_e_sa;
+      vector[NS] out_s_d1; vector[NS] out_s_d2;
       for (i in 1:NKAP) {
         out_J[i] = circmix_J(kappa[i]);
         out_ld[i] = circmix_ld(cosd, logw, logw_guess, kappa[i]);
@@ -858,6 +861,12 @@ circmix_stan_values <- function(data) {
         out_e_sa[i] = circmix_slot_averaging_ld([cos(y_e[i])]', [0.0]', K_slots, ss_slots,
                                                 kappa_e[i], tau_e[i], nodes,
                                                 logk, dlogk, logJ_min, dlogJ);
+      }
+      for (i in 1:NS) {
+        vector[2] d = circmix_vp_slopes(t_s[i], c_s[i], shape_s[i], tau_s[i],
+                                        logk, dlogk, logJ_min, dlogJ);
+        out_s_d1[i] = d[1];
+        out_s_d2[i] = d[2];
       }
     }"
   )
@@ -1176,7 +1185,24 @@ test_that("Stan matches R at a huge kappa or tau for a response on the item", {
     NFAR = length(tau), tau_far = tau,
     nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2)
   )
-  stan <- circmix_stan_values(data)
+  # the slopes only place the mode grid, so a wrong Stan slope barely moves the
+  # density; they are checked directly, on ordinary cells and at a huge J
+  slopes <- rbind(
+    expand.grid(J = c(0.5, 5, 50, 1e4), c = c(1, cos(1), -1), shape = c(2, 5)),
+    data.frame(J = 10^c(12, 16, 50, 155, 300), c = 1, shape = 2)
+  )
+  slopes$tau <- slopes$J
+  stan <- circmix_stan_values(c(data, list(
+    NS = nrow(slopes), t_s = log(slopes$J), c_s = slopes$c, shape_s = slopes$shape,
+    tau_s = slopes$tau
+  )))
+
+  r_slopes <- .circmix_vp_slopes(log(slopes$J), slopes$c, slopes$shape, slopes$tau, tab)
+  expect_equal(stan("out_s_d1"), r_slopes$d1, tolerance = 1e-8)
+  expect_equal(stan("out_s_d2"), r_slopes$d2, tolerance = 1e-8)
+  huge <- slopes$J > 1e10
+  expect_equal(stan("out_s_d1")[huge], rep(1.5, sum(huge)), tolerance = 1e-12)
+  expect_equal(stan("out_s_d2")[huge], rep(-1, sum(huge)), tolerance = 1e-12)
 
   expect_equal(
     stan("out_vp"),
