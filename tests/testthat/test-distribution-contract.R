@@ -5,7 +5,7 @@
 # interleaves parameter groups and compares each group with a reference
 # outside the function's own code (a closed form, quadrature, or the single-
 # trial density of the matching d*()). Every per-observation argument of the
-# sdm, ddm, ezdm, SDT and psychometric d*() and r*() functions is varied in at least one
+# sdm, ddm, ezdm, SDT, psychometric and tcc d*() and r*() functions is varied in at least one
 # test with a vector (matrix) whose recycled form reads differently reversed:
 # a mutant that reverses any one of them after recycling (the rezdm() ones
 # once per version) fails a test in this file or in test-distributions.R.
@@ -1069,6 +1069,37 @@ test_that("rpsychometric_function() pairs intensity, midpoint, width, rates and 
   expect_equal(y, c(0, 0, 50, 0, 0, 50, 50))
 })
 
+# --- tcc ----------------------------------------------------------------------
+
+test_that("dtcc() recycles the response errors and the memory strength to the longest argument", {
+  f <- tcc_similarity("vonmises", 2)
+  expect_elementwise(dtcc, list(x = c(0.1, -0.5, 1.2), d = c(0.5, 1, 2, 3)), fixed = list(similarity = f))
+  expect_elementwise(dtcc, list(x = c(0.1, -0.5, 1.2, 2.5), d = c(0.5, 2, 3)),
+                     fixed = list(similarity = f, log = TRUE))
+})
+
+test_that("rtcc() draws each observation from its own memory strength", {
+  withr::local_seed(4446)
+  f <- tcc_similarity("vonmises", 2)
+  d <- c(0.5, 4, 2)
+  n <- 3000
+  g <- group_of(n, 3)
+  x <- rtcc(n, d = d, similarity = f)
+  expect_length(x, n)
+  options <- 2 * pi * (-179:180) / 360
+  for (k in 1:3) {
+    # E[cos(x)] under the group's probability mass, summed over the options
+    ref <- sum(cos(options) * dtcc(options, d[k], f))
+    obs <- cos(x[g == k])
+    expect_mean_near(obs, ref, sd(obs) / sqrt(length(obs)))
+  }
+  # n not a multiple of the length of d: draw i takes element i, and a
+  # missing d gives a missing draw
+  x <- NULL
+  expect_no_warning(x <- rtcc(7, d = c(NA, 2, 2, 2), similarity = f))
+  expect_identical(is.na(x), rep_len(c(TRUE, FALSE, FALSE, FALSE), 7))
+})
+
 # --- empty observations ---------------------------------------------------------
 
 test_that("the d*() functions return an empty result for no observations", {
@@ -1087,6 +1118,7 @@ test_that("the d*() functions return an empty result for no observations", {
   expect_identical(dsdt_cdp(matrix(0, 0, 9), 1, dfam = 0.8, drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
                             rcrit = 0.5, n_new = 3), numeric(0))
   expect_identical(dpsychometric_function(numeric(0), 1, midpoint = 1:2, width = 1), numeric(0))
+  expect_identical(dtcc(numeric(0), d = 1:2, similarity = tcc_similarity("vonmises", 2)), numeric(0))
 })
 
 test_that("a NULL per-observation argument is empty, as a misspelt data column", {
@@ -1125,14 +1157,15 @@ test_that("a NULL per-observation argument is empty, as a misspelt data column",
                     c("stimulus", "dfam", "drec", "rcrit", "sigmar", "rho")),
     dpsychometric = case(dpsychometric_function, list(x = 5, intensity = 1, midpoint = 1, width = 1, guess = 0.1,
                                                       lapse = 0.05, n_trials = 10),
-                         c("x", "intensity", "midpoint", "width", "guess", "lapse", "n_trials"))
+                         c("x", "intensity", "midpoint", "width", "guess", "lapse", "n_trials")),
+    dtcc = case(dtcc, list(x = 0.3, d = 1, similarity = tcc_similarity("vonmises", 2)), c("x", "d"))
   )
   out <- list()
   for (nm in names(cases)) {
     cs <- cases[[nm]]
     for (a in cs$args) out[[paste(nm, a)]] <- do.call(cs$f, replace(cs$base, a, list(NULL)))
   }
-  expect_identical(out, setNames(rep(list(numeric(0)), 62), names(out)))
+  expect_identical(out, setNames(rep(list(numeric(0)), 64), names(out)))
 })
 
 test_that("NULL in an optional argument means it is not given", {

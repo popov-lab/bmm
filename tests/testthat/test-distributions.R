@@ -797,7 +797,8 @@ test_that("the samplers read n as rnorm() does", {
     rsdt_cdp_rkg = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = thr, rcrit = 0.5,
                                         kcrit = 0, n_new = 1),
     rpsychometric_function = function(n) rpsychometric_function(n, 0, midpoint = 0, width = 1),
-    rsdm = function(n) rsdm(n, mu = 0, c = 3, kappa = 3)
+    rsdm = function(n) rsdm(n, mu = 0, c = 3, kappa = 3),
+    rtcc = function(n) rtcc(n, d = 1, similarity = tcc_similarity("vonmises", 2))
   )
   seeded <- function(f, n) withr::with_seed(7, f(n))
   bad <- list(NA, NA_real_, -1, -0.5, Inf, "a", numeric(0), c(2, 3), list(2))
