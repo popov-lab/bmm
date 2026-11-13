@@ -44,6 +44,7 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
     c(
       "test-helpers-circmix.R" = 3L,
       "test-model_cswald.R" = 3L,
+      "test-model_ezcdm.R" = 3L,
       "test-model_ezdm.R" = 3L,
       "test-model_imm.R" = 2L,
       "test-model_m3.R" = 2L,
@@ -91,6 +92,7 @@ test_that("compiled Stan programs are sampled only at the registered sites (R1)"
     c(
       "test-helpers-circmix.R" = 1L,
       "test-model_cswald.R" = 5L,
+      "test-model_ezcdm.R" = 1L,
       "test-model_ezdm.R" = 1L,
       "test-model_imm.R" = 2L,
       "test-model_m3.R" = 1L,

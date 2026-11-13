@@ -58,8 +58,8 @@ values)
 variables from random effects terms with the categorical predictors),
 flagging sparse or empty cells. For models fit to aggregated data,
 where one row summarizes many trials, the trials of all rows in a cell
-are summed: the \code{n_trials} column of \code{sdt_yn()}, \code{sdt_mafc()} and
-\code{ezdm()}, and the row sums of the response count columns of \code{m3()},
+are summed: the \code{n_trials} column of \code{sdt_yn()}, \code{sdt_mafc()},
+\code{ezdm()} and \code{ezcdm()}, and the row sums of the response count columns of \code{m3()},
 \code{mpt()}, \code{sdt_rating()}, \code{sdt_ranking()} and \code{sdt_cdp()}. For all other
 models a row is one trial. With one row per trial
 (\code{sdt_yn()} and \code{sdt_mafc()} without \code{n_trials}, \code{sdt_rating()} with

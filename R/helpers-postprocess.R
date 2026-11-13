@@ -115,6 +115,7 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #'   | `psychometric_function()` | Number of positive responses, the number of trials (1 for 0/1 data) times the psychometric function at the row's intensity |
 #'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, from the multinomial family of \pkg{brms}; on one row per trial these are the category probabilities |
 #'   | `sdm()`, `mixture2p()`, `mixture3p()`, `imm()` | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
+#'   | `ezcdm()` | Not defined, as for the circular models: the response is the circular mean of the response angles |
 #'
 #'   With `dpar` or `nlpar`, `posterior_epred()` returns draws of that model
 #'   parameter for every model, as in \pkg{brms}: a `dpar` on its native scale,

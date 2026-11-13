@@ -754,6 +754,339 @@ test_that("adjust_ezdm_accuracy() rejects vector input and points to ezdm_summar
 })
 
 ############################################################################# !
+# ezcdm_summary_stats TESTS                                               ####
+############################################################################# !
+
+test_that("ezcdm_summary_stats() returns a 1-row data.frame with the EZ-CDM statistics", {
+  withr::local_seed(123)
+  angle <- runif(50, -pi, pi)
+  rt <- rgamma(50, shape = 5, rate = 10) + 0.3
+
+  result <- ezcdm_summary_stats(angle, rt, method = "simple")
+
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 1)
+  expect_named(result, c(
+    "mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials", "contaminant_prop"
+  ))
+  expect_equal(result$mean_rt, mean(rt))
+  expect_equal(result$var_rt, var(rt))
+  expect_equal(result$n_trials, 50)
+  expect_true(is.na(result$contaminant_prop))
+})
+
+test_that("ezcdm_summary_stats() gives zero circular variance for identical angles", {
+  result <- ezcdm_summary_stats(rep(1.2, 40), seq(0.4, 0.8, length.out = 40), method = "simple")
+  expect_equal(result$mean_angle, 1.2)
+  expect_equal(result$var_angle, 0)
+})
+
+test_that("ezcdm_summary_stats() keeps var_angle at zero where rounding pushes the resultant above 1", {
+  # 40 copies of -2.997 give a resultant length of 1 + 2e-16 before the pmin()
+  result <- ezcdm_summary_stats(rep(-2.997, 40), seq(0.4, 0.8, length.out = 40), method = "simple")
+  expect_identical(result$var_angle, 0)
+})
+
+test_that("ezcdm_summary_stats() gives circular variance one for evenly spaced angles", {
+  angle <- seq(-pi, pi, length.out = 361)[-361]
+  result <- ezcdm_summary_stats(angle, rep(0.5, 360), method = "simple")
+  expect_equal(result$var_angle, 1, tolerance = 1e-10)
+})
+
+test_that("ezcdm_summary_stats() averages across the -pi/pi boundary", {
+  result <- ezcdm_summary_stats(c(pi - 0.1, -pi + 0.1), c(0.5, 0.6), method = "simple")
+  expect_equal(abs(result$mean_angle), pi)
+  expect_equal(result$var_angle, 1 - cos(0.1))
+})
+
+test_that("ezcdm_summary_stats() computes deviations from the target in degrees", {
+  result <- ezcdm_summary_stats(c(179, -179), c(0.5, 0.6), target = 180, radians = FALSE, method = "simple")
+  expect_equal(result$mean_angle, 0, tolerance = 1e-12)
+  expect_equal(result$var_angle, 1 - cos(deg2rad(1)))
+})
+
+test_that("ezcdm_summary_stats() with a target matches the summary of the deviations", {
+  withr::local_seed(42)
+  deviation <- brms::rvon_mises(100, 0.3, 4)
+  target <- runif(100, -pi, pi)
+  rt <- rgamma(100, shape = 5, rate = 10) + 0.3
+
+  expect_equal(
+    ezcdm_summary_stats(wrap(target + deviation), rt, target = target, method = "simple"),
+    ezcdm_summary_stats(deviation, rt, method = "simple")
+  )
+  expect_equal(
+    ezcdm_summary_stats(rad2deg(target + deviation), rt, target = rad2deg(target),
+      radians = FALSE, method = "simple"),
+    ezcdm_summary_stats(deviation, rt, method = "simple")
+  )
+})
+
+test_that("ezcdm_summary_stats() drops incomplete trials", {
+  angle <- c(0.1, NA, 0.3, 0.2)
+  rt <- c(0.5, 0.6, NA, 0.7)
+  result <- ezcdm_summary_stats(angle, rt, method = "simple")
+  expect_equal(result$n_trials, 2)
+  expect_equal(result$mean_rt, 0.6)
+  expect_equal(result, ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.7), method = "simple"))
+})
+
+test_that("ezcdm_summary_stats() returns an NA row when no trial is complete", {
+  expected <- data.frame(
+    mean_angle = NA_real_, var_angle = NA_real_,
+    mean_rt = NA_real_, var_rt = NA_real_, n_trials = 0L, contaminant_prop = NA_real_
+  )
+  for (m in c("simple", "robust", "mixture")) {
+    expect_equal(ezcdm_summary_stats(c(NA_real_, NA_real_), c(0.5, 0.6), method = m), expected)
+    expect_equal(ezcdm_summary_stats(c(0.1, 0.2), c(NA_real_, NA_real_), method = m), expected)
+    expect_equal(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.6), target = NA_real_, method = m), expected)
+    # an unused factor level under group_by(.drop = FALSE) passes empty vectors
+    expect_equal(ezcdm_summary_stats(numeric(0), numeric(0), method = m), expected)
+  }
+})
+
+test_that("ezcdm_summary_stats() validates its arguments", {
+  expect_error(ezcdm_summary_stats(rt = c(0.5, 0.6)), "missing")
+  expect_error(ezcdm_summary_stats(angle = c(0.5, 0.6)), "missing")
+  expect_error(ezcdm_summary_stats("a", 0.5), "'angle' must be a numeric")
+  expect_error(ezcdm_summary_stats(0.1, "a"), "'rt' must be a numeric")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), 0.5), "same length")
+  expect_error(ezcdm_summary_stats(c(0.1, Inf), c(0.5, 0.6)), "'angle' contains infinite")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, Inf)), "'rt' contains infinite")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.6), target = -Inf), "'target' contains infinite")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.6), target = c(0, 0, 0)), "'target' must be")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, 0.6), radians = "yes"), "'radians' must be")
+  expect_error(ezcdm_summary_stats(c(0.1, 0.2), c(0.5, -0.6)), "Non-positive RT")
+})
+
+test_that("ezcdm_summary_stats() warns about likely unit errors", {
+  expect_warning(ezcdm_summary_stats(c(0.1, 0.2), c(500, 600), method = "simple"), "seconds")
+  expect_warning(ezcdm_summary_stats(c(10, 170), c(0.5, 0.6), method = "simple"), "radians = FALSE")
+  expect_warning(ezcdm_summary_stats(c(7, 0.1), c(0.5, 0.6), method = "simple"), "radians = FALSE")
+  expect_silent(ezcdm_summary_stats(c(6.2, 0.1), c(0.5, 0.6), method = "simple"))
+
+  withr::local_seed(4)
+  in_radians <- brms::rvon_mises(30, mu = 0, kappa = 4)
+  rt <- rep(0.5, 30)
+  expect_warning(
+    ezcdm_summary_stats(in_radians, rt, radians = FALSE, method = "simple"),
+    "radians = TRUE"
+  )
+  expect_silent(ezcdm_summary_stats(rad2deg(in_radians), rt, radians = FALSE, method = "simple"))
+  # too few trials to tell precise degrees from radians
+  expect_silent(ezcdm_summary_stats(in_radians[1:9], rt[1:9], radians = FALSE, method = "simple"))
+})
+
+test_that(".circular_summary() summarises each group separately", {
+  withr::local_seed(7)
+  angles <- runif(30, -pi, pi)
+  group <- rep(1:3, c(5, 10, 15))
+
+  grouped <- .circular_summary(angles, group)
+  separate <- do.call(rbind, lapply(split(angles, group), .circular_summary))
+
+  expect_equal(nrow(grouped), 3)
+  expect_equal(grouped, separate, ignore_attr = TRUE)
+})
+
+test_that(".circular_summary() with zero weights drops those angles", {
+  angles <- c(0.2, 0.3, 3.0)
+  expect_equal(
+    .circular_summary(angles, weights = c(1, 1, 0)),
+    .circular_summary(angles[1:2])
+  )
+})
+
+# The BIC gate must make the mixture an exact no-op when there is nothing to
+# correct - this is what makes method = "mixture" safe as the default. Without
+# it, a couple of genuinely slow first-passage times pick up contaminant weight,
+# and because var_rt is dominated by its tail that alone cut var_rt by a quarter
+# in some cells of the ezcdm article's (contaminant-free) simulated data.
+test_that("ezcdm_summary_stats(method = 'mixture') is a no-op on clean data", {
+  withr::local_seed(123)
+  angle <- brms::rvon_mises(300, mu = 0.2, kappa = 5)
+  rt <- rgamma(300, shape = 5, rate = 10) + 0.3
+
+  simple <- ezcdm_summary_stats(angle, rt, method = "simple")
+  mixture <- ezcdm_summary_stats(angle, rt, method = "mixture")
+
+  expect_equal(mixture$contaminant_prop, 0)
+  expect_equal(mixture[1:5], simple[1:5])
+})
+
+test_that("ezcdm_summary_stats(method = 'mixture') gates on a heavy RT tail", {
+  # slow first-passage times are not contaminants, however uniform they look
+  withr::local_seed(17)
+  angle <- brms::rvon_mises(200, mu = 0, kappa = 4)
+  rt <- c(rgamma(196, shape = 2, rate = 4) + 0.3, 3.1, 3.6, 4.0, 4.4)
+
+  expect_equal(ezcdm_summary_stats(angle, rt)$contaminant_prop, 0)
+  expect_equal(ezcdm_summary_stats(angle, rt)$var_rt, var(rt))
+})
+
+test_that("ezcdm_summary_stats(method = 'robust') changes the RT moments only", {
+  withr::local_seed(5)
+  angle <- brms::rvon_mises(80, mu = 0.2, kappa = 4)
+  rt <- c(rgamma(76, shape = 5, rate = 10) + 0.3, 3.5, 4.1, 3.8, 4.5)
+
+  simple <- ezcdm_summary_stats(angle, rt, method = "simple")
+  robust <- ezcdm_summary_stats(angle, rt, method = "robust")
+  robust_mad <- ezcdm_summary_stats(angle, rt, method = "robust", robust_scale = "mad")
+
+  # var_angle is a sufficient statistic, so no robust angle estimator exists
+  expect_equal(robust$mean_angle, simple$mean_angle)
+  expect_equal(robust$var_angle, simple$var_angle)
+  expect_equal(robust$mean_rt, median(rt))
+  expect_equal(robust$var_rt, (IQR(rt) / 1.349)^2)
+  expect_equal(robust_mad$var_rt, mad(rt)^2)
+  expect_equal(robust$n_trials, 80)
+  expect_true(is.na(robust$contaminant_prop))
+})
+
+test_that("ezcdm_summary_stats(method = 'mixture') corrects both channels", {
+  withr::local_seed(42)
+  n_clean <- 360
+  angle <- c(brms::rvon_mises(n_clean, mu = 0, kappa = 3), runif(40, -pi, pi))
+  rt <- c(rgamma(n_clean, shape = 6, rate = 12) + 0.3, runif(40, 0.15, 4))
+
+  clean <- ezcdm_summary_stats(angle[1:n_clean], rt[1:n_clean], method = "simple")
+  simple <- ezcdm_summary_stats(angle, rt, method = "simple")
+  mixture <- ezcdm_summary_stats(angle, rt, method = "mixture")
+
+  expect_lt(
+    abs(mixture$var_angle - clean$var_angle),
+    abs(simple$var_angle - clean$var_angle)
+  )
+  expect_lt(abs(mixture$var_rt - clean$var_rt), abs(simple$var_rt - clean$var_rt))
+  expect_lt(abs(mixture$mean_rt - clean$mean_rt), abs(simple$mean_rt - clean$mean_rt))
+  expect_gt(mixture$contaminant_prop, 0.03)
+  expect_lt(mixture$n_trials, 400)
+  expect_type(mixture$n_trials, "integer")
+})
+
+test_that("ezcdm_summary_stats(method = 'mixture') corrects with every RT family and with fixed bounds", {
+  withr::local_seed(42)
+  angle <- c(brms::rvon_mises(360, mu = 0, kappa = 3), runif(40, -pi, pi))
+  rt <- c(rgamma(360, shape = 6, rate = 12) + 0.3, runif(40, 0.15, 4))
+  model <- ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials")
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+
+  for (dist in c("lognormal", "invgaussian")) {
+    result <- ezcdm_summary_stats(angle, rt, distribution = dist)
+    expect_gt(result$contaminant_prop, 0)
+    expect_lt(result$var_rt, var(rt))
+    expect_silent(check_data(model, result, formula))
+  }
+
+  fixed <- ezcdm_summary_stats(angle, rt, contaminant_bound = c(0.15, 4))
+  expect_gt(fixed$contaminant_prop, 0)
+  expect_silent(check_data(model, fixed, formula))
+})
+
+test_that("ezcdm_summary_stats(method = 'mixture') returns a row check_data() accepts", {
+  withr::local_seed(11)
+  angle <- c(brms::rvon_mises(180, mu = 0, kappa = 3), runif(20, -pi, pi))
+  rt <- c(rgamma(180, shape = 6, rate = 12) + 0.3, runif(20, 0.15, 4))
+
+  dat <- ezcdm_summary_stats(angle, rt)
+  model <- ezcdm("mean_angle", "var_angle", "mean_rt", "var_rt", "n_trials")
+  formula <- bmf(drift ~ 1, driftangle ~ 1, bound ~ 1, ndt ~ 1)
+
+  expect_silent(check_data(model, dat, formula))
+})
+
+# L-BFGS-B stops with code 52 on the one-component null of this clean cell.
+# While the null was evaluated at its start values, the gate passed and the
+# mixture returned contaminant_prop 0.008 and n_trials 149.
+test_that("ezcdm_summary_stats(method = 'mixture') gates against a fitted null", {
+  withr::local_seed(218)
+  angle <- brms::rvon_mises(150, mu = 0, kappa = 4)
+  rt <- rgamma(150, shape = 5, rate = 10) + 0.3
+
+  mixture <- ezcdm_summary_stats(angle, rt)
+
+  expect_identical(mixture$contaminant_prop, 0)
+  expect_identical(mixture$n_trials, 150L)
+  expect_equal(mixture[1:5], ezcdm_summary_stats(angle, rt, method = "simple")[1:5])
+})
+
+# Without contaminants the EM creeps toward pi = 0 for hundreds of iterations;
+# an EM cut short must still be judged by the gate, not replaced by the robust
+# moments, which are biased on clean data.
+test_that("ezcdm_summary_stats() returns the simple moments when an unconverged mixture fails the gate", {
+  withr::local_seed(3)
+  angle <- brms::rvon_mises(60, mu = 0.1, kappa = 3)
+  rt <- rgamma(60, shape = 5, rate = 10) + 0.3
+
+  expect_warning(
+    capped <- ezcdm_summary_stats(angle, rt, maxit = 1),
+    "did not converge within maxit = 1 iterations .*simple moments are returned"
+  )
+  expect_equal(capped[1:5], ezcdm_summary_stats(angle, rt, method = "simple")[1:5])
+  expect_identical(capped$contaminant_prop, 0)
+
+  expect_warning(
+    small <- ezcdm_summary_stats(angle[1:5], rt[1:5]),
+    "Fewer than min_trials"
+  )
+  expect_equal(small, ezcdm_summary_stats(angle[1:5], rt[1:5], method = "simple"))
+})
+
+test_that("ezcdm_summary_stats() returns an unconverged mixture that passes the gate", {
+  withr::local_seed(42)
+  angle <- c(brms::rvon_mises(360, mu = 0, kappa = 3), runif(40, -pi, pi))
+  rt <- c(rgamma(360, shape = 6, rate = 12) + 0.3, runif(40, 0.15, 4))
+
+  expect_warning(
+    capped <- ezcdm_summary_stats(angle, rt, maxit = 3),
+    "did not converge within maxit = 3 iterations .*is returned"
+  )
+  expect_gt(capped$contaminant_prop, 0.03)
+  expect_lt(capped$var_rt, var(rt))
+})
+
+test_that("ezcdm_summary_stats() warns when the contaminant proportion is clipped", {
+  withr::local_seed(42)
+  angle <- c(brms::rvon_mises(360, mu = 0, kappa = 3), runif(40, -pi, pi))
+  rt <- c(rgamma(360, shape = 6, rate = 12) + 0.3, runif(40, 0.15, 4))
+
+  expect_warning(
+    clipped <- ezcdm_summary_stats(angle, rt, init_contaminant = 0.02, max_contaminant = 0.05),
+    "clipped to max_contaminant \\(0.05\\)"
+  )
+  expect_gt(clipped$contaminant_prop, 0)
+})
+
+test_that("ezcdm_summary_stats() validates the contamination arguments", {
+  withr::local_seed(9)
+  angle <- brms::rvon_mises(40, mu = 0, kappa = 3)
+  rt <- rgamma(40, shape = 5, rate = 10) + 0.3
+
+  expect_error(ezcdm_summary_stats(angle, rt, method = "bogus"), "should be one of")
+  expect_error(ezcdm_summary_stats(angle, rt, robust_scale = "bogus"), "should be one of")
+  expect_error(ezcdm_summary_stats(angle, rt, distribution = "normal"), "should be one of")
+  expect_error(ezcdm_summary_stats(angle, rt, min_trials = 0), "min_trials must be a positive")
+  expect_error(ezcdm_summary_stats(angle, rt, contaminant_bound = 0.5), "length 2")
+  expect_error(ezcdm_summary_stats(angle, rt, init_contaminant = 0), "init_contaminant")
+  expect_error(ezcdm_summary_stats(angle, rt, max_contaminant = 1.5), "max_contaminant")
+})
+
+test_that("ezcdm_summary_stats() works with grouped reframe() for every method", {
+  skip_if_not_installed("dplyr", "1.1.0")
+  withr::local_seed(13)
+  dat <- data.frame(
+    id = rep(1:2, each = 60),
+    angle = brms::rvon_mises(120, mu = 0.2, kappa = 4),
+    rt = rgamma(120, shape = 5, rate = 10) + 0.3
+  )
+  for (m in c("simple", "robust", "mixture")) {
+    result <- dplyr::reframe(dat, ezcdm_summary_stats(angle, rt, method = m), .by = id)
+    expect_equal(nrow(result), 2)
+    expect_false(anyNA(result[c("mean_angle", "var_angle", "mean_rt", "var_rt")]))
+  }
+})
+
+############################################################################# !
 # FLAG_CONTAMINANT_RTS TESTS                                              ####
 ############################################################################# !
 

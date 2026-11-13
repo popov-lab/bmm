@@ -151,6 +151,7 @@ test_that("check_data() returns a data.frame()", {
   # - y, x, z, w, l, s for circular/mixture models
   # - mean_rt, var_rt, n_upper, n_trials for ezdm 3par
   # - mean_rt_upper/lower, var_rt_upper/lower for ezdm 4par
+  # - mean_angle, var_angle (with mean_rt, var_rt, n_trials) for ezcdm
   # - stimulus (0/1) for sdt_yn (response counts come from `response`)
   # Use 50 rows to avoid small sample size warnings from cswald
   test_data <- data.frame(
@@ -161,6 +162,7 @@ test_that("check_data() returns a data.frame()", {
     mean_rt_upper = rep(0.45, 50), mean_rt_lower = rep(0.55, 50),
     var_rt_upper = rep(0.018, 50), var_rt_lower = rep(0.025, 50),
     rt = rep(0.6, 50), response = rep(1, 50),
+    mean_angle = rep(0.1, 50), var_angle = rep(0.2, 50),
     stimulus = rep(c(0L, 1L), 25)
   )
   registered <- model_test_cases("check_data")
@@ -176,6 +178,7 @@ test_that("check_data() returns a data.frame()", {
       nt_distances = "z", resp_cats = c("w", "l"), num_options = c(1, 1),
       mean_rt = "mean_rt", var_rt = "var_rt", n_upper = "n_upper",
       n_trials = "n_trials", rt = "rt", response = "response",
+      mean_angle = "mean_angle", var_angle = "var_angle",
       stimulus = "stimulus", m = 2,
       trees = mpt_tree("t", list(w = "p", l = "1 - p"))
     )
