@@ -492,6 +492,29 @@ test_that("the circular mixture densities are NA where tau is NA", {
   expect_false(anyNA(dmixture2p(c(0, 1), kappa = 5, p_mem = 0.8, tau = c(NA, 2))[2]))
 })
 
+# a missing tau drew at constant precision and a missing weight from the first
+# component (#710)
+test_that("the circular mixture samplers draw NA where a parameter is NA, as the densities are", {
+  withr::local_seed(710)
+  expect_identical(rmixture2p(3, kappa = 5, p_mem = 0.8, tau = NA), rep(NA_real_, 3))
+  expect_identical(rmixture2p(3, kappa = NA, p_mem = 0.8), rep(NA_real_, 3))
+  expect_identical(rmixture2p(3, kappa = 5, p_mem = NaN), rep(NA_real_, 3))
+  expect_identical(
+    rmixture2p(3, kappa = 5, K = NA, set_size = 4, version = "slot_averaging"),
+    rep(NA_real_, 3)
+  )
+  expect_identical(
+    rmixture2p(3, kappa = 5, tau = NA, K = 0.5, set_size = 4, version = "slot_averaging"),
+    rep(NA_real_, 3)
+  )
+  expect_identical(rmixture3p(3, kappa = 5, tau = NA), rep(NA_real_, 3))
+  expect_identical(rimm(3, kappa = 5, tau = NA), rep(NA_real_, 3))
+
+  y <- rmixture2p(6, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1))
+  expect_identical(is.na(y), rep(c(FALSE, TRUE, TRUE), 2))
+  expect_identical(is.na(y), is.na(dmixture2p(0, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1, 0, 1, 0, 1))))
+})
+
 test_that("rmixture2p returns values between -pi and pi", {
   withr::local_seed(445)
   res <- rmixture2p(500,

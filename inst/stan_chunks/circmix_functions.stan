@@ -63,10 +63,10 @@
            + log1p(inv(8 * kappa) + 9 / (128 * square(kappa)) + 225 / (3072 * kappa^3));
   }
 
-  // von Mises mixture sharing one kappa plus uniform guessing; normalised log weights, cosd = cos(y - mu_k)
+  // von Mises mixture sharing one kappa plus uniform guessing; normalised log weights, cosd = cos(y - mu_k); kappa (cosd - 1) - log(I0(kappa) e^-kappa), as in .circmix_ld(), because with log_modified_bessel_first_kind(0, kappa) the log density at kappa 1e16 and y = pi was -1.75e307
   real circmix_ld(vector cosd, vector logw, real logw_guess, real kappa) {
-    return log_sum_exp(log_sum_exp(logw + kappa * cosd)
-                         - log_modified_bessel_first_kind(0, kappa),
+    return log_sum_exp(log_sum_exp(logw + kappa * (cosd - 1))
+                         - circmix_log_besselI0_scaled(kappa),
                        logw_guess)
            - log(2 * pi());
   }
@@ -76,8 +76,8 @@
     int k = num_elements(cosd);
     vector[k] lp;
     for (j in 1:k) {
-      lp[j] = logw[j] + kappa[j] * cosd[j]
-              - log_modified_bessel_first_kind(0, kappa[j]);
+      lp[j] = logw[j] + kappa[j] * (cosd[j] - 1)
+              - circmix_log_besselI0_scaled(kappa[j]);
     }
     return log_sum_exp(log_sum_exp(lp), logw_guess) - log(2 * pi());
   }
@@ -95,13 +95,9 @@
     return J < 1e-17 * sqrt(tau);
   }
 
-  // gamma shape J(kappa) / tau of the precision distribution; +Inf when no grid is needed: constant precision (tau = 0 or a grid narrower than 1e-6) or uniform memory (circmix_vp_uniform()), as .circmix_vp_rows(); any other positive shape is integrable, see circmix_vp_component()
-  real circmix_vp_shape(real kappa, real tau) {
-    if (tau <= 0) {
-      return positive_infinity();
-    }
-    real J = circmix_J(kappa);
-    if (circmix_vp_uniform(J, tau)) {
+  // gamma shape J / tau of the precision distribution, J = circmix_J(kappa); +Inf when no grid is needed: constant precision (tau = 0 or a grid narrower than 1e-6) or uniform memory (circmix_vp_uniform()), as .circmix_vp_rows(); any other positive shape is integrable, see circmix_vp_component()
+  real circmix_vp_shape(real J, real tau) {
+    if (tau <= 0 || circmix_vp_uniform(J, tau)) {
       return positive_infinity();
     }
     real shape = J / tau;
@@ -109,6 +105,26 @@
       return positive_infinity();
     }
     return shape;
+  }
+
+  // shape log(shape) - shape - lgamma(shape): from shape 10 on as 0.5 log(shape / (2 pi)) minus Stirling's series, whose terms of size shape log(shape) cancel exactly
+  real circmix_gamma_log_norm(real shape) {
+    if (shape < 10) {
+      return shape * log(shape) - shape - lgamma(shape);
+    }
+    real u = inv(shape);
+    real u2 = square(u);
+    return 0.5 * (log(shape) - log(2 * pi()))
+           - u * (1.0 / 12 - u2 * (1.0 / 360 - u2 * (1.0 / 1260 - u2 * (1.0 / 1680 - u2 / 1188))));
+  }
+
+  // log density of t = log J for J ~ gamma(shape, scale = tau), as .circmix_vp_log_gamma(); see there why not gamma_lpdf(). delta past 700 is -Inf in value, and returned as a constant so that the overflowing expm1() gives no NaN gradient
+  real circmix_vp_log_gamma(real t, real shape, real tau) {
+    real delta = t - log(shape) - log(tau);
+    if (delta > 700) {
+      return negative_infinity();
+    }
+    return circmix_gamma_log_norm(shape) - shape * (expm1(delta) - delta);
   }
 
   // first and second derivative in t = log J of the log integrand in circmix_vp_component(), as .circmix_vp_slopes(): c - A as (c - 1) + (1 - A), and curvature = dA / d kappa / (1 - A)^2, so that neither cancels nor underflows at a huge kappa
@@ -165,7 +181,7 @@
       real J = exp(ti);
       real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
       // kappa c - log I0(kappa) would cancel the gamma weight away once kappa nears 1e17, see .circmix_vp_log_integrand()
-      lp[i] = circmix_simpson_lw(i, nodes) + ti + gamma_lpdf(J | shape, rate)
+      lp[i] = circmix_simpson_lw(i, nodes) + circmix_vp_log_gamma(ti, shape, tau)
               + kappa * (c - 1) - circmix_log_besselI0_scaled(kappa);
     }
     return log_sum_exp(log_sum_exp(lp) + log(step / 3), log(tail)) - log(2 * pi());
@@ -202,7 +218,7 @@
       real ti = lo + (i - 1) * step;
       real J = exp(ti);
       real kappa = circmix_kappa(J, logk, dlogk, logJ_min, dlogJ);
-      lp[i] = circmix_simpson_lw(i, nodes) + ti + gamma_lpdf(J | shape, rate)
+      lp[i] = circmix_simpson_lw(i, nodes) + circmix_vp_log_gamma(ti, shape, tau)
               + kappa * (c - 1) - circmix_log_besselI0_scaled(kappa);
     }
     return log_sum_exp(lp) + log(step / 3) - log(2 * pi());
@@ -214,10 +230,11 @@
                      data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
     // tau -> Inf sends the shape to 0 with the mean fixed, leaving J at 0: memory is uniform, as in .circmix_vp_ld(), and close to that limit integrating would hit a subnormal shape
-    if (tau == positive_infinity() || circmix_vp_uniform(circmix_J(kappa), tau)) {
+    real J = circmix_J(kappa);
+    if (tau == positive_infinity() || circmix_vp_uniform(J, tau)) {
       return circmix_ld(cosd, logw, logw_guess, 0);
     }
-    real shape = circmix_vp_shape(kappa, tau);
+    real shape = circmix_vp_shape(J, tau);
     if (is_inf(shape)) {
       return circmix_ld(cosd, logw, logw_guess, kappa);
     }
