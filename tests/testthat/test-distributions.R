@@ -483,6 +483,15 @@ test_that("dimm recycles its parameters to the longest argument", {
   )
 })
 
+# a missing tau used to give the constant-precision density, while a missing
+# kappa gave NA
+test_that("the circular mixture densities are NA where tau is NA", {
+  expect_true(all(is.na(dmixture2p(c(0, 1), kappa = 5, p_mem = 0.8, tau = NA, log = TRUE))))
+  expect_true(all(is.na(dmixture3p(c(0, 1), kappa = 5, tau = c(NA, NaN)))))
+  expect_true(all(is.na(dimm(c(0, 1), kappa = 5, tau = NA))))
+  expect_false(anyNA(dmixture2p(c(0, 1), kappa = 5, p_mem = 0.8, tau = c(NA, 2))[2]))
+})
+
 test_that("rmixture2p returns values between -pi and pi", {
   withr::local_seed(445)
   res <- rmixture2p(500,
