@@ -51,6 +51,7 @@
 * `rejection_sampling()` is deprecated and will be removed in bmm 1.6.0 at the earliest. It was the sampler behind `rsdm()`, which no longer needs it; it still works, with a warning (#444).
 * `dmixture2p()`, `dmixture3p()` and `dimm()`: passing `log` by position is deprecated, because `tau` now takes that position. Until bmm 1.6.0 a logical value there is still read as `log`, with a warning; write `log = TRUE` instead (#398).
 * `pmixture2p()`, `qmixture2p()`, `pmixture3p()`, `qmixture3p()`, `pimm()` and `qimm()` are removed. They were never implemented and always stopped with an error (#556).
+* The forms deprecated in bmm 0.4 and 1.0 (`fit_model()`, `IMMfull()`, `IMMabc()`, `IMMbsc()`, `sdmSimple()`, the `setsize` argument of `mixture3p()` and `imm()`, and the `parallel` argument of `bmm()`) will be removed in bmm 1.6.0. They keep working in every 1.5.x release and now warn with the replacement. Use `bmm()`, `imm()`, `imm(version = "abc")`, `imm(version = "bsc")`, `sdm()`, `set_size` and `cores` instead.
 
 ### Changes to default priors
 <!-- From 1.5.0 every change to a default prior is listed here (ADR 0008 § D4); defaults do not change inside a minor line. -->
@@ -61,10 +62,6 @@
 <!-- `mu1` -> `mu` in mixture2p, mixture3p and imm (#434, #590) -->
 <!-- `pnt` -> `ptarget` = P(target | memory) in mixture3p and imm (#434, #590) -->
 * `model_spec()` is the model contract of ADR 0005, at contract version 0.9 (`"1.0"` in bmm 1.6.0). bmmtools and bmm-explorer read it from this release on. A later change to a field it returns is announced under this heading (#633).
-
-### Deprecated functions and arguments
-<!-- Announcements of removals scheduled for 1.6.0; what 1.5.0 deprecates is listed under the first "Deprecated functions and arguments" heading above. -->
-* The forms deprecated in bmm 0.4 and 1.0 (`fit_model()`, `IMMfull()`, `IMMabc()`, `IMMbsc()`, `sdmSimple()`, the `setsize` argument of `mixture3p()` and `imm()`, and the `parallel` argument of `bmm()`) will be removed in bmm 1.6.0. They keep working in every 1.5.x release and now warn with the replacement. Use `bmm()`, `imm()`, `imm(version = "abc")`, `imm(version = "bsc")`, `sdm()`, `set_size` and `cores` instead.
 
 ### Other changes
 * `sdt_yn()` fits with one row per trial and the default normal noise (`dist = "normal"`) are faster: each sampling step takes about half the time it did. Estimates are unchanged up to sampling error.
