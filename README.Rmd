@@ -68,7 +68,8 @@ bmm::print_pretty_models_md(group = "Categorical recall and n-AFC decisions")
 whether a signal was present or an item was studied, rate their confidence,
 give Remember/Know judgments, pick the target among several alternatives, or
 rank the alternatives. One signal detection model per response format, each
-fit to response counts per participant and condition. See the
+fit to response counts per participant and condition or to one row per trial.
+See the
 [signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
 and, for the dual-process and meta-d′ versions of `sdt_rating()` and the
 Remember/Know model `sdt_cdp()`, the

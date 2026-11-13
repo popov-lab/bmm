@@ -95,14 +95,15 @@ post-processing toolkit: `roc_sdt()`, `roc_observed()`, `auc_sdt()`,
 Fitting any of the four models follows the same recipe as every `bmm` model;
 only the ingredients are SDT-specific.
 
-1. **Aggregate the data, or declare trial rows.** `sdt_rating()` and
-   `sdt_ranking()` consume counts per design cell (for example per subject and
-   stimulus type), with the counts in the columns the constructor names. If
-   your data hold one row per trial, aggregate them first (e.g. with
-   `dplyr::count()` or `stats::aggregate()`); the Rating SDT section below
-   shows a real reshaping example. `sdt_yn()` and `sdt_mafc()` take either
-   counts per cell or one row per trial with a 0/1 response: for trial rows,
-   leave out `n_trials`.
+1. **Aggregate the data, or declare trial rows.** All four models take either
+   counts per design cell (for example per subject and stimulus type), with the
+   counts in the columns the constructor names, or one row per trial. For trial
+   rows, `response` names one column: the 0/1 response for `sdt_yn()` and
+   `sdt_mafc()`, which then take no `n_trials`, the rating for `sdt_rating()`,
+   and the target's rank for `sdt_ranking()`. Trial rows allow item random
+   effects; without item or trial-level terms, counts give the same posterior
+   in less time. The Rating SDT section below shows a real reshaping example
+   into counts.
 2. **Create the model object.** The constructor maps your column names onto the
    model's response format — for example `sdt_yn(response = "n_old",
    stimulus = "stimulus", n_trials = "n_trials")` — and selects the noise
@@ -630,6 +631,30 @@ formula has to state what the design holds constant:
 `sdt_criterion()` and `sdt_bias()` compute both quantities from one hit rate
 and one false-alarm rate, for checking a fit against the raw rates.
 
+## Trial-level data
+
+With one row per trial, `sdt_yn()` takes no `n_trials`, and `response` holds 1
+for an "old" and 0 for a "new" response on each trial. Trial rows allow item
+random effects, which counts aggregated over items cannot carry:
+
+```r
+bmm(
+  formula = bmf(
+    d ~ 1 + (1 | id) + (1 | item),
+    criterion ~ 1 + (1 | id) + (1 | item)
+  ),
+  data = trials,
+  model = sdt_yn(response = "resp", stimulus = "stimulus")
+)
+```
+
+Without item or trial-level terms, the trial rows give the same posterior as
+the counts aggregated from them, and the aggregated fit is faster. The section
+[Signal detection as a probit GLMM](https://venpopov.com/bmm/articles/bmm_brms_to_bmm.html#signal-detection-as-a-probit-glmm)
+of the *From brms to bmm* article fits this model to simulated data, shows that
+it is the probit GLMM many psychologists already use, and explains why the item
+effects on `d` rest on the trials with old items only.
+
 ## Multiple criteria: identifying the unequal-variance ratio
 
 When the criterion is shifted across conditions — for example by a base-rate or
@@ -841,7 +866,10 @@ pp_check(fit_uv, type = "ecdf_overlay", group = "stimulus", ndraws = 100)
 
 In a confidence-rating task each item is judged on an ordered scale (e.g. 1 =
 "sure new" … 6 = "sure old"). The data are counts per rating category, one column
-per category. Internally `bmm` fits this with `brms`' native multinomial family;
+per category. With one row per trial, `response` instead names a single column
+holding each trial's rating, a whole number from 1 to `n_ratings`, the number
+of categories. Internally, `bmm` fits counts with `brms`' native multinomial
+family and trial rows with a family of its own;
 the K-1 confidence criteria are parameterized by a `threshold_type`
 [@Selker_2019; @Paulewicz_Blaut_2020; @Paulewicz_Blaut_2022].
 
@@ -1114,7 +1142,9 @@ pp_check(fit_mafc, type = "ecdf_overlay", ndraws = 100)
 # Ranking SDT
 
 In a ranking task the observer orders `m` items by evidence and the data are
-counts per rank position assigned to the target [@MeyerGrant_2026]. As with
+counts per rank position assigned to the target [@MeyerGrant_2026]. With one
+row per trial, `response` instead names a single column holding the target's
+rank on each trial, a whole number from 1 to that trial's `m`. As with
 m-AFC there is no criterion: the rank assigned to the target is an *order
 statistic* of the latent evidence, so the probability of each rank follows from
 the evidence distribution directly. With `dist = "gumbel_min"` these rank
