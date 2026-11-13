@@ -334,12 +334,9 @@ fit opens with `skip_unless_fixtures()` (`helper-tiers.R`). -
 `tests/local/` - tests that sample with a real backend; build-ignored,
 run by hand (`Rscript tests/local/run.R`) and by the weekly
 `local-tests` workflow. See `tests/local/README.md`. -
-`tests/internal/` - reference fits from 2024; nothing in
-`tests/testthat` reads them since \#422, the reference summaries in
-`tests/local/references.rds` replace them, and the folder’s deletion
-awaits the maintainer (ADR 0004) - `bmm-dev/feature_tests/` -
-exploratory/development scripts (synced via SWITCHdrive, not tracked by
-git) - `local/` - machine-specific scratch scripts (not tracked by git)
+`bmm-dev/feature_tests/` - exploratory/development scripts (synced via
+SWITCHdrive, not tracked by git) - `local/` - machine-specific scratch
+scripts (not tracked by git)
 
 Rules, with the ADR’s rule ids. `tests/testthat/test-conventions.R`
 checks R1, R2, R4, R7, R8, the file-level part of R10 and part of R5
@@ -481,7 +478,6 @@ bmf(kappa ~ set_size, c ~ 1, a = 0.5)  # 'a' fixed to 0.5
     data/                # Package datasets (.rda files)
     tests/testthat/      # Unit, mock-pipeline, fixture and Stan compile tests (test-*.R pattern)
     tests/local/         # Sampling tests, run by hand and weekly (build-ignored)
-    tests/internal/      # Reference fits from 2024, to be deleted (ADR 0004)
     vignettes/articles/  # Long-form tutorials (Rmd)
     man/                 # AUTO-GENERATED - do not edit
     docs/                # AUTO-GENERATED pkgdown site - do not edit
