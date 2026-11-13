@@ -5120,7 +5120,9 @@ rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lap
 #'   to the nearest option. 0 (the default) for none.
 #' @param correlation `NULL` (the default) for independent noise, or the
 #'   correlation of the noise of two options at each distance 0, 1, ...,
-#'   `n_options / 2`, starting with 1, as in [tcc()].
+#'   `n_options / 2`, starting with 1, as in [tcc()], including the
+#'   independent noise of 1e-5 that `tcc()` mixes into a correlation whose
+#'   circulant matrix is singular.
 #'
 #' @return `dtcc()` returns the probability of the option each `x` falls on (a
 #'   probability mass, not a density: divide by `2 * pi / n_options` for the
@@ -5183,6 +5185,7 @@ rtcc <- function(n, d, similarity, n_options = 360, noise = c("gaussian", "gumbe
   d <- rep_len(d, n)
   sd_steps <- motor_sd * n_options / (2 * pi)
   if (!is.null(correlation)) {
+    correlation <- .tcc_with_nugget(correlation, inform = TRUE)
     return(2 * pi * .tcc_rnoise(d, similarity, correlation, sd_steps) / n_options)
   }
   offsets <- if (is.null(options)) {

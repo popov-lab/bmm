@@ -37,11 +37,43 @@
   by_distance[pmin(lag, n - lag) + 1]
 }
 
+# A correlation that falls off smoothly has eigenvalues within 1e-10 of 0 at
+# fine scales: no noise there, so the table, which conditions on the
+# similarity's part where the noise lives, cannot carry the rest. Against a
+# brute-force argmax of d f + z, dropping that rest biased d by up to 0.7 SE
+# at 2,000 trials, also when it was only 3e-7 of the similarity, and a nugget
+# of 1e-3 by up to 0.56 SE. A nugget of 1e-5 moved d by at most 0.06 SE (the
+# table's own seed spread) with the authors' measured correlation, and the
+# response probabilities by a KL of at most 3.4e-5 per trial under
+# exp(-(x / 15)^2), whose matrix is singular in 287 of 360 directions; the
+# table stayed right at the kappa of 212 that gave (S13 measurement,
+# 2026-11-13). The constant mode cannot move an argmax and does not count
+.tcc_nugget <- 1e-5
+
+.tcc_with_nugget <- function(correlation, inform = FALSE) {
+  lam <- Re(stats::fft(.tcc_circ_row(correlation)))
+  n_null <- sum(lam[-1] <= 1e-10 * max(lam))
+  if (n_null == 0) {
+    return(correlation)
+  }
+  if (inform) {
+    message2(
+      "`correlation` leaves no noise in {n_null} directions (its circulant matrix is \\
+      singular there), which the likelihood table cannot represent. bmm mixes in \\
+      {format(.tcc_nugget, scientific = FALSE)} of independent noise: \\
+      `{format(1 - .tcc_nugget, scientific = FALSE)} * correlation + \\
+      {format(.tcc_nugget, scientific = FALSE)} * c(1, rep(0, {length(correlation) - 1}))`. \\
+      See the section Correlated noise of ?tcc."
+    )
+  }
+  (1 - .tcc_nugget) * correlation + .tcc_nugget * c(1, rep(0, length(correlation) - 1))
+}
+
 # Everything the build needs from the correlation and the similarity by
 # distance. Eigenvalues below 1e-10 of the largest count as null modes. The
 # similarity's part on null modes is dropped (the estimator conditions on
-# f_R alone), and `dropped` is reported for tcc() to refuse a correlation
-# that would lose more than 1e-6 of the similarity's energy
+# f_R alone); tcc() and rtcc() mix a nugget into a correlation with null
+# modes first, so for theirs nothing is, and `dropped` is 0
 .tcc_corr_setup <- function(correlation, similarity) {
   n <- 2 * (length(similarity) - 1)
   lam <- Re(stats::fft(.tcc_circ_row(correlation)))

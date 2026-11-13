@@ -86,10 +86,11 @@ test_that("tcc() refuses correlated or motor noise it cannot fit", {
   expect_silent(tcc("err", f, correlation = c(1 + 2e-16, rho[-1])))
   expect_error(tcc("err", f, correlation = c(1 + 1e-6, rho[-1])), "must be 1 at distance 0")
   expect_error(tcc("err", f, correlation = c(1, rep(-0.9, 180))), "negative eigenvalue")
-  # rank 3: the similarity lives mostly on modes without noise
+  # rank 3: the similarity lies mostly in directions where only the nugget
+  # gives noise, which puts kappa at 922, beyond what the table resolves
   expect_error(
     tcc("err", f, correlation = (1 + cos((0:180) * pi / 180)) / 2),
-    "leaves no noise in directions that carry 0.5"
+    "kappa = 922, at most 250"
   )
   expect_error(tcc("err", f, correlation = rho, correlation_draws = 100), "at least 6000")
   # without correlation the table is exact, and the draws would go unused
@@ -519,14 +520,37 @@ test_that("under the identity link the correlated table starts at d = -2 and is 
   expect_lt(abs(sum(c(1, rep(2, 29), 1) * exp(tab[2, ])) - 1), 60 * 0.5 / 6000)
 })
 
-test_that("tcc() refuses a correlation that drops more than 1e-6 of the similarity", {
+test_that("tcc() and rtcc() mix 1e-5 of independent noise into a correlation with null modes", {
   x <- 0:180
   f <- exp(-x / 20)
-  # a Gaussian correlation has null modes at fine scales, which carry 3.13e-4
-  # of this similarity: inside a threshold of 1e-3, outside one of 1e-6
-  expect_error(tcc("err", f, correlation = exp(-(x / 15)^2)), "carry 0.000313 of the variation")
-  # a nugget of independent noise removes the null modes
-  expect_silent(tcc("err", f, correlation = 0.999 * exp(-(x / 15)^2) + 0.001 * c(1, rep(0, 180))))
+  gauss <- exp(-(x / 15)^2)
+  nugget <- (1 - 1e-5) * gauss + 1e-5 * c(1, rep(0, 180))
+  expect_message(model <- tcc("err", f, correlation = gauss), "no noise in 287 directions")
+  expect_equal(model$other_vars$correlation, nugget)
+  # with the nugget, no part of the similarity is dropped from the table
+  expect_equal(bmm:::.tcc_corr_setup(model$other_vars$correlation, f)$dropped, 0)
+  # rtcc() simulates the model that tcc() fits
+  expect_message(drawn <- withr::with_seed(3, rtcc(200, 2, f, correlation = gauss)), "0.00001")
+  expect_identical(drawn, withr::with_seed(3, rtcc(200, 2, f, correlation = nugget)))
+})
+
+test_that("a correlation without null modes is used as given", {
+  x <- 0:180
+  correlation <- exp(-x / 10)
+  expect_no_message(model <- tcc("err", exp(-x / 20), correlation = correlation))
+  expect_identical(model$other_vars$correlation, correlation)
+})
+
+test_that("an eigenvalue counts as a null mode from 1e-10 of the largest down", {
+  # a correlation from a chosen spectrum: flat but for one frequency pair
+  from_spectrum <- function(low) {
+    lam <- rep(1, 360)
+    lam[c(61, 301)] <- low
+    row <- Re(stats::fft(lam, inverse = TRUE)) / 360
+    (row / row[1])[1:181]
+  }
+  expect_no_message(bmm:::.tcc_with_nugget(from_spectrum(2e-10), inform = TRUE))
+  expect_message(bmm:::.tcc_with_nugget(from_spectrum(5e-11), inform = TRUE), "no noise in 2 directions")
 })
 
 test_that("motor noise is converted from the response's unit to option steps", {
@@ -604,15 +628,16 @@ test_that("rtcc(correlation) draws from the distribution of the correlated table
   )
 })
 
-test_that("rtcc() simulates a correlation with null modes, which tcc() cannot fit", {
+test_that("rtcc() simulates a correlation of low rank, which tcc() refuses", {
   withr::local_seed(9)
   f <- corr_similarity(36)
-  # rank 3: the noise has no part finer than one cycle around the wheel. The
-  # circulant square root draws it; the Monte Carlo table cannot condition on it
+  # rank 3: the noise has no part finer than one cycle around the wheel, in
+  # 33 directions, until the nugget gives it some. The circulant square root
+  # draws it; the table would need a kappa of 310
   rank3 <- (1 + cos(seq(0, pi, length.out = 19))) / 2
-  r <- rtcc(2000, 2, f, n_options = 36, correlation = rank3)
+  expect_message(r <- rtcc(2000, 2, f, n_options = 36, correlation = rank3), "no noise in 33 directions")
   expect_true(all(r > -pi & r <= pi))
-  expect_error(tcc("err", f, n_options = 36, correlation = rank3), "leaves no noise in directions")
+  expect_error(tcc("err", f, n_options = 36, correlation = rank3), "at most 250 is supported")
   # dtcc() and rtcc() have no n_alternatives, so their refusals do not name it
   expect_error(
     rtcc(5, 2, f, n_options = 36, correlation = rank3, options = c(0, pi)),

@@ -62,7 +62,9 @@ to the nearest option. 0 (the default) for none.}
 
 \item{correlation}{\code{NULL} (the default) for independent noise, or the
 correlation of the noise of two options at each distance 0, 1, ...,
-\code{n_options / 2}, starting with 1, as in \code{\link[=tcc]{tcc()}}.}
+\code{n_options / 2}, starting with 1, as in \code{\link[=tcc]{tcc()}}, including the
+independent noise of 1e-5 that \code{tcc()} mixes into a correlation whose
+circulant matrix is singular.}
 }
 \value{
 \code{dtcc()} returns the probability of the option each \code{x} falls on (a

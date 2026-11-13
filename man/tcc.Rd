@@ -261,18 +261,27 @@ function of their distance, one value per distance 0, 1, ...,
 correlation Schurgin et al. (2020) used for their colour wheel falls
 from 0.96 at 1 degree to 0.35 at 15 degrees and is 0 from 90 degrees
 on. The values must define a valid correlation on the circle (a
-circulant matrix without negative eigenvalues), and the similarity must
-lie in the directions where that matrix has noise. A correlation that
-falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales:
-the measured one has five, and \code{exp(-(x / 15)^2)} for \code{x} in degrees
-has more. \code{tcc()} refuses such a correlation when more than 1e-6 of the
-similarity's variation lies on those scales, which a sharp peak puts
-there: Laplace shapes from \code{\link[=tcc_similarity]{tcc_similarity()}} are refused with smooth
-correlations, with the measured one from a \code{kappa} of about 2, while
-von Mises shapes are accepted unless very narrow (\code{kappa} in the
-hundreds). Mixing in a little independent noise, such as \code{0.999 * correlation + 0.001 * c(1, rep(0, n_options / 2))}, removes the zero
-eigenvalues. A correlation that falls off like \code{exp(-x / 10)} has none
-and is accepted with any similarity. Correlated noise needs \code{noise = "gaussian"} and the full wheel.
+circulant matrix without negative eigenvalues). A correlation that
+falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales,
+directions in which the options get no noise: the measured one has
+five, and \code{exp(-(x / 15)^2)} for \code{x} in degrees 287 of 360. The
+likelihood table cannot represent the similarity's part in those
+directions, so \code{tcc()} and \code{rtcc()} mix in a little independent noise,
+\code{0.99999 * correlation + 0.00001 * c(1, rep(0, n_options / 2))}, and say
+so. Measured against the correlation as given (a brute-force argmax of
+\code{d * f + z}), this moved \code{d} by at most 0.06 SE at 2,000 trials with the
+measured correlation, for \code{d} from 0.5 to 12 and von Mises, Laplace and
+exponential similarities, and the response probabilities by a
+Kullback-Leibler divergence of at most 3.4e-5 per trial with
+\code{exp(-(x / 15)^2)}. Dropping the similarity's part in those directions
+instead biased \code{d} by up to 0.7 SE, and 100 times as much independent
+noise by up to 0.56 SE. \code{tcc()} refuses a correlation with noise in so
+few directions that most of the similarity lies where only this
+independent noise reaches, such as \code{(1 + cos(x)) / 2}: its table would
+need a precision it was not checked at (\code{rtcc()} still simulates it). A
+correlation that falls off like \code{exp(-x / 10)} has no such directions and
+is used as given. Correlated noise needs \code{noise = "gaussian"} and the
+full wheel.
 
 The response probabilities have no closed form, so the likelihood reads
 them from a table that \code{bmm()} estimates by Monte Carlo before

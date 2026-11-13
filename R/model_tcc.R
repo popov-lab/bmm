@@ -256,20 +256,27 @@
 #'   correlation Schurgin et al. (2020) used for their colour wheel falls
 #'   from 0.96 at 1 degree to 0.35 at 15 degrees and is 0 from 90 degrees
 #'   on. The values must define a valid correlation on the circle (a
-#'   circulant matrix without negative eigenvalues), and the similarity must
-#'   lie in the directions where that matrix has noise. A correlation that
-#'   falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales:
-#'   the measured one has five, and `exp(-(x / 15)^2)` for `x` in degrees
-#'   has more. `tcc()` refuses such a correlation when more than 1e-6 of the
-#'   similarity's variation lies on those scales, which a sharp peak puts
-#'   there: Laplace shapes from [tcc_similarity()] are refused with smooth
-#'   correlations, with the measured one from a `kappa` of about 2, while
-#'   von Mises shapes are accepted unless very narrow (`kappa` in the
-#'   hundreds). Mixing in a little independent noise, such as `0.999 *
-#'   correlation + 0.001 * c(1, rep(0, n_options / 2))`, removes the zero
-#'   eigenvalues. A correlation that falls off like `exp(-x / 10)` has none
-#'   and is accepted with any similarity. Correlated noise needs `noise =
-#'   "gaussian"` and the full wheel.
+#'   circulant matrix without negative eigenvalues). A correlation that
+#'   falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales,
+#'   directions in which the options get no noise: the measured one has
+#'   five, and `exp(-(x / 15)^2)` for `x` in degrees 287 of 360. The
+#'   likelihood table cannot represent the similarity's part in those
+#'   directions, so `tcc()` and `rtcc()` mix in a little independent noise,
+#'   `0.99999 * correlation + 0.00001 * c(1, rep(0, n_options / 2))`, and say
+#'   so. Measured against the correlation as given (a brute-force argmax of
+#'   `d * f + z`), this moved `d` by at most 0.06 SE at 2,000 trials with the
+#'   measured correlation, for `d` from 0.5 to 12 and von Mises, Laplace and
+#'   exponential similarities, and the response probabilities by a
+#'   Kullback-Leibler divergence of at most 3.4e-5 per trial with
+#'   `exp(-(x / 15)^2)`. Dropping the similarity's part in those directions
+#'   instead biased `d` by up to 0.7 SE, and 100 times as much independent
+#'   noise by up to 0.56 SE. `tcc()` refuses a correlation with noise in so
+#'   few directions that most of the similarity lies where only this
+#'   independent noise reaches, such as `(1 + cos(x)) / 2`: its table would
+#'   need a precision it was not checked at (`rtcc()` still simulates it). A
+#'   correlation that falls off like `exp(-x / 10)` has no such directions and
+#'   is used as given. Correlated noise needs `noise = "gaussian"` and the
+#'   full wheel.
 #'
 #'   The response probabilities have no closed form, so the likelihood reads
 #'   them from a table that `bmm()` estimates by Monte Carlo before
@@ -580,6 +587,7 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
              !isTRUE(is.finite(correlation_draws) && correlation_draws >= 6000),
            "`correlation_draws` must be a single number of at least 6000.")
     correlation_draws <- .tcc_corr_rotations * ceiling(correlation_draws / .tcc_corr_rotations)
+    correlation <- .tcc_with_nugget(correlation, inform = TRUE)
   }
   .model_tcc(resp_error = resp_error, similarity = similarity, n_options = n_options,
              units = units, noise = noise, d_max = d_max, options = options,
@@ -646,13 +654,8 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
          "`similarity` must vary with distance when `correlation` is given: a \\
          constant similarity gives every option the same mean signal, so `d` cannot \\
          be estimated.")
-  setup <- .tcc_corr_setup(correlation, similarity)
-  stopif(!isTRUE(setup$dropped <= 1e-6),
-         "`correlation` leaves no noise in directions that carry \\
-         {signif(setup$dropped, 3)} of the variation of `similarity` (at most 1e-6 \\
-         is allowed). Its circulant matrix is singular there; mix in a little \\
-         independent noise, such as `0.999 * correlation + 0.001 * c(1, rep(0, \\
-         {n_options / 2}))`.")
+  # tcc() fits the correlation with its nugget, if it needs one
+  setup <- .tcc_corr_setup(.tcc_with_nugget(correlation), similarity)
   # the table's drift grid pads the d grid by 16 / kappa in steps of 0.01, so
   # a kappa of 0.016 needs 1e5 bins and over 1 GB at d_max = 30; exponential
   # and measured correlations gave 0.9 to 1.3 with the similarities tried
@@ -660,6 +663,15 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
          "`similarity` varies too little across options, relative to the noise \\
          `correlation` gives it, for the correlated-noise table (kappa = \\
          {signif(setup$kappa, 2)}, at least 0.1 is needed).")
+  # a large kappa comes from a similarity that lies mostly where the nugget is
+  # the only noise. The drift grid's step of 0.01 resolved Phi(kappa (s - d))
+  # up to a kappa of 212; at 922 (rank 3 on the full wheel) P(target) came out
+  # 0.3 % low against a brute-force argmax, in every one of five seeds (S13)
+  stopif(setup$kappa > 250,
+         "`correlation` has noise in too few directions, relative to where \\
+         `similarity` varies, for the correlated-noise table (kappa = \\
+         {signif(setup$kappa, 3)}, at most 250 is supported): most of the \\
+         similarity lies in directions with almost no noise.")
 }
 
 # the full wheel prints nothing here, so that print() of tcc() without option
