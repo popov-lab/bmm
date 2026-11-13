@@ -307,6 +307,11 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_true(all(abs(y * 6 / pi - round(y * 6 / pi)) < 1e-12))
   expect_within_mc(y == 0, 0.3484979, "tcc P(target)")
   expect_within_mc(cos(y), 0.5483012, "tcc")
+  # Gumbel noise: the softmax of d f over the options
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, noise = "gumbel")
+  y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
+  expect_within_mc(y == 0, 0.2254180, "tcc gumbel P(target)")
+  expect_within_mc(cos(y), 0.3218072, "tcc gumbel")
   bins <- simulate_data(tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, units = "bins"),
                         list(d = 0.5), n_trials = 50)$y
   expect_true(all(bins %in% -5:6))
