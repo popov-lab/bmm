@@ -157,6 +157,16 @@ test_that("rsdm() draws each observation from its own location, strength and pre
       obs <- cos(x[group_of(n, 2) == k])
       expect_mean_near(obs, ref, sd(obs) / sqrt(length(obs)))
     }
+    # c and kappa of lengths that are not multiples of each other: six groups;
+    # the quadrature is split at the peak, where the Laplace activation has a kink
+    x <- do.call(rsdm, c(list(n, mu = 0, c = c(0.5, 4), kappa = c(1, 3, 6)), cell))
+    for (k in 1:6) {
+      dens <- function(t) do.call(dsdm, c(list(t, 0, pick(c(0.5, 4), k), pick(c(1, 3, 6), k)), cell))
+      ref <- integrate(function(t) cos(t) * dens(t), -pi, 0, rel.tol = 1e-10)$value +
+        integrate(function(t) cos(t) * dens(t), 0, pi, rel.tol = 1e-10)$value
+      obs <- cos(x[group_of(n, 6) == k])
+      expect_mean_near(obs, ref, sd(obs) / sqrt(length(obs)))
+    }
     # n not a multiple of the parameter length: draw i takes element i, and a
     # sharp density puts every draw on its location's side of zero
     x <- NULL
@@ -165,6 +175,49 @@ test_that("rsdm() draws each observation from its own location, strength and pre
     # n = 2, as in posterior_predict(ndraws = 2), pairs as well
     x <- replicate(10, do.call(rsdm, c(list(2, mu = c(-2, 2)), sharp[[activation]], cell)))
     expect_equal(sign(x), matrix(c(-1, 1), 2, 10))
+  }
+})
+
+test_that("dsdm() with n_options recycles alike for every activation", {
+  # x sits on the options, so that every value is finite
+  offered <- c(-pi / 2, 0, pi / 4, pi / 2, pi)
+  for (activation in c("vonmises", "laplace")) {
+    expect_elementwise(dsdm, list(x = c(0, pi / 2), mu = c(0, 1, 2), c = c(2, 3, 4, 5), kappa = c(1, 5, 20)),
+                       fixed = list(activation = activation, n_options = 8, log = TRUE))
+    expect_elementwise(dsdm, list(x = c(0, pi / 2), mu = c(0, 1, 2), c = c(2, 3, 4, 5), kappa = c(1, 5, 20)),
+                       fixed = list(activation = activation, n_options = 8, options = offered, log = TRUE))
+  }
+})
+
+test_that("rsdm() with n_options draws each observation from its own parameters", {
+  withr::local_seed(4442)
+  n <- 3000
+  K <- 8
+  centres <- seq(1 - K / 2, K / 2) * 2 * pi / K
+  # E[cos(x - mu)] over the options, each weighted by its probability from
+  # dsdm(); the standard error comes from the same weights, as a sharp group can
+  # put every draw on one option
+  expect_group_means <- function(x, mu, c_, kappa, cell, G = max(lengths(list(mu, c_, kappa)))) {
+    g <- group_of(length(x), G)
+    for (k in unique(g)) {
+      p <- do.call(dsdm, c(list(centres, pick(mu, k), pick(c_, k), pick(kappa, k)), cell)) * 2 * pi / K
+      v <- cos(centres - pick(mu, k))
+      ref <- sum(v * p)
+      expect_mean_near(cos(x[g == k] - pick(mu, k)), ref, sqrt(sum((v - ref)^2 * p) / sum(g == k)))
+    }
+  }
+  for (activation in c("vonmises", "laplace")) {
+    cell <- list(activation = activation, scaling = "density", n_options = K)
+    x <- do.call(rsdm, c(list(n, mu = c(-2, 0, 2), c = c(2, 4, 3), kappa = c(2, 10, 5)), cell))
+    expect_length(x, n)
+    expect_true(all(x %in% centres))
+    expect_group_means(x, c(-2, 0, 2), c(2, 4, 3), c(2, 10, 5), cell)
+    # c longer than kappa, and lengths that are not multiples of each other
+    # (six groups): c* pairs them draw by draw
+    x <- do.call(rsdm, c(list(n, mu = 0, c = c(0.5, 10), kappa = 5), cell))
+    expect_group_means(x, 0, c(0.5, 10), 5, cell)
+    x <- do.call(rsdm, c(list(n, mu = 0, c = c(0.5, 10), kappa = c(1, 5, 20)), cell))
+    expect_group_means(x, 0, c(0.5, 10), c(1, 5, 20), cell, G = 6)
   }
 })
 
