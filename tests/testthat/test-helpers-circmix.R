@@ -770,10 +770,15 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 # which alone accounts for differences of ~1e-7. The cells *_e are one-component
 # variable-precision rows with their own kappa and tau, and the cells *_s are
 # points at which circmix_vp_slopes() is evaluated; a call without them passes
-# none. The CSV round trip at sig_figs = 18 returns some large values garbled
-# (cmdstan 2.40.0: 1e13 came back as 4.9e-311, -3.18e14 as NaN, while -6.36e14
-# survived), which #710 had read as Stan returning NaN or -1.75e307; compare
-# only values of moderate size, or scale them down in generated quantities.
+# none. cmdstan writes the CSV correctly, but cmdstanr 0.9.0 reads the draws
+# with data.table::fread(), which types a column that prints as an integer
+# beyond int32 as integer64, and its bits are then read as a double: 1e13 came
+# back as 4.9e-311 (1e13 * 2^-1074), -3.18e14 as NaN and -2e16 as -1.75e307,
+# which #710 had read as Stan returning NaN or -1.75e307. Any output printed
+# without a decimal point and beyond int32 is garbled: a whole number such as
+# 1e13, and at sig_figs = 18 every |x| >= 1e17; -6.36e14 survived only because
+# it had a fraction. Compare only values of moderate size, or scale them down
+# in generated quantities.
 circmix_stan_values <- function(data) {
   data <- utils::modifyList(list(
     NE = 0L, y_e = numeric(0), logw_e = numeric(0), logw_guess_e = numeric(0),
@@ -1307,7 +1312,9 @@ test_that("the uniform cut of variable precision sits at J / sqrt(tau) = 1e-17",
 })
 
 # The reference is R's dgamma(), accurate for shape > 1 (Loader's saddle point)
-# and below 1 while shape / J does not underflow
+# and below 1 while shape / J does not underflow. At shape 1e7 the two differ
+# by 4.6e-12 on macOS arm64, of which 3.8e-12 is dgamma()'s own error; the
+# bound leaves room for another libm.
 test_that(".circmix_vp_log_gamma() is the log density of log J", {
   cells <- expand.grid(shape = c(1e-3, 0.5, 1.999, 2, 9.99, 10, 10.01, 50, 1e4, 1e7), z = c(-3, -0.5, 0, 0.5, 2))
   tau <- 0.3
@@ -1316,7 +1323,7 @@ test_that(".circmix_vp_log_gamma() is the log density of log J", {
   expect_lt(
     max(abs(.circmix_vp_log_gamma(t, cells$shape, tau) -
       (t + stats::dgamma(exp(t), shape = cells$shape, scale = tau, log = TRUE)))),
-    1e-11
+    1e-10
   )
 })
 
@@ -1331,6 +1338,21 @@ test_that(".circmix_vp_log_gamma() is finite where dgamma(log = TRUE) underflows
     .circmix_vp_log_gamma(t, shape, tau),
     shape * (t - log(tau)) - exp(t) / tau - lgamma(shape),
     tolerance = 1e-14
+  )
+})
+
+# The same underflow end to end: at kappa 1e140 and tau 1e250 (shape 1e-110)
+# the integrand of a response on the item peaks near J = tau, where
+# dgamma(log = TRUE) was -Inf, and R gave -1.83 against Stan's 34.057 (#710).
+# The density is E[sqrt(J / (2 pi))], as in ".circmix_vp_ld() is accurate at a
+# huge kappa or tau for a response on the item"; the tail grid, whose step is
+# 7.4 in log J at this tau, holds it to 0.14 nats.
+test_that(".circmix_vp_ld() keeps the mass of the tail grid where dgamma(log = TRUE) underflows", {
+  shape <- .circmix_J(1e140) / 1e250
+  expect_lt(
+    abs(.circmix_vp_ld(matrix(1), matrix(0), -Inf, 1e140, 1e250) -
+      (0.5 * log(1e250 / (2 * pi)) + lgamma(shape + 0.5) - lgamma(shape))),
+    0.2
   )
 })
 
