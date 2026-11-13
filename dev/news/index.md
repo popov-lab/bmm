@@ -444,25 +444,6 @@
   `pimm()` and `qimm()` are removed. They were never implemented and
   always stopped with an error
   ([\#556](https://github.com/popov-lab/bmm/issues/556)).
-
-#### Changes to default priors
-
-- bmm now states its policy on default priors: a default prior changes
-  only in a minor release (1.5.0, 1.6.0) and is listed under this
-  heading; no default changes in a patch release (1.5.x). bmm 1.6.0 will
-  record the prior set a fit used and let you ask for an older set, so
-  older analyses can be reproduced.
-
-#### Companion packages
-
-- [`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
-  is the model contract of ADR 0005, at contract version 0.9 (`"1.0"` in
-  bmm 1.6.0). bmmtools and bmm-explorer read it from this release on. A
-  later change to a field it returns is announced under this heading
-  ([\#633](https://github.com/popov-lab/bmm/issues/633)).
-
-#### Deprecated functions and arguments
-
 - The forms deprecated in bmm 0.4 and 1.0
   ([`fit_model()`](https://venpopov.com/bmm/dev/reference/bmm.md),
   [`IMMfull()`](https://venpopov.com/bmm/dev/reference/imm.md),
@@ -481,6 +462,22 @@
   `imm(version = "abc")`, `imm(version = "bsc")`,
   [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md), `set_size`
   and `cores` instead.
+
+#### Changes to default priors
+
+- bmm now states its policy on default priors: a default prior changes
+  only in a minor release (1.5.0, 1.6.0) and is listed under this
+  heading; no default changes in a patch release (1.5.x). bmm 1.6.0 will
+  record the prior set a fit used and let you ask for an older set, so
+  older analyses can be reproduced.
+
+#### Companion packages
+
+- [`model_spec()`](https://venpopov.com/bmm/dev/reference/model_spec.md)
+  is the model contract of ADR 0005, at contract version 0.9 (`"1.0"` in
+  bmm 1.6.0). bmmtools and bmm-explorer read it from this release on. A
+  later change to a field it returns is announced under this heading
+  ([\#633](https://github.com/popov-lab/bmm/issues/633)).
 
 #### Other changes
 
