@@ -299,6 +299,17 @@ test_that("simulated statistics of the circular models match their densities", {
   y <- simulate_data(model, list(kappa = exp(1), c = 2, a = 0.5, s = 1, tau = 1), display,
                      scale = "native")$y
   expect_within_mc(cos(y), 0.2972343, "imm variable precision")
+
+  # tcc: P(option k) = integral of dnorm(z - d f_k) prod_j pnorm(z - d f_j) dz,
+  # by quadrature with d = e^0.5 on a wheel of 12 with f = exp(-(0:6) / 2)
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12)
+  y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
+  expect_true(all(abs(y * 6 / pi - round(y * 6 / pi)) < 1e-12))
+  expect_within_mc(y == 0, 0.3484979, "tcc P(target)")
+  expect_within_mc(cos(y), 0.5483012, "tcc")
+  bins <- simulate_data(tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, units = "bins"),
+                        list(d = 0.5), n_trials = 50)$y
+  expect_true(all(bins %in% -5:6))
 })
 
 test_that("simulated decisions of the RT models match the closed forms", {
