@@ -54,7 +54,9 @@ Both fits run the same Stan model, so they give the same estimates. With that
 established, the rest of the article explains each difference in the code: where
 the response went, why every parameter gets its own formula, what
 `0 + setsize` and `1 + setsize` each give you, which scale the estimates are on,
-and why `bmm` sets informative default priors.
+and why `bmm` sets informative default priors. A later section does the same
+comparison for signal detection:
+[trial-level `sdt_yn()` against a probit generalized linear mixed model](#signal-detection-as-a-probit-glmm).
 
 # The same model, written twice
 
@@ -254,12 +256,13 @@ This is the equal-variance Gaussian signal detection model [@DeCarlo_1998]. In
 The probability of an "old" response is `pnorm(Intercept)` for a new item and
 `pnorm(Intercept + stimulus)` for a studied one, where `stimulus` stands for its
 coefficient. In signal detection terms, these are `pnorm(-criterion)` and
-`pnorm(d - criterion)`: the evidence of a new item is normal with mean 0 and SD
-1, that of a studied item normal with mean `d`, and the participant says "old"
-when the evidence lies above the criterion. The criterion is thus measured from
-the mean of the new items. Matching the two pairs of probabilities gives the
-intercept as minus the criterion and the `stimulus` coefficient as `d`. So each
-part of the `brms` model has a `bmm` name:
+`pnorm(d - criterion)`: the evidence of a new item is normal with mean 0 and
+standard deviation (SD) 1, that of a studied item normal with mean `d`, and the
+participant says "old" when the evidence lies above the criterion. The
+criterion is thus measured from the mean of the new items. Matching the two
+pairs of probabilities gives the intercept as minus the criterion and the
+`stimulus` coefficient as `d`. So each part of the `brms` model has a `bmm`
+name:
 
 | `bmm` (`sdt_yn()`) | `brms` probit GLMM |
 |---|---|
@@ -270,14 +273,16 @@ part of the `brms` model has a `bmm` name:
 | `(1 \| item)` in the formula of `d` | `stimulus` slope by `item` |
 | `(1 \| item)` in the formula of `criterion` | intercept by `item` |
 | `sdratio` (unequal variance) | none: the probit GLMM fixes both standard deviations at 1 |
-| `bias` (criterion measured from the midpoint between the two distributions) | minus the intercept, if `stimulus` is coded -0.5 / +0.5; none with the 0 / 1 coding used here |
-| `dist` (the distribution of the evidence) | partly: `bernoulli("logit")` is `dist = "logistic"` and `bernoulli("cloglog")` is `dist = "gumbel_max"`; no link gives `dist = "gumbel_min"` (see below the table) |
+| `bias` (criterion measured from the midpoint between the two distributions) | minus the intercept if `stimulus` is coded -0.5 / +0.5; with the 0 / 1 coding used here, `-(Intercept + stimulus / 2)` |
+| `dist` (the distribution of the evidence) | partly: `bernoulli("logit")` is `dist = "logistic"` and `bernoulli("cloglog")` is `dist = "gumbel_max"`; no link gives `dist = "gumbel_min"` for a response coded 1 = "old" (see below the table) |
 
 In the `dist` row, the link is that of the probability of an "old" response,
 whereas `?sdt_yn` gives each `dist` by the cumulative distribution function of
 the evidence. The function `1 - exp(-exp(x))`, the inverse of the complementary
 log-log link, is listed there under `"gumbel_min"`; the probability of "old"
-under `"gumbel_max"` is that same function of `d - criterion`.
+under `"gumbel_max"` is that same function of `d - criterion`. With the response
+coded 1 for "new" instead, `bernoulli("cloglog")` gives `dist = "gumbel_min"`:
+the probability of "new" is that function of `criterion - d * stimulus`.
 
 `stimulus` itself appears in no `bmm` formula: it is named in the model object,
 `sdt_yn(stimulus = "stimulus")`, and `d` is its effect, so a predictor in the
@@ -290,8 +295,9 @@ the `criterion` coefficients are the intercept and `cond` coefficients, each
 multiplied by -1.
 
 The intercept by participant changes sign along with the intercept, so its
-standard deviation (SD) is the SD of the criterion. Beyond the parameters,
-`bmm` adds the ROC and AUC helpers that the
+SD is the SD of the criterion. Beyond the parameters, `bmm` adds helpers for the
+receiver operating characteristic (ROC) and the area under the ROC curve (AUC),
+which the
 [signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
 describes.
 
@@ -400,9 +406,9 @@ terms of `d` and `criterion` a shared ID, `(1 | p | id)`, to add them in `bmm`.
 The `bmm` correlation is that of `d` and `criterion`, which is minus the `brms`
 correlation of slope and intercept, because the intercept is minus the
 criterion. The default priors on a correlation also differ: `brms` uses
-LKJ(1) and `bmm` uses LKJ(2), as `make_stancode()` and `stancode()` of the two
-models show. `prior(lkj(2), class = cor)` gives the `brms` model the `bmm`
-prior.
+LKJ(1) and `bmm` uses LKJ(2): `make_stancode()` of the `brms` model shows
+LKJ(1), and `stancode()` of a `bmm` model with `(1 | p | id)` shows LKJ(2).
+`prior(lkj(2), class = cor)` gives the `brms` model the `bmm` prior.
 
 The table puts the estimates of the two fits next to the values we simulated
 from, each as the posterior mean and its 95% credible interval (CrI). The
@@ -867,6 +873,9 @@ want to change a model beyond what `bmm` offers, these give you the `brms` code 
   covers the formula syntax.
 - The [mixture models article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
   fits the two- and three-parameter mixture models to a larger data set.
+- The [signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
+  covers the yes/no, rating, m-AFC and ranking models, with counts or trial
+  rows.
 - [Extracting model information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows how to get the default priors, the Stan code and the Stan data before
   you fit.

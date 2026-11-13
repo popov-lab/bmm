@@ -100,10 +100,12 @@ only the ingredients are SDT-specific.
    counts in the columns the constructor names, or one row per trial. For trial
    rows, `response` names one column: the 0/1 response for `sdt_yn()` and
    `sdt_mafc()`, which then take no `n_trials`, the rating for `sdt_rating()`,
-   and the target's rank for `sdt_ranking()`. Trial rows allow item random
-   effects; without item or trial-level terms, counts give the same posterior
-   in less time. The Rating SDT section below shows a real reshaping example
-   into counts.
+   and the target's rank for `sdt_ranking()`. `sdt_rating()` also needs
+   `n_ratings`, the number of rating categories. `sdt_ranking()` takes `m` as
+   for counts, a number or the name of a column with each trial's set size.
+   Trial rows allow item random effects; without item or trial-level terms,
+   counts give the same posterior in less time. The Rating SDT section below
+   shows a real reshaping example into counts.
 2. **Create the model object.** The constructor maps your column names onto the
    model's response format — for example `sdt_yn(response = "n_old",
    stimulus = "stimulus", n_trials = "n_trials")` — and selects the noise

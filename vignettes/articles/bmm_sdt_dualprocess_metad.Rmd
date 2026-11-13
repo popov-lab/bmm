@@ -73,8 +73,9 @@ ROC:
   correct, separately from how well they discriminate old from new.
 
 Both are *versions of the same rating model* — they consume identical data
-(counts per confidence category, with a 0/1 `stimulus` column) and reduce to the
-standard model when their extra parameter is switched off. They are selected with
+(counts per confidence category, or one row per trial with `n_ratings`, and a
+0/1 `stimulus` column) and reduce to the standard model when their extra
+parameter is switched off. They are selected with
 the `version` argument of `sdt_rating()`:
 
 | `version` | extra parameter(s) | captures | reduces to standard when |
@@ -457,8 +458,9 @@ performance, which is why it has become the standard index of metacognitive
 efficiency [@Maniscalco_Lau_2012; @Fleming_2017].
 
 Two cautions carry over from the rest of SDT. First, like all the rating models
-here, meta-d′ is fit to *aggregated counts*, so the type-2 estimate is only as
-informative as the number of trials per confidence category. Second, meta-d′
+here, meta-d′ is fit to counts per confidence category, given as counts or as
+one row per trial, so the type-2 estimate is only as informative as the number
+of trials per confidence category. Second, meta-d′
 inherits the standard model's assumptions about how confidence criteria are
 placed; systematic `pp_check()` deviations flag when those assumptions strain.
 
@@ -559,8 +561,9 @@ rotello_long <- rbind(
 head(rotello_long)
 ```
 
-Like `sdt_rating()`, the model itself is fit to **aggregated counts** — one row
-per cell and one count column per response category.
+Like `sdt_rating()`, the model takes either **aggregated counts** — one row
+per cell and one count column per response category — or one row per trial, with
+the columns named in `judgment` and `confidence`. Here we use counts.
 `aggregate_sdt_cdp_data()` pivots the long rows into these canonical columns;
 every column other than `judgment`, `confidence`, and `count` (here just
 `stimulus`) defines the cells and is carried over:
