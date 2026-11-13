@@ -56,7 +56,7 @@ test_that("Stan programs are compiled only at the registered sites (R1)", {
       "test-model_sdt_cdp.R" = 3L,
       "test-model_sdt_mafc.R" = 1L,
       "test-model_sdt_ranking.R" = 1L,
-      "test-model_sdt_rating.R" = 2L,
+      "test-model_sdt_rating.R" = 3L,
       "test-model_sdt_yn.R" = 2L,
       "test-sdt-rating-versions.R" = 1L
     ),

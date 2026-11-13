@@ -7,8 +7,9 @@
 # =============================================================================
 
 # models whose stored frame check_data() accepts as it is, so that update() has
-# nothing to route
-frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm")
+# nothing to route; sdt_rating()'s trial family reads the user's rating column
+frame_is_user_layout <- c("cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm",
+                          "sdt_rating_trial_level")
 
 for (case_name in names(stored_frame_cases())) {
   test_that(paste0("only a slice of a fit's model frame counts as stored data (", case_name, ")"), {
