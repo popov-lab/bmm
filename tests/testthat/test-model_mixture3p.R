@@ -112,6 +112,7 @@ test_that("dmixture3p() refuses node counts the model refuses", {
 })
 
 test_that("rmixture3p() draws from dmixture3p()", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(445)
   compare <- function(n = 2e5, n_bins = 20, ...) {
     draws <- rmixture3p(n, ...)
@@ -124,7 +125,11 @@ test_that("rmixture3p() draws from dmixture3p()", {
   }
   compare(mu = c(0, 2, -1.5), kappa = 6, p_mem = 0.6, p_nt = 0.2)
   compare(mu = c(0, 2, -1.5), kappa = 6, p_mem = 0.6, p_nt = 0.2, tau = 1.5)
+  # each capacity version below and above the set size of 3: above it every
+  # item is stored, below it the slot-averaging sampler guesses
   compare(mu = c(0, 2, -1.5), kappa = 6, K = 2, ptarget = 0.7, version = "slot")
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 4.5, ptarget = 0.7, version = "slot")
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 2, ptarget = 0.7, version = "slot_averaging")
   compare(mu = c(0, 2, -1.5), kappa = 6, K = 4.5, ptarget = 0.7, version = "slot_averaging")
 })
 

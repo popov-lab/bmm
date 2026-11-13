@@ -834,7 +834,10 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param n Number of observations to generate data for
 #' @param mu Vector of locations. First value represents the location of the
 #'   target item and any additional values indicate the location of non-target
-#'   items.
+#'   items. The number of locations is the set size the `"slot"` and
+#'   `"slot_averaging"` versions use, so pass the target and every non-target
+#'   of the trial: for a trial of a fitted model, the target followed by the
+#'   first `set_size - 1` columns of `nt_features`.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`. Under `"slot_averaging"` it is the precision of an item
@@ -880,6 +883,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   Variability in encoding precision accounts for visual short-term memory
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
+#'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
+#'   representations in visual working memory. Nature, 453(7192), 233-235.
+#'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
 #'   and `rmixture3p` gives the random generation function for the
 #'   three-parameter mixture model.
@@ -891,7 +897,7 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' r <- rmixture3p(10000, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
 #' x <- seq(-pi, pi, length.out = 10000)
 #' d <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
-#' hist(r, breaks = 60, freq = FALSE)
+#' hist(r, breaks = 60, freq = FALSE, ylim = c(0, 0.9))
 #' lines(x, d, type = "l", col = "red")
 #'
 #' # slot averaging: with 6 slots for 3 items each item holds two slots

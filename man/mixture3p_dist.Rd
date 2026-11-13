@@ -37,7 +37,10 @@ rmixture3p(
 
 \item{mu}{Vector of locations. First value represents the location of the
 target item and any additional values indicate the location of non-target
-items.}
+items. The number of locations is the set size the \code{"slot"} and
+\code{"slot_averaging"} versions use, so pass the target and every non-target
+of the trial: for a trial of a fitted model, the target followed by the
+first \code{set_size - 1} columns of \code{nt_features}.}
 
 \item{kappa}{Vector of precision values. With \code{tau > 0} this is the
 concentration of the average trial, whose Fisher information \code{J(kappa)} is
@@ -102,7 +105,7 @@ the capacity \code{K} and \code{ptarget}, as \code{\link[=mixture3p]{mixture3p()
 r <- rmixture3p(10000, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
 x <- seq(-pi, pi, length.out = 10000)
 d <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
-hist(r, breaks = 60, freq = FALSE)
+hist(r, breaks = 60, freq = FALSE, ylim = c(0, 0.9))
 lines(x, d, type = "l", col = "red")
 
 # slot averaging: with 6 slots for 3 items each item holds two slots
@@ -119,5 +122,8 @@ resource. Journal of Vision, 9(10), Article 7.
 van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 Variability in encoding precision accounts for visual short-term memory
 limitations. PNAS, 109(22), 8780-8785.
+
+Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
+representations in visual working memory. Nature, 453(7192), 233-235.
 }
 \keyword{distribution}

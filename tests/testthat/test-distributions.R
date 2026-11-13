@@ -494,6 +494,31 @@ test_that("the capacity versions of dmixture3p recycle their parameters", {
   }
 })
 
+# draw i takes element i of every parameter recycled to n, as density i of
+# dmixture3p() does, whether n is shorter or longer than the parameters
+test_that("the capacity versions of rmixture3p recycle their parameters to n draws", {
+  withr::local_seed(711)
+  odd <- seq(1, 2000, by = 2)
+  for (version in c("slot", "slot_averaging")) {
+    for (n in c(3, 12)) {
+      expect_length(
+        rmixture3p(n, K = c(1, 2, 4, 5, 6), ptarget = c(0.4, 0.9),
+                   kappa = c(3, 10, 20), tau = c(0, 1), version = version),
+        n
+      )
+    }
+    # K near 0 guesses (uniform, SD 1.81), K = 300 stores the target (SD 0.07)
+    r <- rmixture3p(2000, kappa = 200, K = c(1e-9, 300), ptarget = 1, version = version)
+    expect_gt(sd(r[odd]), 1.5)
+    expect_lt(sd(r[-odd]), 0.2)
+    # at full capacity ptarget = 0 reports a non-target, at 2 or -1.5
+    r <- rmixture3p(2000, mu = c(0, 2, -1.5), kappa = 200, K = 3, ptarget = c(1, 0),
+                    version = version)
+    expect_lt(mean(abs(r[odd])), 0.2)
+    expect_gt(mean(abs(r[-odd])), 1.5)
+  }
+})
+
 # with one item there is nothing to swap to, so ptarget drops out and the slot
 # model is that of mixture2p
 test_that("the slot version of dmixture3p at set size 1 is the mixture2p slot model", {
