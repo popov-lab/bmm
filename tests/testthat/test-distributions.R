@@ -431,7 +431,8 @@ test_that("dmixture3p recycles its parameters to the longest argument", {
 # capacity too, where slot averaging gives an item several slots (#711)
 test_that("dmixture3p matches the mixture3p likelihood of every version at every K", {
   x <- seq(-pi, pi, length.out = 7)
-  mu <- c(0, 2, -1.5, 1)
+  # a target away from 0, so a call that drops mu[1] shows
+  mu <- c(0.5, 2, -1.5, 1)
   set_size <- length(mu)
   internal <- list(slot = .dmixture3p_slot, slot_averaging = .dmixture3p_slot_averaging)
   for (version in names(internal)) {
@@ -532,6 +533,9 @@ test_that("the capacity versions of rmixture3p recycle their parameters to n dra
                     version = version)
     expect_lt(mean(abs(r[odd])), 0.2)
     expect_gt(mean(abs(r[-odd])), 1.5)
+    # a target away from 0, so a sampler that drops mu[1] shows
+    r <- rmixture3p(2000, mu = c(1, 2.5, -1.5), kappa = 200, K = 3, ptarget = 1, version = version)
+    expect_lt(abs(mean(r) - 1), 0.05)
   }
 })
 
@@ -559,19 +563,23 @@ test_that("the capacity versions of dmixture3p integrate to 1", {
 })
 
 test_that("dmixture3p and rmixture3p warn about the arguments a version ignores", {
-  expect_warning(dmixture3p(0.3, K = 2), "'simple' version of mixture3p ignores 'K'")
-  expect_warning(
-    rmixture3p(2, ptarget = 0.5), "'simple' version of mixture3p ignores 'ptarget'"
-  )
-  expect_warning(
-    dmixture3p(0.3, p_mem = 0.5, p_nt = 0.1, version = "slot"),
-    "'slot' version of mixture3p ignores 'p_mem', 'p_nt'"
-  )
-  expect_warning(
-    rmixture3p(2, p_nt = 0.1, version = "slot_averaging"),
-    "'slot_averaging' version of mixture3p ignores 'p_nt'"
-  )
-  expect_no_warning(dmixture3p(0.3, K = 2, ptarget = 0.5, version = "slot"))
+  for (fun in list(function(...) dmixture3p(0.3, ...), function(...) rmixture3p(2, ...))) {
+    # invalid values, because an ignored argument is not checked; the anchor
+    # stops 'K' from matching "'K', 'ptarget'"
+    expect_warning(fun(K = 0), "'simple' version of mixture3p ignores 'K'\\.$")
+    expect_warning(fun(ptarget = 2), "'simple' version of mixture3p ignores 'ptarget'\\.$")
+    expect_warning(
+      fun(p_mem = 0.5, version = "slot"), "'slot' version of mixture3p ignores 'p_mem'\\.$"
+    )
+    expect_warning(
+      fun(p_mem = 0.5, p_nt = 0.1, version = "slot_averaging"),
+      "'slot_averaging' version of mixture3p ignores 'p_mem', 'p_nt'"
+    )
+    expect_warning(
+      fun(p_nt = 0.1, version = "slot"), "'slot' version of mixture3p ignores 'p_nt'\\.$"
+    )
+    expect_no_warning(fun(K = 2, ptarget = 0.5, version = "slot"))
+  }
 })
 
 test_that("the capacity versions of dmixture3p and rmixture3p check K and ptarget", {
@@ -579,7 +587,14 @@ test_that("the capacity versions of dmixture3p and rmixture3p check K and ptarge
     expect_error(fun(K = 0, version = "slot"), "K must be positive")
     expect_error(fun(ptarget = 1.2, version = "slot_averaging"), "ptarget must be between 0 and 1")
     expect_error(fun(version = "slots"), "should be one of")
+    expect_error(fun(ptarget = -0.1, version = "slot"), "ptarget must be between 0 and 1")
+    expect_error(fun(K = c(2, -1), version = "slot_averaging"), "K must be positive")
+    expect_error(fun(kappa = -1, version = "slot"), "kappa must be non-negative")
+    expect_error(fun(tau = -1, version = "slot_averaging"), "tau must be non-negative")
   }
+  expect_error(
+    dmixture3p(0.1, tau = 1, vp_nodes = 21, version = "slot"), "odd number of at least 41"
+  )
 })
 
 test_that("dimm integrates to 1", {
