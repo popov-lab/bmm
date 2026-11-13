@@ -154,12 +154,6 @@
   new level gives one new participant, whose interval is not a credible
   interval for the population mean
   ([\#531](https://github.com/popov-lab/bmm/issues/531)).
-- mixture2p, mixture3p and imm: a fit with `variable_precision = TRUE`
-  that has divergent transitions now warns when its posterior presses
-  against the smallest gamma shape the quadrature accepts, 60 /
-  `vp_nodes`, and names the `vp_nodes` to refit with. Before, such a fit
-  showed only the divergences. The refit takes about 1.5 times as long
-  ([\#398](https://github.com/popov-lab/bmm/issues/398)).
 - mixture2p:
   [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
   gains `version = "slot"` and `version = "slot_averaging"`, the
@@ -187,16 +181,17 @@
   trial (van den Berg et al., 2012) and adds the parameter `tau`; `tau`
   near 0 is the constant-precision model, and `kappa` then describes the
   average trial (under slot averaging, the average slot). It works with
-  every version. Fits take much longer, and `tau` needs a lot of data.
-  `vp_nodes` sets the accuracy of the integral; where it is too low,
-  Stan rejects the proposal and says how far to raise it.
+  every version, also when precision varies strongly between trials.
+  Fits take much longer, and `tau` needs a lot of data. `vp_nodes`
+  trades accuracy against speed; keep the default of 81 for fitting.
   [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
   [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
   [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
   [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
   [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) and
   [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) gain
-  `tau` ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+  `tau` ([\#398](https://github.com/popov-lab/bmm/issues/398),
+  [\#695](https://github.com/popov-lab/bmm/issues/695)).
 - mixture2p, mixture3p and imm: the `links` argument is now applied,
   e.g. `imm(..., links = list(c = "softplus"))`. Before, these models
   refused any link change. mixture3p still refuses links on its mixture

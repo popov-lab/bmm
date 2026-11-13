@@ -85,7 +85,7 @@ IMMabc(resp_error, nt_features, set_size, regex = FALSE, ...)
   Number of quadrature nodes used when `variable_precision = TRUE`; must
   be an odd number of at least 41, default 81. See
   [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
-  for the accuracy this buys and the shapes it refuses.
+  for the accuracy this gives.
 
 - links:
 
