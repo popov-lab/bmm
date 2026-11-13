@@ -448,6 +448,15 @@ test_that("dmixture3p matches the mixture3p likelihood of every version at every
       }
     }
   }
+  # the simple likelihood takes the log odds of a target and of a non-target
+  # response against a guess, here 0.5 and 0.2 against 0.3
+  for (tau in c(0, 1)) {
+    expect_equal(
+      dmixture3p(x, mu = mu, kappa = 8, p_mem = 0.5, p_nt = 0.2, tau = tau,
+                 vp_nodes = 41L, log = TRUE),
+      .dmixture3p_simple(x, mu[1], 8, log(0.5 / 0.3), log(0.2 / 0.3), set_size, mu[-1], tau, 41L)
+    )
+  }
 })
 
 # the capacity versions written as the "simple" mixture they reduce to, so that
@@ -525,7 +534,8 @@ test_that("the capacity versions of rmixture3p recycle their parameters to n dra
     expect_lt(sd(r[odd]), 0.2)
     expect_gt(sd(r[-odd]), 1)
     # this test runs on CRAN, the draws test does not: above capacity every
-    # item is stored, and no weight may leave [0, 1]
+    # item is stored, and no weight may leave [0, 1]; a NaN weight would leave
+    # a draw at its initial 0
     expect_no_warning(r <- rmixture3p(200, kappa = 200, K = 300, ptarget = 1, version = version))
     expect_true(all(r != 0))
     # at full capacity ptarget = 0 reports a non-target, at 2 or -1.5
@@ -539,15 +549,47 @@ test_that("the capacity versions of rmixture3p recycle their parameters to n dra
   }
 })
 
-# with one item there is nothing to swap to, so ptarget drops out and the slot
-# model is that of mixture2p
-test_that("the slot version of dmixture3p at set size 1 is the mixture2p slot model", {
+# as for rmixture2p: under one seed, short parameter vectors give the draws of
+# the same vectors recycled to n by hand, so draw i pairs element i of every
+# parameter, in the non-target weights too
+test_that("rmixture3p draws as with its parameters recycled to n by hand", {
+  draw <- function(n, ...) withr::with_seed(711, rmixture3p(n, ...))
+  pars <- list(
+    simple = list(p_mem = c(0.5, 0.7), p_nt = c(0.1, 0.2, 0.3, 0.2)),
+    slot = list(K = c(1, 2, 4, 5, 6), ptarget = c(0.4, 0.9)),
+    slot_averaging = list(K = c(1, 2, 4, 5, 6), ptarget = c(0.4, 0.9))
+  )
+  for (version in names(pars)) {
+    for (n in c(3, 7)) {
+      short <- c(pars[[version]], list(kappa = c(3, 10, 20), tau = c(0, 1)))
+      expect_identical(
+        do.call(draw, c(list(n), short, version = version)),
+        do.call(draw, c(list(n), lapply(short, rep_len, n), version = version))
+      )
+    }
+  }
+})
+
+# with one item there is nothing to swap to, so ptarget drops out and each
+# capacity version is that of mixture2p: the same density and, under one seed,
+# the same draws
+test_that("the capacity versions of mixture3p at set size 1 are those of mixture2p", {
   x <- seq(-pi, pi, length.out = 7)
-  for (K in c(0.5, 2)) {
-    expect_equal(
-      dmixture3p(x, mu = 0, kappa = 6, K = K, ptarget = 0.3, version = "slot"),
-      dmixture2p(x, mu = 0, kappa = 6, K = K, set_size = 1, version = "slot")
-    )
+  for (version in c("slot", "slot_averaging")) {
+    for (K in c(0.5, 2)) {
+      expect_equal(
+        dmixture3p(x, mu = 0, kappa = 6, K = K, ptarget = 0.3, version = version),
+        dmixture2p(x, mu = 0, kappa = 6, K = K, set_size = 1, version = version)
+      )
+      expect_identical(
+        withr::with_seed(
+          711, rmixture3p(50, mu = 1, kappa = 6, K = K, ptarget = 0.3, version = version)
+        ),
+        withr::with_seed(
+          711, rmixture2p(50, mu = 1, kappa = 6, K = K, set_size = 1, version = version)
+        )
+      )
+    }
   }
 })
 
@@ -582,7 +624,7 @@ test_that("dmixture3p and rmixture3p warn about the arguments a version ignores"
   }
 })
 
-test_that("the capacity versions of dmixture3p and rmixture3p check K and ptarget", {
+test_that("the capacity versions of dmixture3p and rmixture3p check their arguments", {
   for (fun in list(function(...) dmixture3p(0.3, ...), function(...) rmixture3p(2, ...))) {
     expect_error(fun(K = 0, version = "slot"), "K must be positive")
     expect_error(fun(ptarget = 1.2, version = "slot_averaging"), "ptarget must be between 0 and 1")
