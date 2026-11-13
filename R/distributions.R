@@ -63,7 +63,7 @@
 #' [rmixture2p()], [rmixture3p()] and [rimm()] return `NA` for a draw whose
 #' parameters include an `NA` or `NaN`, and warn "NAs produced" once per call,
 #' as [stats::rnorm()] does. The other draws follow the parameters as usual,
-#' though a seed does not give them the values it gives when no parameter is
+#' though a seed need not give them the values it gives when no parameter is
 #' missing. [dmixture2p()], [dmixture3p()] and [dimm()] return `NA` for such
 #' an observation.
 #'
@@ -956,7 +956,7 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 .mixture3p_swap_weights <- function(p_target, set_size) {
   n <- length(p_target)
   if (set_size == 1) {
-    return(matrix(0, nrow = n))
+    return(matrix(0, nrow = n, ncol = 1))
   }
   cbind(
     log(p_target),

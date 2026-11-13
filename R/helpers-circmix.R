@@ -326,10 +326,10 @@
 # delta = t - log E[J]: shape log(shape) - shape - lgamma(shape) -
 # shape (e^delta - 1 - delta). Stan's gamma_lpdf() sums terms of size
 # shape log J, which cancel: from shape 1e7 on its rounding moved the log
-# density by up to 2.5e-8, at shape 6e13 by 0.35 nats, and it was NaN at shape
-# 1e12 with kappa 1e90. dgamma(log = TRUE) is accurate there but is -Inf once
-# shape / J underflows (tau 1e300 with shape 1e-108), which left the tail grid
-# without mass. Both twins use this form, whose error is about
+# density by up to 2.5e-8, at shape 6e13 by 0.27 nats (#710), and it was NaN
+# at shape 1e12 with kappa 1e90. dgamma(log = TRUE) is accurate there but is
+# -Inf once shape / J underflows (tau 1e300 with shape 1e-108), which left the
+# tail grid without mass. Both twins use this form, whose error is about
 # shape * 1e-16 * |delta| per node, so 1e-9 at shape 1e13.
 .circmix_vp_log_gamma <- function(t, shape, tau) {
   delta <- t - log(shape) - log(tau)
@@ -393,8 +393,8 @@
 # integrates out and is therefore an independent check on it.
 # A draw from a missing parameter is missing, with rnorm()'s warning, as its
 # density is; an NA tau had fallen to constant precision and an NA weight to
-# the first component (#710). Only complete rows draw, so a seed gives the
-# draws it gave before only for inputs without a missing value.
+# the first component (#710). Only complete rows draw, so with a missing value
+# the other draws can differ from those a seed gave before.
 .rcircmix <- function(mu, logw, logw_guess, kappa, tau) {
   out <- rep(NA_real_, nrow(mu))
   complete <- which(!matrixStats::rowAnyNAs(cbind(mu, logw, logw_guess, kappa, tau)))

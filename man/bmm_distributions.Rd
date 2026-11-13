@@ -72,7 +72,7 @@ An argument that a version does not use, such as \code{zr} of
 \code{\link[=rmixture2p]{rmixture2p()}}, \code{\link[=rmixture3p]{rmixture3p()}} and \code{\link[=rimm]{rimm()}} return \code{NA} for a draw whose
 parameters include an \code{NA} or \code{NaN}, and warn "NAs produced" once per call,
 as \code{\link[stats:rnorm]{stats::rnorm()}} does. The other draws follow the parameters as usual,
-though a seed does not give them the values it gives when no parameter is
+though a seed need not give them the values it gives when no parameter is
 missing. \code{\link[=dmixture2p]{dmixture2p()}}, \code{\link[=dmixture3p]{dmixture3p()}} and \code{\link[=dimm]{dimm()}} return \code{NA} for such
 an observation.
 }

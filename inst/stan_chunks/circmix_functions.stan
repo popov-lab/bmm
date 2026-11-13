@@ -118,7 +118,7 @@
            - u * (1.0 / 12 - u2 * (1.0 / 360 - u2 * (1.0 / 1260 - u2 * (1.0 / 1680 - u2 / 1188))));
   }
 
-  // log density of t = log J for J ~ gamma(shape, scale = tau), as .circmix_vp_log_gamma(); see there why not gamma_lpdf(). The return at delta > 700 is a guard only, so that an overflowing expm1() could give no NaN gradient: no grid reaches it, as the uniform cut (circmix_vp_uniform()) keeps delta below log 40 - log(1e-17 / sqrt(DBL_MAX)) = 397.7 on the tail grid, and the mode grid stays below 2.05
+  // log density of t = log J for J ~ gamma(shape, scale = tau), as .circmix_vp_log_gamma(); see there why not gamma_lpdf(). The return at delta > 700 is a guard only, so that an overflowing expm1() could give no NaN gradient: no grid reaches it, as the uniform cut (circmix_vp_uniform()) keeps delta below log 40 - log(1e-17 / sqrt(DBL_MAX)) = 397.7 on the tail grid, and the mode grid's top node below 5.05: log(2.5 / 2) + 6 sqrt(trigamma(2)) = 5.04 at shape 2 for a response on the item, falling as the shape grows
   real circmix_vp_log_gamma(real t, real shape, real tau) {
     real delta = t - log(shape) - log(tau);
     if (delta > 700) {
