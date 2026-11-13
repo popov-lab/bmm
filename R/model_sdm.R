@@ -52,7 +52,8 @@
         mu = c(-0.5,0.5),
         kappa = c(2.5,3.5),
         c = c(4,6)
-      )
+      ),
+      functions = list(density = "dsdm", generator = "rsdm")
     ),
     class = c("bmmodel", "circular", if (!is.null(n_options)) "option_set", "sdm",
               paste0("sdm_", version)),

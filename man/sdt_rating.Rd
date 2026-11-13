@@ -392,6 +392,8 @@ Provide one row per trial with the following columns:
 \item Rating (response): the category chosen on the trial, a whole number from 1 = 'definitely noise' to K = n_ratings = 'definitely signal'
 \item Stimulus type (stimulus): 0 = noise, 1 = signal
 }
+
+Trial rows are fitted through a per-trial likelihood that evaluates only the category given on the trial; with K = 6, a row costs about a sixth of what a multinomial over all K categories costs.
 \itemize{
 \item \strong{Trial-level data:} Without trial-level predictors or item terms, trial rows give the same posterior as the counts aggregated from them, which are sufficient statistics; the fit only takes longer, because its cost grows with the number of rows. Crossed random effects such as \code{(1 | id) + (1 | item)} need trial rows, unless the counts are kept per participant and item.
 \itemize{

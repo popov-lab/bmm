@@ -536,6 +536,10 @@ revert_check_data.sdt_ranking <- function(model, data) {
 #' @exportS3Method
 revert_check_data.sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response
+  # the trial family reads the user's rating column as it is
+  if (!is.matrix(data$Y)) {
+    return(NextMethod("revert_check_data"))
+  }
   if (is_trial_level(model)) {
     data[[resp_cols]] <- .sdt_trial_category(data$Y)
   } else {

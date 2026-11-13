@@ -137,5 +137,11 @@ model <- m3(
 )
 bmm::simulate_data(model, pars = list(c = 2, a = 0.5), design = data.frame(n_trials = c(100, 100)))
 }
+\seealso{
+Other model information:
+\code{\link[=bmm_models]{bmm_models()}},
+\code{\link[=model_spec]{model_spec()}},
+\code{\link[=parameter_info]{parameter_info()}}
+}
 \concept{model information}
 \keyword{distribution}

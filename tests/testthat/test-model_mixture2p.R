@@ -11,9 +11,8 @@ test_that("mixture2p() validates its arguments", {
 })
 
 test_that("mixture2p() and dmixture2p() default to 81 quadrature nodes", {
-  # 41 nodes put the reject threshold inside a real-data posterior: slot
-  # averaging + VP on three subjects of zhang_luck_2008 diverged on 143 of 200
-  # transitions at 41 nodes and on none at 81 (#398)
+  # 41 nodes hold the log likelihood to about 1e-3 and step by as much where
+  # the gamma shape crosses 2; 81 hold it to 4e-7 for kappa up to 1000 (#695)
   expect_equal(mixture2p("y", variable_precision = TRUE)$vp_nodes, 81L)
   expect_equal(formals(mixture2p)$vp_nodes, 81L)
   expect_equal(formals(dmixture2p)$vp_nodes, 81L)
@@ -398,12 +397,14 @@ test_that("the Stan and R likelihoods agree for every version", {
     }"
   )
 
-  y <- c(-2.5, -0.8, 0, 0.4, 1.9, 3.0)
-  kappa <- c(0.5, 2, 6, 6, 20, 80)
-  tau <- c(0, 0, 0, 1, 0.5, 2)
-  thetat <- c(0.1, 0.5, 0.75, 0.9, 0.99, 0.6)
-  K <- c(1.2, 2.5, 3, 3.5, 6, 8)
-  ss <- c(1L, 2L, 3L, 4L, 6L, 8L)
+  # the last row has gamma shape J(6) / 20 = 0.27, below the switch to the
+  # analytic tail at 2, so Stan's tail grid is checked at 41 nodes
+  y <- c(-2.5, -0.8, 0, 0.4, 1.9, 3.0, 1.2)
+  kappa <- c(0.5, 2, 6, 6, 20, 80, 6)
+  tau <- c(0, 0, 0, 1, 0.5, 2, 20)
+  thetat <- c(0.1, 0.5, 0.75, 0.9, 0.99, 0.6, 0.7)
+  K <- c(1.2, 2.5, 3, 3.5, 6, 8, 2)
+  ss <- c(1L, 2L, 3L, 4L, 6L, 8L, 3L)
 
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
   fit <- model$sample(

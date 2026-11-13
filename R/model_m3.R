@@ -92,7 +92,8 @@
       fixed_parameters = list(
         b = if (choice_rule == "simple") 0.1 else 0
       ),
-      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
+      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]],
+      functions = list(density = "dm3", generator = "rm3")
     ),
     class = c("bmmodel", "m3", paste0("m3_", version)),
     call = call

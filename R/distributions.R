@@ -1,20 +1,18 @@
 #' @title Vector arguments of the distribution functions
 #'
 #' @description The density (`d*()`) and random generation (`r*()`) functions
-#'   of the sdm, ddm and ezdm models and of the signal detection models
+#'   of the sdm, ddm and ezdm models, of the signal detection models
 #'   (`sdt_yn`, `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`,
-#'   `sdt_ranking` and `sdt_cdp`) take their per-observation arguments as
-#'   vectors, or as matrices with one row per observation, and recycle them as
-#'   [stats::dnorm()] and [stats::rnorm()] do. This page states the rules; the
-#'   help page of each of these distributions repeats them under "Vector
-#'   arguments".
+#'   `sdt_ranking` and `sdt_cdp`) and of the psychometric function take their
+#'   per-observation arguments as vectors, or as matrices with one row per
+#'   observation, and recycle them as [stats::dnorm()] and [stats::rnorm()]
+#'   do. This page states the rules; the help page of each of these
+#'   distributions repeats them under "Vector arguments".
 #'
 #'   The other distribution functions do not follow these rules yet:
 #'   [dcswald()] and [rcswald()], the circular mixtures ([dmixture2p()],
 #'   [dmixture3p()], [dimm()] and their `r*()` functions), [dm3()] and [rm3()],
-#'   [dmpt()] and [rmpt()], and [dpsychometric_function()].
-#'   [rpsychometric_function()] reads `n` by the rule below but does not yet
-#'   recycle its other arguments by these rules.
+#'   and [dmpt()] and [rmpt()].
 #'
 #' @section Vector arguments:
 #' - `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or matrix
@@ -909,13 +907,16 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @param p_mem Vector of probabilities of a target response. For a
 #'   [mixture3p()] fit these are `thetat` on its native scale (version
 #'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
-#'   (versions `"slot"` and `"slot_averaging"`).
+#'   (versions `"slot"` and `"slot_averaging"`). The mapping is exact for
+#'   `"slot"` and for `"slot_averaging"` up to `K = set_size`. Above capacity,
+#'   slot averaging gives an item several slots and raises its precision,
+#'   which these functions do not model.
 #' @param p_nt Vector of probabilities of a non-target response, summed over
 #'   the non-targets, which share it equally. For a [mixture3p()] fit these are
 #'   `thetant` on its native scale (version `"simple"`) or
-#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions). Unlike
-#'   `ptarget`, `p_mem` and `p_nt` are not conditional on a response from
-#'   memory.
+#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions, with the limit
+#'   for `"slot_averaging"` given under `p_mem`). Unlike `ptarget`, `p_mem` and
+#'   `p_nt` are not conditional on a response from memory.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
@@ -1858,7 +1859,7 @@ rddm <- function(n, drift, bound, ndt, zr = 0.5) {
 #' @export
 dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = c("simple", "crisk"), log = TRUE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   version <- match.arg(version)
 
   stopif(
@@ -1906,7 +1907,7 @@ dcswald <- function(rt, response, drift, bound, ndt, zr = 0.5, s = 1,
 #' @rdname cswald_dist
 #' @export
 rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   .rcswald(n, drift, bound, ndt, zr, s)
 }
 
@@ -1945,7 +1946,7 @@ rcswald <- function(n, drift, bound, ndt, zr = 0.5, s = 1) {
 #' @export
 pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
   q_shifted <- q - ndt
   p <- numeric(length(q))
 
@@ -2003,7 +2004,7 @@ pcswald <- function(q, response, drift, bound, ndt, zr = 0.5, s = 1,
 #' @export
 qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
                     version = "simple", lower.tail = TRUE, log.p = FALSE) {
-  validate_cswald_parameters(drift, bound, ndt, zr, s)
+  .check_cswald_args(drift, bound, ndt, zr, s)
 
   if (log.p) {
     p <- exp(p)
@@ -2071,7 +2072,7 @@ qcswald <- function(p, response, drift, bound, ndt, zr = 0.5, s = 1,
   q
 }
 
-validate_cswald_parameters <- function(drift, bound, ndt, zr, s) {
+.check_cswald_args <- function(drift, bound, ndt, zr, s) {
   stopif(
     any(bound <= 0),
     "Values for the boundary separation 'bound' must be positive."
@@ -3973,8 +3974,9 @@ rsdt_mafc <- function(n, n_trials, m, d,
 #' @param m Integer vector. Number of ranked items per observation. Must be
 #'   at least 2 and no larger than the number of count columns.
 #' @param sdratio Numeric vector. Ratio of signal to noise standard deviations
-#'   (default 1, i.e., equal variance). Must be positive. Only used when
-#'   `dist = "normal"`.
+#'   (default 1, i.e., equal variance). Must be positive. Read only with
+#'   `dist = "normal"`; with `dist = "gumbel_min"` any value other than 1
+#'   stops.
 #' @param dist Character. The distribution assumed for the latent evidence:
 #'   "gumbel_min" (default), the smallest extreme value distribution with
 #'   cumulative distribution function \eqn{1 - \exp(-\exp(x))}, evaluated in
@@ -4015,6 +4017,9 @@ dsdt_ranking <- function(counts, m, d, sdratio = 1,
                          log = FALSE) {
   dist <- match.arg(dist)
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  stopif(dist == "gumbel_min" && any(sdratio != 1),
+         "sdratio is read only with dist = \"normal\"; with dist = \"gumbel_min\" \\
+         it must be 1. Use dist = \"normal\" for unequal-variance ranking.")
   counts <- .counts_rows(counts)
   n <- .obs_length(m, d, sdratio, rows = list(counts))
   if (n == 0L) return(numeric(0))
@@ -4059,6 +4064,9 @@ rsdt_ranking <- function(n, n_trials, m, d, sdratio = 1,
   stopif(any(n_trials < 1), "n_trials must be positive")
   stopif(any(m < 2), "m must be an integer >= 2")
   stopif(any(sdratio <= 0), "sdratio must be positive")
+  stopif(dist == "gumbel_min" && any(sdratio != 1),
+         "sdratio is read only with dist = \"normal\"; with dist = \"gumbel_min\" \\
+         it must be 1. Use dist = \"normal\" for unequal-variance ranking.")
 
   # with no draws the columns follow the largest set size given
   if (n == 0) {
@@ -5028,6 +5036,7 @@ rsdt_cdp <- function(n, n_trials, stimulus, dfam, drec, thresholds,
 #'   where \eqn{F} is the sigmoid with its midpoint and width.
 #'
 #' @name psychometric_function_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param x Integer vector. Number of positive responses, between 0 and
 #'   `n_trials`.
@@ -5097,10 +5106,17 @@ dpsychometric_function <- function(x, intensity, midpoint, width, guess = 0, lap
   stopif(anyNA(n_trials), "n_trials must not contain NA")
   stopif(any(x < 0), "x must be non-negative")
   stopif(any(n_trials < 1), "n_trials must be positive")
-  stopif(any(x > n_trials), "x must not exceed n_trials")
   .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
+  n <- .obs_length(x, intensity, midpoint, width, guess, lapse, n_trials)
+  if (n == 0L) return(numeric(0))
+  x <- rep_len(x, n)
+  n_trials <- rep_len(n_trials, n)
+  stopif(any(x > n_trials), "x must not exceed n_trials")
 
-  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
+  lp <- .psychometric_log_probs(
+    rep_len(intensity, n), rep_len(midpoint, n), rep_len(width, n),
+    rep_len(guess, n), rep_len(lapse, n), sigmoid
+  )
   out <- lchoose(n_trials, x) +
     times_nonzero(x, lp$one) +
     times_nonzero(n_trials - x, lp$zero)
@@ -5121,6 +5137,9 @@ rpsychometric_function <- function(n, intensity, midpoint, width, guess = 0, lap
   stopif(any(n_trials < 1), "n_trials must be positive")
   .psychometric_check_pars(intensity, midpoint, width, guess, lapse, sigmoid)
 
-  lp <- .psychometric_log_probs(intensity, midpoint, width, guess, lapse, sigmoid)
-  stats::rbinom(n, rep_len(n_trials, n), rep_len(exp(lp$one), n))
+  lp <- .psychometric_log_probs(
+    rep_len(intensity, n), rep_len(midpoint, n), rep_len(width, n),
+    rep_len(guess, n), rep_len(lapse, n), sigmoid
+  )
+  stats::rbinom(n, rep_len(n_trials, n), exp(lp$one))
 }

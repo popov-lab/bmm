@@ -186,6 +186,8 @@ fits, in `tests/local/test-summary-fits.R` and in the skipped
 when it happens. The manual test files, including
 `test-kfold-update.R`, moved to `tests/local/` on 2026-10-13.
 
+2026-11-11, #674: `tests/internal/` is deleted. The last commit that holds the files is 5491fdc25f0d2c54051bd15860c7afd302936ac3; `tests/local/test-summary-fits.R` now reads `tests/testthat/assets/bmmfit_mixture3p.rds`.
+
 ## Consequences
 
 - Pull-request checks on Windows and macOS no longer compile Stan; a
