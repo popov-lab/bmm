@@ -55,9 +55,9 @@ sdm_tight_cells <- data.frame(
 )
 sdm_stan_cells <- rbind(sdm_issue_grid, sdm_extended_cells, sdm_tight_cells)
 
-# dsdm() integrates without scaling by the peak and stops with a non-finite
-# value once log Z passes about 709 (log c 5 with kappa 200), so the
-# likelihood cells stop at kappa 100; (5, 100) is a corner cell
+# the likelihood cells stop at kappa 100, where dsdm() stopped before #558
+# (a non-finite value once log Z passed about 709, log c 5 with kappa 200);
+# dsdm() now returns a value there as well. (5, 100) is a corner cell
 sdm_parity_cells <- data.frame(lc = c(1, 3, 5), kappa = c(2, 30, 100))
 sdm_parity_y <- c(-pi, -2, -1, -0.3, -0.05, -0.01, 0, 0.004, 0.02, 0.1, 0.6, 2.5)
 
