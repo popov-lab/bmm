@@ -536,7 +536,9 @@ categories as `n_ratings`; every version takes this layout.
 
 - Stimulus type (stimulus): 0 = noise, 1 = signal
 
-&nbsp;
+Trial rows are fitted through a per-trial likelihood that evaluates only
+the category given on the trial; with K = 6, a row costs about a sixth
+of what a multinomial over all K categories costs.
 
 - **Trial-level data:** Without trial-level predictors or item terms,
   trial rows give the same posterior as the counts aggregated from them,

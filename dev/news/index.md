@@ -381,6 +381,21 @@
   must be greater than or equal to 0”, and passing your own `init` was
   the only way around it. Bounds on an intercept or on a group-level
   standard deviation (`class = sd`) are respected too.
+- A prior with `class = "Intercept"` on a parameter named by `nlpar`,
+  such as
+  `set_prior("normal(2, 0.5)", nlpar = "c", class = "Intercept")` on an
+  [`m3()`](https://venpopov.com/bmm/dev/reference/m3.md) fit, now
+  applies to that parameter’s intercept. It stopped with “The following
+  priors do not correspond to any model parameter”.
+- [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html),
+  [`posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html)
+  and the other prediction methods now take `newdata` with one stimulus,
+  such as the signal rows alone, for
+  [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md),
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+  and [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
+  fits. They stopped with “Stimulus variable ‘stimulus’ is 1 in every
+  row”. Fitting a model still needs both stimuli.
 
 #### Deprecated functions and arguments
 
@@ -473,6 +488,12 @@
   with one row per trial and the default normal noise
   (`dist = "normal"`) are faster: each sampling step takes about half
   the time it did. Estimates are unchanged up to sampling error.
+- [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+  fits with one row per trial (`n_ratings`) are faster: with six rating
+  categories, each sampling step takes about a sixth of the time it did.
+  Estimates are unchanged up to sampling error, and priors written for
+  count data, such as `set_prior("normal(1, 1)", nlpar = "d")`, apply
+  unchanged.
 - mixture2p, mixture3p and imm fits saved with bmm 1.4 or earlier still
   work with [`summary()`](https://rdrr.io/r/base/summary.html) and the
   other extractors. [`update()`](https://rdrr.io/r/stats/update.html)
