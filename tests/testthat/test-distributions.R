@@ -438,9 +438,11 @@ test_that("dmixture3p matches the mixture3p likelihood of every version at every
     for (tau in c(0, 1)) {
       for (K in c(2, 4, 6, 8)) {
         expect_equal(
+          # 41 nodes, not the default 81, so a node count the exported
+          # function ignores shows
           dmixture3p(x, mu = mu, kappa = 8, tau = tau, K = K, ptarget = 0.7,
-                     version = version, log = TRUE),
-          internal[[version]](x, mu[1], 8, K, 0.7, set_size, mu[-1], tau, 81L)
+                     version = version, vp_nodes = 41L, log = TRUE),
+          internal[[version]](x, mu[1], 8, K, 0.7, set_size, mu[-1], tau, 41L)
         )
       }
     }
@@ -507,10 +509,24 @@ test_that("the capacity versions of rmixture3p recycle their parameters to n dra
         n
       )
     }
+    expect_length(
+      rmixture3p(2, K = c(1, 2, 4), ptarget = c(0.4, 0.9, 0.5),
+                 kappa = c(3, 10, 20), tau = c(0, 1, 0.5), version = version),
+      2
+    )
     # K near 0 guesses (uniform, SD 1.81), K = 300 stores the target (SD 0.07)
     r <- rmixture3p(2000, kappa = 200, K = c(1e-9, 300), ptarget = 1, version = version)
     expect_gt(sd(r[odd]), 1.5)
     expect_lt(sd(r[-odd]), 0.2)
+    # one slot per item; tau = 1e4 puts J near 0 (gamma shape 0.02), close to
+    # a guess
+    r <- rmixture3p(2000, kappa = 200, K = 3, ptarget = 1, tau = c(0, 1e4), version = version)
+    expect_lt(sd(r[odd]), 0.2)
+    expect_gt(sd(r[-odd]), 1)
+    # this test runs on CRAN, the draws test does not: above capacity every
+    # item is stored, and no weight may leave [0, 1]
+    expect_no_warning(r <- rmixture3p(200, kappa = 200, K = 300, ptarget = 1, version = version))
+    expect_true(all(r != 0))
     # at full capacity ptarget = 0 reports a non-target, at 2 or -1.5
     r <- rmixture3p(2000, mu = c(0, 2, -1.5), kappa = 200, K = 3, ptarget = c(1, 0),
                     version = version)
