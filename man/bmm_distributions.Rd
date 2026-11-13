@@ -5,20 +5,18 @@
 \title{Vector arguments of the distribution functions}
 \description{
 The density (\verb{d*()}) and random generation (\verb{r*()}) functions
-of the sdm, ddm and ezdm models and of the signal detection models
+of the sdm, ddm and ezdm models, of the signal detection models
 (\code{sdt_yn}, \code{sdt_mafc}, \code{sdt_rating}, \code{sdt_dpsdt}, \code{sdt_metad},
-\code{sdt_ranking} and \code{sdt_cdp}) take their per-observation arguments as
-vectors, or as matrices with one row per observation, and recycle them as
-\code{\link[stats:dnorm]{stats::dnorm()}} and \code{\link[stats:rnorm]{stats::rnorm()}} do. This page states the rules; the
-help page of each of these distributions repeats them under "Vector
-arguments".
+\code{sdt_ranking} and \code{sdt_cdp}) and of the psychometric function take their
+per-observation arguments as vectors, or as matrices with one row per
+observation, and recycle them as \code{\link[stats:dnorm]{stats::dnorm()}} and \code{\link[stats:rnorm]{stats::rnorm()}}
+do. This page states the rules; the help page of each of these
+distributions repeats them under "Vector arguments".
 
 The other distribution functions do not follow these rules yet:
 \code{\link[=dcswald]{dcswald()}} and \code{\link[=rcswald]{rcswald()}}, the circular mixtures (\code{\link[=dmixture2p]{dmixture2p()}},
 \code{\link[=dmixture3p]{dmixture3p()}}, \code{\link[=dimm]{dimm()}} and their \verb{r*()} functions), \code{\link[=dm3]{dm3()}} and \code{\link[=rm3]{rm3()}},
-\code{\link[=dmpt]{dmpt()}} and \code{\link[=rmpt]{rmpt()}}, and \code{\link[=dpsychometric_function]{dpsychometric_function()}}.
-\code{\link[=rpsychometric_function]{rpsychometric_function()}} reads \code{n} by the rule below but does not yet
-recycle its other arguments by these rules.
+and \code{\link[=dmpt]{dmpt()}} and \code{\link[=rmpt]{rmpt()}}.
 }
 \section{Vector arguments}{
 

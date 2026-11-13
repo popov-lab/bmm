@@ -377,6 +377,34 @@ test_that("simulated responses of the signal detection models match their densit
                                          n_new = 2), "sdt_cdp")
 })
 
+test_that("one simulated trial per row of sdt_yn and sdt_mafc is 0 or 1 with the model's probability", {
+  skip_on_cran()
+  withr::local_seed(6)
+  # pnorm(1 - 0.5), pnorm(-0.5); P(correct) of 2, 3 and 4 alternatives at d = 1, from
+  # integrate(dnorm(x - 1) * pnorm(x)^(m - 1))
+  design <- data.frame(stimulus = rep(0:1, each = n_sim))
+  y <- simulate_data(sdt_yn("y", "stimulus"), list(d = 1, criterion = 0.5), design)$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y[design$stimulus == 0], 0.3085375387, "sdt_yn trial noise")
+  expect_within_mc(y[design$stimulus == 1], 0.6914624613, "sdt_yn trial signal")
+
+  y <- simulate_data(sdt_mafc("y", m = 4), list(d = 1), data.frame(id = seq_len(n_sim)))$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y, 0.5520314384, "sdt_mafc trial m = 4")
+
+  design <- data.frame(m = rep(2:3, each = n_sim))
+  y <- simulate_data(sdt_mafc("y", m = "m"), list(d = 1), design)$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y[design$m == 2], 0.7602499389, "sdt_mafc trial m column 2")
+  expect_within_mc(y[design$m == 3], 0.6337020458, "sdt_mafc trial m column 3")
+})
+
+test_that("sdt_mafc simulates trials without a design when it reads no column", {
+  data <- simulate_data(sdt_mafc("y", m = 4), list(d = 1), n_trials = 100)
+  expect_identical(dim(data), c(100L, 1L))
+  expect_in(data$y, c(0, 1))
+})
+
 test_that("simulated counts of the m3 and mpt models match their closed forms", {
   skip_on_cran()
   withr::local_seed(4)

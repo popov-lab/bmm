@@ -32,6 +32,14 @@ model_cases_sdt_mafc <- function() {
       sdt_mafc = list(
         model = sdt_mafc("n_correct", "n_trials", m = "m"), pars = list(d = 1),
         design = data.frame(m = 2:5, n_trials = 40), formula = bmf(d ~ 1), simulate_pars = list(d = 1)
+      ),
+      sdt_mafc_trial_level = list(
+        model = trial_model, pars = list(d = 1), design = data.frame(id = rep(1:2, each = 6)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 1)
+      ),
+      sdt_mafc_trial_level_m_column = list(
+        model = sdt_mafc("correct", m = "m"), pars = list(d = 1),
+        design = data.frame(m = rep(2:5, 3)), formula = bmf(d ~ 1), simulate_pars = list(d = 1)
       )
     )
   )

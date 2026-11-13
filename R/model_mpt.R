@@ -348,7 +348,8 @@ print.mpt_tree <- function(x, ...) {
       links = link_info,
       links_fixed = .mpt_named_list(c(simplex_pars, raw_pars), "identity"),
       fixed_parameters = list(),
-      default_priors = prior_info
+      default_priors = prior_info,
+      functions = list(density = "dmpt", generator = "rmpt")
     ),
     class = c("bmmodel", "mpt"),
     call = call

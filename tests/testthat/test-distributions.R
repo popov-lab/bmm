@@ -436,6 +436,39 @@ test_that("dmixture3p recycles its parameters to the longest argument", {
   )
 })
 
+# model_spec() names dmixture3p() as the density of every mixture3p version, but
+# one kappa cannot give the per-item precision of slot averaging above
+# capacity. A version-aware dmixture3p() makes the last expectation fail on
+# purpose: flip it and remove the caveat from the `functions` item of
+# model_spec() and from the p_mem/p_nt parameters of mixture3p_dist.
+test_that("dmixture3p matches mixture3p slot averaging up to capacity and not above", {
+  x <- seq(-pi, pi, length.out = 7)
+  mu <- c(0, 2, -1.5, 1)
+  set_size <- length(mu)
+  ptarget <- 0.7
+  log_dens <- function(K, tau) {
+    capacity <- min(1, K / set_size)
+    list(
+      exported = dmixture3p(
+        x, mu = mu, kappa = 8, p_mem = capacity * ptarget,
+        p_nt = capacity * (1 - ptarget), tau = tau, log = TRUE
+      ),
+      slot_averaging = .dmixture3p_slot_averaging(
+        x, mu[1], 8, K, ptarget, set_size, mu[-1], tau, 81L
+      )
+    )
+  }
+
+  for (tau in c(0, 1)) {
+    for (K in c(set_size / 2, set_size)) {
+      dens <- log_dens(K, tau)
+      expect_equal(dens$exported, dens$slot_averaging, tolerance = 1e-8)
+    }
+    above <- log_dens(2 * set_size, tau)
+    expect_gt(max(abs(above$exported - above$slot_averaging)), 0.1)
+  }
+})
+
 test_that("dimm integrates to 1", {
   withr::local_seed(445)
   expect_equal(integrate(dimm, -pi, pi,
@@ -458,6 +491,15 @@ test_that("dimm recycles its parameters to the longest argument", {
     dimm(c(0.3, -1), a = c(0.5, 2), s = c(1, 5), b = c(0, 1), kappa = c(4, 9), tau = c(0, 1)),
     c(at(0.3, a = 0.5, s = 1, b = 0, kappa = 4, tau = 0), at(-1, a = 2, s = 5, b = 1, kappa = 9, tau = 1))
   )
+})
+
+# a missing tau used to give the constant-precision density, while a missing
+# kappa gave NA
+test_that("the circular mixture densities are NA where tau is NA", {
+  expect_true(all(is.na(dmixture2p(c(0, 1), kappa = 5, p_mem = 0.8, tau = NA, log = TRUE))))
+  expect_true(all(is.na(dmixture3p(c(0, 1), kappa = 5, tau = c(NA, NaN)))))
+  expect_true(all(is.na(dimm(c(0, 1), kappa = 5, tau = NA))))
+  expect_false(anyNA(dmixture2p(c(0, 1), kappa = 5, p_mem = 0.8, tau = c(NA, 2))[2]))
 })
 
 test_that("rmixture2p returns values between -pi and pi", {

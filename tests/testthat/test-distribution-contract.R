@@ -5,7 +5,7 @@
 # interleaves parameter groups and compares each group with a reference
 # outside the function's own code (a closed form, quadrature, or the single-
 # trial density of the matching d*()). Every per-observation argument of the
-# sdm, ddm, ezdm and SDT d*() and r*() functions is varied in at least one
+# sdm, ddm, ezdm, SDT and psychometric d*() and r*() functions is varied in at least one
 # test with a vector (matrix) whose recycled form reads differently reversed:
 # a mutant that reverses any one of them after recycling (the rezdm() ones
 # once per version) fails a test in this file or in test-distributions.R.
@@ -513,9 +513,14 @@ test_that("each per-observation argument alone sets the length of a d*() result"
                     list(n_new = 3, log = TRUE)),
     dsdt_cdp_kcrit = case(dsdt_cdp, list(counts = rbind(c(10, 20, 30, 10, 15, 5, 5, 3, 2, 1, 2, 1)), stimulus = 1,
                                          dfam = 0.8, drec = 1, thresholds = thr5, rcrit = 0.5, kcrit = 0.3),
-                          list(kcrit = c(0.2, 0.3, 0.4)), list(n_new = 3, log = TRUE))
+                          list(kcrit = c(0.2, 0.3, 0.4)), list(n_new = 3, log = TRUE)),
+    dpsychometric = case(dpsychometric_function, list(x = 5, intensity = 1, midpoint = 1, width = 1, guess = 0.1,
+                                                      lapse = 0.05, n_trials = 10),
+                         list(x = c(3, 5, 7), intensity = c(0.8, 1, 1.3), midpoint = c(0.9, 1, 1.2),
+                              width = c(0.5, 1, 2), guess = c(0, 0.1, 0.3), lapse = c(0, 0.05, 0.1),
+                              n_trials = c(10, 12, 9)))
   )
-  # two expectations over all 69 cases rather than expect_elementwise() for
+  # two expectations over all 76 cases rather than expect_elementwise() for
   # each, whose per-expectation overhead tripled the time of this test
   vec <- each <- list()
   expect_no_warning(for (nm in names(cases)) {
@@ -526,8 +531,8 @@ test_that("each per-observation argument alone sets the length of a d*() result"
       each[[paste(nm, a)]] <- vapply(1:3, function(i) do.call(cs$f, c(lapply(args, pick, i = i), cs$fixed)), 0)
     }
   })
-  expect_identical(lengths(vec), setNames(rep(3L, 69), names(vec)))
-  expect_equal(unlist(vec) / unlist(each), rep(1, 3 * 69), ignore_attr = TRUE)
+  expect_identical(lengths(vec), setNames(rep(3L, 76), names(vec)))
+  expect_equal(unlist(vec) / unlist(each), rep(1, 3 * 76), ignore_attr = TRUE)
 })
 
 test_that("a matrix in a one-number-per-observation argument gives one value per element", {
@@ -586,7 +591,13 @@ test_that("a matrix in a one-number-per-observation argument gives one value per
                     list(n_new = 3, log = TRUE)),
     dsdt_cdp_kcrit = case(dsdt_cdp, list(counts = c(10, 20, 30, 10, 15, 5, 5, 3, 2, 1, 2, 1), stimulus = 1,
                                          dfam = 0.8, drec = 1, thresholds = thr5, rcrit = 0.5, kcrit = 0.3),
-                          list(kcrit = c(0.2, 0.3, 0.4, 0.25)), list(n_new = 3, log = TRUE))
+                          list(kcrit = c(0.2, 0.3, 0.4, 0.25)), list(n_new = 3, log = TRUE)),
+    dpsychometric = case(dpsychometric_function, list(x = 5, intensity = 1, midpoint = 1, width = 1, guess = 0.1,
+                                                      lapse = 0.05, n_trials = 10),
+                         list(x = c(3, 5, 7, 4), intensity = c(0.8, 1, 1.3, 0.9), midpoint = c(0.9, 1, 1.2, 1.1),
+                              width = c(0.5, 1, 2, 1.5), guess = c(0, 0.1, 0.3, 0.2), lapse = c(0, 0.05, 0.1, 0.02),
+                              n_trials = c(10, 12, 9, 11)),
+                         list(log = TRUE))
   )
   vec <- each <- list()
   for (nm in names(cases)) {
@@ -597,9 +608,9 @@ test_that("a matrix in a one-number-per-observation argument gives one value per
       each[[paste(nm, a)]] <- vapply(value, function(v) do.call(cs$f, c(replace(cs$base, a, v), cs$fixed)), 0)
     }
   }
-  expect_identical(lengths(vec), setNames(rep(4L, 58), names(vec)))
+  expect_identical(lengths(vec), setNames(rep(4L, 65), names(vec)))
   expect(all(is.finite(unlist(each)) & unlist(each) != 0), "a reference value is zero or not finite")
-  expect_equal(unlist(vec) / unlist(each), rep(1, 4 * 58), ignore_attr = TRUE)
+  expect_equal(unlist(vec) / unlist(each), rep(1, 4 * 65), ignore_attr = TRUE)
 })
 
 test_that("dsdm() and dsdt_yn() keep the dim, names and class they returned before bmm 1.5.0", {
@@ -911,6 +922,31 @@ test_that("rsdt_ranking() pairs sensitivity, set size and variance ratio per dra
   }
 })
 
+test_that("the ranking d*() and r*() functions refuse an sdratio that gumbel_min would ignore", {
+  counts <- c(5, 3, 2)
+  msg <- "sdratio is read only with dist = \"normal\""
+  expect_error(dsdt_ranking(counts, m = 3, d = 1, sdratio = 2), msg, fixed = TRUE)
+  expect_error(dsdt_ranking(counts, m = 3, d = 1, sdratio = c(1, 2)), msg, fixed = TRUE)
+  expect_error(rsdt_ranking(3, 10, m = 3, d = 1, sdratio = 2), msg, fixed = TRUE)
+  # 1 is the equal variance that gumbel_min assumes
+  expect_identical(dsdt_ranking(counts, m = 3, d = 1, sdratio = c(1, 1, 1)), rep(dsdt_ranking(counts, m = 3, d = 1), 3))
+  expect_identical(withr::with_seed(5, rsdt_ranking(3, 10, m = 3, d = 1, sdratio = 1)),
+                   withr::with_seed(5, rsdt_ranking(3, 10, m = 3, d = 1)))
+  # under normal noise the ratio is read: the target, sdratio wide and d_a
+  # above the lures, is ranked r-th when m - r lures fall below it
+  normal_rank_probs <- function(d, sdratio, m) {
+    shift <- d * sqrt((1 + sdratio^2) / 2)
+    vapply(seq_len(m), function(r) {
+      choose(m - 1, r - 1) * integrate(function(x) {
+        dnorm(x, shift, sdratio) * pnorm(x)^(m - r) * pnorm(x, lower.tail = FALSE)^(r - 1)
+      }, -Inf, Inf, rel.tol = 1e-10)$value
+    }, numeric(1))
+  }
+  expect_equal(dsdt_ranking(counts, m = 3, d = 1, sdratio = 2, dist = "normal"),
+               dmultinom(counts, prob = normal_rank_probs(1, 2, 3)), tolerance = 1e-6)
+  expect_no_error(rsdt_ranking(3, 10, m = 3, d = 1, sdratio = 2, dist = "normal"))
+})
+
 test_that("rsdt_cdp() pairs familiarity, recollection, criteria, correlation and thresholds per draw", {
   withr::local_seed(4445)
   dfam <- c(0.8, 1.2, 0.5)
@@ -955,6 +991,84 @@ test_that("rsdt_cdp() pairs familiarity, recollection, criteria, correlation and
   expect_equal(counts[cbind(1:7, max.col(counts))], c(30, 50, 40, 30, 50, 40, 30))
 })
 
+# --- psychometric function ------------------------------------------------------
+
+# psi = guess + (1 - guess)(1 - lapse) F(z) with the normal sigmoid, z placing
+# F at 0.05 and 0.95 one width apart around the midpoint
+psy_normal_psi <- function(intensity, midpoint, width, guess = 0, lapse = 0) {
+  z <- (qnorm(0.95) - qnorm(0.05)) * (intensity - midpoint) / width
+  guess + (1 - guess) * (1 - lapse) * pnorm(z)
+}
+
+test_that("dpsychometric_function() recycles the counts, the intensities and the parameters", {
+  expect_elementwise(dpsychometric_function, list(x = c(3, 7), intensity = c(0.5, 1, 2), midpoint = c(1, 1.2, 0.8, 1.1),
+                                                  width = c(1.5, 0.8), guess = c(0, 0.5, 0.25), lapse = c(0.02, 0),
+                                                  n_trials = c(10, 12, 11, 10)))
+  expect_elementwise(dpsychometric_function, list(x = c(3, 7, 9, 5), intensity = c(0.5, 2), midpoint = c(1, 1.2, 0.8),
+                                                  width = c(1.5, 0.8, 2), guess = c(0.5, 0.25), lapse = c(0.1, 0, 0.05),
+                                                  n_trials = c(10, 12, 11)),
+                     fixed = list(sigmoid = "weibull", log = TRUE))
+  # the case of #697: three counts against five midpoints gave five values
+  expect_elementwise(dpsychometric_function, list(x = c(10, 20, 30), intensity = c(0.1, 0.5, 0.9),
+                                                  midpoint = c(0.2, 0.4, 0.6, 0.8, 1.0), width = 0.5, n_trials = 30),
+                     fixed = list(log = TRUE))
+})
+
+test_that("dpsychometric_function() is the binomial of the closed-form sigmoid, observation by observation", {
+  # from the closed forms of the seven sigmoids with base R alone, three
+  # observations whose arguments all differ
+  reference <- list(
+    normal      = c(0.104995368499126, 0.226476299895508, 0.385719591310977),
+    logistic    = c(0.0857327188980194, 0.228042550822386, 0.386659423475966),
+    gumbel_min  = c(0.145544542205733, 0.224300818400239, 0.372138771861868),
+    gumbel_max  = c(0.0218567359990233, 0.228071943260389, 0.383237065334363),
+    weibull     = c(0.0553719020780618, 0.221015369366346, 0.380320744265491),
+    lognormal   = c(0.0189890574206546, 0.223496666805467, 0.380149786615929),
+    loglogistic = c(0.017166037573399, 0.226279539492662, 0.381421759107447)
+  )
+  dens <- lapply(names(reference), function(s) {
+    dpsychometric_function(c(3, 7, 9), intensity = c(0.5, 1, 2), midpoint = c(1, 1.2, 0.8), width = c(1.5, 0.8, 2),
+                           guess = c(0, 0.5, 0.25), lapse = c(0.02, 0, 0.1), n_trials = c(10, 12, 10), sigmoid = s)
+  })
+  expect_equal(setNames(dens, names(reference)), reference, tolerance = 1e-12)
+})
+
+test_that("dpsychometric_function() refuses x above n_trials, also after recycling", {
+  expect_error(dpsychometric_function(c(5, 15), 1, 1, 1, n_trials = c(20, 10)), "x must not exceed n_trials")
+  expect_error(dpsychometric_function(c(5, 15, 5), 1, 1, 1, n_trials = c(20, 10)), "x must not exceed n_trials")
+})
+
+test_that("rpsychometric_function() pairs intensity, midpoint, width, rates and trials per draw", {
+  withr::local_seed(4445)
+  intensity <- c(0.8, 1.2, 1)
+  midpoint <- c(1, 0.9, 1.1)
+  width <- c(1, 2, 0.5)
+  guess <- c(0, 0.5, 0.2)
+  lapse <- c(0.05, 0, 0.1)
+  n_trials <- c(20, 40, 30)
+  n <- 1500
+  g <- group_of(n, 3)
+  y <- rpsychometric_function(n, intensity, midpoint, width, guess, lapse, n_trials)
+  expect_length(y, n)
+  for (k in 1:3) {
+    psi <- psy_normal_psi(intensity[k], midpoint[k], width[k], guess[k], lapse[k])
+    expect_mean_near(y[g == k] / n_trials[k], psi, se_prop(psi, n_trials[k] * sum(g == k)))
+  }
+  # n not a multiple of the parameter lengths: draw i takes element i, and an
+  # intensity 100 widths from the midpoint makes every trial a yes or a no
+  # (the case of #697, which gave 0 30 30 0 0 0 30 with a warning)
+  y <- NULL
+  expect_no_warning(y <- rpsychometric_function(7, intensity = c(0.1, 0.5, 0.9), midpoint = c(0.2, 0.4, 0.6, 0.8, 1),
+                                                width = 0.001, n_trials = c(30, 40, 50, 60)))
+  expect_equal(y, c(0, 40, 50, 0, 0, 40, 0))
+  # a guess or lapse near 1 decides the draw whatever the sigmoid gives
+  near_one <- 1 - 1e-9
+  expect_no_warning(y <- rpsychometric_function(7, intensity = 1, midpoint = c(0, 2), width = c(0.001, 0.002),
+                                                guess = c(0, 0, near_one), lapse = c(near_one, 0, 0, 0),
+                                                n_trials = 50))
+  expect_equal(y, c(0, 0, 50, 0, 0, 50, 50))
+})
+
 # --- empty observations ---------------------------------------------------------
 
 test_that("the d*() functions return an empty result for no observations", {
@@ -972,6 +1086,7 @@ test_that("the d*() functions return an empty result for no observations", {
   expect_identical(dsdt_ranking(matrix(0, 0, 4), m = 4, d = 1:2), numeric(0))
   expect_identical(dsdt_cdp(matrix(0, 0, 9), 1, dfam = 0.8, drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3),
                             rcrit = 0.5, n_new = 3), numeric(0))
+  expect_identical(dpsychometric_function(numeric(0), 1, midpoint = 1:2, width = 1), numeric(0))
 })
 
 test_that("a NULL per-observation argument is empty, as a misspelt data column", {
@@ -1007,14 +1122,17 @@ test_that("a NULL per-observation argument is empty, as a misspelt data column",
     dsdt_cdp = case(dsdt_cdp, list(counts = c(10, 20, 30, 10, 15, 5, 5, 3, 2), stimulus = 1, dfam = 0.8,
                                    drec = 1, thresholds = c(-1.1, -0.5, 0, 0.6, 1.3), rcrit = 0.5, sigmar = 0,
                                    rho = 0, n_new = 3),
-                    c("stimulus", "dfam", "drec", "rcrit", "sigmar", "rho"))
+                    c("stimulus", "dfam", "drec", "rcrit", "sigmar", "rho")),
+    dpsychometric = case(dpsychometric_function, list(x = 5, intensity = 1, midpoint = 1, width = 1, guess = 0.1,
+                                                      lapse = 0.05, n_trials = 10),
+                         c("x", "intensity", "midpoint", "width", "guess", "lapse", "n_trials"))
   )
   out <- list()
   for (nm in names(cases)) {
     cs <- cases[[nm]]
     for (a in cs$args) out[[paste(nm, a)]] <- do.call(cs$f, replace(cs$base, a, list(NULL)))
   }
-  expect_identical(out, setNames(rep(list(numeric(0)), 55), names(out)))
+  expect_identical(out, setNames(rep(list(numeric(0)), 62), names(out)))
 })
 
 test_that("NULL in an optional argument means it is not given", {

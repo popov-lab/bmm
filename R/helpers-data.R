@@ -412,10 +412,20 @@ standata.bmmformula <- function(object, data, model, ...) {
 #' @keywords extract_info
 #' @export
 standata.bmmfit <- function(object, newdata = NULL, ...) {
-  if (lacks_built_columns(object, newdata)) {
-    newdata <- check_newdata(object, newdata)
+  if (!is.null(newdata)) {
+    newdata <- prepare_newdata(object$bmm$model, newdata, object)
   }
   NextMethod()
+}
+
+# newdata in the layout the fit's model frame has, which is what brms reads
+prepare_newdata <- function(model, newdata, fit) {
+  UseMethod("prepare_newdata")
+}
+
+#' @exportS3Method
+prepare_newdata.default <- function(model, newdata, fit) {
+  if (lacks_built_columns(fit, newdata)) check_newdata(fit, newdata) else newdata
 }
 
 # The model frame holds the columns check_data() built, and data in the layout
@@ -432,9 +442,10 @@ lacks_built_columns <- function(object, newdata) {
 
 # brms returns predictions in the rows of newdata, so the data are not sorted,
 # and a check_data() method that dropped or reordered rows would misalign them
-# without an error. The `prediction_newdata` mark tells the checks that warn
-# about what the data can estimate (one set size for a capacity rule) that
-# nothing is estimated from these data; it lives only for this check_data() call
+# without an error. The `prediction_newdata` mark tells the checks of what the
+# data can estimate (both stimuli for the SDT models, one set size for a
+# capacity rule) that nothing is estimated from these data; it lives only for
+# this check_data() call
 check_newdata <- function(object, newdata) {
   withr::local_options(bmm.sort_data = FALSE)
   newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata), object$data)

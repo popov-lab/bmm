@@ -521,7 +521,7 @@ test_that("model constructors and the template list their fields in the canonica
   canonical <- c(
     "resp_vars", "other_vars", "domain", "task", "name", "citation", "version",
     "requirements", "parameters", "links", "links_fixed", "fixed_parameters",
-    "alternative_parameters", "default_priors", "init_ranges",
+    "alternative_parameters", "default_priors", "init_ranges", "functions",
     "deprecated_parameters", "dpar_since", "variable_precision", "vp_nodes"
   )
   # m3 builds its inits in create_initfun.m3() and drops an empty

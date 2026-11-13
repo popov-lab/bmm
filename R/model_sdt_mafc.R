@@ -61,7 +61,8 @@
       links = list(d = "identity"),
       fixed_parameters = list(),
       default_priors = default_priors,
-      init_ranges = list(d = c(0.5, 1.5))
+      init_ranges = list(d = c(0.5, 1.5)),
+      functions = list(density = "dsdt_mafc", generator = "rsdt_mafc")
     ),
     class = c("bmmodel", "sdt", "sdt_mafc"),
     call = call
@@ -280,10 +281,12 @@ configure_model.sdt_mafc <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_mafc <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, trials = vars$n_trials, counts = if (is.character(vars$m)) vars$m)
+  trial_level <- is_trial_level(model)
+  design <- .design_or_n(model, design, trials = vars$n_trials,
+                         counts = if (is.character(vars$m)) vars$m, ...)
   sim <- .simulate_pars(model, pars, design, scale)
-  response <- rsdt_mafc(nrow(design), design[[vars$n_trials]], .sdt_resolve_set_size(vars$m, design),
-                        d = sim$native$d, dist = vars$dist)
+  response <- rsdt_mafc(nrow(design), if (trial_level) 1L else design[[vars$n_trials]],
+                        .sdt_resolve_set_size(vars$m, design), d = sim$native$d, dist = vars$dist)
   .simulate_result(design, stats::setNames(list(response), model$resp_vars$response), sim)
 }
 
