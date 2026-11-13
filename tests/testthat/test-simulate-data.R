@@ -322,6 +322,20 @@ test_that("simulated statistics of the circular models match their densities", {
   model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, n_alternatives = 4, noise = "gumbel")
   y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
   expect_within_mc(y == 0, 0.5667801, "tcc 4 alternatives gumbel P(target)")
+  # correlated noise, corr = exp(-k / 1.5) at k steps: P(target) is the
+  # orthant probability of the differences X_0 - X_j (mvtnorm::pmvnorm);
+  # motor noise of one step: the independent P convolved with the rounded
+  # normal; the independent P(target) is 0.3484979
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, correlation = exp(-(0:6) / 1.5))
+  y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
+  expect_within_mc(y == 0, 0.3896782, "tcc correlated P(target)")
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, motor_sd = pi / 6)
+  y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
+  expect_within_mc(y == 0, 0.2086131, "tcc motor P(target)")
+  # with units = "bins" motor_sd counts option steps: the same one-step cell
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, units = "bins", motor_sd = 1)
+  y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
+  expect_within_mc(y == 0, 0.2086131, "tcc bins motor P(target)")
   bins <- simulate_data(tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, units = "bins"),
                         list(d = 0.5), n_trials = 50)$y
   expect_true(all(bins %in% -5:6))

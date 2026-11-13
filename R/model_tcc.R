@@ -4,11 +4,16 @@
 
 .model_tcc <- function(resp_error = NULL, similarity = NULL, n_options = 360,
                        units = "radians", noise = "gaussian", d_max = 30, options = NULL,
-                       n_alternatives = NULL, links = NULL, call = NULL, ...) {
+                       n_alternatives = NULL, correlation = NULL, motor_sd = 0,
+                       correlation_draws = 1e6, links = NULL, call = NULL, ...) {
   gumbel <- noise == "gumbel"
-  # the option arguments enter other_vars only when given, so that a model
-  # stored before they existed is the full-wheel model it was
+  # the option and noise arguments enter other_vars only when given, so that a
+  # model stored before they existed is the model it was
   option_vars <- Filter(Negate(is.null), nlist(options, n_alternatives))
+  noise_vars <- c(
+    if (!is.null(correlation)) nlist(correlation, correlation_draws),
+    if (motor_sd > 0) nlist(motor_sd)
+  )
   schurgin <- glue(
     "Schurgin, M. W., Wixted, J. T., & Brady, T. F. (2020). Psychophysical \\
     scaling reveals a unified theory of visual memory strength. Nature Human \\
@@ -19,7 +24,11 @@
       resp_vars = nlist(resp_error),
       # table = "r" passes the d table from R instead of building it in Stan;
       # an internal switch for table transforms (correlated or motor noise)
-      other_vars = c(nlist(similarity, n_options, units, noise, d_max, table = "stan"), option_vars),
+      other_vars = c(
+        nlist(similarity, n_options, units, noise, d_max,
+              table = if (length(noise_vars)) "r" else "stan"),
+        option_vars, noise_vars
+      ),
       domain = "Working memory",
       task = "Continuous reproduction",
       # Gumbel noise is the first step from the TCC towards the SDM in Oberauer
@@ -58,6 +67,12 @@
             "Memory strength d: the mean memory-match signal of the target in units \\
             of the scale of the standard Gumbel noise (whose SD is pi / sqrt(6)); an \\
             option at distance x has mean d * f(x)"
+          )
+        } else if (!is.null(correlation)) {
+          glue(
+            "Memory strength d (the d' of Schurgin et al., 2020, under the noise \\
+            correlation given): the mean memory-match signal of the target in units \\
+            of the noise SD; an option at distance x has mean d * f(x)"
           )
         } else {
           glue(
@@ -98,13 +113,18 @@
 #'   every option on the response wheel produces a Gaussian memory-match
 #'   signal with unit variance and mean `d * f(x)`, where `f(x)` is the
 #'   psychophysical similarity of an option `x` options away from the target,
-#'   and the response is the option with the strongest signal. This is the
-#'   uncorrelated-noise model of Schurgin et al. (2020). The d' they report
-#'   comes from a correlated-noise version and is larger: across the
+#'   and the response is the option with the strongest signal. By default
+#'   the noise is independent across options. The d' Schurgin et al. (2020)
+#'   report comes from their correlated-noise model and is larger: across the
 #'   subjects and set sizes of their Figure 3 data, the median ratio of their
-#'   d' to this `d` was 1.60. With `noise = "gumbel"` the signals carry
-#'   standard Gumbel noise instead, and the response probabilities become a
-#'   softmax (see the section Noise).
+#'   d' to the independent-noise `d` was 1.60. With `correlation`, the noise
+#'   is correlated across options as in their model, and `d` is their d'.
+#'   That model is the base of the TCC family: continuous report, forced
+#'   choice and change detection are its marginals (see the section "One
+#'   process, three formats"). Independent noise stays the default because its
+#'   likelihood needs no Monte Carlo table. With `noise = "gumbel"` the
+#'   signals carry standard Gumbel noise instead, and the response
+#'   probabilities become a softmax (see the section Noise).
 #' @details `r model_docs(.model_tcc())`
 #'
 #' ## Similarity
@@ -125,8 +145,10 @@
 #' ## Noise
 #'
 #'   `noise` sets the distribution of the noise on each option's signal.
-#'   `"gaussian"`, the default, is the model of Schurgin et al. (2020), with
-#'   normal noise of unit variance. Its response probabilities have no closed
+#'   `"gaussian"`, the default, is normal noise of unit variance, as in
+#'   Schurgin et al. (2020): independent across options by default, or
+#'   correlated as in their model with `correlation` (see the section
+#'   Correlated noise). Its response probabilities have no closed
 #'   form, so on the full wheel the likelihood reads them from a table (see
 #'   the section Grid limit on d); with `options` it integrates them per
 #'   cell. With `"gumbel"` the noise follows the standard Gumbel (type I
@@ -157,8 +179,9 @@
 #'   likelihood sums over the options once for each run of rows that share
 #'   `d` (see the section Speed). With `options` it is much cheaper (see the
 #'   section Forced-choice option sets). It skips the table build before
-#'   sampling and has no grid limit. Keep normal noise to stay with the model
-#'   of Schurgin et al. (2020) and to compare `d` with their d'. The two `d` are not on one scale. The
+#'   sampling and has no grid limit. Keep normal noise to stay with the
+#'   models of Schurgin et al. (2020); to compare `d` with their d', also give
+#'   their `correlation`. The normal and Gumbel `d` are not on one scale. The
 #'   standard Gumbel distribution has an SD of `pi / sqrt(6)` = 1.28, but
 #'   matching the response probabilities takes a larger factor: the Gumbel
 #'   `d` with the smallest Kullback-Leibler divergence from the probabilities
@@ -177,17 +200,127 @@
 #'   choice among `n_options` discrete options, so `n_options` should be the
 #'   number of options the participant could choose from.
 #'
-#'   On the full wheel, `n_options` is part of the model, not a resolution
-#'   setting. Each option
+#'   With independent noise on the full wheel, `n_options` is part of the
+#'   model, not a resolution setting. Each option
 #'   draws its own noise, and the more options lie near the target, the more
 #'   often one of them wins: at `d = 2`, with the Laplace similarity of the
 #'   examples built for each wheel (`tcc_similarity(..., n_options = n)`), the
 #'   probability of choosing an option at most 10 degrees from the target is
-#'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
-#'   continuous limit, and values of `d` fitted with different `n_options` are
-#'   not on one scale. With `options`, `n_options` only places the options:
+#'   0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The
+#'   independent-noise model has no continuous limit, and its values of `d`
+#'   fitted with different `n_options` are not on one scale; with
+#'   `correlation` they are (see the section "One process, three formats"). With `options`, `n_options` only places the options:
 #'   the choice is among the offered options alone, and any even `n_options`
 #'   of at least 4 that is a multiple of `m` spaces `m` options equally.
+#'
+#' ## One process, three formats
+#'
+#'   With correlated noise the TCC is one process on the circle: a Gaussian
+#'   process with mean `d * f(x)` and covariance `correlation(|x - y|)`, read
+#'   out by its maximum. Each test format is a marginal of that process.
+#'
+#'   - Continuous report is the argmax over the circle, which `tcc()` takes
+#'     over `n_options` discrete options. Under the correlation Schurgin et
+#'     al. (2020) measured, the predicted response distribution no longer
+#'     changes from 720 options on (within Monte Carlo error); on
+#'     their 1-degree wheel of 360 options the probability of a response
+#'     within 10 degrees of the target lies 0.015 above that limit at `d =
+#'     2`. Values of `d` fitted on different wheels are therefore on one
+#'     scale, which they are not under independent noise (see the section
+#'     Response).
+#'   - m-alternative forced choice is the argmax over the offered options,
+#'     whose signals are jointly normal with the sub-matrix of the
+#'     correlation for their distances. `tcc(options = )` fits forced choice
+#'     with independent noise; with correlated noise it is planned for bmm
+#'     1.6.0.
+#'   - Single-probe change detection compares one option's signal, normal
+#'     with mean `d * f(x)` and SD 1, with a criterion. It needs no
+#'     correlation, as it reads one signal.
+#'
+#'   A two-alternative choice between the target and the opposite option has
+#'   d' = `d * (1 - f(180)) / sqrt(1 - correlation(180))`, with `f(180)` and
+#'   `correlation(180)` the last values of `similarity` and `correlation`. When
+#'   both are 0, as in the similarity and correlation Schurgin et al. measured,
+#'   `d` is that d' (in simulations from their model with `d` of 2 and 1, it
+#'   came out at 2.00 and 1.01, SE about 0.03). Independent noise is the
+#'   member of the family whose correlation is 0 at every distance but 0. Its
+#'   forced-choice and change-detection marginals share `d` as well, but its
+#'   continuous report has no continuous limit: there `d` changes with
+#'   `n_options` (see the section Response).
+#'
+#' ## Correlated noise
+#'
+#'   `correlation` gives the correlation of the noise of two options as a
+#'   function of their distance, one value per distance 0, 1, ...,
+#'   `n_options / 2`, starting with 1, in the layout of `similarity`. The
+#'   correlation Schurgin et al. (2020) used for their colour wheel falls
+#'   from 0.96 at 1 degree to 0.35 at 15 degrees and is 0 from 90 degrees
+#'   on. The values must define a valid correlation on the circle (a
+#'   circulant matrix without negative eigenvalues). A correlation that
+#'   falls off smoothly has eigenvalues within 1e-10 of 0 at fine scales,
+#'   directions in which the options get no noise: the measured one has
+#'   five, and `exp(-(x / 15)^2)` for `x` in degrees 287 of 360. The
+#'   likelihood table cannot represent the similarity's part in those
+#'   directions, so `tcc()` and `rtcc()` mix in a little independent noise,
+#'   `0.99999 * correlation + 0.00001 * c(1, rep(0, n_options / 2))`, and say
+#'   so. Measured against the correlation as given (a brute-force argmax of
+#'   `d * f + z`), this moved `d` by at most 0.06 SE at 2,000 trials with the
+#'   measured correlation, for `d` from 0.5 to 12 and von Mises, Laplace and
+#'   exponential similarities, and the response probabilities by a
+#'   Kullback-Leibler divergence of at most 3.4e-5 per trial with
+#'   `exp(-(x / 15)^2)`. Dropping the similarity's part in those directions
+#'   instead biased `d` by up to 0.7 SE, and 100 times as much independent
+#'   noise by up to 0.56 SE. `tcc()` refuses a correlation with noise in so
+#'   few directions that most of the similarity lies where only this
+#'   independent noise reaches, such as `(1 + cos(x)) / 2`: its table would
+#'   need a precision it was not checked at (`rtcc()` still simulates it). A
+#'   correlation that falls off like `exp(-x / 10)` has no such directions and
+#'   is used as given. Correlated noise needs `noise = "gaussian"` and the
+#'   full wheel.
+#'
+#'   The response probabilities have no closed form, so the likelihood reads
+#'   them from a table that `bmm()` estimates by Monte Carlo before
+#'   sampling, from `correlation_draws` draws of the noise (conditioning each
+#'   draw on its component along the similarity). With the default of one
+#'   million draws and the measured correlation, the build took 70.5 and
+#'   70.7 s in two runs on one core of an Apple M3 Max laptop under other
+#'   load. An earlier version of the estimator took 40 s on that laptop when
+#'   it was otherwise idle; timed in turn with it, the current one was about
+#'   7 % faster. The table is kept in the R process that built it, so
+#'   `update()`, `loo()` refits and `kfold()` in that process reuse it;
+#'   parallel workers (`future`) each build their own. The table's seed
+#'   follows from the model, so the same model always gets the same table
+#'   and the user's random number stream is left as it was.
+#'
+#'   A Monte Carlo table has its own error, which shifts an estimate a little
+#'   with the seed. The shift grows with the number of trials an estimate
+#'   pools, so each table is certified for a number of trials per estimate:
+#'   up to that number, the shift that its seed causes in an estimate of `d`
+#'   has an SD across seeds of at most 0.1 posterior SD. With the default draws and the measured
+#'   correlation the table was certified for about 13,000 trials per estimate.
+#'   The number grows in proportion to `correlation_draws`, and so does the
+#'   build time. `summary()` reports it, and `bmm()` warns after the fit when
+#'   the data hold more trials, naming a `correlation_draws` that would
+#'   cover them. As the correlation weakens towards independence the table
+#'   thins out: some far responses at a large `d` are then drawn too rarely
+#'   for their probability to be estimated, or never, and `bmm()` warns when
+#'   cells are never drawn below `d_max`. For independent noise,
+#'   leave `correlation` out; the default table is then exact.
+#'
+#' ## Motor noise
+#'
+#'   `motor_sd` adds the motor noise of Schurgin et al. (2020): the click
+#'   lands at the chosen option plus a normal error with SD `motor_sd`,
+#'   rounded to the nearest option. Give it in the unit of `resp_error`:
+#'   radians, or option steps with `units = "bins"`. Their 2 degrees are
+#'   `deg2rad(2)`. The probabilities are those of the model without motor
+#'   noise, convolved with that rounded normal, with or without
+#'   `correlation`. The authors' code for the uncorrelated model samples the
+#'   normal density at whole steps from -6 to 6 instead; the two kernels differ by up to 0.15 in log
+#'   probability at a large `d`, where the response distribution is the
+#'   kernel itself, and moved the estimates on their Figure 3 data by at most
+#'   0.016. Motor noise needs `noise = "gaussian"` and the full wheel: a
+#'   forced choice has no click to move.
 #'
 #' ## Grid limit on d
 #'
@@ -367,6 +500,19 @@
 #'   against the option columns. Without `options`, a single number `m`: each
 #'   trial offers `m` options spaced equally around the wheel, the target
 #'   among them; `n_options` must be a multiple of `m`.
+#' @param correlation `NULL` (the default) for independent noise, or the
+#'   correlation of the noise of two options at each distance 0, 1, ...,
+#'   `n_options / 2` options, a numeric vector laid out as `similarity` and
+#'   starting with 1. See the section Correlated noise.
+#' @param motor_sd The SD of the motor noise that moves the click from the
+#'   chosen option, in the unit of `resp_error` (radians, or option steps
+#'   with `units = "bins"`); 0, the default, for none. See the section Motor
+#'   noise.
+#' @param correlation_draws With `correlation`, the number of Monte Carlo
+#'   draws for the likelihood table, at least 6000, rounded up to a multiple
+#'   of 6; refused without `correlation`. The table is certified for a
+#'   number of trials per estimate that grows in proportion; see the section
+#'   Correlated noise.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references Oberauer, K. (2023). Measurement models for visual working
@@ -418,7 +564,8 @@
 #' loo::loo_compare(brms::loo(fit_c1), brms::loo(fit_cm))
 tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "bins"),
                 noise = c("gaussian", "gumbel"), d_max = 30, options = NULL,
-                n_alternatives = NULL, ...) {
+                n_alternatives = NULL, correlation = NULL, motor_sd = 0,
+                correlation_draws = 1e6, ...) {
   call <- match.call()
   .check_constructor_dots(list(...), known = "links")
   stop_missing_args()
@@ -427,12 +574,104 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
   .check_tcc_args(similarity, n_options)
   stopif(!is.numeric(d_max) || length(d_max) != 1 || !isTRUE(d_max > 0),
          "`d_max` must be a single positive number.")
-  option_args <- if (!is.null(options) || !is.null(n_alternatives)) {
+  option_set <- !is.null(options) || !is.null(n_alternatives)
+  option_args <- if (option_set) {
     .check_option_args(n_options, options, n_alternatives, units)
+  }
+  .tcc_check_noise_args(similarity, n_options, noise, option_set, correlation, motor_sd)
+  stopif(!missing(correlation_draws) && is.null(correlation),
+         "`correlation_draws` sets the Monte Carlo draws of the correlated-noise table \\
+         and needs `correlation`; without it the table is exact.")
+  if (!is.null(correlation)) {
+    stopif(!is.numeric(correlation_draws) || length(correlation_draws) != 1 ||
+             !isTRUE(is.finite(correlation_draws) && correlation_draws >= 6000),
+           "`correlation_draws` must be a single number of at least 6000.")
+    correlation_draws <- .tcc_corr_rotations * ceiling(correlation_draws / .tcc_corr_rotations)
+    correlation <- .tcc_with_nugget(correlation, inform = TRUE)
   }
   .model_tcc(resp_error = resp_error, similarity = similarity, n_options = n_options,
              units = units, noise = noise, d_max = d_max, options = options,
-             n_alternatives = option_args$n_alternatives, call = call, ...)
+             n_alternatives = option_args$n_alternatives, correlation = correlation,
+             motor_sd = motor_sd, correlation_draws = correlation_draws, call = call, ...)
+}
+
+# The checks tcc(), dtcc() and rtcc() share. Correlated noise is Gaussian and
+# full-wheel only in 1.5.0: correlated n-AFC needs the argmax over the offered
+# points under their sub-covariance, planned for 1.6.0. Motor noise moves a
+# click on the wheel, which an n-AFC choice does not have, and its table is
+# built for the Gaussian lpmf only. `fit` is FALSE for dtcc() and rtcc(),
+# which have no `n_alternatives` and need no Monte Carlo table
+.tcc_check_noise_args <- function(similarity, n_options, noise, option_set, correlation, motor_sd,
+                                  fit = TRUE) {
+  stopif(!is.numeric(motor_sd) || length(motor_sd) != 1 ||
+           !isTRUE(is.finite(motor_sd) && motor_sd >= 0),
+         "`motor_sd` must be a single non-negative number.")
+  if (is.null(correlation) && motor_sd == 0) {
+    return(invisible())
+  }
+  what <- if (is.null(correlation)) "`motor_sd`" else "`correlation`"
+  stopif(noise == "gumbel",
+         "{what} requires noise = 'gaussian': correlated and motor noise are \\
+         defined for normal noise only.")
+  option_args <- if (fit) "`options` or `n_alternatives`" else "`options`"
+  stopif(option_set && !is.null(correlation),
+         "`correlation` cannot be combined with {option_args}. \\
+         Correlated noise in forced choice (the argmax over the offered options \\
+         under their sub-covariance) is planned for bmm 1.6.0; fit option sets with \\
+         independent noise for now.")
+  stopif(option_set,
+         "`motor_sd` cannot be combined with {option_args}: motor \\
+         noise moves a click on the wheel, and a forced choice has none.")
+  if (!is.null(correlation)) {
+    .tcc_check_correlation(correlation, similarity, n_options, fit)
+  }
+}
+
+# rtcc() draws by the circulant square root, which any correlation without a
+# negative eigenvalue has; the last two checks guard the Monte Carlo table
+.tcc_check_correlation <- function(correlation, similarity, n_options, fit) {
+  n_values <- n_options / 2 + 1
+  stopif(!is.numeric(correlation) || length(correlation) != n_values,
+         "`correlation` must be a numeric vector of {n_values} values, one for each \\
+         distance from 0 to {n_options / 2} options, as `similarity`.")
+  stopif(anyNA(correlation) || any(abs(correlation[-1]) > 1),
+         "`correlation` must lie between -1 and 1.")
+  # a measured correlation is 1 at distance 0 only to rounding, on either side
+  stopif(abs(correlation[1] - 1) > 1e-8,
+         "`correlation` must be 1 at distance 0: it is the correlation of an \\
+         option's noise with its own.")
+  lam <- Re(stats::fft(.tcc_circ_row(correlation)))
+  stopif(min(lam) / max(lam) < -1e-8,
+         "`correlation` is not a valid correlation function on the circle: the \\
+         circulant matrix it defines has a negative eigenvalue \\
+         ({signif(min(lam) / max(lam), 3)} of the largest).")
+  if (!fit) {
+    return(invisible())
+  }
+  # the table conditions on the similarity's direction, which a constant one
+  # does not have (kappa = 0)
+  stopif(all(similarity == similarity[1]),
+         "`similarity` must vary with distance when `correlation` is given: a \\
+         constant similarity gives every option the same mean signal, so `d` cannot \\
+         be estimated.")
+  # tcc() fits the correlation with its nugget, if it needs one
+  setup <- .tcc_corr_setup(.tcc_with_nugget(correlation), similarity)
+  # the table's drift grid pads the d grid by 16 / kappa in steps of 0.01, so
+  # a kappa of 0.016 needs 1e5 bins and over 1 GB at d_max = 30; exponential
+  # and measured correlations gave 0.9 to 1.3 with the similarities tried
+  stopif(setup$kappa < 0.1,
+         "`similarity` varies too little across options, relative to the noise \\
+         `correlation` gives it, for the correlated-noise table (kappa = \\
+         {signif(setup$kappa, 2)}, at least 0.1 is needed).")
+  # a large kappa comes from a similarity that lies mostly where the nugget is
+  # the only noise. The drift grid's step of 0.01 resolved Phi(kappa (s - d))
+  # up to a kappa of 212; at 922 (rank 3 on the full wheel) P(target) came out
+  # 0.3 % low against a brute-force argmax, in every one of five seeds (S13)
+  stopif(setup$kappa > 250,
+         "`correlation` has noise in too few directions, relative to where \\
+         `similarity` varies, for the correlated-noise table (kappa = \\
+         {signif(setup$kappa, 3)}, at most 250 is supported): most of the \\
+         similarity lies in directions with almost no noise.")
 }
 
 # the full wheel prints nothing here, so that print() of tcc() without option
@@ -441,6 +680,7 @@ tcc <- function(resp_error, similarity, n_options = 360, units = c("radians", "b
 print_model_details.tcc <- function(model, ...) {
   options <- model$other_vars$options
   n_alternatives <- model$other_vars$n_alternatives
+  .tcc_print_noise(model$other_vars)
   if (is.null(options) && is.null(n_alternatives)) {
     return(invisible(NULL))
   }
@@ -640,7 +880,7 @@ configure_model.tcc <- function(model, data, formula) {
     brms::stanvar(x = grid$lo, name = "tcc_grid_lo") +
     brms::stanvar(x = grid$step, name = "tcc_grid_step")
   if (table == "r") {
-    return(out + brms::stanvar(x = .tcc_table(similarity, grid), name = "tcc_tab"))
+    return(out + brms::stanvar(x = .tcc_noise_table(model, grid)$tab, name = "tcc_tab"))
   }
   rule <- .gl_rule(.tcc_gl_nodes)
   out +
@@ -746,6 +986,12 @@ postprocess_brm.tcc <- function(model, fit, ...) {
   # fits of the update() tests)
   if (has_draws(fit) && length(fit$fit@sim$samples) && length(fit$fit@sim$samples[[1]])) {
     .tcc_check_grid(model, brms::prepare_predictions(fit))
+  }
+  if (!is.null(model$other_vars$correlation)) {
+    # the session cache holds the table configure_model() just built
+    info <- .tcc_noise_table(model, .tcc_grid(model))$info
+    fit$bmm$model$other_vars$table_info <- info[c("draws", "seed", "n_pool", "zeros", "zeros_from")]
+    .tcc_check_certified(info, nrow(fit$data), model$other_vars$d_max)
   }
   fit
 }
@@ -951,12 +1197,17 @@ simulate_data.tcc <- function(model, pars, design = NULL, scale = c("link", "nat
   .simulate_result(design, stats::setNames(list(y), model$resp_vars$resp_error), sim)
 }
 
-# one rtcc() call per option set; without offered sets one call for all rows
+# one rtcc() call per option set; without offered sets one call for all rows.
+# correlation and motor_sd are options of the model, not versions, so the R4
+# check cannot see a method that drops them
 .simulate_tcc_responses <- function(model, design, d) {
   n_options <- model$other_vars$n_options
+  # rtcc() reads motor_sd in radians; the model holds it in the units of the response
+  motor_sd <- .tcc_motor_steps(model$other_vars) * 2 * pi / n_options
   draw <- function(rows, options = NULL) {
     rtcc(length(rows), d = d[rows], similarity = model$other_vars$similarity,
-         n_options = n_options, noise = model$other_vars$noise, options = options)
+         n_options = n_options, noise = model$other_vars$noise, options = options,
+         correlation = model$other_vars$correlation, motor_sd = motor_sd)
   }
   # .option_offsets() checks the option columns only in rows with a response
   checked <- design
