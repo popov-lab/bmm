@@ -824,7 +824,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @description Density, distribution, and random generation functions for the
 #'   three-parameter mixture model with the location of `mu`, precision of
 #'   memory representations `kappa`, probability of a target response `p_mem`,
-#'   and probability of a non-target response `p_nt`.
+#'   and probability of a non-target response `p_nt`. The capacity versions
+#'   (`version = "slot"` and `"slot_averaging"`) replace `p_mem` and `p_nt` by
+#'   the capacity `K` and `ptarget`, as [mixture3p()] does.
 #'
 #' @name mixture3p_dist
 #'
@@ -835,24 +837,30 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   items.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
-#'   the mean of `J`.
-#' @param p_mem Vector of probabilities of a target response. For a
-#'   [mixture3p()] fit these are `thetat` on its native scale (version
-#'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
-#'   (versions `"slot"` and `"slot_averaging"`). The mapping is exact for
-#'   `"slot"` and for `"slot_averaging"` up to `K = set_size`. Above capacity,
-#'   slot averaging gives an item several slots and raises its precision,
-#'   which these functions do not model.
+#'   the mean of `J`. Under `"slot_averaging"` it is the precision of an item
+#'   held in a single slot.
+#' @param p_mem Vector of probabilities of a target response, i.e. `thetat` of
+#'   a [mixture3p()] fit with `version = "simple"` on its native scale (see
+#'   [native_parameters()]). Used by the `"simple"` version; the other versions
+#'   derive the probability of a response from memory from `K` and the set size,
+#'   and warn if `p_mem` is given.
 #' @param p_nt Vector of probabilities of a non-target response, summed over
-#'   the non-targets, which share it equally. For a [mixture3p()] fit these are
-#'   `thetant` on its native scale (version `"simple"`) or
-#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions, with the limit
-#'   for `"slot_averaging"` given under `p_mem`). Unlike `ptarget`, `p_mem` and
-#'   `p_nt` are not conditional on a response from memory.
+#'   the non-targets, which share it equally: `thetant` of a `"simple"` fit on
+#'   its native scale. Unlike `ptarget`, `p_mem` and `p_nt` are not conditional
+#'   on a response from memory. Used by the `"simple"` version, like `p_mem`.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision. See [mixture3p()].
+#' @param K Vector of memory capacities. Used by the `"slot"` and
+#'   `"slot_averaging"` versions, which read the set size as the number of
+#'   locations in `mu`; `"simple"` ignores `K` and warns if it is given.
+#' @param ptarget Vector of probabilities that a response from memory reports
+#'   the target rather than a non-target. Used by the `"slot"` and
+#'   `"slot_averaging"` versions; `"simple"` ignores it and warns if it is
+#'   given.
+#' @param version A character string selecting the storage model: `"simple"`,
+#'   `"slot"` or `"slot_averaging"`. See [mixture3p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
 #'   odd number of at least 41. See [mixture2p()]. The random generation
 #'   function needs no nodes: it draws `J` from its gamma distribution and then
@@ -886,22 +894,36 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 #'
+#' # slot averaging: with 6 slots for 3 items each item holds two slots
+#' d6 <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, K = 6, ptarget = 0.8,
+#'                  version = "slot_averaging")
+#' lines(x, d6, col = "blue")
+#'
 dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
-                       tau = 0, vp_nodes = 81L, log = FALSE) {
+                       tau = 0, K = 3, ptarget = 0.75, version = "simple",
+                       vp_nodes = 81L, log = FALSE) {
   if (isTRUE(tau) || isFALSE(tau)) {
     .warn_positional_log("dmixture3p", "x, mu, kappa, p_mem, p_nt", tau)
     log <- tau
     tau <- 0
   }
-  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  version <- match.arg(version, names(.mixture3p_version_table))
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau, K, ptarget, version)
   .circmix_check_variable_precision(FALSE, vp_nodes)
+  .check_mixture3p_version_args(version, c(
+    p_mem = !missing(p_mem), p_nt = !missing(p_nt),
+    K = !missing(K), ptarget = !missing(ptarget)
+  ))
 
-  args <- .circmix_recycle(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau)
   set_size <- length(mu)
-  weights <- .mixture3p_marginal_weights(args$p_mem, args$p_nt, set_size, length(args$x))
-  density <- .circmix_vp_ld(
-    .circmix_cos(args$x, mu[1], mu[-1], set_size),
-    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
+  density <- switch(version,
+    simple = .dmixture3p_marginal(x, mu, kappa, p_mem, p_nt, tau, vp_nodes),
+    slot = .dmixture3p_slot(
+      x, mu[1], kappa, K, ptarget, set_size, mu[-1], tau, vp_nodes
+    ),
+    slot_averaging = .dmixture3p_slot_averaging(
+      x, mu[1], kappa, K, ptarget, set_size, mu[-1], tau, vp_nodes
+    )
   )
 
   if (!log) {
@@ -911,12 +933,36 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   density
 }
 
-.check_mixture3p_args <- function(kappa, p_mem, p_nt, tau) {
+.dmixture3p_marginal <- function(x, mu, kappa, p_mem, p_nt, tau, nodes) {
+  args <- .circmix_recycle(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau)
+  set_size <- length(mu)
+  weights <- .mixture3p_marginal_weights(args$p_mem, args$p_nt, set_size, length(args$x))
+  .circmix_vp_ld(
+    .circmix_cos(args$x, mu[1], mu[-1], set_size),
+    weights$logw, weights$logw_guess, args$kappa, args$tau, nodes
+  )
+}
+
+.check_mixture3p_args <- function(kappa, p_mem, p_nt, tau, K, ptarget, version) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
-  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+  if (version == "simple") {
+    stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
+    stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
+    stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+    return(invisible())
+  }
+  stopif(isTRUE(any(K <= 0)), "K must be positive.")
+  stopif(isTRUE(any(ptarget < 0 | ptarget > 1)), "ptarget must be between 0 and 1.")
+}
+
+.check_mixture3p_version_args <- function(version, supplied) {
+  unused <- if (version == "simple") c("K", "ptarget") else c("p_mem", "p_nt")
+  ignored <- intersect(unused, names(supplied)[supplied])
+  warnif(
+    length(ignored) > 0,
+    "The '{version}' version of mixture3p ignores {collapse_comma(ignored)}."
+  )
 }
 
 # the weights the exported functions take: marginal probabilities of a target
@@ -1026,14 +1072,31 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @rdname mixture3p_dist
 #' @export
 rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
-                       tau = 0) {
-  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+                       tau = 0, K = 3, ptarget = 0.75, version = "simple") {
+  version <- match.arg(version, names(.mixture3p_version_table))
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau, K, ptarget, version)
+  .check_mixture3p_version_args(version, c(
+    p_mem = !missing(p_mem), p_nt = !missing(p_nt),
+    K = !missing(K), ptarget = !missing(ptarget)
+  ))
 
   set_size <- length(mu)
-  .rmixture3p(
-    rep_len(mu[1], n), mu[-1], set_size,
-    .mixture3p_marginal_weights(p_mem, p_nt, set_size, n),
-    rep_len(kappa, n), rep_len(tau, n)
+  recycle <- function(x) rep_len(x, n)
+  switch(version,
+    simple = .rmixture3p(
+      recycle(mu[1]), mu[-1], set_size,
+      .mixture3p_marginal_weights(p_mem, p_nt, set_size, n),
+      recycle(kappa), recycle(tau)
+    ),
+    slot = .rmixture3p(
+      recycle(mu[1]), mu[-1], set_size,
+      .mixture3p_nested_weights(pmin(1, recycle(K) / set_size), recycle(ptarget), set_size),
+      recycle(kappa), recycle(tau)
+    ),
+    slot_averaging = .rmixture3p_slot_averaging(
+      recycle(mu[1]), mu[-1], set_size, recycle(kappa), recycle(K),
+      recycle(ptarget), recycle(tau)
+    )
   )
 }
 

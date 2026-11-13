@@ -426,36 +426,118 @@ test_that("dmixture3p recycles its parameters to the longest argument", {
   )
 })
 
-# model_spec() names dmixture3p() as the density of every mixture3p version, but
-# one kappa cannot give the per-item precision of slot averaging above
-# capacity. A version-aware dmixture3p() makes the last expectation fail on
-# purpose: flip it and remove the caveat from the `functions` item of
-# model_spec() and from the p_mem/p_nt parameters of mixture3p_dist.
-test_that("dmixture3p matches mixture3p slot averaging up to capacity and not above", {
+# model_spec() names dmixture3p() as the density of every mixture3p version,
+# so it must agree with the likelihood log_lik() evaluates at every K, above
+# capacity too, where slot averaging gives an item several slots (#711)
+test_that("dmixture3p matches the mixture3p likelihood of every version at every K", {
   x <- seq(-pi, pi, length.out = 7)
   mu <- c(0, 2, -1.5, 1)
   set_size <- length(mu)
-  ptarget <- 0.7
-  log_dens <- function(K, tau) {
-    capacity <- min(1, K / set_size)
-    list(
-      exported = dmixture3p(
-        x, mu = mu, kappa = 8, p_mem = capacity * ptarget,
-        p_nt = capacity * (1 - ptarget), tau = tau, log = TRUE
-      ),
-      slot_averaging = .dmixture3p_slot_averaging(
-        x, mu[1], 8, K, ptarget, set_size, mu[-1], tau, 81L
-      )
-    )
+  internal <- list(slot = .dmixture3p_slot, slot_averaging = .dmixture3p_slot_averaging)
+  for (version in names(internal)) {
+    for (tau in c(0, 1)) {
+      for (K in c(2, 4, 6, 8)) {
+        expect_equal(
+          dmixture3p(x, mu = mu, kappa = 8, tau = tau, K = K, ptarget = 0.7,
+                     version = version, log = TRUE),
+          internal[[version]](x, mu[1], 8, K, 0.7, set_size, mu[-1], tau, 81L)
+        )
+      }
+    }
+  }
+})
+
+# the capacity versions written as the "simple" mixture they reduce to, so that
+# a bug shared by the exported and the internal capacity functions shows
+test_that("the capacity versions of dmixture3p reduce to the simple mixture", {
+  x <- seq(-pi, pi, length.out = 7)
+  mu <- c(0, 2, -1.5, 1)
+  set_size <- length(mu)
+  simple <- function(p_mem, ptarget, kappa = 8, tau = 0) {
+    dmixture3p(x, mu = mu, kappa = kappa, p_mem = p_mem * ptarget,
+               p_nt = p_mem * (1 - ptarget), tau = tau, log = TRUE)
+  }
+  capacity <- function(K, version, kappa = 8, tau = 0) {
+    dmixture3p(x, mu = mu, kappa = kappa, tau = tau, K = K, ptarget = 0.7,
+               version = version, log = TRUE)
   }
 
   for (tau in c(0, 1)) {
-    for (K in c(set_size / 2, set_size)) {
-      dens <- log_dens(K, tau)
-      expect_equal(dens$exported, dens$slot_averaging, tolerance = 1e-8)
+    for (K in c(2, 4, 6, 8)) {
+      expect_equal(capacity(K, "slot", tau = tau), simple(min(1, K / set_size), 0.7, tau = tau))
     }
-    above <- log_dens(2 * set_size, tau)
-    expect_gt(max(abs(above$exported - above$slot_averaging)), 0.1)
+    for (K in c(2, 4)) {
+      expect_equal(capacity(K, "slot_averaging", tau = tau), simple(K / set_size, 0.7, tau = tau))
+    }
+  }
+
+  # at K = 2 * set_size every item holds two slots, whose Fisher information adds
+  kappa_2 <- stats::uniroot(
+    function(k) .circmix_J(k) - 2 * .circmix_J(8), c(8, 100), tol = 1e-12
+  )$root
+  expect_equal(
+    capacity(2 * set_size, "slot_averaging"), simple(1, 0.7, kappa = kappa_2),
+    tolerance = 1e-6
+  )
+})
+
+test_that("the capacity versions of dmixture3p recycle their parameters", {
+  at <- function(x, ...) dmixture3p(x, ...)
+  for (version in c("slot", "slot_averaging")) {
+    expect_equal(
+      dmixture3p(c(0.3, -1, 2), K = c(1, 5), ptarget = c(0.4, 0.9, 0.6),
+                 kappa = c(3, 10), tau = c(0, 1), version = version),
+      c(at(0.3, K = 1, ptarget = 0.4, kappa = 3, tau = 0, version = version),
+        at(-1, K = 5, ptarget = 0.9, kappa = 10, tau = 1, version = version),
+        at(2, K = 1, ptarget = 0.6, kappa = 3, tau = 0, version = version))
+    )
+  }
+})
+
+# with one item there is nothing to swap to, so ptarget drops out and the slot
+# model is that of mixture2p
+test_that("the slot version of dmixture3p at set size 1 is the mixture2p slot model", {
+  x <- seq(-pi, pi, length.out = 7)
+  for (K in c(0.5, 2)) {
+    expect_equal(
+      dmixture3p(x, mu = 0, kappa = 6, K = K, ptarget = 0.3, version = "slot"),
+      dmixture2p(x, mu = 0, kappa = 6, K = K, set_size = 1, version = "slot")
+    )
+  }
+})
+
+test_that("the capacity versions of dmixture3p integrate to 1", {
+  for (version in c("slot", "slot_averaging")) {
+    for (tau in c(0, 1.5)) {
+      expect_equal(integrate(dmixture3p, -pi, pi,
+        mu = c(0, 2, -1.5), kappa = 6, tau = tau, K = 4.5, ptarget = 0.7,
+        version = version, rel.tol = 1e-10
+      )$value, 1, tolerance = 1e-6)
+    }
+  }
+})
+
+test_that("dmixture3p and rmixture3p warn about the arguments a version ignores", {
+  expect_warning(dmixture3p(0.3, K = 2), "'simple' version of mixture3p ignores 'K'")
+  expect_warning(
+    rmixture3p(2, ptarget = 0.5), "'simple' version of mixture3p ignores 'ptarget'"
+  )
+  expect_warning(
+    dmixture3p(0.3, p_mem = 0.5, p_nt = 0.1, version = "slot"),
+    "'slot' version of mixture3p ignores 'p_mem', 'p_nt'"
+  )
+  expect_warning(
+    rmixture3p(2, p_nt = 0.1, version = "slot_averaging"),
+    "'slot_averaging' version of mixture3p ignores 'p_nt'"
+  )
+  expect_no_warning(dmixture3p(0.3, K = 2, ptarget = 0.5, version = "slot"))
+})
+
+test_that("the capacity versions of dmixture3p and rmixture3p check K and ptarget", {
+  for (fun in list(function(...) dmixture3p(0.3, ...), function(...) rmixture3p(2, ...))) {
+    expect_error(fun(K = 0, version = "slot"), "K must be positive")
+    expect_error(fun(ptarget = 1.2, version = "slot_averaging"), "ptarget must be between 0 and 1")
+    expect_error(fun(version = "slots"), "should be one of")
   }
 })
 

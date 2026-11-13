@@ -13,11 +13,24 @@ dmixture3p(
   p_mem = 0.6,
   p_nt = 0.2,
   tau = 0,
+  K = 3,
+  ptarget = 0.75,
+  version = "simple",
   vp_nodes = 81L,
   log = FALSE
 )
 
-rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
+rmixture3p(
+  n,
+  mu = c(0, 2, -1.5),
+  kappa = 5,
+  p_mem = 0.6,
+  p_nt = 0.2,
+  tau = 0,
+  K = 3,
+  ptarget = 0.75,
+  version = "simple"
+)
 }
 \arguments{
 \item{x}{Vector of observed responses}
@@ -28,27 +41,36 @@ items.}
 
 \item{kappa}{Vector of precision values. With \code{tau > 0} this is the
 concentration of the average trial, whose Fisher information \code{J(kappa)} is
-the mean of \code{J}.}
+the mean of \code{J}. Under \code{"slot_averaging"} it is the precision of an item
+held in a single slot.}
 
-\item{p_mem}{Vector of probabilities of a target response. For a
-\code{\link[=mixture3p]{mixture3p()}} fit these are \code{thetat} on its native scale (version
-\code{"simple"}, see \code{\link[=native_parameters]{native_parameters()}}) or \code{min(1, K / set_size) * ptarget}
-(versions \code{"slot"} and \code{"slot_averaging"}). The mapping is exact for
-\code{"slot"} and for \code{"slot_averaging"} up to \code{K = set_size}. Above capacity,
-slot averaging gives an item several slots and raises its precision,
-which these functions do not model.}
+\item{p_mem}{Vector of probabilities of a target response, i.e. \code{thetat} of
+a \code{\link[=mixture3p]{mixture3p()}} fit with \code{version = "simple"} on its native scale (see
+\code{\link[=native_parameters]{native_parameters()}}). Used by the \code{"simple"} version; the other versions
+derive the probability of a response from memory from \code{K} and the set size,
+and warn if \code{p_mem} is given.}
 
 \item{p_nt}{Vector of probabilities of a non-target response, summed over
-the non-targets, which share it equally. For a \code{\link[=mixture3p]{mixture3p()}} fit these are
-\code{thetant} on its native scale (version \code{"simple"}) or
-\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions, with the limit
-for \code{"slot_averaging"} given under \code{p_mem}). Unlike \code{ptarget}, \code{p_mem} and
-\code{p_nt} are not conditional on a response from memory.}
+the non-targets, which share it equally: \code{thetant} of a \code{"simple"} fit on
+its native scale. Unlike \code{ptarget}, \code{p_mem} and \code{p_nt} are not conditional
+on a response from memory. Used by the \code{"simple"} version, like \code{p_mem}.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
 \code{gamma(mean = J(kappa), scale = tau)}. \code{tau = 0}, the default, is constant
 precision. See \code{\link[=mixture3p]{mixture3p()}}.}
+
+\item{K}{Vector of memory capacities. Used by the \code{"slot"} and
+\code{"slot_averaging"} versions, which read the set size as the number of
+locations in \code{mu}; \code{"simple"} ignores \code{K} and warns if it is given.}
+
+\item{ptarget}{Vector of probabilities that a response from memory reports
+the target rather than a non-target. Used by the \code{"slot"} and
+\code{"slot_averaging"} versions; \code{"simple"} ignores it and warns if it is
+given.}
+
+\item{version}{A character string selecting the storage model: \code{"simple"},
+\code{"slot"} or \code{"slot_averaging"}. See \code{\link[=mixture3p]{mixture3p()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
 odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
@@ -71,7 +93,9 @@ three-parameter mixture model.
 Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of \code{mu}, precision of
 memory representations \code{kappa}, probability of a target response \code{p_mem},
-and probability of a non-target response \code{p_nt}.
+and probability of a non-target response \code{p_nt}. The capacity versions
+(\code{version = "slot"} and \code{"slot_averaging"}) replace \code{p_mem} and \code{p_nt} by
+the capacity \code{K} and \code{ptarget}, as \code{\link[=mixture3p]{mixture3p()}} does.
 }
 \examples{
 # generate random samples from the mixture3p model and overlay the density
@@ -80,6 +104,11 @@ x <- seq(-pi, pi, length.out = 10000)
 d <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
 hist(r, breaks = 60, freq = FALSE)
 lines(x, d, type = "l", col = "red")
+
+# slot averaging: with 6 slots for 3 items each item holds two slots
+d6 <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, K = 6, ptarget = 0.8,
+                 version = "slot_averaging")
+lines(x, d6, col = "blue")
 
 }
 \references{

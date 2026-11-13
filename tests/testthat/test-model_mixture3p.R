@@ -124,6 +124,8 @@ test_that("rmixture3p() draws from dmixture3p()", {
   }
   compare(mu = c(0, 2, -1.5), kappa = 6, p_mem = 0.6, p_nt = 0.2)
   compare(mu = c(0, 2, -1.5), kappa = 6, p_mem = 0.6, p_nt = 0.2, tau = 1.5)
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 2, ptarget = 0.7, version = "slot")
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 4.5, ptarget = 0.7, version = "slot_averaging")
 })
 
 test_that("rmixture3p() is exact at high precision", {
