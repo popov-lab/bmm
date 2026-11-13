@@ -1,0 +1,227 @@
+---
+title: "Two decision rules for change detection"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+bibliography: REFERENCES.bib
+header-includes:
+  - \usepackage{amsmath}
+vignette: >
+  %\VignetteIndexEntry{Two decision rules for change detection}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output","message","error"))
+```
+
+# The task
+
+In single-probe change detection, participants see a set of items, for
+example coloured squares, and after a short delay one probe appears at the
+location of one of them. They answer whether the probe has the same feature as
+the item shown there (the target) or a different one. Each trial yields one
+binary response, and the probe can lie anywhere between the target itself and
+the feature opposite it on the wheel.
+
+`bmm` models the memory in this task with the same ideas it uses for
+continuous reproduction, and adds a decision stage that turns memory into
+"same" or "change". There are two such decision stages, and they lead to
+different models of the same data:
+
+- `tcc_cd()` compares a familiarity signal with a criterion
+  [@Schurgin_2020; @Williams_2022].
+- The `*_cd` models apply the Bayesian decision rule of @Lin_Oberauer_2022 to
+  the retrieval densities of `sdm()`, `mixture2p()`, `mixture3p()` and
+  `imm()`. These models are in development (GitHub issue #136) and not part of
+  a release yet. This page describes them as they stand on the development
+  branches and will change if they do.
+
+This page sets out what each rule assumes, which data each model takes, and
+how to compare them.
+
+# A threshold on familiarity: `tcc_cd()`
+
+The target confusability competition (TCC) model of @Schurgin_2020 treats
+memory as familiarity. Remembering a target raises the familiarity of every
+feature by an amount that falls off with the feature's psychophysical
+similarity to the target: a feature `x` steps away from the target has mean
+familiarity $d \cdot f(x)$ and Gaussian noise with unit variance. $d$ is the
+memory strength, and $f$ is a similarity function measured in a separate
+perceptual task, with $f(0) = 1$. In continuous report the observer picks the
+most familiar feature on the wheel, which is the model `tcc()` fits.
+
+With a single probe there is a single familiarity value, and the observer
+compares it with a criterion, as in yes/no recognition. The probe looks
+familiar enough when its signal exceeds the criterion, and the answer is then
+"same":
+
+$$P(\text{change} \mid x) = \Phi\big(\text{criterion} - d \, f(x)\big).$$
+
+Schurgin et al. do not write this rule out. It is their familiarity model
+with the decision stage of signal detection theory, which they name as its
+origin. It is the likelihood of `sdt_yn()` with equal variance, one trial per
+row, and a graded stimulus strength $f(x)$ in place of the 0/1 stimulus code.
+A probe that matches the target is a signal trial and a probe with
+$f(x) = 0$ is a noise trial. When every change is a change to the opposite
+side of the wheel, as in the experiments of @Williams_2022, and the similarity
+there is 0, `tcc_cd()` and `sdt_yn()` are the same model, and Williams et al. found that equal-variance
+signal detection without guessing accounted for such data. Probes at
+intermediate distances trace how the probability of "change" follows the
+similarity function. The figure shows it for three memory strengths with the
+criterion at the midpoint between 0 and $d$ (`bias = 0`).
+
+```{r tcc-cd-curves, fig.width = 6, fig.height = 3.5, fig.cap = "Probability of a 'change' response under tcc_cd() as the probe moves away from the target, for an exponential stand-in for a colour similarity function."}
+library(bmm)
+f <- exp(-(0:180) / 20)
+f <- (f - min(f)) / (1 - min(f))
+deg <- 0:180
+plot(NULL, xlim = c(0, 180), ylim = c(0, 1), xlab = "Probe distance from the target (degrees)",
+     ylab = "P(change)")
+for (d in c(1, 2, 4)) {
+  lines(deg, dtcc_cd(1, deg * pi / 180, d = d, similarity = f, bias = 0), lty = match(d, c(1, 2, 4)))
+}
+legend("bottomright", legend = paste("d =", c(1, 2, 4)), lty = 1:3, bty = "n")
+```
+
+What the rule assumes:
+
+- Memory on a trial is one number per probe. Whether the target was stored
+  well or poorly shows up only through $d$, which can vary between conditions
+  and people but not between trials of one condition.
+- The shape of the familiarity gradient is the perceptual similarity function,
+  which you supply. It is not estimated, and a different $f$ gives a different
+  $d$.
+- There is no guessing state: a weak memory is a small $d$, and every probe's
+  familiarity carries noise of the same size.
+- The observer knows nothing about the quality of memory on a trial and uses
+  one criterion for all trials that share a criterion term in the formula.
+
+The data are the response, coded 0 = "same" and 1 = "change", and the probe's
+distance from the target in radians. Set size and other conditions enter
+through the formula, e.g. `bmf(d ~ 0 + set_size, criterion ~ 1)`.
+
+# A Bayesian observer: the `*_cd` models
+
+@Lin_Oberauer_2022 model the decision as a comparison of two hypotheses. The
+observer retrieves a feature $x$ from memory for the probed location and
+compares the probe $\varphi$ with it. The decision variable is the
+log-likelihood ratio of the retrieved feature and the probe under a change and
+under no change, and the answer is "change" when it exceeds a criterion. The
+likelihoods come from the memory model itself: the memory model plays two
+roles, once as memory and once as the observer's knowledge of that memory. In
+`bmm` the memory models are those of continuous reproduction. `sdm_cd()`,
+`mixture2p_cd()`, `mixture3p_cd()` and `imm_cd()` have the memory parameters
+of `sdm()`, `mixture2p()`, `mixture3p()` and `imm()` under the same names,
+plus `criterion`. The rule puts a "same" region around the probe, and the
+probability of "same" is the retrieval probability inside it.
+
+What the rule assumes:
+
+- Memory on a trial is a retrieved feature, drawn from the retrieval density
+  of a continuous-reproduction model, including its guessing or intrusion
+  components where the model has them.
+- The observer weighs the evidence with a model of their own memory. When
+  precision varies across trials, the observer may know only how precise
+  memory is on average (`knowledge = "limited"`, the default) or how precise
+  it is on the current trial (`knowledge = "rich"`). `mixture2p_cd()`,
+  `mixture3p_cd()` and `imm_cd()` take this argument; `sdm_cd()` has a single
+  precision state, where the two coincide. Lin and Oberauer found
+  that the decision model "works well in combination with all memory models
+  when it is equipped with knowledge about constant characteristics of memory,
+  but little or no knowledge about the state of memory representations in a
+  particular trial" [@Lin_Oberauer_2022, pp. 43-44].
+- The shape of the retrieval density is estimated from the change-detection
+  data, through the memory model's parameters.
+
+The data are the response, coded as for `tcc_cd()`, and the probe and target
+features in radians as two columns. `mixture3p_cd()` and `imm_cd()` also take
+the non-target features and the set size, as their continuous-reproduction
+versions do.
+
+# The two rules side by side
+
+|                          | `tcc_cd()`                                              | `*_cd` models (in development)                                             |
+|--------------------------|---------------------------------------------------------|----------------------------------------------------------------------------|
+| Memory at test           | one familiarity value for the probe                     | a feature retrieved for the probed location                               |
+| "Change" when            | the familiarity falls short of the criterion            | the log-likelihood ratio of change against same exceeds the criterion      |
+| Memory parameters        | `d`; the similarity function is fixed input             | those of `sdm()`, `mixture2p()`, `mixture3p()` or `imm()`                  |
+| Decision parameters      | `criterion` or `bias`                                   | `criterion`                                                                |
+| Guessing                 | none                                                    | as in the memory model                                                     |
+| Observer's knowledge     | none beyond the criterion                               | the memory model, on average or per trial (`knowledge`, where precision varies) |
+| Data columns             | response, probe minus target                            | response, probe, target (and non-targets and set size for two models)      |
+
+# Comparing the two rules
+
+**On the same data.** Both kinds of model score each trial by the Bernoulli
+probability of the observed response, so their pointwise log-likelihoods are
+on one scale and `loo()` compares them directly. This differs from comparing
+`tcc()` with `sdm()` in continuous report, where one model returns a
+probability mass and the other a density. Fit both to the same rows, with
+`distance = probe - target` as the column for `tcc_cd()`.
+
+**The design decides what can be compared.** The two rules predict different
+shapes for the probability of "change" as a function of the probe's distance
+from the target. With only "same" probes and changes to the opposite side of
+the wheel, each condition gives two response rates, which `tcc_cd()` matches
+exactly with `d` and the criterion, and the comparison has nothing to work
+with. Probes at several intermediate distances are what separates the rules.
+
+**The similarity function is part of the TCC model.** `tcc_cd()` reads the
+shape of the familiarity gradient from the similarity you pass, while the
+`*_cd` models estimate the shape of memory from the data. A poorly measured
+similarity function counts against `tcc_cd()` in any comparison, so use one
+measured for the stimuli of the experiment.
+
+**Across task formats.** Change detection and continuous reproduction can be
+fitted with matching models: `tcc()` and `tcc_cd()` share `d`, and the
+`*_cd` models share their memory parameters with the continuous-reproduction
+models. Whether one person has the same values in both tasks is an empirical
+question, and three things stand in the way of reading equal estimates as
+equal memory:
+
+- For TCC, the scale of `d` differs. `tcc()` fits the uncorrelated-noise
+  model, which treats each option of the wheel as an independent signal.
+  Schurgin et al. report that only the d' of their correlated-noise model is
+  interchangeable with a d' from a same/different task, and that the
+  uncorrelated d' is that value scaled by about 0.65 [@Schurgin_2020, Extended
+  Data Fig. 2]. So on real data `tcc_cd()` should report the larger `d`.
+- Continuous reproduction carries response noise that change detection does
+  not have, which lowers the precision a continuous-reproduction model
+  estimates.
+- Participants encode differently depending on the test they expect. When
+  delayed-estimation and change-detection trials were interleaved and the
+  expected task was varied by its frequency, expecting delayed estimation made
+  estimates more precise, while expecting change detection did not change
+  change-detection accuracy [@CohenDallal_2023]. Comparisons between blocked
+  tasks confound the test format with the way items were encoded; trials of
+  both formats mixed within blocks avoid that.
+
+A fit of both formats with shared parameters, which would test the
+invariance directly, needs models for several responses in one fit, which
+GitHub issue #394 develops.
+
+# References

@@ -157,6 +157,11 @@ Choices and response times
 \item ezdm(): EZ-Diffusion Model
 }
 
+Change detection
+\itemize{
+\item tcc_cd(): Target Confusability Competition (TCC) model for single-probe change detection
+}
+
 Type  ?modelname  to get information about a specific model, e.g.  ?imm
 }
 
