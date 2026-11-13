@@ -1,7 +1,8 @@
 #' @title Vector arguments of the distribution functions
 #'
 #' @description The density (`d*()`) and random generation (`r*()`) functions
-#'   of the sdm, ddm and ezdm models, of the signal detection models
+#'   of the sdm, ddm and ezdm models, of the circular mixture models
+#'   (`mixture2p`, `mixture3p` and `imm`), of the signal detection models
 #'   (`sdt_yn`, `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`,
 #'   `sdt_ranking` and `sdt_cdp`) and of the psychometric function take their
 #'   per-observation arguments as vectors, or as matrices with one row per
@@ -10,9 +11,8 @@
 #'   distributions repeats them under "Vector arguments".
 #'
 #'   The other distribution functions do not follow these rules yet:
-#'   [dcswald()] and [rcswald()], the circular mixtures ([dmixture2p()],
-#'   [dmixture3p()], [dimm()] and their `r*()` functions), [dm3()] and [rm3()],
-#'   and [dmpt()] and [rmpt()].
+#'   [dcswald()] and [rcswald()], [dm3()] and [rm3()], and [dmpt()] and
+#'   [rmpt()].
 #'
 #' @section Vector arguments:
 #' - `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or matrix
@@ -51,11 +51,16 @@
 #'   exception: it returns a data frame of the same shape, one density per
 #'   cell, and cuts longer parameters to the number of cells.
 #' - A set of values that describes one observation, such as the `thresholds`
-#'   of the rating models, is a vector when every observation shares it and a
-#'   matrix with one row per observation otherwise: row `i` belongs to
-#'   observation `i`, or to draw `i`.
-#' - Configuration arguments such as `version`, `dist`, `log`,
-#'   `parametrization` and `n_new` are single values and are never recycled.
+#'   of the rating models or the item locations `mu` (and `dist`) of
+#'   [dmixture3p()] and [dimm()], is a vector when every observation shares it
+#'   and a matrix with one row per observation otherwise: row `i` belongs to
+#'   observation `i`, or to draw `i`. Item locations are padded with `NA` past
+#'   each row's set size, and a data frame of them is read as the matrix of its
+#'   rows. As for counts, an empty vector of them stops: pass a matrix with
+#'   zero rows for no observations.
+#' - Configuration arguments such as `version`, `dist` of the ranking models,
+#'   `log`, `parametrization` and `n_new` are single values and are never
+#'   recycled.
 #'   An argument that a version does not use, such as `zr` of
 #'   `dezdm(version = "3par")`, is ignored.
 #'
@@ -616,10 +621,12 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 #'   `p_mem`.
 #'
 #' @name mixture2p_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param x Vector of observed responses
 #' @param n Number of observations to generate data for
-#' @param mu Vector of locations
+#' @param mu Vector of target locations, one per observation. Unlike `mu` of
+#'   [dmixture3p()] and [dimm()], it holds no non-targets.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`.
@@ -685,6 +692,14 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   .check_mixture2p_version_args(version, set_size, c(
     p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
   ))
+  n <- if (version == "simple") {
+    .obs_length(x, mu, kappa, p_mem, tau)
+  } else {
+    .obs_length(x, mu, kappa, K, set_size, tau)
+  }
+  if (n == 0) {
+    return(numeric(0))
+  }
 
   density <- switch(version,
     simple = .dmixture2p_simple(x, mu, kappa, p_mem, tau, vp_nodes),
@@ -803,6 +818,7 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
   .check_mixture2p_version_args(version, set_size, c(
     p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
   ))
+  n <- .n_draws(n)
 
   recycle <- function(x) rep_len(x, n)
   switch(version,
@@ -827,12 +843,16 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   and probability of a non-target response `p_nt`.
 #'
 #' @name mixture3p_dist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param x Vector of observed responses
 #' @param n Number of observations to generate data for
-#' @param mu Vector of locations. First value represents the location of the
-#'   target item and any additional values indicate the location of non-target
-#'   items.
+#' @param mu Item locations in radians. A vector is one item set shared by
+#'   every observation: the target first, then the non-targets. A matrix or
+#'   data frame holds one item set per observation in each row: the target in
+#'   the first column, then the row's non-targets, and `NA` past its set size,
+#'   so rows can differ in set size. The rows are recycled to the number of
+#'   observations. Before bmm 1.5.0 a matrix was read as one long item set.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`.
@@ -886,6 +906,11 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 #'
+#' # item locations per trial: one row per trial, NA past its set size
+#' locations <- rbind(c(0, 2, -1.5), c(1, -2, NA), c(-0.5, NA, NA))
+#' y <- rmixture3p(3, mu = locations, kappa = 4, p_mem = 0.6, p_nt = 0.2)
+#' dmixture3p(y, mu = locations, kappa = 4, p_mem = 0.6, p_nt = 0.2)
+#'
 dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
                        tau = 0, vp_nodes = 81L, log = FALSE) {
   if (isTRUE(tau) || isFALSE(tau)) {
@@ -895,14 +920,20 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   }
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
   .circmix_check_variable_precision(FALSE, vp_nodes)
+  items <- .circmix_item_rows(mu)
+  n <- .obs_length(x, kappa, p_mem, p_nt, tau, rows = if (items$per_row) list(items$locations))
+  if (n == 0) {
+    return(numeric(0))
+  }
 
-  args <- .circmix_recycle(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau)
-  set_size <- length(mu)
-  weights <- .mixture3p_marginal_weights(args$p_mem, args$p_nt, set_size, length(args$x))
-  density <- .circmix_vp_ld(
-    .circmix_cos(args$x, mu[1], mu[-1], set_size),
-    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
-  )
+  args <- lapply(list(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau), rep_len, n)
+  density <- .circmix_by_set_size(items, n, function(idx, locations, dist) {
+    weights <- .mixture3p_marginal_weights(args$p_mem[idx], args$p_nt[idx], ncol(locations), length(idx))
+    .circmix_vp_ld(
+      cos(args$x[idx] - locations), weights$logw, weights$logw_guess,
+      args$kappa[idx], args$tau[idx], vp_nodes
+    )
+  })
 
   if (!log) {
     return(exp(density))
@@ -1028,13 +1059,14 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
                        tau = 0) {
   .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  n <- .n_draws(n)
+  items <- .circmix_item_rows(mu)
 
-  set_size <- length(mu)
-  .rmixture3p(
-    rep_len(mu[1], n), mu[-1], set_size,
-    .mixture3p_marginal_weights(p_mem, p_nt, set_size, n),
-    rep_len(kappa, n), rep_len(tau, n)
-  )
+  args <- lapply(list(kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau), rep_len, n)
+  .circmix_by_set_size(items, n, function(idx, locations, dist) {
+    weights <- .mixture3p_marginal_weights(args$p_mem[idx], args$p_nt[idx], ncol(locations), length(idx))
+    .rcircmix(locations, weights$logw, weights$logw_guess, args$kappa[idx], args$tau[idx])
+  })
 }
 
 #' @title Distribution functions for the Interference Measurement Model (IMM)
@@ -1046,11 +1078,20 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   `kappa`.
 #'
 #' @name IMMdist
+#' @inheritSection bmm_distributions Vector arguments
 #'
 #' @param x Vector of observed responses
 #' @param n Number of observations to generate data for
-#' @param mu Vector of locations
-#' @param dist Vector of distances of the item locations to the cued location
+#' @param mu Item locations in radians. A vector is one item set shared by
+#'   every observation: the target first, then the non-targets. A matrix or
+#'   data frame holds one item set per observation in each row: the target in
+#'   the first column, then the row's non-targets, and `NA` past its set size,
+#'   so rows can differ in set size. The rows are recycled to the number of
+#'   observations. Before bmm 1.5.0 a matrix was read as one long item set.
+#' @param dist Distances of the items to the cued location, in the layout of
+#'   `mu`: a vector for every observation, or a matrix or data frame of the
+#'   shape of `mu` with `NA` in the same places. A vector beside a matrix `mu`
+#'   holds for every row, so every row's set size must equal its length.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`.
@@ -1109,15 +1150,22 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
     log <- tau
     tau <- 0
   }
-  .check_imm_args(kappa, s, dist, tau, length(mu))
+  .check_imm_args(kappa, s, dist, tau)
   .circmix_check_variable_precision(FALSE, vp_nodes)
+  items <- .circmix_item_rows(mu, dist)
+  n <- .obs_length(x, c, a, b, s, kappa, tau, rows = if (items$per_row) list(items$locations))
+  if (n == 0) {
+    return(numeric(0))
+  }
 
-  args <- .circmix_recycle(x = x, c = c, a = a, s = s, b = b, kappa = kappa, tau = tau)
-  weights <- .imm_item_weights(args$c, args$a, args$s, args$b, dist)
-  density <- .circmix_vp_ld(
-    .circmix_cos(args$x, mu[1], mu[-1], length(mu)),
-    weights$logw, weights$logw_guess, args$kappa, args$tau, vp_nodes
-  )
+  args <- lapply(list(x = x, c = c, a = a, s = s, b = b, kappa = kappa, tau = tau), rep_len, n)
+  density <- .circmix_by_set_size(items, n, function(idx, locations, dist) {
+    weights <- .imm_item_weights(args$c[idx], args$a[idx], args$s[idx], args$b[idx], dist)
+    .circmix_vp_ld(
+      cos(args$x[idx] - locations), weights$logw, weights$logw_guess,
+      args$kappa[idx], args$tau[idx], vp_nodes
+    )
+  })
 
   if (!log) {
     return(exp(density))
@@ -1126,12 +1174,8 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   density
 }
 
-.check_imm_args <- function(kappa, s, dist, tau, n_items) {
+.check_imm_args <- function(kappa, s, dist, tau) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
-  stopif(
-    n_items != length(dist),
-    "The number of items does not match the distances provided from the cued location."
-  )
   stopif(isTRUE(any(s < 0)), "s must be non-negative")
   stopif(isTRUE(any(dist < 0)), "all distances have to be positive.")
   stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
@@ -1142,12 +1186,11 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 }
 
 # Activation of every item, including the target at distance zero, weighed
-# against the background. Assembled on the log scale, which is the same
-# quantity as c * exp(-s * d) + a without the intermediate exponentials.
+# against the background; dist has one row of item distances per observation.
+# Assembled on the log scale, which is the same quantity as
+# c * exp(-s * d) + a without the intermediate exponentials.
 .imm_item_weights <- function(c, a, s, b, dist) {
-  n <- length(c)
-  logw <- vapply(dist, function(d) .log_sum2(log(c) - s * d, log(a)), numeric(n))
-  logw <- matrix(logw, nrow = n)
+  logw <- .log_sum2(log(c) - s * dist, log(a))
   total <- matrixStats::rowLogSumExps(cbind(logw, log(b)))
   list(logw = logw - total, logw_guess = log(b) - total)
 }
@@ -1215,15 +1258,15 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
 #' @export
 rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                  c = 1, a = 0.2, b = 1, s = 2, kappa = 5, tau = 0) {
-  .check_imm_args(kappa, s, dist, tau, length(mu))
+  .check_imm_args(kappa, s, dist, tau)
+  n <- .n_draws(n)
+  items <- .circmix_item_rows(mu, dist)
 
-  weights <- .imm_item_weights(
-    rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
-  )
-  .rcircmix(
-    matrix(mu, nrow = n, ncol = length(mu), byrow = TRUE),
-    weights$logw, weights$logw_guess, rep_len(kappa, n), rep_len(tau, n)
-  )
+  args <- lapply(list(c = c, a = a, s = s, b = b, kappa = kappa, tau = tau), rep_len, n)
+  .circmix_by_set_size(items, n, function(idx, locations, dist) {
+    weights <- .imm_item_weights(args$c[idx], args$a[idx], args$s[idx], args$b[idx], dist)
+    .rcircmix(locations, weights$logw, weights$logw_guess, args$kappa[idx], args$tau[idx])
+  })
 }
 
 #' @title Distribution functions for the Memory Measurement Model (M3)

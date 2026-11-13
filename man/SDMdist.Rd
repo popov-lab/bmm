@@ -146,11 +146,16 @@ as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
 exception: it returns a data frame of the same shape, one density per
 cell, and cuts longer parameters to the number of cells.
 \item A set of values that describes one observation, such as the \code{thresholds}
-of the rating models, is a vector when every observation shares it and a
-matrix with one row per observation otherwise: row \code{i} belongs to
-observation \code{i}, or to draw \code{i}.
-\item Configuration arguments such as \code{version}, \code{dist}, \code{log},
-\code{parametrization} and \code{n_new} are single values and are never recycled.
+of the rating models or the item locations \code{mu} (and \code{dist}) of
+\code{\link[=dmixture3p]{dmixture3p()}} and \code{\link[=dimm]{dimm()}}, is a vector when every observation shares it
+and a matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}. Item locations are padded with \code{NA} past
+each row's set size, and a data frame of them is read as the matrix of its
+rows. As for counts, an empty vector of them stops: pass a matrix with
+zero rows for no observations.
+\item Configuration arguments such as \code{version}, \code{dist} of the ranking models,
+\code{log}, \code{parametrization} and \code{n_new} are single values and are never
+recycled.
 An argument that a version does not use, such as \code{zr} of
 \code{dezdm(version = "3par")}, is ignored.
 }

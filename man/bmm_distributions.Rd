@@ -5,7 +5,8 @@
 \title{Vector arguments of the distribution functions}
 \description{
 The density (\verb{d*()}) and random generation (\verb{r*()}) functions
-of the sdm, ddm and ezdm models, of the signal detection models
+of the sdm, ddm and ezdm models, of the circular mixture models
+(\code{mixture2p}, \code{mixture3p} and \code{imm}), of the signal detection models
 (\code{sdt_yn}, \code{sdt_mafc}, \code{sdt_rating}, \code{sdt_dpsdt}, \code{sdt_metad},
 \code{sdt_ranking} and \code{sdt_cdp}) and of the psychometric function take their
 per-observation arguments as vectors, or as matrices with one row per
@@ -14,9 +15,8 @@ do. This page states the rules; the help page of each of these
 distributions repeats them under "Vector arguments".
 
 The other distribution functions do not follow these rules yet:
-\code{\link[=dcswald]{dcswald()}} and \code{\link[=rcswald]{rcswald()}}, the circular mixtures (\code{\link[=dmixture2p]{dmixture2p()}},
-\code{\link[=dmixture3p]{dmixture3p()}}, \code{\link[=dimm]{dimm()}} and their \verb{r*()} functions), \code{\link[=dm3]{dm3()}} and \code{\link[=rm3]{rm3()}},
-and \code{\link[=dmpt]{dmpt()}} and \code{\link[=rmpt]{rmpt()}}.
+\code{\link[=dcswald]{dcswald()}} and \code{\link[=rcswald]{rcswald()}}, \code{\link[=dm3]{dm3()}} and \code{\link[=rm3]{rm3()}}, and \code{\link[=dmpt]{dmpt()}} and
+\code{\link[=rmpt]{rmpt()}}.
 }
 \section{Vector arguments}{
 
@@ -57,11 +57,16 @@ as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
 exception: it returns a data frame of the same shape, one density per
 cell, and cuts longer parameters to the number of cells.
 \item A set of values that describes one observation, such as the \code{thresholds}
-of the rating models, is a vector when every observation shares it and a
-matrix with one row per observation otherwise: row \code{i} belongs to
-observation \code{i}, or to draw \code{i}.
-\item Configuration arguments such as \code{version}, \code{dist}, \code{log},
-\code{parametrization} and \code{n_new} are single values and are never recycled.
+of the rating models or the item locations \code{mu} (and \code{dist}) of
+\code{\link[=dmixture3p]{dmixture3p()}} and \code{\link[=dimm]{dimm()}}, is a vector when every observation shares it
+and a matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}. Item locations are padded with \code{NA} past
+each row's set size, and a data frame of them is read as the matrix of its
+rows. As for counts, an empty vector of them stops: pass a matrix with
+zero rows for no observations.
+\item Configuration arguments such as \code{version}, \code{dist} of the ranking models,
+\code{log}, \code{parametrization} and \code{n_new} are single values and are never
+recycled.
 An argument that a version does not use, such as \code{zr} of
 \code{dezdm(version = "3par")}, is ignored.
 }
