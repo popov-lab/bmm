@@ -17,8 +17,10 @@
 # or 4 is chosen so that reversing it changes the expected draws; one of
 # length 2 reads the same reversed (a b a b a b a) and is caught only when
 # shifted. Non-multiple lengths recycle silently, as rnorm() does; the cswald
-# tests use multiples only until #406 lands. The circular mixtures are
-# circmix's (#434).
+# tests use multiples only until #406 lands. The circular mixtures are tested
+# for element-wise values, item locations given by rows and draws paired with
+# their row; the reversal claim above does not extend to the parameters of
+# their r*() functions.
 
 pick <- function(x, i) {
   if (is.matrix(x)) x[(i - 1) %% nrow(x) + 1, ] else x[(i - 1) %% length(x) + 1]
@@ -1067,6 +1069,202 @@ test_that("rpsychometric_function() pairs intensity, midpoint, width, rates and 
                                                 guess = c(0, 0, near_one), lapse = c(near_one, 0, 0, 0),
                                                 n_trials = 50))
   expect_equal(y, c(0, 0, 50, 0, 0, 50, 50))
+})
+
+# --- circular mixtures ----------------------------------------------------------
+
+wrap_angle <- function(a) (a + pi) %% (2 * pi) - pi
+
+test_that("the circular mixture d*() functions give value i from the i-th elements alone", {
+  # tau > 0 builds the kappa table, about 1 s once per process
+  skip_on_cran()
+  x <- c(-2.5, -1, 0.3, 1.1, 2, 2.9)
+  expect_elementwise(dmixture2p, list(x = x, mu = c(0, 0.5, -0.4, 1), kappa = c(3, 12, 30), p_mem = c(0.6, 0.9),
+                                      tau = c(0, 0.7, 0, 1.4)))
+  expect_elementwise(dmixture2p, list(x = x, kappa = c(3, 12, 30), K = c(1.5, 3.2), set_size = c(2, 4, 6, 3)),
+                     list(version = "slot_averaging"))
+  expect_elementwise(dmixture3p, list(x = x, kappa = c(4, 10, 25), p_mem = c(0.5, 0.7),
+                                      p_nt = c(0.1, 0.2, 0.25, 0.15), tau = c(0, 0.6, 1.1)),
+                     list(mu = c(0, 2, -1.5)))
+  expect_elementwise(dimm, list(x = x, c = c(1, 4, 9), a = c(0.2, 0.6), b = c(0.5, 1, 2, 0.8), s = c(1, 3, 8),
+                                kappa = c(5, 12), tau = c(0, 0.8, 0, 1.3)),
+                     list(mu = c(0, 2, -1.5), dist = c(0, 0.5, 2)))
+})
+
+test_that("dmixture3p() and dimm() read a matrix of item locations row by row", {
+  # row i holds observation i's target, then its non-targets, NA past its set
+  # size; the 3 rows recycle to the 6 values of x
+  x <- c(-2.5, -1, 0.3, 1.1, 2, 2.9)
+  mu <- rbind(c(0.4, 2, -1.5, 1), c(-1, 1.2, NA, NA), c(2.5, NA, NA, NA))
+  dist <- rbind(c(0, 0.5, 2, 1), c(0, 0.8, NA, NA), c(0, NA, NA, NA))
+  expect_elementwise(dmixture3p, list(x = x, mu = mu, kappa = c(4, 10)), list(p_mem = 0.6, p_nt = 0.25))
+  expect_elementwise(dmixture3p, list(x = x, mu = mu, tau = c(0, 0.6, 0, 1.1)), list(kappa = 8))
+  expect_elementwise(dimm, list(x = x, mu = mu, dist = dist, c = c(2, 5)), list(s = 2, a = 0.3))
+  # a vector dist holds for every row, so every row's set size is its length
+  mu3 <- rbind(c(0.4, 2, -1.5), c(-1, 1.2, 0), c(2.5, -2, 1))
+  expect_elementwise(dimm, list(x = x, mu = mu3, kappa = c(4, 10)), list(dist = c(0, 0.5, 2)))
+})
+
+test_that("a vector of item locations is one set, and an NA-padded row equals its shorter vector", {
+  x <- c(-1, 0.3, 2)
+  expect_identical(dmixture3p(x, mu = rbind(c(0, 2, -1.5))), dmixture3p(x, mu = c(0, 2, -1.5)))
+  expect_identical(dimm(x, mu = rbind(c(0, 2, -1.5)), dist = rbind(c(0, 0.5, 2))),
+                   dimm(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2)))
+  expect_identical(withr::with_seed(1, rmixture3p(5, mu = rbind(c(0, 2, -1.5)))),
+                   withr::with_seed(1, rmixture3p(5, mu = c(0, 2, -1.5))))
+  expect_identical(withr::with_seed(1, rimm(5, mu = rbind(c(0, 2, -1.5)), dist = c(0, 0.5, 2))),
+                   withr::with_seed(1, rimm(5, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2))))
+
+  padded <- rbind(c(0, 2, NA, NA), c(0, 2, -1.5, NA))
+  padded_dist <- rbind(c(0, 0.5, NA, NA), c(0, 0.5, 2, NA))
+  expect_equal(dmixture3p(c(0.3, 0.3), mu = padded),
+               c(dmixture3p(0.3, mu = c(0, 2)), dmixture3p(0.3, mu = c(0, 2, -1.5))))
+  expect_equal(dimm(c(0.3, 0.3), mu = padded, dist = padded_dist),
+               c(dimm(0.3, mu = c(0, 2), dist = c(0, 0.5)), dimm(0.3, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2))))
+
+  # location columns taken from the data read as the matrix of their rows
+  locations <- data.frame(target = c(0, 1), nt1 = c(2, -1), nt2 = c(NA, 0.5))
+  distances <- data.frame(target = c(0, 0), nt1 = c(0.4, 1), nt2 = c(NA, 2))
+  expect_identical(dmixture3p(x[1:2], mu = locations), dmixture3p(x[1:2], mu = as.matrix(locations)))
+  expect_identical(dimm(x[1:2], mu = locations, dist = distances),
+                   dimm(x[1:2], mu = as.matrix(locations), dist = as.matrix(distances)))
+  expect_identical(withr::with_seed(1, rmixture3p(4, mu = locations)),
+                   withr::with_seed(1, rmixture3p(4, mu = as.matrix(locations))))
+})
+
+test_that("rmixture3p() and rimm() draw observation i from row i of the item locations", {
+  withr::local_seed(444)
+  n <- 4000
+  targets <- c(-2, 0.5, 2.5, 1)
+  mu <- cbind(targets, c(1, -1, 0, -2), c(NA, 2, NA, 3))
+  # all activation on the target: the non-targets are 3 radians from the cue
+  dist <- ifelse(is.na(mu), NA, 3)
+  dist[, 1] <- 0
+  g <- group_of(n, 4)
+  draws <- list(
+    mixture3p = rmixture3p(n, mu = mu, kappa = 200, p_mem = 1, p_nt = 0),
+    imm = rimm(n, mu = mu, dist = dist, c = 1, a = 0, b = 0, s = 20, kappa = 200)
+  )
+  for (y in draws) {
+    for (k in 1:4) {
+      err <- wrap_angle(y[g == k] - targets[k])
+      expect_mean_near(err, 0, sd(err) / sqrt(length(err)))
+    }
+  }
+})
+
+test_that("each row's set size sets the non-target share of rmixture3p() and rimm() draws", {
+  withr::local_seed(444)
+  n <- 20000
+  mu <- rbind(c(0, 2, NA), c(0, 2, -2))
+  g <- group_of(n, 2)
+  near <- function(y, location) abs(wrap_angle(y - location)) < 0.3
+  # p_nt is shared by the row's own non-targets: all of it on 2 at set size 2,
+  # half of it at set size 3
+  y <- rmixture3p(n, mu = mu, kappa = 500, p_mem = 0.4, p_nt = 0.6)
+  expect_mean_near(near(y[g == 1], 2), 0.6, se_prop(0.6, n / 2))
+  expect_mean_near(near(y[g == 2], 2), 0.3, se_prop(0.3, n / 2))
+  expect_mean_near(near(y[g == 2], -2), 0.3, se_prop(0.3, n / 2))
+  # equal activation and no background: each item of a row is reported equally often
+  y <- rimm(n, mu = mu, dist = rbind(c(0, 0, NA), c(0, 0, 0)), c = 1, a = 0, b = 0, s = 1, kappa = 500)
+  expect_mean_near(near(y[g == 1], 0), 1 / 2, se_prop(1 / 2, n / 2))
+  expect_mean_near(near(y[g == 2], 0), 1 / 3, se_prop(1 / 3, n / 2))
+})
+
+test_that("a matrix of item locations with one row per draw scales to many draws", {
+  # read as one long item set, as before bmm 1.5.0, 1e5 rows of 4 items asked
+  # R for a matrix of 4e10 locations
+  withr::local_seed(444)
+  n <- 1e5
+  mu <- matrix(stats::runif(4 * n, -pi, pi), n, 4)
+  mu[seq(1, n, by = 2), 3:4] <- NA
+  expect_length(rmixture3p(n, mu = mu), n)
+  expect_length(dmixture3p(rep(0, n), mu = mu), n)
+})
+
+test_that("the circular mixture d*() functions return an empty result for no observations", {
+  for (f in list(dmixture2p, dmixture3p, dimm)) expect_identical(f(numeric(0)), numeric(0))
+  expect_identical(dmixture2p(c(0, 1), kappa = numeric(0)), numeric(0))
+  expect_identical(dmixture2p(c(0, 1), K = numeric(0), set_size = 2, version = "slot"), numeric(0))
+  expect_identical(dmixture3p(c(0, 1), p_nt = numeric(0)), numeric(0))
+  expect_identical(dimm(c(0, 1), s = numeric(0)), numeric(0))
+  expect_identical(dmixture3p(c(0, 1), mu = matrix(0, 0, 3)), numeric(0))
+  expect_identical(dimm(c(0, 1), mu = matrix(0, 0, 3), dist = matrix(0, 0, 3)), numeric(0))
+
+  nulls <- list(dmixture2p = c("x", "mu", "kappa", "p_mem", "tau"),
+                dmixture3p = c("x", "kappa", "p_mem", "p_nt", "tau"),
+                dimm = c("x", "c", "a", "b", "s", "kappa", "tau"))
+  out <- list()
+  for (f in names(nulls)) {
+    for (a in nulls[[f]]) out[[paste(f, a)]] <- do.call(f, replace(list(x = 0.3), a, list(NULL)))
+  }
+  expect_identical(out, setNames(rep(list(numeric(0)), 17), names(out)))
+})
+
+test_that("the circular mixture r*() functions read n as rnorm() does", {
+  for (f in list(rmixture2p, rmixture3p, rimm)) {
+    expect_identical(expect_silent(f(0)), numeric(0))
+    expect_length(f(2.7), 2)
+    expect_error(f(c(1, 2, 3)), "n, the number of draws, must be a single number >= 0.", fixed = TRUE)
+  }
+  expect_identical(expect_silent(rmixture3p(0, mu = rbind(c(0, 1), c(1, NA)))), numeric(0))
+})
+
+test_that("item locations that are no item set per observation stop", {
+  target_na <- rbind(c(0, 2, -1), c(NA, 1, 2), c(NA, NA, NA))
+  expect_error(dmixture3p(0, mu = target_na), "no target location (its first column) in row(s) 2, 3",
+               fixed = TRUE)
+  expect_error(rimm(3, mu = target_na, dist = c(0, 1, 2)), "row(s) 2, 3", fixed = TRUE)
+  gap <- rbind(c(0, 2, -1), c(0, NA, 1), c(1, 2, NA), c(0, NA, 3))
+  expect_error(dmixture3p(0, mu = gap), "NA before the last location in row(s) 2, 4", fixed = TRUE)
+  expect_error(rmixture3p(2, mu = gap), "row(s) 2, 4", fixed = TRUE)
+
+  mu <- rbind(c(0, 2, -1), c(0, 1, NA))
+  expect_error(dimm(0, mu = mu, dist = rbind(c(0, 1, 2), c(0, 1, 2))), "the shape of mu with NA in the same places")
+  expect_error(rimm(2, mu = mu, dist = rbind(c(0, 1, 2))), "the shape of mu with NA in the same places")
+  expect_error(dimm(0, mu = mu, dist = c(0, 1, 2)), "number of items does not match the distances")
+  expect_error(rimm(2, mu = c(0, 1), dist = c(0, 1, 2)), "number of items does not match the distances")
+
+  for (f in list(function(mu) dmixture3p(0, mu = mu), function(mu) rmixture3p(2, mu = mu),
+                 function(mu) dimm(0, mu = mu, dist = numeric(0)), function(mu) rimm(2, mu = mu, dist = numeric(0)))) {
+    expect_error(f(numeric(0)), "mu is an empty vector")
+  }
+  expect_error(rmixture3p(2, mu = matrix(0, 0, 3)), "mu has no rows")
+})
+
+test_that("vector item locations give the values and draws of the development version before rows", {
+  # tau > 0 builds the kappa table, about 1 s once per process
+  skip_on_cran()
+  # pinned from develop 847f9085. expect_equal() rather than identical(),
+  # because the last bit of cos() and log() can differ between platforms; the
+  # bit-identity to that version was checked on one machine
+  expect_equal(dmixture2p(c(-1, 0.3, 2), mu = c(0, 0.5), kappa = c(3, 12), p_mem = 0.8, tau = c(0, 0.7),
+                          log = TRUE),
+               c(-1.8092969663630616, -0.12544109228409531, -3.2361077273953796), tolerance = 1e-12)
+  expect_equal(dmixture2p(c(-1, 0.3, 2), mu = 0.2, kappa = 9, K = 2.5, set_size = c(2, 4, 6),
+                          version = "slot_averaging", log = TRUE),
+               c(-5.859457541593752, -0.26875969019868456, -2.3767890497299282), tolerance = 1e-12)
+  expect_equal(dmixture3p(c(-1, 0.3, 2, 2.9), mu = c(0, 2, -1.5), kappa = c(4, 10), p_mem = 0.6, p_nt = 0.25,
+                          tau = c(0, 0, 0.5, 1.2), log = TRUE),
+               c(-1.8568905242723088, -0.68955983473488747, -2.0984227971019052, -3.5283391243095821),
+               tolerance = 1e-12)
+  expect_equal(dmixture3p(c(-1, 0.3), mu = 0.5, kappa = 6, p_mem = 0.7, p_nt = 0.1, log = TRUE),
+               c(-3.3707433793512855, -0.47006224236256733), tolerance = 1e-12)
+  expect_equal(dimm(c(-1, 0.3, 2, 2.9), mu = c(0, 2, -1.5, 1), dist = c(0, 0.4, 1.3, 2), c = c(2, 5), a = 0.5,
+                    b = 1, s = c(1, 3), kappa = 6, tau = c(0, 0.8), log = TRUE),
+               c(-2.2043725097724427, -0.83028593607342394, -1.2929712393274586, -3.2170098984402298),
+               tolerance = 1e-12)
+  expect_equal(withr::with_seed(1, rmixture2p(6, mu = c(0, 1), kappa = c(3, 20), p_mem = 0.7, tau = c(0, 0.5))),
+               c(-0.19234197097035199, 1.062415334820126, 0.98600549498782986, 2.79397711416728,
+                 -0.19850450227458483, 1.0103223271802657), tolerance = 1e-12)
+  expect_equal(withr::with_seed(2, rmixture3p(6, mu = c(0, 2, -1.5), kappa = c(5, 15), p_mem = 0.5, p_nt = 0.3,
+                                              tau = c(0, 0.6))),
+               c(0.32725968809479555, -1.3407944502197355, 1.5753248556460644, -0.1037969695610701,
+                 -2.3300628687682798, 2.0951206990324458), tolerance = 1e-12)
+  expect_equal(withr::with_seed(3, rimm(6, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2), c = c(1, 3), a = 0.2, b = 1,
+                                        s = 2, kappa = 8, tau = c(0, 0.4))),
+               c(0.41726460774893681, -2.4372070959799852, 1.1452984583542865, 0.061050479492785747,
+                 -0.82344749306488429, 1.7589832105522332), tolerance = 1e-12)
 })
 
 # --- empty observations ---------------------------------------------------------

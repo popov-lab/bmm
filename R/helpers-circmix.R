@@ -576,6 +576,94 @@
   cos(args$x - .circmix_locations(args$mu, nt, set_size))
 }
 
+# The item locations that dmixture3p(), dimm() and their r*() take from the
+# user, read once for all four as .counts_rows() reads counts: a vector is one
+# item set shared by every observation, a matrix or data frame one set per row
+# (the target, then the non-targets, NA past the row's set size, the padding
+# simulate_data() uses). dist of dimm() and rimm() has the shape of mu or is
+# one vector for every row; it comes back as a matrix of the shape of mu.
+.circmix_item_rows <- function(mu, dist = NULL) {
+  per_row <- is.matrix(mu) || is.data.frame(mu)
+  stopif(
+    !per_row && length(mu) == 0,
+    "mu is an empty vector, but a vector of item locations is one item set, \\
+    shared by every observation. For no observations, pass a matrix with zero rows."
+  )
+  locations <- unname(if (per_row) as.matrix(mu) else matrix(mu, nrow = 1))
+  if (ncol(locations) == 0) locations <- matrix(NA_real_, nrow(locations), 1)
+  set_size <- rowSums(!is.na(locations))
+  listed <- function(bad) {
+    rows <- which(bad)
+    shown <- toString(utils::head(rows, 5))
+    if (length(rows) > 5) glue("{shown}, ... ({length(rows)} in all)") else shown
+  }
+  no_target <- is.na(locations[, 1])
+  stopif(
+    any(no_target),
+    "mu has no target location (its first column) in row(s) {listed(no_target)}."
+  )
+  gap <- rowSums(is.na(locations) & col(locations) <= set_size) > 0
+  stopif(
+    any(gap),
+    "mu has NA before the last location in row(s) {listed(gap)}: a row holds \\
+    its target and non-target locations first, with NA only after them."
+  )
+  if (is.null(dist)) {
+    return(nlist(locations, set_size, per_row))
+  }
+
+  if (is.matrix(dist) || is.data.frame(dist)) {
+    dist <- unname(as.matrix(dist))
+    stopif(
+      !identical(dim(dist), dim(locations)) || !identical(is.na(dist), is.na(locations)),
+      "dist must be one vector for every row, or have the shape of mu with NA \\
+      in the same places."
+    )
+  } else {
+    # NA-padded like a row of mu, so that row i of a padded dist matrix passed
+    # alone reads as observation i's distances
+    dist <- dist[seq_len(sum(!is.na(dist)))]
+    stopif(
+      anyNA(dist) || any(set_size != length(dist)),
+      "The number of items does not match the distances provided from the cued location."
+    )
+    dist <- matrix(dist, nrow(locations), length(dist), byrow = TRUE)
+  }
+  nlist(locations, dist, set_size, per_row)
+}
+
+# fun(idx, locations, dist) once per set size, with the rows idx of the n
+# observations and their locations and distances cut to that set size. Rows of
+# one set size share the shape of their component matrices, so each set size
+# is one vectorised call: a design has few set sizes, but with continuous
+# locations as many distinct rows as observations.
+.circmix_by_set_size <- function(items, n, fun) {
+  stopif(
+    nrow(items$locations) == 0 && n > 0,
+    "mu has no rows, so there is no item set to draw from."
+  )
+  sizes <- unique(items$set_size)
+  # one set size, as for every vector mu: a single call on all rows, without
+  # the copies that cutting out the rows of each size costs
+  if (length(sizes) == 1) {
+    cols <- seq_len(sizes)
+    return(fun(
+      seq_len(n), .recycle_obs(items$locations[, cols, drop = FALSE], n),
+      if (!is.null(items$dist)) .recycle_obs(items$dist[, cols, drop = FALSE], n)
+    ))
+  }
+  locations <- .recycle_obs(items$locations, n)
+  dist <- if (!is.null(items$dist)) .recycle_obs(items$dist, n)
+  set_size <- rep_len(items$set_size, n)
+  out <- numeric(n)
+  for (k in unique(set_size)) {
+    idx <- which(set_size == k)
+    cols <- seq_len(k)
+    out[idx] <- fun(idx, locations[idx, cols, drop = FALSE], dist[idx, cols, drop = FALSE])
+  }
+  out
+}
+
 # tau is only a distributional parameter when the model estimates variable
 # precision; otherwise the likelihood is the tau = 0 limit.
 .circmix_prep_tau <- function(prep, i) {
