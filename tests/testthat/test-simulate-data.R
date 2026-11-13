@@ -397,6 +397,16 @@ test_that("sdt_mafc simulates trials without a design when it reads no column", 
   expect_in(data$y, c(0, 1))
 })
 
+test_that("trial-level sdt_ranking simulates without a design; aggregated counts still need one", {
+  data <- simulate_data(sdt_ranking("y", m = 4), list(d = 1), n_trials = 50)
+  expect_identical(dim(data), c(50L, 1L))
+  expect_type(data$y, "integer")
+  expect_in(data$y, 1:4)
+
+  expect_error(simulate_data(sdt_ranking(paste0("rank", 1:4), m = 4), list(d = 1), n_trials = 50),
+               "reads the column\\(s\\) 'n_trials'.*`design`")
+})
+
 test_that("simulated counts of the m3 and mpt models match their closed forms", {
   skip_on_cran()
   withr::local_seed(4)
