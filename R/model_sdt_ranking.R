@@ -444,7 +444,7 @@ simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("lin
   vars <- model$other_vars
   trial_level <- is_trial_level(model)
   design <- .design_or_n(model, design, trials = if (!trial_level) "n_trials",
-                         counts = if (is.character(vars$m)) vars$m)
+                         counts = if (is.character(vars$m)) vars$m, ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   counts <- rsdt_ranking(nrow(design), if (trial_level) 1L else design$n_trials,
