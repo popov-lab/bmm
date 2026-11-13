@@ -219,8 +219,8 @@ Participants give categorical responses, and you describe the discrete
 processes that lead to each response as a multinomial processing tree, for
 example the two-high-threshold model of recognition or the pair-clustering
 model of free recall. You write each tree's branch probabilities as
-expressions, and `mpt()` fits them to response counts. The
-[MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html) covers
+expressions, and `mpt()` fits them to response counts or to one row per trial.
+The [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html) covers
 specifying trees, importing model files from MPTinR and TreeBUGS, and
 constraining parameters. `mpt()` is in the tables of the categorical recall
 and the detection and recognition groups above.

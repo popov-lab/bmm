@@ -67,9 +67,9 @@ requirements; they are not modes of a single function.
 | Constructor | Response format | Key parameters | ROC defined? |
 |-------------|-----------------|----------------|--------------|
 | `sdt_yn()` | counts of "signal"/"old" responses, or one 0/1 row per trial | `d`, `criterion`, `sdratio` | yes |
-| `sdt_rating()` | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
+| `sdt_rating()` | counts per confidence-rating category, or one rating per trial | `d`, `criterion`, threshold params, `sdratio` | yes |
 | `sdt_mafc()` | counts of correct m-AFC responses, or one 0/1 row per trial | `d` | no |
-| `sdt_ranking()` | counts per rank position | `d`, `sdratio` (`dist = "normal"` only) | no |
+| `sdt_ranking()` | counts per rank position, or one rank per trial | `d`, `sdratio` (`dist = "normal"` only) | no |
 
 All four assume a latent evidence variable whose noise distribution is selected
 with the `dist` argument: `"normal"` (Gaussian SDT), `"logistic"`,
@@ -1073,7 +1073,8 @@ plot(latent_sdt(fit_rating_lr))
 # m-AFC SDT
 
 In an m-alternative forced-choice task the observer picks the target among `m`
-alternatives; the data are counts of correct responses. There is no criterion and
+alternatives; the data are counts of correct responses, or one 0/1 row per
+trial. There is no criterion and
 no stimulus column — accuracy alone identifies `d` [@DeCarlo_2012]. A correct
 response occurs when the target's evidence exceeds that of all $m-1$ distractors;
 `d` is $d'$, the target--distractor separation. `sdt_mafc()` has no `sdratio`,

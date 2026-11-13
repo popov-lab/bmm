@@ -275,9 +275,9 @@ part of the `brms` model has a `bmm` name:
 
 In the `dist` row, the link is that of the probability of an "old" response,
 whereas `?sdt_yn` gives each `dist` by the cumulative distribution function of
-the evidence. The form `1 - exp(-exp(x))` of the complementary log-log link is
-listed there under `"gumbel_min"`; the probability of "old" under `"gumbel_max"`
-is that same function of `d - criterion`.
+the evidence. The function `1 - exp(-exp(x))`, the inverse of the complementary
+log-log link, is listed there under `"gumbel_min"`; the probability of "old"
+under `"gumbel_max"` is that same function of `d - criterion`.
 
 `stimulus` itself appears in no `bmm` formula: it is named in the model object,
 `sdt_yn(stimulus = "stimulus")`, and `d` is its effect, so a predictor in the
@@ -495,10 +495,10 @@ moves the criterion and enters every trial.
 Item terms need trial rows, because counts summed over a participant's items
 no longer say which item each response came from. The same holds for predictors
 that change from trial to trial. Without item terms or trial-level predictors,
-you do not need trial rows. `sdt_yn()` also takes one row per participant and stimulus
-type, with the number of "old" responses and the
-number of trials. This layout is faster, because the time a fit takes grows with
-the number of rows: here, `r 2 * n_id` rows instead of `r nrow(rec)`.
+you do not need trial rows. `sdt_yn()` also takes one row per participant and
+stimulus type, with the number of "old" responses and the number of trials.
+This layout is faster, because the time a fit takes grows with the number of
+rows: here, `r 2 * n_id` rows instead of `r nrow(rec)`.
 
 ```{r glmm-agg-fit, results = "hide", message = FALSE}
 rec_counts <- aggregate(
