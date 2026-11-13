@@ -391,12 +391,14 @@
 # marginal density. Under variable precision the per-draw concentration is drawn
 # from the gamma on J first, so this samples the hierarchy the likelihood
 # integrates out and is therefore an independent check on it.
-# A draw from a missing parameter is missing, as its density is; an NA tau
-# fell to constant precision and an NA weight to the first component (#710).
-# Complete rows draw as before, so seeded draws are unchanged.
+# A draw from a missing parameter is missing, with rnorm()'s warning, as its
+# density is; an NA tau had fallen to constant precision and an NA weight to
+# the first component (#710). Only complete rows draw, so a seed gives the
+# draws it gave before only for inputs without a missing value.
 .rcircmix <- function(mu, logw, logw_guess, kappa, tau) {
   out <- rep(NA_real_, nrow(mu))
   complete <- which(!matrixStats::rowAnyNAs(cbind(mu, logw, logw_guess, kappa, tau)))
+  warnif(length(complete) < nrow(mu), "NAs produced")
   if (length(complete)) {
     out[complete] <- .rcircmix_complete(
       mu[complete, , drop = FALSE], logw[complete, , drop = FALSE],
@@ -514,12 +516,16 @@
 .rcircmix_slot_averaging <- function(mu, logw, K, set_size, kappa, tau) {
   n <- nrow(mu)
   allocation <- .circmix_slots(K, set_size)
-  # an NA K keeps its NA slot count without rbinom()'s warning
+  # an NA K keeps its NA slot count without a second warning from rbinom()
   slots <- allocation$slots + stats::rbinom(n, 1, ifelse(is.na(allocation$extra), 0, allocation$extra))
 
+  incomplete <- is.na(slots) | matrixStats::rowAnyNAs(cbind(mu, logw, kappa, tau))
+  warnif(any(incomplete), "NAs produced")
+
   out <- stats::runif(n, -pi, pi)
-  out[is.na(slots) | matrixStats::rowAnyNAs(cbind(mu, logw, kappa, tau))] <- NA_real_
-  held <- which(slots >= 0.5)
+  out[incomplete] <- NA_real_
+  # .rcircmix() gets complete rows only, so the call warns once
+  held <- which(slots >= 0.5 & !incomplete)
   if (length(held)) {
     out[held] <- .rcircmix(
       mu[held, , drop = FALSE], logw[held, , drop = FALSE], rep(-Inf, length(held)),
@@ -603,8 +609,8 @@
   locations <- matrix(mu, nrow = length(mu))
   if (set_size > 1) {
     locations <- cbind(locations, matrix(
-      nt[seq_len(set_size - 1)],
-      nrow = length(mu), ncol = set_size - 1, byrow = TRUE
+      rep(nt[seq_len(set_size - 1)], each = length(mu)),
+      nrow = length(mu), ncol = set_size - 1
     ))
   }
   locations

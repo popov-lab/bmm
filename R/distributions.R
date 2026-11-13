@@ -59,6 +59,14 @@
 #'   An argument that a version does not use, such as `zr` of
 #'   `dezdm(version = "3par")`, is ignored.
 #'
+#' @section Missing values:
+#' [rmixture2p()], [rmixture3p()] and [rimm()] return `NA` for a draw whose
+#' parameters include an `NA` or `NaN`, and warn "NAs produced" once per call,
+#' as [stats::rnorm()] does. The other draws follow the parameters as usual,
+#' though a seed does not give them the values it gives when no parameter is
+#' missing. [dmixture2p()], [dmixture3p()] and [dimm()] return `NA` for such
+#' an observation.
+#'
 #' @name bmm_distributions
 #' @keywords distribution
 NULL
@@ -771,7 +779,7 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
     x = x, mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
   )
   .circmix_slot_averaging_ld(
-    matrix(cos(args$x - args$mu)), matrix(0, nrow = length(args$x)),
+    matrix(cos(args$x - args$mu)), matrix(0, nrow = length(args$x), ncol = 1),
     args$K, args$set_size, args$kappa, args$tau, nodes
   )
 }
@@ -789,7 +797,7 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
     mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
   )
   .rcircmix_slot_averaging(
-    matrix(args$mu), matrix(0, nrow = length(args$mu)),
+    matrix(args$mu), matrix(0, nrow = length(args$mu), ncol = 1),
     args$K, args$set_size, args$kappa, args$tau
   )
 }
@@ -1221,7 +1229,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
     rep_len(c, n), rep_len(a, n), rep_len(s, n), rep_len(b, n), dist
   )
   .rcircmix(
-    matrix(mu, nrow = n, ncol = length(mu), byrow = TRUE),
+    matrix(rep(mu, each = n), nrow = n, ncol = length(mu)),
     weights$logw, weights$logw_guess, rep_len(kappa, n), rep_len(tau, n)
   )
 }

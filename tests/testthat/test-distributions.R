@@ -493,26 +493,64 @@ test_that("the circular mixture densities are NA where tau is NA", {
 })
 
 # a missing tau drew at constant precision and a missing weight from the first
-# component (#710)
-test_that("the circular mixture samplers draw NA where a parameter is NA, as the densities are", {
+# component; bmm 1.4.2 stopped (#710). One warning per call, as from rnorm(),
+# also when the slot-averaging sampler passes a held NA row on.
+test_that("the circular mixture samplers draw NA where a parameter is NA, with one warning", {
   withr::local_seed(710)
-  expect_identical(rmixture2p(3, kappa = 5, p_mem = 0.8, tau = NA), rep(NA_real_, 3))
-  expect_identical(rmixture2p(3, kappa = NA, p_mem = 0.8), rep(NA_real_, 3))
-  expect_identical(rmixture2p(3, kappa = 5, p_mem = NaN), rep(NA_real_, 3))
+  draws <- function(call) {
+    expect_identical(capture_warnings(out <- call), "NAs produced")
+    out
+  }
+  expect_identical(draws(rmixture2p(3, kappa = 5, p_mem = 0.8, tau = NA)), rep(NA_real_, 3))
+  expect_identical(draws(rmixture2p(3, kappa = NA, p_mem = 0.8)), rep(NA_real_, 3))
+  expect_identical(draws(rmixture2p(3, kappa = 5, p_mem = NaN)), rep(NA_real_, 3))
   expect_identical(
-    rmixture2p(3, kappa = 5, K = NA, set_size = 4, version = "slot_averaging"),
+    draws(rmixture2p(3, kappa = 5, K = NA, set_size = 4, version = "slot")),
     rep(NA_real_, 3)
   )
   expect_identical(
-    rmixture2p(3, kappa = 5, tau = NA, K = 0.5, set_size = 4, version = "slot_averaging"),
+    draws(rmixture2p(3, kappa = 5, K = NA, set_size = 4, version = "slot_averaging")),
     rep(NA_real_, 3)
   )
-  expect_identical(rmixture3p(3, kappa = 5, tau = NA), rep(NA_real_, 3))
-  expect_identical(rimm(3, kappa = 5, tau = NA), rep(NA_real_, 3))
+  expect_identical(
+    draws(rmixture2p(3, kappa = 5, tau = NA, K = 0.5, set_size = 4, version = "slot_averaging")),
+    rep(NA_real_, 3)
+  )
+  expect_identical(
+    draws(rmixture2p(3, kappa = 5, tau = NA, K = 6, set_size = 4, version = "slot_averaging")),
+    rep(NA_real_, 3)
+  )
+  expect_identical(draws(rmixture3p(3, kappa = 5, tau = NA)), rep(NA_real_, 3))
+  expect_identical(draws(rimm(3, kappa = 5, tau = NA)), rep(NA_real_, 3))
 
-  y <- rmixture2p(6, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1))
+  y <- draws(rmixture2p(6, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1)))
   expect_identical(is.na(y), rep(c(FALSE, TRUE, TRUE), 2))
   expect_identical(is.na(y), is.na(dmixture2p(0, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1, 0, 1, 0, 1))))
+})
+
+test_that("the circular mixture samplers do not warn when every parameter is given", {
+  withr::local_seed(710)
+  expect_no_warning(rmixture2p(4, kappa = 5, p_mem = 0.8, tau = c(0, 1)))
+  expect_no_warning(rmixture2p(4, kappa = 5, K = 2, set_size = 4, tau = c(0, 1), version = "slot"))
+  expect_no_warning(rmixture2p(4, kappa = 5, K = c(1, 6), set_size = 4, tau = c(0, 0, 1, 1), version = "slot_averaging"))
+  expect_no_warning(rmixture3p(4, tau = c(0, 1)))
+  expect_no_warning(rimm(4, tau = c(0, 1)))
+})
+
+# rmixture2p(version = "slot_averaging") stopped with "data is too long", and
+# rmixture3p() and rimm() warned "non-empty data for zero-extent matrix"
+test_that("the circular mixture samplers return an empty vector for n = 0", {
+  calls <- alist(
+    simple = rmixture2p(0, tau = 1),
+    slot = rmixture2p(0, kappa = 5, K = 2.5, set_size = 4, version = "slot"),
+    slot_averaging = rmixture2p(0, kappa = 5, K = 2.5, set_size = 4, version = "slot_averaging"),
+    mixture3p = rmixture3p(0, tau = 1),
+    imm = rimm(0, tau = 1)
+  )
+  for (name in names(calls)) {
+    expect_identical(capture_warnings(out <- eval(calls[[name]])), character(0), info = name)
+    expect_identical(out, numeric(0), info = name)
+  }
 })
 
 test_that("rmixture2p returns values between -pi and pi", {
