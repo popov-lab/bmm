@@ -11,6 +11,8 @@ tcc(
   units = c("radians", "bins"),
   noise = c("gaussian", "gumbel"),
   d_max = 30,
+  options = NULL,
+  n_alternatives = NULL,
   ...
 )
 }
@@ -36,7 +38,18 @@ Schurgin et al., 2020) or \code{"gumbel"} (standard Gumbel, which makes the
 response probabilities a softmax). See the section Noise.}
 
 \item{d_max}{The upper end of the \code{d} grid of the likelihood table; draws
-of \code{d} beyond it are reported after the fit. Not used with \code{noise = "gumbel"}, which needs no table.}
+of \code{d} beyond it are reported after the fit. Not used with \code{noise = "gumbel"} or with \code{options}, which need no table.}
+
+\item{options}{The names of the columns holding the options offered on
+each trial, one column per option, in the units of \code{resp_error} and
+relative to the target; rows that offer fewer options hold \code{NA} in the
+remaining columns. See the section "Forced-choice option sets".}
+
+\item{n_alternatives}{With \code{options}, optionally the name of a column
+holding the number of options offered on each trial, which is checked
+against the option columns. Without \code{options}, a single number \code{m}: each
+trial offers \code{m} options spaced equally around the wheel, the target
+among them; \code{n_options} must be a multiple of \code{m}.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -71,6 +84,7 @@ softmax (see the section Noise).
 }
 }
 \itemize{
+\item With \code{options} or \code{n_alternatives}, each trial must offer the target, and         the response must be one of the options its trial offers
 \item \code{similarity} gives the psychophysical similarity f of an option to the         target at each distance 0, 1, ..., n_options / 2 options, scaled so that         f = 1 at distance 0
 }
 \itemize{
@@ -114,9 +128,10 @@ estimates the width of the gradient from the responses is the \code{\link[=sdm]{
 \code{noise} sets the distribution of the noise on each option's signal.
 \code{"gaussian"}, the default, is the model of Schurgin et al. (2020), with
 normal noise of unit variance. Its response probabilities have no closed
-form, so the likelihood reads them from a table (see the section Grid
-limit on d). With \code{"gumbel"} the noise follows the standard Gumbel (type
-I extreme value) distribution. The largest of independent Gumbel
+form, so on the full wheel the likelihood reads them from a table (see
+the section Grid limit on d); with \code{options} it integrates them per
+cell. With \code{"gumbel"} the noise follows the standard Gumbel (type I
+extreme value) distribution. The largest of independent Gumbel
 variables is again Gumbel distributed, which turns the probability of
 choosing an option into the softmax of \code{d * f(x)} over all options,
 \verb{exp(d * f(x)) / sum(exp(d * f(x')))} (Oberauer, 2023, eq. 4). This needs
@@ -133,14 +148,15 @@ integral of the \code{\link[=sdm]{sdm()}}, so the two agree to about 1e-8 in log
 probability (1.4e-8 at \code{kappa = 200}) while the gradient's SD, \code{1 / sqrt(kappa)} radians, spans about 4 options
 or more (\code{kappa} up to 200 on 360 options), and differ by 0.013 at \code{kappa = 1000}.
 
-Per gradient, Gumbel noise is not cheaper than normal noise. With \code{d} per
-subject and set size on \link{oberauer_lin_2017} and the data sorted by the
-predictors of \code{d}, it cost 1.5 times as much. On the same data unsorted
-it cost about 8 times as much, because the Gumbel likelihood sums over
-the options once for each run of rows that share \code{d} (see the section
-Speed). It skips the table build before sampling and has no grid limit. Keep
-normal noise to stay with the model of Schurgin et al. (2020) and to
-compare \code{d} with their d'. The two \code{d} are not on one scale. The
+On the full wheel, per gradient, Gumbel noise is not cheaper than normal
+noise. With \code{d} per subject and set size on \link{oberauer_lin_2017} and the
+data sorted by the predictors of \code{d}, it cost 1.5 times as much. On the
+same data unsorted it cost about 8 times as much, because the Gumbel
+likelihood sums over the options once for each run of rows that share
+\code{d} (see the section Speed). With \code{options} it is much cheaper (see the
+section Forced-choice option sets). It skips the table build before
+sampling and has no grid limit. Keep normal noise to stay with the model
+of Schurgin et al. (2020) and to compare \code{d} with their d'. The two \code{d} are not on one scale. The
 standard Gumbel distribution has an SD of \code{pi / sqrt(6)} = 1.28, but
 matching the response probabilities takes a larger factor: the Gumbel
 \code{d} with the smallest Kullback-Leibler divergence from the probabilities
@@ -156,18 +172,21 @@ With \code{units = "radians"}, \code{resp_error} is the response minus the targe
 in radians, as for \code{\link[=sdm]{sdm()}} and \code{\link[=mixture2p]{mixture2p()}}, and each value is assigned to
 the nearest of the \code{n_options} options (+-pi fall into the same option).
 With \code{units = "bins"}, it is the chosen option's offset from the target in
-option steps. The model treats the response as a choice among
-\code{n_options} discrete options, so \code{n_options} should be the number of
-options the participant could choose from.
+option steps. On the full wheel, the model treats the response as a
+choice among \code{n_options} discrete options, so \code{n_options} should be the
+number of options the participant could choose from.
 
-\code{n_options} is part of the model, not a resolution setting. Each option
+On the full wheel, \code{n_options} is part of the model, not a resolution
+setting. Each option
 draws its own noise, and the more options lie near the target, the more
 often one of them wins: at \code{d = 2}, with the Laplace similarity of the
 examples built for each wheel (\code{tcc_similarity(..., n_options = n)}), the
 probability of choosing an option at most 10 degrees from the target is
 0.67 on 360 options, 0.82 on 3,600 and 0.89 on 36,000. The model has no
 continuous limit, and values of \code{d} fitted with different \code{n_options} are
-not on one scale.
+not on one scale. With \code{options}, \code{n_options} only places the options:
+the choice is among the offered options alone, and any even \code{n_options}
+of at least 4 that is a multiple of \code{m} spaces \code{m} options equally.
 }
 
 \subsection{Grid limit on d}{
@@ -179,8 +198,9 @@ at that of guessing uniformly, so under a flat prior on \code{log(d)} the
 posterior cannot be normalised, and a cell with little information
 drifts towards \code{d = 0} without end. The default prior is proper. This
 holds for either noise; the rest of this section applies to normal noise
-only. The likelihood reads the response probabilities from a table on a grid
-of \code{d} values up to \code{d_max} in steps of 0.02, built once per chain
+on the full wheel only, not with \code{options}. The likelihood reads the
+response probabilities from a table on a grid of \code{d} values up to
+\code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
 log probability). Beyond \code{d_max} the table is extended
 linearly, with the log probability of each response allowed to fall but
@@ -235,15 +255,94 @@ The comparison is fair only if the responses were themselves recorded on
 
 The fit is fastest when rows that share a value of \code{d} are adjacent, so
 bmm offers to sort the data by the predictors of \code{d}, as for \code{\link[=sdm]{sdm()}}.
-Continuous predictors of \code{d} are supported at the per-trial cost. With
-Gumbel noise that cost is much higher: on unsorted data, the fit
-described under Noise cost about 8 times as much as with normal noise.
+Continuous predictors of \code{d} are supported at the per-trial cost. On the
+full wheel with Gumbel noise that cost is much higher: on unsorted data,
+the fit described under Noise cost about 8 times as much as with normal
+noise.
 In a non-interactive session \code{bmm()} cannot ask whether to sort and fits
 the data as they are; set \code{sort_data = TRUE} to sort them.
 }
+
+\subsection{Forced-choice option sets}{
+
+With \code{options}, each trial offers only some of the \code{n_options} positions,
+as in an m-alternative forced choice, and the response is the offered
+option with the strongest signal: the probabilities above are taken over
+the offered options only. The columns named in \code{options} hold the offered
+options of each row, relative to the target and in the units of
+\code{resp_error}, with \code{NA} where a row offers fewer options than there are
+columns. They must include the target (an offset of 0) and the response,
+offer each option once, and sit on the grid of \code{n_options} positions
+(values within a tenth of a step are rounded onto it). Sets may differ in
+size and spacing from trial to trial; rows that offer the same options,
+in any order, share one set. A data set with two- and four-option trials on a 360-option
+wheel, in degrees for readability (convert them with \code{\link[=deg2rad]{deg2rad()}}):
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{err  opt1 opt2 opt3 opt4
+  0     0  180   NA   NA
+ 90     0   90  180  -90
+}\if{html}{\out{</div>}}
+
+fitted with \code{tcc("err", similarity, options = paste0("opt", 1:4))}.
+When every trial offers \code{m} options spaced equally around the wheel from
+the target, \code{n_alternatives = m} builds these columns; with \code{options},
+\code{n_alternatives} may instead name a column holding the number of options
+of each row, which is checked against the option columns. The data
+contract is the one of \code{sdm(options = )}, so the same data fit both models.
+
+The design is that of Experiment 1 of Robinson et al. (2023), who
+offered 2, 4, 8 or 16 equally spaced colours (16 options lie 22.5 degrees
+apart, so \code{n_options} must be a multiple of 16, such as 720). Their
+critical test fixes the parameter across m and compares the two noises:
+with one value for all m, the normal-noise TCC fitted better than the softmax (Gumbel) model,
+while both fitted alike with the parameter free per m. They fitted each
+participant on their own. In bmm the test compares \code{d ~ 1} under \code{noise = "gaussian"} with \code{d ~ 1} under \code{noise = "gumbel"}, on the same similarity
+and \code{options}; with several participants, \code{d} varies by participant and
+stays fixed across m in both fits, either unpooled as in \code{d ~ 0 + id},
+the analogue of their separate fits, or partially pooled as in \code{d ~ 1 + (1 | id)}. The Gumbel fit is their softmax model, and both
+log-likelihoods are log probabilities over the offered options, so
+\code{loo_compare()} reads them as they are (see the examples). Comparing
+\code{d ~ 1} with \code{d ~ 0 + m_condition} within one noise checks whether that
+model needs a parameter per m. \code{\link[=sdm]{sdm()}} with the same \code{options} gives
+this check for \code{c} (\code{c ~ 1} against \code{c ~ 0 + m_condition}); with
+\code{kappa} estimated it is not their softmax model, which keeps the
+measured similarity. \code{d} under normal noise and the Gumbel parameters
+(\code{d} with \code{noise = "gumbel"}, or \code{c} of \code{\link[=sdm]{sdm()}}) are not on one scale
+(see the section Noise), so compare the fits, or how each parameter
+varies across m, not their values.
+For either noise, the log-likelihood is a log probability over the
+offered options, as for the full wheel (see the section Comparing with
+continuous models); \code{sdm(options = )} reports it on the density scale,
+so before comparing a \code{tcc()} fit with an \code{\link[=sdm]{sdm()}} fit, add
+\code{log(n_options / (2 * pi))} per observation to the \code{tcc()}
+log-likelihood.
+
+Under normal noise the likelihood integrates over the offered options
+once per cell: the rows that offer one option set within a run of
+adjacent rows with equal values of the predictors of \code{d}, grouping
+variables included. Sorting the data by the predictors of \code{d} keeps the
+cells few. The likelihood needs no table, so \code{d_max} is not used.
+Measured on one chain and one thread with fixed-step NUTS on an Apple M3
+Max laptop, a cell cost about 0.07 ms per gradient with 2 options and
+0.18 ms with 16. The design of Robinson et al. with \code{d} per participant
+and m (30 participants, 15,000 trials, 120 cells) took 14 ms per
+gradient, and 500 trials with random foils, each trial its own cell,
+took 41 ms with 4 options and 87 ms with 16. Gumbel noise needs no
+integral and took 1 ms and 0.2 to 0.3 ms for the same designs. Under
+normal noise only, \code{bmm()} says when there
+are more cells than half the rows, as with a continuous predictor of \code{d}
+or foils drawn anew on each trial. \code{log_lik()}, \code{posterior_predict()} and
+\code{pp_check()} read each row's options from the data; to predict, pass
+\code{newdata} that carries the option columns and a response that is either
+one of the offered options or a numeric \code{NA} (\code{NA_real_}); any of these
+will do, as \code{posterior_predict()} ignores it. \code{log_lik()} and \code{loo()}
+evaluate each row on its own under normal noise, unless consecutive rows
+share their draws and options; for 4,000 draws on the same laptop this
+took 0.13 s per row with 4 options and 0.39 s with 16.
+}
 }
 \examples{
-\dontshow{if (isTRUE(Sys.getenv("BMM_EXAMPLES"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(Sys.getenv("BMM_EXAMPLES"), "true")) withAutoprint(\{ # examplesIf}
 f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
 dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
@@ -251,11 +350,45 @@ fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
 # Gumbel noise with a fixed von Mises similarity
 f_vm <- tcc_similarity("vonmises", kappa = 4)
 fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f_vm, noise = "gumbel"), cores = 4)
+
+# Forced choice among 2, 4, 8 or 16 equally spaced options (Robinson et al.,
+# 2023), 125 trials each, on a wheel of 720 half-degree positions
+f720 <- tcc_similarity("vonmises", kappa = 4, n_options = 720)
+m <- c(2, 4, 8, 16)
+afc <- data.frame(m_condition = factor(rep(m, each = 125)))
+offered <- lapply(m, function(k) (seq_len(k) - 1) * 2 * pi / k)
+afc[paste0("opt", 1:16)] <- t(vapply(rep(offered, each = 125), function(x) {
+  c(x, rep(NA, 16 - length(x)))
+}, numeric(16)))
+afc$err <- unlist(lapply(offered, function(x) {
+  rtcc(125, d = 1.8, similarity = f720, n_options = 720, options = x)
+}))
+tcc_afc <- tcc("err", similarity = f720, n_options = 720, options = paste0("opt", 1:16))
+fit_d1 <- bmm(bmf(d ~ 1), afc, tcc_afc, cores = 4)
+fit_dm <- bmm(bmf(d ~ 0 + m_condition), afc, tcc_afc, cores = 4)
+tcc_gumbel <- tcc("err", similarity = f720, n_options = 720, options = paste0("opt", 1:16),
+                  noise = "gumbel")
+fit_g1 <- bmm(bmf(d ~ 1), afc, tcc_gumbel, cores = 4)
+# Robinson et al.'s critical test: one d for all m, normal against Gumbel noise
+loo::loo_compare(brms::loo(fit_d1), brms::loo(fit_g1))
+sdm_afc <- sdm("err", n_options = 720, options = paste0("opt", 1:16))
+fit_c1 <- bmm(bmf(c ~ 1, kappa ~ 1), afc, sdm_afc, cores = 4)
+fit_cm <- bmm(bmf(c ~ 0 + m_condition, kappa ~ 1), afc, sdm_afc, cores = 4)
+# within one model, does one parameter hold across m? Here the data come
+# from one d, so the normal-noise model should need no d per m
+loo::loo_compare(brms::loo(fit_d1), brms::loo(fit_dm))
+loo::loo_compare(brms::loo(fit_c1), brms::loo(fit_cm))
 \dontshow{\}) # examplesIf}
 }
 \references{
 Oberauer, K. (2023). Measurement models for visual working
 memory - A factorial model comparison. \emph{Psychological Review, 130}(3),
 841-852. https://doi.org/10.1037/rev0000328
+
+Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F.
+(2023). How do people build up visual memory representations from sensory
+evidence? Revisiting two classic models of choice. \emph{Journal of
+Mathematical Psychology, 117}, 102805.
+https://doi.org/10.1016/j.jmp.2023.102805
 }
 \keyword{bmmodel}

@@ -312,6 +312,16 @@ test_that("simulated statistics of the circular models match their densities", {
   y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
   expect_within_mc(y == 0, 0.2254180, "tcc gumbel P(target)")
   expect_within_mc(cos(y), 0.3218072, "tcc gumbel")
+  # option sets on the same wheel: {0, pi/2} with Gaussian noise has
+  # P(target) = pnorm(d (1 - f(3)) / sqrt(2)); four alternatives with Gumbel
+  # noise the softmax of d f over the offsets 0, 3, 6 and -3
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, options = c("o1", "o2"))
+  y <- simulate_data(model, list(d = 0.5), data.frame(o1 = rep(0, n_sim), o2 = pi / 2))$y
+  expect_true(all(y %in% c(0, pi / 2)))
+  expect_within_mc(y == 0, 0.8174505, "tcc options {0, pi/2} P(target)")
+  model <- tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, n_alternatives = 4, noise = "gumbel")
+  y <- simulate_data(model, list(d = 0.5), n_trials = n_sim)$y
+  expect_within_mc(y == 0, 0.5667801, "tcc 4 alternatives gumbel P(target)")
   bins <- simulate_data(tcc("y", similarity = exp(-(0:6) / 2), n_options = 12, units = "bins"),
                         list(d = 0.5), n_trials = 50)$y
   expect_true(all(bins %in% -5:6))

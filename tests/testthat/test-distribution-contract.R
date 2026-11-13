@@ -1043,6 +1043,17 @@ test_that("rtcc() draws each observation from its own memory strength", {
   expect_identical(is.na(x), rep_len(c(TRUE, FALSE, FALSE, FALSE), 7))
 })
 
+test_that("dtcc() and rtcc() with an option set pair x and d per observation", {
+  f <- tcc_similarity("vonmises", 2)
+  four <- c(0, 90, 180, -90) * pi / 180
+  expect_elementwise(dtcc, list(x = four[1:3], d = c(0.5, 1, 2, 3)), fixed = list(similarity = f, options = four))
+  expect_elementwise(dtcc, list(x = four, d = c(0.5, 2, 3)),
+                     fixed = list(similarity = f, options = four, log = TRUE))
+  x <- NULL
+  expect_no_warning(x <- withr::with_seed(4447, rtcc(7, d = c(NA, 2, 2, 2), similarity = f, options = four)))
+  expect_identical(is.na(x), rep_len(c(TRUE, FALSE, FALSE, FALSE), 7))
+})
+
 # --- empty observations ---------------------------------------------------------
 
 test_that("the d*() functions return an empty result for no observations", {
