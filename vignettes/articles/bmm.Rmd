@@ -143,8 +143,9 @@ alternatives, or rank the alternatives. Signal detection theory separates
 sensitivity from response bias for each of these response formats, and `bmm`
 has one model per format. Each model takes either response counts per subject
 and condition or one row per trial; the yes/no example below shows how to
-declare each for `sdt_yn()`. Trial rows allow item random effects; without
-them, counts give the same posterior in less time. The
+declare each for `sdt_yn()`. Trial rows allow item random effects and
+trial-level predictors; without them, counts give the same posterior in less
+time. The
 [signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
 walks through the yes/no, rating, m-AFC and ranking models, and the
 [dual-process and meta-d′ article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html)

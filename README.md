@@ -114,11 +114,11 @@ articles.
 you describe the discrete processes that lead to each response as a
 multinomial processing tree: the two-high-threshold model of
 recognition, the pair-clustering model of free recall, or a tree of your
-own. The model is fit to response counts per participant and condition.
-See the [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html).
-The model, [`mpt()`](https://venpopov.com/bmm/reference/mpt.html), is
-listed above under categorical recall and under detection and
-recognition.
+own. The model is fit to response counts per participant and condition
+or to one row per trial. See the [MPT
+article](https://venpopov.com/bmm/articles/bmm_mpt.html). The model,
+[`mpt()`](https://venpopov.com/bmm/reference/mpt.html), is listed above
+under categorical recall and under detection and recognition.
 
 <img src="man/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%" />
 

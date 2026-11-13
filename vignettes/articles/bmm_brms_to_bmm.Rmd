@@ -270,8 +270,24 @@ part of the `brms` model has a `bmm` name:
 | `(1 \| item)` in the formula of `d` | `stimulus` slope by `item` |
 | `(1 \| item)` in the formula of `criterion` | intercept by `item` |
 | `sdratio` (unequal variance) | none: the probit GLMM fixes both standard deviations at 1 |
-| `bias` (criterion measured from the midpoint between the two distributions) | none |
-| `dist` (the distribution of the evidence) | partly: `bernoulli("logit")` is `dist = "logistic"` and `bernoulli("cloglog")` is `dist = "gumbel_max"`; no link gives `dist = "gumbel_min"` |
+| `bias` (criterion measured from the midpoint between the two distributions) | minus the intercept, if `stimulus` is coded -0.5 / +0.5; none with the 0 / 1 coding used here |
+| `dist` (the distribution of the evidence) | partly: `bernoulli("logit")` is `dist = "logistic"` and `bernoulli("cloglog")` is `dist = "gumbel_max"`; no link gives `dist = "gumbel_min"` (see below the table) |
+
+In the `dist` row, the link is that of the probability of an "old" response,
+whereas `?sdt_yn` gives each `dist` by the cumulative distribution function of
+the evidence. The form `1 - exp(-exp(x))` of the complementary log-log link is
+listed there under `"gumbel_min"`; the probability of "old" under `"gumbel_max"`
+is that same function of `d - criterion`.
+
+`stimulus` itself appears in no `bmm` formula: it is named in the model object,
+`sdt_yn(stimulus = "stimulus")`, and `d` is its effect, so a predictor in the
+formula of `d` is always one that interacts with `stimulus`. A predictor of the
+`brms` intercept is a predictor of `criterion`, with its sign flipped, and its
+interaction with `stimulus` is a predictor of `d`. For a design factor `cond`,
+`resp ~ 0 + Intercept + stimulus * cond` is `bmf(d ~ 1 + cond, criterion ~ 1 + cond)`.
+The `d` coefficients are the `stimulus` and `stimulus:cond` coefficients, and
+the `criterion` coefficients are the intercept and `cond` coefficients, each
+multiplied by -1.
 
 The intercept by participant changes sign along with the intercept, so its
 standard deviation (SD) is the SD of the criterion. Beyond the parameters,
@@ -330,8 +346,8 @@ if (!identical(
 ```
 
 The `brms` fit is the GLMM from above. As in the first example, we give it the
-priors that `bmm` uses for `sdt_yn()`, so that the two fits differ only in
-their parameterization. `?sdt_yn` lists them: `r sdt_priors$d$main` on `d`,
+priors that `bmm` uses for `sdt_yn()`, so that the priors on the means and the
+SDs agree. `?sdt_yn` lists them: `r sdt_priors$d$main` on `d`,
 `r sdt_priors$criterion$main` on `criterion` and `r sdt_priors$d$sd` on every
 SD. On the intercept, the criterion's prior has its sign flipped:
 
@@ -376,11 +392,17 @@ job that the `stimulus` predictor does in `brms`. The `1` in `d ~ 1` is the
 population `d`, the coefficient of `stimulus` in the GLMM, and `(1 | id)` lets
 it vary between participants, as the `stimulus` slope by `id` does.
 
-One difference remains. `(1 + stimulus | id)` in `brms` also estimates the
-correlation between each participant's intercept and slope, and the same for
-items. The `bmm` formula above leaves these correlations out. Write
-`(1 + stimulus || id)` to drop them in `brms`, or give the participant terms of
-`d` and `criterion` a shared ID, `(1 | p | id)`, to add them in `bmm`.
+The fits still differ in the correlations. `(1 + stimulus | id)` in `brms` also
+estimates the correlation between each participant's intercept and slope, and
+the same for items. The `bmm` formula above leaves these correlations out.
+Write `(1 + stimulus || id)` to drop them in `brms`, or give the participant
+terms of `d` and `criterion` a shared ID, `(1 | p | id)`, to add them in `bmm`.
+The `bmm` correlation is that of `d` and `criterion`, which is minus the `brms`
+correlation of slope and intercept, because the intercept is minus the
+criterion. The default priors on a correlation also differ: `brms` uses
+LKJ(1) and `bmm` uses LKJ(2), as `make_stancode()` and `stancode()` of the two
+models show. `prior(lkj(2), class = cor)` gives the `brms` model the `bmm`
+prior.
 
 The table puts the estimates of the two fits next to the values we simulated
 from, each as the posterior mean and its 95% credible interval (CrI). The
@@ -439,6 +461,11 @@ covered <- function(par) {
     x >= q[1] && x <= q[2]
   }, truth[names(par)], par)
 }
+# the text before the chunk states the design as numbers
+if (n_id != 30 || n_item != 60) {
+  stop("n_id or n_item changed: revise '30 participants', '60 items', ",
+       "'items 1 to 30', '31 to 60' and '15 participants' in the text above.")
+}
 # the text says every simulated value lies inside both intervals
 if (!all(covered(glmm_par), covered(trial_par))) {
   stop("A simulated value lies outside a 95% CrI: revise the text under the table.")
@@ -466,8 +493,9 @@ moves the criterion and enters every trial.
 ## Aggregated counts
 
 Item terms need trial rows, because counts summed over a participant's items
-no longer say which item each response came from. Without item terms, you do
-not need trial rows. `sdt_yn()` also takes one row per participant and stimulus
+no longer say which item each response came from. The same holds for predictors
+that change from trial to trial. Without item terms or trial-level predictors,
+you do not need trial rows. `sdt_yn()` also takes one row per participant and stimulus
 type, with the number of "old" responses and the
 number of trials. This layout is faster, because the time a fit takes grows with
 the number of rows: here, `r 2 * n_id` rows instead of `r nrow(rec)`.
