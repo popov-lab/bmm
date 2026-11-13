@@ -58,7 +58,16 @@ single activation source is supported.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dsdm</span><span class="op">(</span><span class="va">x</span>, mu <span class="op">=</span> <span class="fl">0</span>, c <span class="op">=</span> <span class="fl">3</span>, kappa <span class="op">=</span> <span class="fl">3.5</span>, log <span class="op">=</span> <span class="cn">FALSE</span>, parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dsdm</span><span class="op">(</span></span>
+<span>  <span class="va">x</span>,</span>
+<span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  c <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  kappa <span class="op">=</span> <span class="fl">3.5</span>,</span>
+<span>  log <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  parametrization <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  activation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"vonmises"</span>, <span class="st">"laplace"</span><span class="op">)</span>,</span>
+<span>  scaling <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">psdm</span><span class="op">(</span></span>
 <span>  <span class="va">q</span>,</span>
@@ -68,7 +77,9 @@ single activation source is supported.</p>
 <span>  lower.tail <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  log.p <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  lower.bound <span class="op">=</span> <span class="op">-</span><span class="va">pi</span>,</span>
-<span>  parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span></span>
+<span>  parametrization <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  activation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"vonmises"</span>, <span class="st">"laplace"</span><span class="op">)</span>,</span>
+<span>  scaling <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">qsdm</span><span class="op">(</span></span>
@@ -79,10 +90,20 @@ single activation source is supported.</p>
 <span>  lower.tail <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  log.p <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  lower.bound <span class="op">=</span> <span class="op">-</span><span class="va">pi</span>,</span>
-<span>  parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span></span>
+<span>  parametrization <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  activation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"vonmises"</span>, <span class="st">"laplace"</span><span class="op">)</span>,</span>
+<span>  scaling <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">rsdm</span><span class="op">(</span><span class="va">n</span>, mu <span class="op">=</span> <span class="fl">0</span>, c <span class="op">=</span> <span class="fl">3</span>, kappa <span class="op">=</span> <span class="fl">3.5</span>, parametrization <span class="op">=</span> <span class="st">"sqrtexp"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">rsdm</span><span class="op">(</span></span>
+<span>  <span class="va">n</span>,</span>
+<span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  c <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  kappa <span class="op">=</span> <span class="fl">3.5</span>,</span>
+<span>  parametrization <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  activation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"vonmises"</span>, <span class="st">"laplace"</span><span class="op">)</span>,</span>
+<span>  scaling <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -114,9 +135,20 @@ frame with no rows.</p></dd>
 
 
 <dt id="arg-parametrization">parametrization<a class="anchor" aria-label="anchor" href="#arg-parametrization"></a></dt>
-<dd><p>Character; either <code>"bessel"</code> or <code>"sqrtexp"</code>
-(default). See <a href="https://venpopov.com/bmm/articles/bmm_sdm_simple.html">the online article</a> for details on the
-parameterization.</p></dd>
+<dd><p>Deprecated since bmm 1.5.0; use <code>scaling</code>
+instead. <code>"sqrtexp"</code> is <code>scaling = "density"</code>; for <code>"bessel"</code>, convert <code>c</code>
+with <code><a href="c_parametrizations.html">c_bessel2sqrtexp()</a></code> and use <code>scaling = "density"</code>.</p></dd>
+
+
+<dt id="arg-activation">activation<a class="anchor" aria-label="anchor" href="#arg-activation"></a></dt>
+<dd><p>Character; the activation kernel of the SDM,
+<code>"vonmises"</code> (default) or <code>"laplace"</code>. See <code><a href="sdm.html">sdm()</a></code>.</p></dd>
+
+
+<dt id="arg-scaling">scaling<a class="anchor" aria-label="anchor" href="#arg-scaling"></a></dt>
+<dd><p>Character; what <code>c</code> measures: <code>"density"</code>, <code>"peak"</code> or
+<code>"range"</code>. <code>NULL</code> (default) means <code>"density"</code> for the von Mises and
+<code>"peak"</code> for the Laplace activation. See <code><a href="sdm.html">sdm()</a></code>.</p></dd>
 
 
 <dt id="arg-q">q<a class="anchor" aria-label="anchor" href="#arg-q"></a></dt>
@@ -154,12 +186,24 @@ random deviates.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p><strong>Parametrization</strong></p>
-<p>See <a href="https://venpopov.com/bmm/articles/bmm_sdm_simple.html">the online article</a> for details on the parameterization.
-Oberauer (2023) introduced the SDM with the bessel parametrization. The
-sqrtexp parametrization is the default in the <code>bmm</code> package for
-numerical stability and efficiency. The two parametrizations are related by
-the functions <code><a href="c_parametrizations.html">c_bessel2sqrtexp()</a></code> and <code><a href="c_parametrizations.html">c_sqrtexp2bessel()</a></code>.</p>
+    <p><strong>Activation and scaling</strong></p>
+<p>The density is \(\exp(c^* s(x - \mu)) / Z\), where \(s\) is the
+activation function with \(s(0) = 1\), \(c^*\) its peak, and \(Z\)
+normalises the density over the circle. <code>scaling</code> says how <code>c</code> translates
+into \(c^*\); the sections "Activation functions", "Scaling of the
+activation" and "What <code>c</code> means" in <code><a href="sdm.html">sdm()</a></code> give the formulas. The
+default, the von Mises activation with <code>scaling = "density"</code>, is what
+these functions computed before <code>activation</code> and <code>scaling</code> existed (the
+sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
+exact density of the von Mises distribution instead (the bessel
+parametrization); <code><a href="c_parametrizations.html">c_bessel2sqrtexp()</a></code> and <code><a href="c_parametrizations.html">c_sqrtexp2bessel()</a></code> convert
+between the two. For the Laplace activation with <code>scaling = "density"</code>,
+<code><a href="c_parametrizations.html">c_laplace_circle2line()</a></code> and <code><a href="c_parametrizations.html">c_laplace_line2circle()</a></code> convert between
+<code>bmm</code>'s <code>c</code> and that of Oberauer (2023, eq. 2). See <a href="https://venpopov.com/bmm/articles/bmm_sdm_simple.html">the online article</a>.
+At exactly <code>kappa = 0</code> the range scaling is undefined, because target and
+opposite have the same activation: <code>dsdm</code>, <code>psdm</code> and <code>qsdm</code> return <code>NaN</code>
+and <code>rsdm</code> stops with an error. Fits
+never reach it, since <code>kappa</code> has a log link.</p>
 <p><strong>The cumulative distribution function</strong></p>
 <p>Since responses are on the circle, the cumulative distribution function
 requires you to choose a lower bound of integration. The default is
@@ -243,12 +287,14 @@ memory - A factorial model comparison. Psychological Review, 130(3), 841–852</
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu">dsdm</span><span class="op">(</span><span class="va">x</span>, <span class="fl">0</span>, <span class="fl">9</span>, <span class="fl">1</span><span class="op">)</span>, col <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu">dsdm</span><span class="op">(</span><span class="va">x</span>, <span class="fl">0</span>, <span class="fl">2</span>, <span class="fl">8</span><span class="op">)</span>, col <span class="op">=</span> <span class="st">"green"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu">dsdm</span><span class="op">(</span><span class="va">x</span>, <span class="fl">0</span>, <span class="fl">4</span>, <span class="fl">3</span>, activation <span class="op">=</span> <span class="st">"laplace"</span><span class="op">)</span>, col <span class="op">=</span> <span class="st">"blue"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/legend.html" class="external-link">legend</a></span><span class="op">(</span><span class="st">"topright"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="st">"c=2, kappa=3.0, mu=0"</span>,</span></span>
 <span class="r-in"><span>  <span class="st">"c=9, kappa=1.0, mu=0"</span>,</span></span>
-<span class="r-in"><span>  <span class="st">"c=2, kappa=8, mu=1"</span></span></span>
+<span class="r-in"><span>  <span class="st">"c=2, kappa=8, mu=1"</span>,</span></span>
+<span class="r-in"><span>  <span class="st">"Laplace, c=4, kappa=3"</span></span></span>
 <span class="r-in"><span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>col <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"black"</span>, <span class="st">"red"</span>, <span class="st">"green"</span><span class="op">)</span>, lty <span class="op">=</span> <span class="fl">1</span>, cex <span class="op">=</span> <span class="fl">0.8</span></span></span>
+<span class="r-in"><span>col <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"black"</span>, <span class="st">"red"</span>, <span class="st">"green"</span>, <span class="st">"blue"</span><span class="op">)</span>, lty <span class="op">=</span> <span class="fl">1</span>, cex <span class="op">=</span> <span class="fl">0.8</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="SDMdist-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>

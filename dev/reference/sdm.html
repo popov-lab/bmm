@@ -49,7 +49,13 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">sdm</span><span class="op">(</span><span class="va">resp_error</span>, version <span class="op">=</span> <span class="st">"simple"</span>, <span class="va">...</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">sdm</span><span class="op">(</span></span>
+<span>  <span class="va">resp_error</span>,</span>
+<span>  version <span class="op">=</span> <span class="st">"simple"</span>,</span>
+<span>  activation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"vonmises"</span>, <span class="st">"laplace"</span><span class="op">)</span>,</span>
+<span>  scaling <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">sdmSimple</span><span class="op">(</span><span class="va">resp_error</span>, version <span class="op">=</span> <span class="st">"simple"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -68,6 +74,19 @@ degrees to radians using the <code>deg2rad</code> function.</p></dd>
 <dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
 <dd><p>Character. The version of the model to use. Currently only
 "simple" is supported.</p></dd>
+
+
+<dt id="arg-activation">activation<a class="anchor" aria-label="anchor" href="#arg-activation"></a></dt>
+<dd><p>Character. The activation kernel of the SDM,
+<code>"vonmises"</code> (the default, as in Oberauer, 2023) or <code>"laplace"</code>. See the
+section "Activation functions".</p></dd>
+
+
+<dt id="arg-scaling">scaling<a class="anchor" aria-label="anchor" href="#arg-scaling"></a></dt>
+<dd><p>Character. What the memory strength <code>c</code> measures:
+<code>"density"</code>, <code>"peak"</code> or <code>"range"</code>. <code>NULL</code> (the default) means <code>"density"</code>
+for the von Mises and <code>"peak"</code> for the Laplace activation. See the
+sections "Scaling of the activation" and "What <code>c</code> means".</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -110,6 +129,64 @@ and how to use it. * <strong>Domain:</strong> Working memory</p><ul><li><p><stro
 </ul></li>
 </ul></li>
 </ul></div>
+    <div class="section level2">
+    <h2 id="activation-functions">Activation functions<a class="anchor" aria-label="anchor" href="#activation-functions"></a></h2>
+    <p>Each response \(x\) is activated by
+\(c^* s(x - \mu)\), where the activation function \(s\) is 1 at the
+target and \(c^*\) is the activation of the target; the response density
+is \(\exp(c^* s(x - \mu)) / Z\), with \(Z\) its integral over the
+circle.</p><ul><li><p><code>activation = "vonmises"</code>: \(s(x) = \exp(\kappa (\cos x - 1))\), the
+von Mises activation kernel of the signal discrimination model of Oberauer
+(2023).</p></li>
+<li><p><code>activation = "laplace"</code>: \(s(x) = \exp(-\kappa |x|)\), with
+\(|x|\) the angular distance and \(\kappa\) the rate of the Laplace
+activation in Oberauer (2023, eq. 2). This is the SDM with the Laplace
+activation kernel of Oberauer's model space (Table 2): the same Gumbel
+noise and decision rule, with \(\kappa\) estimated freely. The density
+has a kink at \(\mu\), so estimating <code>mu</code> puts a kink at every
+response, which gradient-based sampling handles poorly; <code><a href="bmm.html">bmm()</a></code> warns
+when the formula estimates <code>mu</code>.</p></li>
+</ul></div>
+    <div class="section level2">
+    <h2 id="scaling-of-the-activation">Scaling of the activation<a class="anchor" aria-label="anchor" href="#scaling-of-the-activation"></a></h2>
+    <p><code>scaling</code> decides how <code>c</code> translates
+into the activation of the target \(c^*\); the table in "What <code>c</code>
+means" gives the formulas. <code>"density"</code> divides <code>c</code> by the integral of
+\(s\) over the circle, so <code>c</code> weighs an activation of unit area. For the
+von Mises activation that integral is approximated by
+\(\sqrt{2\pi/\kappa}\), the form <code>bmm</code> has always used (the "sqrtexp"
+parametrization; <code><a href="c_parametrizations.html">c_sqrtexp2bessel()</a></code> converts to Oberauer's exact
+Bessel form), and fits from before <code>scaling</code> existed are this cell. For the
+Laplace activation the integral is exact, \(2(1 - e^{-\kappa \pi}) /
+  \kappa\); Oberauer (2023, eq. 2) multiplies by \(\kappa / 2\), which
+divides by the integral over the real line, \(2 / \kappa\). <code>bmm</code>
+keeps the exact integral over the circle, so its <code>c</code> is that of eq. 2
+times \(1 - e^{-\kappa \pi}\) (0.998 at \(\kappa = 2\), 0.79 at
+\(\kappa = 0.5\)); <code><a href="c_parametrizations.html">c_laplace_circle2line()</a></code> converts it to the <code>c</code>
+of eq. 2 and <code><a href="c_parametrizations.html">c_laplace_line2circle()</a></code> back. <code>"peak"</code> takes <code>c</code> as the
+activation of the target, and <code>"range"</code> as the difference between the
+activation of the target and that of the location opposite it.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="default-priors">Default priors<a class="anchor" aria-label="anchor" href="#default-priors"></a></h2>
+    <p><code>kappa</code> and <code>c</code> mean different things in each
+cell, so each cell has its own <code>main</code> priors (log scale; the <code>effects</code> and
+<code>sd</code> priors are the same everywhere). They were chosen in a prior
+predictive check so that the implied distributions of the circular SD of
+the response error are comparable across cells, not exactly matched. The
+last column is the share of prior predictive distributions with a circular
+SD below 0.05 radians; the Laplace cells still produce more of these
+spikes. The von Mises peak and range cells keep the priors of the
+default cell, which already give them comparable error distributions
+(Kolmogorov-Smirnov distance 0.06 to the default cell); the Laplace cells
+needed their own. Set your own priors where that matters.</p><table class="table table"><tr><td><code>activation</code></td><td><code>scaling</code></td><td><code>c</code></td><td><code>kappa</code></td><td>circular SD &lt; 0.05</td></tr><tr><td><code>"vonmises"</code></td><td><code>"density"</code></td><td><code>student_t(5, 2, 0.75)</code></td><td><code>student_t(5, 1.75, 0.75)</code></td><td>0.07</td></tr><tr><td><code>"vonmises"</code></td><td><code>"peak"</code></td><td><code>student_t(5, 2, 0.75)</code></td><td><code>student_t(5, 1.75, 0.75)</code></td><td>0.03</td></tr><tr><td><code>"vonmises"</code></td><td><code>"range"</code></td><td><code>student_t(5, 2, 0.75)</code></td><td><code>student_t(5, 1.75, 0.75)</code></td><td>0.03</td></tr><tr><td><code>"laplace"</code></td><td><code>"density"</code></td><td><code>student_t(5, 3.25, 0.75)</code></td><td><code>student_t(5, -0.5, 0.75)</code></td><td>0.16</td></tr><tr><td><code>"laplace"</code></td><td><code>"peak"</code></td><td><code>student_t(5, 2.5, 0.75)</code></td><td><code>student_t(5, -0.5, 0.75)</code></td><td>0.11</td></tr><tr><td><code>"laplace"</code></td><td><code>"range"</code></td><td><code>student_t(5, 2.25, 0.75)</code></td><td><code>student_t(5, -0.5, 0.75)</code></td><td>0.09</td></tr></table></div>
+    <div class="section level2">
+    <h2 id="what-c-means">What <code>c</code> means<a class="anchor" aria-label="anchor" href="#what-c-means"></a></h2>
+
+<table class="table table"><tr><td><code>scaling</code></td><td>\(c^*\), von Mises</td><td>\(c^*\), Laplace</td><td><code>c</code> is</td></tr><tr><td><code>"density"</code></td><td>\(c \sqrt{\kappa / 2\pi}\)</td><td>\(c \kappa / (2 (1 - e^{-\kappa \pi}))\)</td><td>the weight of an activation of unit area</td></tr><tr><td><code>"peak"</code></td><td>\(c\)</td><td>\(c\)</td><td>the activation of the target</td></tr><tr><td><code>"range"</code></td><td>\(c / (1 - e^{-2\kappa})\)</td><td>\(c / (1 - e^{-\kappa \pi})\)</td><td>the target-opposite contrast in activation</td></tr></table><p>For a given data set the three scalings give the same likelihood at
+values of <code>c</code> related by these formulas; what differs is which quantity
+the regression formula for <code>c</code> and its prior act on.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>

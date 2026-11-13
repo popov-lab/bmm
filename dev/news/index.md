@@ -78,6 +78,24 @@
   such as `loo`, are removed from the result, because they describe the
   old chains only; add them again
   ([\#555](https://github.com/popov-lab/bmm/issues/555)).
+- [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) takes
+  `activation = "laplace"` for the SDM with a Laplace activation kernel
+  (Oberauer, 2023, eq. 2 and Table 2), and `scaling = "density"`,
+  `"peak"` or `"range"` for what `c` measures: the weight of a unit-area
+  activation, the activation of the target, or the target-opposite
+  contrast. `sdm("y")` fits what it fitted before.
+  [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+  [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+  [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) and
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) take
+  both arguments; see
+  [`?sdm`](https://venpopov.com/bmm/dev/reference/sdm.md) for the
+  formulas and the priors. The Laplace activation has its own default
+  priors per scaling.
+  [`c_laplace_circle2line()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+  converts the Laplace `c` with `scaling = "density"` to that of
+  Oberauer’s eq. 2
+  ([\#558](https://github.com/popov-lab/bmm/issues/558)).
 - [`link_transform()`](https://venpopov.com/bmm/dev/reference/link_transform.md)
   is now exported. It converts values between the native scale of a
   model parameter and the scale of its link (`log`, `logit`, `tan_half`
@@ -396,6 +414,14 @@
   and [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
   fits. They stopped with “Stimulus variable ‘stimulus’ is 1 in every
   row”. Fitting a model still needs both stimuli.
+- [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), and so
+  [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html)
+  and [`loo()`](https://mc-stan.org/loo/reference/loo.html) on
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) fits, stopped
+  with “non-finite function value” for large `c` and `kappa`
+  (`dsdm(0, 0, 150, 200)`). It now returns the density there, and is
+  accurate to better than 1e-10 on the log scale elsewhere
+  ([\#558](https://github.com/popov-lab/bmm/issues/558)).
 
 #### Deprecated functions and arguments
 
@@ -444,6 +470,16 @@
   `pimm()` and `qimm()` are removed. They were never implemented and
   always stopped with an error
   ([\#556](https://github.com/popov-lab/bmm/issues/556)).
+- `parametrization` of
+  [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+  [`psdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+  [`qsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) and
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) is
+  deprecated and will be removed in bmm 1.6.0 at the earliest. Replace
+  `parametrization = "sqrtexp"` with `scaling = "density"`, or drop it,
+  as it is the default. For `parametrization = "bessel"`, convert `c`
+  with `c_bessel2sqrtexp(c, kappa)`
+  ([\#558](https://github.com/popov-lab/bmm/issues/558)).
 - The forms deprecated in bmm 0.4 and 1.0
   ([`fit_model()`](https://venpopov.com/bmm/dev/reference/bmm.md),
   [`IMMfull()`](https://venpopov.com/bmm/dev/reference/imm.md),

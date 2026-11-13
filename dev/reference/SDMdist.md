@@ -8,7 +8,16 @@ source is supported.
 ## Usage
 
 ``` r
-dsdm(x, mu = 0, c = 3, kappa = 3.5, log = FALSE, parametrization = "sqrtexp")
+dsdm(
+  x,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  log = FALSE,
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
+)
 
 psdm(
   q,
@@ -18,7 +27,9 @@ psdm(
   lower.tail = TRUE,
   log.p = FALSE,
   lower.bound = -pi,
-  parametrization = "sqrtexp"
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
 )
 
 qsdm(
@@ -29,10 +40,20 @@ qsdm(
   lower.tail = TRUE,
   log.p = FALSE,
   lower.bound = -pi,
-  parametrization = "sqrtexp"
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
 )
 
-rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
+rsdm(
+  n,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
+)
 ```
 
 ## Arguments
@@ -63,9 +84,23 @@ rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 
 - parametrization:
 
-  Character; either `"bessel"` or `"sqrtexp"` (default). See [the online
-  article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for
-  details on the parameterization.
+  Deprecated since bmm 1.5.0; use `scaling` instead. `"sqrtexp"` is
+  `scaling = "density"`; for `"bessel"`, convert `c` with
+  [`c_bessel2sqrtexp()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+  and use `scaling = "density"`.
+
+- activation:
+
+  Character; the activation kernel of the SDM, `"vonmises"` (default) or
+  `"laplace"`. See
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md).
+
+- scaling:
+
+  Character; what `c` measures: `"density"`, `"peak"` or `"range"`.
+  `NULL` (default) means `"density"` for the von Mises and `"peak"` for
+  the Laplace activation. See
+  [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md).
 
 - q:
 
@@ -99,17 +134,33 @@ gives the quantile function, and `rsdm` generates random deviates.
 
 ## Details
 
-**Parametrization**
+**Activation and scaling**
 
-See [the online
-article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for
-details on the parameterization. Oberauer (2023) introduced the SDM with
-the bessel parametrization. The sqrtexp parametrization is the default
-in the `bmm` package for numerical stability and efficiency. The two
-parametrizations are related by the functions
+The density is \\\exp(c^\* s(x - \mu)) / Z\\, where \\s\\ is the
+activation function with \\s(0) = 1\\, \\c^\*\\ its peak, and \\Z\\
+normalises the density over the circle. `scaling` says how `c`
+translates into \\c^\*\\; the sections "Activation functions", "Scaling
+of the activation" and "What `c` means" in
+[`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) give the
+formulas. The default, the von Mises activation with
+`scaling = "density"`, is what these functions computed before
+`activation` and `scaling` existed (the sqrtexp parametrization).
+Oberauer (2023) wrote the von Mises SDM with the exact density of the
+von Mises distribution instead (the bessel parametrization);
 [`c_bessel2sqrtexp()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
 and
-[`c_sqrtexp2bessel()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md).
+[`c_sqrtexp2bessel()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+convert between the two. For the Laplace activation with
+`scaling = "density"`,
+[`c_laplace_circle2line()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+and
+[`c_laplace_line2circle()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+convert between `bmm`'s `c` and that of Oberauer (2023, eq. 2). See [the
+online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+At exactly `kappa = 0` the range scaling is undefined, because target
+and opposite have the same activation: `dsdm`, `psdm` and `qsdm` return
+`NaN` and `rsdm` stops with an error. Fits never reach it, since `kappa`
+has a log link.
 
 **The cumulative distribution function**
 
@@ -215,12 +266,14 @@ plot(x, dsdm(x, 0, 2, 3),
 )
 lines(x, dsdm(x, 0, 9, 1), col = "red")
 lines(x, dsdm(x, 0, 2, 8), col = "green")
+lines(x, dsdm(x, 0, 4, 3, activation = "laplace"), col = "blue")
 legend("topright", c(
   "c=2, kappa=3.0, mu=0",
   "c=9, kappa=1.0, mu=0",
-  "c=2, kappa=8, mu=1"
+  "c=2, kappa=8, mu=1",
+  "Laplace, c=4, kappa=3"
 ),
-col = c("black", "red", "green"), lty = 1, cex = 0.8
+col = c("black", "red", "green", "blue"), lty = 1, cex = 0.8
 )
 
 

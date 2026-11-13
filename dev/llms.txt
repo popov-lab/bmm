@@ -554,6 +554,8 @@ Utility functions for transforming data and parameters
 
 - [`c_sqrtexp2bessel()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
   [`c_bessel2sqrtexp()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+  [`c_laplace_circle2line()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
+  [`c_laplace_line2circle()`](https://venpopov.com/bmm/dev/reference/c_parametrizations.md)
   : Convert between parametrizations of the c parameter of the SDM
   distribution
 
