@@ -1143,12 +1143,21 @@ test_that("the trial family's log density equals the one-hot multinomial's", {
     })
     cmdstanr::write_stan_json(data, files[1])
     cmdstanr::write_stan_json(values, files[2])
-    status <- system2(mod$exe_file(), c("log_prob", paste0("constrained_params=", files[2]),
-                                        "jacobian=1", "data", paste0("file=", files[1]),
-                                        "output", paste0("file=", files[3]), "sig_figs=18"),
-                      stdout = FALSE, stderr = FALSE)
-    expect_identical(status, 0L)
-    utils::read.csv(files[3], comment.char = "#")$lp[1]
+    stderr_file <- file.path(dir, paste0(name, "_stderr.txt"))
+    # tbb.dll on Windows, as in the log_prob test of test-model_ezdm.R
+    run_path <- if (.Platform$OS.type == "windows") {
+      c(
+        getFromNamespace("toolchain_PATH_env_var", "cmdstanr")(),
+        getFromNamespace("tbb_path", "cmdstanr")()
+      )
+    }
+    status <- withr::with_path(run_path, system2(mod$exe_file(), c(
+      "log_prob", paste0("constrained_params=", files[2]), "jacobian=1",
+      "data", paste0("file=", files[1]),
+      "output", paste0("file=", files[3]), "sig_figs=18"
+    ), stdout = FALSE, stderr = stderr_file))
+    expect_identical(status, 0L, info = paste(readLines(stderr_file, warn = FALSE), collapse = "\n"))
+    utils::read.csv(files[3], comment.char = "#")$lp__[1]
   }
   expect_identical(c(sdata$K_d, sdata$N_1, sdata$N_2, sdata$N_3), c(2L, 4L, 12L, 4L))
   expect_equal(log_prob("trial"), log_prob("one_hot"), tolerance = 1e-8)
