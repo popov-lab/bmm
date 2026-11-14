@@ -45,6 +45,35 @@ test_that("c parameter conversions work", {
   expect_error(c_bessel2sqrtexp(1, -2), "kappa must be non-negative")
 })
 
+test_that("the Laplace c conversions round-trip", {
+  c_circle <- c(0, 1, 4, 20)
+  kappa <- c(0.1, 0.5, 2, 10)
+  expect_equal(c_laplace_line2circle(c_laplace_circle2line(c_circle, kappa), kappa), c_circle)
+  expect_equal(c_laplace_circle2line(4, 2), 4 / (1 - exp(-2 * pi)))
+  expect_identical(c_laplace_circle2line(2, 0), Inf)
+  expect_identical(c_laplace_circle2line(0, 0), NaN)
+  expect_identical(c_laplace_line2circle(2, 0), 0)
+  expect_error(c_laplace_circle2line(-1, 2), "c must be non-negative")
+  expect_error(c_laplace_circle2line(1, -2), "kappa must be non-negative")
+  expect_error(c_laplace_line2circle(-1, 2), "c must be non-negative")
+  expect_error(c_laplace_line2circle(1, -2), "kappa must be non-negative")
+})
+
+test_that("dsdm() with the Laplace density scaling is eq. 2 of Oberauer (2023) at the converted c", {
+  x <- c(-2.5, -0.4, 0, 0.3, 1.7)
+  c_circle <- 3
+  for (kappa in c(0.5, 2, 10)) {
+    c_line <- c_laplace_circle2line(c_circle, kappa)
+    activation <- function(x) c_line * kappa / 2 * exp(-kappa * abs(x))
+    z <- integrate(function(x) exp(activation(x)), -pi, pi, rel.tol = 1e-12)$value
+    expect_equal(
+      dsdm(x, 0, c_circle, kappa, activation = "laplace", scaling = "density"),
+      exp(activation(x)) / z,
+      tolerance = 1e-8
+    )
+  }
+})
+
 test_that("identity is a no-op and round-trips", {
   x <- c(-2, -0.5, 0, 1.25, 3)
   eta <- link_transform(x, "identity", inverse = FALSE)

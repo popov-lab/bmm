@@ -113,7 +113,7 @@ revert_postprocess_brm.default <- function(model, fit, ...) {
 #'   | `sdt_yn()` | Number of "old"/"signal" responses, the number of trials times their probability |
 #'   | `sdt_mafc()` | Number of correct responses, the number of trials times their probability |
 #'   | `psychometric_function()` | Number of positive responses, the number of trials (1 for 0/1 data) times the psychometric function at the row's intensity |
-#'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, from the multinomial family of \pkg{brms}; on one row per trial these are the category probabilities |
+#'   | `m3()`, `sdt_rating()`, `sdt_ranking()`, `sdt_cdp()` | Expected count of each response category, an array of draws x observations x categories; on one row per trial these are the category probabilities, which `sdt_rating()` computes in its own trial family and the others take from the multinomial family of \pkg{brms} |
 #'   | `sdm()`, `mixture2p()`, `mixture3p()`, `imm()` | Not defined: the mean of a circular response error is not a useful quantity, so these models stop with an error |
 #'
 #'   With `dpar` or `nlpar`, `posterior_epred()` returns draws of that model
