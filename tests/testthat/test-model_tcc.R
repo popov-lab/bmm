@@ -147,6 +147,7 @@ test_that("check_data() refuses responses it cannot bin", {
 ############################################################################# !
 
 test_that("dtcc() matches adaptive quadrature where the error peaks", {
+  skip_on_cran()
   # the largest d of the default table and the least likely options, plus
   # negative d (repulsion) at the low end of the table
   cells <- rbind(
@@ -254,6 +255,7 @@ test_that("the Stan table is built in transformed data and read by the lpmf", {
 })
 
 test_that("a table from R reaches the same lpmf as data and skips the build", {
+  skip_on_cran()
   model <- tcc_test_model(d_max = 6)
   model$other_vars$table <- "r"
   fit <- tcc_mock_fit(model)
@@ -313,6 +315,7 @@ tcc_case_prep <- function(case, d) {
 }
 
 test_that("log_lik_tcc() reads the table the fit used, for either response convention", {
+  skip_on_cran()
   d <- c(1.234, 0.011, 2.345, 5.987)
   for (case in tcc_postprocess_cases()) {
     prep <- tcc_case_prep(case, d)
@@ -325,6 +328,7 @@ test_that("log_lik_tcc() reads the table the fit used, for either response conve
 })
 
 test_that("posterior_predict_tcc() draws signed offsets from the model's pmf", {
+  skip_on_cran()
   withr::local_seed(567)
   n <- 20000
   for (case in tcc_postprocess_cases()) {
@@ -529,6 +533,7 @@ test_that("model_citation() keeps the Oberauer reference of a Gumbel model and f
 })
 
 test_that("dtcc(noise = 'gumbel') matches the argmax integral of Gumbel signals", {
+  skip_on_cran()
   for (f in list(tcc_test_similarity(360), tcc_similarity("laplace", kappa = 1.7),
                  tcc_similarity("vonmises", kappa = 4))) {
     for (d in c(0.3, 2, 7)) {
@@ -557,6 +562,7 @@ test_that("dtcc(noise = 'gumbel') is the softmax arm of m3() with one category p
 })
 
 test_that("dtcc(noise = 'gumbel') sums to one and rtcc() matches the argmax of Gumbel signals", {
+  skip_on_cran()
   x <- 2 * pi * (-179:180) / 360
   for (d in c(0, 1.3, 12, 60)) {
     expect_equal(sum(dtcc(x, d, tcc_test_similarity(360), noise = "gumbel")), 1, tolerance = 1e-12)
@@ -678,6 +684,7 @@ test_that("log_lik_tcc_gumbel() is dtcc() at each draw, and each cell reads its 
 })
 
 test_that("posterior_predict_tcc_gumbel() and pp_simulate() draw from the Gumbel pmf", {
+  skip_on_cran()
   withr::local_seed(574)
   n <- 20000
   breaks <- c(-1, 0, 1, 2, 5, 10, 20, 90, 180)
