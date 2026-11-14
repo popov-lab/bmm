@@ -1043,6 +1043,11 @@ test_that("dmixture3p() and dimm() read a matrix of item locations row by row", 
   expect_elementwise(dmixture3p, list(x = x, mu = mu, kappa = c(4, 10)), list(p_mem = 0.6, p_nt = 0.25))
   expect_elementwise(dmixture3p, list(x = x, mu = mu, tau = c(0, 0.6, 0, 1.1)), list(kappa = 8))
   expect_elementwise(dimm, list(x = x, mu = mu, dist = dist, c = c(2, 5)), list(s = 2, a = 0.3))
+  # two rows of set size 2 with different distances, which one distance row
+  # shared by every observation would get wrong
+  mu2 <- rbind(c(0.4, 2, NA), c(-1, 1.2, NA), c(2.5, -2, 1))
+  dist2 <- rbind(c(0, 0.2, NA), c(0, 2.5, NA), c(0, 1, 0.3))
+  expect_elementwise(dimm, list(x = x, mu = mu2, dist = dist2), list(s = 2, a = 0.1))
   # a vector dist holds for every row, so every row's set size is its length
   mu3 <- rbind(c(0.4, 2, -1.5), c(-1, 1.2, 0), c(2.5, -2, 1))
   expect_elementwise(dimm, list(x = x, mu = mu3, kappa = c(4, 10)), list(dist = c(0, 0.5, 2)))
