@@ -75,15 +75,57 @@ unit_counts <- function(k, K) replace(numeric(K), k, 1)
 
 # --- sdm ----------------------------------------------------------------------
 
+# the deprecated `parametrization` (#558) warns on every call
+dsdm_bessel <- function(...) {
+  withCallingHandlers(dsdm(..., parametrization = "bessel"), warning = function(w) {
+    if (grepl("`parametrization = ", conditionMessage(w), fixed = TRUE)) invokeRestart("muffleWarning")
+  })
+}
+
 test_that("dsdm() recycles x and the parameters to the longest argument", {
   expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2), c = c(2, 3, 4, 5), kappa = 3))
   expect_elementwise(dsdm, list(x = 0.3, mu = 0, c = c(2, 3), kappa = c(1, 5, 20, 10)),
                      fixed = list(log = TRUE))
-  expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2, -1), c = 3, kappa = 3),
-                     fixed = list(parametrization = "bessel"))
+  expect_elementwise(dsdm_bessel, list(x = c(0.1, -0.5), mu = c(0, 1, 2, -1), c = 3, kappa = 3))
   # parameter sets that agree in their first four digits get their own integral;
   # x longer than c, so that sets repeat and dsdm() looks them up by key
   expect_elementwise(dsdm, list(x = c(0.1, 0.2, 0.3, 0.4), mu = 0, c = c(3, 3.0001), kappa = 2))
+})
+
+test_that("dsdm() recycles alike for every activation and scaling", {
+  cells <- expand.grid(activation = c("vonmises", "laplace"), scaling = c("density", "peak", "range"),
+                       stringsAsFactors = FALSE)
+  for (i in seq_len(nrow(cells))) {
+    cell <- as.list(cells[i, ])
+    expect_elementwise(dsdm, list(x = c(0.1, -0.5), mu = c(0, 1, 2), c = c(2, 3, 4, 5), kappa = c(1, 5, 20)),
+                       fixed = c(cell, log = TRUE))
+    # sets repeat, and two of them differ in kappa only: under the peak scaling
+    # their c* is the same, so the key must hold kappa as well
+    expect_elementwise(dsdm, list(x = seq(0.1, 0.8, by = 0.1), mu = 0, c = c(3, 3.0001), kappa = c(1, 5, 2, 4)),
+                       fixed = c(cell, log = TRUE))
+  }
+})
+
+test_that("psdm() and qsdm() pair c and kappa per observation in every cell where c* depends on kappa", {
+  # c and kappa of non-multiple lengths: a c* formed before recycling to the
+  # length of q pairs element i with the wrong c. The peak scaling, c* = c,
+  # cannot mispair. qsdm() solves each element with the same root finder alone
+  # and in the vector, so its values agree to the last digit as well
+  q <- c(0.3, -1.2, 2.9, -3)
+  p <- c(0.2, 0.4, 0.65, 0.9)
+  pars <- list(list(c = c(2.5, 7), kappa = c(1.5, 4, 12)), list(c = c(2.5, 7, 4), kappa = c(1.5, 12)))
+  cells <- expand.grid(activation = c("vonmises", "laplace"), scaling = c("density", "range"),
+                       stringsAsFactors = FALSE)
+  for (i in seq_len(nrow(cells))) {
+    cell <- as.list(cells[i, ])
+    for (par in pars) {
+      expect_elementwise(psdm, c(list(q = q, mu = 0), par), fixed = cell)
+      expect_elementwise(qsdm, c(list(p = p, mu = 0), par), fixed = cell)
+    }
+    # mu of a length that does not divide that of q, recycled silently like the parameters
+    expect_elementwise(psdm, list(q = q, mu = c(0, 1, -1), c = c(2.5, 7), kappa = c(1.5, 4, 12)), fixed = cell)
+    expect_elementwise(qsdm, list(p = p, mu = c(0, 1, -1), c = c(2.5, 7), kappa = c(1.5, 4, 12)), fixed = cell)
+  }
 })
 
 test_that("rsdm() draws each observation from its own location, strength and precision", {
@@ -93,22 +135,37 @@ test_that("rsdm() draws each observation from its own location, strength and pre
   kappa <- c(2, 10, 5)
   n <- 3000
   g <- group_of(n, 3)
-  x <- rsdm(n, mu = mu, c = c_, kappa = kappa)
-  expect_length(x, n)
-  for (k in 1:3) {
-    # E[cos(x - mu)] under the group's density, by quadrature of dsdm()
-    ref <- integrate(function(t) cos(t - mu[k]) * dsdm(t, mu[k], c_[k], kappa[k]), -pi, pi)$value
-    obs <- cos(x[g == k] - mu[k])
-    expect_mean_near(obs, ref, sd(obs) / sqrt(length(obs)))
+  # a density sharp enough below to keep every draw on its location's side, and
+  # wide enough for the sampler: c* is about 89 (von Mises) and 100 (Laplace)
+  sharp <- list(vonmises = list(c = 10, kappa = 500), laplace = list(c = 10, kappa = 20))
+  for (activation in c("vonmises", "laplace")) {
+    cell <- list(activation = activation, scaling = "density")
+    x <- do.call(rsdm, c(list(n, mu = mu, c = c_, kappa = kappa), cell))
+    expect_length(x, n)
+    for (k in 1:3) {
+      # E[cos(x - mu)] under the group's density, by quadrature of dsdm()
+      dens <- function(t) do.call(dsdm, c(list(t, mu[k], c_[k], kappa[k]), cell))
+      ref <- integrate(function(t) cos(t - mu[k]) * dens(t), -pi, pi)$value
+      obs <- cos(x[g == k] - mu[k])
+      expect_mean_near(obs, ref, sd(obs) / sqrt(length(obs)))
+    }
+    # c longer than kappa: c* pairs them draw by draw
+    x <- do.call(rsdm, c(list(n, mu = 0, c = c(0.5, 10), kappa = 5), cell))
+    for (k in 1:2) {
+      dens <- function(t) do.call(dsdm, c(list(t, 0, c(0.5, 10)[k], 5), cell))
+      ref <- integrate(function(t) cos(t) * dens(t), -pi, pi)$value
+      obs <- cos(x[group_of(n, 2) == k])
+      expect_mean_near(obs, ref, sd(obs) / sqrt(length(obs)))
+    }
+    # n not a multiple of the parameter length: draw i takes element i, and a
+    # sharp density puts every draw on its location's side of zero
+    x <- NULL
+    expect_no_warning(x <- do.call(rsdm, c(list(5, mu = c(-2, 2)), sharp[[activation]], cell)))
+    expect_equal(sign(x), rep_len(c(-1, 1), 5))
+    # n = 2, as in posterior_predict(ndraws = 2), pairs as well
+    x <- replicate(10, do.call(rsdm, c(list(2, mu = c(-2, 2)), sharp[[activation]], cell)))
+    expect_equal(sign(x), matrix(c(-1, 1), 2, 10))
   }
-  # n not a multiple of the parameter length: draw i takes element i, and a
-  # sharp density puts every draw on its location's side of zero
-  x <- NULL
-  expect_no_warning(x <- rsdm(5, mu = c(-2, 2), c = 10, kappa = 500))
-  expect_equal(sign(x), rep_len(c(-1, 1), 5))
-  # n = 2, as in posterior_predict(ndraws = 2), pairs as well
-  x <- replicate(10, rsdm(2, mu = c(-2, 2), c = 10, kappa = 500))
-  expect_equal(sign(x), matrix(c(-1, 1), 2, 10))
 })
 
 test_that("rejection_sampling() is deprecated and still samples", {

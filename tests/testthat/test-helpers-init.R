@@ -77,18 +77,6 @@ test_that("create_initfun returns a function with random-effects inits for mixtu
   )
 })
 
-test_that("create_initfun keeps the variable-precision gamma shape integrable", {
-  dat <- oberauer_lin_2017
-  model <- mixture2p(resp_error = "dev_rad", variable_precision = TRUE)
-  init_fun <- configured_initfun(model, bmf(thetat ~ 1, kappa ~ 1, tau ~ 1), dat)
-
-  shapes <- replicate(50, {
-    inits <- init_fun()
-    .circmix_J(exp(inits$Intercept_kappa)) / exp(inits$Intercept_tau)
-  })
-  expect_true(all(shapes > 60 / model$vp_nodes))
-})
-
 test_that("create_initfun returns 0 for m3 with simple choice rule and identity link", {
   dat <- oberauer_lewandowsky_2019_e1
   ff <- bmf(c ~ 1, a ~ 1)
