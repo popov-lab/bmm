@@ -910,8 +910,8 @@ try_read_bmmfit <- function(file) {
   if (is.null(file)) {
     return(NULL)
   }
-  dir <- try(fs::dir_create(dirname(file)))
-  stopif(is_try_error(dir), "Cannot create directory for file.")
+  dir.create(dirname(file), recursive = TRUE, showWarnings = FALSE)
+  stopif(!dir.exists(dirname(file)), "Cannot create directory for file.")
 
   out <- suppressWarnings(try(readRDS(file), silent = TRUE))
   if (is_try_error(out)) {
@@ -961,9 +961,10 @@ check_rds_file <- function(file) {
   if (is.null(file)) {
     return(NULL)
   }
-  stopif(!is.character(file) || length(file) > 1, "'file' must be a single string.")
-  ext <- fs::path_ext(file)
-  if (ext != "rds") {
+  # tools::file_ext() returns "" for NA, so NA must stop here or it would be
+  # saved as "NA.rds"
+  stopif(!is.character(file) || length(file) != 1 || is.na(file), "'file' must be a single string.")
+  if (tools::file_ext(file) != "rds") {
     file <- paste0(file, ".rds")
   }
   file
