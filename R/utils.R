@@ -627,34 +627,6 @@ get_variables <- function(x, all_variables, regex = FALSE) {
   variables
 }
 
-# replace the base identical function with a S3 method
-identical <- function(x, y, ...) {
-  UseMethod("identical")
-}
-
-#' @export
-identical.default <- function(x, y, ...) {
-  base::identical(x, y, ...)
-}
-
-#' @export
-identical.brmsformula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
-#' @export
-identical.bmmformula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
-#' @export
-identical.formula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
 #' View or change global bmm options
 #' @param sort_data logical. If TRUE, the data will be sorted by the predictors.
 #'   If FALSE, the data will not be sorted, but sampling will be slower. If
