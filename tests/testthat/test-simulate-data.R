@@ -230,6 +230,14 @@ test_that("simulated statistics of the circular models match their densities", {
   y <- simulate_data(sdm("y"), list(c = 2, kappa = 1.75), n_trials = n_sim)$y
   expect_within_mc(cos(y), circular_mean_cos(function(x) dsdm(x, 0, 7.389056, 5.754603)), "sdm")
 
+  # E[cos] of exp(cstar s(x)) by quadrature of the kernel itself, c = e,
+  # kappa = e^0.5; the default cell gives 0.3261631 at these values, so a
+  # method that ignores activation or scaling fails both
+  y <- simulate_data(sdm("y", activation = "laplace"), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_within_mc(cos(y), 0.4829029, "sdm laplace peak")
+  y <- simulate_data(sdm("y", scaling = "range"), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_within_mc(cos(y), 0.6224407, "sdm vonmises range")
+
   display <- data.frame(set_size = rep(3, n_sim), nt1 = 1.5, nt2 = -2, d1 = 1, d2 = 2)
   model <- mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size")
   y <- simulate_data(model, list(kappa = 2, thetat = 0.5, thetant = -0.5), display)$y
@@ -407,6 +415,34 @@ test_that("simulated responses of the signal detection models match their densit
   expect_within_mc(k$remember4, dsdt_cdp(c(0, 0, 0, 0, 0, 1), 1, dfam = 1, drec = 1,
                                          thresholds = c(-1.0986123, 0, 1.0986123), rcrit = 0,
                                          n_new = 2), "sdt_cdp")
+})
+
+test_that("one simulated trial per row of sdt_yn and sdt_mafc is 0 or 1 with the model's probability", {
+  skip_on_cran()
+  withr::local_seed(6)
+  # pnorm(1 - 0.5), pnorm(-0.5); P(correct) of 2, 3 and 4 alternatives at d = 1, from
+  # integrate(dnorm(x - 1) * pnorm(x)^(m - 1))
+  design <- data.frame(stimulus = rep(0:1, each = n_sim))
+  y <- simulate_data(sdt_yn("y", "stimulus"), list(d = 1, criterion = 0.5), design)$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y[design$stimulus == 0], 0.3085375387, "sdt_yn trial noise")
+  expect_within_mc(y[design$stimulus == 1], 0.6914624613, "sdt_yn trial signal")
+
+  y <- simulate_data(sdt_mafc("y", m = 4), list(d = 1), data.frame(id = seq_len(n_sim)))$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y, 0.5520314384, "sdt_mafc trial m = 4")
+
+  design <- data.frame(m = rep(2:3, each = n_sim))
+  y <- simulate_data(sdt_mafc("y", m = "m"), list(d = 1), design)$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y[design$m == 2], 0.7602499389, "sdt_mafc trial m column 2")
+  expect_within_mc(y[design$m == 3], 0.6337020458, "sdt_mafc trial m column 3")
+})
+
+test_that("sdt_mafc simulates trials without a design when it reads no column", {
+  data <- simulate_data(sdt_mafc("y", m = 4), list(d = 1), n_trials = 100)
+  expect_identical(dim(data), c(100L, 1L))
+  expect_in(data$y, c(0, 1))
 })
 
 test_that("simulated counts of the m3 and mpt models match their closed forms", {
