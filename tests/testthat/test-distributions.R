@@ -537,11 +537,10 @@ test_that("the circular mixture samplers do not warn when every parameter is giv
   expect_no_warning(rimm(4, tau = c(0, 1)))
 })
 
-# rmixture2p(version = "slot_averaging") stopped with "data is too long", and
 # rmixture3p() and rimm() warned "non-empty data for zero-extent matrix". The
-# mixture3p slot-averaging generator behind posterior_predict() and
-# simulate_data() stopped the same way at set size 1, which no exported
-# function reaches with zero draws.
+# NA check reads the weight matrix, so a zero-row matrix built from a constant
+# stops with "data is too long"; the slot-averaging cases, the mixture3p
+# generator behind posterior_predict() and simulate_data() included, guard that.
 test_that("the circular mixture samplers return an empty vector for n = 0", {
   calls <- alist(
     simple = rmixture2p(0, tau = 1),

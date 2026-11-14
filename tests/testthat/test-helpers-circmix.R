@@ -776,10 +776,10 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 # back as 4.9e-311 (1e13 * 2^-1074), -3.18e14 as NaN and -2e16 as -1.75e307,
 # which #710 had read as Stan returning NaN or -1.75e307. Any output printed
 # without a decimal point and beyond int32 is garbled: a whole number such as
-# 1e13, and at sig_figs = 18 every |x| from 1e17 to below 1e18. From 1e18 on
-# cmdstan writes exponent form (1e+18), which survives, and -6.36e14 survived
-# because it had a fraction. Compare only values of moderate size, or scale
-# them down in generated quantities.
+# 1e13, and at sig_figs = 18 every |x| from 2^53 (9.0e15) to below 1e18, all
+# whole numbers. From 1e18 on cmdstan writes exponent form (1e+18), which
+# survives, and -6.36e14 survived because it had a fraction. Compare only
+# values of moderate size, or scale them down in generated quantities.
 circmix_stan_values <- function(data) {
   data <- utils::modifyList(list(
     NE = 0L, y_e = numeric(0), logw_e = numeric(0), logw_guess_e = numeric(0),
