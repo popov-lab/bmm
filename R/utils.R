@@ -961,8 +961,8 @@ check_rds_file <- function(file) {
   if (is.null(file)) {
     return(NULL)
   }
-  # tools::file_ext() returns "" for NA, so NA must stop here or it would be
-  # saved as "NA.rds"
+  # tools::file_ext() gives NA for NA before R 4.6 and "" from R 4.6 on; the
+  # second would save the fit as "NA.rds", so NA must stop here
   stopif(!is.character(file) || length(file) != 1 || is.na(file), "'file' must be a single string.")
   if (tools::file_ext(file) != "rds") {
     file <- paste0(file, ".rds")
