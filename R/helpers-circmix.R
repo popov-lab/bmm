@@ -625,15 +625,16 @@
   } else {
     # NA-padded like a row of mu, so that row i of a padded dist matrix passed
     # alone reads as observation i's distances
-    dist <- dist[seq_len(sum(!is.na(dist)))]
+    dist <- dist[seq_len(sum(!is.na(dist)))] %||% numeric(0)
     stopif(anyNA(dist), "dist has NA before its last distance; NA may only follow the distances.")
     stopif(
       any(items$set_size != length(dist)),
       "The number of items does not match the distances provided from the cued location."
     )
     # filled by column, because byrow = TRUE warns for a mu with zero rows;
-    # as.numeric() turns a NULL dist beside zero rows into numeric(0)
-    dist <- matrix(rep(as.numeric(dist), each = nrow(locations)), nrow(locations), length(dist))
+    # rep() keeps the type, so a factor or character dist stops in the
+    # arithmetic instead of passing its level codes as distances
+    dist <- matrix(rep(dist, each = nrow(locations)), nrow(locations), length(dist))
   }
   items$dist <- dist
   items

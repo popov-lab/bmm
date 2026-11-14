@@ -1184,6 +1184,10 @@ test_that("item locations that are no item set per observation stop", {
   # pass c(0, 2) for a set of two items
   expect_error(dimm(0, mu = c(0, 2), dist = c(0, NA, 2)), "dist has NA before its last distance")
   expect_error(rimm(2, mu = c(0, 2), dist = c(0, NA, 2)), "dist has NA before its last distance")
+  # a factor would otherwise pass its level codes 1, 2, 3 as the distances
+  expect_error(suppressWarnings(dimm(0, dist = factor(c(0, 0.5, 2)))), "non-numeric argument")
+  expect_error(suppressWarnings(rimm(2, dist = factor(c(0, 0.5, 2)))), "non-numeric argument")
+  expect_error(dimm(0, dist = c("0", "0.5", "2")), "non-numeric argument")
 
   for (f in list(function(mu) dmixture3p(0, mu = mu), function(mu) rmixture3p(2, mu = mu),
                  function(mu) dimm(0, mu = mu, dist = numeric(0)), function(mu) rimm(2, mu = mu, dist = numeric(0)))) {
