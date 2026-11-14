@@ -1152,7 +1152,7 @@ dimm <- function(x, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
   }
   .check_imm_args(kappa, s, dist, tau)
   .circmix_check_variable_precision(FALSE, vp_nodes)
-  items <- .circmix_item_rows(mu, dist)
+  items <- .circmix_item_dist(.circmix_item_rows(mu), dist)
   n <- .obs_length(x, c, a, b, s, kappa, tau, rows = if (items$per_row) list(items$locations))
   if (n == 0) {
     return(numeric(0))
@@ -1260,7 +1260,7 @@ rimm <- function(n, mu = c(0, 2, -1.5), dist = c(0, 0.5, 2),
                  c = 1, a = 0.2, b = 1, s = 2, kappa = 5, tau = 0) {
   .check_imm_args(kappa, s, dist, tau)
   n <- .n_draws(n)
-  items <- .circmix_item_rows(mu, dist)
+  items <- .circmix_item_dist(.circmix_item_rows(mu), dist)
 
   args <- lapply(list(c = c, a = a, s = s, b = b, kappa = kappa, tau = tau), rep_len, n)
   .circmix_by_set_size(items, n, function(idx, locations, dist) {

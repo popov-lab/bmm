@@ -580,9 +580,8 @@
 # user, read once for all four as .counts_rows() reads counts: a vector is one
 # item set shared by every observation, a matrix or data frame one set per row
 # (the target, then the non-targets, NA past the row's set size, the padding
-# simulate_data() uses). dist of dimm() and rimm() has the shape of mu or is
-# one vector for every row; it comes back as a matrix of the shape of mu.
-.circmix_item_rows <- function(mu, dist = NULL) {
+# simulate_data() uses).
+.circmix_item_rows <- function(mu) {
   per_row <- is.matrix(mu) || is.data.frame(mu)
   stopif(
     !per_row && length(mu) == 0,
@@ -608,10 +607,14 @@
     "mu has NA before the last location in row(s) {listed(gap)}: a row holds \\
     its target and non-target locations first, with NA only after them."
   )
-  if (is.null(dist)) {
-    return(nlist(locations, set_size, per_row))
-  }
+  nlist(locations, set_size, per_row)
+}
 
+# Adds dist of dimm() and rimm() to the items of .circmix_item_rows(), as a
+# matrix of the shape of mu. dist has that shape or is one vector for every
+# row; a NULL dist, such as a misspelt data column, is an empty vector.
+.circmix_item_dist <- function(items, dist) {
+  locations <- items$locations
   if (is.matrix(dist) || is.data.frame(dist)) {
     dist <- unname(as.matrix(dist))
     stopif(
@@ -624,12 +627,13 @@
     # alone reads as observation i's distances
     dist <- dist[seq_len(sum(!is.na(dist)))]
     stopif(
-      anyNA(dist) || any(set_size != length(dist)),
+      anyNA(dist) || any(items$set_size != length(dist)),
       "The number of items does not match the distances provided from the cued location."
     )
     dist <- matrix(dist, nrow(locations), length(dist), byrow = TRUE)
   }
-  nlist(locations, dist, set_size, per_row)
+  items$dist <- dist
+  items
 }
 
 # fun(idx, locations, dist) once per set size, with the rows idx of the n

@@ -1167,6 +1167,10 @@ test_that("item locations that are no item set per observation stop", {
   expect_error(rimm(2, mu = mu, dist = rbind(c(0, 1, 2))), "the shape of mu with NA in the same places")
   expect_error(dimm(0, mu = mu, dist = c(0, 1, 2)), "number of items does not match the distances")
   expect_error(rimm(2, mu = c(0, 1), dist = c(0, 1, 2)), "number of items does not match the distances")
+  # a misspelt distance column is NULL: no distances for the items, as in bmm 1.4
+  expect_error(dimm(0, dist = NULL), "number of items does not match the distances")
+  expect_error(rimm(2, dist = NULL), "number of items does not match the distances")
+  expect_error(dimm(0, mu = rbind(c(0, 2), c(1, NA)), dist = NULL), "number of items does not match the distances")
 
   for (f in list(function(mu) dmixture3p(0, mu = mu), function(mu) rmixture3p(2, mu = mu),
                  function(mu) dimm(0, mu = mu, dist = numeric(0)), function(mu) rimm(2, mu = mu, dist = numeric(0)))) {
