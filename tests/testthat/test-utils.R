@@ -62,12 +62,17 @@ test_that("bmm_options works", {
 
 
 test_that("check_rds_file works", {
-  good_files <- list("a.rds", "abc/a.rds", "a", "abc/a", "a.M")
+  # the saved path, not only its extension: a cached fit is found again only
+  # if the same `file` maps to the same path
+  good_files <- c(
+    "a.rds" = "a.rds", "abc/a.rds" = "abc/a.rds", "a" = "a.rds", "abc/a" = "abc/a.rds",
+    "a.M" = "a.M.rds", "a.RDS" = "a.RDS.rds", "cards" = "cards.rds"
+  )
   bad_files <- list(1, mean, c("a", "b"), TRUE, NA_character_, character(0))
 
-  for (f in good_files) {
+  for (f in names(good_files)) {
     expect_silent(res <- check_rds_file(f))
-    expect_equal(tools::file_ext(res), "rds")
+    expect_identical(res, good_files[[f]])
   }
 
   for (f in bad_files) {
