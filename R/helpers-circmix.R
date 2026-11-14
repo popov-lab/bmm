@@ -626,8 +626,9 @@
     # NA-padded like a row of mu, so that row i of a padded dist matrix passed
     # alone reads as observation i's distances
     dist <- dist[seq_len(sum(!is.na(dist)))]
+    stopif(anyNA(dist), "dist has NA before its last distance; NA may only follow the distances.")
     stopif(
-      anyNA(dist) || any(items$set_size != length(dist)),
+      any(items$set_size != length(dist)),
       "The number of items does not match the distances provided from the cued location."
     )
     # filled by column, because byrow = TRUE warns for a mu with zero rows;

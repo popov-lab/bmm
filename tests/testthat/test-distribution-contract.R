@@ -1180,6 +1180,10 @@ test_that("item locations that are no item set per observation stop", {
   expect_error(dimm(0, dist = NULL), "number of items does not match the distances")
   expect_error(rimm(2, dist = NULL), "number of items does not match the distances")
   expect_error(dimm(0, mu = rbind(c(0, 2), c(1, NA)), dist = NULL), "number of items does not match the distances")
+  # NA pads a vector dist only at its end; dropped in the middle, it would
+  # pass c(0, 2) for a set of two items
+  expect_error(dimm(0, mu = c(0, 2), dist = c(0, NA, 2)), "dist has NA before its last distance")
+  expect_error(rimm(2, mu = c(0, 2), dist = c(0, NA, 2)), "dist has NA before its last distance")
 
   for (f in list(function(mu) dmixture3p(0, mu = mu), function(mu) rmixture3p(2, mu = mu),
                  function(mu) dimm(0, mu = mu, dist = numeric(0)), function(mu) rimm(2, mu = mu, dist = numeric(0)))) {
