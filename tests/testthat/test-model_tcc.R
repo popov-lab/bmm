@@ -533,6 +533,7 @@ test_that("model_citation() keeps the Oberauer reference of a Gumbel model and f
 })
 
 test_that("dtcc(noise = 'gumbel') matches the argmax integral of Gumbel signals", {
+  skip_on_cran()
   for (f in list(tcc_test_similarity(360), tcc_similarity("laplace", kappa = 1.7),
                  tcc_similarity("vonmises", kappa = 4))) {
     for (d in c(0.3, 2, 7)) {
@@ -561,6 +562,7 @@ test_that("dtcc(noise = 'gumbel') is the softmax arm of m3() with one category p
 })
 
 test_that("dtcc(noise = 'gumbel') sums to one and rtcc() matches the argmax of Gumbel signals", {
+  skip_on_cran()
   x <- 2 * pi * (-179:180) / 360
   for (d in c(0, 1.3, 12, 60)) {
     expect_equal(sum(dtcc(x, d, tcc_test_similarity(360), noise = "gumbel")), 1, tolerance = 1e-12)
@@ -682,6 +684,7 @@ test_that("log_lik_tcc_gumbel() is dtcc() at each draw, and each cell reads its 
 })
 
 test_that("posterior_predict_tcc_gumbel() and pp_simulate() draw from the Gumbel pmf", {
+  skip_on_cran()
   withr::local_seed(574)
   n <- 20000
   breaks <- c(-1, 0, 1, 2, 5, 10, 20, 90, 180)
