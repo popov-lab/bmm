@@ -177,6 +177,30 @@ test_that("trial-level newdata beyond the fit's categories is refused", {
   )
 })
 
+# Fitting needs noise and signal rows to separate d from the criterion; a
+# prediction estimates nothing, so the signal rows alone are valid newdata
+test_that("newdata with one stimulus predict from the SDT models that need both to fit", {
+  skip_on_cran()
+  refused <- 0
+  for (case_name in names(newdata_cases())) {
+    case <- newdata_cases()[[case_name]]
+    stim <- case$model$other_vars$stimulus
+    if (is.null(stim)) next
+    user <- as.data.frame(case$data)
+    rows <- user[[stim]] == 1
+    expect_error(check_data(case$model, user[rows, , drop = FALSE], case$formula),
+                 "is 1 in every row", info = case_name)
+    refused <- refused + 1
+    fit <- newdata_fit(case_name)
+    expect_equal(
+      brms::standata(fit, newdata = user[rows, , drop = FALSE]),
+      brms::standata(fit, newdata = fit$data[rows, , drop = FALSE]),
+      info = case_name
+    )
+  }
+  expect_gt(refused, 0)
+})
+
 test_that("newdata for mixture2p's capacity versions may hold a larger set size", {
   skip_on_cran()
   fit <- newdata_fit("mixture2p_slot")

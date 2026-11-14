@@ -576,7 +576,8 @@ test_that("latent_sdt reports the response-process parameters as an attribute", 
 })
 
 # Ro, Rn and logmratio enter the category log-probabilities, not the
-# categories, so each version builds its aggregated program from trial rows
+# categories, so each version's trial family reads the same parameters as its
+# aggregated program, with the version's kernel and extra dpars
 test_that("the dpsdt and metad versions build on one row per trial", {
   skip_on_cran()
   trials <- data.frame(
@@ -597,8 +598,17 @@ test_that("the dpsdt and metad versions build on one row per trial", {
     trial_model <- sdt_rating("r", "stimulus", n_ratings = 4, version = version)
     trial_fit <- mock(trials, trial_model)
     cell_fit <- mock(cells, sdt_rating(paste0("r", 1:4), "stimulus", version = version))
-    expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit), info = version)
-    expect_equal(unname(rowsum(brms::standata(trial_fit)$Y, paste(trials$id, trials$stimulus))),
+    trial_code <- brms::stancode(trial_fit)
+    kernel <- switch(version, dpsdt = "sdt_dpsdt_logmu", metad = "sdt_metad_logmu")
+    extras <- switch(version, dpsdt = "Ro[n], Rn[n]", metad = "logmratio[n]")
+    expect_match(trial_code, paste0("target += sdt_rating_trial_", version,
+                                    "_parsimonious_criterion_lpmf(Y[n] | mu[n], d[n], criterion[n], ",
+                                    "spacing[n], sdratio[n], ", extras, ", vint1[n], 4, 1, 1, 1);"),
+                 fixed = TRUE, info = version)
+    expect_match(trial_code, paste0("return ", kernel, "(y, K,"), fixed = TRUE, info = version)
+    expect_match(brms::stancode(cell_fit), "multinomial_logit2_lpmf", fixed = TRUE, info = version)
+    expect_equal(unname(t(vapply(split(brms::standata(trial_fit)$Y, paste(trials$id, trials$stimulus)),
+                                 tabulate, numeric(4), nbins = 4))),
                  unname(as.matrix(cells[paste0("r", 1:4)])), info = version)
     expect_identical(names(trial_model$parameters),
                      names(sdt_rating(paste0("r", 1:4), "stimulus", version = version)$parameters))
