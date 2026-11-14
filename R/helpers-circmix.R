@@ -630,7 +630,9 @@
       anyNA(dist) || any(items$set_size != length(dist)),
       "The number of items does not match the distances provided from the cued location."
     )
-    dist <- matrix(dist, nrow(locations), length(dist), byrow = TRUE)
+    # filled by column, because byrow = TRUE warns for a mu with zero rows;
+    # as.numeric() turns a NULL dist beside zero rows into numeric(0)
+    dist <- matrix(rep(as.numeric(dist), each = nrow(locations)), nrow(locations), length(dist))
   }
   items$dist <- dist
   items

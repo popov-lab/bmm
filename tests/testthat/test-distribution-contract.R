@@ -1138,6 +1138,9 @@ test_that("the circular mixture d*() functions return an empty result for no obs
   expect_identical(dimm(c(0, 1), s = numeric(0)), numeric(0))
   expect_identical(dmixture3p(c(0, 1), mu = matrix(0, 0, 3)), numeric(0))
   expect_identical(dimm(c(0, 1), mu = matrix(0, 0, 3), dist = matrix(0, 0, 3)), numeric(0))
+  # the default dist is a vector, one for every row of mu, also for no rows
+  expect_identical(expect_silent(dimm(c(0, 1), mu = matrix(0, 0, 3))), numeric(0))
+  expect_identical(expect_silent(dimm(0.3, mu = matrix(0, 0, 3), dist = NULL)), numeric(0))
 
   nulls <- list(dmixture2p = c("x", "mu", "kappa", "p_mem", "tau"),
                 dmixture3p = c("x", "kappa", "p_mem", "p_nt", "tau"),
@@ -1156,6 +1159,7 @@ test_that("the circular mixture r*() functions read n as rnorm() does", {
     expect_error(f(c(1, 2, 3)), "n, the number of draws, must be a single number >= 0.", fixed = TRUE)
   }
   expect_identical(expect_silent(rmixture3p(0, mu = rbind(c(0, 1), c(1, NA)))), numeric(0))
+  expect_identical(expect_silent(rimm(0, mu = matrix(0, 0, 3))), numeric(0))
 })
 
 test_that("item locations that are no item set per observation stop", {
