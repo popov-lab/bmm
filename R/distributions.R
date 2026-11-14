@@ -853,9 +853,8 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   the first column, then the row's non-targets, and `NA` past its set size,
 #'   so rows can differ in set size. The rows are recycled to the number of
 #'   observations. The random generation function draws the rows of one set
-#'   size at a time, so with a fixed seed, reordering the rows changes which
-#'   draw each row gets. Before bmm 1.5.0 a matrix was read as one long item
-#'   set.
+#'   size at a time, so with a fixed seed, moving a row can change which draw
+#'   it gets. Before bmm 1.5.0 a matrix was read as one long item set.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`.
@@ -1091,9 +1090,8 @@ rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #'   the first column, then the row's non-targets, and `NA` past its set size,
 #'   so rows can differ in set size. The rows are recycled to the number of
 #'   observations. The random generation function draws the rows of one set
-#'   size at a time, so with a fixed seed, reordering the rows changes which
-#'   draw each row gets. Before bmm 1.5.0 a matrix was read as one long item
-#'   set.
+#'   size at a time, so with a fixed seed, moving a row can change which draw
+#'   it gets. Before bmm 1.5.0 a matrix was read as one long item set.
 #' @param dist Distances of the items to the cued location, in the layout of
 #'   `mu`: a vector for every observation, or a matrix or data frame of the
 #'   shape of `mu` with `NA` in the same places. A vector beside a matrix `mu`

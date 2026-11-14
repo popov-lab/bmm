@@ -28,9 +28,8 @@ data frame holds one item set per observation in each row: the target in
 the first column, then the row's non-targets, and \code{NA} past its set size,
 so rows can differ in set size. The rows are recycled to the number of
 observations. The random generation function draws the rows of one set
-size at a time, so with a fixed seed, reordering the rows changes which
-draw each row gets. Before bmm 1.5.0 a matrix was read as one long item
-set.}
+size at a time, so with a fixed seed, moving a row can change which draw
+it gets. Before bmm 1.5.0 a matrix was read as one long item set.}
 
 \item{kappa}{Vector of precision values. With \code{tau > 0} this is the
 concentration of the average trial, whose Fisher information \code{J(kappa)} is
