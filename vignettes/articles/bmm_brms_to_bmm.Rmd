@@ -211,8 +211,9 @@ parameters on their left-hand side.
 The reason is that a measurement model usually needs more than one column, and
 each column plays a different role. The three-parameter mixture model needs the
 response error, the colors of the items that were not cued, and the set size.
-A yes/no signal detection model needs the number of "old" responses, the number
-of trials, and whether the item was old or new. In `brms`, these roles end up
+A yes/no signal detection model fit to counts needs the number of "old"
+responses, the number of trials, and whether the item was old or new; with one
+row per trial, `n_trials` drops out. In `brms`, these roles end up
 spread over the response, addition terms such as `| trials()`, and predictors
 inside non-linear formulas. In `bmm`, the model object names each column once,
 by its role:
@@ -234,11 +235,10 @@ lists the columns it expects.
 
 # Signal detection as a probit GLMM
 
-Many psychologists already fit signal detection models without calling them
-that. With one row per trial, `resp` coded 1 for an "old" response and
-`stimulus` coded 1 for a studied item and 0 for a new one, a yes/no recognition
-experiment is often analyzed as a generalized linear mixed model (GLMM) with a
-probit link:
+A signal detection model can be fit without calling it that. With one row per
+trial, `resp` coded 1 for an "old" response and `stimulus` coded 1 for a studied
+item and 0 for a new one, a yes/no recognition experiment can be analyzed as a
+generalized linear mixed model (GLMM) with a probit link:
 
 ```r
 brm(
@@ -875,7 +875,8 @@ want to change a model beyond what `bmm` offers, these give you the `brms` code 
   fits the two- and three-parameter mixture models to a larger data set.
 - The [signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
   covers the yes/no, rating, m-AFC and ranking models, with counts or trial
-  rows.
+  rows. The section [Signal detection as a probit GLMM](#signal-detection-as-a-probit-glmm)
+  above is the short version for `sdt_yn()`.
 - [Extracting model information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows how to get the default priors, the Stan code and the Stan data before
   you fit.

@@ -1040,11 +1040,12 @@ For these models the posterior predictive check is the most practical guide to
 that trade-off: a parameterization that leaves systematic, one-sided deviations
 is too rigid, while one whose predicted point-ranges sit on the observed bars (as
 here) is adequate. A *formal* predictive comparison is tempting, but the usual
-`loo()` is **not** appropriate here: each observation is an aggregated count over
+`loo()` is **not** appropriate with counts: each observation is an aggregated count over
 many trials, so leaving one out removes a large, highly influential chunk of data
 and the PSIS-LOO approximation becomes unreliable — it flags most observations
 with a high Pareto-$k$, and (because that reflects heavy-tailed importance weights
-rather than Monte Carlo noise) more posterior draws will not fix it. The
+rather than Monte Carlo noise) more posterior draws will not fix it. With one
+row per trial, `loo()` leaves out single trials, a different prediction. The
 principled alternative for aggregated data is k-fold cross-validation via
 `brms::kfold()`, which refits on held-out folds and avoids importance sampling
 altogether. `"log_distance"` behaves like `"log_ratio"`, and `"softmax"` offers an

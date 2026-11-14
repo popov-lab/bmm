@@ -654,9 +654,10 @@ Because each extension nests the standard model, the most direct evidence is the
 `logmratio` credibly different from zero (M-ratio different from 1)? That,
 together with `pp_check()` and the
 ROC/zROC fit, is the practical guide. A *formal* predictive comparison via
-`loo()` is **not** appropriate for these aggregated-count models — leaving out one
+`loo()` is **not** appropriate for these models fit to counts — leaving out one
 multinomial observation removes a large, influential block of data and the
-PSIS-LOO approximation becomes unreliable. The principled alternative is k-fold
+PSIS-LOO approximation becomes unreliable. With one row per trial, `loo()` leaves
+out single trials instead, a different prediction. The principled alternative is k-fold
 cross-validation with `brms::kfold()`, which refits on held-out folds. As always,
 let theory and parameter invariance across designs — not ROC fit alone — arbitrate
 between accounts that can mimic one another [@MeyerGrant_2026; @Robinson_2023].
