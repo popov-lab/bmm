@@ -115,6 +115,15 @@ test_that("check_data() warns before overwriting its reserved column", {
   expect_identical(out$tcc_cd_dist, c(0L, 180L))
 })
 
+test_that("newdata at a single distance gets its binned distance, without the identification warning", {
+  fit <- tcc_cd_mock_fit()
+  newdata <- data.frame(change = c(0, 1), dist = c(0.3, -0.3))
+  sdata <- NULL
+  expect_no_warning(sdata <- brms::standata(fit, newdata = newdata))
+  # 0.3 rad is 17.2 degrees, the nearest step of the 1-degree similarity is 17
+  expect_identical(as.vector(sdata$vint1), c(17L, 17L))
+})
+
 ############################################################################# !
 # DISTRIBUTION FUNCTIONS                                                 ####
 ############################################################################# !

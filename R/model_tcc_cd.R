@@ -141,9 +141,9 @@
 #' ## Predictions for new data
 #'
 #'   `check_data()` stores the binned distance in a column `tcc_cd_dist`
-#'   (0 to `n / 2`), and brms looks for that column in `newdata`. Data passed
-#'   to `bmm()` get it automatically; `newdata` for `predict()`,
-#'   `posterior_epred()` or `posterior_linpred()` needs it as well, e.g.
+#'   (0 to `n / 2`), which the likelihood reads. `newdata` in the layout given
+#'   to `bmm()`, with the response and distance columns, gets it built again.
+#'   Without the response column, add it yourself, e.g.
 #'   `newdata$tcc_cd_dist <- round(abs(newdata$dist) * 180 / pi)` for a
 #'   1-degree similarity and distances in radians up to pi.
 #'   `posterior_epred()` returns the probability of a "change" response.
@@ -214,6 +214,11 @@ tcc_cd <- function(response, distance, similarity, units = c("radians", "bins"),
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+#' @exportS3Method
+built_data_columns.tcc_cd <- function(model) {
+  c("tcc_cd_dist", NextMethod("built_data_columns"))
+}
+
 #' @export
 check_data.tcc_cd <- function(model, data, formula) {
   resp <- model$resp_vars$response
@@ -239,7 +244,9 @@ check_data.tcc_cd <- function(model, data, formula) {
          "Column 'tcc_cd_dist' in your data is reserved by the TCC change-detection \\
          model and will be overwritten.")
   data$tcc_cd_dist <- abs(.tcc_bin(data[[dist]], .tcc_cd_n_steps(similarity), units))
-  warnif(length(unique(stats::na.omit(similarity[data$tcc_cd_dist + 1]))) == 1,
+  # newdata for predictions estimates nothing, so one similarity is fine there
+  warnif(length(unique(stats::na.omit(similarity[data$tcc_cd_dist + 1]))) == 1 &&
+           !isTRUE(attr(data, "prediction_newdata")),
          "Every probe in the data has the same similarity to its target, so there is \\
          only one similarity, which gives one rate for 'd' and the criterion together. \\
          Neither is identified; add probes at other distances (e.g. at the target \\

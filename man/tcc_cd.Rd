@@ -169,9 +169,9 @@ coefficients are priors on \code{log(d)}.
 \subsection{Predictions for new data}{
 
 \code{check_data()} stores the binned distance in a column \code{tcc_cd_dist}
-(0 to \code{n / 2}), and brms looks for that column in \code{newdata}. Data passed
-to \code{bmm()} get it automatically; \code{newdata} for \code{predict()},
-\code{posterior_epred()} or \code{posterior_linpred()} needs it as well, e.g.
+(0 to \code{n / 2}), which the likelihood reads. \code{newdata} in the layout given
+to \code{bmm()}, with the response and distance columns, gets it built again.
+Without the response column, add it yourself, e.g.
 \code{newdata$tcc_cd_dist <- round(abs(newdata$dist) * 180 / pi)} for a
 1-degree similarity and distances in radians up to pi.
 \code{posterior_epred()} returns the probability of a "change" response.
