@@ -957,9 +957,9 @@ test_that("an unbiased observer is bias fixed at 0", {
 })
 
 # tcc_cd() (#566) reuses this kernel's distribution functions from a chunk of
-# its own; the sdt_yn programs are those of 566-tcc at bc06ef10, before
-# tcc_cd() was added: md5 of the stancode without its brms version line, taken
-# under brms 2.23.0 (other brms versions generate other code)
+# its own; the sdt_yn programs are those of develop without tcc_cd(), after
+# #652 added the elementwise overloads: md5 of the stancode without its brms
+# version line, taken under brms 2.23.0 (other brms versions generate other code)
 test_that("the sdt_yn Stan programs carry none of the tcc_cd kernel", {
   dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
   code <- bmm::stancode(bmf(d ~ 1, bias ~ 1), data = dat, model = sdt_yn("n_old", "stimulus", "n_trials"))
@@ -980,10 +980,10 @@ test_that("the sdt_yn Stan programs stay bit-identical", {
                     n_trials = 50, cond = c("a", "a", "b", "b"), id = c(1, 1, 2, 2))
   model <- sdt_yn("n_old", "stimulus", "n_trials")
   expect_equal(md5_code(bmf(d ~ cond + (1 | id), criterion ~ cond, sdratio ~ 1), model),
-               "02462f41df758b5753ff92e2896dfe64")
-  expect_equal(md5_code(bmf(d ~ cond, bias ~ 1), model), "c84a1adb26ccdf2f69990ddfde5b497c")
+               "61f302c1d010976ed7def3a4a4448f03")
+  expect_equal(md5_code(bmf(d ~ cond, bias ~ 1), model), "2078f9dd4cc393dd029c1a549807725e")
   expect_equal(md5_code(bmf(d ~ 1, criterion ~ cond),
                         sdt_yn("n_old", "stimulus", "n_trials", dist = "gumbel_min"),
                         threads = brms::threading(2)),
-               "90a812214e92e1cd3880b4358e169180")
+               "24041f9210ee7822c8f25edd3d768db5")
 })
