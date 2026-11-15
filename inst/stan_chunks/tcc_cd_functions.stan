@@ -1,4 +1,4 @@
-// Single-probe change detection under TCC; needs sdt_dist_funs.stan.
+// Single-probe change detection under TCC; needs sdt_dist_functions.stan.
 // sdt_yn_lpmf with the probe's similarity to the target, a real strength in
 // [0, 1], in place of its 0/1 stimulus, sdratio = 1 and normal noise: the
 // probe's familiarity is normal(d * similarity, 1), and the observer answers

@@ -294,7 +294,7 @@ configure_model.tcc_cd <- function(model, data, formula) {
 .tcc_cd_stanvars <- function(model) {
   sc_path <- system.file("stan_chunks", package = "bmm")
   stan_funs <- paste(read_lines2(file.path(sc_path, "sdt_dist_functions.stan")),
-                     read_lines2(file.path(sc_path, "tcc_cd_funs.stan")), sep = "\n")
+                     read_lines2(file.path(sc_path, "tcc_cd_functions.stan")), sep = "\n")
   brms::stanvar(scode = stan_funs, block = "functions") +
     brms::stanvar(x = .tcc_similarity(model), name = "tcc_cd_similarity")
 }
