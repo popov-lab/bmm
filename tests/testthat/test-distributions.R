@@ -754,6 +754,22 @@ test_that("a sampler warns once when missing values fall in rows of several set 
   }
 })
 
+# only "NAs produced" is collected across set sizes; any other warning of a
+# set size reaches the caller as it was raised
+test_that("collecting 'NAs produced' across set sizes passes other warnings on", {
+  withr::local_seed(710)
+  draw <- bmm:::.rcircmix
+  local_mocked_bindings(.rcircmix = function(mu, ...) {
+    if (ncol(mu) == 2) warning("another warning", call. = FALSE)
+    draw(mu, ...)
+  })
+  mu <- rbind(c(0, 1, NA), c(0, 1, 2))
+  expect_identical(
+    capture_warnings(rmixture3p(4, mu = mu, kappa = c(5, 5, NA, NA))),
+    c("another warning", "NAs produced")
+  )
+})
+
 test_that("the circular mixture samplers do not warn when every parameter is given", {
   withr::local_seed(710)
   expect_no_warning(rmixture2p(4, kappa = 5, p_mem = 0.8, tau = c(0, 1)))

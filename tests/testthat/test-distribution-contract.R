@@ -1296,6 +1296,11 @@ test_that("the circular mixture r*() functions read n as rnorm() does", {
     expect_error(rmixture3p(c(1, 2, 3), K = 2, version = version),
                  "n, the number of draws, must be a single number >= 0.", fixed = TRUE)
   }
+  # an argument the version ignores does not stop the sampler either
+  expect_warning(r <- rmixture3p(3, p_mem = NULL, version = "slot"), "ignores 'p_mem'")
+  expect_length(r, 3)
+  expect_warning(r <- rmixture3p(3, K = NULL), "ignores 'K'")
+  expect_length(r, 3)
 })
 
 test_that("item locations that are no item set per observation stop", {
