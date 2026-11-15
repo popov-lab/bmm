@@ -6,6 +6,8 @@ model_cases_tcc_cd <- function() {
     change = c(0, 1, 1, 0, 1, 0, 0, 1), dist = c(0, pi, 0.5, -0.5, 2, 0, 1, -pi),
     set_size = rep(c(2, 4), 4), ID = rep(1:2, each = 4)
   )
+  # probes at the target, a quarter turn away and opposite it
+  sim_design <- data.frame(dist = rep(c(0, pi / 2, pi), 20), ID = rep(1:2, 30))
   list(
     stored_frame = list(
       # brms keeps the binned distance only, so the distance column is rebuilt
@@ -26,6 +28,21 @@ model_cases_tcc_cd <- function() {
     ),
     init = list(tcc_cd = list(model = model, data = data,
                               formula = bmf(d ~ 1 + (1 | ID), criterion ~ 1 + (1 | ID)))),
-    links = list(tcc_cd = list(model = model, settable = c("d", "criterion", "bias")))
+    links = list(tcc_cd = list(model = model, settable = c("d", "criterion", "bias"))),
+    simulate = list(
+      tcc_cd = list(
+        model = model, pars = list(d = 0.5, criterion = 0.4), design = sim_design,
+        formula = bmf(d ~ 1, criterion ~ 1), simulate_pars = list(d = 0.5, criterion = 0.4)
+      ),
+      tcc_cd_bias = list(
+        model = model, pars = list(d = 0.5, bias = 0.1), design = sim_design,
+        formula = bmf(d ~ 1, bias ~ 1), simulate_pars = list(d = 0.5, bias = 0.1)
+      ),
+      tcc_cd_bins = list(
+        model = bins, pars = list(d = 0.5, criterion = 0.4),
+        design = data.frame(step = rep(c(0, 5, 90), 20), ID = rep(1:2, 30)),
+        formula = bmf(d ~ 1, criterion ~ 1), simulate_pars = list(d = 0.5, criterion = 0.4)
+      )
+    )
   )
 }

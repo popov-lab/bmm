@@ -320,6 +320,24 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_true(all(bins %in% -5:6))
 })
 
+test_that("simulated change-detection responses of tcc_cd match P(change) at each distance", {
+  skip_on_cran()
+  withr::local_seed(593)
+  # P(change) = pnorm(criterion - d * f) with d = 2, criterion = 0.8 and
+  # f = exp(-(0:6) / 2) on a grid of 12 steps: probes 0, 1 and 6 steps away
+  f <- exp(-(0:6) / 2)
+  expected <- c(0.1150696702, 0.3397808441, 0.7581693054)
+  design <- data.frame(dist = rep(c(0, pi / 6, pi), each = n_sim))
+  y <- simulate_data(tcc_cd("y", "dist", similarity = f), list(d = log(2), criterion = 0.8), design)$y
+  expect_in(y, c(0, 1))
+  for (k in 1:3) expect_within_mc(y[design$dist == unique(design$dist)[k]], expected[k], paste("tcc_cd", k))
+  # in steps, with bias = criterion - d / 2 on the native scale
+  design <- data.frame(step = rep(c(0, 1, 6), each = n_sim))
+  y <- simulate_data(tcc_cd("y", "step", similarity = f, units = "bins"), list(d = 2, bias = -0.2),
+                     design, scale = "native")$y
+  for (k in 1:3) expect_within_mc(y[design$step == c(0, 1, 6)[k]], expected[k], paste("tcc_cd bins", k))
+})
+
 test_that("simulated decisions of the RT models match the closed forms", {
   skip_on_cran()
   withr::local_seed(2)

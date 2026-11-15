@@ -350,6 +350,23 @@ posterior_epred_tcc_cd <- function(prep) {
 }
 
 ############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+#' @export
+simulate_data.tcc_cd <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  vars <- model$other_vars
+  design <- .design_or_n(model, design, vars$distance)
+  sim <- .simulate_pars(model, pars, design, scale)
+  similarity <- .tcc_similarity(model)
+  distance <- design[[vars$distance]]
+  if (vars$units == "bins") distance <- distance * 2 * pi / .tcc_cd_n_steps(similarity)
+  response <- rtcc_cd(nrow(design), distance, sim$native$d, similarity,
+                      criterion = sim$native$criterion, bias = sim$native$bias)
+  .simulate_result(design, stats::setNames(list(response), model$resp_vars$response), sim)
+}
+
+############################################################################# !
 # STORED FRAME                                                           ####
 ############################################################################# !
 
