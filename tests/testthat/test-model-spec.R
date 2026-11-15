@@ -106,6 +106,8 @@ test_that("model_spec() states each model's density and generator", {
                    c(density = "dpsychometric_function", generator = "rpsychometric_function"))
   expect_identical(functions(tcc("y", similarity = tcc_similarity("vonmises", 2))),
                    c(density = "dtcc", generator = "rtcc"))
+  expect_identical(functions(tcc_cd("y", "x", similarity = tcc_similarity("vonmises", 2))),
+                   c(density = "dtcc_cd", generator = "rtcc_cd"))
 })
 
 test_that("model_spec() follows the capacity versions and variable precision", {

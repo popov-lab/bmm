@@ -57,7 +57,8 @@
       # d is tcc()'s memory strength and the criterion is sdt_yn()'s, so each
       # takes the default priors of the model it comes from
       default_priors = c(tcc_model$default_priors, sdt_model$default_priors[c("criterion", "bias")]),
-      init_ranges = c(tcc_model$init_ranges, sdt_model$init_ranges[c("criterion", "bias")])
+      init_ranges = c(tcc_model$init_ranges, sdt_model$init_ranges[c("criterion", "bias")]),
+      functions = list(density = "dtcc_cd", generator = "rtcc_cd")
     ),
     class = c("bmmodel", "tcc_cd"),
     call = call
