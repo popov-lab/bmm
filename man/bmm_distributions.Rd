@@ -79,7 +79,11 @@ parameters include an \code{NA} or \code{NaN}, and warn "NAs produced" once per 
 as \code{\link[stats:rnorm]{stats::rnorm()}} does. The other draws follow the parameters as usual,
 though a seed need not give them the values it gives when no parameter is
 missing. \code{\link[=dmixture2p]{dmixture2p()}}, \code{\link[=dmixture3p]{dmixture3p()}} and \code{\link[=dimm]{dimm()}} return \code{NA} for such
-an observation.
+an observation. An \code{NA} in the item locations \code{mu} or the distances \code{dist}
+of \code{\link[=dmixture3p]{dmixture3p()}}, \code{\link[=dimm]{dimm()}} and their \verb{r*()} functions is padding past a
+row's set size, not a missing value: it shortens that row's item set (see
+"Vector arguments"), and an \code{NA} in the target column or before a row's
+last location stops.
 }
 
 \keyword{distribution}

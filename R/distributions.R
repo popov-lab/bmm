@@ -70,7 +70,11 @@
 #' as [stats::rnorm()] does. The other draws follow the parameters as usual,
 #' though a seed need not give them the values it gives when no parameter is
 #' missing. [dmixture2p()], [dmixture3p()] and [dimm()] return `NA` for such
-#' an observation.
+#' an observation. An `NA` in the item locations `mu` or the distances `dist`
+#' of [dmixture3p()], [dimm()] and their `r*()` functions is padding past a
+#' row's set size, not a missing value: it shortens that row's item set (see
+#' "Vector arguments"), and an `NA` in the target column or before a row's
+#' last location stops.
 #'
 #' @name bmm_distributions
 #' @keywords distribution
@@ -912,8 +916,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision. See [mixture3p()].
 #' @param K Vector of memory capacities. Used by the `"slot"` and
-#'   `"slot_averaging"` versions, which read the set size as the number of
-#'   locations in `mu`; `"simple"` ignores `K` and warns if it is given.
+#'   `"slot_averaging"` versions, which read each observation's set size as
+#'   the number of locations in its item set in `mu` (the row's locations
+#'   before the `NA` padding); `"simple"` ignores `K` and warns if it is given.
 #' @param ptarget Vector of probabilities that a response from memory reports
 #'   the target rather than a non-target. Used by the `"slot"` and
 #'   `"slot_averaging"` versions; `"simple"` ignores it and warns if it is

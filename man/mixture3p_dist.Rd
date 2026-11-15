@@ -70,8 +70,9 @@ Fisher information \code{J} of a memory representation is drawn from
 precision. See \code{\link[=mixture3p]{mixture3p()}}.}
 
 \item{K}{Vector of memory capacities. Used by the \code{"slot"} and
-\code{"slot_averaging"} versions, which read the set size as the number of
-locations in \code{mu}; \code{"simple"} ignores \code{K} and warns if it is given.}
+\code{"slot_averaging"} versions, which read each observation's set size as
+the number of locations in its item set in \code{mu} (the row's locations
+before the \code{NA} padding); \code{"simple"} ignores \code{K} and warns if it is given.}
 
 \item{ptarget}{Vector of probabilities that a response from memory reports
 the target rather than a non-target. Used by the \code{"slot"} and
