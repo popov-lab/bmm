@@ -42,11 +42,11 @@ the first column, then the row's non-targets, and \code{NA} past its set size,
 so rows can differ in set size. The rows are recycled to the number of
 observations. The random generation function draws the rows of one set
 size at a time, so with a fixed seed, moving a row can change which draw
-it gets. Before bmm 1.5.0 a matrix was read as one long item set. Each
-row's number of locations (a vector's length) is the set size the
-\code{"slot"} and \code{"slot_averaging"} versions use, so pass the target and
-every non-target of the trial: for a trial of a fitted model, the target
-followed by the first \code{set_size - 1} columns of \code{nt_features}.}
+it gets. Before bmm 1.5.0 a matrix was read as one long item set. The
+number of locations of a row, or of a vector, before any \code{NA} padding is
+the set size the \code{"slot"} and \code{"slot_averaging"} versions use, so pass the
+target and every non-target of the trial: for a trial of a fitted model,
+the target followed by the first \code{set_size - 1} columns of \code{nt_features}.}
 
 \item{kappa}{Vector of precision values. With \code{tau > 0} this is the
 concentration of the average trial, whose Fisher information \code{J(kappa)} is

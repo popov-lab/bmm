@@ -893,11 +893,11 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   so rows can differ in set size. The rows are recycled to the number of
 #'   observations. The random generation function draws the rows of one set
 #'   size at a time, so with a fixed seed, moving a row can change which draw
-#'   it gets. Before bmm 1.5.0 a matrix was read as one long item set. Each
-#'   row's number of locations (a vector's length) is the set size the
-#'   `"slot"` and `"slot_averaging"` versions use, so pass the target and
-#'   every non-target of the trial: for a trial of a fitted model, the target
-#'   followed by the first `set_size - 1` columns of `nt_features`.
+#'   it gets. Before bmm 1.5.0 a matrix was read as one long item set. The
+#'   number of locations of a row, or of a vector, before any `NA` padding is
+#'   the set size the `"slot"` and `"slot_averaging"` versions use, so pass the
+#'   target and every non-target of the trial: for a trial of a fitted model,
+#'   the target followed by the first `set_size - 1` columns of `nt_features`.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
 #'   the mean of `J`. Under `"slot_averaging"` it is the precision of an item
