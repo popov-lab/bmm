@@ -233,7 +233,7 @@ tcc_cd_prep <- function(dpars, change, dist, similarity = tcc_cd_test_similarity
   epred_prep(dpars, list(Y = change, vint1 = dist, tcc_cd_similarity = similarity))
 }
 
-test_that("log_lik_tcc_cd() is dtcc_cd() at each draw, with criterion or bias", {
+test_that("the pointwise log-likelihood is dtcc_cd() at each draw, with criterion or bias", {
   d <- matrix(c(0.5, 2, 4.5), 3, 4)
   crit <- matrix(c(-0.2, 0.7, 1.9), 3, 4)
   change <- c(1L, 0L, 1L, 0L)
@@ -249,7 +249,7 @@ test_that("log_lik_tcc_cd() is dtcc_cd() at each draw, with criterion or bias", 
   }
 })
 
-test_that("posterior_predict_tcc_cd() answers 'change' with the model's probability", {
+test_that("posterior predictions answer 'change' with the model's probability", {
   withr::local_seed(566)
   n_draws <- 40000
   prep <- tcc_cd_prep(list(d = matrix(2, n_draws, 2), criterion = matrix(0.9, n_draws, 2)),
@@ -262,7 +262,7 @@ test_that("posterior_predict_tcc_cd() answers 'change' with the model's probabil
   }
 })
 
-test_that("posterior_epred_tcc_cd() is the probability of 'change', observation by observation", {
+test_that("the expected response is the probability of 'change', observation by observation", {
   d <- matrix(c(0.5, 2, 4.5, 1, 3, 0.2), 2, 3)
   crit <- matrix(c(-0.2, 0.7, 1.9, 0.1, 2, 0), 2, 3)
   dist <- c(0L, 15L, 180L)
