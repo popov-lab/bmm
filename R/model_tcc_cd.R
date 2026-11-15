@@ -196,13 +196,13 @@ tcc_cd <- function(response, distance, similarity, units = c("radians", "bins"),
   .check_constructor_dots(list(...))
   stop_missing_args()
   units <- match.arg(units)
-  .tcc_cd_check_similarity(similarity)
+  .check_tcc_cd_args(similarity)
   .model_tcc_cd(response = response, distance = distance, similarity = similarity,
                 units = units, links = links, call = call, ...)
 }
 
 # the vector tcc() takes, read without n_options: its length sets the grid
-.tcc_cd_check_similarity <- function(similarity) {
+.check_tcc_cd_args <- function(similarity) {
   stopif(length(similarity) < 3,
          "`similarity` must hold at least 3 values, one for each distance from 0 to n / 2 steps.")
   .check_tcc_args(similarity, .tcc_cd_n_steps(similarity))

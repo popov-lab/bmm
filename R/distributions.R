@@ -1,7 +1,7 @@
 #' @title Vector arguments of the distribution functions
 #'
 #' @description The density (`d*()`) and random generation (`r*()`) functions
-#'   of the sdm, ddm, ezdm and tcc models, of the signal detection models
+#'   of the sdm, ddm, ezdm and tcc models and of [tcc_cd()], of the signal detection models
 #'   (`sdt_yn`, `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`,
 #'   `sdt_ranking` and `sdt_cdp`) and of the psychometric function take their
 #'   per-observation arguments as vectors, or as matrices with one row per
@@ -5177,6 +5177,8 @@ rtcc <- function(n, d, similarity, n_options = 360) {
 #'
 #' @name tcc_cd_dist
 #'
+#' @inheritSection bmm_distributions Vector arguments
+#'
 #' @param x Vector of responses, coded 0 = "same" and 1 = "change"; a missing
 #'   response gives `NA`.
 #' @param n Number of observations to generate.
@@ -5193,8 +5195,9 @@ rtcc <- function(n, d, similarity, n_options = 360) {
 #'   `d`, so that `criterion = bias + d / 2`. Give this or `criterion`.
 #' @param log Logical; if `TRUE`, the log probability is returned.
 #'
-#' @details `distance`, `d`, `criterion` and `bias` are recycled. All
-#'   parameters are on their natural scale: `d` is not on the log scale that
+#' @details `x`, `distance`, `d`, `criterion` and `bias` take one value per
+#'   observation (see "Vector arguments"). All parameters are on their natural
+#'   scale: `d` is not on the log scale that
 #'   [tcc_cd()] estimates it on.
 #'
 #' @return `dtcc_cd()` returns the probability of each response. `rtcc_cd()`
@@ -5215,19 +5218,29 @@ rtcc <- function(n, d, similarity, n_options = 360) {
 #' mean(rtcc_cd(1000, pi / 2, d = 2, similarity = f, criterion = 1))
 #' @export
 dtcc_cd <- function(x, distance, d, similarity, criterion = NULL, bias = NULL, log = FALSE) {
-  .tcc_cd_check_similarity(similarity)
+  .check_tcc_cd_args(similarity)
   stopif(any(!x %in% c(0, 1, NA)), "x must be coded 0 = 'same' and 1 = 'change'.")
+  n <- .obs_length(x, distance, d, optional = list(criterion, bias))
+  if (n == 0L) return(numeric(0))
+  d <- rep_len(d, n)
+  if (!is.null(criterion)) criterion <- rep_len(criterion, n)
+  if (!is.null(bias)) bias <- rep_len(bias, n)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, 1)
-  out <- .tcc_cd_log_p(x, .tcc_cd_strength(distance, similarity), d, criterion)
+  out <- .tcc_cd_log_p(rep_len(x, n), .tcc_cd_strength(rep_len(distance, n), similarity), d, criterion)
   if (log) out else exp(out)
 }
 
 #' @rdname tcc_cd_dist
 #' @export
 rtcc_cd <- function(n, distance, d, similarity, criterion = NULL, bias = NULL) {
-  stopif(length(n) != 1 || !isTRUE(n >= 1), "n must be a single positive integer.")
-  .tcc_cd_check_similarity(similarity)
+  .check_tcc_cd_args(similarity)
+  n <- .n_draws(n)
+  # an empty or NULL argument gives NA draws, as an empty mean does in rnorm()
+  recycle <- function(x) rep_len(if (length(x)) x else NA_real_, n)
+  d <- recycle(d)
+  if (!is.null(criterion)) criterion <- recycle(criterion)
+  if (!is.null(bias)) bias <- recycle(bias)
   criterion <- .sdt_resolve_criterion(criterion, bias, d, 1)
-  p_change <- exp(.tcc_cd_log_p(1, .tcc_cd_strength(distance, similarity), d, criterion))
-  stats::rbinom(n, 1, rep_len(p_change, n))
+  strength <- .tcc_cd_strength(recycle(distance), similarity)
+  stats::rbinom(n, 1, exp(.tcc_cd_log_p(1, strength, d, criterion)))
 }

@@ -5,7 +5,7 @@
 # interleaves parameter groups and compares each group with a reference
 # outside the function's own code (a closed form, quadrature, or the single-
 # trial density of the matching d*()). Every per-observation argument of the
-# sdm, ddm, ezdm, SDT, psychometric and tcc d*() and r*() functions is varied in at least one
+# sdm, ddm, ezdm, SDT, psychometric, tcc and tcc_cd d*() and r*() functions is varied in at least one
 # test with a vector (matrix) whose recycled form reads differently reversed:
 # a mutant that reverses any one of them after recycling (the rezdm() ones
 # once per version) fails a test in this file or in test-distributions.R.
@@ -1100,6 +1100,42 @@ test_that("rtcc() draws each observation from its own memory strength", {
   expect_identical(is.na(x), rep_len(c(TRUE, FALSE, FALSE, FALSE), 7))
 })
 
+test_that("dtcc_cd() recycles the responses, distances and parameters to the longest argument", {
+  f <- tcc_similarity("vonmises", 2)
+  expect_elementwise(dtcc_cd, list(x = c(1, 1, 0, 1), distance = c(0, 0.3, 2), d = c(0.5, 3),
+                                   criterion = c(0.4, -0.2, 1)),
+                     fixed = list(similarity = f))
+  expect_elementwise(dtcc_cd, list(x = c(0, 1, 1), distance = c(0, 0.3, 2, pi, 1), d = c(0.5, 3, 1.5),
+                                   bias = c(0.4, -0.2, 1, 0)),
+                     fixed = list(similarity = f, log = TRUE))
+})
+
+test_that("rtcc_cd() draws each observation from its own distance, strength and criterion", {
+  withr::local_seed(4447)
+  f <- tcc_similarity("vonmises", 2)
+  dist <- c(0, 0.4, 2)
+  d <- c(0.5, 3, 1.5)
+  crit <- c(0.8, 1.2, 0.3)
+  n <- 6000
+  g <- group_of(n, 3)
+  x <- rtcc_cd(n, dist, d, f, criterion = crit)
+  expect_length(x, n)
+  for (k in 1:3) {
+    # P('change') = Phi(criterion - d * f) at the probe's similarity
+    ref <- pnorm(crit[k] - d[k] * f[round(dist[k] * 180 / pi) + 1])
+    expect_mean_near(x[g == k], ref, se_prop(ref, sum(g == k)))
+  }
+  # certain outcomes, n = 7 and lengths 3, 2, 4: 'change' exactly where the
+  # criterion lies 20 or more above the familiarity d * f; reversing any one
+  # argument after recycling, or swapping the two values of d, moves a draw
+  x <- NULL
+  expect_no_warning(x <- rtcc_cd(7, c(0, 0, pi), c(0, 40), f, criterion = c(20, 20, -20, -20)))
+  expect_identical(x, c(1L, 0L, 0L, 0L, 1L, 1L, 0L))
+  expect_identical(rtcc_cd(0, 0, 1, f, criterion = 0), integer(0))
+  expect_length(rtcc_cd(2.7, 0, 1, f, criterion = 0), 2)
+  expect_error(rtcc_cd(c(3, 4), 0, 1, f, criterion = 0), "single number >= 0")
+})
+
 # --- empty observations ---------------------------------------------------------
 
 test_that("the d*() functions return an empty result for no observations", {
@@ -1119,6 +1155,8 @@ test_that("the d*() functions return an empty result for no observations", {
                             rcrit = 0.5, n_new = 3), numeric(0))
   expect_identical(dpsychometric_function(numeric(0), 1, midpoint = 1:2, width = 1), numeric(0))
   expect_identical(dtcc(numeric(0), d = 1:2, similarity = tcc_similarity("vonmises", 2)), numeric(0))
+  expect_identical(dtcc_cd(numeric(0), 0, d = 1:2, similarity = tcc_similarity("vonmises", 2), criterion = 0),
+                   numeric(0))
 })
 
 test_that("a NULL per-observation argument is empty, as a misspelt data column", {
@@ -1158,14 +1196,17 @@ test_that("a NULL per-observation argument is empty, as a misspelt data column",
     dpsychometric = case(dpsychometric_function, list(x = 5, intensity = 1, midpoint = 1, width = 1, guess = 0.1,
                                                       lapse = 0.05, n_trials = 10),
                          c("x", "intensity", "midpoint", "width", "guess", "lapse", "n_trials")),
-    dtcc = case(dtcc, list(x = 0.3, d = 1, similarity = tcc_similarity("vonmises", 2)), c("x", "d"))
+    dtcc = case(dtcc, list(x = 0.3, d = 1, similarity = tcc_similarity("vonmises", 2)), c("x", "d")),
+    dtcc_cd = case(dtcc_cd, list(x = 1, distance = 0.3, d = 1, similarity = tcc_similarity("vonmises", 2),
+                                 criterion = 0.5),
+                   c("x", "distance", "d"))
   )
   out <- list()
   for (nm in names(cases)) {
     cs <- cases[[nm]]
     for (a in cs$args) out[[paste(nm, a)]] <- do.call(cs$f, replace(cs$base, a, list(NULL)))
   }
-  expect_identical(out, setNames(rep(list(numeric(0)), 64), names(out)))
+  expect_identical(out, setNames(rep(list(numeric(0)), 67), names(out)))
 })
 
 test_that("NULL in an optional argument means it is not given", {

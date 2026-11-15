@@ -189,7 +189,6 @@ test_that("dtcc_cd() and rtcc_cd() recycle their arguments and refuse what they 
   expect_error(dtcc_cd(1, 0, 1, f, criterion = 0, bias = 0), "exactly one of 'criterion'")
   expect_error(rtcc_cd(5, 0, 1, f), "exactly one of 'criterion'")
   expect_error(dtcc_cd(1, 0, 1, f[-1], criterion = 0), "1 at distance 0")
-  expect_error(rtcc_cd(0, 0, 1, f, criterion = 0), "single positive integer")
 })
 
 ############################################################################# !
