@@ -192,6 +192,7 @@
 tcc_cd <- function(response, distance, similarity, units = c("radians", "bins"),
                    links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   units <- match.arg(units)
   .tcc_cd_check_similarity(similarity)
