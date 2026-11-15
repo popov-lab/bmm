@@ -709,11 +709,23 @@
   dist <- if (!is.null(items$dist)) .recycle_obs(items$dist, n)
   set_size <- rep_len(items$set_size, n)
   out <- numeric(n)
-  for (k in unique(set_size)) {
-    idx <- which(set_size == k)
-    cols <- seq_len(k)
-    out[idx] <- fun(idx, locations[idx, cols, drop = FALSE], dist[idx, cols, drop = FALSE])
-  }
+  # each set size samples on its own, but a sampler warns "NAs produced" once
+  # per call, as rnorm() does (#710), however many set sizes hold a missing value
+  nas_produced <- FALSE
+  withCallingHandlers(
+    for (k in unique(set_size)) {
+      idx <- which(set_size == k)
+      cols <- seq_len(k)
+      out[idx] <- fun(idx, locations[idx, cols, drop = FALSE], dist[idx, cols, drop = FALSE])
+    },
+    warning = function(w) {
+      if (identical(conditionMessage(w), "NAs produced")) {
+        nas_produced <<- TRUE
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  warnif(nas_produced, "NAs produced")
   out
 }
 
