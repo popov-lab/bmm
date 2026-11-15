@@ -49,8 +49,8 @@ memory strength of \code{\link[=tcc]{tcc()}}; the criterion is that of \code{\li
 }
 \details{
 \itemize{
-\item \strong{Domain:} Visual working memory (change detection)
-\item \strong{Task:} Change detection
+\item \strong{Domain:} Working memory
+\item \strong{Task:} Detection, recognition and confidence judgments
 \item \strong{Name:} Target Confusability Competition (TCC) model for single-probe change detection
 \item \strong{Citation:}
 \itemize{

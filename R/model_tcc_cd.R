@@ -10,8 +10,8 @@
     list(
       resp_vars = nlist(response),
       other_vars = nlist(distance, similarity, units),
-      domain = "Visual working memory (change detection)",
-      task = "Change detection",
+      domain = "Working memory",
+      task = "Detection, recognition and confidence judgments",
       name = "Target Confusability Competition (TCC) model for single-probe change detection",
       citation = c(
         tcc_model$citation,
