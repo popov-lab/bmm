@@ -1176,6 +1176,61 @@ test_that("each row's set size sets the non-target share of rmixture3p() and rim
   expect_mean_near(near(y[g == 2], 0), 1 / 3, se_prop(1 / 3, n / 2))
 })
 
+test_that("the capacity versions of dmixture3p() read each row's set size", {
+  # set sizes 4, 2, 1 and 3, recycled to the 6 values of x; K / set_size runs
+  # from 0.375 to 6.4, so rows sit below, at and above capacity
+  x <- c(-2.5, -1, 0.3, 1.1, 2, 2.9)
+  mu <- rbind(c(0.4, 2, -1.5, 1), c(-1, 1.2, NA, NA), c(2.5, NA, NA, NA), c(0.1, -0.7, 2.2, NA))
+  for (version in c("slot", "slot_averaging")) {
+    expect_elementwise(dmixture3p, list(x = x, mu = mu, K = c(1.5, 3, 6.4), ptarget = c(0.7, 0.95),
+                                        kappa = c(4, 10)), list(version = version))
+    # K longer than x and the rows
+    expect_elementwise(dmixture3p, list(x = 0.3, mu = mu[c(1, 4), ], K = c(1, 2.5, 4, 0.6)),
+                       list(ptarget = 0.8, version = version))
+    # one set size goes the way of a vector mu, draws included
+    expect_identical(dmixture3p(x, mu = rbind(c(0, 2, -1.5)), K = 2, version = version),
+                     dmixture3p(x, mu = c(0, 2, -1.5), K = 2, version = version))
+    expect_identical(withr::with_seed(1, rmixture3p(5, mu = rbind(c(0, 2, -1.5)), K = 2, version = version)),
+                     withr::with_seed(1, rmixture3p(5, mu = c(0, 2, -1.5), K = 2, version = version)))
+  }
+})
+
+test_that("the capacity versions of dmixture3p() read each row's set size under variable precision", {
+  # tau > 0 builds the kappa table, about 1 s once per process
+  skip_on_cran()
+  x <- c(-2.5, -1, 0.3, 1.1, 2, 2.9)
+  mu <- rbind(c(0.4, 2, -1.5, 1), c(-1, 1.2, NA, NA), c(2.5, NA, NA, NA), c(0.1, -0.7, 2.2, NA))
+  for (version in c("slot", "slot_averaging")) {
+    expect_elementwise(dmixture3p, list(x = x, mu = mu, K = c(1.5, 3, 6.4), tau = c(0, 0.6, 1.1)),
+                       list(ptarget = 0.8, kappa = 8, version = version))
+  }
+})
+
+test_that("the capacity versions of rmixture3p() draw from each row's items and set size", {
+  withr::local_seed(711)
+  # every item held and every response from memory on the target
+  n <- 400
+  targets <- c(-2, 0.5, 2.5, 1)
+  mu <- cbind(targets, c(1, -1, 0, -2), c(NA, 2, NA, 3), c(NA, NA, NA, -0.5))
+  g <- group_of(n, 4)
+  for (version in c("slot", "slot_averaging")) {
+    y <- rmixture3p(n, mu = mu, kappa = 200, K = 10, ptarget = 1, version = version)
+    expect_true(all(abs(wrap_angle(y - targets[g])) < 0.5), info = version)
+  }
+  # K = 2 holds every item of a set size 2 row and half of those of a set
+  # size 4 row; a draw from memory lands on the target, a guess anywhere
+  n <- 10000
+  mu <- rbind(c(0, 2, NA, NA), c(0, 2, -2, 1))
+  g <- group_of(n, 2)
+  near <- function(y) abs(wrap_angle(y)) < 0.3
+  guess_near <- 0.6 / (2 * pi)
+  for (version in c("slot", "slot_averaging")) {
+    y <- rmixture3p(n, mu = mu, kappa = 500, K = 2, ptarget = 1, version = version)
+    expect_mean_near(near(y[g == 1]), 1, se_prop(0.5, n / 2))
+    expect_mean_near(near(y[g == 2]), 0.5 + 0.5 * guess_near, se_prop(0.5, n / 2))
+  }
+})
+
 test_that("a matrix of item locations with one row per draw scales to many draws", {
   # read as one long item set, as before bmm 1.5.0, 1e5 rows of 4 items asked
   # R for a matrix of 4e10 locations
@@ -1207,6 +1262,22 @@ test_that("the circular mixture d*() functions return an empty result for no obs
     for (a in nulls[[f]]) out[[paste(f, a)]] <- do.call(f, replace(list(x = 0.3), a, list(NULL)))
   }
   expect_identical(out, setNames(rep(list(numeric(0)), 17), names(out)))
+
+  # the capacity versions count K and ptarget instead of p_mem and p_nt
+  for (version in c("slot", "slot_averaging")) {
+    for (a in c("K", "ptarget")) {
+      for (empty in list(numeric(0), NULL)) {
+        args <- c(list(x = c(0, 1), version = version), stats::setNames(list(empty), a))
+        expect_identical(do.call(dmixture3p, args), numeric(0), info = paste(version, a))
+      }
+    }
+    expect_identical(dmixture3p(c(0, 1), mu = matrix(0, 0, 3), K = 2, version = version), numeric(0))
+  }
+  # an argument the version ignores does not empty the result
+  expect_warning(d <- dmixture3p(c(0, 1), K = NULL), "ignores 'K'")
+  expect_identical(d, dmixture3p(c(0, 1)))
+  expect_warning(d <- dmixture3p(c(0, 1), p_nt = numeric(0), version = "slot"), "ignores 'p_nt'")
+  expect_identical(d, dmixture3p(c(0, 1), version = "slot"))
 })
 
 test_that("the circular mixture r*() functions read n as rnorm() does", {
@@ -1217,6 +1288,14 @@ test_that("the circular mixture r*() functions read n as rnorm() does", {
   }
   expect_identical(expect_silent(rmixture3p(0, mu = rbind(c(0, 1), c(1, NA)))), numeric(0))
   expect_identical(expect_silent(rimm(0, mu = matrix(0, 0, 3))), numeric(0))
+  for (version in c("slot", "slot_averaging")) {
+    expect_identical(expect_silent(rmixture3p(0, K = 2, version = version)), numeric(0))
+    expect_identical(expect_silent(rmixture3p(0, mu = rbind(c(0, 1), c(1, NA)), K = 2, version = version)),
+                     numeric(0))
+    expect_length(rmixture3p(2.7, K = 2, version = version), 2)
+    expect_error(rmixture3p(c(1, 2, 3), K = 2, version = version),
+                 "n, the number of draws, must be a single number >= 0.", fixed = TRUE)
+  }
 })
 
 test_that("item locations that are no item set per observation stop", {

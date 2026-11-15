@@ -718,6 +718,42 @@ test_that("the circular mixture samplers draw NA where a parameter is NA, with o
   expect_identical(is.na(y), is.na(dmixture2p(0, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1, 0, 1, 0, 1))))
 })
 
+# K and ptarget of the capacity versions follow the rule of the other
+# parameters (#711, #710)
+test_that("an NA K or ptarget gives NA in the capacity versions of dmixture3p() and rmixture3p()", {
+  withr::local_seed(711)
+  mu <- rbind(c(0, 2, NA), c(0, 2, -1.5))
+  for (version in c("slot", "slot_averaging")) {
+    for (args in list(list(K = c(3, NA, 3, 3)), list(ptarget = c(0.8, NA, 0.8, 0.8)))) {
+      y <- NULL
+      expect_identical(
+        capture_warnings(y <- do.call(rmixture3p, c(list(4, mu = mu, version = version), args))),
+        "NAs produced"
+      )
+      expect_identical(is.na(y), c(FALSE, TRUE, FALSE, FALSE))
+      d <- expect_silent(do.call(dmixture3p, c(list(c(0.1, 0.2, 0.3, 0.4), mu = mu, version = version), args)))
+      expect_identical(is.na(d), c(FALSE, TRUE, FALSE, FALSE))
+    }
+  }
+})
+
+# the rows of one set size draw together, so a missing value in rows of two
+# set sizes reached the warning twice
+test_that("a sampler warns once when missing values fall in rows of several set sizes", {
+  withr::local_seed(710)
+  mu <- rbind(c(0, 1, NA), c(0, 1, 2))
+  calls <- alist(
+    simple = rmixture3p(4, mu = mu, kappa = c(NA, NA, 5, 5)),
+    slot = rmixture3p(4, mu = mu, K = c(NA, NA, 2, 2), version = "slot"),
+    slot_averaging = rmixture3p(4, mu = mu, ptarget = c(NA, NA, 0.8, 0.8), version = "slot_averaging"),
+    imm = rimm(4, mu = mu, dist = rbind(c(0, 1, NA), c(0, 1, 2)), c = c(NA, NA, 1, 1))
+  )
+  for (name in names(calls)) {
+    expect_identical(capture_warnings(y <- eval(calls[[name]])), "NAs produced", info = name)
+    expect_identical(is.na(y), c(TRUE, TRUE, FALSE, FALSE), info = name)
+  }
+})
+
 test_that("the circular mixture samplers do not warn when every parameter is given", {
   withr::local_seed(710)
   expect_no_warning(rmixture2p(4, kappa = 5, p_mem = 0.8, tau = c(0, 1)))
