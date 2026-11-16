@@ -157,6 +157,12 @@
 #'   at the target and probes far from it. `bmm()` warns when the whole data
 #'   set has only one.
 #'
+#'   A criterion that varies with the distance absorbs `d` in the same way,
+#'   so `bmm()` refuses the distance variable in the formula for `criterion`
+#'   or `bias`. A recoded copy of the distance under another name, such as a
+#'   factor column of the distance levels, is not caught and has the same
+#'   effect.
+#'
 #' @param response The name of the variable in the data holding the response,
 #'   coded 0 = "same" and 1 = "change". A logical variable is accepted, with
 #'   `TRUE` = "change".
@@ -255,6 +261,23 @@ check_data.tcc_cd <- function(model, data, formula) {
          and far from it).")
   data[[resp]] <- as.integer(data[[resp]])
   NextMethod("check_data")
+}
+
+# With one criterion per distance level, c_k = qnorm(p_k) + d * f_k fits every
+# d equally well, as a stimulus term does in sdt_yn()
+#' @export
+check_formula.tcc_cd <- function(model, data, formula) {
+  dist <- model$other_vars$distance
+  criterion_vars <- rhs_vars(formula, collapse = FALSE)[intersect(names(formula), c("criterion", "bias"))]
+  uses_dist <- vapply(criterion_vars, function(x) dist %in% x, logical(1))
+  stopif(
+    any(uses_dist),
+    "The formula for {collapse_comma(names(uses_dist)[uses_dist])} uses the \\
+    distance variable '{dist}'. The likelihood already reads each probe's \\
+    similarity from '{dist}', so a criterion that varies with it absorbs 'd', \\
+    and 'd' is not identified. Drop '{dist}' from that formula."
+  )
+  NextMethod("check_formula")
 }
 
 ############################################################################# !

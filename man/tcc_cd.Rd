@@ -184,6 +184,12 @@ parameters, so \code{d} and the criterion trade off. Every cell in which both
 are estimated needs probes of at least two similarities, such as probes
 at the target and probes far from it. \code{bmm()} warns when the whole data
 set has only one.
+
+A criterion that varies with the distance absorbs \code{d} in the same way,
+so \code{bmm()} refuses the distance variable in the formula for \code{criterion}
+or \code{bias}. A recoded copy of the distance under another name, such as a
+factor column of the distance levels, is not caught and has the same
+effect.
 }
 }
 \examples{

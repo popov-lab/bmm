@@ -217,6 +217,18 @@ test_that("a formula with bias selects the bias family, and one with both is ref
                "gives both 'criterion', 'bias'")
 })
 
+test_that("a criterion or bias that varies with the probe distance is refused", {
+  model <- tcc_cd_test_model()
+  dat <- data.frame(change = c(0, 1), dist = c(0, pi), cond = c("a", "b"))
+  expect_error(check_formula(model, dat, bmf(d ~ 1, criterion ~ dist)),
+               "formula for 'criterion' uses the distance variable 'dist'")
+  expect_error(check_formula(model, dat, bmf(d ~ 1, criterion ~ 0 + cond:dist)),
+               "formula for 'criterion' uses the distance variable 'dist'")
+  expect_error(check_formula(model, dat, bmf(d ~ 1, bias ~ 1 + (1 | dist))),
+               "formula for 'bias' uses the distance variable 'dist'")
+  expect_no_error(check_formula(model, dat, bmf(d ~ cond, criterion ~ cond)))
+})
+
 test_that("threading passes the similarity to the sliced likelihood as data", {
   code <- brms::stancode(tcc_cd_mock_fit(threads = brms::threading(2)))
   expect_match(code, "reduce_sum(partial_log_lik_lpmf", fixed = TRUE)
