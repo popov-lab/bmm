@@ -158,10 +158,12 @@
 #'   set has only one.
 #'
 #'   A criterion that varies with the distance absorbs `d` in the same way,
-#'   so `bmm()` refuses the distance variable in the formula for `criterion`
-#'   or `bias`. A recoded copy of the distance under another name, such as a
-#'   factor column of the distance levels, is not caught and has the same
-#'   effect.
+#'   and a `d` that varies with it is no longer one memory strength (at a
+#'   distance with no similarity it is not estimated at all). `bmm()` therefore
+#'   refuses the distance variable in every formula, including those of
+#'   non-linear sub-parameters. A recoded copy of the distance under another
+#'   name, such as a factor column of the distance levels, is not caught and
+#'   has the same effect.
 #'
 #' @param response The name of the variable in the data holding the response,
 #'   coded 0 = "same" and 1 = "change". A logical variable is accepted, with
@@ -264,18 +266,20 @@ check_data.tcc_cd <- function(model, data, formula) {
 }
 
 # With one criterion per distance level, c_k = qnorm(p_k) + d * f_k fits every
-# d equally well, as a stimulus term does in sdt_yn()
+# d equally well, as a stimulus term does in sdt_yn(); with one d per level,
+# d_k * f_k is free per level and d is lost wherever f_k = 0. Every component
+# is checked, because a non-linear sub-parameter in the distance carries the
+# confound into the parameter it feeds
 #' @export
 check_formula.tcc_cd <- function(model, data, formula) {
   dist <- model$other_vars$distance
-  criterion_vars <- rhs_vars(formula, collapse = FALSE)[intersect(names(formula), c("criterion", "bias"))]
-  uses_dist <- vapply(criterion_vars, function(x) dist %in% x, logical(1))
+  uses_dist <- vapply(rhs_vars(formula, collapse = FALSE), function(x) dist %in% x, logical(1))
   stopif(
     any(uses_dist),
     "The formula for {collapse_comma(names(uses_dist)[uses_dist])} uses the \\
     distance variable '{dist}'. The likelihood already reads each probe's \\
-    similarity from '{dist}', so a criterion that varies with it absorbs 'd', \\
-    and 'd' is not identified. Drop '{dist}' from that formula."
+    similarity from '{dist}', so a parameter that varies with it absorbs the \\
+    similarity, and 'd' is not identified. Drop '{dist}' from that formula."
   )
   NextMethod("check_formula")
 }
