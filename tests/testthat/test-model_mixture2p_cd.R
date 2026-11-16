@@ -98,6 +98,23 @@ test_that("dmixture2p_cd() gives NA for a missing weight, capacity or set size, 
   }
 })
 
+test_that("rmixture2p_cd() gives NA for a draw with a missing parameter and warns once", {
+  withr::local_seed(710)
+  expect_warning(
+    drawn <- rmixture2p_cd(4, c(0.5, NA, 0.5, 0.5), p_mem = c(0.6, 0.6, NA, 0.6)),
+    "NAs produced"
+  )
+  expect_identical(is.na(drawn), c(FALSE, TRUE, TRUE, FALSE))
+  for (version in c("slot", "slot_averaging")) {
+    expect_warning(
+      drawn <- rmixture2p_cd(3, 0.5, K = c(NA, 2, 2), set_size = c(3, NA, 3), version = version),
+      "NAs produced"
+    )
+    expect_identical(is.na(drawn), c(TRUE, TRUE, FALSE), label = version)
+  }
+  expect_no_warning(rmixture2p_cd(3, 0.5))
+})
+
 test_that("dmixture2p_cd() integrates the retrieval mixture over the unbiased arc", {
   # P("same") = p_mem times the von Mises mass within hw of the probe plus
   # (1 - p_mem) hw / pi, with cos(hw) = log I0(kappa) / kappa, by integrate()

@@ -694,6 +694,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   arc. `rmixture2p_cd()` draws the remembered feature of every trial and
 #'   lets the observer decide on it, so it does not use `dmixture2p_cd()`.
 #'
+#'   An observation or draw whose parameters include an `NA` gives `NA`, and
+#'   `rmixture2p_cd()` then warns "NAs produced" once per call.
+#'
 #' @keywords distribution
 #'
 #' @references Lin, H.-Y., & Oberauer, K. (2022). An interference model for
@@ -754,12 +757,25 @@ rmixture2p_cd <- function(n, probe, mu = 0, kappa = 5, p_mem = 0.6,
     p_mem = !missing(p_mem), K = !missing(K), set_size = !is.null(set_size)
   ))
 
-  recycle <- function(x) rep_len(x, n)
-  .mixture2p_cd_observe(
-    recycle(probe), recycle(mu), recycle(kappa), recycle(p_mem),
-    recycle(criterion), recycle(K), recycle(set_size %||% 1), version,
-    knowledge == "rich"
+  args <- lapply(
+    list(probe, mu, kappa, p_mem, criterion, K, set_size %||% 1),
+    function(x) rep_len(x, n)
   )
+  .cd_draw_complete(args, function(args) {
+    do.call(.mixture2p_cd_observe, c(args, list(version, knowledge == "rich")))
+  })
+}
+
+# A draw whose parameters include an NA or NaN is NA, and the call warns
+# "NAs produced" once, as the r* functions of the reproduction models do
+.cd_draw_complete <- function(args, observe) {
+  complete <- stats::complete.cases(as.data.frame(args))
+  out <- rep(NA_integer_, length(complete))
+  if (any(complete)) {
+    out[complete] <- observe(lapply(args, function(x) x[complete]))
+  }
+  warnif(!all(complete), "NAs produced")
+  out
 }
 
 # the constructor's set-size refusal, and the arguments a version ignores

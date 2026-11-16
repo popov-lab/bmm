@@ -89,6 +89,9 @@ an arc around the probe, whose half-width follows from \code{kappa},
 Appendix B). \code{dmixture2p_cd()} integrates the retrieval mixture over that
 arc. \code{rmixture2p_cd()} draws the remembered feature of every trial and
 lets the observer decide on it, so it does not use \code{dmixture2p_cd()}.
+
+An observation or draw whose parameters include an \code{NA} gives \code{NA}, and
+\code{rmixture2p_cd()} then warns "NAs produced" once per call.
 }
 \examples{
 # P("change") grows with the distance of the probe from the target
