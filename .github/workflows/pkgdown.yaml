@@ -54,7 +54,6 @@ jobs:
             cowplot
             stringr
             remotes
-            waldo
             fansi
             rtdists
             MPTinR
