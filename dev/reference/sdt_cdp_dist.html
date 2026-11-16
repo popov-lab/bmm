@@ -238,11 +238,16 @@ as the matrix of its rows, and so are <code>mean_rt</code> and <code>var_rt</cod
 exception: it returns a data frame of the same shape, one density per
 cell, and cuts longer parameters to the number of cells.</p></li>
 <li><p>A set of values that describes one observation, such as the <code>thresholds</code>
-of the rating models, is a vector when every observation shares it and a
-matrix with one row per observation otherwise: row <code>i</code> belongs to
-observation <code>i</code>, or to draw <code>i</code>.</p></li>
-<li><p>Configuration arguments such as <code>version</code>, <code>dist</code>, <code>log</code>,
-<code>parametrization</code> and <code>n_new</code> are single values and are never recycled.
+of the rating models or the item locations <code>mu</code> (and <code>dist</code>) of
+<code><a href="mixture3p_dist.html">dmixture3p()</a></code> and <code><a href="IMMdist.html">dimm()</a></code>, is a vector when every observation shares it
+and a matrix with one row per observation otherwise: row <code>i</code> belongs to
+observation <code>i</code>, or to draw <code>i</code>. Item locations are padded with <code>NA</code> past
+each row's set size, and a data frame of them is read as the matrix of its
+rows. As for counts, an empty vector of them stops: pass a matrix with
+zero rows for no observations.</p></li>
+<li><p>Configuration arguments such as <code>version</code>, <code>dist</code> of the ranking models,
+<code>log</code>, <code>parametrization</code> and <code>n_new</code> are single values and are never
+recycled.
 An argument that a version does not use, such as <code>zr</code> of
 <code>dezdm(version = "3par")</code>, is ignored.</p></li>
 </ul></div>
@@ -271,12 +276,12 @@ remember/know judgments. <em>Psychological Review</em>, <em>117</em>(4),
 <span class="r-in"><span>                           rcrit <span class="op">=</span> <span class="fl">0.5</span>, n_new <span class="op">=</span> <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id stimulus new1 new2 new3 know4 know5 know6 remember4 remember5 remember6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1        0   13   16   14    16     5     5         8         9        14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2        0   16   13   10    16     5     8         7        14        11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3        0   26   17   14     8    11     1         1        11        11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4        0   18   18   11    11     9     3         3         8        19</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5        0   19   11   12    16     9     5         6        11        11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6        0   18    9   22    13    10     6         2         6        14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1        0   17   13   15    12     8     7         5        12        11</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2        0   29   20   12     9     3     5         2         9        11</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3        0   31   18   10    11     5     5         1         9        10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4        0   19   12   15    15     9     0         4         9        17</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5        0   21   12   14    15     5     4         7         6        16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6        0   23   18    9    16    11     5         2         7         9</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

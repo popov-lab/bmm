@@ -1,7 +1,8 @@
 # Vector arguments of the distribution functions
 
 The density (`d*()`) and random generation (`r*()`) functions of the
-sdm, ddm and ezdm models, of the signal detection models (`sdt_yn`,
+sdm, ddm and ezdm models, of the circular mixture models (`mixture2p`,
+`mixture3p` and `imm`), of the signal detection models (`sdt_yn`,
 `sdt_mafc`, `sdt_rating`, `sdt_dpsdt`, `sdt_metad`, `sdt_ranking` and
 `sdt_cdp`) and of the psychometric function take their per-observation
 arguments as vectors, or as matrices with one row per observation, and
@@ -13,11 +14,6 @@ repeats them under "Vector arguments".
 The other distribution functions do not follow these rules yet:
 [`dcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md) and
 [`rcswald()`](https://venpopov.com/bmm/dev/reference/cswald_dist.md),
-the circular mixtures
-([`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
-[`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
-[`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) and their
-`r*()` functions),
 [`dm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md) and
 [`rm3()`](https://venpopov.com/bmm/dev/reference/m3dist.md), and
 [`dmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) and
@@ -82,14 +78,21 @@ the circular mixtures
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## Missing values
 
@@ -104,4 +107,10 @@ the values it gives when no parameter is missing.
 [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
 [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
 and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) return
-`NA` for such an observation.
+`NA` for such an observation. An `NA` in the item locations `mu` or the
+distances `dist` of
+[`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+[`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) and their
+`r*()` functions is padding past a row's set size, not a missing value:
+it shortens that row's item set (see "Vector arguments"), and an `NA` in
+the target column or before a row's last location stops.

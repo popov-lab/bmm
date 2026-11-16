@@ -174,14 +174,21 @@ exponentiate first.
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## References
 
@@ -221,8 +228,8 @@ head(dat)
 #>   id stimulus n_trials n_old
 #> 1  1        0      100    22
 #> 2  2        0      100    16
-#> 3  3        0      100    19
-#> 4  4        0      100    16
-#> 5  5        0      100    21
-#> 6  6        0      100    18
+#> 3  3        0      100    18
+#> 4  4        0      100    11
+#> 5  5        0      100    23
+#> 6  6        0      100    14
 ```

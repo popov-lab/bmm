@@ -193,14 +193,21 @@ frame for a ready-to-fit data set.
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## References
 
@@ -227,10 +234,10 @@ dat <- cbind(dat, rsdt_cdp(nrow(dat), 100, dat$stimulus,
                            rcrit = 0.5, n_new = 3))
 head(dat)
 #>   id stimulus new1 new2 new3 know4 know5 know6 remember4 remember5 remember6
-#> 1  1        0   13   16   14    16     5     5         8         9        14
-#> 2  2        0   16   13   10    16     5     8         7        14        11
-#> 3  3        0   26   17   14     8    11     1         1        11        11
-#> 4  4        0   18   18   11    11     9     3         3         8        19
-#> 5  5        0   19   11   12    16     9     5         6        11        11
-#> 6  6        0   18    9   22    13    10     6         2         6        14
+#> 1  1        0   17   13   15    12     8     7         5        12        11
+#> 2  2        0   29   20   12     9     3     5         2         9        11
+#> 3  3        0   31   18   10    11     5     5         1         9        10
+#> 4  4        0   19   12   15    15     9     0         4         9        17
+#> 5  5        0   21   12   14    15     5     4         7         6        16
+#> 6  6        0   23   18    9    16    11     5         2         7         9
 ```

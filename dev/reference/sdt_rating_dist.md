@@ -147,14 +147,21 @@ one rating-count column per category (`r1` ... `rK`).
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## References
 
@@ -179,10 +186,10 @@ dat <- cbind(dat, rsdt_rating(nrow(dat), 100, dat$stimulus,
                               d = 1.5, thresholds = c(0.25, 0.75, 1.25)))
 head(dat)
 #>   id stimulus r1 r2 r3 r4
-#> 1  1        0 66 14 10 10
-#> 2  2        0 57 22 11 10
-#> 3  3        0 59 14 17 10
-#> 4  4        0 63 21 11  5
-#> 5  5        0 63 13 10 14
-#> 6  6        0 58 12 18 12
+#> 1  1        0 64  9 17 10
+#> 2  2        0 62 18 12  8
+#> 3  3        0 61 16 12 11
+#> 4  4        0 65 18 10  7
+#> 5  5        0 65 14 14  7
+#> 6  6        0 64 16  9 11
 ```

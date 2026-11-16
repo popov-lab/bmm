@@ -225,14 +225,21 @@ the non-positive mean RTs; drop those rows before fitting. Values below
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## References
 

@@ -150,14 +150,21 @@ noise. That is a legal value and raises no error, so exponentiate first.
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## References
 
@@ -178,10 +185,10 @@ dat <- data.frame(id = 1:10, set_size = 4L)
 dat <- cbind(dat, rsdt_ranking(10, 100, m = 4, d = 1.0))
 head(dat)
 #>   id set_size rank1 rank2 rank3 rank4
-#> 1  1        4    53    25    11    11
-#> 2  2        4    63    14    10    13
-#> 3  3        4    60    17    11    12
-#> 4  4        4    56    16    21     7
-#> 5  5        4    54    23    18     5
-#> 6  6        4    53    27    10    10
+#> 1  1        4    51    18    17    14
+#> 2  2        4    52    17    18    13
+#> 3  3        4    59    18     8    15
+#> 4  4        4    52    19    16    13
+#> 5  5        4    62    12    12    14
+#> 6  6        4    59    22    11     8
 ```

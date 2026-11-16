@@ -184,11 +184,16 @@ as the matrix of its rows, and so are <code>mean_rt</code> and <code>var_rt</cod
 exception: it returns a data frame of the same shape, one density per
 cell, and cuts longer parameters to the number of cells.</p></li>
 <li><p>A set of values that describes one observation, such as the <code>thresholds</code>
-of the rating models, is a vector when every observation shares it and a
-matrix with one row per observation otherwise: row <code>i</code> belongs to
-observation <code>i</code>, or to draw <code>i</code>.</p></li>
-<li><p>Configuration arguments such as <code>version</code>, <code>dist</code>, <code>log</code>,
-<code>parametrization</code> and <code>n_new</code> are single values and are never recycled.
+of the rating models or the item locations <code>mu</code> (and <code>dist</code>) of
+<code><a href="mixture3p_dist.html">dmixture3p()</a></code> and <code><a href="IMMdist.html">dimm()</a></code>, is a vector when every observation shares it
+and a matrix with one row per observation otherwise: row <code>i</code> belongs to
+observation <code>i</code>, or to draw <code>i</code>. Item locations are padded with <code>NA</code> past
+each row's set size, and a data frame of them is read as the matrix of its
+rows. As for counts, an empty vector of them stops: pass a matrix with
+zero rows for no observations.</p></li>
+<li><p>Configuration arguments such as <code>version</code>, <code>dist</code> of the ranking models,
+<code>log</code>, <code>parametrization</code> and <code>n_new</code> are single values and are never
+recycled.
 An argument that a version does not use, such as <code>zr</code> of
 <code>dezdm(version = "3par")</code>, is ignored.</p></li>
 </ul></div>
@@ -210,12 +215,12 @@ publication. <a href="https://doi.org/10.1037/rev0000615" class="external-link">
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu">rsdt_ranking</span><span class="op">(</span><span class="fl">10</span>, <span class="fl">100</span>, m <span class="op">=</span> <span class="fl">4</span>, d <span class="op">=</span> <span class="fl">1.0</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   id set_size rank1 rank2 rank3 rank4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1        4    53    25    11    11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2        4    63    14    10    13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3        4    60    17    11    12</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4        4    56    16    21     7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5        4    54    23    18     5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6        4    53    27    10    10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  1        4    51    18    17    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  2        4    52    17    18    13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3        4    59    18     8    15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  4        4    52    19    16    13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  5        4    62    12    12    14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6        4    59    22    11     8</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

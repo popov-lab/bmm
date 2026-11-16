@@ -152,12 +152,12 @@ data <- bmm::simulate_data(mixture2p(resp_error = "y"),
 )
 head(data)
 #>             y
-#> 1  0.55736215
-#> 2 -0.50792284
-#> 3  0.36035066
-#> 4  0.27127972
-#> 5 -0.06787571
-#> 6 -0.35931991
+#> 1 -0.09415168
+#> 2  0.90649537
+#> 3 -0.33058185
+#> 4  0.50521460
+#> 5 -0.22003155
+#> 6  2.11354138
 attr(data, "simulate_pars")[1, ]
 #>   mu    kappa thetat
 #> 1  0 2.079442    0.5
@@ -175,12 +175,12 @@ data <- bmm::simulate_data(ddm(rt = "rt", response = "response"),
 )
 head(data)
 #>   cond        rt response
-#> 1 easy 0.3394879        1
-#> 2 easy 0.2731111        1
-#> 3 easy 0.3965125        1
-#> 4 easy 0.4204438        1
-#> 5 easy 0.2694648        0
-#> 6 easy 0.4030829        1
+#> 1 easy 0.2966168        1
+#> 2 easy 0.3179967        1
+#> 3 easy 0.3653507        0
+#> 4 easy 0.7211590        1
+#> 5 easy 0.3158004        1
+#> 6 easy 0.2791824        1
 
 # counts: yes/no recognition, 50 trials per stimulus type
 design <- data.frame(stimulus = c(0, 1), n_trials = 50)
@@ -188,8 +188,8 @@ bmm::simulate_data(sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = 
   pars = list(d = 1.5, criterion = 0.5), design = design
 )
 #>   stimulus n_trials n_old
-#> 1        0       50    16
-#> 2        1       50    39
+#> 1        0       50    19
+#> 2        1       50    38
 
 # categorical responses: memory measurement model, 100 trials per row
 model <- m3(
@@ -198,6 +198,6 @@ model <- m3(
 )
 bmm::simulate_data(model, pars = list(c = 2, a = 0.5), design = data.frame(n_trials = c(100, 100)))
 #>   n_trials corr other npl
-#> 1      100   48    29  23
-#> 2      100   55    27  18
+#> 1      100   55    24  21
+#> 2      100   48    30  22
 ```

@@ -200,8 +200,9 @@
   gain `K`, `ptarget` and `version` and now cover every version of
   [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md).
   With `version = "slot"` or `"slot_averaging"` they take the capacity
-  `K` and `ptarget`, read the set size as the number of locations in
-  `mu`, and ignore `p_mem` and `p_nt` with a warning
+  `K` and `ptarget`, read each trial’s set size as the number of
+  locations in its item set in `mu` (a row of a matrix, or the vector),
+  and ignore `p_mem` and `p_nt` with a warning
   ([\#711](https://github.com/popov-lab/bmm/issues/711)).
 - mixture2p, mixture3p and imm: the new argument
   `variable_precision = TRUE` lets memory precision vary from trial to
@@ -226,6 +227,18 @@
   appears in the parameter list, fixed to 0 on its log scale, which is
   an activation of 1
   ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+  [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) and
+  [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) now take
+  item locations per trial: a matrix or data frame `mu` with one row per
+  trial (target, non-targets, then `NA` past the trial’s set size), as
+  in `rmixture3p(2, mu = rbind(c(0, 2, -1.5), c(1, -2, NA)))`. `dist`
+  takes the same shape, or one vector for all rows. A vector `mu` is one
+  set for all trials; a trailing `NA` now shortens the set (the `d*()`
+  functions gave `NA`, the `r*()` functions stopped), and an empty one
+  stops. A matrix `mu` was read as one long item set; rerun those calls
+  ([\#444](https://github.com/popov-lab/bmm/issues/444)).
 
 #### Bug fixes
 
@@ -275,9 +288,9 @@
   ([\#710](https://github.com/popov-lab/bmm/issues/710)). In bmm 1.4.2
   they stopped with an error beginning “max_f must be finite and
   positive”.
-- The `d*()` and `r*()` functions of the sdm, ddm, ezdm and signal
-  detection models now follow one recycling rule, as
-  [`dnorm()`](https://rdrr.io/r/stats/Normal.html) and
+- The `d*()` and `r*()` functions of the sdm, ddm, ezdm, mixture2p,
+  mixture3p, imm and signal detection models now follow one recycling
+  rule, as [`dnorm()`](https://rdrr.io/r/stats/Normal.html) and
   [`rnorm()`](https://rdrr.io/r/stats/Normal.html) do; see
   [`?bmm_distributions`](https://venpopov.com/bmm/dev/reference/bmm_distributions.md)
   ([\#444](https://github.com/popov-lab/bmm/issues/444)).
@@ -360,7 +373,10 @@
   ([\#444](https://github.com/popov-lab/bmm/issues/444)).
 - [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md),
   [`rezdm()`](https://venpopov.com/bmm/dev/reference/ezdm_dist.md),
-  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md), the
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md),
+  [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+  [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), the
   `rsdt_*()` samplers and
   [`rpsychometric_function()`](https://venpopov.com/bmm/dev/reference/psychometric_function_dist.md)
   now read a single `n` as
@@ -375,10 +391,10 @@
   stops, except in
   [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md)
   ([\#444](https://github.com/popov-lab/bmm/issues/444)).
-- The `d*()` functions of the sdm, ddm, ezdm and signal detection models
-  now return `numeric(0)` when the data or any per-observation argument
-  is empty or `NULL`, such as `counts` with zero rows, `d = numeric(0)`
-  or a misspelt data column, as
+- The `d*()` functions of the sdm, ddm, ezdm, mixture2p, mixture3p, imm
+  and signal detection models now return `numeric(0)` when the data or
+  any per-observation argument is empty or `NULL`, such as `counts` with
+  zero rows, `d = numeric(0)` or a misspelt data column, as
   [`dnorm()`](https://rdrr.io/r/stats/Normal.html) does for an empty
   one. Most of them returned `NA` or stopped; `dezdm(version = "4par")`
   returned a number for zero rows. An empty `kcrit`, and an empty

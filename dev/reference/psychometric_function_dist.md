@@ -167,14 +167,21 @@ sigmoids). Transform a fitted value back before passing it here.
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## References
 
@@ -203,10 +210,10 @@ dat$n_correct <- rpsychometric_function(nrow(dat), dat$contrast, midpoint = 0.04
                                         n_trials = 40, sigmoid = "weibull")
 head(dat)
 #>   contrast n_correct
-#> 1     0.01        19
-#> 2     0.02        21
-#> 3     0.04        24
-#> 4     0.08        40
+#> 1     0.01        27
+#> 2     0.02        20
+#> 3     0.04        29
+#> 4     0.08        38
 #> 5     0.16        40
-#> 6     0.01        23
+#> 6     0.01        24
 ```

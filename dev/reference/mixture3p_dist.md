@@ -47,9 +47,16 @@ rmixture3p(
 
 - mu:
 
-  Vector of locations. First value represents the location of the target
-  item and any additional values indicate the location of non-target
-  items. The number of locations is the set size the `"slot"` and
+  Item locations in radians. A vector is one item set shared by every
+  observation: the target first, then the non-targets. A matrix or data
+  frame holds one item set per observation in each row: the target in
+  the first column, then the row's non-targets, and `NA` past its set
+  size, so rows can differ in set size. The rows are recycled to the
+  number of observations. The random generation function draws the rows
+  of one set size at a time, so with a fixed seed, moving a row can
+  change which draw it gets. Before bmm 1.5.0 a matrix was read as one
+  long item set. The number of locations of a row, or of a vector,
+  before any `NA` padding is the set size the `"slot"` and
   `"slot_averaging"` versions use, so pass the target and every
   non-target of the trial: for a trial of a fitted model, the target
   followed by the first `set_size - 1` columns of `nt_features`.
@@ -90,8 +97,10 @@ rmixture3p(
 - K:
 
   Vector of memory capacities. Used by the `"slot"` and
-  `"slot_averaging"` versions, which read the set size as the number of
-  locations in `mu`; `"simple"` ignores `K` and warns if it is given.
+  `"slot_averaging"` versions, which read each observation's set size as
+  the number of locations in its item set in `mu` (the row's locations
+  before the `NA` padding); `"simple"` ignores `K` and warns if it is
+  given.
 
 - ptarget:
 
@@ -130,6 +139,80 @@ rmixture3p(
 `rmixture3p` gives the random generation function for the
 three-parameter mixture model.
 
+## Vector arguments
+
+- `r*(n, ...)` returns exactly `n` draws: a vector, or a data frame or
+  matrix with `n` rows. Every per-observation argument (a parameter, a
+  stimulus, a number of trials) is recycled to length `n` with
+  [`rep_len()`](https://rdrr.io/r/base/rep.html), as in
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html): draw `i` uses
+  element `i`, and a matrix is read element by element; only a set of
+  values per draw, such as `thresholds`, takes row `i` of a matrix (see
+  below). A shorter vector is repeated, also when `n` is not a multiple
+  of its length. Until bmm 1.6.0 at the earliest,
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) with
+  `n = 1` and parameter vectors still returns one draw per element, with
+  a deprecation warning.
+
+- `n` is a single number of at least 0. A fraction is truncated, as in
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html), and `n = 0`
+  gives an empty vector, or a matrix or data frame with zero rows and
+  the usual columns. Unlike
+  [`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html), which takes
+  the length of a vector `n`, these functions stop on one;
+  [`rddm()`](https://venpopov.com/bmm/dev/reference/ddm_dist.md) still
+  takes its length, with a deprecation warning.
+
+- `d*(x, ...)` returns one value per observation: as many as the longest
+  of `x` (its rows, when the observations are rows of counts) and the
+  per-observation arguments, the others recycled to that length. Value
+  `i` is what the call on the `i`-th elements alone returns. A matrix in
+  an argument that takes one number per observation, such as `x` or `d`,
+  holds one observation per element, as in
+  [`stats::dnorm()`](https://rdrr.io/r/stats/Normal.html). When `x` or
+  any per-observation argument is empty, the result is empty, as in
+  [`stats::dnorm()`](https://rdrr.io/r/stats/Normal.html). A `NULL`
+  argument, such as a misspelt column of a data frame, counts as empty,
+  except where the default is `NULL`, as for `criterion` or `kcrit`:
+  there it means that the argument is not given. Where an observation is
+  a vector of counts
+  ([`dsdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating_dist.md),
+  [`dsdt_dpsdt()`](https://venpopov.com/bmm/dev/reference/sdt_dpsdt_dist.md),
+  [`dsdt_metad()`](https://venpopov.com/bmm/dev/reference/sdt_metad_dist.md),
+  [`dsdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking_dist.md)
+  and
+  [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)),
+  or the pair of `mean_rt` or `var_rt` values of
+  `dezdm(version = "4par")`, a vector is always one observation: pass a
+  matrix with zero rows for none, as an empty vector stops. An empty
+  `kcrit` of
+  [`dsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
+  and
+  [`rsdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp_dist.md)
+  stops as well; `kcrit = NULL` gives the R/K model. Counts in a data
+  frame, a tibble included, are read as the matrix of its rows, and so
+  are `mean_rt` and `var_rt` of `dezdm(version = "4par")`.
+  [`dsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) with a
+  data frame `x` is the exception: it returns a data frame of the same
+  shape, one density per cell, and cuts longer parameters to the number
+  of cells.
+
+- A set of values that describes one observation, such as the
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of `dmixture3p()` and
+  [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is a
+  vector when every observation shares it and a matrix with one row per
+  observation otherwise: row `i` belongs to observation `i`, or to draw
+  `i`. Item locations are padded with `NA` past each row's set size, and
+  a data frame of them is read as the matrix of its rows. As for counts,
+  an empty vector of them stops: pass a matrix with zero rows for no
+  observations.
+
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
+
 ## References
 
 Bays, P. M., Catalao, R. F. G., & Husain, M. (2009). The precision of
@@ -158,4 +241,10 @@ d6 <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, K = 6, ptarget = 0.8,
                  version = "slot_averaging")
 lines(x, d6, col = "blue")
 
+
+# item locations per trial: one row per trial, NA past its set size
+locations <- rbind(c(0, 2, -1.5), c(1, -2, NA), c(-0.5, NA, NA))
+y <- rmixture3p(3, mu = locations, kappa = 4, p_mem = 0.6, p_nt = 0.2)
+dmixture3p(y, mu = locations, kappa = 4, p_mem = 0.6, p_nt = 0.2)
+#> [1] 0.1379080 0.4523002 0.4898005
 ```

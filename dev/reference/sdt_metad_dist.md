@@ -162,14 +162,21 @@ one rating-count column per category (`r1` ... `rK`).
   of cells.
 
 - A set of values that describes one observation, such as the
-  `thresholds` of the rating models, is a vector when every observation
-  shares it and a matrix with one row per observation otherwise: row `i`
-  belongs to observation `i`, or to draw `i`.
+  `thresholds` of the rating models or the item locations `mu` (and
+  `dist`) of
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md), is
+  a vector when every observation shares it and a matrix with one row
+  per observation otherwise: row `i` belongs to observation `i`, or to
+  draw `i`. Item locations are padded with `NA` past each row's set
+  size, and a data frame of them is read as the matrix of its rows. As
+  for counts, an empty vector of them stops: pass a matrix with zero
+  rows for no observations.
 
-- Configuration arguments such as `version`, `dist`, `log`,
-  `parametrization` and `n_new` are single values and are never
-  recycled. An argument that a version does not use, such as `zr` of
-  `dezdm(version = "3par")`, is ignored.
+- Configuration arguments such as `version`, `dist` of the ranking
+  models, `log`, `parametrization` and `n_new` are single values and are
+  never recycled. An argument that a version does not use, such as `zr`
+  of `dezdm(version = "3par")`, is ignored.
 
 ## References
 
@@ -191,10 +198,10 @@ dat <- cbind(dat, rsdt_metad(nrow(dat), 100, dat$stimulus, d = 1.5,
                              thresholds = c(0.25, 0.75, 1.25), metad = 1.0))
 head(dat)
 #>   id stimulus r1 r2 r3 r4
-#> 1  1        0 55 30  8  7
-#> 2  2        0 63 13 14 10
-#> 3  3        0 60 23  8  9
-#> 4  4        0 59 22 12  7
-#> 5  5        0 52 21 16 11
-#> 6  6        0 66 17  8  9
+#> 1  1        0 51 22 14 13
+#> 2  2        0 53 23  8 16
+#> 3  3        0 49 27 12 12
+#> 4  4        0 54 18 14 14
+#> 5  5        0 49 22 11 18
+#> 6  6        0 52 25  8 15
 ```
