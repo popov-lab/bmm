@@ -25,17 +25,6 @@
   u * (1 / 2 + u * (1 / 8 + u * (1 / 8 + u * (25 / 128 + u * 13 / 32))))
 }
 
-.circmix_log_besselI0 <- function(kappa) {
-  out <- log(besselI(kappa, 0, expon.scaled = TRUE)) + kappa
-  large <- which(!is.finite(out))
-  if (length(large)) {
-    k <- kappa[large]
-    out[large] <- k - 0.5 * log(2 * pi * k) +
-      log1p(1 / (8 * k) + 9 / (128 * k^2) + 225 / (3072 * k^3))
-  }
-  out
-}
-
 # log(I0(kappa) e^-kappa). Stan has no scaled Bessel function, and there
 # log I0(kappa) - kappa loses up to 2.2e-13 below kappa 2000, 1.6e-12 below 1e4
 # and 1.4e-11 below 1e5, while the three-term series is accurate to 7.1e-15
@@ -149,15 +138,19 @@
 # supplied by the caller because it does not depend on kappa, which is what lets
 # the whole variable-precision grid re-use one set of cosines.
 
+# The von Mises terms are kappa (cosd - 1) - log(I0(kappa) e^-kappa), not
+# kappa cosd - log I0(kappa): past kappa ~1e15 the two large terms cancel to
+# within an ulp of kappa, which moved the log density at kappa 1e16 by 0.66
+# nats.
 .circmix_ld <- function(cosd, logw, logw_guess, kappa) {
-  memory <- matrixStats::rowLogSumExps(logw + kappa * cosd) -
-    .circmix_log_besselI0(kappa)
+  memory <- matrixStats::rowLogSumExps(logw + kappa * (cosd - 1)) -
+    .circmix_log_besselI0_scaled(kappa)
   matrixStats::rowLogSumExps(cbind(memory, logw_guess)) - log(2 * pi)
 }
 
 .circmix_het_ld <- function(cosd, logw, logw_guess, kappa) {
-  log_i0 <- matrix(.circmix_log_besselI0(as.vector(kappa)), nrow = nrow(cosd))
-  memory <- matrixStats::rowLogSumExps(logw + kappa * cosd - log_i0)
+  log_i0 <- matrix(.circmix_log_besselI0_scaled(as.vector(kappa)), nrow = nrow(cosd))
+  memory <- matrixStats::rowLogSumExps(logw + kappa * (cosd - 1) - log_i0)
   matrixStats::rowLogSumExps(cbind(memory, logw_guess)) - log(2 * pi)
 }
 
@@ -224,9 +217,10 @@
 # Memory is uniform to double precision once J(kappa) / sqrt(tau) < 1e-17. The
 # memory density exceeds 1 / (2 pi) by at most pi sqrt(2) J(kappa) / sqrt(tau),
 # its limit at large tau, so by 4.4e-17 there, below half an ulp of log(2 pi).
-# Those rows go to kappa = 0 because integrating them fails: Stan's
-# gamma_lpdf() is NaN at a subnormal shape, which tau = 1 reaches below kappa
-# 2e-154 and kappa 0.01 at tau 1e305.
+# Those rows go to kappa = 0 because integrating them failed: Stan's
+# gamma_lpdf(), which the grids used before .circmix_vp_log_gamma(), was NaN
+# at a subnormal shape, which tau = 1 reaches below kappa 2e-154 and kappa 0.01
+# at tau 1e305; the tail scheme's gamma_lcdf() still takes that shape.
 .circmix_vp_uniform <- function(J, tau) {
   J < 1e-17 * sqrt(tau)
 }
@@ -324,8 +318,36 @@
 .circmix_vp_log_integrand <- function(t, cos_d, shape, tau, tab) {
   J <- exp(t)
   kappa <- .circmix_kappa(J, tab)
-  t + stats::dgamma(J, shape = shape, scale = tau, log = TRUE) +
+  .circmix_vp_log_gamma(t, shape, tau) +
     kappa * (cos_d - 1) - .circmix_log_besselI0_scaled(kappa) - log(2 * pi)
+}
+
+# log density of t = log J for J ~ gamma(shape, scale = tau), written in
+# delta = t - log E[J]: shape log(shape) - shape - lgamma(shape) -
+# shape (e^delta - 1 - delta). Stan's gamma_lpdf() sums terms of size
+# shape log J, which cancel: from shape 1e7 on its rounding moved the log
+# density by up to 2.5e-8, at shape 6e13 by 0.27 nats (#710), and it was NaN
+# at shape 1e12 with kappa 1e90. dgamma(log = TRUE) is accurate there but is
+# -Inf once shape / J underflows (tau 1e300 with shape 1e-108), which left the
+# tail grid without mass. Both twins use this form, whose error is about
+# shape * 1e-16 * |delta| per node, so 1e-9 at shape 1e13.
+.circmix_vp_log_gamma <- function(t, shape, tau) {
+  delta <- t - log(shape) - log(tau)
+  .circmix_gamma_log_norm(shape) - shape * (expm1(delta) - delta)
+}
+
+# shape log(shape) - shape - lgamma(shape); from shape 10 on as
+# 0.5 log(shape / (2 pi)) minus Stirling's series, where the terms of size
+# shape log(shape) cancel exactly. The series' first omitted term is 2e-14 at 10.
+.circmix_gamma_log_norm <- function(shape) {
+  u <- 1 / shape
+  u2 <- u^2
+  ifelse(
+    shape < 10,
+    shape * log(shape) - shape - lgamma(shape),
+    0.5 * (log(shape) - log(2 * pi)) -
+      u * (1 / 12 - u2 * (1 / 360 - u2 * (1 / 1260 - u2 * (1 / 1680 - u2 / 1188))))
+  )
 }
 
 # First and second derivatives of .circmix_vp_log_integrand() in t, from
@@ -369,7 +391,24 @@
 # marginal density. Under variable precision the per-draw concentration is drawn
 # from the gamma on J first, so this samples the hierarchy the likelihood
 # integrates out and is therefore an independent check on it.
+# A draw from a missing parameter is missing, with rnorm()'s warning, as its
+# density is; an NA tau had fallen to constant precision and an NA weight to
+# the first component (#710). Only complete rows draw, so with a missing value
+# the other draws can differ from those a seed gave before.
 .rcircmix <- function(mu, logw, logw_guess, kappa, tau) {
+  out <- rep(NA_real_, nrow(mu))
+  complete <- which(!matrixStats::rowAnyNAs(cbind(mu, logw, logw_guess, kappa, tau)))
+  warnif(length(complete) < nrow(mu), "NAs produced")
+  if (length(complete)) {
+    out[complete] <- .rcircmix_complete(
+      mu[complete, , drop = FALSE], logw[complete, , drop = FALSE],
+      logw_guess[complete], kappa[complete], tau[complete]
+    )
+  }
+  out
+}
+
+.rcircmix_complete <- function(mu, logw, logw_guess, kappa, tau) {
   n <- nrow(mu)
   n_components <- ncol(mu)
   component <- .circmix_sample_component(exp(cbind(logw, logw_guess)))
@@ -477,10 +516,16 @@
 .rcircmix_slot_averaging <- function(mu, logw, K, set_size, kappa, tau) {
   n <- nrow(mu)
   allocation <- .circmix_slots(K, set_size)
-  slots <- allocation$slots + stats::rbinom(n, 1, allocation$extra)
+  # an NA K keeps its NA slot count without a second warning from rbinom()
+  slots <- allocation$slots + stats::rbinom(n, 1, ifelse(is.na(allocation$extra), 0, allocation$extra))
+
+  incomplete <- is.na(slots) | matrixStats::rowAnyNAs(cbind(mu, logw, kappa, tau))
+  warnif(any(incomplete), "NAs produced")
 
   out <- stats::runif(n, -pi, pi)
-  held <- which(slots >= 0.5)
+  out[incomplete] <- NA_real_
+  # .rcircmix() gets complete rows only, so the call warns once
+  held <- which(slots >= 0.5 & !incomplete)
   if (length(held)) {
     out[held] <- .rcircmix(
       mu[held, , drop = FALSE], logw[held, , drop = FALSE], rep(-Inf, length(held)),
@@ -564,8 +609,8 @@
   locations <- matrix(mu, nrow = length(mu))
   if (set_size > 1) {
     locations <- cbind(locations, matrix(
-      nt[seq_len(set_size - 1)],
-      nrow = length(mu), ncol = set_size - 1, byrow = TRUE
+      rep(nt[seq_len(set_size - 1)], each = length(mu)),
+      nrow = length(mu), ncol = set_size - 1
     ))
   }
   locations
