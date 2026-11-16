@@ -503,8 +503,9 @@ conditional_effects.bmmfit <- function(x,
 #' @noRd
 .compute_softmax_conditional_effects <- function(bmmfit, par, ...) {
   # only the simple version normalises its weights by a softmax; the
-  # capacity-limited versions parameterise them directly
-  if (!"mixture3p_simple" %in% class(bmmfit$bmm$model)) {
+  # capacity-limited versions parameterise them directly. mixture3p_cd reuses
+  # mixture3p's weights, set-size-1 rule included
+  if (!inherits(bmmfit$bmm$model, c("mixture3p_simple", "mixture3p_cd_simple"))) {
     NULL
   } else {
     .compute_softmax_ce_inner(bmmfit, par, ...)

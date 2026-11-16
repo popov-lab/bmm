@@ -1741,6 +1741,23 @@ test_that("mixture3p softmax route gives no weight to non-targets at set size 1 
   expect_equal(thetat$estimate__, c(mean(at_one), mean(softmax_of(draws_t[, 2], draws_nt[, 2]))))
 })
 
+# mixture3p_cd's simple version has the same softmax weights; without the
+# route its links reached .apply_link_transform(), which knows no "softmax"
+test_that("mixture3p_cd's simple version takes the softmax route (#136)", {
+  draws_t <- cbind(c(0.2, 1.1, -0.4, 2.3), c(0.2, 1.1, -0.4, 2.3))
+  draws_nt <- cbind(c(0.5, -0.3, 2, 0.1), c(0.5, -0.3, 2, 0.1))
+  stub_category_route(
+    stub_grid("set_size", n = 2),
+    function(args) if (args$dpar == "thetat") draws_t else draws_nt
+  )
+  fit <- mock_bmm(
+    bmf(kappa ~ 1, thetat ~ 0 + set_size, thetant ~ 1), mixture3p_cd_data(),
+    mixture3p_cd("change", "probe", paste0("col_nt", 1:7), "set_size")
+  )
+  thetant <- conditional_effects(fit, par = "thetant", effects = "set_size")[[1]]
+  expect_equal(thetant$estimate__, c(0, mean(softmax_of(draws_nt[, 2], draws_t[, 2]))))
+})
+
 # conditional_effects() re-classes the route's result only when an effect
 # survives .filter_internal_effects(), so the route keeps its own class
 test_that("mixture3p softmax route returns a brms_conditional_effects object (#512)", {
