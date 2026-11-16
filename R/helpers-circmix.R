@@ -180,6 +180,10 @@
 # 3e-3 at 1e12, 0.03 at 1e20 and about 1.6 nats at 1e100.
 .circmix_vp_ld <- function(cosd, logw, logw_guess, kappa, tau, nodes = 81L,
                            tab = .circmix_kappa_table()) {
+  # constant precision on every row needs no J(kappa), which costs more than the density itself
+  if (length(tau) && all(tau %in% 0)) {
+    return(.circmix_ld(cosd, logw, logw_guess, kappa))
+  }
   # pmin() recycles a scalar kappa over tau, and an NA tau makes its row NA
   kappa <- pmin(kappa, ifelse(tau %in% Inf | .circmix_vp_uniform(.circmix_J(kappa), tau), 0, Inf))
   out <- .circmix_ld(cosd, logw, logw_guess, kappa)

@@ -229,6 +229,10 @@
                      real kappa, real tau, int nodes,
                      data vector logk, data vector dlogk,
                      data real logJ_min, data real dlogJ) {
+    // every constant-precision fit passes tau = 0, and J(kappa) costs two log-Bessel evaluations it would discard
+    if (tau <= 0) {
+      return circmix_ld(cosd, logw, logw_guess, kappa);
+    }
     // tau -> Inf sends the shape to 0 with the mean fixed, leaving J at 0: memory is uniform, as in .circmix_vp_ld(), and close to that limit integrating would hit a subnormal shape
     real J = circmix_J(kappa);
     if (tau == positive_infinity() || circmix_vp_uniform(J, tau)) {
