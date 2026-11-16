@@ -274,6 +274,16 @@ test_that("the generated program passes the set size as an integer, the probe an
                fixed = TRUE)
 })
 
+test_that("the Stan data carry the probe in vreal1 and the non-targets after it", {
+  # the wrapper and .cd_prep_probe() read vreal1 as the probe, so the order of
+  # the columns in vreal() decides which feature the observer compares
+  data <- mixture3p_cd_data()
+  sdata <- standata(cd3p_formulas$simple, data, cd3p_model())
+  expect_equal(as.vector(sdata$vreal1), data$probe)
+  shown <- !is.na(data$col_nt1)
+  expect_equal(as.vector(sdata$vreal2)[shown], data$col_nt1[shown])
+})
+
 test_that("log_lik(), posterior_predict() and posterior_epred() evaluate the same P('same')", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(552)
