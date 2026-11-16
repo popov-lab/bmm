@@ -237,6 +237,7 @@ test_that("check_data() refuses a missing set size and warns where K cannot be t
 })
 
 test_that("the swap parameter is flagged as undetermined at set size 1", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   data <- mixture3p_cd_data()
   expect_warning(
     bmm(bmf(kappa ~ 1, thetat ~ 1, thetant ~ 0 + set_size), data, cd3p_model(),
