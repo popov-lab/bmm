@@ -257,7 +257,18 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   data <- simulate_data(model, list(c = 1.5, kappa = 1), design)
   expected <- 1 - sdm_cd_reference(1, 0, exp(1.5), exp(1), 0)
   expect_lt(abs(mean(data$change) - expected), 5 * sqrt(0.25 / nrow(data)))
+  # a criterion of 0.6 moves P("change") from 0.72 to 0.52; the observer must
+  # apply it, as dsdm_cd() does
+  biased <- simulate_data(model, list(c = 1.5, kappa = 1, criterion = 0.6), design)
+  expected <- dsdm_cd(1, 1, c = exp(1.5), kappa = exp(1), criterion = 0.6)
+  expect_lt(abs(mean(biased$change) - expected), 5 * sqrt(0.25 / nrow(biased)))
   expect_error(simulate_data(model, list(c = 1.5, kappa = 1), n_trials = 5), "probe")
+})
+
+test_that("a criterion far past the trial's range of evidence leaves one response", {
+  # the bounded criterion rounds to the end of the range, where the "same" arc
+  # is the whole circle (positive) or empty (negative)
+  expect_identical(.sdm_cd_psame(1, 0, exp(1.5), exp(1), c(60, -60)), c(1, 0))
 })
 
 test_that("the likelihood computes log Z once per run and matches R row by row", {
