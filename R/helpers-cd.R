@@ -67,9 +67,10 @@
   p_s <- args$p_s
   scaled <- log1p(-p_s) + criterion
   out <- -criterion + log1m_exp(pmin(scaled, 0)) - log(p_s)
-  out[scaled >= 0] <- -Inf
-  out[p_s <= 0] <- ifelse(criterion[p_s <= 0] < 0, Inf, -Inf)
-  out[criterion == 0] <- 0
+  out[which(scaled >= 0)] <- -Inf
+  none <- which(p_s <= 0)
+  out[none] <- ifelse(criterion[none] < 0, Inf, -Inf)
+  out[which(criterion == 0)] <- 0
   out
 }
 
@@ -305,7 +306,8 @@
   n <- nrow(d)
   criterion <- rep_len(criterion, n)
   extra <- branch$extra
-  out <- numeric(n)
+  # a missing K or set size leaves held NA, a row no branch below takes
+  out <- rep(NA_real_, n)
 
   empty <- which(!branch$held)
   if (length(empty)) {

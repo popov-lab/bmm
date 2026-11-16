@@ -83,6 +83,21 @@ test_that("dmixture2p_cd() refuses what the constructor refuses", {
   expect_warning(dmixture2p_cd(1, 0.5, p_mem = 0.5, K = 2, set_size = 3, version = "slot"), "ignores 'p_mem'")
 })
 
+test_that("dmixture2p_cd() gives NA for a missing weight, capacity or set size, as dmixture2p() does", {
+  expect_identical(
+    dmixture2p_cd(1, 0.5, p_mem = c(NA, 0.6)),
+    c(NA, dmixture2p_cd(1, 0.5, p_mem = 0.6))
+  )
+  for (version in c("slot", "slot_averaging")) {
+    complete <- dmixture2p_cd(1, 0.5, K = 4, set_size = 3, version = version)
+    expect_identical(
+      dmixture2p_cd(1, 0.5, K = c(NA, 4, 4), set_size = c(3, NA, 3), version = version),
+      c(NA, NA, complete),
+      label = version
+    )
+  }
+})
+
 test_that("dmixture2p_cd() integrates the retrieval mixture over the unbiased arc", {
   # P("same") = p_mem times the von Mises mass within hw of the probe plus
   # (1 - p_mem) hw / pi, with cos(hw) = log I0(kappa) / kappa, by integrate()
