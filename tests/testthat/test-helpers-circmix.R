@@ -213,7 +213,7 @@ vp_reference <- function(y, kappa, tau, p_mem, mu = 0, w = 1) {
   integrand <- function(t) {
     J <- exp(t)
     k <- .circmix_kappa(J)
-    memory <- Reduce(`+`, Map(function(m, wm) wm * exp(k * cos(y - m) - .circmix_log_besselI0(k)), mu, w))
+    memory <- Reduce(`+`, Map(function(m, wm) wm * exp(k * (cos(y - m) - 1) - .circmix_log_besselI0_scaled(k)), mu, w))
     density <- (p_mem * memory + (1 - p_mem)) / (2 * pi)
     density * stats::dgamma(J, shape = shape, scale = tau) * J
   }
@@ -770,7 +770,16 @@ test_that(".circmix_stan_wrapper() emits Stan that parses", {
 # which alone accounts for differences of ~1e-7. The cells *_e are one-component
 # variable-precision rows with their own kappa and tau, and the cells *_s are
 # points at which circmix_vp_slopes() is evaluated; a call without them passes
-# none.
+# none. cmdstan writes the CSV correctly, but cmdstanr 0.9.0 reads the draws
+# with data.table::fread(), which types a column that prints as an integer
+# beyond int32 as integer64, and its bits are then read as a double: 1e13 came
+# back as 4.9e-311 (1e13 * 2^-1074), -3.18e14 as NaN and -2e16 as -1.75e307,
+# which #710 had read as Stan returning NaN or -1.75e307. Any output printed
+# without a decimal point and beyond int32 is garbled: a whole number such as
+# 1e13, and at sig_figs = 18 every |x| from 2^53 (9.0e15) to below 1e18, all
+# whole numbers. From 1e18 on cmdstan writes exponent form (1e+18), which
+# survives, and -6.36e14 survived because it had a fraction. Compare only
+# values of moderate size, or scale them down in generated quantities.
 circmix_stan_values <- function(data) {
   data <- utils::modifyList(list(
     NE = 0L, y_e = numeric(0), logw_e = numeric(0), logw_guess_e = numeric(0),
@@ -819,7 +828,7 @@ circmix_stan_values <- function(data) {
       }
       out_het = circmix_het_ld(cosd, logw, logw_guess, kappa_het);
       for (i in 1:NI0) {
-        out_logi0[i] = log_modified_bessel_first_kind(0, kappa_i0[i]);
+        out_logi0[i] = circmix_log_besselI0_scaled(kappa_i0[i]);
       }
       for (i in 1:NTAU) {
         out_vp[i] = circmix_vp_ld(cosd, logw, logw_guess, kappa_vp, tau[i], nodes,
@@ -836,7 +845,7 @@ circmix_stan_values <- function(data) {
                                    tau_far[i], nodes, logk, dlogk, logJ_min, dlogJ);
       }
       for (i in 1:NTAU) {
-        out_shape[i] = circmix_vp_shape(kappa_vp, tau[i]);
+        out_shape[i] = circmix_vp_shape(circmix_J(kappa_vp), tau[i]);
       }
       out_branches = circmix_slot_averaging_branches(K_slots, ss_slots, kappa_vp,
                                                      logk, dlogk, logJ_min, dlogJ);
@@ -856,7 +865,7 @@ circmix_stan_values <- function(data) {
       out_w3_slot1 = mixture3p_slot_logw(0.6, 0.8, 1);
       out_w3_sa1 = mixture3p_slot_averaging_logw(0.8, 1);
       for (i in 1:NE) {
-        out_e_shape[i] = circmix_vp_shape(kappa_e[i], tau_e[i]);
+        out_e_shape[i] = circmix_vp_shape(circmix_J(kappa_e[i]), tau_e[i]);
         out_e_vp[i] = circmix_vp_ld([cos(y_e[i])]', [logw_e[i]]', logw_guess_e[i], kappa_e[i],
                                     tau_e[i], nodes, logk, dlogk, logJ_min, dlogJ);
         out_e_sa[i] = circmix_slot_averaging_ld([cos(y_e[i])]', [0.0]', K_slots, ss_slots,
@@ -898,9 +907,9 @@ test_that("the Stan and R implementations of the shared core agree", {
     1e-7, 1e-3, 0.5, 9.486, 500, 5e4, 1e7,
     node(c(2, 1000, n_tab - 1, n_tab)), sqrt(node(n_tab - 1) * node(n_tab))
   )
-  # either side of the point where besselI() underflows and R switches to the
-  # asymptotic series; Stan's log_modified_bessel_first_kind() is independent
-  kappa_i0 <- c(1, 1e3, 9e4, 9.99e4, 1.0005e5, 1.001e5, 1e6)
+  # either side of the switch to the series at 2000, and kappa where
+  # log(2 pi kappa) would overflow
+  kappa_i0 <- c(1, 1e3, 1999, 2000, 1e6, 1e16, 3e307)
   kappa_het <- c(3, 12, 40)
   tau <- c(0, 0.5, 2, .circmix_J(10) / 0.75)
   # far from both components and no guessing: each component's own window
@@ -926,7 +935,8 @@ test_that("the Stan and R implementations of the shared core agree", {
 
   expect_equal(stan("out_J"), .circmix_J(kappa), tolerance = 1e-10)
   expect_lt(max(abs(stan("out_kappa") / .circmix_kappa(Jtest) - 1)), 1e-13)
-  expect_lt(max(abs(stan("out_logi0") / .circmix_log_besselI0(kappa_i0) - 1)), 1e-14)
+  # below kappa 2000 Stan's log I0(kappa) - kappa loses up to 2.2e-13
+  expect_lt(max(abs(stan("out_logi0") - .circmix_log_besselI0_scaled(kappa_i0))), 5e-13)
   expect_equal(
     stan("out_ld"),
     .circmix_ld(as_rows(cosd), as_rows(logw), rep(logw_guess, n), kappa),
@@ -1300,4 +1310,170 @@ test_that("the uniform cut of variable precision sits at J / sqrt(tau) = 1e-17",
   J <- .circmix_J(1e100)
   tau <- (J / c(2e-17, 5e-18))^2
   expect_equal(.circmix_vp_rows(c(1e100, 1e100), tau)$rows, 1L)
+})
+
+# The reference is R's dgamma(), accurate for shape > 1 (Loader's saddle point)
+# and below 1 while shape / J does not underflow. At shape 1e7 the two differ
+# by 4.6e-12 on macOS arm64, of which 3.8e-12 is dgamma()'s own error; the
+# bound leaves room for another libm.
+test_that(".circmix_vp_log_gamma() is the log density of log J", {
+  cells <- expand.grid(shape = c(1e-3, 0.5, 1.999, 2, 9.99, 10, 10.01, 50, 1e4, 1e7), z = c(-3, -0.5, 0, 0.5, 2))
+  tau <- 0.3
+  # about z sd(log J) from log E[J] above shape 1, z itself below
+  t <- log(cells$shape * tau) + cells$z / sqrt(pmax(cells$shape, 1))
+  expect_lt(
+    max(abs(.circmix_vp_log_gamma(t, cells$shape, tau) -
+      (t + stats::dgamma(exp(t), shape = cells$shape, scale = tau, log = TRUE)))),
+    1e-10
+  )
+})
+
+# dgamma(log = TRUE) is -Inf once shape / J underflows, which took the mass of
+# the tail grid at tau >= ~1e210 and kappa >= ~1e94
+test_that(".circmix_vp_log_gamma() is finite where dgamma(log = TRUE) underflows", {
+  shape <- 1e-108
+  tau <- 1e308
+  t <- log(1e300)
+  expect_identical(stats::dgamma(exp(t), shape = shape, scale = tau, log = TRUE), -Inf)
+  expect_equal(
+    .circmix_vp_log_gamma(t, shape, tau),
+    shape * (t - log(tau)) - exp(t) / tau - lgamma(shape),
+    tolerance = 1e-14
+  )
+})
+
+# The same underflow end to end: at kappa 1e140 and tau 1e250 (shape 1e-110)
+# the integrand of a response on the item peaks near J = tau, where
+# dgamma(log = TRUE) was -Inf, and R gave -1.83 against Stan's 34.057 (#710).
+# The density is E[sqrt(J / (2 pi))], as in ".circmix_vp_ld() is accurate at a
+# huge kappa or tau for a response on the item"; the tail grid, whose step is
+# 7.4 in log J at this tau, holds it to 0.14 nats.
+test_that(".circmix_vp_ld() keeps the mass of the tail grid where dgamma(log = TRUE) underflows", {
+  shape <- .circmix_J(1e140) / 1e250
+  expect_lt(
+    abs(.circmix_vp_ld(matrix(1), matrix(0), -Inf, 1e140, 1e250) -
+      (0.5 * log(1e250 / (2 * pi)) + lgamma(shape + 0.5) - lgamma(shape))),
+    0.2
+  )
+})
+
+# At a large shape J is concentrated near J(kappa), so the integral is the
+# constant-precision density plus half the variance of J, J(kappa) tau, times
+# its second derivative in J. Stan's gamma_lpdf() had moved the log density by
+# 2.5e-8 at shape 1e7 and 0.27 nats at 6e13 (#710); R was within 3e-9 of
+# this check from shape 1e8 on, the finite difference included.
+test_that(".circmix_vp_ld() approaches constant precision plus the variance of J at large shapes", {
+  cells <- expand.grid(kappa = c(1, 10, 100), shape = c(1e8, 1e10, 1e12, 6e13))
+  tau <- .circmix_J(cells$kappa) / cells$shape
+  y <- 1
+  density <- function(J) exp(.circmix_ld(matrix(cos(y), length(J)), matrix(0, length(J)), rep(-Inf, length(J)), .circmix_kappa(J)))
+  J <- .circmix_J(cells$kappa)
+  h <- 1e-3 * J
+  corrected <- log(density(J) + 0.5 * J * tau * (density(J + h) - 2 * density(J) + density(J - h)) / h^2)
+  n <- nrow(cells)
+  expect_lt(
+    max(abs(.circmix_vp_ld(matrix(cos(y), n), matrix(0, n), rep(-Inf, n), cells$kappa, tau) - corrected)),
+    1e-8
+  )
+})
+
+# kappa cosd - log I0(kappa) cancelled to within an ulp of kappa, 2 at 1e16,
+# and log(2 pi kappa) overflowed to give +Inf at 3e307 (#710)
+test_that(".circmix_ld() keeps its precision at a huge kappa", {
+  kappa <- c(1e16, 3e307)
+  expect_equal(
+    .circmix_ld(matrix(1, 2), matrix(0, 2), rep(-Inf, 2), kappa),
+    0.5 * log(kappa / (2 * pi)) - log1p(1 / (8 * kappa)),
+    tolerance = 1e-14
+  )
+  expect_equal(
+    .circmix_ld(matrix(cos(1)), matrix(0), -Inf, 3e307),
+    3e307 * (cos(1) - 1) + 0.5 * log(3e307 / (2 * pi)),
+    tolerance = 1e-14
+  )
+  expect_equal(
+    .circmix_het_ld(matrix(1, 1, 2), matrix(log(c(0.5, 0.5)), 1), -Inf, matrix(c(1e16, 1e16), 1)),
+    0.5 * log(1e16 / (2 * pi)),
+    tolerance = 1e-14
+  )
+})
+
+test_that("Stan matches R at large gamma shapes and at a huge constant kappa", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  tab <- .circmix_kappa_table()
+  large <- expand.grid(y = c(0, 1, pi), kappa = c(1, 10, 100, 1e4), shape = c(1e6, 1e8, 1e10, 1e12, 6e13))
+  large$tau <- .circmix_J(large$kappa) / large$shape
+  large$p_mem <- 1
+  # tau = 0 is constant precision; with guessing the value at y = pi stays small
+  # enough for the CSV round trip
+  huge <- expand.grid(y = c(0, 1, pi), kappa = c(1e16, 3e307), shape = NA, tau = 0, p_mem = 0.8)
+  cells <- rbind(large, huge)
+  n <- nrow(cells)
+  stan <- circmix_stan_values(list(
+    NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+    logJ_min = tab$logJ_min, dlogJ = tab$dlogJ,
+    NC = 1L, cosd = array(1), logw = array(0), logw_guess = -Inf,
+    kappa_het = array(3), NKAP = 1L, kappa = array(2), NJ = 1L, Jtest = array(0.5),
+    NTAU = 1L, tau = array(1), NI0 = 1L, kappa_i0 = array(1),
+    kappa_vp = 5, nodes = 81L, K_slots = 1.5, ss_slots = 2L, ss_empty = 4L,
+    cosd_far = c(1, 1), logw_far = log(c(0.7, 0.3)), kappa_far = 5,
+    NFAR = 1L, tau_far = array(1),
+    nt_loc = c(1, 2, 3), ss_loc = 3L, dist_w = c(0.5, 2),
+    NE = n, y_e = cells$y, logw_e = log(cells$p_mem), logw_guess_e = log1p(-cells$p_mem),
+    kappa_e = cells$kappa, tau_e = cells$tau
+  ))
+  r <- .circmix_vp_ld(
+    matrix(cos(cells$y)), matrix(log(cells$p_mem)), log1p(-cells$p_mem),
+    cells$kappa, cells$tau
+  )
+  expect_lt(max(abs(stan("out_e_vp") - r)), 1e-8)
+})
+
+# At a large shape the grid differentiates -shape (expm1(delta) - delta), whose
+# terms cancel. The slope in log tau is the variance term J(kappa) tau f'' / 2,
+# so it falls as 1 / shape: 0.1056, 1.056e-3 and 1.056e-5 at kappa 1e4, y = 1.
+# There R's finite difference is rounding noise (2e-5 against 1.06e-5 at shape
+# 1e12), so that slope is checked by its scaling, the slope in log kappa
+# against R.
+test_that("the Stan gradient of the variable-precision density is right at large shapes", {
+  skip_unless_stan_tests()
+  skip_on_cran()
+
+  tab <- .circmix_kappa_table()
+  cells <- expand.grid(y = c(0, 1), shape = c(1e8, 1e10, 1e12), kappa = c(10, 1e4))
+  cells$tau <- .circmix_J(cells$kappa) / cells$shape
+  n <- nrow(cells)
+  code <- paste0(
+    "functions {\n",
+    read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm")),
+    "\n}\n",
+    "data { int NK; vector[NK] logk; vector[NK] dlogk; real logJ_min; real dlogJ; int N; vector[N] y; }
+    parameters { vector[N] log_kappa; vector[N] log_tau; }
+    model {
+      for (i in 1:N) {
+        target += circmix_vp_ld([cos(y[i])]', [0.0]', negative_infinity(), exp(log_kappa[i]),
+                                exp(log_tau[i]), 81, logk, dlogk, logJ_min, dlogJ);
+      }
+    }"
+  )
+  model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
+  utils::capture.output(diagnosis <- model$diagnose(
+    data = list(
+      NK = length(tab$logkappa), logk = tab$logkappa, dlogk = tab$dlogkappa,
+      logJ_min = tab$logJ_min, dlogJ = tab$dlogJ, N = n, y = cells$y
+    ),
+    init = list(list(log_kappa = log(cells$kappa), log_tau = log(cells$tau))),
+    error = 1e6
+  ))
+  gradient <- diagnosis$gradients()$model
+
+  h <- 1e-5
+  ld <- function(kappa) .circmix_vp_ld(matrix(cos(cells$y)), matrix(0, n), rep(-Inf, n), kappa, cells$tau, 81L)
+  slope_kappa <- (ld(cells$kappa * exp(h)) - ld(cells$kappa * exp(-h))) / (2 * h)
+  expect_lt(max(abs(gradient[seq_len(n)] - slope_kappa) / abs(slope_kappa)), 1e-4)
+
+  slope_tau <- gradient[n + which(cells$kappa == 1e4 & cells$y == 1)]
+  expect_equal(slope_tau[-3] / slope_tau[-1], c(100, 100), tolerance = 1e-3)
 })

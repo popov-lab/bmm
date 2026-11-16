@@ -63,11 +63,7 @@ strings.}
 constructor must hold.}
 \item{\code{functions}}{A list with the names of the model's exported
 \code{density} and \code{generator} (random generation) functions, such as
-\code{"dsdm"} and \code{"rsdm"}; \code{NA} where a model has none. They are the
-model's exported d/r pair and may not cover every version:
-\code{dmixture3p()} and \code{rmixture3p()} do not express the item-wise
-precision of \code{\link[=mixture3p]{mixture3p()}} \code{version = "slot_averaging"} above
-\code{K = set_size}.}
+\code{"dsdm"} and \code{"rsdm"}; \code{NA} where a model has none.}
 \item{\code{contract_version}}{The version of this specification, \code{"0.9"}
 until bmm 1.6.0 fixes it as \code{"1.0"}.}
 }
