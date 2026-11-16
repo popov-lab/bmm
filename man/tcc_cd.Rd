@@ -121,10 +121,11 @@ fit the same model, with "same" as "old". Probes at intermediate distances
 add operating points along \code{f}.
 Schurgin et al. (2020) do not write this rule out; it is their
 familiarity model with the decision stage of yes/no recognition. The
-observer here knows nothing about the state of memory on a trial. For
-the decision rule of Lin and Oberauer (2022), which weighs the
-likelihood of a change, see the article on change-detection decision
-rules on the package website.
+observer here knows nothing about the state of memory on a trial. The
+article "A familiarity rule for change detection" on the package website
+sets out what the rule assumes and what a design needs; models with the
+decision rule of Lin and Oberauer (2022), which weighs the likelihood of
+a change, are in development (GitHub issue #136).
 
 \code{criterion} is measured from the familiarity of a probe with no
 similarity to the target, \code{bias} from the midpoint between 0 and \code{d};
