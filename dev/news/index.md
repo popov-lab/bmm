@@ -574,6 +574,14 @@
   Estimates are unchanged up to sampling error, and priors written for
   count data, such as `set_prior("normal(1, 1)", nlpar = "d")`, apply
   unchanged.
+- **mixture2p**, **mixture3p** and **imm** with constant precision (the
+  default) no longer compute the precision term of the
+  variable-precision model and then discard it, on every observation and
+  sampling step. On `oberauer_lin_2017` without set size 1, each
+  sampling step of mixture3p and imm now takes 1.26 times less time than
+  with the brms mixture families of bmm 1.4, and one of mixture2p 1.84
+  times more. Values of the likelihood are unchanged
+  ([\#434](https://github.com/popov-lab/bmm/issues/434)).
 - mixture2p, mixture3p and imm fits saved with bmm 1.4 or earlier still
   work with [`summary()`](https://rdrr.io/r/base/summary.html) and the
   other extractors. [`update()`](https://rdrr.io/r/stats/update.html)
