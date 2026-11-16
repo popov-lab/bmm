@@ -53,7 +53,6 @@ jobs:
             ggthemes
             cowplot
             stringr
-            waldo
             fansi
             yaml
             roxygen2
