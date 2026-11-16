@@ -43,10 +43,15 @@ bmmtools::validation_plan(
   sds = c(d = 0.3, criterion = 0.4),
   grid = expand.grid(n_subjects = c(20, 50), n_trials = c(100, 300)),
   generator = tcc_cd_generator,
-  # bmmtools 0.3.0 has no default calibration generator for tcc_cd. Two
-  # cores per fit, one per chain, are given here, because SBC's default reads
+  # bmmtools 0.3.0 has no default calibration generator for tcc_cd. Cores per
+  # fit, one per chain, are given here, because SBC's default reads
   # future::availableCores(), whose deprecation warning (future 1.82) fails
-  # on the call bmmtools builds with rlang::exec()
-  sbc = list(generator = tcc_cd_sbc_generator, cores_per_fit = 2L),
+  # on the call bmmtools builds with rlang::exec(). bmmtools' default of 2
+  # chains of 500 at adapt_delta 0.8 left 4 of 100 fits with Rhat above 1.05
+  # and 30 with divergences
+  sbc = list(
+    generator = tcc_cd_sbc_generator, cores_per_fit = 4L,
+    sampler = list(chains = 4L, iter = 1000L, warmup = 500L, control = list(adapt_delta = 0.95))
+  ),
   seed = 2026
 )
