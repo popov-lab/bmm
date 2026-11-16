@@ -114,14 +114,7 @@ A list of class `bmm_model_spec` with these elements, in this order:
 
   A list with the names of the model's exported `density` and
   `generator` (random generation) functions, such as `"dsdm"` and
-  `"rsdm"`; `NA` where a model has none. They are the model's exported
-  d/r pair and may not cover every version:
-  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  and
-  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
-  do not express the item-wise precision of
-  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
-  `version = "slot_averaging"` above `K = set_size`.
+  `"rsdm"`; `NA` where a model has none.
 
 - `contract_version`:
 

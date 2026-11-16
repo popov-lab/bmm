@@ -8,10 +8,14 @@
 </script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet"><link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet"><script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Distribution functions for the three-parameter mixture model (mixture3p) — mixture3p_dist"><meta name="description" content="Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of mu, precision of
 memory representations kappa, probability of a target response p_mem,
-and probability of a non-target response p_nt."><meta property="og:description" content="Density, distribution, and random generation functions for the
+and probability of a non-target response p_nt. The capacity versions
+(version = &quot;slot&quot; and &quot;slot_averaging&quot;) replace p_mem and p_nt by
+the capacity K and ptarget, as mixture3p() does."><meta property="og:description" content="Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of mu, precision of
 memory representations kappa, probability of a target response p_mem,
-and probability of a non-target response p_nt."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
+and probability of a non-target response p_nt. The capacity versions
+(version = &quot;slot&quot; and &quot;slot_averaging&quot;) replace p_mem and p_nt by
+the capacity K and ptarget, as mixture3p() does."><meta property="og:image" content="https://venpopov.com/bmm/logo.png"><meta name="robots" content="noindex"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -53,7 +57,9 @@ and probability of a non-target response p_nt."><meta property="og:image" conten
     <p>Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of <code>mu</code>, precision of
 memory representations <code>kappa</code>, probability of a target response <code>p_mem</code>,
-and probability of a non-target response <code>p_nt</code>.</p>
+and probability of a non-target response <code>p_nt</code>. The capacity versions
+(<code>version = "slot"</code> and <code>"slot_averaging"</code>) replace <code>p_mem</code> and <code>p_nt</code> by
+the capacity <code>K</code> and <code>ptarget</code>, as <code><a href="mixture3p.html">mixture3p()</a></code> does.</p>
     </div>
 
     <div class="section level2">
@@ -65,11 +71,24 @@ and probability of a non-target response <code>p_nt</code>.</p>
 <span>  p_mem <span class="op">=</span> <span class="fl">0.6</span>,</span>
 <span>  p_nt <span class="op">=</span> <span class="fl">0.2</span>,</span>
 <span>  tau <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  ptarget <span class="op">=</span> <span class="fl">0.75</span>,</span>
+<span>  version <span class="op">=</span> <span class="st">"simple"</span>,</span>
 <span>  vp_nodes <span class="op">=</span> <span class="fl">81L</span>,</span>
 <span>  log <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">rmixture3p</span><span class="op">(</span><span class="va">n</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>, kappa <span class="op">=</span> <span class="fl">5</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span>, p_nt <span class="op">=</span> <span class="fl">0.2</span>, tau <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">rmixture3p</span><span class="op">(</span></span>
+<span>  <span class="va">n</span>,</span>
+<span>  mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>,</span>
+<span>  kappa <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  p_mem <span class="op">=</span> <span class="fl">0.6</span>,</span>
+<span>  p_nt <span class="op">=</span> <span class="fl">0.2</span>,</span>
+<span>  tau <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  K <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  ptarget <span class="op">=</span> <span class="fl">0.75</span>,</span>
+<span>  version <span class="op">=</span> <span class="st">"simple"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -83,32 +102,32 @@ and probability of a non-target response <code>p_nt</code>.</p>
 <dt id="arg-mu">mu<a class="anchor" aria-label="anchor" href="#arg-mu"></a></dt>
 <dd><p>Vector of locations. First value represents the location of the
 target item and any additional values indicate the location of non-target
-items.</p></dd>
+items. The number of locations is the set size the <code>"slot"</code> and
+<code>"slot_averaging"</code> versions use, so pass the target and every non-target
+of the trial: for a trial of a fitted model, the target followed by the
+first <code>set_size - 1</code> columns of <code>nt_features</code>.</p></dd>
 
 
 <dt id="arg-kappa">kappa<a class="anchor" aria-label="anchor" href="#arg-kappa"></a></dt>
 <dd><p>Vector of precision values. With <code>tau &gt; 0</code> this is the
 concentration of the average trial, whose Fisher information <code>J(kappa)</code> is
-the mean of <code>J</code>.</p></dd>
+the mean of <code>J</code>. Under <code>"slot_averaging"</code> it is the precision of an item
+held in a single slot.</p></dd>
 
 
 <dt id="arg-p-mem">p_mem<a class="anchor" aria-label="anchor" href="#arg-p-mem"></a></dt>
-<dd><p>Vector of probabilities of a target response. For a
-<code><a href="mixture3p.html">mixture3p()</a></code> fit these are <code>thetat</code> on its native scale (version
-<code>"simple"</code>, see <code><a href="native_parameters.html">native_parameters()</a></code>) or <code>min(1, K / set_size) * ptarget</code>
-(versions <code>"slot"</code> and <code>"slot_averaging"</code>). The mapping is exact for
-<code>"slot"</code> and for <code>"slot_averaging"</code> up to <code>K = set_size</code>. Above capacity,
-slot averaging gives an item several slots and raises its precision,
-which these functions do not model.</p></dd>
+<dd><p>Vector of probabilities of a target response, i.e. <code>thetat</code> of
+a <code><a href="mixture3p.html">mixture3p()</a></code> fit with <code>version = "simple"</code> on its native scale (see
+<code><a href="native_parameters.html">native_parameters()</a></code>). Used by the <code>"simple"</code> version; the other versions
+derive the probability of a response from memory from <code>K</code> and the set size,
+and warn if <code>p_mem</code> is given.</p></dd>
 
 
 <dt id="arg-p-nt">p_nt<a class="anchor" aria-label="anchor" href="#arg-p-nt"></a></dt>
 <dd><p>Vector of probabilities of a non-target response, summed over
-the non-targets, which share it equally. For a <code><a href="mixture3p.html">mixture3p()</a></code> fit these are
-<code>thetant</code> on its native scale (version <code>"simple"</code>) or
-<code>min(1, K / set_size) * (1 - ptarget)</code> (capacity versions, with the limit
-for <code>"slot_averaging"</code> given under <code>p_mem</code>). Unlike <code>ptarget</code>, <code>p_mem</code> and
-<code>p_nt</code> are not conditional on a response from memory.</p></dd>
+the non-targets, which share it equally: <code>thetant</code> of a <code>"simple"</code> fit on
+its native scale. Unlike <code>ptarget</code>, <code>p_mem</code> and <code>p_nt</code> are not conditional
+on a response from memory. Used by the <code>"simple"</code> version, like <code>p_mem</code>.</p></dd>
 
 
 <dt id="arg-tau">tau<a class="anchor" aria-label="anchor" href="#arg-tau"></a></dt>
@@ -116,6 +135,24 @@ for <code>"slot_averaging"</code> given under <code>p_mem</code>). Unlike <code>
 Fisher information <code>J</code> of a memory representation is drawn from
 <code>gamma(mean = J(kappa), scale = tau)</code>. <code>tau = 0</code>, the default, is constant
 precision. See <code><a href="mixture3p.html">mixture3p()</a></code>.</p></dd>
+
+
+<dt id="arg-k">K<a class="anchor" aria-label="anchor" href="#arg-k"></a></dt>
+<dd><p>Vector of memory capacities. Used by the <code>"slot"</code> and
+<code>"slot_averaging"</code> versions, which read the set size as the number of
+locations in <code>mu</code>; <code>"simple"</code> ignores <code>K</code> and warns if it is given.</p></dd>
+
+
+<dt id="arg-ptarget">ptarget<a class="anchor" aria-label="anchor" href="#arg-ptarget"></a></dt>
+<dd><p>Vector of probabilities that a response from memory reports
+the target rather than a non-target. Used by the <code>"slot"</code> and
+<code>"slot_averaging"</code> versions; <code>"simple"</code> ignores it and warns if it is
+given.</p></dd>
+
+
+<dt id="arg-version">version<a class="anchor" aria-label="anchor" href="#arg-version"></a></dt>
+<dd><p>A character string selecting the storage model: <code>"simple"</code>,
+<code>"slot"</code> or <code>"slot_averaging"</code>. See <code><a href="mixture3p.html">mixture3p()</a></code>.</p></dd>
 
 
 <dt id="arg-vp-nodes">vp_nodes<a class="anchor" aria-label="anchor" href="#arg-vp-nodes"></a></dt>
@@ -150,6 +187,8 @@ resource. Journal of Vision, 9(10), Article 7.</p>
 <p>van den Berg, R., Shin, H., Chou, W.-C., George, R., &amp; Ma, W. J. (2012).
 Variability in encoding precision accounts for visual short-term memory
 limitations. PNAS, 109(22), 8780-8785.</p>
+<p>Zhang, W., &amp; Luck, S. J. (2008). Discrete fixed-resolution
+representations in visual working memory. Nature, 453(7192), 233-235.</p>
     </div>
 
     <div class="section level2">
@@ -158,8 +197,13 @@ limitations. PNAS, 109(22), 8780-8785.</p>
 <span class="r-in"><span><span class="va">r</span> <span class="op">&lt;-</span> <span class="fu">rmixture3p</span><span class="op">(</span><span class="fl">10000</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>, kappa <span class="op">=</span> <span class="fl">4</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span>, p_nt <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="op">-</span><span class="va">pi</span>, <span class="va">pi</span>, length.out <span class="op">=</span> <span class="fl">10000</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu">dmixture3p</span><span class="op">(</span><span class="va">x</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>, kappa <span class="op">=</span> <span class="fl">4</span>, p_mem <span class="op">=</span> <span class="fl">0.6</span>, p_nt <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">r</span>, breaks <span class="op">=</span> <span class="fl">60</span>, freq <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">r</span>, breaks <span class="op">=</span> <span class="fl">60</span>, freq <span class="op">=</span> <span class="cn">FALSE</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.9</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">d</span>, type <span class="op">=</span> <span class="st">"l"</span>, col <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># slot averaging: with 6 slots for 3 items each item holds two slots</span></span></span>
+<span class="r-in"><span><span class="va">d6</span> <span class="op">&lt;-</span> <span class="fu">dmixture3p</span><span class="op">(</span><span class="va">x</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span>, kappa <span class="op">=</span> <span class="fl">4</span>, K <span class="op">=</span> <span class="fl">6</span>, ptarget <span class="op">=</span> <span class="fl">0.8</span>,</span></span>
+<span class="r-in"><span>                 version <span class="op">=</span> <span class="st">"slot_averaging"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">d6</span>, col <span class="op">=</span> <span class="st">"blue"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="mixture3p_dist-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

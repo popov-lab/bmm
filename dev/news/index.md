@@ -194,6 +194,15 @@
   response from memory reports the target rather than a non-target. See
   [`?mixture3p`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
   ([\#398](https://github.com/popov-lab/bmm/issues/398)).
+- [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  gain `K`, `ptarget` and `version` and now cover every version of
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md).
+  With `version = "slot"` or `"slot_averaging"` they take the capacity
+  `K` and `ptarget`, read the set size as the number of locations in
+  `mu`, and ignore `p_mem` and `p_nt` with a warning
+  ([\#711](https://github.com/popov-lab/bmm/issues/711)).
 - mixture2p, mixture3p and imm: the new argument
   `variable_precision = TRUE` lets memory precision vary from trial to
   trial (van den Berg et al., 2012) and adds the parameter `tau`; `tau`
@@ -527,6 +536,15 @@
   bmm 1.6.0). bmmtools and bmm-explorer read it from this release on. A
   later change to a field it returns is announced under this heading
   ([\#633](https://github.com/popov-lab/bmm/issues/633)).
+- `model_spec()$functions` of
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md)
+  names
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md),
+  which now take the parameters of every version, `K` and `ptarget`
+  included; select the version with their `version` argument
+  ([\#711](https://github.com/popov-lab/bmm/issues/711)).
 
 #### Other changes
 
