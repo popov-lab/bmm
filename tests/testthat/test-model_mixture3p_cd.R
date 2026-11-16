@@ -325,6 +325,33 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   expect_error(simulate_data(model, list(kappa = 1, thetat = 0, thetant = 0), n_trials = 5), "probe")
 })
 
+test_that("simulate_data() reads each version's parameters on their own scale", {
+  withr::local_seed(1136)
+  # values away from 0 on the link scale, so a weight read on the wrong scale
+  # or dropped moves P("change") by more than the tolerance
+  n <- 4e4
+  nt <- c(1.7, -2.2)
+  design <- data.frame(probe = rep(c(1.7, -1), length.out = n), nt1 = nt[1], nt2 = nt[2], set_size = 3)
+  cases <- list(
+    simple = list(link = list(thetat = 1.2, thetant = -0.8), w = c(1.2, -0.8)),
+    slot = list(link = list(K = log(2.2), ptarget = qlogis(0.6)), w = c(2.2, 0.6)),
+    slot_averaging = list(link = list(K = log(4.5), ptarget = qlogis(0.6)), w = c(4.5, 0.6))
+  )
+  for (version in names(cases)) {
+    case <- cases[[version]]
+    model <- mixture3p_cd("change", "probe", c("nt1", "nt2"), "set_size", version = version)
+    data <- simulate_data(model, c(list(kappa = log(6), criterion = 0.4), case$link), design)
+    for (probe in c(1.7, -1)) {
+      p_change <- 1 - .mixture3p_cd_psame(
+        probe, 0, 6, case$w[1], case$w[2], 0.4, 3, nt, version, FALSE
+      )
+      observed <- mean(data$change[data$probe == probe])
+      expect_lt(abs(observed - p_change), 5 * sqrt(p_change * (1 - p_change) / (n / 2)),
+                label = paste(version, probe))
+    }
+  }
+})
+
 test_that("the generated likelihood passes each parameter to its place in the core, and Stan matches R", {
   skip_unless_stan_tests()
   skip_on_cran()
