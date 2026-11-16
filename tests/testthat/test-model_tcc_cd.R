@@ -230,6 +230,8 @@ test_that("a parameter that varies with the probe distance is refused", {
                "formula for 'd' uses the distance variable 'dist'")
   expect_error(check_formula(model, dat, bmf(d ~ 1, criterion ~ a, a ~ dist)),
                "formula for 'a' uses the distance variable 'dist'")
+  expect_error(check_formula(model, dat, bmf(d ~ tcc_cd_dist, criterion ~ tcc_cd_dist)),
+               "formula for 'd', 'criterion' uses the distance variable 'dist' or its binned copy")
   expect_no_error(check_formula(model, dat, bmf(d ~ cond, criterion ~ cond)))
 })
 

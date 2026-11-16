@@ -189,8 +189,8 @@ set has only one.
 A criterion that varies with the distance absorbs \code{d} in the same way,
 and a \code{d} that varies with it is no longer one memory strength (at a
 distance with no similarity it is not estimated at all). \code{bmm()} therefore
-refuses the distance variable in every formula, including those of
-non-linear sub-parameters. A recoded copy of the distance under another
+refuses the distance variable and its binned copy \code{tcc_cd_dist} in every
+formula, including those of non-linear sub-parameters. A recoded copy of the distance under another
 name, such as a factor column of the distance levels, is not caught and
 has the same effect.
 }

@@ -161,8 +161,8 @@
 #'   A criterion that varies with the distance absorbs `d` in the same way,
 #'   and a `d` that varies with it is no longer one memory strength (at a
 #'   distance with no similarity it is not estimated at all). `bmm()` therefore
-#'   refuses the distance variable in every formula, including those of
-#'   non-linear sub-parameters. A recoded copy of the distance under another
+#'   refuses the distance variable and its binned copy `tcc_cd_dist` in every
+#'   formula, including those of non-linear sub-parameters. A recoded copy of the distance under another
 #'   name, such as a factor column of the distance levels, is not caught and
 #'   has the same effect.
 #'
@@ -274,11 +274,13 @@ check_data.tcc_cd <- function(model, data, formula) {
 #' @export
 check_formula.tcc_cd <- function(model, data, formula) {
   dist <- model$other_vars$distance
-  uses_dist <- vapply(rhs_vars(formula, collapse = FALSE), function(x) dist %in% x, logical(1))
+  # tcc_cd_dist is the binned copy check_data() builds, named in the docs
+  uses_dist <- vapply(rhs_vars(formula, collapse = FALSE),
+                      function(x) any(c(dist, "tcc_cd_dist") %in% x), logical(1))
   stopif(
     any(uses_dist),
     "The formula for {collapse_comma(names(uses_dist)[uses_dist])} uses the \\
-    distance variable '{dist}'. The likelihood already reads each probe's \\
+    distance variable '{dist}' or its binned copy 'tcc_cd_dist'. The likelihood already reads each probe's \\
     similarity from '{dist}', so a parameter that varies with it absorbs the \\
     similarity, and 'd' is not identified. Drop '{dist}' from that formula."
   )
