@@ -259,6 +259,18 @@ test_that("the generated program passes the set size as an integer, the probe, n
                fixed = TRUE)
 })
 
+test_that("the Stan data carry the probe in vreal1, then the non-targets, then their distances", {
+  # the wrapper and .imm_cd_prep_psame() read the columns of vreal by position,
+  # so their order decides which feature the observer compares and which
+  # distance weighs which non-target
+  data <- imm_cd_data()
+  sdata <- standata(cdimm_formulas$full, data, cdimm_model())
+  expect_equal(as.vector(sdata$vreal1), data$probe)
+  shown <- !is.na(data$col_nt1)
+  expect_equal(as.vector(sdata$vreal2)[shown], data$col_nt1[shown])
+  expect_equal(as.vector(sdata$vreal9)[shown], data$dist_nt1[shown])
+})
+
 test_that("log_lik(), posterior_predict() and posterior_epred() evaluate the same P('same')", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(552)
