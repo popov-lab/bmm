@@ -260,6 +260,11 @@ test_that("simulate_data() draws the observer's decision on the design's probes"
   design <- data.frame(probe = rep(1, 1e5))
   data <- simulate_data(mixture2p_cd("change", "probe"), list(kappa = 1, thetat = 0), design)
   expect_lt(abs(mean(data$change) - 0.571702760207019), 5 * sqrt(0.25 / nrow(data)))
+  # a criterion of 0.6 moves P("change") to 0.34; the observer must apply it,
+  # as dmixture2p_cd() does
+  biased <- simulate_data(mixture2p_cd("change", "probe"), list(kappa = 1, thetat = 0, criterion = 0.6), design)
+  expected <- dmixture2p_cd(1, 1, kappa = exp(1), p_mem = 0.5, criterion = 0.6)
+  expect_lt(abs(mean(biased$change) - expected), 5 * sqrt(0.25 / nrow(biased)))
   expect_error(simulate_data(mixture2p_cd("change", "probe"), list(kappa = 1, thetat = 0),
                              n_trials = 5), "probe")
 })
