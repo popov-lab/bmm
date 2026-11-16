@@ -145,7 +145,10 @@ has one model per format. The models take response counts per subject and
 condition. `sdt_yn()` also accepts one row per trial, as the first fit below
 shows; the rating, ranking and Remember/Know models need one count column per
 response category, which `aggregate_sdt_cdp_data()` builds for `sdt_cdp()`
-from trial-level data whose confidence runs on one old/new scale. The
+from trial-level data whose confidence runs on one old/new scale.
+`tcc_cd()` fits single-probe change detection from one row per trial: the
+probe's distance from the target sets its similarity, and the model estimates
+the memory strength `d` of `tcc()` with the criterion of `sdt_yn()`. The
 [signal detection article](https://venpopov.com/bmm/articles/bmm_sdt.html)
 walks through the yes/no, rating, m-AFC and ranking models, and the
 [dual-process and meta-d′ article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html)
