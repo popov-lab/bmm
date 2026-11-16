@@ -19,9 +19,9 @@ function.
 | Constructor | Response format | Key parameters | ROC defined? |
 |----|----|----|----|
 | [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) | counts of “signal”/“old” responses, or one 0/1 row per trial | `d`, `criterion`, `sdratio` | yes |
-| [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md) | counts per confidence-rating category | `d`, `criterion`, threshold params, `sdratio` | yes |
+| [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md) | counts per confidence-rating category, or one rating per trial | `d`, `criterion`, threshold params, `sdratio` | yes |
 | [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) | counts of correct m-AFC responses, or one 0/1 row per trial | `d` | no |
-| [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md) | counts per rank position | `d`, `sdratio` (`dist = "normal"` only) | no |
+| [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md) | counts per rank position, or one rank per trial | `d`, `sdratio` (`dist = "normal"` only) | no |
 
 All four assume a latent evidence variable whose noise distribution is
 selected with the `dist` argument: `"normal"` (Gaussian SDT),
@@ -61,20 +61,25 @@ the [`plot()`](https://rdrr.io/r/graphics/plot.default.html) methods
 Fitting any of the four models follows the same recipe as every `bmm`
 model; only the ingredients are SDT-specific.
 
-1.  **Aggregate the data, or declare trial rows.**
-    [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
-    and
-    [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
-    consume counts per design cell (for example per subject and stimulus
-    type), with the counts in the columns the constructor names. If your
-    data hold one row per trial, aggregate them first (e.g. with
-    [`dplyr::count()`](https://dplyr.tidyverse.org/reference/count.html)
-    or [`stats::aggregate()`](https://rdrr.io/r/stats/aggregate.html));
-    the Rating SDT section below shows a real reshaping example.
+1.  **Aggregate the data, or declare trial rows.** All four models take
+    either counts per design cell (for example per subject and stimulus
+    type), with the counts in the columns the constructor names, or one
+    row per trial. For trial rows, `response` names one column: the 0/1
+    response for
     [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and
-    [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md)
-    take either counts per cell or one row per trial with a 0/1
-    response: for trial rows, leave out `n_trials`.
+    [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md),
+    which then take no `n_trials`, the rating for
+    [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
+    and the target’s rank for
+    [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md).
+    [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+    also needs `n_ratings`, the number of rating categories.
+    [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md)
+    takes `m` as for counts, a number or the name of a column with each
+    trial’s set size. Trial rows allow item random effects; without item
+    or trial-level terms, counts give the same posterior in less time.
+    The Rating SDT section below shows a real reshaping example into
+    counts.
 2.  **Create the model object.** The constructor maps your column names
     onto the model’s response format — for example
     `sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")`
@@ -641,7 +646,36 @@ and [`sdt_bias()`](https://venpopov.com/bmm/dev/reference/SDTdist.md)
 compute both quantities from one hit rate and one false-alarm rate, for
 checking a fit against the raw rates.
 
-### 4.3 Multiple criteria: identifying the unequal-variance ratio
+### 4.3 Trial-level data
+
+With one row per trial,
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) takes no
+`n_trials`, and `response` holds 1 for an “old” and 0 for a “new”
+response on each trial. Trial rows allow item random effects, which
+counts aggregated over items cannot carry:
+
+``` r
+
+bmm(
+  formula = bmf(
+    d ~ 1 + (1 | id) + (1 | item),
+    criterion ~ 1 + (1 | id) + (1 | item)
+  ),
+  data = trials,
+  model = sdt_yn(response = "resp", stimulus = "stimulus")
+)
+```
+
+Without item or trial-level terms, the trial rows give the same
+posterior as the counts aggregated from them, and the aggregated fit is
+faster. The section [Signal detection as a probit
+GLMM](https://venpopov.com/bmm/articles/bmm_brms_to_bmm.html#signal-detection-as-a-probit-glmm)
+of the *From brms to bmm* article fits this model to simulated data,
+shows that it is the probit GLMM many psychologists already use, and
+explains why the item effects on `d` rest on the trials with old items
+only.
+
+### 4.4 Multiple criteria: identifying the unequal-variance ratio
 
 When the criterion is shifted across conditions — for example by a
 base-rate or payoff manipulation — while sensitivity is held constant,
@@ -750,7 +784,7 @@ design; the section “Identifying `sdratio`” of
 [`?sdt_yn`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) covers the
 cases in between.
 
-#### 4.3.1 Which sensitivity index?
+#### 4.4.1 Which sensitivity index?
 
 Once `sdratio` is free, “the” distance between the two distributions
 depends on which standard deviation you measure it in, and `d` is no
@@ -827,7 +861,7 @@ so compare unequal-variance Gumbel fits with
 [`auc_sdt()`](https://venpopov.com/bmm/dev/reference/auc_sdt.md) rather
 than on `d`.
 
-### 4.4 ROC and AUC
+### 4.5 ROC and AUC
 
 [`roc_sdt()`](https://venpopov.com/bmm/dev/reference/roc_sdt.md) returns
 the model-implied ROC from the posterior. For a binary fit it traces the
@@ -880,7 +914,7 @@ attr(auc, "summary")
 #> 1 0.8494397 0.8193612 0.8770114
 ```
 
-### 4.5 Quantile-transformed ROC and latent distributions
+### 4.6 Quantile-transformed ROC and latent distributions
 
 Passing `scale = "quantile"` to the ROC
 [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method reads
@@ -932,7 +966,7 @@ plot(latent_sdt(fit_uv))
 
 ![](bmm_sdt_files/figure-html/unnamed-chunk-12-1.jpeg)
 
-### 4.6 Posterior predictive checks
+### 4.7 Posterior predictive checks
 
 [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) uses a
 custom binomial family, so
@@ -956,10 +990,13 @@ pp_check(fit_uv, type = "ecdf_overlay", group = "stimulus", ndraws = 100)
 
 In a confidence-rating task each item is judged on an ordered scale
 (e.g. 1 = “sure new” … 6 = “sure old”). The data are counts per rating
-category, one column per category. Internally `bmm` fits this with
-`brms`’ native multinomial family; the K-1 confidence criteria are
-parameterized by a `threshold_type` (Selker et al. 2019; Paulewicz and
-Blaut 2020, 2022).
+category, one column per category. With one row per trial, `response`
+instead names a single column holding each trial’s rating, a whole
+number from 1 to `n_ratings`, the number of categories. Internally,
+`bmm` fits counts with `brms`’ native multinomial family and trial rows
+with a family of its own; the K-1 confidence criteria are parameterized
+by a `threshold_type` (Selker et al. 2019; Paulewicz and Blaut 2020,
+2022).
 
 We use a real recognition ROC dataset. The `roc6` object in the
 [MPTinR](https://cran.r-project.org/package=MPTinR) package collects 12
@@ -1185,12 +1222,14 @@ one-sided deviations is too rigid, while one whose predicted
 point-ranges sit on the observed bars (as here) is adequate. A *formal*
 predictive comparison is tempting, but the usual
 [`loo()`](https://mc-stan.org/loo/reference/loo.html) is **not**
-appropriate here: each observation is an aggregated count over many
-trials, so leaving one out removes a large, highly influential chunk of
-data and the PSIS-LOO approximation becomes unreliable — it flags most
-observations with a high Pareto-\\k\\, and (because that reflects
-heavy-tailed importance weights rather than Monte Carlo noise) more
-posterior draws will not fix it. The principled alternative for
+appropriate with counts: each observation is an aggregated count over
+many trials, so leaving one out removes a large, highly influential
+chunk of data and the PSIS-LOO approximation becomes unreliable — it
+flags most observations with a high Pareto-\\k\\, and (because that
+reflects heavy-tailed importance weights rather than Monte Carlo noise)
+more posterior draws will not fix it. With one row per trial,
+[`loo()`](https://mc-stan.org/loo/reference/loo.html) leaves out single
+trials, a different prediction. The principled alternative for
 aggregated data is k-fold cross-validation via
 [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html),
 which refits on held-out folds and avoids importance sampling
@@ -1235,11 +1274,11 @@ plot(latent_sdt(fit_rating_lr))
 ## 6 m-AFC SDT
 
 In an m-alternative forced-choice task the observer picks the target
-among `m` alternatives; the data are counts of correct responses. There
-is no criterion and no stimulus column — accuracy alone identifies `d`
-(DeCarlo 2012). A correct response occurs when the target’s evidence
-exceeds that of all \\m-1\\ distractors; `d` is \\d'\\, the
-target–distractor separation.
+among `m` alternatives; the data are counts of correct responses, or one
+0/1 row per trial. There is no criterion and no stimulus column —
+accuracy alone identifies `d` (DeCarlo 2012). A correct response occurs
+when the target’s evidence exceeds that of all \\m-1\\ distractors; `d`
+is \\d'\\, the target–distractor separation.
 [`sdt_mafc()`](https://venpopov.com/bmm/dev/reference/sdt_mafc.md) has
 no `sdratio`, and its `d` is on the same scale as the `d` of
 [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md),
@@ -1346,8 +1385,10 @@ pp_check(fit_mafc, type = "ecdf_overlay", ndraws = 100)
 
 In a ranking task the observer orders `m` items by evidence and the data
 are counts per rank position assigned to the target (Meyer-Grant et al.
-2026). As with m-AFC there is no criterion: the rank assigned to the
-target is an *order statistic* of the latent evidence, so the
+2026). With one row per trial, `response` instead names a single column
+holding the target’s rank on each trial, a whole number from 1 to that
+trial’s `m`. As with m-AFC there is no criterion: the rank assigned to
+the target is an *order statistic* of the latent evidence, so the
 probability of each rank follows from the evidence distribution
 directly. With `dist = "gumbel_min"` these rank probabilities have a
 closed form (the extreme-value assumption that makes ranking

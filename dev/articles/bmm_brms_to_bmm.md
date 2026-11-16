@@ -16,7 +16,9 @@ estimates. With that established, the rest of the article explains each
 difference in the code: where the response went, why every parameter
 gets its own formula, what `0 + setsize` and `1 + setsize` each give
 you, which scale the estimates are on, and why `bmm` sets informative
-default priors.
+default priors. A later section does the same comparison for signal
+detection: [trial-level `sdt_yn()` against a probit generalized linear
+mixed model](#signal-detection-as-a-probit-glmm).
 
 ## 2 The same model, written twice
 
@@ -217,12 +219,13 @@ parameters on their left-hand side.
 The reason is that a measurement model usually needs more than one
 column, and each column plays a different role. The three-parameter
 mixture model needs the response error, the colors of the items that
-were not cued, and the set size. A yes/no signal detection model needs
-the number of “old” responses, the number of trials, and whether the
-item was old or new. In `brms`, these roles end up spread over the
-response, addition terms such as `| trials()`, and predictors inside
-non-linear formulas. In `bmm`, the model object names each column once,
-by its role:
+were not cued, and the set size. A yes/no signal detection model fit to
+counts needs the number of “old” responses, the number of trials, and
+whether the item was old or new; with one row per trial, `n_trials`
+drops out. In `brms`, these roles end up spread over the response,
+addition terms such as `| trials()`, and predictors inside non-linear
+formulas. In `bmm`, the model object names each column once, by its
+role:
 
 ``` r
 
@@ -243,7 +246,346 @@ each set size. The help page of each model, such as
 [`?mixture2p`](https://venpopov.com/bmm/dev/reference/mixture2p.md),
 lists the columns it expects.
 
-## 4 One formula per parameter
+## 4 Signal detection as a probit GLMM
+
+A signal detection model can be fit without calling it that. With one
+row per trial, `resp` coded 1 for an “old” response and `stimulus` coded
+1 for a studied item and 0 for a new one, a yes/no recognition
+experiment can be analyzed as a generalized linear mixed model (GLMM)
+with a probit link:
+
+``` r
+
+brm(
+  resp ~ 0 + Intercept + stimulus + (1 + stimulus | id) + (1 + stimulus | item),
+  family = bernoulli("probit")
+)
+```
+
+This is the equal-variance Gaussian signal detection model (DeCarlo
+1998). In `bmm`, the same model is
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) with one
+row per trial: leave out `n_trials`, and `response` holds the 0 or 1 of
+each trial.
+
+### 4.1 How the parameters map
+
+The probability of an “old” response is `pnorm(Intercept)` for a new
+item and `pnorm(Intercept + stimulus)` for a studied one, where
+`stimulus` stands for its coefficient. In signal detection terms, these
+are `pnorm(-criterion)` and `pnorm(d - criterion)`: the evidence of a
+new item is normal with mean 0 and standard deviation (SD) 1, that of a
+studied item normal with mean `d`, and the participant says “old” when
+the evidence lies above the criterion. The criterion is thus measured
+from the mean of the new items. Matching the two pairs of probabilities
+gives the intercept as minus the criterion and the `stimulus`
+coefficient as `d`. So each part of the `brms` model has a `bmm` name:
+
+| `bmm` ([`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md)) | `brms` probit GLMM |
+|----|----|
+| `d` | coefficient of `stimulus` |
+| `criterion` | minus the intercept |
+| `(1 \| id)` in the formula of `d` | `stimulus` slope by `id` |
+| `(1 \| id)` in the formula of `criterion` | intercept by `id` |
+| `(1 \| item)` in the formula of `d` | `stimulus` slope by `item` |
+| `(1 \| item)` in the formula of `criterion` | intercept by `item` |
+| `sdratio` (unequal variance) | none: the probit GLMM fixes both standard deviations at 1 |
+| `bias` (criterion measured from the midpoint between the two distributions) | minus the intercept if `stimulus` is coded -0.5 / +0.5; with the 0 / 1 coding used here, `-(Intercept + stimulus / 2)` |
+| `dist` (the distribution of the evidence) | partly: `bernoulli("logit")` is `dist = "logistic"` and `bernoulli("cloglog")` is `dist = "gumbel_max"`; no link gives `dist = "gumbel_min"` for a response coded 1 = “old” (see below the table) |
+
+In the `dist` row, the link is that of the probability of an “old”
+response, whereas
+[`?sdt_yn`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) gives each
+`dist` by the cumulative distribution function of the evidence. The
+function `1 - exp(-exp(x))`, the inverse of the complementary log-log
+link, is listed there under `"gumbel_min"`; the probability of “old”
+under `"gumbel_max"` is that same function of `d - criterion`. With the
+response coded 1 for “new” instead, `bernoulli("cloglog")` gives
+`dist = "gumbel_min"`: the probability of “new” is that function of
+`criterion - d * stimulus`.
+
+`stimulus` itself appears in no `bmm` formula: it is named in the model
+object, `sdt_yn(stimulus = "stimulus")`, and `d` is its effect, so a
+predictor in the formula of `d` is always one that interacts with
+`stimulus`. A predictor of the `brms` intercept is a predictor of
+`criterion`, with its sign flipped, and its interaction with `stimulus`
+is a predictor of `d`. For a design factor `cond`,
+`resp ~ 0 + Intercept + stimulus * cond` is
+`bmf(d ~ 1 + cond, criterion ~ 1 + cond)`. The `d` coefficients are the
+`stimulus` and `stimulus:cond` coefficients, and the `criterion`
+coefficients are the intercept and `cond` coefficients, each multiplied
+by -1.
+
+The intercept by participant changes sign along with the intercept, so
+its SD is the SD of the criterion. Beyond the parameters, `bmm` adds
+helpers for the receiver operating characteristic (ROC) and the area
+under the ROC curve (AUC), which the [signal detection
+article](https://venpopov.com/bmm/articles/bmm_sdt.html) describes.
+
+### 4.2 Both fits on one data set
+
+To check the mapping, we simulate a recognition experiment in which 30
+participants each see the same 60 items. Half of the participants
+studied items 1 to 30, the other half items 31 to 60, so every item is
+old for 15 participants and new for the other 15. `d` and `criterion`
+vary between participants and between items. The data come from the
+latent normal distributions of the model directly, not from a `bmm`
+function, so that the check does not depend on `bmm`’s own code:
+
+``` r
+
+set.seed(4646)
+truth <- c(
+  d = 1.3, criterion = 0.6,
+  sd_id_d = 0.4, sd_id_criterion = 0.25,
+  sd_item_d = 0.3, sd_item_criterion = 0.2
+)
+n_id <- 30
+n_item <- 60
+rec <- expand.grid(id = seq_len(n_id), item = seq_len(n_item))
+rec$stimulus <- as.integer((rec$item <= n_item / 2) == (rec$id %% 2 == 1))
+
+id_d <- rnorm(n_id, 0, truth[["sd_id_d"]])
+id_criterion <- rnorm(n_id, 0, truth[["sd_id_criterion"]])
+item_d <- rnorm(n_item, 0, truth[["sd_item_d"]])
+item_criterion <- rnorm(n_item, 0, truth[["sd_item_criterion"]])
+trial_d <- truth[["d"]] + id_d[rec$id] + item_d[rec$item]
+trial_criterion <- truth[["criterion"]] + id_criterion[rec$id] +
+  item_criterion[rec$item]
+
+# new items draw their evidence from normal(0, 1), old items from normal(d, 1)
+evidence <- rnorm(nrow(rec), mean = rec$stimulus * trial_d)
+rec$resp <- as.integer(evidence > trial_criterion)
+rec$id <- factor(rec$id)
+rec$item <- factor(rec$item)
+head(rec)
+#>   id item stimulus resp
+#> 1  1    1        1    0
+#> 2  2    1        0    1
+#> 3  3    1        1    0
+#> 4  4    1        0    0
+#> 5  5    1        1    1
+#> 6  6    1        0    1
+```
+
+The `brms` fit is the GLMM from above. As in the first example, we give
+it the priors that `bmm` uses for
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md), so that
+the priors on the means and the SDs agree.
+[`?sdt_yn`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) lists
+them: normal(1, 1) on `d`, normal(0.5, 1.5) on `criterion` and
+exponential(1) on every SD. On the intercept, the criterion’s prior has
+its sign flipped:
+
+``` r
+
+glmm_fit <- brm(
+  resp ~ 0 + Intercept + stimulus + (1 + stimulus | id) + (1 + stimulus | item),
+  family = bernoulli("probit"),
+  prior = prior(normal(-0.5, 1.5), class = b, coef = Intercept) +
+    prior(normal(1, 1), class = b, coef = stimulus) +
+    prior(exponential(1), class = sd),
+  data = rec,
+  chains = 4,
+  cores = 4,
+  seed = 646,
+  backend = "cmdstanr",
+  file = "fits/brmsfit_sdt_glmm_brms_to_bmm"
+)
+```
+
+The `bmm` fit names the two columns in
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) and gives
+`d` and `criterion` a formula each:
+
+``` r
+
+trial_fit <- bmm(
+  formula = bmf(
+    d ~ 1 + (1 | id) + (1 | item),
+    criterion ~ 1 + (1 | id) + (1 | item)
+  ),
+  data = rec,
+  model = sdt_yn(response = "resp", stimulus = "stimulus"),
+  chains = 4,
+  cores = 4,
+  seed = 646,
+  backend = "cmdstanr",
+  file = "fits/bmmfit_sdt_trial_brms_to_bmm"
+)
+```
+
+`stimulus` appears in neither formula.
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) reads it
+from the column named in the model object and uses it to decide whether
+`d` enters a trial, the job that the `stimulus` predictor does in
+`brms`. The `1` in `d ~ 1` is the population `d`, the coefficient of
+`stimulus` in the GLMM, and `(1 | id)` lets it vary between
+participants, as the `stimulus` slope by `id` does.
+
+The fits still differ in the correlations. `(1 + stimulus | id)` in
+`brms` also estimates the correlation between each participant’s
+intercept and slope, and the same for items. The `bmm` formula above
+leaves these correlations out. Write `(1 + stimulus || id)` to drop them
+in `brms`, or give the participant terms of `d` and `criterion` a shared
+ID, `(1 | p | id)`, to add them in `bmm`. The `bmm` correlation is that
+of `d` and `criterion`, which is minus the `brms` correlation of slope
+and intercept, because the intercept is minus the criterion. The default
+priors on a correlation also differ: `brms` uses LKJ(1) and `bmm` uses
+LKJ(2):
+[`make_stancode()`](https://paulbuerkner.com/brms/reference/stancode.html)
+of the `brms` model shows LKJ(1), and
+[`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
+of a `bmm` model with `(1 | p | id)` shows LKJ(2).
+`prior(lkj(2), class = cor)` gives the `brms` model the `bmm` prior.
+
+The table puts the estimates of the two fits next to the values we
+simulated from, each as the posterior mean and its 95% credible interval
+(CrI). The `brms` intercept and its draws are multiplied by -1 to give
+the criterion:
+
+``` r
+
+glmm_draws <- as_draws_df(glmm_fit)
+trial_draws <- as_draws_df(trial_fit)
+glmm_par <- list(
+  d = glmm_draws$b_stimulus,
+  criterion = -glmm_draws$b_Intercept,
+  sd_id_d = glmm_draws$sd_id__stimulus,
+  sd_id_criterion = glmm_draws$sd_id__Intercept,
+  sd_item_d = glmm_draws$sd_item__stimulus,
+  sd_item_criterion = glmm_draws$sd_item__Intercept
+)
+trial_par <- list(
+  d = trial_draws$b_d_Intercept,
+  criterion = trial_draws$b_criterion_Intercept,
+  sd_id_d = trial_draws$sd_id__d_Intercept,
+  sd_id_criterion = trial_draws$sd_id__criterion_Intercept,
+  sd_item_d = trial_draws$sd_item__d_Intercept,
+  sd_item_criterion = trial_draws$sd_item__criterion_Intercept
+)
+mean_cri <- function(x) {
+  q <- quantile(x, c(0.025, 0.975))
+  sprintf("%.2f [%.2f, %.2f]", mean(x), q[1], q[2])
+}
+knitr::kable(data.frame(
+  parameter = c("d", "criterion", "SD of d by id", "SD of criterion by id",
+                "SD of d by item", "SD of criterion by item"),
+  `brms term` = c("stimulus", "-Intercept", "sd(stimulus) by id",
+                  "sd(Intercept) by id", "sd(stimulus) by item",
+                  "sd(Intercept) by item"),
+  simulated = truth[names(glmm_par)],
+  brms = vapply(glmm_par, mean_cri, character(1)),
+  bmm = vapply(trial_par, mean_cri, character(1)),
+  check.names = FALSE
+), row.names = FALSE)
+```
+
+| parameter | brms term | simulated | brms | bmm |
+|:---|:---|---:|:---|:---|
+| d | stimulus | 1.30 | 1.24 \[1.04, 1.45\] | 1.24 \[1.05, 1.45\] |
+| criterion | -Intercept | 0.60 | 0.59 \[0.45, 0.74\] | 0.59 \[0.46, 0.72\] |
+| SD of d by id | sd(stimulus) by id | 0.40 | 0.37 \[0.16, 0.59\] | 0.33 \[0.16, 0.51\] |
+| SD of criterion by id | sd(Intercept) by id | 0.25 | 0.25 \[0.09, 0.41\] | 0.23 \[0.10, 0.36\] |
+| SD of d by item | sd(stimulus) by item | 0.30 | 0.27 \[0.03, 0.49\] | 0.25 \[0.04, 0.44\] |
+| SD of criterion by item | sd(Intercept) by item | 0.20 | 0.18 \[0.03, 0.34\] | 0.16 \[0.02, 0.28\] |
+
+For every row, each fit’s estimate lies inside the other fit’s 95% CrI,
+and the two estimates differ by at most 0.04. Every simulated value lies
+inside both intervals. The intervals of the SDs are wide, because 30
+participants and 60 items are few groups from which to estimate a
+spread.
+
+### 4.3 The item effects on `d`
+
+The item SD of `d` rests on fewer trials than the item SD of the
+criterion. On a trial with a new item, `d` does not enter the
+probability of an “old” response, `pnorm(-criterion)`, so an item’s
+effect on `d` is estimated only from the trials on which the item was
+old: 15 per item here, against 30 for its effect on the criterion. The
+`brms` model says the same thing in its own terms: the `stimulus` slope
+by item multiplies a predictor that is 0 on every trial with a new item.
+In a design in which some items are never old, their effects on `d` stay
+at the prior. With `bias` instead of `criterion`, `d` also moves the
+criterion and enters every trial.
+
+### 4.4 Aggregated counts
+
+Item terms need trial rows, because counts summed over a participant’s
+items no longer say which item each response came from. The same holds
+for predictors that change from trial to trial. Without item terms or
+trial-level predictors, you do not need trial rows.
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) also
+takes one row per participant and stimulus type, with the number of
+“old” responses and the number of trials. This layout is faster, because
+the time a fit takes grows with the number of rows: here, 60 rows
+instead of 1800.
+
+``` r
+
+rec_counts <- aggregate(
+  cbind(n_old = resp, n_trials = 1) ~ id + stimulus,
+  data = rec, FUN = sum
+)
+agg_fit <- bmm(
+  formula = bmf(d ~ 1 + (1 | id), criterion ~ 1 + (1 | id)),
+  data = rec_counts,
+  model = sdt_yn(response = "n_old", stimulus = "stimulus",
+                 n_trials = "n_trials"),
+  chains = 4,
+  cores = 4,
+  seed = 646,
+  backend = "cmdstanr",
+  file = "fits/bmmfit_sdt_agg_brms_to_bmm"
+)
+```
+
+For this model, the 1800 trials and the 60 counts give the same
+posterior, because the counts keep everything the trials say about the
+parameters. To check this, we take every posterior draw of `agg_fit` and
+compute two log-likelihoods: that of the 1800 trial rows, each written
+as a count of 0 or 1 out of 1 trial, and that of the 60 counts. Their
+difference, the gap, is printed as its range over all draws. If the gap
+is the same in every draw, the two log-likelihoods are the same function
+of the parameters up to a constant, and with the same priors they give
+the same posterior. The second line computes the constant we expect:
+
+``` r
+
+rec_single <- transform(rec, n_old = resp, n_trials = 1)
+loglik_gap <- rowSums(log_lik(agg_fit, newdata = rec_single)) -
+  rowSums(log_lik(agg_fit))
+range(loglik_gap)
+#> [1] -889.9357 -889.9357
+-sum(lchoose(rec_counts$n_trials, rec_counts$n_old))
+#> [1] -889.9357
+```
+
+The gap is the same in every draw, up to rounding, and equals minus the
+sum of the log binomial coefficients of the counts. That term does not
+depend on any parameter, so it drops out of the posterior.
+
+### 4.5 Running and comparing trial-level fits
+
+Trial-level fits take longer because they evaluate the likelihood of
+every trial. With `backend = "cmdstanr"`,
+`bmm(..., threads = threading(4))` evaluates it on four threads in each
+chain, which shortens the fit if your machine has cores to spare beyond
+the chains.
+[`threading()`](https://paulbuerkner.com/brms/reference/threading.html)
+is the `brms` function that sets this up, and `threads = 4` is short for
+it.
+
+[`loo()`](https://mc-stan.org/loo/reference/loo.html) on a trial-level
+fit leaves out one trial at a time; on the aggregated fit, it leaves out
+one count, that is, all trials of a participant and stimulus type at
+once. These are different predictions, so compare the
+[`loo()`](https://mc-stan.org/loo/reference/loo.html) results only
+between fits to the same rows. To compare a trial-level fit with an
+aggregated one, use `kfold(fit, group = "id")`, which leaves out whole
+participants in either layout.
+
+## 5 One formula per parameter
 
 Because the response lives in the model object, a `bmmformula` is a list
 of regressions, one for each parameter of the model. Each one is a
@@ -253,7 +595,7 @@ effects in the `lme4` syntax, and non-linear terms if you need them. The
 article](https://venpopov.com/bmm/articles/bmm_bmmformula.html) covers
 the syntax in full, including how to fix a parameter to a constant.
 
-### 4.1 `0 + setsize` or `1 + setsize`
+### 5.1 `0 + setsize` or `1 + setsize`
 
 Most `bmm` articles write `0 + setsize`, and you may be used to
 `1 + setsize` (or just `setsize`, which is the same thing). Both
@@ -403,7 +745,7 @@ here, gives every participant one shift for all set sizes.
 participants differ per set size, coded as cell values or as differences
 from the reference cell.
 
-## 5 Which scale the estimates are on
+## 6 Which scale the estimates are on
 
 The summary of a `bmm` fit lists the link of each parameter:
 
@@ -494,7 +836,7 @@ A coefficient on its own transforms to something else. With
 set size 6 is larger or smaller than at set size 1, not `kappa` at set
 size 6. The help page of each model lists the links of its parameters.
 
-## 6 Why the default priors are informative
+## 7 Why the default priors are informative
 
 `brms` uses flat priors on regression coefficients unless you set them.
 For the `brms` version of this model, the defaults are:
@@ -596,7 +938,7 @@ What this means for you:
   plan to compute them, choose the priors on purpose rather than taking
   the defaults.
 
-## 7 What stays brms
+## 8 What stays brms
 
 A `bmm` fit is a `brmsfit` with extra information, so the `brms` toolbox
 works on it:
@@ -615,7 +957,7 @@ of the `bmm` one. It lists the link of `theta1` as `identity`, because
 change a model beyond what `bmm` offers, these give you the `brms` code
 to start from.
 
-## 8 Where to go next
+## 9 Where to go next
 
 - [Get started](https://venpopov.com/bmm/articles/bmm.html) lists the
   models by task and walks through a first fit.
@@ -625,12 +967,22 @@ to start from.
 - The [mixture models
   article](https://venpopov.com/bmm/articles/bmm_mixture_models.html)
   fits the two- and three-parameter mixture models to a larger data set.
+- The [signal detection
+  article](https://venpopov.com/bmm/articles/bmm_sdt.html) covers the
+  yes/no, rating, m-AFC and ranking models, with counts or trial rows.
+  The section [Signal detection as a probit
+  GLMM](#signal-detection-as-a-probit-glmm) above is the short version
+  for [`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md).
 - [Extracting model
   information](https://venpopov.com/bmm/articles/bmm_extract_info.html)
   shows how to get the default priors, the Stan code and the Stan data
   before you fit.
 
 ## References
+
+DeCarlo, Lawrence T. 1998. “Signal Detection Theory and Generalized
+Linear Models.” *Psychological Methods* 3 (2): 186–205.
+<https://doi.org/10.1037/1082-989X.3.2.186>.
 
 Zhang, Weiwei, and Steven J. Luck. 2008. “Discrete Fixed-Resolution
 Representations in Visual Working Memory.” *Nature* 453 (7192): 233–35.

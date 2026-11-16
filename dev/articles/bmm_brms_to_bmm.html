@@ -98,7 +98,9 @@ Both fits run the same Stan model, so they give the same estimates. With that
 established, the rest of the article explains each difference in the code: where
 the response went, why every parameter gets its own formula, what
 <code>0 + setsize</code> and <code>1 + setsize</code> each give you, which scale the estimates are on,
-and why <code>bmm</code> sets informative default priors.</p>
+and why <code>bmm</code> sets informative default priors. A later section does the same
+comparison for signal detection:
+<a href="#signal-detection-as-a-probit-glmm">trial-level <code>sdt_yn()</code> against a probit generalized linear mixed model</a>.</p>
 </div>
 <div class="section level2" number="2">
 <h2 id="the-same-model-written-twice">
@@ -324,8 +326,9 @@ parameters on their left-hand side.</p>
 <p>The reason is that a measurement model usually needs more than one column, and
 each column plays a different role. The three-parameter mixture model needs the
 response error, the colors of the items that were not cued, and the set size.
-A yes/no signal detection model needs the number of “old” responses, the number
-of trials, and whether the item was old or new. In <code>brms</code>, these roles end up
+A yes/no signal detection model fit to counts needs the number of “old”
+responses, the number of trials, and whether the item was old or new; with one
+row per trial, <code>n_trials</code> drops out. In <code>brms</code>, these roles end up
 spread over the response, addition terms such as <code>| trials()</code>, and predictors
 inside non-linear formulas. In <code>bmm</code>, the model object names each column once,
 by its role:</p>
@@ -343,8 +346,407 @@ filled at each set size. The help page of each model, such as <code><a href="../
 lists the columns it expects.</p>
 </div>
 <div class="section level2" number="4">
+<h2 id="signal-detection-as-a-probit-glmm">
+<span class="header-section-number">4</span> Signal detection as a probit GLMM<a class="anchor" aria-label="anchor" href="#signal-detection-as-a-probit-glmm"></a>
+</h2>
+<p>A signal detection model can be fit without calling it that. With one row per
+trial, <code>resp</code> coded 1 for an “old” response and <code>stimulus</code> coded 1 for a studied
+item and 0 for a new one, a yes/no recognition experiment can be analyzed as a
+generalized linear mixed model (GLMM) with a probit link:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brm</a></span><span class="op">(</span></span>
+<span>  <span class="va">resp</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">Intercept</span> <span class="op">+</span> <span class="va">stimulus</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="va">stimulus</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="va">stimulus</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsfamily.html" class="external-link">bernoulli</a></span><span class="op">(</span><span class="st">"probit"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>This is the equal-variance Gaussian signal detection model <span class="citation">(DeCarlo 1998)</span>. In
+<code>bmm</code>, the same model is <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> with one row per trial: leave out
+<code>n_trials</code>, and <code>response</code> holds the 0 or 1 of each trial.</p>
+<div class="section level3" number="4.1">
+<h3 id="how-the-parameters-map">
+<span class="header-section-number">4.1</span> How the parameters map<a class="anchor" aria-label="anchor" href="#how-the-parameters-map"></a>
+</h3>
+<p>The probability of an “old” response is <code>pnorm(Intercept)</code> for a new item and
+<code>pnorm(Intercept + stimulus)</code> for a studied one, where <code>stimulus</code> stands for its
+coefficient. In signal detection terms, these are <code>pnorm(-criterion)</code> and
+<code>pnorm(d - criterion)</code>: the evidence of a new item is normal with mean 0 and
+standard deviation (SD) 1, that of a studied item normal with mean <code>d</code>, and the
+participant says “old” when the evidence lies above the criterion. The
+criterion is thus measured from the mean of the new items. Matching the two
+pairs of probabilities gives the intercept as minus the criterion and the
+<code>stimulus</code> coefficient as <code>d</code>. So each part of the <code>brms</code> model has a <code>bmm</code>
+name:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>
+<code>bmm</code> (<code><a href="../reference/sdt_yn.html">sdt_yn()</a></code>)</th>
+<th>
+<code>brms</code> probit GLMM</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>d</code></td>
+<td>coefficient of <code>stimulus</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>criterion</code></td>
+<td>minus the intercept</td>
+</tr>
+<tr class="odd">
+<td>
+<code>(1 \| id)</code> in the formula of <code>d</code>
+</td>
+<td>
+<code>stimulus</code> slope by <code>id</code>
+</td>
+</tr>
+<tr class="even">
+<td>
+<code>(1 \| id)</code> in the formula of <code>criterion</code>
+</td>
+<td>intercept by <code>id</code>
+</td>
+</tr>
+<tr class="odd">
+<td>
+<code>(1 \| item)</code> in the formula of <code>d</code>
+</td>
+<td>
+<code>stimulus</code> slope by <code>item</code>
+</td>
+</tr>
+<tr class="even">
+<td>
+<code>(1 \| item)</code> in the formula of <code>criterion</code>
+</td>
+<td>intercept by <code>item</code>
+</td>
+</tr>
+<tr class="odd">
+<td>
+<code>sdratio</code> (unequal variance)</td>
+<td>none: the probit GLMM fixes both standard deviations at 1</td>
+</tr>
+<tr class="even">
+<td>
+<code>bias</code> (criterion measured from the midpoint between the two distributions)</td>
+<td>minus the intercept if <code>stimulus</code> is coded -0.5 / +0.5; with the 0 / 1 coding used here, <code>-(Intercept + stimulus / 2)</code>
+</td>
+</tr>
+<tr class="odd">
+<td>
+<code>dist</code> (the distribution of the evidence)</td>
+<td>partly: <code>bernoulli("logit")</code> is <code>dist = "logistic"</code> and <code>bernoulli("cloglog")</code> is <code>dist = "gumbel_max"</code>; no link gives <code>dist = "gumbel_min"</code> for a response coded 1 = “old” (see below the table)</td>
+</tr>
+</tbody>
+</table>
+<p>In the <code>dist</code> row, the link is that of the probability of an “old” response,
+whereas <code><a href="../reference/sdt_yn.html">?sdt_yn</a></code> gives each <code>dist</code> by the cumulative distribution function of
+the evidence. The function <code>1 - exp(-exp(x))</code>, the inverse of the complementary
+log-log link, is listed there under <code>"gumbel_min"</code>; the probability of “old”
+under <code>"gumbel_max"</code> is that same function of <code>d - criterion</code>. With the response
+coded 1 for “new” instead, <code>bernoulli("cloglog")</code> gives <code>dist = "gumbel_min"</code>:
+the probability of “new” is that function of <code>criterion - d * stimulus</code>.</p>
+<p><code>stimulus</code> itself appears in no <code>bmm</code> formula: it is named in the model object,
+<code>sdt_yn(stimulus = "stimulus")</code>, and <code>d</code> is its effect, so a predictor in the
+formula of <code>d</code> is always one that interacts with <code>stimulus</code>. A predictor of the
+<code>brms</code> intercept is a predictor of <code>criterion</code>, with its sign flipped, and its
+interaction with <code>stimulus</code> is a predictor of <code>d</code>. For a design factor <code>cond</code>,
+<code>resp ~ 0 + Intercept + stimulus * cond</code> is <code>bmf(d ~ 1 + cond, criterion ~ 1 + cond)</code>.
+The <code>d</code> coefficients are the <code>stimulus</code> and <code>stimulus:cond</code> coefficients, and
+the <code>criterion</code> coefficients are the intercept and <code>cond</code> coefficients, each
+multiplied by -1.</p>
+<p>The intercept by participant changes sign along with the intercept, so its
+SD is the SD of the criterion. Beyond the parameters, <code>bmm</code> adds helpers for the
+receiver operating characteristic (ROC) and the area under the ROC curve (AUC),
+which the
+<a href="https://venpopov.com/bmm/articles/bmm_sdt.html">signal detection article</a>
+describes.</p>
+</div>
+<div class="section level3" number="4.2">
+<h3 id="both-fits-on-one-data-set">
+<span class="header-section-number">4.2</span> Both fits on one data set<a class="anchor" aria-label="anchor" href="#both-fits-on-one-data-set"></a>
+</h3>
+<p>To check the mapping, we simulate a recognition experiment in which 30
+participants each see the same 60 items. Half of the participants studied
+items 1 to 30, the other half items 31 to 60, so every item is old for 15
+participants and new for the other 15. <code>d</code> and <code>criterion</code> vary between
+participants and between items. The data come from the latent normal
+distributions of the model directly, not from a <code>bmm</code> function, so that the
+check does not depend on <code>bmm</code>’s own code:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">4646</span><span class="op">)</span></span>
+<span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  d <span class="op">=</span> <span class="fl">1.3</span>, criterion <span class="op">=</span> <span class="fl">0.6</span>,</span>
+<span>  sd_id_d <span class="op">=</span> <span class="fl">0.4</span>, sd_id_criterion <span class="op">=</span> <span class="fl">0.25</span>,</span>
+<span>  sd_item_d <span class="op">=</span> <span class="fl">0.3</span>, sd_item_criterion <span class="op">=</span> <span class="fl">0.2</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">n_id</span> <span class="op">&lt;-</span> <span class="fl">30</span></span>
+<span><span class="va">n_item</span> <span class="op">&lt;-</span> <span class="fl">60</span></span>
+<span><span class="va">rec</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="va">n_id</span><span class="op">)</span>, item <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="va">n_item</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">rec</span><span class="op">$</span><span class="va">stimulus</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="op">(</span><span class="va">rec</span><span class="op">$</span><span class="va">item</span> <span class="op">&lt;=</span> <span class="va">n_item</span> <span class="op">/</span> <span class="fl">2</span><span class="op">)</span> <span class="op">==</span> <span class="op">(</span><span class="va">rec</span><span class="op">$</span><span class="va">id</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">2</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">id_d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_id</span>, <span class="fl">0</span>, <span class="va">truth</span><span class="op">[[</span><span class="st">"sd_id_d"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="va">id_criterion</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_id</span>, <span class="fl">0</span>, <span class="va">truth</span><span class="op">[[</span><span class="st">"sd_id_criterion"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="va">item_d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_item</span>, <span class="fl">0</span>, <span class="va">truth</span><span class="op">[[</span><span class="st">"sd_item_d"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="va">item_criterion</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_item</span>, <span class="fl">0</span>, <span class="va">truth</span><span class="op">[[</span><span class="st">"sd_item_criterion"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="va">trial_d</span> <span class="op">&lt;-</span> <span class="va">truth</span><span class="op">[[</span><span class="st">"d"</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span> <span class="va">id_d</span><span class="op">[</span><span class="va">rec</span><span class="op">$</span><span class="va">id</span><span class="op">]</span> <span class="op">+</span> <span class="va">item_d</span><span class="op">[</span><span class="va">rec</span><span class="op">$</span><span class="va">item</span><span class="op">]</span></span>
+<span><span class="va">trial_criterion</span> <span class="op">&lt;-</span> <span class="va">truth</span><span class="op">[[</span><span class="st">"criterion"</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span> <span class="va">id_criterion</span><span class="op">[</span><span class="va">rec</span><span class="op">$</span><span class="va">id</span><span class="op">]</span> <span class="op">+</span></span>
+<span>  <span class="va">item_criterion</span><span class="op">[</span><span class="va">rec</span><span class="op">$</span><span class="va">item</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># new items draw their evidence from normal(0, 1), old items from normal(d, 1)</span></span>
+<span><span class="va">evidence</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">rec</span><span class="op">)</span>, mean <span class="op">=</span> <span class="va">rec</span><span class="op">$</span><span class="va">stimulus</span> <span class="op">*</span> <span class="va">trial_d</span><span class="op">)</span></span>
+<span><span class="va">rec</span><span class="op">$</span><span class="va">resp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="va">evidence</span> <span class="op">&gt;</span> <span class="va">trial_criterion</span><span class="op">)</span></span>
+<span><span class="va">rec</span><span class="op">$</span><span class="va">id</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">rec</span><span class="op">$</span><span class="va">id</span><span class="op">)</span></span>
+<span><span class="va">rec</span><span class="op">$</span><span class="va">item</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">rec</span><span class="op">$</span><span class="va">item</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">rec</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   id item stimulus resp</span></span>
+<span><span class="co">#&gt; 1  1    1        1    0</span></span>
+<span><span class="co">#&gt; 2  2    1        0    1</span></span>
+<span><span class="co">#&gt; 3  3    1        1    0</span></span>
+<span><span class="co">#&gt; 4  4    1        0    0</span></span>
+<span><span class="co">#&gt; 5  5    1        1    1</span></span>
+<span><span class="co">#&gt; 6  6    1        0    1</span></span></code></pre></div>
+<p>The <code>brms</code> fit is the GLMM from above. As in the first example, we give it the
+priors that <code>bmm</code> uses for <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code>, so that the priors on the means and the
+SDs agree. <code><a href="../reference/sdt_yn.html">?sdt_yn</a></code> lists them: normal(1, 1) on <code>d</code>,
+normal(0.5, 1.5) on <code>criterion</code> and exponential(1) on every
+SD. On the intercept, the criterion’s prior has its sign flipped:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">glmm_fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/brm.html" class="external-link">brm</a></span><span class="op">(</span></span>
+<span>  <span class="va">resp</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">Intercept</span> <span class="op">+</span> <span class="va">stimulus</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="va">stimulus</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="va">stimulus</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsfamily.html" class="external-link">bernoulli</a></span><span class="op">(</span><span class="st">"probit"</span><span class="op">)</span>,</span>
+<span>  prior <span class="op">=</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="op">-</span><span class="fl">0.5</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span>, coef <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span>, coef <span class="op">=</span> <span class="va">stimulus</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsfamily.html" class="external-link">exponential</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">sd</span><span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">rec</span>,</span>
+<span>  chains <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">646</span>,</span>
+<span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
+<span>  file <span class="op">=</span> <span class="st">"fits/brmsfit_sdt_glmm_brms_to_bmm"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The <code>bmm</code> fit names the two columns in <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> and gives <code>d</code> and
+<code>criterion</code> a formula each:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">trial_fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
+<span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
+<span>    <span class="va">d</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span>,</span>
+<span>    <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">rec</span>,</span>
+<span>  model <span class="op">=</span> <span class="fu"><a href="../reference/sdt_yn.html">sdt_yn</a></span><span class="op">(</span>response <span class="op">=</span> <span class="st">"resp"</span>, stimulus <span class="op">=</span> <span class="st">"stimulus"</span><span class="op">)</span>,</span>
+<span>  chains <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">646</span>,</span>
+<span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_sdt_trial_brms_to_bmm"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code>stimulus</code> appears in neither formula. <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> reads it from the column
+named in the model object and uses it to decide whether <code>d</code> enters a trial, the
+job that the <code>stimulus</code> predictor does in <code>brms</code>. The <code>1</code> in <code>d ~ 1</code> is the
+population <code>d</code>, the coefficient of <code>stimulus</code> in the GLMM, and <code>(1 | id)</code> lets
+it vary between participants, as the <code>stimulus</code> slope by <code>id</code> does.</p>
+<p>The fits still differ in the correlations. <code>(1 + stimulus | id)</code> in <code>brms</code> also
+estimates the correlation between each participant’s intercept and slope, and
+the same for items. The <code>bmm</code> formula above leaves these correlations out.
+Write <code>(1 + stimulus || id)</code> to drop them in <code>brms</code>, or give the participant
+terms of <code>d</code> and <code>criterion</code> a shared ID, <code>(1 | p | id)</code>, to add them in <code>bmm</code>.
+The <code>bmm</code> correlation is that of <code>d</code> and <code>criterion</code>, which is minus the <code>brms</code>
+correlation of slope and intercept, because the intercept is minus the
+criterion. The default priors on a correlation also differ: <code>brms</code> uses
+LKJ(1) and <code>bmm</code> uses LKJ(2): <code><a href="https://paulbuerkner.com/brms/reference/stancode.html" class="external-link">make_stancode()</a></code> of the <code>brms</code> model shows
+LKJ(1), and <code><a href="../reference/stancode.bmmformula.html">stancode()</a></code> of a <code>bmm</code> model with <code>(1 | p | id)</code> shows LKJ(2).
+<code>prior(lkj(2), class = cor)</code> gives the <code>brms</code> model the <code>bmm</code> prior.</p>
+<p>The table puts the estimates of the two fits next to the values we simulated
+from, each as the posterior mean and its 95% credible interval (CrI). The
+<code>brms</code> intercept and its draws are multiplied by -1 to give the criterion:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">glmm_draws</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df</a></span><span class="op">(</span><span class="va">glmm_fit</span><span class="op">)</span></span>
+<span><span class="va">trial_draws</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df</a></span><span class="op">(</span><span class="va">trial_fit</span><span class="op">)</span></span>
+<span><span class="va">glmm_par</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  d <span class="op">=</span> <span class="va">glmm_draws</span><span class="op">$</span><span class="va">b_stimulus</span>,</span>
+<span>  criterion <span class="op">=</span> <span class="op">-</span><span class="va">glmm_draws</span><span class="op">$</span><span class="va">b_Intercept</span>,</span>
+<span>  sd_id_d <span class="op">=</span> <span class="va">glmm_draws</span><span class="op">$</span><span class="va">sd_id__stimulus</span>,</span>
+<span>  sd_id_criterion <span class="op">=</span> <span class="va">glmm_draws</span><span class="op">$</span><span class="va">sd_id__Intercept</span>,</span>
+<span>  sd_item_d <span class="op">=</span> <span class="va">glmm_draws</span><span class="op">$</span><span class="va">sd_item__stimulus</span>,</span>
+<span>  sd_item_criterion <span class="op">=</span> <span class="va">glmm_draws</span><span class="op">$</span><span class="va">sd_item__Intercept</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">trial_par</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  d <span class="op">=</span> <span class="va">trial_draws</span><span class="op">$</span><span class="va">b_d_Intercept</span>,</span>
+<span>  criterion <span class="op">=</span> <span class="va">trial_draws</span><span class="op">$</span><span class="va">b_criterion_Intercept</span>,</span>
+<span>  sd_id_d <span class="op">=</span> <span class="va">trial_draws</span><span class="op">$</span><span class="va">sd_id__d_Intercept</span>,</span>
+<span>  sd_id_criterion <span class="op">=</span> <span class="va">trial_draws</span><span class="op">$</span><span class="va">sd_id__criterion_Intercept</span>,</span>
+<span>  sd_item_d <span class="op">=</span> <span class="va">trial_draws</span><span class="op">$</span><span class="va">sd_item__d_Intercept</span>,</span>
+<span>  sd_item_criterion <span class="op">=</span> <span class="va">trial_draws</span><span class="op">$</span><span class="va">sd_item__criterion_Intercept</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">mean_cri</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">x</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.025</span>, <span class="fl">0.975</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.2f [%.2f, %.2f]"</span>, <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="va">q</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>, <span class="va">q</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  parameter <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"d"</span>, <span class="st">"criterion"</span>, <span class="st">"SD of d by id"</span>, <span class="st">"SD of criterion by id"</span>,</span>
+<span>                <span class="st">"SD of d by item"</span>, <span class="st">"SD of criterion by item"</span><span class="op">)</span>,</span>
+<span>  `brms term` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stimulus"</span>, <span class="st">"-Intercept"</span>, <span class="st">"sd(stimulus) by id"</span>,</span>
+<span>                  <span class="st">"sd(Intercept) by id"</span>, <span class="st">"sd(stimulus) by item"</span>,</span>
+<span>                  <span class="st">"sd(Intercept) by item"</span><span class="op">)</span>,</span>
+<span>  simulated <span class="op">=</span> <span class="va">truth</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">glmm_par</span><span class="op">)</span><span class="op">]</span>,</span>
+<span>  brms <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">glmm_par</span>, <span class="va">mean_cri</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  bmm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">trial_par</span>, <span class="va">mean_cri</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  check.names <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span>, row.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<colgroup>
+<col width="26%">
+<col width="23%">
+<col width="10%">
+<col width="19%">
+<col width="19%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">parameter</th>
+<th align="left">brms term</th>
+<th align="right">simulated</th>
+<th align="left">brms</th>
+<th align="left">bmm</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">d</td>
+<td align="left">stimulus</td>
+<td align="right">1.30</td>
+<td align="left">1.24 [1.04, 1.45]</td>
+<td align="left">1.24 [1.05, 1.45]</td>
+</tr>
+<tr class="even">
+<td align="left">criterion</td>
+<td align="left">-Intercept</td>
+<td align="right">0.60</td>
+<td align="left">0.59 [0.45, 0.74]</td>
+<td align="left">0.59 [0.46, 0.72]</td>
+</tr>
+<tr class="odd">
+<td align="left">SD of d by id</td>
+<td align="left">sd(stimulus) by id</td>
+<td align="right">0.40</td>
+<td align="left">0.37 [0.16, 0.59]</td>
+<td align="left">0.33 [0.16, 0.51]</td>
+</tr>
+<tr class="even">
+<td align="left">SD of criterion by id</td>
+<td align="left">sd(Intercept) by id</td>
+<td align="right">0.25</td>
+<td align="left">0.25 [0.09, 0.41]</td>
+<td align="left">0.23 [0.10, 0.36]</td>
+</tr>
+<tr class="odd">
+<td align="left">SD of d by item</td>
+<td align="left">sd(stimulus) by item</td>
+<td align="right">0.30</td>
+<td align="left">0.27 [0.03, 0.49]</td>
+<td align="left">0.25 [0.04, 0.44]</td>
+</tr>
+<tr class="even">
+<td align="left">SD of criterion by item</td>
+<td align="left">sd(Intercept) by item</td>
+<td align="right">0.20</td>
+<td align="left">0.18 [0.03, 0.34]</td>
+<td align="left">0.16 [0.02, 0.28]</td>
+</tr>
+</tbody>
+</table>
+<p>For every row, each fit’s estimate lies inside the other fit’s 95% CrI, and
+the two estimates differ by at most 0.04. Every
+simulated value lies inside both intervals. The intervals of the SDs are wide,
+because 30 participants and 60 items are few groups from which to
+estimate a spread.</p>
+</div>
+<div class="section level3" number="4.3">
+<h3 id="the-item-effects-on-d">
+<span class="header-section-number">4.3</span> The item effects on <code>d</code><a class="anchor" aria-label="anchor" href="#the-item-effects-on-d"></a>
+</h3>
+<p>The item SD of <code>d</code> rests on fewer trials than the item SD of the criterion.
+On a trial with a new item, <code>d</code> does not enter the probability of an “old”
+response, <code>pnorm(-criterion)</code>, so an item’s effect on <code>d</code> is estimated only
+from the trials on which the item was old: 15 per item here, against
+30 for its effect on the criterion. The <code>brms</code> model says the same thing in its own
+terms: the <code>stimulus</code> slope by item multiplies a predictor that is 0 on every
+trial with a new item. In a design in which some items are never old, their
+effects on <code>d</code> stay at the prior. With <code>bias</code> instead of <code>criterion</code>, <code>d</code> also
+moves the criterion and enters every trial.</p>
+</div>
+<div class="section level3" number="4.4">
+<h3 id="aggregated-counts">
+<span class="header-section-number">4.4</span> Aggregated counts<a class="anchor" aria-label="anchor" href="#aggregated-counts"></a>
+</h3>
+<p>Item terms need trial rows, because counts summed over a participant’s items
+no longer say which item each response came from. The same holds for predictors
+that change from trial to trial. Without item terms or trial-level predictors,
+you do not need trial rows. <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> also takes one row per participant and
+stimulus type, with the number of “old” responses and the number of trials.
+This layout is faster, because the time a fit takes grows with the number of
+rows: here, 60 rows instead of 1800.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rec_counts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span>n_old <span class="op">=</span> <span class="va">resp</span>, n_trials <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">~</span> <span class="va">id</span> <span class="op">+</span> <span class="va">stimulus</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">rec</span>, FUN <span class="op">=</span> <span class="va">sum</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">agg_fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
+<span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">d</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span>, <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">rec_counts</span>,</span>
+<span>  model <span class="op">=</span> <span class="fu"><a href="../reference/sdt_yn.html">sdt_yn</a></span><span class="op">(</span>response <span class="op">=</span> <span class="st">"n_old"</span>, stimulus <span class="op">=</span> <span class="st">"stimulus"</span>,</span>
+<span>                 n_trials <span class="op">=</span> <span class="st">"n_trials"</span><span class="op">)</span>,</span>
+<span>  chains <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">646</span>,</span>
+<span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_sdt_agg_brms_to_bmm"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>For this model, the 1800 trials and the 60 counts give the same posterior,
+because the counts keep everything the trials say about the parameters. To
+check this, we take every posterior draw of <code>agg_fit</code> and compute two
+log-likelihoods: that of the 1800 trial rows, each written as a count of
+0 or 1 out of 1 trial, and that of the 60 counts. Their
+difference, the gap, is printed as its range over all draws. If the gap is the
+same in every draw, the two log-likelihoods are the same function of the
+parameters up to a constant, and with the same priors they give the same
+posterior. The second line computes the constant we expect:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rec_single</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/transform.html" class="external-link">transform</a></span><span class="op">(</span><span class="va">rec</span>, n_old <span class="op">=</span> <span class="va">resp</span>, n_trials <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">loglik_gap</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/log_lik.html" class="external-link">log_lik</a></span><span class="op">(</span><span class="va">agg_fit</span>, newdata <span class="op">=</span> <span class="va">rec_single</span><span class="op">)</span><span class="op">)</span> <span class="op">-</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="fu"><a href="https://mc-stan.org/rstantools/reference/log_lik.html" class="external-link">log_lik</a></span><span class="op">(</span><span class="va">agg_fit</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">loglik_gap</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] -889.9357 -889.9357</span></span>
+<span><span class="op">-</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Special.html" class="external-link">lchoose</a></span><span class="op">(</span><span class="va">rec_counts</span><span class="op">$</span><span class="va">n_trials</span>, <span class="va">rec_counts</span><span class="op">$</span><span class="va">n_old</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] -889.9357</span></span></code></pre></div>
+<p>The gap is the same in every draw, up to rounding, and equals minus the sum of
+the log binomial coefficients of the counts. That term does not depend on any
+parameter, so it drops out of the posterior.</p>
+</div>
+<div class="section level3" number="4.5">
+<h3 id="running-and-comparing-trial-level-fits">
+<span class="header-section-number">4.5</span> Running and comparing trial-level fits<a class="anchor" aria-label="anchor" href="#running-and-comparing-trial-level-fits"></a>
+</h3>
+<p>Trial-level fits take longer because they evaluate the likelihood of every
+trial. With <code>backend = "cmdstanr"</code>, <code>bmm(..., threads = threading(4))</code>
+evaluates it on four threads in each chain, which shortens the fit if your
+machine has cores to spare beyond the chains. <code><a href="https://paulbuerkner.com/brms/reference/threading.html" class="external-link">threading()</a></code> is the <code>brms</code>
+function that sets this up, and <code>threads = 4</code> is short for it.</p>
+<p><code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> on a trial-level fit leaves out one trial at a time; on the aggregated
+fit, it leaves out one count, that is, all trials of a participant and stimulus
+type at once. These are different predictions, so compare the <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> results
+only between fits to the same rows. To compare a trial-level fit with an
+aggregated one, use <code>kfold(fit, group = "id")</code>, which leaves out whole
+participants in either layout.</p>
+</div>
+</div>
+<div class="section level2" number="5">
 <h2 id="one-formula-per-parameter">
-<span class="header-section-number">4</span> One formula per parameter<a class="anchor" aria-label="anchor" href="#one-formula-per-parameter"></a>
+<span class="header-section-number">5</span> One formula per parameter<a class="anchor" aria-label="anchor" href="#one-formula-per-parameter"></a>
 </h2>
 <p>Because the response lives in the model object, a <code>bmmformula</code> is a list of
 regressions, one for each parameter of the model. Each one is a regular <code>brms</code>
@@ -352,9 +754,9 @@ formula, with population-level effects, group-level effects in the <code>lme4</c
 syntax, and non-linear terms if you need them. The
 <a href="https://venpopov.com/bmm/articles/bmm_bmmformula.html">bmmformula article</a>
 covers the syntax in full, including how to fix a parameter to a constant.</p>
-<div class="section level3" number="4.1">
+<div class="section level3" number="5.1">
 <h3 id="setsize-or-1-setsize">
-<span class="header-section-number">4.1</span> <code>0 + setsize</code> or <code>1 + setsize</code><a class="anchor" aria-label="anchor" href="#setsize-or-1-setsize"></a>
+<span class="header-section-number">5.1</span> <code>0 + setsize</code> or <code>1 + setsize</code><a class="anchor" aria-label="anchor" href="#setsize-or-1-setsize"></a>
 </h3>
 <p>Most <code>bmm</code> articles write <code>0 + setsize</code>, and you may be used to <code>1 + setsize</code>
 (or just <code>setsize</code>, which is the same thing). Both describe the same regression
@@ -375,7 +777,7 @@ set size 1, and the other coefficients are differences from it.
 This coding is just as suitable, and it reads naturally when the difference
 between conditions is your question. To get the parameter in a cell, you add
 the coefficients:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bmm_fit_ref</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
 <span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
 <span>    <span class="va">kappa</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">setsize</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">subID</span><span class="op">)</span>,</span>
@@ -388,7 +790,7 @@ the coefficients:</p>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
 <span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_brms_to_bmm_reference"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">bmm_fit_ref</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"kappa_Intercept"</span>, <span class="st">"kappa_setsize6"</span><span class="op">)</span>, <span class="op">]</span></span>
 <span><span class="co">#&gt;                   Estimate  Est.Error      Q2.5      Q97.5</span></span>
 <span><span class="co">#&gt; kappa_Intercept  2.8105353 0.06038921  2.694992  2.9271767</span></span>
@@ -415,7 +817,7 @@ between set sizes is the difference of two cell coefficients of the
 cell of the design, whatever the coding of the formula, and reports it on the
 scale of the model (more on scales in the next section). Here are both fits
 side by side:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">np_cell</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/native_parameters.html">native_parameters</a></span><span class="op">(</span><span class="va">bmm_fit</span>, re_formula <span class="op">=</span> <span class="cn">NA</span>, summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">np_ref</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/native_parameters.html">native_parameters</a></span><span class="op">(</span><span class="va">bmm_fit_ref</span>, re_formula <span class="op">=</span> <span class="cn">NA</span>, summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">fmt</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">np</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.2f [%.2f, %.2f]"</span>, <span class="va">np</span><span class="op">$</span><span class="va">Estimate</span>, <span class="va">np</span><span class="op">$</span><span class="va">Q2.5</span>, <span class="va">np</span><span class="op">$</span><span class="va">Q97.5</span><span class="op">)</span></span>
@@ -532,12 +934,12 @@ gives every participant one shift for all set sizes. <code>(0 + setsize | subID)
 values or as differences from the reference cell.</p>
 </div>
 </div>
-<div class="section level2" number="5">
+<div class="section level2" number="6">
 <h2 id="which-scale-the-estimates-are-on">
-<span class="header-section-number">5</span> Which scale the estimates are on<a class="anchor" aria-label="anchor" href="#which-scale-the-estimates-are-on"></a>
+<span class="header-section-number">6</span> Which scale the estimates are on<a class="anchor" aria-label="anchor" href="#which-scale-the-estimates-are-on"></a>
 </h2>
 <p>The summary of a <code>bmm</code> fit lists the link of each parameter:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">bmm_fit</span><span class="op">)</span></span></code></pre></div>
 <pre class="fansi fansi-output"><code><span style="color: #AF5FFF;">  Model: </span><span style="color: #FF875F;">mixture2p</span>(resp_error = "response_error") 
 <span style="color: #AF5FFF;">  Links: </span>mu1 = tan_half; kappa = log; thetat = logit 
@@ -585,7 +987,7 @@ scale.</p>
 <p>To report a parameter on its own scale, transform the draws and summarize
 afterwards, not the other way around. The mean of <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> of the draws is not
 <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp()</a></code> of their mean. For set size 6:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>  `exp(mean)` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">kappa6_cell</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  `mean(exp)` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">kappa6_cell</span><span class="op">)</span><span class="op">)</span></span>
@@ -595,7 +997,7 @@ afterwards, not the other way around. The mean of <code><a href="https://rdrr.io
 <p><code><a href="../reference/native_parameters.html">native_parameters()</a></code>, used above, follows this order for every parameter. For
 the mixture models, <code><a href="../reference/k2sd.html">k2sd()</a></code> converts <code>kappa</code> into the circular standard
 deviation in radians, which is the measure of precision many papers report:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">kappa_draws</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/native_parameters.html">native_parameters</a></span><span class="op">(</span><span class="va">bmm_fit</span>, re_formula <span class="op">=</span> <span class="cn">NA</span>, pars <span class="op">=</span> <span class="st">"kappa"</span><span class="op">)</span></span>
 <span><span class="va">sd_deg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/k2sd.html">k2sd</a></span><span class="op">(</span><span class="va">kappa_draws</span><span class="op">$</span><span class="va">value</span><span class="op">)</span> <span class="op">*</span> <span class="fl">180</span> <span class="op">/</span> <span class="va">pi</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">sd_deg</span>, <span class="va">kappa_draws</span><span class="op">$</span><span class="va">setsize</span>, <span class="va">median</span><span class="op">)</span></span>
@@ -606,13 +1008,13 @@ deviation in radians, which is the measure of precision many papers report:</p>
 or smaller than at set size 1, not <code>kappa</code> at set size 6. The help page of each
 model lists the links of its parameters.</p>
 </div>
-<div class="section level2" number="6">
+<div class="section level2" number="7">
 <h2 id="why-the-default-priors-are-informative">
-<span class="header-section-number">6</span> Why the default priors are informative<a class="anchor" aria-label="anchor" href="#why-the-default-priors-are-informative"></a>
+<span class="header-section-number">7</span> Why the default priors are informative<a class="anchor" aria-label="anchor" href="#why-the-default-priors-are-informative"></a>
 </h2>
 <p><code>brms</code> uses flat priors on regression coefficients unless you set them. For the
 <code>brms</code> version of this model, the defaults are:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://paulbuerkner.com/brms/reference/brmsformula.html" class="external-link">bf</a></span><span class="op">(</span></span>
 <span>    <span class="va">response_error</span> <span class="op">~</span> <span class="fl">1</span>,</span>
@@ -663,7 +1065,7 @@ has a flat prior. That suits a regression whose coefficients could take any
 value. It does not suit a measurement model. Its parameters stand for cognitive
 processes, and we know roughly which values are plausible before seeing any data. <code>bmm</code> puts this
 knowledge into its default priors:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/default_prior.bmmformula.html">default_prior</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span><span class="va">kappa</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">setsize</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">subID</span><span class="op">)</span>, <span class="va">thetat</span> <span class="op">~</span> <span class="fl">0</span> <span class="op">+</span> <span class="va">setsize</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">subID</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">dat</span>,</span>
@@ -741,9 +1143,9 @@ shows the details.</li>
 compute them, choose the priors on purpose rather than taking the defaults.</li>
 </ul>
 </div>
-<div class="section level2" number="7">
+<div class="section level2" number="8">
 <h2 id="what-stays-brms">
-<span class="header-section-number">7</span> What stays brms<a class="anchor" aria-label="anchor" href="#what-stays-brms"></a>
+<span class="header-section-number">8</span> What stays brms<a class="anchor" aria-label="anchor" href="#what-stays-brms"></a>
 </h2>
 <p>A <code>bmm</code> fit is a <code>brmsfit</code> with extra information, so the <code>brms</code> toolbox works
 on it: <code><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef()</a></code>, <code><a href="https://rdrr.io/pkg/nlme/man/random.effects.html" class="external-link">ranef()</a></code>, <code><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df()</a></code>, <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code>,
@@ -754,9 +1156,9 @@ the <code>brms</code> summary instead of the <code>bmm</code> one. It lists the 
 <code>identity</code>, because <code>brms</code> applies the softmax inside the mixture family. If you
 want to change a model beyond what <code>bmm</code> offers, these give you the <code>brms</code> code to start from.</p>
 </div>
-<div class="section level2" number="8">
+<div class="section level2" number="9">
 <h2 id="where-to-go-next">
-<span class="header-section-number">8</span> Where to go next<a class="anchor" aria-label="anchor" href="#where-to-go-next"></a>
+<span class="header-section-number">9</span> Where to go next<a class="anchor" aria-label="anchor" href="#where-to-go-next"></a>
 </h2>
 <ul>
 <li>
@@ -766,6 +1168,10 @@ models by task and walks through a first fit.</li>
 covers the formula syntax.</li>
 <li>The <a href="https://venpopov.com/bmm/articles/bmm_mixture_models.html">mixture models article</a>
 fits the two- and three-parameter mixture models to a larger data set.</li>
+<li>The <a href="https://venpopov.com/bmm/articles/bmm_sdt.html">signal detection article</a>
+covers the yes/no, rating, m-AFC and ranking models, with counts or trial
+rows. The section <a href="#signal-detection-as-a-probit-glmm">Signal detection as a probit GLMM</a>
+above is the short version for <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code>.</li>
 <li>
 <a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">Extracting model information</a>
 shows how to get the default priors, the Stan code and the Stan data before
@@ -776,6 +1182,9 @@ you fit.</li>
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
 <div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-DeCarlo_1998" class="csl-entry">
+DeCarlo, Lawrence T. 1998. <span>“Signal Detection Theory and Generalized Linear Models.”</span> <em>Psychological Methods</em> 3 (2): 186–205. <a href="https://doi.org/10.1037/1082-989X.3.2.186" class="external-link">https://doi.org/10.1037/1082-989X.3.2.186</a>.
+</div>
 <div id="ref-Zhang_Luck_2008" class="csl-entry">
 Zhang, Weiwei, and Steven J. Luck. 2008. <span>“Discrete Fixed-Resolution Representations in Visual Working Memory.”</span> <em>Nature</em> 453 (7192): 233–35. <a href="https://doi.org/10.1038/nature06860" class="external-link">https://doi.org/10.1038/nature06860</a>.
 </div>

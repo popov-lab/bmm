@@ -340,11 +340,11 @@ shows how to set up the response categories and the activation model.</p>
 their confidence, give Remember/Know judgments, pick the target among several
 alternatives, or rank the alternatives. Signal detection theory separates
 sensitivity from response bias for each of these response formats, and <code>bmm</code>
-has one model per format. The models take response counts per subject and
-condition. <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> also accepts one row per trial, as the first fit below
-shows; the rating, ranking and Remember/Know models need one count column per
-response category, which <code><a href="../reference/aggregate_sdt_cdp_data.html">aggregate_sdt_cdp_data()</a></code> builds for <code><a href="../reference/sdt_cdp.html">sdt_cdp()</a></code>
-from trial-level data whose confidence runs on one old/new scale. The
+has one model per format. Each model takes either response counts per subject
+and condition or one row per trial; the yes/no example below shows how to
+declare each for <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code>. Trial rows allow item random effects and
+trial-level predictors; without them, counts give the same posterior in less
+time. The
 <a href="https://venpopov.com/bmm/articles/bmm_sdt.html">signal detection article</a>
 walks through the yes/no, rating, m-AFC and ranking models, and the
 <a href="https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html">dual-process and meta-d′ article</a>
@@ -579,8 +579,8 @@ responses are the topic of the
 processes that lead to each response as a multinomial processing tree, for
 example the two-high-threshold model of recognition or the pair-clustering
 model of free recall. You write each tree’s branch probabilities as
-expressions, and <code><a href="../reference/mpt.html">mpt()</a></code> fits them to response counts. The
-<a href="https://venpopov.com/bmm/articles/bmm_mpt.html">MPT article</a> covers
+expressions, and <code><a href="../reference/mpt.html">mpt()</a></code> fits them to response counts or to one row per trial.
+The <a href="https://venpopov.com/bmm/articles/bmm_mpt.html">MPT article</a> covers
 specifying trees, importing model files from MPTinR and TreeBUGS, and
 constraining parameters. <code><a href="../reference/mpt.html">mpt()</a></code> is in the tables of the categorical recall
 and the detection and recognition groups above.</p>

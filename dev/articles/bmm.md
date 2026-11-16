@@ -124,19 +124,15 @@ Participants decide whether a signal was present or an item was studied,
 rate their confidence, give Remember/Know judgments, pick the target
 among several alternatives, or rank the alternatives. Signal detection
 theory separates sensitivity from response bias for each of these
-response formats, and `bmm` has one model per format. The models take
-response counts per subject and condition.
-[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md) also
-accepts one row per trial, as the first fit below shows; the rating,
-ranking and Remember/Know models need one count column per response
-category, which
-[`aggregate_sdt_cdp_data()`](https://venpopov.com/bmm/dev/reference/aggregate_sdt_cdp_data.md)
-builds for
-[`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md) from
-trial-level data whose confidence runs on one old/new scale. The [signal
-detection article](https://venpopov.com/bmm/articles/bmm_sdt.html) walks
-through the yes/no, rating, m-AFC and ranking models, and the
-[dual-process and meta-d′
+response formats, and `bmm` has one model per format. Each model takes
+either response counts per subject and condition or one row per trial;
+the yes/no example below shows how to declare each for
+[`sdt_yn()`](https://venpopov.com/bmm/dev/reference/sdt_yn.md). Trial
+rows allow item random effects and trial-level predictors; without them,
+counts give the same posterior in less time. The [signal detection
+article](https://venpopov.com/bmm/articles/bmm_sdt.html) walks through
+the yes/no, rating, m-AFC and ranking models, and the [dual-process and
+meta-d′
 article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html)
 through the `dpsdt` and `metad` versions of
 [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
@@ -186,7 +182,7 @@ for example the two-high-threshold model of recognition or the
 pair-clustering model of free recall. You write each tree’s branch
 probabilities as expressions, and
 [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) fits them to
-response counts. The [MPT
+response counts or to one row per trial. The [MPT
 article](https://venpopov.com/bmm/articles/bmm_mpt.html) covers
 specifying trees, importing model files from MPTinR and TreeBUGS, and
 constraining parameters.

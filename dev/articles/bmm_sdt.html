@@ -125,7 +125,7 @@ requirements; they are not modes of a single function.</p>
 </tr>
 <tr class="even">
 <td><code><a href="../reference/sdt_rating.html">sdt_rating()</a></code></td>
-<td>counts per confidence-rating category</td>
+<td>counts per confidence-rating category, or one rating per trial</td>
 <td>
 <code>d</code>, <code>criterion</code>, threshold params, <code>sdratio</code>
 </td>
@@ -139,7 +139,7 @@ requirements; they are not modes of a single function.</p>
 </tr>
 <tr class="even">
 <td><code><a href="../reference/sdt_ranking.html">sdt_ranking()</a></code></td>
-<td>counts per rank position</td>
+<td>counts per rank position, or one rank per trial</td>
 <td>
 <code>d</code>, <code>sdratio</code> (<code>dist = "normal"</code> only)</td>
 <td>no</td>
@@ -170,14 +170,17 @@ post-processing toolkit: <code><a href="../reference/roc_sdt.html">roc_sdt()</a>
 only the ingredients are SDT-specific.</p>
 <ol style="list-style-type: decimal">
 <li>
-<strong>Aggregate the data, or declare trial rows.</strong> <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code> and
-<code><a href="../reference/sdt_ranking.html">sdt_ranking()</a></code> consume counts per design cell (for example per subject and
-stimulus type), with the counts in the columns the constructor names. If
-your data hold one row per trial, aggregate them first (e.g. with
-<code><a href="https://dplyr.tidyverse.org/reference/count.html" class="external-link">dplyr::count()</a></code> or <code><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">stats::aggregate()</a></code>); the Rating SDT section below
-shows a real reshaping example. <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> and <code><a href="../reference/sdt_mafc.html">sdt_mafc()</a></code> take either
-counts per cell or one row per trial with a 0/1 response: for trial rows,
-leave out <code>n_trials</code>.</li>
+<strong>Aggregate the data, or declare trial rows.</strong> All four models take either
+counts per design cell (for example per subject and stimulus type), with the
+counts in the columns the constructor names, or one row per trial. For trial
+rows, <code>response</code> names one column: the 0/1 response for <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> and
+<code><a href="../reference/sdt_mafc.html">sdt_mafc()</a></code>, which then take no <code>n_trials</code>, the rating for <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code>,
+and the target’s rank for <code><a href="../reference/sdt_ranking.html">sdt_ranking()</a></code>. <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code> also needs
+<code>n_ratings</code>, the number of rating categories. <code><a href="../reference/sdt_ranking.html">sdt_ranking()</a></code> takes <code>m</code> as
+for counts, a number or the name of a column with each trial’s set size.
+Trial rows allow item random effects; without item or trial-level terms,
+counts give the same posterior in less time. The Rating SDT section below
+shows a real reshaping example into counts.</li>
 <li>
 <strong>Create the model object.</strong> The constructor maps your column names onto the
 model’s response format — for example <code>sdt_yn(response = "n_old", stimulus = "stimulus", n_trials = "n_trials")</code> — and selects the noise
@@ -683,8 +686,31 @@ the coefficients differ by <span class="math inline">\(d/2\)</span> and get diff
 and one false-alarm rate, for checking a fit against the raw rates.</p>
 </div>
 <div class="section level3" number="4.3">
+<h3 id="trial-level-data">
+<span class="header-section-number">4.3</span> Trial-level data<a class="anchor" aria-label="anchor" href="#trial-level-data"></a>
+</h3>
+<p>With one row per trial, <code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> takes no <code>n_trials</code>, and <code>response</code> holds 1
+for an “old” and 0 for a “new” response on each trial. Trial rows allow item
+random effects, which counts aggregated over items cannot carry:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
+<span>  formula <span class="op">=</span> <span class="fu"><a href="../reference/bmmformula.html">bmf</a></span><span class="op">(</span></span>
+<span>    <span class="va">d</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span>,</span>
+<span>    <span class="va">criterion</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">item</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">trials</span>,</span>
+<span>  model <span class="op">=</span> <span class="fu"><a href="../reference/sdt_yn.html">sdt_yn</a></span><span class="op">(</span>response <span class="op">=</span> <span class="st">"resp"</span>, stimulus <span class="op">=</span> <span class="st">"stimulus"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Without item or trial-level terms, the trial rows give the same posterior as
+the counts aggregated from them, and the aggregated fit is faster. The section
+<a href="https://venpopov.com/bmm/articles/bmm_brms_to_bmm.html#signal-detection-as-a-probit-glmm">Signal detection as a probit GLMM</a>
+of the <em>From brms to bmm</em> article fits this model to simulated data, shows that
+it is the probit GLMM many psychologists already use, and explains why the item
+effects on <code>d</code> rest on the trials with old items only.</p>
+</div>
+<div class="section level3" number="4.4">
 <h3 id="multiple-criteria-identifying-the-unequal-variance-ratio">
-<span class="header-section-number">4.3</span> Multiple criteria: identifying the unequal-variance ratio<a class="anchor" aria-label="anchor" href="#multiple-criteria-identifying-the-unequal-variance-ratio"></a>
+<span class="header-section-number">4.4</span> Multiple criteria: identifying the unequal-variance ratio<a class="anchor" aria-label="anchor" href="#multiple-criteria-identifying-the-unequal-variance-ratio"></a>
 </h3>
 <p>When the criterion is shifted across conditions — for example by a base-rate or
 payoff manipulation — while sensitivity is held constant, the several
@@ -694,7 +720,7 @@ signal-to-noise SD ratio <span class="math inline">\(s\)</span>, whose reciproca
 <span class="citation">(DeCarlo 1998)</span>. The bundled <code>broeder_schuetz_2009_e3</code> data
 <span class="citation">(Bröder and Schütz 2009)</span> has exactly this structure: 40 subjects tested under five
 base-rate conditions (<code>br1</code> conservative … <code>br5</code> liberal).</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sdt_yn.html">sdt_yn</a></span><span class="op">(</span>response <span class="op">=</span> <span class="st">"n_old"</span>, stimulus <span class="op">=</span> <span class="st">"stimulus"</span>,</span>
 <span>                n_trials <span class="op">=</span> <span class="st">"n_trials"</span><span class="op">)</span></span>
 <span></span>
@@ -764,7 +790,7 @@ base-rate conditions (<code>br1</code> conservative … <code>br5</code> liberal
 by <code>condition</code> — the five criteria are five operating points on a single ROC.
 <code>sdratio</code> is estimated on the log scale, so exponentiate it for the SD ratio on
 the natural scale:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit_uv</span><span class="op">)</span><span class="op">[</span><span class="st">"sdratio_Intercept"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Estimate"</span>, <span class="st">"Q2.5"</span>, <span class="st">"Q97.5"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Estimate     Q2.5    Q97.5 </span></span>
 <span><span class="co">#&gt; 1.579851 1.336469 1.889383</span></span></code></pre></div>
@@ -776,9 +802,9 @@ shared-lure design above, would not: the false-alarm rate then informs the
 criterion alone, and every hit rate can be matched by trading <code>sdratio</code> against
 <code>d</code>. <code><a href="../reference/bmm.html">bmm()</a></code> warns for that design; the section “Identifying <code>sdratio</code>” of
 <code><a href="../reference/sdt_yn.html">?sdt_yn</a></code> covers the cases in between.</p>
-<div class="section level4" number="4.3.1">
+<div class="section level4" number="4.4.1">
 <h4 id="which-sensitivity-index">
-<span class="header-section-number">4.3.1</span> Which sensitivity index?<a class="anchor" aria-label="anchor" href="#which-sensitivity-index"></a>
+<span class="header-section-number">4.4.1</span> Which sensitivity index?<a class="anchor" aria-label="anchor" href="#which-sensitivity-index"></a>
 </h4>
 <p>Once <code>sdratio</code> is free, “the” distance between the two distributions depends on
 which standard deviation you measure it in, and <code>d</code> is no longer <span class="math inline">\(d'\)</span> but <span class="math inline">\(d_a\)</span>,
@@ -788,7 +814,7 @@ the coefficient table of <code>summary(fit_uv)</code> says so. The alternatives 
 and <span class="math inline">\(d_S\)</span> (divide by the signal SD). <code><a href="../reference/sdt_sensitivity.html">sdt_sensitivity()</a></code> returns any of them,
 converting draw by draw so the intervals carry the joint uncertainty in <code>d</code> and
 <code>sdratio</code>:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sens</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sdt_sensitivity.html">sdt_sensitivity</a></span><span class="op">(</span><span class="va">fit_uv</span><span class="op">)</span></span>
 <span><span class="va">sens</span></span>
 <span><span class="co">#&gt; SDT sensitivity (sdt_yn, dist = normal)</span></span>
@@ -865,9 +891,9 @@ identity only holds with equal variance, so compare unequal-variance Gumbel fits
 with <code><a href="../reference/auc_sdt.html">auc_sdt()</a></code> rather than on <code>d</code>.</p>
 </div>
 </div>
-<div class="section level3" number="4.4">
+<div class="section level3" number="4.5">
 <h3 id="roc-and-auc">
-<span class="header-section-number">4.4</span> ROC and AUC<a class="anchor" aria-label="anchor" href="#roc-and-auc"></a>
+<span class="header-section-number">4.5</span> ROC and AUC<a class="anchor" aria-label="anchor" href="#roc-and-auc"></a>
 </h3>
 <p><code><a href="../reference/roc_sdt.html">roc_sdt()</a></code> returns the model-implied ROC from the posterior. For a binary fit it
 traces the smooth analytical curve from the posterior of <code>d</code> (and <code>sdratio</code>
@@ -876,7 +902,7 @@ when estimated). When it detects a predictor that varies the criterion only — 
 points (one per criterion level) in a <code>points</code> attribute. <code><a href="../reference/roc_observed.html">roc_observed()</a></code> gives
 the empirical operating points straight from the response counts, and the
 <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method overlays everything.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">roc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/roc_sdt.html">roc_sdt</a></span><span class="op">(</span><span class="va">fit_uv</span><span class="op">)</span></span>
 <span><span class="va">obs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/roc_observed.html">roc_observed</a></span><span class="op">(</span><span class="va">fit_uv</span><span class="op">)</span></span>
 <span></span>
@@ -893,18 +919,18 @@ variance, the logistic distribution, and all rating fits — is integrated
 numerically over the model-implied curve. The returned AUC is always the area
 under the full curve (one value per curve, not the area spanned by the discrete
 points).</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">auc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/auc_sdt.html">auc_sdt</a></span><span class="op">(</span><span class="va">fit_uv</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">auc</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-10-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">auc</span>, <span class="st">"summary"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    AUC_mean AUC_lower AUC_upper</span></span>
 <span><span class="co">#&gt; 1 0.8494397 0.8193612 0.8770114</span></span></code></pre></div>
 </div>
-<div class="section level3" number="4.5">
+<div class="section level3" number="4.6">
 <h3 id="quantile-transformed-roc-and-latent-distributions">
-<span class="header-section-number">4.5</span> Quantile-transformed ROC and latent distributions<a class="anchor" aria-label="anchor" href="#quantile-transformed-roc-and-latent-distributions"></a>
+<span class="header-section-number">4.6</span> Quantile-transformed ROC and latent distributions<a class="anchor" aria-label="anchor" href="#quantile-transformed-roc-and-latent-distributions"></a>
 </h3>
 <p>Passing <code>scale = "quantile"</code> to the ROC <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> method reads the rates on the
 noise distribution’s quantile axis via the transform <span class="math inline">\(-q(1 - \text{rate})\)</span>,
@@ -920,7 +946,7 @@ units (the <span class="math inline">\(d_N\)</span> that <code><a href="../refer
 a slope below 1 is the visual signature of unequal variance and observed points
 that bow away from a straight line flag misfit. (The <span class="math inline">\((0,0)\)</span> and
 <span class="math inline">\((1,1)\)</span> endpoints map to infinity and are dropped.)</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">roc</span>, observed <span class="op">=</span> <span class="va">obs</span>, scale <span class="op">=</span> <span class="st">"quantile"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-11-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p>For the base-rate data the fitted slope is 0.64
@@ -936,13 +962,13 @@ estimates describe. Here the criterion varies across the base-rate conditions bu
 <code>d</code>/<code>sdratio</code> do not, so the densities are identical across conditions:
 <code><a href="../reference/latent_sdt.html">latent_sdt()</a></code> collapses them into one panel and overlays the several criteria,
 colour-coded by condition (pass <code>collapse = FALSE</code> for one panel per condition).</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="../reference/latent_sdt.html">latent_sdt</a></span><span class="op">(</span><span class="va">fit_uv</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-12-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 </div>
-<div class="section level3" number="4.6">
+<div class="section level3" number="4.7">
 <h3 id="posterior-predictive-checks">
-<span class="header-section-number">4.6</span> Posterior predictive checks<a class="anchor" aria-label="anchor" href="#posterior-predictive-checks"></a>
+<span class="header-section-number">4.7</span> Posterior predictive checks<a class="anchor" aria-label="anchor" href="#posterior-predictive-checks"></a>
 </h3>
 <p><code><a href="../reference/sdt_yn.html">sdt_yn()</a></code> uses a custom binomial family, so <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> delegates to
 <code>brms</code>. The “old”-response counts span a wide range whose ceiling differs across
@@ -951,7 +977,7 @@ view is cluttered and hard to read. An overlaid empirical CDF split by stimulus
 type is a cleaner check that the model reproduces the response distributions for
 signal and noise items — and the ROC plot above already checks the operating
 points directly:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit_uv</span>, type <span class="op">=</span> <span class="st">"ecdf_overlay"</span>, group <span class="op">=</span> <span class="st">"stimulus"</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-13-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 </div>
@@ -962,7 +988,10 @@ points directly:</p>
 </h2>
 <p>In a confidence-rating task each item is judged on an ordered scale (e.g. 1 =
 “sure new” … 6 = “sure old”). The data are counts per rating category, one column
-per category. Internally <code>bmm</code> fits this with <code>brms</code>’ native multinomial family;
+per category. With one row per trial, <code>response</code> instead names a single column
+holding each trial’s rating, a whole number from 1 to <code>n_ratings</code>, the number
+of categories. Internally, <code>bmm</code> fits counts with <code>brms</code>’ native multinomial
+family and trial rows with a family of its own;
 the K-1 confidence criteria are parameterized by a <code>threshold_type</code>
 <span class="citation">(<span class="nocase">Selker et al.</span> 2019; Paulewicz and Blaut 2020, 2022)</span>.</p>
 <p>We use a real recognition ROC dataset. The <code>roc6</code> object in the
@@ -972,7 +1001,7 @@ a 6-point confidence scale. Here we take <span class="citation">Pratte et al. (2
 stimulus class — narrow posteriors, clear effects) and reshape it to the format
 <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code> expects: one row per (subject × stimulus), with categories
 <code>r1</code> = “sure new” … <code>r6</code> = “sure old”.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"MPTinR"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="st">"roc6"</span>, package <span class="op">=</span> <span class="st">"MPTinR"</span><span class="op">)</span></span>
 <span><span class="va">pratte</span> <span class="op">&lt;-</span> <span class="va">roc6</span><span class="op">[</span><span class="va">roc6</span><span class="op">$</span><span class="va">exp</span> <span class="op">==</span> <span class="st">"Pratte_2010"</span>, <span class="op">]</span></span>
@@ -1078,11 +1107,11 @@ as a credible-band ribbon with the K-1 thresholds overlaid as colour-coded
 operating points (<code>t1</code>..<code>t(K-1)</code>) carrying crosshair credible intervals — the same
 display as the binary ROC. <code><a href="../reference/roc_observed.html">roc_observed()</a></code> gives the empirical points from the
 pooled counts. The quantile axis (<code>scale = "quantile"</code>) works here too.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">roc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/roc_sdt.html">roc_sdt</a></span><span class="op">(</span><span class="va">fit_rating</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">roc</span>, observed <span class="op">=</span> <span class="fu"><a href="../reference/roc_observed.html">roc_observed</a></span><span class="op">(</span><span class="va">fit_rating</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-15-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="../reference/auc_sdt.html">auc_sdt</a></span><span class="op">(</span><span class="va">fit_rating</span><span class="op">)</span>, <span class="st">"summary"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    AUC_mean AUC_lower AUC_upper</span></span>
@@ -1096,7 +1125,7 @@ pooled counts. The quantile axis (<code>scale = "quantile"</code>) works here to
 response-proportion profile (observed bars vs. posterior-predictive
 point-ranges). For SDT the signal and noise rating distributions should be
 checked separately, so <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> <strong>defaults to faceting by <code>stimulus</code></strong>:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit_rating</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-16-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p>Pass <code>group = NA</code> to pool both stimulus types into a single profile, or
@@ -1121,7 +1150,7 @@ log width of the interval just above the criterion, and each of the others is th
 log ratio of an interval to its neighbour nearer the criterion (printing the model
 object lists what each <code>delta</code> measures). Refit with it and re-run the same
 check:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_lr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sdt_rating.html">sdt_rating</a></span><span class="op">(</span>response <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"r"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">6</span><span class="op">)</span>, stimulus <span class="op">=</span> <span class="st">"stimulus"</span>,</span>
 <span>                       threshold_type <span class="op">=</span> <span class="st">"log_ratio"</span><span class="op">)</span></span>
 <span></span>
@@ -1152,11 +1181,12 @@ it should be weighed against the gain in fit.</p>
 that trade-off: a parameterization that leaves systematic, one-sided deviations
 is too rigid, while one whose predicted point-ranges sit on the observed bars (as
 here) is adequate. A <em>formal</em> predictive comparison is tempting, but the usual
-<code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> is <strong>not</strong> appropriate here: each observation is an aggregated count over
+<code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> is <strong>not</strong> appropriate with counts: each observation is an aggregated count over
 many trials, so leaving one out removes a large, highly influential chunk of data
 and the PSIS-LOO approximation becomes unreliable — it flags most observations
 with a high Pareto-<span class="math inline">\(k\)</span>, and (because that reflects heavy-tailed importance weights
-rather than Monte Carlo noise) more posterior draws will not fix it. The
+rather than Monte Carlo noise) more posterior draws will not fix it. With one
+row per trial, <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> leaves out single trials, a different prediction. The
 principled alternative for aggregated data is k-fold cross-validation via
 <code><a href="https://mc-stan.org/loo/reference/kfold-generic.html" class="external-link">brms::kfold()</a></code>, which refits on held-out folds and avoids importance sampling
 altogether. <code>"log_distance"</code> behaves like <code>"log_ratio"</code>, and <code>"softmax"</code> offers an
@@ -1171,7 +1201,7 @@ maps them to threshold locations. <code><a href="../reference/sdt_thresholds.htm
 reconstructs the K-1 thresholds per posterior draw on the latent
 decision-variable scale, so the confidence criteria can be reported directly,
 whatever the <code>threshold_type</code>.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="../reference/sdt_thresholds.html">sdt_thresholds</a></span><span class="op">(</span><span class="va">fit_rating_lr</span><span class="op">)</span>, <span class="st">"summary"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   marker   position      lower      upper</span></span>
 <span><span class="co">#&gt; 1     t1 -0.6661859 -0.7630365 -0.5663209</span></span>
@@ -1184,7 +1214,7 @@ evidence densities with the K-1 confidence criteria cutting the axis into the
 six rating bins, each threshold carrying the credible band on its location. The
 uneven spacing the <code>log_ratio</code> fit recovered (and the parsimonious model could
 not) is directly visible:</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="../reference/latent_sdt.html">latent_sdt</a></span><span class="op">(</span><span class="va">fit_rating_lr</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-19-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 </div>
@@ -1194,7 +1224,8 @@ not) is directly visible:</p>
 <span class="header-section-number">6</span> m-AFC SDT<a class="anchor" aria-label="anchor" href="#m-afc-sdt"></a>
 </h2>
 <p>In an m-alternative forced-choice task the observer picks the target among <code>m</code>
-alternatives; the data are counts of correct responses. There is no criterion and
+alternatives; the data are counts of correct responses, or one 0/1 row per
+trial. There is no criterion and
 no stimulus column — accuracy alone identifies <code>d</code> <span class="citation">(DeCarlo 2012)</span>. A correct
 response occurs when the target’s evidence exceeds that of all <span class="math inline">\(m-1\)</span> distractors;
 <code>d</code> is <span class="math inline">\(d'\)</span>, the target–distractor separation. <code><a href="../reference/sdt_mafc.html">sdt_mafc()</a></code> has no <code>sdratio</code>,
@@ -1214,7 +1245,7 @@ distributional assumption empirical content is varying the set size within an
 experiment: different evidence distributions imply different accuracy-versus-<code>m</code>
 curves, so passing <code>m</code> as a data column with mixed set sizes is what makes the
 choice of evidence distribution testable at all.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># rsdt_mafc() is vectorised over its arguments; varying d by subject</span></span>
 <span><span class="co"># gives hierarchical data.</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
@@ -1264,13 +1295,13 @@ Setting <code>show_competitors = TRUE</code> overlays the density of the <em>max
 <span class="math inline">\(m-1\)</span> distractor samples — the effective competitor the target must beat — which
 shifts rightward as <span class="math inline">\(m\)</span> grows and shows directly why accuracy falls with set
 size.</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="../reference/latent_sdt.html">latent_sdt</a></span><span class="op">(</span><span class="va">fit_mafc</span>, show_competitors <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-21-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 <p>Each subject contributes one correct-response count, so a bar per count value is
 sparse and noisy; an overlaid empirical CDF of the correct-response counts is a
 compact check that the model captures the spread of accuracy across subjects:</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit_mafc</span>, type <span class="op">=</span> <span class="st">"ecdf_overlay"</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-22-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 </div>
@@ -1279,7 +1310,9 @@ compact check that the model captures the spread of accuracy across subjects:</p
 <span class="header-section-number">7</span> Ranking SDT<a class="anchor" aria-label="anchor" href="#ranking-sdt"></a>
 </h2>
 <p>In a ranking task the observer orders <code>m</code> items by evidence and the data are
-counts per rank position assigned to the target <span class="citation">(Meyer-Grant et al. 2026)</span>. As with
+counts per rank position assigned to the target <span class="citation">(Meyer-Grant et al. 2026)</span>. With one
+row per trial, <code>response</code> instead names a single column holding the target’s
+rank on each trial, a whole number from 1 to that trial’s <code>m</code>. As with
 m-AFC there is no criterion: the rank assigned to the target is an <em>order
 statistic</em> of the latent evidence, so the probability of each rank follows from
 the evidence distribution directly. With <code>dist = "gumbel_min"</code> these rank
@@ -1310,7 +1343,7 @@ not the joint distribution of the latent evidence behind it — in the max-Gumbe
 models produce identical ranking probabilities <span class="citation">(Kilani 2025)</span>. Independence of
 the evidence samples therefore stays a modeling convention in the ranking
 models too.</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sdt_ranking.html">sdt_ranking</a></span><span class="op">(</span></span>
 <span>  response <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rank1"</span>, <span class="st">"rank2"</span>, <span class="st">"rank3"</span>, <span class="st">"rank4"</span>, <span class="st">"rank5"</span><span class="op">)</span>,</span>
 <span>  m <span class="op">=</span> <span class="st">"set_size"</span>,</span>
@@ -1352,7 +1385,7 @@ models too.</p>
 <p>ROC/AUC are undefined; <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> shows the rank-position profile. With mixed
 set sizes, facet by the set-size column so each panel has a homogeneous
 denominator:</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.bmmfit.html">pp_check</a></span><span class="op">(</span><span class="va">fit_rank</span>, group <span class="op">=</span> <span class="st">"set_size"</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></code></pre></div>
 <p><img src="bmm_sdt_files/figure-html/unnamed-chunk-24-1.jpeg" alt="" width="80%" style="display: block; margin: auto;"></p>
 </div>

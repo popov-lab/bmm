@@ -33,9 +33,10 @@ leaves its mark on the ROC:
   discriminate old from new.
 
 Both are *versions of the same rating model* — they consume identical
-data (counts per confidence category, with a 0/1 `stimulus` column) and
-reduce to the standard model when their extra parameter is switched off.
-They are selected with the `version` argument of
+data (counts per confidence category, or one row per trial with
+`n_ratings`, and a 0/1 `stimulus` column) and reduce to the standard
+model when their extra parameter is switched off. They are selected with
+the `version` argument of
 [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md):
 
 | `version` | extra parameter(s) | captures | reduces to standard when |
@@ -549,10 +550,11 @@ standard index of metacognitive efficiency (Maniscalco and Lau 2012;
 Fleming 2017).
 
 Two cautions carry over from the rest of SDT. First, like all the rating
-models here, meta-d′ is fit to *aggregated counts*, so the type-2
-estimate is only as informative as the number of trials per confidence
-category. Second, meta-d′ inherits the standard model’s assumptions
-about how confidence criteria are placed; systematic
+models here, meta-d′ is fit to counts per confidence category, given as
+counts or as one row per trial, so the type-2 estimate is only as
+informative as the number of trials per confidence category. Second,
+meta-d′ inherits the standard model’s assumptions about how confidence
+criteria are placed; systematic
 [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 deviations flag when those assumptions strain.
 
@@ -679,8 +681,9 @@ head(rotello_long)
 
 Like
 [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md),
-the model itself is fit to **aggregated counts** — one row per cell and
-one count column per response category.
+the model takes either **aggregated counts** — one row per cell and one
+count column per response category — or one row per trial, with the
+columns named in `judgment` and `confidence`. Here we use counts.
 [`aggregate_sdt_cdp_data()`](https://venpopov.com/bmm/dev/reference/aggregate_sdt_cdp_data.md)
 pivots the long rows into these canonical columns; every column other
 than `judgment`, `confidence`, and `count` (here just `stimulus`)
@@ -821,10 +824,12 @@ different from 1)? That, together with
 [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
 and the ROC/zROC fit, is the practical guide. A *formal* predictive
 comparison via [`loo()`](https://mc-stan.org/loo/reference/loo.html) is
-**not** appropriate for these aggregated-count models — leaving out one
+**not** appropriate for these models fit to counts — leaving out one
 multinomial observation removes a large, influential block of data and
-the PSIS-LOO approximation becomes unreliable. The principled
-alternative is k-fold cross-validation with
+the PSIS-LOO approximation becomes unreliable. With one row per trial,
+[`loo()`](https://mc-stan.org/loo/reference/loo.html) leaves out single
+trials instead, a different prediction. The principled alternative is
+k-fold cross-validation with
 [`brms::kfold()`](https://mc-stan.org/loo/reference/kfold-generic.html),
 which refits on held-out folds. As always, let theory and parameter
 invariance across designs — not ROC fit alone — arbitrate between

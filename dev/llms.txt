@@ -51,7 +51,7 @@ whether a signal was present or an item was studied, rate their
 confidence, give Remember/Know judgments, pick the target among several
 alternatives, or rank the alternatives. One signal detection model per
 response format, each fit to response counts per participant and
-condition. See the [signal detection
+condition or to one row per trial. See the [signal detection
 article](https://venpopov.com/bmm/articles/bmm_sdt.html) and, for the
 dual-process and meta-d′ versions of
 [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
@@ -66,6 +66,8 @@ each model offers.
 
 - [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
   Processing Tree (MPT) Model
+- [`psychometric_function()`](https://venpopov.com/bmm/reference/psychometric_function.html):
+  Psychometric Function
 - [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.html):
   Continuous Dual-Process Signal Detection Theory Model
 - [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.html):
@@ -98,11 +100,11 @@ articles.
 you describe the discrete processes that lead to each response as a
 multinomial processing tree: the two-high-threshold model of
 recognition, the pair-clustering model of free recall, or a tree of your
-own. The model is fit to response counts per participant and condition.
-See the [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html).
-The model, [`mpt()`](https://venpopov.com/bmm/reference/mpt.html), is
-listed above under categorical recall and under detection and
-recognition.
+own. The model is fit to response counts per participant and condition
+or to one row per trial. See the [MPT
+article](https://venpopov.com/bmm/articles/bmm_mpt.html). The model,
+[`mpt()`](https://venpopov.com/bmm/reference/mpt.html), is listed above
+under categorical recall and under detection and recognition.
 
 ![The tasks bmm covers and the models for
 each](reference/figures/README-task-map.png)

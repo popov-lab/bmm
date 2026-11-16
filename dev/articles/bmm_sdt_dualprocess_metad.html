@@ -112,8 +112,9 @@ well an observer’s confidence tracks whether their decision was actually
 correct, separately from how well they discriminate old from new.</li>
 </ul>
 <p>Both are <em>versions of the same rating model</em> — they consume identical data
-(counts per confidence category, with a 0/1 <code>stimulus</code> column) and reduce to the
-standard model when their extra parameter is switched off. They are selected with
+(counts per confidence category, or one row per trial with <code>n_ratings</code>, and a
+0/1 <code>stimulus</code> column) and reduce to the standard model when their extra
+parameter is switched off. They are selected with
 the <code>version</code> argument of <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code>:</p>
 <table class="table">
 <colgroup>
@@ -567,8 +568,9 @@ the M-ratio comparable across tasks and observers with different type-1
 performance, which is why it has become the standard index of metacognitive
 efficiency <span class="citation">(Maniscalco and Lau 2012; Fleming 2017)</span>.</p>
 <p>Two cautions carry over from the rest of SDT. First, like all the rating models
-here, meta-d′ is fit to <em>aggregated counts</em>, so the type-2 estimate is only as
-informative as the number of trials per confidence category. Second, meta-d′
+here, meta-d′ is fit to counts per confidence category, given as counts or as
+one row per trial, so the type-2 estimate is only as informative as the number
+of trials per confidence category. Second, meta-d′
 inherits the standard model’s assumptions about how confidence criteria are
 placed; systematic <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> deviations flag when those assumptions strain.</p>
 <div class="section level4" number="3.3.1">
@@ -681,8 +683,9 @@ work the same way, just without <code>count</code>):</p>
 <span><span class="co">#&gt; 4        1     know          4   101</span></span>
 <span><span class="co">#&gt; 5        1     know          5    92</span></span>
 <span><span class="co">#&gt; 6        1     know          6    59</span></span></code></pre></div>
-<p>Like <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code>, the model itself is fit to <strong>aggregated counts</strong> — one row
-per cell and one count column per response category.
+<p>Like <code><a href="../reference/sdt_rating.html">sdt_rating()</a></code>, the model takes either <strong>aggregated counts</strong> — one row
+per cell and one count column per response category — or one row per trial, with
+the columns named in <code>judgment</code> and <code>confidence</code>. Here we use counts.
 <code><a href="../reference/aggregate_sdt_cdp_data.html">aggregate_sdt_cdp_data()</a></code> pivots the long rows into these canonical columns;
 every column other than <code>judgment</code>, <code>confidence</code>, and <code>count</code> (here just
 <code>stimulus</code>) defines the cells and is carried over:</p>
@@ -803,9 +806,10 @@ continuous second axis — rather than collapsing it to a confidence rating.</li
 <code>logmratio</code> credibly different from zero (M-ratio different from 1)? That,
 together with <code><a href="../reference/pp_check.bmmfit.html">pp_check()</a></code> and the
 ROC/zROC fit, is the practical guide. A <em>formal</em> predictive comparison via
-<code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> is <strong>not</strong> appropriate for these aggregated-count models — leaving out one
+<code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> is <strong>not</strong> appropriate for these models fit to counts — leaving out one
 multinomial observation removes a large, influential block of data and the
-PSIS-LOO approximation becomes unreliable. The principled alternative is k-fold
+PSIS-LOO approximation becomes unreliable. With one row per trial, <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> leaves
+out single trials instead, a different prediction. The principled alternative is k-fold
 cross-validation with <code><a href="https://mc-stan.org/loo/reference/kfold-generic.html" class="external-link">brms::kfold()</a></code>, which refits on held-out folds. As always,
 let theory and parameter invariance across designs — not ROC fit alone — arbitrate
 between accounts that can mimic one another <span class="citation">(Meyer-Grant et al. 2026; Robinson et al. 2023)</span>.</p>
