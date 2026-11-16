@@ -62,16 +62,21 @@ test_that("bmm_options works", {
 
 
 test_that("check_rds_file works", {
-  good_files <- list("a.rds", "abc/a.rds", "a", "abc/a", "a.M")
-  bad_files <- list(1, mean, c("a", "b"), TRUE)
+  # the saved path, not only its extension: a cached fit is found again only
+  # if the same `file` maps to the same path
+  good_files <- c(
+    "a.rds" = "a.rds", "abc/a.rds" = "abc/a.rds", "a" = "a.rds", "abc/a" = "abc/a.rds",
+    "a.M" = "a.M.rds", "a.RDS" = "a.RDS.rds", "cards" = "cards.rds"
+  )
+  bad_files <- list(1, mean, c("a", "b"), TRUE, NA_character_, character(0))
 
-  for (f in good_files) {
+  for (f in names(good_files)) {
     expect_silent(res <- check_rds_file(f))
-    expect_equal(fs::path_ext(res), "rds")
+    expect_identical(res, good_files[[f]])
   }
 
   for (f in bad_files) {
-    expect_error(check_rds_file(f))
+    expect_error(check_rds_file(f), "must be a single string")
   }
 
   expect_null(check_rds_file(NULL))
@@ -144,6 +149,30 @@ test_that("try_save_bmmfit works", {
     file = file, file_refit = "Always"
   )
   expect_equal(mock_fit4$fit, 4)
+})
+
+test_that("bmm() saves the fit into a nested directory that does not exist yet", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- file.path(withr::local_tempdir(), "not", "yet", "fit")
+  mock_fit <- bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F,
+    file = file
+  )
+  rds_file <- paste0(file, ".rds")
+  expect_true(file.exists(rds_file))
+  expect_equal(readRDS(rds_file), mock_fit, ignore_function_env = TRUE, ignore_formula_env = TRUE)
+})
+
+test_that("bmm() stops before fitting when the directory for `file` cannot be created", {
+  blocker <- withr::local_tempfile()
+  writeLines("a file, not a directory", blocker)
+  expect_error(
+    bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
+      backend = "mock", mock_fit = 1, file = file.path(blocker, "fit")
+    ),
+    "Cannot create directory for file"
+  )
 })
 
 # `mock_fit` doubles as the identity of the fit: the cached object carries the
