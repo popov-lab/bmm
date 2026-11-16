@@ -280,8 +280,13 @@ test_that("the Stan data carry the probe in vreal1 and the non-targets after it"
   data <- mixture3p_cd_data()
   sdata <- standata(cd3p_formulas$simple, data, cd3p_model())
   expect_equal(as.vector(sdata$vreal1), data$probe)
-  shown <- !is.na(data$col_nt1)
-  expect_equal(as.vector(sdata$vreal2)[shown], data$col_nt1[shown])
+  # every slot, not only the first: the wrapper reads the first set_size - 1
+  # non-targets, so a swap behind the first one hands it a padded NA as a feature
+  for (k in 1:7) {
+    col <- data[[paste0("col_nt", k)]]
+    shown <- !is.na(col)
+    expect_equal(as.vector(sdata[[paste0("vreal", 1 + k)]])[shown], col[shown], label = paste("non-target", k))
+  }
 })
 
 test_that("log_lik(), posterior_predict() and posterior_epred() evaluate the same P('same')", {
