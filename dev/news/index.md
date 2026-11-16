@@ -629,6 +629,10 @@
   [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), is listed
   under each of them
   ([\#554](https://github.com/popov-lab/bmm/issues/554)).
+- bmm no longer imports the fs package; `bmm(file = )` still creates a
+  missing directory for the file. A `file` of `NA` or `character(0)` now
+  stops with “‘file’ must be a single string.”
+  ([\#699](https://github.com/popov-lab/bmm/issues/699)).
 
 #### Documentation
 

@@ -173,6 +173,7 @@
 <li>For developers: <code><a href="../reference/check_data.html">check_data()</a></code> no longer adds the <code>LureIdx*</code> and <code>inv_ss</code> columns for <strong>mixture3p</strong> and <strong>imm</strong>, whose likelihoods read the set size directly (<a href="https://github.com/popov-lab/bmm/issues/398" class="external-link">#398</a>).</li>
 <li>
 <code><a href="../reference/bmm_models.html">bmm_models()</a></code> and the help pages now show each model by its name only, such as “Two-Parameter Mixture Model”, without the citation, which stays in the <code>Citation</code> field of the help page. A model that fits several tasks, such as <code><a href="../reference/mpt.html">mpt()</a></code>, is listed under each of them (<a href="https://github.com/popov-lab/bmm/issues/554" class="external-link">#554</a>).</li>
+<li>bmm no longer imports the fs package; <code>bmm(file = )</code> still creates a missing directory for the file. A <code>file</code> of <code>NA</code> or <code>character(0)</code> now stops with “‘file’ must be a single string.” (<a href="https://github.com/popov-lab/bmm/issues/699" class="external-link">#699</a>).</li>
 </ul></div>
 <div class="section level4">
 <h4 id="documentation-development-version">Documentation<a class="anchor" aria-label="anchor" href="#documentation-development-version"></a></h4>
