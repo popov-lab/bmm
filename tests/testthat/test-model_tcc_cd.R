@@ -362,9 +362,12 @@ test_that("the Stan likelihood matches dtcc_cd() with criterion or bias, into th
   rad <- rows$dist * pi / 180
   r_crit <- dtcc_cd(rows$y, rad, rows$d, f, criterion = rows$crit, log = TRUE)
   r_bias <- dtcc_cd(rows$y, rad, rows$d, f, bias = rows$crit, log = TRUE)
-  expect_equal(out$crit, r_crit, tolerance = 1e-10)
-  expect_equal(out$bias, r_bias, tolerance = 1e-10)
+  # expect_equal() bounds the mean relative difference, which the tail rows
+  # (log p near -800) dominate; a difference in log p is the relative error of
+  # p itself, so each row is bounded on its own
+  expect_lt(max(abs(out$crit - r_crit)), 1e-10)
+  expect_lt(max(abs(out$bias - r_bias)), 1e-10)
   prep <- tcc_cd_prep(list(d = matrix(rows$d, 1), criterion = matrix(rows$crit, 1)), rows$y, rows$dist)
-  expect_equal(vapply(seq_len(nrow(rows)), log_lik_tcc_cd, numeric(1), prep = prep), out$crit,
-               tolerance = 1e-10)
+  expect_lt(max(abs(vapply(seq_len(nrow(rows)), log_lik_tcc_cd, numeric(1), prep = prep) - out$crit)),
+            1e-10)
 })
