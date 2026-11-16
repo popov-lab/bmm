@@ -59,6 +59,9 @@ below \code{exp(-criterion) / (2 * pi)}. \code{dsdm_cd()} integrates the SDM den
 over that arc. \code{rsdm_cd()} draws the remembered feature of every trial
 with \code{\link[=rsdm]{rsdm()}} and lets the observer decide on it, so it does not use
 \code{dsdm_cd()}.
+
+An observation or draw whose parameters include an \code{NA} gives \code{NA}, and
+\code{rsdm_cd()} then warns "NAs produced" once per call.
 }
 \examples{
 # P("change") grows with the distance of the probe from the target

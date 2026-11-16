@@ -328,6 +328,16 @@ test_that("the likelihood computes log Z once per run and matches R row by row",
   )
 })
 
+test_that("rsdm_cd() gives NA for a draw with a missing parameter and warns once", {
+  withr::local_seed(710)
+  expect_warning(
+    drawn <- rsdm_cd(5, c(0.5, NA, 0.5, 0.5, 0.5), c = c(3, 3, NA, 3, 3), kappa = c(3, 3, 3, NA, 3)),
+    "NAs produced"
+  )
+  expect_identical(is.na(drawn), c(FALSE, TRUE, TRUE, TRUE, FALSE))
+  expect_no_warning(rsdm_cd(3, 0.5))
+})
+
 test_that("dsdm_cd() returns NA for a missing probe or location, as dsdm() does", {
   expect_true(all(is.na(dsdm_cd(c(0, 1), probe = NA))))
   expect_identical(is.na(dsdm_cd(1, probe = c(0.5, NA, 2))), c(FALSE, TRUE, FALSE))
