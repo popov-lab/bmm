@@ -253,6 +253,19 @@
   `x`, as in `dimm(0.3, c = c(1, 5, 20))`
   ([\#586](https://github.com/popov-lab/bmm/issues/586)). It returned a
   single density, for the first value.
+- [`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) now
+  return `NA` for a draw whose parameters include an `NA` or `NaN`, and
+  warn “NAs produced”, as
+  [`rnorm()`](https://rdrr.io/r/stats/Normal.html) does;
+  [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+  [`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+  and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md)
+  return `NA` there
+  ([\#710](https://github.com/popov-lab/bmm/issues/710)). In bmm 1.4.2
+  they stopped with an error beginning “max_f must be finite and
+  positive”.
 - The `d*()` and `r*()` functions of the sdm, ddm, ezdm and signal
   detection models now follow one recycling rule, as
   [`dnorm()`](https://rdrr.io/r/stats/Normal.html) and

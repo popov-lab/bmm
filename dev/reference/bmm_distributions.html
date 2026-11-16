@@ -129,8 +129,20 @@ observation <code>i</code>, or to draw <code>i</code>.</p></li>
 An argument that a version does not use, such as <code>zr</code> of
 <code>dezdm(version = "3par")</code>, is ignored.</p></li>
 </ul></div>
+    <div class="section level2">
+    <h2 id="missing-values">Missing values<a class="anchor" aria-label="anchor" href="#missing-values"></a></h2>
 
-  </main></div>
+
+<p><code><a href="mixture2p_dist.html">rmixture2p()</a></code>, <code><a href="mixture3p_dist.html">rmixture3p()</a></code> and <code><a href="IMMdist.html">rimm()</a></code> return <code>NA</code> for a draw whose
+parameters include an <code>NA</code> or <code>NaN</code>, and warn "NAs produced" once per call,
+as <code><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">stats::rnorm()</a></code> does. The other draws follow the parameters as usual,
+though a seed need not give them the values it gives when no parameter is
+missing. <code><a href="mixture2p_dist.html">dmixture2p()</a></code>, <code><a href="mixture3p_dist.html">dmixture3p()</a></code> and <code><a href="IMMdist.html">dimm()</a></code> return <code>NA</code> for such
+an observation.</p>
+    </div>
+
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

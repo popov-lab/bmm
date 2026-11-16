@@ -90,3 +90,18 @@ the circular mixtures
   `parametrization` and `n_new` are single values and are never
   recycled. An argument that a version does not use, such as `zr` of
   `dezdm(version = "3par")`, is ignored.
+
+## Missing values
+
+[`rmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+[`rmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+and [`rimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) return
+`NA` for a draw whose parameters include an `NA` or `NaN`, and warn "NAs
+produced" once per call, as
+[`stats::rnorm()`](https://rdrr.io/r/stats/Normal.html) does. The other
+draws follow the parameters as usual, though a seed need not give them
+the values it gives when no parameter is missing.
+[`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md),
+[`dmixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p_dist.md)
+and [`dimm()`](https://venpopov.com/bmm/dev/reference/IMMdist.md) return
+`NA` for such an observation.
