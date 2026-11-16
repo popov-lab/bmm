@@ -266,9 +266,17 @@ test_that("the Stan data carry the probe in vreal1, then the non-targets, then t
   data <- imm_cd_data()
   sdata <- standata(cdimm_formulas$full, data, cdimm_model())
   expect_equal(as.vector(sdata$vreal1), data$probe)
-  shown <- !is.na(data$col_nt1)
-  expect_equal(as.vector(sdata$vreal2)[shown], data$col_nt1[shown])
-  expect_equal(as.vector(sdata$vreal9)[shown], data$dist_nt1[shown])
+  # every slot, not only the first: a swap among the distances behind the first
+  # one weighs a non-target by another one's distance
+  offsets <- c(col_nt = 1, dist_nt = 8)
+  for (prefix in names(offsets)) {
+    for (k in 1:7) {
+      col <- data[[paste0(prefix, k)]]
+      shown <- !is.na(col)
+      expect_equal(as.vector(sdata[[paste0("vreal", offsets[[prefix]] + k)]])[shown], col[shown],
+                   label = paste0(prefix, k))
+    }
+  }
 })
 
 test_that("log_lik(), posterior_predict() and posterior_epred() evaluate the same P('same')", {
