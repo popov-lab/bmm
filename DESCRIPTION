@@ -27,7 +27,6 @@ Imports:
     bayesplot,
     brms (>= 2.21.0),
     crayon,
-    fs,
     glue,
     graphics,
     matrixStats,
@@ -72,7 +71,6 @@ Suggests:
     tidyr,
     usethis,
     vctrs,
-    waldo,
     yaml
 Additional_repositories: https://stan-dev.r-universe.dev
 Config/testthat/edition: 3
