@@ -64,6 +64,14 @@
 #'   An argument that a version does not use, such as `zr` of
 #'   `dezdm(version = "3par")`, is ignored.
 #'
+#' @section Missing values:
+#' [rmixture2p()], [rmixture3p()] and [rimm()] return `NA` for a draw whose
+#' parameters include an `NA` or `NaN`, and warn "NAs produced" once per call,
+#' as [stats::rnorm()] does. The other draws follow the parameters as usual,
+#' though a seed need not give them the values it gives when no parameter is
+#' missing. [dmixture2p()], [dmixture3p()] and [dimm()] return `NA` for such
+#' an observation.
+#'
 #' @name bmm_distributions
 #' @keywords distribution
 NULL
@@ -244,9 +252,14 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' @param c Vector of memory strength values
 #' @param kappa Vector of precision values
 #' @param log Logical; if `TRUE`, values are returned on the log scale.
-#' @param parametrization Character; either `"bessel"` or `"sqrtexp"`
-#'   (default). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the
-#'   parameterization.
+#' @param parametrization Deprecated since bmm 1.5.0; use `scaling`
+#'   instead. `"sqrtexp"` is `scaling = "density"`; for `"bessel"`, convert `c`
+#'   with [c_bessel2sqrtexp()] and use `scaling = "density"`.
+#' @param activation Character; the activation kernel of the SDM,
+#'   `"vonmises"` (default) or `"laplace"`. See [sdm()].
+#' @param scaling Character; what `c` measures: `"density"`, `"peak"` or
+#'   `"range"`. `NULL` (default) means `"density"` for the von Mises and
+#'   `"peak"` for the Laplace activation. See [sdm()].
 #' @param log.p Logical; if `TRUE`, probabilities are returned on the log
 #'   scale.
 #' @param lower.bound Numeric; Lower bound of integration for the cumulative
@@ -262,13 +275,25 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #'   function, `qsdm` gives the quantile function, and `rsdm` generates
 #'   random deviates.
 #'
-#' @details **Parametrization**
+#' @details **Activation and scaling**
 #'
-#' See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html) for details on the parameterization.
-#' Oberauer (2023) introduced the SDM with the bessel parametrization. The
-#' sqrtexp parametrization is the default in the `bmm` package for
-#' numerical stability and efficiency. The two parametrizations are related by
-#' the functions `c_bessel2sqrtexp()` and `c_sqrtexp2bessel()`.
+#' The density is \eqn{\exp(c^* s(x - \mu)) / Z}, where \eqn{s} is the
+#' activation function with \eqn{s(0) = 1}, \eqn{c^*} its peak, and \eqn{Z}
+#' normalises the density over the circle. `scaling` says how `c` translates
+#' into \eqn{c^*}; the sections "Activation functions", "Scaling of the
+#' activation" and "What `c` means" in [sdm()] give the formulas. The
+#' default, the von Mises activation with `scaling = "density"`, is what
+#' these functions computed before `activation` and `scaling` existed (the
+#' sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
+#' exact density of the von Mises distribution instead (the bessel
+#' parametrization); `c_bessel2sqrtexp()` and `c_sqrtexp2bessel()` convert
+#' between the two. For the Laplace activation with `scaling = "density"`,
+#' `c_laplace_circle2line()` and `c_laplace_line2circle()` convert between
+#' `bmm`'s `c` and that of Oberauer (2023, eq. 2). See [the online article](https://venpopov.com/bmm/articles/bmm_sdm_simple.html).
+#' At exactly `kappa = 0` the range scaling is undefined, because target and
+#' opposite have the same activation: `dsdm`, `psdm` and `qsdm` return `NaN`
+#' and `rsdm` stops with an error. Fits
+#' never reach it, since `kappa` has a log link.
 #'
 #' **The cumulative distribution function**
 #'
@@ -302,12 +327,14 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' )
 #' lines(x, dsdm(x, 0, 9, 1), col = "red")
 #' lines(x, dsdm(x, 0, 2, 8), col = "green")
+#' lines(x, dsdm(x, 0, 4, 3, activation = "laplace"), col = "blue")
 #' legend("topright", c(
 #'   "c=2, kappa=3.0, mu=0",
 #'   "c=9, kappa=1.0, mu=0",
-#'   "c=2, kappa=8, mu=1"
+#'   "c=2, kappa=8, mu=1",
+#'   "Laplace, c=4, kappa=3"
 #' ),
-#' col = c("black", "red", "green"), lty = 1, cex = 0.8
+#' col = c("black", "red", "green", "blue"), lty = 1, cex = 0.8
 #' )
 #'
 #' # plot the cumulative distribution function of the SDM distribution
@@ -320,9 +347,10 @@ rejection_sampling <- function(n, f, max_f, proposal_fun, ...) {
 #' hist(r, breaks = 60, freq = FALSE)
 #' lines(x, d, type = "l", col = "red")
 dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
-                 parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
-  .dsdm_numer <- .sdm_numer(parametrization)
+                 parametrization = NULL, activation = c("vonmises", "laplace"),
+                 scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
 
   # arithmetic on a data frame x returned a data frame of densities before bmm
   # 1.5.0, its elements, column by column, paired with the parameters, and
@@ -337,7 +365,7 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
                        logical(1))),
            "The columns of a data frame x must be numeric.")
     values <- unlist(out, use.names = FALSE)
-    dens <- dsdm(values, mu, c, kappa, log, parametrization)
+    dens <- dsdm(values, mu, c, kappa, log, parametrization, activation = activation, scaling = scaling)
     # an empty parameter gives no values, as for an empty x: the frame with no rows
     if (!length(values) || length(dens) < length(values)) return(out[0, , drop = FALSE])
     # filled column by column, so that a matrix column kept by I() keeps its cells
@@ -349,48 +377,50 @@ dsdm <- function(x, mu = 0, c = 3, kappa = 3.5, log = FALSE,
   if (n == 0L) return(numeric(0))
   out <- .obs_template(n, x, mu, c, kappa)
   x <- rep_len(x, n)
-  # one normalising integral per distinct parameter set: a long x over a short
-  # parameter vector pays for the sets it cycles through, not for every element.
-  # Sets repeat only when x is longer than every parameter; with as many
-  # parameter values as observations, as in log_lik(), the key costs and saves
-  # nothing
-  n_par <- max(lengths(list(mu, c, kappa)))
-  denom <- if (n_par > 1) {
-    mu <- rep_len(mu, n)
+  mu <- rep_len(mu, n)
+  # one normaliser per distinct parameter set: a long x over a short parameter
+  # vector pays for the sets it cycles through, not for every element. Z
+  # depends on log c* and kappa only, not on mu. Sets repeat only when x or mu
+  # is longer than c and kappa; with as many parameter values as observations,
+  # as in log_lik(), the key costs and saves nothing
+  n_par <- max(lengths(list(c, kappa)))
+  if (n_par > 1) {
     c <- rep_len(c, n)
     kappa <- rep_len(kappa, n)
-    if (n_par == n) {
-      .dsdm_integrate_numer_v(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
-    } else {
-      # 17 significant digits round-trip a double, so two sets share a key
-      # only if their values are identical
-      set <- paste(format(mu, digits = 17), format(c, digits = 17), format(kappa, digits = 17))
-      first <- !duplicated(set)
-      .dsdm_integrate_numer_v(.dsdm_numer, mu[first], c[first], kappa[first],
-                              lower = mu[first], upper = mu[first] + pi)[match(set, set[first])]
-    }
-  } else {
-    .dsdm_integrate_numer(.dsdm_numer, mu, c, kappa, lower = mu, upper = mu + pi)
   }
-  lnumerator <- .dsdm_numer(x, mu, c, kappa, log = TRUE)
-
-  denom <- 2 * denom
-
-  out[] <- if (log) lnumerator - log(denom) else exp(lnumerator) / denom
+  log_cstar <- .sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization)
+  log_z <- if (n_par > 1 && n_par < n) {
+    # 17 significant digits round-trip a double, so two sets share a key
+    # only if their values are identical
+    set <- paste(format(log_cstar, digits = 17), format(kappa, digits = 17))
+    first <- !duplicated(set)
+    .sdm_log_z(log_cstar[first], kappa[first], activation)[match(set, set[first])]
+  } else {
+    .sdm_log_z(log_cstar, kappa, activation)
+  }
+  log_dens <- exp(log_cstar + .sdm_log_s(x - mu, kappa, activation)) - log_z
+  out[] <- if (log) log_dens else exp(log_dens)
   out
 }
 
 #' @rdname SDMdist
 #' @export
 psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
-                 lower.bound = -pi, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
+                 lower.bound = -pi, parametrization = NULL,
+                 activation = c("vonmises", "laplace"), scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
+  # c* pairs c and kappa per observation, so both are recycled before it is formed
+  n <- .obs_length(q, mu, c, kappa, lower.bound)
+  c <- rep_len(c, n)
+  kappa <- rep_len(kappa, n)
+  amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
   # mapply() refuses a zero-length q next to scalar parameters
   out <- if (length(q) == 0) {
     numeric(0)
   } else {
-    as.numeric(mapply(.psdm_one, q, mu, c, kappa, lower.bound,
-      MoreArgs = list(numer = .sdm_numer(parametrization))
+    as.numeric(mapply(.psdm_one, rep_len(q, n), rep_len(mu, n), amp, kappa, rep_len(lower.bound, n),
+      MoreArgs = list(activation = activation)
     ))
   }
 
@@ -406,59 +436,80 @@ psdm <- function(q, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE
 #' @rdname SDMdist
 #' @export
 qsdm <- function(p, mu = 0, c = 3, kappa = 3.5, lower.tail = TRUE, log.p = FALSE,
-                 lower.bound = -pi, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
+                 lower.bound = -pi, parametrization = NULL,
+                 activation = c("vonmises", "laplace"), scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
+  # c* pairs c and kappa per observation, so both are recycled before it is formed
+  n <- .obs_length(p, mu, c, kappa, lower.bound)
+  c <- rep_len(c, n)
+  kappa <- rep_len(kappa, n)
+  amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
   if (length(p) == 0) {
     numeric(0)
   } else {
     p <- if (log.p) exp(p) else p
     p <- if (lower.tail) p else 1 - p
     warnif(any(p < 0 | p > 1, na.rm = TRUE), "NaNs produced")
-    as.numeric(mapply(.qsdm_root, p, mu, c, kappa, lower.bound,
-      MoreArgs = list(numer = .sdm_numer(parametrization))
+    as.numeric(mapply(.qsdm_root, rep_len(p, n), rep_len(mu, n), amp, kappa, rep_len(lower.bound, n),
+      MoreArgs = list(activation = activation)
     ))
   }
 }
 
 #' @rdname SDMdist
 #' @export
-rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
-  .check_sdm_args(c, kappa, parametrization)
+rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
+                 activation = c("vonmises", "laplace"), scaling = NULL) {
+  activation <- match.arg(activation)
+  .check_sdm_args(c, kappa, parametrization, activation, scaling)
   n <- .n_draws(n)
-  .dsdm_numer <- .sdm_numer(parametrization)
+  # c* pairs c and kappa draw by draw, so both are recycled before it is formed
+  if (max(length(c), length(kappa)) > 1) {
+    c <- rep_len(c, n)
+    kappa <- rep_len(kappa, n)
+  }
+  amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
 
-  # compare to the peak on the log scale: the unnormalized density itself
-  # overflows for large c and kappa (exp(798) at c = 100, kappa = 400)
+  # the density over its value at the peak, on the log scale: the
+  # unnormalized density itself overflows for large c and kappa
   .rejection_sampling(
     n = n,
-    f = function(x, mu, c, kappa) {
-      exp(.dsdm_numer(x, mu, c, kappa, log = TRUE) - .dsdm_numer(mu, mu, c, kappa, log = TRUE))
-    },
+    f = function(x, mu, amp, kappa) exp(amp * expm1(.sdm_log_s(x - mu, kappa, activation))),
     max_f = 1,
     proposal_fun = function(n) stats::runif(n, -pi, pi),
-    mu = .recycle_draws(mu, n), c = .recycle_draws(c, n), kappa = .recycle_draws(kappa, n)
+    mu = .recycle_draws(mu, n), amp = .recycle_draws(amp, n), kappa = .recycle_draws(kappa, n)
   )
 }
 
-.psdm_one <- function(q, mu, c, kappa, lower.bound, numer) {
-  undefined <- .sdm_undefined(
-    c(q, mu, c, kappa, lower.bound),
-    positions = c(q, mu, lower.bound),
-    amplitude = numer(0, 0, c, kappa, log = TRUE)
-  )
+# log c* of a d/p/q/r call. The deprecated parametrization = "bessel" takes c
+# of the exact von Mises density, whose peak is c / (2 pi I0(kappa) e^-kappa)
+.sdm_dist_log_cstar <- function(c, kappa, activation, scaling, parametrization) {
+  if (identical(parametrization, "sqrtexp")) {
+    warn_deprecated('parametrization = "sqrtexp"', with = 'scaling = "density"', since = "1.5.0")
+  } else if (identical(parametrization, "bessel")) {
+    warn_deprecated('parametrization = "bessel"', with = NULL, since = "1.5.0",
+      details = 'Convert c with `c_bessel2sqrtexp(c, kappa)` and use `scaling = "density"`.'
+    )
+    return(log(c) - log(2 * pi * besselI(kappa, 0, expon.scaled = TRUE)))
+  }
+  if (is.null(scaling)) {
+    scaling <- .sdm_default_scaling(activation)
+  }
+  .sdm_log_cstar(log(c), kappa, activation, scaling)
+}
+
+.psdm_one <- function(q, mu, amp, kappa, lower.bound, activation) {
+  undefined <- .sdm_undefined(c(q, mu, amp, kappa, lower.bound), positions = c(q, mu, lower.bound))
   if (!is.null(undefined)) {
     undefined
   } else {
-    .sdm_cdf(q, mu, lower.bound, .sdm_kernel(numer, c, kappa))
+    .sdm_cdf(q, mu, lower.bound, .sdm_kernel(amp, kappa, activation))
   }
 }
 
-.qsdm_root <- function(p, mu, c, kappa, lower.bound, numer) {
-  undefined <- .sdm_undefined(
-    c(p, mu, c, kappa, lower.bound),
-    positions = c(mu, lower.bound),
-    amplitude = numer(0, 0, c, kappa, log = TRUE)
-  )
+.qsdm_root <- function(p, mu, amp, kappa, lower.bound, activation) {
+  undefined <- .sdm_undefined(c(p, mu, amp, kappa, lower.bound), positions = c(mu, lower.bound))
   if (!is.null(undefined)) {
     undefined
   } else if (p < 0 || p > 1) {
@@ -468,7 +519,7 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   } else if (p == 1) {
     lower.bound + 2 * pi
   } else {
-    kernel <- .sdm_kernel(numer, c, kappa)
+    kernel <- .sdm_kernel(amp, kappa, activation)
     base <- .sdm_mass_below(lower.bound, mu, kernel)
     # f.lower and f.upper are the CDF at the ends by definition, so the
     # bracket holds however the CDF rounds next to them
@@ -481,29 +532,36 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
 }
 
 # NULL for usable arguments. Otherwise NA for a missing value, and NaN for NaN,
-# an infinite value, a position beyond 1e8 (where an ulp is about 1.5e-8
-# radians) or an amplitude that is not finite: R's besselI() returns 0 for
-# kappa above 1e5. `amplitude` is evaluated only for finite arguments
-.sdm_undefined <- function(values, positions, amplitude) {
+# an infinite value or a position beyond 1e8 (where an ulp is about 1.5e-8
+# radians). The peak `amp` is among the values: with the bessel
+# parametrization it is infinite for kappa above 1e5, where R's besselI()
+# returns 0
+.sdm_undefined <- function(values, positions) {
   if (anyNA(values) && !any(is.nan(values))) {
     NA_real_
-  } else if (!all(is.finite(values)) || any(abs(positions) > 1e8) ||
-               !is.finite(amplitude)) {
+  } else if (!all(is.finite(values)) || any(abs(positions) > 1e8)) {
     NaN
   }
 }
 
-# The numerator over its peak in u = x - mu, in the sin()/expm1() form that
-# keeps its digits near the peak at large c and kappa. It is below exp(-50)
-# past `end`; the breaks keep integrate() from missing a peak that is far
-# narrower than the range it integrates over
-.sdm_kernel <- function(numer, c, kappa) {
-  amp <- numer(0, 0, c, kappa, log = TRUE)
-  depth <- if (amp > 50) -log1p(-50 / amp) / (2 * kappa) else Inf
-  end <- if (depth < 1) 2 * asin(sqrt(depth)) else pi
-  breaks <- 64^seq_len(8) / sqrt(kappa * max(amp, 1))
+# The density over its peak in u = x - mu, in the expm1() form that keeps its
+# digits near the peak at large c and kappa. It is below exp(-50) past `end`,
+# where amp * expm1(log s(u)) = -50; the breaks, at multiples of the width of
+# the peak, keep integrate() from missing a peak that is far narrower than the
+# range it integrates over
+.sdm_kernel <- function(amp, kappa, activation) {
+  depth <- if (amp > 50) -log1p(-50 / amp) else Inf
+  if (activation == "vonmises") {
+    depth <- depth / (2 * kappa)
+    end <- if (depth < 1) 2 * asin(sqrt(depth)) else pi
+    width <- sqrt(kappa * max(amp, 1))
+  } else {
+    end <- min(depth / kappa, pi)
+    width <- kappa * max(amp, 1)
+  }
+  breaks <- 64^seq_len(8) / width
   kernel <- list(
-    f = function(u) exp(amp * expm1(-2 * kappa * sin(u / 2)^2)),
+    f = function(u) exp(amp * expm1(.sdm_log_s(u, kappa, activation))),
     ends = c(breaks[breaks < end], end)
   )
   kernel$norm <- 2 * .sdm_beyond(kernel, 0)
@@ -569,48 +627,23 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp") {
   }
 }
 
-.check_sdm_args <- function(c, kappa, parametrization) {
+.check_sdm_args <- function(c, kappa, parametrization, activation, scaling) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(c < 0)), "c must be non-negative")
   stopif(
-    !is.character(parametrization) || length(parametrization) != 1 ||
-      !parametrization %in% c("bessel", "sqrtexp"),
+    !is.null(parametrization) && (!is.character(parametrization) || length(parametrization) != 1 ||
+      !parametrization %in% c("bessel", "sqrtexp")),
     "Parametrization must be one of 'bessel' or 'sqrtexp'"
   )
-}
-
-.sdm_numer <- function(parametrization) {
-  switch(parametrization,
-    bessel = .dsdm_numer_bessel,
-    sqrtexp = .dsdm_numer_sqrtexp
+  stopif(
+    !is.null(scaling) && (!is.character(scaling) || length(scaling) != 1 || !scaling %in% .sdm_scalings),
+    "scaling must be one of 'density', 'peak' or 'range'"
+  )
+  stopif(
+    !is.null(parametrization) && (activation != "vonmises" || !is.null(scaling)),
+    "`parametrization` is deprecated and applies only to the von Mises activation without `scaling`."
   )
 }
-
-# helper functions for calculating the density of the SDM distribution
-.dsdm_numer_bessel <- function(x, mu, c, kappa, log = FALSE) {
-  be <- besselI(kappa, nu = 0, expon.scaled = TRUE)
-  out <- c * exp(kappa * (cos(x - mu) - 1)) / (2 * pi * be)
-  if (!log) {
-    out <- exp(out)
-  }
-  out
-}
-
-.dsdm_numer_sqrtexp <- function(x, mu, c, kappa, log = FALSE) {
-  out <- c * exp(kappa * (cos(x - mu) - 1)) * sqrt(kappa) / sqrt(2 * pi)
-  if (!log) {
-    out <- exp(out)
-  }
-  out
-}
-
-.dsdm_integrate_numer <- function(fun, mu, c, kappa, lower, upper) {
-  stats::integrate(fun, lower = lower, upper = upper, mu, c, kappa)$value
-}
-
-.dsdm_integrate_numer_v <- Vectorize(.dsdm_integrate_numer,
-  vectorize.args = c("mu", "c", "kappa", "lower", "upper")
-)
 
 
 #' @title Distribution functions for the two-parameter mixture model (mixture2p)
@@ -786,7 +819,7 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
     x = x, mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
   )
   .circmix_slot_averaging_ld(
-    matrix(cos(args$x - args$mu)), matrix(0, nrow = length(args$x)),
+    matrix(cos(args$x - args$mu)), matrix(0, nrow = length(args$x), ncol = 1),
     args$K, args$set_size, args$kappa, args$tau, nodes
   )
 }
@@ -804,7 +837,7 @@ dmixture2p <- function(x, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
     mu = mu, kappa = kappa, K = K, set_size = set_size, tau = tau
   )
   .rcircmix_slot_averaging(
-    matrix(args$mu), matrix(0, nrow = length(args$mu)),
+    matrix(args$mu), matrix(0, nrow = length(args$mu), ncol = 1),
     args$K, args$set_size, args$kappa, args$tau
   )
 }
@@ -840,7 +873,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' @description Density, distribution, and random generation functions for the
 #'   three-parameter mixture model with the location of `mu`, precision of
 #'   memory representations `kappa`, probability of a target response `p_mem`,
-#'   and probability of a non-target response `p_nt`.
+#'   and probability of a non-target response `p_nt`. The capacity versions
+#'   (`version = "slot"` and `"slot_averaging"`) replace `p_mem` and `p_nt` by
+#'   the capacity `K` and `ptarget`, as [mixture3p()] does.
 #'
 #' @name mixture3p_dist
 #' @inheritSection bmm_distributions Vector arguments
@@ -854,27 +889,37 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   so rows can differ in set size. The rows are recycled to the number of
 #'   observations. The random generation function draws the rows of one set
 #'   size at a time, so with a fixed seed, moving a row can change which draw
-#'   it gets. Before bmm 1.5.0 a matrix was read as one long item set.
+#'   it gets. Before bmm 1.5.0 a matrix was read as one long item set. Each
+#'   row's number of locations (a vector's length) is the set size the
+#'   `"slot"` and `"slot_averaging"` versions use, so pass the target and
+#'   every non-target of the trial: for a trial of a fitted model, the target
+#'   followed by the first `set_size - 1` columns of `nt_features`.
 #' @param kappa Vector of precision values. With `tau > 0` this is the
 #'   concentration of the average trial, whose Fisher information `J(kappa)` is
-#'   the mean of `J`.
-#' @param p_mem Vector of probabilities of a target response. For a
-#'   [mixture3p()] fit these are `thetat` on its native scale (version
-#'   `"simple"`, see [native_parameters()]) or `min(1, K / set_size) * ptarget`
-#'   (versions `"slot"` and `"slot_averaging"`). The mapping is exact for
-#'   `"slot"` and for `"slot_averaging"` up to `K = set_size`. Above capacity,
-#'   slot averaging gives an item several slots and raises its precision,
-#'   which these functions do not model.
+#'   the mean of `J`. Under `"slot_averaging"` it is the precision of an item
+#'   held in a single slot.
+#' @param p_mem Vector of probabilities of a target response, i.e. `thetat` of
+#'   a [mixture3p()] fit with `version = "simple"` on its native scale (see
+#'   [native_parameters()]). Used by the `"simple"` version; the other versions
+#'   derive the probability of a response from memory from `K` and the set size,
+#'   and warn if `p_mem` is given.
 #' @param p_nt Vector of probabilities of a non-target response, summed over
-#'   the non-targets, which share it equally. For a [mixture3p()] fit these are
-#'   `thetant` on its native scale (version `"simple"`) or
-#'   `min(1, K / set_size) * (1 - ptarget)` (capacity versions, with the limit
-#'   for `"slot_averaging"` given under `p_mem`). Unlike `ptarget`, `p_mem` and
-#'   `p_nt` are not conditional on a response from memory.
+#'   the non-targets, which share it equally: `thetant` of a `"simple"` fit on
+#'   its native scale. Unlike `ptarget`, `p_mem` and `p_nt` are not conditional
+#'   on a response from memory. Used by the `"simple"` version, like `p_mem`.
 #' @param tau Vector of scales for trial-to-trial variability in precision. The
 #'   Fisher information `J` of a memory representation is drawn from
 #'   `gamma(mean = J(kappa), scale = tau)`. `tau = 0`, the default, is constant
 #'   precision. See [mixture3p()].
+#' @param K Vector of memory capacities. Used by the `"slot"` and
+#'   `"slot_averaging"` versions, which read the set size as the number of
+#'   locations in `mu`; `"simple"` ignores `K` and warns if it is given.
+#' @param ptarget Vector of probabilities that a response from memory reports
+#'   the target rather than a non-target. Used by the `"slot"` and
+#'   `"slot_averaging"` versions; `"simple"` ignores it and warns if it is
+#'   given.
+#' @param version A character string selecting the storage model: `"simple"`,
+#'   `"slot"` or `"slot_averaging"`. See [mixture3p()].
 #' @param vp_nodes Number of quadrature nodes used when `tau > 0`; must be an
 #'   odd number of at least 41. See [mixture2p()]. The random generation
 #'   function needs no nodes: it draws `J` from its gamma distribution and then
@@ -894,6 +939,9 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #'   Variability in encoding precision accounts for visual short-term memory
 #'   limitations. PNAS, 109(22), 8780-8785.
 #'
+#'   Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
+#'   representations in visual working memory. Nature, 453(7192), 233-235.
+#'
 #' @return `dmixture3p` gives the density of the three-parameter mixture model,
 #'   and `rmixture3p` gives the random generation function for the
 #'   three-parameter mixture model.
@@ -905,8 +953,13 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' r <- rmixture3p(10000, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
 #' x <- seq(-pi, pi, length.out = 10000)
 #' d <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
-#' hist(r, breaks = 60, freq = FALSE)
+#' hist(r, breaks = 60, freq = FALSE, ylim = c(0, 0.9))
 #' lines(x, d, type = "l", col = "red")
+#'
+#' # slot averaging: with 6 slots for 3 items each item holds two slots
+#' d6 <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, K = 6, ptarget = 0.8,
+#'                  version = "slot_averaging")
+#' lines(x, d6, col = "blue")
 #'
 #' # item locations per trial: one row per trial, NA past its set size
 #' locations <- rbind(c(0, 2, -1.5), c(1, -2, NA), c(-0.5, NA, NA))
@@ -914,26 +967,45 @@ rmixture2p <- function(n, mu = 0, kappa = 5, p_mem = 0.6, tau = 0, K = 3,
 #' dmixture3p(y, mu = locations, kappa = 4, p_mem = 0.6, p_nt = 0.2)
 #'
 dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
-                       tau = 0, vp_nodes = 81L, log = FALSE) {
+                       tau = 0, K = 3, ptarget = 0.75, version = "simple",
+                       vp_nodes = 81L, log = FALSE) {
   if (isTRUE(tau) || isFALSE(tau)) {
     .warn_positional_log("dmixture3p", "x, mu, kappa, p_mem, p_nt", tau)
     log <- tau
     tau <- 0
   }
-  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+  version <- match.arg(version, names(.mixture3p_version_table))
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau, K, ptarget, version)
   .circmix_check_variable_precision(FALSE, vp_nodes)
+  .check_mixture3p_version_args(version, c(
+    p_mem = !missing(p_mem), p_nt = !missing(p_nt),
+    K = !missing(K), ptarget = !missing(ptarget)
+  ))
   items <- .circmix_item_rows(mu)
-  n <- .obs_length(x, kappa, p_mem, p_nt, tau, rows = if (items$per_row) list(items$locations))
+  # only the weights the version reads count towards the observations, as in
+  # dmixture2p()
+  args <- c(
+    list(x = x, kappa = kappa, tau = tau),
+    if (version == "simple") list(p_mem = p_mem, p_nt = p_nt) else list(K = K, ptarget = ptarget)
+  )
+  n <- do.call(.obs_length, c(args, list(rows = if (items$per_row) list(items$locations))))
   if (n == 0) {
     return(numeric(0))
   }
 
-  args <- lapply(list(x = x, kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau), rep_len, n)
+  args <- lapply(args, rep_len, n)
   density <- .circmix_by_set_size(items, n, function(idx, locations, dist) {
-    weights <- .mixture3p_marginal_weights(args$p_mem[idx], args$p_nt[idx], ncol(locations), length(idx))
+    set_size <- ncol(locations)
+    cosd <- cos(args$x[idx] - locations)
+    if (version == "slot_averaging") {
+      return(.circmix_slot_averaging_ld(
+        cosd, .mixture3p_swap_weights(args$ptarget[idx], set_size),
+        args$K[idx], set_size, args$kappa[idx], args$tau[idx], vp_nodes
+      ))
+    }
+    weights <- .mixture3p_row_weights(version, args, idx, set_size)
     .circmix_vp_ld(
-      cos(args$x[idx] - locations), weights$logw, weights$logw_guess,
-      args$kappa[idx], args$tau[idx], vp_nodes
+      cosd, weights$logw, weights$logw_guess, args$kappa[idx], args$tau[idx], vp_nodes
     )
   })
 
@@ -944,12 +1016,35 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
   density
 }
 
-.check_mixture3p_args <- function(kappa, p_mem, p_nt, tau) {
+# the weights of the "simple" and "slot" versions for the observations idx,
+# whose item sets all have set_size items
+.mixture3p_row_weights <- function(version, args, idx, set_size) {
+  if (version == "simple") {
+    return(.mixture3p_marginal_weights(args$p_mem[idx], args$p_nt[idx], set_size, length(idx)))
+  }
+  .mixture3p_nested_weights(pmin(1, args$K[idx] / set_size), args$ptarget[idx], set_size)
+}
+
+.check_mixture3p_args <- function(kappa, p_mem, p_nt, tau, K, ptarget, version) {
   stopif(isTRUE(any(kappa < 0)), "kappa must be non-negative")
   stopif(isTRUE(any(tau < 0)), "tau must be non-negative")
-  stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
-  stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
-  stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+  if (version == "simple") {
+    stopif(isTRUE(any(p_mem < 0)), "p_mem must be larger than zero.")
+    stopif(isTRUE(any(p_nt < 0)), "p_nt must be larger than zero.")
+    stopif(isTRUE(any(p_mem + p_nt > 1)), "The sum of p_mem and p_nt must be smaller than one.")
+    return(invisible())
+  }
+  stopif(isTRUE(any(K <= 0)), "K must be positive.")
+  stopif(isTRUE(any(ptarget < 0 | ptarget > 1)), "ptarget must be between 0 and 1.")
+}
+
+.check_mixture3p_version_args <- function(version, supplied) {
+  unused <- if (version == "simple") c("K", "ptarget") else c("p_mem", "p_nt")
+  ignored <- intersect(unused, names(supplied)[supplied])
+  warnif(
+    length(ignored) > 0,
+    "The '{version}' version of mixture3p ignores {collapse_comma(ignored)}."
+  )
 }
 
 # the weights the exported functions take: marginal probabilities of a target
@@ -981,7 +1076,7 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 .mixture3p_swap_weights <- function(p_target, set_size) {
   n <- length(p_target)
   if (set_size == 1) {
-    return(matrix(0, nrow = n))
+    return(matrix(0, nrow = n, ncol = 1))
   }
   cbind(
     log(p_target),
@@ -1059,14 +1154,29 @@ dmixture3p <- function(x, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2
 #' @rdname mixture3p_dist
 #' @export
 rmixture3p <- function(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2,
-                       tau = 0) {
-  .check_mixture3p_args(kappa, p_mem, p_nt, tau)
+                       tau = 0, K = 3, ptarget = 0.75, version = "simple") {
+  version <- match.arg(version, names(.mixture3p_version_table))
+  .check_mixture3p_args(kappa, p_mem, p_nt, tau, K, ptarget, version)
+  .check_mixture3p_version_args(version, c(
+    p_mem = !missing(p_mem), p_nt = !missing(p_nt),
+    K = !missing(K), ptarget = !missing(ptarget)
+  ))
   n <- .n_draws(n)
   items <- .circmix_item_rows(mu)
 
-  args <- lapply(list(kappa = kappa, p_mem = p_mem, p_nt = p_nt, tau = tau), rep_len, n)
+  args <- lapply(c(
+    list(kappa = kappa, tau = tau),
+    if (version == "simple") list(p_mem = p_mem, p_nt = p_nt) else list(K = K, ptarget = ptarget)
+  ), rep_len, n)
   .circmix_by_set_size(items, n, function(idx, locations, dist) {
-    weights <- .mixture3p_marginal_weights(args$p_mem[idx], args$p_nt[idx], ncol(locations), length(idx))
+    set_size <- ncol(locations)
+    if (version == "slot_averaging") {
+      return(.rcircmix_slot_averaging(
+        locations, .mixture3p_swap_weights(args$ptarget[idx], set_size),
+        args$K[idx], set_size, args$kappa[idx], args$tau[idx]
+      ))
+    }
+    weights <- .mixture3p_row_weights(version, args, idx, set_size)
     .rcircmix(locations, weights$logw, weights$logw_guess, args$kappa[idx], args$tau[idx])
   })
 }

@@ -170,9 +170,9 @@ cs <- c(2, 9, 2)
 kappas <- c(3, 1, 8)
 
 # simulate data from the model
-y <- c(rsdm(n = 1000, mu=0, c = cs[1], kappa = kappas[1], parametrization = "sqrtexp"),
-       rsdm(n = 1000, mu=0, c = cs[2], kappa = kappas[2], parametrization = "sqrtexp"),
-       rsdm(n = 1000, mu=0, c = cs[3], kappa = kappas[3], parametrization = "sqrtexp"))
+y <- c(rsdm(n = 1000, mu=0, c = cs[1], kappa = kappas[1]),
+       rsdm(n = 1000, mu=0, c = cs[2], kappa = kappas[2]),
+       rsdm(n = 1000, mu=0, c = cs[3], kappa = kappas[3]))
 dat <- data.frame(y = y, cond = factor(rep(c('A','B','C'), each=1000)))
 ```
 
@@ -185,7 +185,7 @@ dd <- data.frame(y = rep(seq(-pi, pi, length.out=1000),3),
                  cond = factor(rep(c('A','B','C'), each=1000)),
                  c = rep(cs, each=1000),
                  kappa = rep(kappas, each=1000))
-dd$d <- dsdm(dd$y, mu = 0, c = dd$c, kappa = dd$kappa, parametrization = "sqrtexp")
+dd$d <- dsdm(dd$y, mu = 0, c = dd$c, kappa = dd$kappa)
 
 # prepare labels for plots
 par_labels <- data.frame(cond = c('A','B','C'),
@@ -324,7 +324,7 @@ par_labels$label <- paste0(
   "kappa = ", par_labels$kappa, " (estimate = ", round(par_labels$kappa_est, 2), ")"
 )
 
-ddest$d <- dsdm(ddest$y, mu = 0, c = ddest$c, kappa = ddest$kappa, parametrization = "sqrtexp")
+ddest$d <- dsdm(ddest$y, mu = 0, c = ddest$c, kappa = ddest$kappa)
 
 # plot the data and the predicted density
 ggplot(dat, aes(x = y, fill = cond)) +
