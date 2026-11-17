@@ -9,6 +9,7 @@ tcc(
   similarity,
   n_options = 360,
   units = c("radians", "bins"),
+  noise = c("gaussian", "gumbel"),
   d_max = 30,
   ...
 )
@@ -30,8 +31,12 @@ number: 360 for a colour wheel in 1-degree steps, 180 for orientation.}
 
 \item{units}{Either \code{"radians"} or \code{"bins"}, see \code{resp_error}.}
 
+\item{noise}{The noise on each option's signal: \code{"gaussian"} (normal, as in
+Schurgin et al., 2020) or \code{"gumbel"} (standard Gumbel, which makes the
+response probabilities a softmax). See the section Noise.}
+
 \item{d_max}{The upper end of the \code{d} grid of the likelihood table; draws
-of \code{d} beyond it are reported after the fit.}
+of \code{d} beyond it are reported after the fit. Not used with \code{noise = "gumbel"}, which needs no table.}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -47,7 +52,9 @@ and the response is the option with the strongest signal. This is the
 uncorrelated-noise model of Schurgin et al. (2020). The d' they report
 comes from a correlated-noise version and is larger: across the
 subjects and set sizes of their Figure 3 data, the median ratio of their
-d' to this \code{d} was 1.60.
+d' to this \code{d} was 1.60. With \code{noise = "gumbel"} the signals carry
+standard Gumbel noise instead, and the response probabilities become a
+softmax (see the section Noise).
 }
 \details{
 \itemize{
@@ -102,6 +109,47 @@ chosen \code{kappa}; the fit is then a TCC with that shape fixed. A model that
 estimates the width of the gradient from the responses is the \code{\link[=sdm]{sdm()}}.
 }
 
+\subsection{Noise}{
+
+\code{noise} sets the distribution of the noise on each option's signal.
+\code{"gaussian"}, the default, is the model of Schurgin et al. (2020), with
+normal noise of unit variance. Its response probabilities have no closed
+form, so the likelihood reads them from a table (see the section Grid
+limit on d). With \code{"gumbel"} the noise follows the standard Gumbel (type
+I extreme value) distribution. The largest of independent Gumbel
+variables is again Gumbel distributed, which turns the probability of
+choosing an option into the softmax of \code{d * f(x)} over all options,
+\verb{exp(d * f(x)) / sum(exp(d * f(x')))} (Oberauer, 2023, eq. 4). This needs
+no table, so \code{d} has no grid limit and \code{d_max} is not used.
+
+Gumbel noise is the first step on Oberauer's (2023) path from the TCC to
+his signal discrimination model, and it keeps the similarity measured and
+fixed. Estimating the width of the similarity gradient is the next step,
+and that model is the \code{\link[=sdm]{sdm()}}. The two meet at a von Mises similarity:
+with \code{similarity = tcc_similarity("vonmises", kappa)} and \code{noise = "gumbel"}, \code{\link[=dtcc]{dtcc()}} is the \code{\link[=sdm]{sdm()}} density at each option's centre times
+the option width \code{2 * pi / n_options}, with the same \code{kappa} and \code{c = d * sqrt(2 * pi / kappa) / (1 - exp(-2 * kappa))} in the default
+parametrization of \code{\link[=sdm]{sdm()}}. The sum over options stands in for the
+integral of the \code{\link[=sdm]{sdm()}}, so the two agree to about 1e-8 in log
+probability (1.4e-8 at \code{kappa = 200}) while the gradient's SD, \code{1 / sqrt(kappa)} radians, spans about 4 options
+or more (\code{kappa} up to 200 on 360 options), and differ by 0.013 at \code{kappa = 1000}.
+
+Per gradient, Gumbel noise is not cheaper than normal noise. With \code{d} per
+subject and set size on \link{oberauer_lin_2017} and the data sorted by the
+predictors of \code{d}, it cost 1.5 times as much. On the same data unsorted
+it cost about 8 times as much, because the Gumbel likelihood sums over
+the options once for each run of rows that share \code{d} (see the section
+Speed). It skips the table build before sampling and has no grid limit. Keep
+normal noise to stay with the model of Schurgin et al. (2020) and to
+compare \code{d} with their d'. The two \code{d} are not on one scale. The
+standard Gumbel distribution has an SD of \code{pi / sqrt(6)} = 1.28, but
+matching the response probabilities takes a larger factor: the Gumbel
+\code{d} with the smallest Kullback-Leibler divergence from the probabilities
+of the normal-noise model was 2.6 to 2.9 times the normal \code{d} for values
+of the latter from 0.5 to 2, and 1.9 to 2.4 times at 8, for Laplace
+similarities with \code{kappa} 2.9 and 1.7 and a von Mises similarity with
+\code{kappa} 4.
+}
+
 \subsection{Response}{
 
 With \code{units = "radians"}, \code{resp_error} is the response minus the target
@@ -129,8 +177,9 @@ multiplicative, and priors on its coefficients are priors on \code{log(d)}.
 Keep those priors proper: as \code{d} approaches 0 the likelihood levels off
 at that of guessing uniformly, so under a flat prior on \code{log(d)} the
 posterior cannot be normalised, and a cell with little information
-drifts towards \code{d = 0} without end. The default prior is proper.
-The likelihood reads the response probabilities from a table on a grid
+drifts towards \code{d = 0} without end. The default prior is proper. This
+holds for either noise; the rest of this section applies to normal noise
+only. The likelihood reads the response probabilities from a table on a grid
 of \code{d} values up to \code{d_max} in steps of 0.02, built once per chain
 by quadrature and interpolated with a cubic spline (error below 1e-6 in
 log probability). Beyond \code{d_max} the table is extended
@@ -186,7 +235,11 @@ The comparison is fair only if the responses were themselves recorded on
 
 The fit is fastest when rows that share a value of \code{d} are adjacent, so
 bmm offers to sort the data by the predictors of \code{d}, as for \code{\link[=sdm]{sdm()}}.
-Continuous predictors of \code{d} are supported at the per-trial cost.
+Continuous predictors of \code{d} are supported at the per-trial cost. With
+Gumbel noise that cost is much higher: on unsorted data, the fit
+described under Noise cost about 8 times as much as with normal noise.
+In a non-interactive session \code{bmm()} cannot ask whether to sort and fits
+the data as they are; set \code{sort_data = TRUE} to sort them.
 }
 }
 \examples{
@@ -194,6 +247,15 @@ Continuous predictors of \code{d} are supported at the per-trial cost.
 f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
 dat <- data.frame(err = rtcc(1000, d = 2, similarity = f))
 fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f), cores = 4)
+
+# Gumbel noise with a fixed von Mises similarity
+f_vm <- tcc_similarity("vonmises", kappa = 4)
+fit <- bmm(bmf(d ~ 1), dat, tcc("err", similarity = f_vm, noise = "gumbel"), cores = 4)
 \dontshow{\}) # examplesIf}
+}
+\references{
+Oberauer, K. (2023). Measurement models for visual working
+memory - A factorial model comparison. \emph{Psychological Review, 130}(3),
+841-852. https://doi.org/10.1037/rev0000328
 }
 \keyword{bmmodel}
