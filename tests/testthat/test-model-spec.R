@@ -104,6 +104,8 @@ test_that("model_spec() states each model's density and generator", {
                    c(density = "dmixture3p", generator = "rmixture3p"))
   expect_identical(functions(psychometric_function("r", "x", n_trials = "n")),
                    c(density = "dpsychometric_function", generator = "rpsychometric_function"))
+  expect_identical(functions(ezcdm("ma", "va", "mr", "vr", "n", version = "4par")),
+                   c(density = "dezcdm", generator = "rezcdm"))
 })
 
 test_that("model_spec() follows the capacity versions and variable precision", {

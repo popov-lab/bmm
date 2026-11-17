@@ -336,6 +336,24 @@ test_that("bmm_data_check takes ezdm trials from n_trials", {
     finding_messages(res), fixed = TRUE)))
 })
 
+test_that("bmm_data_check takes ezcdm trials from n_trials", {
+  dat <- data.frame(
+    id = rep(1:3, each = 2), ma = c(0.1, -0.1, 0.05, 0, 0.02, -0.03),
+    va = c(0.3, 0.35, 0.4, 0.3, 0.33, 0.31), mrt = c(0.8, 0.9, 0.85, 0.95, 0.8, 0.9),
+    vrt = c(0.05, 0.06, 0.05, 0.07, 0.06, 0.05), ntr = c(4, 4, 30, 30, 5, 6)
+  )
+  res <- bmm_data_check(
+    bmf(drift ~ 1 + (1 | id), bound ~ 1, ndt ~ 1),
+    dat, ezcdm("ma", "va", "mrt", "vrt", "ntr")
+  )
+  expect_null(res$pipeline$error)
+  expect_identical(res$cells$unit, "trials")
+  expect_equal(res$cells$counts$n, c(8, 60, 11))
+  expect_equal(res$cells$counts$n_rows, c(2, 2, 2))
+  expect_true(any(grepl("1 design cell(s) have fewer than 10 trials: id=1 (n=8)",
+    finding_messages(res), fixed = TRUE)))
+})
+
 test_that("data_trials reads the trial counts of each aggregated SDT format", {
   counts <- data.frame(r1 = c(1, 2), r2 = c(3, NA), r3 = c(5, 6), n = c(9, 8))
   expect_equal(data_trials(sdt_mafc("r1", n_trials = "n", m = 4), counts), c(9, 8))

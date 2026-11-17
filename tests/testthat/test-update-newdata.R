@@ -9,7 +9,7 @@
 # models whose stored frame check_data() accepts as it is, so that update() has
 # nothing to route; sdt_rating()'s trial family reads the user's rating column
 frame_is_user_layout <- c(
-  "cswald", "ddm", "ezdm", "mixture2p", "mixture3p_set_size", "sdm",
+  "cswald", "ddm", "ezcdm", "ezcdm_4par", "ezdm", "mixture2p", "mixture3p_set_size", "sdm",
   "sdm_vonmises_peak", "sdm_vonmises_range", "sdm_laplace_density", "sdm_laplace_peak",
   "sdm_laplace_range", "sdt_rating_trial_level"
 )
