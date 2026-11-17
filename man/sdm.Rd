@@ -10,6 +10,10 @@ sdm(
   version = "simple",
   activation = c("vonmises", "laplace"),
   scaling = NULL,
+  n_options = NULL,
+  options = NULL,
+  n_alternatives = NULL,
+  units = c("radians", "bins"),
   ...
 )
 
@@ -32,6 +36,29 @@ section "Activation functions".}
 \code{"density"}, \code{"peak"} or \code{"range"}. \code{NULL} (the default) means \code{"density"}
 for the von Mises and \code{"peak"} for the Laplace activation. See the
 sections "Scaling of the activation" and "What \code{c} means".}
+
+\item{n_options}{\code{NULL} (the default) for a continuous response, or the
+number of equally spaced response options on the wheel, an even number of
+at least 4: 360 for a colour wheel in 1-degree steps. Each response is
+then a choice among these options. See the section "Discrete response
+options".}
+
+\item{options}{The names of the columns holding the options offered on
+each trial, one column per option, in the units of \code{resp_error} and
+relative to the target; rows that offer fewer options hold \code{NA} in the
+remaining columns. Needs \code{n_options}, the grid the options sit on. See the
+section "Forced-choice option sets".}
+
+\item{n_alternatives}{With \code{options}, optionally the name of a column
+holding the number of options offered on each trial, which is checked
+against the option columns. Without \code{options}, a single number \code{m}: each
+trial offers \code{m} equally spaced options, the target among them, as in the
+m-alternative tasks of Robinson et al. (2023).}
+
+\item{units}{With \code{n_options}, the units of \code{resp_error} and of the option
+columns: \code{"radians"} (the default), binned to the nearest option, or
+\code{"bins"}, whole option steps from the target (any integer, taken modulo
+\code{n_options}).}
 
 \item{...}{used internally for testing, ignore it}
 }
@@ -93,6 +120,91 @@ and how to use it. * \strong{Domain:} Working memory
 }
 }
 }
+\section{Discrete response options}{
+ With \code{n_options = K}, the response is a
+choice among \eqn{K} equally spaced options, and the probability of the
+option at offset \eqn{x} from the target is the softmax of the activation
+over the options, \eqn{\exp(c^* s(x - \mu)) / \sum_k \exp(c^* s(x_k -
+  \mu))}: the SDM with Gumbel noise on a wheel of \eqn{K} options. Use it
+when participants chose among discrete options, as on a colour wheel of
+360 colours, and especially when the options are coarse.
+
+The log-likelihood is reported on the density scale, \eqn{\log P -
+  \log(2\pi / K)}, so \code{loo()} of a discrete fit can be compared with that
+of a continuous \code{sdm()} fit of the same responses. For the von Mises
+activation the two models agree wherever the activation spans a few
+steps: with \eqn{w = 1 / \sqrt{\max(c^*, 1) \kappa}}, the log-likelihood
+of a trial differs by less than 1e-10 once \eqn{w} is at least 2.25
+steps of \eqn{2\pi / K} (measured for \eqn{K} from 90 to 720; on coarser
+wheels the difference is larger at the same \eqn{w}), by about 1e-5 at
+one step, and by more below.
+\code{bmm()} warns after the fit when a posterior draw has \eqn{w} below one
+step; the discrete likelihood is then still exact, but a comparison with
+a continuous fit is not. For the Laplace activation the two never agree
+to that precision, because its kink at the target makes the sum over the
+options differ from the integral by a term of the order of the step.
+
+The likelihood needs one sum over the options per combination of
+parameter values and option set. As in the continuous model, rows share
+parameter values when they share the values of all predictors, which
+is fastest when they are adjacent, so bmm offers to sort the data by the
+predictors. With a
+continuous predictor every trial has its own sum; for the von Mises
+activation on a wheel of at least 90 options the sum over the full wheel
+is then replaced by the continuous normaliser wherever \eqn{w} is at least
+2.25 steps, which changes the log-likelihood by less than 1e-10 and costs
+about as much as the
+continuous model (1.1 times as much per gradient on the 15,200 trials of
+\link{oberauer_lin_2017}, against 7.6 times without the replacement). The
+Laplace activation has no such replacement, and there the full wheel of
+360 options cost 9.7 times as much as the continuous model per gradient.
+\code{log_lik()}, and so \code{loo()}, sums over all options of a row for every
+posterior draw, which with a continuous predictor takes a while on large
+data sets. \code{posterior_predict()} returns option offsets from the
+target in steps; multiply by \code{2 * pi / n_options} for radians.
+
+Fits from before \code{n_options} existed are continuous, and \code{n_options = NULL} keeps that model unchanged.
+}
+
+\section{Forced-choice option sets}{
+ With \code{options}, each trial offers the
+options in its row of the option columns, which must include the target
+(an offset of 0) and the response, and must sit on the grid of
+\code{n_options} positions (values within a tenth of a step are rounded onto
+it, with a message). The probability of the response is the softmax over
+the offered options only. Sets may differ in size and spacing from trial
+to trial, and trials that offer the same options, in any order, share one
+normalising sum within each combination of parameter values.
+\code{conditional_effects()} shows the parameters. A prediction of the
+response needs the options a trial offers, so predict with
+\code{posterior_predict()} or \code{predict()} on \code{newdata} that carries the option
+columns; \code{conditional_effects(method = "posterior_predict")} is not
+meaningful for option sets, because its grid of conditions holds no
+option set.
+
+A data set could look like this, for trials with two and four options in
+radians:\tabular{lllll}{
+   \code{error} \tab \code{opt1} \tab \code{opt2} \tab \code{opt3} \tab \code{opt4} \cr
+   0 \tab 0 \tab 3.142 \tab NA \tab NA \cr
+   1.571 \tab 0 \tab 1.571 \tab 3.142 \tab -1.571 \cr
+}
+
+
+fitted with \code{sdm("error", n_options = 360, options = paste0("opt", 1:4))}.
+Robinson et al. (2023) compared such m-alternative tasks with 2, 4, 8 and
+16 equally spaced colours; for that design \code{n_alternatives = m} builds the
+option columns. They found that the softmax parameter varied with the
+number of alternatives while the d' of a signal detection model with
+normal noise did not; with \code{options}, the SDM, whose Gumbel noise makes it
+a softmax model, can be fitted across set sizes to test that for its
+memory strength \code{c}.
+
+Robinson, M. M., DeStefano, I. C., Vul, E., & Brady, T. F. (2023). How do
+people build up visual memory representations from sensory evidence?
+Revisiting two classic models of choice. Journal of Mathematical
+Psychology, 117, 102805. https://doi.org/10.1016/j.jmp.2023.102805
+}
+
 \section{Activation functions}{
  Each response \eqn{x} is activated by
 \eqn{c^* s(x - \mu)}, where the activation function \eqn{s} is 1 at the
