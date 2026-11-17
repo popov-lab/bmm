@@ -208,15 +208,14 @@ fit_setsize <- bmm(
   backend = "cmdstanr",
   seed = 308,
   refresh = 0,
-  file = "assets/bmmfit_hyp_m2p_setsize"
+  file = "fits/bmmfit_hyp_m2p_setsize"
 )
 ```
 
 Before interpreting any estimate, check that the sampler converged: all
 $\hat{R}$ values should be below 1.01 and the effective sample sizes should be
 large enough (a common rule of thumb is above 400). We checked the two other
-fits of this article in the same way: their largest $\hat{R}$ is below 1.005 and
-their smallest effective sample size above 700.
+fits of this article in the same way, and both pass these checks.
 
 ```{r convergence, message = FALSE}
 draws_summary <- posterior::summarise_draws(
@@ -361,7 +360,7 @@ rbind(
 
 ```{r bf-values, include = FALSE}
 bf01 <- h$Evid.Ratio
-results <- readRDS("assets/hypothesis_testing_results.rds")
+results <- readRDS(file = "fits/hypothesis_testing_results.rds")
 sd_tab <- results$savage_dickey
 sd_lr <- subset(sd_tab, draws == 40000)
 sd_def <- subset(sd_tab, draws == 3000)
@@ -392,7 +391,8 @@ note below the output says).
 <div class="takeaway">
 **Coming from p values?** None of these numbers is a p value.
 
-- `Post.Prob` = 0.04 in the first row does *not* mean "p = .04". It is the
+- `Post.Prob` = `r fmt(h$Post.Prob[1])` in the first row does *not* mean
+  "p = `r sub("^0", "", fmt(h$Post.Prob[1]))`". It is the
   probability of "no difference" after seeing the data, if "no difference" and
   "a difference" had been equally probable beforehand.
 - A 95% CrI that excludes zero says that, given the model and the prior, the
@@ -422,7 +422,7 @@ prior:
 prior_info(fit_setsize)
 ```
 
-(`mu1`, the centre of the response distribution, is fixed to zero by default,
+(`mu`, the centre of the response distribution, is fixed to zero by default,
 shown as `constant(0)` in the table: no prior is estimated for it.)
 
 With cell-means coding, the prior on a difference is *implied* by the priors
@@ -435,7 +435,7 @@ why it matters for the set size 6 versus 8 result.
 <summary>Under the hood: the prior on a difference, and how it shapes the Bayes factor</summary>
 
 The default prior on each cell mean of `kappa` is
-`r subset(brms::prior_summary(fit_setsize), nlpar == "kappa" & class == "b" & coef == "")$prior`
+`r subset(brms::prior_summary(fit_setsize), dpar == "kappa" & class == "b" & coef == "")$prior`
 (`brms` writes priors as mean and standard deviation).
 The difference of two independent normal variables with the same mean and
 standard deviation $s$ is centred at zero, with standard deviation
@@ -695,7 +695,7 @@ fit_null <- bmm(
   backend = "cmdstanr",
   seed = 308,
   refresh = 0,
-  file = "assets/bmmfit_hyp_m2p_null"
+  file = "fits/bmmfit_hyp_m2p_null"
 )
 ```
 
@@ -889,7 +889,7 @@ bf_tab |>
 ```
 
 ```{r bf-values-q2, include = FALSE}
-# count only estimated parameters; constants of the mixture family do not vary
+# count only estimated parameters; constants such as the fixed mu do not vary
 par_sd <- posterior::summarise_draws(fit_setsize, "sd")
 par_sd <- par_sd[grepl("^(b|sd|r)_", par_sd$variable) & par_sd$sd > 0, ]
 n_pars <- table(factor(sub("_.*", "", par_sd$variable), levels = c("b", "sd", "r")))
@@ -981,8 +981,21 @@ fit_sdm <- bmm(
   backend = "cmdstanr",
   seed = 308,
   refresh = 0,
-  file = "assets/bmmfit_hyp_sdm"
+  file = "fits/bmmfit_hyp_sdm"
 )
+```
+
+```{r convergence-other-fits, include = FALSE}
+# the text after the first fit says the two other fits pass the same checks
+conv_ok <- function(fit) {
+  s <- posterior::summarise_draws(fit, "rhat", "ess_bulk", "ess_tail")
+  max(s$rhat, na.rm = TRUE) < 1.01 &&
+    min(s$ess_bulk, s$ess_tail, na.rm = TRUE) > 400
+}
+if (!conv_ok(fit_null) || !conv_ok(fit_sdm)) {
+  stop("fit_null or fit_sdm fails the convergence checks: revise the text ",
+       "after the convergence chunk.")
+}
 ```
 
 As in Question 1, we look at the estimates first, here on the native scale:
