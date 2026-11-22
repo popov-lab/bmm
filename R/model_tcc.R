@@ -119,10 +119,13 @@
 #'   subjects and set sizes of their Figure 3 data, the median ratio of their
 #'   d' to the independent-noise `d` was 1.60. With `correlation`, the noise
 #'   is correlated across options as in their model, and `d` is their d'.
-#'   That model is the base of the TCC family: continuous report, forced
-#'   choice and change detection are its marginals (see the section "One
-#'   process, three formats"). Independent noise stays the default because its
-#'   likelihood needs no Monte Carlo table. With `noise = "gumbel"` the
+#'   Both are versions of the TCC: Schurgin et al. fitted both, and they
+#'   describe the correlation as not critical to the model's account of
+#'   continuous report, where the two predict the same error distributions
+#'   and differ in the scale of d'. The correlation puts `d` on one scale
+#'   across wheels and test formats (see the section "One process, three
+#'   formats") and costs a Monte Carlo table for the likelihood, which is why
+#'   independent noise is the default. With `noise = "gumbel"` the
 #'   signals carry standard Gumbel noise instead, and the response
 #'   probabilities become a softmax (see the section Noise).
 #' @details `r model_docs(.model_tcc())`
@@ -136,10 +139,14 @@
 #'   option opposite the target. The model assumes the similarity depends only
 #'   on the distance, the same for every target and on both sides of it. The
 #'   values are fixed, not estimated; Schurgin et al. (2020) measured them in
-#'   a separate perceptual matching task. With 360 options in 1-degree steps,
-#'   `similarity[k + 1]` is the similarity at `k` degrees. Without a measured
-#'   similarity, [tcc_similarity()] returns a von Mises or Laplace shape for a
-#'   chosen `kappa`; the fit is then a TCC with that shape fixed. A model that
+#'   a separate similarity rating task. With 360 options in 1-degree steps,
+#'   `similarity[k + 1]` is the similarity at `k` degrees. A similarity that
+#'   is obtained independently of the responses being fitted is what makes
+#'   the model a TCC: Schurgin et al. describe the model as replacing free
+#'   parameters such as precision with independently measured values. Without
+#'   a measured similarity, [tcc_similarity()] returns a von Mises or Laplace
+#'   shape for a given `kappa`. Take that `kappa` from other data or from
+#'   theory, not from the fit to the responses at hand: a model that
 #'   estimates the width of the gradient from the responses is the [sdm()].
 #'
 #' ## Noise
@@ -157,6 +164,19 @@
 #'   choosing an option into the softmax of `d * f(x)` over all options,
 #'   `exp(d * f(x)) / sum(exp(d * f(x')))` (Oberauer, 2023, eq. 4). This needs
 #'   no table, so `d` has no grid limit and `d_max` is not used.
+#'
+#'   The form of the noise is an assumption within the TCC that has been
+#'   tested but is not settled. Schurgin et al. (2020) assumed normal noise.
+#'   Robinson et al. (2023) argue that this is more than a convenience: normal
+#'   noise follows from pooling many sensory signals and Gumbel noise from
+#'   taking their maximum, and in forced choice among 2 to 16 options their
+#'   d' under normal noise was stable across the number of options while the
+#'   softmax parameter was not. Oberauer (2023) found that normal and Gumbel
+#'   noise fitted continuous-report data about equally well and recommends
+#'   Gumbel noise for practical reasons, as its closed form is faster to fit.
+#'   In bmm the similarity decides the name: with a fixed `similarity` that
+#'   was obtained independently of the responses, either noise gives a TCC,
+#'   and `noise = "gumbel"` is reported as "TCC with Gumbel noise".
 #'
 #'   Gumbel noise is the first step on Oberauer's (2023) path from the TCC to
 #'   his signal discrimination model, and it keeps the similarity measured and
@@ -189,6 +209,15 @@
 #'   of the latter from 0.5 to 2, and 1.9 to 2.4 times at 8, for Laplace
 #'   similarities with `kappa` 2.9 and 1.7 and a von Mises similarity with
 #'   `kappa` 4.
+#'
+#'   The factor also depends on the number of options offered, so the two
+#'   noises cannot agree on `d` at more than one of them. For a normal `d` of
+#'   1 with `m` equally spaced options, the best-matching Gumbel `d` was 1.15
+#'   at `m` = 2, 1.31 at 4, 1.5 at 8 and 1.7 to 1.8 at 16, against 2.9 to 3.0
+#'   on the full wheel (the Laplace similarity with `kappa` 2.9 and the von
+#'   Mises one, on 720 options). Under Gumbel noise, read `d` within one
+#'   format and one number of options, and do not carry it over to another
+#'   (see the section Forced-choice option sets).
 #'
 #' ## Response
 #'
@@ -427,8 +456,12 @@
 #'   apart, so `n_options` must be a multiple of 16, such as 720). Their
 #'   critical test fixes the parameter across m and compares the two noises:
 #'   with one value for all m, the normal-noise TCC fitted better than the softmax (Gumbel) model,
-#'   while both fitted alike with the parameter free per m. They fitted each
-#'   participant on their own. In bmm the test compares `d ~ 1` under `noise =
+#'   while both fitted alike with the parameter free per m. Free per m, their
+#'   mean d' was 1.79, 1.86, 1.98 and 1.84 for 2, 4, 8 and 16 colours, and
+#'   their mean softmax parameter 2.42, 2.50, 2.85 and 3.07. With `noise =
+#'   "gumbel"` and trials that differ in the number of options, one `d` for
+#'   all of them is therefore an assumption to check, not a default to
+#'   trust. They fitted each participant on their own. In bmm the test compares `d ~ 1` under `noise =
 #'   "gaussian"` with `d ~ 1` under `noise = "gumbel"`, on the same similarity
 #'   and `options`; with several participants, `d` varies by participant and
 #'   stays fixed across m in both fits, either unpooled as in `d ~ 0 + id`,
@@ -726,11 +759,16 @@ print_model_details.tcc <- function(model, ...) {
 #'   at the target and 0 at the opposite option, as Schurgin et al. (2020)
 #'   scaled their measured similarity.
 #'
-#'   `kappa` is fixed here, so a fit with this vector is still the TCC: the
-#'   similarity enters the model as known. Schurgin et al. (2020) measured
-#'   theirs in a separate perceptual task, and a measured similarity is the
-#'   model as its authors intended it. To estimate `kappa` from the responses,
-#'   fit [sdm()] instead, which estimates it for the von Mises shape.
+#'   `kappa` is fixed here, so the similarity enters the model as known.
+#'   Whether the fit is then a TCC depends on where `kappa` comes from. The
+#'   TCC takes its similarity from a source that is independent of the
+#'   responses being fitted: Schurgin et al. (2020) measured theirs in a
+#'   separate similarity rating task and fixed it for all participants and
+#'   conditions. A `kappa` taken from such a measurement, from a fit to other
+#'   data or from theory keeps to that. A `kappa` chosen because it fits the
+#'   responses at hand is an estimate entered without its uncertainty. To
+#'   estimate `kappa` from the responses, fit [sdm()] instead, which
+#'   estimates it for the von Mises shape.
 #' @param shape `"vonmises"` or `"laplace"`.
 #' @param kappa The concentration (von Mises) or rate (Laplace) of the shape, a
 #'   single positive finite number, for distances in radians: a Laplace
