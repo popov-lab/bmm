@@ -392,6 +392,14 @@ bmf2bf.mixture3p <- function(model, formula) {
 
 #' @export
 configure_model.mixture3p <- function(model, data, formula) {
+  # brms's threaded partial_log_lik function declares its own `ptarget` to sum
+  # the log-likelihood, so a dpar of that name stops stanc (#720)
+  stopif(
+    brms_slices_likelihood() && model$version %in% c("slot", "slot_averaging"),
+    "mixture3p(version = \"{model$version}\") cannot be fitted with `threads`: \\
+    brms's threaded likelihood uses the name of its parameter `ptarget` for \\
+    itself. Fit the model without `threads`."
+  )
   spec <- .mixture3p_version_table[[model$version]]
   n_nt <- attr(data, "max_set_size") - 1
 
