@@ -669,8 +669,9 @@ circular_range_findings <- function(data, vars, label) {
 }
 
 # in set size varying designs the nt columns must contain values at positions
-# up to set_size - 1 and NA padding after that; check_data silently replaces
-# NAs, so misplaced ones are only visible here
+# up to set_size - 1 and NA padding after that. check_data() stops on an NA
+# inside the set size (#721), but values past it pass silently, so those are
+# only visible here
 set_size_padding_findings <- function(data, cols, set_size, arg) {
   missing_cols <- setdiff(cols, colnames(data))
   if (length(missing_cols) > 0) {
@@ -697,8 +698,7 @@ set_size_padding_findings <- function(data, cols, set_size, arg) {
     findings <- c(findings, list(data_check_finding("warning", glue(
       "{n_na_active} NA value(s) in '{arg}' at positions within the set size \\
       of the trial ({length(rows)} row(s), first at row {rows[1]}). These \\
-      positions must contain values - during fitting NAs are silently \\
-      replaced by placeholder values, which biases the estimates."
+      positions must contain values; check_data() stops on them as well."
     ))))
   }
   n_value_padding <- sum(!na_mat & padding)

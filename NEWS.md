@@ -1,5 +1,8 @@
 # bmm (development version)
 
+### Breaking changes
+* **mixture3p** and **imm**: `bmm()`, `update()` and predictions with `newdata` now stop when a non-target feature (`nt_features`) or, for imm, a non-target distance (`nt_distances`) is missing inside a trial's set size, that is, in one of its first `set_size - 1` columns. The message names the columns and the number of trials. bmm 1.4.2 and earlier replaced such a feature with 0, the location of the target, and such a distance with 999, without a message, so those trials were fitted with a non-target at the target's location, or with one too far away to count, instead of the item that was shown. Fill in the missing values or drop those trials. `NA` past a trial's set size is still the padding of smaller displays and needs no change (#721).
+
 ### New models
 * Add the **psychometric function** (`psychometric_function()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric_function()` and `rpsychometric_function()`. See `?psychometric_function` (#507). Thanks to @GidonFrischkorn
 

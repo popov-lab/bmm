@@ -660,3 +660,18 @@ test_that("a refit from the fit's frame keeps the single-set-size warning, a pre
   )
   expect_no_warning(check_newdata(fit, one_size))
 })
+
+test_that("newdata for a prediction may not miss a non-target inside the set size (#721)", {
+  skip_on_cran()
+  data <- subset(oberauer_lin_2017, set_size %in% 1:4 & ID %in% 1:2)
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), data,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:3), set_size = "set_size"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  newdata <- data[data$set_size == 4, ][1:3, ]
+  expect_s3_class(check_newdata(fit, newdata), "data.frame")
+  newdata$col_nt3[2] <- NA
+  expect_error(check_newdata(fit, newdata),
+               "'col_nt3' contain NA within the set size in 1 trial\\(s\\), row\\(s\\) 2:")
+})

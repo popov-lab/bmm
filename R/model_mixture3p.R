@@ -209,7 +209,8 @@ settable_links.mixture3p <- function(model) {
 #'   feature values. The non_target feature values should be in radians and
 #'   centered relative to the target. Alternatively, if regex=TRUE, a regular
 #'   expression can be used to match the non-target feature columns in the
-#'   dataset.
+#'   dataset. A trial's first `set_size - 1` columns hold its non-targets and
+#'   must not be `NA`; the columns past them may be `NA`.
 #' @param set_size Name of the column containing the set size variable (if
 #'   set_size varies) or a numeric value for the set_size, if the set_size is
 #'   fixed. In the `"slot"` and `"slot_averaging"` versions a single set size
@@ -541,7 +542,7 @@ simulate_data.mixture3p <- function(model, pars, design = NULL, scale = c("link"
   p <- sim$native
   tau <- p$tau %||% rep(0, nrow(design))
   set_size <- check_var_set_size(model$other_vars$set_size, design)$ss_numeric
-  .check_nt_na(design, nt_features, set_size)
+  .check_nt_na(design, nt_features, set_size, "design")
   nt <- unname(as.matrix(design[nt_features]))
   draw <- switch(model$version,
     simple = function(idx, ss) {
