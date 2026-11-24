@@ -851,9 +851,9 @@ check_data.sdt_rating <- function(model, data, formula) {
   }
 
   paste0(
+    "// log probability of rating category cat; anchor 2 measures the criterion from the midpoint between the means\n",
     "real ", variant$logmu_fun, "(", signature, ") {\n",
     delta_decl,
-    "  // a bias is measured from the midpoint, the thresholds from the noise mean\n",
     "  real crit = anchor == 2 ? criterion + d * sdt_rms_scale(exp(sdratio)) / 2.0 : criterion;\n",
     "  vector[K - 1] thr = sdt_make_thresholds_rating(crit, spacing, deltas, K, thresh_type);\n",
     "  return ", variant$logmu_cat_call, ";\n",
@@ -1024,6 +1024,7 @@ centre_dpar_intercepts.sdt_rating <- function(model) {
                   variant$extra_params, "stimulus", .sdt_rating_delta_dpars(model)),
                 collapse = ", ")
   paste0(
+    "// log probability of the observed rating on one trial\n",
     "real ", .sdt_rating_trial_family_name(model, anchor), "_lpmf(", signature, ") {\n",
     "  return ", variant$logmu_fun, "(", args, ");\n",
     "}\n"

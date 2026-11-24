@@ -474,7 +474,8 @@ test_that("the generated likelihood passes each parameter to its place in the co
     code <- configure_model(model, data, case$formula)$stanvars[[paste0(family, "_lpdf")]]$scode
     code <- gsub(paste0(family, "_lpdf"), paste0("w_", name, "_lpdf"), code, fixed = TRUE)
     wrappers <- c(wrappers, code)
-    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1", strsplit(code, "\n")[[1]][1])
+    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1",
+                     grep("_lpdf(", strsplit(code, "\n")[[1]], fixed = TRUE, value = TRUE))
     arg_names <- sub(".* ", "", strsplit(signature, ", ")[[1]])
     arg_values <- ifelse(arg_names %in% names(values),
       format(values[arg_names], digits = 17), arg_names

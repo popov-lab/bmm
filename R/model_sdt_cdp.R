@@ -813,6 +813,7 @@ simulate_data.sdt_cdp <- function(model, pars, design = NULL, scale = c("link", 
   }
 
   paste0(
+    "// log probability of response category cat under the continuous dual-process model\n",
     "real sdt_cdp_logmu(", signature, ") {\n",
     delta_decl,
     "  vector[n_new + n_old - 1] thr = cdp_make_thresholds(criterion, spacing, ",

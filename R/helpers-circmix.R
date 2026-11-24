@@ -915,6 +915,7 @@
     .circmix_table_vars()
   )
   as.character(glue(
+    "  // log density of a response: gathers the values of a trial and calls {family}_core\n",
     "  real {family}_lpdf({paste(args, collapse = ', ')}) {{\n",
     "    return {family}_core({paste(call_args, collapse = ', ')});\n",
     "  }}\n"
