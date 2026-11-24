@@ -320,7 +320,7 @@ functions {
 
 
 
-  // log of the numerator of the sdm likelihood
+  // log of the numerator of the SDM likelihood, summed over all observations
   real sdm_simple_lpdf(vector y, vector mu, vector c, vector kappa) {
     int N = size(y);
     vector[N] num = exp(fma(kappa,cos(y-mu)-1,c)) ;
@@ -329,22 +329,7 @@ functions {
     return(out);
   }
 
-  // Minus the log of the mean of exp(eta(u)) over the circle, where
-  // eta(u) = exp(c) sqrt(kappa / (2 pi)) exp(kappa (cos(u) - 1)) and c is on the
-  // log scale. eta is even, so [0, pi] carries the whole integral. The spike at
-  // u = 0 narrows with kappa and its peak grows with c (#615). Its squared
-  // inverse width is about peak * kappa at the top, at most 2 kappa log(peak)
-  // where it meets the floor, and kappa for a small peak, so kappa (peak + 1)
-  // measures how sharp it is. Up to 4000, which takes in exp(c) &lt;= 50 with
-  // kappa &lt;= 30, a fixed rule with nodes crowded toward u = 0 resolves it;
-  // wide_cosm1 holds cos(u) - 1 at its nodes. Sharper spikes get Gauss-Legendre
-  // on panels cut at multiples of two widths: w, where eta falls to about 1,
-  // and s, the SD of exp(eta) near the peak, which is far narrower than w once
-  // the peak is large. The last w cut is at 5 w because past 3 w the spike of a
-  // small peak still carries up to 1.2e-6 of the integral above its floor,
-  // and 1.2e-13 past 5 w. eta - peak is formed as
-  // peak expm1(kappa (cos(u) - 1)), with cos(u) - 1 free of cancellation,
-  // because cos(u) - 1 and eta - peak both cancel near the peak.
+  // normalising term of the SDM log likelihood for one combination of c and kappa
   real sdm_simple_ldenom(real c, real kappa, data vector gl_x, data vector gl_w,
                          data vector wide_cosm1, data vector wide_w) {
     int n_nodes = num_elements(gl_x);
@@ -373,6 +358,7 @@ functions {
     return log(pi()) - peak - log_int;
   }
 
+  // normalising term summed over runs of observations that share c and kappa
   real sdm_simple_run_ldenom(vector c, vector kappa, data vector gl_x,
                              data vector gl_w, data vector wide_cosm1,
                              data vector wide_w, int G_runs,
@@ -385,6 +371,7 @@ functions {
     return(out);
   }
 
+  // the same sum for the observations from start to end, used with threading
   real sdm_simple_run_ldenom_slice(vector c, vector kappa, data vector gl_x,
                                    data vector gl_w, data vector wide_cosm1,
                                    data vector wide_w, int start, int end,
@@ -417,7 +404,7 @@ data {
   array[G_sdm_runs] int sdm_run_count;
 }
 transformed data {
-    // fail fast if the run metadata computed in R does not match the data Stan received
+    // check that the run information passed from R matches the data
   {
     int sdm_run_total = 0;
     for (g in 1:G_sdm_runs) {
