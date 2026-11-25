@@ -123,14 +123,37 @@ check_data.non_targets <- function(model, data, formula) {
     'nt_features' should equal max(set_size)-1"
   )
 
+  .check_nt_na(data, nt_features, ss_numeric, "data")
+
   data$ss_numeric <- ss_numeric
-  # the likelihood reads only as many non-target columns as a trial's set size
-  # has, so the padding value never enters it; it only has to not be missing
+  # what is left is NA past a trial's set size, the padding of displays of
+  # different sizes. The likelihood reads only as many non-target columns as
+  # a trial's set size has, so the padding value never enters it; it only has
+  # to not be missing
   data[, nt_features][is.na(data[, nt_features])] <- 0
 
   attr(data, "max_set_size") <- max_set_size
 
   NextMethod("check_data")
+}
+
+# A trial's first set_size - 1 non-target columns hold the items it showed, so
+# a value missing there cannot be filled in without inventing an item (#721).
+# The columns past them may be NA. A trial whose set size is missing is left
+# to the checks of the set size; brms drops it from a fit
+.check_nt_na <- function(data, columns, set_size, what) {
+  nt <- as.matrix(data[columns])
+  shown_na <- is.na(nt) & col(nt) < set_size
+  shown_na[is.na(shown_na)] <- FALSE
+  bad <- columns[colSums(shown_na) > 0]
+  rows <- which(rowSums(shown_na) > 0)
+  listed <- paste(utils::head(rows, 5), collapse = ", ")
+  if (length(rows) > 5) listed <- paste0(listed, ", ...")
+  stopif(length(bad) > 0,
+         "The {what}'s column(s) {collapse_comma(bad)} contain NA within the set size \\
+         in {length(rows)} trial(s), row(s) {listed}: a trial's first set_size - 1 \\
+         non-target columns need values, and NA may stand only past them. Fill in the \\
+         missing values or drop those trials.")
 }
 
 check_var_set_size <- function(set_size, data) {

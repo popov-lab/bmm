@@ -401,6 +401,28 @@ test_that("every version runs through the bmm() pipeline", {
   ))
 })
 
+test_that("the capacity versions refuse threads, the simple version threads (#720)", {
+  skip_on_cran() # the mock backend parses each program
+  dat <- small_data()
+  for (version in c("slot", "slot_averaging")) {
+    expect_error(
+      bmm(bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), dat, nt_model(version = version),
+        backend = "mock", mock_fit = 1, rename = FALSE, threads = brms::threading(2)
+      ),
+      glue("mixture3p(version = \"{version}\") cannot be fitted with `threads`"),
+      fixed = TRUE
+    )
+    expect_silent(bmm(
+      bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), dat, nt_model(version = version),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ))
+  }
+  expect_silent(bmm(
+    bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), dat, nt_model(),
+    backend = "mock", mock_fit = 1, rename = FALSE, threads = brms::threading(2)
+  ))
+})
+
 test_that("every version's family refuses the expected response by name", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017
@@ -660,4 +682,19 @@ test_that("a refit from the fit's frame keeps the single-set-size warning, a pre
     "K is estimated from the responses at set size 4"
   )
   expect_no_warning(check_newdata(fit, one_size))
+})
+
+test_that("newdata for a prediction may not miss a non-target inside the set size (#721)", {
+  skip_on_cran()
+  data <- subset(oberauer_lin_2017, set_size %in% 1:4 & ID %in% 1:2)
+  fit <- suppressWarnings(suppressMessages(bmm(
+    bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), data,
+    mixture3p("dev_rad", nt_features = paste0("col_nt", 1:3), set_size = "set_size"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  )))
+  newdata <- data[data$set_size == 4, ][1:3, ]
+  expect_s3_class(check_newdata(fit, newdata), "data.frame")
+  newdata$col_nt3[2] <- NA
+  expect_error(check_newdata(fit, newdata),
+               "'col_nt3' contain NA within the set size in 1 trial\\(s\\), row\\(s\\) 2:")
 })
