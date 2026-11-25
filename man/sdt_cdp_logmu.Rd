@@ -52,9 +52,10 @@ R companion to the Stan \code{sdt_cdp_logmu} function. It returns
 Stan function -- the category probabilities sum to 1 analytically and
 \code{softmax} absorbs the shared constant), which the \code{\link[=sdt_cdp]{sdt_cdp()}} multinomial
 formula uses as the category logit. \code{brms} evaluates the non-linear
-formula in R for \code{posterior_predict()} and \code{posterior_epred()}, so this
-function must be on the search path; it is exported for that reason and is
-not called directly. Vectorized over the draws-by-observations matrices
+formula in R for \code{log_lik()}, \code{posterior_predict()} and \code{posterior_epred()}
+and finds this function in the bmm namespace, attached or not. It is
+exported for fits saved before bmm 1.5.0, which find it only after
+\code{library(bmm)}, and is not called directly. Vectorized over the draws-by-observations matrices
 brms supplies.
 }
 \keyword{internal}
