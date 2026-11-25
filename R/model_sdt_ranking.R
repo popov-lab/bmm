@@ -91,7 +91,8 @@
       links = param_links,
       fixed_parameters = fixed_pars,
       default_priors = default_priors,
-      init_ranges = init_ranges
+      init_ranges = init_ranges,
+      functions = list(density = "dsdt_ranking", generator = "rsdt_ranking")
     ),
     class = c("bmmodel", "sdt", "sdt_ranking"),
     call = call
@@ -443,7 +444,7 @@ simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("lin
   vars <- model$other_vars
   trial_level <- is_trial_level(model)
   design <- .design_or_n(model, design, trials = if (!trial_level) "n_trials",
-                         counts = if (is.character(vars$m)) vars$m)
+                         counts = if (is.character(vars$m)) vars$m, ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   counts <- rsdt_ranking(nrow(design), if (trial_level) 1L else design$n_trials,

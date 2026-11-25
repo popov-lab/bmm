@@ -45,6 +45,11 @@ model_cases_sdt_yn <- function() {
         model = sdt_yn("n_old", "stimulus", "n_trials"), pars = list(d = 1.2, bias = 0.2),
         design = data.frame(stimulus = 0:1, n_trials = 50),
         formula = bmf(d ~ 1, bias ~ 1), simulate_pars = list(d = 1.2, bias = 0.2, sdratio = 0)
+      ),
+      sdt_yn_trial_level = list(
+        model = trial_model, pars = list(d = 1.2, criterion = 0.4),
+        design = data.frame(id = rep(1:2, each = 6), stimulus = rep(0:1, 6)),
+        formula = bmf(d ~ 1, criterion ~ 1), simulate_pars = list(d = 1.2, criterion = 0.4, sdratio = 0)
       )
     )
   )

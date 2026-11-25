@@ -3,9 +3,8 @@ nt_model <- function(...) {
 }
 
 test_that("mixture3p() and dmixture3p() default to 81 quadrature nodes", {
-  # 41 nodes put the reject threshold inside a real-data posterior: slot
-  # averaging + VP on three subjects of oberauer_lin_2017 diverged on 165 of
-  # 200 transitions at 41 nodes (#398)
+  # 41 nodes hold the log likelihood to about 1e-3 and step by as much where
+  # the gamma shape crosses 2; 81 hold it to 4e-7 for kappa up to 1000 (#695)
   expect_equal(nt_model(variable_precision = TRUE)$vp_nodes, 81L)
   expect_equal(formals(mixture3p)$vp_nodes, 81L)
   expect_equal(formals(dmixture3p)$vp_nodes, 81L)
@@ -113,6 +112,7 @@ test_that("dmixture3p() refuses node counts the model refuses", {
 })
 
 test_that("rmixture3p() draws from dmixture3p()", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   withr::local_seed(445)
   compare <- function(n = 2e5, n_bins = 20, ...) {
     draws <- rmixture3p(n, ...)
@@ -125,6 +125,12 @@ test_that("rmixture3p() draws from dmixture3p()", {
   }
   compare(mu = c(0, 2, -1.5), kappa = 6, p_mem = 0.6, p_nt = 0.2)
   compare(mu = c(0, 2, -1.5), kappa = 6, p_mem = 0.6, p_nt = 0.2, tau = 1.5)
+  # each capacity version below and above the set size of 3: above it every
+  # item is stored, below it the slot-averaging sampler guesses
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 2, ptarget = 0.7, version = "slot")
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 4.5, ptarget = 0.7, version = "slot")
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 2, ptarget = 0.7, version = "slot_averaging")
+  compare(mu = c(0, 2, -1.5), kappa = 6, K = 4.5, ptarget = 0.7, version = "slot_averaging")
 })
 
 test_that("rmixture3p() is exact at high precision", {
@@ -474,15 +480,17 @@ test_that("the Stan and R likelihoods agree for every version", {
     }"
   )
 
-  y <- c(-2.5, -0.8, 0, 0.4, 1.9, 3.0)
-  kappa <- c(0.5, 2, 6, 6, 20, 80)
-  tau <- c(0, 0, 0, 1, 0.5, 2)
-  thetat <- c(-1, 0, 0.8, 1.5, 2, 0.3)
-  thetant <- c(-2, -1, -0.5, 0, 0.5, -1.5)
-  K <- c(1.2, 2.5, 3, 3.5, 6, 8)
-  ptarget <- c(0.95, 0.85, 0.75, 0.6, 0.9, 0.5)
-  ss <- c(1L, 2L, 3L, 4L, 6L, 8L)
-  nt <- matrix(seq(-3, 3, length.out = 6 * 7), nrow = 6)
+  # the last row has gamma shape J(6) / 20 = 0.27, below the switch to the
+  # analytic tail at 2, so Stan's tail grid is checked at 41 nodes
+  y <- c(-2.5, -0.8, 0, 0.4, 1.9, 3.0, 1.2)
+  kappa <- c(0.5, 2, 6, 6, 20, 80, 6)
+  tau <- c(0, 0, 0, 1, 0.5, 2, 20)
+  thetat <- c(-1, 0, 0.8, 1.5, 2, 0.3, 1)
+  thetant <- c(-2, -1, -0.5, 0, 0.5, -1.5, -0.5)
+  K <- c(1.2, 2.5, 3, 3.5, 6, 8, 2)
+  ptarget <- c(0.95, 0.85, 0.75, 0.6, 0.9, 0.5, 0.8)
+  ss <- c(1L, 2L, 3L, 4L, 6L, 8L, 3L)
+  nt <- rbind(matrix(seq(-3, 3, length.out = 6 * 7), nrow = 6), seq(-2.7, 2.7, length.out = 7))
 
   model <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(code))
   fit <- model$sample(
@@ -561,7 +569,8 @@ test_that("the generated likelihood passes each parameter to its place in the co
     code <- configure_model(model, data, case$formula)$stanvars[[paste0(family, "_lpdf")]]$scode
     code <- gsub(paste0(family, "_lpdf"), paste0("w_", name, "_lpdf"), code, fixed = TRUE)
     wrappers <- c(wrappers, code)
-    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1", strsplit(code, "\n")[[1]][1])
+    signature <- sub(".*_lpdf\\((.*?)\\).*", "\\1",
+                     grep("_lpdf(", strsplit(code, "\n")[[1]], fixed = TRUE, value = TRUE))
     arg_names <- sub(".* ", "", strsplit(signature, ", ")[[1]])
     arg_values <- ifelse(arg_names %in% names(values),
       format(values[arg_names], digits = 17), arg_names

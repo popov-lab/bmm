@@ -97,6 +97,7 @@
       fixed_parameters = list(mu = 0, b = 0),
       default_priors = spec$priors,
       init_ranges = spec$init_ranges,
+      functions = list(density = "dimm", generator = "rimm"),
       deprecated_parameters = list(mu1 = "mu"),
       dpar_since = "1.5.0",
       variable_precision = variable_precision,
@@ -170,7 +171,7 @@ settable_links.imm <- function(model) {
 #'   precision is the only extension offered here.
 #' @param vp_nodes Number of quadrature nodes used when
 #'   `variable_precision = TRUE`; must be an odd number of at least 41, default
-#'   81. See [mixture2p()] for the accuracy this buys and the shapes it refuses.
+#'   81. See [mixture2p()] for the accuracy this gives.
 #' @param links A named list of link functions for the model parameters.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
