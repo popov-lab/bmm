@@ -42,7 +42,9 @@ IMMabc(resp_error, nt_features, set_size, regex = FALSE, ...)
   A character vector with the names of the non-target variables. The
   non_target variables should be in radians and be centered relative to
   the target. Alternatively, if regex=TRUE, a regular expression can be
-  used to match the non-target feature columns in the dataset.
+  used to match the non-target feature columns in the dataset. A trial's
+  first `set_size - 1` columns hold its non-targets and must not be
+  `NA`; the columns past them may be `NA`.
 
 - nt_distances:
 
@@ -50,7 +52,8 @@ IMMabc(resp_error, nt_features, set_size, regex = FALSE, ...)
   non-target items to the target item. Alternatively, if regex=TRUE, a
   regular expression can be used to match the non-target distances
   columns in the dataset. Only necessary for the `bsc` and `full`
-  versions.
+  versions. As for `nt_features`, a trial's first `set_size - 1` columns
+  must not be `NA`.
 
 - set_size:
 

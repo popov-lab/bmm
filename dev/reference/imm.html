@@ -91,14 +91,16 @@ in degrees to radian using the <code>deg2rad</code> function.</p></dd>
 variables. The non_target variables should be in radians and be centered
 relative to the target. Alternatively, if regex=TRUE, a regular
 expression can be used to match the non-target feature columns in the
-dataset.</p></dd>
+dataset. A trial's first <code>set_size - 1</code> columns hold its non-targets and
+must not be <code>NA</code>; the columns past them may be <code>NA</code>.</p></dd>
 
 
 <dt id="arg-nt-distances">nt_distances<a class="anchor" aria-label="anchor" href="#arg-nt-distances"></a></dt>
 <dd><p>A vector of names of the columns containing the distances
 of non-target items to the target item. Alternatively, if regex=TRUE, a regular
 expression can be used to match the non-target distances columns in the
-dataset. Only necessary for the <code>bsc</code> and <code>full</code> versions.</p></dd>
+dataset. Only necessary for the <code>bsc</code> and <code>full</code> versions. As for
+<code>nt_features</code>, a trial's first <code>set_size - 1</code> columns must not be <code>NA</code>.</p></dd>
 
 
 <dt id="arg-set-size">set_size<a class="anchor" aria-label="anchor" href="#arg-set-size"></a></dt>

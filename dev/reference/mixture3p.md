@@ -33,7 +33,8 @@ mixture3p(
   The non_target feature values should be in radians and centered
   relative to the target. Alternatively, if regex=TRUE, a regular
   expression can be used to match the non-target feature columns in the
-  dataset.
+  dataset. A trial's first `set_size - 1` columns hold its non-targets
+  and must not be `NA`; the columns past them may be `NA`.
 
 - set_size:
 

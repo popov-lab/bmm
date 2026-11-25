@@ -242,6 +242,14 @@
 
 #### Bug fixes
 
+- **mixture3p** and **imm**: a non-target feature or distance missing
+  inside a trial’s set size (one of its first `set_size - 1` columns)
+  was replaced by 0 or 999 without a message, so those trials were
+  fitted with an item that was not shown.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) and
+  predictions with `newdata` now stop and name the columns; fill in the
+  values or drop those trials. `NA` past a trial’s set size is padding
+  and is fine ([\#721](https://github.com/popov-lab/bmm/issues/721)).
 - [`dmixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p_dist.md)
   now returns one density per value when a parameter is a vector longer
   than `x`, as in `dmixture2p(0.3, kappa = c(1, 5, 20))`

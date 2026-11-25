@@ -78,7 +78,8 @@ in degrees to radians using the <code>deg2rad</code> function.</p></dd>
 feature values. The non_target feature values should be in radians and
 centered relative to the target. Alternatively, if regex=TRUE, a regular
 expression can be used to match the non-target feature columns in the
-dataset.</p></dd>
+dataset. A trial's first <code>set_size - 1</code> columns hold its non-targets and
+must not be <code>NA</code>; the columns past them may be <code>NA</code>.</p></dd>
 
 
 <dt id="arg-set-size">set_size<a class="anchor" aria-label="anchor" href="#arg-set-size"></a></dt>
