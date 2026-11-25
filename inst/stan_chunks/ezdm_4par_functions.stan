@@ -1,11 +1,9 @@
-  // EZ-diffusion likelihood for aggregated data, with a free start point zr as a proportion of bound
-  // mu is a dummy dpar required by brms and is not used
+  // EZ-diffusion log likelihood of aggregated data with a free start point zr; mu is unused
   real ezdm_4par_lpdf(real mrt_upper, real mu, real drift, real bound, real ndt,
                       real zr, real s, real mrt_lower, real vrt_upper,
                       real vrt_lower, int hits, int trials, int rt_upper,
                       int rt_lower) {
     int misses = trials - hits;
-    // check_data() fills the summaries of an unused boundary with placeholders, so these gate every read
     int use_upper = rt_upper == 1 && hits >= 2;
     int use_lower = rt_lower == 1 && misses >= 2;
     real s_sq = square(s);
@@ -13,13 +11,11 @@
     real b_upper = zr * bound;
     real b_lower = bound - b_upper;
 
-    // the logit of pC for a free start point; at zr = 0.5 it is the 3par one
     real lp = binomial_logit_lpmf(hits | trials, ezdm_logit_pc(b_upper, b_lower, k));
     if (!use_upper && !use_lower) {
       return lp;
     }
 
-    // both boundaries share the b0 = bound terms; x0 < 0.49 is the seam to the series
     real w = square(k);
     real x0 = square(bound) * w;
     int series = x0 < 0.49;

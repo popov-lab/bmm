@@ -368,7 +368,7 @@ check_data.sdt_ranking <- function(model, data, formula) {
 # ranking math is computed by the static Stan function sdt_ranking_logmu for
 # fitting and by the exported R companion sdt_ranking_logmu() for
 # posterior_predict/epred (brms evaluates the non-linear formula in R for
-# prediction). log_lik and posterior_predict therefore come from brms — proper
+# prediction, from the bmm namespace: bmm_nl_formula()). log_lik and posterior_predict therefore come from brms — proper
 # joint multinomial draws — while both noise distributions stay supported.
 
 #' @export
@@ -386,11 +386,11 @@ bmf2bf.sdt_ranking <- function(model, formula) {
                 .sdt_dist_id(model$other_vars$dist), sep = ", ")
 
   bform <- brms::bf(
-    glue("Y | trials(nTrials) ~ sdt_ranking_logmu(1, {args})"),
+    bmm_nl_formula(glue("Y | trials(nTrials) ~ sdt_ranking_logmu(1, {args})")),
     nl = TRUE
   )
   for (k in seq_along(resp_cats)[-1]) {
-    bform <- bform + brms::nlf(stats::as.formula(
+    bform <- bform + brms::nlf(bmm_nl_formula(
       glue("mu{resp_cats[k]} ~ sdt_ranking_logmu({k}, {args})")
     ))
   }
@@ -444,7 +444,7 @@ simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("lin
   vars <- model$other_vars
   trial_level <- is_trial_level(model)
   design <- .design_or_n(model, design, trials = if (!trial_level) "n_trials",
-                         counts = if (is.character(vars$m)) vars$m)
+                         counts = if (is.character(vars$m)) vars$m, ...)
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   counts <- rsdt_ranking(nrow(design), if (trial_level) 1L else design$n_trials,
@@ -491,8 +491,10 @@ simulate_data.sdt_ranking <- function(model, pars, design = NULL, scale = c("lin
 #'   `log(p(rank))` for rank position `cat`, which the [sdt_ranking()]
 #'   multinomial formula uses as the category logit (so `softmax` recovers the
 #'   ranking probabilities). `brms` evaluates the non-linear formula in R for
-#'   `posterior_predict()` and `posterior_epred()`, so this function must be on
-#'   the search path; it is exported for that reason and is not called directly.
+#'   `log_lik()`, `posterior_predict()` and `posterior_epred()` and finds this
+#'   function in the bmm namespace, attached or not. It is exported for fits
+#'   saved before bmm 1.5.0, which find it only after `library(bmm)`, and is
+#'   not called directly.
 #' @param cat Integer rank position index.
 #' @param max_rank Set size (number of ranked items) for the observation; ranks
 #'   above it return the finite `-100` sentinel so the category switches off.

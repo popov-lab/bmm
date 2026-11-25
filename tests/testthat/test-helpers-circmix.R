@@ -88,6 +88,23 @@ test_that(".circmix_vp_ld() returns the constant-precision density when tau is z
   )
 })
 
+test_that(".circmix_vp_ld() does not compute J(kappa) when every row has constant precision", {
+  y <- seq(-pi, pi, length.out = 5)
+  local_mocked_bindings(.circmix_J = function(kappa) stop("J(kappa) computed"))
+  expect_equal(
+    .circmix_vp_ld(matrix(cos(y)), matrix(log(0.8), 5), rep(log(0.2), 5), rep(10, 5), rep(0, 5)),
+    .circmix_ld(matrix(cos(y)), matrix(log(0.8), 5), rep(log(0.2), 5), rep(10, 5))
+  )
+})
+
+test_that("circmix_vp_ld() returns at constant precision before it computes J(kappa)", {
+  # constant-precision fits pass tau = 0 on every row; computing J(kappa) first
+  # and discarding it cost two log-Bessel evaluations per row and gradient
+  code <- read_lines2(system.file("stan_chunks", "circmix_functions.stan", package = "bmm"))
+  preamble <- regmatches(code, regexpr("(?s)real circmix_vp_ld\\(.*?circmix_J\\(", code, perl = TRUE))
+  expect_match(preamble, "if (tau <= 0) {\n      return circmix_ld(cosd, logw, logw_guess, kappa);", fixed = TRUE)
+})
+
 # tau -> Inf at fixed kappa leaves the mean of J at J(kappa) but sends the
 # shape to 0, so the mass of J collapses onto 0 and memory becomes uniform.
 # vM(kappa) is the opposite limit, tau -> 0.

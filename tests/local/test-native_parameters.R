@@ -57,7 +57,7 @@ test_that("native_parameters returns mixture3p weights as probabilities", {
     native$value[native$parameter == "kappa"],
     exp(sampling$value[sampling$parameter == "kappa"])
   )
-  expect_true(all(native$value[native$parameter == "mu1"] == 0))
+  expect_true(all(native$value[native$parameter == "mu"] == 0))
 })
 
 test_that("native_parameters reports no non-target responses at set size 1", {
@@ -89,11 +89,16 @@ test_that("native_parameters reports no non-target responses at set size 1", {
 })
 
 test_that("native_parameters agrees with conditional_effects on the native scale", {
-  fit <- fit_mixture3p()
+  # conditional_effects() needs a predictor; the reference fit's thetat has set size
+  fit <- reference_fit("mixture3p")
 
   native <- native_parameters(fit, re_formula = NA, pars = "thetat")
-  ce <- conditional_effects(fit, "thetat", scale = "native", re_formula = NA)
-  expect_equal(mean(native$value), ce[[1]]$estimate__[1], tolerance = 1e-8)
+  ce <- conditional_effects(fit, "thetat", scale = "native", re_formula = NA)[[1]]
+  expect_equal(
+    ce$estimate__,
+    as.vector(tapply(native$value, as.character(native$setsize), mean)[as.character(ce$setsize)]),
+    tolerance = 1e-8
+  )
 })
 
 test_that("native_parameters reports link-scale constants on the native scale", {
@@ -129,7 +134,8 @@ test_that("native_parameters excludes internal variables for models with non-tar
   )
 
   out <- native_parameters(fit)
-  expect_setequal(unique(out$parameter), c("mu1", "kappa", "a", "c"))
+  # mu and b are fixed model parameters; the non-target internals are not reported
+  expect_setequal(unique(out$parameter), c("mu", "kappa", "a", "c", "b"))
   expect_named(out, c(".chain", ".iteration", ".draw", "parameter", "value"))
 
   sampling <- native_parameters(fit, scale = "sampling")
@@ -165,10 +171,10 @@ test_that("population means by quadrature agree with Monte Carlo on a real fit",
 
   grid_vars <- bmm:::.np_grid_vars(fit, names(fit$bmm$model$parameters), NA)
   newdata <- bmm:::.np_newdata(fit, grid_vars, NULL)
-  links <- list(mu1 = "tan_half", kappa = "log", thetat = "logit")
+  links <- list(mu = "tan_half", kappa = "log", thetat = "logit")
   withr::local_seed(531)
   mc <- bmm:::.np_population_mc(
-    fit, c("mu1", "kappa", "thetat"), c("thetat", "kappa"), newdata, grid_vars, NULL,
+    fit, c("mu", "kappa", "thetat"), c("thetat", "kappa"), newdata, grid_vars, NULL,
     draw_ids, "mean", native = TRUE, links = links, ndraws_population = 20000,
     dots = list()
   )
