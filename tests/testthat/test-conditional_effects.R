@@ -1874,6 +1874,33 @@ test_that("conditional_effects puts a distributional parameter on the requested 
   expect_equal(attr(sampling, "spaghetti")$estimate__, log(c(1, 3)))
 })
 
+test_that("a mixture weight at scale = 'sampling' is its linear predictor", {
+  df <- data.frame(x = 1:2, estimate__ = c(0.2, 0.6), se__ = c(0.1, 0.1),
+                   lower__ = c(0.1, 0.4), upper__ = c(0.3, 0.8))
+  attr(df, "effects") <- "x"
+  attr(df, "spaghetti") <- data.frame(x = 1:2, estimate__ = c(0.25, 0.5),
+                                      sample__ = factor(1))
+  local_mocked_bindings(.brms_conditional_effects = function(x, ...) {
+    structure(list(x = df), class = "brms_conditional_effects")
+  })
+  mixture2p <- mock_bmm(bmf(kappa ~ 1, thetat ~ 1), small_data(), mixture2p("dev_rad"))
+
+  # brms holds the softmax weights of mixture3p with the identity link, so what
+  # it returns for them is already the linear predictor of their category
+  for (par in c("thetat", "thetant")) {
+    sampling <- conditional_effects(mock_mixture3p_fit(), par = par, scale = "sampling")$x
+    expect_equal(sampling$estimate__, df$estimate__)
+    expect_equal(sampling$lower__, df$lower__)
+    expect_equal(sampling$upper__, df$upper__)
+    expect_equal(attr(sampling, "spaghetti")$estimate__, c(0.25, 0.5))
+  }
+  sampling <- conditional_effects(mixture2p, par = "thetat", scale = "sampling")$x
+  expect_equal(sampling$estimate__, qlogis(df$estimate__))
+  expect_equal(sampling$upper__, qlogis(df$upper__))
+  sampling <- conditional_effects(mock_mixture3p_fit(), par = "kappa", scale = "sampling")$x
+  expect_equal(sampling$estimate__, log(df$estimate__))
+})
+
 # ===========================================================================
 # Tier 1: Unit tests — the par argument
 # ===========================================================================

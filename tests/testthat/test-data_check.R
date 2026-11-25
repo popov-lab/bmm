@@ -84,6 +84,8 @@ test_that("bmm_data_check flags misplaced NAs and values in nt_features", {
   sev <- finding_severities(res)
   expect_true(any(sev == "warning" & grepl("NA value\\(s\\) in 'nt_features'", msgs)))
   expect_true(any(sev == "note" & grepl("beyond set_size", msgs)))
+  # check_data() stops on the same NA (#721), so the report has it twice
+  expect_match(res$pipeline$error, "'nt1' contain NA within the set size in 1 trial")
 })
 
 test_that("bmm_data_check flags misplaced NAs in nt_distances for imm", {

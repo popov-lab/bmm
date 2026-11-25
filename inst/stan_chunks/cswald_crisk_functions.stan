@@ -1,6 +1,5 @@
-// log-PDF of the competing risks shifted Wald model
+// log density of one response time under the competing-risks shifted Wald model
 real cswald_crisk_lpdf(real rt, real mu, real drift, real bound, real ndt, real zr, real s, int response) {
-  // bounds for the upper and lower response
   real bound_upper = bound - zr*bound;
   real bound_lower = zr*bound;
 
@@ -11,15 +10,13 @@ real cswald_crisk_lpdf(real rt, real mu, real drift, real bound, real ndt, real 
   }
 }
 
-// vectorized overload for the loop = FALSE family: winner's density plus loser's survivor
+// the same log density summed over all observations
 real cswald_crisk_lpdf(vector rt, vector mu, vector drift, vector bound,
                        vector ndt, vector zr, vector s, array[] int dec) {
   int N = rows(rt);
-  // both accumulators share rt - ndt, so a single rt <= ndt makes the target -inf
   vector[N] t = rt - ndt;
   if (min(t) <= 0) return negative_infinity();
 
-  // the winner is the accumulator matching the decision; the 0/1 vector w keeps this vectorized
   vector[N] w = to_vector(dec);
   vector[N] bound_upper = bound - zr .* bound;
   vector[N] bound_lower = zr .* bound;
