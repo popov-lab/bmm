@@ -1,8 +1,4 @@
-  // TCC with forced-choice option sets (#566): each trial offers m of the options on the wheel, and
-  // the response is the offered option with the strongest signal. log P of each offered option, whose
-  // similarities to the target are f. noise 1 (normal): the argmax integral by Gauss-Legendre in x, as
-  // tcc_logp_by_distance() takes it over the full wheel, with each offered option counted once; the
-  // window and the std_normal_lcdf() fallback are the same. noise 2 (Gumbel): the softmax of d f
+  // TCC with forced-choice option sets: log probability of each offered option, given its similarity f
   vector tcc_set_logp(real d, vector f, int noise, data vector gl_nodes, data vector gl_logw) {
     int m = rows(f);
     vector[m] means = d * f;
@@ -15,22 +11,18 @@
     for (q in 1:rows(gl_nodes)) {
       vector[m] z = x[q] - means;
       vector[m] lphi;
-      // Phi() is 0 below z = -37.5; the branch, not a later overwrite, keeps its log(0) out of the
-      // gradient, since d is a parameter here
       for (k in 1:m) lphi[k] = z[k] > -37 ? log(Phi(z[k])) : std_normal_lcdf(z[k] | );
       out = log_sum_exp(out, logw[q] + sum(lphi) - 0.5 * square(z) - lphi);
     }
     return out;
   }
 
-  // the response enters through the cell tables (choices per offered option of each cell, counted in
-  // transformed data), which tcc_options_cells() reads; the family's own term adds nothing
+  // adds nothing: the responses enter the likelihood through tcc_options_cells()
   real tcc_options_lpmf(array[] int y, vector mu, vector d) {
     return 0;
   }
 
-  // the cells whose first row lies in start:end, each once, weighted by its choices; d holds rows
-  // start:end
+  // log likelihood of the cells whose first row lies in start to end, weighted by their choices
   real tcc_options_cells(vector d, int start, int end, int noise, data array[] int cell_first,
                          data array[] int cell_set, data array[,] int cell_n,
                          data array[] int set_size, data array[,] int set_off,
