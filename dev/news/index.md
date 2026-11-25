@@ -468,6 +468,17 @@
   (`dsdm(0, 0, 150, 200)`). It now returns the density there, and is
   accurate to better than 1e-10 on the log scale elsewhere
   ([\#558](https://github.com/popov-lab/bmm/issues/558)).
+- The capacity versions of
+  [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md),
+  `version = "slot"` and `version = "slot_averaging"`, cannot be fitted
+  with `threads`.
+  [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md),
+  [`stancode()`](https://venpopov.com/bmm/dev/reference/stancode.bmmformula.md)
+  and [`update()`](https://rdrr.io/r/stats/update.html) now stop with a
+  message that says so, instead of failing in Stan with “Identifier
+  ‘ptarget’ is already in use”. Fit them without `threads`; the `simple`
+  version still takes `threads`
+  ([\#720](https://github.com/popov-lab/bmm/issues/720)).
 
 #### Deprecated functions and arguments
 
