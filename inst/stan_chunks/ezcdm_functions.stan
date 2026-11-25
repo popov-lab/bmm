@@ -1,11 +1,10 @@
-// EZ-CDM summaries, sigma = 1, exact von Mises angle term; R twins dezcdm(), .ezcdm_moments(), .ez_rt_terms()
+// EZ-CDM: log density of a cell's mean and variance of the angle and of the response time
 real ezcdm_lpdf(real mean_angle, real mu, real drift, real driftangle,
                 real bound, real ndt,
                 real var_angle, real mean_rt, real var_rt, int trials) {
   real kappa = bound * drift;
   real log_I0 = log_modified_bessel_first_kind(0, kappa);
   real k2 = square(kappa);
-  // MRT = ndt + L r, VRT = L^2 v, k3 = L^3 c3, k4 = L^4 c4; regimes and L as in .ezcdm_moments()
   real L;
   real r;
   real v;
@@ -18,7 +17,6 @@ real ezcdm_lpdf(real mean_angle, real mu, real drift, real driftangle,
   } else {
     L = bound / drift;
     if (kappa > 1000) {
-      // asymptotic I1/I0: exp(log I1 - log I0) loses ~1e-12, which v amplifies
       real u = inv(kappa);
       r = (1 - u * (3.0 / 8 + u * (15.0 / 128 + u * (105.0 / 1024 + u * 14175.0 / 98304))))
           / (1 + u * (1.0 / 8 + u * (9.0 / 128 + u * (75.0 / 1024 + u * 11025.0 / 98304))));
@@ -53,7 +51,6 @@ real ezcdm_lpdf(real mean_angle, real mu, real drift, real driftangle,
     }
   }
   real VRT = square(L) * v;
-  // nW = n W / L^4, with W and the conditional normal of mean_rt as in .ez_rt_terms()
   real nW = c4 + 2 * trials * square(v) / (trials - 1);
   real shape = trials * square(v) / nW;
   return trials * (kappa * (1 - var_angle) * cos(mean_angle - driftangle) - log_I0)
