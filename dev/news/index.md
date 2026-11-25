@@ -468,6 +468,25 @@
   (`dsdm(0, 0, 150, 200)`). It now returns the density there, and is
   accurate to better than 1e-10 on the log scale elsewhere
   ([\#558](https://github.com/popov-lab/bmm/issues/558)).
+- [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html),
+  [`posterior_epred()`](https://mc-stan.org/rstantools/reference/posterior_epred.html),
+  [`log_lik()`](https://mc-stan.org/rstantools/reference/log_lik.html),
+  [`loo()`](https://mc-stan.org/loo/reference/loo.html),
+  [`predict()`](https://rdrr.io/r/stats/predict.html),
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) and
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  now work on
+  [`sdt_ranking()`](https://venpopov.com/bmm/dev/reference/sdt_ranking.md),
+  [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md),
+  [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
+  (count data) and `m3(choice_rule = "gaussian")` fits when bmm is
+  loaded but not attached, as after
+  [`bmm::bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) without
+  [`library(bmm)`](https://github.com/popov-lab/bmm). They stopped with
+  `could not find function "sdt_ranking_logmu"` (or `sdt_cdp_logmu`,
+  `sdt_rating_logmu`, `m3_gauss_logp`). Fits saved with an earlier
+  version still need [`library(bmm)`](https://github.com/popov-lab/bmm)
+  first.
 - The capacity versions of
   [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md),
   `version = "slot"` and `version = "slot_averaging"`, cannot be fitted

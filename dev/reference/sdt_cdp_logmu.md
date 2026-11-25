@@ -6,10 +6,12 @@ Stan function – the category probabilities sum to 1 analytically and
 `softmax` absorbs the shared constant), which the
 [`sdt_cdp()`](https://venpopov.com/bmm/dev/reference/sdt_cdp.md)
 multinomial formula uses as the category logit. `brms` evaluates the
-non-linear formula in R for `posterior_predict()` and
-`posterior_epred()`, so this function must be on the search path; it is
-exported for that reason and is not called directly. Vectorized over the
-draws-by-observations matrices brms supplies.
+non-linear formula in R for `log_lik()`, `posterior_predict()` and
+`posterior_epred()` and finds this function in the bmm namespace,
+attached or not. It is exported for fits saved before bmm 1.5.0, which
+find it only after [`library(bmm)`](https://github.com/popov-lab/bmm),
+and is not called directly. Vectorized over the draws-by-observations
+matrices brms supplies.
 
 ## Usage
 

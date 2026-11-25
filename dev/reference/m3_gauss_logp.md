@@ -3,8 +3,10 @@
 R companion to the Stan function `m3_gauss_logp` that
 `m3(choice_rule = "gaussian")` places in each category's activation
 formula. `brms` evaluates the non-linear formula in R for `log_lik()`,
-`posterior_predict()` and `posterior_epred()`, looking the function up
-on the search path; it is exported for that reason and is not meant to
+`posterior_predict()` and `posterior_epred()` and finds this function in
+the bmm namespace, attached or not. It is exported for fits saved before
+bmm 1.5.0, which find it only after
+[`library(bmm)`](https://github.com/popov-lab/bmm), and is not meant to
 be called directly.
 
 ## Usage

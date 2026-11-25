@@ -5,9 +5,11 @@ R companion to the Stan `sdt_rating_logmu` function. It returns
 [`sdt_rating()`](https://venpopov.com/bmm/dev/reference/sdt_rating.md)
 multinomial formula uses as the category logit (so `softmax` recovers
 the SDT category probabilities). `brms` evaluates the non-linear formula
-in R for `posterior_predict()` and `posterior_epred()`, so this function
-must be on the search path; it is exported for that reason and is not
-called directly.
+in R for `log_lik()`, `posterior_predict()` and `posterior_epred()` and
+finds this function in the bmm namespace, attached or not. It is
+exported for fits saved before bmm 1.5.0, which find it only after
+[`library(bmm)`](https://github.com/popov-lab/bmm), and is not called
+directly.
 
 ## Usage
 
