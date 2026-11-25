@@ -208,6 +208,51 @@ announce it in an issue before that release (rule 3). Forms deprecated before
 1.5.0 may be removed in any later release once the removal is announced the
 same way.
 
+## Vector arguments of the distribution functions
+
+The `d*()` and `r*()` functions of the sdm, ddm, ezdm and signal detection
+models follow one recycling contract, stated on the help page
+`?bmm_distributions` and inherited by each distribution's page under "Vector
+arguments". The cswald and circular-mixture functions adopt it with their open
+pull requests; `dm3()`/`rm3()`, the MPT functions and
+`dpsychometric_function()` are not covered yet, and `rpsychometric_function()`
+follows only the rule for `n`. A new distribution follows it from the start:
+
+1. `r*(n, ...)` returns exactly `n` draws (a vector, or `n` rows). `n` is a
+   single number of at least 0, read with `.n_draws()`: a fraction is
+   truncated, as in `rnorm()`, but a vector `n` stops, where `rnorm()` takes
+   its length (`rddm()` still takes it, with a deprecation warning). Each
+   per-observation argument is recycled to `n` with `rep_len()`, as `rnorm()`
+   does, also when `n` is not a multiple of its length; draw `i` uses element
+   `i`. A matrix is read element by element, as `rnorm()` reads it; only
+   counts, thresholds and the `mean_rt` and `var_rt` pairs of
+   `dezdm(version = "4par")` hold one observation per row, so draw or value
+   `i` uses their row `i`.
+2. `d*(x, ...)` returns as many values as the longest of `x` (its rows, for
+   counts) and the per-observation arguments; value `i` equals the call on
+   the `i`-th elements (or rows) alone. An empty `x` or an empty per-observation argument gives an
+   empty result, as in `dnorm()`; where an observation is a vector of counts
+   (or a `mean_rt` or `var_rt` pair of `dezdm(version = "4par")`), a vector
+   is one observation, an empty vector stops and a 0-row matrix gives the
+   empty result. An empty `kcrit` of the cdp functions stops, as
+   `kcrit = NULL` selects the R/K model.
+3. A set of values that describes one observation (thresholds, item
+   locations) is a vector when every observation shares it and a matrix with
+   one row per observation otherwise.
+4. Configuration arguments (`version`, `dist`, `log`, `parametrization`,
+   model objects) are single values, never recycled.
+
+In the code, `.obs_length()` gives the common length, counting `NULL` as
+empty except in its `optional` list (arguments such as `criterion` whose
+`NULL` means not given), and `.recycle_obs()` recycles a vector or the rows
+of a matrix. A `posterior_predict_*()` function
+passes `n = prep$ndraws`. A new distribution adds its element-wise and
+pairing tests to `tests/testthat/test-distribution-contract.R`; a pairing
+test interleaves parameter groups and checks each group against a reference
+outside the function's own code (a closed form, quadrature, or the matching
+`d*()` on single-trial counts), so that draws paired with the wrong
+parameters fail it.
+
 ## Companion packages and extensions
 
 Other packages build on bmm's models. [bmmtools](https://github.com/GidonFrischkorn/bmmtools)

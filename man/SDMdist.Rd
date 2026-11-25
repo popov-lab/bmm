@@ -8,7 +8,16 @@
 \alias{rsdm}
 \title{Distribution functions for the Signal Discrimination Model (SDM)}
 \usage{
-dsdm(x, mu = 0, c = 3, kappa = 3.5, log = FALSE, parametrization = "sqrtexp")
+dsdm(
+  x,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  log = FALSE,
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
+)
 
 psdm(
   q,
@@ -18,7 +27,9 @@ psdm(
   lower.tail = TRUE,
   log.p = FALSE,
   lower.bound = -pi,
-  parametrization = "sqrtexp"
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
 )
 
 qsdm(
@@ -29,13 +40,27 @@ qsdm(
   lower.tail = TRUE,
   log.p = FALSE,
   lower.bound = -pi,
-  parametrization = "sqrtexp"
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
 )
 
-rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
+rsdm(
+  n,
+  mu = 0,
+  c = 3,
+  kappa = 3.5,
+  parametrization = NULL,
+  activation = c("vonmises", "laplace"),
+  scaling = NULL
+)
 }
 \arguments{
-\item{x}{Vector of quantiles}
+\item{x}{Vector of quantiles, or a data frame of them. For a data frame,
+\code{dsdm()} returns a data frame of the same shape with one density per
+cell, its cells taken column by column; parameters longer than the
+number of cells are cut to it, and an empty parameter gives the data
+frame with no rows.}
 
 \item{mu}{Vector of location values in radians}
 
@@ -45,9 +70,16 @@ rsdm(n, mu = 0, c = 3, kappa = 3.5, parametrization = "sqrtexp")
 
 \item{log}{Logical; if \code{TRUE}, values are returned on the log scale.}
 
-\item{parametrization}{Character; either \code{"bessel"} or \code{"sqrtexp"}
-(default). See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for details on the
-parameterization.}
+\item{parametrization}{Deprecated since bmm 1.5.0; use \code{scaling}
+instead. \code{"sqrtexp"} is \code{scaling = "density"}; for \code{"bessel"}, convert \code{c}
+with \code{\link[=c_bessel2sqrtexp]{c_bessel2sqrtexp()}} and use \code{scaling = "density"}.}
+
+\item{activation}{Character; the activation kernel of the SDM,
+\code{"vonmises"} (default) or \code{"laplace"}. See \code{\link[=sdm]{sdm()}}.}
+
+\item{scaling}{Character; what \code{c} measures: \code{"density"}, \code{"peak"} or
+\code{"range"}. \code{NULL} (default) means \code{"density"} for the von Mises and
+\code{"peak"} for the Laplace activation. See \code{\link[=sdm]{sdm()}}.}
 
 \item{q}{Vector of quantiles}
 
@@ -76,13 +108,25 @@ memory strength \code{c}, and precision \code{kappa}. Currently only a
 single activation source is supported.
 }
 \details{
-\strong{Parametrization}
+\strong{Activation and scaling}
 
-See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article} for details on the parameterization.
-Oberauer (2023) introduced the SDM with the bessel parametrization. The
-sqrtexp parametrization is the default in the \code{bmm} package for
-numerical stability and efficiency. The two parametrizations are related by
-the functions \code{c_bessel2sqrtexp()} and \code{c_sqrtexp2bessel()}.
+The density is \eqn{\exp(c^* s(x - \mu)) / Z}, where \eqn{s} is the
+activation function with \eqn{s(0) = 1}, \eqn{c^*} its peak, and \eqn{Z}
+normalises the density over the circle. \code{scaling} says how \code{c} translates
+into \eqn{c^*}; the sections "Activation functions", "Scaling of the
+activation" and "What \code{c} means" in \code{\link[=sdm]{sdm()}} give the formulas. The
+default, the von Mises activation with \code{scaling = "density"}, is what
+these functions computed before \code{activation} and \code{scaling} existed (the
+sqrtexp parametrization). Oberauer (2023) wrote the von Mises SDM with the
+exact density of the von Mises distribution instead (the bessel
+parametrization); \code{c_bessel2sqrtexp()} and \code{c_sqrtexp2bessel()} convert
+between the two. For the Laplace activation with \code{scaling = "density"},
+\code{c_laplace_circle2line()} and \code{c_laplace_line2circle()} convert between
+\code{bmm}'s \code{c} and that of Oberauer (2023, eq. 2). See \href{https://venpopov.com/bmm/articles/bmm_sdm_simple.html}{the online article}.
+At exactly \code{kappa = 0} the range scaling is undefined, because target and
+opposite have the same activation: \code{dsdm}, \code{psdm} and \code{qsdm} return \code{NaN}
+and \code{rsdm} stops with an error. Fits
+never reach it, since \code{kappa} has a log link.
 
 \strong{The cumulative distribution function}
 
@@ -103,6 +147,60 @@ give \code{NA}; \code{NaN}, infinite values and positions (\code{q}, \code{mu}, 
 beyond 1e8 in absolute value give \code{NaN}, as does the bessel
 parametrization for \code{kappa} above 1e5.
 }
+\section{Vector arguments}{
+
+\itemize{
+\item \verb{r*(n, ...)} returns exactly \code{n} draws: a vector, or a data frame or matrix
+with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
+number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, and a matrix is read element
+by element; only a set of values per draw, such as \code{thresholds}, takes
+row \code{i} of a matrix (see below). A shorter vector is
+repeated, also when \code{n} is not a multiple of its length. Until bmm 1.6.0
+at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and parameter vectors still
+returns one draw per element, with a deprecation warning.
+\item \code{n} is a single number of at least 0. A fraction is truncated, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}, and \code{n = 0} gives an empty vector, or a matrix or data
+frame with zero rows and the usual columns. Unlike \code{\link[stats:rnorm]{stats::rnorm()}},
+which takes the length of a vector \code{n}, these functions stop on one;
+\code{\link[=rddm]{rddm()}} still takes its length, with a deprecation warning.
+\item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
+\code{x} (its rows, when the observations are rows of counts) and the
+per-observation arguments, the others recycled to that length. Value \code{i}
+is what the call on the \code{i}-th elements alone returns. A matrix in an
+argument that takes one number per observation, such as \code{x} or \code{d}, holds
+one observation per element, as in \code{\link[stats:dnorm]{stats::dnorm()}}. When \code{x} or any
+per-observation argument is empty, the result is empty, as in
+\code{\link[stats:dnorm]{stats::dnorm()}}. A \code{NULL} argument, such as a misspelt column of a data
+frame, counts as empty, except where the default is \code{NULL}, as for
+\code{criterion} or \code{kcrit}: there it means that the argument is not given.
+Where an observation is a vector of counts
+(\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()}, \code{dsdt_ranking()} and
+\code{dsdt_cdp()}), or the pair of \code{mean_rt} or \code{var_rt} values of
+\code{dezdm(version = "4par")}, a vector is always one observation: pass a
+matrix with zero rows for none, as an empty vector stops. An empty
+\code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
+\item A set of values that describes one observation, such as the \code{thresholds}
+of the rating models or the item locations \code{mu} (and \code{dist}) of
+\code{\link[=dmixture3p]{dmixture3p()}} and \code{\link[=dimm]{dimm()}}, is a vector when every observation shares it
+and a matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}. Item locations are padded with \code{NA} past
+each row's set size, and a data frame of them is read as the matrix of its
+rows. As for counts, an empty vector of them stops: pass a matrix with
+zero rows for no observations.
+\item Configuration arguments such as \code{version}, \code{dist} of the ranking models,
+\code{log}, \code{parametrization} and \code{n_new} are single values and are never
+recycled.
+An argument that a version does not use, such as \code{zr} of
+\code{dezdm(version = "3par")}, is ignored.
+}
+}
+
 \examples{
 # plot the density of the SDM distribution
 x <- seq(-pi, pi, length.out = 10000)
@@ -114,12 +212,14 @@ plot(x, dsdm(x, 0, 2, 3),
 )
 lines(x, dsdm(x, 0, 9, 1), col = "red")
 lines(x, dsdm(x, 0, 2, 8), col = "green")
+lines(x, dsdm(x, 0, 4, 3, activation = "laplace"), col = "blue")
 legend("topright", c(
   "c=2, kappa=3.0, mu=0",
   "c=9, kappa=1.0, mu=0",
-  "c=2, kappa=8, mu=1"
+  "c=2, kappa=8, mu=1",
+  "Laplace, c=4, kappa=3"
 ),
-col = c("black", "red", "green"), lty = 1, cex = 0.8
+col = c("black", "red", "green", "blue"), lty = 1, cex = 0.8
 )
 
 # plot the cumulative distribution function of the SDM distribution

@@ -82,7 +82,6 @@ jobs:
             cowplot
             stringr
             remotes
-            waldo
             fansi
             yaml
             roxygen2

@@ -1,5 +1,4 @@
-  // IMM (Oberauer & Lin, 2017); R twin .imm_log_weights() in R/distributions.R
-  // weight builders return normalised log weights: target, ss - 1 non-targets, background b last
+  // IMM-abc (Oberauer & Lin, 2017): normalised log weights of target, non-targets and guessing
   vector imm_abc_logw(real c, real a, real b, int ss) {
     int n_nt = ss - 1;
     vector[ss + 1] logw;
@@ -12,6 +11,7 @@
     return logw - log_sum_exp(logw);
   }
 
+  // IMM-bsc: the same weights, with non-target weights that fall with the distance to the target
   vector imm_bsc_logw(real c, real s, real b, int ss, vector dist) {
     int n_nt = ss - 1;
     vector[ss + 1] logw;
@@ -24,6 +24,7 @@
     return logw - log_sum_exp(logw);
   }
 
+  // full IMM: the same weights, combining the abc and the bsc version
   vector imm_full_logw(real c, real a, real s, real b, int ss, vector dist) {
     int n_nt = ss - 1;
     vector[ss + 1] logw;
@@ -37,6 +38,7 @@
     return logw - log_sum_exp(logw);
   }
 
+  // log density of a response under the IMM-abc
   real imm_abc_core(real y, real mu, real kappa, real tau, real c, real a,
                     real b, int ss, vector nt, int nodes, data vector logk,
                     data vector dlogk, data real logJ_min, data real dlogJ) {
@@ -45,6 +47,7 @@
                          w[ss + 1], kappa, tau, nodes, logk, dlogk, logJ_min, dlogJ);
   }
 
+  // log density of a response under the IMM-bsc
   real imm_bsc_core(real y, real mu, real kappa, real tau, real c, real s,
                     real b, int ss, vector nt, vector dist, int nodes,
                     data vector logk, data vector dlogk, data real logJ_min,
@@ -54,6 +57,7 @@
                          w[ss + 1], kappa, tau, nodes, logk, dlogk, logJ_min, dlogJ);
   }
 
+  // log density of a response under the full IMM
   real imm_full_core(real y, real mu, real kappa, real tau, real c, real a,
                      real s, real b, int ss, vector nt, vector dist, int nodes,
                      data vector logk, data vector dlogk, data real logJ_min,

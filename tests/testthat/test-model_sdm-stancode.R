@@ -294,3 +294,33 @@ test_that("the deprecated sdmSimple() warns and builds the model sdm() builds", 
   expect_identical(class(old), class(current))
   expect_identical(old$resp_vars, current$resp_vars)
 })
+
+# MD5 of brms::stancode() for the default cell, without the line naming the
+# brms and bmm versions, taken on develop 4ae8bfff with brms 2.23.0 before
+# sdm() gained `activation` and `scaling` (#558), and taken again when the
+# chunk comments were cut: the hash covers comments, and the code without
+# them hashed the same before and after. A new brms can change the
+# code it writes around the chunks, so the hashes are pinned to that version.
+# The lines go through a binary connection: a path opens in text mode, which
+# on Windows writes CRLF and hashes the same code to another value.
+sdm_stancode_md5 <- function(formula, ...) {
+  code <- stancode(formula, data = oberauer_lin_2017, model = sdm("dev_rad"), ...)
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  file <- withr::local_tempfile()
+  con <- file(file, "wb")
+  writeLines(lines[!grepl("^// generated with brms", lines)], con, sep = "\n")
+  close(con)
+  unname(tools::md5sum(file))
+}
+
+test_that("the default sdm() cell writes the Stan code it wrote before activation and scaling", {
+  skip_on_cran()
+  skip_if_not(packageVersion("brms") == "2.23.0", "hashes pinned with brms 2.23.0")
+
+  intercept <- bmf(c ~ 1, kappa ~ 1)
+  hierarchical <- bmf(c ~ set_size + (1 | ID), kappa ~ set_size + (1 | ID))
+  expect_identical(sdm_stancode_md5(intercept), "772e9ca304c67f4d7374df8ebc496b9e")
+  expect_identical(sdm_stancode_md5(intercept, threads = brms::threading(2)), "f735c4fc2734ccdb148a22a979c240b6")
+  expect_identical(sdm_stancode_md5(hierarchical), "986b097f46b8b3315c216765f1b0b4fc")
+  expect_identical(sdm_stancode_md5(hierarchical, threads = brms::threading(2)), "28516aece656a0f9252bc2c0f80c6721")
+})

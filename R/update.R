@@ -19,7 +19,10 @@
 #' @param file_compress Logical or a character string, specifying one of the
 #'   compression algorithms supported by [saveRDS] when saving the updated
 #'   model object.
-#' @param ... Further arguments passed to [brms::update.brmsfit()]
+#' @param ... Further arguments passed to [brms::update.brmsfit()].
+#'   `stanvars` are added to the ones the model sets up. The `stanvars` you
+#'   gave the original fit are not carried over, so pass them again, as in
+#'   `update(fit, newdata = d, stanvars = sv)`.
 #' @return An updated `bmmfit` object refit to the new data and/or formula. If
 #'   `file` is given, it names the newly written file. If not, the `file` field
 #'   is carried over from the original fit, so the updated object still points
@@ -533,6 +536,10 @@ revert_check_data.sdt_ranking <- function(model, data) {
 #' @exportS3Method
 revert_check_data.sdt_rating <- function(model, data) {
   resp_cols <- model$resp_vars$response
+  # the trial family reads the user's rating column as it is
+  if (!is.matrix(data$Y)) {
+    return(NextMethod("revert_check_data"))
+  }
   if (is_trial_level(model)) {
     data[[resp_cols]] <- .sdt_trial_category(data$Y)
   } else {

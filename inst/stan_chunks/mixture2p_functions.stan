@@ -1,15 +1,15 @@
-  // mixture2p (Zhang & Luck, 2008); parameters arrive on the natural scale, tau = 0 means constant precision
-  // weight builders return normalised log weights, target first and guessing last
+  // mixture2p (Zhang & Luck, 2008): log weights of memory and guessing responses
   vector mixture2p_simple_logw(real thetat) {
     return [log(thetat), log1m(thetat)]';
   }
 
-  // fixed-resolution slots: p_mem = min(1, K / ss)
+  // log weights with K memory slots: P(memory) = min(1, K / set size)
   vector mixture2p_slot_logw(real K, int ss) {
     real p_mem = fmin(1.0, K / ss);
     return [log(p_mem), log1m(p_mem)]';
   }
 
+  // log density of a response under the two-parameter mixture model
   real mixture2p_simple_core(real y, real mu, real kappa, real tau, real thetat,
                              int nodes, data vector logk, data vector dlogk,
                              data real logJ_min, data real dlogJ) {
@@ -18,6 +18,7 @@
                          kappa, tau, nodes, logk, dlogk, logJ_min, dlogJ);
   }
 
+  // log density of a response under the slot model
   real mixture2p_slot_core(real y, real mu, real kappa, real tau, real K, int ss,
                            int nodes, data vector logk, data vector dlogk,
                            data real logJ_min, data real dlogJ) {
@@ -26,7 +27,7 @@
                          kappa, tau, nodes, logk, dlogk, logJ_min, dlogJ);
   }
 
-  // slots plus averaging: the single item's weight given that it is held is one
+  // log density of a response under the slots-plus-averaging model
   real mixture2p_slot_averaging_core(real y, real mu, real kappa, real tau,
                                      real K, int ss, int nodes, data vector logk,
                                      data vector dlogk, data real logJ_min,

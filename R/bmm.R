@@ -72,6 +72,7 @@
 #'   description of [brms::brm()] for more details. Unless `control` names a
 #'   `step_size` (`stepsize` for the rstan backend), bmm adds the starting step
 #'   size set in [bmm_options()] to it; the other entries of `control` are kept.
+#'   `stanvars` are added to the ones the model sets up, so pass only your own.
 #'
 #' @details # Supported Models
 #'

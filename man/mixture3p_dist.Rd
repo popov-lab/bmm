@@ -3,8 +3,6 @@
 \name{mixture3p_dist}
 \alias{mixture3p_dist}
 \alias{dmixture3p}
-\alias{pmixture3p}
-\alias{qmixture3p}
 \alias{rmixture3p}
 \title{Distribution functions for the three-parameter mixture model (mixture3p)}
 \usage{
@@ -15,43 +13,74 @@ dmixture3p(
   p_mem = 0.6,
   p_nt = 0.2,
   tau = 0,
+  K = 3,
+  ptarget = 0.75,
+  version = "simple",
   vp_nodes = 81L,
   log = FALSE
 )
 
-pmixture3p(q, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
-
-qmixture3p(p, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2)
-
-rmixture3p(n, mu = c(0, 2, -1.5), kappa = 5, p_mem = 0.6, p_nt = 0.2, tau = 0)
+rmixture3p(
+  n,
+  mu = c(0, 2, -1.5),
+  kappa = 5,
+  p_mem = 0.6,
+  p_nt = 0.2,
+  tau = 0,
+  K = 3,
+  ptarget = 0.75,
+  version = "simple"
+)
 }
 \arguments{
 \item{x}{Vector of observed responses}
 
-\item{mu}{Vector of locations. First value represents the location of the
-target item and any additional values indicate the location of non-target
-items.}
+\item{mu}{Item locations in radians. A vector is one item set shared by
+every observation: the target first, then the non-targets. A matrix or
+data frame holds one item set per observation in each row: the target in
+the first column, then the row's non-targets, and \code{NA} past its set size,
+so rows can differ in set size. The rows are recycled to the number of
+observations. The random generation function draws the rows of one set
+size at a time, so with a fixed seed, moving a row can change which draw
+it gets. Before bmm 1.5.0 a matrix was read as one long item set. The
+number of locations of a row, or of a vector, before any \code{NA} padding is
+the set size the \code{"slot"} and \code{"slot_averaging"} versions use, so pass the
+target and every non-target of the trial: for a trial of a fitted model,
+the target followed by the first \code{set_size - 1} columns of \code{nt_features}.}
 
 \item{kappa}{Vector of precision values. With \code{tau > 0} this is the
 concentration of the average trial, whose Fisher information \code{J(kappa)} is
-the mean of \code{J}.}
+the mean of \code{J}. Under \code{"slot_averaging"} it is the precision of an item
+held in a single slot.}
 
-\item{p_mem}{Vector of probabilities of a target response. For a
-\code{\link[=mixture3p]{mixture3p()}} fit these are \code{thetat} on its native scale (version
-\code{"simple"}, see \code{\link[=native_parameters]{native_parameters()}}) or \code{min(1, K / set_size) * ptarget}
-(versions \code{"slot"} and \code{"slot_averaging"}).}
+\item{p_mem}{Vector of probabilities of a target response, i.e. \code{thetat} of
+a \code{\link[=mixture3p]{mixture3p()}} fit with \code{version = "simple"} on its native scale (see
+\code{\link[=native_parameters]{native_parameters()}}). Used by the \code{"simple"} version; the other versions
+derive the probability of a response from memory from \code{K} and the set size,
+and warn if \code{p_mem} is given.}
 
 \item{p_nt}{Vector of probabilities of a non-target response, summed over
-the non-targets, which share it equally. For a \code{\link[=mixture3p]{mixture3p()}} fit these are
-\code{thetant} on its native scale (version \code{"simple"}) or
-\code{min(1, K / set_size) * (1 - ptarget)} (capacity versions). Unlike
-\code{ptarget}, \code{p_mem} and \code{p_nt} are not conditional on a response from
-memory.}
+the non-targets, which share it equally: \code{thetant} of a \code{"simple"} fit on
+its native scale. Unlike \code{ptarget}, \code{p_mem} and \code{p_nt} are not conditional
+on a response from memory. Used by the \code{"simple"} version, like \code{p_mem}.}
 
 \item{tau}{Vector of scales for trial-to-trial variability in precision. The
 Fisher information \code{J} of a memory representation is drawn from
 \code{gamma(mean = J(kappa), scale = tau)}. \code{tau = 0}, the default, is constant
 precision. See \code{\link[=mixture3p]{mixture3p()}}.}
+
+\item{K}{Vector of memory capacities. Used by the \code{"slot"} and
+\code{"slot_averaging"} versions, which read each observation's set size as
+the number of locations in its item set in \code{mu} (the row's locations
+before the \code{NA} padding); \code{"simple"} ignores \code{K} and warns if it is given.}
+
+\item{ptarget}{Vector of probabilities that a response from memory reports
+the target rather than a non-target. Used by the \code{"slot"} and
+\code{"slot_averaging"} versions; \code{"simple"} ignores it and warns if it is
+given.}
+
+\item{version}{A character string selecting the storage model: \code{"simple"},
+\code{"slot"} or \code{"slot_averaging"}. See \code{\link[=mixture3p]{mixture3p()}}.}
 
 \item{vp_nodes}{Number of quadrature nodes used when \code{tau > 0}; must be an
 odd number of at least 41. See \code{\link[=mixture2p]{mixture2p()}}. The random generation
@@ -63,32 +92,92 @@ it by name: in bmm 1.4 it was the sixth argument, which is now \code{tau}.
 Until bmm 1.6.0 a logical value in that position is still read as \code{log},
 with a warning.}
 
-\item{q}{Vector of quantiles}
-
-\item{p}{Vector of probability}
-
 \item{n}{Number of observations to generate data for}
 }
 \value{
 \code{dmixture3p} gives the density of the three-parameter mixture model,
-\code{pmixture3p} gives the cumulative distribution function of the
-three-parameter mixture model, \code{qmixture3p} gives the quantile function of
-the three-parameter mixture model, and \code{rmixture3p} gives the random
-generation function for the three-parameter mixture model.
+and \code{rmixture3p} gives the random generation function for the
+three-parameter mixture model.
 }
 \description{
 Density, distribution, and random generation functions for the
 three-parameter mixture model with the location of \code{mu}, precision of
 memory representations \code{kappa}, probability of a target response \code{p_mem},
-and probability of a non-target response \code{p_nt}.
+and probability of a non-target response \code{p_nt}. The capacity versions
+(\code{version = "slot"} and \code{"slot_averaging"}) replace \code{p_mem} and \code{p_nt} by
+the capacity \code{K} and \code{ptarget}, as \code{\link[=mixture3p]{mixture3p()}} does.
 }
+\section{Vector arguments}{
+
+\itemize{
+\item \verb{r*(n, ...)} returns exactly \code{n} draws: a vector, or a data frame or matrix
+with \code{n} rows. Every per-observation argument (a parameter, a stimulus, a
+number of trials) is recycled to length \code{n} with \code{\link[=rep_len]{rep_len()}}, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}: draw \code{i} uses element \code{i}, and a matrix is read element
+by element; only a set of values per draw, such as \code{thresholds}, takes
+row \code{i} of a matrix (see below). A shorter vector is
+repeated, also when \code{n} is not a multiple of its length. Until bmm 1.6.0
+at the earliest, \code{\link[=rddm]{rddm()}} with \code{n = 1} and parameter vectors still
+returns one draw per element, with a deprecation warning.
+\item \code{n} is a single number of at least 0. A fraction is truncated, as in
+\code{\link[stats:rnorm]{stats::rnorm()}}, and \code{n = 0} gives an empty vector, or a matrix or data
+frame with zero rows and the usual columns. Unlike \code{\link[stats:rnorm]{stats::rnorm()}},
+which takes the length of a vector \code{n}, these functions stop on one;
+\code{\link[=rddm]{rddm()}} still takes its length, with a deprecation warning.
+\item \verb{d*(x, ...)} returns one value per observation: as many as the longest of
+\code{x} (its rows, when the observations are rows of counts) and the
+per-observation arguments, the others recycled to that length. Value \code{i}
+is what the call on the \code{i}-th elements alone returns. A matrix in an
+argument that takes one number per observation, such as \code{x} or \code{d}, holds
+one observation per element, as in \code{\link[stats:dnorm]{stats::dnorm()}}. When \code{x} or any
+per-observation argument is empty, the result is empty, as in
+\code{\link[stats:dnorm]{stats::dnorm()}}. A \code{NULL} argument, such as a misspelt column of a data
+frame, counts as empty, except where the default is \code{NULL}, as for
+\code{criterion} or \code{kcrit}: there it means that the argument is not given.
+Where an observation is a vector of counts
+(\code{dsdt_rating()}, \code{dsdt_dpsdt()}, \code{dsdt_metad()}, \code{dsdt_ranking()} and
+\code{dsdt_cdp()}), or the pair of \code{mean_rt} or \code{var_rt} values of
+\code{dezdm(version = "4par")}, a vector is always one observation: pass a
+matrix with zero rows for none, as an empty vector stops. An empty
+\code{kcrit} of \code{dsdt_cdp()} and \code{rsdt_cdp()} stops as well; \code{kcrit = NULL}
+gives the R/K model. Counts in a data frame, a tibble included, are read
+as the matrix of its rows, and so are \code{mean_rt} and \code{var_rt} of
+\code{dezdm(version = "4par")}. \code{\link[=dsdm]{dsdm()}} with a data frame \code{x} is the
+exception: it returns a data frame of the same shape, one density per
+cell, and cuts longer parameters to the number of cells.
+\item A set of values that describes one observation, such as the \code{thresholds}
+of the rating models or the item locations \code{mu} (and \code{dist}) of
+\code{\link[=dmixture3p]{dmixture3p()}} and \code{\link[=dimm]{dimm()}}, is a vector when every observation shares it
+and a matrix with one row per observation otherwise: row \code{i} belongs to
+observation \code{i}, or to draw \code{i}. Item locations are padded with \code{NA} past
+each row's set size, and a data frame of them is read as the matrix of its
+rows. As for counts, an empty vector of them stops: pass a matrix with
+zero rows for no observations.
+\item Configuration arguments such as \code{version}, \code{dist} of the ranking models,
+\code{log}, \code{parametrization} and \code{n_new} are single values and are never
+recycled.
+An argument that a version does not use, such as \code{zr} of
+\code{dezdm(version = "3par")}, is ignored.
+}
+}
+
 \examples{
 # generate random samples from the mixture3p model and overlay the density
 r <- rmixture3p(10000, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
 x <- seq(-pi, pi, length.out = 10000)
 d <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, p_mem = 0.6, p_nt = 0.2)
-hist(r, breaks = 60, freq = FALSE)
+hist(r, breaks = 60, freq = FALSE, ylim = c(0, 0.9))
 lines(x, d, type = "l", col = "red")
+
+# slot averaging: with 6 slots for 3 items each item holds two slots
+d6 <- dmixture3p(x, mu = c(0, 2, -1.5), kappa = 4, K = 6, ptarget = 0.8,
+                 version = "slot_averaging")
+lines(x, d6, col = "blue")
+
+# item locations per trial: one row per trial, NA past its set size
+locations <- rbind(c(0, 2, -1.5), c(1, -2, NA), c(-0.5, NA, NA))
+y <- rmixture3p(3, mu = locations, kappa = 4, p_mem = 0.6, p_nt = 0.2)
+dmixture3p(y, mu = locations, kappa = 4, p_mem = 0.6, p_nt = 0.2)
 
 }
 \references{
@@ -99,5 +188,8 @@ resource. Journal of Vision, 9(10), Article 7.
 van den Berg, R., Shin, H., Chou, W.-C., George, R., & Ma, W. J. (2012).
 Variability in encoding precision accounts for visual short-term memory
 limitations. PNAS, 109(22), 8780-8785.
+
+Zhang, W., & Luck, S. J. (2008). Discrete fixed-resolution
+representations in visual working memory. Nature, 453(7192), 233-235.
 }
 \keyword{distribution}

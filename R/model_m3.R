@@ -92,7 +92,8 @@
       fixed_parameters = list(
         b = if (choice_rule == "simple") 0.1 else 0
       ),
-      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]]
+      default_priors = .m3_version_table[[version]][["priors"]][[choice_rule]],
+      functions = list(density = "dm3", generator = "rm3")
     ),
     class = c("bmmodel", "m3", paste0("m3_", version)),
     call = call
@@ -641,7 +642,12 @@ m3_gaussian_stanvars <- function(model) {
   )
   sc_path <- system.file("stan_chunks", package = "bmm")
   brms::stanvar(
-    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_functions.stan")), wrapper, sep = "\n"),
+    scode = paste(
+      read_lines2(paste0(sc_path, "/m3_gaussian_functions.stan")),
+      "// log probability of response category k under the Gaussian choice rule",
+      wrapper,
+      sep = "\n"
+    ),
     block = "functions"
   )
 }
