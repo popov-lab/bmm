@@ -645,9 +645,11 @@ test_that("the Gumbel likelihood reads no table and passes the similarity to its
 })
 
 # md5 of the Gaussian Stan programs at 566-tcc 355aca27, before Gumbel noise
-# was added, without the brms version line and hashed through a binary
-# connection (a text-mode file gets CRLF on Windows); taken under brms 2.23.0,
-# other brms versions generate other code
+# was added, and taken again when the chunk comments were cut: the hash covers
+# comments, and the code without them was the same before and after. Taken
+# without the brms version line and hashed through a binary connection (a
+# text-mode file gets CRLF on Windows), under brms 2.23.0; other brms versions
+# generate other code
 test_that("adding Gumbel noise leaves the Gaussian Stan programs bit-identical", {
   skip_if_not(packageVersion("brms") == "2.23.0", "hashes taken under brms 2.23.0")
   md5_code <- function(model, formula, ...) {
@@ -660,9 +662,9 @@ test_that("adding Gumbel noise leaves the Gaussian Stan programs bit-identical",
   }
   f <- exp(-(0:180) / 20)
   expect_equal(md5_code(tcc("err", similarity = f), bmf(d ~ cond)),
-               "5ee0c72d0d4ace4d2cff6816bd208014")
+               "89f5e2b7479a16267325393abfbe9fd9")
   expect_equal(md5_code(tcc("err", similarity = f), bmf(d ~ cond), threads = brms::threading(2)),
-               "9a1c977823b5fe0979b495cb6514c182")
+               "e1c38f05a0bb3f6d7b7ffcc68faeed86")
 })
 
 # md5 of the Gumbel and table-from-R programs at 566-tcc-options ef664176,

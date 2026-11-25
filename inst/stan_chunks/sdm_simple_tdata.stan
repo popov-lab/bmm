@@ -1,4 +1,4 @@
-  // fail fast if the run metadata computed in R does not match the data Stan received
+  // check that the run information passed from R matches the data
   {
     int sdm_run_total = 0;
     for (g in 1:G_sdm_runs) {

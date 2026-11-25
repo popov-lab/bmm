@@ -1,5 +1,4 @@
-  // each cell's first row and its choices per offered option, from the responses; the tables from R
-  // must match the data Stan received
+  // each cell's first row and its choices per offered option, counted from the responses
   array[G_tcc_cells] int tcc_cell_first = rep_array(0, G_tcc_cells);
   array[G_tcc_cells, M_tcc_sets] int tcc_cell_n = rep_array(0, G_tcc_cells, M_tcc_sets);
   for (n in 1:N) {
