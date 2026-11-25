@@ -1,13 +1,10 @@
-// m-AFC SDT likelihood (Green & Swets, 1966; DeCarlo, 2012): P(correct) is P(signal is the largest of m)
-// returns logit P(correct), because P(correct) rounds to 1 at large d' and the likelihood goes flat
-
+// logit of P(correct) in m-alternative forced choice (Green & Swets, 1966; DeCarlo, 2012)
 real mafc_logit_pc(real d, int m, int dist_type,
                    data vector gh_nodes, data vector gh_weights,
                    data vector gl_nodes, data vector gl_weights) {
-  if (dist_type == 3)                                      // gumbel_max: softmax
+  if (dist_type == 3)
     return d - log(m - 1);
-  if (dist_type == 2) {                                    // gumbel_min: gamma ratio
-    // telescoped to prod(k / (k + e)), so log1p resolves the tiny e where the lgammas cancel
+  if (dist_type == 2) {
     real e = exp(-d);
     real log_pc = 0;
     for (k in 1:(m - 1))
@@ -15,7 +12,7 @@ real mafc_logit_pc(real d, int m, int dist_type,
     return log_pc - log(-expm1(log_pc));
   }
 
-  if (dist_type == 1) {                                    // normal: Gauss-Hermite
+  if (dist_type == 1) {
     if (m == 2)
       return sdt_log_cumprob(d / sqrt(2.0), dist_type) -
              sdt_log_one_minus_cumprob(d / sqrt(2.0), dist_type);
@@ -26,11 +23,9 @@ real mafc_logit_pc(real d, int m, int dist_type,
       log_terms[i] = log(gh_weights[i]) + log_cdf;
       q += gh_weights[i] * (-expm1(log_cdf));
     }
-    // the weights sum to 1 only to rounding, so the complement can land above it
     return log_sum_exp(log_terms) - log(fmin(q, 1));
   }
 
-  // logistic (dist_type == 4): Gauss-Legendre on [0, 1]
   vector[64] log_terms;
   real q = 0;
   for (i in 1:64) {
@@ -42,7 +37,7 @@ real mafc_logit_pc(real d, int m, int dist_type,
   return log_sum_exp(log_terms) - log(fmin(q, 1));
 }
 
-// all rows at once (loop = FALSE); dist_type is one code for all rows, m may vary by row
+// binomial log likelihood of the number of correct responses, summed over all observations
 real sdt_mafc_lpmf(array[] int y, vector mu, vector d, array[] int m, int dist_type,
                    array[] int trials, data vector gh_nodes, data vector gh_weights,
                    data vector gl_nodes, data vector gl_weights) {
@@ -53,7 +48,6 @@ real sdt_mafc_lpmf(array[] int y, vector mu, vector d, array[] int m, int dist_t
   for (n in 1:N) {
     logit_pc[n] = mafc_logit_pc(d[n], m[n], dist_type,
                                 gh_nodes, gh_weights, gl_nodes, gl_weights);
-    // binomial_logit_lpmf errors on an infinite logit, where every trial is correct or none is
     if (is_inf(logit_pc[n])) {
       if (y[n] != (logit_pc[n] > 0 ? trials[n] : 0))
         return negative_infinity();

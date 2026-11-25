@@ -281,12 +281,20 @@ conditional_effects.bmmfit <- function(x,
     stop2("Internal error: parameter type must be 'dpar' or 'nlpar'")
   }
 
-  # nlpars: brms returns on sampling scale; dpars: on native scale
+  # brms returns an nlpar on the sampling scale and a dpar through the link the
+  # fitted family holds for it, which differs from bmm's link where the
+  # likelihood applies the link itself (mixture3p's softmax weights: identity)
   if (par_info$link != "identity") {
     if (par_info$type == "nlpar" && scale == "native") {
       ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = TRUE)
     } else if (par_info$type == "dpar" && scale == "sampling") {
-      ce_result <- .apply_link_transform(ce_result, par_info$link, inverse = FALSE)
+      ce_result <- .apply_link_transform(
+        ce_result,
+        x$family[[
+          if (par_info$brms_name == "mu") "link" else paste0("link_", par_info$brms_name)
+        ]] %||% par_info$link,
+        inverse = FALSE
+      )
     }
   }
 

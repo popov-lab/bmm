@@ -583,20 +583,20 @@ bmf2bf.m3 <- function(model, formula) {
 
   # set the base brmsformula based
   cat <- resp_cats[1]
-  brms_formula <- brms::bf(glue(
+  brms_formula <- brms::bf(bmm_nl_formula(glue(
     "Y | trials(nTrials) ~
     {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars, resp_cats),
     "+ (1 - {n_opt_idx_vars[cat]}) * (-100)"
-  ), nl = TRUE)
+  )), nl = TRUE)
 
   # for each dependent parameter, check if it is used as a non-linear predictor of
   # another parameter and add the corresponding brms function
   for (cat in resp_cats[-1]) {
-    brms_formula <- brms_formula + glue_nlf(
+    brms_formula <- brms_formula + brms::nlf(bmm_nl_formula(glue(
       "mu{cat} ~
       {n_opt_idx_vars[cat]} *", glue_choice_rule_functions(model$other_vars$choice_rule, cat, options_vars, resp_cats),
       "+ (1 - {n_opt_idx_vars[cat]}) * (-100)"
-    )
+    )))
   }
 
   brms_formula
@@ -642,7 +642,12 @@ m3_gaussian_stanvars <- function(model) {
   )
   sc_path <- system.file("stan_chunks", package = "bmm")
   brms::stanvar(
-    scode = paste(read_lines2(paste0(sc_path, "/m3_gaussian_functions.stan")), wrapper, sep = "\n"),
+    scode = paste(
+      read_lines2(paste0(sc_path, "/m3_gaussian_functions.stan")),
+      "// log probability of response category k under the Gaussian choice rule",
+      wrapper,
+      sep = "\n"
+    ),
     block = "functions"
   )
 }
@@ -651,8 +656,9 @@ m3_gaussian_stanvars <- function(model) {
 #' @description R companion to the Stan function `m3_gauss_logp` that
 #'   `m3(choice_rule = "gaussian")` places in each category's activation
 #'   formula. `brms` evaluates the non-linear formula in R for `log_lik()`,
-#'   `posterior_predict()` and `posterior_epred()`, looking the function up on
-#'   the search path; it is exported for that reason and is not meant to be
+#'   `posterior_predict()` and `posterior_epred()` and finds this function in
+#'   the bmm namespace, attached or not. It is exported for fits saved before
+#'   bmm 1.5.0, which find it only after `library(bmm)`, and is not meant to be
 #'   called directly.
 #' @param k Integer index of the response category.
 #' @param ... The K category activations followed by the K option counts, as

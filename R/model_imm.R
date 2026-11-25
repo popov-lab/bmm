@@ -148,11 +148,13 @@ settable_links.imm <- function(model) {
 #'   variables. The non_target variables should be in radians and be centered
 #'   relative to the target. Alternatively, if regex=TRUE, a regular
 #'   expression can be used to match the non-target feature columns in the
-#'   dataset.
+#'   dataset. A trial's first `set_size - 1` columns hold its non-targets and
+#'   must not be `NA`; the columns past them may be `NA`.
 #' @param nt_distances A vector of names of the columns containing the distances
 #'   of non-target items to the target item. Alternatively, if regex=TRUE, a regular
 #'   expression can be used to match the non-target distances columns in the
-#'   dataset. Only necessary for the `bsc` and `full` versions.
+#'   dataset. Only necessary for the `bsc` and `full` versions. As for
+#'   `nt_features`, a trial's first `set_size - 1` columns must not be `NA`.
 #' @param set_size Name of the column containing the set size variable (if
 #'   set_size varies) or a numeric value for the set_size, if the set_size is
 #'   fixed.
@@ -303,7 +305,9 @@ check_data.imm_full <- function(model, data, formula) {
     'nt_distances' should equal max(set_size)-1})"
   )
 
-  # replace NA values with 999 so they have 0 effect through the distance formula
+  .check_nt_na(data, nt_distances, data$ss_numeric, "data")
+  # what is left is the padding past a trial's set size, which the likelihood
+  # never reads; 999 would also give it no weight through the distance formula
   data[, nt_distances][is.na(data[, nt_distances])] <- 999
 
   stopif(
@@ -556,8 +560,8 @@ simulate_data.imm <- function(model, pars, design = NULL, scale = c("link", "nat
   p <- sim$native
   tau <- p$tau %||% rep(0, nrow(design))
   set_size <- check_var_set_size(vars$set_size, design)$ss_numeric
-  .check_nt_na(design, vars$nt_features, set_size)
-  .check_nt_na(design, vars$nt_distances, set_size)
+  .check_nt_na(design, vars$nt_features, set_size, "design")
+  .check_nt_na(design, vars$nt_distances, set_size, "design")
   nt <- unname(as.matrix(design[vars$nt_features]))
   dist <- if (length(vars$nt_distances)) unname(as.matrix(design[vars$nt_distances]))
   y <- numeric(nrow(design))

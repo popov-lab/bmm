@@ -23,10 +23,16 @@ jobs:
         with:
           use-public-rspm: true
 
+      # BH and RcppEigen are only LinkingTo of rstan, so a binary rstan arrives
+      # without them, yet stan_model() reads their headers when it compiles:
+      # without BH it stops with "Boost not found", without RcppEigen with
+      # "Eigen not found".
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: NA
           extra-packages: |
+            BH
+            RcppEigen
             devtools
             withr
             dplyr

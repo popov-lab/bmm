@@ -139,9 +139,9 @@ test_that("simulate_data() names the design column that holds NA", {
   expect_error(simulate_data(model, pars, data.frame(ss = c(2, NA), nt1 = 1, nt2 = NA)),
                "column\\(s\\) 'ss' contain NA")
   expect_error(simulate_data(model, pars, data.frame(ss = c(3, 3, 2), nt1 = c(1, 1, 1), nt2 = c(1, NA, NA))),
-               "'nt2' contain NA within the set size, in row\\(s\\) 2:")
+               "'nt2' contain NA within the set size in 1 trial\\(s\\), row\\(s\\) 2:")
   expect_error(simulate_data(model, pars, data.frame(ss = 3, nt1 = 1, nt2 = c(1, rep(NA, 7)))),
-               "in row\\(s\\) 2, 3, 4, 5, 6, \\.\\.\\. \\(7 in all\\):")
+               "in 7 trial\\(s\\), row\\(s\\) 2, 3, 4, 5, 6, \\.\\.\\.:")
   # past a row's set size NA is the layout of displays of different sizes
   data <- simulate_data(model, pars, data.frame(ss = c(1, 2, 3), nt1 = c(NA, 1, 1), nt2 = c(NA, NA, 1)))
   expect_false(anyNA(data$y))
@@ -432,6 +432,16 @@ test_that("sdt_mafc simulates trials without a design when it reads no column", 
   data <- simulate_data(sdt_mafc("y", m = 4), list(d = 1), n_trials = 100)
   expect_identical(dim(data), c(100L, 1L))
   expect_in(data$y, c(0, 1))
+})
+
+test_that("trial-level sdt_ranking simulates without a design; aggregated counts still need one", {
+  data <- simulate_data(sdt_ranking("y", m = 4), list(d = 1), n_trials = 50)
+  expect_identical(dim(data), c(50L, 1L))
+  expect_type(data$y, "integer")
+  expect_in(data$y, 1:4)
+
+  expect_error(simulate_data(sdt_ranking(paste0("rank", 1:4), m = 4), list(d = 1), n_trials = 50),
+               "reads the column\\(s\\) 'n_trials'.*`design`")
 })
 
 test_that("simulated counts of the m3 and mpt models match their closed forms", {

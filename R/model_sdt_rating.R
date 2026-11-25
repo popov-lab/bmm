@@ -789,8 +789,8 @@ check_data.sdt_rating <- function(model, data, formula) {
 # to log(p_k^SDT) so softmax recovers the SDT probabilities exactly. The SDT math
 # (thresholds + noise CDF) is computed by a per-model Stan function for fitting
 # and by the exported R companion sdt_rating_logmu() for posterior_predict/epred
-# (brms evaluates the non-linear formula in R for prediction, looking the
-# function up on the search path). log_lik and posterior_predict therefore come
+# (brms evaluates the non-linear formula in R for prediction, from the bmm
+# namespace: bmm_nl_formula()). log_lik and posterior_predict therefore come
 # from brms — proper joint multinomial draws — while the four distributions and
 # five threshold parameterizations stay supported.
 
@@ -851,9 +851,9 @@ check_data.sdt_rating <- function(model, data, formula) {
   }
 
   paste0(
+    "// log probability of rating category cat; anchor 2 measures the criterion from the midpoint between the means\n",
     "real ", variant$logmu_fun, "(", signature, ") {\n",
     delta_decl,
-    "  // a bias is measured from the midpoint, the thresholds from the noise mean\n",
     "  real crit = anchor == 2 ? criterion + d * sdt_rms_scale(exp(sdratio)) / 2.0 : criterion;\n",
     "  vector[K - 1] thr = sdt_make_thresholds_rating(crit, spacing, deltas, K, thresh_type);\n",
     "  return ", variant$logmu_cat_call, ";\n",
@@ -881,11 +881,11 @@ bmf2bf.sdt_rating <- function(model, formula) {
                 collapse = ", ")
 
   bform <- brms::bf(
-    glue("Y | trials(nTrials) ~ {fun}(1, {args})"),
+    bmm_nl_formula(glue("Y | trials(nTrials) ~ {fun}(1, {args})")),
     nl = TRUE
   )
   for (k in seq_along(resp_cats)[-1]) {
-    bform <- bform + brms::nlf(stats::as.formula(
+    bform <- bform + brms::nlf(bmm_nl_formula(
       glue("mu{resp_cats[k]} ~ {fun}({k}, {args})")
     ))
   }
@@ -1024,6 +1024,7 @@ centre_dpar_intercepts.sdt_rating <- function(model) {
                   variant$extra_params, "stimulus", .sdt_rating_delta_dpars(model)),
                 collapse = ", ")
   paste0(
+    "// log probability of the observed rating on one trial\n",
     "real ", .sdt_rating_trial_family_name(model, anchor), "_lpmf(", signature, ") {\n",
     "  return ", variant$logmu_fun, "(", args, ");\n",
     "}\n"
@@ -1107,8 +1108,10 @@ simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link
 #'   `log(p_k)` for rating category `cat`, which the [sdt_rating()] multinomial
 #'   formula uses as the category logit (so `softmax` recovers the SDT category
 #'   probabilities). `brms` evaluates the non-linear formula in R for
-#'   `posterior_predict()` and `posterior_epred()`, so this function must be on
-#'   the search path; it is exported for that reason and is not called directly.
+#'   `log_lik()`, `posterior_predict()` and `posterior_epred()` and finds this
+#'   function in the bmm namespace, attached or not. It is exported for fits
+#'   saved before bmm 1.5.0, which find it only after `library(bmm)`, and is
+#'   not called directly.
 #' @param cat Integer rating category index.
 #' @param K Integer number of rating categories.
 #' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).

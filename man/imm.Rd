@@ -36,12 +36,14 @@ in degrees to radian using the \code{deg2rad} function.}
 variables. The non_target variables should be in radians and be centered
 relative to the target. Alternatively, if regex=TRUE, a regular
 expression can be used to match the non-target feature columns in the
-dataset.}
+dataset. A trial's first \code{set_size - 1} columns hold its non-targets and
+must not be \code{NA}; the columns past them may be \code{NA}.}
 
 \item{nt_distances}{A vector of names of the columns containing the distances
 of non-target items to the target item. Alternatively, if regex=TRUE, a regular
 expression can be used to match the non-target distances columns in the
-dataset. Only necessary for the \code{bsc} and \code{full} versions.}
+dataset. Only necessary for the \code{bsc} and \code{full} versions. As for
+\code{nt_features}, a trial's first \code{set_size - 1} columns must not be \code{NA}.}
 
 \item{set_size}{Name of the column containing the set size variable (if
 set_size varies) or a numeric value for the set_size, if the set_size is
