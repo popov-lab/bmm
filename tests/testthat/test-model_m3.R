@@ -728,6 +728,14 @@ test_that("m3 runs through the pipeline with the gaussian choice rule in all ver
                  "Default priors for each parameter")
 })
 
+test_that("the gaussian choice rule finds m3_gauss_logp() without library(bmm)", {
+  model <- m3(c("corr", "other", "npl"), c("n_corr", "n_other", "n_npl"),
+              choice_rule = "gaussian", version = "ss")
+  fit <- bmm(bmf(c ~ 1, a ~ 1), oberauer_lewandowsky_2019_e1, model,
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_nl_functions_resolve(fit)
+})
+
 test_that("the gaussian choice rule fixes b at 0, accepts any case, and puts log P on each category", {
   model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "Gaussian", version = "ss")
   expect_identical(model$other_vars$choice_rule, "gaussian")

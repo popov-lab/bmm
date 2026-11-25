@@ -1,11 +1,11 @@
-  // log of the numerator of the likelihood of the sdm() cells other than the
-  // default; sdm_kernel_functions.stan defines the cell
+  // log of the numerator of the SDM likelihood for the chosen activation function and scaling of c
   real sdm_cont_lpdf(vector y, vector mu, vector c, vector kappa, data int sdm_activation,
                      data int sdm_scaling) {
     return sum(exp(sdm_log_cstar(c, kappa, sdm_activation, sdm_scaling)
                    + sdm_log_s(y - mu, kappa, sdm_activation)));
   }
 
+  // normalising term of the SDM log likelihood for one combination of c and kappa
   real sdm_cont_ldenom(real c, real kappa, int activation, int scaling, data vector gl_x,
                        data vector gl_w, data vector wide_cosm1, data vector wide_w) {
     real log_peak = sdm_log_cstar(c, kappa, activation, scaling);
@@ -15,6 +15,7 @@
     return sdm_laplace_ldenom(log_peak, kappa, gl_x, gl_w);
   }
 
+  // normalising term summed over runs of observations that share c and kappa
   real sdm_cont_run_ldenom(vector c, vector kappa, int activation, int scaling,
                            data vector gl_x, data vector gl_w, data vector wide_cosm1,
                            data vector wide_w, int G_runs, array[] int run_start,
@@ -28,6 +29,7 @@
     return out;
   }
 
+  // the same sum for the observations from start to end, used with threading
   real sdm_cont_run_ldenom_slice(vector c, vector kappa, int activation, int scaling,
                                  data vector gl_x, data vector gl_w, data vector wide_cosm1,
                                  data vector wide_w, int start, int end, int G_runs,

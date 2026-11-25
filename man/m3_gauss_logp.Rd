@@ -20,8 +20,9 @@ activation.
 R companion to the Stan function \code{m3_gauss_logp} that
 \code{m3(choice_rule = "gaussian")} places in each category's activation
 formula. \code{brms} evaluates the non-linear formula in R for \code{log_lik()},
-\code{posterior_predict()} and \code{posterior_epred()}, looking the function up on
-the search path; it is exported for that reason and is not meant to be
+\code{posterior_predict()} and \code{posterior_epred()} and finds this function in
+the bmm namespace, attached or not. It is exported for fits saved before
+bmm 1.5.0, which find it only after \code{library(bmm)}, and is not meant to be
 called directly.
 }
 \keyword{internal}

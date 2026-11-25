@@ -241,3 +241,10 @@ test_that("log_lik() and posterior_predict() of an m3 fit take the data given to
   withr::local_seed(1)
   expect_equal(from_user, brms::posterior_predict(fit, draw_ids = 1:5))
 })
+
+for (case_name in names(newdata_cases())) {
+  test_that(paste("the non-linear formulas of", case_name, "find their functions without library(bmm)"), {
+    skip_on_cran()
+    expect_nl_functions_resolve(newdata_fit(case_name))
+  })
+}
