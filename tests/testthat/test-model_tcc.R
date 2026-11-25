@@ -668,7 +668,8 @@ test_that("adding Gumbel noise leaves the Gaussian Stan programs bit-identical",
 })
 
 # md5 of the Gumbel and table-from-R programs at 566-tcc-options ef664176,
-# before correlated and motor noise were added; taken as above
+# before correlated and motor noise were added, and taken again when the
+# chunk comments were cut; taken as above
 test_that("correlated and motor noise leave the Gumbel and table-from-R programs bit-identical", {
   skip_on_cran()
   skip_if_not(packageVersion("brms") == "2.23.0", "hashes taken under brms 2.23.0")
@@ -682,15 +683,15 @@ test_that("correlated and motor noise leave the Gumbel and table-from-R programs
   }
   f <- exp(-(0:180) / 20)
   gumbel <- tcc("err", similarity = f, noise = "gumbel")
-  expect_equal(md5_code(gumbel, bmf(d ~ cond)), "9c11f0e60651bbbf79eb154023d59313")
+  expect_equal(md5_code(gumbel, bmf(d ~ cond)), "6ebf0401d54d66af952a122408581f73")
   expect_equal(md5_code(gumbel, bmf(d ~ cond), threads = brms::threading(2)),
-               "426e4125e03be789b7361e08b1415d74")
+               "055483b03456a8413f076e0b918ee66e")
   from_r <- tcc("err", similarity = f, d_max = 6)
   from_r$other_vars$table <- "r"
-  expect_equal(md5_code(from_r, bmf(d ~ cond)), "4ce5b52728d80d7247b022de3ef8a2c6")
+  expect_equal(md5_code(from_r, bmf(d ~ cond)), "7994cd9da995590fb54f5d1ee7680db2")
   correlated <- tcc("err", similarity = f, d_max = 6, correlation = exp(-(0:180) / 10),
                     correlation_draws = 6000, motor_sd = 0.03)
-  expect_equal(md5_code(correlated, bmf(d ~ cond)), "4ce5b52728d80d7247b022de3ef8a2c6")
+  expect_equal(md5_code(correlated, bmf(d ~ cond)), "7994cd9da995590fb54f5d1ee7680db2")
 })
 
 test_that("a Gumbel fit is not checked against a table, whatever its draws", {
