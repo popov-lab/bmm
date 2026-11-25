@@ -126,7 +126,9 @@ jobs:
           echo "Runner CPU: ${cpu}; $(nproc) cores" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the suite under the time budget
-        timeout-minutes: 30
+        # 15 minutes above the 1500 s suite cap, so a breach is reported
+        # with its timings instead of being cut off
+        timeout-minutes: 40
         run: Rscript .github/scripts/test-budget.R
 
       - name: Run the tests CRAN runs under the CRAN-tier cap
