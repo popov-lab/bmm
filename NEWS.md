@@ -1,8 +1,5 @@
 # bmm (development version)
 
-### Breaking changes
-* **mixture3p** and **imm**: `bmm()`, `update()` and predictions with `newdata` now stop when a non-target feature (`nt_features`) or, for imm, a non-target distance (`nt_distances`) is missing inside a trial's set size, that is, in one of its first `set_size - 1` columns. The message names the columns and the number of trials. bmm 1.4.2 and earlier replaced such a feature with 0, the location of the target, and such a distance with 999, without a message, so those trials were fitted with a non-target at the target's location, or with one too far away to count, instead of the item that was shown. Fill in the missing values or drop those trials. `NA` past a trial's set size is still the padding of smaller displays and needs no change (#721).
-
 ### New models
 * Add the **psychometric function** (`psychometric_function()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric_function()` and `rpsychometric_function()`. See `?psychometric_function` (#507). Thanks to @GidonFrischkorn
 
@@ -28,6 +25,7 @@
 * `dmixture3p()`, `rmixture3p()`, `dimm()` and `rimm()` now take item locations per trial: a matrix or data frame `mu` with one row per trial (target, non-targets, then `NA` past the trial's set size), as in `rmixture3p(2, mu = rbind(c(0, 2, -1.5), c(1, -2, NA)))`. `dist` takes the same shape, or one vector for all rows. A vector `mu` is one set for all trials; a trailing `NA` now shortens the set (the `d*()` functions gave `NA`, the `r*()` functions stopped), and an empty one stops. A matrix `mu` was read as one long item set; rerun those calls (#444).
 
 ### Bug fixes
+* **mixture3p** and **imm**: a non-target feature or distance missing inside a trial's set size (one of its first `set_size - 1` columns) was replaced by 0 or 999 without a message, so those trials were fitted with an item that was not shown. `bmm()` and predictions with `newdata` now stop and name the columns; fill in the values or drop those trials. `NA` past a trial's set size is padding and is fine (#721).
 * `dmixture2p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture2p(0.3, kappa = c(1, 5, 20))` (#584). It stopped with "number of items to replace is not a multiple of replacement length".
 * Fits made with bmm versions before 0.4.5 (development versions from February and March 2024) work again with `update()`, `prior_info()`, `native_parameters()` and `conditional_effects()`. For `mixture2p()`, `mixture3p()` and `imm()` fits, `update()` stopped with an empty error message and the other functions failed; `imm()` fits of the `bsc` and `abc` versions were read as `full` (#458).
 * `dmixture3p()` now returns one density per value when a parameter is a vector longer than `x`, as in `dmixture3p(0.3, kappa = c(1, 5, 20))` (#585). It stopped with "number of items to replace is not a multiple of replacement length".

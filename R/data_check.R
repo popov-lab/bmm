@@ -698,7 +698,7 @@ set_size_padding_findings <- function(data, cols, set_size, arg) {
     findings <- c(findings, list(data_check_finding("warning", glue(
       "{n_na_active} NA value(s) in '{arg}' at positions within the set size \\
       of the trial ({length(rows)} row(s), first at row {rows[1]}). These \\
-      positions must contain values; check_data() stops on them as well."
+      positions must contain values; bmm() stops on them as well."
     ))))
   }
   n_value_padding <- sum(!na_mat & padding)
