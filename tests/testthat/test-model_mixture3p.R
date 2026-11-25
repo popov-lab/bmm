@@ -401,6 +401,28 @@ test_that("every version runs through the bmm() pipeline", {
   ))
 })
 
+test_that("the capacity versions refuse threads, the simple version threads (#720)", {
+  skip_on_cran() # the mock backend parses each program
+  dat <- small_data()
+  for (version in c("slot", "slot_averaging")) {
+    expect_error(
+      bmm(bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), dat, nt_model(version = version),
+        backend = "mock", mock_fit = 1, rename = FALSE, threads = brms::threading(2)
+      ),
+      glue("mixture3p(version = \"{version}\") cannot be fitted with `threads`"),
+      fixed = TRUE
+    )
+    expect_silent(bmm(
+      bmf(kappa ~ 1, K ~ 1, ptarget ~ 1), dat, nt_model(version = version),
+      backend = "mock", mock_fit = 1, rename = FALSE
+    ))
+  }
+  expect_silent(bmm(
+    bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1), dat, nt_model(),
+    backend = "mock", mock_fit = 1, rename = FALSE, threads = brms::threading(2)
+  ))
+})
+
 test_that("every version's family refuses the expected response by name", {
   skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   dat <- oberauer_lin_2017
