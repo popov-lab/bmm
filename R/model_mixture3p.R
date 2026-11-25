@@ -397,8 +397,8 @@ configure_model.mixture3p <- function(model, data, formula) {
   stopif(
     brms_slices_likelihood() && model$version %in% c("slot", "slot_averaging"),
     "mixture3p(version = \"{model$version}\") cannot be fitted with `threads`: \\
-    brms's threaded likelihood uses the name of its parameter `ptarget` for \\
-    itself. Fit the model without `threads`."
+    brms's threaded likelihood declares a variable `ptarget`, which is also \\
+    the name of this model's parameter. Fit the model without `threads`."
   )
   spec <- .mixture3p_version_table[[model$version]]
   n_nt <- attr(data, "max_set_size") - 1
