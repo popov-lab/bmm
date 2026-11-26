@@ -116,10 +116,14 @@ first value belongs to the target itself and must be 1, the last to the
 option opposite the target. The model assumes the similarity depends only
 on the distance, the same for every target and on both sides of it. The
 values are fixed, not estimated; Schurgin et al. (2020) measured them in
-a separate perceptual matching task. With 360 options in 1-degree steps,
-\code{similarity[k + 1]} is the similarity at \code{k} degrees. Without a measured
-similarity, \code{\link[=tcc_similarity]{tcc_similarity()}} returns a von Mises or Laplace shape for a
-chosen \code{kappa}; the fit is then a TCC with that shape fixed. A model that
+a separate similarity rating task. With 360 options in 1-degree steps,
+\code{similarity[k + 1]} is the similarity at \code{k} degrees. A similarity that
+is obtained independently of the responses being fitted is what makes
+the model a TCC: Schurgin et al. describe the model as replacing free
+parameters such as precision with independently measured values. Without
+a measured similarity, \code{\link[=tcc_similarity]{tcc_similarity()}} returns a von Mises or Laplace
+shape for a given \code{kappa}. Take that \code{kappa} from other data or from
+theory, not from the fit to the responses at hand: a model that
 estimates the width of the gradient from the responses is the \code{\link[=sdm]{sdm()}}.
 }
 

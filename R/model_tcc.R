@@ -116,10 +116,14 @@
 #'   option opposite the target. The model assumes the similarity depends only
 #'   on the distance, the same for every target and on both sides of it. The
 #'   values are fixed, not estimated; Schurgin et al. (2020) measured them in
-#'   a separate perceptual matching task. With 360 options in 1-degree steps,
-#'   `similarity[k + 1]` is the similarity at `k` degrees. Without a measured
-#'   similarity, [tcc_similarity()] returns a von Mises or Laplace shape for a
-#'   chosen `kappa`; the fit is then a TCC with that shape fixed. A model that
+#'   a separate similarity rating task. With 360 options in 1-degree steps,
+#'   `similarity[k + 1]` is the similarity at `k` degrees. A similarity that
+#'   is obtained independently of the responses being fitted is what makes
+#'   the model a TCC: Schurgin et al. describe the model as replacing free
+#'   parameters such as precision with independently measured values. Without
+#'   a measured similarity, [tcc_similarity()] returns a von Mises or Laplace
+#'   shape for a given `kappa`. Take that `kappa` from other data or from
+#'   theory, not from the fit to the responses at hand: a model that
 #'   estimates the width of the gradient from the responses is the [sdm()].
 #'
 #' ## Noise
@@ -486,11 +490,16 @@ print_model_details.tcc <- function(model, ...) {
 #'   at the target and 0 at the opposite option, as Schurgin et al. (2020)
 #'   scaled their measured similarity.
 #'
-#'   `kappa` is fixed here, so a fit with this vector is still the TCC: the
-#'   similarity enters the model as known. Schurgin et al. (2020) measured
-#'   theirs in a separate perceptual task, and a measured similarity is the
-#'   model as its authors intended it. To estimate `kappa` from the responses,
-#'   fit [sdm()] instead, which estimates it for the von Mises shape.
+#'   `kappa` is fixed here, so the similarity enters the model as known.
+#'   Whether the fit is then a TCC depends on where `kappa` comes from. The
+#'   TCC takes its similarity from a source that is independent of the
+#'   responses being fitted: Schurgin et al. (2020) measured theirs in a
+#'   separate similarity rating task and fixed it for all participants and
+#'   conditions. A `kappa` taken from such a measurement, from a fit to other
+#'   data or from theory keeps to that. A `kappa` chosen because it fits the
+#'   responses at hand is an estimate entered without its uncertainty. To
+#'   estimate `kappa` from the responses, fit [sdm()] instead, which
+#'   estimates it for the von Mises shape.
 #' @param shape `"vonmises"` or `"laplace"`.
 #' @param kappa The concentration (von Mises) or rate (Laplace) of the shape, a
 #'   single positive finite number, for distances in radians: a Laplace
