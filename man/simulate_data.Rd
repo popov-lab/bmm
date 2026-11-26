@@ -42,7 +42,7 @@ recall of 0.75 there.}
 
 \item{...}{\code{n_trials}, the number of observations when \code{design} is \code{NULL};
 \code{formula}, the \code{\link[=bmmformula]{bmmformula()}} with the activation functions, for the
-custom version of \code{\link[=m3]{m3()}}, whose parameters exist only in that formula.}
+custom versions of \code{\link[=m3]{m3()}} and \code{\link[=rdm]{rdm()}}, whose parameters exist only in that formula.}
 }
 \value{
 A data frame: \code{design} with the response columns added. It carries
@@ -83,7 +83,7 @@ needs a generator written separately.
 The columns each model reads from \code{design}, under the names the model was
 specified with:\tabular{ll}{
    Model \tab Columns \cr
-   \code{\link[=sdm]{sdm()}}, \code{\link[=ddm]{ddm()}}, \code{\link[=cswald]{cswald()}} \tab none \cr
+   \code{\link[=sdm]{sdm()}}, \code{\link[=ddm]{ddm()}}, \code{\link[=cswald]{cswald()}}, \code{\link[=rdm]{rdm()}} \tab none \cr
    \code{\link[=mixture2p]{mixture2p()}} \tab \code{set_size} (if it names a column) for the versions \code{"slot"} and \code{"slot_averaging"}; none for \code{"simple"} \cr
    \code{\link[=mixture3p]{mixture3p()}} \tab \code{set_size} (if it names a column), \code{nt_features}, of which a row's first \code{set_size - 1} are read \cr
    \code{\link[=imm]{imm()}} \tab as \code{\link[=mixture3p]{mixture3p()}}, plus \code{nt_distances} for the versions \code{"full"} and \code{"bsc"} \cr

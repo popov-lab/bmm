@@ -1,6 +1,7 @@
 # bmm (development version)
 
 ### New models
+* Add the **Racing Diffusion Model** (`rdm`) (Tillman, Van Zandt, & Logan, 2020) for multi-alternative choice reaction time tasks, a race model in which each response alternative has a Wald accumulator. Two versions: `simple` (one drift for correct, one shared by the errors, integer-coded responses) and `custom` (one drift per named response category, with optional per-category `accumulators`). Starting-point variability (`sp`) is fixed to 0 by default; write `sp ~ 1` in `bmf()` to estimate it. Density and RNG helpers `drdm()`/`rrdm()`/`prdm()`/`qrdm()` are exported. See `?rdm`. Thanks to @GidonFrischkorn (#353)
 * Add the **psychometric function** (`psychometric_function()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric_function()` and `rpsychometric_function()`. See `?psychometric_function` (#507). Thanks to @GidonFrischkorn
 
 ### New features

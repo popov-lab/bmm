@@ -245,6 +245,11 @@ link_inverse.bmmfit <- function(x, ...) {
 # categories, which find_response() reports, not the user's response column
 .insight_trial_frame <- function(x) {
   model <- x$bmm$model
+  # a race model's frame keeps the winning-category code, not the user's
+  # response column
+  if (inherits(model, "rdm")) {
+    return(revert_check_data(model, x$data))
+  }
   response <- all.vars(brms::brmsterms(x$formula)$respform)[1]
   if (!inherits(model, c("sdt_rating", "sdt_ranking", "sdt_cdp")) ||
       !is_trial_level(model) || !is.matrix(x$data[[response]])) {
