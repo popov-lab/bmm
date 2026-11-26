@@ -510,19 +510,21 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
   env <- .sdm_envelope(pick(amp, narrow), pick(kappa, narrow), activation)
   # .rejection_sampling() draws proposals without the per-draw parameters,
   # so it draws y in (-1, 1), which f maps onto the draw's own envelope
-  y <- .rejection_sampling(
-    n = length(narrow),
-    f = function(y, amp, kappa, d1, rate, log_f1, peak, flat) {
-      d <- abs(.sdm_envelope_offset(y, nlist(d1, rate, peak, flat), activation))
-      exp(amp * expm1(.sdm_log_s(d, kappa, activation)) -
-        .log_add_exp(-rate * (if (activation == "laplace") d else d^2), ifelse(d > d1, log_f1, -Inf)))
-    },
-    max_f = 1,
-    proposal_fun = function(n) stats::runif(n, -1, 1),
-    amp = pick(amp, narrow), kappa = pick(kappa, narrow),
-    d1 = env$d1, rate = env$rate, log_f1 = env$log_f1, peak = env$peak, flat = env$flat
-  )
-  out[narrow] <- (pick(mu, narrow) + .sdm_envelope_offset(y, env, activation) + pi) %% (2 * pi) - pi
+  out[narrow] <- (pick(mu, narrow) + .sdm_envelope_offset(
+    .rejection_sampling(
+      n = length(narrow),
+      f = function(y, amp, kappa, d1, rate, log_f1, peak, flat) {
+        d <- abs(.sdm_envelope_offset(y, nlist(d1, rate, peak, flat), activation))
+        exp(amp * expm1(.sdm_log_s(d, kappa, activation)) -
+          .log_add_exp(-rate * (if (activation == "laplace") d else d^2), ifelse(d > d1, log_f1, -Inf)))
+      },
+      max_f = 1,
+      proposal_fun = function(n) stats::runif(n, -1, 1),
+      amp = pick(amp, narrow), kappa = pick(kappa, narrow),
+      d1 = env$d1, rate = env$rate, log_f1 = env$log_f1, peak = env$peak, flat = env$flat
+    ),
+    env, activation
+  ) + pi) %% (2 * pi) - pi
   out
 }
 
@@ -557,8 +559,10 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
       }
     )
     if (!is.null(best)) {
-      better <- cand$peak + cand$flat < best$peak + best$flat
-      cand <- Map(function(new, old) ifelse(better, new, old), cand, best)
+      cand <- Map(
+        function(new, old) ifelse(cand$peak + cand$flat < best$peak + best$flat, new, old),
+        cand, best
+      )
     }
     best <- cand
   }
