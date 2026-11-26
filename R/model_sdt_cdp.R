@@ -718,11 +718,11 @@ bmf2bf.sdt_cdp <- function(model, formula) {
   args <- paste(.sdt_cdp_logmu_args(model), collapse = ", ")
 
   bform <- brms::bf(
-    glue("Y | trials(nTrials) ~ sdt_cdp_logmu(1, {args})"),
+    bmm_nl_formula(glue("Y | trials(nTrials) ~ sdt_cdp_logmu(1, {args})")),
     nl = TRUE
   )
   for (k in seq_along(resp_cats)[-1]) {
-    bform <- bform + brms::nlf(stats::as.formula(
+    bform <- bform + brms::nlf(bmm_nl_formula(
       glue("mu{resp_cats[k]} ~ sdt_cdp_logmu({k}, {args})")
     ))
   }
@@ -831,9 +831,10 @@ simulate_data.sdt_cdp <- function(model, pars, design = NULL, scale = c("link", 
 #'   Stan function -- the category probabilities sum to 1 analytically and
 #'   `softmax` absorbs the shared constant), which the [sdt_cdp()] multinomial
 #'   formula uses as the category logit. `brms` evaluates the non-linear
-#'   formula in R for `posterior_predict()` and `posterior_epred()`, so this
-#'   function must be on the search path; it is exported for that reason and is
-#'   not called directly. Vectorized over the draws-by-observations matrices
+#'   formula in R for `log_lik()`, `posterior_predict()` and `posterior_epred()`
+#'   and finds this function in the bmm namespace, attached or not. It is
+#'   exported for fits saved before bmm 1.5.0, which find it only after
+#'   `library(bmm)`, and is not called directly. Vectorized over the draws-by-observations matrices
 #'   brms supplies.
 #' @param cat Integer response-category index (canonical order: new, then
 #'   guess/know/remember blocks).
