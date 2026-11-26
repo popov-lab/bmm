@@ -1298,9 +1298,12 @@ test_that("the vectorized cswald likelihood matches the scalar and R versions", 
         drift = rep(2, 4), bound = rep(1.5, 4), ndt = c(1.6, 1.6, 1.7, 1.7),
         s = rep(1, 4), zr = rep(0.5, 4), sndt = rep(sndt, 4)
       )
+      # the preserved seed repeats cmdstanr's random file name, and the fit this
+      # loop replaces would delete the CSV of a later fit under that name
       edge_fit <- withr::with_preserve_seed(model$sample(
         data = edge, chains = 1, iter_sampling = 1, fixed_param = TRUE,
-        refresh = 0, show_messages = FALSE, seed = 1
+        refresh = 0, show_messages = FALSE, seed = 1,
+        output_basename = paste0("bmm_cswald_edge_", version, "_", sndt)
       ))
       lp_edge_r <- with(edge, .dcswald(rt, dec, drift, bound, ndt, zr, s, sndt,
         version = version, log = TRUE
