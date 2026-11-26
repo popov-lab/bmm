@@ -21,7 +21,7 @@ bmmtools::validation_plan(
     memory <- runif(n_trials) < pars$thetat
     y <- ifelse(
       memory,
-      rvm_reject(n_trials, pars$kappa) + pars$mu1,
+      rvm_reject(n_trials, pars$kappa) + pars$mu,
       runif(n_trials, -pi, pi)
     )
     y <- (y + pi) %% (2 * pi) - pi
@@ -35,7 +35,7 @@ Install bmmtools with `remotes::install_github("GidonFrischkorn/bmmtools")`.
 
 The `generator` takes `(pars, n_trials, model)` and returns one subject's rows
 with the model's column names. The generator receives `pars` as a named list on
-the natural scale (`kappa`; `mu1` and other fixed parameters filled with their
+the natural scale (`kappa`; `mu` and other fixed parameters filled with their
 fixed values), except a parameter with a `softmax` link, which arrives on the
 link scale: for `mixture3p`, `thetat` and `thetant` are log weights, and the
 probabilities are the softmax of `(thetat, thetant, 0)`.
@@ -53,6 +53,32 @@ Add `sds =` and `grid =` because the hierarchical design needs subject SDs and
 a subjects-by-trials grid. The plan must cover a true-against-recovered comparison, a hierarchical design with several subjects
 whose parameters vary, and data from an independent generator, so that a bug in
 the density cannot cancel out (see `.github/CONTRIBUTING.md`).
+
+## The plans in this folder
+
+Every plan simulates and fits a hierarchical design: 10 replications per cell
+of the subjects-by-trials grid, sampled with 4 chains of 2000 iterations
+(1000 warmup), and 100 SBC data sets of 20 subjects, fitted with 4 chains of
+1000 iterations at `adapt_delta = 0.95`. Each generator shares no code with
+bmm's `d*`/`r*` functions or the Stan likelihood; the file header says how.
+
+| Model | Generator | Grid (subjects x trials) | SBC trials per subject | Card |
+|---|---|---|---|---|
+| `imm` (full) | source drawn per trial, von Mises by rejection | 20, 50 x 100, 300, 600 | 150 | to come |
+| `mixture2p` | source drawn per trial, von Mises by rejection | 20, 50 x 30, 100, 300 | 50 | to come |
+| `mixture3p` | source (target, lure, guess) drawn per trial, von Mises by rejection | 20, 50 x 60, 150, 300 | 100 | to come |
+| `sdm` (von Mises) | inverse CDF of the density on a fine grid | 20, 50 x 30, 100, 300 | 50 | to come |
+| `sdm` (Laplace) | inverse CDF of the density on a fine grid | 20, 50 x 30, 100, 300 | 50 | waits on #732 |
+| `psychometric_function` | observer with lapse and guess, cumulative normal | 20, 50 x 30, 100, 300 | 50 | to come |
+| `mpt` (2HTM) | tree walk, one uniform draw per branch point | 20, 50 x 30, 100, 300 | 50 | to come |
+| `sdt_yn` | observer: normal evidence against a criterion | 20, 50 x 30, 100, 300 | 50 | to come |
+| `sdt_rating` | observer: normal evidence against the thresholds | 20, 50 x 30, 100, 300, 600 | 100 | to come |
+| `sdt_mafc` | observer: largest of m normal evidence draws | 20, 50 x 30, 100, 300 | 50 | to come |
+| `sdt_ranking` | observer: smallest-extreme-value evidence, ranked | 20, 50 x 30, 100, 300 | 50 | to come |
+| `sdt_cdp` | observer: familiarity plus recollection, both normal | 20, 50 x 30, 100, 300, 600 | 100 | VM (long run) |
+| `ezcdm` | 2-D Wiener process to the circle's edge, then summarised | 20, 50 x 30, 100, 300 | 50 | follows #524 |
+
+The `ezcdm` plan is not in this folder: it arrives with the model in #524.
 
 To run a plan and render its card (`local/` is untracked):
 
