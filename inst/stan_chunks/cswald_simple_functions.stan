@@ -1,15 +1,16 @@
-// censored shifted Wald model: log density of a response, log survivor of a censored trial
-real cswald_lpdf(real rt, real mu, real drift, real bound, real ndt, real s, int response) {
+// censored shifted Wald model with variable non-decision time: log density of a response, log survivor if censored
+real cswald_lpdf(real rt, real mu, real drift, real bound, real ndt, real s,
+                 real sndt, int response) {
   if (response == 1) {
-    return swald_lpdf(rt | drift, bound, ndt, s);
+    return swald_sndt_lpdf(rt | drift, bound, ndt, sndt, s);
   } else {
-    return swald_lccdf(rt | drift, bound, ndt, s);
+    return swald_sndt_lccdf(rt | drift, bound, ndt, sndt, s);
   }
 }
 
-// the same log likelihood summed over all observations
+// the same log likelihood summed over all observations, valid only while sndt is fixed at 0
 real cswald_lpdf(vector rt, vector mu, vector drift, vector bound,
-                 vector ndt, vector s, array[] int dec) {
+                 vector ndt, vector s, vector sndt, array[] int dec) {
   int N = rows(rt);
   array[N] int idx1;
   array[N] int idx0;

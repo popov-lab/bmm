@@ -659,3 +659,27 @@ test_that("model_docs() keeps the trial-level part out of 'all' and the stimulus
   expect_match(mafc, "Requirements for one row per trial", fixed = TRUE)
   expect_no_match(mafc, "criterion", fixed = TRUE)
 })
+
+test_that("resolve_fixed_links switches a parameter's link while it is fixed", {
+  model <- structure(
+    list(
+      parameters = list(a = "a", b = "b"),
+      links = list(a = "log", b = "log"),
+      links_fixed = list(b = "identity"),
+      fixed_parameters = list(b = 0)
+    ),
+    class = "bmmodel"
+  )
+
+  fixed <- resolve_fixed_links(model)
+  expect_equal(fixed$links$b, "identity")
+  expect_equal(fixed$links$a, "log")
+
+  freed <- update_model_fixed_parameters(fixed, bmf(a ~ 1, b ~ 1))
+  expect_null(freed$fixed_parameters$b)
+  expect_equal(freed$links$b, "log")
+
+  refixed <- update_model_fixed_parameters(freed, bmf(a ~ 1, b = 0))
+  expect_equal(refixed$fixed_parameters$b, 0)
+  expect_equal(refixed$links$b, "identity")
+})

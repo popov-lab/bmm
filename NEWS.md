@@ -79,6 +79,7 @@
 <!-- `pnt` -> `ptarget` = P(target | memory) in mixture3p and imm (#434, #590) -->
 * `model_spec()` is the model contract of ADR 0005, at contract version 0.9 (`"1.0"` in bmm 1.6.0). bmmtools and bmm-explorer read it from this release on. A later change to a field it returns is announced under this heading (#633).
 * `model_spec()$functions` of `mixture3p()` names `dmixture3p()` and `rmixture3p()`, which now take the parameters of every version, `K` and `ptarget` included; select the version with their `version` argument (#711).
+* The **cswald** model gains an optional parameter `sndt` for uniform trial-to-trial variability in the non-decision time (the `st0` of rtdists): the non-decision time is `Uniform(ndt, ndt + sndt)`, so `ndt` is the minimum and `ndt + sndt/2` the mean. It is fixed at 0 by default and estimated by adding `sndt ~ 1` to the formula. Without it a few fast responses bias `ndt`, `drift` and `bound`. `sndt` is weakly identified, and in the `crisk` version at substantial error rates it can absorb approximation error; see `?cswald`. `dcswald()`, `pcswald()`, `qcswald()` and `rcswald()` gain a matching `sndt` argument (#387).
 <!-- [1.6.0] contract changes (ADR 0005 announcement rule), filled by the pull request that lands each: -->
 <!-- [1.6.0] `bmm_contract_version()` = 1.0 pinned; `register_bmm_model()` (#442) -->
 <!-- [1.6.0] the `log` default of `dm3()`, `dmpt()`, `dddm()`, `dcswald()`, `dezdm()` becomes FALSE (#553) -->
@@ -254,7 +255,7 @@ This is the 1.4.0 release resubmitted: 1.4.0 was sent to CRAN on 2026-10-15 and 
 * New [Get started](https://venpopov.com/bmm/articles/bmm.html) page on the website: install and check your machine with `bmm_setup()`, find the model for your task, including a table of the signal detection models by response format and noise distribution, and fit a first model to `broeder_schuetz_2009_e3` step by step (#440).
 * The model lists on the Get started page are now tables with one row per model version: the data columns each version needs, by argument, and the parameters it estimates (#467).
 * For developers: the model file written by `use_model_template()` now follows the package's current conventions. `document()` runs on it without warnings, the new model passes the website reference check, its default priors include `sd`, and with `custom_family = TRUE` `posterior_epred()` works once the generated stubs are filled in. The file header lists the registries and test fixtures a new model must also update (#490).
-* The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. The posterior is unchanged (#387).
+* The **cswald** likelihood now evaluates all observations in one call instead of one at a time. This makes fitting faster, improves the accuracy of the gradients the sampler uses, and adds support for within-chain parallelization: `bmm(..., threads = 2)` now works for **cswald** as it does for **sdm**. A non-zero `sndt` keeps the one-at-a-time likelihood, so those fits do not get the speed-up; `threads` still works for them. The posterior is unchanged (#387).
 
 # bmm 1.3.2
 
