@@ -72,7 +72,9 @@ which the likelihood should be returned. Available versions are "simple"
 and "crisk", the default is "simple."}
 
 \item{log}{A single logical value indicating if log-likelihoods should be
-returned, the default is \code{TRUE}}
+returned. The default is \code{TRUE} until bmm 1.6.0 and \code{FALSE} from then on,
+as in base R and the other density functions of bmm. Pass \code{log} to get the
+same result in every version.}
 
 \item{n}{The number of random samples that should be generated}
 

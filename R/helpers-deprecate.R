@@ -10,7 +10,12 @@ warn_deprecated <- function(what, with, since, removed_in = next_minor(since),
   if (length(what) == 0) {
     return(invisible())
   }
-  replacement <- if (length(with) == 0) "" else glue(" Use `{with}` instead.", .trim = FALSE)
+  # an empty `with` element is a deprecated form that needs no replacement
+  replacement <- if (length(with) == 0) {
+    ""
+  } else {
+    ifelse(nzchar(with), glue(" Use `{with}` instead.", .trim = FALSE), "")
+  }
   statements <- unique(glue(
     "`{what}` is deprecated since bmm {since} and will be removed in bmm ",
     "{removed_in} at the earliest.{replacement}"

@@ -1,0 +1,72 @@
+# Weekly consistency check of the public projection of the roadmap (ADR 0008): the
+# milestones and the open pull requests on GitHub. The dates themselves live in the
+# maintainer's local calendar and are compared there at session start; this job only
+# checks what GitHub can see. Warnings, never failures: planning facts do not block code.
+on:
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+name: roadmap
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  roadmap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Milestones and pull-request targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          milestones="$(gh api "repos/${GH_REPO}/milestones?state=open" \
+            --jq '[.[] | {title, due_on, open_issues, closed_issues}]')"
+          prs="$(gh pr list --state open --limit 100 \
+            --json number,baseRefName,headRefName,isDraft,milestone,labels,title)"
+          warnings=0
+          warn() { echo "::warning title=roadmap::$1"; warnings=$((warnings + 1)); }
+
+          # 1. Every release milestone (a version number) carries a due date.
+          while IFS=$'\t' read -r title due; do
+            [[ "$title" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+            [ -n "$due" ] && [ "$due" != "null" ] || warn "milestone ${title} has no due date"
+          done < <(echo "$milestones" | jq -r '.[] | [.title, .due_on] | @tsv')
+
+          # 2. A pull request in a release milestone targets that release's branch (ADR 0002),
+          #    or is stacked on a branch whose own pull request is in the same milestone.
+          target_of() { case "$1" in 1.5.0) echo develop ;; 1.6.0) echo dev-1.6.0 ;; *) echo "" ;; esac; }
+          while IFS=$'\t' read -r number base head ms; do
+            [ -n "$ms" ] && [ "$ms" != "null" ] || continue
+            want="$(target_of "$ms")"
+            [ -n "$want" ] || continue
+            [ "$base" = "$want" ] && continue
+            base_ms="$(echo "$prs" | jq -r --arg h "$base" '.[] | select(.headRefName == $h) | .milestone.title // ""')"
+            [ "$base_ms" = "$ms" ] && continue
+            warn "PR #${number} is in milestone ${ms} but targets ${base} (expected ${want}, or a stacked branch in the same milestone)"
+          done < <(echo "$prs" | jq -r '.[] | [.number, .baseRefName, .headRefName, (.milestone.title // "")] | @tsv')
+
+          # 3. Open pull requests without a milestone (drafts included).
+          missing="$(echo "$prs" | jq -r '[.[] | select(.milestone == null) | "#\(.number)"] | join(", ")')"
+          [ -z "$missing" ] || warn "open pull requests without a milestone: ${missing}"
+
+          # 4. Milestone progress for the job summary.
+          {
+            echo "## Roadmap check ($(date -u +%F))"
+            echo
+            echo "| milestone | due | open | closed | open PRs |"
+            echo "| --- | --- | --- | --- | --- |"
+            echo "$milestones" | jq -r --argjson prs "$prs" '.[] | . as $m
+              | ($prs | map(select(.milestone.title == $m.title)) | length) as $n
+              | "| \(.title) | \(.due_on // "-" | .[:10]) | \(.open_issues) | \(.closed_issues) | \($n) |"'
+            echo
+            echo "${warnings} warning(s)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "${warnings} warning(s)"

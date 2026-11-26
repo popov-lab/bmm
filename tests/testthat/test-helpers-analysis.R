@@ -406,6 +406,10 @@ test_that(".sdt_unit_sdratio is model-only and keys off the natural-scale value"
   m_fixed$fixed_parameters$sdratio <- 0.3
   expect_false(.sdt_unit_sdratio(m_fixed))
 
+  m_fixed_neg <- m_ev
+  m_fixed_neg$fixed_parameters$sdratio <- -0.3
+  expect_false(.sdt_unit_sdratio(m_fixed_neg))
+
   m_uv <- m_ev
   m_uv$fixed_parameters$sdratio <- NULL
   expect_false(.sdt_unit_sdratio(m_uv))
@@ -1439,4 +1443,13 @@ test_that("sdt_thresholds() puts a bias fit's thresholds on the noise-mean axis"
   from_bias <- run("bias", -0.1)
   expect_equal(from_bias, run("criterion", -0.1 + sep / 2), tolerance = 1e-12)
   expect_equal(from_bias$position[3], -0.1 + sep / 2, tolerance = 1e-12)
+})
+
+test_that("roc_observed() reads trial rows like the cells aggregated from them", {
+  skip_on_cran()
+  trials <- data.frame(stimulus = rep(0:1, each = 10),
+                       resp = c(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1))
+  fit <- suppressMessages(bmm(bmf(d ~ 1, criterion ~ 1), trials, sdt_yn("resp", "stimulus"),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  expect_equal(unlist(roc_observed(fit)[c("FA", "Hit")]), c(FA = 0.2, Hit = 0.8))
 })

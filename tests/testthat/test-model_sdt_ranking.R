@@ -47,7 +47,6 @@ test_that("sdt_ranking requires response and m", {
 
 test_that("constant m must match the number of response columns", {
   expect_error(sdt_ranking(ranks4, m = 5), "exactly m columns")
-  expect_error(sdt_ranking("rank1", m = 4), "at least 2")
 })
 
 test_that("the gumbel_min ranking kernel is the smallest-extreme-value one", {
@@ -263,7 +262,7 @@ test_that("the generated Gauss-Hermite rule integrates the normal exactly", {
 
 test_that("configure_model substitutes every quadrature token", {
   sc <- system.file("stan_chunks", package = "bmm")
-  tpl <- read_lines2(file.path(sc, "sdt_ranking_funs.stan"))
+  tpl <- read_lines2(file.path(sc, "sdt_ranking_functions.stan"))
   n_entries <- function(code, name) {
     vec <- sub(paste0(".*", name, " = to_vector\\(\\{([^}]*)\\}\\).*"), "\\1",
                gsub("\n", " ", code))
@@ -340,9 +339,9 @@ test_that("the telescoped gumbel_min form is the gamma ratio of Meyer-Grant et a
 ranking_stan_logmu <- function(grid, max_m) {
   sc <- system.file("stan_chunks", package = "bmm")
   funs <- paste(
-    read_lines2(file.path(sc, "sdt_dist_funs.stan")),
+    read_lines2(file.path(sc, "sdt_dist_functions.stan")),
     bmm:::.ranking_fill_quadrature(
-      read_lines2(file.path(sc, "sdt_ranking_funs.stan")),
+      read_lines2(file.path(sc, "sdt_ranking_functions.stan")),
       max_m = max_m, free_sdratio = TRUE
     ),
     sep = "\n"
@@ -657,3 +656,121 @@ test_that("sdt_ranking unequal-variance ranking runs through the pipeline (mock)
   )
 })
 
+
+
+############################################################################# !
+# TRIAL-LEVEL DATA                                                       ####
+############################################################################# !
+
+# 2 participants x 8 trials, set sizes 3 and 4 alternating
+ranking_trials <- function() {
+  data.frame(
+    id = rep(1:2, each = 8), set_size = rep(c(3, 4), 8),
+    rank = c(1, 2, 1, 4, 3, 1, 2, 1,  1, 1, 2, 3, 1, 1, 3, 2)
+  )
+}
+
+test_that("one rank column declares one row per trial", {
+  trial <- sdt_ranking("rank", m = "set_size")
+  expect_true(trial$other_vars$trial_level)
+  expect_match(trial$requirements, "one row per trial")
+  expect_identical(.sdt_categories(sdt_ranking("rank", m = 3)), c("rank1", "rank2", "rank3"))
+  cells <- sdt_ranking(c("r1", "r2", "r3"), m = 3)
+  expect_false(cells$other_vars$trial_level)
+  expect_identical(.sdt_categories(cells), c("r1", "r2", "r3"))
+  expect_error(sdt_ranking("target_rank", m = 3), "'target_rank'")
+  expect_error(sdt_ranking(c("r1", "r2"), m = 3), "or a single column holding the rank")
+})
+
+test_that("trial-level check_data() names the ranks off the scale or past the set size", {
+  model <- sdt_ranking("rank", m = "set_size")
+  dat <- ranking_trials()
+  dat$rank[c(2, 4)] <- c(0, 5)
+  expect_error(check_data(model, dat, bmf(d ~ 1)),
+               "the rank column 'rank' must hold one of '1', '2', '3', '4' in every row. Found: '0', '5'")
+  dat <- ranking_trials()
+  dat$rank[c(3, 5)] <- 4
+  expect_error(check_data(model, dat, bmf(d ~ 1)),
+               "Found rank '4', '4' with set size '3', '3' in row(s) '3', '5'", fixed = TRUE)
+  dat <- ranking_trials()
+  dat$rank[1] <- NA
+  expect_error(check_data(model, dat, bmf(d ~ 1)), "'rank' must not contain NA")
+})
+
+test_that("trial-level check_data() takes the number of ranks from the largest set size", {
+  model <- sdt_ranking("rank", m = "set_size")
+  checked <- check_data(model, ranking_trials(), bmf(d ~ 1))
+  expect_identical(colnames(checked$Y), c("rank1", "rank2", "rank3", "rank4"))
+  expect_identical(checked$nTrials, rep(1L, 16))
+  expect_identical(checked$max_rank, ranking_trials()$set_size)
+  expect_null(data_trials(model, ranking_trials()))
+})
+
+# carry_fit_bounds() hands check_data() the fit's number of ranks for newdata
+# and the stored frame
+test_that("trial-level check_data() keeps the fit's number of ranks", {
+  model <- sdt_ranking("rank", m = "set_size")
+  dat <- ranking_trials()[ranking_trials()$set_size == 3, ]
+  attr(dat, "fit_n_ranks") <- 4L
+  checked <- check_data(model, dat, bmf(d ~ 1))
+  expect_identical(colnames(checked$Y), c("rank1", "rank2", "rank3", "rank4"))
+  expect_null(attr(checked, "fit_n_ranks"))
+  dat <- ranking_trials()
+  attr(dat, "fit_n_ranks") <- 3L
+  expect_error(check_data(model, dat, bmf(d ~ 1)),
+               "set size of 4, above the 3 the model was fitted with", fixed = TRUE)
+})
+
+test_that("the last requirement of each layout is a paragraph of its own", {
+  for (response in list("rank", paste0("rank", 1:4))) {
+    expect_match(sdt_ranking(response, m = 4)$requirements,
+                 "\n\nNo stimulus column needed")
+  }
+})
+
+test_that("ranking trial rows and the cells aggregated from them give the same Stan program", {
+  skip_on_cran()
+  trials <- ranking_trials()
+  cells <- data.frame(id = rep(1:2, each = 2), set_size = rep(c(3, 4), 2),
+                      rank1 = c(2, 2, 2, 2), rank2 = c(1, 1, 1, 1),
+                      rank3 = c(1, 0, 1, 1), rank4 = c(0, 1, 0, 0))
+  formula <- bmf(d ~ 1 + (1 | id))
+  mock <- function(data, model) suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_fit <- mock(trials, sdt_ranking("rank", m = "set_size"))
+  cell_fit <- mock(cells, sdt_ranking(paste0("rank", 1:4), m = "set_size"))
+  expect_identical(brms::stancode(trial_fit), brms::stancode(cell_fit))
+  expect_match(brms::stancode(trial_fit), "murank4", fixed = TRUE)
+  trial_data <- brms::standata(trial_fit)
+  expect_equal(as.vector(rowSums(trial_data$Y)), rep(1, 16))
+  expect_equal(unname(rowsum(trial_data$Y, paste(trials$id, trials$set_size))),
+               unname(as.matrix(cells[paste0("rank", 1:4)])))
+})
+
+# one-hot rows carry no multinomial coefficient: 5! / (3! 1! 1!) = 20
+# orderings of the cell's 5 trials
+test_that("ranking trial rows sum to the cell log-likelihood less the log multinomial coefficient", {
+  ranks <- c(1, 3, 1, 2, 1)
+  one_hot <- diag(4)[ranks, ]
+  expect_equal(
+    sum(dsdt_ranking(one_hot, m = 4, d = 1.1, log = TRUE)),
+    dsdt_ranking(c(3, 1, 1, 0), m = 4, d = 1.1, log = TRUE) - log(20),
+    tolerance = 1e-10
+  )
+  expect_equal(
+    sum(dsdt_ranking(one_hot, m = 4, d = 0.7, sdratio = 1.3, dist = "normal", log = TRUE)),
+    dsdt_ranking(c(3, 1, 1, 0), m = 4, d = 0.7, sdratio = 1.3, dist = "normal", log = TRUE) - log(20),
+    tolerance = 1e-10
+  )
+})
+
+test_that("revert_check_data() gives trial rows their rank and set size back", {
+  model <- sdt_ranking("rank", m = "set_size")
+  checked <- check_data(model, ranking_trials(), bmf(d ~ 1))
+  reverted <- revert_check_data(model, checked[setdiff(names(checked), "set_size")])
+  expect_equal(reverted$rank, ranking_trials()$rank)
+  expect_equal(reverted$set_size, ranking_trials()$set_size)
+  expect_false(any(c("Y", "nTrials", "max_rank") %in% names(reverted)))
+  expect_identical(check_data(model, reverted, bmf(d ~ 1))$Y, checked$Y)
+})

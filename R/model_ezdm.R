@@ -64,8 +64,8 @@
     list(
       resp_vars = nlist(mean_rt, var_rt, n_upper),
       other_vars = nlist(n_trials),
-      domain = "Decision Making / Response times",
-      task = "Choice Reaction Time tasks",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "EZ-Diffusion Model",
       citation = c(
         glue(
@@ -93,7 +93,8 @@
       links = .ezdm_version_table[[version]][["links"]],
       fixed_parameters = .ezdm_version_table[[version]][["fixed_parameters"]],
       default_priors = .ezdm_version_table[[version]][["priors"]],
-      init_ranges = .ezdm_version_table[[version]][["init_ranges"]]
+      init_ranges = .ezdm_version_table[[version]][["init_ranges"]],
+      functions = list(density = "dezdm", generator = "rezdm")
     ),
     class = c("bmmodel", "ezdm", paste0("ezdm_", version)),
     call = call
@@ -203,6 +204,7 @@
 ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL,
                  version = c("3par", "4par"), ...) {
   call <- match.call()
+  .check_constructor_dots(list(...))
   stop_missing_args()
   version <- match.arg(version)
   .model_ezdm(
@@ -214,6 +216,19 @@ ezdm <- function(mean_rt, var_rt, n_upper, n_trials, links = NULL,
 ############################################################################# !
 # CHECK_DATA S3 methods                                                  ####
 ############################################################################# !
+
+#' @exportS3Method
+built_data_columns.ezdm <- function(model) {
+  c(
+    if (model$version == "4par") .EZDM_RT_USED,
+    NextMethod("built_data_columns")
+  )
+}
+
+#' @exportS3Method
+data_trials.ezdm <- function(model, data) {
+  .row_trials(data, model$other_vars$n_trials)
+}
 
 #' @export
 check_data.ezdm <- function(model, data, formula) {
@@ -444,7 +459,7 @@ log_lik_ezdm_3par <- function(i, prep) {
 # pp_check(fit, resp_var = ...) instead (#401)
 posterior_predict_ezdm_3par <- function(i, prep, ...) {
   rezdm(
-    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n = prep$ndraws,
     n_trials = prep$data$trials[i],
     drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),
@@ -490,6 +505,37 @@ configure_model.ezdm_4par <- function(model, data, formula) {
   nlist(formula, data, stanvars)
 }
 
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# the summaries of few trials can have a mean RT that is not positive, which
+# bmm() rejects; redrawing would truncate the sampling distribution dezdm()
+# assumes, so those rows are dropped. A mean RT below ndt is a valid draw
+#' @export
+simulate_data.ezdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  n_trials <- model$other_vars$n_trials
+  design <- .design_or_n(model, design, trials = n_trials)
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  out <- rezdm(nrow(design), design[[n_trials]], p$drift, p$bound, p$ndt, zr = p$zr %||% 0.5,
+               s = p$s, version = model$version)
+  resp <- model$resp_vars
+  out <- stats::setNames(out[-ncol(out)], unlist(resp[c("mean_rt", "var_rt", "n_upper")], use.names = FALSE))
+  mean_rt <- as.matrix(out[resp$mean_rt])
+  dropped <- which(rowSums(mean_rt <= 0, na.rm = TRUE) > 0)
+  if (length(dropped) == 0) {
+    return(.simulate_result(design, out, sim))
+  }
+  warning2("Dropped {length(dropped)} of {nrow(design)} rows whose simulated mean \\
+           response time is not positive, which bmm() rejects. Their row numbers \\
+           are in attr(, \"dropped_rows\").")
+  sim$link <- sim$link[-dropped, , drop = FALSE]
+  data <- .simulate_result(design[-dropped, , drop = FALSE], out[-dropped, , drop = FALSE], sim)
+  attr(data, "dropped_rows") <- dropped
+  data
+}
+
 
 log_lik_ezdm_4par <- function(i, prep) {
   # based on bmf2bf.ezdm_4par formula:
@@ -516,7 +562,7 @@ log_lik_ezdm_4par <- function(i, prep) {
 # no dv argument: see posterior_predict_ezdm_3par()
 posterior_predict_ezdm_4par <- function(i, prep, ...) {
   rezdm(
-    n = length(brms::get_dpar(prep, "drift", i = i)),
+    n = prep$ndraws,
     n_trials = prep$data$vint2[i],
     drift = brms::get_dpar(prep, "drift", i = i),
     bound = brms::get_dpar(prep, "bound", i = i),

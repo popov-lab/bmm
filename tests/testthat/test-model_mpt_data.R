@@ -323,3 +323,70 @@ test_that("mpt_data_reshape refuses carried columns that the long data need", {
   )
   expect_no_error(mpt_data_reshape(cbind(id = 1:2, wide_2htm()), model, id = "id"))
 })
+
+test_that("mpt_data_reshape says so when id names a count column", {
+  model <- eqn_2htm_model()
+  expect_error(
+    mpt_data_reshape(wide_2htm(), model, id = "hit"),
+    "id column 'hit' is also a count column"
+  )
+  # the participant check comes second: repeated counts are still counts
+  repeated <- wide_2htm()
+  repeated$miss <- c(10, 10)
+  expect_error(
+    mpt_data_reshape(repeated, model, id = "miss"),
+    "id column 'miss' is also a count column"
+  )
+  qualified <- cbind(wide_2htm(), old.hit = c(5, 6))
+  expect_error(
+    mpt_data_reshape(qualified, model, id = "old.hit"),
+    "id column 'old.hit' is also a count column"
+  )
+  # a column that no tree reads as a count is a participant column
+  expect_no_error(mpt_data_reshape(cbind(subject = c("s1", "s2"), wide_2htm()), model, id = "subject"))
+})
+
+test_that("mpt_data_reshape refuses counts beyond the integer range without a coercion warning", {
+  model <- eqn_2htm_model()
+  big <- wide_2htm()
+  big$hit[1] <- 3e9
+  expect_no_warning(expect_error(
+    mpt_data_reshape(big, model), "count column\\(s\\) 'hit' exceed 2147483647"
+  ))
+  # the largest count that fits is unchanged
+  edge <- wide_2htm()
+  edge$hit[1] <- 2147483647
+  expect_identical(mpt_data_reshape(edge, model)$yes[1], 2147483647L)
+})
+
+test_that("mpt_data_reshape refuses category sums beyond the integer range", {
+  eqn_file <- withr::local_tempfile(fileext = ".eqn")
+  writeLines(c("3", "t1 a p*q", "t1 b p*(1-q)", "t1 c 1-p"), eqn_file)
+  model <- suppressMessages(mpt_from_eqn(eqn_file, categories = c(a = "x", b = "x", c = "y")))
+  # labels a and b are both read as category x, so their counts are added
+  expect_identical(mpt_data_reshape(data.frame(a = 1, b = 2, c = 3), model)$x, 3L)
+  expect_no_warning(expect_error(
+    mpt_data_reshape(data.frame(a = 2e9, b = 2e9, c = 1), model),
+    "counts of tree 't1' in the wide data exceed 2147483647"
+  ))
+})
+
+test_that("check_data() refuses row totals beyond the integer range without warnings", {
+  model <- mpt(mpt_2htm_trees(), tree_id = "item_type")
+  formula <- bmf(D ~ 1, g ~ 1)
+  one_count <- data.frame(item_type = c("old", "new"), old = c(3e9, 5), new = c(1, 5))
+  expect_no_warning(expect_error(
+    check_data(model, one_count, formula),
+    "Row totals of the response counts exceed 2147483647"
+  ))
+  # each count fits, the total of the row does not
+  summed <- data.frame(item_type = c("old", "new"), old = c(2e9, 5), new = c(2e9, 5))
+  expect_no_warning(expect_error(
+    check_data(model, summed, formula),
+    "Row totals of the response counts exceed 2147483647"
+  ))
+  edge <- data.frame(item_type = c("old", "new"), old = c(2147483646, 5), new = c(1, 5))
+  expect_identical(
+    suppressMessages(check_data(model, edge, formula))$nTrials, c(2147483647L, 10L)
+  )
+})

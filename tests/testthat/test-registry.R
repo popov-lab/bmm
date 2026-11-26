@@ -8,7 +8,7 @@
     list(
       resp_vars = list(y = y),
       other_vars = list(),
-      domain = "Registry tests",
+      domain = "Decision making",
       task = "Testing the registry",
       name = "Registry test model",
       citation = "Test, A. (2026). A model for the registry tests.",
@@ -78,16 +78,16 @@ test_that("a registered model is listed with its package, after bmm's own models
 
   printed <- capture.output(print(bmm_models()))
   expect_true("- regtest() (bmmregtest): Registry test model" %in% printed)
-  expect_true("- mixture2p(): Two-parameter mixture model by Zhang and Luck (2008)" %in% printed)
+  expect_true("- mixture2p(): Two-Parameter Mixture Model" %in% printed)
   md <- capture.output(print_pretty_models_md())
   expect_true("- `regtest()` (bmmregtest): Registry test model" %in% md)
 })
 
 test_that("a registered model with a url links to it in the markdown list", {
   local_regtest(url = "https://example.org/regtest.html")
-  md <- capture.output(print_pretty_models_md(group = "Registry tests"))
+  md <- capture.output(print_pretty_models_md(group = "Testing the registry"))
   expect_identical(md[1], "- [`regtest()`](https://example.org/regtest.html) (bmmregtest): Registry test model")
-  overview <- model_overview(group = "Registry tests")
+  overview <- model_overview(group = "Testing the registry")
   expect_match(overview$Model, "[`regtest()`](https://example.org/regtest.html)", fixed = TRUE)
 })
 
@@ -97,6 +97,7 @@ test_that("a registered model fits on the mock backend and the fit records its p
              backend = "mock", mock_fit = 1, rename = FALSE)
   expect_s3_class(fit, "bmmfit")
   expect_identical(fit$bmm$package, "bmmregtest")
+  expect_identical(model_spec(fit)$package, "bmmregtest")
   expect_identical(fit$version$bmmregtest, package_version("0.1.0"))
   expect_identical(fit$version$bmm, utils::packageVersion("bmm"))
   expect_match(

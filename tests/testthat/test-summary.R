@@ -120,3 +120,14 @@ test_that("the Links line lists only the alternative parameter the formula uses"
   expect_match(links, "criterion = identity", fixed = TRUE)
   expect_no_match(links, "bias", fixed = TRUE)
 })
+
+# a model built without the exported constructor carries no call attribute,
+# and the trial-level marker is not an argument of the constructor
+test_that("construct_model_call() leaves the trial-level marker out of the call", {
+  model <- sdt_yn("resp", "stimulus")
+  attr(model, "call") <- NULL
+  expect_identical(
+    gsub("\\s+", " ", construct_model_call(model)),
+    "sdt_yn(response = \"resp\", stimulus = \"stimulus\", n_trials = NULL, dist = \"normal\")"
+  )
+})
