@@ -1,3 +1,13 @@
+# the deprecated `parametrization` (#558) warns on every call; the tests that
+# wrap a call in this check the values it still gives
+quiet_parametrization <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl("`parametrization = ", conditionMessage(w), fixed = TRUE)) {
+      invokeRestart("muffleWarning")
+    }
+  })
+}
+
 test_that("sdm distribution functions run without errors", {
   withr::local_seed(445)
   n <- 10
@@ -56,7 +66,7 @@ test_that("psdm returns 1 at the upper end of the circle and 0 at lower.bound", 
   expect_equal(psdm(pi, mu = 0, c = 3, kappa = 5, lower.tail = FALSE), 0)
   expect_equal(psdm(1 + pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 1)
   expect_equal(psdm(1 - pi, mu = 1, c = 3, kappa = 5, lower.bound = 1 - pi), 0)
-  expect_equal(psdm(2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0, parametrization = "bessel"), 1)
+  expect_equal(quiet_parametrization(psdm(2 * pi, mu = 0, c = 3, kappa = 5, lower.bound = 0, parametrization = "bessel")), 1)
   expect_equal(psdm(c(-pi, 0, pi), mu = 0, c = 3, kappa = 5), c(0, 0.5, 1))
 })
 
@@ -98,7 +108,7 @@ test_that("psdm matches independently computed values of narrow distributions", 
     tolerance = 1e-8
   )
   expect_equal(
-    psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100, parametrization = "bessel"),
+    quiet_parametrization(psdm(c(-0.02, 0.02, 0.6, 2.4), mu = 0, c = 20, kappa = 100, parametrization = "bessel")),
     c(0.038542019868, 0.961457980132, 1, 1),
     tolerance = 1e-8
   )
@@ -128,10 +138,10 @@ test_that("psdm works where |q - mu| is a few ulps inside the cut-off of the ker
 
 test_that("psdm and qsdm return NaN for the bessel parametrization above kappa = 1e5", {
   expect_identical(
-    psdm(c(-pi, -0.01, 0.001, 0.5, pi), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"),
+    quiet_parametrization(psdm(c(-pi, -0.01, 0.001, 0.5, pi), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel")),
     rep(NaN, 5)
   )
-  expect_no_warning(res <- qsdm(c(0, 0.3, 1), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel"))
+  expect_no_warning(res <- quiet_parametrization(qsdm(c(0, 0.3, 1), mu = 0, c = 0.5, kappa = 1e6, parametrization = "bessel")))
   expect_identical(res, rep(NaN, 3))
 })
 
@@ -192,12 +202,12 @@ test_that("qsdm matches independently computed quantiles", {
     tolerance = 1e-8
   )
   expect_equal(
-    qsdm(p, mu = 0, c = 3, kappa = 5, parametrization = "bessel"),
+    quiet_parametrization(qsdm(p, mu = 0, c = 3, kappa = 5, parametrization = "bessel")),
     c(-2.7469702720, -0.3748796718, 0, 0.3748796718, 2.7469702720),
     tolerance = 1e-8
   )
   expect_equal(
-    qsdm(p, mu = 1.2, c = 8, kappa = 2, parametrization = "bessel"),
+    quiet_parametrization(qsdm(p, mu = 1.2, c = 8, kappa = 2, parametrization = "bessel")),
     c(-1.6664740454, 0.8663819230, 1.1779562294, 1.4706224867, 2.3265643834),
     tolerance = 1e-8
   )
@@ -211,7 +221,7 @@ test_that("qsdm matches independently computed quantiles of a narrow distributio
     tolerance = 1e-8
   )
   expect_equal(
-    qsdm(p, mu = 0, c = 20, kappa = 50, parametrization = "bessel"),
+    quiet_parametrization(qsdm(p, mu = 0, c = 20, kappa = 50, parametrization = "bessel")),
     c(-0.060010882249, -0.012816159925, 0.012816159925, 0.060010882249),
     tolerance = 1e-8
   )
@@ -221,14 +231,14 @@ test_that("qsdm returns a quantile for p near 1 where lower.bound + 2 * pi round
   # the 16 digits matter: (lb + 2 * pi) - lb is not exactly 2 * pi here
   lb <- 4.411322201024876
   for (par in c("sqrtexp", "bessel")) {
-    q <- qsdm(1 - 1e-13, mu = 0, c = 3, kappa = 5, lower.bound = lb, parametrization = par)
+    q <- quiet_parametrization(qsdm(1 - 1e-13, mu = 0, c = 3, kappa = 5, lower.bound = lb, parametrization = par))
     expect_true(q >= lb && q <= lb + 2 * pi)
   }
 })
 
 test_that("qsdm is the median at mu for a distribution symmetric around mu", {
   expect_equal(qsdm(0.5, mu = 0), 0, tolerance = 1e-8)
-  expect_equal(qsdm(0.5, mu = 0, parametrization = "bessel"), 0, tolerance = 1e-8)
+  expect_equal(quiet_parametrization(qsdm(0.5, mu = 0, parametrization = "bessel")), 0, tolerance = 1e-8)
   expect_equal(qsdm(0.5, mu = 1, c = 8, kappa = 2, lower.bound = 1 - pi), 1, tolerance = 1e-8)
   expect_equal(qsdm(0.5, mu = -2.5, c = 8, kappa = 2, lower.bound = -2.5 - pi), -2.5, tolerance = 1e-8)
 })
@@ -242,8 +252,8 @@ test_that("psdm(qsdm(p)) returns p to 1e-8 on both parametrizations", {
   )
   for (par in c("sqrtexp", "bessel")) {
     for (s in sets) {
-      q <- qsdm(p, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
-      back <- psdm(q, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par)
+      q <- quiet_parametrization(qsdm(p, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par))
+      back <- quiet_parametrization(psdm(q, mu = s$mu, c = s$c, kappa = s$kappa, parametrization = par))
       expect_lt(max(abs(back - p)), 1e-8)
     }
   }
@@ -328,13 +338,13 @@ test_that("rsdm returns finite draws when the density peak overflows", {
   expect_lt(max(abs(y)), 0.05)
 })
 
-test_that("rejection_sampling takes arguments of length n per draw", {
+test_that(".rejection_sampling takes arguments of length n per draw", {
   withr::local_seed(445)
   n <- 20000
   group <- sample(rep(1:2, n / 2))
   shape <- c(1, 9)
   # Beta(shape, 1): density shape * x^(shape - 1) peaks at shape, mean shape / (shape + 1)
-  y <- rejection_sampling(
+  y <- .rejection_sampling(
     n,
     f = function(x, group, shape) shape[group] * x^(shape[group] - 1),
     max_f = shape[group],
@@ -348,7 +358,7 @@ test_that("rejection_sampling takes arguments of length n per draw", {
   }
 
   # with n = 1 every argument belongs to the single draw and is passed whole
-  expect_length(rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
+  expect_length(.rejection_sampling(1, function(x, g) g(x), 1, stats::runif, g = stats::dunif), 1)
 })
 
 test_that("rejection_sampling validates n and max_f", {
@@ -366,8 +376,8 @@ test_that("rejection_sampling errors instead of looping forever", {
   withr::defer(setTimeLimit(elapsed = Inf))
   expect_error(rejection_sampling(5, stats::dunif, Inf, stats::runif), "max_f")
   expect_error(rsdm(5, mu = NA), "NA")
-  expect_error(rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
-  expect_error(rejection_sampling(5, function(x) rep(1, length(x)), 1, function(n) rep(NA_real_, n)), "NA")
+  expect_error(.rejection_sampling(5, function(x) 0 * x, 1, stats::runif), "accepted")
+  expect_error(.rejection_sampling(5, function(x) rep(1, length(x)), 1, function(n) rep(NA_real_, n)), "NA")
 })
 
 test_that("conversion between sdm parametrizations works", {
@@ -385,8 +395,8 @@ test_that("dsdm parametrization conversion returns accurate results", {
   kappa <- rnorm(100, 5, 1)
   c_b <- rnorm(100, 5, 1)
   c_se <- c_bessel2sqrtexp(c_b, kappa)
-  d1 <- dsdm(y, 0, c_b, kappa, parametrization = "bessel")
-  d2 <- dsdm(y, 0, c_se, kappa, parametrization = "sqrtexp")
+  d1 <- quiet_parametrization(dsdm(y, 0, c_b, kappa, parametrization = "bessel"))
+  d2 <- quiet_parametrization(dsdm(y, 0, c_se, kappa, parametrization = "sqrtexp"))
   expect_equal(d1, d2)
 })
 
@@ -413,6 +423,232 @@ test_that("dmixture3p integrates to 1", {
   )$value, 1, tolerance = 1e-6)
 })
 
+# as in dmixture2p(), a parameter vector longer than x sets the length
+test_that("dmixture3p recycles its parameters to the longest argument", {
+  at <- function(x, ...) dmixture3p(x, ...)
+  expect_equal(
+    dmixture3p(0.3, kappa = c(1, 5, 20)),
+    c(at(0.3, kappa = 1), at(0.3, kappa = 5), at(0.3, kappa = 20))
+  )
+  expect_equal(
+    dmixture3p(c(0.3, -1), p_mem = c(0.5, 0.7), p_nt = c(0.1, 0.2), tau = c(0, 1)),
+    c(at(0.3, p_mem = 0.5, p_nt = 0.1, tau = 0), at(-1, p_mem = 0.7, p_nt = 0.2, tau = 1))
+  )
+})
+
+# model_spec() names dmixture3p() as the density of every mixture3p version,
+# so it must agree with the likelihood log_lik() evaluates at every K, above
+# capacity too, where slot averaging gives an item several slots (#711)
+test_that("dmixture3p matches the mixture3p likelihood of every version at every K", {
+  x <- seq(-pi, pi, length.out = 7)
+  # a target away from 0, so a call that drops mu[1] shows
+  mu <- c(0.5, 2, -1.5, 1)
+  set_size <- length(mu)
+  internal <- list(slot = .dmixture3p_slot, slot_averaging = .dmixture3p_slot_averaging)
+  for (version in names(internal)) {
+    for (tau in c(0, 1)) {
+      for (K in c(2, 4, 6, 8)) {
+        expect_equal(
+          # 41 nodes, not the default 81, so a node count the exported
+          # function ignores shows
+          dmixture3p(x, mu = mu, kappa = 8, tau = tau, K = K, ptarget = 0.7,
+                     version = version, vp_nodes = 41L, log = TRUE),
+          internal[[version]](x, mu[1], 8, K, 0.7, set_size, mu[-1], tau, 41L)
+        )
+      }
+    }
+  }
+  # the simple likelihood takes the log odds of a target and of a non-target
+  # response against a guess, here 0.5 and 0.2 against 0.3
+  for (tau in c(0, 1)) {
+    expect_equal(
+      dmixture3p(x, mu = mu, kappa = 8, p_mem = 0.5, p_nt = 0.2, tau = tau,
+                 vp_nodes = 41L, log = TRUE),
+      .dmixture3p_simple(x, mu[1], 8, log(0.5 / 0.3), log(0.2 / 0.3), set_size, mu[-1], tau, 41L)
+    )
+  }
+})
+
+# the capacity versions written as the "simple" mixture they reduce to, so that
+# a bug shared by the exported and the internal capacity functions shows
+test_that("the capacity versions of dmixture3p reduce to the simple mixture", {
+  x <- seq(-pi, pi, length.out = 7)
+  mu <- c(0, 2, -1.5, 1)
+  set_size <- length(mu)
+  simple <- function(p_mem, ptarget, kappa = 8, tau = 0) {
+    dmixture3p(x, mu = mu, kappa = kappa, p_mem = p_mem * ptarget,
+               p_nt = p_mem * (1 - ptarget), tau = tau, log = TRUE)
+  }
+  capacity <- function(K, version, kappa = 8, tau = 0) {
+    dmixture3p(x, mu = mu, kappa = kappa, tau = tau, K = K, ptarget = 0.7,
+               version = version, log = TRUE)
+  }
+
+  for (tau in c(0, 1)) {
+    for (K in c(2, 4, 6, 8)) {
+      expect_equal(capacity(K, "slot", tau = tau), simple(min(1, K / set_size), 0.7, tau = tau))
+    }
+    for (K in c(2, 4)) {
+      expect_equal(capacity(K, "slot_averaging", tau = tau), simple(K / set_size, 0.7, tau = tau))
+    }
+  }
+
+  # at K = 2 * set_size every item holds two slots, whose Fisher information adds
+  kappa_2 <- stats::uniroot(
+    function(k) .circmix_J(k) - 2 * .circmix_J(8), c(8, 100), tol = 1e-12
+  )$root
+  expect_equal(
+    capacity(2 * set_size, "slot_averaging"), simple(1, 0.7, kappa = kappa_2),
+    tolerance = 1e-6
+  )
+})
+
+test_that("the capacity versions of dmixture3p recycle their parameters", {
+  at <- function(x, ...) dmixture3p(x, ...)
+  for (version in c("slot", "slot_averaging")) {
+    expect_equal(
+      dmixture3p(c(0.3, -1, 2), K = c(1, 5), ptarget = c(0.4, 0.9, 0.6),
+                 kappa = c(3, 10), tau = c(0, 1), version = version),
+      c(at(0.3, K = 1, ptarget = 0.4, kappa = 3, tau = 0, version = version),
+        at(-1, K = 5, ptarget = 0.9, kappa = 10, tau = 1, version = version),
+        at(2, K = 1, ptarget = 0.6, kappa = 3, tau = 0, version = version))
+    )
+  }
+})
+
+# draw i takes element i of every parameter recycled to n, as density i of
+# dmixture3p() does, whether n is shorter or longer than the parameters
+test_that("the capacity versions of rmixture3p recycle their parameters to n draws", {
+  withr::local_seed(711)
+  odd <- seq(1, 2000, by = 2)
+  for (version in c("slot", "slot_averaging")) {
+    for (n in c(3, 12)) {
+      expect_length(
+        rmixture3p(n, K = c(1, 2, 4, 5, 6), ptarget = c(0.4, 0.9),
+                   kappa = c(3, 10, 20), tau = c(0, 1), version = version),
+        n
+      )
+    }
+    expect_length(
+      rmixture3p(2, K = c(1, 2, 4), ptarget = c(0.4, 0.9, 0.5),
+                 kappa = c(3, 10, 20), tau = c(0, 1, 0.5), version = version),
+      2
+    )
+    # K near 0 guesses (uniform, SD 1.81), K = 300 stores the target (SD 0.07)
+    r <- rmixture3p(2000, kappa = 200, K = c(1e-9, 300), ptarget = 1, version = version)
+    expect_gt(sd(r[odd]), 1.5)
+    expect_lt(sd(r[-odd]), 0.2)
+    # one slot per item; tau = 1e4 puts J near 0 (gamma shape 0.02), close to
+    # a guess
+    r <- rmixture3p(2000, kappa = 200, K = 3, ptarget = 1, tau = c(0, 1e4), version = version)
+    expect_lt(sd(r[odd]), 0.2)
+    expect_gt(sd(r[-odd]), 1)
+    # this test runs on CRAN, the draws test does not: above capacity every
+    # item is stored, and no weight may leave [0, 1]; a NaN weight would leave
+    # a draw at its initial 0
+    expect_no_warning(r <- rmixture3p(200, kappa = 200, K = 300, ptarget = 1, version = version))
+    expect_true(all(r != 0))
+    # at full capacity ptarget = 0 reports a non-target, at 2 or -1.5
+    r <- rmixture3p(2000, mu = c(0, 2, -1.5), kappa = 200, K = 3, ptarget = c(1, 0),
+                    version = version)
+    expect_lt(mean(abs(r[odd])), 0.2)
+    expect_gt(mean(abs(r[-odd])), 1.5)
+    # a target away from 0, so a sampler that drops mu[1] shows
+    r <- rmixture3p(2000, mu = c(1, 2.5, -1.5), kappa = 200, K = 3, ptarget = 1, version = version)
+    expect_lt(abs(mean(r) - 1), 0.05)
+  }
+})
+
+# as for rmixture2p: under one seed, short parameter vectors give the draws of
+# the same vectors recycled to n by hand, so draw i pairs element i of every
+# parameter, in the non-target weights too
+test_that("rmixture3p draws as with its parameters recycled to n by hand", {
+  draw <- function(n, ...) withr::with_seed(711, rmixture3p(n, ...))
+  pars <- list(
+    simple = list(p_mem = c(0.5, 0.7), p_nt = c(0.1, 0.2, 0.3, 0.2)),
+    slot = list(K = c(1, 2, 4, 5, 6), ptarget = c(0.4, 0.9)),
+    slot_averaging = list(K = c(1, 2, 4, 5, 6), ptarget = c(0.4, 0.9))
+  )
+  for (version in names(pars)) {
+    for (n in c(3, 7)) {
+      short <- c(pars[[version]], list(kappa = c(3, 10, 20), tau = c(0, 1)))
+      expect_identical(
+        do.call(draw, c(list(n), short, version = version)),
+        do.call(draw, c(list(n), lapply(short, rep_len, n), version = version))
+      )
+    }
+  }
+})
+
+# with one item there is nothing to swap to, so ptarget drops out and each
+# capacity version is that of mixture2p: the same density and, under one seed,
+# the same draws
+test_that("the capacity versions of mixture3p at set size 1 are those of mixture2p", {
+  x <- seq(-pi, pi, length.out = 7)
+  for (version in c("slot", "slot_averaging")) {
+    for (K in c(0.5, 2)) {
+      expect_equal(
+        dmixture3p(x, mu = 0, kappa = 6, K = K, ptarget = 0.3, version = version),
+        dmixture2p(x, mu = 0, kappa = 6, K = K, set_size = 1, version = version)
+      )
+      expect_identical(
+        withr::with_seed(
+          711, rmixture3p(50, mu = 1, kappa = 6, K = K, ptarget = 0.3, version = version)
+        ),
+        withr::with_seed(
+          711, rmixture2p(50, mu = 1, kappa = 6, K = K, set_size = 1, version = version)
+        )
+      )
+    }
+  }
+})
+
+test_that("the capacity versions of dmixture3p integrate to 1", {
+  for (version in c("slot", "slot_averaging")) {
+    for (tau in c(0, 1.5)) {
+      expect_equal(integrate(dmixture3p, -pi, pi,
+        mu = c(0, 2, -1.5), kappa = 6, tau = tau, K = 4.5, ptarget = 0.7,
+        version = version, rel.tol = 1e-10
+      )$value, 1, tolerance = 1e-6)
+    }
+  }
+})
+
+test_that("dmixture3p and rmixture3p warn about the arguments a version ignores", {
+  for (fun in list(function(...) dmixture3p(0.3, ...), function(...) rmixture3p(2, ...))) {
+    # invalid values, because an ignored argument is not checked; the anchor
+    # stops 'K' from matching "'K', 'ptarget'"
+    expect_warning(fun(K = 0), "'simple' version of mixture3p ignores 'K'\\.$")
+    expect_warning(fun(ptarget = 2), "'simple' version of mixture3p ignores 'ptarget'\\.$")
+    expect_warning(
+      fun(p_mem = 0.5, version = "slot"), "'slot' version of mixture3p ignores 'p_mem'\\.$"
+    )
+    expect_warning(
+      fun(p_mem = 0.5, p_nt = 0.1, version = "slot_averaging"),
+      "'slot_averaging' version of mixture3p ignores 'p_mem', 'p_nt'"
+    )
+    expect_warning(
+      fun(p_nt = 0.1, version = "slot"), "'slot' version of mixture3p ignores 'p_nt'\\.$"
+    )
+    expect_no_warning(fun(K = 2, ptarget = 0.5, version = "slot"))
+  }
+})
+
+test_that("the capacity versions of dmixture3p and rmixture3p check their arguments", {
+  for (fun in list(function(...) dmixture3p(0.3, ...), function(...) rmixture3p(2, ...))) {
+    expect_error(fun(K = 0, version = "slot"), "K must be positive")
+    expect_error(fun(ptarget = 1.2, version = "slot_averaging"), "ptarget must be between 0 and 1")
+    expect_error(fun(version = "slots"), "should be one of")
+    expect_error(fun(ptarget = -0.1, version = "slot"), "ptarget must be between 0 and 1")
+    expect_error(fun(K = c(2, -1), version = "slot_averaging"), "K must be positive")
+    expect_error(fun(kappa = -1, version = "slot"), "kappa must be non-negative")
+    expect_error(fun(tau = -1, version = "slot_averaging"), "tau must be non-negative")
+  }
+  expect_error(
+    dmixture3p(0.1, tau = 1, vp_nodes = 21, version = "slot"), "odd number of at least 41"
+  )
+})
+
 test_that("dimm integrates to 1", {
   withr::local_seed(445)
   expect_equal(integrate(dimm, -pi, pi,
@@ -425,6 +661,146 @@ test_that("dimm integrates to 1", {
     b = 0,
     rel.tol = 1e-10
   )$value, 1, tolerance = 1e-6)
+})
+
+# as in dmixture2p(), a parameter vector longer than x sets the length
+test_that("dimm recycles its parameters to the longest argument", {
+  at <- function(x, ...) dimm(x, ...)
+  expect_equal(dimm(0.3, c = c(1, 5, 20)), c(at(0.3, c = 1), at(0.3, c = 5), at(0.3, c = 20)))
+  expect_equal(
+    dimm(c(0.3, -1), a = c(0.5, 2), s = c(1, 5), b = c(0, 1), kappa = c(4, 9), tau = c(0, 1)),
+    c(at(0.3, a = 0.5, s = 1, b = 0, kappa = 4, tau = 0), at(-1, a = 2, s = 5, b = 1, kappa = 9, tau = 1))
+  )
+})
+
+# a missing tau used to give the constant-precision density, while a missing
+# kappa gave NA
+test_that("the circular mixture densities are NA where tau is NA", {
+  expect_true(all(is.na(dmixture2p(c(0, 1), kappa = 5, p_mem = 0.8, tau = NA, log = TRUE))))
+  expect_true(all(is.na(dmixture3p(c(0, 1), kappa = 5, tau = c(NA, NaN)))))
+  expect_true(all(is.na(dimm(c(0, 1), kappa = 5, tau = NA))))
+  expect_false(anyNA(dmixture2p(c(0, 1), kappa = 5, p_mem = 0.8, tau = c(NA, 2))[2]))
+})
+
+# a missing tau drew at constant precision and a missing weight from the first
+# component; bmm 1.4.2 stopped (#710). One warning per call, as from rnorm(),
+# also when the slot-averaging sampler passes a held NA row on.
+test_that("the circular mixture samplers draw NA where a parameter is NA, with one warning", {
+  withr::local_seed(710)
+  draws <- function(call) {
+    expect_identical(capture_warnings(out <- call), "NAs produced")
+    out
+  }
+  expect_identical(draws(rmixture2p(3, kappa = 5, p_mem = 0.8, tau = NA)), rep(NA_real_, 3))
+  expect_identical(draws(rmixture2p(3, kappa = NA, p_mem = 0.8)), rep(NA_real_, 3))
+  expect_identical(draws(rmixture2p(3, kappa = 5, p_mem = NaN)), rep(NA_real_, 3))
+  expect_identical(
+    draws(rmixture2p(3, kappa = 5, K = NA, set_size = 4, version = "slot")),
+    rep(NA_real_, 3)
+  )
+  expect_identical(
+    draws(rmixture2p(3, kappa = 5, K = NA, set_size = 4, version = "slot_averaging")),
+    rep(NA_real_, 3)
+  )
+  expect_identical(
+    draws(rmixture2p(3, kappa = 5, tau = NA, K = 0.5, set_size = 4, version = "slot_averaging")),
+    rep(NA_real_, 3)
+  )
+  expect_identical(
+    draws(rmixture2p(3, kappa = 5, tau = NA, K = 6, set_size = 4, version = "slot_averaging")),
+    rep(NA_real_, 3)
+  )
+  expect_identical(draws(rmixture3p(3, kappa = 5, tau = NA)), rep(NA_real_, 3))
+  expect_identical(draws(rimm(3, kappa = 5, tau = NA)), rep(NA_real_, 3))
+
+  y <- draws(rmixture2p(6, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1)))
+  expect_identical(is.na(y), rep(c(FALSE, TRUE, TRUE), 2))
+  expect_identical(is.na(y), is.na(dmixture2p(0, kappa = c(5, NA, 5), p_mem = c(0.8, 0.8, NA), tau = c(0, 1, 0, 1, 0, 1))))
+})
+
+# K and ptarget of the capacity versions follow the rule of the other
+# parameters (#711, #710)
+test_that("an NA K or ptarget gives NA in the capacity versions of dmixture3p() and rmixture3p()", {
+  withr::local_seed(711)
+  mu <- rbind(c(0, 2, NA), c(0, 2, -1.5))
+  for (version in c("slot", "slot_averaging")) {
+    for (args in list(list(K = c(3, NA, 3, 3)), list(ptarget = c(0.8, NA, 0.8, 0.8)))) {
+      y <- NULL
+      expect_identical(
+        capture_warnings(y <- do.call(rmixture3p, c(list(4, mu = mu, version = version), args))),
+        "NAs produced"
+      )
+      expect_identical(is.na(y), c(FALSE, TRUE, FALSE, FALSE))
+      d <- expect_silent(do.call(dmixture3p, c(list(c(0.1, 0.2, 0.3, 0.4), mu = mu, version = version), args)))
+      expect_identical(is.na(d), c(FALSE, TRUE, FALSE, FALSE))
+    }
+  }
+})
+
+# the rows of one set size draw together, so a missing value in rows of two
+# set sizes reached the warning twice
+test_that("a sampler warns once when missing values fall in rows of several set sizes", {
+  withr::local_seed(710)
+  mu <- rbind(c(0, 1, NA), c(0, 1, 2))
+  calls <- alist(
+    simple = rmixture3p(4, mu = mu, kappa = c(NA, NA, 5, 5)),
+    slot = rmixture3p(4, mu = mu, K = c(NA, NA, 2, 2), version = "slot"),
+    slot_averaging = rmixture3p(4, mu = mu, ptarget = c(NA, NA, 0.8, 0.8), version = "slot_averaging"),
+    imm = rimm(4, mu = mu, dist = rbind(c(0, 1, NA), c(0, 1, 2)), c = c(NA, NA, 1, 1))
+  )
+  for (name in names(calls)) {
+    expect_identical(capture_warnings(y <- eval(calls[[name]])), "NAs produced", info = name)
+    expect_identical(is.na(y), c(TRUE, TRUE, FALSE, FALSE), info = name)
+  }
+})
+
+# only "NAs produced" is collected across set sizes; any other warning of a
+# set size reaches the caller as it was raised
+test_that("collecting 'NAs produced' across set sizes passes other warnings on", {
+  withr::local_seed(710)
+  draw <- bmm:::.rcircmix
+  local_mocked_bindings(.rcircmix = function(mu, ...) {
+    if (ncol(mu) == 2) warning("another warning", call. = FALSE)
+    draw(mu, ...)
+  })
+  mu <- rbind(c(0, 1, NA), c(0, 1, 2))
+  expect_identical(
+    capture_warnings(rmixture3p(4, mu = mu, kappa = c(5, 5, NA, NA))),
+    c("another warning", "NAs produced")
+  )
+})
+
+test_that("the circular mixture samplers do not warn when every parameter is given", {
+  withr::local_seed(710)
+  expect_no_warning(rmixture2p(4, kappa = 5, p_mem = 0.8, tau = c(0, 1)))
+  expect_no_warning(rmixture2p(4, kappa = 5, K = 2, set_size = 4, tau = c(0, 1), version = "slot"))
+  expect_no_warning(rmixture2p(4, kappa = 5, K = c(1, 6), set_size = 4, tau = c(0, 0, 1, 1), version = "slot_averaging"))
+  expect_no_warning(rmixture3p(4, tau = c(0, 1)))
+  expect_no_warning(rimm(4, tau = c(0, 1)))
+})
+
+# rmixture3p() and rimm() warned "non-empty data for zero-extent matrix". The
+# NA check reads the weight matrix, so a zero-row matrix built from a constant
+# stops with "data is too long"; the slot-averaging cases, the mixture3p
+# generator behind posterior_predict() and simulate_data() included, guard that.
+test_that("the circular mixture samplers return an empty vector for n = 0", {
+  calls <- alist(
+    simple = rmixture2p(0, tau = 1),
+    slot = rmixture2p(0, kappa = 5, K = 2.5, set_size = 4, version = "slot"),
+    slot_averaging = rmixture2p(0, kappa = 5, K = 2.5, set_size = 4, version = "slot_averaging"),
+    mixture3p = rmixture3p(0, tau = 1),
+    imm = rimm(0, tau = 1),
+    mixture3p_slot_averaging_1 = .rmixture3p_slot_averaging(
+      numeric(0), c(1, 2, 3), 1, numeric(0), numeric(0), numeric(0), numeric(0)
+    ),
+    mixture3p_slot_averaging_3 = .rmixture3p_slot_averaging(
+      numeric(0), c(1, 2, 3), 3, numeric(0), numeric(0), numeric(0), numeric(0)
+    )
+  )
+  for (name in names(calls)) {
+    expect_identical(capture_warnings(out <- eval(calls[[name]])), character(0), info = name)
+    expect_identical(out, numeric(0), info = name)
+  }
 })
 
 test_that("rmixture2p returns values between -pi and pi", {
@@ -684,11 +1060,14 @@ test_that("dddm rejects invalid response codes", {
   )
 })
 
-test_that("dddm rejects mismatched rt and response lengths", {
-  expect_error(
-    dddm(c(0.5, 0.6), 1, drift = 2, bound = 1.5, ndt = 0.3, log = TRUE),
-    "Different number of RTs and responses"
+test_that("dddm recycles rt and response of different lengths", {
+  expect_equal(
+    dddm(0.6, c(1, 0), drift = 1, bound = 1, ndt = 0.2, log = FALSE),
+    c(dddm(0.6, 1, drift = 1, bound = 1, ndt = 0.2, log = FALSE),
+      dddm(0.6, 0, drift = 1, bound = 1, ndt = 0.2, log = FALSE))
   )
+  expect_length(dddm(c(0.5, 0.6, 0.7), c(1, 0), drift = 2, bound = 1.5, ndt = 0.3, log = TRUE), 3)
+  expect_length(dddm(numeric(0), c(1, 0), drift = 2, bound = 1.5, ndt = 0.3, log = TRUE), 0)
 })
 
 test_that("rddm returns data frame with correct structure", {
@@ -699,6 +1078,149 @@ test_that("rddm returns data frame with correct structure", {
   expect_true(all(c("rt", "response") %in% names(res)))
   expect_true(all(res$rt > 0))
   expect_true(all(res$response %in% c(0, 1)))
+})
+
+test_that("the samplers read n as rnorm() does", {
+  withr::local_seed(4443)
+  thr <- c(-0.5, 0.3, 1)
+  calls <- list(
+    rddm = function(n) rddm(n, drift = 1, bound = 1, ndt = 0.2),
+    rezdm_3par = function(n) rezdm(n, n_trials = 100, drift = 1, bound = 1, ndt = 0.2),
+    rezdm_4par = function(n) rezdm(n, n_trials = 100, drift = 1, bound = 1, ndt = 0.2, zr = 0.4,
+                                   version = "4par"),
+    rsdt_yn = function(n) rsdt_yn(n, 10, 1, 1, criterion = 0),
+    rsdt_rating = function(n) rsdt_rating(n, 10, 1, 1, thresholds = c(-0.5, 0.5)),
+    rsdt_dpsdt = function(n) rsdt_dpsdt(n, 10, 1, 1, thresholds = c(-0.5, 0.5), Ro = 0.2),
+    rsdt_metad = function(n) rsdt_metad(n, 10, 1, 1, thresholds = c(-0.5, 0, 0.5), metad = 1),
+    rsdt_mafc = function(n) rsdt_mafc(n, 10, m = 2, d = 1),
+    rsdt_ranking = function(n) rsdt_ranking(n, 10, m = c(3, 4), d = 1),
+    rsdt_cdp = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = thr, rcrit = 0.5, n_new = 1),
+    rsdt_cdp_rkg = function(n) rsdt_cdp(n, 10, 1, dfam = 1, drec = 1, thresholds = thr, rcrit = 0.5,
+                                        kcrit = 0, n_new = 1),
+    rpsychometric_function = function(n) rpsychometric_function(n, 0, midpoint = 0, width = 1),
+    rsdm = function(n) rsdm(n, mu = 0, c = 3, kappa = 3)
+  )
+  seeded <- function(f, n) withr::with_seed(7, f(n))
+  bad <- list(NA, NA_real_, -1, -0.5, Inf, "a", numeric(0), c(2, 3), list(2))
+  names(bad) <- vapply(bad, deparse1, character(1))
+  # one expectation per sampler and kind of n: the expectations, not the
+  # draws, are what this test spends its time on under CRAN
+  for (name in names(calls)) {
+    f <- calls[[name]]
+    two <- seeded(f, 2)
+    expect_identical(list(seeded(f, 2.5), seeded(f, 2L), seeded(f, "2"), seeded(f, TRUE)),
+                     list(two, two, two, seeded(f, 1)), info = name)
+    # no draws: the type, columns and column names of a call with draws
+    empty <- if (is.null(dim(two))) two[0] else two[0, , drop = FALSE]
+    expect_identical(f(0), empty, info = name)
+    tried <- if (name == "rddm") Filter(function(b) length(b) <= 1, bad) else bad
+    # a warning before the refusal, such as a coercion warning for "a", shows
+    # up as a refusal that differs from the expected message
+    refusals <- vapply(tried, function(b) tryCatch({
+      f(b)
+      "no error"
+    }, warning = function(w) paste("warning:", conditionMessage(w)), error = conditionMessage), character(1))
+    expect_identical(refusals, setNames(rep("n, the number of draws, must be a single number >= 0.", length(tried)),
+                                        names(tried)), info = name)
+  }
+})
+
+test_that("rddm() with an n of length above 1 gives length(n) draws, with a deprecation warning", {
+  expect_warning(
+    out <- withr::with_seed(7, rddm(c(5, 6), drift = 1, bound = 1, ndt = 0.2)),
+    "rddm(2, ...)", fixed = TRUE
+  )
+  expect_identical(out, withr::with_seed(7, rddm(2, drift = 1, bound = 1, ndt = 0.2)))
+})
+
+test_that("rddm() reads a fraction above 1 with parameter vectors as one draw", {
+  drift <- c(1, 2, 3)
+  one <- withr::with_seed(7, rddm(1, drift = 1, bound = 1, ndt = 0.2))
+  for (n in list(1.5, "1.5", 1.99)) {
+    out <- NULL
+    expect_no_warning(out <- withr::with_seed(7, rddm(n, drift = drift, bound = 1, ndt = 0.2)))
+    expect_identical(out, one, info = format(n))
+  }
+  # only an n of exactly 1 keeps the draw per element of before 1.5.0
+  for (n in list(1, 1L, "1", TRUE)) {
+    expect_warning(out <- rddm(n, drift = drift, bound = 1, ndt = 0.2), "deprecated since bmm 1.5.0")
+    expect_equal(nrow(out), 3, info = format(n))
+  }
+})
+
+test_that("the SDT samplers give no draws at n = 0 for every dist", {
+  # max(m) of an empty m stopped the gumbel_min logit of rsdt_mafc()
+  calls <- list(
+    rsdt_yn = function(n, dist) rsdt_yn(n, 10, 1, 1, criterion = 0, dist = dist),
+    rsdt_rating = function(n, dist) rsdt_rating(n, 10, 1, 1, thresholds = c(-0.5, 0.5), dist = dist),
+    rsdt_dpsdt = function(n, dist) rsdt_dpsdt(n, 10, 1, 1, thresholds = c(-0.5, 0.5), Ro = 0.2, dist = dist),
+    rsdt_metad = function(n, dist) rsdt_metad(n, 10, 1, 1, thresholds = c(-0.5, 0, 0.5), metad = 1, dist = dist),
+    rsdt_mafc = function(n, dist) rsdt_mafc(n, c(10, 20), m = c(2, 4), d = c(1, 2), dist = dist),
+    rsdt_ranking = function(n, dist) rsdt_ranking(n, 10, m = c(3, 4), d = 1, dist = dist)
+  )
+  for (name in names(calls)) {
+    for (dist in eval(formals(name)$dist)) {
+      # two draws, so that rsdt_ranking() reads both m and has max(m) columns
+      two <- withr::with_seed(7, calls[[name]](2, dist))
+      empty <- if (is.null(dim(two))) two[0] else two[0, , drop = FALSE]
+      expect_identical(calls[[name]](0, dist), empty, info = paste(name, dist))
+    }
+  }
+})
+
+test_that("a kcrit finite for some observations only gives R/K, with one warning", {
+  thr <- c(-0.5, 0.3, 1)
+  rk <- c(40, 5, 12, 30, 10, 18, 60)
+  rkg <- c(40, 5, 3, 1, 12, 30, 10, 18, 60, 2)
+  count_warnings <- function(expr) {
+    n <- 0
+    value <- withCallingHandlers(expr, warning = function(w) {
+      expect_match(conditionMessage(w), "Some kcrit values are not finite")
+      n <<- n + 1
+      invokeRestart("muffleWarning")
+    })
+    list(value = value, n = n)
+  }
+  rk_draws <- withr::with_seed(7, rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, n_new = 1))
+  rk_dens <- dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, n_new = 1)
+  # the single observation of the dsdt_cdp() calls reads kcrit[1], finite here
+  for (kcrit in list(c(0, NA), c(0, Inf), c(0.2, -Inf))) {
+    r <- count_warnings(withr::with_seed(7, rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1)))
+    expect_identical(r$value, rk_draws, info = format(kcrit))
+    expect_equal(r$n, 1, info = format(kcrit))
+    # a kcrit that is not read does not set the number of observations
+    d <- count_warnings(dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, kcrit = kcrit, n_new = 1))
+    expect_identical(d$value, rk_dens, info = format(kcrit))
+    expect_equal(d$n, 1, info = format(kcrit))
+  }
+  # the one observation reads only kcrit[1]; the finite kcrit[2] asks for nothing
+  r <- count_warnings(withr::with_seed(7, rsdt_cdp(1, 10, 1, 0.8, 1, thr, 0.7, kcrit = c(NA, 0.3), n_new = 1)))
+  expect_identical(r, list(value = rk_draws[1, , drop = FALSE], n = 0))
+  d <- count_warnings(dsdt_cdp(rk, 1, 0.8, 1, thr, 0.7, kcrit = c(NA, 0.3), n_new = 1))
+  expect_identical(d, list(value = rk_dens, n = 0))
+  # with two observations the second reads the finite kcrit[2] and asks for the split
+  d <- count_warnings(dsdt_cdp(rbind(rk, rk), 1, 0.8, 1, thr, 0.7, kcrit = c(NA, 0.3), n_new = 1))
+  expect_equal(d$value, rep(rk_dens, 2))
+  expect_equal(d$n, 1)
+  expect_error(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
+  expect_error(dsdt_cdp(rkg, 1, 0.8, 1, thr, 0.7, kcrit = numeric(0), n_new = 1), "kcrit is empty")
+  expect_equal(ncol(rsdt_cdp(2, 10, 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1)), length(rkg))
+  expect_length(dsdt_cdp(rbind(rkg, rkg), 1, 0.8, 1, thr, 0.7, kcrit = c(0, 0.2), n_new = 1), 2)
+})
+
+test_that("an empty counts vector points to the matrix with zero rows", {
+  thr <- c(-0.5, 0.5)
+  calls <- list(
+    dsdt_rating = function(x) dsdt_rating(x, 1, 1, thr),
+    dsdt_dpsdt = function(x) dsdt_dpsdt(x, 1, 1, thr, Ro = 0.2),
+    dsdt_metad = function(x) dsdt_metad(x, 1, 1, c(-0.5, 0, 0.5), metad = 1),
+    dsdt_ranking = function(x) dsdt_ranking(x, m = 3, d = 1),
+    dsdt_cdp = function(x) dsdt_cdp(x, 1, 0.8, 1, c(-0.5, 0.3, 1), 0.7, n_new = 1)
+  )
+  for (name in names(calls)) {
+    expect_error(calls[[name]](numeric(0)), "pass a matrix with zero rows", info = name)
+  }
+  expect_identical(dsdt_rating(matrix(0, 0, 3), 1, 1, thr), numeric(0))
 })
 
 test_that("rddm handles vector parameters correctly", {
@@ -1504,7 +2026,7 @@ test_that("rezdm validates parameters correctly", {
   withr::local_seed(445)
   expect_error(
     rezdm(n = c(10, 20), n_trials = 100, drift = 2, bound = 1.5, ndt = 0.3),
-    "n must be a single integer"
+    "n, the number of draws, must be a single number >= 0", fixed = TRUE
   )
 
   # n_trials must be larger than 2
@@ -1715,6 +2237,17 @@ test_that("dezdm 3par is vectorized over observations", {
   expect_length(ll_vec, 2)
   expect_equal(ll_vec[1], ll1)
   expect_equal(ll_vec[2], ll2)
+})
+
+test_that("dezdm 3par reads a matrix of summaries element by element and returns a plain vector", {
+  dat <- data.frame(mean_rt = c(0.5, 0.55), var_rt = c(0.02, 0.025))
+  ll_vec <- dezdm(dat$mean_rt, dat$var_rt, 80, 100, drift = 2, bound = 1.5, ndt = 0.3)
+  expect_identical(dezdm(as.matrix(dat["mean_rt"]), dat$var_rt, 80, 100, drift = 2, bound = 1.5, ndt = 0.3),
+                   ll_vec)
+  expect_identical(dezdm(as.matrix(dat["mean_rt"]), as.matrix(dat["var_rt"]), 80, 100,
+                         drift = 2, bound = 1.5, ndt = 0.3), ll_vec)
+  expect_identical(dezdm(as.matrix(dat), 0.02, 80, 100, drift = 2, bound = 1.5, ndt = 0.3),
+                   dezdm(c(0.5, 0.55, 0.02, 0.025), 0.02, 80, 100, drift = 2, bound = 1.5, ndt = 0.3))
 })
 
 test_that("dezdm 3par recycles parameters correctly", {
@@ -2347,6 +2880,80 @@ test_that(".ezdm_logit_pc is the logit of .ezdm_pc and the 3par logit at zr = 0.
 
   # pC rounds to 1 here and qlogis() of it is Inf
   expect_equal(.ezdm_logit_pc(0.45, bound - 0.45, 30), 2 * 30 * 0.45)
+})
+
+# The expected values are what bmm 1.4 returned for these positional calls
+test_that("a logical in tau's position is read as log, with a deprecation warning", {
+  expect_warning(
+    m2 <- dmixture2p(0.3, 0, 5, 0.6, TRUE),
+    "`dmixture2p(x, mu, kappa, p_mem, TRUE)` is deprecated since bmm 1.5.0",
+    fixed = TRUE
+  )
+  expect_equal(m2, -0.7343545, tolerance = 1e-6)
+  expect_warning(
+    m3 <- dmixture3p(0.3, c(0, 2, -1.5), 5, 0.6, 0.2, TRUE),
+    "Use `dmixture3p(x, mu, kappa, p_mem, p_nt, log = TRUE)` instead",
+    fixed = TRUE
+  )
+  expect_equal(m3, -0.8018945, tolerance = 1e-6)
+  expect_warning(
+    im <- dimm(0.3, c(0, 2, -1.5), c(0, 0.5, 2), 5, 2, 1, 2, 5, TRUE),
+    "now holds `tau`"
+  )
+  expect_equal(im, -1.018699, tolerance = 1e-6)
+  expect_warning(dens <- dmixture2p(0.3, 0, 5, 0.6, FALSE), "deprecated")
+  expect_equal(dens, exp(-0.7343545), tolerance = 1e-6)
+})
+
+test_that("the positional log warning is the lifecycle policy's deprecation warning", {
+  policy <- function(fun, before) {
+    tryCatch(warn_deprecated(
+      what = glue("{fun}({before}, TRUE)"),
+      with = glue("{fun}({before}, log = TRUE)"),
+      since = "1.5.0",
+      details = "That position now holds `tau`, so pass `log` by name."
+    ), warning = conditionMessage)
+  }
+  expect_warning(
+    dmixture2p(0.3, 0, 5, 0.6, TRUE),
+    policy("dmixture2p", "x, mu, kappa, p_mem"), fixed = TRUE
+  )
+  expect_warning(
+    dmixture3p(0.3, c(0, 2, -1.5), 5, 0.6, 0.2, TRUE),
+    policy("dmixture3p", "x, mu, kappa, p_mem, p_nt"), fixed = TRUE
+  )
+  expect_warning(
+    dimm(0.3, c(0, 2, -1.5), c(0, 0.5, 2), 5, 2, 1, 2, 5, TRUE),
+    policy("dimm", "x, mu, dist, c, a, b, s, kappa"), fixed = TRUE
+  )
+})
+
+test_that("the capacity versions of dmixture2p() and rmixture2p() need set_size", {
+  withr::local_seed(445)
+  expect_error(
+    dmixture2p(0.3, K = 2, version = "slot"),
+    "set_size argument is required"
+  )
+  expect_error(
+    rmixture2p(5, K = 2, version = "slot_averaging"),
+    "set_size argument is required"
+  )
+  expect_silent(dmixture2p(0.3, set_size = 4, version = "slot"))
+})
+
+test_that("dmixture2p() and rmixture2p() warn about arguments the version ignores", {
+  withr::local_seed(445)
+  expect_warning(
+    dmixture2p(0.3, K = 2, set_size = 4),
+    "The 'simple' version of mixture2p ignores 'K', 'set_size'",
+    fixed = TRUE
+  )
+  expect_warning(
+    dmixture2p(0.3, p_mem = 0.5, set_size = 4, version = "slot"),
+    "ignores 'p_mem'"
+  )
+  expect_warning(rmixture2p(5, K = 2), "ignores 'K'")
+  expect_silent(dmixture2p(0.3, p_mem = 0.5))
 })
 
 test_that("dmpt and rmpt ignore parameters the selected tree does not use", {

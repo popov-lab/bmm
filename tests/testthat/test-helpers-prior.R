@@ -64,17 +64,18 @@ test_that("combine_prior() lets a prior on a whole nlpar replace its intercept p
   expect_equal(nrow(combine_prior(dpar_default, dpar_user)), 2)
 })
 
-test_that("a user prior on a non-linear parameter reaches its intercept (#526)", {
+test_that("a user intercept prior on a distributional parameter replaces the default (#526)", {
   skip_on_cran()
+  # mixture2p's parameters are dpars, whose intercept is its own class; the
+  # nlpar case of #526 is the mpt test below
   withr::local_seed(445)
   dat <- data.frame(y = rmixture2p(n = 100), cond = rep(c("a", "b"), 50))
-  user <- brms::set_prior("normal(0, 2)", class = "b", nlpar = "kappa")
+  user <- brms::set_prior("normal(0, 2)", class = "Intercept", dpar = "kappa")
 
   for (formula in list(bmf(kappa ~ 1, thetat ~ 1), bmf(kappa ~ 1 + cond, thetat ~ 1))) {
     code <- suppressMessages(stancode(formula, dat, mixture2p(resp_error = "y"), prior = user))
-    # one prior for every coefficient of kappa, so brms vectorizes it
-    expect_match(code, "normal_lpdf(b_kappa | 0, 2)", fixed = TRUE)
-    expect_no_match(code, "normal_lpdf(b_kappa[1] | 2, 1)", fixed = TRUE)
+    expect_match(code, "normal_lpdf(Intercept_kappa | 0, 2)", fixed = TRUE)
+    expect_no_match(code, "normal_lpdf(Intercept_kappa | 2, 1)", fixed = TRUE)
   }
 
   expect_no_warning(suppressMessages(
@@ -435,7 +436,7 @@ test_that("prior_info() omits the technical parameters of mixture families", {
   # reference the sampler holds at zero; none of them is a model parameter
   expect_false(any(c("mu2", "kappa2") %in% out$parameter))
   expect_false(any(grepl("^theta[0-9]+$", out$class)))
-  expect_setequal(out$parameter, c("kappa", "thetat", "mu1"))
+  expect_setequal(out$parameter, c("kappa", "thetat", "mu"))
 
   text <- paste(capture.output(print(prior_info(fit, format = "text"))), collapse = " ")
   expect_false(grepl("kappa2|mu2|theta2", text))
@@ -852,4 +853,76 @@ test_that("the displaced-prior message names the main parameter, which brms stor
     '\n  class = "cor": lkj(2) replaced by lkj(1)',
     fixed = TRUE
   )
+})
+
+# sdt_rating()'s parameters are nlpars on aggregated rows and dpars on trial
+# rows, where the threshold deltas stay nlpars; a prior written for either
+# layout moves to the column the formula uses
+test_that(".align_prior_parameters() moves a prior to the parameter type of the formula", {
+  skip_on_cran()
+  trials <- data.frame(stimulus = rep(0:1, 6), rating = rep(1:4, 3))
+  cells <- data.frame(stimulus = 0:1, r1 = 1, r2 = 2, r3 = 3, r4 = 1)
+  formula <- bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1)
+  mock <- function(data, model) suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_formula <- mock(trials, sdt_rating("rating", "stimulus", n_ratings = 4,
+                                           threshold_type = "log_distance"))$formula
+  cell_formula <- mock(cells, sdt_rating(paste0("r", 1:4), "stimulus",
+                                         threshold_type = "log_distance"))$formula
+
+  written_for_cells <- brms::set_prior("normal(1, 1)", nlpar = "d") +
+    brms::set_prior("exponential(3)", nlpar = "d", class = "sd") +
+    brms::set_prior("normal(0, 2)", nlpar = "delta1")
+  on_trials <- as.data.frame(.align_prior_parameters(written_for_cells, trial_formula))
+  expect_identical(on_trials$dpar, c("d", "d", ""))
+  expect_identical(on_trials$nlpar, c("", "", "delta1"))
+  expect_identical(on_trials$class, c("b", "sd", "b"))
+  expect_identical(on_trials$lb, as.data.frame(written_for_cells)$lb)
+
+  written_for_trials <- brms::set_prior("normal(1, 1)", dpar = "d", class = "Intercept")
+  on_cells <- as.data.frame(.align_prior_parameters(written_for_trials, cell_formula))
+  expect_identical(unlist(on_cells[c("class", "coef", "dpar", "nlpar")]),
+                   c(class = "b", coef = "Intercept", dpar = "", nlpar = "d"))
+  expect_identical(.align_prior_parameters(written_for_cells, cell_formula), written_for_cells)
+
+  # an intercept written as class "Intercept" in the column the formula uses
+  # is the coefficient too, as brms keeps no class "Intercept" there
+  where <- c("class", "coef", "dpar", "nlpar")
+  on_trials <- as.data.frame(.align_prior_parameters(written_for_trials, trial_formula))
+  expect_identical(unlist(on_trials[where]), c(class = "b", coef = "Intercept", dpar = "d", nlpar = ""))
+  on_cells <- as.data.frame(.align_prior_parameters(
+    brms::set_prior("normal(1, 1)", nlpar = "d", class = "Intercept"), cell_formula
+  ))
+  expect_identical(unlist(on_cells[where]), c(class = "b", coef = "Intercept", dpar = "", nlpar = "d"))
+  # a centred dpar keeps its class "Intercept"
+  centred <- brms::set_prior("normal(0, 1)", dpar = "sigma", class = "Intercept")
+  expect_identical(.align_prior_parameters(centred, brms::bf(y ~ x, sigma ~ x)), centred)
+})
+
+test_that("a class = 'Intercept' prior on a trial-row sdt_rating() dpar reaches its intercept", {
+  skip_on_cran()
+  trials <- data.frame(stimulus = rep(0:1, 6), rating = rep(1:4, 3), cond = factor(rep(c("a", "b"), each = 6)))
+  fit <- suppressMessages(bmm(
+    bmf(d ~ 1 + cond, criterion ~ 1, spacing ~ 1), trials, sdt_rating("rating", "stimulus", n_ratings = 4),
+    prior = brms::set_prior("normal(2, 0.3)", dpar = "d", class = "Intercept"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_match(brms::stancode(fit), "lprior += normal_lpdf(b_d[1] | 2, 0.3);", fixed = TRUE)
+})
+
+# sdt_rating() moves a prior between nlpar and dpar (.align_prior_parameters());
+# the message names the parameter as the user wrote it
+test_that("the displaced-prior message labels a moved prior as the user wrote it", {
+  skip_on_cran()
+  withr::local_options(bmm.silent = 1)
+  trials <- data.frame(stimulus = rep(0:1, 6), rating = rep(1:4, 3))
+  msgs <- displacement_messages(bmm(
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), trials, sdt_rating("rating", "stimulus", n_ratings = 4),
+    prior = brms::set_prior("normal(0, 1)", nlpar = "sdratio", coef = "Intercept"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_length(msgs, 1)
+  expect_match(msgs, 'nlpar = "sdratio", class = "b", coef = "Intercept": normal(0, 1) replaced by constant(0) (sdratio fixed at 0)',
+               fixed = TRUE)
 })

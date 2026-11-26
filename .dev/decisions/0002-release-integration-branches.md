@@ -1,6 +1,7 @@
 # 0002: Integration branches for the next two releases
 
-- **Status:** accepted
+- **Status:** accepted; the NEWS layout (one heading per integration branch) amended by
+  [0008](0008-roadmap-to-2027-03.md) § D15 on 2026-11-06: one development heading, bullets tagged `[1.6.0]`.
 - **Date:** 2026-10-04
 
 ## Context

@@ -48,6 +48,11 @@
 #'   [mpt_tree()]). Trees and categories are named as in the returned model,
 #'   i.e. by `tree_names` and by the category labels of the lines. Trees that
 #'   are not listed have no impossible categories.
+#' @param response Character. Name of the data column that holds the
+#'   response category of each trial, for data with one row per trial (see
+#'   the `response` argument of [mpt()]). Its values are the category labels
+#'   of the lines. `NULL` (the default) declares aggregated counts, one
+#'   column per response category.
 #'
 #' @details **Comments.** A line whose first non-blank character is `#` is a
 #'   comment and is skipped. It does not separate trees; only blank lines do.
@@ -76,10 +81,13 @@
 #'   column, one count column per response category, 0 for impossible
 #'   categories) and the checks to run before fitting; they apply to models
 #'   from this function as well, with the tree names of `tree_names` and the
-#'   category labels of the lines. The data MPTinR fits to a model file in
-#'   this format are wide and positional: one row per participant (or one
-#'   vector for aggregated counts) and one unnamed column per line of the
-#'   model file, in file order, because each line is one response category.
+#'   category labels of the lines. With `response`, the data have one row per
+#'   trial instead: the tree column and the column named by `response`, whose
+#'   values are the category labels of the lines. The data MPTinR fits to a
+#'   model file in this format are wide and positional: one row per
+#'   participant (or one vector for aggregated counts) and one unnamed column
+#'   per line of the model file, in file order, because each line is one
+#'   response category.
 #'   (For EQN files MPTinR sorts the columns instead; see [mpt_from_eqn()].)
 #'   Name the columns `<tree>.<category>`; [mpt_data_reshape()] then stacks the
 #'   trees and gives 0 to the categories a tree cannot produce (see Examples).
@@ -176,7 +184,8 @@
 mpt_from_string <- function(text, restrictions = NULL, tree_names,
                             categories = NULL, tree_id = NULL,
                             covariates = NULL, simplex = NULL,
-                            links = "logit", impossible = NULL) {
+                            links = "logit", impossible = NULL,
+                            response = NULL) {
   stop_missing_args()
   # a vector of lines keeps its "" elements, which separate the trees
   text <- paste(text, collapse = "\n")
@@ -321,7 +330,8 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
   )
   model <- .mpt_model_from_branches(
     branches, impossible, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, restrictions = restrictions, links = links
+    simplex = simplex, restrictions = restrictions, links = links,
+    response = response
   )
   attr(model, "mpt_source") <- list(text = text)
   attr(model, "call") <- match.call()
@@ -379,6 +389,11 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
 #'   names must start with a letter and contain only letters, digits, or
 #'   underscores, so files with numeric tree labels need this mapping. Labels
 #'   not listed keep their name.
+#' @param response Character. Name of the data column that holds the
+#'   response category of each trial, for data with one row per trial (see
+#'   the `response` argument of [mpt()]). Its values are the bmm names of the
+#'   categories, which `print(model)` lists under "Response". `NULL` (the
+#'   default) declares aggregated counts, one column per response category.
 #'
 #' @details **File format.** Blank lines and lines that start with `#` are
 #'   skipped. If the first remaining line holds a single integer and nothing
@@ -434,8 +449,13 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
 #'   and tree: a column named by `tree_id` holding the bmm tree names, and
 #'   one count column per shared response category, named by `bmm_name` in
 #'   the renaming map (see [mpt()]). A category that is `impossible` in a
-#'   tree gets 0 (or `NA`) in the rows of that tree. TreeBUGS data are wide:
-#'   one row per participant, one column per category label of the EQN file.
+#'   tree gets 0 (or `NA`) in the rows of that tree. With `response`, [bmm()]
+#'   instead expects one row per trial: the tree column and a column named by
+#'   `response` whose values are the bmm names of the categories (`bmm_name`
+#'   in the renaming map, listed by `print(model)` under "Response"), so a
+#'   file label that `categories` maps is given by the name it maps onto.
+#'   TreeBUGS data are wide: one row per participant, one column per category
+#'   label of the EQN file.
 #'   MPTinR data for an EQN model are unnamed, and their columns do not follow
 #'   the file: the trees and, within each tree, the category labels are sorted
 #'   (alphabetically, or numerically when all labels in the file are numbers);
@@ -521,7 +541,7 @@ mpt_from_string <- function(text, restrictions = NULL, tree_names,
 mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
                          tree_id = NULL, covariates = NULL, simplex = NULL,
                          links = "logit", impossible = NULL,
-                         tree_names = NULL) {
+                         tree_names = NULL, response = NULL) {
   stop_missing_args()
   categories_problem <- .mpt_named_map_problem(categories)
   stopif(
@@ -590,7 +610,8 @@ mpt_from_eqn <- function(file, restrictions = NULL, categories = NULL,
   )
   model <- .mpt_model_from_branches(
     branches, impossible, tree_id = tree_id, covariates = covariates,
-    simplex = simplex, restrictions = parameters$restrictions, links = links
+    simplex = simplex, restrictions = parameters$restrictions, links = links,
+    response = response
   )
   attr(model, "mpt_renaming") <- renaming
   attr(model, "mpt_source") <- list(

@@ -13,7 +13,36 @@ test_that("sdt_rating takes the number of categories from the response columns",
 
 test_that("sdt_rating model rejects fewer than 3 response columns", {
   expect_error(sdt_rating(c("r1", "r2"), "stimulus"), "more than 2")
-  expect_error(sdt_rating("rating", "stimulus"), "more than 2")
+})
+
+test_that("one rating column with n_ratings declares one row per trial", {
+  trial <- sdt_rating("rating", "stimulus", n_ratings = 6)
+  expect_true(trial$other_vars$trial_level)
+  expect_identical(trial$other_vars$n_ratings, 6L)
+  expect_match(trial$requirements, "one row per trial")
+  expect_identical(.sdt_categories(trial), c("rating1", "rating2", "rating3", "rating4", "rating5", "rating6"))
+  cells <- sdt_rating(c("r1", "r2", "r3", "r4"), "stimulus")
+  expect_false(cells$other_vars$trial_level)
+  expect_identical(.sdt_categories(cells), c("r1", "r2", "r3", "r4"))
+  # the thresholds follow K whichever layout gives it
+  expect_identical(
+    names(sdt_rating("rating", "stimulus", n_ratings = 5, threshold_type = "log_distance")$parameters),
+    names(sdt_rating(paste0("r", 1:5), "stimulus", threshold_type = "log_distance")$parameters)
+  )
+})
+
+test_that("sdt_rating names the layout it recognised when n_ratings does not fit it", {
+  expect_error(sdt_rating("rating", "stimulus"),
+               "response names one column, which declares one row per trial")
+  expect_error(sdt_rating(c("r1", "r2", "r3"), "stimulus", n_ratings = 3),
+               "response names 3 count columns, one per rating category")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 2), "single whole number above 2")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 4.5), "single whole number above 2")
+  expect_error(sdt_rating("conf_rating", "stimulus", n_ratings = 4), "'conf_rating'")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 3, threshold_type = "log_ratio"),
+               "at least 4 rating categories")
+  expect_error(sdt_rating("rating", "stimulus", n_ratings = 5, version = "metad"),
+               "The scale has 5 categories")
 })
 
 test_that("sdt_rating refuses column names brms cannot turn into parameters", {
@@ -370,7 +399,7 @@ test_that("the generated rating call passes K, the threshold builder and its del
 })
 
 test_that("sdt_rating stancode loads the shared distribution dispatch", {
-  # the noise-distribution dispatch lives in sdt_dist_funs.stan; the rating
+  # the noise-distribution dispatch lives in sdt_dist_functions.stan; the rating
   # likelihood relies on the log-scale dispatchers from that shared chunk.
   dat <- sim_rating(3, 50, d = 1.5, criterion = 0, n_ratings = 4,
                     spacing = 0.5)
@@ -388,8 +417,8 @@ test_that("sdt_rating stancode loads the shared distribution dispatch", {
 # probability, so both the builders and the kernel meet their R counterparts.
 rating_stan_logmu <- function(grid, deltas, K) {
   sc <- system.file("stan_chunks", package = "bmm")
-  funs <- paste(read_lines2(file.path(sc, "sdt_dist_funs.stan")),
-                read_lines2(file.path(sc, "sdt_rating_funs.stan")), sep = "\n")
+  funs <- paste(read_lines2(file.path(sc, "sdt_dist_functions.stan")),
+                read_lines2(file.path(sc, "sdt_rating_functions.stan")), sep = "\n")
   program <- paste0(
     "functions {\n", funs, "\n}\n",
     "data {\n  int N; int K; array[N] int cat; array[N] int thresh;\n",
@@ -528,8 +557,8 @@ test_that("the generated Stan logmu function reads either anchor as its R compan
   model <- sdt_rating(paste0("r", 1:4), "stimulus")
   sc <- system.file("stan_chunks", package = "bmm")
   program <- paste0(
-    "functions {\n", read_lines2(file.path(sc, "sdt_dist_funs.stan")), "\n",
-    read_lines2(file.path(sc, "sdt_rating_funs.stan")), "\n",
+    "functions {\n", read_lines2(file.path(sc, "sdt_dist_functions.stan")), "\n",
+    read_lines2(file.path(sc, "sdt_rating_functions.stan")), "\n",
     bmm:::.sdt_rating_logmu_stan(model), "\n}\n",
     "data {\n  int N; array[N] int cat; array[N] int anchor; array[N] int dist;\n",
     "  vector[N] d; vector[N] crit; vector[N] sdratio; vector[N] stimulus;\n}\n",
@@ -562,4 +591,574 @@ test_that("a rating formula with bias passes anchor 2 and the bias parameter", {
   bf_crit <- bmm:::bmf2bf(model, bmf(d ~ 1, criterion ~ 1, spacing ~ 1))
   expect_match(deparse1(bf_crit$formula), "sdt_rating_logmu(1, 4, 1, 1, 1, d, criterion,",
                fixed = TRUE)
+})
+
+
+############################################################################# !
+# TRIAL-LEVEL DATA                                                       ####
+############################################################################# !
+
+# 2 participants x 2 stimulus types x 6 trials, ratings 1..4
+rating_trials <- function() {
+  data.frame(
+    id = rep(1:2, each = 12), stimulus = rep(rep(0:1, each = 6), 2),
+    rating = c(1, 2, 1, 3, 2, 1,  3, 4, 4, 2, 4, 3,
+               2, 1, 1, 1, 4, 2,  4, 3, 4, 4, 2, 4)
+  )
+}
+
+test_that("trial-level check_data() names the ratings outside 1..n_ratings", {
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  dat <- rating_trials()
+  dat$rating[c(2, 5)] <- c(0, 2.5)
+  expect_error(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+               "the rating column 'rating' must hold one of '1', '2', '3', '4' in every row. Found: '0', '2.5'")
+  dat <- rating_trials()
+  dat$rating[3] <- NA
+  expect_error(check_data(model, dat, bmf(d ~ 1, criterion ~ 1, spacing ~ 1)),
+               "'rating' must not contain NA")
+})
+
+# match() reads TRUE as category 1; the rank column goes through the same helper
+test_that("trial-level check_data() refuses a logical rating or rank column", {
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  dat <- rating_trials()
+  dat$rating <- TRUE
+  expect_error(check_data(model, dat, formula),
+               "The rating column 'rating' is logical (TRUE/FALSE), but it must hold whole numbers from 1 to 4.",
+               fixed = TRUE)
+  dat$rating <- rep(c(TRUE, FALSE), 12)
+  expect_error(check_data(model, dat, formula), "'rating' is logical", fixed = TRUE)
+  ranks <- data.frame(id = 1:4, rank = c(TRUE, FALSE, TRUE, TRUE))
+  expect_error(check_data(sdt_ranking("rank", m = 3), ranks, bmf(d ~ 1)),
+               "The rank column 'rank' is logical (TRUE/FALSE), but it must hold whole numbers from 1 to 3.",
+               fixed = TRUE)
+})
+
+test_that("trial-level check_data() keeps the rating as the category number", {
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  checked <- check_data(model, rating_trials(), bmf(d ~ 1, criterion ~ 1, spacing ~ 1))
+  expect_identical(checked$rating, as.integer(rating_trials()$rating))
+  expect_false(any(c("Y", "nTrials") %in% names(checked)))
+  expect_null(data_trials(model, rating_trials()))
+})
+
+test_that("rating trial rows fit through the trial family and cells keep the multinomial", {
+  skip_on_cran()
+  trials <- rating_trials()
+  cells <- data.frame(id = rep(1:2, each = 2), stimulus = rep(0:1, 2),
+                      rating1 = c(3, 0, 3, 0), rating2 = c(2, 1, 2, 1),
+                      rating3 = c(1, 2, 0, 1), rating4 = c(0, 3, 1, 4))
+  formula <- bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1)
+  mock <- function(data, model) suppressMessages(
+    bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+  trial_code <- brms::stancode(mock(trials, sdt_rating("rating", "stimulus", n_ratings = 4)))
+  expect_match(trial_code, paste0(
+    "target += sdt_rating_trial_standard_parsimonious_criterion_lpmf(Y[n] | mu[n], d[n], ",
+    "criterion[n], spacing[n], sdratio[n], vint1[n], 4, 1, 1, 1);"
+  ), fixed = TRUE)
+  expect_match(trial_code, paste0(
+    "return sdt_rating_logmu(y, K, dist_type, thresh_type, anchor, d, criterion, ",
+    "spacing, sdratio, stimulus);"
+  ), fixed = TRUE)
+  expect_no_match(trial_code, "multinomial")
+  cell_code <- brms::stancode(mock(cells, sdt_rating(paste0("rating", 1:4), "stimulus")))
+  expect_match(cell_code, "target += multinomial_logit2_lpmf(Y[n] | mu[n]);", fixed = TRUE)
+  expect_match(cell_code, "murating4[n] = (sdt_rating_logmu(4 , 4 , 1 , 1 , 1 , nlp_d[n] ,", fixed = TRUE)
+  expect_no_match(cell_code, "sdt_rating_trial_")
+})
+
+# one prep of a mock trial fit, with the dpars set to fixed values per draw
+rating_trial_prep <- function(model, formula, data, dpars) {
+  fit <- suppressMessages(bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE))
+  sdata <- brms::standata(fit)
+  dpars <- lapply(dpars, function(v) matrix(v, length(v), sdata$N))
+  structure(list(dpars = dpars, data = sdata, ndraws = nrow(dpars[[1]]), nobs = sdata$N,
+                 family = fit$family),
+            class = "brmsprep")
+}
+
+# equidistant thresholds at criterion 0.3 and spacing log(0.5): -0.2, 0.3, 0.8
+test_that("the trial family's log_lik is the category log-probability of the multinomial route", {
+  skip_on_cran()
+  dat <- data.frame(stimulus = c(0, 1, 1, 0), rating = c(1, 3, 4, 2))
+  prep <- rating_trial_prep(
+    sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant"),
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat,
+    list(d = c(1.2, 0.5), criterion = c(0.3, 0.3), spacing = log(c(0.5, 0.5)), sdratio = c(0, 0))
+  )
+  ll <- vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, prep), numeric(2))
+  expect_equal(ll[1, 2], log(pnorm(0.8 - 1.2) - pnorm(0.3 - 1.2)), tolerance = 1e-10)
+  expected <- rbind(
+    dsdt_rating(diag(4)[dat$rating, ], dat$stimulus, d = 1.2, thresholds = c(-0.2, 0.3, 0.8), log = TRUE),
+    dsdt_rating(diag(4)[dat$rating, ], dat$stimulus, d = 0.5, thresholds = c(-0.2, 0.3, 0.8), log = TRUE)
+  )
+  expect_equal(ll, expected, tolerance = 1e-10)
+  epred <- bmm:::posterior_epred_sdt_rating_trial(prep)
+  expect_identical(dim(epred), c(2L, 4L, 4L))
+  expect_equal(apply(epred, c(1, 2), sum), matrix(1, 2, 4), tolerance = 1e-12)
+  expect_equal(ll, vapply(1:4, function(i) log(epred[, i, dat$rating[i]]), numeric(2)),
+               tolerance = 1e-10)
+  predicted <- vapply(1:4, function(i) bmm:::posterior_predict_sdt_rating_trial(i, prep), numeric(2))
+  expect_true(all(predicted %in% 1:4))
+})
+
+# 4000 draws of one parameter point: the share of draws predicting each
+# category is the category probability, within 0.04 (five Monte Carlo SEs at
+# p = 0.5). A reversed or shifted category mapping misses it by over 0.3
+test_that("the trial family's posterior_predict draws each category at its probability", {
+  skip_on_cran()
+  withr::local_seed(667)
+  n <- 4000
+  dat <- data.frame(stimulus = c(0, 1, 1, 0), rating = c(1, 3, 4, 2))
+  prep <- rating_trial_prep(
+    sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant"),
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat,
+    list(d = rep(1.2, n), criterion = rep(0.3, n), spacing = rep(log(0.5), n), sdratio = rep(0, n))
+  )
+  predicted <- vapply(1:4, function(i) bmm:::posterior_predict_sdt_rating_trial(i, prep), numeric(n))
+  share <- vapply(1:4, function(k) colMeans(predicted == k), numeric(4))
+  probs <- bmm:::posterior_epred_sdt_rating_trial(prep)[1, , ]
+  expect_equal(probs[2, ], c(pnorm(-1.4), pnorm(-0.9) - pnorm(-1.4), pnorm(-0.4) - pnorm(-0.9),
+                             1 - pnorm(-0.4)), tolerance = 1e-10)
+  expect_lt(max(abs(share - probs)), 0.04)
+})
+
+# brms can hand a dpar to the family's methods as draws x rows, as one value
+# per draw or as one value; each is recycled over the rows
+test_that("the trial family's methods take a dpar as one value per draw or one value", {
+  skip_on_cran()
+  dat <- data.frame(stimulus = c(0, 1, 1, 0), rating = c(1, 3, 4, 2))
+  prep <- rating_trial_prep(
+    sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant"),
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat,
+    list(d = c(1.2, 0.5), criterion = c(0.3, 0.3), spacing = log(c(0.5, 0.5)), sdratio = c(0, 0))
+  )
+  short <- prep
+  short$dpars$d <- c(1.2, 0.5)
+  short$dpars$sdratio <- 0
+  expect_equal(bmm:::posterior_epred_sdt_rating_trial(short), bmm:::posterior_epred_sdt_rating_trial(prep))
+  expect_equal(vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, short), numeric(2)),
+               vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, prep), numeric(2)))
+})
+
+# The methods read the version from the family name. Ro and Rn of dpsdt and
+# logmratio of metad move every category's probability, so a method that
+# computed another version misses the version's density
+test_that("the trial family's methods compute the version the family names", {
+  skip_on_cran()
+  dat <- data.frame(stimulus = c(0, 1, 1, 0), rating = c(1, 3, 4, 2))
+  counts <- diag(4)[dat$rating, ]
+  thresholds <- c(-0.2, 0.3, 0.8)
+  shared <- list(d = 1.2, criterion = 0.3, spacing = log(0.5), sdratio = 0)
+  cases <- list(
+    standard = list(formula = list(), dpars = list(),
+                    density = dsdt_rating(counts, dat$stimulus, d = 1.2, thresholds = thresholds,
+                                          log = TRUE)),
+    dpsdt = list(formula = list(Ro ~ 1, Rn ~ 1), dpars = list(Ro = qlogis(0.3), Rn = qlogis(0.2)),
+                 density = dsdt_dpsdt(counts, dat$stimulus, d = 1.2, thresholds = thresholds,
+                                      Ro = 0.3, Rn = 0.2, log = TRUE)),
+    metad = list(formula = list(logmratio ~ 1), dpars = list(logmratio = log(0.6)),
+                 density = dsdt_metad(counts, dat$stimulus, d = 1.2, thresholds = thresholds,
+                                      metad = 0.72, log = TRUE))
+  )
+  for (version in names(cases)) {
+    case <- cases[[version]]
+    prep <- rating_trial_prep(
+      sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant", version = version),
+      do.call(bmf, c(list(d ~ 1, criterion ~ 1, spacing ~ 1), case$formula)), dat,
+      c(shared, case$dpars)
+    )
+    expect_equal(vapply(1:4, function(i) bmm:::log_lik_sdt_rating_trial(i, prep), numeric(1)),
+                 case$density, tolerance = 1e-10, info = version)
+    epred <- bmm:::posterior_epred_sdt_rating_trial(prep)[1, , ]
+    expect_equal(log(epred[cbind(1:4, dat$rating)]), case$density, tolerance = 1e-10, info = version)
+  }
+})
+
+# a bias is the criterion moved by half the separation: bias -0.3 at d 1.2 is
+# criterion 0.3, so both anchors give the same probabilities
+test_that("every version builds on trial rows with either anchor, and the bias anchor converts", {
+  skip_on_cran()
+  dat <- rating_trials()
+  for (version in c("standard", "dpsdt", "metad")) {
+    extra <- switch(version, standard = list(), dpsdt = list(Ro ~ 1), metad = list(logmratio ~ 1))
+    for (anchor in c("criterion", "bias")) {
+      formula <- do.call(bmf, c(list(d ~ 1, stats::as.formula(paste(anchor, "~ 1")), spacing ~ 1), extra))
+      fit <- suppressMessages(bmm(formula, dat, sdt_rating("rating", "stimulus", n_ratings = 4,
+                                                               version = version),
+                                  backend = "mock", mock_fit = 1, rename = FALSE))
+      name <- paste("sdt_rating_trial", version, "parsimonious", anchor, sep = "_")
+      expect_identical(fit$family$name, name)
+      expect_match(brms::stancode(fit), paste0("target += ", name, "_lpmf(Y[n] |"), fixed = TRUE,
+                   info = name)
+    }
+  }
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "equidistant")
+  dpars <- list(d = 1.2, spacing = log(0.5), sdratio = 0)
+  by_criterion <- rating_trial_prep(model, bmf(d ~ 1, criterion ~ 1, spacing ~ 1), dat,
+                                    c(dpars, criterion = 0.3))
+  by_bias <- rating_trial_prep(model, bmf(d ~ 1, bias ~ 1, spacing ~ 1), dat, c(dpars, bias = -0.3))
+  expect_equal(bmm:::posterior_epred_sdt_rating_trial(by_bias),
+               bmm:::posterior_epred_sdt_rating_trial(by_criterion), tolerance = 1e-12)
+})
+
+# the multinomial route substitutes inv_link() into its nlf call; the trial
+# family hands the same links to brms, which applies them to the dpars
+test_that("a link on d or criterion reaches the trial family's dpars", {
+  skip_on_cran()
+  fit <- suppressMessages(bmm(
+    bmf(d ~ 1, criterion ~ 1, spacing ~ 1), rating_trials(),
+    sdt_rating("rating", "stimulus", n_ratings = 4, links = list(d = "softplus", criterion = "probit")),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  expect_identical(fit$family$link_d, "softplus")
+  code <- brms::stancode(fit)
+  expect_match(code, "d = log1p_exp(d);", fixed = TRUE)
+  expect_match(code, "criterion = Phi(criterion);", fixed = TRUE)
+})
+
+test_that("threshold deltas stay nlpars on trial rows and reach the family by letter", {
+  skip_on_cran()
+  fit <- suppressMessages(bmm(
+    bmf(d ~ 1, criterion ~ 1, delta1 ~ 1 + (1 | id), delta2 ~ 1),
+    rating_trials(), sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "log_distance"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  bterms <- brms::brmsterms(fit$formula)
+  expect_setequal(names(bterms$nlpars), c("delta1", "delta2"))
+  expect_setequal(names(bterms$dpars), c("mu", "d", "criterion", "sdratio", "deltaa", "deltab"))
+  code <- brms::stancode(fit)
+  expect_match(code, "deltaa[n] = (nlp_delta1[n]);", fixed = TRUE)
+  expect_match(code, "sdratio, stimulus, deltaa, deltab);", fixed = TRUE)
+  expect_identical(bmm:::.get_parameter_info(fit, "d")$type, "dpar")
+  expect_identical(bmm:::.get_parameter_info(fit, "delta1")$type, "nlpar")
+})
+
+# brms centres a dpar's intercept when the formula has predictors; the trial
+# family's dpars are uncentred, as the aggregated fit's nlpars are, so the
+# defaults and a prior written for the aggregated fit land on the same rows
+test_that("a prior written for the aggregated fit reaches the trial fit unchanged", {
+  skip_on_cran()
+  dat <- rating_trials()
+  dat$cond <- factor(rep(c("a", "b"), 12))
+  formula <- bmf(d ~ 1 + cond + (1 | id), criterion ~ 1, spacing ~ 1)
+  user <- brms::set_prior("normal(2, 0.3)", nlpar = "d") +
+    brms::set_prior("normal(0, 9)", nlpar = "d", coef = "condb") +
+    brms::set_prior("exponential(4)", nlpar = "d", class = "sd")
+  fit <- suppressMessages(bmm(formula, dat, sdt_rating("rating", "stimulus", n_ratings = 4),
+                              prior = user, backend = "mock", mock_fit = 1, rename = FALSE))
+  rows <- as.data.frame(fit$prior)[nzchar(fit$prior$prior) & fit$prior$dpar == "d",
+                                   c("prior", "class", "coef", "lb")]
+  expect_identical(sort(rows$prior), c("exponential(4)", "normal(0, 9)", "normal(2, 0.3)"))
+  expect_identical(rows$lb[rows$class == "sd"], "0")
+  expect_false("Intercept" %in% fit$prior$class)
+  code <- brms::stancode(fit)
+  expect_match(code, "lprior += normal_lpdf(b_d[1] | 2, 0.3);", fixed = TRUE)
+  expect_match(code, "lprior += normal_lpdf(b_d[2] | 0, 9);", fixed = TRUE)
+  expect_match(code, "lprior += normal_lpdf(b_criterion[1] | 0.5, 1.5);", fixed = TRUE)
+  expect_match(code, "lprior += exponential_lpdf(sd_1 | 4);", fixed = TRUE)
+  expect_match(code, "b_sdratio[1] = 0;", fixed = TRUE)
+  expect_no_match(code, "Intercept_d")
+})
+
+# one-hot rows carry no multinomial coefficient: 6! / (2! 1! 0! 3!) = 60
+# orderings of the cell's 6 trials
+test_that("rating trial rows sum to the cell log-likelihood less the log multinomial coefficient", {
+  ratings <- c(4, 1, 4, 2, 1, 4)
+  one_hot <- diag(4)[ratings, ]
+  thresholds <- c(-0.4, 0.3, 1.1)
+  for (stim in c(0, 1)) {
+    expect_equal(
+      sum(dsdt_rating(one_hot, stim, d = 1.3, thresholds = thresholds, log = TRUE)),
+      dsdt_rating(c(2, 1, 0, 3), stim, d = 1.3, thresholds = thresholds, log = TRUE) - log(60),
+      tolerance = 1e-10
+    )
+    expect_equal(
+      sum(dsdt_rating(one_hot, stim, d = 0.6, thresholds = thresholds, sdratio = 1.4,
+                      dist = "gumbel_min", log = TRUE)),
+      dsdt_rating(c(2, 1, 0, 3), stim, d = 0.6, thresholds = thresholds, sdratio = 1.4,
+                  dist = "gumbel_min", log = TRUE) - log(60),
+      tolerance = 1e-10
+    )
+  }
+})
+
+# the helpers that read counts take the trial family's rating through one
+# bridge, .observed_counts(), and expand its predicted categories to one-hot
+test_that("the count-reading helpers read the trial family's ratings", {
+  skip_on_cran()
+  trials <- rating_trials()
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  fit <- suppressMessages(bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1), trials, model,
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  expect_true(bmm:::.is_sdt_rating_trial_fit(fit))
+  one_hot <- diag(4)[trials$rating, ]
+  observed <- bmm:::.observed_counts(fit$bmm$model, fit$data)
+  expect_equal(unname(observed), one_hot)
+  expect_identical(colnames(observed), paste0("rating", 1:4))
+  predicted <- matrix(c(1L, 4L), 2, 24)
+  epred <- array(0.25, c(2, 24, 4))
+  local_mocked_bindings(posterior_predict = function(...) predicted,
+                        posterior_epred = function(...) epred, .package = "brms")
+
+  # ppp(): observed and replicated one-hot, expected passed through
+  counts <- bmm:::.ppp_counts.default(fit$bmm$model, fit, NULL)
+  expect_equal(unname(counts$observed), one_hot)
+  expect_identical(dim(counts$replicated), c(2L, 24L, 4L))
+  expect_equal(unname(counts$replicated[1, , ]), matrix(rep(c(1, 0, 0, 0), each = 24), 24))
+  expect_equal(unname(counts$replicated[2, , ]), matrix(rep(c(0, 0, 0, 1), each = 24), 24))
+  expect_identical(counts$expected, epred)
+
+  # roc_observed(): the cumulative rates of the cells the trials aggregate to
+  roc <- bmm:::.roc_observed_rating(fit, fit$bmm$model)
+  noise <- tabulate(trials$rating[trials$stimulus == 0], 4) / 12
+  signal <- tabulate(trials$rating[trials$stimulus == 1], 4) / 12
+  expect_equal(roc$FA, c(1, 1 - cumsum(noise)[1:3], 0))
+  expect_equal(roc$Hit, c(1, 1 - cumsum(signal)[1:3], 0))
+
+  # pp_check(): the multinomial path, with the predicted ratings as one-hot rows
+  plot_data <- bmm:::.pp_check_multinomial(fit, ndraws = 2)$data
+  expect_equal(plot_data$proportion[order(plot_data$category)],
+               as.vector(colSums(one_hot)) / 24)
+  expect_equal(sort(unique(plot_data$pred_median)), c(0, 0.5))
+})
+
+user_ntrials_fit <- function() {
+  trials <- rating_trials()
+  trials$nTrials <- rep(1:12, 2)
+  suppressMessages(bmm(bmf(d ~ 1 + nTrials, criterion ~ 1, spacing ~ 1), trials,
+                       sdt_rating("rating", "stimulus", n_ratings = 4),
+                       backend = "mock", mock_fit = 1, rename = FALSE))
+}
+
+# trial rows build no column, so a column nTrials is the user's predictor, in
+# the frame and in pp_check(group = ) and conditional_effects()
+test_that("a user column nTrials on trial rows stays the user's predictor", {
+  skip_on_cran()
+  fit <- user_ntrials_fit()
+  expect_setequal(fit$data$nTrials, 1:12)
+  expect_identical(bmm:::built_data_columns(fit$bmm$model), character(0))
+  expect_true("nTrials" %in% bmm:::.resolve_pp_conditions(fit))
+  ce <- structure(list(nTrials = data.frame()), class = "brms_conditional_effects")
+  expect_named(bmm:::.filter_internal_effects(ce, fit), "nTrials")
+})
+
+# get_data() reaches insight::find_random(), a Suggests package that CI does not
+# install; this is the one expectation of the nTrials test that needs it
+test_that("get_data() keeps a user column nTrials on trial rows", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  expect_true("nTrials" %in% names(bmm:::get_data.bmmfit(user_ntrials_fit())))
+})
+
+test_that("sdt post-processing asks a trial fit for dpars and its deltas for nlpars", {
+  skip_on_cran()
+  fit <- suppressMessages(bmm(
+    bmf(d ~ 1, criterion ~ 1, delta1 ~ 1, delta2 ~ 1), rating_trials(),
+    sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "log_distance"),
+    backend = "mock", mock_fit = 1, rename = FALSE
+  ))
+  asked <- list()
+  local_mocked_bindings(posterior_linpred = function(object, dpar = NULL, nlpar = NULL, ...) {
+    asked[[length(asked) + 1]] <<- c(dpar = dpar %||% "", nlpar = nlpar %||% "")
+    matrix(0, 2, 1)
+  }, .package = "brms")
+  for (par in c("d", "criterion", "delta1")) bmm:::.sdt_par_draws(fit, par, data.frame())
+  expect_identical(do.call(rbind, asked),
+                   rbind(c(dpar = "d", nlpar = ""), c(dpar = "criterion", nlpar = ""),
+                         c(dpar = "", nlpar = "delta1")))
+})
+
+test_that("revert_check_data() round-trips trial rows and a 1.5.0 one-hot frame", {
+  model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  checked <- check_data(model, rating_trials(), formula)
+  reverted <- revert_check_data(model, checked)
+  expect_equal(reverted$rating, rating_trials()$rating)
+  expect_identical(check_data(model, reverted, formula), checked)
+  # a trial fit of 1.5.0 stored the one-hot Y the multinomial read
+  one_hot <- checked[setdiff(names(checked), "rating")]
+  one_hot$Y <- diag(4)[checked$rating, ]
+  one_hot$nTrials <- 1L
+  old <- revert_check_data(model, one_hot)
+  expect_equal(old$rating, rating_trials()$rating)
+  expect_false(any(c("Y", "nTrials") %in% names(old)))
+})
+
+# A trial fit made through the multinomial (1.5.0) stored a one-hot Y and
+# nTrials; newdata in the user's layout get them built again, its frame slices
+# go to brms as they are
+one_hot_trial_fit <- function(formula) {
+  trials <- rating_trials()
+  one_hot <- trials[c("id", "stimulus")]
+  one_hot[paste0("rating", 1:4)] <- as.data.frame(diag(4)[trials$rating, ])
+  old <- suppressMessages(bmm(formula, one_hot, sdt_rating(paste0("rating", 1:4), "stimulus"),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  old$bmm$model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  old
+}
+
+test_that("user-layout newdata predict from a 1.5.0 one-hot trial fit", {
+  skip_on_cran()
+  old <- one_hot_trial_fit(bmf(d ~ 1, criterion ~ 1, spacing ~ 1))
+  newdata <- rating_trials()[c(3, 8, 20), ]
+
+  checked <- bmm:::prepare_newdata(old$bmm$model, newdata, old)
+  expect_equal(unname(checked$Y), unname(diag(4)[newdata$rating, ]))
+  expect_identical(checked$nTrials, rep(1L, 3))
+  expect_null(attr(checked, "fit_one_hot"))
+  old_data <- brms::standata(old, newdata = newdata)
+  expect_equal(unname(old_data$Y), unname(diag(4)[newdata$rating, ]))
+  expect_equal(as.vector(old_data$trials), rep(1, 3))
+  expect_identical(bmm:::prepare_newdata(old$bmm$model, old$data[c(3, 8, 20), ], old),
+                   old$data[c(3, 8, 20), ])
+})
+
+# A trial-family fit reads the user's layout. check_data() recodes what bmm()
+# accepts there and names what brms would take or misread, and a 1.5.0 frame
+# slice, which kfold() and reloo() of a 1.5.0 fit pass to its trial-family
+# refit, gets its rating back. Rows in the frame's coding go to brms as they
+# are, as do the grids of the SDT helpers (stimulus 0, rating 3)
+test_that("newdata for the trial family take the rating and stimulus as bmm() takes them", {
+  skip_on_cran()
+  formula <- bmf(d ~ 1, criterion ~ 1, spacing ~ 1)
+  trials <- rating_trials()
+  fit <- suppressMessages(bmm(formula, trials, sdt_rating("rating", "stimulus", n_ratings = 4),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  model <- fit$bmm$model
+  rows <- c(3, 8, 14, 20)
+  newdata <- trials[rows, ]
+  standata_of <- function(nd) brms::standata(fit, newdata = nd)[c("Y", "vint1")]
+  expected <- list(Y = newdata$rating, vint1 = newdata$stimulus)
+
+  expect_identical(bmm:::prepare_newdata(model, newdata, fit), newdata)
+  expect_equal(lapply(standata_of(newdata), as.vector), expected)
+
+  old <- one_hot_trial_fit(formula)
+  slice <- old$data[rows, ]
+  expect_true(is.matrix(slice$Y))
+  expect_equal(lapply(standata_of(slice), as.vector),
+               list(Y = max.col(slice$Y), vint1 = slice$stimulus))
+
+  recoded <- newdata
+  recoded$rating <- factor(recoded$rating, levels = c(3, 1, 4, 2), ordered = TRUE)
+  recoded$stimulus <- as.character(recoded$stimulus)
+  expect_equal(lapply(standata_of(recoded), as.vector), expected)
+  recoded$rating <- as.character(newdata$rating)
+  recoded$stimulus <- as.logical(newdata$stimulus)
+  expect_equal(lapply(standata_of(recoded), as.vector), expected)
+  recoded$stimulus <- factor(newdata$stimulus)
+  expect_equal(lapply(standata_of(recoded), as.vector), expected)
+
+  # the kernel multiplies by the stimulus, so a 1/2 or -1/1 coding gave wrong
+  # predictions without an error
+  miscoded <- function(col, values) {
+    nd <- newdata
+    nd[[col]] <- values
+    standata_of(nd)
+  }
+  expect_error(miscoded("rating", c(6, newdata$rating[-1])), "must hold one of '1', '2', '3', '4'")
+  expect_error(miscoded("rating", c(1.9, newdata$rating[-1])), "must hold one of '1', '2', '3', '4'")
+  expect_error(miscoded("rating", c(NA, newdata$rating[-1])), "'rating' must not contain NA")
+  expect_error(miscoded("stimulus", newdata$stimulus + 1), "and 1 \\(signal\\); found '2'")
+  expect_error(miscoded("stimulus", 2 * newdata$stimulus - 1), "and 1 \\(signal\\); found '-1'")
+  expect_error(miscoded("stimulus", c(NA, newdata$stimulus[-1])), "but 1 of 4 values are NA")
+
+  # a prediction estimates nothing, so the signal rows alone are newdata in
+  # any type bmm() takes
+  signal <- trials[trials$stimulus == 1, ][1:4, ]
+  expect_identical(bmm:::prepare_newdata(model, signal, fit), signal)
+  as_factor <- signal
+  as_factor$stimulus <- factor(as_factor$stimulus)
+  expect_equal(standata_of(as_factor), standata_of(signal))
+
+  grid <- data.frame(rating = 3, stimulus = 0, id = NA)
+  expect_identical(bmm:::prepare_newdata(model, grid, fit), grid)
+})
+
+# sdt_rating()'s trial family plots a parameter's own effects, as the
+# aggregated fit does, not every predictor of the model
+test_that("conditional_effects() asks brms for a trial-family parameter's own effects only", {
+  skip_on_cran()
+  dat <- rating_trials()
+  dat$cond <- factor(rep(c("a", "b"), 12))
+  fit <- suppressMessages(bmm(bmf(d ~ 1 + cond, criterion ~ 1, delta1 ~ 1, delta2 ~ 1), dat,
+                              sdt_rating("rating", "stimulus", n_ratings = 4, threshold_type = "log_distance"),
+                              backend = "mock", mock_fit = 1, rename = FALSE))
+  asked <- list()
+  local_mocked_bindings(.brms_conditional_effects = function(x, ...) {
+    asked[[length(asked) + 1]] <<- list(...)
+    structure(list(), names = character(0), class = "brms_conditional_effects")
+  })
+  for (par in c("d", "criterion", "delta1")) {
+    ce <- bmm:::.ce_compute_and_transform(fit, par, bmm:::.get_parameter_info(fit, par), "native")
+    expect_length(ce, 0)
+  }
+  expect_length(asked, 1)
+  expect_identical(asked[[1]][c("effects", "dpar")], list(effects = "cond", dpar = "d"))
+  bmm:::.ce_compute_and_transform(fit, "criterion", bmm:::.get_parameter_info(fit, "criterion"),
+                                  "native", effects = "cond")
+  expect_identical(asked[[2]][c("dpar", "effects")], list(dpar = "criterion", effects = "cond"))
+  # a wrapper that passes its own default on
+  bmm:::.ce_compute_and_transform(fit, "d", bmm:::.get_parameter_info(fit, "d"), "native",
+                                  effects = NULL)
+  expect_identical(asked[[3]][c("effects", "dpar")], list(effects = "cond", dpar = "d"))
+})
+
+# The trial family and the one-hot multinomial (aggregated rows of one trial
+# each, the program 1.5.0 fits to trial rows) share every parameter and prior,
+# so their total log densities agree at any point. log_prob through the
+# executable: cmdstanr's init_model_methods() can clash with RcppParallel's TBB.
+# About 28 s: it compiles both programs, which no other test builds
+test_that("the trial family's log density equals the one-hot multinomial's", {
+  skip_unless_stan_tests()
+  withr::local_seed(11)
+  dir <- withr::local_tempdir()
+  trials <- data.frame(id = rep(1:4, each = 12), item = rep(1:12, 4),
+                       cond = factor(rep(c("a", "b"), 24)), stimulus = rep(rep(0:1, each = 6), 4),
+                       rating = sample.int(6, 48, replace = TRUE))
+  one_hot <- trials
+  one_hot[paste0("rating", 1:6)] <- as.data.frame(diag(6)[trials$rating, ])
+  formula <- bmf(d ~ 1 + cond + (1 | id) + (1 | item), criterion ~ 1 + (1 | id), spacing ~ 1)
+  fits <- list(
+    trial = suppressMessages(bmm(formula, trials, sdt_rating("rating", "stimulus", n_ratings = 6),
+                                 backend = "mock", mock_fit = 1, rename = FALSE)),
+    one_hot = suppressMessages(bmm(formula, one_hot, sdt_rating(paste0("rating", 1:6), "stimulus"),
+                                   backend = "mock", mock_fit = 1, rename = FALSE))
+  )
+  sdata <- brms::standata(fits$trial)
+  values <- list(b_d = array(c(1.1, 0.4)), b_criterion = array(0.3), b_spacing = array(-0.5),
+                 sd_1 = array(0.4), z_1 = matrix(stats::rnorm(4), 1),
+                 sd_2 = array(0.2), z_2 = matrix(stats::rnorm(12), 1),
+                 sd_3 = array(0.3), z_3 = matrix(stats::rnorm(4), 1))
+  log_prob <- function(name) {
+    mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(brms::stancode(fits[[name]]), dir),
+                                   quiet = TRUE)
+    files <- file.path(dir, paste0(name, c("_data.json", "_params.json", "_out.csv")))
+    data <- lapply(unclass(brms::standata(fits[[name]])), function(x) {
+      if (is.null(dim(x)) && length(x) > 1) as.array(x) else unclass(x)
+    })
+    cmdstanr::write_stan_json(data, files[1])
+    cmdstanr::write_stan_json(values, files[2])
+    stderr_file <- file.path(dir, paste0(name, "_stderr.txt"))
+    # tbb.dll on Windows, as in the log_prob test of test-model_ezdm.R
+    run_path <- if (.Platform$OS.type == "windows") {
+      c(
+        getFromNamespace("toolchain_PATH_env_var", "cmdstanr")(),
+        getFromNamespace("tbb_path", "cmdstanr")()
+      )
+    }
+    status <- withr::with_path(run_path, system2(mod$exe_file(), c(
+      "log_prob", paste0("constrained_params=", files[2]), "jacobian=1",
+      "data", paste0("file=", files[1]),
+      "output", paste0("file=", files[3]), "sig_figs=18"
+    ), stdout = FALSE, stderr = stderr_file))
+    expect_identical(status, 0L, info = paste(readLines(stderr_file, warn = FALSE), collapse = "\n"))
+    utils::read.csv(files[3], comment.char = "#")$lp__[1]
+  }
+  expect_identical(c(sdata$K_d, sdata$N_1, sdata$N_2, sdata$N_3), c(2L, 4L, 12L, 4L))
+  expect_equal(log_prob("trial"), log_prob("one_hot"), tolerance = 1e-8)
 })

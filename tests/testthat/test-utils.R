@@ -62,16 +62,21 @@ test_that("bmm_options works", {
 
 
 test_that("check_rds_file works", {
-  good_files <- list("a.rds", "abc/a.rds", "a", "abc/a", "a.M")
-  bad_files <- list(1, mean, c("a", "b"), TRUE)
+  # the saved path, not only its extension: a cached fit is found again only
+  # if the same `file` maps to the same path
+  good_files <- c(
+    "a.rds" = "a.rds", "abc/a.rds" = "abc/a.rds", "a" = "a.rds", "abc/a" = "abc/a.rds",
+    "a.M" = "a.M.rds", "a.RDS" = "a.RDS.rds", "cards" = "cards.rds"
+  )
+  bad_files <- list(1, mean, c("a", "b"), TRUE, NA_character_, character(0))
 
-  for (f in good_files) {
+  for (f in names(good_files)) {
     expect_silent(res <- check_rds_file(f))
-    expect_equal(fs::path_ext(res), "rds")
+    expect_identical(res, good_files[[f]])
   }
 
   for (f in bad_files) {
-    expect_error(check_rds_file(f))
+    expect_error(check_rds_file(f), "must be a single string")
   }
 
   expect_null(check_rds_file(NULL))
@@ -144,6 +149,30 @@ test_that("try_save_bmmfit works", {
     file = file, file_refit = "Always"
   )
   expect_equal(mock_fit4$fit, 4)
+})
+
+test_that("bmm() saves the fit into a nested directory that does not exist yet", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
+  withr::local_options(bmm.sort_data = FALSE)
+  file <- file.path(withr::local_tempdir(), "not", "yet", "fit")
+  mock_fit <- bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
+    backend = "mock", mock_fit = 1, rename = F,
+    file = file
+  )
+  rds_file <- paste0(file, ".rds")
+  expect_true(file.exists(rds_file))
+  expect_equal(readRDS(rds_file), mock_fit, ignore_function_env = TRUE, ignore_formula_env = TRUE)
+})
+
+test_that("bmm() stops before fitting when the directory for `file` cannot be created", {
+  blocker <- withr::local_tempfile()
+  writeLines("a file, not a directory", blocker)
+  expect_error(
+    bmm(bmf(c ~ 1, kappa ~ 1), small_data(), sdm("dev_rad"),
+      backend = "mock", mock_fit = 1, file = file.path(blocker, "fit")
+    ),
+    "Cannot create directory for file"
+  )
 })
 
 # `mock_fit` doubles as the identity of the fit: the cached object carries the
@@ -545,4 +574,65 @@ test_that("bmm_options(step_size = ) validates and applies the option", {
 test_that("bmm does not change how message conditions print", {
   cnd <- tryCatch(message("hi"), message = identity)
   expect_output(print(cnd), "simpleMessage")
+})
+
+test_that("user stanvars are added to the model's stanvars, not replacing them (#688)", {
+  model_sv <- brms::stanvar(x = 1, name = "model_x") +
+    brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  user_sv <- brms::stanvar(scode = "real user_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", data = "d", stanvars = model_sv, init = 1)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = user_sv)))
+  expect_identical(out$stanvars, model_sv + user_sv)
+  expect_named(out, c("formula", "data", "stanvars", "init"))
+})
+
+test_that("user stanvars are passed on as they are when the model has none", {
+  user_sv <- brms::stanvar(x = 1, name = "user_x")
+  config_args <- list(formula = "a", data = "d", init = 1)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = user_sv)))
+  expect_identical(out$stanvars, user_sv)
+})
+
+test_that("a user stanvar with the name of a model stanvar stops with the name", {
+  config_args <- list(formula = "a", stanvars = brms::stanvar(x = 1, name = "model_x"))
+  dots <- list(stanvars = brms::stanvar(x = 2, name = "model_x"))
+  expect_error(combine_args(nlist(config_args, dots)), "already defines stanvars named 'model_x'")
+})
+
+test_that("a fit's stanvars passed back stop and say to pass only your own (#688)", {
+  model_sv <- brms::stanvar(x = 1, name = "model_x") +
+    brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  user_sv <- brms::stanvar(scode = "real user_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  dots <- list(stanvars = model_sv + user_sv)
+  expect_error(
+    combine_args(nlist(config_args, dots)),
+    "named 'model_x'\\..*pass only yours \\(not those of a fit, `fit\\$stanvars`\\)"
+  )
+})
+
+test_that("unnamed model Stan code passed back stops instead of being declared twice (#688)", {
+  model_sv <- brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  dots <- list(stanvars = model_sv)
+  expect_error(
+    combine_args(nlist(config_args, dots)),
+    "Stan code the model adds itself.*`fit\\$stanvars`.*Pass only your own"
+  )
+})
+
+test_that("unnamed user Stan code that differs from the model's is added to it (#688)", {
+  model_sv <- brms::stanvar(scode = "real model_f() { return 1; }", block = "functions")
+  user_sv <- brms::stanvar(scode = "real user_f() { return 1; }", block = "functions")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = user_sv)))
+  expect_identical(out$stanvars, model_sv + user_sv)
+})
+
+test_that("stanvars = NULL keeps the model's stanvars (#688)", {
+  model_sv <- brms::stanvar(x = 1, name = "model_x")
+  config_args <- list(formula = "a", stanvars = model_sv)
+  out <- combine_args(nlist(config_args, dots = list(stanvars = NULL)))
+  expect_identical(out$stanvars, model_sv)
+  expect_named(out, c("formula", "stanvars"))
 })
