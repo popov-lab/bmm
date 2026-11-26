@@ -955,3 +955,12 @@ test_that("an unbiased observer is bias fixed at 0", {
   expect_true(any(prior$dpar == "bias" & grepl("constant\\(0\\)", prior$prior)))
   expect_false(any(prior$dpar == "criterion"))
 })
+
+# tcc_cd() (#566) reuses this kernel's distribution functions from a chunk of
+# its own, which must not leak into the sdt_yn programs
+test_that("the sdt_yn Stan programs carry none of the tcc_cd kernel", {
+  dat <- data.frame(n_old = c(10, 40), stimulus = c(0L, 1L), n_trials = 50)
+  code <- bmm::stancode(bmf(d ~ 1, bias ~ 1), data = dat, model = sdt_yn("n_old", "stimulus", "n_trials"))
+  expect_no_match(code, "tcc_cd", fixed = TRUE)
+  expect_match(code, "real sdt_yn_bias_lpmf(", fixed = TRUE)
+})

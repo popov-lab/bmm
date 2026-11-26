@@ -74,6 +74,9 @@ See the
 and, for the dual-process and meta-d′ versions of `sdt_rating()` and the
 Remember/Know model `sdt_cdp()`, the
 [dual-process and meta-d′ article](https://venpopov.com/bmm/articles/bmm_sdt_dualprocess_metad.html).
+For change detection with a single probe, `tcc_cd()` takes one row per trial
+and the probe's distance from the target, and estimates the memory strength
+of `tcc()`.
 The
 [Get started](https://venpopov.com/bmm/articles/bmm.html#detection-recognition-and-confidence-judgments)
 page has a table of the response formats and the noise distributions each
