@@ -338,6 +338,72 @@ test_that("rsdm returns finite draws when the density peak overflows", {
   expect_lt(max(abs(y)), 0.05)
 })
 
+test_that("rsdm draws from peaks too narrow for a uniform proposal", {
+  withr::local_seed(732)
+  # a uniform proposal on the circle hits these peaks once in 3e6 to 2e8 tries
+  cells <- list(
+    list(c = 1e6, kappa = 1, activation = "laplace"),
+    list(c = 7.165e7, kappa = 0.0934, activation = "laplace"),
+    list(c = 1e16, kappa = 1, activation = "vonmises")
+  )
+  for (cell in cells) {
+    x <- do.call(rsdm, c(list(20, mu = 1), cell))
+    expect_length(x, 20)
+    expect_true(all(is.finite(x)))
+    expect_lt(max(abs(x - 1)), 1e-3)
+  }
+})
+
+test_that("rsdm stops on a missing or infinite mu at a narrow peak as at a wide one", {
+  for (c_ in c(3, 1e6)) {
+    expect_error(rsdm(3, mu = c(0, NA, 0), c = c_, kappa = 1, activation = "laplace"), "contain NA")
+    expect_error(rsdm(3, mu = Inf, c = c_, kappa = 1, activation = "laplace"), "contain NA")
+    expect_identical(rsdm(0, mu = NA, c = c_, kappa = 1, activation = "laplace"), numeric(0))
+    expect_identical(rsdm(0, mu = Inf, c = c_, kappa = 1, activation = "laplace"), numeric(0))
+  }
+})
+
+# p-value of a chi-square test of draws against the deciles of qsdm(); with
+# 2000 draws per bin, a bin off by 0.01 in probability gives p below 0.001
+sdm_decile_p <- function(x, cell) {
+  edges <- c(-pi, do.call(qsdm, c(list((1:9) / 10), cell)), pi)
+  stats::chisq.test(table(cut(x, edges, include.lowest = TRUE)))$p.value
+}
+
+test_that("rsdm follows qsdm at narrow peaks, on both sides of the switch of proposal", {
+  skip_on_cran()
+  withr::local_seed(7321)
+  cells <- list(
+    list(mu = 0, c = 7.165e7, kappa = 0.0934, activation = "laplace"),
+    # a peak holding 78% of the mass on a floor exp(-10) holding the rest
+    list(mu = 0.5, c = 10, kappa = 200, activation = "laplace"),
+    # pi c kappa of 1257 and 942, just narrower and wider than where the
+    # uniform proposal hands over
+    list(mu = 0, c = 100, kappa = 4, activation = "laplace"),
+    list(mu = 0, c = 100, kappa = 3, activation = "laplace"),
+    list(mu = -1, c = 1e6, kappa = 100, activation = "vonmises"),
+    # a von Mises peak on a floor exp(-8) holding 41% of the mass, so the
+    # envelope needs its floor piece and a peak mass that is exact
+    list(mu = 0, c = 8, kappa = 1e5, activation = "vonmises", scaling = "peak")
+  )
+  for (cell in cells) {
+    x <- do.call(rsdm, c(list(20000), cell))
+    expect_gt(sdm_decile_p(x, cell), 0.001)
+  }
+})
+
+test_that("rsdm draws each value from its own cell when narrow and wide cells mix", {
+  withr::local_seed(7322)
+  n <- 30000
+  group <- sample(rep_len(1:4, n))
+  pars <- data.frame(mu = c(-2, 2, 0.5, -0.8), c = c(3, 1e6, 10, 2), kappa = c(3.5, 1, 200, 10))
+  y <- rsdm(n, pars$mu[group], pars$c[group], pars$kappa[group], activation = "laplace")
+  for (g in 1:4) {
+    cell <- list(mu = pars$mu[g], c = pars$c[g], kappa = pars$kappa[g], activation = "laplace")
+    expect_gt(sdm_decile_p(y[group == g], cell), 0.001)
+  }
+})
+
 test_that(".rejection_sampling takes arguments of length n per draw", {
   withr::local_seed(445)
   n <- 20000
