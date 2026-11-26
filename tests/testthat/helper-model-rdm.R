@@ -54,6 +54,22 @@ model_cases_rdm <- function() {
         data = data.frame(rt = rep(c(0.6, 0.8), 25), response = rep(1:2, 25))
       )
     ),
+    simulate = list(
+      rdm_simple = list(
+        model = rdm("rt", "response", n_choices = 3),
+        pars = list(driftc = log(3), drifte = log(1.4), gap = 0, ndt = log(0.3)),
+        design = data.frame(id = rep(1:2, 30)),
+        formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, ndt ~ 1),
+        simulate_pars = list(driftc = log(3), drifte = log(1.4), gap = 0, ndt = log(0.3), s = 0, sp = -100)
+      ),
+      rdm_custom = list(
+        model = check_model(rdm("rt", "label", version = "custom"), formula = custom_formula),
+        pars = list(correct = log(3), lure = log(1.4), gap = 0, ndt = log(0.3)),
+        design = data.frame(id = rep(1:2, 30)),
+        formula = custom_formula,
+        simulate_pars = list(correct = log(3), lure = log(1.4), gap = 0, ndt = log(0.3), s = 0, sp = -100)
+      )
+    ),
     observables = list(
       rdm = list(
         model = rdm(rt = "rt", response = "response", n_choices = 3),

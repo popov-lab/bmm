@@ -1206,7 +1206,7 @@ test_that("rrdm with sp > 0 returns valid data", {
   expect_true(all(dat$rt > 0.2))
 })
 
-test_that("validate_rdm_parameters catches invalid inputs", {
+test_that(".check_rdm_args catches invalid inputs", {
   expect_error(drdm(0.5, 1, drift = c(3, 1.5), gap = -1, ndt = 0.2))
   expect_error(drdm(0.5, 1, drift = c(-1, 1.5), gap = 1, ndt = 0.2))
   expect_error(drdm(0.5, 1, drift = c(3, 1.5), gap = 1, ndt = 0.2,

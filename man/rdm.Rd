@@ -65,8 +65,8 @@ Racing Diffusion Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Decision Making / Response times
-\item \strong{Task:} Choice Reaction Time tasks (multi-alternative)
+\item \strong{Domain:} Decision making
+\item \strong{Task:} Choices and response times
 \item \strong{Name:} Racing Diffusion Model
 \item \strong{Citation:}
 \itemize{

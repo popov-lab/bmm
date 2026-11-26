@@ -105,8 +105,8 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = nlist(n_choices, accumulators),
-      domain = "Decision Making / Response times",
-      task = "Choice Reaction Time tasks (multi-alternative)",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "Racing Diffusion Model",
       citation = glue(
         "Tillman, G., Van Zandt, T., & Logan, G. D. (2020). Sequential sampling \\
@@ -126,7 +126,8 @@
       links = vt[["links"]],
       fixed_parameters = vt[["fixed_parameters"]],
       default_priors = vt[["priors"]],
-      init_ranges = vt[["init_ranges"]]
+      init_ranges = vt[["init_ranges"]],
+      functions = list(density = "drdm", generator = "rrdm")
     ),
     class = c("bmmodel", "rdm", paste0("rdm_", version)),
     call = call
@@ -278,6 +279,7 @@ rdm <- function(rt, response, n_choices = NULL,
                 accumulators = NULL, links = NULL, ...) {
   call <- match.call()
   dots <- list(...)
+  .check_constructor_dots(dots, deprecated = c("n_alternatives", "num_alternatives"))
   if ("n_alternatives" %in% names(dots)) {
     n_choices <- dots$n_alternatives
     warning2("The argument 'n_alternatives' is deprecated. Please use 'n_choices' instead.")
@@ -723,6 +725,45 @@ pp_simulate.rdm <- function(model, prep) {
     rt = matrix(race$rt + .pp_dpar_vector(prep, "ndt"), nrow = prep$ndraws),
     response = matrix(race$response, nrow = prep$ndraws)
   )
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# rrdm() takes one value per parameter, so rows are drawn in groups of
+# identical parameters. The custom version's categories exist only in the
+# formula, which the user passes as `formula =`; a model that gives categories
+# a number of accumulators other than one is not simulated
+#' @export
+simulate_data.rdm <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  formula <- list(...)[["formula"]]
+  custom <- model$version == "custom"
+  stopif(custom && is.null(formula),
+         "The custom version of rdm takes its accumulators from the formula: \\
+         pass the bmmformula you fit as `formula =`.")
+  stopif(!is.null(model$other_vars$accumulators),
+         "simulate_data() draws one accumulator per category; the model sets \\
+         `accumulators`.")
+  if (custom) model <- check_model(model, formula = formula)
+  design <- .design_or_n(model, design, character(0), ...)
+  sim <- .simulate_pars(model, pars, design, scale, formula)
+  p <- sim$native
+  cats <- model$other_vars$resp_cats
+  drift_names <- if (custom) cats else c("driftc", rep("drifte", model$other_vars$n_choices - 1))
+  rt <- numeric(nrow(design))
+  response <- integer(nrow(design))
+  for (idx in .row_groups(as.data.frame(p))) {
+    i <- idx[1]
+    draw <- rrdm(
+      length(idx), drift = vapply(p[drift_names], `[`, numeric(1), i),
+      gap = p$gap[i], ndt = p$ndt[i], s = p$s[i], sp = p$sp[i]
+    )
+    rt[idx] <- draw$rt
+    response[idx] <- draw$response
+  }
+  out <- list(rt = rt, response = if (custom) cats[response] else response)
+  .simulate_result(design, stats::setNames(out, c(model$resp_vars$rt, model$resp_vars$response)), sim)
 }
 
 # check_data() codes the response as the category .rdm_cat and the accumulator

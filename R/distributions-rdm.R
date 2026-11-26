@@ -66,7 +66,7 @@
 #' @export
 drdm <- function(rt, response, drift, gap, ndt, s = 1, sp = 0,
                  log = FALSE) {
-  validate_rdm_parameters(drift, gap, ndt, s, sp)
+  .check_rdm_args(drift, gap, ndt, s, sp)
   K <- length(drift)
   stopif(
     any(is.na(response)) || any(response < 1 | response > K | response != round(response)),
@@ -89,7 +89,7 @@ drdm <- function(rt, response, drift, gap, ndt, s = 1, sp = 0,
 #' @rdname rdm_dist
 #' @export
 rrdm <- function(n, drift, gap, ndt, s = 1, sp = 0) {
-  validate_rdm_parameters(drift, gap, ndt, s, sp)
+  .check_rdm_args(drift, gap, ndt, s, sp)
   stopif(
     any(lengths(list(gap, ndt, s, sp)) != 1),
     "rrdm() takes a single value for each of gap, ndt, s and sp."
@@ -107,7 +107,7 @@ rrdm <- function(n, drift, gap, ndt, s = 1, sp = 0) {
 #' @export
 prdm <- function(q, drift, gap, ndt, s = 1, sp = 0,
                  lower.tail = TRUE, log.p = FALSE) {
-  validate_rdm_parameters(drift, gap, ndt, s, sp)
+  .check_rdm_args(drift, gap, ndt, s, sp)
   n <- max(length(q), length(gap), length(ndt), length(s), length(sp))
   t <- rep_len(q, n) - rep_len(ndt, n)
   gap <- rep_len(gap, n)
@@ -128,7 +128,7 @@ prdm <- function(q, drift, gap, ndt, s = 1, sp = 0,
 #' @export
 qrdm <- function(p, drift, gap, ndt, s = 1, sp = 0,
                  lower.tail = TRUE, log.p = FALSE) {
-  validate_rdm_parameters(drift, gap, ndt, s, sp)
+  .check_rdm_args(drift, gap, ndt, s, sp)
   stopif(
     any(lengths(list(gap, ndt, s, sp)) != 1),
     "qrdm() takes a single value for each of gap, ndt, s and sp."
@@ -149,7 +149,7 @@ qrdm <- function(p, drift, gap, ndt, s = 1, sp = 0,
   }, numeric(1))
 }
 
-validate_rdm_parameters <- function(drift, gap, ndt, s, sp) {
+.check_rdm_args <- function(drift, gap, ndt, s, sp) {
   stopif(any(drift <= 0), "drift rates must be positive.")
   stopif(any(gap <= 0), "gap (threshold gap) must be positive.")
   stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")
