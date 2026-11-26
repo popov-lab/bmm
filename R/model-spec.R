@@ -103,7 +103,7 @@ model_spec.bmmodel <- function(x, ...) {
   structure(
     list(
       name = x$name,
-      package = "bmm",
+      package = model_package(spec_model_name(x)),
       version = if (x$version %in% c("NA", "")) NA_character_ else x$version,
       domain = x$domain,
       task = x$task,
@@ -196,7 +196,7 @@ spec_init_ranges <- function(ranges, pars) {
   )
 }
 
-# NA for a model registered by another package
+# NA for a class vector that names no listed model
 spec_model_name <- function(model) {
   intersect(rev(class(model)), model_names())[1]
 }

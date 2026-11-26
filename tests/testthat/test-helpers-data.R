@@ -205,7 +205,7 @@ test_that("check_data() replaces the non-target padding past the set size as bef
 test_that("check_data() returns a data.frame()", {
   # a model whose response the shared columns below cannot express (the
   # multi-column SDT responses) registers its own case in its provider
-  models <- model_names()
+  models <- bmm_builtin_models()
   mls <- lapply(models, get_model)
   # test data includes variables for all model types:
   # - y, x, z, w, l, s for circular/mixture models

@@ -156,16 +156,16 @@ test_that("every model has a model-case provider with the cases every model need
   # a provider is model_cases_<model>() in helper-model-<model>.R; the shared
   # tests read its cases through model_test_cases() (helper-model-cases.R)
   providers <- sub("^model_cases_", "", ls(environment(model_test_cases), pattern = "^model_cases_"))
-  expect_identical(setdiff(model_names(), providers), character(0), info = paste(
+  expect_identical(setdiff(bmm_builtin_models(), providers), character(0), info = paste(
     "R4: add tests/testthat/helper-model-<model>.R defining model_cases_<model>()"
   ))
   for (kind in c("stored_frame", "sd_default", "init", "links")) {
     covered <- unlist(lapply(model_test_cases(kind), function(case) {
-      intersect(class(case$model), model_names())
+      intersect(class(case$model), bmm_builtin_models())
     }))
     # a model whose check_data() consumes or creates columns also needs a
     # revert_check_data() method for its stored-frame case to pass
-    expect_identical(setdiff(model_names(), covered), character(0),
+    expect_identical(setdiff(bmm_builtin_models(), covered), character(0),
                      info = paste0("R4: no '", kind, "' case for these models"))
   }
 })
@@ -176,15 +176,15 @@ test_that("every model has a simulate_data() method and a simulate case per vers
   # produce data that check_data() accepts is listed here with its reason;
   # none on develop
   exempt <- character(0)
-  versions <- unlist(lapply(model_names(), function(name) {
+  versions <- unlist(lapply(bmm_builtin_models(), function(name) {
     version <- eval(formals(get(name, mode = "function"))$version)
     if (is.null(version)) name else paste0(name, "_", version)
   }))
   covered <- unlist(lapply(model_test_cases("simulate"), function(case) class(case$model)))
-  has_method <- vapply(model_names(), function(name) {
+  has_method <- vapply(bmm_builtin_models(), function(name) {
     !is.null(utils::getS3method("simulate_data", name, optional = TRUE))
   }, logical(1))
-  missing <- setdiff(c(versions, model_names()[!has_method]), c(covered, exempt))
+  missing <- setdiff(c(versions, bmm_builtin_models()[!has_method]), c(covered, exempt))
   expect_identical(missing, character(0), info = paste0(
     "R4: no 'simulate' case for these models/versions: ", collapse_comma(missing),
     "; add a `simulate` case to model_cases_<model>() and a simulate_data.<model> method; ",
