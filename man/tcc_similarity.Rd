@@ -33,11 +33,16 @@ concentration or the rate (Oberauer, 2023). Each is scaled to 1
 at the target and 0 at the opposite option, as Schurgin et al. (2020)
 scaled their measured similarity.
 
-\code{kappa} is fixed here, so a fit with this vector is still the TCC: the
-similarity enters the model as known. Schurgin et al. (2020) measured
-theirs in a separate perceptual task, and a measured similarity is the
-model as its authors intended it. To estimate \code{kappa} from the responses,
-fit \code{\link[=sdm]{sdm()}} instead, which estimates it for the von Mises shape.
+\code{kappa} is fixed here, so the similarity enters the model as known.
+Whether the fit is then a TCC depends on where \code{kappa} comes from. The
+TCC takes its similarity from a source that is independent of the
+responses being fitted: Schurgin et al. (2020) measured theirs in a
+separate similarity rating task and fixed it for all participants and
+conditions. A \code{kappa} taken from such a measurement, from a fit to other
+data or from theory keeps to that. A \code{kappa} chosen because it fits the
+responses at hand is an estimate entered without its uncertainty. To
+estimate \code{kappa} from the responses, fit \code{\link[=sdm]{sdm()}} instead, which
+estimates it for the von Mises shape.
 }
 \examples{
 f <- tcc_similarity("laplace", kappa = 1 / deg2rad(20))
