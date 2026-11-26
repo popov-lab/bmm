@@ -242,6 +242,19 @@
 
 #### Bug fixes
 
+- [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) stopped
+  with “No proposal was accepted in 1e7 tries” when the response
+  distribution was very narrow, as with `activation = "laplace"` and
+  `c = 1e6, kappa = 1`.
+  [`posterior_predict()`](https://mc-stan.org/rstantools/reference/posterior_predict.html)
+  and
+  [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md)
+  of [`sdm()`](https://venpopov.com/bmm/dev/reference/sdm.md) fits
+  stopped the same way when any draw had such values, for example in a
+  prior predictive check.
+  [`rsdm()`](https://venpopov.com/bmm/dev/reference/SDMdist.md) now
+  returns draws at such values
+  ([\#732](https://github.com/popov-lab/bmm/issues/732)).
 - **mixture3p** and **imm**: a non-target feature or distance missing
   inside a trial’s set size (one of its first `set_size - 1` columns)
   was replaced by 0 or 999 without a message, so those trials were
