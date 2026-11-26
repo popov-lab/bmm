@@ -26,7 +26,9 @@ R companion to the Stan \code{sdt_ranking_logmu} function. It returns
 \code{log(p(rank))} for rank position \code{cat}, which the \code{\link[=sdt_ranking]{sdt_ranking()}}
 multinomial formula uses as the category logit (so \code{softmax} recovers the
 ranking probabilities). \code{brms} evaluates the non-linear formula in R for
-\code{posterior_predict()} and \code{posterior_epred()}, so this function must be on
-the search path; it is exported for that reason and is not called directly.
+\code{log_lik()}, \code{posterior_predict()} and \code{posterior_epred()} and finds this
+function in the bmm namespace, attached or not. It is exported for fits
+saved before bmm 1.5.0, which find it only after \code{library(bmm)}, and is
+not called directly.
 }
 \keyword{internal}

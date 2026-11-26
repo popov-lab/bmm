@@ -73,7 +73,6 @@ jobs:
             tidyr
             usethis
             vctrs
-            waldo
             yaml
             withr
             posterior

@@ -20,8 +20,11 @@
 # split took 906 s because of the order, not the runner (ADR 0004,
 # 2026-11-03). Four workers on the 4-vCPU runner double each test's
 # time against one worker, so caps from a one-worker run do not carry over.
+# The suite cap rose to 1500 s on 2026-11-25: the slowest runners (AMD EPYC
+# 7763) took up to 1175 s with every test passing, so 1000 s measured which
+# runner the job drew rather than the code (ADR 0004).
 # Every later change goes through the ADR.
-caps <- list(suite = 1000, file = 0.23, test = 0.033)
+caps <- list(suite = 1500, file = 0.23, test = 0.033)
 
 # tests with a cap of their own, "file | test" = share; empty since #422, and
 # an entry needs one in ADR 0004

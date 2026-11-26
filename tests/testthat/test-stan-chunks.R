@@ -10,8 +10,8 @@ chunk_files <- list.files(chunk_dir, pattern = "\\.stan$")
 read_chunk <- function(file) read_lines2(file.path(chunk_dir, file))
 
 # string literals go first so that the // of a URL inside reject() does not
-# start a comment; the comments go because m3_gaussian_functions.stan and
-# sdt_dist_functions.stan write braces in them (prod_{j != k}, F^{-1})
+# start a comment; the comments go because a brace written in one (a formula
+# such as F^{-1}) would be counted as code
 strip_stan_comments <- function(code) {
   gsub("(?s)\"[^\"\n]*\"|/\\*.*?\\*/|//[^\n]*", "", code, perl = TRUE)
 }
