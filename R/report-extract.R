@@ -90,8 +90,9 @@ uncited_part.m3_custom <- function(model) {
 # Sampler settings and package versions as the fit stores them. The versions
 # describe the compilation: update() without recompiling keeps the stored brms
 # and Stan versions, while the settings and the date describe the last run.
-# brms stores no R version at all. ndraws_stored counts the post-warmup draws
-# that summary() and as_draws_array() see; brms::ndraws() reads n_save instead,
+# brms stores no R version; bmm stores the one each run used since #432, so
+# older fits have none. ndraws_stored counts the post-warmup draws that
+# summary() and as_draws_array() see; brms::ndraws() reads n_save instead,
 # which can disagree with the stored draws
 fit_settings <- function(fit) {
   sim <- if (has_draws(fit)) fit$fit@sim else list()
@@ -113,7 +114,8 @@ fit_settings <- function(fit) {
       bmm = version_string(version$bmm),
       brms = version_string(version$brms),
       stan = stan_version(fit),
-      backend = version_string(if (backend %in% c("cmdstanr", "rstan")) version[[backend]])
+      backend = version_string(if (backend %in% c("cmdstanr", "rstan")) version[[backend]]),
+      R = version_string(version$R)
     ),
     date = if (has_draws(fit)) fit$fit@date else NA_character_
   )
@@ -172,11 +174,11 @@ convergence_summary <- function(fit) {
       in_summary = grepl(summary_variables_regex(fit), conv$variable)
     ),
     algorithm = algorithm,
-    divergent = sum(brms::nuts_params(fit, pars = "divergent__")$Value),
+    divergent = sum(brms::nuts_params(fit, pars = "divergent__", inc_warmup = FALSE)$Value),
     max_treedepth_hits = if (is.null(max_treedepth)) {
       NA_real_
     } else {
-      sum(brms::nuts_params(fit, pars = "treedepth__")$Value >= max_treedepth)
+      sum(brms::nuts_params(fit, pars = "treedepth__", inc_warmup = FALSE)$Value >= max_treedepth)
     }
   )
 }
@@ -218,9 +220,16 @@ current_constructor <- function(model) {
   if (is.na(name)) {
     return(NULL)
   }
+  constructor <- get_model(name)
+  # the circular mixture models cite the variable-precision source only when
+  # the model uses it
+  args <- list()
+  if ("variable_precision" %in% names(formals(constructor))) {
+    args$variable_precision <- isTRUE(model$variable_precision)
+  }
   versions <- model_versions(name)
   if (all(model$version %in% c(NA, "NA", "")) || all(is.na(versions))) {
-    return(get_model(name)())
+    return(do.call(constructor, args))
   }
-  if (model$version %in% versions) get_model(name)(version = model$version)
+  if (model$version %in% versions) do.call(constructor, c(list(version = model$version), args))
 }

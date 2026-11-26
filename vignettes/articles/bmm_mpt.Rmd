@@ -161,7 +161,7 @@ model_2htm_probit <- mpt(
 
 # Data format and simulation
 
-The data contain one column of aggregated response counts per response category, named after the branch names of the trees, plus the `tree_id` column. Aggregated counts are sufficient whenever parameters and covariates are constant within participant and condition. Trial-level data (one row per trial with a 1 in the chosen category's column) also work and are only needed when predictors vary from trial to trial.
+The data contain one column of aggregated response counts per response category, named after the branch names of the trees, plus the `tree_id` column. Aggregated counts are sufficient whenever parameters and covariates are constant within participant and condition. Data with one row per trial are needed for item effects and for predictors that vary from trial to trial; [Trial-level data and item effects] shows that layout.
 
 The distribution functions `dmpt()` and `rmpt()` provide the multinomial density and random generation for any `mpt()` model. `rmpt()` draws the counts for one tree and one parameter vector; a short function around it simulates a hierarchical data set in the shape of TreeBUGS' `genTraitMPT()`: population means on the probability scale, participant heterogeneity as standard deviations on the latent scale (here the logit scale; the `sigma` of `genTraitMPT()` is on the probit scale, see [Default priors] for the conversion).
 
@@ -402,6 +402,82 @@ model_ss
 ```
 
 Only `Pb` and `Pi` are latent parameters; the `Gcorr*` symbols must exist as numeric columns in the data (for example, `GcorrPi = 1 / rsizeList`). This mechanism goes beyond what classical MPT software supports, because the guessing rates can vary continuously across trials or conditions. When the data are checked, the branch sums are re-evaluated with the observed covariate values row by row, and `bmm()` stops when covariate columns violate their joint constraints.
+
+# Trial-level data and item effects
+
+Recognition experiments sample their items, and items differ in how well they are remembered. Counts aggregated per participant and tree average over the items, so the item differences end up in the person effects and in the residual misfit. With one row per trial, the items can get random effects of their own, crossed with the participants, as in a generalized linear mixed model.
+
+`mpt()` reads one row per trial when `response` names the column that holds the response category of each trial. The values of that column are the branch names, here `"old"` and `"new"`; everything else stays as before:
+
+```{r}
+model_trials <- mpt(
+  trees = list(tree_target, tree_lure),
+  tree_id = "item_type",
+  response = "resp"
+)
+```
+
+The simulation draws a recognition test of 60 items for 30 participants. Two counterbalanced study lists make each item a target for half of the participants and a lure for the other half. Detection `D` varies over participants and items, the guessing rate `g` over participants. Each trial runs through the tree: the item is detected with probability `D`, and an undetected item is called old with probability `g`.
+
+```{r}
+simulate_trials <- function(n_subj, n_items, mean, sd) {
+  D_id <- rnorm(n_subj, 0, sd[["D_id"]])
+  D_item <- rnorm(n_items, 0, sd[["D_item"]])
+  g_id <- rnorm(n_subj, 0, sd[["g_id"]])
+  dat <- expand.grid(id = seq_len(n_subj), item = seq_len(n_items))
+  # list 1 (odd participants) studies the odd items, list 2 the even items
+  studied <- dat$item %% 2 == dat$id %% 2
+  dat$item_type <- ifelse(studied, "target", "lure")
+  D <- plogis(qlogis(mean[["D"]]) + D_id[dat$id] + D_item[dat$item])
+  g <- plogis(qlogis(mean[["g"]]) + g_id[dat$id])
+  detected <- runif(nrow(dat)) < D
+  dat$resp <- ifelse(detected, ifelse(studied, "old", "new"),
+                     ifelse(runif(nrow(dat)) < g, "old", "new"))
+  dat$id <- factor(dat$id)
+  dat$item <- factor(dat$item)
+  dat
+}
+
+set.seed(2613)
+dat_trials <- simulate_trials(
+  n_subj = 30, n_items = 60,
+  mean = c(D = 0.6, g = 0.5), sd = c(D_id = 0.5, D_item = 0.6, g_id = 0.4)
+)
+head(dat_trials)
+```
+
+Item effects enter the formula like person effects. Here only `D` gets them, because guessing happens without any memory of the item:
+
+```{r fit-trials, results = "hide", message = FALSE, warning = FALSE}
+fit_trials <- bmm(
+  formula = bmf(
+    D ~ 1 + (1 | id) + (1 | item),
+    g ~ 1 + (1 | id)
+  ),
+  data = dat_trials,
+  model = model_trials,
+  backend = "cmdstanr",
+  cores = 4,
+  refresh = 0,
+  file = "fits/mpt_trial_item"
+)
+```
+
+```{r}
+summary(fit_trials)
+```
+
+The simulated standard deviations were 0.5 for `D` over participants, 0.6 for `D` over items and 0.4 for `g` over participants, all on the logit scale, and each lies inside its 95% interval in the summary. The data hold `r nrow(dat_trials)` trials, so a fit to them takes longer than a fit to the `r 2 * 30` aggregated rows, because its cost grows with the number of rows.
+
+`bmm_data_check()` treats each participant as a cell and names participants with too few trials. The items it counts per level, as the minimum, median and maximum number of trials per item, and it names an item only when that item holds far fewer trials than the typical item. The argument `min_trials` in `?bmm_data_check` gives the exact rule. `ppp()` needs to be told which grouping variable identifies the participants, because the formula now has two:
+
+```{r ppp-trials}
+ppp(fit_trials, participant = "id")
+```
+
+The cells are the two trees, as for aggregated data: `ppp()` sums the trial rows of each cell, for $T_2$ per participant, so both statistics compare counts aggregated over trials. The item effects enter through the expected counts.
+
+Neither TreeBUGS nor MPTinR can fit this model. Both take one row of category frequencies per participant (TreeBUGS 1.5.3, `traitMPT(data = )`; MPTinR 1.14.1, `fit.mpt(data = )`), and covariates in TreeBUGS describe participants, not trials. An item effect would have to be squeezed into the model as a separate tree per item, each with its own parameter, which gives fixed rather than random item effects, and a trial-level covariate as separate trees per value. In `bmm`, a covariate that changes from trial to trial goes into a branch expression as in [Design-fixed covariates in branch expressions], or into a parameter formula as a predictor, and the trial rows carry its value.
 
 # Fitting real data
 
@@ -667,6 +743,7 @@ Importing the model structure is the easy part; what usually needs translating i
 |---|---|
 | model file (EQN, MPTinR text) | `mpt_from_eqn()`, `mpt_from_string()`, or `mpt_tree()` + `mpt()` |
 | wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation]) |
+| frequencies per participant only; no item effects | one row per trial with `response =` (in `mpt()`, `mpt_from_eqn()` and `mpt_from_string()`), and item effects such as `(1 | item)` ([Trial-level data and item effects]) |
 | reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_data_reshape(wide, model)`, or `mpt_data_reshape(wide, model, columns = "mptinr")` |
 | `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS' `FE` has no restriction counterpart: leave the random effect out of that parameter's formula |
 | `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model]) |

@@ -71,8 +71,8 @@ Log-Normal Race Model
 }
 \details{
 \itemize{
-\item \strong{Domain:} Decision Making / Response times
-\item \strong{Task:} Choice Reaction Time tasks (multi-alternative)
+\item \strong{Domain:} Decision making
+\item \strong{Task:} Choices and response times
 \item \strong{Name:} Log-Normal Race Model
 \item \strong{Citation:}
 \itemize{

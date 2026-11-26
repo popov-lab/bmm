@@ -96,8 +96,8 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = nlist(n_choices, accumulators),
-      domain = "Decision Making / Response times",
-      task = "Choice Reaction Time tasks (multi-alternative)",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "Log-Normal Race Model",
       citation = glue(
         "Rouder, J. N., Province, J. M., Morey, R. D., Gomez, P., & Heathcote, A. \\
@@ -117,7 +117,8 @@
       links = vt[["links"]],
       fixed_parameters = vt[["fixed_parameters"]],
       default_priors = vt[["priors"]],
-      init_ranges = vt[["init_ranges"]]
+      init_ranges = vt[["init_ranges"]],
+      functions = list(density = "dlnr", generator = "rlnr")
     ),
     class = c("bmmodel", "lnr", paste0("lnr_", version)),
     call = call
@@ -252,6 +253,7 @@ lnr <- function(rt, response, n_choices = NULL,
                 version = c("simple", "custom"),
                 accumulators = NULL, links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), deprecated = c("n_alternatives", "num_alternatives"))
   dots <- list(...)
   if ("n_alternatives" %in% names(dots)) {
     n_choices <- dots$n_alternatives
@@ -664,6 +666,50 @@ pp_simulate.lnr <- function(model, prep) {
     rt = matrix(race$rt + .pp_dpar_vector(prep, "ndt"), nrow = prep$ndraws),
     response = matrix(race$response, nrow = prep$ndraws)
   )
+}
+
+############################################################################# !
+# SIMULATE_DATA S3 METHODS                                               ####
+############################################################################# !
+
+# One draw per row: every row is its own race, with its own meanlogs, sdlog and
+# accumulator counts. The simple version races one correct accumulator against
+# n_choices - 1 errors; which error won is drawn uniformly, as no parameter
+# distinguishes the errors
+#' @export
+simulate_data.lnr <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  custom <- model$version == "custom"
+  formula <- list(...)[["formula"]]
+  stopif(custom && is.null(formula),
+         "The custom version of lnr takes its categories from the formula: \\
+         pass the bmmformula you fit as `formula =`.")
+  if (custom) {
+    model <- check_model(model, formula = formula)
+  }
+  cats <- if (custom) model$other_vars$resp_cats else c("correct", "error")
+  acc <- model$other_vars$accumulators
+  design <- .design_or_n(model, design, if (is.character(acc)) unname(acc), ...)
+  sim <- .simulate_pars(model, pars, design, scale, formula)
+  n <- nrow(design)
+  counts <- if (!custom) {
+    matrix(c(1L, model$other_vars$n_choices - 1L), n, 2, byrow = TRUE)
+  } else if (is.character(acc)) {
+    as.matrix(design[acc[cats]])
+  } else {
+    matrix(acc[cats] %||% 1L, n, length(cats), byrow = TRUE)
+  }
+  race <- lnr_race(
+    m = vapply(sim$native[cats], identity, numeric(n)),
+    s = matrix(sim$native$s, n, length(cats)),
+    counts = counts
+  )
+  response <- if (custom) {
+    cats[race$response]
+  } else {
+    ifelse(race$response == 1L, 1L, sample.int(model$other_vars$n_choices - 1L, n, replace = TRUE) + 1L)
+  }
+  out <- list(race$rt + sim$native$ndt, response)
+  .simulate_result(design, stats::setNames(out, c(model$resp_vars$rt, model$resp_vars$response)), sim)
 }
 
 #' @exportS3Method

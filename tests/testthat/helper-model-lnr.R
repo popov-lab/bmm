@@ -78,6 +78,22 @@ model_cases_lnr <- function() {
                             formula = observables_custom),
         data = sim, formula = observables_custom
       )
+    ),
+    simulate = list(
+      lnr_simple = list(
+        model = lnr("rt", "response", n_choices = 3), pars = list(correct = -0.5, error = 0, ndt = -1.5, s = 0),
+        design = data.frame(id = rep(1:2, 50)), formula = bmf(correct ~ 1, error ~ 1, ndt ~ 1, s ~ 1),
+        simulate_pars = list(correct = -0.5, error = 0, ndt = -1.5, s = 0)
+      ),
+      lnr_custom = list(
+        model = check_model(
+          lnr("rt", "label", version = "custom", accumulators = c(a = 1, b = 2)),
+          formula = bmf(a ~ 1, b ~ 1, ndt ~ 1, s ~ 1)
+        ),
+        pars = list(a = -0.5, b = 0, ndt = -1.5, s = 0),
+        design = data.frame(id = rep(1:2, 50)), formula = bmf(a ~ 1, b ~ 1, ndt ~ 1, s ~ 1),
+        simulate_pars = list(a = -0.5, b = 0, ndt = -1.5, s = 0)
+      )
     )
   )
 }

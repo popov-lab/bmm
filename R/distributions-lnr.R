@@ -58,7 +58,7 @@
 #' hist(dat$rt)
 #' @export
 dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
-  validate_lnr_parameters(s, ndt, length(m), length(rt))
+  .check_lnr_args(s, ndt, length(m), length(rt))
   stopif(
     !is.numeric(response) || anyNA(response),
     "response must contain integers in 1:{length(m)}."
@@ -101,7 +101,7 @@ dlnr <- function(rt, response, m, s, ndt, log = FALSE) {
 #' @rdname lnr_dist
 #' @export
 rlnr <- function(n, m, s, ndt) {
-  validate_lnr_parameters(s, ndt, length(m), 1L)
+  .check_lnr_args(s, ndt, length(m), 1L)
   .rlnr(n, m, s, ndt)
 }
 
@@ -122,7 +122,7 @@ rlnr <- function(n, m, s, ndt) {
 #' @rdname lnr_dist
 #' @export
 plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
-  validate_lnr_parameters(s, ndt, length(m), length(q))
+  .check_lnr_args(s, ndt, length(m), length(q))
   K <- length(m)
   if (length(s) == 1) s <- rep(s, K)
   t <- q - ndt
@@ -182,7 +182,7 @@ plnr <- function(q, response, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
 #' @rdname lnr_dist
 #' @export
 qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
-  validate_lnr_parameters(s, ndt, length(m), 1L)
+  .check_lnr_args(s, ndt, length(m), 1L)
   K <- length(m)
   if (length(s) == 1) s <- rep(s, K)
   log_surv_target <- if (lower.tail) {
@@ -210,7 +210,7 @@ qlnr <- function(p, m, s, ndt, lower.tail = TRUE, log.p = FALSE) {
   }, numeric(1))
 }
 
-validate_lnr_parameters <- function(s, ndt, n_acc, n_obs) {
+.check_lnr_args <- function(s, ndt, n_acc, n_obs) {
   stopif(
     any(!is.finite(s)) || any(s <= 0),
     "s (sdlog) must be finite and positive."

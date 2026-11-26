@@ -42,3 +42,28 @@ for (name in names(reference_cases())) {
     }
   })
 }
+
+# native_parameters() reads the same parameters on the same scales, so the two
+# must agree; medians and quantiles pass through a monotone link unchanged,
+# whichever scale each of them summarises on
+for (name in c("mixture2p", "mixture3p", "imm")) {
+  test_that(paste("conditional_effects() agrees with native_parameters() on a", name, "fit"), {
+    fit <- reference_fit(name)
+    for (par in reference_ce_pars(reference_cases()[[name]])) {
+      for (scale in c("native", "sampling")) {
+        label <- paste(name, par, scale)
+        effect <- conditional_effects(fit, par = par, scale = scale, re_formula = NA,
+                                      robust = TRUE)[[1]]
+        np <- native_parameters(fit, pars = par, re_formula = NA, scale = scale)
+        var <- attr(effect, "effects")[1]
+        draws <- split(np$value, as.character(np[[var]]))[as.character(effect[[var]])]
+        expect_equal(effect$estimate__, unname(vapply(draws, stats::median, numeric(1))),
+                     tolerance = 1e-6, info = label)
+        expect_equal(effect$lower__, unname(vapply(draws, stats::quantile, numeric(1), 0.025)),
+                     tolerance = 1e-6, info = label)
+        expect_equal(effect$upper__, unname(vapply(draws, stats::quantile, numeric(1), 0.975)),
+                     tolerance = 1e-6, info = label)
+      }
+    }
+  })
+}

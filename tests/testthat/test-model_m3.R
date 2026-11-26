@@ -728,6 +728,14 @@ test_that("m3 runs through the pipeline with the gaussian choice rule in all ver
                  "Default priors for each parameter")
 })
 
+test_that("the gaussian choice rule finds m3_gauss_logp() without library(bmm)", {
+  model <- m3(c("corr", "other", "npl"), c("n_corr", "n_other", "n_npl"),
+              choice_rule = "gaussian", version = "ss")
+  fit <- bmm(bmf(c ~ 1, a ~ 1), oberauer_lewandowsky_2019_e1, model,
+             backend = "mock", mock_fit = 1, rename = FALSE)
+  expect_nl_functions_resolve(fit)
+})
+
 test_that("the gaussian choice rule fixes b at 0, accepts any case, and puts log P on each category", {
   model <- m3(c("corr", "other", "npl"), c(1, 4, 10), choice_rule = "Gaussian", version = "ss")
   expect_identical(model$other_vars$choice_rule, "gaussian")
@@ -833,7 +841,7 @@ test_that("the Stan Gaussian-rule wrapper matches its R companion", {
   expect_lt(max(abs(stan - r)), 1e-6)
 })
 
-# Without the std_normal_lcdf fallback in m3_gaussian_funs.stan the value here is still right but the
+# Without the std_normal_lcdf fallback in m3_gaussian_functions.stan the value here is still right but the
 # gradient is non-finite (log(0) times Phi's zero derivative); the fallback's derivative is approximate
 # (5e-4 off the finite difference at this point), hence error = 1e-2
 test_that("the Stan Gaussian-rule kernel has finite gradients where one category trails by 50", {

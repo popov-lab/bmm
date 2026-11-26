@@ -4,7 +4,9 @@
 #' response category of the EQN file. [bmm()] takes one row per participant
 #' and tree, a column naming the tree, and one count column per *shared*
 #' response category (see [mpt()]). `mpt_data_reshape()` reshapes the first
-#' layout into the second for a given model.
+#' layout into the second for a given model. Data with one row per trial are
+#' long already and need no reshaping: name their column of response
+#' categories in `mpt(response = )`.
 #'
 #' @param data A data frame or matrix with one row per participant. The count
 #'   columns are read as described under `columns`; with `columns = "names"`,
