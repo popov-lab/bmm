@@ -71,8 +71,8 @@ Linear Ballistic Accumulator
 }
 \details{
 \itemize{
-\item \strong{Domain:} Decision Making / Response times
-\item \strong{Task:} Choice Reaction Time tasks (multi-alternative)
+\item \strong{Domain:} Decision making
+\item \strong{Task:} Choices and response times
 \item \strong{Name:} Linear Ballistic Accumulator
 \item \strong{Citation:}
 \itemize{

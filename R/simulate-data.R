@@ -60,6 +60,7 @@
 #' | Model | Columns |
 #' |:--|:--|
 #' | [sdm()], [ddm()], [cswald()] | none |
+#' | [lba()] | none; the columns `accumulators` names for the custom version, whose `formula` goes in `...` |
 #' | [mixture2p()] | `set_size` (if it names a column) for the versions `"slot"` and `"slot_averaging"`; none for `"simple"` |
 #' | [mixture3p()] | `set_size` (if it names a column), `nt_features`, of which a row's first `set_size - 1` are read |
 #' | [imm()] | as [mixture3p()], plus `nt_distances` for the versions `"full"` and `"bsc"` |

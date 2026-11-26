@@ -154,10 +154,6 @@ Choices and response times
 \item cswald(): Censored-Shifted Wald Model
 \item ddm(): Diffusion Decision Model
 \item ezdm(): EZ-Diffusion Model
-}
-
-Choice Reaction Time tasks (multi-alternative)
-\itemize{
 \item lba(): Linear Ballistic Accumulator
 }
 

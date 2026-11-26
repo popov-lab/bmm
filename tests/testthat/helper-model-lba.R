@@ -65,6 +65,27 @@ model_cases_lba <- function() {
         data = data.frame(rt = rep(c(0.6, 0.8), 25), response = rep(1:2, 25))
       )
     ),
+    simulate = list(
+      lba_simple = list(
+        model = lba("rt", "response", n_choices = 3),
+        pars = list(driftc = 1.5, drifte = 0.5, gap = -0.7, sp = -0.7, ndt = -1.6),
+        design = data.frame(id = rep(1:2, 25)),
+        formula = bmf(driftc ~ 1, drifte ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1),
+        simulate_pars = list(driftc = 1.5, drifte = 0.5, gap = -0.7, sp = -0.7, ndt = -1.6, s = 0)
+      ),
+      # the custom model is checked against its formula, which names its categories;
+      # one accumulator more for the first category on every other trial
+      lba_custom = list(
+        model = check_model(
+          lba("rt", "choice", version = "custom", accumulators = c(left = "n_left", right = "n_right")),
+          NULL, bmf(left ~ 1, right ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1)
+        ),
+        pars = list(left = 1.5, right = 0.5, gap = -0.7, sp = -0.7, ndt = -1.6),
+        design = data.frame(n_left = rep(1:2, 25), n_right = 1L),
+        formula = bmf(left ~ 1, right ~ 1, gap ~ 1, sp ~ 1, ndt ~ 1),
+        simulate_pars = list(left = 1.5, right = 0.5, gap = -0.7, sp = -0.7, ndt = -1.6, s = 0)
+      )
+    ),
     observables = list(
       lba = list(
         model = lba(rt = "rt", response = "response", n_choices = 2),

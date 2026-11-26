@@ -95,8 +95,8 @@
     list(
       resp_vars = nlist(rt, response),
       other_vars = nlist(n_choices, accumulators, distribution),
-      domain = "Decision Making / Response times",
-      task = "Choice Reaction Time tasks (multi-alternative)",
+      domain = "Decision making",
+      task = "Choices and response times",
       name = "Linear Ballistic Accumulator",
       citation = glue(
         "Brown, S. D., & Heathcote, A. (2008). The simplest complete model of \\
@@ -115,7 +115,8 @@
       links = vt[["links"]],
       fixed_parameters = vt[["fixed_parameters"]],
       default_priors = vt[["priors"]],
-      init_ranges = vt[["init_ranges"]]
+      init_ranges = vt[["init_ranges"]],
+      functions = list(density = "dlba", generator = "rlba")
     ),
     class = c("bmmodel", "lba", paste0("lba_", version)),
     call = call
@@ -238,6 +239,7 @@ lba <- function(rt, response, n_choices = NULL,
                 distribution = "normal",
                 accumulators = NULL, links = NULL, ...) {
   call <- match.call()
+  .check_constructor_dots(list(...), deprecated = c("n_alternatives", "num_alternatives"))
   dots <- list(...)
   if ("n_alternatives" %in% names(dots)) {
     n_choices <- dots$n_alternatives
@@ -655,6 +657,69 @@ pp_simulate.lba_simple <- function(model, prep) {
 #' @export
 pp_simulate.lba_custom <- function(model, prep) {
   .lba_pp_simulate(model, prep)
+}
+
+# The simple version races one accumulator per choice, the correct one against
+# n_choices - 1 errors with a shared drift, and reports the winner as the
+# response. The custom version takes its categories from `formula`, whose
+# parameters exist only there, and races the accumulators the model gives each
+# category (columns of the design when `accumulators` names columns)
+#' @export
+simulate_data.lba <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
+  formula <- list(...)[["formula"]]
+  custom <- model$version == "custom"
+  stopif(
+    custom && is.null(formula),
+    "The custom version of lba() has parameters only in its formula: pass it as \
+    `formula =`. See ?simulate_data."
+  )
+  accumulators <- model$other_vars$accumulators
+  design <- .design_or_n(
+    model, design, ...,
+    counts = if (is.character(accumulators)) unname(accumulators)
+  )
+  # check_model() gives the custom model the categories of the formula
+  if (custom) {
+    model <- check_model(model, formula = formula)
+  }
+  sim <- .simulate_pars(model, pars, design, scale)
+  p <- sim$native
+  n <- nrow(design)
+
+  if (custom) {
+    cats <- model$other_vars$resp_cats
+    drift <- do.call(cbind, p[cats])
+    counts <- if (is.null(accumulators)) {
+      matrix(1L, n, length(cats))
+    } else if (is.character(accumulators)) {
+      as.matrix(design[unname(accumulators[cats])])
+    } else {
+      matrix(accumulators[cats], n, length(cats), byrow = TRUE)
+    }
+  } else {
+    cats <- seq_len(model$other_vars$n_choices)
+    drift <- do.call(cbind, p[c("driftc", rep("drifte", length(cats) - 1))])
+    counts <- matrix(1L, n, length(cats))
+  }
+
+  key <- as.data.frame(cbind(drift, counts, do.call(cbind, p[.lba_shared_pars])))
+  rt <- numeric(n)
+  winner <- integer(n)
+  for (rows in .row_groups(key)) {
+    i <- rows[1]
+    owner <- rep(seq_along(cats), counts[i, ])
+    out <- rlba(
+      length(rows), drift[i, owner], p$gap[i], p$sp[i], p$ndt[i], p$s[i],
+      model$other_vars$distribution
+    )
+    rt[rows] <- out$rt
+    winner[rows] <- owner[out$response]
+  }
+  .simulate_result(
+    design,
+    stats::setNames(list(rt, cats[winner]), c(model$resp_vars$rt, model$resp_vars$response)),
+    sim
+  )
 }
 
 .lba_dist_from_family <- function(family_name) {

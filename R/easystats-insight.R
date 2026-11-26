@@ -246,8 +246,11 @@ link_inverse.bmmfit <- function(x, ...) {
 .insight_trial_frame <- function(x) {
   model <- x$bmm$model
   response <- all.vars(brms::brmsterms(x$formula)$respform)[1]
-  if (!inherits(model, c("sdt_rating", "sdt_ranking", "sdt_cdp")) ||
-      !is_trial_level(model) || !is.matrix(x$data[[response]])) {
+  # lba() keeps no response column in the frame, only the category codes and
+  # counts that check_data() wrote
+  if (!inherits(model, "lba") &&
+      (!inherits(model, c("sdt_rating", "sdt_ranking", "sdt_cdp")) ||
+         !is_trial_level(model) || !is.matrix(x$data[[response]]))) {
     return(x$data)
   }
   data <- revert_check_data(model, x$data)

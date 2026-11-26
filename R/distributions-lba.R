@@ -63,7 +63,7 @@ dlba <- function(rt, response, drift, gap, sp, ndt, s = 1,
                  distribution = "normal",
                  log = FALSE) {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
+  .check_lba_args(drift, gap, sp, ndt, s, distribution)
   stopif(
     !is.numeric(rt) || !is.numeric(response),
     "rt and response must be numeric vectors."
@@ -88,7 +88,7 @@ dlba <- function(rt, response, drift, gap, sp, ndt, s = 1,
 rlba <- function(n, drift, gap, sp, ndt, s = 1,
                  distribution = "normal") {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
+  .check_lba_args(drift, gap, sp, ndt, s, distribution)
   b <- gap + sp
   A <- sp
   .rlba(n, drift, b, A, ndt, s, distribution)
@@ -100,7 +100,7 @@ plba <- function(q, drift, gap, sp, ndt, s = 1,
                  distribution = "normal",
                  lower.tail = TRUE, log.p = FALSE) {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
+  .check_lba_args(drift, gap, sp, ndt, s, distribution)
   t <- q - ndt
   b <- gap + sp
   A <- sp
@@ -124,7 +124,7 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
                  distribution = "normal",
                  lower.tail = TRUE, log.p = FALSE) {
   distribution <- match.arg(distribution)
-  validate_lba_parameters(drift, gap, sp, ndt, s, distribution)
+  .check_lba_args(drift, gap, sp, ndt, s, distribution)
 
   if (log.p) p <- exp(p)
   if (!lower.tail) p <- 1 - p
@@ -371,7 +371,7 @@ qlba <- function(p, drift, gap, sp, ndt, s = 1,
 }
 
 
-validate_lba_parameters <- function(drift, gap, sp, ndt, s, distribution) {
+.check_lba_args <- function(drift, gap, sp, ndt, s, distribution) {
   stopif(any(gap <= 0), "gap (threshold gap) must be positive.")
   stopif(any(sp <= 0), "sp (maximum starting point) must be positive.")
   stopif(any(ndt < 0), "ndt (non-decision time) must be non-negative.")

@@ -526,7 +526,7 @@ test_that("dlba matches rtdists for normal distribution", {
   expect_equal(bmm_d, rtd_d, tolerance = 1e-10)
 })
 
-test_that("validate_lba_parameters catches invalid inputs", {
+test_that(".check_lba_args catches invalid inputs", {
   expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = -1, sp = 0.3,
                     ndt = 0.2))
   expect_error(dlba(0.5, 1, drift = c(3, 1.5), gap = 0.5, sp = -0.1,
