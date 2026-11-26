@@ -381,7 +381,10 @@ test_that("rsdm follows qsdm at narrow peaks, on both sides of the switch of pro
     # uniform proposal hands over
     list(mu = 0, c = 100, kappa = 4, activation = "laplace"),
     list(mu = 0, c = 100, kappa = 3, activation = "laplace"),
-    list(mu = -1, c = 1e6, kappa = 100, activation = "vonmises")
+    list(mu = -1, c = 1e6, kappa = 100, activation = "vonmises"),
+    # a von Mises peak on a floor exp(-8) holding 41% of the mass, so the
+    # envelope needs its floor piece and a peak mass that is exact
+    list(mu = 0, c = 8, kappa = 1e5, activation = "vonmises", scaling = "peak")
   )
   for (cell in cells) {
     x <- do.call(rsdm, c(list(20000), cell))
