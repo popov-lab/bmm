@@ -1,6 +1,7 @@
 # bmm (development version)
 
 ### New models
+* Add the **Log-Normal Race Model** (`lnr`) for multi-alternative choice reaction time tasks (Rouder et al., 2015), a race model in which each response alternative has a lognormal accumulator. Two versions: `simple` (one meanlog for correct, one shared by the errors, integer-coded responses) and `custom` (one meanlog per named response category, with optional per-category `accumulators`). The sdlog `s` is estimated by default; write `s = 0` in `bmf()` to hold it at 1 instead. See `?lnr` and the [article](https://popov-lab.github.io/bmm/dev/articles/bmm_lnr.html) on the `bmm` website. Thanks to @GidonFrischkorn (#352)
 * Add the **psychometric function** (`psychometric_function()`) for detection and discrimination at varying stimulus intensity, from 0/1 responses per trial or counts per level. It estimates the `midpoint` and `width` of a normal, logistic, Gumbel, Weibull, log-normal or log-logistic sigmoid, and a guess and lapse rate; either rate can instead be fixed in the call, e.g. `guess = 0.5` for 2AFC. `psychometric_threshold()` returns thresholds and slopes at any target performance. Also adds `dpsychometric_function()` and `rpsychometric_function()`. See `?psychometric_function` (#507). Thanks to @GidonFrischkorn
 
 ### New features
