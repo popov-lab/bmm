@@ -84,6 +84,7 @@ The columns each model reads from \code{design}, under the names the model was
 specified with:\tabular{ll}{
    Model \tab Columns \cr
    \code{\link[=sdm]{sdm()}}, \code{\link[=ddm]{ddm()}}, \code{\link[=cswald]{cswald()}} \tab none \cr
+   \code{\link[=lba]{lba()}} \tab none; the columns \code{accumulators} names for the custom version, whose \code{formula} goes in \code{...} \cr
    \code{\link[=mixture2p]{mixture2p()}} \tab \code{set_size} (if it names a column) for the versions \code{"slot"} and \code{"slot_averaging"}; none for \code{"simple"} \cr
    \code{\link[=mixture3p]{mixture3p()}} \tab \code{set_size} (if it names a column), \code{nt_features}, of which a row's first \code{set_size - 1} are read \cr
    \code{\link[=imm]{imm()}} \tab as \code{\link[=mixture3p]{mixture3p()}}, plus \code{nt_distances} for the versions \code{"full"} and \code{"bsc"} \cr
