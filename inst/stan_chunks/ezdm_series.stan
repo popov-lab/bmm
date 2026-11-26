@@ -1,7 +1,4 @@
-  // Generated, do not edit by hand: a test recomputes every literal from .EZDM_LOG_SINHC_COEF
-  // ezdm_log_sinhc_dn is the n-th derivative of G(x) = log(sinh(sqrt x) / sqrt x) as a Horner series
-  // ezdm_log_cosh_dn is the n-th derivative of C(y) = log cosh(sqrt y) as a Horner series
-
+  // first derivative of log(sinh(sqrt(x)) / sqrt(x)), as a power series in x
   real ezdm_log_sinhc_d1(real x) {
     real acc = -1.2336844022586037e-16;
     acc = fma(acc, x, 1.2175977014591684e-15);
@@ -22,6 +19,7 @@
     return acc;
   }
 
+  // second derivative of log(sinh(sqrt(x)) / sqrt(x)), as a power series in x
   real ezdm_log_sinhc_d2(real x) {
     real acc = -1.8505266033879055e-15;
     acc = fma(acc, x, 1.704636782042836e-14);
@@ -41,6 +39,7 @@
     return acc;
   }
 
+  // third derivative of log(sinh(sqrt(x)) / sqrt(x)), as a power series in x
   real ezdm_log_sinhc_d3(real x) {
     real acc = -2.5907372447430678e-14;
     acc = fma(acc, x, 2.2160278166556864e-13);
@@ -59,6 +58,7 @@
     return acc;
   }
 
+  // fourth derivative of log(sinh(sqrt(x)) / sqrt(x)), as a power series in x
   real ezdm_log_sinhc_d4(real x) {
     real acc = -3.367958418165988e-13;
     acc = fma(acc, x, 2.659233379986824e-12);
@@ -76,6 +76,7 @@
     return acc;
   }
 
+  // first derivative of log(cosh(sqrt(x))), as a power series in x
   real ezdm_log_cosh_d1(real x) {
     real acc = -5.298634160052327e-07;
     acc = fma(acc, x, 1.3073855756453773e-06);
@@ -96,6 +97,7 @@
     return acc;
   }
 
+  // second derivative of log(cosh(sqrt(x))), as a power series in x
   real ezdm_log_cosh_d2(real x) {
     real acc = -7.94795124007849e-06;
     acc = fma(acc, x, 1.8303398059035282e-05);
@@ -115,6 +117,7 @@
     return acc;
   }
 
+  // third derivative of log(cosh(sqrt(x))), as a power series in x
   real ezdm_log_cosh_d3(real x) {
     real acc = -0.00011127131736109887;
     acc = fma(acc, x, 0.00023794417476745867);
@@ -133,6 +136,7 @@
     return acc;
   }
 
+  // fourth derivative of log(cosh(sqrt(x))), as a power series in x
   real ezdm_log_cosh_d4(real x) {
     real acc = -0.0014465271256942852;
     acc = fma(acc, x, 0.002855330097209504);

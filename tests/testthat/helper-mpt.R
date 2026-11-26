@@ -22,6 +22,18 @@ mpt_2htm_data <- function(n_id = 10, n_items = 50) {
   dat
 }
 
+# one row per trial for the 2HTM trees, labels in the column resp: 2
+# participants x 2 trees x 5 trials, both responses in each participant's trees
+mpt_trial_data <- function() {
+  data.frame(
+    id = factor(rep(1:2, each = 10)),
+    item = factor(rep(1:10, 2)),
+    item_type = rep(rep(c("old", "new"), each = 5), 2),
+    resp = c("old", "old", "old", "new", "old", "new", "new", "old", "new", "new",
+             "old", "new", "old", "old", "old", "new", "old", "new", "new", "new")
+  )
+}
+
 mpt_impossible_trees <- function() {
   list(
     mpt_tree("withdist", list(

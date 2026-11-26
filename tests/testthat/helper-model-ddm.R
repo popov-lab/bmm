@@ -22,6 +22,13 @@ model_cases_ddm <- function() {
         data = withr::with_seed(1, rddm(20, drift = 1, bound = 1.5, ndt = 0.3)),
         formula = bmf(drift ~ 1)
       )
+    ),
+    simulate = list(
+      ddm = list(
+        model = ddm("rt", "response"), pars = list(drift = 1, bound = 0, ndt = -1.2),
+        design = data.frame(id = rep(1:2, 50)), formula = bmf(drift ~ 1, bound ~ 1, ndt ~ 1),
+        simulate_pars = list(drift = 1, bound = 0, ndt = -1.2, zr = 0)
+      )
     )
   )
 }

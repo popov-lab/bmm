@@ -14,7 +14,7 @@ badge](https://popov-lab.r-universe.dev/badges/bmm)](https://popov-lab.r-univers
 [![test-coverage](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fpopov-lab%2Fbmm%2Fbadges%2Fcoverage.json)](https://github.com/popov-lab/bmm/actions/workflows/test-coverage.yaml)
 [![downloads](https://cranlogs.r-pkg.org/badges/bmm)](https://cran.r-project.org/package=bmm)
-[![Dependencies](https://img.shields.io/badge/dependencies-15/25-orange?style=flat)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-15/34-orange?style=flat)](#)
 <!-- badges: end -->
 
 *Bayesian Measurement Models for behavioral research in R*
@@ -44,13 +44,13 @@ dependent variable. See the [continuous reproduction
 article](https://venpopov.com/bmm/articles/bmm_vwm_crt.html).
 
 - [`imm()`](https://venpopov.com/bmm/reference/imm.html): Interference
-  measurement model by Oberauer and Lin (2017)
+  Measurement Model
 - [`mixture2p()`](https://venpopov.com/bmm/reference/mixture2p.html):
-  Two-parameter mixture model by Zhang and Luck (2008)
+  Two-Parameter Mixture Model
 - [`mixture3p()`](https://venpopov.com/bmm/reference/mixture3p.html):
-  Three-parameter mixture model by Bays et al (2009)
+  Three-Parameter Mixture Model
 - [`sdm()`](https://venpopov.com/bmm/reference/sdm.html): Signal
-  Discrimination Model (SDM) by Oberauer (2023)
+  Discrimination Model (SDM)
 
 **Categorical recall and n-AFC decisions.** Participants choose one
 response from a set of categories (n-alternative forced choice), for
@@ -58,15 +58,17 @@ example the correct item, an item from another position, or an item that
 was not studied. See the [M3
 article](https://venpopov.com/bmm/articles/bmm_m3.html).
 
-- [`m3()`](https://venpopov.com/bmm/reference/m3.html): The Multinomial
-  / Memory Measurement Model
+- [`m3()`](https://venpopov.com/bmm/reference/m3.html): Memory
+  Measurement Model
+- [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
+  Processing Tree (MPT) Model
 
 **Detection, recognition and confidence judgments.** Participants decide
 whether a signal was present or an item was studied, rate their
 confidence, give Remember/Know judgments, pick the target among several
 alternatives, or rank the alternatives. One signal detection model per
 response format, each fit to response counts per participant and
-condition. See the [signal detection
+condition or to one row per trial. See the [signal detection
 article](https://venpopov.com/bmm/articles/bmm_sdt.html) and, for the
 dual-process and meta-d′ versions of `sdt_rating()` and the
 Remember/Know model `sdt_cdp()`, the [dual-process and meta-d′
@@ -76,16 +78,20 @@ started](https://venpopov.com/bmm/articles/bmm.html#detection-recognition-and-co
 page has a table of the response formats and the noise distributions
 each model offers.
 
+- [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
+  Processing Tree (MPT) Model
+- [`psychometric_function()`](https://venpopov.com/bmm/reference/psychometric_function.html):
+  Psychometric Function
 - [`sdt_cdp()`](https://venpopov.com/bmm/reference/sdt_cdp.html):
-  Continuous Dual-Process Signal Detection Theory (CDP)
+  Continuous Dual-Process Signal Detection Theory Model
 - [`sdt_mafc()`](https://venpopov.com/bmm/reference/sdt_mafc.html):
-  Signal Detection Theory (m-AFC)
+  m-Alternative Forced Choice Signal Detection Theory Model
 - [`sdt_ranking()`](https://venpopov.com/bmm/reference/sdt_ranking.html):
-  Signal Detection Theory (Ranking)
+  Ranking Signal Detection Theory Model
 - [`sdt_rating()`](https://venpopov.com/bmm/reference/sdt_rating.html):
-  Signal Detection Theory (Confidence Rating)
-- [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Signal
-  Detection Theory (Yes/No)
+  Confidence Rating Signal Detection Theory Model
+- [`sdt_yn()`](https://venpopov.com/bmm/reference/sdt_yn.html): Yes/No
+  Signal Detection Theory Model
 
 **Choices and response times.** Participants choose between two options
 and the response time is recorded, either on every trial or as means and
@@ -108,11 +114,11 @@ articles.
 you describe the discrete processes that lead to each response as a
 multinomial processing tree: the two-high-threshold model of
 recognition, the pair-clustering model of free recall, or a tree of your
-own. The model is fit to response counts per participant and condition.
-See the [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html).
-
-- [`mpt()`](https://venpopov.com/bmm/reference/mpt.html): Multinomial
-  Processing Tree (MPT) models
+own. The model is fit to response counts per participant and condition
+or to one row per trial. See the [MPT
+article](https://venpopov.com/bmm/articles/bmm_mpt.html). The model,
+[`mpt()`](https://venpopov.com/bmm/reference/mpt.html), is listed above
+under categorical recall and under detection and recognition.
 
 <img src="man/figures/README-task-map.png" alt="The tasks bmm covers and the models for each" width="100%" />
 

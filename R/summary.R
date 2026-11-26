@@ -228,7 +228,7 @@ construct_model_call <- function(model, newline = FALSE, wsp = 1, ...) {
     model_name <- classes[length(classes)]
 
     # construct the inner part of the call
-    allvars <- c(model$resp_vars, model$other_vars)
+    allvars <- c(model$resp_vars, model$other_vars[setdiff(names(model$other_vars), "trial_level")])
   } else {
     model_name <- deparse(call[[1]])
     allvars <- as.list(call)[-1]

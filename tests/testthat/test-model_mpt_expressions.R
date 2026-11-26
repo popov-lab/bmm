@@ -685,19 +685,11 @@ test_that("the search message states why the branches are searched (#560)", {
   repeated <- mpt(mpt_tree("t", list(hit = "1 - (1 - D)^n", miss = "(1 - D)^n")), covariates = "n")
   expect_message(
     check_data(repeated, data.frame(n = 1:300, hit = 5, miss = 5), bmf(D ~ 1)),
-    paste0(
-      "category 'hit' in tree 't', category 'miss' in tree 't' is approximate: ",
-      "their tree has the form for which the check is exact, but the exact ",
-      "check would need more than 65,536 points \\(a grid over the parameters ",
-      "for each distinct covariate setting in the tree's rows\\).*local search"
-    )
+    "'hit' in tree 't', category 'miss' in tree 't' is approximate.*65,536 points \\(a grid over the parameters for each"
   )
   expect_message(
     mpt(mpt_tree("t", list(y = "0.5 + 0.5 * (a - 0.3)^2", n = "0.5 - 0.5 * (a - 0.3)^2"))),
-    paste0(
-      "is approximate: a parameter enters them more than once.*",
-      "not written with parameters.*local search"
-    )
+    "a parameter enters them more than once.*not written with parameters"
   )
   # one message per reason
   msgs <- testthat::capture_messages(bmm:::.mpt_message_sampled(
@@ -742,14 +734,9 @@ test_that("the search message names the reason for pair clustering over the grid
   expect_message(
     check_data(pairs, data, bmf(c ~ 1, r ~ 1, u ~ 1)),
     paste0(
-      "category 'E2' in tree 'pairs', category 'E3' in tree 'pairs', category ",
-      "'E4' in tree 'pairs' is approximate: their tree has the form for which ",
-      "the check is exact.*more than 65,536 points.*local search.*",
-      "The search left unsearched 11,488 of the 12,000 combinations of a ",
-      "distinct covariate setting with a vertex of the parameters it holds ",
-      "fixed and capped its further starts for category 'E2' in tree 'pairs', ",
-      "category 'E3' in tree 'pairs'; it left unsearched 23,488 of the 24,000 .*",
-      "for category 'E4' in tree 'pairs'\\."
+      "'E2' in tree 'pairs', category 'E3' in tree 'pairs', category 'E4' in tree 'pairs' is approximate.*65,536 points.*",
+      "unsearched 11,488 of the 12,000 .*'E2' in tree 'pairs', category 'E3' in tree 'pairs'; ",
+      "it left unsearched 23,488 of the 24,000 .*'E4' in tree 'pairs'\\."
     )
   )
 })

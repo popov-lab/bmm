@@ -55,10 +55,12 @@ the attribute \code{"draws"}.
 }
 \description{
 Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
-(2010) and their posterior predictive p-values (PPP) for models that fit
-aggregated response counts: \code{\link[=mpt]{mpt()}}, \code{\link[=m3]{m3()}}, \code{\link[=sdt_yn]{sdt_yn()}}, \code{\link[=sdt_rating]{sdt_rating()}},
-\code{\link[=sdt_mafc]{sdt_mafc()}}, \code{\link[=sdt_ranking]{sdt_ranking()}} and \code{\link[=sdt_cdp]{sdt_cdp()}}. TreeBUGS' \code{PPP()} reports the
-same two statistics; Details says where their values differ.
+(2010) and their posterior predictive p-values (PPP) for the count models,
+whose rows are aggregated counts or single trials (\code{\link[=sdt_yn]{sdt_yn()}} and
+\code{\link[=sdt_mafc]{sdt_mafc()}} without \code{n_trials}, \code{\link[=mpt]{mpt()}} with \code{response}): \code{\link[=mpt]{mpt()}}, \code{\link[=m3]{m3()}},
+\code{\link[=sdt_yn]{sdt_yn()}}, \code{\link[=sdt_rating]{sdt_rating()}}, \code{\link[=sdt_mafc]{sdt_mafc()}}, \code{\link[=sdt_ranking]{sdt_ranking()}} and \code{\link[=sdt_cdp]{sdt_cdp()}}.
+TreeBUGS' \code{PPP()} reports the same two statistics; Details says where their
+values differ.
 }
 \details{
 Both statistics are computed once per posterior draw, for the observed counts

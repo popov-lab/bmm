@@ -1,25 +1,24 @@
-  // sampling distribution of the EZ-diffusion summaries, shared by 3par and 4par
-  // derivation and R twins: .ezdm_cumulants() and .ez_rt_terms() in R/distributions.R
-  // scalar on purpose: vector temporaries in these per-row functions cost ~1.5x per gradient
-
-  // closed-form regime, in p = t coth(t) and q = t^2 csch(t)^2 from one exp(-2t) that stays finite
+  // t * coth(t), computed from exp(-2t)
   real ezdm_coth_term(real t, real exp_m2t) {
     return t * (1 + exp_m2t) / (1 - exp_m2t);
   }
 
+  // t^2 / sinh(t)^2, computed from exp(-2t)
   real ezdm_csch_term(real t, real exp_m2t) {
     return 4 * square(t) * exp_m2t * inv_square(1 - exp_m2t);
   }
 
+  // third-derivative term of the cumulant generating function of the decision time
   real ezdm_cgf_d3(real p, real q) {
     return 3 * (p + q) + 2 * p * q;
   }
 
+  // fourth-derivative term of the cumulant generating function of the decision time
   real ezdm_cgf_d4(real p, real q, real t) {
     return -(15 * (p + q) + 12 * p * q + 2 * q * (2 * square(t) + 3 * q));
   }
 
-  // log density of the mean and variance of n RTs, given ndt + MDT, VRT, k3 and k4
+  // log density of the observed mean and variance of n response times, given their expected moments
   real ezdm_summaries_lpdf(real mrt, real vrt, int n, real mean, real VRT,
                            real k3, real k4) {
     real inv_W = inv(k4 / n + 2 * square(VRT) / (n - 1));
@@ -29,7 +28,7 @@
                          sqrt(VRT / n - square(cov_mean_var) * inv_W));
   }
 
-  // RT summaries at the boundary a distance b from the start point; b0_d1..b0_d4 are the shared b0 terms
+  // log density of the response time summaries at one boundary, a distance b from the start point
   real ezdm_boundary_lpdf(real mrt, real vrt, int n, real ndt, real b, real w,
                           real s_sq, int series, real b0_d1, real b0_d2,
                           real b0_d3, real b0_d4) {
@@ -56,11 +55,10 @@
       (ezdm_cgf_d4(p, q, t) - b0_d4) * square(inv_s2w_sq));
   }
 
-  // RT summaries of 3par, where the two log sinh terms collapse into one log cosh (~1.6x faster)
+  // log density of the response time summaries with the start point midway between the boundaries
   real ezdm_symmetric_lpdf(real mrt, real vrt, int n, real ndt, real bound,
                            real w, real s_sq) {
     real y = 0.25 * square(bound) * w;
-    // the seam of the general path, t = 2 sqrt(y) = 0.7
     if (y < 0.1225) {
       real scale = 0.5 * square(bound) / s_sq;
       real scale_sq = square(scale);
@@ -83,12 +81,12 @@
       -ezdm_cgf_d4(p, q, u) * square(inv_s2w_sq));
   }
 
-  // log(expm1(x) / x) by series, exact below |x| = 1e-4, so pC keeps its drift gradient at zero
+  // log(expm1(x) / x) for x close to zero
   real ezdm_log_expm1_ratio(real x) {
     return log1p(x * (0.5 + x * (1.0 / 6 + x / 24)));
   }
 
-  // logit of pC with the bound terms cancelled, so no log is taken of a probability rounded to 0 or 1
+  // logit of the predicted proportion of correct responses
   real ezdm_logit_pc(real b_upper, real b_lower, real k) {
     real up = 2 * k * b_upper;
     real lo = 2 * k * b_lower;
