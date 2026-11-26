@@ -152,6 +152,13 @@ glue_nlf <- function(..., env.frame = -1) {
   brms::nlf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
 }
 
+# A non-linear formula that calls a function of bmm. brms evaluates it in R for
+# every prediction method, looking the function up from the formula's
+# environment; the namespace finds it whether or not the user attached bmm
+bmm_nl_formula <- function(x) {
+  stats::as.formula(x, env = asNamespace("bmm"))
+}
+
 # args$prior is NULL by default or is the combined default and user-provided
 # prior; args$dots holds whatever the user passed to bmm() and so overwrites the
 # configured default for any argument (such as init) they named themselves.
@@ -834,7 +841,10 @@ reset_env.brmsformula <- function(object, env = globalenv(), ...) {
 
 #' @export
 reset_env.formula <- function(object, env = globalenv(), ...) {
-  environment(object) <- env
+  # a bmm_nl_formula() needs the namespace to find its function
+  if (!identical(environment(object), asNamespace("bmm"))) {
+    environment(object) <- env
+  }
   object
 }
 
