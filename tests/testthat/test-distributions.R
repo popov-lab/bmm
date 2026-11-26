@@ -358,6 +358,8 @@ test_that("rsdm stops on a missing or infinite mu at a narrow peak as at a wide 
   for (c_ in c(3, 1e6)) {
     expect_error(rsdm(3, mu = c(0, NA, 0), c = c_, kappa = 1, activation = "laplace"), "contain NA")
     expect_error(rsdm(3, mu = Inf, c = c_, kappa = 1, activation = "laplace"), "contain NA")
+    expect_identical(rsdm(0, mu = NA, c = c_, kappa = 1, activation = "laplace"), numeric(0))
+    expect_identical(rsdm(0, mu = Inf, c = c_, kappa = 1, activation = "laplace"), numeric(0))
   }
 })
 

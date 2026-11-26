@@ -478,9 +478,6 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
   kappa <- .recycle_draws(kappa, n)
   # i is either a subset of the draws or all of them, in order
   pick <- function(x, i) if (length(x) %in% c(1, length(i))) x else x[i]
-  # the envelope adds mu only after sampling, so a missing or infinite mu
-  # would pass there unnoticed instead of stopping as it does in the target
-  stopif(!all(is.finite(mu)), "The proposals or the target density contain NA; check the parameter values.")
   uniform <- function(i) {
     # the density over its value at the peak, on the log scale: the
     # unnormalized density itself overflows for large c and kappa
@@ -503,6 +500,9 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
   if (length(narrow) == 0) {
     return(uniform(seq_len(n)))
   }
+  # the envelope adds mu only after sampling, so a missing or infinite mu
+  # would pass there unnoticed instead of stopping as it does in the target
+  stopif(!all(is.finite(pick(mu, narrow))), "The proposals or the target density contain NA; check the parameter values.")
   out <- numeric(n)
   if (length(narrow) < n) {
     out[-narrow] <- uniform(seq_len(n)[-narrow])
