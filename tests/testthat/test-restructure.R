@@ -96,3 +96,78 @@ test_that("restructure() leaves native brms families without posterior_epred", {
   fit <- restructure(fit)
   expect_null(fit$formula$family$posterior_epred)
 })
+
+# a fit saved before #731, whose non-linear formulas reset_env() pointed at the
+# global environment
+nl_formulas <- function(fit) {
+  Filter(function(f) isTRUE(attr(f, "nl")), c(list(fit$formula$formula), fit$formula$pforms))
+}
+
+# reset_env() leaves a namespace environment alone, so the old state is set here
+with_global_formula_envs <- function(fit) {
+  environment(fit$formula$formula) <- globalenv()
+  fit$formula$pforms <- lapply(fit$formula$pforms, function(f) {
+    environment(f) <- globalenv()
+    f
+  })
+  fit
+}
+
+nl_companion_fits <- local({
+  fits <- NULL
+  function() {
+    if (is.null(fits)) fits <<- build_nl_companion_fits()
+    fits
+  }
+})
+
+build_nl_companion_fits <- function() {
+  m3_gauss <- m3(c("corr", "other", "npl"), c("n_corr", "n_other", "n_npl"),
+                 choice_rule = "gaussian", version = "ss")
+  list(
+    sdt_ranking = stored_frame_fit(model_test_cases("stored_frame")$sdt_ranking),
+    sdt_cdp = stored_frame_fit(model_test_cases("stored_frame")$sdt_cdp),
+    sdt_rating = stored_frame_fit(model_test_cases("stored_frame")$sdt_rating),
+    m3_gaussian = bmm(bmf(c ~ 1, a ~ 1), oberauer_lewandowsky_2019_e1, m3_gauss,
+                      backend = "mock", mock_fit = 1, rename = FALSE)
+  )
+}
+
+for (kind in names(nl_companion_fits())) {
+  test_that(paste("restructure() gives the non-linear formulas of an old", kind, "fit the namespace"), {
+    skip_on_cran()
+    fit <- nl_companion_fits()[[kind]]
+    old <- with_global_formula_envs(fit)
+    expect_true(all(vapply(nl_formulas(old), function(f) identical(environment(f), globalenv()), logical(1))))
+
+    repaired <- restructure(old)
+    expect_identical(environment(repaired$formula$formula), asNamespace("bmm"))
+    expect_nl_functions_resolve(repaired)
+  })
+}
+
+test_that("restructure() also repairs the formulas of the further categories", {
+  skip_on_cran()
+  repaired <- restructure(with_global_formula_envs(nl_companion_fits()$sdt_ranking))
+  expect_identical(environment(repaired$formula$pforms$murank2), asNamespace("bmm"))
+  expect_identical(environment(repaired$formula$pforms$murank5), asNamespace("bmm"))
+})
+
+test_that("restructure() repairs the formulas once and leaves a current fit as it is", {
+  skip_on_cran()
+  fit <- nl_companion_fits()$sdt_ranking
+  repaired <- restructure(with_global_formula_envs(fit))
+  again <- restructure(repaired)
+  expect_identical(lapply(nl_formulas(again), environment), lapply(nl_formulas(repaired), environment))
+  current <- restructure(fit)
+  expect_identical(lapply(nl_formulas(current), environment), lapply(nl_formulas(fit), environment))
+})
+
+test_that("restructure() keeps the environment of a formula that calls no function of bmm", {
+  fit <- load_fixture_fit("bmmfit_m3_ppcheck.rds")
+  own <- new.env()
+  fit$formula$formula <- reset_env(fit$formula$formula, own)
+  attr(fit$formula$formula, "nl") <- TRUE
+  fit <- restructure(fit)
+  expect_identical(environment(fit$formula$formula), own)
+})

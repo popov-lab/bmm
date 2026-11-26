@@ -33,6 +33,7 @@ restructure.bmmfit <- function(x, ...) {
   # and can still predate the function
   x <- add_posterior_epred(x)
   x <- add_sdm_cell(x)
+  x <- add_nl_namespace(x)
 
   if (restr_version >= current_version) {
     x <- NextMethod("restructure")
@@ -134,6 +135,24 @@ add_posterior_epred <- function(x) {
   if (inherits(x$family, "customfamily")) {
     x$family$posterior_epred <- fun
   }
+  x
+}
+
+# Fits saved before #731 keep their non-linear formulas in the global
+# environment, where brms finds the R companion of a bmm function (such as
+# sdt_ranking_logmu()) only when bmm is attached. Like add_posterior_epred(),
+# not gated by version: development fits carry the current version number
+add_nl_namespace <- function(x) {
+  in_namespace <- function(f) {
+    rhs <- f[[length(f)]]
+    if (isTRUE(attr(f, "nl")) &&
+        any(setdiff(all.names(rhs), all.vars(rhs)) %in% getNamespaceExports("bmm"))) {
+      environment(f) <- asNamespace("bmm")
+    }
+    f
+  }
+  x$formula$formula <- in_namespace(x$formula$formula)
+  x$formula$pforms <- lapply(x$formula$pforms, in_namespace)
   x
 }
 
