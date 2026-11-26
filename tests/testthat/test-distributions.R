@@ -392,10 +392,10 @@ test_that("rsdm follows qsdm at narrow peaks, on both sides of the switch of pro
 test_that("rsdm draws each value from its own cell when narrow and wide cells mix", {
   withr::local_seed(7322)
   n <- 30000
-  group <- sample(rep(1:3, n / 3))
-  pars <- data.frame(mu = c(-2, 2, 0.5), c = c(3, 1e6, 10), kappa = c(3.5, 1, 200))
+  group <- sample(rep_len(1:4, n))
+  pars <- data.frame(mu = c(-2, 2, 0.5, -0.8), c = c(3, 1e6, 10, 2), kappa = c(3.5, 1, 200, 10))
   y <- rsdm(n, pars$mu[group], pars$c[group], pars$kappa[group], activation = "laplace")
-  for (g in 1:3) {
+  for (g in 1:4) {
     cell <- list(mu = pars$mu[g], c = pars$c[g], kappa = pars$kappa[g], activation = "laplace")
     expect_gt(sdm_decile_p(y[group == g], cell), 0.001)
   }
