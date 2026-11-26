@@ -10,12 +10,10 @@
 # DISTRIBUTION ID & NAME MAPPING                                          ####
 ############################################################################# !
 
-# registry position defines the Stan dist_type integer (see .sdt_dists)
-.sdt_dist_id <- function(dist) {
-  match(dist, names(.sdt_dists))
-}
-
-.sdt_dist_names <- names(.sdt_dists)
+# aliases of .noise_dist_id() and .noise_dist_names (R/distributions.R),
+# remove when no branch reads them
+.sdt_dist_id <- .noise_dist_id
+.sdt_dist_names <- .noise_dist_names
 
 
 ############################################################################# !
