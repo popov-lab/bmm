@@ -7,10 +7,11 @@
 #'
 #' Computes the goodness-of-fit statistics \eqn{T_1} and \eqn{T_2} of Klauer
 #' (2010) and their posterior predictive p-values (PPP) for the count models,
-#' whose rows are aggregated counts or, for [sdt_yn()] and [sdt_mafc()] without
-#' `n_trials`, single trials: [mpt()], [m3()], [sdt_yn()], [sdt_rating()],
-#' [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()]. TreeBUGS' `PPP()` reports the
-#' same two statistics; Details says where their values differ.
+#' whose rows are aggregated counts or single trials ([sdt_yn()] and
+#' [sdt_mafc()] without `n_trials`, [mpt()] with `response`): [mpt()], [m3()],
+#' [sdt_yn()], [sdt_rating()], [sdt_mafc()], [sdt_ranking()] and [sdt_cdp()].
+#' TreeBUGS' `PPP()` reports the same two statistics; Details says where their
+#' values differ.
 #'
 #' @details
 #' Both statistics are computed once per posterior draw, for the observed counts
@@ -215,9 +216,15 @@ print.bmm_ppp <- function(x, digits = 3, ...) {
 }
 
 .ppp_counts.default <- function(model, fit, draw_ids) {
+  observed <- .observed_counts(model, fit$data)
+  replicated <- brms::posterior_predict(fit, draw_ids = draw_ids)
+  # sdt_rating()'s trial family predicts the category of each row
+  if (length(dim(replicated)) == 2L) {
+    replicated <- .one_hot(replicated, colnames(observed))
+  }
   list(
-    observed = unclass(fit$data$Y),
-    replicated = brms::posterior_predict(fit, draw_ids = draw_ids),
+    observed = observed,
+    replicated = replicated,
     expected = brms::posterior_epred(fit, draw_ids = draw_ids)
   )
 }

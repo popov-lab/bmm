@@ -38,6 +38,7 @@ reference:
   - contents:
     - "bmm-package"
     - "bmm_models"
+    - "model_spec"
     - "bmm_options"
     - "bmm_setup"
   - title: "Fitting models"

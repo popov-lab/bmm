@@ -59,11 +59,12 @@
 #'
 #' | Model | Columns |
 #' |:--|:--|
-#' | [mixture2p()], [sdm()], [ddm()], [cswald()] | none |
+#' | [sdm()], [ddm()], [cswald()] | none |
+#' | [mixture2p()] | `set_size` (if it names a column) for the versions `"slot"` and `"slot_averaging"`; none for `"simple"` |
 #' | [mixture3p()] | `set_size` (if it names a column), `nt_features`, of which a row's first `set_size - 1` are read |
 #' | [imm()] | as [mixture3p()], plus `nt_distances` for the versions `"full"` and `"bsc"` |
 #' | [m3()] | `n_trials`, the number of trials of each row; `num_options` when it names columns; for the custom version, the columns its activation functions read besides the parameters, as numbers (code a factor as 0/1 indicators) |
-#' | [mpt()] | `n_trials`; `tree_id` and `covariates` when the model has them |
+#' | [mpt()] | `n_trials` (none with `response`, one row per trial); `tree_id` and `covariates` when the model has them |
 #' | [ezdm()] | `n_trials` |
 #' | [sdt_yn()] | `stimulus`, `n_trials` |
 #' | [sdt_mafc()] | `n_trials`; `m` when it names a column |
@@ -176,20 +177,6 @@ simulate_data.default <- function(model, pars, design = NULL, scale = c("link", 
   stopif(length(bad) > 0,
          "The design's column(s) {collapse_comma(bad)} hold {what}: they must be \\
          whole numbers of {min} or more.")
-}
-
-# a row's first set_size - 1 non-target columns describe the items shown; the
-# columns past them may be NA
-.check_nt_na <- function(design, columns, set_size) {
-  nt <- as.matrix(design[columns])
-  shown_na <- is.na(nt) & col(nt) < set_size
-  bad <- columns[colSums(shown_na) > 0]
-  rows <- which(rowSums(shown_na) > 0)
-  listed <- paste(utils::head(rows, 5), collapse = ", ")
-  if (length(rows) > 5) listed <- glue::glue("{listed}, ... ({length(rows)} in all)")
-  stopif(length(bad) > 0,
-         "The design's column(s) {collapse_comma(bad)} contain NA within the set size, \\
-         in row(s) {listed}: a row's first set_size - 1 non-target columns need values.")
 }
 
 #' The values of a model's parameters for every row of a design

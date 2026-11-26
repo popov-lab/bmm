@@ -1,8 +1,4 @@
-// meta-d' SDT (Maniscalco & Lau, 2012) category log-probability; needs sdt_rating_functions.stan
-// thresholds follow metad, each side rescaled so its mass matches type-1 d; metad = d recovers sdt_rating
-// the two spaces share each threshold's distance from the midpoint between the means, so thresholds given
-// from the type-1 noise mean move by half the difference between the separations
-// the criterion is threshold K/2, so K must be even; sdt_rating() refuses the metad version at odd K
+// log probability of a rating category under the meta-d' model (Maniscalco & Lau, 2012)
 real sdt_metad_logmu_cat(int cat, vector thresholds,
                          real d, real metad, real sdratio, real stimulus,
                          int dist_type) {

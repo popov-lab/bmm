@@ -230,6 +230,68 @@ test_that("find_response() names the count columns of sdt_cdp(), whatever their 
   expect_identical(insight::find_response(fit), paste0("cdp", 1:6))
 })
 
+# the multinomial models fit trial rows to a one-hot matrix; the user passed
+# one rating, one rank, or a judgment and a confidence per trial
+trial_level_fits <- local({
+  fits <- NULL
+  function() {
+    if (is.null(fits)) {
+      mock <- function(formula, data, model) suppressWarnings(suppressMessages(
+        bmm(formula, data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+      ))
+      data <- list(
+        rating = data.frame(id = rep(1:2, each = 6), stimulus = rep(rep(0:1, each = 3), 2),
+                            rating = c(1, 2, 4, 3, 4, 2, 2, 1, 1, 4, 3, 4)),
+        ranking = data.frame(id = rep(1:2, each = 4), set_size = rep(c(3, 4), 4),
+                             rank = c(1, 2, 3, 4, 2, 1, 1, 3)),
+        cdp = data.frame(id = rep(1:2, each = 4), stimulus = rep(rep(0:1, each = 2), 2),
+                         judgment = c("new", "know", "remember", "new", "new", "new", "know", "remember"),
+                         confidence = c(1, 3, 4, 2, 2, 1, 4, 3))
+      )
+      fits <<- list(
+        rating = mock(bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1), data$rating,
+                      sdt_rating("rating", "stimulus", n_ratings = 4)),
+        ranking = mock(bmf(d ~ 1 + (1 | id)), data$ranking, sdt_ranking("rank", m = "set_size")),
+        cdp = mock(bmf(dfam ~ 1 + (1 | id), drec ~ 1, criterion ~ 1, spacing ~ 1, rcrit ~ 1), data$cdp,
+                   sdt_cdp(stimulus = "stimulus", n_new = 2, n_old = 2,
+                           judgment = "judgment", confidence = "confidence"))
+      )
+      attr(fits, "data") <- data
+    }
+    fits
+  }
+})
+
+test_that("find_response() and get_data() give trial rows the user's response columns", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  fits <- trial_level_fits()
+  data <- attr(fits, "data")
+  expect_identical(insight::find_response(fits$rating), "rating")
+  expect_identical(insight::find_response(fits$ranking), "rank")
+  expect_identical(insight::find_response(fits$cdp), c("judgment", "confidence"))
+  expect_identical(names(insight::get_data(fits$rating)), c("rating", "stimulus", "id"))
+  # brms drops a set-size column no formula names; it comes back from max_rank
+  expect_identical(names(insight::get_data(fits$ranking)), c("rank", "id", "set_size"))
+  expect_identical(names(insight::get_data(fits$cdp)), c("judgment", "confidence", "stimulus", "id"))
+  expect_equal(insight::get_data(fits$rating)$rating, data$rating$rating)
+  expect_equal(insight::get_data(fits$ranking)[c("rank", "set_size")], data$ranking[c("rank", "set_size")])
+  expect_equal(insight::get_data(fits$cdp)[c("judgment", "confidence")], data$cdp[c("judgment", "confidence")])
+  expect_identical(names(insight::get_data(fits$cdp, effects = "fixed")), c("judgment", "confidence", "stimulus"))
+  expect_identical(deparse1(insight::find_formula(fits$cdp)$conditional), "judgment + confidence ~ 1")
+  expect_equal(insight::get_response(fits$rating), data$rating$rating)
+})
+
+# get_predicted() passes get_data() to the model as newdata
+test_that("get_data() of trial rows goes back into the model as newdata", {
+  skip_on_cran()
+  skip_if_not_installed("insight")
+  for (fit in trial_level_fits()) {
+    newdata <- brms::standata(fit, newdata = insight::get_data(fit))
+    expect_identical(unclass(newdata$Y), unclass(brms::standata(fit)$Y), info = fit_label(fit))
+  }
+})
+
 test_that("model_info() describes a bmm model as nonlinear without a dispersion parameter", {
   skip_if_not_installed("insight")
   for (fit in fixture_fits()) {

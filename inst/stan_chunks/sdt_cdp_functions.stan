@@ -1,13 +1,9 @@
-// Continuous dual-process SDT (Wixted & Mickes, 2010): each category logit is log(p_cat) for brms' softmax
-// confidence is read off S = F + R, Remember/Know off R vs rcrit, and Know/Guess off F vs kcrit
-
-// bivariate standard-normal CDF P(Z1 <= h, Z2 <= k) with correlation r, via Owen's T (Owen, 1956)
+// bivariate standard normal CDF P(Z1 <= h, Z2 <= k) with correlation r (Owen, 1956)
 real cdp_Phi2(real h, real k, real r) {
   if (h == negative_infinity() || k == negative_infinity()) return 0;
   if (h == positive_infinity()) return Phi(k);
   if (k == positive_infinity()) return Phi(h);
   real denom = sqrt((1 + r) * (1 - r));
-  // on an axis Owen's T is a limit; the first-order term keeps the gradient there
   if (abs(h) < 1e-10) {
     return 0.5 * Phi(k) + owens_t(k, r / denom)
            + h * 0.3989422804014327 * Phi(k / denom);
@@ -19,7 +15,6 @@ real cdp_Phi2(real h, real k, real r) {
   real x = h;
   real y = k;
   real base;
-  // with opposite signs, the upper tail of the positive argument keeps 1 - Phi from rounding away
   if (x < 0 && y > 0) {
     base = 0.5 * (Phi(x) - Phi(-y));
   } else if (y < 0 && x > 0) {
@@ -30,7 +25,7 @@ real cdp_Phi2(real h, real k, real r) {
   return base - owens_t(x, (y / x - r) / denom) - owens_t(y, (x / y - r) / denom);
 }
 
-// P(lo < Z < hi) from the tail the interval lies in; infinite bounds skip Phi() to keep the gradient finite
+// P(lo < Z < hi) for a standard normal Z
 real cdp_Phi_interval(real lo, real hi) {
   if (hi <= lo) return 0;
   if (lo > 0) {
@@ -39,7 +34,7 @@ real cdp_Phi_interval(real lo, real hi) {
   return (is_inf(hi) ? 1 : Phi(hi)) - (is_inf(lo) ? 0 : Phi(lo));
 }
 
-// P(a < X < b, Y < k), or Y > k if above = 1, mirrored onto the small side of both axes
+// P(a < X < b, Y < k) for a standard bivariate normal with correlation r; Y > k if above = 1
 real cdp_rect(real a, real b, real k, real r, int above) {
   real kk = above == 1 ? -k : k;
   real rr = above == 1 ? -r : r;
@@ -53,7 +48,7 @@ real cdp_rect(real a, real b, real k, real r, int above) {
   return cdp_Phi2(hi, kk, rr) - cdp_Phi2(lo, kk, rr);
 }
 
-// Guess (region 1) or Know-not-Guess (region 2) mass in the strength bin (c_lo, c_hi), by Gauss-Legendre
+// probability of a Guess (region 1) or Know (region 2) response in one confidence bin, by quadrature
 real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
                      real mu_R, real beta, real sd_c, real rcrit, real kcrit) {
   int N_GL = 20;
@@ -113,7 +108,6 @@ real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
         }
       }
     } else {
-      // a zero-length piece adds no mass but carries the gradient's boundary term; one node holds it
       real m = mu_R + beta * (edges[e] - mu_S);
       real pc = region == 1
                 ? cdp_Phi_interval((edges[e] - kcrit - m) / sd_c, (rcrit - m) / sd_c)
@@ -124,8 +118,7 @@ real cdp_region_mass(int region, real c_lo, real c_hi, real mu_S, real sigma_S,
   return total;
 }
 
-// confidence thresholds on S = F + R with the old/new boundary at `criterion`
-// thresh_type: 1 = parsimonious (Selker et al., 2019), 2 = equidistant, 3 = log_distance
+// thresholds; thresh_type: 1 = parsimonious (Selker et al., 2019), 2 = equidistant, 3 = log_distance
 vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
                            int n_new, int n_old, int thresh_type) {
   int K_full = n_new + n_old;
@@ -139,7 +132,7 @@ vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
     for (k in (n_new + 1):n_thresh)
       thr[k] = thr[k - 1] + exp(deltas[k - 1]);
     for (k in 1:(n_new - 1)) {
-      int kk = n_new - k;            // Stan counts up: descend n_new-1 .. 1
+      int kk = n_new - k;
       thr[kk] = thr[kk + 1] - exp(deltas[kk]);
     }
   } else {
@@ -150,7 +143,7 @@ vector cdp_make_thresholds(real criterion, real spacing, array[] real deltas,
   return thr;
 }
 
-// CDP probability of one category, ordered new(1..n_new), [guess], know, remember(1..n_old each)
+// probability of one response category under the continuous dual-process model (Wixted & Mickes, 2010)
 real cdp_category_prob(int cat, vector thresholds,
                        real dfam, real drec, real sigmar, real rho,
                        real rcrit, real kcrit, real stimulus,
@@ -163,12 +156,12 @@ real cdp_category_prob(int cat, vector thresholds,
     conf = cat;
   } else if (has_guess == 1) {
     int r = cat - n_new;
-    int block = (r - 1) %/% n_old;          // 0 guess, 1 know, 2 remember
+    int block = (r - 1) %/% n_old;
     type = block == 0 ? 2 : (block == 1 ? 3 : 4);
     conf = r - block * n_old;
   } else {
     int r = cat - n_new;
-    int block = (r - 1) %/% n_old;          // 0 know, 1 remember
+    int block = (r - 1) %/% n_old;
     type = block == 0 ? 3 : 4;
     conf = r - block * n_old;
   }
@@ -182,7 +175,6 @@ real cdp_category_prob(int cat, vector thresholds,
   real corr = tanh(rho);
   real mu_S = mu_F + mu_R;
   real sigma_S = sqrt(square(sd_R + corr) + (1 - square(corr)));
-  // infinite outer bounds stay constants, or they would carry infinite partials into the gradient
   real z_lo = is_inf(c_lo) ? negative_infinity() : (c_lo - mu_S) / sigma_S;
   real z_hi = is_inf(c_hi) ? positive_infinity() : (c_hi - mu_S) / sigma_S;
 
@@ -190,7 +182,6 @@ real cdp_category_prob(int cat, vector thresholds,
   if (type == 1) {
     p = cdp_Phi_interval(z_lo, z_hi);
   } else if (type == 4 || has_guess == 0) {
-    // the smaller of Remember and Know comes from its rectangle, the larger as the rest, so neither cancels
     real rho_RS = (sd_R + corr) / sigma_S;
     real hcrit = (rcrit - mu_R) / sd_R;
     real rem = cdp_rect(z_lo, z_hi, hcrit, rho_RS, 1);
@@ -207,8 +198,5 @@ real cdp_category_prob(int cat, vector thresholds,
     p = cdp_region_mass(type == 2 ? 1 : 2, c_lo, c_hi, mu_S, sigma_S, mu_R,
                         beta, sd_c, rcrit, kcrit);
   }
-  // the floor keeps an empty region's logit finite, so a zero count there adds 0, not NaN
   return fmax(p, 1e-300);
 }
-
-// sdt_cdp_logmu itself is generated per model by .sdt_cdp_logmu_stan() in R/model_sdt_cdp.R

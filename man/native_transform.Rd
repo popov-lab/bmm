@@ -20,16 +20,15 @@ model parameter, each with draws in rows and prediction grid cells in
 columns. These are \code{\link[brms:posterior_linpred]{brms::posterior_linpred()}} output, so they are on the
 \emph{link} scale for distributional parameters and are the raw value for
 non-linear parameters. For \code{bmm}'s \code{nlpar}-based models the link is a
-fiction maintained by the model's own \code{nlf()} expression — \code{imm} declares
-\code{c = "log"} because \code{configure_model.imm_abc()} writes \code{exp(c)} into the
-formula, not because \code{brms} applies a link — so a model that declares a link
-it does not actually apply in its \code{nlf()} will get silently wrong output
-here.}
+fiction maintained by the model's own \code{nlf()} expression, which has to
+apply the inverse of the declared link itself, so a model that declares a
+link it does not actually apply in its \code{nlf()} will get silently wrong
+output here.}
 
 \item{data}{The prediction grid the draws were computed on, with one row per
 column of the \code{linpred} matrices. These are rows of the fitted model's own
 data, so they carry the \code{bmm}-internal columns a design-dependent
-transformation keys on (\verb{LureIdx*}, \code{inv_ss}, \verb{Idx_*}, matrix columns).
+transformation keys on (\code{ss_numeric}, \verb{Idx_*}, matrix columns).
 \code{native_transform.non_targets()} is the worked example.}
 
 \item{...}{Currently unused.}

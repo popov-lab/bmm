@@ -63,7 +63,7 @@ test_that("the simulate_pars attribute holds the link values whatever the scale"
                         design, scale = "native")
   expect_identical(data$cond, design$cond)
   expect_equal(attr(data, "simulate_pars"), data.frame(
-    mu1 = c(0, 0), kappa = c(1, 1), thetat = log(c(0.6, 0.5) / c(0.2, 0.3)),
+    mu = c(0, 0), kappa = c(1, 1), thetat = log(c(0.6, 0.5) / c(0.2, 0.3)),
     thetant = log(0.2 / c(0.2, 0.3))
   ))
   expect_identical(attr(data, "simulate_call"), list(model = class(model), scale = "native"))
@@ -139,9 +139,9 @@ test_that("simulate_data() names the design column that holds NA", {
   expect_error(simulate_data(model, pars, data.frame(ss = c(2, NA), nt1 = 1, nt2 = NA)),
                "column\\(s\\) 'ss' contain NA")
   expect_error(simulate_data(model, pars, data.frame(ss = c(3, 3, 2), nt1 = c(1, 1, 1), nt2 = c(1, NA, NA))),
-               "'nt2' contain NA within the set size, in row\\(s\\) 2:")
+               "'nt2' contain NA within the set size in 1 trial\\(s\\), row\\(s\\) 2:")
   expect_error(simulate_data(model, pars, data.frame(ss = 3, nt1 = 1, nt2 = c(1, rep(NA, 7)))),
-               "in row\\(s\\) 2, 3, 4, 5, 6, \\.\\.\\. \\(7 in all\\):")
+               "in 7 trial\\(s\\), row\\(s\\) 2, 3, 4, 5, 6, \\.\\.\\.:")
   # past a row's set size NA is the layout of displays of different sizes
   data <- simulate_data(model, pars, data.frame(ss = c(1, 2, 3), nt1 = c(NA, 1, 1), nt2 = c(NA, NA, 1)))
   expect_false(anyNA(data$y))
@@ -208,8 +208,35 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), circular_mean_cos(function(x) dmixture2p(x, 0, 7.389056, 0.5986877)),
                    "mixture2p")
 
+  # the capacity versions and variable precision, against E[cos] from
+  # A = I1 / I0 and J(kappa) = kappa A(kappa): a j-slot item has J = j J(kappa),
+  # variable precision draws J from gamma(J / tau, tau), integrated here
+  slot <- data.frame(set_size = rep(4, n_sim))
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot"),
+                     list(kappa = exp(2), K = 2), slot, scale = "native")$y
+  expect_within_mc(cos(y), 0.4648183, "mixture2p slot")
+  pair <- data.frame(set_size = rep(2, n_sim))
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot_averaging"),
+                     list(kappa = exp(1), K = 3), pair, scale = "native")$y
+  expect_within_mc(cos(y), 0.8378172, "mixture2p slot_averaging")
+  # constant precision gives 0.7081129 and 0.8378172 at these values
+  y <- simulate_data(mixture2p("y", variable_precision = TRUE),
+                     list(kappa = exp(1), thetat = 0.9, tau = 1), n_trials = n_sim, scale = "native")$y
+  expect_within_mc(cos(y), 0.6498559, "mixture2p variable precision")
+  y <- simulate_data(mixture2p("y", set_size = "set_size", version = "slot_averaging", variable_precision = TRUE),
+                     list(kappa = exp(1), K = 3, tau = 1), pair, scale = "native")$y
+  expect_within_mc(cos(y), 0.7917740, "mixture2p slot_averaging variable precision")
+
   y <- simulate_data(sdm("y"), list(c = 2, kappa = 1.75), n_trials = n_sim)$y
   expect_within_mc(cos(y), circular_mean_cos(function(x) dsdm(x, 0, 7.389056, 5.754603)), "sdm")
+
+  # E[cos] of exp(cstar s(x)) by quadrature of the kernel itself, c = e,
+  # kappa = e^0.5; the default cell gives 0.3261631 at these values, so a
+  # method that ignores activation or scaling fails both
+  y <- simulate_data(sdm("y", activation = "laplace"), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_within_mc(cos(y), 0.4829029, "sdm laplace peak")
+  y <- simulate_data(sdm("y", scaling = "range"), list(c = 1, kappa = 0.5), n_trials = n_sim)$y
+  expect_within_mc(cos(y), 0.6224407, "sdm vonmises range")
 
   display <- data.frame(set_size = rep(3, n_sim), nt1 = 1.5, nt2 = -2, d1 = 1, d2 = 2)
   model <- mixture3p("y", nt_features = c("nt1", "nt2"), set_size = "set_size")
@@ -218,6 +245,29 @@ test_that("simulated statistics of the circular models match their densities", {
   expect_within_mc(cos(y), circular_mean_cos(function(x) {
     dmixture3p(x, c(0, 1.5, -2), 7.389056, p_mem = 0.5064804, p_nt = 0.1863237)
   }), "mixture3p")
+
+  # the capacity versions, set size 1 and variable precision, against E[cos] from
+  # A = I1 / I0 and J(kappa) = kappa A(kappa): from memory the target is reported
+  # with ptarget and each non-target with (1 - ptarget) / 2; a j-slot item has J = j J(kappa)
+  nt <- c("nt1", "nt2")
+  y <- simulate_data(mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot"),
+                     list(kappa = exp(2), K = 2, ptarget = 0.7), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.4017199, "mixture3p slot")
+  averaging <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging")
+  y <- simulate_data(averaging, list(kappa = exp(1), K = 4, ptarget = 0.7), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.5320389, "mixture3p slot_averaging")
+  # at set size 1 the softmax runs over the target and guessing only
+  single <- data.frame(set_size = rep(1, n_sim), nt1 = NA, nt2 = NA)
+  y <- simulate_data(model, list(kappa = exp(2), thetat = 0.5, thetant = 0.2), single, scale = "native")$y
+  expect_within_mc(cos(y), 0.5810229, "mixture3p set size 1")
+  # constant precision gives 0.6158454 and 0.5320389 at these values
+  y <- simulate_data(mixture3p("y", nt_features = nt, set_size = "set_size", variable_precision = TRUE),
+                     list(kappa = exp(1), thetat = 0.8, thetant = 0.1, tau = 1), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.5651793, "mixture3p variable precision")
+  averaging_vp <- mixture3p("y", nt_features = nt, set_size = "set_size", version = "slot_averaging",
+                            variable_precision = TRUE)
+  y <- simulate_data(averaging_vp, list(kappa = exp(1), K = 4, ptarget = 0.7, tau = 1), display, scale = "native")$y
+  expect_within_mc(cos(y), 0.4981567, "mixture3p slot_averaging variable precision")
 
   model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
                set_size = "set_size", version = "full")
@@ -239,6 +289,24 @@ test_that("simulated statistics of the circular models match their densities", {
   y <- simulate_data(model, list(kappa = 2, c = 0.5, a = -0.5), display)$y
   expect_within_mc(cos(y), 0.9296366 * (2.255252 + 0.6065307 * (cos(1.5) + cos(-2))) / 4.468313,
                    "imm abc")
+
+  # full, set size 1 and variable precision, against E[cos] from the Luce choice
+  # over target c + a, non-target j c exp(-s d_j) + a and the background b = 1,
+  # A = I1 / I0 and J(kappa) = kappa A(kappa), computed outside the package
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "full")
+  full_pars <- list(kappa = exp(2), c = 2, a = 0.5, s = 1)
+  y <- simulate_data(model, full_pars, display, scale = "native")$y
+  expect_within_mc(cos(y), 0.3826816, "imm full")
+  single <- data.frame(set_size = rep(1, n_sim), nt1 = NA, nt2 = NA, d1 = NA, d2 = NA)
+  y <- simulate_data(model, full_pars, single, scale = "native")$y
+  expect_within_mc(cos(y), 0.6640262, "imm set size 1")
+  # constant precision gives 0.3238802 at these values
+  model <- imm("y", nt_features = c("nt1", "nt2"), nt_distances = c("d1", "d2"),
+               set_size = "set_size", version = "full", variable_precision = TRUE)
+  y <- simulate_data(model, list(kappa = exp(1), c = 2, a = 0.5, s = 1, tau = 1), display,
+                     scale = "native")$y
+  expect_within_mc(cos(y), 0.2972343, "imm variable precision")
 })
 
 test_that("simulated decisions of the RT models match the closed forms", {
@@ -307,6 +375,44 @@ test_that("simulated responses of the signal detection models match their densit
   expect_within_mc(k$remember4, dsdt_cdp(c(0, 0, 0, 0, 0, 1), 1, dfam = 1, drec = 1,
                                          thresholds = c(-1.0986123, 0, 1.0986123), rcrit = 0,
                                          n_new = 2), "sdt_cdp")
+})
+
+test_that("one simulated trial per row of sdt_yn and sdt_mafc is 0 or 1 with the model's probability", {
+  skip_on_cran()
+  withr::local_seed(6)
+  # pnorm(1 - 0.5), pnorm(-0.5); P(correct) of 2, 3 and 4 alternatives at d = 1, from
+  # integrate(dnorm(x - 1) * pnorm(x)^(m - 1))
+  design <- data.frame(stimulus = rep(0:1, each = n_sim))
+  y <- simulate_data(sdt_yn("y", "stimulus"), list(d = 1, criterion = 0.5), design)$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y[design$stimulus == 0], 0.3085375387, "sdt_yn trial noise")
+  expect_within_mc(y[design$stimulus == 1], 0.6914624613, "sdt_yn trial signal")
+
+  y <- simulate_data(sdt_mafc("y", m = 4), list(d = 1), data.frame(id = seq_len(n_sim)))$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y, 0.5520314384, "sdt_mafc trial m = 4")
+
+  design <- data.frame(m = rep(2:3, each = n_sim))
+  y <- simulate_data(sdt_mafc("y", m = "m"), list(d = 1), design)$y
+  expect_in(y, c(0, 1))
+  expect_within_mc(y[design$m == 2], 0.7602499389, "sdt_mafc trial m column 2")
+  expect_within_mc(y[design$m == 3], 0.6337020458, "sdt_mafc trial m column 3")
+})
+
+test_that("sdt_mafc simulates trials without a design when it reads no column", {
+  data <- simulate_data(sdt_mafc("y", m = 4), list(d = 1), n_trials = 100)
+  expect_identical(dim(data), c(100L, 1L))
+  expect_in(data$y, c(0, 1))
+})
+
+test_that("trial-level sdt_ranking simulates without a design; aggregated counts still need one", {
+  data <- simulate_data(sdt_ranking("y", m = 4), list(d = 1), n_trials = 50)
+  expect_identical(dim(data), c(50L, 1L))
+  expect_type(data$y, "integer")
+  expect_in(data$y, 1:4)
+
+  expect_error(simulate_data(sdt_ranking(paste0("rank", 1:4), m = 4), list(d = 1), n_trials = 50),
+               "reads the column\\(s\\) 'n_trials'.*`design`")
 })
 
 test_that("simulated counts of the m3 and mpt models match their closed forms", {

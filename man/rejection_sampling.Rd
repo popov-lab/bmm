@@ -2,7 +2,7 @@
 % Please edit documentation in R/distributions.R
 \name{rejection_sampling}
 \alias{rejection_sampling}
-\title{Rejection Sampling}
+\title{Deprecated: rejection sampling}
 \usage{
 rejection_sampling(n, f, max_f, proposal_fun, ...)
 }
@@ -31,7 +31,10 @@ through the closure of \code{f} instead of \code{...}.}
 A numeric vector of length \code{n} containing samples from the target distribution.
 }
 \description{
-Performs rejection sampling to generate samples from a target distribution.
+\code{rejection_sampling()} is deprecated since bmm 1.5.0 and will
+be removed in bmm 1.6.0 at the earliest. It was the sampler behind
+\code{\link[=rsdm]{rsdm()}}, which no longer needs the export; nothing replaces it. It still
+performs rejection sampling from a target distribution, with a warning.
 Each draw can come from its own target: draw \code{i} is sampled from \code{f}
 evaluated at the \code{i}-th element of every per-draw argument in \code{...}, under
 the envelope \code{max_f[i]}.
@@ -39,16 +42,7 @@ the envelope \code{max_f[i]}.
 \examples{
 target_density <- function(x) brms::dvon_mises(x, mu = 0, kappa = 10)
 proposal <- function(n) runif(n, min = -pi, max = pi)
-samples <- rejection_sampling(10000, target_density, max_f = target_density(0), proposal)
-hist(samples, freq = FALSE)
-curve(target_density, col = "red", add = TRUE)
-
-# one location per draw
-mu <- rep(c(0, 2), 5000)
-samples <- rejection_sampling(
-  10000, brms::dvon_mises, max_f = brms::dvon_mises(0, 0, 10), proposal,
-  mu = mu, kappa = 10
-)
-tapply(samples, mu, mean)
+samples <- rejection_sampling(1000, target_density, max_f = target_density(0), proposal)
 }
+\keyword{deprecated}
 \keyword{distribution}

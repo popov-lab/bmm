@@ -3,6 +3,12 @@ model_cases_sdt_rating <- function() {
   responses <- paste0("r", 1:5)
   model <- sdt_rating(responses, "stimulus")
   data <- toy_rating_data()
+  trial_model <- sdt_rating("rating", "stimulus", n_ratings = 4)
+  # one row per trial: 2 participants x 2 stimulus types x 6 trials
+  trial_data <- data.frame(
+    id = rep(1:2, each = 12), stimulus = rep(rep(0:1, each = 6), 2),
+    rating = c(1, 2, 1, 3, 2, 1, 3, 4, 4, 2, 4, 3, 2, 1, 1, 1, 4, 2, 4, 3, 4, 4, 2, 4)
+  )
   list(
     stored_frame = list(
       sdt_rating = list(
@@ -25,6 +31,10 @@ model_cases_sdt_rating <- function() {
         model = sdt_rating(paste0("r", 1:4), "stimulus", version = "metad"),
         formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1 + (1 | id)),
         data = data[setdiff(names(data), "r5")]
+      ),
+      sdt_rating_trial_level = list(
+        model = trial_model, formula = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1),
+        data = trial_data
       )
     ),
     sd_default = list(
@@ -41,7 +51,10 @@ model_cases_sdt_rating <- function() {
                         formula = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1))
     ),
     # one count column per rating category
-    check_data = list(sdt_rating = list(model = model, data = data)),
+    check_data = list(
+      sdt_rating = list(model = model, data = data),
+      sdt_rating_trial_level = list(model = trial_model, data = trial_data)
+    ),
     links = list(sdt_rating = list(model = model, settable = c("d", "criterion", "bias"))),
     simulate = list(
       sdt_rating = list(
@@ -76,6 +89,11 @@ model_cases_sdt_rating <- function() {
         design = data.frame(stimulus = rep(0:1, 3), n_trials = 60),
         formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
         simulate_pars = list(d = 1, criterion = 0.3, spacing = 0, sdratio = 0, logmratio = -0.2)
+      ),
+      sdt_rating_trial_level = list(
+        model = trial_model, pars = list(d = 1, criterion = 0.3, spacing = 0.1),
+        design = data.frame(stimulus = rep(0:1, 30)), formula = bmf(d ~ 1, criterion ~ 1, spacing ~ 1),
+        simulate_pars = list(d = 1, criterion = 0.3, spacing = 0.1, sdratio = 0)
       )
     )
   )

@@ -3,6 +3,11 @@ model_cases_sdt_ranking <- function() {
   ranks <- paste0("rank", 1:5)
   data <- meyer_grant_jakob_2025[as.integer(meyer_grant_jakob_2025$id) <= 4, ]
   unequal <- sdt_ranking(ranks, m = "set_size", dist = "normal")
+  # one row per trial: 2 participants x 8 trials, set sizes 3 and 4
+  trial_data <- data.frame(
+    id = rep(1:2, each = 8), set_size = rep(c(3, 4), 8),
+    rank = c(1, 2, 1, 4, 3, 1, 2, 1, 1, 1, 2, 3, 1, 1, 3, 2)
+  )
   list(
     stored_frame = list(
       sdt_ranking = list(model = sdt_ranking(ranks, m = 5), formula = bmf(d ~ 1),
@@ -11,6 +16,9 @@ model_cases_sdt_ranking <- function() {
       sdt_ranking_m_predictor = list(
         model = sdt_ranking(ranks, m = "set_size"),
         formula = bmf(d ~ 1 + set_size), data = data
+      ),
+      sdt_ranking_trial_level = list(
+        model = sdt_ranking("rank", m = "set_size"), formula = bmf(d ~ 1 + (1 | id)), data = trial_data
       )
     ),
     sd_default = list(
@@ -24,10 +32,13 @@ model_cases_sdt_ranking <- function() {
                          data = data)
     ),
     # a wide rank-frequency response, which the shared columns cannot express
-    check_data = list(sdt_ranking = list(
-      model = sdt_ranking(c("rank1", "rank2"), m = 2),
-      data = data.frame(rank1 = rep(30L, 50), rank2 = rep(20L, 50))
-    )),
+    check_data = list(
+      sdt_ranking = list(
+        model = sdt_ranking(c("rank1", "rank2"), m = 2),
+        data = data.frame(rank1 = rep(30L, 50), rank2 = rep(20L, 50))
+      ),
+      sdt_ranking_trial_level = list(model = sdt_ranking("rank", m = "set_size"), data = trial_data)
+    ),
     links = list(sdt_ranking = list(model = sdt_ranking(ranks, m = 5), settable = "d")),
     simulate = list(
       sdt_ranking = list(
@@ -39,6 +50,10 @@ model_cases_sdt_ranking <- function() {
         model = sdt_ranking(paste0("rank", 1:4), m = "m", dist = "normal"), pars = list(d = 1, sdratio = 0.2),
         design = data.frame(m = rep(3:4, 3), n_trials = 30), formula = bmf(d ~ 1, sdratio ~ 1),
         simulate_pars = list(d = 1, sdratio = 0.2)
+      ),
+      sdt_ranking_trial_level = list(
+        model = sdt_ranking("rank", m = "m"), pars = list(d = 1),
+        design = data.frame(m = rep(3:4, 20)), formula = bmf(d ~ 1), simulate_pars = list(d = 1)
       )
     )
   )

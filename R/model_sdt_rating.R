@@ -22,6 +22,7 @@
     logmu_fun = "sdt_rating_logmu",
     logmu_cat_call = "sdt_rating_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type)",
     stan_chunk = "sdt_rating_functions.stan",
+    functions = list(density = "dsdt_rating", generator = "rsdt_rating"),
     citation = glue(
       "Green, D. M., & Swets, J. A. (1966). Signal detection theory ",
       "and psychophysics. Wiley."
@@ -52,6 +53,7 @@
     logmu_fun = "sdt_dpsdt_logmu",
     logmu_cat_call = "sdt_dpsdt_logmu_cat(cat, thr, d, sdratio, stimulus, dist_type, Ro, Rn)",
     stan_chunk = "sdt_dpsdt_functions.stan",
+    functions = list(density = "dsdt_dpsdt", generator = "rsdt_dpsdt"),
     citation = c(
       glue(
         "Yonelinas, A. P. (1994). Receiver-operating characteristics in ",
@@ -93,6 +95,7 @@
     logmu_fun = "sdt_metad_logmu",
     logmu_cat_call = "sdt_metad_logmu_cat(cat, thr, d, exp(logmratio) * d, sdratio, stimulus, dist_type)",
     stan_chunk = "sdt_metad_functions.stan",
+    functions = list(density = "dsdt_metad", generator = "rsdt_metad"),
     citation = glue(
       "Maniscalco, B., & Lau, H. (2012). A signal detection theoretic ",
       "approach for estimating metacognitive sensitivity from confidence ",
@@ -103,12 +106,15 @@
 )
 
 .model_sdt_rating <- function(response = NULL, stimulus = NULL,
+                              n_ratings = NULL,
                               dist = "normal",
                               threshold_type = "parsimonious",
                               version = "standard",
                               links = NULL, call = NULL, ...) {
-  # one count column per category, so the columns fix the number of categories
-  n_ratings <- length(response)
+  # aggregated rows have one count column per category, so the columns fix the
+  # number of categories; trial rows hold the rating in one column and need it
+  trial_level <- !is.null(n_ratings)
+  n_ratings <- n_ratings %||% length(response)
 
   parameters <- list(
     d = paste0(
@@ -175,18 +181,30 @@
   init_ranges <- c(init_ranges, variant$init_ranges)
   fixed_parameters <- c(list(sdratio = 0), variant$fixed_parameters)
 
-  requirements <- glue(
-    "Provide pre-aggregated data with the following columns:", "\n\n",
-    "  - Response counts: one column per rating category (K columns)", "\n",
-    "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
-    "  Categories should be ordered: 1 = 'definitely noise' to ",
-    "K = 'definitely signal'"
-  )
+  requirements <- if (trial_level) {
+    glue(
+      "Provide one row per trial with the following columns:", "\n\n",
+      "  - Rating (response): the category chosen on the trial, a whole number ",
+      "from 1 = 'definitely noise' to K = n_ratings = 'definitely signal'", "\n",
+      "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n\n",
+      "  Trial rows are fitted through a per-trial likelihood that evaluates ",
+      "only the category given on the trial; with K = 6, a row costs about a ",
+      "sixth of what a multinomial over all K categories costs."
+    )
+  } else {
+    glue(
+      "Provide pre-aggregated data with the following columns:", "\n\n",
+      "  - Response counts: one column per rating category (K columns)", "\n",
+      "  - Stimulus type (stimulus): 0 = noise, 1 = signal", "\n",
+      "  Categories should be ordered: 1 = 'definitely noise' to ",
+      "K = 'definitely signal'"
+    )
+  }
 
   out <- structure(
     list(
       resp_vars = nlist(response),
-      other_vars = nlist(stimulus, dist, n_ratings, threshold_type),
+      other_vars = nlist(stimulus, dist, n_ratings, threshold_type, trial_level),
       domain = c("Perception", "Long-term memory"),
       task = "Detection, recognition and confidence judgments",
       name = "Confidence Rating Signal Detection Theory Model",
@@ -198,7 +216,8 @@
       fixed_parameters = fixed_parameters,
       alternative_parameters = list(c("criterion", "bias")),
       default_priors = default_priors,
-      init_ranges = init_ranges
+      init_ranges = init_ranges,
+      functions = variant$functions
     ),
     class = c("bmmodel", "sdt", "sdt_rating", paste0("sdt_rating_", version)),
     call = call
@@ -286,6 +305,11 @@ settable_link_functions.sdt_rating <- function(model) {
 #' Extract the M-ratio posterior with [mratio()].
 #' `r model_docs(.model_sdt_rating(version = "metad"))`
 #'
+#' #### One row per trial
+#' Name a single rating column in `response` and give the number of categories
+#' as `n_ratings`; every version takes this layout.
+#' `r model_docs(.model_sdt_rating(response = "rating", n_ratings = 6), components = "trial_level")`
+#'
 #' By default, the model assumes equal variance (sdratio fixed to 0). To
 #' estimate unequal variance, add `sdratio ~ 1` (or `sdratio ~ predictors`)
 #' to the formula.
@@ -338,9 +362,11 @@ settable_link_functions.sdt_rating <- function(model) {
 #' identified from K = 3 categories, where it uses every degree of freedom
 #' (the fit is saturated), and leaves the zROC testable from K = 4; the
 #' identification caveats on the [sdt_yn()] page do not carry over.
-#' @param response A character vector of K column names containing response
-#'   counts per rating category, ordered from "definitely noise" to
-#'   "definitely signal".
+#' @param response For aggregated data, a character vector of K column names
+#'   containing response counts per rating category, ordered from "definitely
+#'   noise" to "definitely signal". For one row per trial, the name of a single
+#'   column holding the rating of each trial, a whole number from 1 to
+#'   `n_ratings`.
 #' @param stimulus The name of the variable coding the stimulus type.
 #'   Must be coded as 0 (noise/new) and 1 (signal/old).
 #' @param dist The distribution assumed for the latent evidence, given here by
@@ -388,6 +414,9 @@ settable_link_functions.sdt_rating <- function(model) {
 #'   reads each of them through `exp()` and fixes `sdratio` at 0 for equal
 #'   variance. The same holds for `Ro` and `Rn`, read through `inv_logit()`
 #'   and fixed off by default, and for `logmratio`, read through `exp()`.
+#' @param n_ratings The number of rating categories K when `response` names a
+#'   single rating column, which declares one row per trial. Leave it `NULL`
+#'   for aggregated data, whose count columns fix K.
 #' @param ... used internally for testing, ignore it
 #' @return An object of class `bmmodel`
 #' @references
@@ -465,6 +494,16 @@ settable_link_functions.sdt_rating <- function(model) {
 #' fit_md <- bmm(bmf(d ~ 1, criterion ~ 1, spacing ~ 1, logmratio ~ 1),
 #'               data = dat, model = model_md, backend = "cmdstanr")
 #' mratio(fit_md) # posterior M-ratio (meta-d'/d')
+#'
+#' # One row per trial, with the rating 1 to 4 in one column and item effects
+#' model_trial <- sdt_rating("rating", "stimulus", n_ratings = 4)
+#' trials <- expand.grid(id = 1:20, item = 1:40)
+#' trials$stimulus <- as.integer(trials$item %% 2 == 0)
+#' trials <- simulate_data(model_trial, design = trials,
+#'                         pars = list(d = 1.5, criterion = 0.5, spacing = -0.5))
+#' fit_trial <- bmm(bmf(d ~ 1 + (1 | id) + (1 | item), criterion ~ 1 + (1 | id),
+#'                      spacing ~ 1),
+#'                  data = trials, model = model_trial, backend = "cmdstanr")
 #' }
 sdt_rating <- function(response, stimulus,
                        dist = c("normal", "gumbel_min", "gumbel_max", "logistic"),
@@ -472,7 +511,7 @@ sdt_rating <- function(response, stimulus,
                                           "log_distance", "log_ratio",
                                           "softmax"),
                        version = c("standard", "dpsdt", "metad"),
-                       links = NULL, ...) {
+                       links = NULL, n_ratings = NULL, ...) {
   call <- match.call()
   .check_constructor_dots(list(...))
   stop_missing_args()
@@ -480,22 +519,43 @@ sdt_rating <- function(response, stimulus,
   threshold_type <- match.arg(threshold_type)
   version <- match.arg(version)
 
-  stopif(length(response) <= 2,
-         "response must name more than 2 rating-count columns, one per category")
-  # each column name becomes part of a brms parameter name (mu<column>)
+  if (length(response) == 1L) {
+    stopif(is.null(n_ratings),
+           "response names one column, which declares one row per trial with \\
+           the rating in that column: give the number of rating categories as \\
+           n_ratings. For counts aggregated over trials, name one count column \\
+           per category in response")
+    stopif(!is.numeric(n_ratings) || length(n_ratings) != 1 || !is.finite(n_ratings) ||
+             n_ratings %% 1 != 0 || n_ratings <= 2,
+           "n_ratings must be a single whole number above 2, the number of \\
+           rating categories")
+    n_ratings <- as.integer(n_ratings)
+  } else {
+    stopif(!is.null(n_ratings),
+           "response names {length(response)} count columns, one per rating \\
+           category, which declares aggregated counts with {length(response)} \\
+           categories. n_ratings is only for one row per trial with the rating \\
+           in a single column: drop n_ratings, or name that column in response")
+    stopif(length(response) <= 2,
+           "response must name more than 2 rating-count columns, one per category")
+  }
+  n_categories <- n_ratings %||% length(response)
+  # each column name becomes part of a brms parameter name (mu<column>, or
+  # mu<column><k> for the categories of a rating column)
   unusable <- response[grepl("[._]", response)]
   stopif(length(unusable) > 0,
          "Response column names must not contain '.' or '_', because brms \\
          builds a parameter name from each of them. Rename {collapse_comma(unusable)}")
-  stopif(threshold_type == "log_ratio" && length(response) < 4,
+  stopif(threshold_type == "log_ratio" && n_categories < 4,
          "log_ratio thresholds require at least 4 rating categories (the anchor ratio needs an interval above the criterion)")
-  stopif(version == "metad" && length(response) %% 2L != 0L,
+  stopif(version == "metad" && n_categories %% 2L != 0L,
          "version = 'metad' needs an even number of rating categories: \\
          meta-d' splits the scale at the old/new boundary, which an odd \\
          number of categories does not have (the middle category straddles \\
-         it). response names {length(response)} columns")
+         it). The scale has {n_categories} categories")
 
   .model_sdt_rating(response = response, stimulus = stimulus,
+                    n_ratings = n_ratings,
                     dist = dist, threshold_type = threshold_type,
                     version = version,
                     links = links, call = call, ...)
@@ -506,13 +566,69 @@ sdt_rating <- function(response, stimulus,
 # CHECK_DATA S3 METHODS                                                  ####
 ############################################################################# !
 
+# The trial family reads the user's rating, so trial rows build no column. A
+# user column nTrials on trial rows is then the user's predictor; the nTrials of
+# a 1.5.0 trial fit's frame is prepare_newdata.sdt_rating()'s concern
 #' @exportS3Method
 built_data_columns.sdt_rating <- function(model) {
-  c("nTrials", NextMethod("built_data_columns"))
+  c(if (!is_trial_level(model)) "nTrials", NextMethod("built_data_columns"))
+}
+
+# Trial-row newdata, read against the fit's frame:
+# - A 1.5.0 trial fit's frame holds the one-hot Y and the nTrials its
+#   multinomial reads. newdata without nTrials are in the user's layout and get
+#   both built (carry_fit_bounds.sdt_rating()); its frame slices, and the grids
+#   cut from them, hold them already.
+# - A trial-family frame is the user's layout, rating and stimulus held as
+#   numbers. A 1.5.0 frame slice, which kfold() and reloo() of a 1.5.0 fit pass
+#   to their trial-family refits, gets its rating back. check_data() then
+#   recodes the columns bmm() accepts and brms refuses, a rating or stimulus
+#   not held as numbers, and names the values brms would take or misread: NA,
+#   a rating outside 1..K, and a stimulus other than 0 and 1, which the kernel
+#   multiplies by. Rows already in the frame's coding need no recoding and go
+#   to brms as they are: the single frame rows of reloo(), and the grids of the
+#   SDT helpers (roc_sdt(), sdt_thresholds(), latent_sdt(), auc_sdt(),
+#   sdt_sensitivity()), which hold stimulus 0 and a rating of 3
+#' @exportS3Method
+prepare_newdata.sdt_rating <- function(model, newdata, fit) {
+  if (!is_trial_level(model)) {
+    return(NextMethod("prepare_newdata"))
+  }
+  if (is.matrix(fit$data$Y)) {
+    return(if (not_in("nTrials", names(newdata))) check_newdata(fit, newdata) else newdata)
+  }
+  if (is.matrix(newdata$Y)) {
+    newdata <- revert_check_data(model, newdata)
+  }
+  if (.sdt_rating_newdata_to_recode(model, newdata)) check_newdata(fit, newdata) else newdata
+}
+
+.sdt_rating_newdata_to_recode <- function(model, newdata) {
+  rating <- newdata[[model$resp_vars$response]]
+  stimulus <- newdata[[model$other_vars$stimulus]]
+  not_numbers <- function(x) !is.null(x) && !is.numeric(x)
+  not_numbers(rating) || not_numbers(stimulus) ||
+    any(!rating %in% seq_along(.sdt_categories(model))) ||
+    any(!stimulus %in% c(0, 1))
+}
+
+# Trial rows fitted through the multinomial (1.5.0) stored the one-hot Y and
+# nTrials its formula reads, so newdata for such a fit is built the same way.
+# Read from the fit's frame rather than from the model, which is the same
+# object for both routes
+#' @exportS3Method
+carry_fit_bounds.sdt_rating <- function(model, data, frame = data) {
+  if (is_trial_level(model) && is.matrix(frame$Y)) {
+    attr(data, "fit_one_hot") <- TRUE
+  }
+  data
 }
 
 #' @exportS3Method
 data_trials.sdt_rating <- function(model, data) {
+  if (is_trial_level(model)) {
+    return(NULL)
+  }
   .row_trials(data, model$resp_vars$response)
 }
 
@@ -522,8 +638,23 @@ check_data.sdt_rating <- function(model, data, formula) {
   data[[stim_var]] <- .validate_sdt_stimulus(data, stim_var)
 
   resp_cols <- model$resp_vars$response
-  .validate_sdt_count_cols(data, resp_cols)
+  # the trial family reads the rating itself, as the category number
+  if (is_trial_level(model)) {
+    Y <- .sdt_trial_rows_to_counts(model, data, "rating",
+                                   "one count column per category in response, without n_ratings")
+    one_hot <- isTRUE(attr(data, "fit_one_hot"))
+    attr(data, "fit_one_hot") <- NULL
+    if (one_hot) {
+      data <- data[!colnames(data) %in% resp_cols]
+      data$Y <- Y
+      data$nTrials <- 1L
+    } else {
+      data[[resp_cols]] <- .sdt_trial_category(Y)
+    }
+    return(NextMethod("check_data"))
+  }
 
+  .validate_sdt_count_cols(data, resp_cols)
   Y <- as.matrix(data[resp_cols])
   stopif(anyNA(Y), "Response columns must not contain NA counts")
   stopif(any(rowSums(Y) <= 0),
@@ -549,8 +680,8 @@ check_data.sdt_rating <- function(model, data, formula) {
 # to log(p_k^SDT) so softmax recovers the SDT probabilities exactly. The SDT math
 # (thresholds + noise CDF) is computed by a per-model Stan function for fitting
 # and by the exported R companion sdt_rating_logmu() for posterior_predict/epred
-# (brms evaluates the non-linear formula in R for prediction, looking the
-# function up on the search path). log_lik and posterior_predict therefore come
+# (brms evaluates the non-linear formula in R for prediction, from the bmm
+# namespace: bmm_nl_formula()). log_lik and posterior_predict therefore come
 # from brms — proper joint multinomial draws — while the four distributions and
 # five threshold parameterizations stay supported.
 
@@ -559,7 +690,7 @@ check_data.sdt_rating <- function(model, data, formula) {
 # in the model object. Legacy model objects from before the version machinery
 # carry version = "rating" or "NA" and resolve to the standard variant.
 .sdt_rating_variant <- function(model) {
-  .sdt_rating_variants[[model$version]] %||% .sdt_rating_variants$standard
+  .sdt_rating_variants[[.sdt_rating_variant_name(model)]]
 }
 
 # cat, K, dist, threshold type and anchor travel as integer literals so the
@@ -571,14 +702,20 @@ check_data.sdt_rating <- function(model, data, formula) {
   has_spacing <- "spacing" %in% names(model$parameters)
   # d and criterion reach the kernel on the natural scale, so a non-identity
   # link is inverted here, as apply_links() does for m3
-  c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
-    match(model$other_vars$threshold_type, .sdt_threshold_types),
-    match(anchor, c("criterion", "bias")),
+  c(.sdt_rating_constants(model, anchor),
     deparse(inv_link("d", model$links$d)),
     deparse(inv_link(anchor, model$links[[anchor]])),
     if (has_spacing) "spacing" else "0", "sdratio",
     .sdt_rating_variant(model)$extra_params,
     model$other_vars$stimulus, .sdt_threshold_delta_names(model))
+}
+
+# K, dist, threshold type and anchor, the integer constants both routes pass
+# to the Stan kernel and the trial family's R methods read back
+.sdt_rating_constants <- function(model, anchor) {
+  c(model$other_vars$n_ratings, .sdt_dist_id(model$other_vars$dist),
+    match(model$other_vars$threshold_type, .sdt_threshold_types),
+    match(anchor, c("criterion", "bias")))
 }
 
 # Stan function generated per model: the delta arity is fixed here, while cat,
@@ -605,9 +742,9 @@ check_data.sdt_rating <- function(model, data, formula) {
   }
 
   paste0(
+    "// log probability of rating category cat; anchor 2 measures the criterion from the midpoint between the means\n",
     "real ", variant$logmu_fun, "(", signature, ") {\n",
     delta_decl,
-    "  // a bias is measured from the midpoint, the thresholds from the noise mean\n",
     "  real crit = anchor == 2 ? criterion + d * sdt_rms_scale(exp(sdratio)) / 2.0 : criterion;\n",
     "  vector[K - 1] thr = make_thresholds(crit, spacing, deltas, K, thresh_type);\n",
     "  return ", variant$logmu_cat_call, ";\n",
@@ -626,17 +763,20 @@ check_data.sdt_rating <- function(model, data, formula) {
 # by bmf2bf.bmmodel, so they are deliberately not added here.
 #' @export
 bmf2bf.sdt_rating <- function(model, formula) {
-  resp_cats <- model$resp_vars$response
+  if (is_trial_level(model)) {
+    return(.sdt_rating_trial_bf(model))
+  }
+  resp_cats <- .sdt_categories(model)
   fun <- .sdt_rating_variant(model)$logmu_fun
   args <- paste(.sdt_rating_logmu_args(model, .sdt_anchor_parameter(formula)),
                 collapse = ", ")
 
   bform <- brms::bf(
-    glue("Y | trials(nTrials) ~ {fun}(1, {args})"),
+    bmm_nl_formula(glue("Y | trials(nTrials) ~ {fun}(1, {args})")),
     nl = TRUE
   )
   for (k in seq_along(resp_cats)[-1]) {
-    bform <- bform + brms::nlf(stats::as.formula(
+    bform <- bform + brms::nlf(bmm_nl_formula(
       glue("mu{resp_cats[k]} ~ {fun}({k}, {args})")
     ))
   }
@@ -650,26 +790,179 @@ bmf2bf.sdt_rating <- function(model, formula) {
 
 #' @export
 configure_model.sdt_rating <- function(model, data, formula) {
-  resp_cats <- model$resp_vars$response
-
+  anchor <- .sdt_anchor_parameter(formula)
   formula <- bmf2bf(model, formula)
-  formula$family <- brms::multinomial(refcat = NA)
-  formula$family$cats <- resp_cats
-  formula$family$dpars <- paste0("mu", resp_cats)
+  if (is_trial_level(model)) {
+    formula$family <- .sdt_rating_trial_family(model, anchor)
+    trial_stan <- .sdt_rating_trial_stan(model, anchor)
+  } else {
+    resp_cats <- .sdt_categories(model)
+    formula$family <- brms::multinomial(refcat = NA)
+    formula$family$cats <- resp_cats
+    formula$family$dpars <- paste0("mu", resp_cats)
+    trial_stan <- NULL
+  }
 
   sc_path <- system.file("stan_chunks", package = "bmm")
   chunks <- unique(c("sdt_dist_functions.stan", "threshold_functions.stan",
                      "ordinal_functions.stan", "sdt_rating_functions.stan",
                      .sdt_rating_variant(model)$stan_chunk))
-  stan_funs <- paste(
+  stan_funs <- paste(c(
     paste(vapply(chunks, function(f) read_lines2(paste0(sc_path, "/", f)),
                  character(1)), collapse = "\n"),
     .sdt_rating_logmu_stan(model),
-    sep = "\n"
-  )
+    trial_stan
+  ), collapse = "\n")
   stanvars <- brms::stanvar(scode = stan_funs, block = "functions")
 
   nlist(formula, data, stanvars)
+}
+
+# nlpars and dpars store the intercept the same way only uncentred, and the
+# parameters are nlpars on aggregated rows and dpars on trial rows
+#' @exportS3Method
+centre_dpar_intercepts.sdt_rating <- function(model) {
+  FALSE
+}
+
+
+############################################################################# !
+# TRIAL-NATIVE FAMILY                                                    ####
+############################################################################# !
+
+# Trial rows hold one rating each, so the likelihood of a row is the
+# probability of that one category: one threshold vector and the CDFs around
+# it, where the multinomial route computes all K categories and a softmax.
+# The row kernel is the generated logmu function the multinomial route uses,
+# called with the observed rating as its category. The parameters are the
+# family's dpars. brms refuses dpar names that end in a digit, so each
+# threshold delta stays the nlpar the aggregated fit has and reaches the
+# family through a dpar named by letter (deltaa for delta1, ...); its draws and
+# priors keep the delta<i> names. K, dist, threshold type and anchor travel as
+# integer literals in vars, as they do in the multinomial's nlf call: the
+# delta arity already makes every program model-specific, and the R methods
+# read the literals back from the family, so no data stanvar has to carry them.
+
+# a fit made through the trial family, rather than through the multinomial
+# that aggregated rows, and 1.5.0's trial rows, use
+.is_sdt_rating_trial_fit <- function(fit) {
+  startsWith(fit$family$name %||% "", "sdt_rating_trial_")
+}
+
+# one family per version, threshold type and anchor, whose dpar lists differ;
+# the Stan function and the custom family share the name. The R methods are
+# stored on the family under fixed names: brms would look a missing one up by
+# the family name in the family environment, which postprocess_brm() sets to
+# the global environment, where no bmm function is found by any name
+.sdt_rating_trial_family_name <- function(model, anchor) {
+  paste("sdt_rating_trial", .sdt_rating_variant_name(model),
+        model$other_vars$threshold_type, anchor, sep = "_")
+}
+
+# the version, the fourth part of the family name: no version name holds "_"
+.sdt_rating_trial_version <- function(family) {
+  strsplit(family$name, "_", fixed = TRUE)[[1]][4]
+}
+
+.sdt_rating_variant_name <- function(model) {
+  if (isTRUE(model$version %in% names(.sdt_rating_variants))) model$version else "standard"
+}
+
+.sdt_rating_delta_dpars <- function(model) {
+  n <- length(.sdt_threshold_delta_names(model))
+  paste0(rep_len("delta", n), c(letters, outer(letters, letters, paste0))[seq_len(n)])
+}
+
+.sdt_rating_trial_dpars <- function(model, anchor) {
+  c("mu", "d", anchor,
+    if ("spacing" %in% names(model$parameters)) "spacing", "sdratio",
+    .sdt_rating_variant(model)$extra_params, .sdt_rating_delta_dpars(model))
+}
+
+.sdt_rating_trial_bf <- function(model) {
+  bform <- brms::bf(glue("{model$resp_vars$response} | vint({model$other_vars$stimulus}) ~ 0"))
+  deltas <- .sdt_threshold_delta_names(model)
+  delta_dpars <- .sdt_rating_delta_dpars(model)
+  for (i in seq_along(deltas)) {
+    bform <- bform + brms::nlf(stats::as.formula(glue("{delta_dpars[i]} ~ {deltas[i]}")))
+  }
+  bform
+}
+
+.sdt_rating_trial_family <- function(model, anchor) {
+  dpars <- .sdt_rating_trial_dpars(model, anchor)
+  brms::custom_family(
+    .sdt_rating_trial_family_name(model, anchor),
+    dpars = dpars,
+    links = c("identity", vapply(dpars[-1], function(p) model$links[[p]] %||% "identity",
+                                 character(1), USE.NAMES = FALSE)),
+    type = "int",
+    loop = TRUE,
+    log_lik = log_lik_sdt_rating_trial,
+    posterior_predict = posterior_predict_sdt_rating_trial,
+    posterior_epred = posterior_epred_sdt_rating_trial,
+    vars = c("vint1[n]", .sdt_rating_constants(model, anchor))
+  )
+}
+
+.sdt_rating_trial_stan <- function(model, anchor) {
+  variant <- .sdt_rating_variant(model)
+  dpars <- .sdt_rating_trial_dpars(model, anchor)
+  signature <- paste(c("int y", paste("real", dpars), "int stimulus", "int K",
+                       "int dist_type", "int thresh_type", "int anchor"),
+                     collapse = ", ")
+  args <- paste(c("y", "K", "dist_type", "thresh_type", "anchor", "d", anchor,
+                  if ("spacing" %in% dpars) "spacing" else "0", "sdratio",
+                  variant$extra_params, "stimulus", .sdt_rating_delta_dpars(model)),
+                collapse = ", ")
+  paste0(
+    "// log probability of the observed rating on one trial\n",
+    "real ", .sdt_rating_trial_family_name(model, anchor), "_lpmf(", signature, ") {\n",
+    "  return ", variant$logmu_fun, "(", args, ");\n",
+    "}\n"
+  )
+}
+
+# The K category log-probabilities of each row: draws x K for one row i,
+# draws x rows x K for all rows. get_dpar() gives draws x rows, or for a dpar
+# brms holds fixed a single value or one value per draw; each is recycled
+# draw-fastest over the rows, the order of a draws x rows matrix
+.sdt_rating_trial_log_probs <- function(prep, i = NULL) {
+  consts <- as.integer(prep$family$vars[-1])
+  dpars <- setdiff(prep$family$dpars, "mu")
+  n_draws <- prep$ndraws
+  n_obs <- if (is.null(i)) prep$nobs else 1L
+  draws <- lapply(stats::setNames(nm = dpars), function(p) {
+    rep_len(as.vector(brms::get_dpar(prep, p, i = i)), n_draws * n_obs)
+  })
+  stimulus <- prep$data$vint1
+  if (!is.null(i)) stimulus <- stimulus[i]
+  version <- .sdt_rating_trial_version(prep$family)
+  lp <- .sdt_rating_category_log_probs(
+    version, consts[1], consts[2], consts[3], consts[4],
+    d = draws$d, criterion = draws[[c("criterion", "bias")[consts[4]]]],
+    spacing = draws$spacing %||% 0, sdratio = draws$sdratio,
+    stimulus = rep(stimulus, each = n_draws),
+    extra = draws[.sdt_rating_variants[[version]]$extra_params],
+    deltas = draws[grep("^delta", dpars, value = TRUE)]
+  )
+  if (is.null(i)) array(lp, c(n_draws, n_obs, consts[1])) else lp
+}
+
+log_lik_sdt_rating_trial <- function(i, prep) {
+  .sdt_rating_trial_log_probs(prep, i)[, prep$data$Y[i]]
+}
+
+posterior_predict_sdt_rating_trial <- function(i, prep, ...) {
+  cum <- t(apply(exp(.sdt_rating_trial_log_probs(prep, i)), 1, cumsum))
+  K <- ncol(cum)
+  1L + rowSums(stats::runif(nrow(cum)) * cum[, K] > cum[, -K, drop = FALSE])
+}
+
+# the category probabilities, draws x rows x K: the expected counts of a row
+# that holds one trial, as the multinomial's epred is for nTrials = 1
+posterior_epred_sdt_rating_trial <- function(prep) {
+  exp(.sdt_rating_trial_log_probs(prep))
 }
 
 ############################################################################# !
@@ -682,7 +975,8 @@ configure_model.sdt_rating <- function(model, data, formula) {
 #' @export
 simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link", "native"), ...) {
   vars <- model$other_vars
-  design <- .design_or_n(model, design, vars$stimulus, trials = "n_trials")
+  trial_level <- is_trial_level(model)
+  design <- .design_or_n(model, design, vars$stimulus, trials = if (!trial_level) "n_trials")
   sim <- .simulate_pars(model, pars, design, scale)
   p <- sim$native
   sdratio <- exp(p$sdratio)
@@ -690,15 +984,14 @@ simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link
   deltas <- p[grep("^delta[0-9]+$", names(p))]
   thresholds <- .sdt_make_thresholds(criterion, vars$n_ratings, vars$threshold_type, p$spacing,
                                      if (length(deltas)) do.call(cbind, deltas))
-  args <- list(nrow(design), design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
+  args <- list(nrow(design), if (trial_level) 1L else design$n_trials, .coerce_sdt_stimulus(design[[vars$stimulus]]),
                d = p$d, thresholds = thresholds, sdratio = sdratio, dist = vars$dist)
   counts <- switch(model$version,
     standard = do.call(rsdt_rating, args),
     dpsdt = do.call(rsdt_dpsdt, c(args, list(Ro = stats::plogis(p$Ro), Rn = stats::plogis(p$Rn)))),
     metad = do.call(rsdt_metad, c(args, list(metad = exp(p$logmratio) * p$d)))
   )
-  colnames(counts) <- model$resp_vars$response
-  .simulate_result(design, as.data.frame(counts), sim)
+  .simulate_result(design, .sdt_simulated_responses(model, counts), sim)
 }
 
 
@@ -707,8 +1000,10 @@ simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link
 #'   `log(p_k)` for rating category `cat`, which the [sdt_rating()] multinomial
 #'   formula uses as the category logit (so `softmax` recovers the SDT category
 #'   probabilities). `brms` evaluates the non-linear formula in R for
-#'   `posterior_predict()` and `posterior_epred()`, so this function must be on
-#'   the search path; it is exported for that reason and is not called directly.
+#'   `log_lik()`, `posterior_predict()` and `posterior_epred()` and finds this
+#'   function in the bmm namespace, attached or not. It is exported for fits
+#'   saved before bmm 1.5.0, which find it only after `library(bmm)`, and is
+#'   not called directly.
 #' @param cat Integer rating category index.
 #' @param K Integer number of rating categories.
 #' @param dist Integer noise-distribution id (see the `.sdt_dists` registry).
@@ -731,27 +1026,11 @@ simulate_data.sdt_rating <- function(model, pars, design = NULL, scale = c("link
 #' @export
 sdt_rating_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing,
                              sdratio, stimulus, ...) {
-  dist_name <- .sdt_dist_names[dist]
-  thresh_name <- .sdt_threshold_types[thresh]
-
-  shape <- dim(d)
-  d <- as.vector(d)
-  n <- length(d)
-  criterion <- rep_len(as.vector(criterion), n)
-  spacing <- rep_len(as.vector(spacing), n)
-  sdratio <- rep_len(as.vector(sdratio), n)
-  stimulus <- rep_len(as.vector(stimulus), n)
-  deltas <- if (...length() > 0L) {
-    do.call(cbind, lapply(list(...), function(x) rep_len(as.vector(x), n)))
-  }
-
-  if (anchor == 2L) criterion <- .sdt_bias_to_criterion(criterion, d, exp(sdratio))
-  thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  out <- rbind(.sdt_category_log_probs(rbind(thr), d, exp(sdratio),
-                                       stimulus, dist_name))[, cat]
-
-  if (!is.null(shape)) dim(out) <- shape
-  out
+  .sdt_rating_logmu_column(
+    .sdt_rating_category_log_probs("standard", K, dist, thresh, anchor, d, criterion,
+                                   spacing, sdratio, stimulus, deltas = list(...)),
+    cat, dim(d)
+  )
 }
 
 
@@ -759,29 +1038,12 @@ sdt_rating_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing
 #' @export
 sdt_dpsdt_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing,
                             sdratio, Ro, Rn, stimulus, ...) {
-  dist_name <- .sdt_dist_names[dist]
-  thresh_name <- .sdt_threshold_types[thresh]
-
-  shape <- dim(d)
-  d <- as.vector(d)
-  n <- length(d)
-  criterion <- rep_len(as.vector(criterion), n)
-  spacing <- rep_len(as.vector(spacing), n)
-  sdratio <- rep_len(as.vector(sdratio), n)
-  Ro <- rep_len(as.vector(Ro), n)
-  Rn <- rep_len(as.vector(Rn), n)
-  stimulus <- rep_len(as.vector(stimulus), n)
-  deltas <- if (...length() > 0L) {
-    do.call(cbind, lapply(list(...), function(x) rep_len(as.vector(x), n)))
-  }
-
-  if (anchor == 2L) criterion <- .sdt_bias_to_criterion(criterion, d, exp(sdratio))
-  thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  out <- rbind(.sdt_dpsdt_category_log_probs(rbind(thr), d, exp(sdratio),
-                                             stimulus, dist_name, Ro, Rn))[, cat]
-
-  if (!is.null(shape)) dim(out) <- shape
-  out
+  .sdt_rating_logmu_column(
+    .sdt_rating_category_log_probs("dpsdt", K, dist, thresh, anchor, d, criterion,
+                                   spacing, sdratio, stimulus, extra = list(Ro = Ro, Rn = Rn),
+                                   deltas = list(...)),
+    cat, dim(d)
+  )
 }
 
 
@@ -789,27 +1051,48 @@ sdt_dpsdt_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing,
 #' @export
 sdt_metad_logmu <- function(cat, K, dist, thresh, anchor, d, criterion, spacing,
                             sdratio, logmratio, stimulus, ...) {
-  dist_name <- .sdt_dist_names[dist]
-  thresh_name <- .sdt_threshold_types[thresh]
+  .sdt_rating_logmu_column(
+    .sdt_rating_category_log_probs("metad", K, dist, thresh, anchor, d, criterion,
+                                   spacing, sdratio, stimulus,
+                                   extra = list(logmratio = logmratio), deltas = list(...)),
+    cat, dim(d)
+  )
+}
 
-  shape <- dim(d)
+
+# All K category log-probabilities of every element of d, one row each: the
+# R side of the generated Stan logmu function, shared by the multinomial
+# companions above and the trial family's methods. The other arguments are
+# recycled to the length of d; a bias (anchor 2) is measured from the
+# midpoint, the thresholds from the noise mean
+.sdt_rating_category_log_probs <- function(version, K, dist, thresh, anchor, d, criterion,
+                                           spacing, sdratio, stimulus, extra = list(),
+                                           deltas = list()) {
   d <- as.vector(d)
   n <- length(d)
-  criterion <- rep_len(as.vector(criterion), n)
-  spacing <- rep_len(as.vector(spacing), n)
-  sdratio <- rep_len(as.vector(sdratio), n)
-  # meta-d is derived from the estimated log M-ratio, mirroring the Stan call
-  metad <- exp(rep_len(as.vector(logmratio), n)) * d
-  stimulus <- rep_len(as.vector(stimulus), n)
-  deltas <- if (...length() > 0L) {
-    do.call(cbind, lapply(list(...), function(x) rep_len(as.vector(x), n)))
-  }
+  flat <- function(x) rep_len(as.vector(x), n)
+  criterion <- flat(criterion)
+  sdratio <- exp(flat(sdratio))
+  stimulus <- flat(stimulus)
+  extra <- lapply(extra, flat)
+  deltas <- if (length(deltas) > 0L) do.call(cbind, lapply(deltas, flat))
+  dist <- .sdt_dist_names[dist]
 
-  if (anchor == 2L) criterion <- .sdt_bias_to_criterion(criterion, d, exp(sdratio))
-  thr <- .sdt_make_thresholds(criterion, K, thresh_name, spacing, deltas)
-  out <- rbind(.sdt_metad_category_log_probs(rbind(thr), d, exp(sdratio),
-                                             stimulus, dist_name, metad))[, cat]
+  if (anchor == 2L) criterion <- .sdt_bias_to_criterion(criterion, d, sdratio)
+  thr <- rbind(.sdt_make_thresholds(criterion, K, .sdt_threshold_types[thresh],
+                                    flat(spacing), deltas))
+  rbind(switch(version,
+    standard = .sdt_category_log_probs(thr, d, sdratio, stimulus, dist),
+    dpsdt = .sdt_dpsdt_category_log_probs(thr, d, sdratio, stimulus, dist, extra$Ro, extra$Rn),
+    # meta-d' is derived from the estimated log M-ratio, mirroring the Stan call
+    metad = .sdt_metad_category_log_probs(thr, d, sdratio, stimulus, dist,
+                                          exp(extra$logmratio) * d)
+  ))
+}
 
+# the column of one category, in the shape brms passed d in
+.sdt_rating_logmu_column <- function(lp, cat, shape) {
+  out <- lp[, cat]
   if (!is.null(shape)) dim(out) <- shape
   out
 }

@@ -30,7 +30,9 @@ n_discrete_max <- 10
 #'     `ezdm()`, and the row sums of the response count columns of `m3()`,
 #'     `mpt()`, `sdt_rating()`, `sdt_ranking()` and `sdt_cdp()`. For all other
 #'     models a row is one trial. With one row per trial
-#'     (`sdt_yn()` and `sdt_mafc()` without `n_trials`), only the first
+#'     (`sdt_yn()` and `sdt_mafc()` without `n_trials`, `sdt_rating()` with
+#'     `n_ratings`, `sdt_ranking()` with one rank column, `sdt_cdp()` with
+#'     `judgment` and `confidence`, `mpt()` with `response`), only the first
 #'     grouping variable of the formula, taken as the participant, and any
 #'     grouping variable that is also a discrete predictor are crossed; the
 #'     other grouping variables, such as items, are counted per level
@@ -193,8 +195,15 @@ capture_check_conditions <- function(expr) {
 
 summarise_response_vars <- function(model, data) {
   annotations <- response_annotations(model)
-  info <- lapply(names(model$resp_vars), function(arg) {
-    vars <- model$resp_vars[[arg]]
+  # a trial-level mpt() reads one column naming the categories, not a column
+  # per category
+  resp_vars <- if (inherits(model, "mpt") && is_trial_level(model)) {
+    list(response = model$other_vars$response)
+  } else {
+    model$resp_vars
+  }
+  info <- lapply(names(resp_vars), function(arg) {
+    vars <- resp_vars[[arg]]
     data.frame(
       variable = vars,
       summary = vapply(vars, function(v) describe_data_column(data[[v]]), character(1)),
@@ -660,8 +669,9 @@ circular_range_findings <- function(data, vars, label) {
 }
 
 # in set size varying designs the nt columns must contain values at positions
-# up to set_size - 1 and NA padding after that; check_data silently replaces
-# NAs, so misplaced ones are only visible here
+# up to set_size - 1 and NA padding after that. check_data() stops on an NA
+# inside the set size (#721), but values past it pass silently, so those are
+# only visible here
 set_size_padding_findings <- function(data, cols, set_size, arg) {
   missing_cols <- setdiff(cols, colnames(data))
   if (length(missing_cols) > 0) {
@@ -688,8 +698,7 @@ set_size_padding_findings <- function(data, cols, set_size, arg) {
     findings <- c(findings, list(data_check_finding("warning", glue(
       "{n_na_active} NA value(s) in '{arg}' at positions within the set size \\
       of the trial ({length(rows)} row(s), first at row {rows[1]}). These \\
-      positions must contain values - during fitting NAs are silently \\
-      replaced by placeholder values, which biases the estimates."
+      positions must contain values; bmm() stops on them as well."
     ))))
   }
   n_value_padding <- sum(!na_mat & padding)

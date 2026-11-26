@@ -52,15 +52,9 @@ built_data_columns.default <- function(model) {
   character(0)
 }
 
-# inv_ss and ss_numeric are built whatever the set sizes; the LureIdx step
-# functions are one per non-target feature
 #' @exportS3Method
 built_data_columns.non_targets <- function(model) {
-  c(
-    paste0("LureIdx", seq_along(model$other_vars$nt_features)),
-    "inv_ss", "ss_numeric",
-    NextMethod("built_data_columns")
-  )
+  c("ss_numeric", NextMethod("built_data_columns"))
 }
 
 #' @export
@@ -129,21 +123,37 @@ check_data.non_targets <- function(model, data, formula) {
     'nt_features' should equal max(set_size)-1"
   )
 
-  # create index variables for nt_features and correction variable for theta due to set_size
-  lure_idx_vars <- paste0("LureIdx", 1:(max_set_size - 1))
-  for (i in 1:(max_set_size - 1)) {
-    data[[lure_idx_vars[i]]] <- ifelse(ss_numeric >= (i + 1), 1, 0)
-  }
+  .check_nt_na(data, nt_features, ss_numeric, "data")
+
   data$ss_numeric <- ss_numeric
-  data$inv_ss <- 1 / (ss_numeric - 1)
-  data$inv_ss <- ifelse(is.infinite(data$inv_ss), 1, data$inv_ss)
+  # what is left is NA past a trial's set size, the padding of displays of
+  # different sizes. The likelihood reads only as many non-target columns as
+  # a trial's set size has, so the padding value never enters it; it only has
+  # to not be missing
   data[, nt_features][is.na(data[, nt_features])] <- 0
 
-  # save some variables for later use
   attr(data, "max_set_size") <- max_set_size
-  attr(data, "lure_idx_vars") <- lure_idx_vars
 
   NextMethod("check_data")
+}
+
+# A trial's first set_size - 1 non-target columns hold the items it showed, so
+# a value missing there cannot be filled in without inventing an item (#721).
+# The columns past them may be NA. A trial whose set size is missing is left
+# to the checks of the set size; brms drops it from a fit
+.check_nt_na <- function(data, columns, set_size, what) {
+  nt <- as.matrix(data[columns])
+  shown_na <- is.na(nt) & col(nt) < set_size
+  shown_na[is.na(shown_na)] <- FALSE
+  bad <- columns[colSums(shown_na) > 0]
+  rows <- which(rowSums(shown_na) > 0)
+  listed <- paste(utils::head(rows, 5), collapse = ", ")
+  if (length(rows) > 5) listed <- paste0(listed, ", ...")
+  stopif(length(bad) > 0,
+         "The {what}'s column(s) {collapse_comma(bad)} contain NA within the set size \\
+         in {length(rows)} trial(s), row(s) {listed}: a trial's first set_size - 1 \\
+         non-target columns need values, and NA may stand only past them. Fill in the \\
+         missing values or drop those trials.")
 }
 
 check_var_set_size <- function(set_size, data) {
@@ -394,11 +404,13 @@ standata.bmmformula <- function(object, data, model, ...) {
   dots <- list(...)
   local_brms_threads(dots)
   configure_options(dots)
-  call_brms_extractor(
-    brms::standata,
-    configure_fit(object, data, model, until = "model"),
-    dots
-  )
+  cfg <- configure_fit(object, data, model, until = "model")
+  # the prior skips configure_prior() here, so priors written for an older
+  # parameterisation are translated before brms checks them
+  if (!is.null(dots$prior)) {
+    dots$prior <- translate_deprecated_priors(cfg$model, cfg$config_args$formula, dots$prior)
+  }
+  call_brms_extractor(brms::standata, cfg, dots)
 }
 
 #' @title Stan data of a fitted `bmm` model
@@ -423,10 +435,20 @@ standata.bmmformula <- function(object, data, model, ...) {
 #' @keywords extract_info
 #' @export
 standata.bmmfit <- function(object, newdata = NULL, ...) {
-  if (lacks_built_columns(object, newdata)) {
-    newdata <- check_newdata(object, newdata)
+  if (!is.null(newdata)) {
+    newdata <- prepare_newdata(object$bmm$model, newdata, object)
   }
   NextMethod()
+}
+
+# newdata in the layout the fit's model frame has, which is what brms reads
+prepare_newdata <- function(model, newdata, fit) {
+  UseMethod("prepare_newdata")
+}
+
+#' @exportS3Method
+prepare_newdata.default <- function(model, newdata, fit) {
+  if (lacks_built_columns(fit, newdata)) check_newdata(fit, newdata) else newdata
 }
 
 # The model frame holds the columns check_data() built, and data in the layout
@@ -443,11 +465,16 @@ lacks_built_columns <- function(object, newdata) {
 
 # brms returns predictions in the rows of newdata, so the data are not sorted,
 # and a check_data() method that dropped or reordered rows would misalign them
-# without an error
+# without an error. The `prediction_newdata` mark tells the checks of what the
+# data can estimate (both stimuli for the SDT models, one set size for a
+# capacity rule) that nothing is estimated from these data; it lives only for
+# this check_data() call
 check_newdata <- function(object, newdata) {
   withr::local_options(bmm.sort_data = FALSE)
-  newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata))
+  newdata <- carry_fit_bounds(object$bmm$model, as.data.frame(newdata), object$data)
+  attr(newdata, "prediction_newdata") <- TRUE
   checked <- check_data(object$bmm$model, newdata, object$bmm$user_formula)
+  attr(checked, "prediction_newdata") <- NULL
   stopif(
     !identical(row.names(checked), row.names(newdata)),
     "Preparing 'newdata' for this model changed its rows. Please report this \\
@@ -458,13 +485,15 @@ check_newdata <- function(object, newdata) {
 
 # Data checked against a fit rather than on its own: the fit's stored frame in
 # update() and newdata for a prediction. Both can lack the largest set size
-# the fit was made with, which check_data() would then take from the data
-carry_fit_bounds <- function(model, data) {
+# the fit was made with, which check_data() would then take from the data.
+# `frame` is the fit's model frame, which is `data` itself on the stored-frame
+# path
+carry_fit_bounds <- function(model, data, frame = data) {
   UseMethod("carry_fit_bounds")
 }
 
 #' @exportS3Method
-carry_fit_bounds.default <- function(model, data) {
+carry_fit_bounds.default <- function(model, data, frame = data) {
   data
 }
 
@@ -472,8 +501,30 @@ carry_fit_bounds.default <- function(model, data) {
 # size is one more than their number. Derived rather than stored on the fit, so
 # fits saved before #459 was fixed are covered too
 #' @exportS3Method
-carry_fit_bounds.non_targets <- function(model, data) {
+carry_fit_bounds.non_targets <- function(model, data, frame = data) {
   attr(data, "fit_max_set_size") <- length(model$other_vars$nt_features) + 1
+  data
+}
+
+# Trial rows of sdt_ranking() with a set-size column learn the number of ranks
+# from the data, and those of sdt_cdp() learn from them whether there are guess
+# categories. A subset without the largest set size or without a 'guess'
+# judgment would then give Y fewer columns than the fit has, which brms refuses.
+# Read from the fit's Y rather than stored on the model, so every fit made with
+# trial rows is covered
+#' @exportS3Method
+carry_fit_bounds.sdt_ranking <- function(model, data, frame = data) {
+  if (is_trial_level(model)) {
+    attr(data, "fit_n_ranks") <- ncol(frame$Y)
+  }
+  data
+}
+
+#' @exportS3Method
+carry_fit_bounds.sdt_cdp <- function(model, data, frame = data) {
+  if (is_trial_level(model)) {
+    attr(data, "fit_has_guess") <- .sdt_cdp_has_guess_cols(model, frame$Y)
+  }
   data
 }
 

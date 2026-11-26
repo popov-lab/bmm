@@ -575,3 +575,43 @@ test_that("latent_sdt reports the response-process parameters as an attribute", 
   expect_setequal(extra$parameter, c("Ro", "Rn"))
   expect_equal(extra$mean[extra$parameter == "Ro"], 0.4, tolerance = 1e-6)
 })
+
+# Ro, Rn and logmratio enter the category log-probabilities, not the
+# categories, so each version's trial family reads the same parameters as its
+# aggregated program, with the version's kernel and extra dpars
+test_that("the dpsdt and metad versions build on one row per trial", {
+  skip_on_cran()
+  trials <- data.frame(
+    id = rep(1:2, each = 8), stimulus = rep(rep(0:1, each = 4), 2),
+    r = c(1, 2, 1, 3, 4, 3, 4, 2, 2, 1, 1, 3, 4, 4, 2, 4)
+  )
+  cells <- data.frame(id = rep(1:2, each = 2), stimulus = rep(0:1, 2),
+                      r1 = c(2, 0, 2, 0), r2 = c(1, 1, 1, 1),
+                      r3 = c(1, 1, 1, 0), r4 = c(0, 2, 0, 3))
+  formulas <- list(
+    dpsdt = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, Ro ~ 1, Rn ~ 1),
+    metad = bmf(d ~ 1 + (1 | id), criterion ~ 1, spacing ~ 1, logmratio ~ 1)
+  )
+  for (version in names(formulas)) {
+    mock <- function(data, model) suppressMessages(
+      bmm(formulas[[version]], data, model, backend = "mock", mock_fit = 1, rename = FALSE)
+    )
+    trial_model <- sdt_rating("r", "stimulus", n_ratings = 4, version = version)
+    trial_fit <- mock(trials, trial_model)
+    cell_fit <- mock(cells, sdt_rating(paste0("r", 1:4), "stimulus", version = version))
+    trial_code <- brms::stancode(trial_fit)
+    kernel <- switch(version, dpsdt = "sdt_dpsdt_logmu", metad = "sdt_metad_logmu")
+    extras <- switch(version, dpsdt = "Ro[n], Rn[n]", metad = "logmratio[n]")
+    expect_match(trial_code, paste0("target += sdt_rating_trial_", version,
+                                    "_parsimonious_criterion_lpmf(Y[n] | mu[n], d[n], criterion[n], ",
+                                    "spacing[n], sdratio[n], ", extras, ", vint1[n], 4, 1, 1, 1);"),
+                 fixed = TRUE, info = version)
+    expect_match(trial_code, paste0("return ", kernel, "(y, K,"), fixed = TRUE, info = version)
+    expect_match(brms::stancode(cell_fit), "multinomial_logit2_lpmf", fixed = TRUE, info = version)
+    expect_equal(unname(t(vapply(split(brms::standata(trial_fit)$Y, paste(trials$id, trials$stimulus)),
+                                 tabulate, numeric(4), nbins = 4))),
+                 unname(as.matrix(cells[paste0("r", 1:4)])), info = version)
+    expect_identical(names(trial_model$parameters),
+                     names(sdt_rating(paste0("r", 1:4), "stimulus", version = version)$parameters))
+  }
+})

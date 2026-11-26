@@ -212,6 +212,30 @@ test_that("an m column rebuilt for check_data() stays out of the model frame", {
   expect_equal(unname(data$Y), unname(as.matrix(case$data[paste0("rank", 1:5)])))
 })
 
+# a kfold() training fold is a slice of the model frame, and on trial rows it
+# can lack the fit's largest set size (sdt_ranking) or every 'guess' judgment
+# (sdt_cdp), from which check_data() would otherwise count the categories
+test_that("a slice of a trial-level frame keeps the fit's categories", {
+  skip_on_cran()
+  subsets <- list(
+    sdt_ranking_trial_level = function(user) user$set_size == 3,
+    sdt_cdp_trial_level = function(user) user$judgment != "guess"
+  )
+  for (case_name in names(subsets)) {
+    case <- stored_frame_cases()[[case_name]]
+    fit <- stored_frame_fit(case)
+    slice <- fit$data[subsets[[case_name]](case$data), , drop = FALSE]
+    data <- check_stored_data(case$model, slice, fit$bmm$user_formula)
+    expect_identical(unclass(data$Y), unclass(slice$Y), info = case_name)
+    expect_null(attr(data, "fit_n_ranks"), info = case_name)
+    expect_null(attr(data, "fit_has_guess"), info = case_name)
+  }
+  # the sdt_cdp slice keeps the guess categories, so the fit's `kcrit ~ 1` is
+  # still identified and draws no warning
+  expect_true(attr(data, "has_guess"))
+  expect_silent(check_formula(fit$bmm$model, data, fit$bmm$user_formula))
+})
+
 test_that("an m3 frame whose Idx_ columns came from the wrong option columns is refused (#457)", {
   skip_on_cran()
   case <- stored_frame_cases()$m3_char_num_options_by_category

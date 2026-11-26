@@ -1,6 +1,8 @@
 # 0001: Release scope for 1.4.0, 1.5.0 and 1.6.0
 
-- **Status:** accepted
+- **Status:** accepted; § Decision (the 1.5.0 and 1.6.0 scope, the yield order) and § Consequences
+  superseded by [0008](0008-roadmap-to-2027-03.md) on 2026-11-06. The rationale and the "Not planned"
+  list stand.
 - **Date:** 2026-10-04
 - **Replaces:** the release plan of 2026-09-26 (1.5.0 = MPT + circular mixtures)
 

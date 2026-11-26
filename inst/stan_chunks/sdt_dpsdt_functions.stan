@@ -1,5 +1,4 @@
-// dual-process SDT (Yonelinas, 1994) category log-probability; needs sdt_rating_functions.stan
-// recollection adds mass to the most confident category; d is the d_a of the familiarity process only
+// log probability of a rating category under dual-process SDT (Yonelinas, 1994)
 real sdt_dpsdt_logmu_cat(int cat, vector thresholds,
                          real d, real sdratio, real stimulus,
                          int dist_type, real Ro, real Rn) {

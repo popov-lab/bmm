@@ -82,7 +82,7 @@ shares are in § Changes (2026-10-20, 2026-11-03):
 | --- | --- | --- |
 | a test | share 0.022 (39 runs, 2026-10-30 to 2026-11-03) | share 0.033 |
 | a file | share 0.156 (`test-conditional_effects.R`, same runs) | share 0.23 |
-| the suite | 668 s (12 runs, 2026-10-19 and 2026-10-20) | 1000 s |
+| the suite | 1175 s (15 runs, 2026-11-16 to 2026-11-25, slowest runner) | 1500 s |
 
 No test has a cap of its own: `allowed` in the script has been empty since
 the #422 consolidation, and an entry there gives its cap as a share and
@@ -185,6 +185,8 @@ fits, in `tests/local/test-summary-fits.R` and in the skipped
 `restructure()` test; the record notes the last commit holding the blobs
 when it happens. The manual test files, including
 `test-kfold-update.R`, moved to `tests/local/` on 2026-10-13.
+
+2026-11-11, #674: `tests/internal/` is deleted. The last commit that holds the files is 5491fdc25f0d2c54051bd15860c7afd302936ac3; `tests/local/test-summary-fits.R` now reads `tests/testthat/assets/bmmfit_mixture3p.rds`.
 
 ## Consequences
 
@@ -378,3 +380,17 @@ last.
   821 s for 3111 s; the wall time is now near a quarter of the summed time,
   the floor for four workers. `newdata` joined the list afterwards: it
   took 110 s on that run, among the eight largest files.
+- 2026-11-25. The suite cap rises from 1000 s to 1500 s (25 minutes); the
+  file and test shares stay. Of 15 `tests-source` runs from 2026-11-16 to
+  2026-11-25, four breached 1000 s (1037 to 1175 s) with every test
+  passing: three on an AMD EPYC 7763, one on a Xeon Platinum 8370C, and no
+  run on either CPU passed. The passes took 672 to 894 s. Two develop
+  commits that differ by one test comment took 894 s and 1173 s, and every
+  file over 10 s was 1.18 to 1.43 times slower on the EPYC 7763, so the cap
+  measured which runner the job drew. Moving the slowest files to the
+  local tier instead would have taken the cross-model contract tests
+  (`update()`, the stored frame, `conditional_effects()`) out of pull
+  request CI. The share caps still catch one slow file or test on any
+  runner; on a fast runner the whole suite can now slow by about two thirds
+  before the cap sees it. The step's timeout rises from 30 to 40 minutes,
+  so a breach is reported with its timings rather than cut off.

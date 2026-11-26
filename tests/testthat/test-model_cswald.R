@@ -1011,6 +1011,7 @@ test_that("the ndt prior check skips a student_t prior with no degrees of freedo
 })
 
 test_that("the ndt prior check reads the intercept row, not the class row, of ndt ~ 1 + cond (#548)", {
+  skip_on_cran() # over 0.4 s in CRAN mode (ADR 0004, R10)
   formula <- bmf(drift ~ 1, bound ~ 1, ndt ~ 1 + cond)
   data <- cswald_fast_data(0.13)
   user <- c(

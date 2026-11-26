@@ -1,6 +1,6 @@
 Package: bmm
 Title: Easy and Accessible Bayesian Measurement Models Using 'brms'
-Version: 1.4.1.9000
+Version: 1.4.2.9000
 Authors@R: c(
     person("Vencislav", "Popov", , "vencislav.popov@gmail.com", role = c("aut", "cph"),
            comment = c(ORCID = "0000-0002-8073-4199")),
@@ -27,7 +27,6 @@ Imports:
     bayesplot,
     brms (>= 2.21.0),
     crayon,
-    fs,
     glue,
     graphics,
     matrixStats,
@@ -51,6 +50,7 @@ Suggests:
     ggplot2,
     ggthemes,
     insight (>= 1.6.0),
+    jsonlite,
     knitr,
     loo (>= 2.10.0),
     marginaleffects,
@@ -71,7 +71,6 @@ Suggests:
     tidyr,
     usethis,
     vctrs,
-    waldo,
     yaml
 Additional_repositories: https://stan-dev.r-universe.dev
 Config/testthat/edition: 3

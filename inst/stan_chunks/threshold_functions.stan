@@ -1,6 +1,4 @@
-// K - 1 ordered thresholds on a latent axis from a criterion, a log spacing and log interval deltas;
-// shared by the ordered-threshold models (sdt_rating, likert_cumulative); needs nothing
-
+// parsimonious thresholds: logit-spaced around the criterion, scaled by exp(spacing)
 vector sdt_thresholds_parsimonious_rating(real criterion, real spacing,
                                           int K_full) {
   int n_thresh = K_full - 1;
@@ -12,6 +10,7 @@ vector sdt_thresholds_parsimonious_rating(real criterion, real spacing,
   return thresholds;
 }
 
+// equidistant thresholds: exp(spacing) apart, centred on the criterion
 vector sdt_thresholds_equidistant_rating(real criterion, real spacing,
                                          int K_full) {
   int n_thresh = K_full - 1;
@@ -22,7 +21,7 @@ vector sdt_thresholds_equidistant_rating(real criterion, real spacing,
   return thresholds;
 }
 
-// K - 1 thresholds from K - 2 interval widths, centred on the criterion; R twin: .assemble_thresholds()
+// K - 1 thresholds from K - 2 interval widths, centred on the criterion
 vector sdt_place_thresholds_rating(real criterion, vector gaps, int K_full) {
   int n_thresh = K_full - 1;
   vector[n_thresh] thresholds;
@@ -44,7 +43,6 @@ vector sdt_place_thresholds_rating(real criterion, vector gaps, int K_full) {
     }
   }
   if (lo > 1) {
-    // Stan for-loops only count up; walk k = lo-1 down to 1 via ascending j
     for (j in 1:(lo - 1)) {
       int k = lo - j;
       thresholds[k] = thresholds[k + 1] - gaps[k];
@@ -53,6 +51,7 @@ vector sdt_place_thresholds_rating(real criterion, vector gaps, int K_full) {
   return thresholds;
 }
 
+// log_distance thresholds: each interval width is exp(delta)
 vector sdt_thresholds_log_distance_rating(real criterion,
                                           array[] real deltas,
                                           int K_full) {
@@ -64,7 +63,7 @@ vector sdt_thresholds_log_distance_rating(real criterion,
   return sdt_place_thresholds_rating(criterion, gaps, K_full);
 }
 
-// log_ratio thresholds (Paulewicz & Blaut, 2022); R twin: .log_ratio_widths()
+// log_ratio thresholds (Paulewicz & Blaut, 2022): outer widths are multiples of the central widths
 vector sdt_thresholds_log_ratio_rating(real criterion,
                                        array[] real deltas,
                                        int K_full) {
@@ -96,6 +95,7 @@ vector sdt_thresholds_log_ratio_rating(real criterion,
   return sdt_place_thresholds_rating(criterion, gaps, K_full);
 }
 
+// softmax thresholds: interval widths are shares of a total width set by spacing
 vector sdt_thresholds_softmax_rating(real criterion, real spacing,
                                      array[] real deltas,
                                      int K_full) {
@@ -112,7 +112,7 @@ vector sdt_thresholds_softmax_rating(real criterion, real spacing,
   );
 }
 
-// thresh_type follows .threshold_types in R/helpers-thresholds.R; R twin: .make_thresholds()
+// thresh_type: 1 = parsimonious, 2 = equidistant, 3 = log_distance, 4 = log_ratio, 5 = softmax
 vector make_thresholds(real criterion, real spacing, array[] real deltas,
                        int K_full, int thresh_type) {
   if (thresh_type == 1)

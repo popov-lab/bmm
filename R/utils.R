@@ -152,16 +152,57 @@ glue_nlf <- function(..., env.frame = -1) {
   brms::nlf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
 }
 
+# A non-linear formula that calls a function of bmm. brms evaluates it in R for
+# every prediction method, looking the function up from the formula's
+# environment; the namespace finds it whether or not the user attached bmm
+bmm_nl_formula <- function(x) {
+  stats::as.formula(x, env = asNamespace("bmm"))
+}
+
 # args$prior is NULL by default or is the combined default and user-provided
 # prior; args$dots holds whatever the user passed to bmm() and so overwrites the
-# configured default for any argument (such as init) they named themselves
+# configured default for any argument (such as init) they named themselves.
+# stanvars are the exception: the model's carry part of its likelihood, so the
+# user's are added to them (#688), and an explicit stanvars = NULL must not
+# erase them either
 combine_args <- function(args) {
   config_args <- args$config_args
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
+  if ("stanvars" %in% names(dots)) {
+    dots$stanvars <- combine_stanvars(config_args$stanvars, dots$stanvars)
+  }
   config_args[names(dots)] <- dots
   c(config_args, args$opts)
+}
+
+# A fit's stanvars passed back (the brms idiom stanvars = fit$stanvars) repeat
+# the model's. They are refused, not deduplicated: after update(newdata =) the
+# named ones carry the old data, and repeated code-only stanvars would declare
+# the model's Stan functions twice
+combine_stanvars <- function(model_stanvars, user_stanvars) {
+  if (is.null(model_stanvars)) {
+    return(user_stanvars)
+  }
+  clash <- intersect(setdiff(names(model_stanvars), ""), names(user_stanvars))
+  stopif(
+    length(clash) > 0,
+    "The model already defines stanvars named {collapse_comma(clash)}. bmm adds \\
+    the model's own stanvars itself, so pass only yours (not those of a fit, \\
+    `fit$stanvars`), and rename any that share a name."
+  )
+  model_code <- model_stanvars[names(model_stanvars) == ""]
+  stopif(
+    any(vapply(
+      user_stanvars[names(user_stanvars) == ""],
+      function(sv) any(vapply(model_code, identical, logical(1), sv)),
+      logical(1)
+    )),
+    "The stanvars passed include Stan code the model adds itself, such as those \\
+    of a fit (`fit$stanvars`). Pass only your own."
+  )
+  model_stanvars + user_stanvars
 }
 
 local_brms_threads <- function(dots) {
@@ -593,34 +634,6 @@ get_variables <- function(x, all_variables, regex = FALSE) {
   variables
 }
 
-# replace the base identical function with a S3 method
-identical <- function(x, y, ...) {
-  UseMethod("identical")
-}
-
-#' @export
-identical.default <- function(x, y, ...) {
-  base::identical(x, y, ...)
-}
-
-#' @export
-identical.brmsformula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
-#' @export
-identical.bmmformula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
-#' @export
-identical.formula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
 #' View or change global bmm options
 #' @param sort_data logical. If TRUE, the data will be sorted by the predictors.
 #'   If FALSE, the data will not be sorted, but sampling will be slower. If
@@ -828,7 +841,10 @@ reset_env.brmsformula <- function(object, env = globalenv(), ...) {
 
 #' @export
 reset_env.formula <- function(object, env = globalenv(), ...) {
-  environment(object) <- env
+  # a bmm_nl_formula() needs the namespace to find its function
+  if (!identical(environment(object), asNamespace("bmm"))) {
+    environment(object) <- env
+  }
   object
 }
 
@@ -904,8 +920,8 @@ try_read_bmmfit <- function(file) {
   if (is.null(file)) {
     return(NULL)
   }
-  dir <- try(fs::dir_create(dirname(file)))
-  stopif(is_try_error(dir), "Cannot create directory for file.")
+  dir.create(dirname(file), recursive = TRUE, showWarnings = FALSE)
+  stopif(!dir.exists(dirname(file)), "Cannot create directory for file.")
 
   out <- suppressWarnings(try(readRDS(file), silent = TRUE))
   if (is_try_error(out)) {
@@ -955,9 +971,10 @@ check_rds_file <- function(file) {
   if (is.null(file)) {
     return(NULL)
   }
-  stopif(!is.character(file) || length(file) > 1, "'file' must be a single string.")
-  ext <- fs::path_ext(file)
-  if (ext != "rds") {
+  # tools::file_ext() gives NA for NA before R 4.6 and "" from R 4.6 on; the
+  # second would save the fit as "NA.rds", so NA must stop here
+  stopif(!is.character(file) || length(file) != 1 || is.na(file), "'file' must be a single string.")
+  if (tools::file_ext(file) != "rds") {
     file <- paste0(file, ".rds")
   }
   file

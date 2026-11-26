@@ -121,8 +121,9 @@ check_formula.sdt <- function(model, data, formula) {
     (signal); found {collapse_comma(sort(unexpected))}")
 
   # one rate cannot separate sensitivity from bias, so d and criterion would be
-  # estimated from a single hit or false-alarm rate
-  stopif(length(unique(stim_vals)) == 1,
+  # estimated from a single hit or false-alarm rate. newdata for a prediction
+  # estimate nothing, and the signal rows alone are a legitimate subset
+  stopif(length(unique(stim_vals)) == 1 && !isTRUE(attr(data, "prediction_newdata")),
     "Stimulus variable '{stim_var}' is {stim_vals[1]} in every row. The model \\
     needs both noise (0) and signal (1) rows to estimate d and criterion")
 
@@ -199,4 +200,88 @@ check_formula.sdt <- function(model, data, formula) {
   }
   stopif(any(out < 2, na.rm = TRUE), "Set size must be an integer >= 2")
   out
+}
+
+# The K response categories of a multinomial SDT model. They name the columns
+# of Y and, as mu<category>, brms parameters, so they must be valid Stan
+# identifiers, and every function that builds or reads the categories takes
+# them from here. Aggregated rows name them by their count columns; trial rows
+# by the response column and the category number. sdt_ranking() learns the
+# number of ranks of a set-size column from the data, so check_data() and
+# configure_model() put it on their copy of the model as n_ranks
+.sdt_categories <- function(model) {
+  # the count columns of sdt_cdp() carry a prefix and judgment names that are
+  # no Stan identifiers, so Y is renamed in either layout
+  if (inherits(model, "sdt_cdp")) {
+    return(paste0("cdp", seq_len(.sdt_cdp_n_cat(model))))
+  }
+  response <- model$resp_vars$response
+  if (!is_trial_level(model)) {
+    return(response)
+  }
+  n_categories <- if (inherits(model, "sdt_rating")) {
+    model$other_vars$n_ratings
+  } else {
+    model$other_vars$n_ranks %||% model$other_vars$m
+  }
+  paste0(response, seq_len(n_categories))
+}
+
+# The response counts of the rows a multinomial-type fit was made with, rows x
+# categories: the Y that check_data() built (aggregated rows, and the trial
+# rows that 1.5.0 fitted through the multinomial), or the one-hot form of the
+# rating that sdt_rating()'s trial family reads itself
+.observed_counts <- function(model, data) {
+  if (is.matrix(data$Y)) {
+    return(unclass(data$Y))
+  }
+  .one_hot(data[[model$resp_vars$response]], .sdt_categories(model))
+}
+
+# category numbers as one-hot counts, one dimension more: a rows vector
+# becomes rows x K, a draws x rows matrix of predictions draws x rows x K
+.one_hot <- function(y, categories) {
+  K <- length(categories)
+  shape <- if (is.matrix(y)) dim(y) else length(y)
+  out <- array(as.integer(rep(as.vector(y), K) == rep(seq_len(K), each = length(y))),
+               c(shape, K))
+  dimnames(out) <- c(rep(list(NULL), length(shape)), list(categories))
+  out
+}
+
+# the category of each trial row, the column holding the most trials: in a
+# one-hot row its only trial
+.sdt_trial_category <- function(Y) {
+  max.col(unclass(Y), ties.method = "first")
+}
+
+# The trial rows of sdt_rating() and sdt_ranking() hold the category number in
+# the response column; NA is refused, as the aggregated layout refuses NA
+# counts. `hint` names the aggregated layout
+.sdt_trial_rows_to_counts <- function(model, data, what, hint) {
+  response <- model$resp_vars$response
+  stopif(not_in(response, colnames(data)), "Variables '{response}' missing in the data")
+  stopif(anyNA(data[[response]]), "The {what} column '{response}' must not contain NA")
+  categories <- .sdt_categories(model)
+  # match() reads TRUE as 1, so an all-TRUE column would pass as category 1
+  stopif(
+    is.logical(data[[response]]),
+    "The {what} column '{response}' is logical (TRUE/FALSE), but it must hold \\
+    whole numbers from 1 to {length(categories)}."
+  )
+  Y <- .trial_rows_to_counts(data[[response]], seq_along(categories),
+                             glue("the {what} column '{response}'"),
+                             hint = glue("construct the model with {hint}"))
+  colnames(Y) <- categories
+  Y
+}
+
+# simulated counts of one trial per row become the category number of each
+# row, in the column the trial layout reads
+.sdt_simulated_responses <- function(model, counts) {
+  if (is_trial_level(model)) {
+    return(stats::setNames(list(.sdt_trial_category(counts)), model$resp_vars$response))
+  }
+  colnames(counts) <- .sdt_categories(model)
+  as.data.frame(counts)
 }

@@ -17,8 +17,10 @@ is_trial_level <- function(model) {
 # The response of each trial as an integer one-hot matrix with one column per
 # category. NA rows stay NA, as brms drops them. The binomial models need only
 # the validation and the column of the second category; the multinomial models
-# use the matrix as their response
-.trial_rows_to_counts <- function(values, categories, what) {
+# use the matrix as their response. `hint` names the aggregated layout of the
+# model, for a user whose data are counts after all
+.trial_rows_to_counts <- function(values, categories, what,
+                                  hint = "construct the model with n_trials") {
   idx <- match(values, categories)
   bad <- unique(values[is.na(idx) & !is.na(values)])
   stopif(
@@ -26,7 +28,7 @@ is_trial_level <- function(model) {
     "With one row per trial, {what} must hold one of {collapse_comma(categories)} \\
     in every row. Found: {collapse_comma(utils::head(bad, 5))}\\
     {if (length(bad) > 5) ', ...' else ''}. For counts aggregated over trials, \\
-    construct the model with n_trials."
+    {hint}."
   )
   counts <- matrix(0L, nrow = length(values), ncol = length(categories),
                    dimnames = list(NULL, as.character(categories)))
@@ -75,7 +77,8 @@ is_trial_level <- function(model) {
 
 # the "Trial-level data" part of the help page of the SDT models that carry
 # the marker; model_docs() appends it under the trial-level requirements, with
-# the stimulus bullet only for models with a stimulus column
+# the stimulus bullet only for the models whose sensitivity d has a criterion
+# and a bias anchor (not sdt_cdp(), whose stimulus column reaches dfam and drec)
 trial_level_docs <- paste0(
   "Without trial-level predictors or item terms, trial rows give the same ",
   "posterior as the counts aggregated from them, which are sufficient ",
@@ -95,8 +98,9 @@ trial_level_stimulus_docs <- paste0(
 trial_level_notes_docs <- paste0(
   "   - `loo()` leaves out single trials on trial rows and whole cells on ",
   "aggregated rows. These are different predictions, and the log-likelihoods ",
-  "of the trial rows sum to the cell's log-likelihood less the log binomial ",
-  "coefficient, so ELPD values compare only fits to the same layout. ",
+  "of the trial rows sum to the cell's log-likelihood less the log of the ",
+  "binomial (or multinomial) coefficient, so ELPD values compare only fits to ",
+  "the same layout. ",
   "`kfold(fit, group = \"id\")` leaves out whole participants with either ",
   "layout.\n",
   "   - `bmm(..., threads = n)` with `backend = \"cmdstanr\"` evaluates the ",

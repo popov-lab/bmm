@@ -1,8 +1,4 @@
-// confidence-rating SDT per-row likelihood; needs sdt_dist_functions.stan, threshold_functions.stan
-// and ordinal_functions.stan
-
-// log probability of rating category `cat`; d is d_a and sdratio the log SD ratio
-// the thresholds are not rescaled: they stay on the noise-standardized axis, measured from the noise mean
+// log probability of rating category cat; d is d_a and sdratio the log of the SD ratio
 real sdt_rating_logmu_cat(int cat, vector thresholds,
                           real d, real sdratio, real stimulus,
                           int dist_type) {

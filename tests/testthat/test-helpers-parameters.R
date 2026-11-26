@@ -45,6 +45,35 @@ test_that("c parameter conversions work", {
   expect_error(c_bessel2sqrtexp(1, -2), "kappa must be non-negative")
 })
 
+test_that("the Laplace c conversions round-trip", {
+  c_circle <- c(0, 1, 4, 20)
+  kappa <- c(0.1, 0.5, 2, 10)
+  expect_equal(c_laplace_line2circle(c_laplace_circle2line(c_circle, kappa), kappa), c_circle)
+  expect_equal(c_laplace_circle2line(4, 2), 4 / (1 - exp(-2 * pi)))
+  expect_identical(c_laplace_circle2line(2, 0), Inf)
+  expect_identical(c_laplace_circle2line(0, 0), NaN)
+  expect_identical(c_laplace_line2circle(2, 0), 0)
+  expect_error(c_laplace_circle2line(-1, 2), "c must be non-negative")
+  expect_error(c_laplace_circle2line(1, -2), "kappa must be non-negative")
+  expect_error(c_laplace_line2circle(-1, 2), "c must be non-negative")
+  expect_error(c_laplace_line2circle(1, -2), "kappa must be non-negative")
+})
+
+test_that("dsdm() with the Laplace density scaling is eq. 2 of Oberauer (2023) at the converted c", {
+  x <- c(-2.5, -0.4, 0, 0.3, 1.7)
+  c_circle <- 3
+  for (kappa in c(0.5, 2, 10)) {
+    c_line <- c_laplace_circle2line(c_circle, kappa)
+    activation <- function(x) c_line * kappa / 2 * exp(-kappa * abs(x))
+    z <- integrate(function(x) exp(activation(x)), -pi, pi, rel.tol = 1e-12)$value
+    expect_equal(
+      dsdm(x, 0, c_circle, kappa, activation = "laplace", scaling = "density"),
+      exp(activation(x)) / z,
+      tolerance = 1e-8
+    )
+  }
+})
+
 test_that("identity is a no-op and round-trips", {
   x <- c(-2, -0.5, 0, 1.25, 3)
   eta <- link_transform(x, "identity", inverse = FALSE)
@@ -199,6 +228,15 @@ test_that(".is_softmax_param detects mixture3p softmax params", {
   expect_true(.is_softmax_param("thetat", model))
   expect_true(.is_softmax_param("thetant", model))
   expect_false(.is_softmax_param("kappa", model))
+})
+
+test_that(".is_softmax_param returns FALSE for the capacity-limited versions", {
+  # these parameterise the weights directly rather than through a softmax
+  for (version in c("slot", "slot_averaging")) {
+    model <- .model_mixture3p(version = version)
+    expect_false(.is_softmax_param("K", model))
+    expect_false(.is_softmax_param("ptarget", model))
+  }
 })
 
 test_that(".is_softmax_param returns FALSE for non-mixture3p models", {
@@ -409,11 +447,11 @@ test_that("every link declared by a supported model can be transformed", {
 test_that("native_transform inverts the tan_half link at non-zero values", {
   model <- .model_mixture2p()
   eta <- matrix(c(-3, -1, 0, 0.5, 2, 7), nrow = 2)
-  out <- native_transform(model, list(mu1 = eta), data.frame())
+  out <- native_transform(model, list(mu = eta), data.frame())
 
-  expect_equal(out$mu1, 2 * atan(eta))
-  expect_false(isTRUE(all.equal(out$mu1, eta)))
-  expect_true(all(abs(out$mu1) < pi))
+  expect_equal(out$mu, 2 * atan(eta))
+  expect_false(isTRUE(all.equal(out$mu, eta)))
+  expect_true(all(abs(out$mu) < pi))
 })
 
 test_that("native_transform errors when a softmax group is incomplete", {
@@ -454,7 +492,7 @@ test_that("native_transform.non_targets preserves names and dimensions", {
   model <- .model_mixture3p()
   data <- data.frame(LureIdx1 = c(0, 1))
   linpred <- list(
-    mu1 = matrix(0.3, 4, 2),
+    mu = matrix(0.3, 4, 2),
     kappa = matrix(1.1, 4, 2),
     thetat = matrix(0.8, 4, 2),
     thetant = matrix(-0.4, 4, 2)
@@ -463,7 +501,7 @@ test_that("native_transform.non_targets preserves names and dimensions", {
 
   expect_setequal(names(out), names(linpred))
   expect_equal(lapply(out[names(linpred)], dim), lapply(linpred, dim))
-  expect_equal(out$mu1, 2 * atan(linpred$mu1))
+  expect_equal(out$mu, 2 * atan(linpred$mu))
   expect_equal(out$kappa, exp(linpred$kappa))
 })
 

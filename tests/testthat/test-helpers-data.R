@@ -142,6 +142,66 @@ test_that("check_var_set_size rejects invalid input", {
   )
 })
 
+# The likelihood reads a trial's first set_size - 1 non-target columns, so a
+# value missing there was replaced by 0 (features) or 999 (distances) and
+# fitted as if it had been shown (#721); NA past the set size is padding
+test_that("check_data() stops on a non-target value missing inside the set size", {
+  dat <- data.frame(
+    y = 0.1, ss = c(3, 3, 3, 2, NA),
+    nt1 = c(NA, 1, 2, 1, NA), nt2 = c(1, NA, NA, NA, NA),
+    d1 = 1, d2 = c(1, 1, 1, NA, 1)
+  )
+  m3p_formula <- bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1)
+  imm_formula <- bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1)
+  features <- "column\\(s\\) 'nt1', 'nt2' contain NA within the set size in 3 trial\\(s\\), row\\(s\\) 1, 2, 3"
+  expect_error(check_data(mixture3p("y", c("nt1", "nt2"), "ss"), dat, m3p_formula), features)
+  for (version in c("abc", "bsc", "full")) {
+    model <- imm("y", c("nt1", "nt2"), c("d1", "d2"), "ss", version = version)
+    expect_error(check_data(model, dat, imm_formula), features)
+  }
+
+  # the row with a missing set size is left to brms, which drops it
+  dat[1:3, c("nt1", "nt2")] <- 0.5
+  dat$d1[2] <- NA
+  for (version in c("bsc", "full")) {
+    model <- imm("y", c("nt1", "nt2"), c("d1", "d2"), "ss", version = version)
+    expect_error(check_data(model, dat, imm_formula),
+                 "column\\(s\\) 'd1' contain NA within the set size in 1 trial\\(s\\), row\\(s\\) 2:")
+  }
+  expect_no_error(check_data(imm("y", c("nt1", "nt2"), c("d1", "d2"), "ss", version = "abc"),
+                             dat, imm_formula))
+
+  # with a fixed set size every non-target column is inside it
+  fixed <- data.frame(y = 0.1, nt1 = 1, nt2 = c(1, NA))
+  expect_error(check_data(mixture3p("y", c("nt1", "nt2"), 3), fixed, m3p_formula),
+               "'nt2' contain NA within the set size in 1 trial\\(s\\), row\\(s\\) 2:")
+
+  regex_model <- mixture3p("y", "nt", "ss", regex = TRUE)
+  regex_data <- data.frame(y = 0.1, ss = 3, nt1 = c(1, 1, NA), nt2 = 1)
+  expect_error(check_data(check_model(regex_model, regex_data, m3p_formula), regex_data, m3p_formula),
+               "'nt1' contain NA within the set size in 1 trial\\(s\\), row\\(s\\) 3:")
+})
+
+test_that("check_data() replaces the non-target padding past the set size as before", {
+  dat <- data.frame(
+    y = 0.1, ss = c(1, 2, 3),
+    nt1 = c(NA, 1, 2), nt2 = c(NA, NA, 1),
+    d1 = c(NA, 1, 1), d2 = c(NA, NA, 1)
+  )
+  checked <- expect_no_condition(
+    check_data(mixture3p("y", c("nt1", "nt2"), "ss"), dat, bmf(kappa ~ 1, thetat ~ 1, thetant ~ 1))
+  )
+  expect_identical(checked$nt1, c(0, 1, 2))
+  expect_identical(checked$nt2, c(0, 0, 1))
+  checked <- expect_no_condition(
+    check_data(imm("y", c("nt1", "nt2"), c("d1", "d2"), "ss", version = "full"), dat,
+               bmf(kappa ~ 1, c ~ 1, a ~ 1, s ~ 1))
+  )
+  expect_identical(checked$nt2, c(0, 0, 1))
+  expect_identical(checked$d1, c(999, 1, 1))
+  expect_identical(checked$d2, c(999, 999, 1))
+})
+
 test_that("check_data() returns a data.frame()", {
   # a model whose response the shared columns below cannot express (the
   # multi-column SDT responses) registers its own case in its provider
@@ -222,16 +282,15 @@ test_that("built_data_columns() names what each model's check_data() builds", {
   declared <- function(name) built_data_columns(cases[[name]]$model)
 
   expect_setequal(declared("mixture2p"), character(0))
+  expect_setequal(declared("mixture2p_slot"), "ss_numeric")
   expect_setequal(declared("sdm"), character(0))
-  expect_setequal(
-    declared("mixture3p"),
-    c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric")
-  )
-  expect_setequal(declared("imm"), c(paste0("LureIdx", 1:7), "inv_ss", "ss_numeric"))
+  expect_setequal(declared("mixture3p"), "ss_numeric")
+  expect_setequal(declared("imm"), "ss_numeric")
   expect_setequal(declared("sdt_yn"), "dist_type")
   expect_setequal(declared("sdt_mafc"), c("m_afc", "dist_type"))
   expect_setequal(declared("sdt_ranking"), c("nTrials", "max_rank"))
   expect_setequal(declared("sdt_rating"), "nTrials")
+  expect_setequal(declared("sdt_rating_trial_level"), character(0))
   expect_setequal(declared("sdt_cdp"), "nTrials")
   expect_setequal(
     declared("mpt_impossible"),

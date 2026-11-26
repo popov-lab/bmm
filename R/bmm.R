@@ -72,6 +72,7 @@
 #'   description of [brms::brm()] for more details. Unless `control` names a
 #'   `step_size` (`stepsize` for the rstan backend), bmm adds the starting step
 #'   size set in [bmm_options()] to it; the other entries of `control` are kept.
+#'   `stanvars` are added to the ones the model sets up, so pass only your own.
 #'
 #' @details # Supported Models
 #'
@@ -189,7 +190,7 @@ bmm <- function(formula, data, model,
     # empty rather than NULL: update() reads a fit without a stored user prior as
     # one saved before bmm stored it, whose prior mixes the user's rows with
     # bmm's defaults (#538)
-    user_prior = prior %||% brms::empty_prior(),
+    user_prior = cfg$user_prior %||% brms::empty_prior(),
     configure_opts = configure_opts
   )
 
