@@ -48,3 +48,36 @@ load_fixture_fit <- function(name) {
   skip_if_not(file.exists(path), "fixture not available (excluded by .Rbuildignore)")
   readRDS(path)
 }
+
+# Every brms prediction method evaluates a non-linear formula in R, looking its
+# functions up from the formula's environment. What that lookup reaches above
+# the global environment is the search path, which holds bmm only when the user
+# attached it, so a function bmm writes into the formula must be found before
+# (brms supplies its own Stan-function names, such as inv_logit, itself).
+resolves_without_search_path <- function(name, env) {
+  if (identical(env, globalenv()) || identical(env, emptyenv())) {
+    exists(name, envir = baseenv(), inherits = FALSE)
+  } else {
+    exists(name, envir = env, inherits = FALSE) ||
+      resolves_without_search_path(name, parent.env(env))
+  }
+}
+
+called_functions <- function(x) {
+  if (is.call(x)) {
+    c(if (is.name(x[[1]])) as.character(x[[1]]),
+      unlist(lapply(as.list(x)[-1], called_functions)))
+  }
+}
+
+# every function of bmm that a non-linear formula of fit calls
+expect_nl_functions_resolve <- function(fit) {
+  formulas <- c(list(fit$formula$formula), fit$formula$pforms)
+  for (f in Filter(function(f) isTRUE(attr(f, "nl")), formulas)) {
+    bmm_functions <- intersect(called_functions(f[[length(f)]]), ls(asNamespace("bmm")))
+    for (fun in bmm_functions) {
+      expect_true(resolves_without_search_path(fun, environment(f)),
+                  label = paste(fun, "in", deparse1(f[[2]])))
+    }
+  }
+}

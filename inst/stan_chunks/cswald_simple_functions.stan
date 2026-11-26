@@ -1,4 +1,4 @@
-// log-PDF of the censored shifted Wald model
+// censored shifted Wald model with variable non-decision time: log density of a response, log survivor if censored
 real cswald_lpdf(real rt, real mu, real drift, real bound, real ndt, real s,
                  real sndt, int response) {
   if (response == 1) {
@@ -8,8 +8,7 @@ real cswald_lpdf(real rt, real mu, real drift, real bound, real ndt, real s,
   }
 }
 
-// vectorized overload for the loop = FALSE family: density for responses, survivor for censored trials
-// sndt is unused: configure_model() selects this overload only while sndt is fixed at 0
+// the same log likelihood summed over all observations, valid only while sndt is fixed at 0
 real cswald_lpdf(vector rt, vector mu, vector drift, vector bound,
                  vector ndt, vector s, vector sndt, array[] int dec) {
   int N = rows(rt);
@@ -35,7 +34,6 @@ real cswald_lpdf(vector rt, vector mu, vector drift, vector bound,
   }
 
   if (n0 > 0) {
-    // censored trials with rt <= ndt have survival 1, so they are dropped
     array[n0] int jj = idx0[1:n0];
     vector[n0] t0 = rt[jj] - ndt[jj];
     array[n0] int keep;

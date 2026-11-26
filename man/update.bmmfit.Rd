@@ -38,7 +38,10 @@ from: pass \code{file} explicitly to save the updated fit.}
 compression algorithms supported by \link{saveRDS} when saving the updated
 model object.}
 
-\item{...}{Further arguments passed to \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}}
+\item{...}{Further arguments passed to \code{\link[brms:update.brmsfit]{brms::update.brmsfit()}}.
+\code{stanvars} are added to the ones the model sets up. The \code{stanvars} you
+gave the original fit are not carried over, so pass them again, as in
+\code{update(fit, newdata = d, stanvars = sv)}.}
 }
 \value{
 An updated \code{bmmfit} object refit to the new data and/or formula. If

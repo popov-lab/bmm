@@ -917,7 +917,7 @@ test_that("mpt_from_string checks a categories list against the trees", {
   )
   expect_error(
     pc_call(pc_categories[-2]),
-    "Tree 'single1'.*positions 1, 2.*line i, so the tree needs 2 entries, but categories gives 0"
+    "Tree 'single1'.*positions 1, 2\\..*needs 2 entries, but categories gives 0"
   )
   expect_error(
     pc_call(modifyList(pc_categories, list(pairs2 = c("E1", "E2", "E3")))),
@@ -1091,7 +1091,7 @@ test_that("mpt_from_string says how many categories entries a tree needs", {
       c("a", "b # y", "1 - a - b"), tree_names = "t1",
       categories = list(t1 = c("x", "z"))
     ),
-    "positions 1, 3\\. Entry i of categories labels line i, so the tree needs 3 entries, but categories gives 2"
+    "positions 1, 3\\..*needs 3 entries, but categories gives 2"
   )
 })
 
@@ -1295,4 +1295,53 @@ test_that("importers ask for names when impossible has empty names", {
   )
   expect_match(unnamed, "Every entry needs a name")
   expect_no_match(unnamed, "more than once")
+})
+
+test_that("mpt_from_string(response = ) declares trial rows that check_data() takes", {
+  model_2htm <- c(
+    "D + (1 - D) * g # old", "(1 - D) * (1 - g) # new", "",
+    "(1 - D) * g # old", "D + (1 - D) * (1 - g) # new"
+  )
+  aggregated <- mpt_from_string(
+    model_2htm, tree_names = c("old", "new"), tree_id = "item_type"
+  )
+  expect_false(is_trial_level(aggregated))
+
+  model <- mpt_from_string(
+    model_2htm, tree_names = c("old", "new"), tree_id = "item_type",
+    response = "resp"
+  )
+  expect_true(is_trial_level(model))
+  expect_identical(model$other_vars$response, "resp")
+
+  dat <- data.frame(
+    id = 1, item_type = c("old", "old", "new", "new"),
+    resp = c("old", "new", "old", "new")
+  )
+  checked <- check_data(model, dat, bmf(D ~ 1, g ~ 1))
+  expect_identical(colnames(checked$Y), c("old", "new"))
+  expect_equal(unname(checked$Y[, "old"]), c(1, 0, 1, 0))
+})
+
+test_that("mpt_from_eqn(response = ) declares trial rows that check_data() takes", {
+  eqn_file <- write_eqn(eqn_2htm_lines)
+  aggregated <- suppressMessages(mpt_from_eqn(
+    eqn_file, categories = eqn_2htm_map, tree_id = "item_type"
+  ))
+  expect_false(is_trial_level(aggregated))
+
+  model <- suppressMessages(mpt_from_eqn(
+    eqn_file, categories = eqn_2htm_map, tree_id = "item_type",
+    response = "resp"
+  ))
+  expect_true(is_trial_level(model))
+  expect_identical(model$other_vars$response, "resp")
+
+  dat <- data.frame(
+    id = 1, item_type = c("old", "old", "new", "new"),
+    resp = c("yes", "no", "yes", "no")
+  )
+  checked <- check_data(model, dat, bmf(Do ~ 1, Dn ~ 1, g ~ 1))
+  expect_identical(colnames(checked$Y), c("yes", "no"))
+  expect_equal(unname(checked$Y[, "yes"]), c(1, 0, 1, 0))
 })

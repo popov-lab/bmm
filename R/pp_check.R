@@ -143,7 +143,7 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
                                 dots))
   }
 
-  if (identical(family(object)$family, "multinomial")) {
+  if (identical(family(object)$family, "multinomial") || .is_sdt_rating_trial_fit(object)) {
     group <- .pp_check_resolve_group(object, group)
     object <- .pp_check_restore_set_size(object, group)
     object <- .pp_check_restore_tree(object, group)
@@ -260,8 +260,12 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   yrep <- brms::posterior_predict(object, draw_ids = draw_ids,
                                   ndraws = ndraws, ...)
 
-  y_mat <- object$data$Y
+  y_mat <- .observed_counts(model, object$data)
   cat_names <- colnames(y_mat) %||% resp_cols
+  # sdt_rating()'s trial family predicts the category of each row
+  if (length(dim(yrep)) == 2L) {
+    yrep <- .one_hot(yrep, cat_names)
+  }
 
   cond_cols <- .validate_group_arg(group, object)
   intercept_only <- length(cond_cols) == 0L
@@ -412,17 +416,10 @@ pp_check.bmmfit <- function(object, type = NULL, ndraws = NULL,
   model <- fit$bmm$model
   resp_cols <- unlist(model$resp_vars)
   re_vars <- .group_vars(fit)
-  exclude <- unique(c(resp_cols, "nTrials", re_vars))
+  exclude <- unique(c(resp_cols, fit_built_columns(fit), re_vars))
 
   pred_cols <- setdiff(names(data), exclude)
 
   is_matrix <- vapply(pred_cols, function(col) is.matrix(data[[col]]), logical(1))
-  pred_cols <- pred_cols[!is_matrix]
-
-  pred_cols <- pred_cols[
-    !grepl("^(Idx_|n_)", pred_cols) &
-      !pred_cols %in% unlist(model$other_vars$indicators$possible, use.names = FALSE)
-  ]
-
-  pred_cols
+  pred_cols[!is_matrix]
 }

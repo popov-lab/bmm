@@ -152,16 +152,57 @@ glue_nlf <- function(..., env.frame = -1) {
   brms::nlf(stats::as.formula(glue(..., .envir = sys.frame(env.frame))))
 }
 
+# A non-linear formula that calls a function of bmm. brms evaluates it in R for
+# every prediction method, looking the function up from the formula's
+# environment; the namespace finds it whether or not the user attached bmm
+bmm_nl_formula <- function(x) {
+  stats::as.formula(x, env = asNamespace("bmm"))
+}
+
 # args$prior is NULL by default or is the combined default and user-provided
 # prior; args$dots holds whatever the user passed to bmm() and so overwrites the
-# configured default for any argument (such as init) they named themselves
+# configured default for any argument (such as init) they named themselves.
+# stanvars are the exception: the model's carry part of its likelihood, so the
+# user's are added to them (#688), and an explicit stanvars = NULL must not
+# erase them either
 combine_args <- function(args) {
   config_args <- args$config_args
   dots <- args$dots
   stopif("family" %in% names(dots), "Unsupported argument 'family'. Use the model argument instead.")
   config_args$prior <- args$prior %||% config_args$prior
+  if ("stanvars" %in% names(dots)) {
+    dots$stanvars <- combine_stanvars(config_args$stanvars, dots$stanvars)
+  }
   config_args[names(dots)] <- dots
   c(config_args, args$opts)
+}
+
+# A fit's stanvars passed back (the brms idiom stanvars = fit$stanvars) repeat
+# the model's. They are refused, not deduplicated: after update(newdata =) the
+# named ones carry the old data, and repeated code-only stanvars would declare
+# the model's Stan functions twice
+combine_stanvars <- function(model_stanvars, user_stanvars) {
+  if (is.null(model_stanvars)) {
+    return(user_stanvars)
+  }
+  clash <- intersect(setdiff(names(model_stanvars), ""), names(user_stanvars))
+  stopif(
+    length(clash) > 0,
+    "The model already defines stanvars named {collapse_comma(clash)}. bmm adds \\
+    the model's own stanvars itself, so pass only yours (not those of a fit, \\
+    `fit$stanvars`), and rename any that share a name."
+  )
+  model_code <- model_stanvars[names(model_stanvars) == ""]
+  stopif(
+    any(vapply(
+      user_stanvars[names(user_stanvars) == ""],
+      function(sv) any(vapply(model_code, identical, logical(1), sv)),
+      logical(1)
+    )),
+    "The stanvars passed include Stan code the model adds itself, such as those \\
+    of a fit (`fit$stanvars`). Pass only your own."
+  )
+  model_stanvars + user_stanvars
 }
 
 local_brms_threads <- function(dots) {
@@ -266,11 +307,30 @@ read_lines2 <- function(con) {
 #' @param what String. What to return:
 #'  - "time" for the sampling time per chain
 #'  - "time_mean" for the mean sampling time
+#'  - "inv_metric" for the adapted inverse metric per chain
+#'  - "step_size" for the adapted step size per chain
 #' @return Depends on `what` and the class of `fit`. For `brmsfit` objects,
 #'   information about the single fit is returned. For `brmsfit_list` objects, a
 #'   list or data.frame with the information for each fit is returned.
-#'  - "time": A data.frame with the sampling time per chain
-#'  - "time_mean": A named numeric vector with the mean sampling time
+#'  - "time": A data.frame with the warmup, sampling and total time per chain
+#'  - "time_mean": A named numeric vector with the mean warmup, sampling and
+#'    total time across chains
+#'  - "inv_metric": A list with one numeric vector per chain (the diagonal), or
+#'    one matrix per chain for `metric = "dense_e"`
+#'  - "step_size": A list with one number per chain
+#'
+#'   Every chain of the fit is reported, also in a fit combined from several
+#'   fits with [brms::combine_models()] or extended with [add_chains()]. `NULL`
+#'   is returned for what the sampler
+#'   did not record: anything for a fit without a stanfit or without chains,
+#'   "time" and "time_mean" for variational and Laplace runs, "inv_metric" and
+#'   "step_size" for any algorithm other than NUTS, and "inv_metric" for
+#'   `metric = "unit_e"`. In a fit combined from several fits, a unit_e chain
+#'   next to chains with a metric has a `NULL` element in the "inv_metric"
+#'   list. Values read from Stan's printed adaptation output (rstan fits, and
+#'   fits combined from several fits) have six significant digits by default.
+#'   A cmdstanr unit_e chain carries no printed step size, so in a fit combined
+#'   from several fits its step size is that of its last draw.
 #' @keywords extract_info
 #' @export
 #' @examplesIf identical(Sys.getenv("BMM_EXAMPLES"), "true")
@@ -287,12 +347,114 @@ fit_info <- function(fit, what) {
 
 #' @export
 fit_info.brmsfit <- function(fit, what) {
-  fit_attr <- attributes(fit$fit)
-  metadata <- fit_attr$metadata
+  what <- match.arg(what, c("time", "time_mean", "inv_metric", "step_size"))
+  stanfit <- fit$fit
+  if (!inherits(stanfit, "stanfit")) {
+    return(NULL)
+  }
   switch(what,
-    time = metadata$time$chains,
-    time_mean = colMeans(metadata$time$chains),
-    inv_metric = metadata$inv_metric,
+    time = chain_times(stanfit),
+    time_mean = if (!is.null(times <- chain_times(stanfit))) {
+      colMeans(times[c("warmup", "sampling", "total")])
+    },
+    inv_metric = chain_adaptation(stanfit, "inv_metric"),
+    step_size = chain_adaptation(stanfit, "step_size")
+  )
+}
+
+# brms::combine_models() keeps the cmdstanr metadata of the first fit only, and
+# a fit trimmed or refitted with chains = 0 keeps metadata of chains it no
+# longer has, so the metadata is used only when it describes exactly the
+# stanfit's chains. Each chain of the stanfit carries its own timing and
+# adaptation output whatever the backend, and combine_models() concatenates the
+# chains.
+stored_metadata <- function(stanfit) {
+  metadata <- attr(stanfit, "metadata")
+  if (NROW(metadata$time$chains) == length(stanfit@sim$samples)) metadata
+}
+
+chain_times <- function(stanfit) {
+  stored <- stored_metadata(stanfit)$time$chains
+  if (!is.null(stored)) {
+    return(stored)
+  }
+  elapsed <- lapply(stanfit@sim$samples, attr, "elapsed_time")
+  if (length(elapsed) == 0 || any(lengths(elapsed) == 0)) {
+    return(NULL)
+  }
+  elapsed <- do.call(rbind, elapsed)
+  data.frame(
+    chain_id = as.numeric(seq_len(nrow(elapsed))),
+    warmup = unname(elapsed[, "warmup"]),
+    sampling = unname(elapsed[, "sample"]),
+    total = unname(rowSums(elapsed))
+  )
+}
+
+chain_adaptation <- function(stanfit, what) {
+  stored <- stored_metadata(stanfit)
+  # cmdstanr stores an empty list for metric = "unit_e"
+  if (!is.null(stored)) {
+    return(if (length(stored[[what]])) stored[[what]])
+  }
+  parsed <- lapply(stanfit@sim$samples, function(chain) {
+    info <- parse_adaptation_info(attr(chain, "adaptation_info"))
+    info$step_size <- info$step_size %||% last_step_size(chain)
+    info[[what]]
+  })
+  if (all(lengths(parsed) == 0)) {
+    return(NULL)
+  }
+  stats::setNames(parsed, seq_along(parsed))
+}
+
+# the step size of the last draw, as adaptation_info holds none for a
+# unit_e metric
+last_step_size <- function(chain) {
+  utils::tail(attr(chain, "sampler_params")$stepsize__, 1)
+}
+
+# the "# "-prefixed text Stan writes after warmup:
+#   # Step size = 0.0981616
+#   # Diagonal elements of inverse mass matrix:
+#   # 0.0298361, 0.0410393
+# and, for metric = "dense_e", "Elements of inverse mass matrix:" and a row per
+# line. A non-finite element is printed as C++ writes it (nan, -nan, inf, and
+# -nan(ind) with MSVC), and lines after the metric, such as "Elapsed Time", are
+# not numbers.
+parse_adaptation_info <- function(info) {
+  lines <- unlist(strsplit(paste(info, collapse = "\n"), "\n"))
+  lines <- trimws(sub("^#", "", lines))
+  step_size <- grep("^Step size = ", lines, value = TRUE)
+  header <- grep(
+    "^(Diagonal elements|Elements) of inverse mass matrix:$", lines
+  )
+  inv_metric <- NULL
+  if (length(header) == 1) {
+    num <- paste0(
+      "[-+]?(([0-9]+\\.?[0-9]*|\\.[0-9]+)([eE][-+]?[0-9]+)?",
+      "|nan(\\(ind\\))?|inf(inity)?)"
+    )
+    rows <- utils::tail(lines, -header)
+    rows <- rows[grepl(paste0("^", num, "(, *", num, ")*$"), rows,
+      ignore.case = TRUE
+    )]
+    # MSVC prints NaN as -nan(ind), which as.numeric() does not read
+    rows <- gsub("\\(ind\\)", "", rows, ignore.case = TRUE)
+    rows <- lapply(strsplit(rows, ",", fixed = TRUE), as.numeric)
+    if (length(rows)) {
+      inv_metric <- if (grepl("^Diagonal", lines[header])) {
+        rows[[1]]
+      } else {
+        do.call(rbind, rows)
+      }
+    }
+  }
+  list(
+    step_size = if (length(step_size) == 1) {
+      as.numeric(sub("^Step size = ", "", step_size))
+    },
+    inv_metric = inv_metric
   )
 }
 
@@ -470,34 +632,6 @@ get_variables <- function(x, all_variables, regex = FALSE) {
     "No variables found that match the regular expression '{x}'"
   )
   variables
-}
-
-# replace the base identical function with a S3 method
-identical <- function(x, y, ...) {
-  UseMethod("identical")
-}
-
-#' @export
-identical.default <- function(x, y, ...) {
-  base::identical(x, y, ...)
-}
-
-#' @export
-identical.brmsformula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
-#' @export
-identical.bmmformula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
-}
-
-#' @export
-identical.formula <- function(x, y, ...) {
-  res <- waldo::compare(x, y, ignore_formula_env = TRUE)
-  length(res) == 0
 }
 
 #' View or change global bmm options
@@ -707,7 +841,10 @@ reset_env.brmsformula <- function(object, env = globalenv(), ...) {
 
 #' @export
 reset_env.formula <- function(object, env = globalenv(), ...) {
-  environment(object) <- env
+  # a bmm_nl_formula() needs the namespace to find its function
+  if (!identical(environment(object), asNamespace("bmm"))) {
+    environment(object) <- env
+  }
   object
 }
 
@@ -783,8 +920,8 @@ try_read_bmmfit <- function(file) {
   if (is.null(file)) {
     return(NULL)
   }
-  dir <- try(fs::dir_create(dirname(file)))
-  stopif(is_try_error(dir), "Cannot create directory for file.")
+  dir.create(dirname(file), recursive = TRUE, showWarnings = FALSE)
+  stopif(!dir.exists(dirname(file)), "Cannot create directory for file.")
 
   out <- suppressWarnings(try(readRDS(file), silent = TRUE))
   if (is_try_error(out)) {
@@ -834,9 +971,10 @@ check_rds_file <- function(file) {
   if (is.null(file)) {
     return(NULL)
   }
-  stopif(!is.character(file) || length(file) > 1, "'file' must be a single string.")
-  ext <- fs::path_ext(file)
-  if (ext != "rds") {
+  # tools::file_ext() gives NA for NA before R 4.6 and "" from R 4.6 on; the
+  # second would save the fit as "NA.rds", so NA must stop here
+  stopif(!is.character(file) || length(file) != 1 || is.na(file), "'file' must be a single string.")
+  if (tools::file_ext(file) != "rds") {
     file <- paste0(file, ".rds")
   }
   file

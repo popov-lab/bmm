@@ -1,11 +1,4 @@
-  // precompute chebyshev points
-  matrix[200,200] COSN;
-  for (m in 1:200) {
-    for (i in 1:m) {
-      COSN[i,m] = cos((2*i-1)*pi()/(2*m))-1;
-    }
-  }
-  // fail fast if the run metadata computed in R does not match the data Stan received
+  // check that the run information passed from R matches the data
   {
     int sdm_run_total = 0;
     for (g in 1:G_sdm_runs) {

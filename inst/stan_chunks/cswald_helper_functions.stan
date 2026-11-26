@@ -1,16 +1,16 @@
-// log(exp(a) - exp(b)), returning -inf instead of NaN when rounding makes b >= a
+// log(exp(a) - exp(b)), returning -inf when b >= a
 real swald_log_diff_exp(real a, real b) {
   if (b >= a) return negative_infinity();
   return log_diff_exp(a, b);
 }
 
-// log(Phi(z)) with an exact gradient; std_normal_lcdf takes over below 1e-300 so 1 / p stays finite
+// log of the standard normal CDF, stable in the far lower tail
 real swald_log_Phi(real z) {
   real p = Phi(z);
   return p >= 1e-300 ? log(p) : std_normal_lcdf(z | );
 }
 
-// log shifted Wald survivor Phi(-z1) - exp(log_c) * Phi(z2), in probability space for an exact gradient
+// log survivor function of the shifted Wald distribution from its standardised arguments
 real swald_log_surv(real z1, real z2, real log_c) {
   real surv = Phi(-z1) - exp(log_c + swald_log_Phi(z2));
   if (surv < 1e-300) {
@@ -20,28 +20,27 @@ real swald_log_surv(real z1, real z2, real log_c) {
   return log(surv);
 }
 
-// log-PDF of the shifted Wald distribution, computed in log space
+// log density of the shifted Wald distribution
 real swald_lpdf(real rt, real drift, real bound, real ndt, real sigma) {
   real t_shifted = rt - ndt;
-  if (t_shifted <= 0) return negative_infinity();
+  if (t_shifted <= 0 || bound <= 0) return negative_infinity();
 
   real sigma_sq = square(sigma);
   real log_t = log(t_shifted);
 
-  // log(bound / sqrt(2*pi*sigma^2*t^3))
   real log_norm = log(bound) - 0.5 * (log(2 * pi()) + 2 * log(sigma) + 3 * log_t);
 
-  // -((bound - drift*t)^2) / (2*sigma^2*t)
   real residual = bound - drift * t_shifted;
   real log_kernel = -0.5 * square(residual) / (sigma_sq * t_shifted);
 
   return log_norm + log_kernel;
 }
 
-// log shifted Wald survivor function (complementary CDF)
+// log survivor function (1 - CDF) of the shifted Wald distribution
 real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
   real t_shifted = rt - ndt;
-  if (t_shifted <= 0) return 0;  // process hasn't started, survival = 1
+  if (t_shifted <= 0) return 0;
+  if (bound <= 0) return negative_infinity();
 
   real sigma_sqrt_t = sigma * sqrt(t_shifted);
   real z1 = (drift * t_shifted - bound) / sigma_sqrt_t;
@@ -51,21 +50,20 @@ real swald_lccdf(real rt, real drift, real bound, real ndt, real sigma) {
   return swald_log_surv(z1, z2, log_c);
 }
 
-// vectorized forms on t = rt - ndt; keep in step with the scalar forms and .dwald() / .pwald()
-
-// t <= 0 anywhere makes the summed target -inf, exactly as the scalar sum would
+// shifted Wald log density for a vector of decision times t = rt - ndt
 vector swald_log_dens_vec(vector t, vector drift, vector bound, vector sigma) {
   int n = rows(t);
-  if (min(t) <= 0) return rep_vector(negative_infinity(), n);
+  if (min(t) <= 0 || min(bound) <= 0) return rep_vector(negative_infinity(), n);
   vector[n] residual = bound - drift .* t;
   return log(bound)
          - 0.5 * (log(2 * pi()) + 2 * log(sigma) + 3 * log(t))
          - 0.5 * square(residual) ./ (square(sigma) .* t);
 }
 
-// requires t > 0; the fmax/fmin clamps keep discarded elements from injecting NaN adjoints
+// shifted Wald log survivor function for a vector of decision times t = rt - ndt
 vector swald_log_surv_vec(vector t, vector drift, vector bound, vector sigma) {
   int n = rows(t);
+  if (min(bound) <= 0) return rep_vector(negative_infinity(), n);
   vector[n] denom = sigma .* sqrt(t);
   vector[n] dxt = drift .* t;
   vector[n] z1 = (dxt - bound) ./ denom;
@@ -82,7 +80,7 @@ vector swald_log_surv_vec(vector t, vector drift, vector bound, vector sigma) {
   return out;
 }
 
-// log-CDF of the shifted Wald as a log-space sum, finite deep in the left tail
+// log CDF of the shifted Wald distribution
 real swald_lcdf(real rt, real drift, real bound, real ndt, real sigma) {
   real t_shifted = rt - ndt;
   if (t_shifted <= 0) return negative_infinity();
@@ -95,7 +93,7 @@ real swald_lcdf(real rt, real drift, real bound, real ndt, real sigma) {
   return log_sum_exp(swald_log_Phi(z1), log_c + swald_log_Phi(z2));
 }
 
-// integrated survivor G(x) = int_0^x S_W(u) du; mirrors .gwald()
+// integral of the survivor function of the Wald distribution from 0 to x
 real swald_gint(real x, real drift, real bound, real sigma) {
   if (x <= 0) return x;
 
@@ -104,12 +102,10 @@ real swald_gint(real x, real drift, real bound, real sigma) {
   real dx = drift * x;
   real z1 = (dx - bound) / (sigma * sqrt_x);
   real z2 = -(dx + bound) / (sigma * sqrt_x);
-  // q <= F_W(x) <= 1, so the exp cannot overflow
   real q = exp(2 * bound * drift / sigma_sq + swald_log_Phi(z2));
   real m1;
 
   if (abs(drift) < 3e-8 * sigma_sq / bound) {
-    // exact drift = 0 limit of M1, avoiding the 0 * inf cancellation of bound / drift
     real w = bound / (sigma * sqrt_x);
     m1 = 2 * bound * (sqrt_x * exp(std_normal_lpdf(w | )) / sigma
                       - (bound / sigma_sq) * Phi(-w));
@@ -120,7 +116,7 @@ real swald_gint(real x, real drift, real bound, real sigma) {
   return x * exp(swald_lccdf(x | drift, bound, 0, sigma)) + m1;
 }
 
-// log mean of S_W over [x - sndt, x] by Simpson in log space; mirrors .simpson_log_mean()
+// log mean of the Wald survivor function over [x - sndt, x] by Simpson's rule
 real swald_log_surv_mean(real x, real drift, real bound, real sigma, real sndt) {
   vector[5] weights = log(to_vector({1, 4, 2, 4, 1}) / 12);
   vector[5] terms;
@@ -131,16 +127,14 @@ real swald_log_surv_mean(real x, real drift, real bound, real sigma, real sndt) 
   return log_sum_exp(terms);
 }
 
-// log-PDF of the shifted Wald with NDT ~ uniform(ndt, ndt + sndt); mirrors .dwald_sndt(), cutoffs included
+// log density of the shifted Wald distribution with non-decision time uniform on [ndt, ndt + sndt]
 real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real sigma) {
   if (sndt < 0) return negative_infinity();
-  // continuous at sndt = 0; also the path for the default fixed sndt = 0
   if (sndt < 1e-8) return swald_lpdf(rt | drift, bound, ndt, sigma);
 
   real t1 = rt - ndt;
   if (t1 <= 0) return negative_infinity();
 
-  // strip t1 <= sndt: the earlier survivor is 1, so the density is F_W(t1) / sndt
   if (t1 <= sndt) return swald_lcdf(rt | drift, bound, ndt, sigma) - log(sndt);
 
   real surv_early = swald_lccdf(rt | drift, bound, ndt + sndt, sigma);
@@ -149,14 +143,12 @@ real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real 
     return swald_log_diff_exp(surv_early, surv_late) - log(sndt);
   }
 
-  // the survivors rounded to the same value: the CDFs still carry the digits
   real cdf_late = swald_lcdf(rt | drift, bound, ndt, sigma);
   real cdf_early = swald_lcdf(rt | drift, bound, ndt + sndt, sigma);
   if (cdf_late - cdf_early >= 1e-8) {
     return swald_log_diff_exp(cdf_late, cdf_early) - log(sndt);
   }
 
-  // deep tail of a defective accumulator: Simpson on the density itself
   vector[5] weights = log(to_vector({1, 4, 2, 4, 1}) / 12);
   vector[5] terms;
   for (k in 1:5) {
@@ -166,7 +158,7 @@ real swald_sndt_lpdf(real rt, real drift, real bound, real ndt, real sndt, real 
   return log_sum_exp(terms);
 }
 
-// log survivor of the shifted Wald with uniform NDT, for censored trials; mirrors .pwald_sndt()
+// log survivor function of the shifted Wald distribution with uniform non-decision time
 real swald_sndt_lccdf(real rt, real drift, real bound, real ndt, real sndt, real sigma) {
   if (sndt < 0) return negative_infinity();
   if (sndt < 1e-8) return swald_lccdf(rt | drift, bound, ndt, sigma);

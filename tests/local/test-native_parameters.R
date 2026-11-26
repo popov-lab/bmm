@@ -57,7 +57,7 @@ test_that("native_parameters returns mixture3p weights as probabilities", {
     native$value[native$parameter == "kappa"],
     exp(sampling$value[sampling$parameter == "kappa"])
   )
-  expect_true(all(native$value[native$parameter == "mu1"] == 0))
+  expect_true(all(native$value[native$parameter == "mu"] == 0))
 })
 
 test_that("native_parameters reports no non-target responses at set size 1", {
@@ -89,11 +89,16 @@ test_that("native_parameters reports no non-target responses at set size 1", {
 })
 
 test_that("native_parameters agrees with conditional_effects on the native scale", {
-  fit <- fit_mixture3p()
+  # conditional_effects() needs a predictor; the reference fit's thetat has set size
+  fit <- reference_fit("mixture3p")
 
   native <- native_parameters(fit, re_formula = NA, pars = "thetat")
-  ce <- conditional_effects(fit, "thetat", scale = "native", re_formula = NA)
-  expect_equal(mean(native$value), ce[[1]]$estimate__[1], tolerance = 1e-8)
+  ce <- conditional_effects(fit, "thetat", scale = "native", re_formula = NA)[[1]]
+  expect_equal(
+    ce$estimate__,
+    as.vector(tapply(native$value, as.character(native$setsize), mean)[as.character(ce$setsize)]),
+    tolerance = 1e-8
+  )
 })
 
 test_that("native_parameters reports link-scale constants on the native scale", {
@@ -129,7 +134,8 @@ test_that("native_parameters excludes internal variables for models with non-tar
   )
 
   out <- native_parameters(fit)
-  expect_setequal(unique(out$parameter), c("mu1", "kappa", "a", "c"))
+  # mu and b are fixed model parameters; the non-target internals are not reported
+  expect_setequal(unique(out$parameter), c("mu", "kappa", "a", "c", "b"))
   expect_named(out, c(".chain", ".iteration", ".draw", "parameter", "value"))
 
   sampling <- native_parameters(fit, scale = "sampling")
@@ -137,4 +143,71 @@ test_that("native_parameters excludes internal variables for models with non-tar
     out$value[out$parameter == "a"],
     exp(sampling$value[sampling$parameter == "a"])
   )
+})
+
+# ---------------------------------------------------------------------------
+# population_summary (#531)
+# ---------------------------------------------------------------------------
+
+fit_mixture2p_random_effects <- function() {
+  bmm(
+    bmf(
+      thetat ~ 1 + set_size + (1 + set_size |p| ID),
+      kappa ~ 1 + (1 |p| ID) + (1 | ID:set_size)
+    ),
+    data = subset(oberauer_lin_2017, ID %in% 1:8 & set_size %in% c(2, 6)),
+    model = mixture2p(resp_error = "dev_rad"),
+    chains = 1, iter = 600, warmup = 300, refresh = 0, silent = 2
+  )
+}
+
+test_that("population means by quadrature agree with Monte Carlo on a real fit", {
+  fit <- fit_mixture2p_random_effects()
+  draw_ids <- 1:20
+  exact <- native_parameters(fit, population_summary = "mean", draw_ids = draw_ids)
+  method <- attr(exact, "population_method")
+  expect_equal(method$method[method$parameter == "thetat"], c("Gauss-Hermite", "Gauss-Hermite"))
+  expect_equal(method$method[method$parameter == "kappa"], c("closed form", "closed form"))
+
+  grid_vars <- bmm:::.np_grid_vars(fit, names(fit$bmm$model$parameters), NA)
+  newdata <- bmm:::.np_newdata(fit, grid_vars, NULL)
+  links <- list(mu = "tan_half", kappa = "log", thetat = "logit")
+  withr::local_seed(531)
+  mc <- bmm:::.np_population_mc(
+    fit, c("mu", "kappa", "thetat"), c("thetat", "kappa"), newdata, grid_vars, NULL,
+    draw_ids, "mean", native = TRUE, links = links, ndraws_population = 20000,
+    dots = list()
+  )
+  for (par in c("thetat", "kappa")) {
+    mean <- matrix(exact$value[exact$parameter == par & exact$statistic == "mean"], nrow = 20)
+    sd <- matrix(exact$value[exact$parameter == par & exact$statistic == "sd"], nrow = 20)
+    expect_lt(max(abs(mc[[par]]$mean - mean) / (sd / sqrt(20000))), 5)
+  }
+})
+
+test_that("Monte Carlo population summaries are reproducible under a seed", {
+  fit <- bmm(
+    bmf(thetat ~ 0 + set_size + (1 | ID), thetant ~ 1 + (1 | ID), kappa ~ 1),
+    data = subset(oberauer_lin_2017, ID %in% 1:6 & set_size %in% c(1, 4)),
+    model = mixture3p(
+      resp_error = "dev_rad",
+      nt_features = paste0("col_nt", 1:3),
+      set_size = "set_size"
+    ),
+    chains = 1, iter = 400, warmup = 200, refresh = 0, silent = 2
+  )
+  run <- function() {
+    # 200 levels is too few for the Monte Carlo error check; its warning is not under test
+    withr::with_seed(1, suppressWarnings(native_parameters(
+      fit, population_summary = "mean", draw_ids = 1:10, ndraws_population = 200
+    )))
+  }
+  first <- run()
+  expect_identical(first, run())
+  method <- attr(first, "population_method")
+  expect_equal(unique(method$method[method$parameter %in% c("thetat", "thetant")]), "Monte Carlo")
+  weights <- first[first$statistic == "mean" & first$parameter %in% c("thetat", "thetant"), ]
+  expect_true(all(weights$value >= 0 & weights$value <= 1))
+  # no non-target is presented at set size 1
+  expect_true(all(first$value[first$parameter == "thetant" & first$set_size == 1] == 0))
 })
