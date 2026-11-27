@@ -48,7 +48,8 @@ bmmtools::validation_plan(
   # stimulus class) still pin d and criterion once subjects share a population
   grid = expand.grid(n_subjects = c(20L, 50L), n_trials = c(30L, 100L, 300L)),
   generator = sdt_yn_generator,
-  # cores per fit, one per chain; sampler budget as tcc_cd needed it
+  # cores per fit, one per chain; sampler budget as the tcc_cd plan (#593)
+  # needed it
   sbc = list(
     generator = sdt_yn_sbc_generator, cores_per_fit = 4L,
     sampler = list(chains = 4L, iter = 1000L, warmup = 500L, control = list(adapt_delta = 0.95))

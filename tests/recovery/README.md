@@ -77,7 +77,7 @@ bmm's `d*`/`r*` functions or the Stan likelihood; the file header says how.
 | `sdt_rating` | observer: normal evidence against the thresholds | 20, 50 x 30, 100, 300, 600 | 100 | to come |
 | `sdt_mafc` | observer: largest of m normal evidence draws | 20, 50 x 30, 100, 300 | 50 | to come |
 | `sdt_ranking` | observer: smallest-extreme-value evidence, ranked | 20, 50 x 30, 100, 300 | 50 | to come |
-| `sdt_cdp` | observer: familiarity plus recollection, both normal | 20, 50 x 30, 100, 300, 600 | 100 | VM (long run) |
+| `sdt_cdp` | observer: familiarity plus recollection, both normal | 20, 50 x 30, 100, 300, 600 | 100 | to come |
 | `ezcdm` | 2-D Wiener process to the circle's edge, then summarised | 20, 50 x 30, 100, 300 | 50 | follows #524 |
 
 The `ezcdm` plan is not in this folder: it arrives with the model in #524.
