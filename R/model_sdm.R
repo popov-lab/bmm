@@ -866,7 +866,10 @@ posterior_epred_sdm_grid <- posterior_epred_undefined("sdm")
   for (rows in split(seq_len(n), ceiling(seq_len(n) / 2000))) {
     delta <- outer(-mu[rows], offsets * 2 * pi / n_options, `+`)
     peak <- exp(log_cstar[rows])
-    weights <- exp(peak * expm1(.sdm_log_s(delta, kappa[rows], activation)))
+    log_weights <- peak * expm1(.sdm_log_s(delta, kappa[rows], activation))
+    # scaled by the largest, or a peak narrower than the option spacing
+    # underflows every weight to 0 and the draw is always the first option
+    weights <- exp(log_weights - matrixStats::rowMaxs(log_weights))
     cum <- matrixStats::rowCumsums(weights)
     draw <- stats::runif(length(rows)) * cum[, ncol(cum)]
     out[rows] <- as.integer(offsets[rowSums(cum < draw) + 1])

@@ -223,6 +223,34 @@ test_that("rsdm() with n_options draws each observation from its own parameters"
   }
 })
 
+test_that("rsdm() with option sets puts a narrow peak on the options that carry its mass", {
+  withr::local_seed(4443)
+  n <- 2000
+  K <- 12
+  step <- 2 * pi / K
+  for (activation in c("vonmises", "laplace")) {
+    # no option within the peak's width of mu: every weight underflows unless
+    # they are scaled by the largest one
+    all_on_two <- rsdm(n, mu = 1, c = 1e6, kappa = 1, activation = activation, n_options = K)
+    expect_equal(unique(all_on_two), 2 * step)
+    on_offered <- rsdm(n, mu = 1, c = 1e6, kappa = 1, activation = activation, n_options = K,
+                       options = c(0, 1, 3) * step)
+    expect_equal(unique(on_offered), step)
+    # mu halfway between options 1 and 2: each carries half the mass; the
+    # tolerance is four standard errors of a proportion, 4 * sqrt(0.25 / n)
+    halfway <- rsdm(n, mu = 1.5 * step, c = 1e6, kappa = 1, activation = activation, n_options = K)
+    expect_true(all(halfway %in% (c(1, 2) * step)))
+    expect_lt(abs(mean(halfway == step) - 0.5), 0.045)
+    # the helper behind posterior_predict() and simulate_data() takes the
+    # offsets directly
+    expect_identical(
+      .sdm_draw_options(-5:6, mu = rep(2 * step, 50), log_cstar = log(1e6), kappa = 1,
+                        activation = activation, n_options = K),
+      rep(2L, 50)
+    )
+  }
+})
+
 test_that("rejection_sampling() is deprecated and still samples", {
   withr::local_seed(4441)
   x <- NULL
