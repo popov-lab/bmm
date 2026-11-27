@@ -682,6 +682,12 @@ kappa_sds <- c(prior_sd(dpr$kappa$main), prior_sd(dpr$kappa$effects))
 # brms centers a dpar's predictors: the Intercept prior sits on the parameter at
 # the column means of the dummies, and the reference cell's prior is implied
 w <- colMeans(model.matrix(~ setsize, dat))[-1]
+# the text below says "balanced", "four set sizes" and "a quarter", and
+# kappa_other_sd takes one weight for every cell but the reference
+if (!isTRUE(all.equal(unname(w), rep(0.25, 3)))) {
+  stop("zhang_luck_2008 no longer has four balanced set sizes: revise the ",
+       "default-priors paragraph.")
+}
 kappa_ref_sd <- sqrt(kappa_sds[1]^2 + kappa_sds[2]^2 * sum(w^2))
 kappa_other_sd <- sqrt(kappa_sds[1]^2 + kappa_sds[2]^2 * ((1 - w[1])^2 + sum(w[-1]^2)))
 kappa_prior_95 <- exp(qnorm(c(0.025, 0.975), prior_mean(dpr$kappa$main),
