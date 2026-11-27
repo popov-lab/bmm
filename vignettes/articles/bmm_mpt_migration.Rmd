@@ -442,7 +442,7 @@ The worked example covered the common steps. The table maps the other functions 
 | `testHetChi()`, `testHetPerm()` | these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In `bmm`, compare models with and without person effects ([Model comparison](https://venpopov.com/bmm/articles/bmm_mpt.html#model-comparison)) |
 | `BayesFactorMPT()` (non-hierarchical models), `BayesFactorSlope()` | `brms::bayes_factor()` on fits stored with `save_pars = save_pars(all = TRUE)` ([Model comparison](https://venpopov.com/bmm/articles/bmm_mpt.html#model-comparison)) |
 
-**The random-effect structure is written as a formula, not chosen from a menu.** The two families of hierarchical MPT models map onto the `|` and `||` operators, and the choice is per parameter:
+**The random-effect structure is written as a formula, not chosen from a menu.** The `|` and `||` operators set which person effects are correlated, and the choice is per parameter. Of the two families of hierarchical MPT models, the latent-trait model is the last formula of the list; the beta-MPT has no exact counterpart:
 
 - `D ~ 0 + condition + (1 | participant:condition)`: independent person effects per condition with one shared standard deviation.
 - `D ~ 0 + condition + (0 + condition || participant)`: one standard deviation per condition, uncorrelated across conditions. The beta-MPT of TreeBUGS also keeps person effects independent, but across parameters and with a beta distribution on the probability scale; `bmm` has no exact counterpart to it.
