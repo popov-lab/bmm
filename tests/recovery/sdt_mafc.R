@@ -36,7 +36,7 @@ bmmtools::validation_plan(
   bmm::sdt_mafc(response = "correct", m = sdt_mafc_m),
   # m = 4 alternatives: accuracy is the only datum, and 4 alternatives leave
   # more room between chance (0.25) and ceiling than 2 do. d = 1.6 sits 0.6
-  # prior SDs above the prior centre (1); P(correct) is then about 0.6.
+  # prior SDs above the prior centre (1); P(correct) is then about 0.73.
   pars = c(d = 1.6),
   # below the prior's mean SD (exponential(1) has mean 1)
   sds = c(d = 0.4),
