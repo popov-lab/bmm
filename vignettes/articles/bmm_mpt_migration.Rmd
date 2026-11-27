@@ -237,7 +237,7 @@ The TreeBUGS default puts half of its mass above `r round(reference$prior_sigma$
 
 # The estimates side by side
 
-The comparison follows one rule, fixed before the fits were read: a group-level parameter agrees when the posterior means of TreeBUGS and `bmm` differ by less than 0.2 times the larger of the two posterior standard deviations. That is a fifth of the larger posterior standard deviation. The rule is applied to the four group means, the four standard deviations and the six correlations.
+The comparison follows one rule, fixed before the fits were read: a group-level parameter agrees when the posterior means of TreeBUGS and `bmm` differ by less than 0.2 times the larger of the two posterior standard deviations. The rule is applied to the four group means, the four standard deviations and the six correlations.
 
 ## Group-level probabilities
 
