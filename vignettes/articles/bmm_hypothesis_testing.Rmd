@@ -857,9 +857,9 @@ new formula, which recompiles it.
 fit_setsize_long <- bmm(
   formula = formula_setsize, data = dat, model = model_2p,
   sample_prior = "yes", save_pars = save_pars(all = TRUE),
-  warmup = 1000, iter = 11000, cores = 4, backend = "cmdstanr"
+  warmup = 1000, iter = 11000, cores = 4, backend = "cmdstanr", seed = 2026
 )
-fit_null_long <- update(fit_setsize_long, formula. = formula_null, cores = 4)
+fit_null_long <- update(fit_setsize_long, formula. = formula_null, cores = 4, seed = 2026)
 
 bridge_setsize <- bridge_sampler(fit_setsize_long, repetitions = 10)
 bridge_null <- bridge_sampler(fit_null_long, repetitions = 10)
