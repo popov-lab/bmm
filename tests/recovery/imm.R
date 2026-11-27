@@ -96,7 +96,7 @@ bmmtools::validation_plan(
   # centre; c 1.2 (c 3.3) 1.2 SD above, a -1.2 (a 0.30) 1.2 SD below, and s 0.7
   # (s 2) 0.7 SD above. At set size 4 (target a + c = 3.6, three lures about
   # 0.3 + 0.5 each, background 1) a response comes from the target with
-  # probability 0.5, from a lure 0.34 and from the background 0.14
+  # probability 0.53, from a lure 0.33 and from the background 0.15
   pars = c(kappa = 3, a = -1.2, c = 1.2, s = 0.7),
   sds = c(kappa = 0.3, a = 0.3, c = 0.3, s = 0.3),
   grid = expand.grid(n_subjects = c(20L, 50L), n_trials = c(100L, 300L, 600L)),
