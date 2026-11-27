@@ -26,8 +26,8 @@ n_discrete_max <- 10
 #'     variables from random effects terms with the categorical predictors),
 #'     flagging sparse or empty cells. For models fit to aggregated data,
 #'     where one row summarizes many trials, the trials of all rows in a cell
-#'     are summed: the `n_trials` column of `sdt_yn()`, `sdt_mafc()` and
-#'     `ezdm()`, and the row sums of the response count columns of `m3()`,
+#'     are summed: the `n_trials` column of `sdt_yn()`, `sdt_mafc()`,
+#'     `ezdm()` and `ezcdm()`, and the row sums of the response count columns of `m3()`,
 #'     `mpt()`, `sdt_rating()`, `sdt_ranking()` and `sdt_cdp()`. For all other
 #'     models a row is one trial. With one row per trial
 #'     (`sdt_yn()` and `sdt_mafc()` without `n_trials`, `sdt_rating()` with

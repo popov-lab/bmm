@@ -43,6 +43,17 @@ reference_cases <- function() {
         data = cbind(dat, cond = cond), seed = 102
       )
     }),
+    ezcdm = withr::with_seed(115, {
+      dat <- data.frame(id = rep(1:10, 2), cond = two_conds(rep(c("A", "B"), each = 10)))
+      dat <- cbind(dat, rezcdm(20, 100, drift = ifelse(dat$cond == "A", 1.5, 2.5),
+                               bound = 1.5, ndt = 0.3))
+      list(
+        model = ezcdm(mean_angle = "mean_angle", var_angle = "var_angle",
+                      mean_rt = "mean_rt", var_rt = "var_rt", n_trials = "n_trials"),
+        formula = bmf(drift ~ cond, bound ~ 1, ndt ~ 1),
+        data = dat, seed = 115
+      )
+    }),
     ezdm = withr::with_seed(103, {
       dat <- data.frame(id = rep(1:10, 2), cond = two_conds(rep(c("A", "B"), each = 10)))
       dat <- cbind(dat, rezdm(20, 100, drift = ifelse(dat$cond == "A", 1, 2),

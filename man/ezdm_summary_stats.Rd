@@ -69,7 +69,9 @@ trials for \code{version = "3par"} and against each boundary's own count for
 \code{version = "4par"}, so the two versions can disagree about whether the
 same cell is corrected. For \code{version = "4par"}, \code{\link[=bmm]{bmm()}} still fits a cell
 whose summaries at one or both boundaries are NA, through its response
-counts. Default is 10}
+counts. Default is 10. In \code{\link[=ezcdm_summary_stats]{ezcdm_summary_stats()}}, \code{min_trials} only
+decides whether the mixture is fitted, and smaller cells get the simple
+statistics instead of \code{NA}}
 
 \item{init_contaminant}{Numeric. Initial proportion of contaminants for EM
 algorithm. Default is 0.05}
