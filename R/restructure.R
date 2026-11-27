@@ -140,12 +140,14 @@ add_posterior_epred <- function(x) {
 
 # Fits saved before #731 keep their non-linear formulas in the global
 # environment, where brms finds the R companion of a bmm function (such as
-# sdt_ranking_logmu()) only when bmm is attached. Like add_posterior_epred(),
-# not gated by version: development fits carry the current version number
+# sdt_ranking_logmu()) only when bmm is attached. Another environment is a
+# user's own and may hold functions the formula calls, so it stays. Like
+# add_posterior_epred(), not gated by version: development fits carry the
+# current version number
 add_nl_namespace <- function(x) {
   in_namespace <- function(f) {
     rhs <- f[[length(f)]]
-    if (isTRUE(attr(f, "nl")) &&
+    if (isTRUE(attr(f, "nl")) && identical(environment(f), globalenv()) &&
         any(setdiff(all.names(rhs), all.vars(rhs)) %in% getNamespaceExports("bmm"))) {
       environment(f) <- asNamespace("bmm")
     }

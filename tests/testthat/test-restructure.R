@@ -171,3 +171,31 @@ test_that("restructure() keeps the environment of a formula that calls no functi
   fit <- restructure(fit)
   expect_identical(environment(fit$formula$formula), own)
 })
+
+# the repair targets the global environment old fits carry; a user's own
+# environment may hold a function the formula calls next to a bmm function
+test_that("restructure() leaves a formula in a user environment that holds a function it calls", {
+  skip_on_cran()
+  own <- new.env(parent = globalenv())
+  own$myid <- function(x) x
+  fit <- with_global_formula_envs(nl_companion_fits()$sdt_ranking)
+  user_formula <- Y | trials(nTrials) ~ sdt_ranking_logmu(1, max_rank, myid(d), 0, 2)
+  attributes(user_formula) <- attributes(fit$formula$formula)
+  environment(user_formula) <- own
+  fit$formula$formula <- user_formula
+  repaired <- restructure(fit)
+  expect_identical(environment(repaired$formula$formula), own)
+  expect_true(is.function(get("myid", environment(repaired$formula$formula))))
+  expect_identical(environment(repaired$formula$pforms$murank2), asNamespace("bmm"))
+})
+
+test_that("restructure() leaves a formula that uses the name of a bmm function as a variable", {
+  skip_on_cran()
+  fit <- with_global_formula_envs(nl_companion_fits()$sdt_ranking)
+  var_formula <- Y ~ exp(sdt_d)
+  attributes(var_formula) <- attributes(fit$formula$formula)
+  environment(var_formula) <- globalenv()
+  fit$formula$formula <- var_formula
+  repaired <- restructure(fit)
+  expect_identical(environment(repaired$formula$formula), globalenv())
+})
