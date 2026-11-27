@@ -69,8 +69,8 @@ bmmtools::validation_plan(
   generator = m2p_generator,
   # prior = NULL puts bmm's own default priors back: bmmtools 0.3.1's entry
   # for mixture2p narrows them for an rmixture2p() overflow that this plan's
-  # generator cannot have, and it names kappa and thetat as nlpars, which are
-  # dpars in bmm 1.5.0, so that prior would not reach the fit
+  # generator cannot have (the entry writes kappa and thetat as nlpars, which
+  # bmm 1.5.0 reads as dpars, so its narrowed SD priors would apply)
   sbc = list(
     prior = NULL, generator = m2p_sbc_generator, cores_per_fit = 4L,
     sampler = list(chains = 4L, iter = 1000L, warmup = 500L, control = list(adapt_delta = 0.95))
