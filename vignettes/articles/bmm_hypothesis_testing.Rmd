@@ -187,9 +187,9 @@ One argument matters for testing hypotheses: `sample_prior = "yes"` tells
 `brms` to also draw samples from the prior. These prior draws are needed for
 the Savage-Dickey Bayes factors in the next section. We also run each chain for
 twice as many iterations as the default and keep every second draw
-(`iter = 3000, thin = 2`). The longer chains are what helps: with the default
-settings, the sampler had not quite converged for some participant-level
-standard deviations. Keeping every second draw keeps the saved fit small.
+(`iter = 3000, thin = 2`). The longer chains help the participant-level standard
+deviations, which have the smallest effective sample sizes of all parameters
+here. Keeping every second draw keeps the saved fit small.
 Because the warmup defaults to half of `iter`, this gives 4 chains $\times$
 (3,000 $-$ 1,500 warmup) / 2 = 3,000 posterior draws, a little fewer than the
 4,000 of the default settings. Thinning costs draws, which matters for the Bayes
@@ -208,15 +208,14 @@ fit_setsize <- bmm(
   backend = "cmdstanr",
   seed = 308,
   refresh = 0,
-  file = "assets/bmmfit_hyp_m2p_setsize"
+  file = "fits/bmmfit_hyp_m2p_setsize"
 )
 ```
 
 Before interpreting any estimate, check that the sampler converged: all
 $\hat{R}$ values should be below 1.01 and the effective sample sizes should be
 large enough (a common rule of thumb is above 400). We checked the two other
-fits of this article in the same way: their largest $\hat{R}$ is below 1.005 and
-their smallest effective sample size above 700.
+fits of this article in the same way, and both pass these checks.
 
 ```{r convergence, message = FALSE}
 draws_summary <- posterior::summarise_draws(
@@ -361,10 +360,15 @@ rbind(
 
 ```{r bf-values, include = FALSE}
 bf01 <- h$Evid.Ratio
-results <- readRDS("assets/hypothesis_testing_results.rds")
+results <- readRDS(file = "fits/hypothesis_testing_results.rds")
 sd_tab <- results$savage_dickey
 sd_lr <- subset(sd_tab, draws == 40000)
 sd_def <- subset(sd_tab, draws == 3000)
+# the text below the stability table says this call lies inside the ten-seed range
+if (bf01[2] < sd_def$min_bf01[2] || bf01[2] > sd_def$max_bf01[2]) {
+  stop("The Bayes factor of the hypothesis() call for set size 6 versus 8 lies outside ",
+       "the ten-seed range: revise the text below the Savage-Dickey stability table.")
+}
 # per-chain Savage-Dickey estimates from the 40,000-draw fit (see the local
 # long-run script); the posterior-side variability that seeds cannot show
 sd_chains <- results$savage_dickey_chains
@@ -392,7 +396,8 @@ note below the output says).
 <div class="takeaway">
 **Coming from p values?** None of these numbers is a p value.
 
-- `Post.Prob` = 0.04 in the first row does *not* mean "p = .04". It is the
+- `Post.Prob` = `r fmt(h$Post.Prob[1])` in the first row does *not* mean
+  "p = `r sub("^0", "", fmt(h$Post.Prob[1]))`". It is the
   probability of "no difference" after seeing the data, if "no difference" and
   "a difference" had been equally probable beforehand.
 - A 95% CrI that excludes zero says that, given the model and the prior, the
@@ -422,7 +427,7 @@ prior:
 prior_info(fit_setsize)
 ```
 
-(`mu1`, the centre of the response distribution, is fixed to zero by default,
+(`mu`, the centre of the response distribution, is fixed to zero by default,
 shown as `constant(0)` in the table: no prior is estimated for it.)
 
 With cell-means coding, the prior on a difference is *implied* by the priors
@@ -435,7 +440,7 @@ why it matters for the set size 6 versus 8 result.
 <summary>Under the hood: the prior on a difference, and how it shapes the Bayes factor</summary>
 
 The default prior on each cell mean of `kappa` is
-`r subset(brms::prior_summary(fit_setsize), nlpar == "kappa" & class == "b" & coef == "")$prior`
+`r subset(brms::prior_summary(fit_setsize), dpar == "kappa" & class == "b" & coef == "")$prior`
 (`brms` writes priors as mean and standard deviation).
 The difference of two independent normal variables with the same mean and
 standard deviation $s$ is centred at zero, with standard deviation
@@ -485,7 +490,7 @@ draws every time (see the next section).
 We repeated both tests with ten different seeds on the fit above (3,000
 posterior draws) and on a refit with 40,000 posterior draws (`fit_setsize_long`
 in Section \@ref(bridge); fewer than the 65,000 to 100,000 recommended above,
-but the refit already takes about half an hour). Table
+but the refit already takes about 45 minutes). Table
 \@ref(tab:sd-stability-table) shows the results; they were computed once and
 stored.
 
@@ -506,8 +511,8 @@ For set size 6 versus 8, the number of draws hardly matters: the median
 $\text{BF}_{01}$ is `r fmt(sd_def$median_bf01[2], 1)` with 3,000 draws and
 `r fmt(sd_lr$median_bf01[2], 1)` with 40,000, and the ten seeds stay within
 about 10% of each other. (Our own call above, which evaluated both hypotheses
-with one seed, gave `r fmt(bf01[2])`, a little above the range in the table.
-That is the size of the noise the shuffled prior draws add.)
+with one seed, gave `r fmt(bf01[2])`, inside the range in the table.
+The range shows the size of the noise the shuffled prior draws add.)
 
 For set size 2 versus 8, the ten seeds also agree closely with 3,000 draws:
 $\text{BF}_{10}$ ranges from `r round(1 / sd_def$max_bf01[1])` to
@@ -624,8 +629,8 @@ wrong_diff <- diff(k2sd(exp(kappa_means)) * 180 / pi)
 ```
 
 From set size 2 to set size 8, the imprecision of a typical participant's
-memory grows by `r fmt(right_diff, 1)` degrees (posterior mean), and the shortcut
-gives `r fmt(wrong_diff, 1)` degrees. Here the two are close because the
+memory grows by `r fmt(right_diff, 2)` degrees (posterior mean), and the shortcut
+gives `r fmt(wrong_diff, 2)` degrees. Here the two are close because the
 posteriors are narrow, but they drift apart as posteriors get wider, for
 example with fewer trials or participants: when a conversion is not a straight
 line, the mean of the converted draws is not the conversion of the mean. Medians and quantiles survive a monotone conversion (such as
@@ -695,7 +700,7 @@ fit_null <- bmm(
   backend = "cmdstanr",
   seed = 308,
   refresh = 0,
-  file = "assets/bmmfit_hyp_m2p_null"
+  file = "fits/bmmfit_hyp_m2p_null"
 )
 ```
 
@@ -842,8 +847,9 @@ Bridge sampling has three requirements:
 
 The code below refits both models with 40,000 draws (4 chains with 10,000
 post-warmup iterations each), fewer than the 72,000 found sufficient above:
-the mixture model refits already take 30 to 50 minutes each, and the SDM refit
-of Question 3 about ten hours. It then runs bridge sampling ten times per model. We
+the mixture model refits already take about 45 minutes each, and the SDM refit
+of Question 3 about 70 minutes on one laptop (a rough guide, as the time depends
+on the machine). It then runs bridge sampling ten times per model. We
 show the code and load the stored results. `update()` refits the model with the
 new formula, which recompiles it.
 
@@ -851,9 +857,9 @@ new formula, which recompiles it.
 fit_setsize_long <- bmm(
   formula = formula_setsize, data = dat, model = model_2p,
   sample_prior = "yes", save_pars = save_pars(all = TRUE),
-  warmup = 1000, iter = 11000, cores = 4, backend = "cmdstanr"
+  warmup = 1000, iter = 11000, cores = 4, backend = "cmdstanr", seed = 2026
 )
-fit_null_long <- update(fit_setsize_long, formula. = formula_null, cores = 4)
+fit_null_long <- update(fit_setsize_long, formula. = formula_null, cores = 4, seed = 2026)
 
 bridge_setsize <- bridge_sampler(fit_setsize_long, repetitions = 10)
 bridge_null <- bridge_sampler(fit_null_long, repetitions = 10)
@@ -884,17 +890,22 @@ bf_tab |>
   select(comparison, draws, median, range) |>
   knitr::kable(
     col.names = c("Comparison", "Posterior draws", "Median BF10", "Range across 10 repetitions"),
-    caption = "Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws. The 4,000-draw rows come from fits with the default settings and `save_pars = save_pars(all = TRUE)`; their convergence was marginal ($\\hat{R}$ up to 1.010), and they are shown only for the comparison of draw counts. The SDM rows use `formula_sdm` with the same two settings."
+    caption = "Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws. The 4,000-draw rows come from fits with the default settings and `save_pars = save_pars(all = TRUE)`; their largest $\\hat{R}$ is 1.008, and they are shown only for the comparison of draw counts. The SDM rows use `formula_sdm` with the same two settings."
   )
 ```
 
 ```{r bf-values-q2, include = FALSE}
-# count only estimated parameters; constants of the mixture family do not vary
+# count only estimated parameters; constants such as the fixed mu do not vary
 par_sd <- posterior::summarise_draws(fit_setsize, "sd")
 par_sd <- par_sd[grepl("^(b|sd|r)_", par_sd$variable) & par_sd$sd > 0, ]
 n_pars <- table(factor(sub("_.*", "", par_sd$variable), levels = c("b", "sd", "r")))
 q2_long <- subset(bf_tab, comparison == "setsize_vs_null" & draws == 40000)
 q2_def <- subset(bf_tab, comparison == "setsize_vs_null" & draws == 4000)
+# the text says the 40,000-draw estimates lie inside the 4,000-draw range
+if (q2_long$min_log10_bf < q2_def$min_log10_bf || q2_long$max_log10_bf > q2_def$max_log10_bf) {
+  stop("The 40,000-draw Bayes factors no longer lie inside the 4,000-draw range: ",
+       "revise the paragraph after the bridge-sampling table.")
+}
 ```
 
 The first two rows of Table \@ref(tab:bf-table) concern Question 2. With
@@ -908,7 +919,7 @@ repetitions vary more than the Savage-Dickey seeds in Section
 approximation that bridge sampling builds of the posterior. Like the seeds,
 however, all repetitions reuse the same posterior draws, so only a fit with
 more draws shows whether the estimate holds. Here the estimates from 40,000
-draws lie at or below the lower end of the range from 4,000 draws.
+draws lie inside the range from 4,000 draws and are much less spread out.
 
 By the median estimate, the data are `r bf_fmt(q2_long$median_log10_bf)` times
 more probable under the model with a population-level effect of set size on `kappa`
@@ -981,8 +992,21 @@ fit_sdm <- bmm(
   backend = "cmdstanr",
   seed = 308,
   refresh = 0,
-  file = "assets/bmmfit_hyp_sdm"
+  file = "fits/bmmfit_hyp_sdm"
 )
+```
+
+```{r convergence-other-fits, include = FALSE}
+# the text after the first fit says the two other fits pass the same checks
+conv_ok <- function(fit) {
+  s <- posterior::summarise_draws(fit, "rhat", "ess_bulk", "ess_tail")
+  max(s$rhat, na.rm = TRUE) < 1.01 &&
+    min(s$ess_bulk, s$ess_tail, na.rm = TRUE) > 400
+}
+if (!conv_ok(fit_null) || !conv_ok(fit_sdm)) {
+  stop("fit_null or fit_sdm fails the convergence checks: revise the text ",
+       "after the convergence chunk.")
+}
 ```
 
 As in Question 1, we look at the estimates first, here on the native scale:
