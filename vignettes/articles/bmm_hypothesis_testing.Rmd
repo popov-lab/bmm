@@ -485,7 +485,7 @@ draws every time (see the next section).
 We repeated both tests with ten different seeds on the fit above (3,000
 posterior draws) and on a refit with 40,000 posterior draws (`fit_setsize_long`
 in Section \@ref(bridge); fewer than the 65,000 to 100,000 recommended above,
-but the refit already takes about half an hour). Table
+but the refit already takes about 45 minutes). Table
 \@ref(tab:sd-stability-table) shows the results; they were computed once and
 stored.
 
@@ -506,8 +506,8 @@ For set size 6 versus 8, the number of draws hardly matters: the median
 $\text{BF}_{01}$ is `r fmt(sd_def$median_bf01[2], 1)` with 3,000 draws and
 `r fmt(sd_lr$median_bf01[2], 1)` with 40,000, and the ten seeds stay within
 about 10% of each other. (Our own call above, which evaluated both hypotheses
-with one seed, gave `r fmt(bf01[2])`, a little above the range in the table.
-That is the size of the noise the shuffled prior draws add.)
+with one seed, gave `r fmt(bf01[2])`, inside the range in the table.
+The range shows the size of the noise the shuffled prior draws add.)
 
 For set size 2 versus 8, the ten seeds also agree closely with 3,000 draws:
 $\text{BF}_{10}$ ranges from `r round(1 / sd_def$max_bf01[1])` to
@@ -842,8 +842,9 @@ Bridge sampling has three requirements:
 
 The code below refits both models with 40,000 draws (4 chains with 10,000
 post-warmup iterations each), fewer than the 72,000 found sufficient above:
-the mixture model refits already take 30 to 50 minutes each, and the SDM refit
-of Question 3 about ten hours. It then runs bridge sampling ten times per model. We
+the mixture model refits already take about 45 minutes each, and the SDM refit
+of Question 3 about 70 minutes on one laptop (a rough guide, as the time depends
+on the machine). It then runs bridge sampling ten times per model. We
 show the code and load the stored results. `update()` refits the model with the
 new formula, which recompiles it.
 
@@ -884,7 +885,7 @@ bf_tab |>
   select(comparison, draws, median, range) |>
   knitr::kable(
     col.names = c("Comparison", "Posterior draws", "Median BF10", "Range across 10 repetitions"),
-    caption = "Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws. The 4,000-draw rows come from fits with the default settings and `save_pars = save_pars(all = TRUE)`; their convergence was marginal ($\\hat{R}$ up to 1.010), and they are shown only for the comparison of draw counts. The SDM rows use `formula_sdm` with the same two settings."
+    caption = "Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws. The 4,000-draw rows come from fits with the default settings and `save_pars = save_pars(all = TRUE)`; their largest $\\hat{R}$ is 1.008, and they are shown only for the comparison of draw counts. The SDM rows use `formula_sdm` with the same two settings."
   )
 ```
 
@@ -908,7 +909,7 @@ repetitions vary more than the Savage-Dickey seeds in Section
 approximation that bridge sampling builds of the posterior. Like the seeds,
 however, all repetitions reuse the same posterior draws, so only a fit with
 more draws shows whether the estimate holds. Here the estimates from 40,000
-draws lie at or below the lower end of the range from 4,000 draws.
+draws lie inside the range from 4,000 draws and are much less spread out.
 
 By the median estimate, the data are `r bf_fmt(q2_long$median_log10_bf)` times
 more probable under the model with a population-level effect of set size on `kappa`
