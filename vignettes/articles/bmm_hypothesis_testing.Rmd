@@ -624,8 +624,8 @@ wrong_diff <- diff(k2sd(exp(kappa_means)) * 180 / pi)
 ```
 
 From set size 2 to set size 8, the imprecision of a typical participant's
-memory grows by `r fmt(right_diff, 1)` degrees (posterior mean), and the shortcut
-gives `r fmt(wrong_diff, 1)` degrees. Here the two are close because the
+memory grows by `r fmt(right_diff, 2)` degrees (posterior mean), and the shortcut
+gives `r fmt(wrong_diff, 2)` degrees. Here the two are close because the
 posteriors are narrow, but they drift apart as posteriors get wider, for
 example with fewer trials or participants: when a conversion is not a straight
 line, the mean of the converted draws is not the conversion of the mean. Medians and quantiles survive a monotone conversion (such as
