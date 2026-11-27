@@ -6,7 +6,9 @@ says what is simulated, how it is fitted and what counts as recovered; it does
 not fit anything when it is sourced.
 
 ```r
-# tests/recovery/mixture2p.R
+# The shortest plan: truths and calibration prior from bmmtools' entry for
+# mixture2p. tests/recovery/mixture2p.R sets its own truths and calibrates
+# under bmm's default priors.
 bmmtools::validation_plan(
   "mixture2p",
   generator = function(pars, n_trials, model) {
@@ -40,7 +42,7 @@ fixed values), except a parameter with a `softmax` link, which arrives on the
 link scale: for `mixture3p`, `thetat` and `thetant` are log weights, and the
 probabilities are the softmax of `(thetat, thetant, 0)`.
 
-bmmtools 0.3.0 has defaults entries for `mixture2p` and `ezdm` only, and they
+bmmtools 0.3.1 has defaults entries for `mixture2p` and `ezdm` only, and they
 simulate with bmm's own `r*` function, which does not meet the
 independent-generator requirement, so a density bug could cancel out. Other
 models with a bmmtools generator adapter (for example `mixture3p`) fall back to
