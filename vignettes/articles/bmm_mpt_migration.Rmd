@@ -433,7 +433,7 @@ The worked example covered the common steps. The table maps the other functions 
 | `fit.mpt()`, `betaMPT()`, `traitMPT()` | `bmm()` with the random-effect structure written in the formula (see below); `betaMPT()` has no exact counterpart, see the list below |
 | `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
 | `transformedParameters` | `brms::hypothesis()`, or arithmetic on the posterior draws |
-| `getParam(fit, "theta")` | `native_parameters(fit, pars = "D1", summary = TRUE)` ([Participant-level probabilities]) |
+| `getParam(fit, "theta")` | `native_parameters(fit, summary = TRUE)`; add `pars = "D1"` for one parameter ([Participant-level probabilities]) |
 | `getParam(fit, "mean")` of `traitMPT()` | `native_parameters(fit, re_formula = NA, summary = TRUE)`: the probability of the median participant, as in TreeBUGS ([Group-level probabilities]) |
 | `probitInverse()` | `?native_parameters`, section "Group-level effects" |
 | `genTraitMPT()`, `genBetaMPT()` | `rmpt()` inside a small simulation function ([Data format and simulation](https://venpopov.com/bmm/articles/bmm_mpt.html#data-format-and-simulation)) |
