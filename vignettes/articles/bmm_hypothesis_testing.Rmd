@@ -187,9 +187,9 @@ One argument matters for testing hypotheses: `sample_prior = "yes"` tells
 `brms` to also draw samples from the prior. These prior draws are needed for
 the Savage-Dickey Bayes factors in the next section. We also run each chain for
 twice as many iterations as the default and keep every second draw
-(`iter = 3000, thin = 2`). The longer chains are what helps: with the default
-settings, the sampler had not quite converged for some participant-level
-standard deviations. Keeping every second draw keeps the saved fit small.
+(`iter = 3000, thin = 2`). The longer chains help the participant-level standard
+deviations, which have the smallest effective sample sizes of all parameters
+here. Keeping every second draw keeps the saved fit small.
 Because the warmup defaults to half of `iter`, this gives 4 chains $\times$
 (3,000 $-$ 1,500 warmup) / 2 = 3,000 posterior draws, a little fewer than the
 4,000 of the default settings. Thinning costs draws, which matters for the Bayes
