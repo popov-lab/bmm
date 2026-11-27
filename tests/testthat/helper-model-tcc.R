@@ -4,6 +4,9 @@ model_cases_tcc <- function() {
   bins <- tcc("bin", similarity = exp(-(0:90) / 10), n_options = 180, units = "bins")
   # Gumbel noise: a closed form, no table
   gumbel <- tcc("dev_rad", similarity = exp(-(0:180) / 20), noise = "gumbel")
+  # correlated and motor noise: a Monte Carlo table from R, small to stay cheap
+  correlated <- tcc("dev_rad", similarity = exp(-(0:180) / 20), d_max = 4,
+                    correlation = exp(-(0:180) / 10), correlation_draws = 6000, motor_sd = 0.03)
   data <- small_data()
   re_formula <- bmf(d ~ 1 + (1 | ID))
   # forced-choice option sets (#566, D4): two- and three-option trials
@@ -22,7 +25,8 @@ model_cases_tcc <- function() {
         data = data.frame(bin = c(0, 3, -7, 90, 181, 12), id = 1:6)
       ),
       # the response and the option columns are rebuilt from the offsets
-      tcc_options = list(model = options, formula = bmf(d ~ 1), data = opt_data)
+      tcc_options = list(model = options, formula = bmf(d ~ 1), data = opt_data),
+      tcc_correlated = list(model = correlated, formula = bmf(d ~ 1), data = data)
     ),
     sd_default = list(
       tcc = list(model = model, formula = re_formula, data = data, sd = c(d = "exponential(1)")),
@@ -45,7 +49,8 @@ model_cases_tcc <- function() {
       tcc_bins = list(
         model = bins, data = data.frame(bin = c(0, 3, -7, 90, 181, 12)), formula = bmf(d ~ 1)
       ),
-      tcc_options = list(model = options, data = opt_data, formula = bmf(d ~ 1))
+      tcc_options = list(model = options, data = opt_data, formula = bmf(d ~ 1)),
+      tcc_correlated = list(model = correlated, data = data, formula = bmf(d ~ 1))
     ),
     simulate = list(
       tcc = list(
@@ -62,6 +67,20 @@ model_cases_tcc <- function() {
       ),
       tcc_options = list(
         model = options, pars = list(d = 0.5), design = opt_data[rep(1:6, 10), c("o1", "o2", "o3", "ID")],
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_correlated = list(
+        model = correlated, pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_motor = list(
+        model = tcc("dev_rad", similarity = exp(-(0:180) / 20), motor_sd = 0.03),
+        pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
+        formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
+      ),
+      tcc_bins_motor = list(
+        model = tcc("bin", similarity = exp(-(0:90) / 10), n_options = 180, units = "bins", motor_sd = 1),
+        pars = list(d = 0.5), design = data.frame(ID = rep(1:2, 50)),
         formula = bmf(d ~ 1), simulate_pars = list(d = 0.5)
       ),
       tcc_options_m = list(
