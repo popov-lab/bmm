@@ -301,6 +301,24 @@ knitr::kable(comparison, digits = c(3, 3, 3, 3, 3, 3, 4, 4, 3))
 
 ```{r, include = FALSE}
 kind_label <- c(mean = "group mean", sigma = "standard deviation", rho = "correlation")
+draws <- posterior::as_draws_array(fit_2htsm)
+bmm_variables <- c(paste0("b_", pars, "_Intercept"),
+                   paste0("sd_subject__", pars, "_Intercept"),
+                   paste0("cor_subject__", pairs[, 1], "_Intercept__", pairs[, 2], "_Intercept"))
+mcse_bmm <- vapply(seq_along(bmm_variables), function(i) {
+  chains <- posterior::extract_variable_matrix(draws, bmm_variables[i])
+  if (i <= length(pars)) chains <- pnorm(chains)
+  posterior::mcse_mean(chains)
+}, numeric(1))
+comparison$mcse <- sqrt(tb$sd^2 / tb$n_eff + mcse_bmm^2)
+comparison$excess <- ifelse(comparison$agrees, NA_real_,
+                            (abs(comparison$difference) - comparison$limit) / comparison$mcse)
+comparison$margin <- ifelse(comparison$agrees,
+                            (comparison$limit - abs(comparison$difference)) / comparison$mcse, NA_real_)
+mcse_fmt <- function(kind, par, col) {
+  row <- comparison[comparison$kind == kind & comparison$parameter == par, ]
+  row[[col]]
+}
 missed <- comparison[!comparison$agrees, ]
 missed_text <- paste0("the ", kind_label[missed$kind], " of `", missed$parameter, "`", collapse = ", ")
 tb_sigma <- reference$treebugs$group[reference$treebugs$group$kind == "sigma", ]
@@ -310,7 +328,7 @@ others_text <- paste0("the ", kind_label[others$kind], " of `", others$parameter
                       formatC(others$limit, format = "f", digits = 4), collapse = ", ")
 ```
 
-`r sum(comparison$agrees)` of the `r nrow(comparison)` parameters agree by the rule. Those that do not are `r missed_text`; the `bmm` estimate is the smaller one in `r sum(missed$difference < 0)` of these `r nrow(missed)`. The standard deviation of `d1` is the parameter the data say least about: its TreeBUGS posterior has a standard deviation of `r round(tb_sigma$sd[tb_sigma$par == "d1"], 2)` and a 95% interval from `r round(tb_sigma$lower[tb_sigma$par == "d1"], 2)` to `r round(tb_sigma$upper[tb_sigma$par == "d1"], 2)`. Source memory enters only the branches of recognized items, and with a recognition probability of `r round(bmm_mean$Estimate[bmm_mean$parameter == "D1"], 2)` these are few of each participant's `r unique(rowSums(freq[, -1]))` responses. Where the data say this little, the posterior follows the prior, and the TreeBUGS prior on a standard deviation is the much wider one (see [Priors]). The other misses lie close to the limit of the rule: `r others_text`.
+`r sum(comparison$agrees)` of the `r nrow(comparison)` parameters agree by the rule. Those that do not are `r missed_text`; the `bmm` estimate is the smaller one in `r sum(missed$difference < 0)` of these `r nrow(missed)`. The standard deviation of `d1` is the parameter the data say least about: its TreeBUGS posterior has a standard deviation of `r round(tb_sigma$sd[tb_sigma$par == "d1"], 2)` and a 95% interval from `r round(tb_sigma$lower[tb_sigma$par == "d1"], 2)` to `r round(tb_sigma$upper[tb_sigma$par == "d1"], 2)`. Source memory enters only the branches of recognized items, and with a recognition probability of `r round(bmm_mean$Estimate[bmm_mean$parameter == "D1"], 2)` these are few of each participant's `r unique(rowSums(freq[, -1]))` responses. Where the data say this little, the posterior follows the prior, and the TreeBUGS prior on a standard deviation is the much wider one (see [Priors]). The other misses lie close to the limit of the rule: `r others_text`. How close depends on Monte Carlo error, because each posterior mean is an average over a finite number of draws. The standard error of the difference between the two means is `r formatC(mcse_fmt("mean", "d1", "mcse"), format = "f", digits = 4)` for the group mean of `d1` and `r formatC(mcse_fmt("sigma", "a", "mcse"), format = "f", digits = 4)` for the standard deviation of `a`. The group mean of `d1` exceeds its limit by `r round(mcse_fmt("mean", "d1", "excess"), 1)` of such a standard error and the standard deviation of `a` by `r round(mcse_fmt("sigma", "a", "excess"), 1)`, so the first could agree in another run of either sampler. In the other direction, the standard deviation of `b` agrees with `r round(mcse_fmt("sigma", "b", "margin"), 1)` of a standard error to spare. The standard deviation of `d1` exceeds its limit by `r round(mcse_fmt("sigma", "d1", "excess"))` standard errors, which no rerun will change.
 
 ## A prior on the scale of TreeBUGS
 
