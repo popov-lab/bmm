@@ -84,7 +84,7 @@ TreeBUGS::readEQN(eqn_file, restrictions = restrictions, paramOrder = TRUE)
 MPTinR::check.mpt(eqn_file, restrictions.filename = restrictions)
 ```
 
-`mpt_from_eqn()` reads the same file. Here it is written out, so that the article does not need TreeBUGS; the lines are those of `2htsm.eqn`:
+`mpt_from_eqn()` reads the same file. Here it is written out, so that the article does not need TreeBUGS; the lines are those of `2htsm.eqn`. Write each chain of `restrictions` in the reverse order of the TreeBUGS call: TreeBUGS keeps the first name of a chain, `mpt_from_eqn()` the last, so `"D3 = D2 = D1"` leaves `bmm` the names `D1`, `d1`, `a` and `b` that TreeBUGS uses.
 
 ```{r}
 eqn_file <- tempfile(fileext = ".eqn")
@@ -125,7 +125,7 @@ Three arguments differ from the TreeBUGS call.
 
 - `categories`: the EQN file labels each response per tree (`EE`, `UE`, `NE` are all "source E" responses). In `bmm`, all trees share the same response categories, the response options, and `categories` says which labels of the file are the same response. The model has three trees, `E`, `U` and `N`, named after the item's true source, and three response categories, also `E`, `U` and `N`, named after the response.
 - `tree_id`: the name of the data column that says which tree a row belongs to.
-- `restrictions`: the restrictions are written in the other direction. For a chain such as `"D1=D2=D3"`, TreeBUGS keeps the first name, `D1`, while MPTinR and `bmm` keep the last, `D3`. Written as `"D3 = D2 = D1"`, the `bmm` model has the parameter names of TreeBUGS, `D1`, `d1`, `a` and `b`, which makes the two fits easier to compare.
+- `restrictions`: the chains are reversed, as explained above. MPTinR keeps the last name of a chain like `bmm`, so `"D1=D2=D3"` leaves `D3` in both, and the reversed form makes the two fits easier to compare.
 
 The file starts with a comment line. TreeBUGS and MPTinR skip the first line of an EQN file whatever it holds, `mpt_from_eqn()` skips lines that start with `#`, so the three packages read this file alike; `?mpt_from_eqn` lists the cases in which they do not. The printed model replaces `check.mpt()`: it lists the parameters after the restrictions and compares their number with the degrees of freedom, as `check.mpt()` does, and it adds the rank of the Jacobian, which says whether the branch expressions separate the parameters. With `links = "probit"`, all four parameters are estimated on the probit scale, as in `traitMPT()`.
 
@@ -156,7 +156,7 @@ all.equal(long_mptinr[c("source", "E", "U", "N")], long[c("source", "E", "U", "N
           check.attributes = FALSE)
 ```
 
-Without `id`, the rows are numbered, so the participant column holds 1 to 24 instead of the subject codes. `bmm_data_check()` runs the checks of the data that `bmm()` runs before a fit, without fitting:
+Without `id`, the rows are numbered, so the participant column holds 1 to 24 instead of the subject codes. The codes of this subset are not consecutive but the odd numbers 1 to 47, which is why the output below gives the range [1, 47] for 24 participants. `bmm_data_check()` runs the checks of the data that `bmm()` runs before a fit, without fitting:
 
 ```{r}
 formula_2htsm <- bmf(
@@ -227,7 +227,7 @@ priors[nzchar(priors$prior) & priors$coef %in% c("", "Intercept") & priors$group
        c("prior", "class", "coef", "group", "nlpar")]
 ```
 
-The two priors on a standard deviation differ a lot in scale. Quantiles of the prior on one probit-scale standard deviation, computed from 100000 draws of the TreeBUGS default and from the exponential distribution:
+The defaults depend on the link: under the default logit link, `bmm` puts `logistic(0, 1)` on each intercept and `exponential(1)` on each standard deviation. The two priors on a standard deviation differ a lot in scale. Quantiles of the prior on one probit-scale standard deviation, computed from 100000 draws of the TreeBUGS default and from the exponential distribution:
 
 ```{r}
 print(reference$prior_sigma, digits = 3)
@@ -296,7 +296,7 @@ knitr::kable(data.frame(
 And the rule for every group-level parameter, the standard deviations and correlations on the probit scale:
 
 ```{r}
-knitr::kable(comparison, digits = 3)
+knitr::kable(comparison, digits = c(3, 3, 3, 3, 3, 3, 4, 4, 3))
 ```
 
 ```{r, include = FALSE}
@@ -412,10 +412,10 @@ The worked example covered the common steps. The table maps the other functions 
 | reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_data_reshape(wide, model)`, or `mpt_data_reshape(wide, model, columns = "mptinr")` ([The data]) |
 | `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. A chain keeps its last name in `bmm` and MPTinR, its first in TreeBUGS ([The model file]). TreeBUGS' `FE` has no restriction counterpart: leave the random effect out of that parameter's formula |
 | `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model](https://venpopov.com/bmm/articles/bmm_mpt.html#specifying-an-mpt-model)) |
-| `fit.mpt()`, `betaMPT()`, `traitMPT()` | `bmm()` with the random-effect structure written in the formula (see below) |
+| `fit.mpt()`, `betaMPT()`, `traitMPT()` | `bmm()` with the random-effect structure written in the formula (see below); `betaMPT()` has no exact counterpart, see the list below |
 | `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
 | `transformedParameters` | `brms::hypothesis()`, or arithmetic on the posterior draws |
-| `getParam(fit, "theta")` | `native_parameters(fit, pars = "D", summary = TRUE)` ([Participant-level probabilities]) |
+| `getParam(fit, "theta")` | `native_parameters(fit, pars = "D1", summary = TRUE)` ([Participant-level probabilities]) |
 | `getParam(fit, "mean")` of `traitMPT()` | `native_parameters(fit, re_formula = NA, summary = TRUE)`: the probability of the median participant, as in TreeBUGS ([Group-level probabilities]) |
 | `probitInverse()` | `?native_parameters`, section "Group-level effects" |
 | `genTraitMPT()`, `genBetaMPT()` | `rmpt()` inside a small simulation function ([Data format and simulation](https://venpopov.com/bmm/articles/bmm_mpt.html#data-format-and-simulation)) |
@@ -434,7 +434,7 @@ The last of these, combined with `links = "probit"`, is the model TreeBUGS fits 
 
 **Priors need converting from precision to standard deviation.** JAGS parameterizes the normal distribution by precision, Stan by standard deviation, so a JAGS `dnorm(0, 0.1)` on a latent-scale parameter becomes `normal(0, 3.1623)` in `bmm` ($1/\sqrt{0.1}$). Gamma priors carry over unchanged: JAGS `dgamma(1, 0.1)` on a random-effect standard deviation is `gamma(1, 0.1)` here, since both use the shape/rate parameterization.
 
-**Group-level estimates are reported on the latent scale.** TreeBUGS reports the group means of the latent-trait model as probabilities, namely the probability of the median participant. To get there from a `bmm` fit, use `native_parameters(fit, re_formula = NA, summary = TRUE)`, as in [Group-level probabilities]; it applies the inverse link to the linear predictor, which also covers the probit link and models with predictors.
+**TreeBUGS reports group means as probabilities.** TreeBUGS reports the group means of the latent-trait model as probabilities, namely the probability of the median participant. To get there from a `bmm` fit, use `native_parameters(fit, re_formula = NA, summary = TRUE)`, as in [Group-level probabilities]; it applies the inverse link to the linear predictor, which also covers the probit link and models with predictors.
 
 **What the two packages cannot fit.** Both take one row of category frequencies per participant, so item effects and covariates that change from trial to trial have no place in them. In `bmm`, data with one row per trial take random item effects crossed with the participants, and a trial-level covariate can enter a branch expression or a parameter formula. The MPT article shows both, in [Trial-level data and item effects](https://venpopov.com/bmm/articles/bmm_mpt.html#trial-level-data-and-item-effects) and [Design-fixed covariates in branch expressions](https://venpopov.com/bmm/articles/bmm_mpt.html#design-fixed-covariates-in-branch-expressions).
 
