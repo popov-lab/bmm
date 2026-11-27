@@ -497,9 +497,10 @@
   [`bmm::bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) without
   [`library(bmm)`](https://github.com/popov-lab/bmm). They stopped with
   `could not find function "sdt_ranking_logmu"` (or `sdt_cdp_logmu`,
-  `sdt_rating_logmu`, `m3_gauss_logp`). Fits saved with an earlier
-  version still need [`library(bmm)`](https://github.com/popov-lab/bmm)
-  first.
+  `sdt_rating_logmu`, `m3_gauss_logp`). Fits of these models saved with
+  an earlier version now predict without
+  [`library(bmm)`](https://github.com/popov-lab/bmm) too
+  ([\#733](https://github.com/popov-lab/bmm/issues/733)).
 - The capacity versions of
   [`mixture3p()`](https://venpopov.com/bmm/dev/reference/mixture3p.md),
   `version = "slot"` and `version = "slot_averaging"`, cannot be fitted
