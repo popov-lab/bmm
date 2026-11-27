@@ -473,16 +473,116 @@ rsdm <- function(n, mu = 0, c = 3, kappa = 3.5, parametrization = NULL,
     c <- rep_len(c, n)
     kappa <- rep_len(kappa, n)
   }
-  amp <- exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization))
+  amp <- .recycle_draws(exp(.sdm_dist_log_cstar(c, kappa, activation, scaling, parametrization)), n)
+  mu <- .recycle_draws(mu, n)
+  kappa <- .recycle_draws(kappa, n)
+  # i is either a subset of the draws or all of them, in order
+  pick <- function(x, i) if (length(x) %in% c(1, length(i))) x else x[i]
+  uniform <- function(i) {
+    # the density over its value at the peak, on the log scale: the
+    # unnormalized density itself overflows for large c and kappa
+    .rejection_sampling(
+      n = length(i),
+      f = function(x, mu, amp, kappa) exp(amp * expm1(.sdm_log_s(x - mu, kappa, activation))),
+      max_f = 1,
+      proposal_fun = function(n) stats::runif(n, -pi, pi),
+      mu = pick(mu, i), amp = pick(amp, i), kappa = pick(kappa, i)
+    )
+  }
 
-  # the density over its value at the peak, on the log scale: the
-  # unnormalized density itself overflows for large c and kappa
-  .rejection_sampling(
-    n = n,
-    f = function(x, mu, amp, kappa) exp(amp * expm1(.sdm_log_s(x - mu, kappa, activation))),
-    max_f = 1,
-    proposal_fun = function(n) stats::runif(n, -pi, pi),
-    mu = .recycle_draws(mu, n), amp = .recycle_draws(amp, n), kappa = .recycle_draws(kappa, n)
+  # a uniform proposal hits the peak with probability about 1 / (pi c* kappa)
+  # (Laplace) or 1 / sqrt(2 pi c* kappa) (von Mises), and at least exp(-c*).
+  # Below 1e-3 a draw takes an envelope that follows the peak (#732); split by
+  # this threshold, a call without such draws keeps its random number stream
+  narrow <- which(rep_len(
+    (if (activation == "laplace") pi * amp * kappa else sqrt(2 * pi * amp * kappa)) > 1e3 & amp > log(1e3), n
+  ))
+  if (length(narrow) == 0) {
+    return(uniform(seq_len(n)))
+  }
+  # the envelope adds mu only after sampling, so a missing or infinite mu
+  # would pass there unnoticed instead of stopping as it does in the target
+  stopif(!all(is.finite(pick(mu, narrow))), "The proposals or the target density contain NA; check the parameter values.")
+  out <- numeric(n)
+  if (length(narrow) < n) {
+    out[-narrow] <- uniform(seq_len(n)[-narrow])
+  }
+  env <- .sdm_envelope(pick(amp, narrow), pick(kappa, narrow), activation)
+  # .rejection_sampling() draws proposals without the per-draw parameters,
+  # so it draws y in (-1, 1), which f maps onto the draw's own envelope
+  out[narrow] <- (pick(mu, narrow) + .sdm_envelope_offset(
+    .rejection_sampling(
+      n = length(narrow),
+      f = function(y, amp, kappa, d1, rate, log_f1, peak, flat) {
+        d <- abs(.sdm_envelope_offset(y, nlist(d1, rate, peak, flat), activation))
+        exp(amp * expm1(.sdm_log_s(d, kappa, activation)) -
+          .log_add_exp(-rate * (if (activation == "laplace") d else d^2), ifelse(d > d1, log_f1, -Inf)))
+      },
+      max_f = 1,
+      proposal_fun = function(n) stats::runif(n, -1, 1),
+      amp = pick(amp, narrow), kappa = pick(kappa, narrow),
+      d1 = env$d1, rate = env$rate, log_f1 = env$log_f1, peak = env$peak, flat = env$flat
+    ),
+    env, activation
+  ) + pi) %% (2 * pi) - pi
+  out
+}
+
+# An envelope over rsdm()'s target exp(c* expm1(log s(d))), d the distance to
+# mu, for peaks too narrow for a uniform proposal. Up to a cut d1 the drop
+# 1 - s lies above its chord, being concave in d (Laplace) or in
+# w = sin(d / 2)^2 (von Mises), so the target is below exp(-rate d), or below
+# exp(-rate w) and, as sin(d / 2) / d falls, below exp(-rate d^2); beyond d1
+# the target falls, so log_f1, its value at d1, bounds it. The pieces have
+# masses peak and flat on [0, pi]. A single chord over the circle (d1 = pi)
+# accepts only about 1 / (pi kappa) of the proposals at large kappa, so d1 is
+# the candidate of least mass
+.sdm_envelope <- function(amp, kappa, activation) {
+  best <- NULL
+  for (reach in c(2^seq(-6, 10, 0.5), Inf)) {
+    if (activation == "laplace") {
+      d1 <- pmin(reach / kappa, pi)
+      drop <- -expm1(-kappa * d1)
+      rate <- amp * drop / d1
+    } else {
+      w1 <- pmin(reach / (2 * kappa), 1)
+      d1 <- 2 * asin(sqrt(w1))
+      drop <- -expm1(-2 * kappa * w1)
+      rate <- amp * drop / w1 * (sin(d1 / 2) / d1)^2
+    }
+    cand <- list(
+      d1 = d1, rate = rate, log_f1 = -amp * drop, flat = (pi - d1) * exp(-amp * drop),
+      peak = if (activation == "laplace") {
+        -expm1(-rate * pi) / rate
+      } else {
+        sqrt(pi / rate) * (stats::pnorm(pi * sqrt(2 * rate)) - 0.5)
+      }
+    )
+    if (!is.null(best)) {
+      cand <- Map(
+        function(new, old) ifelse(cand$peak + cand$flat < best$peak + best$flat, new, old),
+        cand, best
+      )
+    }
+    best <- cand
+  }
+  best
+}
+
+# the signed distance from mu of an envelope proposal y in (-1, 1): |y| is the
+# share of the envelope's mass below the distance, the peak piece first, and
+# the sign of y the side of mu
+.sdm_envelope_offset <- function(y, env, activation) {
+  mass <- abs(y) * (env$peak + env$flat)
+  share <- pmin(mass / env$peak, 1)
+  sign(y) * ifelse(
+    mass < env$peak,
+    if (activation == "laplace") {
+      -log1p(share * expm1(-env$rate * pi)) / env$rate
+    } else {
+      stats::qnorm(0.5 + share * (stats::pnorm(pi * sqrt(2 * env$rate)) - 0.5)) / sqrt(2 * env$rate)
+    },
+    env$d1 + (mass - env$peak) / env$flat * (pi - env$d1)
   )
 }
 

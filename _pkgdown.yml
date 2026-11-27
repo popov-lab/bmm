@@ -121,6 +121,7 @@ articles:
     contents:
     - articles/bmm_m3
     - articles/bmm_mpt
+    - articles/bmm_mpt_migration
 
   - title: Signal detection & recognition
     desc: Fitting signal detection models and analysing ROC/AUC
