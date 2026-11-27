@@ -1,0 +1,441 @@
+---
+title: "Coming from TreeBUGS or MPTinR"
+output: bookdown::html_document2
+author:
+  - Gidon Frischkorn
+bibliography: REFERENCES.bib
+vignette: >
+  %\VignetteIndexEntry{Coming from TreeBUGS or MPTinR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+pkgdown:
+  as_is: true
+---
+
+```{=html}
+<style type="text/css">
+div.main-container {
+max-width: 800px !important;
+}
+
+p {
+margin-top: 1.5em ;
+margin-bottom: 1.5em ;
+}
+.author{
+    display: none;
+}
+</style>
+```
+```{r, include = FALSE}
+options(crayon.enabled = TRUE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  dev = "jpeg",
+  dpi = 100,
+  fig.asp = 0.8,
+  fig.width = 5,
+  out.width = "80%",
+  fig.align = "center"
+)
+fansi::set_knit_hooks(knitr::knit_hooks, which = c("output", "message", "error"))
+```
+
+# Introduction
+
+This article is for readers who have fitted multinomial processing tree (MPT) models with MPTinR [@singmannKellen2013] or TreeBUGS [@heckEtAl2018] and want to fit them in `bmm`. It fits one data set that ships with TreeBUGS in all three packages and puts the estimates side by side, and it then maps the functions and arguments of the two packages onto `bmm`. The [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html) introduces the models in `bmm` from the start; this page assumes that you know MPT models and one of the two packages.
+
+```{r}
+library(bmm)
+reference <- readRDS(file = "fits/mpt_migration_reference.rds")
+reference$versions
+```
+
+The TreeBUGS and MPTinR results on this page were computed once, with the versions printed above, and stored in `reference`, so the page builds without either package or JAGS. Every statement about what the two packages do was checked against the help pages and source code of these versions.
+
+# The example: source monitoring
+
+TreeBUGS ships one data set, `arnold2013`, from a source-monitoring experiment by @arnoldEtAl2013. Participants studied statements from two sources and were then tested on studied and new statements: for each one they answered "source E", "source U" or "new". In the TreeBUGS article, E stands for the source that the schema leads one to expect and U for the unexpected one [@heckEtAl2018]. The help pages of `traitMPT()` and `betaMPT()` fit the two-high-threshold model of source monitoring (2HTSM) that comes with TreeBUGS to the 24 participants labelled `encoding`, and so does this page. In TreeBUGS the data are loaded as follows:
+
+```{r, eval = FALSE}
+library(TreeBUGS)
+data(arnold2013)
+freq <- subset(arnold2013, group == "encoding", select = -(2:4))
+```
+
+`reference$freq` holds the same rows:
+
+```{r}
+freq <- reference$freq
+head(freq)
+```
+
+Each row is one participant, and each column counts one combination of item type and response: `EU` counts the "source U" responses to items from source E, `NN` the "new" responses to new items.
+
+# The model file
+
+The 2HTSM comes as an EQN file. Each line holds the tree (the item type), the response category, and one branch of the tree. `D1`, `D2` and `D3` are the probabilities of recognizing an item from source E, from source U or a new item as such; `d1` and `d2` the probabilities of remembering the source of a recognized item; `a` and `g` the probabilities of guessing source E for a recognized and for an unrecognized item; and `b` the probability of guessing "old" for an item that was not recognized. In TreeBUGS and MPTinR, the file and the restrictions of the help pages are checked with:
+
+```{r, eval = FALSE}
+eqn_file <- system.file("MPTmodels/2htsm.eqn", package = "TreeBUGS")
+restrictions <- list("D1=D2=D3", "d1=d2", "a=g")
+TreeBUGS::readEQN(eqn_file, restrictions = restrictions, paramOrder = TRUE)
+MPTinR::check.mpt(eqn_file, restrictions.filename = restrictions)
+```
+
+`mpt_from_eqn()` reads the same file. Here it is written out, so that the article does not need TreeBUGS; the lines are those of `2htsm.eqn`:
+
+```{r}
+eqn_file <- tempfile(fileext = ".eqn")
+writeLines(c(
+  "# The two-high threshold model of source monitoring (2HTSM)",
+  "E  EE  D1*d1",
+  "E  EE  D1*(1-d1)*a",
+  "E  EU  D1*(1-d1)*(1-a)",
+  "E  EE  (1-D1)*b*g",
+  "E  EU  (1-D1)*b*(1-g)",
+  "E  EN  (1-D1)*(1-b)",
+  "U  UU  D2*d2",
+  "U  UE  D2*(1-d2)*a",
+  "U  UU  D2*(1-d2)*(1-a)",
+  "U  UE  (1-D2)*b*g",
+  "U  UU  (1-D2)*b*(1-g)",
+  "U  UN  (1-D2)*(1-b)",
+  "N  NN  D3",
+  "N  NE  (1-D3)*b*g",
+  "N  NU  (1-D3)*b*(1-g)",
+  "N  NN  (1-D3)*(1-b)"
+), eqn_file)
+
+responses <- c(EE = "E", UE = "E", NE = "E",
+               EU = "U", UU = "U", NU = "U",
+               EN = "N", UN = "N", NN = "N")
+model_2htsm <- mpt_from_eqn(
+  eqn_file,
+  categories = responses,
+  tree_id = "source",
+  restrictions = c("D3 = D2 = D1", "d2 = d1", "g = a"),
+  links = "probit"
+)
+model_2htsm
+```
+
+Three arguments differ from the TreeBUGS call.
+
+- `categories`: the EQN file labels each response per tree (`EE`, `UE`, `NE` are all "source E" responses). In `bmm`, all trees share the same response categories, the response options, and `categories` says which labels of the file are the same response. The model has three trees, `E`, `U` and `N`, named after the item's true source, and three response categories, also `E`, `U` and `N`, named after the response.
+- `tree_id`: the name of the data column that says which tree a row belongs to.
+- `restrictions`: the restrictions are written in the other direction. For a chain such as `"D1=D2=D3"`, TreeBUGS keeps the first name, `D1`, while MPTinR and `bmm` keep the last, `D3`. Written as `"D3 = D2 = D1"`, the `bmm` model has the parameter names of TreeBUGS, `D1`, `d1`, `a` and `b`, which makes the two fits easier to compare.
+
+The file starts with a comment line. TreeBUGS and MPTinR skip the first line of an EQN file whatever it holds, `mpt_from_eqn()` skips lines that start with `#`, so the three packages read this file alike; `?mpt_from_eqn` lists the cases in which they do not. The printed model replaces `check.mpt()`: it lists the parameters after the restrictions and compares their number with the degrees of freedom, as `check.mpt()` does, and it adds the rank of the Jacobian, which says whether the branch expressions separate the parameters. With `links = "probit"`, all four parameters are estimated on the probit scale, as in `traitMPT()`.
+
+# The data
+
+TreeBUGS takes one row per participant with one column per category label of the EQN file. `bmm` takes one row per participant and tree, a column naming the tree, and one count column per response category. `mpt_data_reshape()` turns the first layout into the second; `id` names the participant column:
+
+```{r}
+long <- mpt_data_reshape(freq, model_2htsm, id = "subject")
+freq[1, ]
+long[long$subject == 1, ]
+```
+
+The first participant's three long rows hold the nine counts of the wide row, one tree per row. Comparing one participant this way is worth doing for your own data, because a reshape that swaps two columns fits without an error. Columns of the wide data that hold no counts, such as a between-participant factor, are carried to every long row. For a model from `mpt_from_string()` or `mpt()`, which has no EQN labels, name the count columns `<tree>.<category>`, for example `target.old`.
+
+MPTinR takes the same counts without column names, sorted by tree and then by category label. `check.mpt()` returns that order in `eqn.order.categories`; it was stored with the MPTinR fit:
+
+```{r}
+reference$mptinr$order
+```
+
+`columns = "mptinr"` reads unnamed columns in this order, which gives the same long data:
+
+```{r}
+wide_mptinr <- unname(as.matrix(freq[, reference$mptinr$order]))
+long_mptinr <- mpt_data_reshape(wide_mptinr, model_2htsm, columns = "mptinr")
+all.equal(long_mptinr[c("source", "E", "U", "N")], long[c("source", "E", "U", "N")],
+          check.attributes = FALSE)
+```
+
+Without `id`, the rows are numbered, so the participant column holds 1 to 24 instead of the subject codes. `bmm_data_check()` runs the checks of the data that `bmm()` runs before a fit, without fitting:
+
+```{r}
+formula_2htsm <- bmf(
+  D1 ~ 1 + (1 |p| subject),
+  d1 ~ 1 + (1 |p| subject),
+  a ~ 1 + (1 |p| subject),
+  b ~ 1 + (1 |p| subject)
+)
+bmm_data_check(formula_2htsm, long, model_2htsm)
+```
+
+# Fitting the latent-trait model
+
+The TreeBUGS fit used the settings of the TreeBUGS article [@heckEtAl2018], four chains of 50000 iterations, the first 10000 of them burn-in, every tenth draw kept, and a seed set before the call; the MPTinR fit used the defaults of `fit.mpt()`, which fits each participant and the summed counts by maximum likelihood:
+
+```{r, eval = FALSE}
+set.seed(20261126)
+fit_treebugs <- TreeBUGS::traitMPT(
+  eqn_file, data = freq[, -1], restrictions = restrictions,
+  n.chains = 4, n.iter = 50000, n.burnin = 10000, n.thin = 10
+)
+fit_mptinr <- MPTinR::fit.mpt(
+  as.matrix(freq[, reference$mptinr$order]), eqn_file,
+  restrictions.filename = restrictions
+)
+```
+
+In `bmm`, the latent-trait model is the formula above with `links = "probit"` in the model. Each parameter has a population intercept and a person effect per participant, and the shared label `|p|` puts all four person effects into one correlation matrix, as `traitMPT()` does:
+
+```{r fit-2htsm, results = "hide", message = FALSE, warning = FALSE}
+fit_2htsm <- bmm(
+  formula = formula_2htsm,
+  data = long,
+  model = model_2htsm,
+  backend = "cmdstanr",
+  cores = 4,
+  iter = 4000,
+  warmup = 1000,
+  refresh = 0,
+  seed = 20261126,
+  file = "fits/mpt_2htsm_arnold2013"
+)
+```
+
+```{r}
+summary(fit_2htsm)
+```
+
+```{r}
+divergent <- function(fit) {
+  sampler <- brms::nuts_params(fit)
+  sum(sampler$Value[sampler$Parameter == "divergent__"])
+}
+divergent(fit_2htsm)
+```
+
+The fit has no divergent transitions, and the largest Rhat of any parameter, person effects included, is `r round(max(brms::rhat(fit_2htsm), na.rm = TRUE), 3)`. The TreeBUGS fit had a largest Rhat of `r round(reference$treebugs$max_rhat, 3)` and at least `r reference$treebugs$min_neff` effective draws for every parameter.
+
+## Priors
+
+The priors are equal where the two packages allow it. TreeBUGS puts `dnorm(0,1)` on the probit-scale group mean of each parameter; JAGS parameterizes the normal distribution by its precision, and a precision of 1 is a standard deviation of 1, so this is the `normal(0, 1)` that `bmm` puts on each intercept under the probit link. Both imply a uniform prior on the probability of the median participant.
+
+The priors on the person-level standard deviations and correlations cannot be made equal. TreeBUGS uses a scaled inverse Wishart distribution: the covariance matrix of the raw person effects has an inverse Wishart prior (identity scale matrix, degrees of freedom one more than the number of parameters), and each standard deviation is multiplied by a scale factor `xi` with a `dunif(0,10)` prior. **brms** offers the LKJ prior for correlation matrices and no inverse Wishart (`?brms::set_prior`). `bmm` puts `exponential(2)` on each standard deviation and `lkj(2)` on the correlation matrix, under which extreme correlations are less likely than under the `lkj(1)` that makes all correlation matrices equally likely:
+
+```{r}
+priors <- as.data.frame(default_prior(formula_2htsm, data = long, model = model_2htsm))
+priors[nzchar(priors$prior) & priors$coef %in% c("", "Intercept") & priors$group %in% c("", "subject"),
+       c("prior", "class", "coef", "group", "nlpar")]
+```
+
+The two priors on a standard deviation differ a lot in scale. Quantiles of the prior on one probit-scale standard deviation, computed from 100000 draws of the TreeBUGS default and from the exponential distribution:
+
+```{r}
+print(reference$prior_sigma, digits = 3)
+```
+
+The TreeBUGS default puts half of its mass above `r round(reference$prior_sigma$q50[1], 2)`, `bmm` above `r round(reference$prior_sigma$q50[2], 2)`. Where the data say little about a standard deviation, the two posteriors differ, and the next section shows where.
+
+# The estimates side by side
+
+The comparison follows one rule, fixed before the fits were read: a group-level parameter agrees when the posterior means of TreeBUGS and `bmm` differ by less than 0.2 times the larger of the two posterior standard deviations. That is a fifth of the larger posterior standard deviation. The rule is applied to the four group means, the four standard deviations and the six correlations.
+
+## Group-level probabilities
+
+`getParam(fit, "mean")` in TreeBUGS and `native_parameters(fit, re_formula = NA, summary = TRUE)` in `bmm` report the same quantity, the probability of the median participant: the inverse probit of the latent mean. MPTinR's aggregated fit estimates a different quantity, the probability that fits the summed counts of all participants, with a confidence interval from the Hessian.
+
+```{r}
+pars <- c("D1", "d1", "a", "b")
+pairs <- t(combn(pars, 2))
+tb <- rbind(reference$treebugs$group, reference$treebugs$rho)
+
+compare_with_treebugs <- function(fit) {
+  means <- native_parameters(fit, re_formula = NA, summary = TRUE)
+  means <- means[match(pars, means$parameter), ]
+  sds <- brms::posterior_summary(fit, variable = paste0("sd_subject__", pars, "_Intercept"))
+  cors <- brms::posterior_summary(
+    fit,
+    variable = paste0("cor_subject__", pairs[, 1], "_Intercept__", pairs[, 2], "_Intercept")
+  )
+  out <- data.frame(
+    kind = tb$kind,
+    parameter = tb$par,
+    TreeBUGS_mean = tb$mean,
+    TreeBUGS_sd = tb$sd,
+    bmm_mean = c(means$Estimate, sds[, "Estimate"], cors[, "Estimate"]),
+    bmm_sd = c(means$Est.Error, sds[, "Est.Error"], cors[, "Est.Error"])
+  )
+  out$difference <- out$bmm_mean - out$TreeBUGS_mean
+  out$limit <- 0.2 * pmax(out$TreeBUGS_sd, out$bmm_sd)
+  out$agrees <- abs(out$difference) < out$limit
+  out
+}
+
+bmm_mean <- native_parameters(fit_2htsm, re_formula = NA, summary = TRUE)
+bmm_mean <- bmm_mean[match(pars, bmm_mean$parameter), ]
+comparison <- compare_with_treebugs(fit_2htsm)
+```
+
+The group means with their 95% intervals, credible intervals for TreeBUGS and `bmm`, confidence intervals for MPTinR:
+
+```{r}
+interval <- function(estimate, lower, upper) {
+  paste0(formatC(estimate, format = "f", digits = 3), " [",
+         formatC(lower, format = "f", digits = 3), ", ",
+         formatC(upper, format = "f", digits = 3), "]")
+}
+tb_mean <- reference$treebugs$group[reference$treebugs$group$kind == "mean", ]
+mptinr <- reference$mptinr$group
+knitr::kable(data.frame(
+  parameter = pars,
+  TreeBUGS = interval(tb_mean$mean, tb_mean$lower, tb_mean$upper),
+  bmm = interval(bmm_mean$Estimate, bmm_mean$Q2.5, bmm_mean$Q97.5),
+  MPTinR_aggregated = interval(mptinr$estimate, mptinr$lower, mptinr$upper)
+))
+```
+
+And the rule for every group-level parameter, the standard deviations and correlations on the probit scale:
+
+```{r}
+knitr::kable(comparison, digits = 3)
+```
+
+```{r, include = FALSE}
+kind_label <- c(mean = "group mean", sigma = "standard deviation", rho = "correlation")
+missed <- comparison[!comparison$agrees, ]
+missed_text <- paste0("the ", kind_label[missed$kind], " of `", missed$parameter, "`", collapse = ", ")
+tb_sigma <- reference$treebugs$group[reference$treebugs$group$kind == "sigma", ]
+others <- missed[!(missed$kind == "sigma" & missed$parameter == "d1"), ]
+others_text <- paste0("the ", kind_label[others$kind], " of `", others$parameter, "` differs by ",
+                      formatC(abs(others$difference), format = "f", digits = 4), " against a limit of ",
+                      formatC(others$limit, format = "f", digits = 4), collapse = ", ")
+```
+
+`r sum(comparison$agrees)` of the `r nrow(comparison)` parameters agree by the rule. Those that do not are `r missed_text`; the `bmm` estimate is the smaller one in `r sum(missed$difference < 0)` of these `r nrow(missed)`. The standard deviation of `d1` is the parameter the data say least about: its TreeBUGS posterior has a standard deviation of `r round(tb_sigma$sd[tb_sigma$par == "d1"], 2)` and a 95% interval from `r round(tb_sigma$lower[tb_sigma$par == "d1"], 2)` to `r round(tb_sigma$upper[tb_sigma$par == "d1"], 2)`. Source memory enters only the branches of recognized items, and with a recognition probability of `r round(bmm_mean$Estimate[bmm_mean$parameter == "D1"], 2)` these are few of each participant's `r unique(rowSums(freq[, -1]))` responses. Where the data say this little, the posterior follows the prior, and the TreeBUGS prior on a standard deviation is the much wider one (see [Priors]). The other misses lie close to the limit of the rule: `r others_text`.
+
+## A prior on the scale of TreeBUGS
+
+If the priors are the reason, a `bmm` fit whose prior on the standard deviations has the scale of the TreeBUGS default should close the gap. An exponential prior has its median at $\log(2)$ divided by its rate, so the rate below gives it the median of the TreeBUGS prior. The shape of the two priors still differs.
+
+```{r}
+rate <- round(log(2) / reference$prior_sigma$q50[1], 3)
+prior_wide <- brms::set_prior(paste0("exponential(", rate, ")"), class = "sd",
+                              nlpar = c("D1", "d1", "a", "b"))
+prior_wide
+```
+
+```{r fit-2htsm-wide, results = "hide", message = FALSE, warning = FALSE}
+fit_2htsm_wide <- bmm(
+  formula = formula_2htsm,
+  data = long,
+  model = model_2htsm,
+  prior = prior_wide,
+  backend = "cmdstanr",
+  cores = 4,
+  iter = 4000,
+  warmup = 1000,
+  refresh = 0,
+  seed = 20261126,
+  file = "fits/mpt_2htsm_arnold2013_widesd"
+)
+```
+
+```{r}
+divergent(fit_2htsm_wide)
+comparison_wide <- compare_with_treebugs(fit_2htsm_wide)
+knitr::kable(data.frame(
+  kind = comparison$kind,
+  parameter = comparison$parameter,
+  TreeBUGS = comparison$TreeBUGS_mean,
+  bmm_default = comparison$bmm_mean,
+  bmm_wide = comparison_wide$bmm_mean,
+  agrees_default = comparison$agrees,
+  agrees_wide = comparison_wide$agrees
+), digits = 3)
+```
+
+With the wider prior, `r sum(comparison_wide$agrees)` of the `r nrow(comparison_wide)` parameters agree with TreeBUGS by the rule. The differences in the first fit come from the priors, not from the models: both packages fit the same likelihood and the same latent-trait structure. Which prior to use is a modelling decision; the `bmm` default is the narrower one, and a TreeBUGS analysis moves to `bmm` with the same estimates only when the prior moves with it.
+
+## Participant-level probabilities
+
+The participant estimates are `getParam(fit, "theta")` in TreeBUGS, `native_parameters(fit, summary = TRUE)` in `bmm`, and the individual fits of MPTinR. For the first three participants of the data:
+
+```{r}
+shown <- reference$shown
+bmm_theta <- native_parameters(fit_2htsm, summary = TRUE)
+bmm_theta <- bmm_theta[bmm_theta$subject %in% shown, ]
+tb_theta <- reference$treebugs$individual
+tb_theta <- tb_theta[tb_theta$subject %in% shown, ]
+ml <- reference$mptinr$individual
+ml <- ml[ml$subject %in% shown, ]
+key <- function(x, par) paste(x$subject, x[[par]])
+rows <- key(ml, "par")
+knitr::kable(data.frame(
+  subject = ml$subject,
+  parameter = ml$par,
+  MPTinR = interval(ml$estimate, ml$lower, ml$upper),
+  TreeBUGS = interval(tb_theta$mean, tb_theta$lower, tb_theta$upper)[match(rows, key(tb_theta, "par"))],
+  bmm = interval(bmm_theta$Estimate, bmm_theta$Q2.5, bmm_theta$Q97.5)[match(rows, key(bmm_theta, "parameter"))]
+))
+```
+
+The two hierarchical fits give nearly the same estimates of `D1`, `a` and `b` for each participant. For `d1` they differ: the TreeBUGS intervals extend to 1 for all three participants and the `bmm` intervals are narrower, as the larger TreeBUGS standard deviation of `d1` lets the participants spread further from the group mean. The maximum-likelihood estimates of MPTinR use one participant's counts alone, so they lie further from the group, and their confidence intervals, computed from the Hessian (`?fit.mpt`), can extend below 0 or above 1. For `d1`, where each participant contributes few informative responses, MPTinR gives participant `r shown[2]` an estimate and interval of `r interval(ml$estimate, ml$lower, ml$upper)[ml$subject == shown[2] & ml$par == "d1"]`, which says nothing about the parameter; the hierarchical fits borrow strength from the other participants instead.
+
+## Goodness of fit
+
+TreeBUGS reports the posterior predictive p-values of @klauer2010 with `PPP()`: $T_1$ for the mean frequencies of the categories, $T_2$ for their covariances across participants. `ppp()` computes the same two statistics for a `bmm` fit ([Goodness of fit in the MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html#goodness-of-fit-t1-and-t2)):
+
+```{r ppp-2htsm}
+set.seed(20261126)
+ppp_2htsm <- ppp(fit_2htsm)
+ppp_2htsm
+```
+
+```{r}
+knitr::kable(data.frame(
+  statistic = c("T1", "T2"),
+  TreeBUGS = c(reference$treebugs$ppp$T1_ppp, reference$treebugs$ppp$T2_ppp),
+  bmm = ppp_2htsm$ppp
+), digits = 3)
+```
+
+TreeBUGS computed its PPP from `r reference$treebugs$ppp_M` posterior draws, `bmm` from all `r ppp_2htsm$ndraws[1]`, and both simulate the replicated data, so each PPP varies a little between runs; the seed above fixes the one printed here. Neither flags misfit. MPTinR tests the fit of the summed counts with $G^2$: $G^2(`r reference$mptinr$gof$aggregated$df`) = `r round(reference$mptinr$gof$aggregated$G.Squared, 2)`$, $p = `r round(reference$mptinr$gof$aggregated$p.value, 3)`$.
+
+# Function and argument map
+
+The worked example covered the common steps. The table maps the other functions and arguments of MPTinR and TreeBUGS onto their `bmm` counterparts; links lead to the sections of the [MPT article](https://venpopov.com/bmm/articles/bmm_mpt.html) that show them.
+
+| MPTinR / TreeBUGS | `bmm` |
+|---|---|
+| model file (EQN, MPTinR text) | `mpt_from_eqn()`, `mpt_from_string()`, or `mpt_tree()` + `mpt()` ([Importing existing model definitions](https://venpopov.com/bmm/articles/bmm_mpt.html#importing-existing-model-definitions)) |
+| wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation](https://venpopov.com/bmm/articles/bmm_mpt.html#data-format-and-simulation)) |
+| frequencies per participant only; no item effects | one row per trial with `response =` (in `mpt()`, `mpt_from_eqn()` and `mpt_from_string()`), and item effects such as `(1 | item)` ([Trial-level data and item effects](https://venpopov.com/bmm/articles/bmm_mpt.html#trial-level-data-and-item-effects)) |
+| reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_data_reshape(wide, model)`, or `mpt_data_reshape(wide, model, columns = "mptinr")` ([The data]) |
+| `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. A chain keeps its last name in `bmm` and MPTinR, its first in TreeBUGS ([The model file]). TreeBUGS' `FE` has no restriction counterpart: leave the random effect out of that parameter's formula |
+| `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model](https://venpopov.com/bmm/articles/bmm_mpt.html#specifying-an-mpt-model)) |
+| `fit.mpt()`, `betaMPT()`, `traitMPT()` | `bmm()` with the random-effect structure written in the formula (see below) |
+| `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
+| `transformedParameters` | `brms::hypothesis()`, or arithmetic on the posterior draws |
+| `getParam(fit, "theta")` | `native_parameters(fit, pars = "D", summary = TRUE)` ([Participant-level probabilities]) |
+| `getParam(fit, "mean")` of `traitMPT()` | `native_parameters(fit, re_formula = NA, summary = TRUE)`: the probability of the median participant, as in TreeBUGS ([Group-level probabilities]) |
+| `probitInverse()` | `?native_parameters`, section "Group-level effects" |
+| `genTraitMPT()`, `genBetaMPT()` | `rmpt()` inside a small simulation function ([Data format and simulation](https://venpopov.com/bmm/articles/bmm_mpt.html#data-format-and-simulation)) |
+| `PPP()` | `ppp()`: $T_1$ and $T_2$ with their posterior predictive p-values, and with `level = "participant"` the $T_1$ of each participant ([Goodness of fit]); `pp_check()` for the plot |
+| `WAIC()`, `select.mpt()` | `loo()`, `waic()` and `bayes_factor()` from **brms**; for aggregated counts read [Model comparison](https://venpopov.com/bmm/articles/bmm_mpt.html#model-comparison) before using any of them |
+| `testHetChi()`, `testHetPerm()` | these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In `bmm`, compare models with and without person effects ([Model comparison](https://venpopov.com/bmm/articles/bmm_mpt.html#model-comparison)) |
+| `BayesFactorMPT()` (non-hierarchical models), `BayesFactorSlope()` | `brms::bayes_factor()` on fits stored with `save_pars = save_pars(all = TRUE)` ([Model comparison](https://venpopov.com/bmm/articles/bmm_mpt.html#model-comparison)) |
+
+**The random-effect structure is written as a formula, not chosen from a menu.** The two families of hierarchical MPT models map onto the `|` and `||` operators, and the choice is per parameter:
+
+- `D ~ 0 + condition + (1 | participant:condition)`: independent person effects per condition with one shared standard deviation.
+- `D ~ 0 + condition + (0 + condition || participant)`: one standard deviation per condition, uncorrelated across conditions. The beta-MPT of TreeBUGS also keeps person effects independent, but across parameters and with a beta distribution on the probability scale; `bmm` has no exact counterpart to it.
+- `D ~ 0 + condition + (0 + condition | participant)`: one standard deviation per condition plus the full correlation matrix, that is, the latent-trait approach of @klauer2010.
+
+The last of these, combined with `links = "probit"`, is the model TreeBUGS fits with `traitMPT()`. Correlations *across* parameters, the defining feature of the latent-trait model, are requested with the `|p|` syntax of **brms**, as in the worked example: `D ~ 1 + (1 |p| id)` and `g ~ 1 + (1 |p| id)` share one correlation matrix. Nothing forces `D` and `g` to share a random-effect structure, and parameters that only exist in one condition can simply take `(1 | participant)`.
+
+**Priors need converting from precision to standard deviation.** JAGS parameterizes the normal distribution by precision, Stan by standard deviation, so a JAGS `dnorm(0, 0.1)` on a latent-scale parameter becomes `normal(0, 3.1623)` in `bmm` ($1/\sqrt{0.1}$). Gamma priors carry over unchanged: JAGS `dgamma(1, 0.1)` on a random-effect standard deviation is `gamma(1, 0.1)` here, since both use the shape/rate parameterization.
+
+**Group-level estimates are reported on the latent scale.** TreeBUGS reports the group means of the latent-trait model as probabilities, namely the probability of the median participant. To get there from a `bmm` fit, use `native_parameters(fit, re_formula = NA, summary = TRUE)`, as in [Group-level probabilities]; it applies the inverse link to the linear predictor, which also covers the probit link and models with predictors.
+
+**What the two packages cannot fit.** Both take one row of category frequencies per participant, so item effects and covariates that change from trial to trial have no place in them. In `bmm`, data with one row per trial take random item effects crossed with the participants, and a trial-level covariate can enter a branch expression or a parameter formula. The MPT article shows both, in [Trial-level data and item effects](https://venpopov.com/bmm/articles/bmm_mpt.html#trial-level-data-and-item-effects) and [Design-fixed covariates in branch expressions](https://venpopov.com/bmm/articles/bmm_mpt.html#design-fixed-covariates-in-branch-expressions).
+
+# References
