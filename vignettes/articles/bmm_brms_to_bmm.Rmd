@@ -491,7 +491,7 @@ if (!all(covered(glmm_par), covered(trial_par))) {
 ```
 
 For every row, each fit's estimate lies inside the other fit's 95% CrI, and
-the two estimates differ by at most `r sprintf("%.2f", largest_gap)`. Every
+the two estimates differ by at most `r sprintf("%.2f", ceiling(largest_gap * 100) / 100)`. Every
 simulated value lies inside both intervals. The intervals of the SDs are wide,
 because `r n_id` participants and `r n_item` items are few groups from which to
 estimate a spread.
