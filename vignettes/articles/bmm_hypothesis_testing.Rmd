@@ -364,6 +364,11 @@ results <- readRDS(file = "fits/hypothesis_testing_results.rds")
 sd_tab <- results$savage_dickey
 sd_lr <- subset(sd_tab, draws == 40000)
 sd_def <- subset(sd_tab, draws == 3000)
+# the text below the stability table says this call lies inside the ten-seed range
+if (bf01[2] < sd_def$min_bf01[2] || bf01[2] > sd_def$max_bf01[2]) {
+  stop("The Bayes factor of the hypothesis() call for set size 6 versus 8 lies outside ",
+       "the ten-seed range: revise the text below the Savage-Dickey stability table.")
+}
 # per-chain Savage-Dickey estimates from the 40,000-draw fit (see the local
 # long-run script); the posterior-side variability that seeds cannot show
 sd_chains <- results$savage_dickey_chains
@@ -896,6 +901,11 @@ par_sd <- par_sd[grepl("^(b|sd|r)_", par_sd$variable) & par_sd$sd > 0, ]
 n_pars <- table(factor(sub("_.*", "", par_sd$variable), levels = c("b", "sd", "r")))
 q2_long <- subset(bf_tab, comparison == "setsize_vs_null" & draws == 40000)
 q2_def <- subset(bf_tab, comparison == "setsize_vs_null" & draws == 4000)
+# the text says the 40,000-draw estimates lie inside the 4,000-draw range
+if (q2_long$min_log10_bf < q2_def$min_log10_bf || q2_long$max_log10_bf > q2_def$max_log10_bf) {
+  stop("The 40,000-draw Bayes factors no longer lie inside the 4,000-draw range: ",
+       "revise the paragraph after the bridge-sampling table.")
+}
 ```
 
 The first two rows of Table \@ref(tab:bf-table) concern Question 2. With
