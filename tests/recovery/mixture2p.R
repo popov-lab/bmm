@@ -58,8 +58,8 @@ bmmtools::validation_plan(
   bmm::mixture2p(resp_error = "y"),
   # kappa on the log scale: e^3 = 20 (SD of the memory error 0.22 rad), 1 SD
   # above the centre of the default prior (normal(2, 1), kappa 7.4); thetat at
-  # 0.8 (logit 1.39), 1.4 SD above the centre of logistic(0, 1) (0.5), a
-  # typical set-size-3 memory rate
+  # 0.8 (logit 1.39), 1.4 scale units (0.8 SD) above the centre of
+  # logistic(0, 1) (0.5), a typical set-size-3 memory rate
   pars = c(kappa = 3, thetat = stats::qlogis(0.8)),
   # between-person SDs on the link scale, 0.3 on log kappa and 0.6 on the
   # logit of thetat, moderate against the exponential(1) default prior

@@ -58,7 +58,7 @@ mpt_2htm <- bmm::mpt(
 bmmtools::validation_plan(
   mpt_2htm,
   # default priors are logistic(0, 1) on both logits, centred on p = 0.5:
-  # D = 0.7 (logit 0.85, 0.85 prior SDs of a logistic above the centre) and
+  # D = 0.7 (logit 0.85, 0.85 scale units or 0.47 prior SDs above the centre) and
   # g = 0.3 (logit -0.85, the same distance below), so neither sits at the
   # centre and the guessing rate is below the unbiased 0.5
   pars = c(D = stats::qlogis(0.7), g = stats::qlogis(0.3)),
