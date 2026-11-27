@@ -68,7 +68,7 @@ bmm's `d*`/`r*` functions or the Stan likelihood; the file header says how.
 | `mixture2p` | source drawn per trial, von Mises by rejection | 20, 50 x 30, 100, 300 | 50 | to come |
 | `mixture3p` | source (target, lure, guess) drawn per trial, von Mises by rejection | 20, 50 x 60, 150, 300 | 100 | to come |
 | `sdm` (von Mises) | inverse CDF of the density on a fine grid | 20, 50 x 30, 100, 300 | 50 | to come |
-| `sdm` (Laplace) | inverse CDF of the density on a fine grid | 20, 50 x 30, 100, 300 | 50 | waits on #732 |
+| `sdm` (Laplace) | inverse CDF of the density on a fine grid | 20, 50 x 30, 100, 300 | 50 | to come |
 | `psychometric_function` | observer with lapse and guess, cumulative normal | 20, 50 x 30, 100, 300 | 50 | to come |
 | `mpt` (2HTM) | tree walk, one uniform draw per branch point | 20, 50 x 30, 100, 300 | 50 | to come |
 | `sdt_yn` | observer: normal evidence against a criterion | 20, 50 x 30, 100, 300 | 50 | to come |
