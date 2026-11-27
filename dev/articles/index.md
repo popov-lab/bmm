@@ -35,6 +35,8 @@ n-AFC, etc)
   (M3)](https://venpopov.com/bmm/dev/articles/bmm_m3.md):
 - [Multinomial Processing Tree (MPT)
   models](https://venpopov.com/bmm/dev/articles/bmm_mpt.md):
+- [Coming from TreeBUGS or
+  MPTinR](https://venpopov.com/bmm/dev/articles/bmm_mpt_migration.md):
 
 ### Signal detection & recognition
 

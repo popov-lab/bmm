@@ -247,9 +247,9 @@ estimated as well. We will test differences between set sizes after fitting.</p>
 <code>brms</code> to also draw samples from the prior. These prior draws are needed for
 the Savage-Dickey Bayes factors in the next section. We also run each chain for
 twice as many iterations as the default and keep every second draw
-(<code>iter = 3000, thin = 2</code>). The longer chains are what helps: with the default
-settings, the sampler had not quite converged for some participant-level
-standard deviations. Keeping every second draw keeps the saved fit small.
+(<code>iter = 3000, thin = 2</code>). The longer chains help the participant-level standard
+deviations, which have the smallest effective sample sizes of all parameters
+here. Keeping every second draw keeps the saved fit small.
 Because the warmup defaults to half of <code>iter</code>, this gives 4 chains <span class="math inline">\(\times\)</span>
 (3,000 <span class="math inline">\(-\)</span> 1,500 warmup) / 2 = 3,000 posterior draws, a little fewer than the
 4,000 of the default settings. Thinning costs draws, which matters for the Bayes
@@ -267,13 +267,12 @@ thinning.</p>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">308</span>,</span>
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_hyp_m2p_setsize"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_hyp_m2p_setsize"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Before interpreting any estimate, check that the sampler converged: all
 <span class="math inline">\(\hat{R}\)</span> values should be below 1.01 and the effective sample sizes should be
 large enough (a common rule of thumb is above 400). We checked the two other
-fits of this article in the same way: their largest <span class="math inline">\(\hat{R}\)</span> is below 1.005 and
-their smallest effective sample size above 700.</p>
+fits of this article in the same way, and both pass these checks.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">draws_summary</span> <span class="op">&lt;-</span> <span class="fu">posterior</span><span class="fu">::</span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_summary.html" class="external-link">summarise_draws</a></span><span class="op">(</span></span>
 <span>  <span class="va">fit_setsize</span>, <span class="st">"rhat"</span>, <span class="st">"ess_bulk"</span>, <span class="st">"ess_tail"</span></span>
@@ -284,7 +283,7 @@ their smallest effective sample size above 700.</p>
 <span>  min_ess_tail <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="va">draws_summary</span><span class="op">$</span><span class="va">ess_tail</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;     max_rhat min_ess_bulk min_ess_tail </span></span>
-<span><span class="co">#&gt;     1.004551  1495.895184  1362.323887</span></span></code></pre></div>
+<span><span class="co">#&gt;     1.005239  1388.247257  1875.733535</span></span></code></pre></div>
 </div>
 <div class="section level2" number="3">
 <h2 id="q1">
@@ -300,10 +299,10 @@ their smallest effective sample size above 700.</p>
 <code class="sourceCode R"><span><span class="va">kappa_est</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit_setsize</span><span class="op">)</span></span>
 <span><span class="va">kappa_est</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"^kappa_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">kappa_est</span><span class="op">)</span><span class="op">)</span>, <span class="op">]</span></span>
 <span><span class="co">#&gt;                 Estimate  Est.Error     Q2.5    Q97.5</span></span>
-<span><span class="co">#&gt; kappa_set_size2 2.479168 0.08234902 2.312736 2.641521</span></span>
-<span><span class="co">#&gt; kappa_set_size4 2.022866 0.10122953 1.812519 2.216225</span></span>
-<span><span class="co">#&gt; kappa_set_size6 1.914383 0.10930230 1.685577 2.118275</span></span>
-<span><span class="co">#&gt; kappa_set_size8 1.879344 0.14212555 1.588411 2.142405</span></span></code></pre></div>
+<span><span class="co">#&gt; kappa_set_size2 2.480241 0.08389647 2.310205 2.647688</span></span>
+<span><span class="co">#&gt; kappa_set_size4 2.018618 0.09934293 1.813578 2.210255</span></span>
+<span><span class="co">#&gt; kappa_set_size6 1.914071 0.10944044 1.696821 2.123263</span></span>
+<span><span class="co">#&gt; kappa_set_size8 1.876223 0.14583055 1.578684 2.143597</span></span></code></pre></div>
 <p>The <code><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl()</a></code> call keeps the rows whose names start with <code>kappa_</code>; <code>Q2.5</code> and
 <code>Q97.5</code> are the bounds of the 95% CrI. <code>kappa</code> is
 estimated on the log scale, so these numbers are hard to read
@@ -334,8 +333,8 @@ also ask about a second, smaller contrast, set size 6 versus set size 8:</p>
 <span><span class="va">hyp</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
 <span><span class="co">#&gt;   Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star</span></span>
-<span><span class="co">#&gt; 1 ss2_vs_ss8     0.60      0.17     0.28     0.93       0.04      0.04    *</span></span>
-<span><span class="co">#&gt; 2 ss6_vs_ss8     0.04      0.18    -0.33     0.40       8.98      0.90     </span></span>
+<span><span class="co">#&gt; 1 ss2_vs_ss8     0.60      0.17     0.29     0.93       0.02      0.02    *</span></span>
+<span><span class="co">#&gt; 2 ss6_vs_ss8     0.04      0.18    -0.31     0.41       7.97      0.89     </span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.</span></span>
 <span><span class="co">#&gt; '*': For one-sided hypotheses, the posterior probability exceeds 95%;</span></span>
@@ -344,9 +343,9 @@ also ask about a second, smaller contrast, set size 6 versus set size 8:</p>
 <p>Each row describes one difference. <code>Estimate</code> is the posterior mean of the
 difference, and <code>CI.Lower</code> and <code>CI.Upper</code> are the bounds of its 95% CrI (on
 the log scale of <code>kappa</code>). For set size 2 versus 8, the difference is
-0.60, 95% CrI [0.28, 0.93]: precision is clearly higher with
+0.60, 95% CrI [0.29, 0.93]: precision is clearly higher with
 two items. For set size 6 versus 8, the difference is
-0.04, 95% CrI [-0.33, 0.40]. This interval includes zero, so
+0.04, 95% CrI [-0.31, 0.41]. This interval includes zero, so
 precision might be the same at these two set sizes, or slightly different in
 either direction.</p>
 <p>How to read the remaining columns:</p>
@@ -397,15 +396,15 @@ evidence for a difference, is simply <span class="math inline">\(1 / \text{BF}_{
 Figure 3.1: The Savage-Dickey method for the difference in log-kappa between set sizes 6 and 8. The grey curve is the prior on the difference implied by the default priors, the black curve is the posterior. The Bayes factor is the ratio of the two heights at zero (points).
 </p>
 </div>
-<p>For set size 2 versus 8, <span class="math inline">\(\text{BF}_{01}\)</span> = 0.037, so
-<span class="math inline">\(\text{BF}_{10}\)</span> = 1 / 0.037 <span class="math inline">\(\approx\)</span>
-27: by this estimate, the data are roughly
-27 times more probable if precision differs between
+<p>For set size 2 versus 8, <span class="math inline">\(\text{BF}_{01}\)</span> = 0.023, so
+<span class="math inline">\(\text{BF}_{10}\)</span> = 1 / 0.023 <span class="math inline">\(\approx\)</span>
+44: by this estimate, the data are roughly
+44 times more probable if precision differs between
 these set sizes than if it does not. This <span class="math inline">\(\text{BF}_{10}\)</span> of
-27 is too small. For a Bayes factor this far from 1,
+44 is too small. For a Bayes factor this far from 1,
 3,000 posterior draws are not enough. With 40,000 draws, the median of ten
-estimates is 101 (Section <a href="#sd-stability">3.3.1</a>). For set size 6 versus 8, <span class="math inline">\(\text{BF}_{01}\)</span> <span class="math inline">\(\approx\)</span>
-9: here the data are roughly 9 times
+estimates is 89 (Section <a href="#sd-stability">3.3.1</a>). For set size 6 versus 8, <span class="math inline">\(\text{BF}_{01}\)</span> <span class="math inline">\(\approx\)</span>
+8: here the data are roughly 8 times
 more probable if precision is the <em>same</em> at both set sizes. The interval for
 this difference could only tell us that zero is among the plausible values. The
 Bayes factor adds that the data actively favour a difference of zero over the
@@ -417,7 +416,8 @@ note below the output says).</p>
 <p><strong>Coming from p values?</strong> None of these numbers is a p value.</p>
 <ul>
 <li>
-<code>Post.Prob</code> = 0.04 in the first row does <em>not</em> mean “p = .04”. It is the
+<code>Post.Prob</code> = 0.02 in the first row does <em>not</em> mean
+“p = .02”. It is the
 probability of “no difference” after seeing the data, if “no difference” and
 “a difference” had been equally probable beforehand.</li>
 <li>A 95% CrI that excludes zero says that, given the model and the prior, the
@@ -443,18 +443,18 @@ on the scale it was sampled on, and flags any parameter left with a flat
 prior:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/prior_info.html">prior_info</a></span><span class="op">(</span><span class="va">fit_setsize</span><span class="op">)</span></span></code></pre></div>
-<pre class="fansi fansi-output"><code><span><span class="co">#&gt; Model:  Two-parameter mixture model by Zhang and Luck (2008). </span></span>
+<pre class="fansi fansi-output"><code><span><span class="co">#&gt; Model:  Two-Parameter Mixture Model </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  parameter link     class     prior          source     </span></span>
 <span><span class="co">#&gt;  kappa     log      b         normal(2, 1)   bmm default</span></span>
 <span><span class="co">#&gt;  thetat    logit    b         logistic(0, 1) bmm default</span></span>
-<span><span class="co">#&gt;  mu1       tan_half Intercept constant(0)    bmm default</span></span>
+<span><span class="co">#&gt;  mu        tan_half Intercept constant(0)    bmm default</span></span>
 <span><span class="co">#&gt;  kappa     log      sd        exponential(1) bmm default</span></span>
 <span><span class="co">#&gt;  thetat    logit    sd        exponential(1) bmm default</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Priors and constants apply on the sampling scale set by each parameter's link</span></span>
 <span><span class="co">#&gt; function.</span></span></code></pre>
-<p>(<code>mu1</code>, the centre of the response distribution, is fixed to zero by default,
+<p>(<code>mu</code>, the centre of the response distribution, is fixed to zero by default,
 shown as <code>constant(0)</code> in the table: no prior is estimated for it.)</p>
 <p>With cell-means coding, the prior on a difference is <em>implied</em> by the priors
 on the two cell means. For <code>kappa</code>, it is a normal distribution centred at
@@ -510,7 +510,7 @@ draws every time (see the next section).</p>
 <p>We repeated both tests with ten different seeds on the fit above (3,000
 posterior draws) and on a refit with 40,000 posterior draws (<code>fit_setsize_long</code>
 in Section <a href="#bridge">4.2</a>; fewer than the 65,000 to 100,000 recommended above,
-but the refit already takes about half an hour). Table
+but the refit already takes about 45 minutes). Table
 <a href="#tab:sd-stability-table">3.1</a> shows the results; they were computed once and
 stored.</p>
 <table class="table">
@@ -518,9 +518,9 @@ stored.</p>
 <span id="tab:sd-stability-table">Table 3.1: </span>Savage-Dickey Bayes factors across ten seeds, with 3,000 and 40,000 posterior draws.</caption>
 <colgroup>
 <col width="44%">
-<col width="20%">
+<col width="21%">
 <col width="15%">
-<col width="10%">
+<col width="9%">
 <col width="9%">
 </colgroup>
 <thead><tr class="header">
@@ -534,58 +534,58 @@ stored.</p>
 <tr class="odd">
 <td align="left">kappa_set_size2 - kappa_set_size8</td>
 <td align="left">3,000</td>
-<td align="left">0.0374</td>
-<td align="left">0.0365</td>
-<td align="left">0.0403</td>
+<td align="left">0.0229</td>
+<td align="left">0.0215</td>
+<td align="left">0.0238</td>
 </tr>
 <tr class="even">
 <td align="left">kappa_set_size6 - kappa_set_size8</td>
 <td align="left">3,000</td>
-<td align="left">8.08</td>
-<td align="left">7.89</td>
-<td align="left">8.70</td>
+<td align="left">8.17</td>
+<td align="left">7.67</td>
+<td align="left">8.50</td>
 </tr>
 <tr class="odd">
 <td align="left">kappa_set_size2 - kappa_set_size8</td>
 <td align="left">40,000</td>
-<td align="left">0.00989</td>
-<td align="left">0.00978</td>
-<td align="left">0.0100</td>
+<td align="left">0.0112</td>
+<td align="left">0.0111</td>
+<td align="left">0.0114</td>
 </tr>
 <tr class="even">
 <td align="left">kappa_set_size6 - kappa_set_size8</td>
 <td align="left">40,000</td>
-<td align="left">7.97</td>
-<td align="left">7.89</td>
-<td align="left">8.08</td>
+<td align="left">7.90</td>
+<td align="left">7.80</td>
+<td align="left">8.00</td>
 </tr>
 </tbody>
 </table>
 <p>For set size 6 versus 8, the number of draws hardly matters: the median
-<span class="math inline">\(\text{BF}_{01}\)</span> is 8.1 with 3,000 draws and
-8.0 with 40,000, and the ten seeds stay within
+<span class="math inline">\(\text{BF}_{01}\)</span> is 8.2 with 3,000 draws and
+7.9 with 40,000, and the ten seeds stay within
 about 10% of each other. (Our own call above, which evaluated both hypotheses
-with one seed, gave 8.98, a little above the range in the table.
-That is the size of the noise the shuffled prior draws add.)</p>
+with one seed, gave 7.97, inside the range in the table.
+The range shows the size of the noise the shuffled prior draws add.)</p>
 <p>For set size 2 versus 8, the ten seeds also agree closely with 3,000 draws:
-<span class="math inline">\(\text{BF}_{10}\)</span> ranges from 25 to
-27. With 40,000 draws, however, the median
-<span class="math inline">\(\text{BF}_{10}\)</span> is 101 (range
-100 to 102 across
-seeds), 3.8 times larger.
+<span class="math inline">\(\text{BF}_{10}\)</span> ranges from 42 to
+47. With 40,000 draws, however, the median
+<span class="math inline">\(\text{BF}_{10}\)</span> is 89 (range
+88 to 90 across
+seeds), 2.0 times larger.
 Repeating the test with different seeds cannot reveal an error of this size,
 because every repetition uses the same posterior draws, and the seeds only
 reshuffle the prior draws. The error lies in the height of the posterior at
 zero. Zero is far in the tail of this posterior: only 5 of the
-3,000 draws fall below 0.1 (50 of the 40,000), and the
+3,000 draws fall below 0.1 (45 of the 40,000), and the
 density estimate at zero rests on these few draws. From one fit to the next it
 can therefore be off by a factor of several, in either direction; the kernel
 smoothing of the density estimate adds a smaller error of its own. A check that
 needs no refit is to compute the Bayes factor separately for each chain. For the
 40,000-draw fit, the four chains of 10,000 draws give <span class="math inline">\(\text{BF}_{10}\)</span> between
-33 and
-599 around the pooled
-101, a conservative bound on the pooled
+45 and
+557 around the pooled
+89, a conservative bound on the pooled
 estimate’s error, since each chain holds a quarter of the draws. How large the
 error is only shows when you draw more.</p>
 <p>In practice: when a Savage-Dickey Bayes factor is far from 1, refit the model
@@ -606,7 +606,7 @@ items, that is, <code>kappa</code> at set size 6 should be <em>higher</em> than 
 <code class="sourceCode R"><span><span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis</a></span><span class="op">(</span><span class="va">fit_setsize</span>, <span class="st">"kappa_set_size6 &gt; kappa_set_size8"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Hypothesis Tests for class b:</span></span>
 <span><span class="co">#&gt;                 Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio Post.Prob Star</span></span>
-<span><span class="co">#&gt; 1 (kappa_set_size6)... &gt; 0     0.04      0.18    -0.26     0.33       1.39      0.58     </span></span>
+<span><span class="co">#&gt; 1 (kappa_set_size6)... &gt; 0     0.04      0.18    -0.26     0.34       1.37      0.58     </span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; 'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.</span></span>
 <span><span class="co">#&gt; '*': For one-sided hypotheses, the posterior probability exceeds 95%;</span></span>
@@ -626,8 +626,8 @@ region of values you consider practically equivalent to zero and check whether
 the CrI falls inside or outside it <span class="citation">(Kruschke 2018)</span>.
 For example, you might decide that a change of less than 0.1 in log-kappa
 (about 10% in <code>kappa</code>) is too small to matter. Applied to our set size 6 versus
-8 result, this rule says the data cannot yet decide: the CrI [-0.33, 0.40] reaches
-beyond 0.1 in both directions. The Bayes factor of 9 for
+8 result, this rule says the data cannot yet decide: the CrI [-0.31, 0.41] reaches
+beyond 0.1 in both directions. The Bayes factor of 8 for
 “no difference” does not conflict with that. It compares a difference of
 exactly zero with the large differences the default prior expected (see the box
 above), whereas the region asks whether the difference is small enough to
@@ -650,13 +650,13 @@ degrees.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">kappa_draws</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/native_parameters.html">native_parameters</a></span><span class="op">(</span><span class="va">fit_setsize</span>, pars <span class="op">=</span> <span class="st">"kappa"</span>, re_formula <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">kappa_draws</span><span class="op">)</span></span>
-<span><span class="co">#&gt;   .chain .iteration .draw set_size parameter    value</span></span>
-<span><span class="co">#&gt; 1      1          1     1        2     kappa 12.72300</span></span>
-<span><span class="co">#&gt; 2      1          2     2        2     kappa 11.32914</span></span>
-<span><span class="co">#&gt; 3      1          3     3        2     kappa 11.78669</span></span>
-<span><span class="co">#&gt; 4      1          4     4        2     kappa 10.67522</span></span>
-<span><span class="co">#&gt; 5      1          5     5        2     kappa 11.45624</span></span>
-<span><span class="co">#&gt; 6      1          6     6        2     kappa 11.68002</span></span></code></pre></div>
+<span><span class="co">#&gt;   .chain .iteration .draw set_size parameter     value</span></span>
+<span><span class="co">#&gt; 1      1          1     1        2     kappa  9.854877</span></span>
+<span><span class="co">#&gt; 2      1          2     2        2     kappa 11.966031</span></span>
+<span><span class="co">#&gt; 3      1          3     3        2     kappa 11.351758</span></span>
+<span><span class="co">#&gt; 4      1          4     4        2     kappa 11.669460</span></span>
+<span><span class="co">#&gt; 5      1          5     5        2     kappa 10.687294</span></span>
+<span><span class="co">#&gt; 6      1          6     6        2     kappa 12.438175</span></span></code></pre></div>
 <p>Each row is one posterior draw for one set size. Because these are draws, any
 quantity you want is ordinary arithmetic on them, and the summary comes last:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
@@ -680,18 +680,18 @@ quantity you want is ordinary arithmetic on them, and the summary comes last:</p
 <pre class="fansi fansi-output"><code><span><span class="co">#&gt; # A tibble: 3 × 4</span></span>
 <span><span class="co">#&gt;   name     mean lower upper</span></span>
 <span><span class="co">#&gt;   &lt;chr&gt;   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1 sd_ss2  17.0  15.6   18.5</span></span>
-<span><span class="co">#&gt; 2 sd_ss8  23.5  20.3   27.5</span></span>
-<span><span class="co">#&gt; 3 sd_diff  6.49  2.85  10.8</span></span></code></pre>
+<span><span class="co">#&gt; 1 sd_ss2  17.0  15.5   18.5</span></span>
+<span><span class="co">#&gt; 2 sd_ss8  23.5  20.3   27.7</span></span>
+<span><span class="co">#&gt; 3 sd_diff  6.54  3.00  10.8</span></span></code></pre>
 <p>The tempting shortcut is to convert the posterior means from <code><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef()</a></code>
 instead:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">kappa_means</span> <span class="op">&lt;-</span> <span class="fu">brms</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">fit_setsize</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"kappa_set_size2"</span>, <span class="st">"kappa_set_size8"</span><span class="op">)</span>, <span class="st">"Estimate"</span><span class="op">]</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff</a></span><span class="op">(</span><span class="fu"><a href="../reference/k2sd.html">k2sd</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">kappa_means</span><span class="op">)</span><span class="op">)</span> <span class="op">*</span> <span class="fl">180</span> <span class="op">/</span> <span class="va">pi</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 6.41727</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 6.466989</span></span></code></pre></div>
 <p>From set size 2 to set size 8, the imprecision of a typical participant’s
-memory grows by 6.5 degrees (posterior mean), and the shortcut
-gives 6.4 degrees. Here the two are close because the
+memory grows by 6.54 degrees (posterior mean), and the shortcut
+gives 6.47 degrees. Here the two are close because the
 posteriors are narrow, but they drift apart as posteriors get wider, for
 example with fewer trials or participants: when a conversion is not a straight
 line, the mean of the converted draws is not the conversion of the mean. Medians and quantiles survive a monotone conversion (such as
@@ -756,7 +756,7 @@ fits that claim. Whichever you choose, report it.</p>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">308</span>,</span>
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_hyp_m2p_null"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_hyp_m2p_null"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>There are two ways to compare these models: by how well each predicts new data
 (LOO) and by a Bayes factor (bridge sampling).</p>
@@ -777,7 +777,7 @@ fit with a technique called Pareto-smoothed importance sampling (PSIS)
 <span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>setsize <span class="op">=</span> <span class="va">loo_setsize</span>, null <span class="op">=</span> <span class="va">loo_null</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt;    model elpd_diff se_diff p_worse       diag_diff diag_elpd</span></span>
 <span><span class="co">#&gt;  setsize       0.0     0.0      NA                          </span></span>
-<span><span class="co">#&gt;     null      -1.5     2.7    0.71 |elpd_diff| &lt; 4</span></span>
+<span><span class="co">#&gt;     null      -1.4     2.7    0.70 |elpd_diff| &lt; 4</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Diagnostic flags present.</span></span>
 <span><span class="co">#&gt; See ?`loo-glossary` (sections `diag_diff` and `diag_elpd`)</span></span>
@@ -788,7 +788,7 @@ worse it predicts, and <code>se_diff</code> is the standard error of that differ
 <code>p_worse</code> is an approximate probability that this model predicts worse than the
 best one (not a p value), and <code>diag_diff</code> flags comparisons for which that
 approximation is unreliable (see <code><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">?loo::loo_compare</a></code>).
-Here, the <code>null</code> model predicts worse by 1.5 points,
+Here, the <code>null</code> model predicts worse by 1.4 points,
 with a standard error of 2.7, and <code>diag_diff</code> says
 <code>|elpd_diff| &lt; 4</code>, which is the tie rule below, not a problem with the data.</p>
 <p>How to read these numbers:</p>
@@ -804,7 +804,7 @@ the object). Values above 0.7 mean the approximation may be unreliable for
 those observations <span class="citation">(Vehtari et al. 2017)</span>.
 <code>loo::pareto_k_values(loo_setsize)</code> returns them. For all models in
 this article, all values are below 0.7;
-the largest is 0.50.</li>
+the largest is 0.56.</li>
 </ul>
 <p>LOO is not a likelihood-ratio test or an AIC comparison, but it plays a
 similar role: it rewards a model for predicting well and penalises it for
@@ -829,7 +829,7 @@ in the set-size model; the other three hardly change:</p>
 <span><span class="op">}</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span>setsize <span class="op">=</span> <span class="fu">sd_kappa</span><span class="op">(</span><span class="va">fit_setsize</span><span class="op">)</span>, null <span class="op">=</span> <span class="fu">sd_kappa</span><span class="op">(</span><span class="va">fit_null</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;         kappa_set_size2 kappa_set_size4 kappa_set_size6 kappa_set_size8</span></span>
-<span><span class="co">#&gt; setsize            0.31            0.30            0.16            0.22</span></span>
+<span><span class="co">#&gt; setsize            0.31            0.30            0.16            0.23</span></span>
 <span><span class="co">#&gt; null               0.54            0.28            0.17            0.21</span></span></code></pre></div>
 <p>So trial-wise LOO asks: <em>for the participants we already have</em>, does a
 population-level effect of set size improve the prediction of one of their
@@ -884,24 +884,25 @@ parameters grows. Run the estimation several times and report the range
 </ol>
 <p>The code below refits both models with 40,000 draws (4 chains with 10,000
 post-warmup iterations each), fewer than the 72,000 found sufficient above:
-the mixture model refits already take 30 to 50 minutes each, and the SDM refit
-of Question 3 about ten hours. It then runs bridge sampling ten times per model. We
+the mixture model refits already take about 45 minutes each, and the SDM refit
+of Question 3 about 70 minutes on one laptop (a rough guide, as the time depends
+on the machine). It then runs bridge sampling ten times per model. We
 show the code and load the stored results. <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">update()</a></code> refits the model with the
 new formula, which recompiles it.</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_setsize_long</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bmm.html">bmm</a></span><span class="op">(</span></span>
 <span>  formula <span class="op">=</span> <span class="va">formula_setsize</span>, data <span class="op">=</span> <span class="va">dat</span>, model <span class="op">=</span> <span class="va">model_2p</span>,</span>
 <span>  sample_prior <span class="op">=</span> <span class="st">"yes"</span>, save_pars <span class="op">=</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/save_pars.html" class="external-link">save_pars</a></span><span class="op">(</span>all <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  warmup <span class="op">=</span> <span class="fl">1000</span>, iter <span class="op">=</span> <span class="fl">11000</span>, cores <span class="op">=</span> <span class="fl">4</span>, backend <span class="op">=</span> <span class="st">"cmdstanr"</span></span>
+<span>  warmup <span class="op">=</span> <span class="fl">1000</span>, iter <span class="op">=</span> <span class="fl">11000</span>, cores <span class="op">=</span> <span class="fl">4</span>, backend <span class="op">=</span> <span class="st">"cmdstanr"</span>, seed <span class="op">=</span> <span class="fl">2026</span></span>
 <span><span class="op">)</span></span>
-<span><span class="va">fit_null_long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">fit_setsize_long</span>, formula. <span class="op">=</span> <span class="va">formula_null</span>, cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
+<span><span class="va">fit_null_long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">fit_setsize_long</span>, formula. <span class="op">=</span> <span class="va">formula_null</span>, cores <span class="op">=</span> <span class="fl">4</span>, seed <span class="op">=</span> <span class="fl">2026</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">bridge_setsize</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/bridgesampling/man/bridge_sampler.html" class="external-link">bridge_sampler</a></span><span class="op">(</span><span class="va">fit_setsize_long</span>, repetitions <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
 <span><span class="va">bridge_null</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/bridgesampling/man/bridge_sampler.html" class="external-link">bridge_sampler</a></span><span class="op">(</span><span class="va">fit_null_long</span>, repetitions <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/bridgesampling/man/bf.html" class="external-link">bayes_factor</a></span><span class="op">(</span><span class="va">bridge_setsize</span>, <span class="va">bridge_null</span><span class="op">)</span></span></code></pre></div>
 <table class="table">
 <caption>
-<span id="tab:bf-table">Table 4.1: </span>Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws. The 4,000-draw rows come from fits with the default settings and <code>save_pars = save_pars(all = TRUE)</code>; their convergence was marginal (<span class="math inline">\(\hat{R}\)</span> up to 1.010), and they are shown only for the comparison of draw counts. The SDM rows use <code>formula_sdm</code> with the same two settings.</caption>
+<span id="tab:bf-table">Table 4.1: </span>Bayes factors from bridge sampling, with 4,000 and 40,000 posterior draws. The 4,000-draw rows come from fits with the default settings and <code>save_pars = save_pars(all = TRUE)</code>; their largest <span class="math inline">\(\hat{R}\)</span> is 1.008, and they are shown only for the comparison of draw counts. The SDM rows use <code>formula_sdm</code> with the same two settings.</caption>
 <colgroup>
 <col width="30%">
 <col width="14%">
@@ -918,42 +919,42 @@ new formula, which recompiles it.</p>
 <tr class="odd">
 <td align="left">Set size effect on kappa vs. none</td>
 <td align="left">4,000</td>
-<td align="left">77</td>
-<td align="left">[58, 98]</td>
+<td align="left">56</td>
+<td align="left">[36, 80]</td>
 </tr>
 <tr class="even">
 <td align="left">Set size effect on kappa vs. none</td>
 <td align="left">40,000</td>
-<td align="left">58</td>
-<td align="left">[55, 61]</td>
+<td align="left">63</td>
+<td align="left">[59, 65]</td>
 </tr>
 <tr class="odd">
 <td align="left">SDM vs. mixture2p</td>
 <td align="left">4,000</td>
-<td align="left"><span class="math inline">\(2.3 \times 10^{9}\)</span></td>
-<td align="left">[<span class="math inline">\(1.4 \times 10^{9}\)</span>, <span class="math inline">\(3.1 \times 10^{9}\)</span>]</td>
+<td align="left"><span class="math inline">\(2.7 \times 10^{9}\)</span></td>
+<td align="left">[<span class="math inline">\(1.7 \times 10^{9}\)</span>, <span class="math inline">\(4.2 \times 10^{9}\)</span>]</td>
 </tr>
 <tr class="even">
 <td align="left">SDM vs. mixture2p</td>
 <td align="left">40,000</td>
-<td align="left"><span class="math inline">\(2.5 \times 10^{9}\)</span></td>
-<td align="left">[<span class="math inline">\(2.4 \times 10^{9}\)</span>, <span class="math inline">\(2.7 \times 10^{9}\)</span>]</td>
+<td align="left"><span class="math inline">\(2.0 \times 10^{9}\)</span></td>
+<td align="left">[<span class="math inline">\(1.9 \times 10^{9}\)</span>, <span class="math inline">\(2.2 \times 10^{9}\)</span>]</td>
 </tr>
 </tbody>
 </table>
 <p>The first two rows of Table <a href="#tab:bf-table">4.1</a> concern Question 2. With
 40,000 draws, the median Bayes factor for a set size effect on <code>kappa</code> is
-58, with a range of
-55 to 61 across
+63, with a range of
+59 to 65 across
 the ten repetitions. With 4,000 draws, the ten repetitions ranged from
-58 to 98. These
+36 to 80. These
 repetitions vary more than the Savage-Dickey seeds in Section
 <a href="#sd-stability">3.3.1</a>, because each one draws a new set of samples from the
 approximation that bridge sampling builds of the posterior. Like the seeds,
 however, all repetitions reuse the same posterior draws, so only a fit with
 more draws shows whether the estimate holds. Here the estimates from 40,000
-draws lie at or below the lower end of the range from 4,000 draws.</p>
-<p>By the median estimate, the data are 58 times
+draws lie inside the range from 4,000 draws and are much less spread out.</p>
+<p>By the median estimate, the data are 63 times
 more probable under the model with a population-level effect of set size on <code>kappa</code>
 than under the balanced null model, whereas trial-wise LOO found the two models
 tied. This is not a contradiction. LOO asked whether the population-level
@@ -1022,7 +1023,7 @@ parameter per set size, and the same random effects.</p>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">308</span>,</span>
 <span>  refresh <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_hyp_sdm"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_hyp_sdm"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>As in Question 1, we look at the estimates first, here on the native scale:</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
@@ -1030,23 +1031,23 @@ parameter per set size, and the same random effects.</p>
 <span>  <span class="va">fit_sdm</span>, pars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"c"</span>, <span class="st">"kappa"</span><span class="op">)</span>, re_formula <span class="op">=</span> <span class="cn">NA</span>, summary <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;   set_size parameter Estimate Est.Error     Q2.5    Q97.5</span></span>
-<span><span class="co">#&gt; 1        2         c 6.913362 0.5621433 5.895038 8.080387</span></span>
-<span><span class="co">#&gt; 2        4         c 4.087181 0.2985485 3.526915 4.711906</span></span>
-<span><span class="co">#&gt; 3        6         c 2.253804 0.2234709 1.849569 2.713827</span></span>
-<span><span class="co">#&gt; 4        8         c 1.592384 0.1712595 1.262558 1.945623</span></span>
-<span><span class="co">#&gt; 5        2     kappa 3.239417 0.2104321 2.843895 3.643891</span></span>
-<span><span class="co">#&gt; 6        4     kappa 3.183455 0.2604547 2.672434 3.693830</span></span>
-<span><span class="co">#&gt; 7        6     kappa 3.741347 0.4150244 2.966770 4.611514</span></span>
-<span><span class="co">#&gt; 8        8     kappa 4.250464 0.6043214 3.090018 5.517396</span></span></code></pre></div>
+<span><span class="co">#&gt; 1        2         c 6.914993 0.5559411 5.922187 8.071634</span></span>
+<span><span class="co">#&gt; 2        4         c 4.084762 0.2971402 3.535235 4.701716</span></span>
+<span><span class="co">#&gt; 3        6         c 2.255846 0.2267384 1.836518 2.717986</span></span>
+<span><span class="co">#&gt; 4        8         c 1.603668 0.1737408 1.278632 1.962779</span></span>
+<span><span class="co">#&gt; 5        2     kappa 3.240268 0.2153187 2.834745 3.674015</span></span>
+<span><span class="co">#&gt; 6        4     kappa 3.188002 0.2688092 2.669362 3.727535</span></span>
+<span><span class="co">#&gt; 7        6     kappa 3.733695 0.4170107 2.969296 4.604326</span></span>
+<span><span class="co">#&gt; 8        8     kappa 4.224904 0.5817787 3.094882 5.440531</span></span></code></pre></div>
 <p>For comparison, here is the probability that the cued item is in memory
 according to the mixture model, converted from <code>thetat</code>:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/native_parameters.html">native_parameters</a></span><span class="op">(</span><span class="va">fit_setsize</span>, pars <span class="op">=</span> <span class="st">"thetat"</span>, re_formula <span class="op">=</span> <span class="cn">NA</span>, summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   set_size parameter  Estimate  Est.Error      Q2.5     Q97.5</span></span>
-<span><span class="co">#&gt; 1        2    thetat 0.9288796 0.02013354 0.8830714 0.9616512</span></span>
-<span><span class="co">#&gt; 2        4    thetat 0.6908174 0.03292112 0.6227316 0.7521342</span></span>
-<span><span class="co">#&gt; 3        6    thetat 0.4154920 0.04336372 0.3327452 0.5021654</span></span>
-<span><span class="co">#&gt; 4        8    thetat 0.2978956 0.03379370 0.2311389 0.3650685</span></span></code></pre></div>
+<span><span class="co">#&gt; 1        2    thetat 0.9285242 0.01953539 0.8839946 0.9611327</span></span>
+<span><span class="co">#&gt; 2        4    thetat 0.6918928 0.03461514 0.6206948 0.7588297</span></span>
+<span><span class="co">#&gt; 3        6    thetat 0.4154836 0.04258071 0.3297266 0.4974276</span></span>
+<span><span class="co">#&gt; 4        8    thetat 0.2986291 0.03441277 0.2321293 0.3685363</span></span></code></pre></div>
 <p>In the SDM, larger set sizes mainly reduce the memory strength <code>c</code>, whereas
 <code>kappa</code> does not decrease. (The SDM’s <code>kappa</code> sets the width of the activation
 on the wheel, not the precision of a remembered item as in the mixture model,
@@ -1060,16 +1061,16 @@ accuracy in the same way as in Question 2:</p>
 <span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mixture2p <span class="op">=</span> <span class="va">loo_setsize</span>, sdm <span class="op">=</span> <span class="va">loo_sdm</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt;      model elpd_diff se_diff p_worse diag_diff diag_elpd</span></span>
 <span><span class="co">#&gt;        sdm       0.0     0.0      NA                    </span></span>
-<span><span class="co">#&gt;  mixture2p     -28.3     6.7    1.00</span></span></code></pre>
+<span><span class="co">#&gt;  mixture2p     -28.6     6.7    1.00</span></span></code></pre>
 <p>The <code>sdm</code> model predicts better than the <code>mixture2p</code> model,
-by 28.3 elpd points with a standard error of
-6.7. The difference is 4.2 times its
+by 28.6 elpd points with a standard error of
+6.7. The difference is 4.3 times its
 standard error, a clear difference in predictive accuracy.</p>
 <p>Can we also compute a Bayes factor? Bridge sampling works for models that are
 not nested, and the last two rows of Table <a href="#tab:bf-table">4.1</a> show the
 estimates. With 40,000 draws, the median Bayes factor in favour of the SDM is
-<span class="math inline">\(2.5 \times 10^{9}\)</span> (range <span class="math inline">\(2.4 \times 10^{9}\)</span>
-to <span class="math inline">\(2.7 \times 10^{9}\)</span>), so it agrees with LOO, and the
+<span class="math inline">\(2.0 \times 10^{9}\)</span> (range <span class="math inline">\(1.9 \times 10^{9}\)</span>
+to <span class="math inline">\(2.2 \times 10^{9}\)</span>), so it agrees with LOO, and the
 repetitions agree on the order of magnitude. Before reading anything into its
 size, though, consider what it compares. The two models
 have different parameters (<code>thetat</code> versus <code>c</code>), and even the parameter they
@@ -1154,17 +1155,17 @@ fine. For example, the results of Questions 1 and 3 could be reported as
 follows:</p>
 <blockquote>
 <p>Memory precision was lower at set size 8 than at set size 2 (difference in
-log-kappa: 0.60, 95% CrI [0.28, 0.93]). On the native scale,
+log-kappa: 0.60, 95% CrI [0.29, 0.93]). On the native scale,
 the circular standard deviation of memory grew by 6.5
-degrees, 95% CrI [2.8,
+degrees, 95% CrI [3.0,
 10.8]. A Savage-Dickey
 Bayes factor, computed against the implied prior
 <span class="math inline">\(\mathcal{N}(0, 1.41^2)\)</span> on this difference, favoured a difference,
-<span class="math inline">\(\text{BF}_{10}\)</span> = 101 (40,000 posterior
-draws; 33 to
-599 across the four chains).
+<span class="math inline">\(\text{BF}_{10}\)</span> = 89 (40,000 posterior
+draws; 45 to
+557 across the four chains).
 The signal discrimination model predicted the responses better than
-the two-parameter mixture model (<span class="math inline">\(\Delta\text{elpd}\)</span> = 28.3,
+the two-parameter mixture model (<span class="math inline">\(\Delta\text{elpd}\)</span> = 28.6,
 SE = 6.7; all Pareto <span class="math inline">\(k\)</span> &lt; 0.7).</p>
 </blockquote>
 <p>For the methods section, <code>prior_info(fit, format = "text")</code> writes the

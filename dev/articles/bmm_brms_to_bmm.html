@@ -94,12 +94,13 @@ translates between the two packages.</p>
 <p>We fit one model twice: once in plain <code>brms</code>, once with <code>bmm</code>. The model is the
 two-parameter mixture model for continuous reproduction tasks
 <span class="citation">(Zhang and Luck 2008)</span>, which <code>brms</code> can express with its built-in mixture family.
-Both fits run the same Stan model, so they give the same estimates. With that
-established, the rest of the article explains each difference in the code: where
-the response went, why every parameter gets its own formula, what
-<code>0 + setsize</code> and <code>1 + setsize</code> each give you, which scale the estimates are on,
-and why <code>bmm</code> sets informative default priors. A later section does the same
-comparison for signal detection:
+Both fits have the same likelihood and the same priors, so they give the same
+estimates up to the noise of the sampler. With that established, the rest of
+the article explains each difference in the code: where the response went,
+why every parameter gets its own formula, what <code>0 + setsize</code> and <code>1 + setsize</code>
+each give you, which scale the estimates are on, and why <code>bmm</code> sets
+informative default priors. A later section does the same comparison for signal
+detection:
 <a href="#signal-detection-as-a-probit-glmm">trial-level <code>sdt_yn()</code> against a probit generalized linear mixed model</a>.</p>
 </div>
 <div class="section level2" number="2">
@@ -169,8 +170,9 @@ distribution. Constant priors do the fixing:</p>
 <span>  data <span class="op">=</span> <span class="va">dat</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>adapt_delta <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">681</span>,</span>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/brmsfit_brms_to_bmm"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/brmsfit_brms_to_bmm"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p><code>kappa2</code> is fixed at -100 because <code>brms</code> estimates <code>kappa</code> on the log scale, and
 <code>exp(-100)</code> is as close to zero as anyone needs. At the default <code>adapt_delta</code>
@@ -198,8 +200,9 @@ We come back to them in
 <span>  model <span class="op">=</span> <span class="fu"><a href="../reference/mixture2p.html">mixture2p</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">"response_error"</span><span class="op">)</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>adapt_delta <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">681</span>,</span>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_brms_to_bmm"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_brms_to_bmm"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>The constraints are gone from the code. <code><a href="../reference/mixture2p.html">mixture2p()</a></code> knows that the locations
 are 0, that the second component is the guessing distribution, and which priors
@@ -210,23 +213,22 @@ weight of the memory responses (the <code>t</code> stands for target), depend on
 <h3 id="same-model-same-estimates">
 <span class="header-section-number">2.4</span> Same model, same estimates<a class="anchor" aria-label="anchor" href="#same-model-same-estimates"></a>
 </h3>
-<p><code>bmm</code> translates its formula into a <code>brmsformula</code>, and <code>brms</code> writes the Stan
-model from that. You can look at the formula <code>bmm</code> generated:</p>
+<p><code>bmm</code> translates its formula into a <code>brmsformula</code> and passes it to <code>brms</code>,
+which writes the Stan model. You can look at the formula <code>bmm</code> generated:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bmm_fit</span><span class="op">$</span><span class="va">formula</span></span>
 <span><span class="co">#&gt; response_error ~ 1 </span></span>
-<span><span class="co">#&gt; mu1 ~ 1</span></span>
+<span><span class="co">#&gt; mu ~ 1</span></span>
 <span><span class="co">#&gt; kappa ~ 0 + setsize + (1 | subID)</span></span>
-<span><span class="co">#&gt; thetat ~ 0 + setsize + (1 | subID)</span></span>
-<span><span class="co">#&gt; kappa2 ~ 1</span></span>
-<span><span class="co">#&gt; mu2 ~ 1</span></span>
-<span><span class="co">#&gt; kappa1 ~ kappa</span></span>
-<span><span class="co">#&gt; theta1 ~ thetat</span></span></code></pre></div>
-<p><code>kappa</code> and <code>thetat</code> are non-linear parameters that <code>bmm</code> passes on to <code>kappa1</code>
-and <code>theta1</code>. <code>mu1</code>, <code>mu2</code> and <code>kappa2</code> are fixed with constant priors, as in
-the <code>brms</code> call. Apart from the parameter names, the Stan code of the two fits
-is the same program with the same priors, so the posteriors agree up to the
-noise of the sampler. Both columns are on the link scale, log <code>kappa</code> and logit
+<span><span class="co">#&gt; thetat ~ 0 + setsize + (1 | subID)</span></span></code></pre></div>
+<p><code>kappa</code> and <code>thetat</code> are parameters of a family that <code>bmm</code> defines itself,
+and <code>mu</code>, the location of the memory responses, is fixed at 0. <code>brms</code> does not
+know this family, so <code>bmm</code> adds the Stan code of its likelihood: a mixture of a
+von Mises distribution centered on the target and a uniform distribution for
+the guesses. The <code>brms</code> call above writes the same likelihood with two von
+Mises components, the second one flat. The two Stan programs differ, but the
+likelihood and the priors are the same, so the posteriors agree up to the noise
+of the sampler. Both columns are on the link scale, log <code>kappa</code> and logit
 <code>thetat</code>, which we explain <a href="#which-scale-the-estimates-are-on">below</a>:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">brms_est</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">brms_fit</span><span class="op">)</span></span>
@@ -263,56 +265,62 @@ noise of the sampler. Both columns are on the link scale, log <code>kappa</code>
 <td align="left">kappa</td>
 <td align="left">1</td>
 <td align="left">2.81 [2.69, 2.93]</td>
-<td align="left">2.81 [2.69, 2.92]</td>
+<td align="left">2.81 [2.69, 2.93]</td>
 </tr>
 <tr class="even">
 <td align="left">kappa</td>
 <td align="left">2</td>
-<td align="left">2.22 [2.10, 2.35]</td>
-<td align="left">2.23 [2.10, 2.35]</td>
+<td align="left">2.22 [2.09, 2.35]</td>
+<td align="left">2.22 [2.09, 2.35]</td>
 </tr>
 <tr class="odd">
 <td align="left">kappa</td>
 <td align="left">3</td>
-<td align="left">1.98 [1.82, 2.14]</td>
+<td align="left">1.99 [1.83, 2.14]</td>
 <td align="left">1.99 [1.83, 2.14]</td>
 </tr>
 <tr class="even">
 <td align="left">kappa</td>
 <td align="left">6</td>
-<td align="left">1.87 [1.58, 2.16]</td>
-<td align="left">1.87 [1.57, 2.15]</td>
+<td align="left">1.87 [1.58, 2.15]</td>
+<td align="left">1.87 [1.58, 2.17]</td>
 </tr>
 <tr class="odd">
 <td align="left">thetat</td>
 <td align="left">1</td>
-<td align="left">5.04 [4.13, 6.26]</td>
-<td align="left">5.06 [4.08, 6.32]</td>
+<td align="left">5.03 [4.06, 6.18]</td>
+<td align="left">5.04 [4.09, 6.26]</td>
 </tr>
 <tr class="even">
 <td align="left">thetat</td>
 <td align="left">2</td>
-<td align="left">2.77 [2.28, 3.23]</td>
-<td align="left">2.77 [2.32, 3.22]</td>
+<td align="left">2.77 [2.31, 3.24]</td>
+<td align="left">2.77 [2.27, 3.23]</td>
 </tr>
 <tr class="odd">
 <td align="left">thetat</td>
 <td align="left">3</td>
-<td align="left">1.53 [1.11, 1.92]</td>
-<td align="left">1.54 [1.14, 1.90]</td>
+<td align="left">1.53 [1.13, 1.91]</td>
+<td align="left">1.53 [1.11, 1.91]</td>
 </tr>
 <tr class="even">
 <td align="left">thetat</td>
 <td align="left">6</td>
-<td align="left">-0.60 [-1.02, -0.24]</td>
-<td align="left">-0.59 [-0.99, -0.27]</td>
+<td align="left">-0.60 [-1.03, -0.24]</td>
+<td align="left">-0.60 [-1.03, -0.26]</td>
 </tr>
 </tbody>
 </table>
-<p>For this model, <code>bmm</code> adds nothing to the Stan program. It writes the <code>brms</code>
-code, checks the data, and picks priors and starting values that suit the
-model. For models that <code>brms</code> has no family for, such as <code><a href="../reference/sdm.html">sdm()</a></code> or
-<code><a href="../reference/cswald.html">cswald()</a></code>, <code>bmm</code> also supplies the Stan code of the likelihood.</p>
+<p>Why does <code>bmm</code> bring its own family when the <code>brms</code> mixture family fits this
+model? Its family also covers versions of the model that a <code>brms</code> mixture
+cannot write: the capacity versions (<code>version = "slot"</code> and
+<code>"slot_averaging"</code>), in which the probability of a memory response follows
+from a capacity <code>K</code> and the set size, and variable precision
+(<code>variable_precision = TRUE</code>), in which the precision of memory varies from
+trial to trial. <code><a href="../reference/mixture2p.html">?mixture2p</a></code> describes them. Besides the likelihood, <code>bmm</code>
+writes the <code>brms</code> code, checks the data, and picks priors and starting values
+that suit the model, as it does for models that <code>brms</code> has no family for at
+all, such as <code><a href="../reference/sdm.html">sdm()</a></code> or <code><a href="../reference/cswald.html">cswald()</a></code>.</p>
 </div>
 </div>
 <div class="section level2" number="3">
@@ -660,7 +668,7 @@ from, each as the posterior mean and its 95% credible interval (CrI). The
 </tbody>
 </table>
 <p>For every row, each fit’s estimate lies inside the other fit’s 95% CrI, and
-the two estimates differ by at most 0.04. Every
+the two estimates differ by at most 0.05. Every
 simulated value lies inside both intervals. The intervals of the SDs are wide,
 because 30 participants and 60 items are few groups from which to
 estimate a spread.</p>
@@ -787,14 +795,15 @@ the coefficients:</p>
 <span>  model <span class="op">=</span> <span class="fu"><a href="../reference/mixture2p.html">mixture2p</a></span><span class="op">(</span>resp_error <span class="op">=</span> <span class="st">"response_error"</span><span class="op">)</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>adapt_delta <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">681</span>,</span>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"assets/bmmfit_brms_to_bmm_reference"</span></span>
+<span>  file <span class="op">=</span> <span class="st">"fits/bmmfit_brms_to_bmm_reference"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="external-link">fixef</a></span><span class="op">(</span><span class="va">bmm_fit_ref</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"kappa_Intercept"</span>, <span class="st">"kappa_setsize6"</span><span class="op">)</span>, <span class="op">]</span></span>
-<span><span class="co">#&gt;                   Estimate  Est.Error      Q2.5      Q97.5</span></span>
-<span><span class="co">#&gt; kappa_Intercept  2.8105353 0.06038921  2.694992  2.9271767</span></span>
-<span><span class="co">#&gt; kappa_setsize6  -0.9254779 0.15041941 -1.222528 -0.6306745</span></span>
+<span><span class="co">#&gt;                  Estimate  Est.Error      Q2.5      Q97.5</span></span>
+<span><span class="co">#&gt; kappa_Intercept  2.811732 0.06189117  2.689923  2.9343583</span></span>
+<span><span class="co">#&gt; kappa_setsize6  -0.926667 0.15239452 -1.219430 -0.6323925</span></span>
 <span></span>
 <span><span class="va">draws_ref</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df</a></span><span class="op">(</span><span class="va">bmm_fit_ref</span><span class="op">)</span></span>
 <span><span class="va">draws_cell</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df</a></span><span class="op">(</span><span class="va">bmm_fit</span><span class="op">)</span></span>
@@ -805,8 +814,8 @@ the coefficients:</p>
 <span>  `0 + setsize` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">kappa6_cell</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.025</span>, <span class="fl">0.5</span>, <span class="fl">0.975</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;                 2.5%      50%    97.5%</span></span>
-<span><span class="co">#&gt; 1 + setsize 1.596731 1.883600 2.176051</span></span>
-<span><span class="co">#&gt; 0 + setsize 1.570206 1.869862 2.153408</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 + setsize 1.593512 1.883484 2.175504</span></span>
+<span><span class="co">#&gt; 0 + setsize 1.583832 1.875491 2.166188</span></span></code></pre></div>
 <p>Add the coefficients draw by draw, as above, and summarize afterwards. The draws
 carry the uncertainty of each coefficient and how the coefficients covary, which
 adding the two point estimates loses. The reverse also works: a difference
@@ -842,26 +851,26 @@ side by side:</p>
 <tr class="odd">
 <td align="left">kappa</td>
 <td align="left">1</td>
-<td align="left">16.63 [14.74, 18.60]</td>
-<td align="left">16.65 [14.81, 18.67]</td>
+<td align="left">16.64 [14.67, 18.70]</td>
+<td align="left">16.67 [14.73, 18.81]</td>
 </tr>
 <tr class="even">
 <td align="left">kappa</td>
 <td align="left">2</td>
-<td align="left">9.28 [8.15, 10.53]</td>
-<td align="left">9.27 [8.09, 10.51]</td>
+<td align="left">9.27 [8.07, 10.53]</td>
+<td align="left">9.27 [8.12, 10.56]</td>
 </tr>
 <tr class="odd">
 <td align="left">kappa</td>
 <td align="left">3</td>
-<td align="left">7.31 [6.26, 8.49]</td>
-<td align="left">7.31 [6.26, 8.46]</td>
+<td align="left">7.31 [6.24, 8.52]</td>
+<td align="left">7.31 [6.22, 8.49]</td>
 </tr>
 <tr class="even">
 <td align="left">kappa</td>
 <td align="left">6</td>
-<td align="left">6.54 [4.81, 8.61]</td>
-<td align="left">6.66 [4.94, 8.81]</td>
+<td align="left">6.58 [4.87, 8.72]</td>
+<td align="left">6.66 [4.92, 8.81]</td>
 </tr>
 <tr class="odd">
 <td align="left">thetat</td>
@@ -878,13 +887,13 @@ side by side:</p>
 <tr class="odd">
 <td align="left">thetat</td>
 <td align="left">3</td>
-<td align="left">0.82 [0.76, 0.87]</td>
-<td align="left">0.83 [0.76, 0.88]</td>
+<td align="left">0.82 [0.75, 0.87]</td>
+<td align="left">0.83 [0.77, 0.88]</td>
 </tr>
 <tr class="even">
 <td align="left">thetat</td>
 <td align="left">6</td>
-<td align="left">0.36 [0.27, 0.43]</td>
+<td align="left">0.36 [0.26, 0.44]</td>
 <td align="left">0.36 [0.28, 0.45]</td>
 </tr>
 </tbody>
@@ -897,10 +906,10 @@ participant; <code><a href="../reference/native_parameters.html">?native_paramet
 average under a non-identity link.</p>
 <p>On the scale of the model, the two codings give practically the same estimates.
 In every cell, the estimates of the two fits differ by less than
-1.8% of the <code>0 + setsize</code> estimate; the
-largest gap is kappa at set size
-6, 6.54 against
-6.66. Pick the coding whose
+2.5% of the <code>0 + setsize</code> estimate; the
+largest gap is thetat at set size
+6, 0.355 against
+0.364. Pick the coding whose
 coefficients you want to read.</p>
 <p>What the coding does change is the default prior of each coefficient. <code>bmm</code>
 sets its default priors per coefficient, and the value of a parameter in one
@@ -908,22 +917,27 @@ cell is a different quantity from the difference between two cells: the first
 lies somewhere in the plausible range of the parameter, the second is centered
 on zero. With <code>0 + setsize</code>, every coefficient is a cell, so every one gets the
 prior for the parameter itself, normal(2, 1) for <code>kappa</code> on the log scale
-and logistic(0, 1) for <code>thetat</code>. With <code>1 + setsize</code>, only the intercept,
-the reference cell, gets that prior. The differences get the prior for effects,
-normal(0, 1) for <code>kappa</code> and normal(0, 2.5) for <code>thetat</code>. Any
-other cell is the intercept plus a difference, so its prior is that of a sum of
-two independent coefficients. For <code>kappa</code>, the two normal priors add up to
-normal(2, 1.41), whose standard deviation is the square root of
-1² + 1²: wider than the normal(2, 1) that
-the same cell gets with <code>0 + setsize</code>. With this data set, the table above shows
-that the difference barely matters. The table hides one exception, visible only
+and logistic(0, 1) for <code>thetat</code>. With <code>1 + setsize</code>, the differences get
+the prior for effects, normal(0, 1) for <code>kappa</code> and
+normal(0, 2.5) for <code>thetat</code>. The prior for the parameter itself,
+normal(2, 1), does not go on the reference cell, though. Like <code>brms</code>,
+<code>bmm</code> centers the predictors before fitting, so that prior applies to the
+intercept of the centered predictors, which in this balanced design is the
+average of log <code>kappa</code> over the four set sizes. The intercept in the summary is
+still the reference cell: that average minus a quarter of each difference. The
+prior of every cell therefore comes from both priors. For <code>kappa</code> it is a
+normal with standard deviation 1.09 at set size 1
+and 1.30 at the other set sizes, wider than the
+standard deviation of 1 that every cell gets with
+<code>0 + setsize</code>. With this data set, the table above shows that the difference
+barely matters. The table hides one exception, visible only
 on the logit scale: <code>thetat</code> at set size 1. Near a probability of 1, the data
 say little about the logit, and with <code>1 + setsize</code> the effects prior, centered
 on zero, pulls the reference cell towards the other set sizes. On the logit
 scale, the two fits estimate <code>thetat</code> at set size 1 as
-5.06 and 4.70,
+5.04 and 4.85,
 and the set-size differences of <code>thetat</code> differ by up to
-0.42 logits. With fewer trials per cell, the
+0.25 logits. With fewer trials per cell, the
 priors carry more weight, and the two codings can give different estimates. So
 check <code><a href="../reference/default_prior.bmmformula.html">default_prior()</a></code> for the coding you use, as shown in <a href="#why-the-default-priors-are-informative">the section on
 priors</a>, and set your own priors if the
@@ -942,8 +956,8 @@ values or as differences from the reference cell.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">bmm_fit</span><span class="op">)</span></span></code></pre></div>
 <pre class="fansi fansi-output"><code><span style="color: #AF5FFF;">  Model: </span><span style="color: #FF875F;">mixture2p</span>(resp_error = "response_error") 
-<span style="color: #AF5FFF;">  Links: </span>mu1 = tan_half; kappa = log; thetat = logit 
-<span style="color: #AF5FFF;">Formula: </span>mu1 = 0
+<span style="color: #AF5FFF;">  Links: </span>mu = tan_half; kappa = log; thetat = logit 
+<span style="color: #AF5FFF;">Formula: </span>mu = 0
          kappa ~ 0 + setsize + (1 | subID)
          thetat ~ 0 + setsize + (1 | subID) 
 <span style="color: #AF5FFF;">   Data:</span> dat (Number of observations: 4000)
@@ -953,23 +967,23 @@ values or as differences from the reference cell.</p>
 <span style="color: #00BB00;">Multilevel Hyperparameters:
 </span>~subID (Number of levels: 8) 
                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-sd(kappa_Intercept)      0.09      0.06     0.01     0.23 1.01      675     1420
-sd(thetat_Intercept)     0.39      0.16     0.17     0.77 1.00     1236     1794
+sd(kappa_Intercept)      0.09      0.06     0.01     0.24 1.01     1009     1591
+sd(thetat_Intercept)     0.40      0.17     0.17     0.82 1.00     1333     1804
 
 <span style="color: #00BB00;">Regression Coefficients:
 </span>                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-kappa_setsize1      2.81      0.06     2.69     2.92 1.00     2722     2078
-kappa_setsize2      2.23      0.07     2.10     2.35 1.00     2361     2233
-kappa_setsize3      1.99      0.08     1.83     2.14 1.00     3120     2769
-kappa_setsize6      1.87      0.15     1.57     2.15 1.00     2948     2364
-thetat_setsize1     5.06      0.56     4.08     6.32 1.00     3247     2143
-thetat_setsize2     2.77      0.23     2.32     3.22 1.00     2053     2104
-thetat_setsize3     1.54      0.19     1.14     1.90 1.00     1648     1481
-thetat_setsize6    -0.59      0.19    -0.99    -0.27 1.00     1602     1516
+kappa_setsize1      2.81      0.06     2.69     2.93 1.00     1940     1440
+kappa_setsize2      2.22      0.07     2.09     2.35 1.00     2071     1819
+kappa_setsize3      1.99      0.08     1.83     2.14 1.00     2359     2101
+kappa_setsize6      1.87      0.15     1.58     2.17 1.00     3294     2287
+thetat_setsize1     5.04      0.54     4.09     6.26 1.00     3003     2142
+thetat_setsize2     2.77      0.24     2.27     3.23 1.00     1709     1758
+thetat_setsize3     1.53      0.20     1.11     1.91 1.00     1378     1218
+thetat_setsize6    -0.60      0.19    -1.03    -0.26 1.00     1308     1371
 
 <span style="color: #00BB00;">Constant Parameters:
-</span>                  Value
-mu1_Intercept      0.00
+</span>                 Value
+mu_Intercept      0.00
 
 Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
 and Tail_ESS are effective sample size measures, and Rhat is the potential
@@ -978,10 +992,9 @@ scale reduction factor on split chains (at convergence, Rhat = 1).
 <p><code>kappa</code> must be positive, and <code>thetat</code> turns into a probability. Neither can be
 predicted by a linear model directly, so <code>bmm</code> estimates them on an unbounded
 scale and transforms them back. <code>kappa</code> has a log link, so the coefficients are
-log precisions. <code>thetat</code> has a logit link. <code>brms</code> fixes the weight of the
-second, guessing component (<code>theta2</code>) at 0 on this scale, so a <code>thetat</code> of 0
-means that memory and guessing are equally likely, and the probability that a
-response comes from memory is <code>plogis(thetat)</code>. Every coefficient in the
+log precisions. <code>thetat</code> has a logit link: the probability that a response
+comes from memory is <code>plogis(thetat)</code>, so a <code>thetat</code> of 0 means that memory and
+guessing are equally likely. Every coefficient in the
 summary, every prior, and every value you fix a parameter to lives on this link
 scale.</p>
 <p>To report a parameter on its own scale, transform the draws and summarize
@@ -993,7 +1006,7 @@ afterwards, not the other way around. The mean of <code><a href="https://rdrr.io
 <span>  `mean(exp)` <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">kappa6_cell</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt; exp(mean) mean(exp) </span></span>
-<span><span class="co">#&gt;  6.475063  6.543754</span></span></code></pre></div>
+<span><span class="co">#&gt;  6.508365  6.578416</span></span></code></pre></div>
 <p><code><a href="../reference/native_parameters.html">native_parameters()</a></code>, used above, follows this order for every parameter. For
 the mixture models, <code><a href="../reference/k2sd.html">k2sd()</a></code> converts <code>kappa</code> into the circular standard
 deviation in radians, which is the measure of precision many papers report:</p>
@@ -1002,7 +1015,7 @@ deviation in radians, which is the measure of precision many papers report:</p>
 <span><span class="va">sd_deg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/k2sd.html">k2sd</a></span><span class="op">(</span><span class="va">kappa_draws</span><span class="op">$</span><span class="va">value</span><span class="op">)</span> <span class="op">*</span> <span class="fl">180</span> <span class="op">/</span> <span class="va">pi</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">sd_deg</span>, <span class="va">kappa_draws</span><span class="op">$</span><span class="va">setsize</span>, <span class="va">median</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        1        2        3        6 </span></span>
-<span><span class="co">#&gt; 14.27673 19.38314 22.02748 23.50076</span></span></code></pre></div>
+<span><span class="co">#&gt; 14.27779 19.38580 22.03948 23.42801</span></span></code></pre></div>
 <p>A coefficient on its own transforms to something else. With <code>1 + setsize</code>,
 <code>exp(b_kappa_setsize6)</code> is the factor by which <code>kappa</code> at set size 6 is larger
 or smaller than at set size 1, not <code>kappa</code> at set size 6. The help page of each
@@ -1133,10 +1146,11 @@ the help page of the model, which lists them.</li>
 <li>If you know more than the defaults, or something different, set your own
 priors with <code>prior =</code> in <code><a href="../reference/bmm.html">bmm()</a></code>. They are <code>brms</code> priors on the <code>bmm</code>
 parameter names, with <code>nlpar</code> or <code>dpar</code> as <code><a href="../reference/default_prior.bmmformula.html">default_prior()</a></code> shows it, for
-example <code>prior(normal(1.5, 0.5), class = b, nlpar = kappa)</code>, again on the log
+example <code>prior(normal(1.5, 0.5), class = b, dpar = kappa)</code>, again on the log
 scale. With <code>0 + setsize</code>, this sets the prior of every cell of <code>kappa</code>. With
-<code>1 + setsize</code>, it sets the prior of the differences only; the intercept takes
-<code>coef = "Intercept"</code>, as <code><a href="../reference/default_prior.bmmformula.html">default_prior()</a></code> shows for that coding. The
+<code>1 + setsize</code>, it sets the prior of the differences only. The intercept takes
+<code>class = Intercept</code>, as <code><a href="../reference/default_prior.bmmformula.html">default_prior()</a></code> shows for that coding, and that
+prior applies to the centered intercept, not to the reference cell. The
 <a href="https://venpopov.com/bmm/articles/bmm_extract_info.html">article on extracting model information</a>
 shows the details.</li>
 <li>Bayes factors depend on the priors much more than estimates do. If you plan to
@@ -1152,8 +1166,9 @@ on it: <code><a href="https://rdrr.io/pkg/nlme/man/fixed.effects.html" class="ex
 <code><a href="../reference/conditional_effects.bmmfit.html">conditional_effects()</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html" class="external-link">hypothesis()</a></code>, <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> and the rest. As shown above,
 <code>bmm_fit$formula</code> holds the <code>brmsformula</code> that <code>bmm</code> generated, and
 <code>stancode(bmm_fit)</code> the Stan code. <code>summary(bmm_fit, backend = "brms")</code> prints
-the <code>brms</code> summary instead of the <code>bmm</code> one. It lists the link of <code>theta1</code> as
-<code>identity</code>, because <code>brms</code> applies the softmax inside the mixture family. If you
+the <code>brms</code> summary instead of the <code>bmm</code> one. It shows the formula as <code>brms</code>
+received it, with <code>response_error ~ 1</code> and <code>mu ~ 1</code>, and it lists the fixed <code>mu</code>
+as a coefficient named <code>Intercept</code>, with the value 0 and no diagnostics. If you
 want to change a model beyond what <code>bmm</code> offers, these give you the <code>brms</code> code to start from.</p>
 </div>
 <div class="section level2" number="9">

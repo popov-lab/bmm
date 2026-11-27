@@ -54,9 +54,10 @@ real-data example. If you already have a model file for multiTree,
 MPTinR or TreeBUGS, jump to [Importing existing model
 definitions](#importing-existing-model-definitions); if you are coming
 from MPTinR or TreeBUGS, read [Specifying an MPT
-model](#specifying-an-mpt-model) first and then [Migrating from MPTinR
-or TreeBUGS](#migrating-from-mptinr-or-treebugs), which maps the
-functions of those packages onto `bmm`.
+model](#specifying-an-mpt-model) first and then the article [Coming from
+TreeBUGS or
+MPTinR](https://venpopov.com/bmm/articles/bmm_mpt_migration.html), which
+maps the functions of those packages onto `bmm`.
 
 ## 2 Specifying an MPT model
 
@@ -338,8 +339,9 @@ participant. Written as `(1 | id)` in each formula, the two person
 effects are independent of each other, which matches the simulation
 above: it draws `D` and `g` independently. A shared label, `(1 |p| id)`
 in both formulas, would estimate their correlation as well, which is the
-latent-trait model; [Migrating from MPTinR or
-TreeBUGS](#migrating-from-mptinr-or-treebugs) discusses these options.
+latent-trait model; the article [Coming from TreeBUGS or
+MPTinR](https://venpopov.com/bmm/articles/bmm_mpt_migration.html#function-and-argument-map)
+discusses these options.
 
 ``` r
 
@@ -1277,8 +1279,9 @@ simulated from the model rarely deviate from the expected covariances as
 much as the observed data do. The model keeps all person effects
 uncorrelated, so a participant with a high `Pi` in one condition is not
 expected to have a high `Pi` in the other conditions as well. Correlated
-person effects, `(0 + cond | ID)` or the `|p|` syntax described under
-[Migrating from MPTinR or TreeBUGS](#migrating-from-mptinr-or-treebugs),
+person effects, `(0 + cond | ID)` or the `|p|` syntax described in
+[Coming from TreeBUGS or
+MPTinR](https://venpopov.com/bmm/articles/bmm_mpt_migration.html#function-and-argument-map),
 are the first extension to try.
 
 With `level = "participant"`,
@@ -1605,150 +1608,31 @@ layout for
 [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md).
 Fitting them took two steps beyond the import: the nine guessing
 probabilities that the design fixes went into `restrictions`, and the
-wide frequency table was reshaped as shown under [Migrating from MPTinR
-or TreeBUGS](#migrating-from-mptinr-or-treebugs). With
-`links = "probit"` and correlated random effects across all parameters,
-the posterior means of the 18-parameter model lay inside the paper’s 95%
-credible intervals for all 18 group-level estimates of Experiment 1
-(Table 5). A re-run with the same settings (4 chains of 4000 iterations,
-1000 of them warmup) had 50 divergent transitions among its 12000
-post-warmup transitions (0.4%). Raising `adapt_delta` from 0.8 to 0.95
-with the same seed did not remove them (56 divergent), and the posterior
-means of these two runs differed by at most 0.0022. The paper reports
-none for the 12-parameter model, whose posterior means lay inside the
-95% intervals of a TreeBUGS fit of the same data.
+wide frequency table was reshaped with
+[`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md),
+as shown in [Coming from TreeBUGS or
+MPTinR](https://venpopov.com/bmm/articles/bmm_mpt_migration.html#the-data).
+With `links = "probit"` and correlated random effects across all
+parameters, the posterior means of the 18-parameter model lay inside the
+paper’s 95% credible intervals for all 18 group-level estimates of
+Experiment 1 (Table 5). A re-run with the same settings (4 chains of
+4000 iterations, 1000 of them warmup) had 50 divergent transitions among
+its 12000 post-warmup transitions (0.4%). Raising `adapt_delta` from 0.8
+to 0.95 with the same seed did not remove them (56 divergent), and the
+posterior means of these two runs differed by at most 0.0022. The paper
+reports none for the 12-parameter model, whose posterior means lay
+inside the 95% intervals of a TreeBUGS fit of the same data.
 
 ## 12 Migrating from MPTinR or TreeBUGS
 
-Importing the model structure is the easy part; what usually needs
-translating is the hierarchical structure, the priors, and the reporting
-conventions. The table maps the functions and arguments of MPTinR
-(Singmann and Kellen 2013) and TreeBUGS (Heck et al. 2018) onto their
-`bmm` counterparts.
-
-| MPTinR / TreeBUGS | `bmm` |
-|----|----|
-| model file (EQN, MPTinR text) | [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md), [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md), or [`mpt_tree()`](https://venpopov.com/bmm/dev/reference/mpt_tree.md) + [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md) |
-| wide data, one row per participant and one column per EQN category (`genTraitMPT()$data`) | long data, one row per participant and tree, with a `tree_id` column and one count column per shared response category ([Data format and simulation](#data-format-and-simulation)) |
-| frequencies per participant only; no item effects | one row per trial with `response =` (in [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), [`mpt_from_eqn()`](https://venpopov.com/bmm/dev/reference/mpt_from_eqn.md) and [`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)), and item effects such as `(1 | item)` ([Trial-level data and item effects](#trial-level-data-and-item-effects)) |
-| reshaping that wide data: named columns (TreeBUGS), or unnamed columns sorted by tree and label (MPTinR, `check.mpt()$eqn.order.categories`) | `mpt_data_reshape(wide, model)`, or `mpt_data_reshape(wide, model, columns = "mptinr")` |
-| `restrictions = list("Dn = Do", "g = 0.5")` (TreeBUGS; MPTinR takes the same list, or a file name, as `restrictions.filename`) | `mpt(..., restrictions = c("Dn = Do", "g = 0.5"))`; a fit-time constant is `bmf(g = 0.5)`. TreeBUGS’ `FE` has no restriction counterpart: leave the random effect out of that parameter’s formula |
-| `check.mpt()` | `print(model)`: parameters, trees, restrictions, the identifiability bound and a Jacobian rank check ([Specifying an MPT model](#specifying-an-mpt-model)) |
-| `fit.mpt()`, `betaMPT()`, `traitMPT()` | [`bmm()`](https://venpopov.com/bmm/dev/reference/bmm.md) with the random-effect structure written in the formula (see below) |
-| `traitMPT(..., predStructure = )`, `covData` | predictors in the parameter formulas, e.g. `D ~ 0 + cond + (1 | id)` |
-| `transformedParameters` | [`brms::hypothesis()`](https://paulbuerkner.com/brms/reference/hypothesis.brmsfit.html), or arithmetic on the posterior draws |
-| `getParam(fit, "theta")` | `native_parameters(fit, pars = "D", summary = TRUE)` |
-| `getParam(fit, "mean")` | `native_parameters(fit, re_formula = NA, summary = TRUE)`: the probability of the median participant, as in TreeBUGS ([Population-level probabilities](#population-level-probabilities)) |
-| `probitInverse()` | [`?native_parameters`](https://venpopov.com/bmm/dev/reference/native_parameters.md), section “Group-level effects” |
-| `genTraitMPT()`, `genBetaMPT()` | [`rmpt()`](https://venpopov.com/bmm/dev/reference/mptdist.md) inside a small simulation function ([Data format and simulation](#data-format-and-simulation)) |
-| `PPP()` | [`ppp()`](https://venpopov.com/bmm/dev/reference/ppp.md): \\T_1\\ and \\T_2\\ with their posterior predictive p-values, and with `level = "participant"` the \\T_1\\ of each participant ([Goodness of fit: T1 and T2](#goodness-of-fit-t1-and-t2)); [`pp_check()`](https://venpopov.com/bmm/dev/reference/pp_check.bmmfit.md) for the plot |
-| [`WAIC()`](https://paulbuerkner.com/brms/reference/waic.brmsfit.html), `select.mpt()` | [`loo()`](https://mc-stan.org/loo/reference/loo.html), [`waic()`](https://mc-stan.org/loo/reference/waic.html) and [`bayes_factor()`](https://rdrr.io/pkg/bridgesampling/man/bf.html) from **brms**; for aggregated counts see [Model comparison](#model-comparison) before using any of them |
-| `testHetChi()`, `testHetPerm()` | these test raw frequencies before any model is fitted: run them in TreeBUGS on the wide data. In `bmm`, compare models with and without person effects ([Model comparison](#model-comparison)) |
-| `BayesFactorMPT()`, `BayesFactorSlope()` | [`brms::bayes_factor()`](https://rdrr.io/pkg/bridgesampling/man/bf.html) on fits stored with `save_pars = save_pars(all = TRUE)` ([Model comparison](#model-comparison)) |
-
-**The data change from wide to long.** A frame in the layout of
-`genTraitMPT()`’s `data`, one row per participant and one column per EQN
-category, becomes one row per participant and tree, with the counts
-under the shared response categories.
-[`mpt_data_reshape()`](https://venpopov.com/bmm/dev/reference/mpt_data_reshape.md)
-does the reshape for the imported model, matching the columns by the
-category labels of the EQN file; columns that are no counts, such as a
-between-participant factor, are carried to every row, and `id =` names
-the participant column (without it, the rows are numbered):
-
-``` r
-
-wide <- data.frame(target_hit = c(40, 35), target_miss = c(10, 15),
-                   lure_fa = c(8, 12), lure_cr = c(42, 38))
-long <- mpt_data_reshape(wide, model_eqn)
-long
-#>   id item_type old new
-#> 1  1    target  40  10
-#> 2  1      lure   8  42
-#> 3  2    target  35  15
-#> 4  2      lure  12  38
-```
-
-MPTinR data for an EQN model are unnamed. Their columns are sorted by
-tree and then by category label, the order of
-`check.mpt()$eqn.order.categories`; `columns = "mptinr"` reads them in
-that order. The row sums are the trials per row, but they cannot show
-swapped columns, so compare one participant’s long rows with the wide
-row and run
-[`bmm_data_check()`](https://venpopov.com/bmm/dev/reference/bmm_data_check.md)
-before fitting (the identifiability warning it prints is the single-test
-2HTM result discussed above):
-
-``` r
-
-wide_mptinr <- unname(as.matrix(wide[c("lure_cr", "lure_fa", "target_hit", "target_miss")]))
-identical(mpt_data_reshape(wide_mptinr, model_eqn, columns = "mptinr"), long)
-#> [1] TRUE
-bmm_data_check(bmf(Do ~ 1, Dn ~ 1, g ~ 1), long, model_eqn)
-```
-
-``` fansi
-#> Pre-fit data check
-#> Model: mpt_from_eqn(file = eqn_file, categories = c(target_hit = "old", lure_fa = "old", target_miss = "new", lure_cr = "new"), tree_id = "item_type") 
-#> Data:  4 rows, 200 trials ('long') 
-#> 
-#> Response variables:
-#>   old  numeric with 4 unique values: 8, 12, 35, 40 (expected: counts per
-#>        response category)
-#>   new  numeric with 4 unique values: 10, 15, 38, 42 (expected: counts per
-#>        response category)
-#> 
-#> Findings: No issues detected.
-#> 
-#> Hard checks: passed with 1 warning(s):
-#>   ! The model is not identified. Jacobian rank 2 of 3 at interior test values:
-#>     the combination of all free parameters is not identified by the branch
-#>     expressions. Along the non-identified direction(s), the posterior follows
-#>     the prior.
-```
-
-For a model from
-[`mpt_from_string()`](https://venpopov.com/bmm/dev/reference/mpt_from_string.md)
-or [`mpt()`](https://venpopov.com/bmm/dev/reference/mpt.md), name the
-columns `<tree>.<category>` instead, e.g. `target.old`.
-
-**The random-effect structure is written as a formula, not chosen from a
-menu.** The two families of hierarchical MPT models map onto the `|` and
-`||` operators, and the choice is per parameter:
-
-- `D ~ 0 + condition + (1 | participant:condition)`: independent person
-  effects per condition with one shared standard deviation.
-- `D ~ 0 + condition + (0 + condition || participant)`: one standard
-  deviation per condition, uncorrelated across conditions. The beta-MPT
-  of TreeBUGS also keeps person effects independent, but across
-  parameters and with a beta distribution on the probability scale;
-  `bmm` has no exact counterpart to it.
-- `D ~ 0 + condition + (0 + condition | participant)`: one standard
-  deviation per condition plus the full correlation matrix, that is, the
-  latent-trait approach of Klauer (2010).
-
-The last of these, combined with `links = "probit"`, is the model
-TreeBUGS fits with `traitMPT()`. Correlations *across* parameters, the
-defining feature of the latent-trait model, are requested with the `|p|`
-syntax of **brms**: `D ~ 1 + (1 |p| id)` and `g ~ 1 + (1 |p| id)` share
-one correlation matrix. Nothing forces `D` and `g` to share a
-random-effect structure, and parameters that only exist in one condition
-can simply take `(1 | participant)`.
-
-**Priors need converting from precision to standard deviation.** JAGS
-parameterizes the normal distribution by precision, Stan by standard
-deviation, so a JAGS `dnorm(0, 0.1)` on a latent-scale parameter becomes
-`normal(0, 3.1623)` in `bmm` (\\1/\sqrt{0.1}\\). Gamma priors carry over
-unchanged: JAGS `dgamma(1, 0.1)` on a random-effect standard deviation
-is `gamma(1, 0.1)` here, since both use the shape/rate parameterization.
-
-**Group-level estimates are reported on the latent scale.** TreeBUGS
-reports group means as probabilities, namely the probability of the
-median participant. To get there from a `bmm` fit, use
-`native_parameters(fit, re_formula = NA, summary = TRUE)`, as shown
-under [Population-level probabilities](#population-level-probabilities);
-it applies the inverse link to the linear predictor, which also covers
-the probit link and models with predictors.
+The article [Coming from TreeBUGS or
+MPTinR](https://venpopov.com/bmm/articles/bmm_mpt_migration.html) maps
+the functions and arguments of MPTinR (Singmann and Kellen 2013) and
+TreeBUGS (Heck et al. 2018) onto `bmm`: model files and restrictions,
+the reshaping of their wide frequency tables, the random-effect
+structures, priors and reported estimates. It also fits a data set that
+ships with TreeBUGS in all three packages and shows the estimates side
+by side.
 
 ## References
 

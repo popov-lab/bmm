@@ -12,6 +12,7 @@ articles:
   articles/bmm_imm: bmm_imm.html
   articles/bmm_m3: bmm_m3.html
   articles/bmm_mixture_models: bmm_mixture_models.html
+  articles/bmm_mpt_migration: bmm_mpt_migration.html
   articles/bmm_mpt: bmm_mpt.html
   articles/bmm_rt_contamination: bmm_rt_contamination.html
   articles/bmm_sdm_simple: bmm_sdm_simple.html
@@ -19,7 +20,7 @@ articles:
   articles/bmm_sdt: bmm_sdt.html
   articles/bmm_vwm_crt: bmm_vwm_crt.html
   articles/bmm: bmm.html
-last_built: 2026-11-27T13:00Z
+last_built: 2026-11-27T13:14Z
 urls:
   reference: https://venpopov.com/bmm/reference
   article: https://venpopov.com/bmm/articles

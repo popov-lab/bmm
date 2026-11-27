@@ -696,6 +696,14 @@
 
 #### Documentation
 
+- The article “From brms to bmm” now describes
+  [`mixture2p()`](https://venpopov.com/bmm/dev/reference/mixture2p.md)
+  as a bmm family: it has the same likelihood and the same priors as the
+  brms mixture it is compared with, but its own Stan code, so the two
+  fits agree up to sampling noise. It also explains that under
+  `1 + setsize` the default intercept prior applies at the mean of the
+  predictors, not to the reference cell
+  ([\#681](https://github.com/popov-lab/bmm/issues/681)).
 - bmm now follows a written lifecycle policy. A deprecated function or
   argument keeps working, with a warning that names its replacement and
   the earliest release that may remove it, for at least one minor
@@ -713,6 +721,11 @@
   `sd_default`, `init` and `links` case, and it lists
   `tests/testthat/test-model_<name>.R` for the model’s own tests
   ([\#580](https://github.com/popov-lab/bmm/issues/580)).
+- New article “Coming from TreeBUGS or MPTinR”: it fits the `arnold2013`
+  source-monitoring data of TreeBUGS in TreeBUGS, MPTinR and bmm, shows
+  the three sets of estimates side by side and where the priors make
+  them differ, and maps the functions of both packages onto bmm. The
+  mapping table moved there from the MPT article.
 
 ## bmm 1.4.2
 
