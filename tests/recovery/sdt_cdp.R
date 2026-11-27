@@ -1,6 +1,6 @@
 # Recovery plan for sdt_cdp() (continuous dual-process, Wixted & Mickes 2010)
 # on one row per trial (ADR 0006): the remember / know / new judgment and its
-# confidence on the unified scale, with 3 "new" and 3 "old" confidence levels
+# confidence on the unified scale, with 2 "new" and 4 "old" confidence levels
 # and the default "parsimonious" thresholds. The generators run the observer
 # forward and share no code with bmm: each trial draws a familiarity F and a
 # recollection R from independent normals with SD 1 (the defaults sigmar = 0,
@@ -13,8 +13,11 @@
 # that threshold n_new is the criterion. bmm computes the category
 # probabilities from bivariate-normal masses, so an error in dsdt_cdp(),
 # rsdt_cdp() or the Stan likelihood does not cancel.
-sdt_cdp_n_new <- 3L
-sdt_cdp_n_old <- 3L
+# Unequal on purpose: with as many "new" as "old" levels the shift
+# log(n_new / (K - n_new)) is 0, and a likelihood that left it out or took it
+# from n_old would fit these data exactly as well.
+sdt_cdp_n_new <- 2L
+sdt_cdp_n_old <- 4L
 
 # judgment and confidence; one value of each parameter per trial
 sdt_cdp_respond <- function(stimulus, dfam, drec, criterion, spacing, rcrit,
@@ -82,7 +85,7 @@ bmmtools::validation_plan(
   # all below the prior's mean SD (exponential(1) for dfam and drec,
   # exponential(2), mean 0.5, for the rest)
   sds = c(dfam = 0.3, drec = 0.3, criterion = 0.3, spacing = 0.15, rcrit = 0.3),
-  # bmmtools' default grid plus 600 trials: nine response categories and five
+  # bmmtools' default grid plus 600 trials: ten response categories and five
   # free parameters per subject; the 600-trial rows are the costly ones (about
   # 30000 rows per fit at 50 subjects)
   grid = expand.grid(n_subjects = c(20L, 50L), n_trials = c(30L, 100L, 300L, 600L)),
